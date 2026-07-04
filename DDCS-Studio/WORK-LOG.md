@@ -96,3 +96,24 @@ The GUI writes only DECLARED stores — settings.atc.magazine (generic), .pickup
 **NOT a deeper FeatureCanvas limitation** (per the dispatch's FLAG-if clause): the drawing primitives (grid/pan/zoom/handles/fit) are frame-agnostic; only the origin-marker semantics were part-specific, so a clean opt-in machine-frame mode was the right, minimal fix (no fork needed).
 
 **PASSED BACK for advisor review + human eyes on the frame screenshot. SIM-FRAME axis; authoring stays disjoint. Zero controller write. NEXT per plan: GUI-2 (numeric/parametric — disk Ø+count / linear length+count → computed pockets, firmware numeric fields, canvas = read-back).**
+
+## 🔨 turn 205 (cycle 13) — GUI-2: NUMERIC + PARAMETRIC ATC-setup controls (human t200 REDIRECT: "shouldn't be a drag but a xy coord field — we need PRECISION" + pattern params disk Ø / linear length / count). SIM/UI only, emit reflects config (firmware store SIM-only → firmware emit BYTE-IDENTICAL). Full suite 566 pass / 2 skip / 0 fail (grew 565→568 with 3 new tests; NO flake this run). 3 files.
+
+**REDIRECT HONORED — numeric is now the PRIMARY precise editor; the canvas (FRAME-FIX) is a live READ-BACK + the drag stays as an OPTIONAL COARSE adjunct (not removed).** Grounded first: the magazine table (renderMagazineTable) ALREADY had disk (pickup XY + Ø + count) + a linear pitch-fill + per-pocket XY — so I REUSED those (surgical) and built the real gap: the FIRMWARE STATION had NO numeric fields (GUI-1 made it drag-only — exactly the human's complaint).
+
+**PIECES (3 files):**
+1. `ui/settingsPanel.js` — a NEW "FIRMWARE PUSH STATION (O10102 · #1306/#1320-1326)" section in the ATC tab: 7 NUMERIC fields — push-start X/Y, push-end X/Y, retreat X/Y, safe-Z — writing settings.atc.firmwareStation. `renderAtcSetup` fills all 7 from the store; a shared `fwFieldSet` materializes the station (from the on-canvas defaults, so store+canvas+seed stay coherent) then sets the EXACT typed value → the canvas read-back + the var-seed'd sim reflect it. Reframed the MACHINE-FRAME LAYOUT hint (numeric = precise; canvas = read-back + coarse drag). SIM-only (nothing pushed to the controller).
+2. `ui/ioTable.js` (magazine table) — the linear pattern fill is now LENGTH-based (the human's word): origin = P1, **Length** over the pocket COUNT → pitch = length ÷ (count − 1), evenly-spaced (was a fixed pitch). Persists atc._lineAxis/_lineLength; added stable data-attrs (data-atc-count / data-atc-len / data-atc-line-axis / data-atc-fill) for precise targeting. Disk Ø + count (Carousel Ø + Pockets) unchanged — magazinePockets already lays the ring from Ø + count + pickup.
+3. `tests/atc-setup-numeric.spec.js` (NEW, 3 tests, real UI gestures + value-asserts).
+
+**ONE-SOURCE:** params + pockets + firmware store all in settings.atc; the canvas + the numeric fields/table + the sim all REFLECT it — the per-pocket table stays as the irregular/precision OVERRIDE.
+
+**VERIFIED REAL SYMPTOM (assert the VALUE, driven through the real Settings UI):**
+- LINEAR — 4 pockets, origin P1 (10,5,-50), set Length=90 + axis=X + click Fill → pockets at x = [10, 40, 70, 100] (pitch 30 = 90÷3), y/z carried from P1. Even-spacing math asserted against the independent length÷(count−1).
+- DISK — pickup (150,100), Ø=120, set the COUNT field = 8 → 8 magazine rows; magazinePockets lays 8 ring positions each at radius 60 (Ø/2) from the carousel centre. count + radius asserted.
+- FIRMWARE — type push-start 321/222, push-end 340/222, safe-Z −15 in the FIELDS → settings.atc.firmwareStation holds the EXACT values; then the firmware wizard's 3D station region (viz._station) renders start=(321,222), end.x=340, z=−15 — the typed coords var-seed the sim end-to-end (precision, the redirect's core).
+- Screenshot scratchpad/atc-setup-numeric.png (canvas read-back + the 7 firmware fields + the parametric magazine table) opened in a VS Code tab.
+
+**BLAST:** UI-only (Settings ATC tab + the store). Full suite 566 pass — goldens + atc-roundtrip GREEN (no emit path touched → BYTE-PARITY, incl. firmware byte-identical); the atc-setup-canvas (GUI-1/FRAME-FIX) 4 specs still green; project-drawer-smoke PASSED this run (the prior flake didn't recur). No FeatureCanvas change this turn.
+
+**PASSED BACK for advisor review + human eyes on the numeric screenshot. SIM-FRAME axis; authoring disjoint. Zero controller write. NEXT per plan: the TOOL-SETTER MODEL → GUI-3 (the pin-picker) → GUI-4 (the gated controller pull/push, FORK 2 to the human).**

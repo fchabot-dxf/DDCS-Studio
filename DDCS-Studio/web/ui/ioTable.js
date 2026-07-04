@@ -169,7 +169,7 @@ export function renderMagazineTable(container, atc, onChange) {
     [['straight', 'Straight / linear'], ['disk', 'Disk / carousel']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((atc.magType || 'straight') === v) o.selected = true; typeSel.appendChild(o); });
     typeSel.addEventListener('change', () => { atc.magType = typeSel.value; onChange(); rerender(); });
     ctl.appendChild(field('Magazine type', typeSel, 150));
-    const cnt = document.createElement('input'); cnt.type = 'number'; cnt.min = '0'; cnt.max = '99'; cnt.value = atc.magazine.length;
+    const cnt = document.createElement('input'); cnt.type = 'number'; cnt.min = '0'; cnt.max = '99'; cnt.value = atc.magazine.length; cnt.setAttribute('data-atc-count', '');
     cnt.addEventListener('change', () => {
         const n = Math.max(0, Math.min(99, parseInt(cnt.value, 10) || 0));
         while (atc.magazine.length < n) { const k = atc.magazine.length + 1; atc.magazine.push({ pocket: k, tool: '', name: '', x: '', y: '', z: '' }); }
@@ -216,25 +216,28 @@ export function renderMagazineTable(container, atc, onChange) {
     COLS.forEach(([h, w]) => { const s = document.createElement('span'); s.textContent = h; s.style.width = w + 'px'; head.appendChild(s); });
     container.appendChild(head);
 
-    // Linear racks sit on a LINE: keep pocket 1, then step each pocket by a fixed pitch along one axis. The
-    // controller still stores each pocket individually (#1330+ tables, usually taught by jogging / pulled), so
-    // you can fine-tune any row after — this just saves typing the evenly-spaced ones.
+    // Linear racks sit on a LINE — a PARAMETRIC fill (regular = the common case): keep pocket 1 as the origin, then
+    // evenly space the rest over a total LENGTH along one axis (pitch = length ÷ (count − 1)). The controller still
+    // stores each pocket individually (#1330+ tables, usually taught by jogging / pulled), so you can fine-tune any
+    // row after (the irregular override) — this just saves typing the evenly-spaced ones.
     if (!isDisk && atc.magazine.length > 1) {
         const lf = document.createElement('div');
         lf.style.cssText = 'display:flex; gap:8px; align-items:flex-end; margin:6px 0 4px; flex-wrap:wrap;';
-        const axSel = document.createElement('select');
-        [['x', 'X'], ['y', 'Y'], ['z', 'Z']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; axSel.appendChild(o); });
-        const pitch = document.createElement('input'); pitch.type = 'number'; pitch.step = '1'; pitch.value = atc._linePitch ?? 50;
-        pitch.addEventListener('change', () => { atc._linePitch = Number(pitch.value) || 0; });
-        const btn = document.createElement('button'); btn.className = 'toolbar-btn settings-io'; btn.textContent = '↳ Fill line from P1';
-        btn.title = 'Pockets are on a line: keep pocket 1, then step each pocket by the pitch along the axis. Edit any row after, or Pull the taught positions from the controller.';
+        const axSel = document.createElement('select'); axSel.setAttribute('data-atc-line-axis', '');
+        [['x', 'X'], ['y', 'Y'], ['z', 'Z']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((atc._lineAxis || 'x') === v) o.selected = true; axSel.appendChild(o); });
+        axSel.addEventListener('change', () => { atc._lineAxis = axSel.value; });
+        const len = document.createElement('input'); len.type = 'number'; len.step = '1'; len.min = '0'; len.value = atc._lineLength ?? ''; len.setAttribute('data-atc-len', '');
+        len.addEventListener('change', () => { atc._lineLength = len.value === '' ? '' : Number(len.value); });
+        const btn = document.createElement('button'); btn.className = 'toolbar-btn settings-io'; btn.textContent = '↳ Fill line from P1'; btn.setAttribute('data-atc-fill', '');
+        btn.title = 'Regular rack: keep pocket 1 as the origin, then evenly space the rest over LENGTH along the axis (pitch = length ÷ (count − 1)). Edit any row after for an irregular pocket, or Pull the taught positions from the controller.';
         btn.addEventListener('click', () => {
-            const ax = axSel.value, pp = Number(pitch.value) || 0, p0 = atc.magazine[0];
-            atc.magazine.forEach((row, i) => { if (i === 0) return; row.x = p0.x; row.y = p0.y; row.z = p0.z; row[ax] = (Number(p0[ax]) || 0) + i * pp; });
+            const ax = axSel.value, n = atc.magazine.length, L = Number(len.value) || 0, p0 = atc.magazine[0];
+            const pp = n > 1 ? L / (n - 1) : 0;
+            atc.magazine.forEach((row, i) => { if (i === 0) return; row.x = p0.x; row.y = p0.y; row.z = p0.z; row[ax] = Math.round(((Number(p0[ax]) || 0) + i * pp) * 1000) / 1000; });
             onChange(); rerender();
         });
         lf.appendChild(field('Line axis', axSel, 56));
-        lf.appendChild(field('Pitch (mm)', pitch, 70));
+        lf.appendChild(field('Length (mm)', len, 80));
         lf.appendChild(btn);
         container.appendChild(lf);
     }

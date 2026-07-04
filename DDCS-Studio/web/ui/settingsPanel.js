@@ -1044,9 +1044,21 @@ function buildSettingsOverlay() {
                     <div id="set_atc_magazine_wrap" style="display:none">
                         <div class="settings-section">
                             <div class="settings-section-title">MACHINE-FRAME LAYOUT</div>
-                            <div class="settings-hint">Top-down of the machine envelope — <b>drag</b> the pockets, the disk pickup, and the firmware push-station points (start → end → retreat) into place instead of typing machine coords. Positions write to the magazine + station below. Sim-side only — nothing is written to the controller.</div>
+                            <div class="settings-hint">A live top-down read-back of the machine frame — the numeric fields below (and the magazine table) are the <b>precise</b> editor; you can also <b>drag</b> a point here for a coarse adjust. Sim-side only — nothing is written to the controller.</div>
                             <div id="atc_setup_canvas" style="width:100%; height:300px; border:1px solid var(--border,#39424e); border-radius:6px; background:var(--panel-2,#12161c); touch-action:none;"></div>
-                            <label class="settings-row" style="margin-top:8px; gap:6px; align-items:center;">Firmware safe-Z (mm · #1306)<input type="number" id="atc_fw_safez" step="0.1" class="num-input" style="width:100px;"></label>
+                        </div>
+                        <div class="settings-section">
+                            <div class="settings-section-title">FIRMWARE PUSH STATION&nbsp;&nbsp;(O10102 · #1306 / #1320-1326)</div>
+                            <div class="settings-hint">Type the taught push-station machine coords for precision (the canvas above shows them). Var-seeds the sim so the station renders — the firmware macro still references the controller's own #1320-1326, so nothing is pushed to the machine.</div>
+                            <div class="settings-grid">
+                                <label>Push-start X<input type="number" id="atc_fw_sx" step="0.1" class="num-input"></label>
+                                <label>Push-start Y<input type="number" id="atc_fw_sy" step="0.1" class="num-input"></label>
+                                <label>Push-end X<input type="number" id="atc_fw_ex" step="0.1" class="num-input"></label>
+                                <label>Push-end Y<input type="number" id="atc_fw_ey" step="0.1" class="num-input"></label>
+                                <label>Retreat X<input type="number" id="atc_fw_rx" step="0.1" class="num-input"></label>
+                                <label>Retreat Y<input type="number" id="atc_fw_ry" step="0.1" class="num-input"></label>
+                                <label>Safe-Z (#1306)<input type="number" id="atc_fw_safez" step="0.1" class="num-input"></label>
+                            </div>
                         </div>
                         <div class="settings-section">
                             <div class="settings-section-title">TOOL MAGAZINE</div>
@@ -2209,26 +2221,27 @@ function wireSettingsOverlay(ov) {
         saveSettings();
     }
 
-    // Render BOTH ATC magazine views from the ONE source (settings.atc): the numeric magazine table + the machine-frame
-    // DRAG canvas (GUI-1). A drag on the canvas or an edit in the table persists (atcOnChangeFull) and refreshes both.
+    // Render the ATC setup from the ONE source (settings.atc): the machine-frame canvas (read-back + coarse drag),
+    // the firmware push-station NUMERIC fields (the precise editor), and the numeric magazine table. An edit anywhere
+    // persists (atcOnChangeFull) and refreshes them all.
+    const FW_XY = [['atc_fw_sx', 'pushStart', 'x'], ['atc_fw_sy', 'pushStart', 'y'], ['atc_fw_ex', 'pushEnd', 'x'], ['atc_fw_ey', 'pushEnd', 'y'], ['atc_fw_rx', 'retreat', 'x'], ['atc_fw_ry', 'retreat', 'y']];
     function renderAtcSetup() {
         const table = ov.querySelector('#atc_magazine');
         const canvas = ov.querySelector('#atc_setup_canvas');
         if (table) renderMagazineTable(table, _ddcsSettings.atc, atcOnChangeFull);
         if (canvas) renderAtcSetupCanvas(canvas, { atc: _ddcsSettings.atc, machine: _ddcsSettings.machine || {}, onChange: atcOnChangeFull });
-        const sz = ov.querySelector('#atc_fw_safez');
         const fw = _ddcsSettings.atc && _ddcsSettings.atc.firmwareStation;
-        if (sz) sz.value = fw && fw.safeZ != null ? fw.safeZ : '';
+        const setF = (id, v) => { const e = ov.querySelector('#' + id); if (e) e.value = (v == null ? '' : v); };
+        FW_XY.forEach(([id, grp, ax]) => setF(id, fw && fw[grp] ? fw[grp][ax] : null));
+        setF('atc_fw_safez', fw ? fw.safeZ : null);
     }
     function atcOnChangeFull() { atcOnChange(); renderAtcSetup(); }
-    // Firmware safe-Z (#1306) — a top-down drag can't set Z, so it's a plain field. Setting it materializes the station
-    // store (from the on-canvas defaults) so the store, the canvas points and the var-seed all agree.
-    { const sz = ov.querySelector('#atc_fw_safez'); if (sz) sz.addEventListener('change', () => {
-        const a = _ddcsSettings.atc; if (!a) return;
-        a.firmwareStation = a.firmwareStation || defaultFirmwareStation(_ddcsSettings.machine || {});
-        a.firmwareStation.safeZ = sz.value === '' ? null : Number(sz.value);
-        saveSettings(); renderAtcSetup();
-    }); }
+    // Firmware push-station fields (the PRECISE numeric editor; the canvas is a read-back + coarse drag). Typing a
+    // coord materializes the station store from the on-canvas defaults (so the whole station + var-seed stay coherent),
+    // then sets the exact value → the canvas + the sim reflect it. SIM-only: nothing is written to the controller.
+    function fwFieldSet(mut) { const a = _ddcsSettings.atc; if (!a) return; a.firmwareStation = a.firmwareStation || defaultFirmwareStation(_ddcsSettings.machine || {}); mut(a.firmwareStation); saveSettings(); renderAtcSetup(); }
+    FW_XY.forEach(([id, grp, ax]) => { const e = ov.querySelector('#' + id); if (e) e.addEventListener('change', () => fwFieldSet((st) => { st[grp] = st[grp] || {}; st[grp][ax] = e.value === '' ? 0 : Number(e.value); })); });
+    { const sz = ov.querySelector('#atc_fw_safez'); if (sz) sz.addEventListener('change', () => fwFieldSet((st) => { st.safeZ = sz.value === '' ? null : Number(sz.value); })); }
 
 }
 
