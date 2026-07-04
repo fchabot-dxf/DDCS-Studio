@@ -1,8 +1,9 @@
 // ATC generators → execution-engine round trip (no browser needed).
 // Every generated macro must: pass verifySyntax, and RUN to completion in the
 // simulator with Auto sensors — proving the sensor-wait logic is coherent
-// (M154/M155 drawbar + M300/M302/M303 waits answered by the truth table /
-// virtual sensors), not just syntactically valid.
+// (M154/M155 drawbar + M300/M301/M302 waits answered by the truth table /
+// virtual sensors), not just syntactically valid. Sensor pins per the ATC_DIALECT
+// ground truth: M301 → IN_DRAWBAR_OPEN (released), M302 → IN_DRAWBAR_CLOSED (clamped).
 import { GcodeExecutionEngine } from '../web/engine/GcodeExecutionEngine.js';
 import { AtcChangeWizard } from '../web/wizards/atcChangeWizard.js';
 import { AtcTestWizard } from '../web/wizards/atcTestWizard.js';
@@ -42,7 +43,7 @@ function runToEnd(name, code, { timeoutMs = 30000 } = {}) {
     const code = change.generate({ mode: 'auto', zClear: 0, capacity: 8, fixedT: 3, waitSpindle: true });
     const { eng, statuses } = await runToEnd('auto-change T3', code);
     if (eng.vars.get(1300) !== 3) throw new Error(`auto-change: #1300 = ${eng.vars.get(1300)}, expected 3`);
-    if (!statuses.some((s) => s.includes('IN_TOOL_LOCKED'))) throw new Error('auto-change: never waited on the tool-locked sensor');
+    if (!statuses.some((s) => s.includes('IN_DRAWBAR_CLOSED'))) throw new Error('auto-change: never waited on the drawbar-clamped sensor');
     console.log('case1 OK — auto change (empty spindle) picked up T3, #1300=3, sensors exercised.');
 }
 
@@ -79,9 +80,9 @@ function runToEnd(name, code, { timeoutMs = 30000 } = {}) {
 {
     const code = test.generate({ mode: 'drawbar', cycles: 3, dwellMs: 50 });
     const { statuses } = await runToEnd('drawbar test x3', code);
-    const opens = statuses.filter((s) => s.includes('waiting for IN_TOOL_OPEN') || s.includes('IN_TOOL_OPEN is ON')).length;
-    const locks = statuses.filter((s) => s.includes('waiting for IN_TOOL_LOCKED') || s.includes('IN_TOOL_LOCKED is ON')).length;
-    if (opens < 3 || locks < 3) throw new Error(`drawbar: sensor waits open=${opens} lock=${locks}, expected >=3 each`);
+    const opens = statuses.filter((s) => s.includes('waiting for IN_DRAWBAR_OPEN') || s.includes('IN_DRAWBAR_OPEN is ON')).length;
+    const locks = statuses.filter((s) => s.includes('waiting for IN_DRAWBAR_CLOSED') || s.includes('IN_DRAWBAR_CLOSED is ON')).length;
+    if (opens < 3 || locks < 3) throw new Error(`drawbar: sensor waits released=${opens} clamped=${locks}, expected >=3 each`);
     console.log('case5 OK — drawbar test ran 3 release/lock cycles with sensor verification.');
 }
 

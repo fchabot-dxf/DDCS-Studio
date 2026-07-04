@@ -21,6 +21,32 @@ import { passAnchorFor } from './passAnchor.js';   // t94/t107 — the probe-col
 // tool coord for any dialect instead of an unset 0. (A live PC-bridge store proxies the real DRO → guarded off there.)
 const DRO_BASES = [880, 1500, 864, 5420];
 
+// The DDCS Expert M350 ATC dialect as ONE declarative table (M-code → {kind, pin, state}). GROUND TRUTH =
+// bridge/controllers/expert-m350/DDCS-ATC-WORKFLOW.md §Sensors (M300 spindle-stopped · M301/M302 drawbar released/
+// clamped · M303/M304 magazine open/closed · M305/M306 gripper open/closed) + §Outputs (M154/M155 drawbar release/lock
+// · M162/M163 dust-cover open/close · M150/M151 gripper open/close). 'wait' parks until a virtualIO INPUT reaches
+// `state`; 'output' drives a virtualIO OUTPUT to `state` (its truth-table handshake then flips the paired sensor).
+// Every pin is a REAL virtualIO pin. This REPLACES the old split ATC_WAITS + the hand-rolled M154/155/M305/306 if-else,
+// which had NO M301 (a silent no-op), mislabelled M303/304 as tool-open/closed, and drove M305/306 as a dust-cover
+// OUTPUT (they are gripper WAITS). Drawbar out reuses the spindle-clamp pins (OUT_SPINDLE_UNCLAMP→IN_DRAWBAR_OPEN etc.).
+export const ATC_DIALECT = {
+    // OUTPUTS — drive a solenoid/valve; the virtualIO handshake confirms the paired sensor
+    154: { kind: 'output', pin: 'OUT_SPINDLE_UNCLAMP', state: true, label: 'drawbar release' },   // → IN_DRAWBAR_OPEN (M301)
+    155: { kind: 'output', pin: 'OUT_SPINDLE_CLAMP', state: true, label: 'drawbar lock' },         // → IN_DRAWBAR_CLOSED (M302)
+    162: { kind: 'output', pin: 'OUT_DUST_COVER', state: true, label: 'dust cover open' },         // → IN_DUST_COVER_OPEN
+    163: { kind: 'output', pin: 'OUT_DUST_COVER', state: false, label: 'dust cover close' },        // → IN_DUST_COVER_OPEN clears
+    150: { kind: 'output', pin: 'OUT_GRIPPER_OPEN', state: true, label: 'gripper open' },          // → IN_GRIPPER_OPEN (M305)
+    151: { kind: 'output', pin: 'OUT_GRIPPER_CLOSE', state: true, label: 'gripper close' },        // → IN_GRIPPER_CLOSED (M306)
+    // WAITS — park until the sensor reaches `state`
+    300: { kind: 'wait', pin: 'IN_SPINDLE_STOPPED', state: true, label: 'spindle stopped' },
+    301: { kind: 'wait', pin: 'IN_DRAWBAR_OPEN', state: true, label: 'drawbar released' },
+    302: { kind: 'wait', pin: 'IN_DRAWBAR_CLOSED', state: true, label: 'drawbar clamped' },
+    303: { kind: 'wait', pin: 'IN_MAG_OPEN', state: true, label: 'magazine open' },
+    304: { kind: 'wait', pin: 'IN_MAG_CLOSED', state: true, label: 'magazine closed' },
+    305: { kind: 'wait', pin: 'IN_GRIPPER_OPEN', state: true, label: 'gripper open' },
+    306: { kind: 'wait', pin: 'IN_GRIPPER_CLOSED', state: true, label: 'gripper closed' },
+};
+
 export class GcodeExecutionEngine {
     constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
@@ -762,14 +788,6 @@ export class GcodeExecutionEngine {
             if (this.autoAnswer) this._scheduleAutoAnswer(pinName, target);
             return true;
         };
-        // DDCS ATC sensor waits: M-code -> [semantic pin, wanted state]
-        const ATC_WAITS = {
-            300: ['IN_SPINDLE_STOPPED', true],   // M300 wait spindle stopped
-            302: ['IN_TOOL_LOCKED', true],       // M302 wait tool locked
-            303: ['IN_TOOL_OPEN', true],         // M303 wait tool open (collet released)
-            304: ['IN_TOOL_CLOSED', true],       // M304 wait tool closed
-        };
-
         let waiting = false;
         let homedMove = null;       // M98 P501 X<N> native home — { axis, machine } resolved below, applied after the wait guard
         let wasNativeHome = false;  // any M98 P501 home line — short-circuit so its X-word (axis index) is never read as a coord
@@ -787,16 +805,16 @@ export class GcodeExecutionEngine {
                 setVirtualOutput('OUT_SPINDLE', true);    // spindle-stopped sensor drops
             } else if (m === 5) {
                 setVirtualOutput('OUT_SPINDLE', false);   // spin-down → stopped sensor confirms
-            } else if (m === 154 || m === 155) {
-                // Drawbar: M154 release / M155 lock (output port = controller param #1250)
-                setVirtualOutput('OUT_TOOL_RELEASE', m === 154);
-                this._setStatus(`M${m} → drawbar ${m === 154 ? 'RELEASE' : 'LOCK'}`, true);
-            } else if (m === 305 || m === 306) {
-                setVirtualOutput('OUT_DUST_COVER', m === 305);
-                this._setStatus(`M${m} → dust cover ${m === 305 ? 'OPEN' : 'CLOSE'}`, true);
-            } else if (ATC_WAITS[m]) {
-                const [pinName, target] = ATC_WAITS[m];
-                if (waitForInput(m, null, pinName, target)) waiting = true;
+            } else if (ATC_DIALECT[m]) {
+                // DDCS ATC dialect (drawbar / dust cover / gripper outputs + sensor waits) — ONE declared table, ground-
+                // truthed to WORKFLOW.md. 'wait' parks on a sensor; 'output' drives a solenoid (its handshake confirms it).
+                const d = ATC_DIALECT[m];
+                if (d.kind === 'wait') {
+                    if (waitForInput(m, null, d.pin, d.state)) waiting = true;
+                } else {
+                    setVirtualOutput(d.pin, d.state);
+                    this._setStatus(`M${m} → ${d.label} (${d.pin} ${d.state ? 'ON' : 'OFF'})`, true);
+                }
             } else if (m === 10 || m === 11) {
                 // Generic output control by port (NOTE: on real DDCS Expert, M10/M11 is the
                 // LUBRICATION output — param #1233. Kept as a generic out for sim experiments.)

@@ -159,49 +159,47 @@ const M3K_TRUTH_TABLE = {
     },
 
     // -----------------------------------------------------------------------
-    // DDCS native ATC dialect (M154/M155 drawbar · M300/M302-304 sensors · M305/306 cover)
-    // Ports for these are CONFIGURED ON THE CONTROLLER (params #1120-#1199, #1250-52),
-    // so the sim models them as semantic pins, not numbered ones.
+    // DDCS Expert M350 native ATC dialect (the engine's ATC_DIALECT table maps M-codes → these pins; ground truth =
+    // WORKFLOW.md §Sensors/§Outputs). Drawbar release/lock (M154/M155) REUSE the spindle-clamp cycle above
+    // (OUT_SPINDLE_UNCLAMP → IN_DRAWBAR_OPEN [M301 waits], OUT_SPINDLE_CLAMP → IN_DRAWBAR_CLOSED [M302 waits]) — so no
+    // separate tool-release family (the old hand-rolled OUT_TOOL_RELEASE/IN_TOOL_* duplicated the drawbar; removed).
+    // Dust cover (M162/M163) + gripper (M150/M151) are their own outputs. The magazine open/closed sensors (M303/M304
+    // wait on IN_MAG_OPEN/IN_MAG_CLOSED) have NO program output — they're position/firmware driven, satisfied by the
+    // operator / auto-answer like any un-driven sensor wait. Ports are controller params (#1120-#1199, #1250-#1270).
     // -----------------------------------------------------------------------
 
-    /** M154 — tool release output ON → collet opens */
-    OUT_TOOL_RELEASE: {
-        targetInput: 'IN_TOOL_OPEN',         // M303 waits on this
-        delayMs: 450,
-        setState: true,
-        description: 'M154 tool release → tool-open sensor',
-        sideEffects: [
-            { pin: 'IN_TOOL_LOCKED', state: false },
-            { pin: 'IN_TOOL_CLOSED', state: false },
-        ],
-    },
-
-    /** M155 — tool release output OFF (lock) → collet clamps */
-    OUT_TOOL_RELEASE_OFF: {
-        targetInput: 'IN_TOOL_LOCKED',       // M302 waits on this
-        delayMs: 400,
-        setState: true,
-        description: 'M155 tool lock → tool-locked sensor',
-        sideEffects: [
-            { pin: 'IN_TOOL_OPEN', state: false },
-            { pin: 'IN_TOOL_CLOSED', state: true },   // M304 waits on this
-        ],
-    },
-
-    /** M305 — dust cover open */
+    /** M162 — dust cover open output → cover-open sensor */
     OUT_DUST_COVER: {
         targetInput: 'IN_DUST_COVER_OPEN',
         delayMs: 600,
         setState: true,
-        description: 'M305 dust cover open → cover sensor',
+        description: 'M162 dust cover open → cover sensor',
     },
 
-    /** M306 — dust cover close */
+    /** M163 — dust cover close output → cover-open sensor releases */
     OUT_DUST_COVER_OFF: {
         targetInput: 'IN_DUST_COVER_OPEN',
         delayMs: 600,
         setState: false,
-        description: 'M306 dust cover close → cover sensor releases',
+        description: 'M163 dust cover close → cover sensor releases',
+    },
+
+    /** M150 — gripper open output → gripper-open sensor (M305 waits on this) */
+    OUT_GRIPPER_OPEN: {
+        targetInput: 'IN_GRIPPER_OPEN',
+        delayMs: 450,
+        setState: true,
+        description: 'M150 gripper open → gripper-open sensor',
+        sideEffects: [{ pin: 'IN_GRIPPER_CLOSED', state: false }],
+    },
+
+    /** M151 — gripper close output → gripper-closed sensor (M306 waits on this) */
+    OUT_GRIPPER_CLOSE: {
+        targetInput: 'IN_GRIPPER_CLOSED',
+        delayMs: 450,
+        setState: true,
+        description: 'M151 gripper close → gripper-closed sensor',
+        sideEffects: [{ pin: 'IN_GRIPPER_OPEN', state: false }],
     },
 
     /** M3/M4 — spindle running → "stopped" sensor drops */
