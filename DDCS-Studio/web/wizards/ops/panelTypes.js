@@ -8,6 +8,7 @@
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { opSimStarts, resolveRelToIndex } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket); resolveRelToIndex maps a SEMANTIC {row} → the surviving pass
+import { markerWorldOf } from '../../viz/markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the 3D preview ALSO reads, so the Layout handle + the 3D ruby can't diverge
 import { whenOk } from '../../blocks/whenGuard.js';   // a `when`-gated binding-group's handle shows only when its guard passes (③ — the prune-gated start handle)
 
 export const PANEL_TYPES = {
@@ -52,7 +53,38 @@ function _writeParam(name, val) { const f = _field(name); if (f) { f.value = r3(
 // canvas drag-to-edit with no per-op code. The handles are DECLARED from the param-block roles and built by the SAME
 // reusable gesture registry the built-in views use (viz/canvasWidgets — point / rect / radial), not a parallel onDrag.
 // See ROADMAP "CANVAS-WIDGET consolidation" Stage 3 + the spatial-gui-form-vs-canvas memory.
-export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots) {
+/** The corner DATUM (a physical stock corner) for a corner op — the ONE place the {corner param + stock} → world-corner
+ *  mapping lives, shared by layoutSpecFromOp's spot derive AND pinnedStartsFor (the 3D marker-parity source), so they can't
+ *  drift. Returns null for a non-corner op or an unset corner. `stock` = { w, h }. */
+export function cornerDatumXY(params, stock) {
+    const cid = ({ 1: 'FL', 2: 'FR', 3: 'BL', 4: 'BR', FL: 'FL', FR: 'FR', BL: 'BL', BR: 'BR' }[params && params.corner]);
+    if (!cid || !stock) return null;
+    return ({ FL: { x: 0, y: 0 }, FR: { x: stock.w, y: 0 }, BL: { x: 0, y: stock.h }, BR: { x: stock.w, y: stock.h } })[cid];
+}
+
+/** t301 MARKER PARITY (Seam A source): the datum-PINNED wall worlds keyed by PASS INDEX, derived from the Layout's spot
+ *  store (`spots`, keyed by group id) as cornerXY + spot — the ONE place the spot→world formula lives. The shared 3D/2D-top
+ *  panel (computePassStarts) reads these so a spotted wall marker HOLDS (does not ride the dragged Start) exactly like the
+ *  Layout, keeping both panels coincident. Empty / no-spot / non-corner → null. Mirrors layoutSpecFromOp's stock + cornerXY. */
+export function pinnedStartsFor(def, params, spots) {
+    if (!spots || !Object.keys(spots).length) return null;
+    const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
+    const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y } : { w: 200, h: 150 };
+    const cornerXY = cornerDatumXY(params, stock);
+    if (!cornerXY) return null;
+    const relToByGid = {};   // group id → its x-role relTo (the reposition/start group's anchor pass)
+    for (const b of (def && def.bindings) || []) if (b.group && b.role === 'x' && b.relTo != null) relToByGid[b.group] = b.relTo;
+    const out = {};
+    for (const gid in spots) {
+        const relTo = relToByGid[gid]; if (relTo == null) continue;
+        const ri = resolveRelToIndex(def.opType, params, relTo);   // the anchor pass index among the whenOk-surviving sim-starts
+        if (ri == null) continue;
+        out[ri + 1] = { x: cornerXY.x + spots[gid].dx, y: cornerXY.y + spots[gid].dy };   // the destination (wall) pass = ri+1
+    }
+    return Object.keys(out).length ? out : null;
+}
+
+export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
     // t120 — CORNER-MARKER INDEPENDENCE (Option A): the DATUM for the datum-relative marker spots = the CORNER position
@@ -60,8 +92,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // no spot logic (other ops keep the incremental-socket behavior). `spots` = the persisted per-group datum-relative spot
     // store (userOpView); `setSpots` re-renders after a drag captures/sets them. `repoGroups` stashes each relTo emitting
     // group's live world + anchor so the drag can CAPTURE the un-dragged ones (freeze) → full independence after any drag.
-    const _cornerId = ({ 1: 'FL', 2: 'FR', 3: 'BL', 4: 'BR', FL: 'FL', FR: 'FR', BL: 'BL', BR: 'BR' }[params && params.corner]);
-    const cornerXY = _cornerId ? ({ FL: { x: 0, y: 0 }, FR: { x: stock.w, y: 0 }, BL: { x: 0, y: stock.h }, BR: { x: stock.w, y: stock.h } })[_cornerId] : null;
+    const cornerXY = cornerDatumXY(params, stock);   // the datum stock corner (shared with pinnedStartsFor — one source)
     const spotStore = (cornerXY && spots && typeof setSpots === 'function') ? spots : null;   // active only for a corner op with the store wired
     const repoGroups = [];   // { gid, fx, fy, ax, ay, worldX, worldY } per relTo emitting group (for the drag capture)
     // t81 — colour a handle by its pass's reposition SOURCE (auto=cyan / manual=amber), MATCHING the top panel. `sources` is the
@@ -134,46 +165,37 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             // handle renders at anchor+delta (the true wall position) and a drag writes world − anchor (the delta), not
             // the absolute world coord. Absent relTo → an absolute point (unchanged).
             let ax = 0, ay = 0, destX = null, destY = null, destPass = null;
-            if (byRole.x.relTo != null && typeof opSimStarts === 'function') {
-                // SEMANTIC relTo ({row:'wall1'}) → the pass index among the SURVIVING when-filtered starts (correct in
-                // BOTH probeZ states); a numeric relTo passes straight through. null = the named pass isn't present here.
+            if (byRole.x.relTo != null) {
+                // SEMANTIC relTo ({row:'wall1'}) → the pass index among the SURVIVING when-filtered starts (correct in BOTH
+                // probeZ states); a numeric relTo passes straight through. null = the named pass isn't present here.
                 const ri = resolveRelToIndex(def.opType, params, byRole.x.relTo);
-                const starts = (ri != null) ? (opSimStarts(def.opType, params, s) || []) : [];
-                const a = starts[ri];
-                if (a) { ax = num(a.x, 0); ay = num(a.y, 0); }
                 if (ri != null) destPass = ri + 1;   // the handle sits on the destination marker (pass ri+1) → colour by that pass's source (t81)
-                // The reposition ARRIVES at the NEXT pass marker (starts[ri+1] — chained via the SAME cornerReposOffsets the
-                // emit uses, and persistence-safe as the registered sim provider): the handle renders THERE (anchor+offset =
-                // the true destination), whether the socket is set (marker reflects the literal) or UNSET. Fixes the num()→0
-                // fallback that stuck the handle AT its anchor (masking the sim ◇). No 2nd hand-rolled path — ONE source.
-                const dest = starts[ri + 1];
-                if (dest) { destX = num(dest.x, 0); destY = num(dest.y, 0); }
-                // t107 machine-faithful — shift the anchor (+ the destination) to the RUNTIME END of the anchor pass
-                // (passEnds[ri], post probe+retract+lift), so the Layout handle sits at the SAME machine-correct ② the top
-                // panel + 3D show, AND a drag writes #23/#24 = target − runtime-END (END-relative). The offset destX−ax stays
-                // the cross (both shift by the same drift), so an UNSET default is unchanged. passEnds absent (pre-trace) →
-                // the static start (graceful degradation, byte-identical to t94). The runtime END is stable while dragging the
-                // DESTINATION (the anchor pass is upstream), so the drag is coherent.
-                // GATED on the DESTINATION's anchorsAtPrev — EXACTLY like the 3D/2D _markerWorld: only an AUTO reposition
-                // has a programmed dog-leg to relocate. MANUAL travel (anchorsAtPrev false — the operator jogs) keeps the
-                // static wall marker on ALL surfaces, so the Layout handle can't diverge from the 3D/2D marker.
+                // t301 Seam C (ONE declared source) — read the anchor + the DESTINATION wall world from the SHARED per-pass
+                // starts (panelStarts = computePassStarts's output, which the 3D marker ALSO consumes) via the ONE wizard-
+                // agnostic markerWorldOf. So the two panels can't diverge BY CONSTRUCTION: a datum-PINNED wall is absolute in
+                // BOTH; an AUTO reposition relocates to the anchor pass's runtime END in BOTH. NO parallel opSimStarts/cornerXY
+                // POSITION derive here. Fall back to the op's declared sim-starts ONLY when no panel is wired (2d-only mode —
+                // there is no 3D preview to be coincident with, so nothing to diverge from).
+                const src = (Array.isArray(panelStarts) && panelStarts.length) ? panelStarts
+                    : ((ri != null) ? (opSimStarts(def.opType, params, s) || []) : []);
+                const a = src[ri], dest = src[ri + 1];
+                if (a) { ax = num(a.x, 0); ay = num(a.y, 0); }
+                if (ri != null && dest) { const mw = markerWorldOf(src, passEnds, ri + 1); destX = num(mw.x, 0); destY = num(mw.y, 0); }
+                // shift the ANCHOR to the anchor pass's RUNTIME END (passEnds[ri], post probe+retract+lift) when the destination
+                // has a programmed dog-leg — EXACTLY the markerWorldOf gate, so the emitted #23/#24 = wall − runtime-END. MANUAL
+                // travel (anchorsAtPrev false — the operator jogs) keeps the static anchor: the handle can't diverge from the ruby.
                 const end = (Array.isArray(passEnds) && ri != null) ? passEnds[ri] : null;
-                if (end && a && dest && dest.anchorsAtPrev) {
-                    const dxE = num(end.x, 0) - ax, dyE = num(end.y, 0) - ay;
-                    ax += dxE; ay += dyE;
-                    if (destX != null) { destX += dxE; destY += dyE; }
-                }
+                if (end && a && dest && dest.anchorsAtPrev) { ax = num(end.x, 0); ay = num(end.y, 0); }
             }
             let offX = (destX != null) ? destX - ax : p('x');
             let offY = (destY != null) ? destY - ay : p('y');
-            // t120 — Option A independence: if THIS group has a stored datum-relative spot, its WORLD is FIXED at cornerXY +
-            // spot; DERIVE the emitted G91 increment = world − the (current, possibly-moved) anchor + WRITE it to the form
-            // field (guarded — only when it actually changed, so no re-render loop; the derive is a fixpoint because the
-            // anchor is upstream + never depends on this field). So dragging an UPSTREAM marker (which moves this anchor) keeps
-            // THIS marker put (its increment re-derives). UNSET → the socket increment (byte-identical default) holds.
-            if (spotStore && spotStore[gid] && cornerXY) {
-                const worldX = cornerXY.x + spotStore[gid].dx, worldY = cornerXY.y + spotStore[gid].dy;
-                offX = worldX - ax; offY = worldY - ay;
+            // t301 — the #23/#24 (G91 increment) WRITE-BACK: when this destination wall is datum-PINNED (its world is fixed on
+            // the stock — the `pinned` flag flows from pinnedStartsFor THROUGH computePassStarts, the ONE source), DERIVE the
+            // emitted increment = pinned world − the (current, possibly Start-shifted) anchor and WRITE it to the form field
+            // (guarded — only on a real change, so no re-render loop; the anchor is upstream + never depends on this field).
+            // So dragging the Start (which moves this anchor) keeps the wall put — its increment re-derives. NO cornerXY here.
+            const destPinned = destPass != null && Array.isArray(panelStarts) && panelStarts[destPass] && panelStarts[destPass].pinned;
+            if (destPinned) {
                 if (wr('x') && r3(offX) !== r3(num(params[byRole.x.param]))) _writeParam(byRole.x.param, offX);
                 if (wr('y') && r3(offY) !== r3(num(params[byRole.y.param]))) _writeParam(byRole.y.param, offY);
             }
@@ -255,10 +277,10 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
 let _layout = null;
-export function renderLayout2D(container, def, params, simStart, sources, passEnds, spots, setSpots) {
+export function renderLayout2D(container, def, params, simStart, sources, passEnds, spots, setSpots, panelStarts) {
     if (!container) return;
     if (!_layout) _layout = new FeatureCanvas();
-    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots));
+    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts));
 }
 
 export function renderDeclaredLayout(container, def, params) {

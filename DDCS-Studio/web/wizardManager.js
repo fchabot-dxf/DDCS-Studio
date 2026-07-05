@@ -497,6 +497,7 @@ export class WizardManager {
                 // Per-pass start hints (multi-point probe): one start per manual REPOSITION so 3-point/A-B probes
                 // land at DISTINCT points (else the degenerate single-start solve). Optional (most ops are 1-pass).
                 getStartHints: () => host.__startHints,
+                getPinnedStarts: () => host.__pinnedStarts,   // t301 MARKER PARITY — datum-PINNED wall worlds (pass → {x,y}) from the Layout's spot store (set by userOpView); a spotted wall HOLDS in the 3D marker instead of riding the Start
                 onLine: (i) => this._highlightWizLine(host, i),   // play → highlight the executing line in the CODE PREVIEW (like Studio main)
             });
         }

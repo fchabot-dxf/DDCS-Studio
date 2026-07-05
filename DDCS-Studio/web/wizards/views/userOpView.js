@@ -14,7 +14,7 @@ import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the stored children for the live preview
-import { panelType, renderLayout2D } from '../ops/panelTypes.js';
+import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { opSimStarts } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers feed the 3D preview
 import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
 
@@ -127,6 +127,10 @@ export const userOpView = {
             if (viz3dBox) viz3dBox.style.display = '';
             let starts = null;
             try { const stk = window.ddcsGetSettings && window.ddcsGetSettings().stock; starts = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
+            // t301 MARKER PARITY (Seam A feed) — refresh the datum-PINNED wall worlds from the live spot store BEFORE the panel
+            // re-renders, so a spotted wall HOLDS in the 3D marker (computePassStarts reads host.__pinnedStarts). Empty spots → null → the pure-auto chain, byte-identical.
+            const _phost = viz3dIn('userViz3dContainer');   // the SAME one-level-up derivation the panel + the drag path use (a two-level querySelector can match the OTHER pane's .wiz-viz3d in form3d+2d)
+            if (_phost) _phost.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots);
             mgr.preview3D(gcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null);
             const c = el('userVizContainer');
             if (c) {
@@ -146,11 +150,14 @@ export const userOpView = {
                     // t120/t122 — the datum-relative marker-spot store (Option A independence). CLEARED per wizard OPEN (onShow),
                     // NOT here per opType (every corner instance shares the opType → a per-type reset leaked drags across instances).
                     // setSpots re-renders so a drag's capture/derive shows.
-                    const setSpots = (next) => { _layoutSpots = next || {}; };
+                    // t301 — a drag's spot capture: update the store AND re-feed the panel's pinned worlds SYNCHRONOUSLY, so the
+                    // immediately-following simStart.onDrag → panel.onStartDrag → setGcode → computePassStarts reads the fresh pins
+                    // (the 3D wall holds this same frame, coincident with the Layout).
+                    const setSpots = (next) => { _layoutSpots = next || {}; if (host) host.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots); };
                     const simStart = (panel && pos0 && typeof panel.onStartDrag === 'function')
                         ? { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } }
                         : (pos0 ? { pos: pos0 } : null);
-                    renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots);
+                    renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps);   // t301 Seam C — feed the panel's SHARED passStarts so the Layout reads the wall world from the ONE source the 3D marker uses (no parallel opSimStarts/cornerXY position derive)
                 };
                 renderLayoutWithSim();
             }

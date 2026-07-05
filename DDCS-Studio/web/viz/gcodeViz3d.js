@@ -18,6 +18,7 @@ import { PartFrame } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
+import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
 
 export class GcodeViz3D {
     constructor(container) {
@@ -324,13 +325,10 @@ export class GcodeViz3D {
     // machine-correct wall approach, matching the drawn route end + the probe fire. This is a display-only VIEW of the
     // DECLARED `starts` (the drag + #21-#24 still derive from starts); no runtime end yet / not flagged → the declared row.
     _markerWorld(p) {
-        const row = this.starts[p] || { x: 0, y: 0, z: 0 };
-        const prev = this.starts[p - 1];
-        const end = this._passEnds && this._passEnds[p - 1];
-        if (row.anchorsAtPrev && p > 0 && end && prev) {
-            return { x: end.x + (row.x - prev.x), y: end.y + (row.y - prev.y), z: end.z + (row.z - prev.z) };
-        }
-        return row;
+        // t301 Seam C — delegate to the shared markerWorldOf (the Layout handle reads the SAME fn off the SAME per-pass
+        // starts): a datum-PINNED wall is absolute (Seam B — it no longer RIDES the dragged Start off the runtime END);
+        // an AUTO reposition relocates to the previous pass's runtime END + delta; else the declared row.
+        return markerWorldOf(this.starts, this._passEnds, p);
     }
 
     // Choose which start the jog pendant drives (and which ruby is highlighted).
