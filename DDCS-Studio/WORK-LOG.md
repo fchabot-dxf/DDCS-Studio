@@ -724,3 +724,13 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **STALE LINES quoted for one-pass prune** (in the doc): l44 (4b-4d batch), l455-461 + l463-469 (probeZFirst superset / M3-vs-M2 record — already SUPERSEDED), l33 (D3 fan-out), l83 (wall-1 hint + Layout unify), l134-136 (prefill + item-2 selector). l107 stays (accurate summary).
 
 **NO CODE, NO spec changes. PASS BACK** — the advisor prunes + dispatches the real remaining work (+ the UX interleaves: toast+FAQ · help slot · version nudge) from the clean list.
+
+## 🔨 turn 267 (cycle 127) — ROUND-TRIP DISCOVERABILITY (the human-scoped small UX increment: toast + FAQ). NO new machinery, NO emit change. 607 pass / 2 skip.
+
+**BUILT (reused existing patterns, per dispatch):**
+- `wizardManager.js`: a ONE-TIME toast on the first wizard-op insert — `showRoundTripToastOnce()` fires from the fresh-insert branch (insert() `else`, after `commitActiveOp`/`commitDecodedCode` succeeds = the op is now an editable block stack). Persisted flag `ddcs_seen_blocks_roundtrip` → shows ONCE ever, never nags. REUSED the shared transient `toast()` (ui/gateway/util.js) — did NOT hand-roll a second toast system. Text: "This op is now an editable block stack — open the Blocks tab to edit or extend it."
+- `settingsPanel.js` (set_tab_faq): a new FAQ `<details>` matching the app's format — "Can I edit a wizard op after inserting it?" → explains the editable block stack, opening Blocks, reorder/tweak/extend, and the round-trip back to the form (nothing is a dead end).
+
+**VERIFY — REAL SYMPTOM (drove the actual insert + Settings):** new blocks-roundtrip-toast.spec (2 tests): fresh profile → insert 'drill' → the toast appears (contains "editable block stack" + "Blocks") + the flag persists ('1'); clear the toast DOM → insert again → NO toast (once-ever); the FAQ entry renders with the round-trip text. SCREENSHOTS (VS Code tabs): roundtrip-toast.png (the toast under the inserted drill G-code), roundtrip-faq.png (the FAQ entry expanded in Settings → General → FAQ). Full suite 607 pass / 2 skip (1 known middle-animator flake, retry-passes).
+
+**NO emit change (pure UX). PASS BACK for review.** NEXT (the remaining UX interleaves per NEXT-SESSION QUEUED): the DECLARED HELP SLOT · the WEB VERSION-NUDGE TOAST · then the real remaining corner work (parity-gap #2 source-chips, gated on the register scout).

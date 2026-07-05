@@ -13,6 +13,7 @@ import { userOpView, setUserOpDef } from './wizards/views/userOpView.js';   // O
 import { listUserOps } from './blocks/userOps.js';
 const isUserOp = (t) => typeof t === 'string' && t.startsWith('user_');
 import { playClick, playClickReverse } from './ui/sound.js';  // audio helper for click sounds
+import { toast } from './ui/gateway/util.js';   // the shared transient toast (round-trip discoverability hint)
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { mountSafeZFrameToggles } from './ui/safeZFrameToggle.js';   // SPATIAL-MODEL 1c: the shared safe-Z frame toggle (rel|mach)
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
@@ -53,6 +54,18 @@ function saveProbeFieldOverride(id, value) {
 // paramFields(opType) returns the { param → field id } map for an op (the old PARAM_FIELDS, derived from the schema);
 // _seedForm() uses it to restore params into the form when re-opening a wizard to edit an op (params = single truth).
 import { paramFields } from './blocks/opSchema.js';
+
+// ROUND-TRIP DISCOVERABILITY (human 07-04): the form↔Blocks round-trip IS the product vision but is invisible until
+// stumbled into. The FIRST time a wizard op inserts as an editable block stack, point the user at the Blocks tab —
+// ONCE ever (a persisted flag), never nags. Reuses the shared transient toast (no second toast system).
+const BLOCKS_ROUNDTRIP_SEEN = 'ddcs_seen_blocks_roundtrip';
+function showRoundTripToastOnce() {
+    try {
+        if (localStorage.getItem(BLOCKS_ROUNDTRIP_SEEN)) return;
+        localStorage.setItem(BLOCKS_ROUNDTRIP_SEEN, '1');
+        toast('This op is now an editable block stack — open the Blocks tab to edit or extend it.');
+    } catch (_) { /* localStorage / toast optional — never block an insert */ }
+}
 
 export class WizardManager {
     constructor(editorManager) {
@@ -434,6 +447,7 @@ export class WizardManager {
                 }
             } else {
                 committed = ops.commitActiveOp() || (!!code && ops.commitDecodedCode(code));   // builder op → high-level; else decode the generated code → blocks
+                if (committed) showRoundTripToastOnce();   // ROUND-TRIP DISCOVERABILITY: a fresh op is now an editable block stack — hint ONCE
             }
         } catch (e) { console.warn('commit op failed', e); }
         if (!committed && !this.editingOpId && code) this.editorManager.insert(code);   // last resort (new op, nothing decoded)
