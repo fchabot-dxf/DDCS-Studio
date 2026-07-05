@@ -149,6 +149,7 @@ class DDCSStudio {
         ];
         for (const def of seeds) {
             try {
+                if (def.defV == null) def.defV = 1;   // N1 — declare the seed's version (author bumps it in the def-builder when its emit changes); a DECLARED defV means updateUserOp respects it (no boot auto-inc)
                 if (have.has(def.opType)) updateUserOp(def);
                 else createUserOp(def);
             } catch (_) { /* ignore duplicate/corrupt edge cases */ }

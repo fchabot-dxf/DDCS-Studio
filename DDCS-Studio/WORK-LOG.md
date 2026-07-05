@@ -859,3 +859,20 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **DECISION TABLE (5 forks: A bump-trigger, B detect-point, C notice-UX, D migration-shape, E scope) + INCREMENTS N1 stamp foundation / N2 detect+transparency notice (additive-only, the universal 80%) / N3 migration map (rule-of-three, when a rename lands) / S2 optional later.** REC: ship N1+N2 first (small, rides the existing import-rebuild + toast); migrations + S2 are declared follow-ons.
 
 **NO CODE. Advisor rules the table. PASS BACK.**
+
+## 🔨 turn 287 (cycle 127) — DEF-CHANGE → REBUILD NOTICE, N1+N2 (as ruled): the defV stamp + import-time staleness detect → transparency notice. 620 pass / 2 skip. NO golden re-baseline needed (see below).
+
+**N1 — the declared per-def version stamp (ruling A: declared int, NEVER a body-hash):**
+- `def.defV` (int). `createUserOp` defaults a fresh def to 1. `updateUserOp` AUTO-INCREMENTS only an UNDECLARED incoming def (a dev-save re-author via userOpFromStack sets no defV → its placed instances are now stale → bump past the stored version); a DECLARED defV (a code seed / author-maintained) is respected as-is. The distinguishing signal is declared-vs-undeclared, NOT isMaintainedAsData (drill/slot/surfacing/text/atcWarmup are PLAIN seeds — only corner is bindingSpecs — so isMaintainedAsData would wrongly boot-bump them). seedDefaultPortedUserOps sets a floor `def.defV ??= 1` so seeds ALWAYS arrive declared → updateUserOp respects them → no boot-bump (verified by the re-apply test).
+- `defVOf(opType)` (userOps): the registered user-def's defV, or 0 for a built-in/unversioned op (never stale).
+- `markerLine(opType, params, defV)`: stamps `rec.defV` LAST, only when > 0 (additive payload key; format MARKER_VERSION untouched — old readers ignore it, so no format bump). `parseMarker` reads defV back (absent → 0 = legacy) and excludes it from params (reserved key).
+
+**N2 — import-time detect (ruling B/C: import-primary, transparency-first, non-blocking):**
+- `staleMarkedOps(text)` (programModel, PURE): a LOOKUP — for each marker, `rec.defV (was) < defVOf(opType) (cur, >0)` → `{opType,label,fromV,toV}`. Built-ins (cur 0) never flag. `defChangeSummary(stale)` = the one-line message naming each op + version jump.
+- `commandDeck` file-open: after importMarkedNc + loadBlockStack, run staleMarkedOps → if any, ONE `toast(defChangeSummary)`. Best-effort (never blocks the load). Import ALREADY rebuilds forward-only (opFromMarker, the file body discarded) — so the notice is pure TRANSPARENCY, no rebuild path added. keep-as-plain escape SKIPPED (not trivial — import discards the body by design; noted for later).
+
+**VERIFY — REAL SYMPTOM (new def-change-notice.spec, drives the actual import functions):** (1) fresh user def stamps v1; an author-declared bump to v2 is respected. (2) v1 marker vs current v1 → staleMarkedOps [] (no notice). (3) after bump to v2 → staleMarkedOps [{user_vtest, VTest, fromV:1, toV:2}] + summary contains "VTest v1→v2"; importMarkedNc rebuilds from the CURRENT builder (a deliberately-bogus X999 file body is DISCARDED — forward-only asserted). (4) legacy marker with NO defV → fromV:0 (v0), flagged once, no crash. (5) a built-in (no user-def) marker → never flags. Plus test 2: an undeclared re-author auto-incs (1→2); a declared defV=7 respected; re-apply doesn't drift (no boot-bump). Full suite 620 pass / 2 skip / 0 fail.
+
+**⚑ GOLDEN NOTE (deviation from the dispatch's expectation, FLAG):** the ruling anticipated re-baselining marker-line goldens — turned out UNNECESSARY. defV stamps ONLY versioned USER-op markers (defVOf>0); the only literal @DDCS marker golden asserts `op:"atc_change"` (a BUILT-IN → defVOf 0 → unstamped), and the corner specs assert params/emit not raw marker lines. So ZERO goldens changed — the stamp is well-scoped (less churn, less risk). No re-baseline performed because none was needed.
+
+**DEFERRED (per E/D): N3 migration map (declared per-step renames/drops + fn escape) at rule-of-three when the first rename lands; S2 in-session re-author detect (op-container stamp). NO emit change (marker payload + import UX only). PASS BACK for review.**

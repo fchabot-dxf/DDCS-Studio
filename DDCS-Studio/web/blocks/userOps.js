@@ -393,12 +393,22 @@ export function listUserOps() {
     return readStore();
 }
 
+/** The declared per-def version stamp (N1) for an op: a registered USER def's `defV` (author-declared for
+ *  data-maintained defs, auto-incremented on updateUserOp for plain re-authors), or 0 for a non-user/built-in op
+ *  (unversioned — never goes stale). Read by serializeWithMarkers (stamp) + the import staleness check (defVOf(cur)
+ *  vs the marker's stamped defV). A found def with no explicit defV → 1 (a legacy stored def is treated as v1). */
+export function defVOf(opType) {
+    const d = readStore().find((x) => x.opType === opType);
+    return d ? (Number(d.defV) || 1) : 0;
+}
+
 /** Validate → register → persist a new user op. Throws if invalid or the opType already exists. */
 export function createUserOp(def) {
     const errs = validateUserOp(def);
     if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
     const defs = readStore();
     if (defs.some((d) => d.opType === def.opType)) throw new Error(`user op "${def.opType}" already exists`);
+    if (def.defV == null) def.defV = 1;                          // N1 — a fresh def starts at version 1 (the stamp)
     registerUserOp(def);                                         // only now install into the live user-layer builder/spec/label
     defs.push(def);
     writeStore(defs);
@@ -413,6 +423,11 @@ export function updateUserOp(def) {
     const defs = readStore();
     const i = defs.findIndex((d) => d.opType === def.opType);
     if (i < 0) return createUserOp(def);
+    // N1 version stamp: a def that DECLARES its defV (a code seed / author-maintained, e.g. corner — the seed loop
+    // sets a floor of 1) is respected as-is; an UNDECLARED incoming def (a dev-save re-author via userOpFromStack,
+    // which sets no defV) bumps PAST the stored version — its placed instances are now stale (the def-change→rebuild
+    // signal). NEVER a body-hash (declare, don't infer). Seeds never hit this (they arrive declared → no boot-bump).
+    if (def.defV == null) def.defV = (Number(defs[i].defV) || 1) + 1;
     registerUserOp(def);            // overwrite the live user-layer builder/spec/label
     defs[i] = def;
     writeStore(defs);

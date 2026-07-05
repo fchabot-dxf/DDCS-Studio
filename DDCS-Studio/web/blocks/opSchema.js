@@ -209,17 +209,21 @@ function revCanon(opType) {                          // marker (canon) key -> in
     return m;
 }
 
-/** Build the marker comment line for an op record. `params` = the op's single-source-of-truth params. */
-export function markerLine(opType, params) {
+/** Build the marker comment line for an op record. `params` = the op's single-source-of-truth params. `defV` (opt)
+ *  = the op's declared per-def version stamp (N1) — additive payload key, stamped last, only when > 0 (a versioned
+ *  user def; built-ins pass 0 → unstamped). It's the def-change→rebuild signal, NOT the format `MARKER_VERSION`. */
+export function markerLine(opType, params, defV) {
     const rec = { op: opType };
     for (const k in (params || {})) rec[canonOf(opType, k)] = params[k];
+    if (defV && defV > 0) rec.defV = defV;
     return `( ${SENTINEL}:${MARKER_VERSION} ${escParens(JSON.stringify(rec))} )`;
 }
 
 /** True if a line is a DDCS op marker (cheap sentinel test). */
 export const isMarker = (line) => /^\(\s*@DDCS:\d+\s/.test(String(line).trim());
 
-/** Parse a line → { opType, params, v } (params back in internal keys) or null if not a marker. */
+/** Parse a line → { opType, params, v, defV } (params back in internal keys) or null if not a marker.
+ *  `defV` = the stamped per-def version (0 when absent — a legacy pre-versioning file). `v` = the format version. */
 export function parseMarker(line) {
     const m = String(line).match(/^\(\s*@DDCS:(\d+)\s+(.*?)\s*\)\s*$/);
     if (!m) return null;
@@ -227,8 +231,8 @@ export function parseMarker(line) {
     try { rec = JSON.parse(m[2]); } catch (_) { return null; }
     if (!rec || typeof rec.op !== 'string') return null;
     const opType = rec.op, rev = revCanon(opType), params = {};
-    for (const k in rec) { if (k === 'op') continue; params[rev[k] || k] = rec[k]; }
-    return { opType, params, v: Number(m[1]) };
+    for (const k in rec) { if (k === 'op' || k === 'defV') continue; params[rev[k] || k] = rec[k]; }   // defV is a reserved marker key, not a param
+    return { opType, params, v: Number(m[1]), defV: Number(rec.defV) || 0 };
 }
 
 /** Validate an op record against the schema → warning strings ([] = clean, or op not catalogued). */

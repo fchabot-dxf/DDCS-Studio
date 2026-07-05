@@ -101,6 +101,10 @@ export function makeOp(opType, params, children) {
  *  Writes the USER label layer only; the built-in OP_LABELS literal is untouched. The wizard-maker calls this on register. */
 export function registerOpLabel(opType, label) { if (opType && label) USER_LABELS[opType] = label; }
 
+/** The friendly label for an opType (built-in OP_LABELS, then the USER layer, then the raw opType) — the same
+ *  resolution makeOp uses inline, exported so views (e.g. the def-change notice) name an op consistently. */
+export function opLabelOf(opType) { return OP_LABELS[opType] || USER_LABELS[opType] || opType; }
+
 /** Remove a runtime op label (paired with registerOpLabel; deleteUserOp calls it so a deleted user op leaves no stale
  *  label). Touches the USER layer only — a built-in label can never be dropped, even if called with a built-in opType. */
 export function removeOpLabel(opType) { if (opType) delete USER_LABELS[opType]; }

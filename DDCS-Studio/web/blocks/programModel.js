@@ -12,7 +12,8 @@
 import { emitMapped } from './blockEmitter.js';
 import { reconcileGcodeToStack, parseGcodeToStack } from './gcodeToStack.js';
 import { markerLine, isMarker, parseMarker } from './opSchema.js';
-import { builderOf, makeOp, _builderAtoms } from './opBuilders.js';   // codec: rebuild ops from markers (declare, never infer)
+import { builderOf, makeOp, _builderAtoms, opLabelOf } from './opBuilders.js';   // codec: rebuild ops from markers (declare, never infer)
+import { defVOf } from './userOps.js';   // N1 — the declared per-def version stamp (marker stamp + import staleness lookup)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
@@ -96,7 +97,7 @@ export function serializeWithMarkers() {
     let lastOpId = null;
     (proj.lines || []).forEach((line, i) => {
         const op = opAtLine(i);
-        if (op && op.id !== lastOpId) { out.push(markerLine(op.opType, op.params || {})); lastOpId = op.id; }
+        if (op && op.id !== lastOpId) { out.push(markerLine(op.opType, op.params || {}, defVOf(op.opType))); lastOpId = op.id; }
         else if (!op) lastOpId = null;
         out.push(line);
     });
@@ -136,6 +137,31 @@ export function importMarkedNc(text, opts) {
     }
     return stack;
 }
+// ── N2: def-change → rebuild TRANSPARENCY (import-time detect, a LOOKUP not a diff) ──────────────────────────
+/** Scan a marked .nc for ops whose stamped def-version is BEHIND the current registered def → they were built with
+ *  an older wizard version and importMarkedNc regenerated them from the CURRENT builder (forward-only). A LOOKUP
+ *  (marker.defV vs defVOf), not a body diff. Returns [{ opType, label, fromV, toV }] (fromV 0 = a legacy pre-stamp
+ *  file). Built-in / unversioned ops (defVOf 0) never flag. Pure — the caller shows the transparency notice. */
+export function staleMarkedOps(text) {
+    const out = [];
+    for (const line of String(text).split('\n')) {
+        if (!isMarker(line)) continue;
+        const rec = parseMarker(line);
+        if (!rec) continue;
+        const cur = defVOf(rec.opType);
+        const was = rec.defV || 0;
+        if (cur > 0 && was < cur) out.push({ opType: rec.opType, label: opLabelOf(rec.opType), fromV: was, toV: cur });
+    }
+    return out;
+}
+
+/** One-line transparency message for a staleMarkedOps result — names each op + its version jump. */
+export function defChangeSummary(stale) {
+    if (!stale || !stale.length) return '';
+    const parts = stale.map((s) => `${s.label} v${s.fromV}→v${s.toV}`);
+    return `Regenerated ${stale.length} op${stale.length === 1 ? '' : 's'} to the current wizard version: ${parts.join(', ')}.`;
+}
+
 /** True when the editor text still matches the live projection (so the line→op map is valid for hover). */
 export function editorMatchesProjection() {
     const e = editor();
