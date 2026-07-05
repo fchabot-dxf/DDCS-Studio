@@ -807,3 +807,26 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **VERIFY — extended assertion + the rendered control (corner-structctl.spec):** (1) the def-match assertion now covers HELP too (label/options/kind/default/help) — sc_* help === CORNER_STRUCT_BINDINGS help, so it can't drift. (3b) NEW — opened corner in Blocks (real workspace, __blkws): each rendered sc_* control's `getTooltip()` IS its declared structural help (probeZFirst / wcs / corner asserted); a no-help atom block keeps the default "<label> (<category>)" tooltip and is NOT any help string (unchanged). Full suite 616 pass / 2 skip / 0 fail.
 
 **DEFERRED (advisor ruling): the knob/param half** — no surface yet (corner value params aren't pre-ticked knobs; the value-knob binding-projection is OPEN, tracked in the t265 audit); it rides that projection later. **The DECLARED HELP SLOT batch (1a form + 1b Setup I/O + 1c Blockly sc_*) is COMPLETE + one-source across three surfaces from three declaration domains, all via the SAME declared help key.** NO emit change throughout. **BATCH READY — advisor releases the tooltips milestone.** PASS BACK.
+
+## 🔨 turn 281 (cycle 127) — VALUE-KNOB PROJECTION scout → PROPOSE (NO CODE). Design-heavy: the pre-tick is trivial, but it amplifies a confirmed lossy-save clobber. Full table + diagram in scratchpad/value-knob-projection-scout.md (VS Code tab).
+
+**THE DEBT (t265):** corner's declared VALUE bindings (dist/retract/f_fast/f_slow/port/radius/safeZ/scanDepth) should pre-tick as knobs on the Blocks canvas. Today augment() grows an expose row per numeric field but leaves every EXPOSE_ FALSE; restoreExpose only re-applies a PERSISTED user exposure — nothing reads def.bindings to pre-tick the declared knobs.
+
+**MECHANICALLY TRIVIAL (~15 lines):** projection is the INVERSE of collectAuthoring (which already turns ticked knobs into exposures {param,blockIndex,key,widget}). The atomBlocks[i] to flat[i] index alignment already exists. So pre-ticking from def.bindings is easy.
+
+**THE HAZARD (why NOT a clean build) — the dev-mode SAVE path is LOSSY for a rich def, CONFIRMED EMPIRICALLY this turn:**
+- corner = def.bindings (rich: relTo/when/group/role/socketHeld/section/help/sourceField) + def.bindingSpecs (re-derive value sockets BY IDENTITY — the whole M2 mechanism).
+- Save to Update: collectAuthoring to buildBindings produces PLAIN {param,blockIndex,key,type:number,default,label} — all the rich metadata STRIPPED. userOpFromStack does NOT set bindingSpecs (grep-confirmed). updateUserOp does defs[i]=def (REPLACE, no merge — confirmed).
+- So hitting Update FLATTENS corner's def, DROPPING bindingSpecs + every piece of the campaign's structural metadata — the exact lossy-hand-rolled-path divergence the campaign exists to prevent.
+- This clobber is PRE-EXISTING (dev-saving corner today already degrades it), but projection AMPLIFIES it: pre-ticked knobs signal these are editable/saveable, turning a latent footgun into a prominent one.
+
+**THE 3 RECONCILE QUESTIONS (the dispatch asked):** (1) which pre-tick = the value bindings (blockIndex+key to a numeric/inline field); sc_* already handled. (2) exposure vs binding reconcile = agree at LOAD, but the save reads exposures back LOSSY and overwrites the rich declared bindings — conflict. (3) does a knob edit round-trip to the form? For a rich def NO, it DEGRADES it (loses the rich metadata + bindingSpecs).
+
+**ALSO:** corner's value params are ALREADY surfaced+editable in Blocks TODAY via the form pane (renderOpForm(def.bindings), blocksApp.js:371). The FUNCTIONAL gap is already covered — the only real gap is the CANVAS expose-rows don't visually MARK the declared knobs.
+
+**FORK (advisor rules):**
+- **A (REC) — project + make Update SAFE:** pre-tick value knobs as a REFLECTION + GUARD the Update path for a bindingSpecs def (MERGE knob deltas into the existing rich def preserving bindingSpecs/metadata, OR REFUSE to flatten with a clear message). Correct; closes the pre-existing clobber footgun; the knobs then exist so it folds in the DEFERRED knob-help tooltip (PNAME to binding.help). Biggest — needs a lossless-merge/block Update path = a real design piece.
+- **B — pre-tick only, no save change:** tiny + literal, but SHIPS THE FOOTGUN (pre-ticked knobs invite Update to flatten the rich def). REJECT.
+- **C — defer/re-scope:** the form pane already does the functional job; the knob path is for hand-authored/simple wizards, not rich bindingSpecs defs; leave projection unbuilt. Zero regression risk; the visual-consistency gap + knob-help tooltip stay open.
+
+**REC: design-heavy, do NOT ship B. Lean A scoped as (1) read-only reflection pre-tick, (2) the Update guard for a bindingSpecs def (the load-bearing safety piece — a real latent bug regardless of projection), (3) fold in knob-help tooltip. If keeping the increment small, C (defer) is the honest fallback — the campaign's re-authoring vision is better served by editWizardDef (loads the TEMPLATE with pills) + a bindingSpecs-preserving save than by the lossy knob path. NO CODE. PASS BACK.**
