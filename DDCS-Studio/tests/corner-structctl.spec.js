@@ -24,13 +24,14 @@ test('(1) the structural-control blocks reflect CORNER_STRUCT_BINDINGS (param, k
       if (JSON.stringify(blk._options) !== JSON.stringify(wantOpts)) mism.push(bind.param + ':options');
       if ((blk._options ? 'select' : 'toggle') !== (bind.type === 'bool' ? 'toggle' : 'select')) mism.push(bind.param + ':kind');
       if (blk.label !== bind.label) mism.push(bind.param + ':label');
+      if ((blk.help || undefined) !== (bind.help || undefined)) mism.push(bind.param + ':help');   // 1c — the DECLARED help is one-source too (assert-match)
       const wantDflt = bind.type === 'bool' ? !!bind.default : bind.default;   // t156 (agent-2 residual) — the DEFAULT is one-source too
       if (JSON.stringify(blk.defaults.value) !== JSON.stringify(wantDflt)) mism.push(bind.param + ':default');
     }
     return { count: STRUCT_CTL_BLOCKS.length, bindCount: CORNER_STRUCT_BINDINGS.length, mism };
   });
   expect(r.count, 'one control per structural binding').toBe(r.bindCount);
-  expect(r.mism, 'every control matches its binding (param/kind/options/label)').toEqual([]);
+  expect(r.mism, 'every control matches its binding (param/kind/options/label/help)').toEqual([]);
 });
 
 async function openCornerBlocks(page) {
@@ -72,6 +73,28 @@ test('(3) toggling probeZFirst reprunes the preview live and the control keeps i
   const kept = await page.evaluate(() => { const b = window.__blkws.getAllBlocks().find((x) => x.type === 'sc_probezfirst'); return b && b.getFieldValue('VALUE'); });
   expect(kept, 'the toggle keeps its value after the reprune').toBe('TRUE');
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
+// (3b) DECLARED HELP SLOT (1c) — each rendered sc_* control's tooltip IS its declared structural help; a no-help block unchanged.
+test('(3b) each sc_* control tooltip IS its declared help; a no-help block keeps the default tooltip', async ({ page }) => {
+  await openCornerBlocks(page);
+  const r = await page.evaluate(async () => {
+    const { CORNER_STRUCT_BINDINGS } = await import('/blocks/dataOps/cornerData.js');
+    const helpByType = Object.fromEntries(CORNER_STRUCT_BINDINGS.map((b) => ['sc_' + b.param.toLowerCase(), b.help]));
+    const blocks = window.__blkws.getAllBlocks();
+    const scTips = {};
+    for (const b of blocks) if (b.type.indexOf('sc_') === 0) scTips[b.type] = b.getTooltip();
+    const plain = blocks.find((b) => b.type !== 'op' && b.type.indexOf('sc_') !== 0);   // an atom without declared help
+    return { helpByType, scTips, plainTip: plain && plain.getTooltip(), helpVals: Object.values(helpByType) };
+  });
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+  // every sc_* control's RENDERED tooltip IS its declared structural help (one-source via structCtl↔bindings assert)
+  expect(r.scTips.sc_probezfirst, 'probeZFirst control tooltip == its declared help').toBe(r.helpByType.sc_probezfirst);
+  expect(r.scTips.sc_wcs, 'wcs').toBe(r.helpByType.sc_wcs);
+  expect(r.scTips.sc_corner, 'corner').toBe(r.helpByType.sc_corner);
+  // a block WITHOUT declared help keeps the default "<label> (<category>)" tooltip — unchanged, not a help string
+  expect(r.plainTip, 'a no-help block keeps the default label/category tooltip').toMatch(/\(.+\)$/);
+  expect(r.helpVals, 'and is not any structural help string').not.toContain(r.plainTip);
 });
 
 // (4) BYTE-PARITY — the controls emit nothing: at a fixed structural value the twin == cornerStack (spot-check via the op emit)

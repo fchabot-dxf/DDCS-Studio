@@ -212,7 +212,9 @@ function jsonDef(def) {
         // t152 — user_root uses EXTERNAL inputs (inputsInline:false) so its dummy mouth-LABEL rows each stay on their own
         // row (the block label / Presentation / Execution don't merge into one cramped row); every other block stays inline.
         type: def.type, message0: message0.trim() || def.label, args0, inputsInline: def.kind !== 'user_root',
-        style: catSlug(def.category) + '_style', tooltip: `${def.label} (${def.category})`,
+        // DECLARED HELP SLOT (1c): a def with a `help` string uses it as the block tooltip (the plain-string form v13
+        // applies via setTooltip during jsonInit); a def without help keeps the default "<label> (<category>)".
+        style: catSlug(def.category) + '_style', tooltip: def.help || `${def.label} (${def.category})`,
     };
     // t146 — each statement-input MOUTH on its OWN row below the header (message1, message2, …), with an optional
     // sub-label. Generalized: user_root's 2 mouths, param_group + section's DO, and every isWrap kind's DO.

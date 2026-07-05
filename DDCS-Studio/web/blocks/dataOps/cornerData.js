@@ -170,12 +170,12 @@ export const CORNER_STRUCT_BINDINGS = [
     { param: 'probeZFirst', type: 'bool', default: !!CORNER_DEFAULTS.probeZFirst, label: 'Probe Z First', help: 'Probe the top surface for Z before the two walls — anchors the sideways probes to a real measured Z instead of a jogged guess.', section: 'GEOMETRY' },
     { param: 'travelApproach', type: 'enum', default: CORNER_DEFAULTS.travelApproach, label: 'Travel', help: 'Auto = the machine moves itself between the walls; Manual = you jog to each start and press Cycle Start (operator-in-the-loop).', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']] } },
     // ② B4 step 4c — the 7-way WCS target: 'active' reads the controller's #578, or write a fixed G54..G59 slot directly.
-    { param: 'wcs', type: 'enum', default: CORNER_DEFAULTS.wcs, label: 'WCS', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
+    { param: 'wcs', type: 'enum', default: CORNER_DEFAULTS.wcs, label: 'WCS', help: 'Which work-coordinate register to store the found corner into — Active uses the currently-selected WCS; G54..G59 write that specific register.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
     // ② B4 step 4d — dual-gantry sync: a bool block-ADD (appends G1 A0 + the slave-offset write #74=[#70+slave], #[#74]=#883).
-    { param: 'syncA', type: 'bool', default: !!CORNER_DEFAULTS.syncA, label: 'Dual-Gantry Sync A', section: 'GEOMETRY' },
+    { param: 'syncA', type: 'bool', default: !!CORNER_DEFAULTS.syncA, label: 'Dual-Gantry Sync A', help: 'Dual-gantry: also write the found corner to the slave A-axis WCS, keeping a twin-motor gantry squared. A WCS write only — no extra motion.', section: 'GEOMETRY' },
     // ③b — corner quadrant + probe order: value/order swaps driven by the 8-way corner×probeSeq guard (NOT prune-add/remove).
-    { param: 'corner', type: 'enum', default: CORNER_DEFAULTS.corner, label: 'Corner', section: 'GEOMETRY', widgetConfig: { options: [['Front-Left', 'FL'], ['Front-Right', 'FR'], ['Back-Left', 'BL'], ['Back-Right', 'BR']] } },
-    { param: 'probeSeq', type: 'enum', default: CORNER_DEFAULTS.probeSeq, label: 'Probe Order', section: 'GEOMETRY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
+    { param: 'corner', type: 'enum', default: CORNER_DEFAULTS.corner, label: 'Corner', help: 'Which corner of the stock you are probing — sets the two walls and their approach directions (Front-Left / Front-Right / Back-Left / Back-Right).', section: 'GEOMETRY', widgetConfig: { options: [['Front-Left', 'FL'], ['Front-Right', 'FR'], ['Back-Left', 'BL'], ['Back-Right', 'BR']] } },
+    { param: 'probeSeq', type: 'enum', default: CORNER_DEFAULTS.probeSeq, label: 'Probe Order', help: 'Which wall to probe first — Y-wall then X-wall, or X then Y.', section: 'GEOMETRY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
 ];
 
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars
