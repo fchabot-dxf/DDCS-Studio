@@ -52,13 +52,13 @@ test('a re-probe REFINES the axis (fast→slow), it does NOT reset the accumulat
   expect(s.datum, 'datum shown (Z + X written)').toBe(true);
 });
 
-test('FEED → SIZE: a SLOWER probe makes a SMALLER disc than a faster probe', async ({ page }) => {
+test('FEED → SIZE (t319 flip): a SLOWER probe makes a BIGGER disc than a faster probe (slow=bigger, matching the 2D pulse)', async ({ page }) => {
   await setup(page, 'G54\nG31 Z-15 F3000\nM30');
   const r = await page.evaluate(() => {
     const v = window.__gpPanel.viz;
     return { slow: v._burstRadiusPx(50), fast: v._burstRadiusPx(3000), mid: v._burstRadiusPx(250) };
   });
-  expect(r.slow, 'slow (F50) disc is SMALLER than fast (F3000)').toBeLessThan(r.fast);
-  expect(r.slow).toBeLessThan(r.mid);
-  expect(r.fast).toBeGreaterThan(r.mid);
+  expect(r.slow, 'slow (F50) disc is BIGGER than fast (F3000) — t319 flipped faster-bigger → slow-bigger').toBeGreaterThan(r.fast);
+  expect(r.slow).toBeGreaterThan(r.mid);
+  expect(r.fast).toBeLessThan(r.mid);
 });

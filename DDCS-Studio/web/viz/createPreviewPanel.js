@@ -184,6 +184,8 @@ export function createPreviewPanel(container, opts = {}) {
     let atcChoreo = null, atcStation = null, lastTool = null, deviceIoListener = null;
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '', curAnchor = false;
     let toolPosSubs = [];   // t309 — live-tool-position subscribers (the Layout animation overlay). Fed the SAME engine head as the 3D/2D, in ANY view mode; cb(pos, segIndex) each tick, cb(null,0) on stop.
+    let touchSubs = [];      // t319/INC-6 — on-touch (G31 contact) subscribers (the Layout overlay's pulse). cb({pos, axis, feed, slow, pass, speed}).
+    let lastPass = 0;        // the live tool's current pass index (from onPositionChange) — the pulse rides the SAME per-pass anchored frame as the head
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
     // DRO — a dual numeric readout mirroring the DDCS controller: Work (the tool's program position) + Mach. Work comes
@@ -262,6 +264,15 @@ export function createPreviewPanel(container, opts = {}) {
         for (let i = 0; i < segs.length; i++) { const s = segs[i], dx = s.x2 - pos.x, dy = s.y2 - pos.y, dd = dx * dx + dy * dy; if (dd < bd) { bd = dd; bi = i; } }
         return bi + 1;
     };
+    // t319/INC-6 — a G31 CONTACT: fire the touch pulse into the top 2D + the Layout overlay (the 3D already flashes its
+    // own disc via viz.probeAxisTouched). SLOW = a fine re-probe (feed < the program's max probe feed) → a BIGGER pulse.
+    function firePulse(axis) {
+        const p = (engine && engine.pos) || {}, feed = (engine && engine.feedVal) || 0;
+        let maxPF = 0; for (const s of segs) { if ((s.type === 'probe' || s.probe) && (s.feed || 0) > maxPF) maxPF = s.feed; }
+        const ev = { pos: { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0 }, axis, feed, slow: feed > 0 && feed < maxPF, pass: lastPass, speed: simSpeed() };
+        if (t2 && t2.pulse) t2.pulse(ev);
+        for (const cb of touchSubs) cb(ev);
+    }
 
     function ensureViz() {
         if (viz) return viz;
@@ -305,7 +316,7 @@ export function createPreviewPanel(container, opts = {}) {
                 if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`);
                 // SLICE 3: a previous G31 has now FINISHED (the engine clamped it to the contact; the tool sits there) →
                 // build that axis of the probe-WCS. Resolving on the NEXT line guarantees the tool is at the contact.
-                if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe, engine.feedVal); flashDro(); }   // probe re-references the DRO (feedVal = the just-finished probe's feed → disc size)
+                if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe, engine.feedVal); flashDro(); firePulse(pendingProbe); }   // probe re-references the DRO (feedVal = the just-finished probe's feed → disc size); t319 — pulse the 2D + Layout too
                 pendingProbe = null;
                 // DATUM = the WCS-WRITE event (DEFERRED read). onLineChange fires BEFORE the assign executes, so the write
                 // detected last line has now run → read the engine's OWN computed value at the target address (robust to ANY
@@ -343,11 +354,11 @@ export function createPreviewPanel(container, opts = {}) {
                     if (c) { const r = engine.vars.get(6); if (Number.isFinite(r)) viz.nudgeSurface(c.axis, r * c.sign); }
                 }
             },
-            onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } if (toolPosSubs.length) { const k = segs.length ? nearest2d(pos) : 0; for (const cb of toolPosSubs) cb(pos, k); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
+            onPositionChange: (pos) => { lastPass = pos.pass || 0; if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } if (toolPosSubs.length) { const k = segs.length ? nearest2d(pos) : 0; for (const cb of toolPosSubs) cb(pos, k); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
             onStatus: ({ message }) => setStatus(message),
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
-                if (pendingProbe && viz && viz.probeAxisTouched) viz.probeAxisTouched(pendingProbe, engine.feedVal);   // SLICE 3: a trailing G31 (last line)
+                if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe, engine.feedVal); firePulse(pendingProbe); }   // SLICE 3: a trailing G31 (last line) — t319 pulse too
                 pendingProbe = null;
                 if (pendingDatum && engine.vars && viz && viz.markDatumWrite) {   // a trailing WCS write (last line) → flush its committed value
                     const val = engine.vars.get(pendingDatum.target);
@@ -813,5 +824,6 @@ export function createPreviewPanel(container, opts = {}) {
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
         getAnchor: () => curAnchor,                                                       // t309 — the anchored/absolute frame flag (feed the overlay so its path frame matches)
         onToolPos: (cb) => { if (typeof cb === 'function') toolPosSubs.push(cb); return () => { toolPosSubs = toolPosSubs.filter((f) => f !== cb); }; },   // t309 — subscribe to the live engine head (fires in ANY mode); returns an unsubscribe
+        onProbeTouch: (cb) => { if (typeof cb === 'function') touchSubs.push(cb); return () => { touchSubs = touchSubs.filter((f) => f !== cb); }; },   // t319 — subscribe to G31 contacts (the Layout pulse); cb({pos, axis, feed, slow, pass, speed})
         get viz() { return viz; }, get engine() { return engine; }, el: container };
 }

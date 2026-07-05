@@ -19,7 +19,7 @@ import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
 import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
-import { PATH_TYPES, PATH_STATE, FEED_LOW, FEED_HIGH } from './pathStyle.js';   // t317 — the ONE declared path-visual palette, shared with the 2D + the legend
+import { PATH_TYPES, PATH_STATE, FEED_LOW, FEED_HIGH, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend
 
 export class GcodeViz3D {
     constructor(container) {
@@ -175,7 +175,7 @@ export class GcodeViz3D {
         // the AXIS LINE (the 2-plane intersection, along the un-probed axis — CYAN) + the DATUM point (where the planes
         // cross — GOLD, a different colour). Both vanish when the next probe LOOP starts. Constant-screen in _scaleMarkers.
         this._datumColor = 0xff2d2d; this._lineColor = 0x00e5ff;   // DATUM = RED 2-axis crosshair (was a gold sphere)
-        this._probeDiscFadeMs = 16000;                                  // disc lifetime at 1× (scaled by the live sim speed) — longer-lived (user request)
+        this._probeDiscFadeMs = TOUCH_PULSE.fadeMs;                     // t319 — disc lifetime = the ONE declared touch-pulse fade (16s sim, SAME both previews); scaled by the live sim speed
         this._probeBurstBasePx = 200; this._probeBurstRefFeed = 250;    // disc radius px = base × clamp(√(feed/ref), .6, 1.8) — FASTER → bigger (LARGER disc, user)
         this._probeLinePx = 200; this._probeLineRadPx = 0.8; this._simSpeed = 1;   // THIN axis line (length spans the scene — see _scaleMarkers)
         // DATUM gizmo — a thin RED 2-axis CROSSHAIR, a PEER of the stock-WCS crosshair (same LineSegments style; red vs amber).
@@ -1997,10 +1997,11 @@ export class GcodeViz3D {
         requestAnimationFrame(tick);
     }
 
-    // Feed → disc radius in PX: SLOWER/fine probe (small feed) → SMALLER disc, FASTER/rough → bigger (clamped). User's request.
+    // Feed → disc radius in PX. t319: SLOW/fine probe (small feed) → BIGGER disc, FAST/rough → smaller (FLIPPED to match
+    // the 2D pulse's slow=bigger; the sqrt(ref/f) inverts the old sqrt(f/ref)).
     _burstRadiusPx(feed) {
         const f = feed > 0 ? feed : this._probeBurstRefFeed;
-        return this._probeBurstBasePx * Math.max(0.6, Math.min(1.8, Math.sqrt(f / this._probeBurstRefFeed)));
+        return this._probeBurstBasePx * Math.max(0.6, Math.min(1.8, Math.sqrt(this._probeBurstRefFeed / f)));
     }
 
     // (A) A TRANSIENT SOLID additive disc (no blur) in the plane PERP to `axis`, IMMOBILE at the probe contact `localPos`
@@ -2012,7 +2013,7 @@ export class GcodeViz3D {
         const px = this._burstRadiusPx(feed);
         const flashes = (feed > 0 && feed < this._probeBurstRefFeed * 0.5) ? 4 : 3;   // SLOW/fine touch (low feed) flashes 4×, fast 3× (user)
         const normal = axis === 'x' ? new THREE.Vector3(1, 0, 0) : axis === 'y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
-        const mat = new THREE.MeshBasicMaterial({ color: this._lineColor, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, side: THREE.DoubleSide });
+        const mat = new THREE.MeshBasicMaterial({ color: TOUCH_PULSE.color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false, side: THREE.DoubleSide });   // t319 — the declared WHITE touch-pulse (was the cyan _lineColor)
         const disc = new THREE.Mesh(new THREE.CircleGeometry(1, 48), mat);
         disc.position.set(localPos.x, localPos.y, localPos.z);   // FIXED at the contact (part-local) — never moved
         disc.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);   // perp to the probed axis

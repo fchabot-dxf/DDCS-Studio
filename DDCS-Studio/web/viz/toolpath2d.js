@@ -14,7 +14,7 @@
  */
 import { traceToolpath } from '../engine/trace.js';
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE draws from the RUNTIME END of the previous pass (t107 machine-faithful, via passEnds), else the static previous START (t94), not its own net-endpoint marker
-import { PATH_TYPES, PATH_STATE, HEAD, feedRgb, hexCss } from './pathStyle.js';   // t317 — the ONE declared path-visual palette (type × state), shared with the 3D + the legend
+import { PATH_TYPES, PATH_STATE, HEAD, TOUCH_PULSE, pulsePx, feedRgb, hexCss } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette (type × state) + the touch-pulse token, shared with the 3D + the legend
 
 // Colours + progress states are the ONE declared source in viz/pathStyle.js (t317) — rapid=yellow(dashed),
 // retract=green, probe=blue(slow=light blue, dotted), feed=a blue→teal gradient by DEPTH (Z) which also surfaces the
@@ -56,6 +56,9 @@ export function createToolpath2d(canvas, opts = {}) {
     let toolPos = null;              // LIVE tool/probe position from the sim (engine onPositionChange) → the moving head marker
     let drag = null, dragStart = null;   // dragStart = the per-pass start INDEX being dragged (null = none)
     const anim = { playing: false, k: 0, raf: null };
+    const pulses = [];          // t319/INC-6 — active on-touch pulses [{x,y,pass,axis,slow,prog,speed,flashes,last}]; drawn as the HONEST top-view projection (Z=circle, X/Y wall=line)
+    let pulseRaf = null;
+    const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
     const W = () => canvas.clientWidth, H = () => canvas.clientHeight;
     const tx = (x) => view.ox + x * view.scale;
@@ -156,7 +159,7 @@ export function createToolpath2d(canvas, opts = {}) {
         const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
         if (!view) return;
         canvas.__t2view = view;   // expose the world→screen transform (debug + tests): sx=ox+x*scale, sy=oy-y*scale
-        if (overlay) { drawPath(ctx, anim.playing ? Math.floor(anim.k) : null); return; }   // t309 — overlay = path + head only; the SVG under-lays the grid/stock/handles
+        if (overlay) { drawPath(ctx, anim.playing ? Math.floor(anim.k) : null); drawPulses(ctx); return; }   // t309/t319 — overlay = path + head + touch pulses; the SVG under-lays the grid/stock/handles
         const foot = footprint(), step = stepFor(foot);
         drawGrid(ctx, foot, step);
         const env = envelopeRect(); if (env) drawRect(ctx, env, 'rgba(108,122,140,0.55)', null);
@@ -168,6 +171,7 @@ export function createToolpath2d(canvas, opts = {}) {
         }
         drawOriginAxes(ctx, foot);
         drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
+        drawPulses(ctx);   // t319 — the on-touch pulses over the path
         drawLabels(ctx, foot, step, w, h);
         if (starts.length) drawStartHandles(ctx);
         canvas.__t2starts = starts.map((s, i) => ({ i, sx: sptx(s.x), sy: spty(s.y), x: s.x, y: s.y, source: startSources[i] || 'auto', emits: !!startEmits[i] }));   // debug + tests: the drawn per-pass start handles + colour source + SHAPE (emits)
@@ -331,6 +335,38 @@ export function createToolpath2d(canvas, opts = {}) {
     function toggle() { if (anim.playing) { stop(); return false; } play(); return anim.playing; }
     function seek(k) { anim.playing = true; anim.k = k; if (view) paint(); else fit(); }
 
+    // ---- on-touch PULSE (t319/INC-6) — a transient white flash at each G31 contact, in lockstep with the red head ----
+    // The HONEST TOP-VIEW PROJECTION by axis: a Z/surface touch is a CIRCLE (the disc face-on); an X/Y WALL touch is a
+    // LINE along the wall tangent (the disc edge-on). SLOW = BIGGER (fine re-probe). Fades over TOUCH_PULSE.fadeMs of SIM
+    // time (speed-scaled) — SAME both previews. Positioned via ptx/pty (the SAME per-pass anchored frame as the head).
+    function pulse(ev) {
+        if (!ev || !ev.pos) return;
+        pulses.push({ x: +ev.pos.x || 0, y: +ev.pos.y || 0, pass: ev.pass, axis: String(ev.axis || 'z').toLowerCase(), slow: !!ev.slow, speed: +ev.speed || 1, flashes: ev.slow ? 4 : 3, prog: 0, last: nowMs() });
+        if (!pulseRaf) pulseLoop();
+    }
+    function pulseLoop() {
+        const t = nowMs();
+        for (const p of pulses) { const dt = t - p.last; p.last = t; p.prog = Math.min(1, p.prog + (dt * (p.speed || 1)) / (TOUCH_PULSE.fadeMs || 16000)); }
+        for (let i = pulses.length - 1; i >= 0; i--) if (pulses[i].prog >= 1) pulses.splice(i, 1);
+        if (view) paint();
+        pulseRaf = pulses.length ? requestAnimationFrame(pulseLoop) : null;
+    }
+    function drawPulses(ctx) {
+        if (!pulses.length || !view) return;
+        const col = hexCss(TOUCH_PULSE.color);
+        for (const p of pulses) {
+            const u = p.prog, flash = Math.abs(Math.sin(u * p.flashes * Math.PI)), fade = u < 0.75 ? 1 : Math.max(0, 1 - (u - 0.75) / 0.25);
+            const a = TOUCH_PULSE.alpha * flash * fade; if (a <= 0.002) continue;
+            const cx = ptx(p.x, p.pass), cy = pty(p.y, p.pass), r = pulsePx(p.slow);
+            ctx.save(); ctx.globalAlpha = a; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.beginPath();
+            if (p.axis === 'z') ctx.arc(cx, cy, r, 0, Math.PI * 2);                    // Z/surface → CIRCLE (Ø = the disc face-on)
+            else if (p.axis === 'x') { ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r); }  // X wall (probe in X, wall runs along Y) → a VERTICAL tangent LINE
+            else { ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy); }                    // Y wall → a HORIZONTAL tangent LINE
+            ctx.stroke(); ctx.restore();
+        }
+    }
+    canvas.__t2pulses = pulses;   // debug + tests: the active pulse list
+
     // ---- interaction: wheel zoom (about cursor) + drag pan + hover readout (pointer events → touch too) ----
     canvas.addEventListener('wheel', (e) => {
         if (!view) return; e.preventDefault();
@@ -369,7 +405,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
     return {
-        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, setViewTransform, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, setViewTransform, pulse, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

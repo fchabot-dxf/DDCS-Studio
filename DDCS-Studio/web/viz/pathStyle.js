@@ -38,6 +38,14 @@ export const PATH_STATE = {
 /** The live red probe-head dot (the moving tool tip). */
 export const HEAD = { color: 0xff2a44, r: 4 };
 
+/** The ON-TOUCH PULSE (t319/INC-6) — a transient white flash at each G31 contact, in lockstep with the red probe head,
+ *  in BOTH previews. Colour is shared; the 2D draws the HONEST TOP-VIEW PROJECTION (a CIRCLE for a Z/surface touch, a
+ *  LINE along the wall tangent for an X/Y wall touch) at screen-space fastPx/slowPx (SLOW = BIGGER); the 3D keeps its
+ *  oriented feed-scaled disc but reads the same colour + fadeMs. fadeMs = SIM-time fade (speed-scaled), same both. */
+export const TOUCH_PULSE = { color: 0xffffff, alpha: 0.3, fastPx: 7, slowPx: 14, fadeMs: 16000 };
+/** The pulse screen size for a touch: SLOW (fine re-probe) is BIGGER than FAST. */
+export const pulsePx = (slow) => (slow ? TOUCH_PULSE.slowPx : TOUCH_PULSE.fastPx);
+
 /** Feed depth-gradient lerp for the 2D: FEED_LOW→FEED_HIGH by t∈[0,1] → an 'rgb(r,g,b)' string (byte-identical to
  *  the old lerpHex). The 3D lerps the same endpoints per-vertex via THREE.Color. */
 export function feedRgb(t) {

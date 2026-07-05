@@ -37,6 +37,7 @@ function wireAnimOverlay(container, fc, panel, starts, passEnds, sources) {
         container.__animOverlay = ov;
         fc.onTransform((tf) => tp.setViewTransform(_pinFromTf(tf)));   // re-pin on every pan / zoom / fit / resize / render
         panel.onToolPos((pos, k) => { if (pos) { tp.seek(k); tp.setToolPosition(pos); } else tp.stop(); });   // live head from the ONE engine (fires in any mode); stop → clear the head + static path
+        if (panel.onProbeTouch) panel.onProbeTouch((ev) => tp.pulse(ev));   // t319 — the on-touch pulse (Z circle / wall line) in lockstep with the 3D disc + the red head
         tp.setViewTransform(_pinFromTf(fc.getTransform()));           // initial pin (the FeatureCanvas already drew before the overlay existed)
     }
     // Feed the SAME trace + frame the top 2D panel uses → the path emanates from / arrives at the same worlds the SVG handles do.
