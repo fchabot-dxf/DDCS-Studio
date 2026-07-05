@@ -20,26 +20,66 @@ const AX = {
 };
 const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
 
-/** Edge params → its probe-macro block stack. The one source of truth for both displays. */
-export function edgeStack(params = {}) {
-    const axis = params.axis === 'Y' ? 'Y' : 'X', av = AX[axis];
-    const dir = params.dir === 'neg' ? 'neg' : 'pos', plus = dir === 'pos';
+/** Edge params → its probe-macro block stack. The one source of truth for both displays.
+ *  `opts.superset` (EDGE-PORT E1) seeds the DATA TWIN as an all-arms template: the wcs base (7-way), the confirm+probe
+ *  region (axis×dir, 4-way) and the WCS write (axis×wcs, address offset + target label) each emit EVERY structural arm
+ *  wrapped in a `guard`, so instantiate() prunes to the concrete shape. Superset OFF (the built-in + every existing
+ *  caller/test) is BYTE-IDENTICAL to today — the fork helpers return the concrete arm INLINE. Mirrors cornerStack. */
+export function edgeStack(params = {}, opts = {}) {
+    const axis = params.axis === 'Y' ? 'Y' : 'X';
+    const dir = params.dir === 'neg' ? 'neg' : 'pos';
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const dist = num(params.dist, 15), retract = num(params.retract, 2), radius = num(params.radius, 2);
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const level = num(params.level, 0);
-    const probeVar = plus ? '#8' : '#7', retractVar = plus ? '#9' : '#10', limitVal = plus ? '2' : '1';
-    const compOp = plus ? '+' : '-';   // edge is at trigger ± stylus radius (toward the probe direction)
 
     const S = [];
     const C = (text) => { const b = newBlock('comment'); b.params = { text }; S.push(b); };
     const A = (v, value, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(value), note: note || '' }; S.push(b); };
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
-    const IF = (lhs, op, rhs, goto) => { const b = newBlock('ifgoto'); b.params = { lhs, op, rhs, goto }; S.push(b); };
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const END = () => { S.push(newBlock('endprogram')); };
-    
+
+    // ── EDGE-PORT E1 — the guarded superset (mirror cornerStack). Block-RETURNING makers + fork helpers; superset OFF
+    // returns the concrete arm INLINE (byte-identical). axis/dir/wcs are the structural drivers instantiate() prunes.
+    const superset = !!opts.superset;
+    const GUARD = (when, kids) => { const b = newBlock('guard'); b.params = { when }; b.children = kids; return b; };
+    const mkC = (t) => { const b = newBlock('comment'); b.params = { text: t }; return b; };
+    const mkA = (v, value, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(value), note: note || '' }; return b; };
+    const mkIF = (lhs, op, rhs, goto) => { const b = newBlock('ifgoto'); b.params = { lhs, op, rhs, goto }; return b; };
+    const mkDM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; return b; };
+    const AXES = ['X', 'Y'], DIRS = ['pos', 'neg'], WCS_VALUES = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
+    const wcsLabelOf = (w) => (w === 'active' ? 'Active WCS' : w);
+    // wcs BASE blocks — 'active' reads #578→#70; a fixed G54..G59 uses the literal base. 7-way wcsFork.
+    const wcsBaseOf = (w) => (w === 'active'
+        ? [mkC('Read Active WCS'), mkA('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'), mkA('#72', '[#71-1]', 'Zero-based index'), mkA('#70', '[805+[#72*5]]', 'Base WCS address')]
+        : [mkC(`Target: ${w}`), mkA('#70', WCS_BASE[w], 'Base WCS address')]);
+    const wcsFork = (fn) => (superset ? WCS_VALUES.map((w) => GUARD({ param: 'wcs', is: w }, fn(w, wcsLabelOf(w)))) : fn(wcs, wcsLabel));
+    // the confirm + one-wall probe for a given axis×dir (its KIND-B prompt/comment + the per-combo vars/sign). 4-way adFork.
+    // PROBE-SURFACE BLOCK (t125): composes the shared probe primitive; functional G-code byte-identical to the old touch.
+    const probeArm = (a, d) => {
+        const AV = AX[a], p = d === 'pos';
+        return [
+            mkA('#1505', 1, `Press Enter to probe ${a} ${d} - ESC=cancel`),
+            mkIF('#1505', '==', '0', 2),
+            mkDM('inc'),
+            ...probeSurfaceStack({
+                axis: a, dir: p ? '+' : '-', comment: `Probe ${a} ${d}`,
+                stopVar: AV.stop, limitVar: AV.limit, limitVal: p ? '2' : '1',
+                probeVar: p ? '#8' : '#7', retractVar: p ? '#9' : '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
+                twoPass: true, raw: AV.result, result: '#50', radius: '#6', compEnable: true,
+                compNote: 'Edge = trigger +/- stylus radius',
+            }),
+        ];
+    };
+    const adFork = (fn) => (superset ? AXES.map((a) => GUARD({ param: 'axis', is: a }, DIRS.map((d) => GUARD({ param: 'dir', is: d }, fn(a, d))))) : fn(axis, dir));
+    // the WCS write — the address OFFSET forks on axis (#[#70+0]/#[#70+1]); the target LABEL forks on wcs. axis×wcs.
+    const wcsWriteArm = (a, w) => [mkA(`#[#70+${AX[a].off}]`, '#50', `Set ${wcsLabelOf(w)} ${a} to edge`)];
+    const wcsWriteFork = superset
+        ? AXES.map((a) => GUARD({ param: 'axis', is: a }, WCS_VALUES.map((w) => GUARD({ param: 'wcs', is: w }, wcsWriteArm(a, w)))))
+        : wcsWriteArm(axis, wcs);
+
     C('Motion Variables');
     A('#1', dist, 'Max probe distance'); A('#2', retract, 'Retract distance');
     A('#3', fFast, 'Fast feedrate'); A('#4', fSlow, 'Slow feedrate'); A('#5', port, 'Probe port');
@@ -48,30 +88,11 @@ export function edgeStack(params = {}) {
     C('Pre-calculated motion values');
     A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
     A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract');
-    if (wcs === 'active') {
-        C('Read Active WCS');
-        A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc');
-        A('#72', '[#71-1]', 'Zero-based index');
-        A('#70', '[805+[#72*5]]', 'Base WCS address');
-    } else {
-        C(`Target: ${wcs}`); A('#70', WCS_BASE[wcs], 'Base WCS address');
-    }
+    S.push(...wcsFork((w) => wcsBaseOf(w)));
     C('Confirm Start');
-    A('#1505', 1, `Press Enter to probe ${axis} ${dir} - ESC=cancel`);
-    IF('#1505', '==', '0', 2);
-    DM('inc');
-    // PROBE-SURFACE BLOCK (t125 inc1): compose the shared probe primitive instead of hand-rolling the G31 sequence.
-    // It bundles the stylus-radius comp (#50=[#1925±#6]) as a DECLARED toggleable property + emits the @DDCS surface
-    // marker. Functional G-code is BYTE-IDENTICAL to the old hand-rolled touch (the marker is an additive comment).
-    S.push(...probeSurfaceStack({
-        axis, dir: compOp, comment: `Probe ${axis} ${dir}`,
-        stopVar: av.stop, limitVar: av.limit, limitVal,
-        probeVar, retractVar, feedFast: '#3', feedSlow: '#4', port: '#5', level,
-        twoPass: true, raw: av.result, result: '#50', radius: '#6', compEnable: true,
-        compNote: 'Edge = trigger +/- stylus radius',
-    }));
+    S.push(...adFork((a, d) => probeArm(a, d)));
     C('Write to WCS');
-    A(`#[#70+${av.off}]`, '#50', `Set ${wcsLabel} ${axis} to edge`);
+    S.push(...wcsWriteFork);
     DM('abs'); A('#1505', '-5000', 'Edge found'); GO(2);
     LB(1); DM('abs'); A('#1505', 1, 'Probe failed - no contact');
     LB(2); END();
