@@ -23,7 +23,7 @@ const GLYPH_SVG =
     '<circle class="psrc-dot" cx="5" cy="5" r="2" fill="currentColor"/>' +
     '</svg>';
 
-function applyState(input, btn, field) {
+function applyState(input, btn, field, gate) {
     const src = probeSrc(field);   // {ctrl,pr,label} when lit, else null
     const isSelect = input.tagName === 'SELECT';
     if (src) {
@@ -31,9 +31,12 @@ function applyState(input, btn, field) {
             input.disabled = true;     // selects can't display the var; glyph + tooltip carry it
         } else {
             if (input.dataset.psrcStudio === undefined) input.dataset.psrcStudio = input.value;
+            if (input.dataset.psrcType === undefined) input.dataset.psrcType = input.type;
+            input.type = 'text';           // a number input can't display "#1078" — show the runtime var as text
             input.value = src.ctrl;
             input.readOnly = true;
         }
+        if (gate) input.setAttribute('data-op-gated', '');   // declared lock: postGating re-enables .disabled controls; readOnly + this survive it (t253 contract)
         input.classList.add('psrc-ctrl');
         btn.classList.add('psrc-lit');
         btn.title = `${src.label}: reads ${src.pr} (${src.ctrl}) on the controller at runtime — click to override with a Studio value`;
@@ -41,40 +44,52 @@ function applyState(input, btn, field) {
         if (isSelect) {
             input.disabled = false;
         } else {
+            if (input.dataset.psrcType !== undefined) {
+                input.type = input.dataset.psrcType;   // restore the original input type (e.g. number)
+                delete input.dataset.psrcType;
+            }
             if (input.dataset.psrcStudio !== undefined) {
                 input.value = input.dataset.psrcStudio;
                 delete input.dataset.psrcStudio;
             }
             input.readOnly = false;
         }
+        if (gate) input.removeAttribute('data-op-gated');
         input.classList.remove('psrc-ctrl');
         btn.classList.remove('psrc-lit');
         btn.title = 'Studio value — click to read this from the controller’s parameter page at runtime';
     }
 }
 
-/** Decorate one input (idempotent). No-op when the active profile has no var for the field. */
-export function decorateInput(inputId, field) {
-    const input = el(inputId);
+/** Decorate one input ELEMENT (idempotent). No-op when the active profile has no var for the field. `opts.gate`
+ *  also stamps `data-op-gated` on the locked field so postGating (which re-enables `.disabled` controls) leaves the
+ *  lock alone — the DATA-OP form passes it; the built-in inputs lock via `readOnly`, which postGating never touches. */
+export function decorateInputEl(input, field, opts) {
     if (!input || !probeSrcAvailable(field)) return;
-    let btn = input.parentElement?.querySelector?.(`.psrc-glyph[data-for="${inputId}"]`);
+    const gate = !!(opts && opts.gate);
+    let wrap = (input.parentElement && input.parentElement.classList.contains('psrc-wrap')) ? input.parentElement : null;
+    let btn = wrap ? wrap.querySelector('.psrc-glyph') : null;
     if (!btn) {
-        const wrap = document.createElement('span');
+        wrap = document.createElement('span');
         wrap.className = 'psrc-wrap';
         input.parentNode.insertBefore(wrap, input);
         wrap.appendChild(input);
         btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'psrc-glyph';
-        btn.dataset.for = inputId;
         btn.innerHTML = GLYPH_SVG;
         wrap.appendChild(btn);
         btn.addEventListener('click', () => {
             setProbeSrc(field, probeSrc(field) ? 'studio' : 'ctrl');  // saveSettings broadcasts → wizard re-renders
-            applyState(input, btn, field);
+            applyState(input, btn, field, gate);
         });
     }
-    applyState(input, btn, field);
+    applyState(input, btn, field, gate);
+}
+
+/** Decorate by input ID (the built-in forms' entry — id-addressable inputs; no gate → locks via readOnly only). */
+export function decorateInput(inputId, field) {
+    decorateInputEl(el(inputId), field);
 }
 
 /** Decorate all of a view's declared probe-config inputs. Called by wizardManager on open. */

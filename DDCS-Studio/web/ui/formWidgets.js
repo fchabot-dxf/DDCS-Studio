@@ -13,6 +13,7 @@
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 import { buildRegions, paintRegions, regionValueFromEvent, regionLabel } from './regionPickSvg.js';
 import { FeatureCanvas } from '../viz/featureCanvas.js';
+import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inline source dot the built-in forms use, on sourceField bindings
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const ROW_CSS = 'display:flex; align-items:center; justify-content:space-between; gap:14px; margin:9px 0;';
@@ -52,11 +53,7 @@ function numberWidget(host, b) {
     if (b.socketHeld) { inp.value = ''; inp.placeholder = 'auto'; } else { inp.value = b.default ?? 0; }
     inp.style.cssText = CTRL_CSS + ' width:120px;';
     inp.dataset.param = b.param;   // so a 2D-preview handle can write this field back (drag-to-edit derives from roles)
-    // t87 — source-chips: a probe field the user opted 'ctrl' (on a profile with a native register) is provided by the
-    // CONTROLLER — GREY the input + tooltip the Pr (the emit uses the register, not this literal). post-field-gating pattern.
-    const src = (b.sourceField && typeof window !== 'undefined' && window.ddcsProbeSrc) ? window.ddcsProbeSrc(b.sourceField) : null;
-    if (src) { inp.disabled = true; inp.style.opacity = '.5'; inp.title = `From the controller (${src.pr || src.label || 'register'}) — change in Settings ▸ Probes`; }
-    host.append(labelSpan(b), inp);
+    host.append(labelSpan(b), inp);   // t289 — source-chips: a sourceField binding is decorated with the inline source dot in the renderOpForm post-pass
     // An UNTOUCHED field must not inject a value that overwrites the template's own (per-structural-combo) socket:
     //   • t114 SOCKET-HELD (no spec default → the socket holds a per-combo expression, e.g. corner #21-#24 which change with
     //     corner×probeSeq): OMIT unless the user TYPED a finite number → instantiate keeps the pruned per-combo socket. This
@@ -399,6 +396,15 @@ export function renderOpForm(host, bindings) {
         if (unit.length > 1 && !MULTI_WIDGETS.has(unit[0] && unit[0].widget)) {
             for (const b of unit) addRow(b, b && b.param);
         } else addRow(unit, unit[0] && unit[0].param);
+    }
+    // t289 — SOURCE CHIPS (parity-gap #2): a binding whose `sourceField` maps to a controller register gets the SAME
+    // inline source dot the built-in forms use. Click toggles studio↔controller (the global per-field setting both
+    // surfaces share → the wizard re-generates on ddcs:settings-changed → the emit follows); ctrl-mode locks via
+    // readOnly + data-op-gated (NOT disabled — postGating re-enables disabled). No-op on a profile without the register.
+    for (const b of (bindings || [])) {
+        if (!b || !b.sourceField) continue;
+        const inp = host.querySelector(`[data-param="${b.param}"]`);
+        if (inp) decorateInputEl(inp, b.sourceField, { gate: true });
     }
     return readers;
 }
