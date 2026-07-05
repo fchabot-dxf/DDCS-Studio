@@ -19,6 +19,7 @@ const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveP
 import { builderOf, makeOp, _framed, _builderAtoms } from './opBuilders.js';   // the BUILDERS leaf (federated resolver)
 import { flattenBlocks } from './userOps.js';   // ONE pre-order walk shared with devMode (group writeback indexes it)
 import { regionParamsFromDesc } from '../wizards/pocketWizard.js';
+import { resolveMethod } from '../wizards/atcModel.js';   // fix B: resolve method (incl. legacy mode/magType) for the declared-param reconcile fallback
 import { regionDesc } from '../wizards/ops/region.js';
 import { offsetRegion } from '../wizards/ops/contour.js';
 // find() recurses into block children (incl. op-containers), so reconcilers locate their inner blocks
@@ -251,7 +252,20 @@ const RECONCILERS = {
         }
         // GENERIC / DISK: ASSUMED magazine pick & place (#100 target table).
         const tgt = asn('#100'), zc = asn('#102');
-        if (!tgt) return null;   // not a change op (e.g. the "not available" stub)
+        if (!tgt) {
+            // DECLARE-NOT-INFER fallback (fix B): a method-agnostic emit — the T# M6 call OR the new inline tncProgram
+            // RAW body — carries no #100/O10102 to reverse-parse. Read the DECLARED method/callMacro off the op-container
+            // (resolveMethod covers legacy mode/magType ops). For fixedT (the one editable field) A1 lets a Blocks EDIT
+            // of the RAW `T# M6` word WIN (T present → n, bare M6 → 0); else the declared value (the inline body has no
+            // T# M6 line). dp is null only when there's no op-container in the program (a raw leaf-parse) → keep null.
+            const dp = declaredOpParams(prog, 'atc_change');
+            if (!dp) return null;
+            const callRaw = all.find((b) => b.type === 'raw' && /^(T\d+\s+)?M6$/.test(((b.params && b.params.text) || '').trim()));
+            let ft;
+            if (callRaw) { const m = /^T(\d+)\s+M6$/.exec((callRaw.params.text || '').trim()); ft = m ? Math.round(num(m[1], 0)) : 0; }
+            else ft = Math.round(num(dp.fixedT, 0));
+            return { atc_change_method: resolveMethod(dp), atc_change_fixedt: ft, atc_change_callmacro: dp.callMacro !== false };
+        }
         const disk = all.some((b) => b.type === 'comment' && /DISK \/ CAROUSEL/.test((b.params && b.params.text) || ''));
         const f = {
             atc_change_method: disk ? 'disk' : 'generic', atc_change_fixedt: fixedFrom(tgt),
@@ -307,6 +321,15 @@ function flat(prog) {
     const out = [];
     (function walk(arr) { for (const b of (arr || [])) { if (!b) continue; out.push(b); if (b.children) walk(b.children); } })(prog);
     return out;
+}
+
+/** DECLARE-NOT-INFER seam (fix B): the DECLARED params of the (first) op of `opType` in a block program. Every
+ *  op-container carries them (makeOp), so a reconciler whose emit is declaration-driven (method-agnostic — nothing
+ *  to reverse-parse) reads the op's OWN declared params instead of inferring from emit-shape. Reusable by any future
+ *  declared-param reconciler as more wizards port to declaration-driven emits (declare the pattern once). */
+function declaredOpParams(prog, opType) {
+    const op = flat(prog).find((b) => b && b.type === 'op' && b.opType === opType);
+    return (op && op.params) || null;
 }
 
 let loadedSig = null, shownOp = null;

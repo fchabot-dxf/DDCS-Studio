@@ -106,18 +106,22 @@ test('INC-B2 (5): re-emit after a live code change is FRESH', async ({ page }) =
   expect(r.second, 're-emit no longer carries the old M54').not.toContain('M54');
 });
 
-// VERIFY (6) — the Blocks reverse-sync over the new RAW inline stack returns a CLEAN null (benign no-op), never garbage.
-test('INC-B2 (6): reconcile over the RAW inline stack → clean null (never garbage fields)', async ({ page }) => {
-  const nulled = await page.evaluate(async (atc) => {
+// VERIFY (6) — FIX B: the Blocks reverse-sync over the method-agnostic RAW inline stack now READS the DECLARED params
+// off the op-container (declare-not-infer), so it recovers the FIELDS (method/callMacro/fixedT) instead of a null
+// no-op — and NOT garbage inferred from the emit (there's no #100 model to mis-parse).
+test('INC-B2 (6): reconcile over the RAW inline stack recovers the DECLARED fields (fix B)', async ({ page }) => {
+  const r = await page.evaluate(async (atc) => {
     const s = window.ddcsGetSettings(); s.atc = atc; s.outputs = [{ type: 'drawbar', onCode: 'M54', offCode: 'M55' }]; s.inputs = [];
     const ops = await import('/blocks/opSession.js');
     const rec = await import('/blocks/opRecord.js');
-    rec.recordOp('atc_change', { method: 'generic', callMacro: false });   // no _atc — the body reads settings live (4b)
+    rec.recordOp('atc_change', { method: 'generic', fixedT: 4, callMacro: false });   // declared method/fixedT/callMacro
     const built = ops.buildActiveOpStack();
     window.ddcsLoadBlockStack(built.blocks);
-    return ops.reconcileActiveOp();   // the atc_change reconciler finds no #100 target table → returns null
+    return ops.reconcileActiveOp();
   }, ATC);
-  expect(nulled, 'the inline body has no #100 model → the reconciler cleanly declines (no garbage fields)').toBeNull();
+  expect(r, 'the reverse-sync no longer no-ops (fix B)').not.toBeNull();
+  expect(r.fields, 'recovers the DECLARED method + callMacro + fixedT (the inline body has no T# M6 line → fixedT declared)')
+    .toMatchObject({ atc_change_method: 'generic', atc_change_callmacro: false, atc_change_fixedt: 4 });
 });
 
 // VERIFY (7) — 4b ANTI-SNAPSHOT + RELOAD-FRESHNESS: the exported marker carries NO settings snapshot keys, and

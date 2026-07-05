@@ -685,3 +685,15 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **TEST SHAPE:** roundTrip(atc_change,{method:'firmware'}) → FIELDS not null (FLIP atc-roundtrip:67); roundTrip({method:'generic',callMacro:false}) → fields (FLIP :60/:74/:76); (A1) build T# M6 fixedT:2 → edit RAW to `T5 M6` → recovers atc_change_fixedt:5; REGRESSION: m6/manual/firmware round-trips still recover their fields.
 
 **NO CODE. PASS BACK the proposal** (seam i + additive declared-param fallback + A1). NEXT after the ruling: build fix B, or the corner backlog / UX items (toast+FAQ · help slot · version nudge).
+
+## 🔨 turn 261 (cycle 127) — BUILD fix B: declared-param reconcile for method-agnostic atc_change (reconciler-only; NO emit change; goldens untouched). 606 pass / 2 skip / 0 fail.
+
+**BUILT (seam i + additive fallback + A1, as blessed):**
+- `opSession.js`: a shared `declaredOpParams(prog, opType)` helper — reads the op-container's declared `.params` (the reusable declare-not-infer seam any future declared-param reconciler uses). Imported `resolveMethod` (atcModel; opSession already imports wizard helpers — pocketWizard/region/contour; no cycle). ADDITIVE fallback in the atc_change reconciler (replacing the method-agnostic `return null`): read the DECLARED method/callMacro off the op-container (`resolveMethod(dp)` covers legacy mode/magType); fixedT via **A1** — the edited RAW `T# M6` word WINS (`T5 M6`→5, bare `M6`→0), else the declared fixedT (the inline body has no T# M6 line). dp null (raw leaf-parse, no op-container) → keep null.
+- The atom-inference branches (O10102→firmware · "Manual" · M6+#102 · #100→generic/disk) are UNTOUCHED → m6/manual/firmware-inline still recover from ATOMS (their LIVE edits). Zero regression.
+
+**VERIFY — REAL SYMPTOM (drove the reconcile over an EDITED block stack):** the A1 test builds a T# M6 op (fixedT:2), rewrites its RAW atom to `T5 M6` (a Blocks-tab tool-word edit), reconciles → recovers `atc_change_fixedt:5` (the edit wins) + method from the declaration; a bare `M6` → 0. Flipped atc-roundtrip 60/67/74/76 from `toBeNull()` to real field assertions (T# M6 firmware → {method:'firmware', fixedt:0, callmacro:true}; generic/legacy-auto/legacy-disk inline → their declared method+callMacro; legacy mode/magType resolves via resolveMethod). Updated atc-inline-onesource VERIFY(6) (was 'reconcile → null' → now 'recovers the DECLARED fields'). Full suite 606 pass / 2 skip / 0 fail.
+
+**NO EMIT CHANGE** — reconciler (reverse-sync) only; atcChangeStack/macroCallStack/tncProgram untouched; goldens unchanged (the emit tests pass). The shared `declaredOpParams` seam is the declared-param-reconcile PATTERN, ready for reuse as more wizards port to declaration-driven emits.
+
+**GATE — byte-diff (the opSession reconciler diff) in scratchpad/fixB-gate.md (VS Code tab). PASS BACK for review.** After this: the corner backlog / UX items (toast+FAQ · help slot · version nudge) — or the queued A2 (a declared macrocall block, emit change) if you want the fuller declare.

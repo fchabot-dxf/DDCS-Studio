@@ -52,28 +52,49 @@ test('atc_change round-trips every change method', async ({ page }) => {
   const man = await roundTrip(page, 'atc_change', { method: 'manual', x: 123, y: 234, z: 12 });
   expect(man.fields).toMatchObject({ atc_change_method: 'manual', atc_change_x: 123, atc_change_y: 234, atc_change_z: 12 });
 
-  // Generic INLINE (callMacro:false) — INC-B2: the inline body is now the one-source tncProgram (method-agnostic —
-  // generic vs disk route on the CONFIGURED changer, not the method label), so the block reverse-sync no longer has a
-  // #100 target table to reverse-parse → a benign NO-OP (reconcile → null; the form keeps its values; method identity
-  // lives in the declared params/marker, not the emit). SAME declare-not-infer posture as the T# M6 default below.
+  // Generic INLINE (callMacro:false) — FIX B (declare-not-infer): the reconciler READS the DECLARED method/fixedT/callMacro
+  // off the op-container instead of inferring from the method-agnostic emit, so the one-source inline body round-trips its
+  // FIELDS (not a null no-op). fixedT comes from the declaration (the inline body has no T# M6 line).
   const gen = await roundTrip(page, 'atc_change', { method: 'generic', magazine: MAG, zClear: 7, fixedT: 2, waitSpindle: true, dustCover: true, confirm: true, callMacro: false });
-  expect(gen, 'generic inline reverse-syncs as a benign no-op (one-source body has no #100 model to parse)').toBeNull();
+  expect(gen.fields, 'generic inline reverse-syncs its declared fields').toMatchObject({ atc_change_method: 'generic', atc_change_fixedt: 2, atc_change_callmacro: false });
 
-  // INC-B — the DEFAULT automatic emit is a method-agnostic `T# M6` call to the installed T.nc. It carries no
-  // method-specific G-code, so the block reverse-sync is a benign NO-OP (reconcile → null → pullFromBlocks keeps the
-  // form as-is; the op's params stay intact via the op record). The method identity lives in the declared params, not
-  // the emit. (If we later want the T-word edited in Blocks to push back to the form, that's a small reconciler add.)
+  // The DEFAULT automatic emit is a method-agnostic `T# M6` call — FIX B reads the DECLARED method + callMacro off the
+  // op-container; fixedT via A1 (the RAW T-word; here fixedT defaults 0 → a bare M6 → 0). No longer a null no-op.
   const call = await roundTrip(page, 'atc_change', { method: 'firmware' });
-  expect(call, 'a T# M6 call op reverse-syncs as a benign no-op (nothing method-specific in the emit to parse)').toBeNull();
+  expect(call.fields, 'a T# M6 call op reverse-syncs its declared method + callMacro (bare M6 → fixedT 0)').toMatchObject({ atc_change_method: 'firmware', atc_change_fixedt: 0, atc_change_callmacro: true });
 
-  // Backward-compat: an OLD saved op (mode/magType, no method) still emits. Manual reverse-parses to its method; the auto
-  // variants (mode:'auto' → generic/disk) now emit the one-source inline body → a benign no-op reconcile (see gen above).
+  // Backward-compat: an OLD saved op (mode/magType, no method) reverse-syncs its RESOLVED method (resolveMethod). Manual
+  // reverse-parses from atoms; the auto variants now recover via the declared-param fallback.
   const legacyManual = await roundTrip(page, 'atc_change', { mode: 'manual', x: 1, y: 2, z: 3 });
   expect(legacyManual.fields.atc_change_method).toBe('manual');
   const legacyAuto = await roundTrip(page, 'atc_change', { mode: 'auto', magazine: MAG, fixedT: 2, callMacro: false });
-  expect(legacyAuto, 'legacy auto inline reverse-syncs as a benign no-op').toBeNull();
+  expect(legacyAuto.fields, 'legacy mode:auto → generic').toMatchObject({ atc_change_method: 'generic', atc_change_callmacro: false });
   const legacyDisk = await roundTrip(page, 'atc_change', { mode: 'auto', magType: 'disk', magazine: MAG, pickup: { x: 5, y: 6, z: -2 }, fixedT: 2, callMacro: false });
-  expect(legacyDisk, 'legacy disk inline reverse-syncs as a benign no-op').toBeNull();
+  expect(legacyDisk.fields, 'legacy mode:auto+disk → disk').toMatchObject({ atc_change_method: 'disk', atc_change_callmacro: false });
+});
+
+test('fix B / A1: a Blocks edit of the T# M6 tool-word round-trips back to fixedT (the edit wins; bare M6 → 0)', async ({ page }) => {
+  const reconcileAfterRawEdit = (params, newText) => page.evaluate(async ({ params, newText }) => {
+    const ops = await import('/blocks/opSession.js');
+    const rec = await import('/blocks/opRecord.js');
+    rec.recordOp('atc_change', params);
+    const built = ops.buildActiveOpStack();
+    const flat = []; (function w(a) { for (const b of a || []) { if (!b) continue; flat.push(b); if (b.children) w(b.children); } })(built.blocks);
+    // the Blocks-tab edit: rewrite the macro-call RAW `T# M6` line
+    const raw = flat.find((b) => b.type === 'raw' && /^(T\d+\s+)?M6$/.test(((b.params && b.params.text) || '').trim()));
+    if (newText != null && raw) raw.params.text = newText;
+    window.ddcsLoadBlockStack(built.blocks);
+    return ops.reconcileActiveOp();
+  }, { params, newText });
+
+  // edit T2 M6 → T5 M6: the EDITED tool-word wins over the declared fixedT; the method still comes from the declaration.
+  const edited = await reconcileAfterRawEdit({ method: 'firmware', fixedT: 2, callMacro: true }, 'T5 M6');
+  expect(edited.fields.atc_change_fixedt, 'the edited T-word (T5) wins over the declared fixedT (2)').toBe(5);
+  expect(edited.fields.atc_change_method, 'method stays from the declaration').toBe('firmware');
+
+  // edit to a bare M6 (tool from the program) → fixedT 0.
+  const bare = await reconcileAfterRawEdit({ method: 'generic', fixedT: 3, callMacro: true }, 'M6');
+  expect(bare.fields.atc_change_fixedt, 'a bare M6 → fixedT 0').toBe(0);
 });
 
 test('atc_change automatic methods emit a T# M6 CALL by default; callMacro=false keeps the firmware-accurate inline dance', async ({ page }) => {
