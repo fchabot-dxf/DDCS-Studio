@@ -49,6 +49,7 @@ function datumXY(s) {
 
 /** Bind a canvas → a 2D top-down scene controller (mirrors the GcodeViz3D inputs that matter in plan view). */
 export function createToolpath2d(canvas, opts = {}) {
+    const overlay = !!opts.overlay;  // t309 — OVERLAY MODE (the Layout animation layer): draw ONLY the path + red head dot; the host (featureCanvas SVG) owns grid/stock/handles + the view (via setViewTransform), so we never auto-fit or draw the scene chrome.
     let segs = [], machine = null, stock = null, wcs = null, gridStep = 0, anchorToStart = false;
     let view = null;                 // { ox, oy, scale }: screenX = ox + x*scale, screenY = oy - y*scale (Y up)
     let cursor = null;               // program coords under the pointer → readout chip
@@ -159,6 +160,7 @@ export function createToolpath2d(canvas, opts = {}) {
         const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
         if (!view) return;
         canvas.__t2view = view;   // expose the world→screen transform (debug + tests): sx=ox+x*scale, sy=oy-y*scale
+        if (overlay) { drawPath(ctx, anim.playing ? Math.floor(anim.k) : null); return; }   // t309 — overlay = path + head only; the SVG under-lays the grid/stock/handles
         const foot = footprint(), step = stepFor(foot);
         drawGrid(ctx, foot, step);
         const env = envelopeRect(); if (env) drawRect(ctx, env, 'rgba(108,122,140,0.55)', null);
@@ -293,7 +295,11 @@ export function createToolpath2d(canvas, opts = {}) {
     }
 
     // ---- view ----
+    // t309 — pin the world→screen transform EXTERNALLY (the Layout overlay sets it from featureCanvas._tf so the path
+    // registers pixel-exact under the SVG handles). ox/oy/scale map exactly: sx = ox + x*scale, sy = oy - y*scale.
+    function setViewTransform(v) { if (!v) return; view = { ox: +v.ox || 0, oy: +v.oy || 0, scale: +v.scale || 1 }; paint(); }
     function fit() {
+        if (overlay) { if (view) paint(); return; }   // t309 — the overlay never auto-fits; the host owns the view (setViewTransform)
         const bb = sceneBounds(), w = W(), h = H(), pad = 28;
         const bw = Math.max(1, bb.maxX - bb.minX), bh = Math.max(1, bb.maxY - bb.minY);
         const scale = Math.min((w - 2 * pad) / bw, (h - 2 * pad) / bh);
@@ -363,7 +369,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
     return {
-        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, setViewTransform, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

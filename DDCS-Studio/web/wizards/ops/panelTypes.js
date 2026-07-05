@@ -278,9 +278,10 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
 let _layout = null;
 export function renderLayout2D(container, def, params, simStart, sources, passEnds, spots, setSpots, panelStarts) {
-    if (!container) return;
+    if (!container) return null;
     if (!_layout) _layout = new FeatureCanvas();
     _layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts));
+    return _layout;   // t309 — hand back the FeatureCanvas so the Layout host can pin an animation overlay to its transform (getTransform/onTransform)
 }
 
 export function renderDeclaredLayout(container, def, params) {

@@ -2189,6 +2189,12 @@ button.primary:hover {
 
 /* 2D parametric layout canvas (viz/featureCanvas.js) */
 .feature-canvas { width: 100%; height: 100%; background: #000; cursor: default; user-select: none; }
+/* t309 — the Layout hosts a 2D-ANIMATION OVERLAY under the SVG: the CONTAINER owns the black bg + isolates the z-stack,
+   the SVG goes TRANSPARENT so the overlay canvas (z-index:-1, behind the SVG, above the bg) shows through — under the
+   interactive handles (which stay topmost). Scoped to #userVizContainer so every OTHER featureCanvas is untouched. */
+#userVizContainer { background: #000; isolation: isolate; }
+#userVizContainer .feature-canvas { background: transparent; }
+.fc-anim-overlay { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; pointer-events: none; }
 .feature-canvas .fc-grid-minor { stroke: #14202c; stroke-width: 1; }
 .feature-canvas .fc-grid-major { stroke: #243446; stroke-width: 1; }
 .feature-canvas .fc-axis-x { stroke: #7a3b3b; stroke-width: 1.5; }

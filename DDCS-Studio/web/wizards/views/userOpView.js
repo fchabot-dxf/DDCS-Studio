@@ -16,7 +16,37 @@ import { emitMapped } from '../../blocks/blockEmitter.js';
 import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the stored children for the live preview
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { opSimStarts } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers feed the 3D preview
+import { createToolpath2d } from '../../viz/toolpath2d.js';   // t309 — the 2D-animation overlay under the Layout SVG (path + red head, driven by the shared engine)
 import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
+
+// t309 — THE 2D-ANIMATION OVERLAY: a path-only toolpath2d <canvas> UNDER the Layout SVG (behind, pointer-events:none via
+// CSS) so the animated toolpath + red probe head show under the interactive handles. Created ONCE per container (memoised
+// on container.__animOverlay — renderLayoutWithSim re-runs on every field/drag and self-recurses, so a fresh instance/raf
+// each call would leak). The overlay reads the SAME shared trace + starts/passEnds/anchor the top 2D panel uses, so its
+// path connects the SVG handles by construction, and pins its view from featureCanvas._tf so it registers pixel-exact.
+function _pinFromTf(tf) { return tf ? { scale: tf.scale, ox: tf.cx - tf.cxw * tf.scale, oy: tf.cy + tf.cyw * tf.scale } : null; }
+function wireAnimOverlay(container, fc, panel, starts, passEnds, sources) {
+    if (!container || !fc || !panel || typeof panel.getSegments !== 'function' || typeof fc.getTransform !== 'function') return;
+    let ov = container.__animOverlay;
+    if (!ov) {
+        const canvas = document.createElement('canvas');
+        canvas.className = 'fc-anim-overlay';                 // CSS: position:absolute; inset:0; z-index:-1; pointer-events:none
+        container.insertBefore(canvas, container.firstChild); // BEHIND the SVG (first child; z-index:-1 keeps it below the transparent SVG, above the container's #000)
+        const tp = createToolpath2d(canvas, { overlay: true });
+        ov = { canvas, tp };
+        container.__animOverlay = ov;
+        fc.onTransform((tf) => tp.setViewTransform(_pinFromTf(tf)));   // re-pin on every pan / zoom / fit / resize / render
+        panel.onToolPos((pos, k) => { if (pos) { tp.seek(k); tp.setToolPosition(pos); } else tp.stop(); });   // live head from the ONE engine (fires in any mode); stop → clear the head + static path
+        tp.setViewTransform(_pinFromTf(fc.getTransform()));           // initial pin (the FeatureCanvas already drew before the overlay existed)
+    }
+    // Feed the SAME trace + frame the top 2D panel uses → the path emanates from / arrives at the same worlds the SVG handles do.
+    ov.tp.setAnchor(typeof panel.getAnchor === 'function' ? panel.getAnchor() : true);
+    ov.tp.setStarts(Array.isArray(starts) ? starts : []);
+    ov.tp.setPassEnds(Array.isArray(passEnds) ? passEnds : null);
+    ov.tp.setStartSources(Array.isArray(sources) ? sources : []);
+    ov.tp.setSegments((panel.getSegments() || []));
+    ov.tp.setViewTransform(_pinFromTf(fc.getTransform()));           // re-pin AFTER the feed (paints the fresh path in the current frame)
+}
 
 // Apply the form values to a COPY of a group's stored children (via the bindings' blockIndex/key) → the records emit
 // walks for the live code preview. A group has no builder; its children ARE the program. The real writeback to the
@@ -157,7 +187,8 @@ export const userOpView = {
                     const simStart = (panel && pos0 && typeof panel.onStartDrag === 'function')
                         ? { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } }
                         : (pos0 ? { pos: pos0 } : null);
-                    renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps);   // t301 Seam C — feed the panel's SHARED passStarts so the Layout reads the wall world from the ONE source the 3D marker uses (no parallel opSimStarts/cornerXY position derive)
+                    const fc = renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps);   // t301 Seam C — feed the panel's SHARED passStarts so the Layout reads the wall world from the ONE source the 3D marker uses (no parallel opSimStarts/cornerXY position derive)
+                    wireAnimOverlay(c, fc, panel, ps, passEnds, sources);   // t309 — the 2D-animation overlay under the SVG (created once, fed the shared trace each render; driven by the panel's engine via onToolPos)
                 };
                 renderLayoutWithSim();
             }

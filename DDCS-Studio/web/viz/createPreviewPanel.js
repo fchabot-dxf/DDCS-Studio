@@ -182,6 +182,7 @@ export function createPreviewPanel(container, opts = {}) {
     // seen is the starting tool, NOT a swap). Isolated firmware op (no tool change) → #1300 never flips → no swap.
     let atcChoreo = null, atcStation = null, lastTool = null, deviceIoListener = null;
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '', curAnchor = false;
+    let toolPosSubs = [];   // t309 — live-tool-position subscribers (the Layout animation overlay). Fed the SAME engine head as the 3D/2D, in ANY view mode; cb(pos, segIndex) each tick, cb(null,0) on stop.
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
 
     // DRO — a dual numeric readout mirroring the DDCS controller: Work (the tool's program position) + Mach. Work comes
@@ -341,7 +342,7 @@ export function createPreviewPanel(container, opts = {}) {
                     if (c) { const r = engine.vars.get(6); if (Number.isFinite(r)) viz.nudgeSurface(c.axis, r * c.sign); }
                 }
             },
-            onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock)
+            onPositionChange: (pos) => { if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } if (toolPosSubs.length) { const k = segs.length ? nearest2d(pos) : 0; for (const cb of toolPosSubs) cb(pos, k); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
             onStatus: ({ message }) => setStatus(message),
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
@@ -611,6 +612,7 @@ export function createPreviewPanel(container, opts = {}) {
         t2.stop();
         if (viz) viz.setAnimate(false);
         if (typeof opts.onLine === 'function') opts.onLine(null);
+        for (const cb of toolPosSubs) cb(null, 0);   // t309 — tell the Layout overlay the sim stopped (clears its red head, redraws the static path)
         updateRunBtn();
     }
     // #18: dragging/declaring the start re-runs the sim animation from the NEW start (not just the static re-trace), so
@@ -813,5 +815,9 @@ export function createPreviewPanel(container, opts = {}) {
         }
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setAtcSwap, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds, get viz() { return viz; }, get engine() { return engine; }, el: container };
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setAtcSwap, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
+        getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
+        getAnchor: () => curAnchor,                                                       // t309 — the anchored/absolute frame flag (feed the overlay so its path frame matches)
+        onToolPos: (cb) => { if (typeof cb === 'function') toolPosSubs.push(cb); return () => { toolPosSubs = toolPosSubs.filter((f) => f !== cb); }; },   // t309 — subscribe to the live engine head (fires in ANY mode); returns an unsubscribe
+        get viz() { return viz; }, get engine() { return engine; }, el: container };
 }

@@ -49,7 +49,13 @@ export class FeatureCanvas {
         this._userAdjusted = false; // true once the user pans/zooms — stop auto-fitting (dbl-click re-fits)
         this._vw = 0; this._vh = 0; // last viewBox size, for redraws outside render()
         this._minScale = 0.02; this._maxScale = 500;
+        this._onTransform = null;  // t309 — a Layout ANIMATION OVERLAY subscribes here; fired on EVERY _draw (pan/zoom/fit/resize/render), the single choke point, so an overlaid toolpath2d canvas re-pins its view from _tf and stays pixel-exact under the handles.
     }
+
+    /** t309 — the live world↔screen transform, for an overlay canvas to register 1:1 with the SVG. */
+    getTransform() { const t = this._tf; return t ? { scale: t.scale, cxw: t.cxw, cyw: t.cyw, cx: t.cx, cy: t.cy, vw: this._vw, vh: this._vh } : null; }
+    /** t309 — register a callback fired on every transform change (pan/zoom/fit/resize/render) with (tf, VW, VH). */
+    onTransform(cb) { this._onTransform = (typeof cb === 'function') ? cb : null; }
 
     _mount(container) {
         if (this.container === container && this.svg) return;
@@ -255,6 +261,7 @@ export class FeatureCanvas {
         const grid = this.gGrid, items = this.gItems, handles = this.gHandles;
         grid.replaceChildren(); items.replaceChildren(); handles.replaceChildren();
         this._placement = spec.placement || { x: 0, y: 0 };   // pattern items/handles ride this; stock is datum-fixed
+        if (this._onTransform && this._tf) this._onTransform(this._tf, VW, VH);   // t309 — re-pin the animation overlay to the current transform (this is the ONE place all pan/zoom/fit/resize/render land)
 
         // --- grid ---------------------------------------------------------
         const tl = this._W(0, 0), br = this._W(VW, VH);
