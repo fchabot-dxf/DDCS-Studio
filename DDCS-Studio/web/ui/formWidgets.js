@@ -130,6 +130,28 @@ function dropdownWidget(host, b) {
     return { read: () => ({ [b.param]: numeric ? numOr(sel.value, b.default ?? 0) : sel.value }) };
 }
 
+// t323 — SEGMENTED control: a small enum (2-3 values) as a compact [ Auto | Manual ] toggle, both states VISIBLE (the
+// selected one highlighted), one click writes the enum value. REUSES the enum read()/change path (no emit change) so a
+// structural toggle (travelApproach) reprunes exactly as the dropdown did. Opt-in via widget:'segmented'.
+function segmentedWidget(host, b) {
+    host.style.cssText = ROW_CSS;
+    const opts = ((b.widgetConfig && b.widgetConfig.options) || []).map((o) => (Array.isArray(o) ? o : [o, o]));
+    let cur = b.default;
+    const seg = document.createElement('div');
+    seg.className = 'seg-control'; seg.setAttribute('role', 'group'); seg.dataset.param = b.param;   // [data-param] parity with the select
+    const sync = () => { for (const bt of seg.children) { const on = bt.dataset.value === String(cur); bt.classList.toggle('seg-on', on); bt.setAttribute('aria-pressed', String(on)); } };
+    for (const [label, value] of opts) {
+        const bt = document.createElement('button');
+        bt.type = 'button'; bt.className = 'seg-btn'; bt.textContent = String(label); bt.dataset.value = String(value);
+        bt.addEventListener('click', () => { if (String(value) === String(cur)) return; cur = value; sync(); seg.dispatchEvent(new Event('change', { bubbles: true })); });   // bubbles → the form's delegated change listener → update() re-emits + reprunes
+        seg.appendChild(bt);
+    }
+    sync();
+    host.append(labelSpan(b), seg);
+    const numeric = b.type === 'number' || b.type === 'int';
+    return { read: () => ({ [b.param]: numeric ? numOr(cur, b.default ?? 0) : cur }) };
+}
+
 function toggleWidget(host, b) {
     host.style.cssText = ROW_CSS;
     const lab = document.createElement('label');
@@ -366,6 +388,7 @@ export const FORM_WIDGETS = {
     number: numberWidget,
     slider: sliderWidget,
     dropdown: dropdownWidget,
+    segmented: segmentedWidget,
     toggle: toggleWidget,
     text: textWidget,
     'corner-grid': cornerGridWidget,

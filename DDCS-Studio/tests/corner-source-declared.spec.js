@@ -23,18 +23,16 @@ test('per-pass source is DECLARED from travelApproach — toggling auto↔manual
     const box = document.getElementById('userViz3dContainer');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
     const panel = host && host.__panel;
-    // the travelApproach dropdown = the ONLY 2-option auto/manual <select> in the form (bare select, no data-param)
-    const ta = [...document.querySelectorAll('#wiz_user_form select')].find((s) => { const v = [...s.options].map((o) => o.value); return v.length === 2 && v.includes('auto') && v.includes('manual'); });
-    return { src: (panel && panel.getPassSources()) || null, ta: ta && ta.value };
+    // the travelApproach SEGMENTED control (t323): the selected value = the highlighted (.seg-on) segment
+    const on = document.querySelector('#wiz_user_form .seg-control[data-param="travelApproach"] .seg-btn.seg-on');
+    return { src: (panel && panel.getPassSources()) || null, ta: on && on.dataset.value };
   });
   const before = await read();
 
-  // toggle travelApproach → 'manual' via the REAL form dropdown (set value + dispatch the events the form listens for)
+  // toggle travelApproach → 'manual' via the REAL segmented control (clicking a segment dispatches the change the form listens for)
   await page.evaluate(() => {
-    const sel = [...document.querySelectorAll('#wiz_user_form select')].find((s) => { const v = [...s.options].map((o) => o.value); return v.length === 2 && v.includes('auto') && v.includes('manual'); });
-    sel.value = 'manual';
-    sel.dispatchEvent(new Event('input', { bubbles: true }));
-    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    const btn = document.querySelector('#wiz_user_form .seg-control[data-param="travelApproach"] .seg-btn[data-value="manual"]');
+    btn.click();
   });
   // the panel recomputes on the form change; poll getPassSources until it reflects the toggle
   await expect.poll(async () => { const s = (await read()).src; return Array.isArray(s) ? s.join(',') : ''; }, { timeout: 5000 }).toContain('manual');

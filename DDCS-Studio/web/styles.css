@@ -2198,6 +2198,12 @@ button.primary:hover {
 .num-step-btn:hover { border-color: #3a4a5a; }
 .num-input-bare::-webkit-inner-spin-button, .num-input-bare::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .num-input-bare { -moz-appearance: textfield; appearance: textfield; }
+/* t323 — segmented control: a compact 2-3 value enum toggle ([ Auto | Manual ]), both segments visible, selected highlighted */
+.seg-control { display: inline-flex; border: 1px solid var(--border, #2a3340); border-radius: 6px; overflow: hidden; }
+.seg-btn { padding: 5px 12px; font: inherit; font-size: 12px; line-height: 1.2; color: var(--text-dim, #90a0b2); background: var(--bg, #0b0f14); border: none; border-right: 1px solid var(--border, #2a3340); cursor: pointer; }
+.seg-btn:last-child { border-right: none; }
+.seg-btn:not(.seg-on):hover { color: inherit; background: rgba(255, 255, 255, 0.05); }
+.seg-btn.seg-on { color: #fff; background: var(--accent, #3b6ea5); }
 /* t309 — the Layout hosts a 2D-ANIMATION OVERLAY under the SVG: the CONTAINER owns the black bg + isolates the z-stack,
    the SVG goes TRANSPARENT so the overlay canvas (z-index:-1, behind the SVG, above the bg) shows through — under the
    interactive handles (which stay topmost). Scoped to #userVizContainer so every OTHER featureCanvas is untouched. */
