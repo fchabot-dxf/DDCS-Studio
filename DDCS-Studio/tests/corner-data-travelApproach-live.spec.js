@@ -61,7 +61,7 @@ test('travelApproach LIVE: enum binding drives auto/manual == cornerStack byte-f
   // (1) the binding declares the enum wiring
   expect(r.taType, 'travelApproach is an enum binding (drives the form dropdown + the guard prune)').toBe('enum');
   expect(r.taDefault, 'travelApproach defaults to auto (the twin ships the hands-free shape)').toBe('auto');
-  expect(r.opts, 'the binding declares the auto/manual options that drive the guards').toEqual(['auto', 'manual']);
+  expect(r.opts, 'the binding declares the manual/auto options that drive the guards (t328 — DISPLAY order [Manual|Auto], default stays auto)').toEqual(['manual', 'auto']);
   // (2) FULL byte-for-byte parity across every (probeZFirst × travelApproach) combination
   for (const c of r.parity) {
     expect(c.equal, `twin == cornerStack byte-for-byte at probeZFirst=${c.pz} travelApproach=${c.ta}`).toBe(true);

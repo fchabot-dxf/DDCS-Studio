@@ -27,7 +27,7 @@ const enu = (param, label, dflt, options, help) => ({ type: structCtlType(param)
 /** One control block per struct binding — MUST match CORNER_STRUCT_BINDINGS (param/options/label/help, asserted). Bool → checkbox; enum → dropdown. */
 export const STRUCT_CTL_BLOCKS = [
     bool('probeZFirst', 'Probe Z First', false, 'Probe the top surface for Z before the two walls — anchors the sideways probes to a real measured Z instead of a jogged guess.'),
-    enu('travelApproach', 'Travel', 'auto', [['Auto', 'auto'], ['Manual', 'manual']], 'Auto = the machine moves itself between the walls; Manual = you jog to each start and press Cycle Start (operator-in-the-loop).'),
+    enu('travelApproach', 'Travel', 'auto', [['Manual', 'manual'], ['Auto', 'auto']], 'Auto = the machine moves itself between the walls; Manual = you jog to each start and press Cycle Start (operator-in-the-loop).'),   // t328 human — DISPLAY order [Manual|Auto] (must mirror CORNER_STRUCT_BINDINGS: the 1:1 assert compares _options)
     enu('wcs', 'WCS', 'active', [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']], 'Which work-coordinate register to store the found corner into — Active uses the currently-selected WCS; G54..G59 write that specific register.'),
     bool('syncA', 'Dual-Gantry Sync A', false, 'Dual-gantry: also write the found corner to the slave A-axis WCS, keeping a twin-motor gantry squared. A WCS write only — no extra motion.'),
     enu('corner', 'Corner', 'FL', [['Front-Left', 'FL'], ['Front-Right', 'FR'], ['Back-Left', 'BL'], ['Back-Right', 'BR']], 'Which corner of the stock you are probing — sets the two walls and their approach directions (Front-Left / Front-Right / Back-Left / Back-Right).'),

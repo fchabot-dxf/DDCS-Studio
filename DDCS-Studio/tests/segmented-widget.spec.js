@@ -1,14 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * SEGMENTED-TOGGLE widget (t323) — a small enum (widget:'segmented') renders as a compact [ Auto | Manual ] control,
+ * SEGMENTED-TOGGLE widget (t323) — a small enum (widget:'segmented') renders as a compact [ Manual | Auto ] control (t328 human — Manual left),
  * both segments visible + the selected one highlighted; one click writes the enum value via the SAME enum change path
  * (no emit change). Opt-in on travelApproach first (do NOT auto-convert every 2-value enum). Clicking Manual reprunes
  * the structural-toggle path (the emit gains the #1505 jog-and-wait manual arm); the other enums stay dropdowns.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-test('travelApproach renders [Auto|Manual]; click Manual reprunes; other enums stay dropdowns', async ({ page }) => {
+test('travelApproach renders [Manual|Auto]; click Manual reprunes; other enums stay dropdowns', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
@@ -21,6 +21,10 @@ test('travelApproach renders [Auto|Manual]; click Manual reprunes; other enums s
   await expect(seg.locator('.seg-btn')).toHaveCount(2);
   const auto = seg.locator('.seg-btn[data-value="auto"]'), manual = seg.locator('.seg-btn[data-value="manual"]');
   await expect(auto).toHaveText('Auto'); await expect(manual).toHaveText('Manual');
+  // t328 human — DISPLAY order is [Manual|Auto]: the FIRST segment is Manual (left), the SECOND is Auto (right)
+  await expect(seg.locator('.seg-btn').nth(0)).toHaveText('Manual');
+  await expect(seg.locator('.seg-btn').nth(1)).toHaveText('Auto');
+  // …but the DEFAULT is still 'auto' (value-mapped, not index) → Auto stays highlighted even though it moved right
   await expect(auto).toHaveClass(/seg-on/);
   await expect(manual).not.toHaveClass(/seg-on/);
 
