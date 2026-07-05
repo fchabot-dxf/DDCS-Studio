@@ -3400,11 +3400,13 @@ svg [id*="Zfirst_travel"] {
     border-radius: 1px;
     flex-shrink: 0;
 }
-.viz-legend-line.probe   { background: transparent; border-top: 3px dotted #3b82f6; height: 0; }   /* probe = dotted blue */
-.viz-legend-line.cut     { background: linear-gradient(90deg, #0a4fd0, #35ffd0); }   /* feed/cut: blue→cyan by depth */
-.viz-legend-line.retract { background: #33cc55; }   /* retract/lead-out = green (Fusion) */
-.viz-legend-line.jog     { background: #ff9a0d; border-top: 3px dashed #ff9a0d; background: transparent; height: 0; }
-.viz-legend-line.travel  { background: #ffcc00; }   /* rapid = solid yellow (Fusion) */
+/* t317 — the legacy legend palette reads the ONE source via CSS vars (viz/pathStyle.js applyPathVars sets --viz-path-*);
+   the fallbacks are the current values so it stays byte-neutral before/without the JS. */
+.viz-legend-line.probe   { background: transparent; border-top: 3px dotted var(--viz-path-probe, #3b82f6); height: 0; }   /* probe = dotted blue */
+.viz-legend-line.cut     { background: linear-gradient(90deg, var(--viz-path-feed-low, #0a4fd0), var(--viz-path-feed-high, #35ffd0)); }   /* feed/cut: blue→cyan by depth */
+.viz-legend-line.retract { background: var(--viz-path-retract, #33cc55); }   /* retract/lead-out = green (Fusion) */
+.viz-legend-line.jog     { background: transparent; border-top: 3px dashed var(--viz-path-jog, #ff9a0d); height: 0; }
+.viz-legend-line.travel  { background: var(--viz-path-rapid, #ffcc00); }   /* rapid = solid yellow (Fusion) */
 
 /* Hint text below inputs */
 .hint { font-size: 9px; color: var(--text-dim); margin-top: 3px; display: block; font-style: italic; }

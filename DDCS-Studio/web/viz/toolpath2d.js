@@ -14,22 +14,18 @@
  */
 import { traceToolpath } from '../engine/trace.js';
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE draws from the RUNTIME END of the previous pass (t107 machine-faithful, via passEnds), else the static previous START (t94), not its own net-endpoint marker
+import { PATH_TYPES, PATH_STATE, HEAD, feedRgb, hexCss } from './pathStyle.js';   // t317 — the ONE declared path-visual palette (type × state), shared with the 3D + the legend
 
-// Colours MATCH THE 3D LEGEND: rapid = yellow (dashed), retract = green, probe = blue (slow = light blue, dotted),
-// feed = a blue→teal gradient by DEPTH (Z) across the path — which also surfaces the Z you can't see top-down.
-const FEED_LOW = 0x0a4fd0, FEED_HIGH = 0x35ffd0;
+// Colours + progress states are the ONE declared source in viz/pathStyle.js (t317) — rapid=yellow(dashed),
+// retract=green, probe=blue(slow=light blue, dotted), feed=a blue→teal gradient by DEPTH (Z) which also surfaces the
+// Z you can't see top-down. The 3D + the legend read the SAME module. Exported for the one-source parity assertion.
 const typeOf = (s) => s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
-function lerpHex(c1, c2, t) {
-    t = Math.max(0, Math.min(1, t));
-    const r1 = (c1 >> 16) & 255, g1 = (c1 >> 8) & 255, b1 = c1 & 255, r2 = (c2 >> 16) & 255, g2 = (c2 >> 8) & 255, b2 = c2 & 255;
-    return `rgb(${Math.round(r1 + (r2 - r1) * t)},${Math.round(g1 + (g2 - g1) * t)},${Math.round(b1 + (b2 - b1) * t)})`;
-}
-function segColor(s, zMin, zRange, maxPF) {
+export function segColor(s, zMin, zRange, maxPF) {
     const t = typeOf(s);
-    if (t === 'rapid') return '#ffcc00';
-    if (t === 'retract') return '#33cc55';
-    if (t === 'probe') return ((s.feed || 0) > 0 && (s.feed || 0) < maxPF) ? '#93c5fd' : '#3b82f6';
-    return lerpHex(FEED_LOW, FEED_HIGH, zRange ? (((s.z1 || 0) + (s.z2 || 0)) / 2 - zMin) / zRange : 0.5);
+    if (t === 'rapid') return hexCss(PATH_TYPES.rapid.color);
+    if (t === 'retract') return hexCss(PATH_TYPES.retract.color);
+    if (t === 'probe') return hexCss(((s.feed || 0) > 0 && (s.feed || 0) < maxPF) ? PATH_TYPES.probeSlow.color : PATH_TYPES.probeFast.color);
+    return feedRgb(zRange ? (((s.z1 || 0) + (s.z2 || 0)) / 2 - zMin) / zRange : 0.5);
 }
 const OLD_DATUM = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
 
@@ -237,7 +233,7 @@ export function createToolpath2d(canvas, opts = {}) {
             // probe/feed keep their TYPE colours.
             const transV = t === 'rapid' && Math.abs((s.x2 || 0) - (s.x1 || 0)) > 0.05 && Math.abs((s.y2 || 0) - (s.y1 || 0)) > 0.05;
             const manualTrav = transV && startSources[s.pass] === 'manual';   // a MANUAL jog travel arcs UP ('rainbow'); AUTO stays straight
-            ctx.strokeStyle = transV ? (startSources[s.pass] === 'manual' ? '#ffb300' : '#22d3ee') : segColor(s, zMin, zRange, maxPF);
+            ctx.strokeStyle = transV ? (startSources[s.pass] === 'manual' ? hexCss(PATH_TYPES.jog.color) : '#22d3ee') : segColor(s, zMin, zRange, maxPF);   // t317 — the MANUAL jog LINE = the one amber #ff9a0d (was the #ffb300 start-marker amber); the AUTO traverse keeps the marker-cyan (a separate glyph-layer colour, not a path type)
             ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
             ctx.setLineDash(t === 'probe' ? [2, 3] : (t === 'rapid' ? [5, 4] : []));   // probe dotted, rapid dashed (match 3D)
             const ax = ptx(s.x1, s.pass), ay = pty(s.y1, s.pass), bx = ptx(s.x2, s.pass), by = pty(s.y2, s.pass);   // each pass rides its own start (INC4)
@@ -255,17 +251,17 @@ export function createToolpath2d(canvas, opts = {}) {
         let zMin = Infinity, zMax = -Infinity, maxPF = 0;   // feed depth-gradient range + the fast-probe feed threshold
         for (const s of segs) { zMin = Math.min(zMin, s.z1, s.z2); zMax = Math.max(zMax, s.z1, s.z2); if ((s.type === 'probe' || s.probe) && (s.feed || 0) > maxPF) maxPF = s.feed; }
         const zR = (zMax - zMin) || 1;
-        if (k == null) { strokeSegs(ctx, 0, segs.length, 1, 2, zMin, zR, maxPF); return; }
+        if (k == null) { strokeSegs(ctx, 0, segs.length, PATH_STATE.static.alpha, PATH_STATE.static.width, zMin, zR, maxPF); return; }   // t317 — STATE tokens from the ONE palette (static/future/traveled), shared with the 3D dim + the human's coming mods
         const n = Math.max(0, Math.min(k, segs.length));
-        strokeSegs(ctx, n, segs.length, 0.8, 1.5, zMin, zR, maxPF);   // t313 — future/untraveled path at 80% (human t312), still dimmer than the traveled path (alpha 1) so the progress contrast holds
-        strokeSegs(ctx, 0, n, 1, 3.12, zMin, zR, maxPF);   // t313 — traveled path 1.2× wider (2.6 → 3.12, human t312)
+        strokeSegs(ctx, n, segs.length, PATH_STATE.future.alpha, PATH_STATE.future.width, zMin, zR, maxPF);   // t313/t317 — future/untraveled (alpha 0.8, still dimmer than traveled) from the ONE palette
+        strokeSegs(ctx, 0, n, PATH_STATE.traveled.alpha, PATH_STATE.traveled.width, zMin, zR, maxPF);   // t313/t317 — traveled (alpha 1, width 3.12) from the ONE palette
         // Head marker: ride the LIVE sim position (engine onPositionChange) when we have it, so the probe/tool travels
         // the path smoothly in sync with the 3D; else fall back to the current segment node. Both via ptx/pty (#13 pin).
         const head = segs[n - 1] || segs[0];
         const hp = toolPos ? toolPos.pass : (head && head.pass);   // INC4: the live tool rides its CURRENT pass's start ②
         const hx = toolPos ? ptx(toolPos.x, hp) : ptx(n > 0 ? head.x2 : head.x1, hp);
         const hy = toolPos ? pty(toolPos.y, hp) : pty(n > 0 ? head.y2 : head.y1, hp);
-        ctx.fillStyle = '#ff2a44'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, Math.PI * 2); ctx.fill();   // RED = the moving probe tip (the ruby that touches), matching the 3D
+        ctx.fillStyle = hexCss(HEAD.color); ctx.beginPath(); ctx.arc(hx, hy, HEAD.r, 0, Math.PI * 2); ctx.fill();   // t317 — RED moving probe tip (the ruby, matching the 3D) from the ONE palette
         canvas.__t2head = { sx: hx, sy: hy, live: !!toolPos };   // debug + tests: the drawn head (screen px)
     }
     function drawLabels(ctx, foot, step, w, h) {   // sparse coord labels along the bottom (X) + left (Y) frame

@@ -19,6 +19,7 @@ import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
 import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
+import { PATH_TYPES, PATH_STATE, FEED_LOW, FEED_HIGH } from './pathStyle.js';   // t317 — the ONE declared path-visual palette, shared with the 2D + the legend
 
 export class GcodeViz3D {
     constructor(container) {
@@ -540,7 +541,7 @@ export class GcodeViz3D {
             const o = this.lineGroups[k]; if (!o) continue;
             if (on) {
                 if (o.material.__op0 == null) o.material.__op0 = o.material.opacity != null ? o.material.opacity : 1;
-                o.material.transparent = true; o.material.opacity = 0.8;   // t313 — always-visible untraveled guide at 80% (human t312c), MATCHING the 2D future=0.8; the bold _trailLine below still carries the traveled emphasis
+                o.material.transparent = true; o.material.opacity = PATH_STATE.future.alpha;   // t313/t317 — untraveled guide alpha = the ONE palette's future state (0.8), SHARED with the 2D future so a human mod hits both; the bold _trailLine still carries the traveled emphasis
             } else if (o.material.__op0 != null) {
                 o.material.opacity = o.material.__op0; o.material.transparent = o.material.__op0 < 1;
             }
@@ -829,8 +830,8 @@ export class GcodeViz3D {
                     : type === 'probe' ? (slowProbe ? probeSlowPos : probeFastPos)
                     : feedPos;
                 // trail colour = the route move-type colour, so the bold executed trail isn't always amber
-                const col = type === 'rapid' ? 0xffcc00 : type === 'retract' ? 0x33cc55
-                    : type === 'probe' ? (slowProbe ? 0x93c5fd : 0x3b82f6) : 0x35ffd0;
+                const col = type === 'rapid' ? PATH_TYPES.rapid.color : type === 'retract' ? PATH_TYPES.retract.color   // t317 — trail colours from the ONE palette
+                    : type === 'probe' ? (slowProbe ? PATH_TYPES.probeSlow.color : PATH_TYPES.probeFast.color) : PATH_TYPES.feed.color;
                 arr.push(ax, ay, az, bx, by, bz);
                 pushSeg(ax, ay, az, bx, by, bz, (type === 'rapid' || type === 'retract') ? 6000 : (s.feed > 0 ? s.feed : 600), s.a1, s.b1, s.a2, s.b2, col);
                 cur = end;
@@ -847,18 +848,18 @@ export class GcodeViz3D {
         let feedCol = null;
         if (feedPos.length) {
             const zMin = bounds ? bounds.minZ : 0, zRange = bounds ? (bounds.maxZ - bounds.minZ) || 1 : 1;
-            const cLow = new THREE.Color(0x0a4fd0), cHigh = new THREE.Color(0x35ffd0), tmp = new THREE.Color();
+            const cLow = new THREE.Color(FEED_LOW), cHigh = new THREE.Color(FEED_HIGH), tmp = new THREE.Color();   // t317 — feed gradient endpoints from the ONE palette
             feedCol = [];
             for (let i = 0; i < feedPos.length; i += 3) { tmp.copy(cLow).lerp(cHigh, (feedPos[i + 2] - zMin) / zRange); feedCol.push(tmp.r, tmp.g, tmp.b); }
         }
         // Colours match the wizard visualiser
         this.lineGroups.feed = this._addLine(feedPos, { vertexColors: feedCol });
-        this.lineGroups.rapid = this._addLine(rapidPos, { color: 0xffcc00, opacity: 0.6 });   // rapid = solid yellow (Fusion)
+        this.lineGroups.rapid = this._addLine(rapidPos, { color: PATH_TYPES.rapid.color, opacity: 0.6 });   // t317 — colours from the ONE palette (opacity = 3D line-group base, a 3D render detail)
         if (this.lineGroups.rapid) this.lineGroups.rapid.visible = this.showRapids;
-        this.lineGroups.retract = this._addLine(retractPos, { color: 0x33cc55, opacity: 0.85 });  // retract/lead-out = green (Fusion)
-        this.lineGroups.probe = this._addLine(probeFastPos, { color: 0x3b82f6, dotted: true });      // probe = dotted blue
-        this.lineGroups.probeSlow = this._addLine(probeSlowPos, { color: 0x93c5fd });  // slow re-probe (light blue)
-        this.lineGroups.jog = this._addLine(jogPos, { color: 0xff9a0d, opacity: 0.95, dashed: true });
+        this.lineGroups.retract = this._addLine(retractPos, { color: PATH_TYPES.retract.color, opacity: 0.85 });
+        this.lineGroups.probe = this._addLine(probeFastPos, { color: PATH_TYPES.probeFast.color, dotted: true });
+        this.lineGroups.probeSlow = this._addLine(probeSlowPos, { color: PATH_TYPES.probeSlow.color });
+        this.lineGroups.jog = this._addLine(jogPos, { color: PATH_TYPES.jog.color, opacity: 0.95, dashed: true });
 
         // Ordered "executed trail" overlay: the whole route as one bold line, in travel order, revealed up to
         // the tool head via setDrawRange while playing (see _animTick / _dimRoute). The type-grouped lines above

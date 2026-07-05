@@ -18,6 +18,7 @@
  */
 import { GcodeViz3D } from './gcodeViz3d.js';
 import { createToolpath2d } from './toolpath2d.js';
+import { LEGEND_ROWS } from './pathStyle.js';   // t317 — the ONE declared path-visual palette (the legend reads it, can't drift from the renderers)
 import { traceToolpath } from '../engine/trace.js';
 import { GcodeExecutionEngine } from '../engine/index.js';
 import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
@@ -529,14 +530,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     // Legend: show ONLY the path types present in the current toolpath (classified like the 3D viz). Probe splits
     // fast/slow at the program's max probe feed; jog = the inter-pass move (≥2 start markers).
-    const LEGEND = [   // colours match the 3D view (gcodeViz3d line groups)
-        { key: 'feed', label: 'Cut', color: '#35d0ff' },
-        { key: 'probe', label: 'Probe', color: '#3b82f6' },
-        { key: 'probeSlow', label: 'Probe slow', color: '#93c5fd' },
-        { key: 'retract', label: 'Retract', color: '#33cc55' },
-        { key: 'jog', label: 'Jog', color: '#ff9a0d' },
-        { key: 'rapid', label: 'Rapid', color: '#ffcc00' },
-    ];
+    const LEGEND = LEGEND_ROWS;   // t317 — the ONE declared palette (viz/pathStyle.js); colours can't drift from the renderers (fixes the old Cut #35d0ff → the real gradient-high #35ffd0)
     function renderLegend(parsed) {
         const el = q('.viz3d-legend'); if (!el) return;
         const ss = (parsed && parsed.segments) || [];
