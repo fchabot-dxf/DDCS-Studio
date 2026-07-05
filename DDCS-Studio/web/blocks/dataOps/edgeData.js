@@ -19,6 +19,7 @@ import { edgeStack } from '../../wizards/edgeWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive EDGE_BINDINGS over a CANONICAL-pruned stack (the superset guards duplicate nothing bound — #1..#6 are outside the guards — but keep the corner-identical shape)
+import { makeProvider } from '../../viz/opSimStarts.js';   // E2 — the declared 'edge' anchor → the per-pass preview marker (mirror corner's provider)
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';   // the SAME source functions the built-in uses (controller register over the literal on an Expert profile)
 
 /** Author defaults — match edgeStack's num() fallbacks + the built-in Edge field defaults. Structural axis/dir/wcs baked at
@@ -48,6 +49,19 @@ export const EDGE_STRUCT_BINDINGS = [
 ];
 
 export const EDGE_DATA_OPTYPE = 'user_edge_data';
+
+/** E2 — the edge SIM-START: ONE 'edge'-anchor pass (mirror corner's declaration; edge datum = a LINE / one wall → ONE anchor
+ *  pass, vs corner's multi-pass POINT). The declared 'edge' anchor CENTRES the perpendicular axis + parks ±outset off the
+ *  probed wall at wall height (plane:'probe') — byte-faithful to the built-in EdgeWizard.inferStart. Sim-only (emits nothing).
+ *  The anchor's axis/side are static in the row (like corner's frac default); the provider re-points them to the LIVE axis/dir
+ *  (the same per-param adjust corner's provider does for a non-FL corner). side 'pos'→−outset / 'neg'→far+outset = inferStart. */
+export const EDGE_SIM_STARTS = [{ id: 'edge', anchor: 'edge', axis: 'X', side: 'pos', out: '@outset', plane: 'probe' }];
+export function edgeSimStartsProvider(params, stock) {
+    const p = params || {};
+    const axis = p.axis === 'Y' ? 'Y' : 'X';
+    const side = p.dir === 'neg' ? 'neg' : 'pos';
+    return makeProvider(EDGE_SIM_STARTS.map((r) => ({ ...r, axis, side })))(p, stock);
+}
 
 /** The wrapped `user_root` template for a param set. The superset (edgeStack {superset:true}) carries every axis/dir/wcs
  *  arm guarded; instantiate() prunes to the concrete shape. Byte-transparent wrap (user_root emits its children in order). */
@@ -92,5 +106,6 @@ export function edgeDataDef() {
     const def = userOpFromStack('edge_data', 'Edge (data)', edgeDataStack(EDGE_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = EDGE_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.postInstantiate = applyProbeSources;   // source-chips (byte-identical when studio-sourced)
+    def.simStartsProvider = edgeSimStartsProvider;   // E2 — the ONE edge-anchor preview marker (sim-only; re-points to the live axis/dir)
     return def;
 }
