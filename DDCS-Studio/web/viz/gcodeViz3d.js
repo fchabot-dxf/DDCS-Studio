@@ -540,7 +540,7 @@ export class GcodeViz3D {
             const o = this.lineGroups[k]; if (!o) continue;
             if (on) {
                 if (o.material.__op0 == null) o.material.__op0 = o.material.opacity != null ? o.material.opacity : 1;
-                o.material.transparent = true; o.material.opacity = 0.5;   // always-visible faint guide
+                o.material.transparent = true; o.material.opacity = 0.8;   // t313 — always-visible untraveled guide at 80% (human t312c), MATCHING the 2D future=0.8; the bold _trailLine below still carries the traveled emphasis
             } else if (o.material.__op0 != null) {
                 o.material.opacity = o.material.__op0; o.material.transparent = o.material.__op0 < 1;
             }

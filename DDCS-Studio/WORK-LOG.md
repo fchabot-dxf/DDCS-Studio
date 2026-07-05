@@ -1154,3 +1154,13 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **VERIFY (form-widgets.spec, new test, green):** a `widgetConfig:{stepperSide:'left'}` number field mounts a `.num-stepper` with 2 buttons positioned to the LEFT of the input (getBoundingClientRect x < input x); a DEFAULT number field is NOT wrapped (still a native `input[type=number]`); clicking ▲ steps the value up (feed 100→>100, the custom stepper drives the input); Insert commits depth=-5 unchanged (no emit change). Full suite 637 pass / 2 skip (636 baseline + 1 new; NO existing field or emit touched).
 
 **PASSED BACK. QUEUED next per the advisor: direction arrows (t292c), travel-shape dropdown (t292d), toast consolidation (t292e).**
+
+## 🔨 turn 313 (cycle 127) — VIZ TWEAKS (human t312, two specific values in toolpath2d drawPath): future/untraveled path alpha 0.22→0.8 (80%) + traveled path width 2.6→3.12 (1.2×). ONE renderer → BOTH the top panel + the Layout overlay. No emit change, 636 pass (1 parallel flake). 1 file.
+
+**BUILT (toolpath2d.js drawPath, the play-state trail):** the future segments strokeSegs alpha 0.22 → 0.8 (human-specified 80% — brighter, but still dimmer than the traveled path at alpha 1 so the progress contrast holds); the traveled segments strokeSegs width 2.6 → 3.12 (2.6×1.2, human t312 amendment). Both are the SAME one-source renderer, so the top 2D panel AND the new Layout animation overlay inherit both at once. The STATIC path (k==null: alpha 1, width 2) is UNTOUCHED — only the mid-play trail changes.
+
+**VERIFY:** real-app mid-animation screenshot scratchpad/anim_overlay.png (regenerated) — the traced path renders brighter (future at 80%) with the red probe head, under the handles; the traveled portion up to the head is the wider 3.12 stroke, still distinct from the 80% future. No emit change (visual-only, drawPath is a preview renderer). Full suite 636 pass / 2 skip (1 failure = custom-op-chip, a known parallel-run flake — passes in isolation; a 2-value opacity/width tweak cannot affect the Edit-chip test).
+
+**PASSED BACK (screenshot for the human). QUEUED next per the advisor: travel-shape dropdown (t292d), toast consolidation (t292e).**
+
+### 🔨 turn 313 (amendment) — THIRD tweak (human t312c, consistency): gcodeViz3d._dimRoute untraveled route opacity 0.5→0.8 to MATCH the 2D future=0.8 → both previews consistent. The bold 3D _trailLine (traveled emphasis) is UNTOUCHED. So this turn = THREE one-value tweaks: 2D future 0.22→0.8, 2D traveled width 2.6→3.12, 3D untraveled 0.5→0.8. (Deeper: these progress-style values + the colour legend get declared ONE-SOURCE in a QUEUED cleanup — not this turn, per the advisor.) Screenshot both previews mid-play.

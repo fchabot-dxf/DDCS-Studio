@@ -257,8 +257,8 @@ export function createToolpath2d(canvas, opts = {}) {
         const zR = (zMax - zMin) || 1;
         if (k == null) { strokeSegs(ctx, 0, segs.length, 1, 2, zMin, zR, maxPF); return; }
         const n = Math.max(0, Math.min(k, segs.length));
-        strokeSegs(ctx, n, segs.length, 0.22, 1.5, zMin, zR, maxPF);
-        strokeSegs(ctx, 0, n, 1, 2.6, zMin, zR, maxPF);
+        strokeSegs(ctx, n, segs.length, 0.8, 1.5, zMin, zR, maxPF);   // t313 — future/untraveled path at 80% (human t312), still dimmer than the traveled path (alpha 1) so the progress contrast holds
+        strokeSegs(ctx, 0, n, 1, 3.12, zMin, zR, maxPF);   // t313 — traveled path 1.2× wider (2.6 → 3.12, human t312)
         // Head marker: ride the LIVE sim position (engine onPositionChange) when we have it, so the probe/tool travels
         // the path smoothly in sync with the 3D; else fall back to the current segment node. Both via ptx/pty (#13 pin).
         const head = segs[n - 1] || segs[0];
