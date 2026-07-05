@@ -24,7 +24,7 @@ test('probe cue reaches meaningful cue-coloured coverage during a real probe (co
   await page.evaluate(() => { window.ddcsGetSettings().preview.autoLoop = false; });
   await page.evaluate(() => window.setGcodeView('3d'));
   await page.waitForSelector(RUN, { state: 'attached', timeout: 8000 });
-  await page.waitForFunction(() => { const v = window.__gpPanel && window.__gpPanel.viz; return v && v._probeBurstBasePx; }, { timeout: 8000 });
+  await page.waitForFunction(() => { const v = window.__gpPanel && window.__gpPanel.viz; return v && v._probeBurstRefFeed; }, { timeout: 8000 });   // t331 — the rogue _probeBurstBasePx was removed; the disc size now reads TOUCH_PULSE.px3D. _probeBurstRefFeed is the equivalent readiness sentinel.
 
   const sample = () => page.evaluate(() => {
     const v = window.__gpPanel.viz, gl = v.renderer.getContext();

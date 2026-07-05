@@ -176,7 +176,7 @@ export class GcodeViz3D {
         // cross — GOLD, a different colour). Both vanish when the next probe LOOP starts. Constant-screen in _scaleMarkers.
         this._datumColor = 0xff2d2d; this._lineColor = 0x00e5ff;   // DATUM = RED 2-axis crosshair (was a gold sphere)
         this._probeDiscFadeMs = TOUCH_PULSE.fadeMs;                     // t319 — disc lifetime = the ONE declared touch-pulse fade (16s sim, SAME both previews); scaled by the live sim speed
-        this._probeBurstBasePx = 200; this._probeBurstRefFeed = 250;    // disc radius px = base × clamp(√(feed/ref), .6, 1.8) — FASTER → bigger (LARGER disc, user)
+        this._probeBurstRefFeed = 250;    // t331 — the feed pivot for the disc-size scale; the disc RADIUS now reads TOUCH_PULSE.px3D (was a rogue base=200), interpolating fast→slow by feed (slow re-probe = BIGGER)
         this._probeLinePx = 200; this._probeLineRadPx = 0.8; this._simSpeed = 1;   // THIN axis line (length spans the scene — see _scaleMarkers)
         // DATUM gizmo — a thin RED 2-axis CROSSHAIR, a PEER of the stock-WCS crosshair (same LineSegments style; red vs amber).
         // The `+` lies in the plane of the 2 displayed/probed axes; the 3rd axis is just DEPTH (the cross sits at that depth).
@@ -2000,8 +2000,12 @@ export class GcodeViz3D {
     // Feed → disc radius in PX. t319: SLOW/fine probe (small feed) → BIGGER disc, FAST/rough → smaller (FLIPPED to match
     // the 2D pulse's slow=bigger; the sqrt(ref/f) inverts the old sqrt(f/ref)).
     _burstRadiusPx(feed) {
+        // t331 — read the ONE token's px3D endpoints (no rogue base). clamp(√(ref/f), .6, 1.8) ∈ [.6 fast .. 1.8 slow] → t ∈ [0,1]
+        // → interpolate px3D.fast (a fast probe) → px3D.slow (a slow re-probe). Monotonic: a slower probe (lower feed) is BIGGER.
         const f = feed > 0 ? feed : this._probeBurstRefFeed;
-        return this._probeBurstBasePx * Math.max(0.6, Math.min(1.8, Math.sqrt(this._probeBurstRefFeed / f)));
+        const s = Math.max(0.6, Math.min(1.8, Math.sqrt(this._probeBurstRefFeed / f)));
+        const t = (s - 0.6) / 1.2;
+        return TOUCH_PULSE.px3D.fast + t * (TOUCH_PULSE.px3D.slow - TOUCH_PULSE.px3D.fast);
     }
 
     // (A) A TRANSIENT SOLID additive disc (no blur) in the plane PERP to `axis`, IMMOBILE at the probe contact `localPos`

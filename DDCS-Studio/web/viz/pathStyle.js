@@ -39,12 +39,19 @@ export const PATH_STATE = {
 export const HEAD = { color: 0xff2a44, r: 4 };
 
 /** The ON-TOUCH PULSE (t319/INC-6) — a transient white flash at each G31 contact, in lockstep with the red probe head,
- *  in BOTH previews. Colour is shared; the 2D draws the HONEST TOP-VIEW PROJECTION (a CIRCLE for a Z/surface touch, a
- *  LINE along the wall tangent for an X/Y wall touch) at screen-space fastPx/slowPx (SLOW = BIGGER); the 3D keeps its
- *  oriented feed-scaled disc but reads the same colour + fadeMs. fadeMs = SIM-time fade (speed-scaled), same both. */
-export const TOUCH_PULSE = { color: 0xffffff, alpha: 0.3, fastPx: 7, slowPx: 14, fadeMs: 16000 };
-/** The pulse screen size for a touch: SLOW (fine re-probe) is BIGGER than FAST. */
-export const pulsePx = (slow) => (slow ? TOUCH_PULSE.slowPx : TOUCH_PULSE.fastPx);
+ *  in BOTH previews. colour/alpha/fadeMs are SHARED; SIZE is PER-RENDERER (t331 — the 3D disc is a WORLD-projected radius,
+ *  the 2D pulse a CANVAS-px radius; the two scales legitimately differ, so size lives in px3D/px2D — but BOTH read from HERE,
+ *  no rogue base). Each is {fast, slow} with SLOW (fine re-probe) BIGGER than FAST. The 2D draws the HONEST TOP-VIEW
+ *  PROJECTION (a CIRCLE for a Z/surface touch, a LINE along the wall tangent for an X/Y wall touch); the 3D an oriented
+ *  feed-scaled disc that interpolates between px3D.fast (a fast probe) and px3D.slow (a slow re-probe). fadeMs = the
+ *  SIM-time fade (speed-scaled), same both. Human-tuned (t331): 3D DOWN (~half), 2D UP (~2×) vs the old 200-base / 7-14. */
+export const TOUCH_PULSE = {
+    color: 0xffffff, alpha: 0.3, fadeMs: 16000,   // SHARED across both views
+    px2D: { fast: 14, slow: 28 },                 // 2D canvas-px radius (t331 — 2× the old 7/14; the Layout pulses were too small)
+    px3D: { fast: 60, slow: 180 },                // 3D disc-radius endpoints (t331 — ~half the old 120/360; the discs were too big)
+};
+/** The 2D pulse canvas-px size for a touch: SLOW (fine re-probe) is BIGGER than FAST. */
+export const pulsePx = (slow) => (slow ? TOUCH_PULSE.px2D.slow : TOUCH_PULSE.px2D.fast);
 
 /** Feed depth-gradient lerp for the 2D: FEED_LOW→FEED_HIGH by t∈[0,1] → an 'rgb(r,g,b)' string (byte-identical to
  *  the old lerpHex). The 3D lerps the same endpoints per-vertex via THREE.Color. */
