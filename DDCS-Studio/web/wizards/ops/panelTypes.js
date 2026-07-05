@@ -124,7 +124,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (wr('width')) decls.push({ type: 'projLength', id: gid + '_width', field: byRole.width.param, cx: mx, cy: my, nx, ny, off: hw, scale: 2, min: 1, label: 'width' });
         } else if (byRole.x && byRole.y && byRole.len) {
             const x = p('x'), y = p('y'), len = p('len');
-            items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });   // anchor marker
+            items.push({ kind: 'hole', x, y, r: Math.max(1, stock.w * 0.012) });   // t297 — a MUTE anchor dot (no n:1): the pass NUMBER is owned by the point handle alone; a numbered hole coincident with a relTo pass-numbered handle would stack two labels (the two-"1" ghost). Handle-owns-number, hole-is-mute.
             pos();
             // 1D extent: drag `len` along Y from the anchor (like text height) — axis FIXED Y (one gesture; X variant later).
             if (wr('len')) decls.push({ type: 'length', id: gid + '_len', field: byRole.len.param, ax: x, ay: y, axis: 'y', value: len, min: 1, label: 'len' });
@@ -180,9 +180,12 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             const x = ax + offX, y = ay + offY;
             // stash this relTo emitting group's live world + anchor so a drag on ANY handle can CAPTURE (freeze) the others
             if (spotStore && byRole.x.param && byRole.y.param) repoGroups.push({ gid, fx: byRole.x.param, fy: byRole.y.param, ax, ay, worldX: x, worldY: y });
-            items.push({ kind: 'hole', x, y, r: Math.max(1, stock.w * 0.012) });   // anchor dot (NO number — the pass number rides the handle label, so no redundant '1')
+            // t297 INVARIANT (handle-owns-number, hole-is-mute): the numeric pass label is a property of exactly ONE marker
+            // kind — the emitting `_pos` handle below — and is NEVER duplicated onto this coincident anchor hole (which is a MUTE
+            // dot, no n) nor onto the sim-only Start ◇ (which stays 'Start', non-numeric). That is what keeps the two-"1" ghost dead.
+            items.push({ kind: 'hole', x, y, r: Math.max(1, stock.w * 0.012) });   // MUTE anchor dot — the pass number rides the handle label alone
             const reposManual = Array.isArray(sources) && sources[destPass] === 'manual';   // auto → cyan square, manual → amber circle
-            if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: destPass != null ? String(destPass) : 'pos', color: srcCol(destPass), manual: reposManual });   // label = the destination PASS NUMBER (1,2,…)
+            if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: destPass != null ? String(destPass) : 'pos', color: srcCol(destPass), manual: reposManual });   // label = the destination PASS NUMBER (1,2,…) — the SOLE owner of the number
         }
     }
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
@@ -224,19 +227,25 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         const SIM_ID = '__simstart0';
         // pass-0 is the operator's manual jog START — always a jog, so always an AMBER CIRCLE, labelled 'Start'.
         const allHandles = [...handles, { id: SIM_ID, x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, manual: true, label: 'Start', color: '#ffb300' }];
-        // t87 — the sim-only marker is DRAGGABLE: route its drag to the panel's onStartDrag (writes userStarts, NEVER emitted —
-        // reuses the top panel's seam, no new mechanism); every other handle keeps its param-writing onDrag. (placement is {0,0}
-        // for a probe op → the canvas world-delta IS the absolute start world point onStartDrag expects.)
-        // t120 — the sim-only ◇ is the CHAIN ROOT (the operator's MANUAL jog: probeZ-on zsurf / probeZ-off wall-1, never emitted).
-        // The emitting #-handles are G91 INCREMENTS relative to it, so its drag must stay a PURE preview move: undragged handles
-        // ride the root (the relative chain, emit byte-identical) and dragged handles hold their datum-relative spot (their derive
-        // re-computes off the moved planned anchor). It must NOT capture — freezing a handle against a PREVIEW root would bake that
-        // preview position into the emitted increment (machine-wrong; the real jog is wherever the operator goes). Emit-side coupling
-        // is only between emitting handles → handled by spotOnDrag. So SIM_ID → onStartDrag (userStarts), every other id → spotOnDrag.
+        // t87/t120 → t297 — the Start ◇ is now the REPOSITION-CHAIN DATUM (TRAVEL-START-SPEC "START=SOURCE"), not a decorative
+        // preview jog. Its drag routes to onStartDrag (writes userStarts pass-0, sim-only — the Start never emits its OWN value).
+        // BUT #21-#24 are DEFINED relative to the Start, so dragging it must HOLD each wall on the physical stock and RE-DERIVE
+        // the increments: capture EVERY repoGroup's current world into spotStore BEFORE the Start re-trace, and the derive
+        // (:174-179) recomputes #21-#24 = wall_world − (the Start-shifted anchor) → walls stay put, offsets adapt. ORDER is
+        // LOAD-BEARING: setSpots must run BEFORE simStart.onDrag (which re-renders synchronously) or the walls jump one frame.
+        // This CHANGES the emitted program on a Start jog BY DESIGN (human-signed-off t294/t296) — it REVERSES the old t120
+        // "must NOT capture" preview-only stance, because the Start is the datum now, not a jog the operator drifts from.
         const wrappedOnDrag = (typeof simStart.onDrag === 'function')
             ? (id, world) => {
-                if (id === SIM_ID) simStart.onDrag({ x: world.x, y: world.y });
-                else if (spotOnDrag) spotOnDrag(id, world);
+                if (id === SIM_ID) {
+                    // freeze the walls (every repoGroup — there is no "dragged" emitting group here) so they hold their world
+                    if (spotStore && repoGroups.length && cornerXY && typeof setSpots === 'function') {
+                        const next = { ...spotStore };
+                        for (const g of repoGroups) if (!next[g.gid]) next[g.gid] = { dx: g.worldX - cornerXY.x, dy: g.worldY - cornerXY.y };
+                        setSpots(next);   // MUST precede simStart.onDrag (the synchronous Start re-render), else the walls flash
+                    }
+                    simStart.onDrag({ x: world.x, y: world.y });
+                } else if (spotOnDrag) spotOnDrag(id, world);
             }
             : spotOnDrag;
         return { stock, items, handles: allHandles, onDrag: wrappedOnDrag, ...cornerPick };

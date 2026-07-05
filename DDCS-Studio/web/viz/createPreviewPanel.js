@@ -484,6 +484,7 @@ export function createPreviewPanel(container, opts = {}) {
                 if (v.starts) {   // sync the 3D markers from the shared per-pass starts (computed above for both views)
                     for (let p = 0; p < passStarts.length; p++) v.starts[p] = { x: passStarts[p].x, y: passStarts[p].y, z: passStarts[p].z, anchorsAtPrev: !!passStarts[p].anchorsAtPrev };   // t94 — carry the draw-anchor flag so the route resolves it (marker sprite still uses x/y/z)
                 }
+                if (v._syncJogPos) v._syncJogPos();   // t297 — BIDIRECTIONAL pendant: refresh the jog-pendant Pos fields from the freshly-mirrored viz.starts, so EVERY drag surface (2D-top handle, Layout ◇/#-handle, 3D gizmo) writes the pendant back — not only the 3D gizmo. Kills the pendant-overrides-handle asymmetric-refresh bug (setGcode runs after every drag). syncPos skips the focused field → live typing is safe.
                 if (v.setStartSources) v.setStartSources(passSources);   // colour each start marker by its reposition source (auto=cyan, manual=amber)
                 if (v.setStartEmits) v.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): SHAPE each marker (emitting=solid vs sim-only=hollow), orthogonal to the colour
                 if (v.setPassEnds) v.setPassEnds(passEnds);   // t107 — BEFORE setSegments: the route rebuild anchors an anchorsAtPrev pass at the previous pass's runtime END + relocates its marker sprite to end+cross

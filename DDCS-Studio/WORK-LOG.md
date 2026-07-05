@@ -970,3 +970,21 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **FLAGGED UNKNOWNS:** (1) the wall anchors follow the Start via the passEnds runtime-shift (panelTypes:160-165, passEnds[0] follows userStarts[0] 1:1 — empirically confirmed), NOT a frac-chain. (2) one-frame top-panel flicker on a Start drag (two-render cascade; Phase 2 is the root fix; unknown if visible). (3) Phase-1-vs-Phase-2 scope is the human's call. (4) the pendant offers wall passes as jog targets today → the wall-jog ghost is reachable, not hypothetical.
 
 **NO CODE. Advisor rules: (1) Phase 1 now / Phase 2 gated vs both; (2) the t120-reversal emit-change sign-off; (3) whether the flicker forces Phase 2 up-front. PASS BACK.**
+
+## 🔨 turn 297 (cycle 127) — BUILT PHASE 1 of the unified bidirectional-drag (blessed scout). Start ◇ = the reposition DATUM. 627 pass / 1 known flake. Screenshots: scratchpad/startdrag-{layout,wizard}.png.
+
+**BUILT (3 seams, exactly as the scout ruled):**
+- **(a) START-DRAG RECOMPUTE** — panelTypes.js wrappedOnDrag SIM_ID branch: freeze EVERY repoGroup into spotStore (guard spotStore&&repoGroups.length&&cornerXY) BEFORE simStart.onDrag (ORDER load-bearing — setSpots first, else one-frame jump). The :174-179 derive then holds each wall world + re-derives #21-#24 = wall − (Start-shifted anchor). Updated the t87/t120 comment → START=DATUM (the emit CHANGES on a Start jog BY DESIGN, human-signed-off t294/t296).
+- **(b) PENDANT bidirectional** — createPreviewPanel.setGcode, after the viz.starts mirror: `if (v._syncJogPos) v._syncJogPos();`. setGcode runs after EVERY drag surface → every drag now refreshes the pendant Pos fields (was only the 3D gizmo — the asymmetric-refresh "pendant overrides handle" bug). syncPos skips the focused field → typing safe.
+- **(c) GHOST** — dropped the residual n:1 at panelTypes.js:127 (the len/text-height branch) + codified the invariant at :183 (handle-owns-number, hole-is-mute; sim ◇ stays 'Start'). One "1" everywhere.
+
+**VERIFY (new corner-start-datum-drag.spec, REAL pointer events + the 16-config plan A-E):**
+- A DEFAULT byte-parity: no drag → #23/#24 UNSET (formula) → emit unchanged.
+- B 16-CONFIG SWEEP (4 corners × 2 probeSeq × 2 probeZ): a real Start-drag HOLDS every wall (reposition marker moves <6px) and RE-DERIVES its offset to a finite CHANGED number — probeZ-ON asserts BOTH pairs (#21/#22 wall-1 + #23/#24 wall-2 hold + recompute). ALL 16 pass.
+- (b) a Layout drag REFRESHES the pendant (_syncJogPos spy fires — pre-fix it only fired on the 3D gizmo).
+- FLICKER MEASURED: the LAYOUT wall deviation across the whole drag = **0px** (no on-Layout flicker — the Layout is frozen by the spot). The sub-frame TOP-PANEL transient the scout flagged is not capturable by settled sampling (two-render cascade) → it's the human's live-eyeball item (the gate); scout estimate ~a few px / one frame.
+- Screenshots: scratchpad/startdrag-layout.png (settled Layout) + startdrag-wizard.png (full wizard).
+- RE-BASELINED corner-layout-sim-drag.spec (1): flipped the old "emit byte-identical on a sim drag" invariant → "the Start drag RECOMPUTES the emit (the reposition datum)" — the t120 reversal. Test (2) degenerate-overlap unchanged.
+- Full suite 627 pass / 2 skip (1 known middle-animator load flake, retry-passes).
+
+**PHASE-1 RESIDUAL (documented, Phase-2 territory per the ruling):** dragging a WALL (pass>=1) via the 3D/2D-top/pendant still writes userStarts[p>=1] (moves the sprite, does NOT reach #21-#24) — the wall-jog ghost the immediate Phase-2 follow-on kills. GATE: pass back the diff + the screenshot PATHS for the human to feel before release.

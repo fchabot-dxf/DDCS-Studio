@@ -1,17 +1,17 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * LAYOUT SIM-ONLY MARKER DRAG (t87) — the human confirmed: "sim only just means it doesn't emit, but we should still drag it to
- * simulate a user position start." So the Layout FeatureCanvas sim-only marker is DRAGGABLE again (it writes userStarts via the
- * SAME onStartDrag seam the top panel uses; never emitted). featureCanvas._hit's blanket `if (h.simOnly) return` (from when the
- * marker + the emitting handle were COINCIDENT, pre-t76) is replaced by a real coincidence DISTANCE check: draggable when clear
- * (the default/separated case), emitting-wins ONLY when they degenerately coincide. Byte-parity untouched (sim-only).
+ * LAYOUT SIM-ONLY MARKER DRAG (t87 → t297) — the Layout FeatureCanvas sim-only Start ◇ is DRAGGABLE (it writes userStarts
+ * via the SAME onStartDrag seam the top panel uses). t297 REVERSAL: the Start ◇ is now the reposition-chain DATUM
+ * (START=SOURCE) — dragging it HOLDS each wall on the stock and RE-DERIVES #21-#24 = wall − Start, so the EMIT now CHANGES
+ * by design (human-signed-off). featureCanvas._hit's coincidence DISTANCE check still applies (draggable when clear,
+ * emitting-wins only when they degenerately coincide).
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-// (1) DRAGGABLE at the default/separated positions — a real mouse drag of the Layout sim ◇ moves the SHARED pass-0 start
-//     (userStarts, mirroring the top panel) and leaves the EMIT byte-identical.
-test('(1) Layout sim-only marker is DRAGGABLE — drag writes userStarts (mirrors the top panel), emit byte-identical', async ({ page }) => {
+// (1) DRAGGABLE — a real mouse drag of the Layout sim ◇ moves the SHARED pass-0 start (userStarts, mirroring the top panel)
+//     AND, as the reposition datum (t297), RE-DERIVES #21-#24 so the emit CHANGES (walls hold — asserted in corner-start-datum-drag).
+test('(1) Layout sim ◇ is DRAGGABLE — writes userStarts AND recomputes the emit (the reposition datum, t297)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => {
@@ -45,7 +45,10 @@ test('(1) Layout sim-only marker is DRAGGABLE — drag writes userStarts (mirror
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 
   expect(before.code.length, 'sanity: emitted code exists').toBeGreaterThan(100);
-  expect(after.code, 'THE INVARIANT — the sim-only drag never touches the EMIT (userStarts is never emitted)').toBe(before.code);
+  // t297 — the Start ◇ is the reposition DATUM: dragging it RE-DERIVES #21-#24 (walls held) → the emit CHANGES (was
+  // byte-identical pre-t297; the human signed off the emit change — see corner-start-datum-drag for the walls-hold values).
+  expect(after.code, 'the Start drag now RECOMPUTES the emit (the reposition datum)').not.toBe(before.code);
+  expect(/#23\s*=/.test(after.code), 'the recomputed reposition #23 is still emitted').toBe(true);
 });
 
 // (2) DEGENERATE overlap — when the sim marker and an EMITTING handle genuinely COINCIDE, the emitting handle wins the hit
