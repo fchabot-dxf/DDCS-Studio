@@ -28,8 +28,9 @@ test('travelApproach renders [Manual|Auto]; click Manual reprunes; other enums s
   await expect(auto).toHaveClass(/seg-on/);
   await expect(manual).not.toHaveClass(/seg-on/);
 
-  // OPT-IN: only travelApproach is segmented; the other enums stay DROPDOWNS (unchanged)
-  await expect(page.locator('#wiz_user_form .seg-control')).toHaveCount(1);
+  // OPT-IN: travelApproach + travelShape (t328) are segmented; the other enums stay DROPDOWNS (unchanged)
+  await expect(page.locator('#wiz_user_form .seg-control')).toHaveCount(2);
+  await expect(page.locator('#wiz_user_form .seg-control[data-param="travelShape"]')).toBeVisible();
   await expect(page.locator('#wiz_user_form select[data-param="wcs"]')).toBeVisible();
   await expect(page.locator('#wiz_user_form select[data-param="corner"]')).toBeVisible();
   await expect(page.locator('#wiz_user_form select[data-param="probeSeq"]')).toBeVisible();

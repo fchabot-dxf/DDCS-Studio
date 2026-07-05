@@ -101,30 +101,39 @@ test('3D manual jog BOWS UP in +Z (rainbow arc), not a straight line', async ({ 
   expect(r.maxZ, 'the jog APEX rises well above the flat chord (a pronounced +Z rainbow bow)').toBeGreaterThan(5);
 });
 
-test('2D path colours the trans-axis TRAVERSE vector (2-axis rapid) by source; in-axis rapid keeps its type colour', async ({ page }) => {
+test('2D path colours a rapid by MOTION TYPE (yellow) — an AUTO trans-axis traverse + an in-axis rapid are BOTH rapid-yellow; only a MANUAL trans-axis jog is amber (t328)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
     const { createToolpath2d } = await import('/viz/toolpath2d.js');
-    const cv = document.createElement('canvas');
-    cv.style.cssText = 'position:fixed;left:0;top:0;width:600px;height:400px;z-index:99999';
-    document.body.appendChild(cv);
-    const t2 = createToolpath2d(cv, {});
-    t2.setMachine(null); t2.setAnchor(true);
-    t2.setStarts([{ x: 0, y: 0, z: 0 }]); t2.setStartSources(['auto']);
-    t2.setSegments([
-      { x1: -40, y1: -40, x2: 40, y2: 40, z1: 0, z2: 0, type: 'rapid', pass: 0 },   // 2-axis rapid = the trans-axis traverse → cyan
-      { x1: -40, y1: -40, x2: 40, y2: -40, z1: 0, z2: 0, type: 'rapid', pass: 0 },   // 1-axis rapid = in-axis → keeps its TYPE colour (yellow)
-    ]);
-    t2.fit();
-    const v = cv.__t2view, ctx = cv.getContext('2d'), dpr = window.devicePixelRatio || 1;
-    const scan = (x1, y1, x2, y2) => { let best = [0, 0, 0]; for (let k = 0; k <= 40; k++) { const u = k / 40, wx = x1 + (x2 - x1) * u, wy = y1 + (y2 - y1) * u; const d = ctx.getImageData(Math.round((v.ox + wx * v.scale) * dpr), Math.round((v.oy - wy * v.scale) * dpr), 1, 1).data; if (d[0] + d[1] + d[2] > best[0] + best[1] + best[2]) best = [d[0], d[1], d[2]]; } return best; };
-    const diag = scan(-40, -40, 40, 40), inaxis = scan(-40, -40, 40, -40);
-    cv.remove();
-    return { diag, inaxis };
+    const mk = (source) => {
+      const cv = document.createElement('canvas');
+      cv.style.cssText = 'position:fixed;left:0;top:0;width:600px;height:400px;z-index:99999';
+      document.body.appendChild(cv);
+      const t2 = createToolpath2d(cv, {});
+      t2.setMachine(null); t2.setAnchor(true);
+      t2.setStarts([{ x: 0, y: 0, z: 0 }]); t2.setStartSources([source]);
+      t2.setSegments([
+        { x1: -40, y1: -40, x2: 40, y2: 40, z1: 0, z2: 0, type: 'rapid', pass: 0 },   // 2-axis rapid = the trans-axis traverse
+        { x1: -40, y1: -40, x2: 40, y2: -40, z1: 0, z2: 0, type: 'rapid', pass: 0 },   // 1-axis rapid = in-axis
+      ]);
+      t2.fit();
+      const v = cv.__t2view, ctx = cv.getContext('2d'), dpr = window.devicePixelRatio || 1;
+      // NB: the MANUAL trans-axis arcs UP, so sample a band ABOVE the chord to catch the amber bow (auto stays on the chord)
+      const scan = (x1, y1, x2, y2) => { let best = [0, 0, 0]; for (let k = 0; k <= 40; k++) { const u = k / 40, wx = x1 + (x2 - x1) * u, wy = y1 + (y2 - y1) * u; for (let up = 0; up <= 40; up += 4) { const d = ctx.getImageData(Math.round((v.ox + wx * v.scale) * dpr), Math.round((v.oy - wy * v.scale) * dpr) - up, 1, 1).data; if (d[3] > 40 && d[0] + d[1] + d[2] > best[0] + best[1] + best[2]) best = [d[0], d[1], d[2]]; } } return best; };
+      const out = { diag: scan(-40, -40, 40, 40), inaxis: scan(-40, -40, 40, -40) };
+      cv.remove();
+      return out;
+    };
+    return { auto: mk('auto'), manual: mk('manual') };
   });
-  expect(r.diag[2], 'trans-axis traverse (2-axis rapid) is cyan: blue > red').toBeGreaterThan(r.diag[0]);
-  expect(r.inaxis[0], 'in-axis rapid keeps its type colour (yellow): red > blue').toBeGreaterThan(r.inaxis[2]);
+  // t328 — a rapid is a rapid: the AUTO trans-axis traverse is now rapid-YELLOW (was source-cyan), red > blue, matching the in-axis rapid
+  expect(r.auto.diag[0], 'AUTO trans-axis traverse is rapid-yellow: red > blue (was cyan)').toBeGreaterThan(r.auto.diag[2]);
+  expect(r.auto.inaxis[0], 'in-axis rapid is rapid-yellow: red > blue').toBeGreaterThan(r.auto.inaxis[2]);
+  expect(Math.abs(r.auto.diag[1] - r.auto.inaxis[1]), 'the AUTO trans-axis + in-axis rapids are the SAME motion-type colour (green channel matches)').toBeLessThan(40);
+  // only the MANUAL trans-axis jog is amber (#ff9a0d, a LOWER green than the #ffcc00 rapid yellow) — its own jog colour + the rainbow arc
+  expect(r.manual.diag[0], 'MANUAL trans-axis jog is amber: red > blue').toBeGreaterThan(r.manual.diag[2]);
+  expect(r.manual.diag[1], 'MANUAL jog amber (#ff9a0d) has a LOWER green than the auto rapid yellow (#ffcc00)').toBeLessThan(r.auto.diag[1]);
 });
 
 test('2D start markers carry the per-pass source (auto / manual)', async ({ page }) => {

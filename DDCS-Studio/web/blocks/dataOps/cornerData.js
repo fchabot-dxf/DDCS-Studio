@@ -53,7 +53,7 @@ export const CORNER_DEFAULTS = {
     // corner/probeSeq/wcs are the STRING forms — the guards match by value-equality (when(corner=='FL'…) / when(probeSeq=='YX'…)
     // / when(wcs=='active'…)); a numeric 1/0 would match no arm and drop the block. (cornerStack still accepts the numeric forms
     // for the built-in via its own normalization.)
-    corner: 'FL', probeSeq: 'YX', probeZFirst: 0, travelApproach: 'auto', wcs: 'active',
+    corner: 'FL', probeSeq: 'YX', probeZFirst: 0, travelApproach: 'auto', travelShape: 'dogleg', wcs: 'active',
     dist: 500, retract: 5, f_fast: 200, f_slow: 50, port: 3,
     level: 0, safeZ: 10, scanDepth: 5, radius: 2, travelDist: 50,
     // NOTE: startX/startY/cross1_x/cross1_y are deliberately ABSENT — the reposition sockets default to their signed-travelDist
@@ -169,6 +169,10 @@ function cornerSimStartsProvider(params, stock) {
 export const CORNER_STRUCT_BINDINGS = [
     { param: 'probeZFirst', type: 'bool', default: !!CORNER_DEFAULTS.probeZFirst, label: 'Probe Z First', help: 'Probe the top surface for Z before the two walls — anchors the sideways probes to a real measured Z instead of a jogged guess.', section: 'GEOMETRY' },
     { param: 'travelApproach', type: 'enum', widget: 'segmented', default: CORNER_DEFAULTS.travelApproach, label: 'Travel', help: 'Auto = the machine moves itself between the walls; Manual = you jog to each start and press Cycle Start (operator-in-the-loop).', section: 'GEOMETRY', widgetConfig: { options: [['Manual', 'manual'], ['Auto', 'auto']] } },   // t323 — opt-in segmented; t328 human — DISPLAY order [Manual|Auto] (Manual left); default stays 'auto' (value-mapped, not index)
+    // t328 — TRAVEL SHAPE for the wall1→wall2 AUTO traverse. dogleg (default) = BYTE-IDENTICAL to today (firstAxis routes around the
+    // corner); diagonal = a single straight XY at the existing safe-Z retract height (OPT-A — zero added Z). Help is HONEST about
+    // the user owning the clearance via their Safe Z [[dont-declare-away-user-responsibility]]. Kept [Dogleg|Diagonal] (default-first).
+    { param: 'travelShape', type: 'enum', widget: 'segmented', default: CORNER_DEFAULTS.travelShape, label: 'Travel shape', help: 'Dogleg = the tool routes around the corner (two axis moves) — never passes over the stock; Diagonal = a single straight move across at your Safe Z — faster, but relies on your Safe Z clearing the stock top.', section: 'GEOMETRY', widgetConfig: { options: [['Dogleg', 'dogleg'], ['Diagonal', 'diagonal']] } },
     // ② B4 step 4c — the 7-way WCS target: 'active' reads the controller's #578, or write a fixed G54..G59 slot directly.
     { param: 'wcs', type: 'enum', default: CORNER_DEFAULTS.wcs, label: 'WCS', help: 'Which work-coordinate register to store the found corner into — Active uses the currently-selected WCS; G54..G59 write that specific register.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
     // ② B4 step 4d — dual-gantry sync: a bool block-ADD (appends G1 A0 + the slave-offset write #74=[#70+slave], #[#74]=#883).
@@ -239,7 +243,7 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
  *  sockets (#21-#24) 8× in the raw superset, so we derive over a CANONICAL-PRUNED stack (probeZFirst:1 · FL · YX → exactly 1×
  *  each socket, all 13 present incl the Z-first #21/#22). The frozen blockIndex is over this canonical stack (validateUserOp
  *  skips it for bindingSpecs defs); EMIT re-derives BY IDENTITY over the actual PRUNED stack each build (via bindingSpecs). */
-const CANONICAL_BIND = { ...CORNER_DEFAULTS, probeZFirst: 1, corner: 'FL', probeSeq: 'YX' };
+const CANONICAL_BIND = { ...CORNER_DEFAULTS, probeZFirst: 1, corner: 'FL', probeSeq: 'YX', travelShape: 'dogleg' };   // t328 — pin dogleg so the canonical prune keeps the wall1→wall2 traverse at 1× (the diagonal arm's duplicate #23/#24 move is pruned away)
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(cornerDataStack(CORNER_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const CORNER_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), CORNER_BINDING_SPECS);
 

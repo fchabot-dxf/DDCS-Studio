@@ -48,15 +48,16 @@ async function openCornerBlocks(page) {
   await page.waitForTimeout(500);
 }
 
-// (2) the STRUCTURAL section shows the 6 controls, seeded at the binding defaults
-test('(2) the STRUCTURAL section shows the 6 controls at their defaults', async ({ page }) => {
+// (2) the STRUCTURAL section shows the 7 controls, seeded at the binding defaults
+test('(2) the STRUCTURAL section shows the 7 controls at their defaults', async ({ page }) => {
   await openCornerBlocks(page);
   const ctls = await page.evaluate(() => Object.fromEntries(window.__blkws.getAllBlocks().filter((b) => b.type.indexOf('sc_') === 0).map((b) => [b.type, b.getFieldValue('VALUE')])));
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
-  expect(Object.keys(ctls).sort()).toEqual(['sc_corner', 'sc_probeseq', 'sc_probezfirst', 'sc_synca', 'sc_travelapproach', 'sc_wcs']);
+  expect(Object.keys(ctls).sort()).toEqual(['sc_corner', 'sc_probeseq', 'sc_probezfirst', 'sc_synca', 'sc_travelapproach', 'sc_travelshape', 'sc_wcs']);
   expect(ctls.sc_probezfirst).toBe('FALSE');
   expect(ctls.sc_corner).toBe('FL');
   expect(ctls.sc_wcs).toBe('active');
+  expect(ctls.sc_travelshape).toBe('dogleg');   // t328 — the new travel-shape control seeds at its default (dogleg = byte-identical)
 });
 
 // (3) DRIVES-GUARDS LIVE + keeps its value — toggling probeZFirst reprunes the preview (Z arm appears) and stays set

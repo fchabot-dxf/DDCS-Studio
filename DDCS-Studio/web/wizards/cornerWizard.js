@@ -92,6 +92,13 @@ export function cornerStack(params = {}, opts = {}) {
     // seq move; 'manual' = an operator jog-and-wait via the shared safeTraverseStack (approach:'manual'), reusing each
     // travel's OWN lift/drop so the Z-state mirrors auto. Default 'auto' → BYTE-IDENTICAL to today.
     const travelApproach = params.travelApproach === 'manual' ? 'manual' : 'auto';
+    // ② B4 step 4e (t328) — TRAVEL SHAPE for the wall1→wall2 AUTO traverse only: 'dogleg' (default) routes AROUND the outside
+    // corner via firstAxis=sA (two axis-aligned rapids — BYTE-IDENTICAL to today); 'diagonal' omits firstAxis (one straight XY
+    // move) at the EXISTING post-retract height — OPT-A (advisor t328): probeWallR's retract ALREADY lifted the tool to the
+    // safe-traverse height (#17 probeZ-ON = safeZ+scanDepth / #19 OFF = safeZ, the SAME height the dogleg routes at), so the
+    // diagonal crosses STRAIGHT with ZERO added Z and the SAME drop. safeZ clears the stock top by the user's declared reliance.
+    // Manual ignores it (the operator jogs — firstAxis is a no-op on the manual arm). Default 'dogleg' → BYTE-IDENTICAL.
+    const travelShape = params.travelShape === 'diagonal' ? 'diagonal' : 'dogleg';
 
     // corner → probe directions via the module-level dirsOf (shared with the sim helper — see the header). The concrete
     // xDir/yDir AND the ③b superset forks (cornerFork/csFork/axesOf) all read it, so a quadrant edit can't desync the paths.
@@ -140,6 +147,13 @@ export function cornerStack(params = {}, opts = {}) {
     const taPair = (autoFn, manualFn) => superset
         ? [GUARD(WHEN_TA('auto'), autoFn()), GUARD(WHEN_TA('manual'), manualFn())]
         : (travelApproach === 'manual' ? manualFn() : autoFn());
+    // ② B4 step 4e — travelShape (dogleg|diagonal) is an ENUM structural fork NESTED inside the AUTO travelApproach arm (manual
+    // ignores firstAxis). tsPair mirrors taPair: superset → BOTH arms guarded by when(travelShape=='dogleg'|'diagonal'); concrete
+    // → the selected arm (LAZY thunks, so the unused shape is never built). Only the wall1→wall2 AUTO traverse forks (repoArmR).
+    const WHEN_TS = (v) => ({ param: 'travelShape', is: v });
+    const tsPair = (doglegFn, diagonalFn) => superset
+        ? [GUARD(WHEN_TS('dogleg'), doglegFn()), GUARD(WHEN_TS('diagonal'), diagonalFn())]
+        : (travelShape === 'diagonal' ? diagonalFn() : doglegFn());
     // ② B4 step 4c — wcs is a 7-WAY enum structural fork: the WCS-base block (active reads #578 → computes #70; a fixed
     // G54..G59 uses the literal base) PLUS the derived `wcsLabel`, which bleeds into 4 comments (header + the X/Y/Z save
     // notes). wcsFork RETURNS one wcs value's arm blocks (composed inside the z-forks so it nests): superset → all 7 arms
@@ -288,8 +302,14 @@ export function cornerStack(params = {}, opts = {}) {
     // Option-B safe-Z travel — mirrors the #19 lift so scanDepth stays unused off-path). MANUAL drops only when probeZ ON (a
     // real measured Z reference); probeZ-OFF the operator RE-JOGS Z, so NEVER auto-adjust after a human jog → no drop. Per-arm
     // scoping rides the existing zPairR fork below (repoArmR is called once per probeZ state → z is known here).
+    // ② B4 step 4e (t328, OPT-A): the AUTO arm forks on travelShape. dogleg = firstAxis=sA (routes around the corner, BYTE-
+    // IDENTICAL to today); diagonal = NO firstAxis (a single straight XY) at the EXISTING post-retract height with the SAME drop
+    // — the wall retract already lifted to the safe-traverse height, so ZERO added Z. Manual is travelShape-agnostic (jog only).
     const repoArmR = (z, sA) => taPair(
-        () => repoTraverse(repoLbl(z, sA), 'auto', sA, z ? '#18' : '[0-#19]'),
+        () => tsPair(
+            () => repoTraverse(repoLbl(z, sA), 'auto', sA, z ? '#18' : '[0-#19]'),
+            () => repoTraverse(repoLbl(z, sA), 'auto', undefined, z ? '#18' : '[0-#19]'),
+        ),
         () => repoTraverse(repoLbl(z, sA), 'manual', sA, z ? '#18' : undefined),
     );
     S.push(...csFork((c, s, ax) => [

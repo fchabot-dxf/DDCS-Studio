@@ -233,11 +233,13 @@ export function createToolpath2d(canvas, opts = {}) {
         const isSlowProbe = (s) => (s.type === 'probe' || s.probe) && (s.feed || 0) > 0 && (s.feed || 0) < maxPF;   // t319 — the WHITE slow re-probe
         const drawSeg = (s) => {
             const t = typeOf(s);
-            // a 2-axis RAPID is a trans-axis TRAVERSE/reposition vector → colour it by its pass SOURCE (auto=cyan,
-            // manual=amber). Single-axis rapids + probe/feed keep their TYPE colours.
+            // MOTION-TYPE colouring (matches the 3D): a rapid is a rapid → the one-source rapid YELLOW, whether single-axis
+            // (dogleg leg) or 2-axis (diagonal traverse) — it IS a G0 positioning move (human t328). The ONLY source-special
+            // case is the MANUAL 2-axis jog, which arcs UP ('rainbow') in its own amber jog colour. Markers still carry the
+            // SOURCE colour (auto=cyan / manual=amber) as a separate glyph layer — the travel LINE is decoupled from it.
             const transV = t === 'rapid' && Math.abs((s.x2 || 0) - (s.x1 || 0)) > 0.05 && Math.abs((s.y2 || 0) - (s.y1 || 0)) > 0.05;
             const manualTrav = transV && startSources[s.pass] === 'manual';   // a MANUAL jog travel arcs UP ('rainbow'); AUTO stays straight
-            ctx.strokeStyle = transV ? (startSources[s.pass] === 'manual' ? hexCss(PATH_TYPES.jog.color) : '#22d3ee') : segColor(s, zMin, zRange, maxPF);   // t317 — the MANUAL jog LINE = the one amber; the AUTO traverse keeps the marker-cyan (a separate glyph layer)
+            ctx.strokeStyle = manualTrav ? hexCss(PATH_TYPES.jog.color) : segColor(s, zMin, zRange, maxPF);   // t328 — the AUTO traverse is a G0 rapid → rapid-yellow (was marker-cyan #22d3ee); only the MANUAL jog LINE stays the one amber
             ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
             ctx.setLineDash(t === 'probe' ? [2, 3] : (t === 'rapid' ? [5, 4] : []));   // probe dotted, rapid dashed (match 3D)
             const ax = ptx(s.x1, s.pass), ay = pty(s.y1, s.pass), bx = ptx(s.x2, s.pass), by = pty(s.y2, s.pass);   // each pass rides its own start (INC4)
