@@ -107,6 +107,33 @@ function syncChangeUnverifiedBanner(method) {
     banner.style.display = unverified ? '' : 'none';
 }
 
+/**
+ * INC-C2 (guardrail A): the install-DEPENDENCY banner. An AUTOMATIC method (firmware/generic/disk) emitting the
+ * DEFAULT `T# M6` call (callMacro=true) does NOTHING on the machine unless the operator has installed a T.nc macro on
+ * the controller. Prominent, can't-miss reminder. MIRRORS syncChangeUnverifiedBanner (lazy-create above the method
+ * rows, then toggle per state) with a distinct amber style so it reads apart from the red UNVERIFIED banner when both
+ * show (callMacro=true + generic/disk). Hidden for the inline fallback (callMacro=false) + for m6/manual.
+ */
+function syncChangeMacroBanner(method, callMacro) {
+    const show = !!callMacro && (method === 'firmware' || method === 'generic' || method === 'disk');
+    let banner = el('atc_change_macrodep');
+    if (!banner) {
+        const anchor = el('atc_change_automatic_params');   // sits right above the callMacro toggle it explains
+        if (!anchor || !anchor.parentNode) return;
+        banner = document.createElement('div');
+        banner.id = 'atc_change_macrodep';
+        banner.setAttribute('role', 'alert');
+        banner.style.cssText = 'display:none; margin:4px 0 8px; padding:8px 10px; border:1px solid var(--warning,#f59e0b);'
+            + ' border-left:4px solid var(--warning,#f59e0b); border-radius:5px; background:rgba(245,158,11,0.10);'
+            + ' color:var(--warning,#f59e0b); font-size:12px; line-height:1.5;';
+        banner.innerHTML = '<b>⚠ Calls your installed T.nc macro</b> — this change emits a bare <b>T# M6</b>. Install it'
+            + ' first via <b>Settings → ATC → Generate T.nc</b>, or a bare T# M6 does <b>NOTHING</b> on the machine.'
+            + ' (Uncheck “Call installed T.nc macro” below to inline the full sequence instead.)';
+        anchor.parentNode.insertBefore(banner, anchor);
+    }
+    banner.style.display = show ? '' : 'none';
+}
+
 /** Pop the full magazine editor as a modal with a Done button — the wizard's own table stays read-only/compact. */
 function openMagazineModal(refresh) {
     const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
@@ -252,6 +279,7 @@ export const atcChangeView = {
         const macroRow = el('atc_change_automatic_params');   // INC-C1: the callMacro toggle (all AUTOMATIC methods)
         if (macroRow) macroRow.style.display = (method === 'firmware' || method === 'generic' || method === 'disk') ? '' : 'none';
         syncChangeUnverifiedBanner(method);   // A2: bold UNVERIFIED warning for generic/disk auto change
+        syncChangeMacroBanner(method, el('atc_change_callmacro')?.checked !== false);   // INC-C2: install-dependency banner for T# M6 mode
 
         const params = {
             method,

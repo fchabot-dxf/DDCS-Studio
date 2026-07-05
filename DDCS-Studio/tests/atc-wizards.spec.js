@@ -85,6 +85,37 @@ test('Tool Change wizard: the callMacro toggle switches the preview between the 
   await expect(row).toBeHidden();
 });
 
+test('Tool Change wizard: the install-dependency banner shows in T# M6 mode, hides for inline / m6 / manual (INC-C2)', async ({ page }) => {
+  await openWizard(page, 'atc_change');
+  const banner = page.locator('#atc_change_macrodep');
+  const toggle = page.locator('#atc_change_callmacro');
+
+  // m6 (default) is not automatic → no install-dependency banner.
+  await expect(banner).toBeHidden();
+
+  // Firmware with callMacro checked (default = the T# M6 call) → the banner SHOWS (install your T.nc or it does nothing).
+  await page.locator('#atc_change_method').selectOption('firmware');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('installed T.nc macro');
+  await expect(banner).toContainText('NOTHING');
+
+  // Uncheck → inline dance → the install-dependency banner HIDES (the codes are inlined; no installed T.nc needed).
+  await toggle.uncheck();
+  await expect(banner).toBeHidden();
+
+  // Re-check → back to the T# M6 call → the banner shows again.
+  await toggle.check();
+  await expect(banner).toBeVisible();
+
+  // Generic + disk (automatic, callMacro on) → shows; manual → hidden.
+  await page.locator('#atc_change_method').selectOption('generic');
+  await expect(banner).toBeVisible();
+  await page.locator('#atc_change_method').selectOption('disk');
+  await expect(banner).toBeVisible();
+  await page.locator('#atc_change_method').selectOption('manual');
+  await expect(banner).toBeHidden();
+});
+
 test('Tool Change wizard: bold UNVERIFIED banner only for generic/disk auto change', async ({ page }) => {
   await openWizard(page, 'atc_change');
   const banner = page.locator('#atc_change_unverified');
