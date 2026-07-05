@@ -784,3 +784,15 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **VERIFY — the declared string IS the row tooltip (new help-slot-io.spec):** drive renderIoTable directly (the exact renderer the Settings I/O table uses) — a drawbar output row's label title === the declared drawbar help (contains "RELEASES"); a `custom` type (no help) keeps the plain "edit to rename" hint. A sensor input row's title names the ATC waits (M301 + spindle stopped M300); `estop` (no help) unchanged. Full suite 614 pass / 2 skip.
 
 **NO emit change (pure Setup UX). PASS BACK.** NEXT per the ruling: 1c (Blockly setTooltip — the version-pinned tooltip API, blockly-skill discipline) — then the help-slot batch (1a+1b+1c) releases as ONE milestone.
+
+## 🔨 turn 277 (cycle 127) — HELP SLOT 1c (Blockly tooltips) scout → PROPOSE (NO CODE). Full finding in scratchpad/help-slot-1c-scout.md (VS Code tab).
+
+**Not a one-liner — both halves hit the dispatch's "read from the declaration, never duplicate" against the campaign's existing layering + one-source-via-assertion patterns.**
+
+**MECHANISM (grounded):** Blockly is 13.0.0 (VERSION + API-NOTES; the blockly-skill known-projects note is STALE at 12.5.1 — flag). Tooltips already flow via the declarative JSON `tooltip` key in bridge.js jsonDef (block-level "<label> (<category>)" + per-field getDesc(f)). getDesc is a GENERIC field-name→description map, NOT the binding's help. setTooltip is a stable v13 Block method (plain string), but the JSON key is the existing reuse point.
+
+**(a) sc_* controls — FORK:** structCtl.js HAND-DECLARES the sc_* defs mirroring CORNER_STRUCT_BINDINGS, asserted-to-match by corner-structctl.spec (param/options/kind/label). It DELIBERATELY doesn't import corner data (layering: generic ops ≠ corner-specific). So help = (A) hand-declare + assert-match (consistent with the label pattern; assertion = no-drift; but duplicates the string, against the rule) vs (B) import CORNER_STRUCT_BINDINGS live (no duplication; but a layering violation the file avoids). Dispatch-rule vs file-design.
+
+**(b) knob/param — BLOCKED on the surface existing:** the atom-block field tooltip is getDesc (generic); linking a knob's PNAME → CORNER_BINDINGS[pname].help is another layering cross; and corner's value params are NOT pre-ticked as knobs today (value-knob projection is OPEN, t265) → NO default corner knob block to tooltip. The VERIFY's "corner knob/param block tooltip" has no surface yet.
+
+**PROPOSAL:** (1) fix the blockly-skill note 12.5.1→13.0.0. (2) sc_* half: rule (A)/(B) — I lean A (matches the blessed hand-declare+assert; the assertion IS the one-source guarantee, honoring the SPIRIT of no-duplication without breaking layering); seed help on all 6 structural bindings + assert. (3) knob/param half: DEFER until the value-knob projection lands (no surface today), OR re-scope to the first-class `param` block type. REC: build sc_* now (via A), defer knob/param with the value-knob projection. NO CODE pending the ruling. PASS BACK.
