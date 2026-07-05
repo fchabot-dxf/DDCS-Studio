@@ -53,7 +53,31 @@ function numberWidget(host, b) {
     if (b.socketHeld) { inp.value = ''; inp.placeholder = 'auto'; } else { inp.value = b.default ?? 0; }
     inp.style.cssText = CTRL_CSS + ' width:120px;';
     inp.dataset.param = b.param;   // so a 2D-preview handle can write this field back (drag-to-edit derives from roles)
-    host.append(labelSpan(b), inp);   // t289 — source-chips: a sourceField binding is decorated with the inline source dot in the renderOpForm post-pass
+    // t311 — DECLARE the stepper (spinner) side. Default (unset / 'right') keeps the NATIVE right spinner UNCHANGED
+    // (byte-identical). 'left' hides the native spinner and mounts a custom ▲▼ stepper ELEMENT, placed on the LEFT via
+    // CSS flex `order` (a declared class, not a per-field hack). The read() closure below binds `inp` either way.
+    if (cfg.stepperSide === 'left') {
+        inp.classList.add('num-input-bare');   // CSS: hide the native inner spin-button (appearance:none)
+        const stepper = document.createElement('span');
+        stepper.className = 'num-stepper';
+        const mkBtn = (dir, glyph) => {
+            const bt = document.createElement('button');
+            bt.type = 'button'; bt.tabIndex = -1; bt.className = 'num-step-btn'; bt.textContent = glyph;
+            bt.addEventListener('click', () => {
+                try { if (dir > 0) inp.stepUp(); else inp.stepDown(); }   // native stepUp respects step + min/max…
+                catch (_) { inp.value = String((parseFloat(inp.value) || 0) + dir); }   // …but throws on step='any' → fall back to ±1
+                inp.dispatchEvent(new Event('input', { bubbles: true })); inp.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            return bt;
+        };
+        stepper.append(mkBtn(1, '▲'), mkBtn(-1, '▼'));
+        const wrap = document.createElement('span');
+        wrap.className = 'num-field num-stepper-left';   // flex [input][stepper]; `order:-1` on the stepper puts it LEFT
+        wrap.append(inp, stepper);
+        host.append(labelSpan(b), wrap);
+    } else {
+        host.append(labelSpan(b), inp);   // DEFAULT — native input + native right spinner (source-chips decorate the input in the renderOpForm post-pass)
+    }
     // An UNTOUCHED field must not inject a value that overwrites the template's own (per-structural-combo) socket:
     //   • t114 SOCKET-HELD (no spec default → the socket holds a per-combo expression, e.g. corner #21-#24 which change with
     //     corner×probeSeq): OMIT unless the user TYPED a finite number → instantiate keeps the pruned per-combo socket. This

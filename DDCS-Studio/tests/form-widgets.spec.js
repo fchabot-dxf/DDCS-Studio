@@ -155,6 +155,56 @@ test('form widgets: rect canvas picker reads x/y/w/h at defaults', async ({ page
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 });
 
+test('form widgets: stepperSide:left renders the spinner on the LEFT; default fields unchanged; no emit change', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsInsertUserOp && window.ddcsGetBlockProgram);
+
+  await page.evaluate(async () => {
+    localStorage.removeItem('ddcs_user_ops');
+    const U = await import('/blocks/userOps.js');
+    U.createUserOp(U.userOpFromStack('stepside_test', 'Stepper Side',
+      [{ type: 'move', params: { x: 0, y: 0, z: -5, feed: 100 } }],
+      [
+        { param: 'depth', blockIndex: 0, key: 'z', type: 'number', default: -5 },                                   // default → native right spinner, UNCHANGED
+        { param: 'feed', blockIndex: 0, key: 'feed', type: 'number', widgetConfig: { stepperSide: 'left' }, default: 100 }, // → custom stepper on the LEFT
+      ]));
+    window.ddcsInsertUserOp('user_stepside_test');
+  });
+
+  const form = page.locator('.uop-form');
+  await expect(form).toBeVisible();
+
+  const geo = await page.evaluate(() => {
+    const feedInp = document.querySelector('.uop-form [data-param="feed"]');
+    const stepper = feedInp.closest('.num-field') ? feedInp.closest('.num-field').querySelector('.num-stepper') : null;
+    const depthInp = document.querySelector('.uop-form [data-param="depth"]');
+    return {
+      stepperX: stepper ? stepper.getBoundingClientRect().x : null,
+      feedInpX: feedInp.getBoundingClientRect().x,
+      stepBtns: stepper ? stepper.querySelectorAll('.num-step-btn').length : 0,
+      depthWrapped: !!depthInp.closest('.num-field'),   // the DEFAULT field must NOT be wrapped (native, unchanged)
+      depthType: depthInp.type,
+    };
+  });
+  expect(geo.stepperX, 'the stepperSide:left field mounted a stepper element').not.toBeNull();
+  expect(geo.stepBtns, 'the stepper has ▲▼ buttons').toBe(2);
+  expect(geo.stepperX, `the stepper sits to the LEFT of the input (stepper x=${geo.stepperX} < input x=${geo.feedInpX})`).toBeLessThan(geo.feedInpX);
+  expect(geo.depthWrapped, 'the DEFAULT field is NOT wrapped (native right spinner, unchanged)').toBe(false);
+  expect(geo.depthType, 'the default field is still a native number input').toBe('number');
+
+  // the ▲ button steps the value up (the custom stepper drives the same input)
+  await page.evaluate(() => { const s = document.querySelector('.uop-form [data-param="feed"]').closest('.num-field').querySelector('.num-step-btn'); s.click(); });
+  // Insert → emit unchanged for the default field; the left-stepper field reads its value normally
+  await form.locator('.uop-insert').click();
+  await expect(form).toHaveCount(0);
+  const op = await page.evaluate(() => (window.ddcsGetBlockProgram() || []).find((b) => b && b.type === 'op' && b.opType === 'user_stepside_test'));
+  expect(op, 'the op committed').toBeTruthy();
+  expect(op.params.depth).toBe(-5);                      // default field byte-identical
+  expect(op.params.feed).toBeGreaterThan(100);           // the ▲ stepper stepped it up (the custom stepper works)
+
+  await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
+});
+
 test('form widgets: registry defaults a widget per binding.type', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
