@@ -25,7 +25,7 @@ test('trace tags each pass source from its REPOSITION (auto-traverse vs operator
   expect(r.mixed, 'in-axis auto + trans manual: pass0 + the manual trans').toEqual(['auto', 'manual']);
 });
 
-test('3D start markers colour by source (auto=cyan 0x22d3ee, manual=amber 0xffb300)', async ({ page }) => {
+test('3D start markers: pass-0 Start = amber; later passes colour by source (auto=cyan, manual=amber)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
@@ -33,12 +33,14 @@ test('3D start markers colour by source (auto=cyan 0x22d3ee, manual=amber 0xffb3
   await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.viz; });
   const r = await page.evaluate(() => {
     const viz = window.ddcsStudio.wizardManager._activePanel.viz;
-    viz._passCount = 2; viz._ensureMarkers(); viz._highlightSelectedStart();
-    viz.setStartSources(['auto', 'manual']);
-    return { c0: viz.spindleMarkers[0].children[0].material.color.getHex(), c1: viz.spindleMarkers[1].children[0].material.color.getHex() };
+    viz._passCount = 3; viz._ensureMarkers(); viz._highlightSelectedStart();
+    viz.setStartSources(['auto', 'auto', 'manual']);
+    return { c0: viz.spindleMarkers[0].children[0].material.color.getHex(), c1: viz.spindleMarkers[1].children[0].material.color.getHex(), c2: viz.spindleMarkers[2].children[0].material.color.getHex() };
   });
-  expect(r.c0, 'pass 0 (auto) = cyan').toBe(0x22d3ee);
-  expect(r.c1, 'pass 1 (manual) = amber').toBe(0xffb300);
+  // t293 — pass-0 is ALWAYS the operator jog Start → amber (even at an 'auto' source); later passes follow their source.
+  expect(r.c0, 'pass 0 (the Start) = amber').toBe(0xffb300);
+  expect(r.c1, 'pass 1 (auto reposition) = cyan').toBe(0x22d3ee);
+  expect(r.c2, 'pass 2 (manual reposition) = amber').toBe(0xffb300);
 });
 
 // The 3D draws a dashed inter-pass jog (prevEnd → this pass's start anchor). A MANUAL reposition IS an operator jog, so

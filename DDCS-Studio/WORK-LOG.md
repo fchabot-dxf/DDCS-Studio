@@ -904,3 +904,26 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **VERIFY — REAL SYMPTOM (extended corner-source-chips.spec):** test 1 (emit) unchanged/green. NEW: (a) the dot is present on the 3 sourced fields (port/f_fast/retract), ABSENT on a non-sourced field (f_slow); studio = editable + unlit + not gated. (b) clicking the port dot flips to ctrl → the field locks via readOnly + data-op-gated (NOT disabled, asserted) + shows #1078 + the dot lights + the glyph names Pr578 + the EMIT rebuilds to #5=#1078 (follows the toggle). (c) Generic profile → NO dot (graceful). Full suite 621 pass / 2 skip / 0 fail (built-in path unregressed; studio byte-parity held by test 1).
 
 **SCOPE NOTE:** corner sources 3 fields (port/f_fast/retract) — the dispatch said "4"; level is the 4th VERIFIED register (#1080) but stays BAKED by the established decision (SRC_BY_PARAM excludes it), so it correctly gets no dot. All 3 sourced fields get the dot. **CORNER = PERFECT gate — on bless, the porting fan-out begins. NOTE: rides the same tree as the advisor's probe-dims merge (c482153) — same release. PASS BACK.**
+
+## 🔨 turn 293 (cycle 127) — START-MARKER VISUAL LANGUAGE, UNIFIED ACROSS ALL WIZARDS + BOTH SURFACES (human-directed, live). Dispatch was "label 2 corner Layout markers" → the HUMAN expanded it to a full one-glyph-language unification. 623 pass / 2 skip. NODE_MODULES was externally WIPED mid-turn + reinstalled.
+
+**⚑ SCOPE (for the advisor): this GREATLY exceeded the t292 dispatch, all HUMAN-directed live in the worker window + confirmed step-by-step.** The dispatch: label the cyan '1 pos' square + the bare hollow circle on corner's Layout. The human, testing live, ruled the 3D preview and the Layout used DIFFERENT glyphs/labels for the SAME markers ("never was supposed to be different") and directed ONE language everywhere, for EVERY wizard (not a corner override).
+
+**THE AGREED LANGUAGE (human-confirmed table):**
+- SHAPE + COLOUR agree: **AUTO reposition (machine drives there) = a filled CYAN SQUARE ■; MANUAL jog / the operator START = a filled AMBER CIRCLE ●.** Under manual travel every reposition marker becomes an amber circle.
+- **The first start (pass 0) is ALWAYS the operator's jog → the amber-circle "Start"** (by pass INDEX, so it doesn't touch the declared per-pass SOURCE data → corner-source-declared's pass-0='auto' assertion is untouched).
+- **3D preview + 2D toolpath (top panel): glyph + colour ONLY, no text** (the numbered ①② badges are gone — 3D sprite number-sprite + 2D badge both removed).
+- **2D Layout canvas: glyph + colour + a LABEL** — `Start` for pass 0, the destination PASS NUMBER (1, 2…) for each reposition. The generic `pos` label + the redundant `n:1` anchor-dot number are gone (the dot stays for non-corner point widgets, just without the number).
+- corner-datum pick circles stay unlabeled (prior human call).
+
+**BUILT (pure preview — the emit is byte-IDENTICAL; nothing touches a builder):**
+- `viz/gcodeViz3d.js`: `_startGlyphTex` emitting diamond→SQUARE + the sim circle FILLED; `_makeMarker` drops the number sprite (`_makeNumberSprite` kept — still used for ATC pockets); `_highlightSelectedStart` colours+shapes by `manual = (p===0) || src==='manual'`.
+- `viz/toolpath2d.js`: `drawStartHandles` diamond→square + filled circle, dropped the numbered badge; `manual = (i===0) || startSources[i]==='manual'`.
+- `viz/featureCanvas.js`: merged the sim/move branches into ONE start-marker rule — `startManual = h.simOnly || col==='#ffb300'` → amber filled circle, else cyan filled square (the drill/point handles untouched).
+- `wizards/ops/panelTypes.js`: the sim-only Layout marker → `label:'Start'`, `manual:true`, amber; the emitting reposition handle → `label = destPass number` (was 'pos') + `manual` flag; the anchor hole keeps its dot but drops `n:1` (no redundant '1').
+
+**VERIFY — full suite 623 pass / 2 skip / 0 fail.** New `corner-marker-labels.spec` (labels: Start + pass number, no 'pos'; the Layout renders an amber circle Start + a cyan square reposition). RE-BASELINED the OLD diamond/hollow specs to the new language: `corner-viz-polish` (1)+(3), `corner-data-sim-marker-emits` (C, repurposed to prove colour follows SOURCE not emits), `corner-data-sim-marker-track` (3), `marker-colour-by-source` (pass-0 Start=amber, later passes by source). corner-source-declared UNCHANGED (pass-0 source data still 'auto'; the amber Start is an index-rule in the renderers, not a source change). Byte-parity held by the existing emit specs (corner-source-chips etc.). Screenshot: scratchpad/markers-after.png. The human live-verified throughout.
+
+**🔴 STILL OPEN (human flagged, NOT yet fixed — the NEXT item): "moving start moves the other marker, i dont want that."** Dragging the Layout Start re-derives the whole chain (the reposition markers are G91 increments relative to pass-0, so they ride the moved root — the deliberate t120 "undragged handles ride the root" behaviour). The human wants dragging Start to move ONLY the Start, leaving the probe markers put. Separate from this visual change; to be scoped/fixed next.
+
+**⚑ ENV: node_modules was WIPED mid-turn (0 entries — external/concurrent, not my edits) → `npm ci` restored it; suite re-run green after.**

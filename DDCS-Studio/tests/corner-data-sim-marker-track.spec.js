@@ -78,7 +78,7 @@ test('(2) emit byte-parity: marker chaining + geometry hoist never touch the G-c
 });
 
 // (3) PART 2 — the sim-only start handle renders on the Layout FeatureCanvas as a HOLLOW circle ○ (t81; distinct from the filled emitting handles).
-test('(3) Layout canvas: the sim-only start handle appears as a HOLLOW circle (second renderer of the userStarts seam)', async ({ page }) => {
+test('(3) Layout canvas: the Start marker is a filled AMBER circle (second renderer of the userStarts seam)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => {
@@ -99,10 +99,11 @@ test('(3) Layout canvas: the sim-only start handle appears as a HOLLOW circle (s
     return { present: !!h, tag: h && h.tagName.toLowerCase(), fill: cs && cs.fill, stroke: cs && cs.stroke, hasEmitting: !!move };
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
-  expect(info.present, 'a sim-only handle renders on the Layout canvas').toBe(true);
-  expect(info.tag, 'drawn as a CIRCLE (t81 — the sim-only/manual-jog shape, distinct from the emitting square)').toBe('circle');
-  expect(info.fill, 'HOLLOW — fill:none COMPUTES (not the gold .fc-handle fill) — the sim-only shape').toBe('none');
-  expect(info.stroke, 'cyan (auto, default) COMPUTES — matches the top-panel sim-only marker colour').toBe('rgb(34, 211, 238)');
+  expect(info.present, 'the Start handle renders on the Layout canvas').toBe(true);
+  expect(info.tag, 'drawn as a CIRCLE (t293 — the manual-jog shape, distinct from the auto square)').toBe('circle');
+  // t293 — the Start is the operator's manual jog → a FILLED AMBER circle (was hollow cyan)
+  expect(info.fill, 'FILLED amber (the manual Start)').toBe('rgb(255, 179, 0)');
+  expect(info.stroke, 'amber stroke — the manual-jog colour').toBe('rgb(255, 179, 0)');
 });
 
 // (4) PART 2 — the EMITTING reposition handle owns its OWN drag (writes cross1_x): it sits at its destination (wall-2), clear

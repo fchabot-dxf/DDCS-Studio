@@ -74,40 +74,32 @@ test('(B) end-to-end: the emits flag reaches the shared passStarts + the 3D rend
 // (C) THE REAL 2D VISUAL SYMPTOM — an EMITTING marker paints a FILLED centre; a SIM-ONLY marker's centre is HOLLOW. Same
 //     colour (cyan, auto) both — the SHAPE is the new axis. Rendered on a real (sized) canvas; sampled at the marker's own
 //     drawn coords (__t2starts), so it's view-agnostic and deterministic (static paint, no animation).
-test('(C) 2D visual: emitting = FILLED diamond, sim-only = HOLLOW — a distinct shape, same colour axis', async ({ page }) => {
+test('(C) 2D visual: the marker COLOUR follows the SOURCE (decoupled from emits) — a later pass flips cyan↔amber by travel', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const px = await page.evaluate(async () => {
     const { createToolpath2d } = await import('/viz/toolpath2d.js');
-    const render = (emits) => {
-      const canvas = document.createElement('canvas');
-      canvas.style.width = '240px'; canvas.style.height = '200px';
+    // render pass-1 (a reposition) with emits held TRUE; vary only the SOURCE → the colour must follow the source.
+    const render = (src1) => {
+      const canvas = document.createElement('canvas'); canvas.style.width = '240px'; canvas.style.height = '200px';
       document.body.appendChild(canvas);
       const t2 = createToolpath2d(canvas);
-      t2.setStock({ x: 100, y: 80, z: 20 });   // establishes the view bounds
-      t2.setStarts([{ x: 50, y: 40, z: 0 }]);   // one start, at stock centre
-      t2.setStartSources(['auto']);              // cyan (auto) — the colour axis, held constant
-      t2.setStartEmits([emits]);                 // the SHAPE axis under test
-      t2.fit();                                  // compute the view + paint → __t2starts populated
-      const rec = canvas.__t2starts && canvas.__t2starts[0];
-      if (!rec) return { ok: false };
-      const dpr = window.devicePixelRatio || 1;
-      const ctx = canvas.getContext('2d');
-      const d = ctx.getImageData(Math.round(rec.sx * dpr), Math.round(rec.sy * dpr), 1, 1).data;
-      canvas.remove();
-      return { ok: true, rec: !!rec.emits, alpha: d[3], r: d[0], g: d[1], b: d[2] };
+      t2.setStock({ x: 100, y: 80, z: 20 });
+      t2.setStarts([{ x: 30, y: 40, z: 0 }, { x: 70, y: 40, z: 0 }]);
+      t2.setStartSources(['auto', src1]); t2.setStartEmits([false, true]);   // emits HELD true on pass 1; only the source varies
+      t2.fit();
+      const rec = canvas.__t2starts; if (!rec || rec.length < 2) return { ok: false };
+      const dpr = window.devicePixelRatio || 1; const ctx = canvas.getContext('2d');
+      const d = ctx.getImageData(Math.round(rec[1].sx * dpr), Math.round(rec[1].sy * dpr), 1, 1).data;
+      canvas.remove(); return { ok: true, r: d[0], g: d[1], b: d[2] };
     };
-    return { hollow: render(false), filled: render(true) };
+    return { auto: render('auto'), manual: render('manual') };
   });
-  expect(px.hollow.ok && px.filled.ok, 'both canvases painted (__t2starts populated)').toBe(true);
-  // the renderer recorded the per-pass shape flag it drew with.
-  expect(px.hollow.rec).toBe(false);
-  expect(px.filled.rec).toBe(true);
-  // the REAL symptom: the emitting marker's CENTRE is painted (filled), the sim-only one's is not (hollow outline).
-  expect(px.filled.alpha, 'emitting marker centre is FILLED (opaque)').toBeGreaterThan(px.hollow.alpha + 120);
-  // ...and it is the SAME colour axis (cyan for auto), not a colour swap: blue-dominant, high blue.
-  expect(px.filled.b, 'filled marker is cyan (#22d3ee) — colour unchanged').toBeGreaterThan(150);
-  expect(px.filled.b, 'cyan, not amber/red').toBeGreaterThan(px.filled.r);
+  expect(px.auto.ok && px.manual.ok, 'both painted').toBe(true);
+  // emits was TRUE in both renders → the colour is driven by SOURCE, not emits: auto = cyan (blue), manual = amber (red+green)
+  expect(px.auto.b, 'auto source → cyan (blue high)').toBeGreaterThan(150);
+  expect(px.auto.b, 'cyan: blue > red').toBeGreaterThan(px.auto.r);
+  expect(px.manual.r > px.manual.b && px.manual.g > px.manual.b, 'manual source → amber (despite emits=true)').toBe(true);
 });
 
 // (D) BACKWARD-COMPAT — the built-in multi-pass ops (middle/alignment) declare no `emits` → every pass stays sim-only, so

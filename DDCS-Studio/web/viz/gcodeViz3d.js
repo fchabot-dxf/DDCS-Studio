@@ -235,19 +235,19 @@ export class GcodeViz3D {
     _pickCube(e) { return pickCube(this, e); }
 
     // A draggable start marker for one pass. RED is reserved for the moving probe tip (the ruby that touches), so the
-    // STATIC start gets a distinct non-red glyph: a CAMERA-LOCKED hollow CYAN diamond (lozenge) that reads identically
-    // to the 2D canvas ◇ from any angle.
-    _makeMarker(pass) {
+    // STATIC start gets a distinct non-red glyph: a CAMERA-LOCKED cyan/amber shape — a hollow CIRCLE ○ (sim-only) or a
+    // filled SQUARE ■ (emitting) per pass — that reads identically to the 2D canvas + the Layout handle from any angle.
+    _makeMarker() {
         const THREE = this.THREE;
         const grp = new THREE.Group();
-        grp.add(this._makeStartGlyph());            // the camera-locked hollow cyan lozenge (children[0])
-        grp.add(this._makeNumberSprite(pass + 1)); // execution order (1-based)
+        grp.add(this._makeStartGlyph());            // the camera-locked start glyph (children[0]) — glyph + colour ONLY, no number badge (the named label lives on the Layout)
         return grp;
     }
 
     // The start-glyph textures (WHITE so material.color tints them per-pass — cyan=auto / amber=manual — hi-res keeps them
     // crisp), cached per shape. SHAPE axis (orthogonal to colour): SIM-ONLY / manual-jog = a hollow CIRCLE ○ (jog preview, never
-    // emitted); EMITTING = a FILLED diamond ◆ (a drag writes a macro var into the program, corner #21-#24).
+    // emitted); EMITTING = a FILLED SQUARE ■ (a drag writes a macro var into the program, corner #21-#24) — ONE glyph language
+    // with the 2D toolpath + the Layout handle (the old lozenge/diamond is retired).
     _startGlyphTex(emits) {
         const key = emits ? '_emitStartTex' : '_simStartTex';
         if (this[key]) return this[key];
@@ -256,13 +256,13 @@ export class GcodeViz3D {
         const ctx = c.getContext('2d');
         ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 18; ctx.lineJoin = 'round';
         ctx.beginPath();
-        if (emits) { ctx.moveTo(64, 14); ctx.lineTo(114, 64); ctx.lineTo(64, 114); ctx.lineTo(14, 64); ctx.closePath(); ctx.fill(); }   // EMITTING = filled diamond
-        else { ctx.arc(64, 64, 46, 0, Math.PI * 2); ctx.stroke(); }   // SIM-ONLY / manual-jog = hollow circle (inset for the thick line)
+        if (emits) { ctx.fillRect(20, 20, 88, 88); }   // AUTO = filled SQUARE ■
+        else { ctx.arc(64, 64, 46, 0, Math.PI * 2); ctx.fill(); }   // MANUAL / Start = filled CIRCLE ●
         return (this[key] = new this.THREE.CanvasTexture(c));
     }
 
-    // The start glyph: a camera-facing (billboard) CYAN diamond drawn on a sprite, so it always shows as a clean lozenge
-    // ◇ — the 3D twin of the 2D start handle. depthTest:false → always visible. Shape (hollow/filled) is set live per pass.
+    // The start glyph: a camera-facing (billboard) cyan sprite — the 3D twin of the 2D start handle (hollow circle ○ =
+    // sim-only, filled square ■ = emitting, set live per pass). depthTest:false → always visible.
     _makeStartGlyph() {
         const THREE = this.THREE;
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this._startGlyphTex(false), color: 0x22d3ee, depthTest: false, transparent: true }));   // cyan (auto) + hollow (sim-only) defaults
@@ -351,8 +351,12 @@ export class GcodeViz3D {
             const sel = p === this.selectedStart;
             glyph.material.opacity = sel ? 1 : 0.45;
             const src = (this._startSources && this._startSources[p]) || 'auto';
-            glyph.material.color.setHex(src === 'manual' ? 0xffb300 : 0x22d3ee);   // amber = manual jog, cyan = auto traverse
-            const tex = this._startGlyphTex(!!(this._startEmits && this._startEmits[p]));   // sim-marker-distinguish (t69): SHAPE — emitting=filled ◆ / sim-only=hollow ◇ (re-applied here so it survives marker recreation)
+            // t293 — ONE glyph language: AUTO reposition (machine drives there) = a CYAN SQUARE ■; MANUAL jog / the operator
+            // Start = an AMBER CIRCLE ●. Shape + colour agree (matches the 2D toolpath + the Layout). Pass-0 is ALWAYS the
+            // operator's first jog (the Start) → manual; every later pass follows its reposition SOURCE.
+            const manual = p === 0 || src === 'manual';
+            glyph.material.color.setHex(manual ? 0xffb300 : 0x22d3ee);
+            const tex = this._startGlyphTex(!manual);
             if (glyph.material.map !== tex) { glyph.material.map = tex; glyph.material.needsUpdate = true; }
         }
     }

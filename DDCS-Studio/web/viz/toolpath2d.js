@@ -186,22 +186,18 @@ export function createToolpath2d(canvas, opts = {}) {
     function drawStartHandles(ctx) {
         for (let i = 0; i < starts.length; i++) {
             const s = markerWorld(i), hx = sptx(s.x), hy = spty(s.y);               // t107 — relocate a reposition-destination marker to its runtime dog-leg END (matches the route + probe fire)
-            const manual = startSources[i] === 'manual';                            // colour by reposition source
-            const col = manual ? '#ffb300' : '#22d3ee';                              // amber = manual jog, cyan = auto traverse
+            // t293 — ONE glyph language (matches the Layout + 3D): AUTO reposition (machine drives there) = a filled CYAN
+            // SQUARE ■; MANUAL jog / the operator Start = a filled AMBER CIRCLE ●. Shape + colour agree. Pass-0 is ALWAYS the
+            // operator's first jog (the Start) → manual; every later pass follows its reposition SOURCE (auto vs manual travel).
+            const manual = i === 0 || startSources[i] === 'manual';
+            const col = manual ? '#ffb300' : '#22d3ee';
             const ringCol = manual ? 'rgba(255,179,0,0.45)' : 'rgba(34,211,238,0.45)';
-            const emits = !!startEmits[i];                                          // SHAPE (orthogonal to the colour): emitting = a drag writes a macro var into the PROGRAM
             ctx.save();
             ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 2.8; ctx.lineJoin = 'round';   // a static reference, NOT red (probe) or orange (tool)
-            ctx.beginPath();
-            if (emits) { ctx.moveTo(hx, hy - 6.5); ctx.lineTo(hx + 6.5, hy); ctx.lineTo(hx, hy + 6.5); ctx.lineTo(hx - 6.5, hy); ctx.closePath(); ctx.fill(); }   // EMITTING = FILLED diamond ◆ (a drag edits the program)
-            else { ctx.arc(hx, hy, 6.5, 0, Math.PI * 2); ctx.stroke(); }            // SIM-ONLY / manual-jog = a hollow CIRCLE ○ (jog preview, never emitted → edge/middle unchanged)
+            if (manual) { ctx.beginPath(); ctx.arc(hx, hy, 6.5, 0, Math.PI * 2); ctx.fill(); }   // MANUAL / Start = filled AMBER CIRCLE ●
+            else { ctx.fillRect(hx - 6, hy - 6, 12, 12); }                           // AUTO = filled CYAN SQUARE ■
             ctx.lineWidth = 1.4; ctx.strokeStyle = ringCol; ctx.beginPath(); ctx.arc(hx, hy, 10, 0, Math.PI * 2); ctx.stroke();   // grab-ring (nearHandle's 12px hit-test)
-            const bx = hx + 11, by = hy - 9;   // numbered badge (1-based), like the 3D number sprite
-            ctx.fillStyle = 'rgba(13,17,23,0.85)'; ctx.beginPath(); ctx.arc(bx, by, 7, 0, Math.PI * 2); ctx.fill();
-            ctx.lineWidth = 1; ctx.strokeStyle = col; ctx.stroke();
-            ctx.fillStyle = '#cdeffb'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(String(i + 1), bx, by + 0.5);
-            ctx.restore();
+            ctx.restore();   // no numbered badge — the top panel carries glyph + colour only; the named label lives on the Layout canvas
         }
     }
     function drawGrid(ctx, foot, step) {

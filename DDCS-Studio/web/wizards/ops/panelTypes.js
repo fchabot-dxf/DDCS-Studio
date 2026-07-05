@@ -180,8 +180,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             const x = ax + offX, y = ay + offY;
             // stash this relTo emitting group's live world + anchor so a drag on ANY handle can CAPTURE (freeze) the others
             if (spotStore && byRole.x.param && byRole.y.param) repoGroups.push({ gid, fx: byRole.x.param, fy: byRole.y.param, ax, ay, worldX: x, worldY: y });
-            items.push({ kind: 'hole', x, y, n: 1, r: Math.max(1, stock.w * 0.012) });
-            if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: 'pos', color: srcCol(destPass) });
+            items.push({ kind: 'hole', x, y, r: Math.max(1, stock.w * 0.012) });   // anchor dot (NO number — the pass number rides the handle label, so no redundant '1')
+            const reposManual = Array.isArray(sources) && sources[destPass] === 'manual';   // auto → cyan square, manual → amber circle
+            if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: destPass != null ? String(destPass) : 'pos', color: srcCol(destPass), manual: reposManual });   // label = the destination PASS NUMBER (1,2,…)
         }
     }
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
@@ -221,7 +222,8 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // owns that point — the sim start is DRAGGED on the top panel (its natural sim surface). Host passes the pass-0 position.
     if (simStart && simStart.pos && Number.isFinite(+simStart.pos.x) && Number.isFinite(+simStart.pos.y)) {
         const SIM_ID = '__simstart0';
-        const allHandles = [...handles, { id: SIM_ID, x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, label: '', color: srcCol(0) }];
+        // pass-0 is the operator's manual jog START — always a jog, so always an AMBER CIRCLE, labelled 'Start'.
+        const allHandles = [...handles, { id: SIM_ID, x: +simStart.pos.x, y: +simStart.pos.y, kind: 'move', simOnly: true, manual: true, label: 'Start', color: '#ffb300' }];
         // t87 — the sim-only marker is DRAGGABLE: route its drag to the panel's onStartDrag (writes userStarts, NEVER emitted —
         // reuses the top panel's seam, no new mechanism); every other handle keeps its param-writing onDrag. (placement is {0,0}
         // for a probe op → the canvas world-delta IS the absolute start world point onStartDrag expects.)
