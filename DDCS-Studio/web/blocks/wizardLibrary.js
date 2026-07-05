@@ -39,10 +39,15 @@ const BUILTINS = [
     { id: 'atc_warmup', type: 'atc_warmup', label: 'Warm-up', icon: '🔥', group: 'setup' },
     { id: 'wcs', type: 'wcs', label: 'WCS / work offsets', icon: '⊕', group: 'probe' },
     { id: 'homing', type: 'homing', label: 'Homing', icon: '⌖', group: 'probe' },
-    // Corner (built-in) RETIRED (④ 2026-07-02) — REPLACED by the "Corner (data)" twin (user_corner_data). cornerStack /
-    // BUILDERS.corner / SCHEMA.corner stay as the shim so legacy saved 'corner' ops still render.
+    // t339 E4 — IN-PLACE SWAP: the built-in Corner/Edge KEEP their Probe slot (label/icon/group), but `opensAs` re-points the
+    // click to the data-op TWIN (userOpView) — the user sees "Corner"/"Edge" WHERE IT ALWAYS WAS, now data-op-backed (human
+    // t332). The built-in stack (cornerStack/edgeStack + BUILDERS/SCHEMA) stays as the LEGACY SHIM (legacy saved ops render).
+    // The twin's OWN menu entry is HIDDEN (userEntries drops opensAs targets) → no duplicate. ONE-SOURCE: every future port
+    // just declares `opensAs` on its built-in entry (Corner was previously retired-and-RELOCATED to a data-wiz folder — the gap;
+    // this makes it truly in-place, and every later probe port inherits the same mechanism).
+    { id: 'corner', type: 'corner', label: 'Corner', icon: '📐', group: 'probe', opensAs: 'user_corner_data' },
     { id: 'middle', type: 'middle', label: 'Middle / Bore / Boss', icon: '🎯', group: 'probe' },
-    { id: 'edge', type: 'edge', label: 'Edge', icon: '📏', group: 'probe' },
+    { id: 'edge', type: 'edge', label: 'Edge', icon: '📏', group: 'probe', opensAs: 'user_edge_data' },
     { id: 'alignment', type: 'alignment', label: 'Align', icon: '🧭', group: 'probe' },
     { id: 'rotary_center', type: 'rotary_center', label: 'Centreline', icon: '', group: 'probe' },
     { id: 'rotary_clock', type: 'rotary_clock', label: 'Clock A0', icon: '🕒', group: 'probe' },
@@ -108,8 +113,12 @@ export function deleteGroup(id) {
 }
 
 // ── the merged library (what the bar + Settings render from) ─────────────────────────────────────────────────
+// t339 E4 — an IN-PLACE port's twin (user_corner_data / user_edge_data) is opened via its BUILTINS entry's `opensAs`, so it must
+// NOT also surface its OWN menu entry (that would duplicate the slot). Drop any user-op a built-in entry adopts via opensAs.
+// ONE declaration (opensAs on the built-in) drives BOTH the slot re-point AND this hide → they can't drift.
+const OPENS_AS_TARGETS = new Set(BUILTINS.filter((b) => b.opensAs).map((b) => b.opensAs));
 function userEntries() {
-    return listUserOps().map((d) => ({
+    return listUserOps().filter((d) => !OPENS_AS_TARGETS.has(d.opType)).map((d) => ({
         id: d.opType,
         type: d.opType,
         label: d.label || d.opType,

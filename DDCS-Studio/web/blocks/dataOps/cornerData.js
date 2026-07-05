@@ -308,8 +308,10 @@ export function cornerDataDef() {
     // register, not the literal — see applyProbeSources). Matches PROBE_SRC_VARS: port(#5)/f_fast(#3)/retract(#2). level is baked.
     const SRC_BY_PARAM = { port: 'port', f_fast: 'fastFeed', retract: 'retract' };
     const bindings = [...CORNER_BINDINGS, ...CORNER_STRUCT_BINDINGS].map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    // t339 E4 — NO '*_datawiz' group: corner is now opened IN-PLACE from the built-in Corner's Probe slot (opensAs), its own
+    // menu entry hidden — RETROFIT of the pilot gap (corner was retired-and-RELOCATED to a data-wiz folder, never in-place).
     const def = userOpFromStack('corner_data', 'Corner (data)', cornerDataStack(CORNER_DEFAULTS),
-        bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
+        bindings, 'form3d+2d', { forceMachine: true });
     def.bindingSpecs = CORNER_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.simStartsProvider = cornerSimStartsProvider;   // t73 — sim markers CHAIN off their anchor via the emit's reposition geometry (preview-only)
     def.postInstantiate = (stack, resolved) => applyStructCtl(applyHeaderComments(applyProbeSources(stack), resolved), resolved);   // t87 source-chips + t138 header recompose + t154 struct-control value sync (all rewrite from resolved state)

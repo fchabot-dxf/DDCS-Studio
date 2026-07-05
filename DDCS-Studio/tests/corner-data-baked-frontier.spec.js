@@ -30,15 +30,20 @@ test('BAKED FRONTIER: `level` stays baked-final (non-operator-facing) — the tw
   expect(levelDiverges, 'level is baked-final (the twin bakes level=0); a non-zero level diverges — DELIBERATE (non-operator-facing), not a follow-on').toBe(true);
 });
 
-// (2) The built-in Corner is now RETIRED (④ move 2a) — replaced by the "Corner (data)" twin. This asserts the retirement
-//     LANDED (no built-in 'corner' entry in wizardLibrary) + guards against an accidental re-registration. The SHIM stays:
-//     cornerStack / BUILDERS.corner / SCHEMA.corner keep legacy saved 'corner' ops rendering.
-test('RETIRED: the built-in Corner wizard is no longer registered (replaced by the Corner (data) twin)', async ({ page }) => {
+// (2) t339 E4 — IN-PLACE SWAP: the Corner slot is BACK in the Probe bar (in-place, human t332), but it `opensAs` the
+//     "Corner (data)" twin — the built-in VIEW stays retired (the click opens user_corner_data, never the built-in corner
+//     wizard). This asserts the in-place entry EXISTS + re-points to the twin. The SHIM stays: cornerStack / BUILDERS.corner
+//     / SCHEMA.corner keep legacy saved 'corner' ops rendering. (Supersedes the ④ "no corner entry" assertion — corner was
+//     retired-and-RELOCATED to a data-wiz folder [the pilot gap]; E4 makes it truly in-place via opensAs.)
+test('IN-PLACE: the Corner Probe slot opens the data-op twin (opensAs), the built-in view stays retired', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
-  const builtinCorner = await page.evaluate(async () => {
+  const cornerEntry = await page.evaluate(async () => {
     const { listEntries } = await import('/blocks/wizardLibrary.js');
-    return listEntries().some((e) => e.id === 'corner' && e.type === 'corner' && e.kind === 'builtin');
+    const e = listEntries().find((x) => x.id === 'corner' && x.type === 'corner' && x.kind === 'builtin');
+    return e ? { opensAs: e.opensAs, group: e.group } : null;
   });
-  expect(builtinCorner, 'the built-in Corner (wizardLibrary id:corner) is RETIRED ④ — replaced by user_corner_data; do NOT re-register it').toBe(false);
+  expect(cornerEntry, 'the Corner slot is back IN-PLACE (a built-in entry in the Probe group)').toBeTruthy();
+  expect(cornerEntry.group, 'in its Probe slot (not a separate Data Wiz folder)').toBe('probe');
+  expect(cornerEntry.opensAs, 'but it OPENS the data-op twin (opensAs → user_corner_data); the built-in corner VIEW stays retired').toBe('user_corner_data');
 });

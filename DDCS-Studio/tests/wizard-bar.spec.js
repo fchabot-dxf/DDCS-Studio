@@ -50,11 +50,17 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   // the "Rotary" sub-label divider survives.
   const probeBy = Object.fromEntries(probe.items.map((i) => [i.text.replace(/\s+/g, ' '), i.onclick]));
   expect(probe.items[0].onclick).toBe("openWiz && openWiz('wcs')");
-  // Built-in Corner RETIRED ④ — no 'Corner' item + no openCornerWiz opener in the probe group (the "Corner (data)" twin lives in its own data-wizard group).
-  expect(probe.items.some((i) => /Corner/.test(i.text)), 'no built-in Corner in the probe bar').toBe(false);
-  expect(probe.items.some((i) => /openCornerWiz/.test(i.onclick || '')), 'no openCornerWiz opener').toBe(false);
+  // t339 E4 — IN-PLACE SWAP: the built-in Corner + Edge KEEP their Probe slots but `opensAs` opens the data-op TWIN
+  // (openWiz('user_*_data') → userOpView); the built-in views retire (no openCornerWiz/openEdgeWiz); NO separate Data Wiz entry.
+  const cornerItem = probe.items.find((i) => /Corner/.test(i.text));
+  expect(cornerItem, 'Corner is IN its Probe slot (in-place)').toBeTruthy();
+  expect(cornerItem.onclick, 'Corner opens the data-op twin in-place').toBe("openWiz && openWiz('user_corner_data')");
+  expect(probe.items.some((i) => /openCornerWiz/.test(i.onclick || '')), 'no openCornerWiz opener (retired)').toBe(false);
+  const edgeItem = probe.items.find((i) => /Edge/.test(i.text));
+  expect(edgeItem, 'Edge is IN its Probe slot (in-place)').toBeTruthy();
+  expect(edgeItem.onclick, 'Edge opens the data-op twin in-place').toBe("openWiz && openWiz('user_edge_data')");
+  expect(probe.items.some((i) => /openEdgeWiz/.test(i.onclick || '')), 'no openEdgeWiz opener (retired)').toBe(false);
   expect(probe.items.find((i) => /Middle/.test(i.text)).onclick).toContain('openMiddleWiz');
-  expect(probe.items.find((i) => /Edge/.test(i.text)).onclick).toContain('openEdgeWiz');
   expect(probe.items.find((i) => /Align/.test(i.text)).onclick).toContain('openAlignmentWiz');
   expect(probe.dividers).toEqual(['Rotary']);
 

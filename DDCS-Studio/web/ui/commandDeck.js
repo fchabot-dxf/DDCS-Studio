@@ -51,7 +51,7 @@ const WIZ_GROUP_ICON = { setup: HEADER_ICONS.comm, probe: HEADER_ICONS.probe, at
 const WIZ_SUBLABEL = { rotary_center: 'Rotary' };
 
 // Wizards with a dedicated 3D-animated opener instead of the generic openWiz(type).
-const WIZ_SPECIAL_OPENER = { middle: 'openMiddleWiz', edge: 'openEdgeWiz', alignment: 'openAlignmentWiz' };   // corner retired (④) — Corner (data) opens via the generic user-op path
+const WIZ_SPECIAL_OPENER = { middle: 'openMiddleWiz', alignment: 'openAlignmentWiz' };   // corner + edge retired (④/E4) — their entries `opensAs` the data-op twin (in-place, via the generic user-op path)
 
 // The I/O quick-actions — a bar-special section appended to the Setup dropdown (not library entries).
 const WIZ_IO_SECTION = `
@@ -79,6 +79,9 @@ function wizItemOnclick(e) {
         if (panel === 'form2d' || panel === 'form3d+2d') return `openWiz && openWiz('${_escArg(e.type)}')`;
         return `ddcsInsertUserOp && ddcsInsertUserOp('${_escArg(e.type)}')`;
     }
+    // t339 E4 — IN-PLACE SWAP: a built-in entry that `opensAs` a data-op twin opens the twin's userOpView (openWiz routes the
+    // 'user_' prefix there), so the built-in keeps its slot but the click is re-pointed. Precedence over the 3D-animated opener.
+    if (e.opensAs) return `openWiz && openWiz('${_escArg(e.opensAs)}')`;
     const special = WIZ_SPECIAL_OPENER[e.id];
     if (special) return `${special} && ${special}()`;
     if (e.variant) return `openWiz && openWiz('${_escArg(e.type)}','${_escArg(e.variant)}')`;

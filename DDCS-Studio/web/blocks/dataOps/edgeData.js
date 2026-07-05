@@ -103,7 +103,9 @@ function applyProbeSources(stack) {
 export function edgeDataDef() {
     const SRC_BY_PARAM = { port: 'port', f_fast: 'fastFeed', retract: 'retract' };
     const bindings = [...EDGE_BINDINGS, ...EDGE_STRUCT_BINDINGS].map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
-    const def = userOpFromStack('edge_data', 'Edge (data)', edgeDataStack(EDGE_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
+    // t339 E4 — NO '*_datawiz' group: the edge twin is opened IN-PLACE from the built-in Edge's Probe slot (opensAs), and its
+    // own menu entry is hidden (wizardLibrary drops opensAs targets), so it never lands in a separate Data Wiz dropdown.
+    const def = userOpFromStack('edge_data', 'Edge (data)', edgeDataStack(EDGE_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true });
     def.bindingSpecs = EDGE_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.postInstantiate = applyProbeSources;   // source-chips (byte-identical when studio-sourced)
     def.simStartsProvider = edgeSimStartsProvider;   // E2 — the ONE edge-anchor preview marker (sim-only; re-points to the live axis/dir)

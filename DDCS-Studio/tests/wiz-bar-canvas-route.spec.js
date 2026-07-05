@@ -12,11 +12,12 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-test('B3c/B3d: clicking Corner (data) in the wiz-bar opens BOTH the 3D sim and the 2D drag canvas (not the plain form)', async ({ page }) => {
+test('B3c/B3d: clicking the IN-PLACE Corner slot in the wiz-bar opens the twin — BOTH the 3D sim and the 2D drag canvas (not the plain form)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsRefreshWizardBar && window.ddcsGetBlockProgram);
 
-  // register Corner (data) as a user op + refresh the bar so its entry renders (its panel is 'form3d+2d')
+  // register Corner (data) as a user op + refresh the bar. t339 E4 — its OWN entry is hidden; the built-in 'Corner' Probe slot
+  // `opensAs` it (in-place). So the USER clicks the 'Corner' slot, which routes openWiz('user_corner_data') → the canvas view.
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
     const CD = await import('/blocks/dataOps/cornerData.js');
@@ -25,23 +26,23 @@ test('B3c/B3d: clicking Corner (data) in the wiz-bar opens BOTH the 3D sim and t
     window.ddcsRefreshWizardBar();
   });
 
-  // the USER's entrypoint: the rendered bar button (NOT openWiz). Read its routing + confirm the declared panel.
+  // the USER's entrypoint: the rendered IN-PLACE 'Corner' bar button (NOT openWiz directly). Read its routing + the panel.
   const routing = await page.evaluate(async () => {
     const CD = await import('/blocks/dataOps/cornerData.js');
     const { listUserOps } = await import('/blocks/userOps.js');
     const def = listUserOps().find((d) => d.opType === CD.CORNER_DATA_OPTYPE);
-    const btn = Array.from(document.querySelectorAll('.dock-header button')).find((x) => /Corner \(data\)/.test(x.textContent || ''));
+    const btn = Array.from(document.querySelectorAll('.dock-header button')).find((x) => /Corner/.test(x.textContent || ''));
     return { panel: def && def.panel, onclick: btn ? (btn.getAttribute('onclick') || '') : null };
   });
   expect(routing.panel, 'Corner (data) declares the form3d+2d canvas panel (3D sim + 2D drag)').toBe('form3d+2d');
-  expect(routing.onclick, 'the bar renders a Corner (data) entry').not.toBeNull();
-  // ROUTING FIX (B3c): a canvas-declaring data-op routes to openWiz, NOT the plain quick-insert form.
-  expect(routing.onclick, 'Corner (data) routes to openWiz (the canvas/wizard path)').toContain('openWiz');
-  expect(routing.onclick, 'Corner (data) does NOT route to the plain quick-insert form').not.toContain('ddcsInsertUserOp');
+  expect(routing.onclick, 'the bar renders the in-place Corner entry').not.toBeNull();
+  // t339 E4 — the in-place Corner slot opensAs the twin: openWiz('user_corner_data'), the canvas/wizard path (NOT the plain form).
+  expect(routing.onclick, 'the Corner slot routes to openWiz (the canvas/wizard path)').toContain("openWiz && openWiz('user_corner_data')");
+  expect(routing.onclick, 'the Corner slot does NOT route to the plain quick-insert form').not.toContain('ddcsInsertUserOp');
 
   // CLICK the actual rendered bar button (the real user gesture — fires its onclick, dropdown visibility aside).
   await page.evaluate(() => {
-    const btn = Array.from(document.querySelectorAll('.dock-header button')).find((x) => /Corner \(data\)/.test(x.textContent || ''));
+    const btn = Array.from(document.querySelectorAll('.dock-header button')).find((x) => /Corner/.test(x.textContent || ''));
     btn.click();
   });
 
