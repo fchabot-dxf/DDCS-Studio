@@ -86,9 +86,12 @@ export function magazinePockets(a, theta) {
  * model an ASSUMED drawbar pick&place — the real M350 O10102 is a pneumatic push station, NEVER verified on
  * real firmware. So we show a prominent in-UI warning the user can't miss; the subtle .wiz-usage hint stays.
  * Created once (lazily, anchored above the method-specific rows) then toggled per method.
+ * INC-C3: also gated on callMacro=false — those ASSUMED codes are only EMITTED when INLINING. In the default
+ * `T# M6` mode (callMacro=true) the op just calls the installed T.nc, so the warning is stale there (the amber
+ * install-dependency banner covers that mode instead).
  */
-function syncChangeUnverifiedBanner(method) {
-    const unverified = method === 'generic' || method === 'auto' || method === 'disk';
+function syncChangeUnverifiedBanner(method, callMacro) {
+    const unverified = !callMacro && (method === 'generic' || method === 'auto' || method === 'disk');
     let banner = el('atc_change_unverified');
     if (!banner) {
         const anchor = el('atc_change_manual_params');   // first method-specific row, right under the Method selector
@@ -278,7 +281,7 @@ export const atcChangeView = {
         if (fwRow) fwRow.style.display = method === 'firmware' ? '' : 'none';
         const macroRow = el('atc_change_automatic_params');   // INC-C1: the callMacro toggle (all AUTOMATIC methods)
         if (macroRow) macroRow.style.display = (method === 'firmware' || method === 'generic' || method === 'disk') ? '' : 'none';
-        syncChangeUnverifiedBanner(method);   // A2: bold UNVERIFIED warning for generic/disk auto change
+        syncChangeUnverifiedBanner(method, el('atc_change_callmacro')?.checked !== false);   // A2 + INC-C3: red UNVERIFIED only when INLINING those codes (callMacro=false)
         syncChangeMacroBanner(method, el('atc_change_callmacro')?.checked !== false);   // INC-C2: install-dependency banner for T# M6 mode
 
         const params = {

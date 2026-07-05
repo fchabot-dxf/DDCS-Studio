@@ -116,25 +116,43 @@ test('Tool Change wizard: the install-dependency banner shows in T# M6 mode, hid
   await expect(banner).toBeHidden();
 });
 
-test('Tool Change wizard: bold UNVERIFIED banner only for generic/disk auto change', async ({ page }) => {
+test('Tool Change wizard: bold UNVERIFIED banner only when INLINING generic/disk assumed codes (INC-C3)', async ({ page }) => {
   await openWizard(page, 'atc_change');
   const banner = page.locator('#atc_change_unverified');
+  const toggle = page.locator('#atc_change_callmacro');
 
   // M6 (default) — verified path, no warning banner.
   await expect(banner).toBeHidden();
 
-  // Generic / Disk — ASSUMED drawbar model, bold UNVERIFIED banner shows.
+  // Generic in the DEFAULT T# M6 mode (callMacro checked) — the op just CALLS the installed T.nc, so the ASSUMED
+  // drawbar codes are NOT emitted → the red UNVERIFIED banner must be HIDDEN (INC-C3; the amber install banner covers this).
   await page.locator('#atc_change_method').selectOption('generic');
+  await expect(toggle).toBeChecked();
+  await expect(banner).toBeHidden();
+
+  // Uncheck → INLINE the change → the assumed codes ARE now emitted → the red UNVERIFIED banner SHOWS.
+  await toggle.uncheck();
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('UNVERIFIED');
   await expect(banner.locator('b').first()).toBeVisible();   // the warning is bolded
 
+  // Re-check → back to the T# M6 call → hidden again.
+  await toggle.check();
+  await expect(banner).toBeHidden();
+
+  // Disk inline — same as generic: red shows only when inlining.
   await page.locator('#atc_change_method').selectOption('disk');
+  await expect(banner).toBeHidden();               // callMacro re-checked above → T# M6 mode
+  await toggle.uncheck();
   await expect(banner).toBeVisible();
 
-  // Firmware + Manual — fine, no warning.
+  // Firmware — never carries the assumed-drawbar codes, so no red banner in EITHER mode.
   await page.locator('#atc_change_method').selectOption('firmware');
+  await expect(banner).toBeHidden();               // inline firmware = M19 orient, not the drawbar model
+  await toggle.check();
   await expect(banner).toBeHidden();
+
+  // Manual — fine, no warning.
   await page.locator('#atc_change_method').selectOption('manual');
   await expect(banner).toBeHidden();
 });
