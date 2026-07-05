@@ -697,3 +697,15 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **NO EMIT CHANGE** — reconciler (reverse-sync) only; atcChangeStack/macroCallStack/tncProgram untouched; goldens unchanged (the emit tests pass). The shared `declaredOpParams` seam is the declared-param-reconcile PATTERN, ready for reuse as more wizards port to declaration-driven emits.
 
 **GATE — byte-diff (the opSession reconciler diff) in scratchpad/fixB-gate.md (VS Code tab). PASS BACK for review.** After this: the corner backlog / UX items (toast+FAQ · help slot · version nudge) — or the queued A2 (a declared macrocall block, emit change) if you want the fuller declare.
+
+## 🔨 turn 263 (cycle 127) — CORNER VISUAL-LANGUAGE POLISH: **ALREADY DONE in HEAD** → flagged, NO code (stale re-dispatch caught).
+
+**PREMISE CHECK (confirm-before-building):** the dispatch's 3 parts are ALL already shipped + verified on this branch — this is a stale re-dispatch of the PRE-ATC corner mainline (completed at the suite-482 era; the ATC campaign then ran the suite 482→606).
+
+**EVIDENCE:**
+- Commits IN HEAD (git merge-base --is-ancestor confirmed): **ec81ab4** "visual-language polish — circle sim-only/manual-jog marker · rainbow upward arc for manual jog · Layout handles adopt the top panel cyan=auto/amber=manual"; **a460b47** "DECLARE the per-pass reposition source from the live travelApproach"; **36783f7** (3D rainbow arc + FeatureCanvas colour-specificity); **7a809fd** sim-marker-distinguish (emits flag → filled ◆ vs hollow ○).
+- The code has all 3: toolpath2d.js:197 (hollow CIRCLE sim-only) / :241 (manual jog arcs up 'rainbow'); gcodeViz3d.js:260 (hollow circle) / :784 (3D rainbow arc bows +Z); featureCanvas.js:346-362 (reposition handle cyan=auto/amber=manual via inline style so getComputedStyle wins).
+- A DEDICATED spec matches the dispatch's 3 parts EXACTLY — `corner-viz-polish.spec.js`: "(1) 2D sim-only marker is a hollow CIRCLE; emitting stays a filled diamond", "(2) 2D manual jog travel arcs up (rainbow); auto travel stays straight", "(3) Layout handles adopt the top panel cyan=auto/amber=manual colour code" — 3/3 GREEN. Plus corner-source-declared (a460b47) green; corner-layout-coherence + corner-data-sim-marker-emits/-track + corner-data-repos-handle green (ran 19 corner-viz tests total, all pass).
+- NEXT-SESSION.md line 106 (the status region) itself marks it "🎉 CORNER VISUAL-LANGUAGE POLISH FULLY COMPLETE" (a460b47).
+
+**ACTION:** did NOT rebuild (redundant + regression risk on working, spec-covered code). The dispatch note itself flags the ACTUAL open item — "the PARITY-GAP #2 fork (controller-source chips) is BACK IN FRONT OF THE HUMAN" — which is likely the real next corner step once the human rules. PASS BACK: confirm the visual polish is complete (or point me at a SPECIFIC remaining gap I'm not seeing — e.g. a shape/behavior the dispatch wants CHANGED from what shipped, like emitting = numbered SQUARES vs the shipped filled diamond).
