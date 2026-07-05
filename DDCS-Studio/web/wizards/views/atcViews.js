@@ -82,13 +82,13 @@ export function magazinePockets(a, theta) {
 }
 
 /**
- * Bold "UNVERIFIED" banner for the generic/disk auto tool-change methods (A2). `autoStack` / `diskAutoStack`
- * model an ASSUMED drawbar pick&place — the real M350 O10102 is a pneumatic push station, NEVER verified on
- * real firmware. So we show a prominent in-UI warning the user can't miss; the subtle .wiz-usage hint stays.
- * Created once (lazily, anchored above the method-specific rows) then toggled per method.
- * INC-C3: also gated on callMacro=false — those ASSUMED codes are only EMITTED when INLINING. In the default
- * `T# M6` mode (callMacro=true) the op just calls the installed T.nc, so the warning is stale there (the amber
- * install-dependency banner covers that mode instead).
+ * Bold "UNVERIFIED" banner for the generic/disk INLINE tool change (A2). The inline change SEQUENCE (magazine
+ * pick&place) is an ASSUMPTION never proven on real DDCS firmware — the real M350 O10102 is a pneumatic push
+ * station, not a drawbar changer. INC-B2: the drawbar/sensor CODES now come from the user's Settings → ATC I/O
+ * (one source, via tncProgram), but the MOTION sequence stays unverified — so the banner stays RED, reworded to
+ * pin the distinction. Created once (lazily, anchored above the method-specific rows) then toggled per method.
+ * INC-C3: gated on callMacro=false — the inline body only ships when INLINING. In the default T# M6 mode
+ * (callMacro=true) the op just calls the installed T.nc, so this is hidden (the amber install banner covers it).
  */
 function syncChangeUnverifiedBanner(method, callMacro) {
     const unverified = !callMacro && (method === 'generic' || method === 'auto' || method === 'disk');
@@ -102,9 +102,10 @@ function syncChangeUnverifiedBanner(method, callMacro) {
         banner.style.cssText = 'display:none; margin:4px 0 8px; padding:8px 10px; border:1px solid var(--danger,#ef4444);'
             + ' border-left:4px solid var(--danger,#ef4444); border-radius:5px; background:rgba(239,68,68,0.10);'
             + ' color:var(--danger,#ef4444); font-size:12px; line-height:1.5;';
-        banner.innerHTML = '<b>⚠ UNVERIFIED on real DDCS firmware</b> — this magazine pick &amp; place model is an'
-            + ' ASSUMPTION (the real M350 O10102 is a pneumatic push station, not a drawbar changer).'
-            + ' <b>Review every emitted line before running</b>, with no tool in the spindle and a hand on e-stop.';
+        banner.innerHTML = '<b>⚠ Change SEQUENCE unverified on real DDCS firmware</b> — this magazine pick &amp; place'
+            + ' MOTION is an ASSUMPTION (the real M350 O10102 is a pneumatic push station, not a drawbar changer).'
+            + ' The drawbar / sensor <b>codes come from your Settings → ATC I/O</b>, but the sequence is unverified —'
+            + ' <b>review every emitted line before running</b>, with no tool in the spindle and a hand on e-stop.';
         anchor.parentNode.insertBefore(banner, anchor);
     }
     banner.style.display = unverified ? '' : 'none';
@@ -302,8 +303,14 @@ export const atcChangeView = {
             magazine: (s.atc && s.atc.magazine) || [],   // pockets + park XYZ come from Settings → Tool table
             magType: s.atc && s.atc.magType,             // 'disk' → rotate-to-pocket change; else per-pocket moves
             pickup: s.atc && s.atc.pickup,               // disk: the fixed pickup XYZ
+            // INC-B2 (4a): thread the live ATC config + I/O codes at the SAME view seam as magazine — EMIT-ONLY
+            // (underscore-prefixed; NOT in the atc_change marker schema, so not serialized). The callMacro=false
+            // inline body (inlineTncStack → tncProgram) sources the user's declared drawbar/sensor codes from these.
+            _atc: (s.atc) || {},
+            _outputs: s.outputs || [],
+            _inputs: s.inputs || [],
             // INC-B/C1: DEFAULT true — the automatic change emits a T# M6 CALL to the installed T.nc; the #atc_change_callmacro
-            // checkbox (INC-C1, guardrail [C]) is the inline-fallback escape hatch — unchecked → the old inline dance.
+            // checkbox (INC-C1, guardrail [C]) is the inline-fallback escape hatch — unchecked → the inline body.
             callMacro: el('atc_change_callmacro')?.checked !== false,
         };
         const gcode = changeWizard.generate(params);

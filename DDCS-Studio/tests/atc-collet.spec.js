@@ -87,8 +87,10 @@ test('(4) input SENSOR live-lighting activates: a generic change trace lights th
     const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
     const { atcChangeStack } = await import('/wizards/atcChangeWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
-    // a generic change with a tool preloaded so it runs the put-away + pick-up (fires M300/M301/M302 waits)
-    const code = '#1300=2\n' + emitMapped(atcChangeStack({ method: 'generic', fixedT: 5, magazine: s.atc.magazine, waitSpindle: true, callMacro: false })).text;   // INC-B: the inline drawbar dance (default is now a T# M6 call)
+    // a generic change requesting T5 (#1504) with a different tool loaded (#1300=2) so the fetch runs (fires M300/M301/M302).
+    // INC-B2: the inline body is now the one-source tncProgram (generateToolChangeNc here — no drawbar grip declared); it
+    // sources the sensor waits from the generator, and the ATC config + I/O thread via _atc/_outputs/_inputs.
+    const code = '#1504=5\n#1300=2\n' + emitMapped(atcChangeStack({ method: 'generic', fixedT: 5, _atc: s.atc, _outputs: s.outputs || [], _inputs: s.inputs, callMacro: false })).text;
     new GcodeExecutionEngine({ autoAnswer: true }).trace(code);   // trace injects each wait's sensor synchronously
     window.ioPanel.refresh();
     const lit = (p) => document.querySelector(`.io-input[data-pin="${p}"]`).classList.contains('active');

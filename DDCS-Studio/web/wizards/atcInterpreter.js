@@ -114,10 +114,15 @@ export function motionToTnc(combo, atc = {}, opts = {}) {
     const descend = (z) => isPlunge ? `G53 G1 Z${z} F${feed}         ; plunge into the dock (magnet grabs/releases mechanically)` : `G53 G0 Z${z}`;
     const preOpen = (grip.release || []).length > 0 && !isPlunge;   // the FETCH opens the grip before descending (drawbar), not a magnet
 
+    const body = !!opts.body;   // INC-B2: emit the executable BODY only (no O-header, no trailing M99) for inlining
     const L = []; const w = (s) => L.push(s);
-    w(`O${oNum} (${combo.gripKind} x ${combo.motionKind} tool-change macro - DDCS Studio)`);
-    w('(GENERATED from the composable ATC config - review every line + dry-run before cutting. NOT validated on a live ATC.)');
-    w(`(STANDALONE macro: the controller runs it on Tn M6. #1504=requested  #1300=spindle  ${mag.length} docks)`);
+    if (body) {
+        w(`(${combo.gripKind} x ${combo.motionKind} tool-change - INLINED from your ATC config; codes from Settings -> ATC I/O)`);
+    } else {
+        w(`O${oNum} (${combo.gripKind} x ${combo.motionKind} tool-change macro - DDCS Studio)`);
+        w('(GENERATED from the composable ATC config - review every line + dry-run before cutting. NOT validated on a live ATC.)');
+        w(`(STANDALONE macro: the controller runs it on Tn M6. #1504=requested  #1300=spindle  ${mag.length} docks)`);
+    }
     w('IF #1504==#1300 GOTO999            ; requested tool already in spindle');
     w('M5  M9                             ; spindle + coolant OFF');
     if (grip.stopWait) w(`${grip.stopWait}                              ; wait: spindle stopped (SAFETY)`);   // declared grip.stopWait — never dropped
@@ -142,7 +147,7 @@ export function motionToTnc(combo, atc = {}, opts = {}) {
         w('G53 G0 X#1 Y#2'); if (preOpen) gripOpen(grip.release, io).forEach(w); w(descend('#3')); gripLines(grip.clamp, io).forEach(w);
         w('G53 G0 Z#4'); w('#1300 = #1504               ; record the new tool'); w('GOTO999');
     });
-    w('N999'); w('M99');
+    w('N999'); if (!body) w('M99');   // INC-B2: M99 is the subprogram-return WRAPPER — omitted when inlined
     return L.join('\n');
 }
 

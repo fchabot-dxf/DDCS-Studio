@@ -55,24 +55,35 @@ test('the 3 methods (and back-compat old ops) resolve to the correct grip × mot
   expect(combo.firmware.motion.steps.length, 'the push motion step-sequence is attached').toBeGreaterThan(0);
 });
 
-test('BYTE-IDENTICAL: the inline fallback (callMacro:false) still goes through the existing stacks (the model is inert)', async ({ page }) => {
-  // INC-B: the automatic methods now DEFAULT to a T# M6 call; the inline dance is the callMacro:false fallback — and that
-  // fallback is byte-preserved through the original stacks (the atcModel remains inert; it never rewrote the emit).
+test('INC-B2: the inline fallback (callMacro:false) emits the ONE-SOURCE tncProgram body — firmware unchanged, generic/disk source the user I/O codes', async ({ page }) => {
+  // INC-B2 RETIRES the old assumed autoStack/diskAutoStack: the generic/disk INLINE fallback now emits the SAME
+  // executable body as ⚙ Generate T.nc (tncProgram, {body:true}), sourcing the drawbar/sensor codes from the user's
+  // Settings → ATC I/O (threaded via _atc/_outputs/_inputs). Firmware inline (the O10102 push) is untouched.
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => !!window.ddcsGetSettings);
   const em = await page.evaluate(async () => {
     const { atcChangeStack } = await import('/wizards/atcChangeWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const gen = (p) => emitMapped(atcChangeStack({ ...p, callMacro: false })).text;
-    return { firmware: gen({ method: 'firmware' }), generic: gen({ method: 'generic', magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }] }), disk: gen({ method: 'disk', magazine: [{ pocket: 1, tool: 1 }], pickup: { x: 5, y: 5, z: -3 } }) };
+    const atc = { magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }] };
+    const outputs = [{ type: 'drawbar', onCode: 'M54', offCode: 'M55' }];   // NON-default drawbar codes (prove one-source)
+    return {
+      firmware: gen({ method: 'firmware' }),
+      generic: gen({ method: 'generic', _atc: atc, _outputs: outputs, _inputs: [] }),
+      disk: gen({ method: 'disk', _atc: atc, _outputs: outputs, _inputs: [] }),
+    };
   });
-  // the firmware emit is still the raw O10102 (pneumatic push) — its signature lines are intact, unchanged by the model
+  // firmware inline = still the raw O10102 (pneumatic push) — untouched by INC-B2
   expect(em.firmware, 'firmware emit = the O10102 push station (G53 #1320)').toContain('G53 X#1320');
   expect(em.firmware, 'firmware emit = the pneumatic M-codes (vacuum M159)').toContain('M159');
   expect(em.firmware, 'firmware emit = M19 orient').toContain('M19');
-  // generic still emits the drawbar (M154) pick-place; disk still emits the rotate/pickup template
-  expect(em.generic, 'generic emit = the drawbar release (M154)').toContain('M154');
-  expect(em.disk, 'disk emit = the carousel rotate template').toContain('Rotate carousel');
+  // generic/disk inline = the one-source tncProgram body: it sources the USER's drawbar codes (M54/M55), NOT the old
+  // hardcoded assumed M154/M155 dance, and uses the T.nc #1504-requested-tool dispatch (drops the old #100 model).
+  expect(em.generic, 'generic inline sources the USER drawbar release code (M54)').toContain('M54');
+  expect(em.generic, 'generic inline sources the USER drawbar clamp code (M55)').toContain('M55');
+  expect(em.generic, 'generic inline is NOT the old assumed M154 dance').not.toContain('M154');
+  expect(em.generic, 'generic inline uses the T.nc #1504 requested-tool dispatch').toContain('#1504');
+  expect(em.disk, 'disk inline routes through the SAME one-source body (user M54 code)').toContain('M54');
 });
 
 test('I2: the choreography descriptor is COMPUTED from the model, IDENTICAL to the old fixed table', async ({ page }) => {

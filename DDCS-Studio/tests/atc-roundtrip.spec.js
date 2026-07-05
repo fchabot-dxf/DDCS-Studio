@@ -52,9 +52,12 @@ test('atc_change round-trips every change method', async ({ page }) => {
   const man = await roundTrip(page, 'atc_change', { method: 'manual', x: 123, y: 234, z: 12 });
   expect(man.fields).toMatchObject({ atc_change_method: 'manual', atc_change_x: 123, atc_change_y: 234, atc_change_z: 12 });
 
-  // Generic (ASSUMED) pick & place — inline dance (callMacro:false) so the drawbar/target blocks exist to reverse-parse.
+  // Generic INLINE (callMacro:false) — INC-B2: the inline body is now the one-source tncProgram (method-agnostic —
+  // generic vs disk route on the CONFIGURED changer, not the method label), so the block reverse-sync no longer has a
+  // #100 target table to reverse-parse → a benign NO-OP (reconcile → null; the form keeps its values; method identity
+  // lives in the declared params/marker, not the emit). SAME declare-not-infer posture as the T# M6 default below.
   const gen = await roundTrip(page, 'atc_change', { method: 'generic', magazine: MAG, zClear: 7, fixedT: 2, waitSpindle: true, dustCover: true, confirm: true, callMacro: false });
-  expect(gen.fields).toMatchObject({ atc_change_method: 'generic', atc_change_fixedt: 2, atc_change_zclear: 7, atc_change_m300: true, atc_change_cover: true, atc_change_confirm: true });
+  expect(gen, 'generic inline reverse-syncs as a benign no-op (one-source body has no #100 model to parse)').toBeNull();
 
   // INC-B — the DEFAULT automatic emit is a method-agnostic `T# M6` call to the installed T.nc. It carries no
   // method-specific G-code, so the block reverse-sync is a benign NO-OP (reconcile → null → pullFromBlocks keeps the
@@ -63,15 +66,14 @@ test('atc_change round-trips every change method', async ({ page }) => {
   const call = await roundTrip(page, 'atc_change', { method: 'firmware' });
   expect(call, 'a T# M6 call op reverse-syncs as a benign no-op (nothing method-specific in the emit to parse)').toBeNull();
 
-  // Backward-compat: an OLD saved op (mode/magType, no method) still emits + reconciles to the mapped method. The auto
-  // variants use callMacro:false so the mode→method mapping reverse-parses off the inline dance (the T# M6 default is
-  // method-agnostic — see the benign no-op above).
+  // Backward-compat: an OLD saved op (mode/magType, no method) still emits. Manual reverse-parses to its method; the auto
+  // variants (mode:'auto' → generic/disk) now emit the one-source inline body → a benign no-op reconcile (see gen above).
   const legacyManual = await roundTrip(page, 'atc_change', { mode: 'manual', x: 1, y: 2, z: 3 });
   expect(legacyManual.fields.atc_change_method).toBe('manual');
   const legacyAuto = await roundTrip(page, 'atc_change', { mode: 'auto', magazine: MAG, fixedT: 2, callMacro: false });
-  expect(legacyAuto.fields.atc_change_method).toBe('generic');
+  expect(legacyAuto, 'legacy auto inline reverse-syncs as a benign no-op').toBeNull();
   const legacyDisk = await roundTrip(page, 'atc_change', { mode: 'auto', magType: 'disk', magazine: MAG, pickup: { x: 5, y: 6, z: -2 }, fixedT: 2, callMacro: false });
-  expect(legacyDisk.fields.atc_change_method).toBe('disk');
+  expect(legacyDisk, 'legacy disk inline reverse-syncs as a benign no-op').toBeNull();
 });
 
 test('atc_change automatic methods emit a T# M6 CALL by default; callMacro=false keeps the firmware-accurate inline dance', async ({ page }) => {

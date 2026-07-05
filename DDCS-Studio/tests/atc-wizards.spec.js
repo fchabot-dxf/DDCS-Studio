@@ -133,7 +133,8 @@ test('Tool Change wizard: bold UNVERIFIED banner only when INLINING generic/disk
   // Uncheck → INLINE the change → the assumed codes ARE now emitted → the red UNVERIFIED banner SHOWS.
   await toggle.uncheck();
   await expect(banner).toBeVisible();
-  await expect(banner).toContainText('UNVERIFIED');
+  await expect(banner).toContainText('SEQUENCE unverified');   // INC-B2 reword: the MOTION is unverified; the codes are now user-sourced
+  await expect(banner).toContainText('codes come from your Settings');
   await expect(banner.locator('b').first()).toBeVisible();   // the warning is bolded
 
   // Re-check → back to the T# M6 call → hidden again.

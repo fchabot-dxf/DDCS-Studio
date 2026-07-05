@@ -17,6 +17,8 @@
  * ONE-SOURCE: grip/motion live under settings.atc (a user override, added by the setup GUI in I3); until then atcCombo
  * derives the combo from the op's method (via resolveMethod), so existing ops/files are untouched.
  */
+import { motionToTnc } from './atcInterpreter.js';        // INC-B2: the shared T.nc emitter routes to the interpreter …
+import { generateToolChangeNc } from '../data/atcGenerator.js';   // … or the linear generator (no import cycle: neither imports atcModel)
 // Map a saved op → a change METHOD — new ops carry params.method; OLD ops (mode/magType, no method) map on so existing
 // blocks/files resolve to the same combo. MOVED here from atcChangeWizard at I2 so the MODEL is the one source for
 // method → combo → choreo, and atcChangeWizard imports it back (no import cycle).
@@ -180,4 +182,22 @@ export function atcChoreography(params = {}, atc = null) {
     if (!seam) return null;
     const device = combo.grip && combo.grip.device;
     return device ? { ...seam, device } : { ...seam };
+}
+
+/**
+ * INC-B2 — the ONE shared T.nc emitter. The SAME routing the ⚙ Generate T.nc button uses (the I5b-2a transitional
+ * cutover): a from-zero CANDIDATE combo OR a DRAWBAR changer → the interpreter (motionToTnc); else the linear
+ * generator (generateToolChangeNc). BOTH settingsPanel (the button) AND the atc_change callMacro=false inline
+ * fallback call this, so the change codes are ONE-SOURCE (the user's Settings → ATC I/O) — never a second hand-roll
+ * of the selector. `opts.body` → the executable BODY only (the DECLARED wrapper-strip: no O-header, no M99), for
+ * inlining into a cutting program. `io = { outputs, inputs }` → the user's declared M-codes (drawbar on/off + waits).
+ * SCOPE (I5b-2b/c pending): a non-drawbar/non-candidate changer (pusher/disk) still routes to generateToolChangeNc —
+ * the later convergence collapses BOTH callers at once.
+ */
+export function tncProgram(atc = {}, io = null, opts = {}) {
+    const cmb = atcCombo({}, atc);
+    const useInterp = cmb && cmb.motion && (cmb.motion.candidate || cmb.gripKind === 'drawbar');
+    return useInterp
+        ? motionToTnc(cmb, atc, { io, body: opts.body })
+        : generateToolChangeNc(atc, io && io.outputs, { body: opts.body });
 }

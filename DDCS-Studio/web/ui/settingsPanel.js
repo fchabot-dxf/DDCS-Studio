@@ -18,9 +18,7 @@ import { renderAtcChanger } from './atcChangerGui.js';
 import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
-import { generateToolChangeNc } from '../data/atcGenerator.js';
-import { atcCombo } from '../wizards/atcModel.js';
-import { motionToTnc } from '../wizards/atcInterpreter.js';
+import { tncProgram } from '../wizards/atcModel.js';   // INC-B2: the ONE shared T.nc emitter (was the inline atcCombo/motionToTnc/generateToolChangeNc routing)
 import { renderCloudLogin } from './cloudAccount.js';
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
@@ -2120,13 +2118,11 @@ function wireSettingsOverlay(ov) {
     const genTnc = q('atc_gen_tnc');
     if (genTnc) genTnc.addEventListener('click', () => {
         const atc = _ddcsSettings.atc;
-        // TRANSITIONAL routing (I5b-2a cutover): the INTERPRETER (motionToTnc) now emits the T.nc for a from-zero
-        // CANDIDATE combo AND for the DRAWBAR changer — a safety-complete O-program whose EXECUTABLE program is
-        // BYTE-IDENTICAL to generateToolChangeNc (verified line-by-line: the ONLY diff is the O-header + comment wording).
-        // This collapses to UNCONDITIONAL motionToTnc (retiring generateToolChangeNc) once disk + pusher converge (I5b-2b/c).
-        const cmb = atcCombo({}, atc);
-        const useInterp = cmb && cmb.motion && (cmb.motion.candidate || cmb.gripKind === 'drawbar');
-        const nc = useInterp ? motionToTnc(cmb, atc, { io: { outputs: getOutputs(), inputs: getInputs() } }) : generateToolChangeNc(atc, getOutputs());   // I5b-3: the interpreter reads the user's ATC I/O codes
+        // INC-B2: ONE emitter — the SAME tncProgram the atc_change callMacro=false inline body calls. The
+        // atcCombo→useInterp→motionToTnc/generateToolChangeNc routing moved into tncProgram (atcModel) so the
+        // button + the inline fallback share a single selector (I5b-2a); disk/pusher converge to the interpreter
+        // at I5b-2b/c, collapsing both callers at once. Reads the user's Settings → ATC I/O codes.
+        const nc = tncProgram(atc, { outputs: getOutputs(), inputs: getInputs() });
         const out = q('atc_tnc_out'); if (out) { out.value = nc; out.style.display = 'block'; }
         const dl = q('atc_dl_tnc'); if (dl) dl.style.display = '';
     });

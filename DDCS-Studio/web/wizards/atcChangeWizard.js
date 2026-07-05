@@ -26,7 +26,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
-import { resolveMethod, atcChoreography } from './atcModel.js';   // I2: method resolution + choreo now source from the composable model
+import { resolveMethod, atcChoreography, tncProgram } from './atcModel.js';   // I2: method/choreo from the model; INC-B2: tncProgram = the shared inline body
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
@@ -74,149 +74,6 @@ function manualStack(params) {
     return S;
 }
 
-function autoStack(params) {
-    const d = getDialect();
-    const S = []; const { C, A, IF, GO, LB, SPOFF, COOLOFF, MM, MC, CF, MSG, END } = H(S);
-
-    // ASSUMED pick & place model (NOT proven on real DDCS firmware). The real O10102 is a pneumatic push
-    // station, not a drawbar changer — this drawbar/grab model is a guess carried for backward-compat.
-    const atc = d && d.vars && d.vars.atc;
-    if (!atc) {
-        C('ATC | Tool Change (Generic — ASSUMED)');
-        C(`No ASSUMED magazine model for ${d ? d.name : 'this controller'}.`);
-        C('Use the M6 or Manual method, or select the DDCS Expert post.');
-        END();
-        return S;
-    }
-
-    const zClear = num(params.zClear, 0), fixedT = num(params.fixedT, 0);
-    const useM300 = params.waitSpindle !== false, useCover = params.dustCover === true, confirm = params.confirm === true;
-    // Pockets + park XYZ come from the Settings → Tool table magazine (literal coords, dispatched by tool number).
-    const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && p.tool !== '' && p.tool != null);
-    const cur = '#' + atc.currentTool;                                   // tool in spindle (#1300)
-    const tgt = fixedT > 0 ? String(fixedT) : '#' + atc.targetTool;      // requested tool (#1504 from M6 Txx)
-
-    C('ATC | Tool Change — magazine pick & place (Generic — ASSUMED, verify on your machine)');
-    C('ASSUMED model — the real M350 O10102 is a pneumatic push station, not this drawbar changer.');
-    C('Pockets + park XYZ come from Settings → Tool table magazine');
-    C(fixedT > 0 ? `TEST MODE: fixed target tool T${fixedT}` : `Target tool from ${tgt} — set by M6 Txx; save as T.nc`);
-    C('VERIFY FIRST RUN with no tool in spindle + hand on e-stop');
-    if (!mag.length) {
-        C('!! Magazine is EMPTY — add pockets in Settings → Tool table (or Import from controller).');
-        END();
-        return S;
-    }
-
-    C('=== CONFIGURATION ===');
-    A('#100', tgt, 'Target tool');
-    A('#101', cur, 'Current tool in spindle, 0 = empty');
-    A('#102', String(zClear), 'Z change height - MACHINE coords');
-    C('=== VALIDATE ===');
-    IF('#100', '==', '#101', 900);            // requested tool already loaded
-    if (confirm) { A('#1510', '#100', 'Show target tool'); CF('Change to this tool? Press Enter', 999); }
-
-    C('=== SPINDLE OFF + RETRACT ===');
-    SPOFF(); COOLOFF();
-    if (useM300) MC(300, 'Wait: spindle-stopped sensor');
-    if (useCover) MC(162, 'Dust cover OPEN');
-    MM('Z', '#102');                          // retract to change height
-
-    C('=== PUT AWAY CURRENT TOOL — skipped if spindle empty or tool not in magazine ===');
-    IF('#101', '<', '1', 20);
-    mag.forEach((p, i) => IF('#101', '==', String(num(p.tool, 0)), 100 + i));
-    GO(20);                                   // current tool not in the magazine — skip the return
-    mag.forEach((p, i) => {
-        LB(100 + i); C(`Return T${num(p.tool, 0)} to pocket ${i + 1}`);
-        A('#110', String(num(p.x, 0)), 'Pocket X'); A('#111', String(num(p.y, 0)), 'Pocket Y'); A('#112', String(num(p.z, 0)), 'Pocket Z');
-        MM('X', '#110'); MM('Y', '#111');     // over the pocket
-        MM('Z', '#112');                      // down: seat tool in pocket
-        MC(154, 'Drawbar RELEASE'); MC(301, 'Wait: drawbar-released sensor');
-        MM('Z', '#102');                      // retract clear of the pocket
-        A(cur, '0', 'Spindle now empty'); GO(20);
-    });
-
-    LB(20); C('=== PICK UP TARGET TOOL ===');
-    mag.forEach((p, i) => IF('#100', '==', String(num(p.tool, 0)), 200 + i));
-    A('#1505', '1', 'ERROR: target tool has no pocket in the magazine'); GO(999);   // Expert dialog flag
-    mag.forEach((p, i) => {
-        LB(200 + i); C(`Fetch T${num(p.tool, 0)} from pocket ${i + 1}`);
-        A('#110', String(num(p.x, 0)), 'Pocket X'); A('#111', String(num(p.y, 0)), 'Pocket Y'); A('#112', String(num(p.z, 0)), 'Pocket Z');
-        MM('X', '#110'); MM('Y', '#111');     // over the pocket
-        MC(154, 'Collet OPEN before descending'); MC(301, 'Wait: drawbar-released sensor');
-        MM('Z', '#112');                      // down over the tool shank
-        MC(155, 'Drawbar LOCK'); MC(302, 'Wait: tool-locked sensor');
-        MM('Z', '#102');                      // retract with the new tool
-        if (useCover) MC(163, 'Dust cover CLOSE');
-        A(cur, '#100', 'Current tool = target'); MSG('Tool change complete'); GO(999);
-    });
-
-    C('=== HANDLERS ===');
-    LB(900); MSG('Tool already in spindle - nothing to do'); GO(999);
-    LB(999); END();
-    return S;
-}
-
-// DISK / CAROUSEL auto change (ASSUMED TEMPLATE — NOT proven on real DDCS firmware): all pockets share one
-// fixed PICKUP; the carousel rotates the target pocket to it. The rotation primitive is firmware-specific
-// (rotate output + index sensor), so the "rotate carousel to pocket N" step is left explicit to wire + VERIFY.
-function diskAutoStack(params) {
-    const d = getDialect();
-    const S = []; const { C, A, IF, GO, LB, SPOFF, COOLOFF, MM, MC, CF, MSG, END } = H(S);
-    const atc = d && d.vars && d.vars.atc;
-    if (!atc) { C('ATC | Tool Change (Disk — ASSUMED template)'); C(`No ASSUMED disk model for ${d ? d.name : 'this controller'}.`); END(); return S; }
-    const pk = params.pickup || {};
-    const zClear = num(params.zClear, 0), fixedT = num(params.fixedT, 0);
-    const useM300 = params.waitSpindle !== false, useCover = params.dustCover === true, confirm = params.confirm === true;
-    const mag = (Array.isArray(params.magazine) ? params.magazine : []).filter((p) => p && p.tool !== '' && p.tool != null);
-    const cur = '#' + atc.currentTool, tgt = fixedT > 0 ? String(fixedT) : '#' + atc.targetTool;
-
-    C('ATC | Tool Change — DISK / CAROUSEL (ASSUMED template — rotate pocket to a fixed pickup)');
-    C('ASSUMED — carousel indexing is firmware-specific; VERIFY the rotation on the machine before trusting this.');
-    C(fixedT > 0 ? `TEST MODE: fixed target tool T${fixedT}` : `Target tool from ${tgt} — set by M6 Txx; save as T.nc`);
-    if (!mag.length) { C('!! Magazine EMPTY — build it in Settings → Tool table.'); END(); return S; }
-
-    C('=== CONFIGURATION ===');
-    A('#100', tgt, 'Target tool'); A('#101', cur, 'Current tool, 0 = empty'); A('#102', String(zClear), 'Z change height (machine)');
-    A('#103', String(num(pk.x, 0)), 'Pickup X'); A('#104', String(num(pk.y, 0)), 'Pickup Y'); A('#105', String(num(pk.z, 0)), 'Pickup Z');
-    IF('#100', '==', '#101', 900);
-    if (confirm) { A('#1510', '#100', 'Show target tool'); CF('Change to this tool? Press Enter', 999); }
-
-    C('=== SPINDLE OFF + RETRACT ===');
-    SPOFF(); COOLOFF(); if (useM300) MC(300, 'Wait: spindle-stopped'); if (useCover) MC(162, 'Dust cover OPEN');
-    MM('Z', '#102');
-
-    C('=== PUT AWAY CURRENT TOOL (rotate its pocket to the pickup, release) ===');
-    IF('#101', '<', '1', 20);
-    mag.forEach((p, i) => IF('#101', '==', String(num(p.tool, 0)), 100 + i));
-    GO(20);
-    mag.forEach((p, i) => {
-        LB(100 + i); C(`Return T${num(p.tool, 0)} → rotate carousel to pocket ${num(p.pocket, i + 1)}, then swap at pickup`);
-        A('#106', String(num(p.pocket, i + 1)), 'Target pocket index');
-        C('>> Rotate carousel to pocket #106 here (rotate output + M303/M304 index sensor). VERIFY on the machine.');
-        MM('X', '#103'); MM('Y', '#104'); MM('Z', '#105');   // to the fixed pickup
-        MC(154, 'Drawbar RELEASE'); MC(301, 'Wait: drawbar-released');
-        MM('Z', '#102'); A(cur, '0', 'Spindle empty'); GO(20);
-    });
-
-    LB(20); C('=== PICK UP TARGET TOOL (rotate its pocket to the pickup, lock) ===');
-    mag.forEach((p, i) => IF('#100', '==', String(num(p.tool, 0)), 200 + i));
-    A('#1505', '1', 'ERROR: target tool not in the magazine'); GO(999);
-    mag.forEach((p, i) => {
-        LB(200 + i); C(`Fetch T${num(p.tool, 0)} → rotate carousel to pocket ${num(p.pocket, i + 1)}, then pick at pickup`);
-        A('#106', String(num(p.pocket, i + 1)), 'Target pocket index');
-        C('>> Rotate carousel to pocket #106 here. VERIFY on the machine.');
-        MM('X', '#103'); MM('Y', '#104');
-        MC(154, 'Collet OPEN'); MC(301, 'Wait: released');
-        MM('Z', '#105'); MC(155, 'Drawbar LOCK'); MC(302, 'Wait: locked');
-        MM('Z', '#102'); if (useCover) MC(163, 'Dust cover CLOSE');
-        A(cur, '#100', 'Current = target'); MSG('Tool change complete'); GO(999);
-    });
-    C('=== HANDLERS ==='); LB(900); MSG('Tool already in spindle'); GO(999); LB(999); END();
-    return S;
-}
-
-// M6 (RECOMMENDED for automatic): park safely (G53 Z to the change height, then G53 X/Y to the change
-// position) and delegate the actual swap to the controller's own M6 handler. Minimal + safe + post-portable.
 function m6Stack(params) {
     const x = num(params.x, 100), y = num(params.y, 100);
     const zClear = num(params.zClear, 0), fixedT = num(params.fixedT, 0);
@@ -311,17 +168,31 @@ function macroCallStack(params) {
     return S;
 }
 
+// INC-B2: the callMacro=false INLINE fallback for the automatic generic/disk methods. Instead of a hand-rolled
+// ASSUMED drawbar dance (the removed autoStack/diskAutoStack), it emits the SAME executable body as ⚙ Generate T.nc
+// (tncProgram, {body:true} = no O-header/M99 wrapper) so the drawbar/sensor codes are ONE-SOURCE from the user's
+// Settings → ATC I/O — never a second hand-roll of the codes. The live atc config + I/O thread via params
+// (_atc/_outputs/_inputs, the same view seam as magazine). Injected as RAW lines: the generator emits a flat
+// Expert-dialect program; re-atomizing to dialect-aware blocks waits for the I5b-2b/c convergence.
+function inlineTncStack(params) {
+    const S = []; const { C, RAW } = H(S);
+    const atc = params._atc || {};
+    const io = { outputs: params._outputs || [], inputs: params._inputs || [] };
+    C('ATC | Tool Change — INLINED change sequence (sources your configured changer + Settings -> ATC I/O codes)');
+    C('Prefer the DEFAULT T# M6 call (install the T.nc via Settings -> ATC -> Generate T.nc) — inline is the offline fallback.');
+    (tncProgram(atc, io, { body: true }) || '').split('\n').forEach((ln) => RAW(ln));
+    return S;
+}
+
 export function atcChangeStack(params = {}) {
     const method = resolveMethod(params);
     // INC-B: the AUTOMATIC methods (firmware/generic/disk) DEFAULT to a T# M6 CALL to the installed T.nc (callMacro !== false).
-    // callMacro === false keeps the INLINE dance (the fallback — untouched this increment; its converge is INC-B2). m6/manual
-    // are unchanged (m6 already delegates; manual is a hand-swap).
+    // callMacro === false is the INLINE fallback. m6/manual are unchanged (m6 already delegates; manual is a hand-swap).
     if ((method === 'firmware' || method === 'generic' || method === 'disk') && params.callMacro !== false) return macroCallStack(params);
     switch (method) {
         case 'm6': return m6Stack(params);
-        case 'firmware': return firmwareStack(params);
-        case 'disk': return diskAutoStack(params);
-        case 'generic': return autoStack(params);
+        case 'firmware': return firmwareStack(params);                 // the O10102 push station — NOT the assumed drawbar dance; unchanged
+        case 'disk': case 'generic': return inlineTncStack(params);    // INC-B2: one-source inline body via tncProgram (was autoStack/diskAutoStack)
         default: return manualStack(params);
     }
 }
