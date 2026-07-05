@@ -71,16 +71,16 @@ export const CORNER_DEFAULTS = {
  *    reposition EXPRESSION), so an UNSET cross stays non-degenerate (kills the old `G0 X0 Y0`); a bound literal (a B3 drag) still
  *    overrides the socket wholesale. This is the "expression-holding socket" of the LOCKED MODEL. */
 export const CORNER_BINDING_SPECS = [
-    { param: 'dist',       type: 'number', default: CORNER_DEFAULTS.dist,       label: 'Max Probe Dist',   section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
-    { param: 'retract',    type: 'number', default: CORNER_DEFAULTS.retract,    label: 'Retract',          section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
-    { param: 'f_fast',     type: 'number', default: CORNER_DEFAULTS.f_fast,     label: 'Fast Feed',        section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
-    { param: 'f_slow',     type: 'number', default: CORNER_DEFAULTS.f_slow,     label: 'Slow Feed',        section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
-    { param: 'port',       type: 'number', default: CORNER_DEFAULTS.port,       label: 'Port',             section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
-    { param: 'radius',     type: 'number', default: CORNER_DEFAULTS.radius,     label: 'Stylus Radius',    section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
+    { param: 'dist',       type: 'number', default: CORNER_DEFAULTS.dist,       label: 'Max Probe Dist',   help: 'How far the stylus travels toward each wall before it gives up — set larger than the gap to the wall, smaller than the next obstacle.', section: 'TOOL & CUT', match: { type: 'assign', var: '#1' },  key: 'value' },
+    { param: 'retract',    type: 'number', default: CORNER_DEFAULTS.retract,    label: 'Retract',          help: 'How far the probe backs off the wall after the first touch, before the slow, accurate re-approach.', section: 'TOOL & CUT', match: { type: 'assign', var: '#2' },  key: 'value' },
+    { param: 'f_fast',     type: 'number', default: CORNER_DEFAULTS.f_fast,     label: 'Fast Feed',        help: 'Feed rate (mm/min) for the initial fast approach to each wall, before the touch.', section: 'TOOL & CUT', match: { type: 'assign', var: '#3' },  key: 'value' },
+    { param: 'f_slow',     type: 'number', default: CORNER_DEFAULTS.f_slow,     label: 'Slow Feed',        help: 'Feed rate (mm/min) for the precise second touch — slower gives a more accurate trigger point.', section: 'TOOL & CUT', match: { type: 'assign', var: '#4' },  key: 'value' },
+    { param: 'port',       type: 'number', default: CORNER_DEFAULTS.port,       label: 'Port',             help: 'The controller input port the probe signal is wired to (the G31 P word).', section: 'TOOL & CUT', match: { type: 'assign', var: '#5' },  key: 'value' },
+    { param: 'radius',     type: 'number', default: CORNER_DEFAULTS.radius,     label: 'Stylus Radius',    help: 'The probe stylus tip radius (mm) — added to each wall touch to give the true wall coordinate.', section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
     { param: 'travelDist', type: 'number', default: CORNER_DEFAULTS.travelDist, label: 'Reposition Travel', section: 'GEOMETRY',  match: { type: 'assign', var: '#15' }, key: 'value' },
     // ② B4(c) — fan-out DISSOLVED: #17 plunge now EMITS as [#19+#20], so safeZ→#19 + scanDepth→#20 are clean single-socket bindings (were baked frontiers).
-    { param: 'safeZ',      type: 'number', default: CORNER_DEFAULTS.safeZ,      label: 'Safe Z',           section: 'GEOMETRY',   match: { type: 'assign', var: '#19' }, key: 'value' },
-    { param: 'scanDepth',  type: 'number', default: CORNER_DEFAULTS.scanDepth,  label: 'Scan Depth',       section: 'GEOMETRY',   match: { type: 'assign', var: '#20' }, key: 'value' },
+    { param: 'safeZ',      type: 'number', default: CORNER_DEFAULTS.safeZ,      label: 'Safe Z',           help: 'Machine Z the probe lifts to for travel between walls — clear of the stock and fixtures (this is YOUR clearance value, in machine coords).', section: 'GEOMETRY',   match: { type: 'assign', var: '#19' }, key: 'value' },
+    { param: 'scanDepth',  type: 'number', default: CORNER_DEFAULTS.scanDepth,  label: 'Scan Depth',       help: 'How far below Safe Z the stylus drops before probing sideways into each wall.', section: 'GEOMETRY',   match: { type: 'assign', var: '#20' }, key: 'value' },
     // ② B4 step 4a — SEMANTIC relTo: anchor the drag to the sim-start row NAMED 'wall1' (not a fragile numeric index).
     // resolveRelToIndex maps 'wall1' → its position among the SURVIVING when-filtered starts, so the handle tracks wall-1
     // in BOTH probeZ states (off: wall1 is filtered-index 0; on: the zsurf row shifts it to 1). Declare-never-infer.
@@ -167,8 +167,8 @@ function cornerSimStartsProvider(params, stock) {
  *  auto↔manual — the hands-free G0 seq move vs the #1505 jog-and-wait prompt, on BOTH the Z→wall1 and wall1→wall2 traverses.
  *  (t154 — DEFINED HERE, above cornerDataStack, so cornerDataStack can DERIVE its STRUCTURAL-section controls from it at eval.) */
 export const CORNER_STRUCT_BINDINGS = [
-    { param: 'probeZFirst', type: 'bool', default: !!CORNER_DEFAULTS.probeZFirst, label: 'Probe Z First', section: 'GEOMETRY' },
-    { param: 'travelApproach', type: 'enum', default: CORNER_DEFAULTS.travelApproach, label: 'Travel', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']] } },
+    { param: 'probeZFirst', type: 'bool', default: !!CORNER_DEFAULTS.probeZFirst, label: 'Probe Z First', help: 'Probe the top surface for Z before the two walls — anchors the sideways probes to a real measured Z instead of a jogged guess.', section: 'GEOMETRY' },
+    { param: 'travelApproach', type: 'enum', default: CORNER_DEFAULTS.travelApproach, label: 'Travel', help: 'Auto = the machine moves itself between the walls; Manual = you jog to each start and press Cycle Start (operator-in-the-loop).', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']] } },
     // ② B4 step 4c — the 7-way WCS target: 'active' reads the controller's #578, or write a fixed G54..G59 slot directly.
     { param: 'wcs', type: 'enum', default: CORNER_DEFAULTS.wcs, label: 'WCS', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
     // ② B4 step 4d — dual-gantry sync: a bool block-ADD (appends G1 A0 + the slave-offset write #74=[#70+slave], #[#74]=#883).

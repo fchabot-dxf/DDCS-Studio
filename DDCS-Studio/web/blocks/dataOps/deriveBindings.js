@@ -70,6 +70,7 @@ export function deriveBindings(flatStack, specs) {
         // form OMITS an untouched socket-held field → the template's per-combo socket expression holds. A typed value overrides.
         if (s.default === undefined) b.socketHeld = true;
         if (s.label) b.label = s.label;
+        if (s.help) b.help = s.help;      // DECLARED HELP SLOT (1a) — carry the optional field tooltip through derivation
         if (s.section) b.section = s.section;
         if (s.group) b.group = s.group;   // canvas-layout grouping (layoutSpecFromOp reads b.group)
         if (s.role) b.role = s.role;      // canvas-layout role (x/y/w/h/… — the draggable handle it drives)

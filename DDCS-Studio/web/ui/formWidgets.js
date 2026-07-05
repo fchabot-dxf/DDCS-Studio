@@ -24,6 +24,10 @@ const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
 function labelSpan(b) {
     const span = document.createElement('span');
     span.textContent = b.label || b.param;
+    // DECLARED HELP SLOT (1a): an optional `help` string on the binding renders as a native tooltip on the field
+    // label — ONE declaration, every renderOpForm surface (the ported wizard form + the Blocks-tab form pane) shows
+    // it for free. Dumb by design (native title=, no positioning framework); fields without `help` are unchanged.
+    if (b.help) span.title = b.help;
     if (b.units || (b.widgetConfig && b.widgetConfig.units)) {
         const u = document.createElement('span');
         u.style.opacity = '.6';

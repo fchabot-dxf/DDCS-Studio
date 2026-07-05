@@ -763,3 +763,14 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **PROPOSED DECOMPOSITION:** 1a (CLEAN, rec) `help` on def.bindings → renderOpForm title (wizard form + Blocks-tab pane; corner seed) — one source, one renderer, two surfaces, proves the slot. 1b I/O-type-catalog help → renderIoTable. 1c Blockly block tooltips (knob/sc_* render → version-pinned setTooltip). 1d built-in static forms (opSchema help + FIELD_BIND title pass). Each hangs on its OWN existing declaration — NO parallel registry.
 
 **RECOMMEND:** build 1a now (clean, two top-used surfaces); 1b/1c/1d as small per-domain follow-ons. The literal "3 renderers reading ONE source" isn't achievable (different declarations) — this is the honest shape. Advisor's call on scope. NO CODE. PASS BACK.
+
+## 🔨 turn 273 (cycle 127) — DECLARED HELP SLOT 1a: optional `help` on def.bindings → renderOpForm renders it as a native title= on the field label. Corner seeded. 612 pass / 2 skip.
+
+**BUILT (dumb + one-source, per the ruling):**
+- `formWidgets.js` `labelSpan(b)`: `if (b.help) span.title = b.help;` — ONE place, EVERY widget type (number/range/select/checkbox all use labelSpan), on the field LABEL. Native title=, no positioning framework. Fields without `help` unchanged.
+- `deriveBindings.js`: carry `help` through derivation (`if (s.help) b.help = s.help;`, alongside the existing label/section copies) — corner's VALUE bindings are DERIVED from CORNER_BINDING_SPECS, so the seed must survive the derive.
+- `cornerData.js` SEED: real machine-meaning `help` on 8 bindings — dist / retract / f_fast / f_slow / port / radius / safeZ / scanDepth (value, via CORNER_BINDING_SPECS) + probeZFirst / travelApproach (structural, CORNER_STRUCT_BINDINGS). Strings say what the field MEANS on the machine (e.g. Safe Z = "Machine Z the probe lifts to … clear of the stock and fixtures — YOUR clearance value"), not a restatement of the name.
+
+**VERIFY — the declared string IS the title in BOTH surfaces (new help-slot.spec):** (1) the Blocks-tab form-pane path — `renderOpForm(CORNER_BINDINGS)` (the exact blocksApp.js:371 call): the derived 'dist' binding carries the help + its label title === the declared string; a field seeded WITHOUT help (travelDist) has no help + no title (unchanged). (2) the real ported wizard form — open('user_corner_data'): the same 'Max Probe Dist' / 'Safe Z' / 'Probe Z First' labels show their declared help as title. ONE declaration → two renders, asserted in both. (Native title is hover-only → no meaningful screenshot; the specs assert the actual title value — the real symptom.) Full suite 612 pass / 2 skip.
+
+**NO emit change (pure UX). PASS BACK for review.** NEXT per the ruling: 1b (I/O type catalog → renderIoTable), then 1c (Blockly setTooltip). 1d waived (static built-in forms dissolve as wizards port onto renderOpForm).
