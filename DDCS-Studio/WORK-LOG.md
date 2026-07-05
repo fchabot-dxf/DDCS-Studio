@@ -709,3 +709,18 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 - NEXT-SESSION.md line 106 (the status region) itself marks it "🎉 CORNER VISUAL-LANGUAGE POLISH FULLY COMPLETE" (a460b47).
 
 **ACTION:** did NOT rebuild (redundant + regression risk on working, spec-covered code). The dispatch note itself flags the ACTUAL open item — "the PARITY-GAP #2 fork (controller-source chips) is BACK IN FRONT OF THE HUMAN" — which is likely the real next corner step once the human rules. PASS BACK: confirm the visual polish is complete (or point me at a SPECIFIC remaining gap I'm not seeing — e.g. a shape/behavior the dispatch wants CHANGED from what shipped, like emitting = numbered SQUARES vs the shipped filled diamond).
+
+## 🔨 turn 265 (cycle 127) — CORNER-BACKLOG RECONCILIATION AUDIT (NO CODE). Full table + stale-line quotes in scratchpad/corner-backlog-audit.md (VS Code tab).
+
+**BOTTOM LINE:** the corner mainline is ~fully DONE (line 107 "CORNER BACKLOG NOW FULLY CLOSED" HOLDS). Exactly ONE corner item is genuinely OPEN (parity-gap #2 source chips); the rest are DONE / deliberately DEFERRED / Blocks-tab port-debt.
+
+**CLASSIFICATION (vs HEAD — code + specs + git log):**
+- **DONE** — (1) STRUCTURAL-TOGGLES + rollout: 4a-4d (02dc8ca/9e1250b/9edc930/8e7a322) + corner×probeSeq 8-way (abd5b82) + Blockly structural controls (ad5028b/c0e4262; corner-structctl + corner-redivide specs); the per-toggle frontier tripwires are RETIRED (only corner-data-baked-frontier remains, holding `level` baked-final by design). (2) MULTI-HANDLE editor: ③ handles (3a8b31e) + sim-marker-track/wall-1 relTo anchor (17ee142) + prefill (0dfb395) + item-2 corner-selector GUI (corner-selector.spec + featureCanvas fc-corner-pick) — ran 19 corner-viz tests green. (3) fan-out `#17=[#19+#20]` (5448249). (8b) per-corner prefill (0dfb395) + glow merge (bae8ea9).
+- **PARTIAL** — VIEWS=DATA: redivide DONE (corner-redivide; "BLOCKLY REORG COMPLETE" l186), per-view RIG blocks DEFERRED as YAGNI (l173). item-d KNOB/BINDING: structural half DONE (sc_*), VALUE-knob projection (def.bindings→pre-ticked knobs, l435) NOT built (restoreExpose is persist/restore, not projection) — Blocks-tab port-debt.
+- **OPEN** — **PARITY-GAP #2 source chips** (the ONE real remaining corner item; human-approved t80, GATED on the register-verification scout, NOT dispatched — l107). DEFINITION-CHANGE→REBUILD notice (committed t36, NO code in HEAD — wizards-as-data lifecycle, l521). 2D-sim-view removal (deliberate BACKLOG, "not corner" — l12).
+
+**REAL REMAINING corner work for a clean re-dispatch:** parity-gap #2 (register scout → wire chips) · the rebuild notice (as-data lifecycle) · value-knob projection (optional debt). DEFERRED/leave: 2D-sim-view removal, per-view RIG blocks.
+
+**STALE LINES quoted for one-pass prune** (in the doc): l44 (4b-4d batch), l455-461 + l463-469 (probeZFirst superset / M3-vs-M2 record — already SUPERSEDED), l33 (D3 fan-out), l83 (wall-1 hint + Layout unify), l134-136 (prefill + item-2 selector). l107 stays (accurate summary).
+
+**NO CODE, NO spec changes. PASS BACK** — the advisor prunes + dispatches the real remaining work (+ the UX interleaves: toast+FAQ · help slot · version nudge) from the clean list.
