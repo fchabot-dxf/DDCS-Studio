@@ -130,28 +130,28 @@ test('travelShape=diagonal: the traverse renders as a RAPID (yellow), not source
     const trans = segs.find((s) => (s.type === 'rapid' || s.rapid) && Math.abs((s.x2 || 0) - (s.x1 || 0)) > 0.05 && Math.abs((s.y2 || 0) - (s.y1 || 0)) > 0.05);
     const rapidHex = hexCss(PATH_TYPES.rapid.color);
 
-    // real paint — sample the Layout overlay canvas: the diagonal must be rapid-yellow, with NO cyan (#22d3ee) travel line left
+    // real paint — sample the Layout overlay canvas: the diagonal draws rapid-yellow pixels (the trans-axis-auto→cyan override is gone).
+    // NB (t331): the source-cyan override was removed AND the fast PROBE is now cyan #22d3ee, so a global 'no cyan' check no longer
+    // isolates the traverse — the segColor(trans)==rapid-yellow assertion below is the specific proof the traverse isn't source-coloured.
     const c = document.querySelector('#userVizContainer .fc-anim-overlay');
     const ctx = c && c.getContext('2d');
-    let yellow = 0, cyan = 0;
+    let yellow = 0;
     if (ctx) {
       const d = ctx.getImageData(0, 0, c.width, c.height).data;
       for (let i = 0; i < d.length; i += 4) {
         const R = d[i], G = d[i + 1], B = d[i + 2], A = d[i + 3];
         if (A < 40) continue;
         if (R > 200 && G > 160 && G < 235 && B < 90) yellow++;               // rapid yellow #ffcc00
-        if (R < 80 && G > 180 && G < 235 && B > 210) cyan++;                 // the old source-cyan #22d3ee
       }
     }
-    return { transType: trans && (trans.type || (trans.rapid ? 'rapid' : 'other')), transColor: trans ? segColor(trans, 0, 1, 0) : null, rapidHex, yellow, cyan };
+    return { transType: trans && (trans.type || (trans.rapid ? 'rapid' : 'other')), transColor: trans ? segColor(trans, 0, 1, 0) : null, rapidHex, yellow };
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 
   // the diagonal reposition IS a rapid → pathStyle colours it yellow (the ONE invariant both previews key on: 3D by type, 2D via segColor)
   expect(r.transType, 'the diagonal reposition traced segment carries type=rapid').toBe('rapid');
-  expect(r.transColor, 'segColor paints the diagonal reposition the one-source rapid yellow').toBe(r.rapidHex);
-  // the real Layout paint: rapid-yellow present, and the source-cyan travel line is GONE (the 2-axis override was removed)
+  expect(r.transColor, 'segColor paints the diagonal reposition the one-source rapid yellow (NOT the source-cyan the 2-axis override used to force)').toBe(r.rapidHex);
+  // the real Layout paint: rapid-yellow present on the diagonal traverse
   expect(r.yellow, 'the Layout draws rapid-yellow pixels for the diagonal traverse').toBeGreaterThan(20);
-  expect(r.cyan, 'NO source-cyan travel-line pixels remain (the trans-axis auto override is removed)').toBeLessThan(10);
 });
 

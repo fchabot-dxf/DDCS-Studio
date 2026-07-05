@@ -3,28 +3,26 @@
 //   color = TYPE.color · dash = TYPE.dash · width = STATE.width × TYPE.widthScale · alpha = STATE.alpha · shape = TYPE.shape.
 // Both path renderers (viz/toolpath2d 2D, viz/gcodeViz3d 3D) AND the legend (createPreviewPanel) read this, collapsing
 // the four hand-maintained palette copies to one — so a value edit (the human's coming mods, t312d) lands ONCE and hits
-// both previews. Built at the CURRENT values = byte-neutral, plus the 2 agreed micro-fixes: (1) jog is ONE amber #ff9a0d
-// (the 2D had borrowed the start-marker #ffb300); (2) the legend Cut chip is the real gradient-high #35ffd0 (was a
+// both previews. Built at the CURRENT values = byte-neutral, plus the 2 agreed micro-fixes: (1) jog is ONE colour (t317 unified
+// it to #ff9a0d; t331 → deep orange #ff6a00 to step off the rapid-yellow); (2) the legend Cut chip is the real gradient-high #35ffd0 (was a
 // transposed #35d0ff). NOTE: colours are hex INTEGERS (canonical) — the 3D uses them as THREE.Color(int), the 2D + legend
 // via hexCss(). The start-marker amber/cyan (#ffb300 / #22d3ee) is a SEPARATE glyph layer, not a path TYPE — not here.
-
-// Feed depth-gradient endpoints (shared 2D + 3D): the colour at the DEEPEST Z → the TOP Z.
-export const FEED_LOW = 0x0a4fd0, FEED_HIGH = 0x35ffd0;
 
 /** hex int → a lowercase '#rrggbb' CSS string (byte-identical to the old inline literals). */
 export const hexCss = (n) => '#' + (((n >>> 0) & 0xffffff)).toString(16).padStart(6, '0');
 
-/** The per-TYPE style. `color` = a hex int (feed's flat/legend colour = the gradient TOP). `dash` = a canvas
- *  setLineDash array ([] = solid). `widthScale` multiplies the STATE width (rapid/jog draw thinner). `shape` =
- *  'line' | 'arc' (a manual jog bows). `gradient` (feed only) = the depth endpoints. */
+/** The per-TYPE style. `color` = a hex int. `dash` = a canvas setLineDash array ([] = solid). `widthScale` multiplies
+ *  the STATE width (rapid/jog draw thinner). `shape` = 'line' | 'arc' (a manual jog bows). t331 (human t330) — the legend
+ *  rescheme: rapid solid-yellow · jog orange-red dashed · probeFast cyan · probeSlow white · feed/cut FLAT blue (the Z-depth
+ *  gradient was removed) · retract green. (PENDING split: a FEED with z1≠z2 [plunge/ramp] renders red 0xef4444 — not yet.) */
 export const PATH_TYPES = {
-    rapid:     { color: 0xffcc00, dash: [5, 4], widthScale: 0.6, shape: 'line', label: 'Rapid' },
-    feed:      { color: FEED_HIGH, dash: [],    widthScale: 1,   shape: 'line', label: 'Cut', gradient: [FEED_LOW, FEED_HIGH] },
-    probeFast: { color: 0x3b82f6, dash: [2, 3], widthScale: 1,   shape: 'line', label: 'Probe' },
-    probeSlow: { color: 0xffffff, dash: [2, 3], widthScale: 1,   shape: 'line', label: 'Probe slow' },   // t319 — WHITE (was #93c5fd); drawn ON TOP of the fast blue at the collinear re-probe overlap
+    rapid:     { color: 0xffcc00, dash: [],     widthScale: 0.6, shape: 'line', label: 'Rapid' },   // t331 — SOLID (was dashed); rapid solid + jog dashed → distinct by line-style AND colour
+    feed:      { color: 0x3b82f6, dash: [],    widthScale: 1,   shape: 'line', label: 'Cut' },       // t331 — FLAT blue (was the FEED_HIGH teal gradient top); the Z-depth gradient was removed
+    probeFast: { color: 0x22d3ee, dash: [5, 4], widthScale: 1,   shape: 'line', label: 'Probe' },     // t331 — CYAN (was #3b82f6 blue), stepped off the new blue feed; DASHED (was dotted [2,3], human t330)
+    probeSlow: { color: 0xffffff, dash: [5, 4], widthScale: 1,   shape: 'line', label: 'Probe slow' },   // t319 — WHITE; drawn ON TOP of the fast at the collinear re-probe overlap; t331 DASHED (was dotted)
 
     retract:   { color: 0x33cc55, dash: [],     widthScale: 1,   shape: 'line', label: 'Retract' },
-    jog:       { color: 0xff9a0d, dash: [5, 4], widthScale: 0.6, shape: 'arc',  label: 'Jog' },   // #ff9a0d = the ONE amber (micro-fix; the 2D had borrowed the #ffb300 start-marker amber)
+    jog:       { color: 0xff4500, dash: [5, 4], widthScale: 0.6, shape: 'arc',  label: 'Jog' },   // t331 (human t330) — ORANGE-RED #ff4500 (was #ff6a00 → #ff9a0d), stepped off the rapid-yellow #ffcc00 AND the red probe-tip #ff2a44. Tunable. Kept DASHED.
 };
 
 /** STATE (progress) tokens — orthogonal to TYPE. A renderer picks static / future(untraveled) / traveled.
@@ -53,19 +51,10 @@ export const TOUCH_PULSE = {
 /** The 2D pulse canvas-px size for a touch: SLOW (fine re-probe) is BIGGER than FAST. */
 export const pulsePx = (slow) => (slow ? TOUCH_PULSE.px2D.slow : TOUCH_PULSE.px2D.fast);
 
-/** Feed depth-gradient lerp for the 2D: FEED_LOW→FEED_HIGH by t∈[0,1] → an 'rgb(r,g,b)' string (byte-identical to
- *  the old lerpHex). The 3D lerps the same endpoints per-vertex via THREE.Color. */
-export function feedRgb(t) {
-    t = Math.max(0, Math.min(1, t));
-    const r1 = (FEED_LOW >> 16) & 255, g1 = (FEED_LOW >> 8) & 255, b1 = FEED_LOW & 255;
-    const r2 = (FEED_HIGH >> 16) & 255, g2 = (FEED_HIGH >> 8) & 255, b2 = FEED_HIGH & 255;
-    return `rgb(${Math.round(r1 + (r2 - r1) * t)},${Math.round(g1 + (g2 - g1) * t)},${Math.round(b1 + (b2 - b1) * t)})`;
-}
-
 /** The LEGEND rows (order · label · resolved CSS colour), read by createPreviewPanel.renderLegend. Colours resolve
- *  FROM PATH_TYPES so the legend can't drift from the renderers (the #35d0ff Cut typo is fixed by reading feed.color). */
+ *  FROM PATH_TYPES so the legend can't drift from the renderers. */
 export const LEGEND_ROWS = [
-    { key: 'feed',      label: PATH_TYPES.feed.label,      color: hexCss(PATH_TYPES.feed.color) },   // #35ffd0 (was the transposed #35d0ff)
+    { key: 'feed',      label: PATH_TYPES.feed.label,      color: hexCss(PATH_TYPES.feed.color) },   // t331 — flat blue #3b82f6 (the gradient was removed)
     { key: 'probe',     label: PATH_TYPES.probeFast.label, color: hexCss(PATH_TYPES.probeFast.color) },
     { key: 'probeSlow', label: PATH_TYPES.probeSlow.label, color: hexCss(PATH_TYPES.probeSlow.color) },
     { key: 'retract',   label: PATH_TYPES.retract.label,   color: hexCss(PATH_TYPES.retract.color) },
@@ -82,7 +71,6 @@ export function applyPathVars(root) {
     el.style.setProperty('--viz-path-retract', hexCss(PATH_TYPES.retract.color));
     el.style.setProperty('--viz-path-probe', hexCss(PATH_TYPES.probeFast.color));
     el.style.setProperty('--viz-path-jog', hexCss(PATH_TYPES.jog.color));
-    el.style.setProperty('--viz-path-feed-low', hexCss(FEED_LOW));
-    el.style.setProperty('--viz-path-feed-high', hexCss(FEED_HIGH));
+    el.style.setProperty('--viz-path-feed', hexCss(PATH_TYPES.feed.color));   // t331 — flat feed colour (the depth gradient + its low/high vars were removed)
 }
 if (typeof document !== 'undefined') applyPathVars();   // one-source the CSS legend on load

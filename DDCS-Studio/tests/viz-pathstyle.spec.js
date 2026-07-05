@@ -5,7 +5,8 @@ import { test, expect } from '@playwright/test';
  * color/dash/widthScale/shape × STATE alpha/width). The 2D renderer (toolpath2d.segColor), the legend
  * (createPreviewPanel LEGEND_ROWS), the 3D (gcodeViz3d line-groups, which use the int directly), and the legacy CSS
  * (via --viz-path-* vars) all READ it — so a TYPE value is IDENTICAL across consumers (the 4 copies collapse to 1).
- * Byte-neutral at the current values + the 2 agreed micro-fixes: jog = one amber #ff9a0d; the Cut chip = #35ffd0.
+ * t331 legend rescheme (human t330): rapid solid-yellow · jog orange-red #ff4500 · probeFast cyan #22d3ee · probeSlow white ·
+ * feed/cut FLAT blue #3b82f6 (the Z-depth gradient removed — ramps absorbed into feed) · retract green. All ONE-SOURCE.
  */
 test('the path palette is ONE source — 2D + legend + CSS resolve a TYPE to the same value; micro-fixes applied', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -14,7 +15,8 @@ test('the path palette is ONE source — 2D + legend + CSS resolve a TYPE to the
     const T2 = await import('/viz/toolpath2d.js');
     const mut = (() => { const o = P.PATH_TYPES.rapid.color; P.PATH_TYPES.rapid.color = 0x123456; const s = T2.segColor({ type: 'rapid' }, 0, 1, 100); P.PATH_TYPES.rapid.color = o; return s; })();
     return {
-      vals: { rapid: P.PATH_TYPES.rapid.color, retract: P.PATH_TYPES.retract.color, probeFast: P.PATH_TYPES.probeFast.color, probeSlow: P.PATH_TYPES.probeSlow.color, jog: P.PATH_TYPES.jog.color, feed: P.PATH_TYPES.feed.color, feedLow: P.FEED_LOW, feedHigh: P.FEED_HIGH },
+      vals: { rapid: P.PATH_TYPES.rapid.color, retract: P.PATH_TYPES.retract.color, probeFast: P.PATH_TYPES.probeFast.color, probeSlow: P.PATH_TYPES.probeSlow.color, jog: P.PATH_TYPES.jog.color, feed: P.PATH_TYPES.feed.color },
+      rapidDash: P.PATH_TYPES.rapid.dash, jogDash: P.PATH_TYPES.jog.dash, feedGone: (typeof P.FEED_LOW === 'undefined' && typeof P.feedRgb === 'undefined'),
       state: { futureAlpha: P.PATH_STATE.future.alpha, traveledWidth: P.PATH_STATE.traveled.width, staticWidth: P.PATH_STATE.static.width },
       hexRapid: P.hexCss(P.PATH_TYPES.rapid.color),
       seg2dRapid: T2.segColor({ type: 'rapid' }, 0, 1, 100),
@@ -30,8 +32,11 @@ test('the path palette is ONE source — 2D + legend + CSS resolve a TYPE to the
     };
   });
 
-  // (1) the palette values (probeSlow is WHITE as of t319 INC-5; the rest byte-neutral)
-  expect(r.vals).toMatchObject({ rapid: 0xffcc00, retract: 0x33cc55, probeFast: 0x3b82f6, probeSlow: 0xffffff, feed: 0x35ffd0, feedLow: 0x0a4fd0, feedHigh: 0x35ffd0 });
+  // (1) the palette values (t331 rescheme: probeFast cyan, feed flat blue; the depth gradient is GONE)
+  expect(r.vals).toMatchObject({ rapid: 0xffcc00, retract: 0x33cc55, probeFast: 0x22d3ee, probeSlow: 0xffffff, feed: 0x3b82f6 });
+  expect(r.rapidDash, 't331 — rapid is SOLID (dash [])').toEqual([]);
+  expect(r.jogDash, 't331 — jog stays DASHED').toEqual([5, 4]);
+  expect(r.feedGone, 't331 — the FEED_LOW/FEED_HIGH/feedRgb depth-gradient exports were removed').toBe(true);
   expect(r.state.futureAlpha).toBe(0.8);
   expect(r.state.traveledWidth).toBeCloseTo(3.12);
   expect(r.state.staticWidth).toBe(2);
@@ -43,13 +48,13 @@ test('the path palette is ONE source — 2D + legend + CSS resolve a TYPE to the
   expect(r.cssRapid, 'the CSS var reads the module (applyPathVars on load)').toBe(r.hexRapid);
   expect(r.seg2dRetract).toBe('#33cc55');
   expect(r.seg2dProbeSlow).toBe('#ffffff');    // feed<maxPF → slow = WHITE (t319)
-  expect(r.seg2dProbeFast).toBe('#3b82f6');    // feed==maxPF → fast stays blue
+  expect(r.seg2dProbeFast).toBe('#22d3ee');    // t331 — feed==maxPF → fast probe = CYAN
 
-  // (3) THE 2 AGREED MICRO-FIXES
-  expect(r.vals.jog, 'jog = the ONE amber #ff9a0d (was the 2D #ffb300 start-marker amber)').toBe(0xff9a0d);
-  expect(r.legendJog).toBe('#ff9a0d');
-  expect(r.cssJog).toBe('#ff9a0d');
-  expect(r.legendFeed, 'the legend Cut chip = the real gradient-high #35ffd0 (was the transposed #35d0ff)').toBe('#35ffd0');
+  // (3) THE t331 LEGEND RESCHEME COLOURS (jog + feed follow the ONE source through the value, legend, and CSS var)
+  expect(r.vals.jog, 'jog = orange-red #ff4500 (t331 human t330 — stepped off the rapid-yellow AND the red probe-tip)').toBe(0xff4500);
+  expect(r.legendJog).toBe('#ff4500');
+  expect(r.cssJog).toBe('#ff4500');   // t331 — the CSS var --viz-path-jog resolves the SAME one-source orange-red
+  expect(r.legendFeed, 't331 — the legend Cut chip = the flat blue #3b82f6 (the gradient was removed)').toBe('#3b82f6');
 
   // (4) LIVE one-source — the 2D segColor reflects a runtime edit to the module (a value mod lands once, hits the renderer)
   expect(r.mut, 'mutating PATH_TYPES.rapid.color changes the 2D segColor → it reads the LIVE module, not a copy').toBe('#123456');
@@ -72,16 +77,16 @@ test('INC-5 draw-order: the WHITE slow probe renders ON TOP of the fast blue at 
     const dpr = window.devicePixelRatio || 1;
     const ctx = cv.getContext('2d');
     const img = ctx.getImageData(0, 0, cv.width, cv.height).data;
-    let white = 0, blue = 0;
+    let white = 0, cyan = 0;
     for (let i = 0; i < img.length; i += 4) {
       const R = img[i], G = img[i + 1], B = img[i + 2], A = img[i + 3];
       if (A < 40) continue;
       if (R > 230 && G > 230 && B > 230) white++;               // the slow probe (WHITE) on top
-      else if (B > 170 && R < 120 && G > 90 && G < 175) blue++;  // the fast probe (#3b82f6) blue
+      else if (R < 120 && G > 170 && B > 180) cyan++;           // t331 — the fast probe (#22d3ee) CYAN (low R, high G+B)
     }
     cv.remove();
-    return { white, blue, dpr };
+    return { white, cyan, dpr };
   });
   expect(r.white, `the WHITE slow probe rendered (${r.white} px)`).toBeGreaterThan(0);
-  expect(r.white, `white (slow, on top: ${r.white}px) dominates blue (fast, covered: ${r.blue}px) — the slow probe drew LAST`).toBeGreaterThan(r.blue);
+  expect(r.white, `white (slow, on top: ${r.white}px) dominates cyan (fast, covered: ${r.cyan}px) — the slow probe drew LAST`).toBeGreaterThan(r.cyan);
 });

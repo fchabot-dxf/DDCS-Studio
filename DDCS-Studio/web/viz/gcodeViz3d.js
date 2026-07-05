@@ -19,7 +19,7 @@ import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
 import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
-import { PATH_TYPES, PATH_STATE, FEED_LOW, FEED_HIGH, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend
+import { PATH_TYPES, PATH_STATE, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend (t331 — FEED_LOW/HIGH gradient removed)
 
 export class GcodeViz3D {
     constructor(container) {
@@ -800,7 +800,7 @@ export class GcodeViz3D {
                     const t = k / N, u = 1 - t, uu = u * u, ut2 = 2 * u * t, tt = t * t;
                     const pb = { x: uu * A.x + ut2 * cxm + tt * B.x, y: uu * A.y + ut2 * cym + tt * B.y, z: uu * A.z + ut2 * cz + tt * B.z };
                     jogPos.push(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z); grow(pa.x, pa.y, pa.z); grow(pb.x, pb.y, pb.z);
-                    pushSeg(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, 6000, 0, 0, 0, 0, 0xff9a0d);
+                    pushSeg(pa.x, pa.y, pa.z, pb.x, pb.y, pb.z, 6000, 0, 0, 0, 0, PATH_TYPES.jog.color);   // t331 — the animated jog-arc trail reads the ONE token (was a rogue 0xff9a0d hardcode) so the deep-orange edit hits it too
                     pa = pb;
                 }
             }
@@ -844,21 +844,13 @@ export class GcodeViz3D {
         this._animMs = animSegs.reduce((t, s) => t + s.ms, 0);
         this._rotaryAxes = getRotaryAxes(); // which Cartesian axis each rotary axis (a/b) spins around
 
-        // Cuts: blue→cyan gradient by depth across the whole scene
-        let feedCol = null;
-        if (feedPos.length) {
-            const zMin = bounds ? bounds.minZ : 0, zRange = bounds ? (bounds.maxZ - bounds.minZ) || 1 : 1;
-            const cLow = new THREE.Color(FEED_LOW), cHigh = new THREE.Color(FEED_HIGH), tmp = new THREE.Color();   // t317 — feed gradient endpoints from the ONE palette
-            feedCol = [];
-            for (let i = 0; i < feedPos.length; i += 3) { tmp.copy(cLow).lerp(cHigh, (feedPos[i + 2] - zMin) / zRange); feedCol.push(tmp.r, tmp.g, tmp.b); }
-        }
-        // Colours match the wizard visualiser
-        this.lineGroups.feed = this._addLine(feedPos, { vertexColors: feedCol });
+        // Colours match the wizard visualiser — t331: FLAT feed/cut (the Z-depth gradient was removed; ramps/plunges are absorbed into the feed colour, human t330)
+        this.lineGroups.feed = this._addLine(feedPos, { color: PATH_TYPES.feed.color });
         this.lineGroups.rapid = this._addLine(rapidPos, { color: PATH_TYPES.rapid.color, opacity: 0.6 });   // t317 — colours from the ONE palette (opacity = 3D line-group base, a 3D render detail)
         if (this.lineGroups.rapid) this.lineGroups.rapid.visible = this.showRapids;
         this.lineGroups.retract = this._addLine(retractPos, { color: PATH_TYPES.retract.color, opacity: 0.85 });
-        this.lineGroups.probe = this._addLine(probeFastPos, { color: PATH_TYPES.probeFast.color, dotted: true });
-        this.lineGroups.probeSlow = this._addLine(probeSlowPos, { color: PATH_TYPES.probeSlow.color });
+        this.lineGroups.probe = this._addLine(probeFastPos, { color: PATH_TYPES.probeFast.color, dashed: true });   // t331 (human t330) — probe DASHED (was dotted), matching the 2D token dash [5,4]
+        this.lineGroups.probeSlow = this._addLine(probeSlowPos, { color: PATH_TYPES.probeSlow.color, dashed: true });   // t331 — dashed to match the fast probe
         if (this.lineGroups.probeSlow) this.lineGroups.probeSlow.renderOrder = 21;   // t319 — the WHITE slow probe renders OVER the fast blue (renderOrder 20) at the collinear re-probe overlap
         this.lineGroups.jog = this._addLine(jogPos, { color: PATH_TYPES.jog.color, opacity: 0.95, dashed: true });
 

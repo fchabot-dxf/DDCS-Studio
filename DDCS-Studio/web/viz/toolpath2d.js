@@ -14,18 +14,21 @@
  */
 import { traceToolpath } from '../engine/trace.js';
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE draws from the RUNTIME END of the previous pass (t107 machine-faithful, via passEnds), else the static previous START (t94), not its own net-endpoint marker
-import { PATH_TYPES, PATH_STATE, HEAD, TOUCH_PULSE, pulsePx, feedRgb, hexCss } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette (type × state) + the touch-pulse token, shared with the 3D + the legend
+import { PATH_TYPES, PATH_STATE, HEAD, TOUCH_PULSE, pulsePx, hexCss } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette (type × state) + the touch-pulse token, shared with the 3D + the legend (t331 — feedRgb gradient removed)
 
 // Colours + progress states are the ONE declared source in viz/pathStyle.js (t317) — rapid=yellow(dashed),
 // retract=green, probe=blue(slow=light blue, dotted), feed=a blue→teal gradient by DEPTH (Z) which also surfaces the
 // Z you can't see top-down. The 3D + the legend read the SAME module. Exported for the one-source parity assertion.
 const typeOf = (s) => s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
+// t331 — the 2D now READS the token dash (was hardcoded): rapid.dash=[] → solid, probe/jog [5,4] → dashed. 'probe' maps to
+// probeFast (both probe types share a dash). The 3D still hardcodes its dash (advisor-flagged future task) — kept in sync.
+const dashFor = (t) => (t === 'probe' ? PATH_TYPES.probeFast.dash : (PATH_TYPES[t] && PATH_TYPES[t].dash)) || [];
 export function segColor(s, zMin, zRange, maxPF) {
     const t = typeOf(s);
     if (t === 'rapid') return hexCss(PATH_TYPES.rapid.color);
     if (t === 'retract') return hexCss(PATH_TYPES.retract.color);
     if (t === 'probe') return hexCss(((s.feed || 0) > 0 && (s.feed || 0) < maxPF) ? PATH_TYPES.probeSlow.color : PATH_TYPES.probeFast.color);
-    return feedRgb(zRange ? (((s.z1 || 0) + (s.z2 || 0)) / 2 - zMin) / zRange : 0.5);
+    return hexCss(PATH_TYPES.feed.color);   // t331 — FLAT feed/cut colour (the Z-depth gradient was removed). PENDING: a z-changing feed (ramp/plunge) gets its own path colour.
 }
 const OLD_DATUM = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
 
@@ -241,7 +244,7 @@ export function createToolpath2d(canvas, opts = {}) {
             const manualTrav = transV && startSources[s.pass] === 'manual';   // a MANUAL jog travel arcs UP ('rainbow'); AUTO stays straight
             ctx.strokeStyle = manualTrav ? hexCss(PATH_TYPES.jog.color) : segColor(s, zMin, zRange, maxPF);   // t328 — the AUTO traverse is a G0 rapid → rapid-yellow (was marker-cyan #22d3ee); only the MANUAL jog LINE stays the one amber
             ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
-            ctx.setLineDash(t === 'probe' ? [2, 3] : (t === 'rapid' ? [5, 4] : []));   // probe dotted, rapid dashed (match 3D)
+            ctx.setLineDash(dashFor(t));   // t331 — read the ONE token dash (rapid solid, probe/jog dashed [5,4])
             const ax = ptx(s.x1, s.pass), ay = pty(s.y1, s.pass), bx = ptx(s.x2, s.pass), by = pty(s.y2, s.pass);   // each pass rides its own start (INC4)
             ctx.beginPath(); ctx.moveTo(ax, ay);
             if (manualTrav) {   // a pronounced UPWARD 'rainbow' arc — a quadratic through a control point above the midpoint (screen-up = smaller y)

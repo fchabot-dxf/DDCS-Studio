@@ -93,12 +93,14 @@ test('3D manual jog BOWS UP in +Z (rainbow arc), not a straight line', async ({ 
     if (!pos) return { hasJog: false };
     let maxZ = -Infinity, minZ = Infinity;
     for (let i = 2; i < pos.length; i += 3) { if (pos[i] > maxZ) maxZ = pos[i]; if (pos[i] < minZ) minZ = pos[i]; }
-    return { hasJog: true, verts: pos.length / 3, maxZ, minZ };
+    const jogHex = viz.lineGroups.jog.material && viz.lineGroups.jog.material.color && viz.lineGroups.jog.material.color.getHex();
+    return { hasJog: true, verts: pos.length / 3, maxZ, minZ, jogHex };
   });
   expect(r.hasJog, 'manual → a jog line exists').toBe(true);
   expect(r.verts, 'the jog is a sampled polyline (many vertices), not a single 2-point segment').toBeGreaterThan(4);
   expect(r.minZ, 'the jog endpoints sit at the low/scan Z (≈0)').toBeLessThan(0.001);
   expect(r.maxZ, 'the jog APEX rises well above the flat chord (a pronounced +Z rainbow bow)').toBeGreaterThan(5);
+  expect(r.jogHex, 'the 3D jog line renders the ORANGE-RED token (t331 #ff4500 — reads PATH_TYPES.jog.color, one edit both previews)').toBe(0xff4500);
 });
 
 test('2D path colours a rapid by MOTION TYPE (yellow) — an AUTO trans-axis traverse + an in-axis rapid are BOTH rapid-yellow; only a MANUAL trans-axis jog is amber (t328)', async ({ page }) => {
@@ -131,9 +133,9 @@ test('2D path colours a rapid by MOTION TYPE (yellow) — an AUTO trans-axis tra
   expect(r.auto.diag[0], 'AUTO trans-axis traverse is rapid-yellow: red > blue (was cyan)').toBeGreaterThan(r.auto.diag[2]);
   expect(r.auto.inaxis[0], 'in-axis rapid is rapid-yellow: red > blue').toBeGreaterThan(r.auto.inaxis[2]);
   expect(Math.abs(r.auto.diag[1] - r.auto.inaxis[1]), 'the AUTO trans-axis + in-axis rapids are the SAME motion-type colour (green channel matches)').toBeLessThan(40);
-  // only the MANUAL trans-axis jog is amber (#ff9a0d, a LOWER green than the #ffcc00 rapid yellow) — its own jog colour + the rainbow arc
-  expect(r.manual.diag[0], 'MANUAL trans-axis jog is amber: red > blue').toBeGreaterThan(r.manual.diag[2]);
-  expect(r.manual.diag[1], 'MANUAL jog amber (#ff9a0d) has a LOWER green than the auto rapid yellow (#ffcc00)').toBeLessThan(r.auto.diag[1]);
+  // only the MANUAL trans-axis jog is orange-red (t331 #ff4500, a LOWER green than the #ffcc00 rapid yellow) — its own jog colour + the rainbow arc
+  expect(r.manual.diag[0], 'MANUAL trans-axis jog is orange-red: red > blue').toBeGreaterThan(r.manual.diag[2]);
+  expect(r.manual.diag[1], 'MANUAL jog orange-red (#ff4500) has a LOWER green than the auto rapid yellow (#ffcc00)').toBeLessThan(r.auto.diag[1]);
 });
 
 test('2D start markers carry the per-pass source (auto / manual)', async ({ page }) => {
