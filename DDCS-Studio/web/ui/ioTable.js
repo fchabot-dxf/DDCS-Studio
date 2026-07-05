@@ -11,18 +11,18 @@
 import { toolOptionsHTML, getTool } from '../wizards/toolPicker.js';
 
 const INPUT_TYPES = [
-    { type: 'probe',  label: '3D Probe' },
-    { type: 'touch',  label: 'Touch-plate (ground)' },
+    { type: 'probe',  label: '3D Probe', help: 'The touch-probe / edge-finder input — its trigger fires G31 to record the touched position (the corner/edge wizards read it).' },
+    { type: 'touch',  label: 'Touch-plate (ground)', help: 'A grounded touch-plate input for tool-length / Z-zero touch-off.' },
     { type: 'setter', label: 'Tool Setter' },
-    { type: 'limit',  label: 'Limit switch' },
+    { type: 'limit',  label: 'Limit switch', help: 'An axis limit / home switch input — the machine references off it (pick which axis end below).' },
     { type: 'estop',  label: 'E-stop' },
-    { type: 'sensor', label: 'Sensor' },
+    { type: 'sensor', label: 'Sensor', help: 'A digital input the program WAITS on before continuing. The ATC change waits on three: drawbar released (M301), drawbar clamped (M302), spindle stopped (M300).' },
 ];
 export const OUTPUT_TYPES = [
-    { type: 'coolant',   label: 'Coolant',              onCode: 'M8',   offCode: 'M9' },
-    { type: 'drawbar',   label: 'Drawbar (ATC)',        onCode: 'M154', offCode: 'M155' },
-    { type: 'dustcover', label: 'Dust cover (ATC)',     onCode: 'M162', offCode: 'M163' },
-    { type: 'rotate',    label: 'Carousel rotate (ATC)', onCode: '',    offCode: '' },
+    { type: 'coolant',   label: 'Coolant',              onCode: 'M8',   offCode: 'M9',   help: 'Flood coolant — the ON code turns it on, the OFF code off (typically M8 / M9).' },
+    { type: 'drawbar',   label: 'Drawbar (ATC)',        onCode: 'M154', offCode: 'M155', help: 'The spindle drawbar solenoid — its ON code RELEASES (unclamps) the tool, its OFF code CLAMPS it. The ATC change pulses this to swap tools.' },
+    { type: 'dustcover', label: 'Dust cover (ATC)',     onCode: 'M162', offCode: 'M163', help: 'The dust-cover / chip-shield actuator — opened (ON) before a tool change, closed (OFF) after.' },
+    { type: 'rotate',    label: 'Carousel rotate (ATC)', onCode: '',    offCode: '',     help: 'Carousel-rotate output for a disk magazine — indexes the target pocket to the fixed pickup station.' },
     { type: 'mist',      label: 'Mist',                 onCode: 'M7',   offCode: 'M9' },
     { type: 'custom',    label: 'Custom',               onCode: '',     offCode: '' },
 ];
@@ -64,13 +64,16 @@ export function renderIoTable(container, kind, list, onChange) {
 
         // Editable label — bound to row.label (default = the type label). ONE SOURCE: row.label shows in BOTH this
         // config UI and the I/O panel (ioTab reads r.label). Edit to rename a pin (e.g. "Pusher", "Locating pin").
-        const typeLabel = (TYPES.find(t => t.type === row.type) || {}).label || row.type;
+        const typeDef = TYPES.find(t => t.type === row.type) || {};
+        const typeLabel = typeDef.label || row.type;
         const nameWrap = document.createElement('div');
         nameWrap.style.cssText = 'display:flex; align-items:center; gap:6px; min-width:150px; padding-bottom:4px;';
         const name = document.createElement('input');
         name.type = 'text';
         name.value = (row.label != null && row.label !== '') ? row.label : typeLabel;
-        name.title = 'Label — shown in the I/O panel (edit to rename this pin)';
+        // DECLARED HELP SLOT (1b): the optional `help` on the I/O TYPE CATALOG entry renders as a native tooltip on the
+        // row label (what the pin DOES on the machine); types without help keep the plain rename hint (unchanged).
+        name.title = typeDef.help || 'Label — shown in the I/O panel (edit to rename this pin)';
         name.style.cssText = INP + ' min-width:120px; font-size:13px; font-weight:600; color:#3a3a3a;';   // legible (t187)
         name.addEventListener('change', () => { row.label = name.value; onChange(); });
         nameWrap.appendChild(name);

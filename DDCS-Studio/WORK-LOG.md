@@ -774,3 +774,13 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **VERIFY — the declared string IS the title in BOTH surfaces (new help-slot.spec):** (1) the Blocks-tab form-pane path — `renderOpForm(CORNER_BINDINGS)` (the exact blocksApp.js:371 call): the derived 'dist' binding carries the help + its label title === the declared string; a field seeded WITHOUT help (travelDist) has no help + no title (unchanged). (2) the real ported wizard form — open('user_corner_data'): the same 'Max Probe Dist' / 'Safe Z' / 'Probe Z First' labels show their declared help as title. ONE declaration → two renders, asserted in both. (Native title is hover-only → no meaningful screenshot; the specs assert the actual title value — the real symptom.) Full suite 612 pass / 2 skip.
 
 **NO emit change (pure UX). PASS BACK for review.** NEXT per the ruling: 1b (I/O type catalog → renderIoTable), then 1c (Blockly setTooltip). 1d waived (static built-in forms dissolve as wizards port onto renderOpForm).
+
+## 🔨 turn 275 (cycle 127) — DECLARED HELP SLOT 1b: help on the I/O TYPE CATALOG → renderIoTable row-label tooltip (the Setup surface). 614 pass / 2 skip.
+
+**BUILT (same dumb native pattern as 1a; the type catalog is its OWN declaration domain):**
+- `ioTable.js`: added optional `help` to the TYPE CATALOG entries (INPUT_TYPES + OUTPUT_TYPES). `renderIoTable` sets `name.title = typeDef.help || <the plain rename hint>` on the row-label input — the type help when present, else the unchanged rename hint (types without help are untouched).
+- SEED (ATC-relevant + a few, real machine-meaning): drawbar ("ON RELEASES/unclamps, OFF CLAMPS — the ATC change pulses this"), dustcover (open before / close after), coolant (M8/M9), rotate (carousel indexes the pocket to the pickup); sensor ("a digital input the program WAITS on — the ATC change waits on drawbar released M301, clamped M302, spindle stopped M300"), probe (G31 trigger), touch/limit. What the pin DOES, not a name restatement.
+
+**VERIFY — the declared string IS the row tooltip (new help-slot-io.spec):** drive renderIoTable directly (the exact renderer the Settings I/O table uses) — a drawbar output row's label title === the declared drawbar help (contains "RELEASES"); a `custom` type (no help) keeps the plain "edit to rename" hint. A sensor input row's title names the ATC waits (M301 + spindle stopped M300); `estop` (no help) unchanged. Full suite 614 pass / 2 skip.
+
+**NO emit change (pure Setup UX). PASS BACK.** NEXT per the ruling: 1c (Blockly setTooltip — the version-pinned tooltip API, blockly-skill discipline) — then the help-slot batch (1a+1b+1c) releases as ONE milestone.
