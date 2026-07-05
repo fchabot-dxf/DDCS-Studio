@@ -30,7 +30,9 @@ test('Tool Change wizard: method switching shows the right fields and dialect', 
   // Firmware: INC-B — the DEFAULT is a T# M6 CALL to the installed T.nc (the O10102 inline dance is the callMacro=false fallback).
   await page.locator('#atc_change_method').selectOption('firmware');
   await expect(page.locator('#atc_change_fw_params')).toBeVisible();
-  await expect(page.locator('#atc_change_m6_params')).toBeHidden();
+  await expect(page.locator('#atc_change_m6_params')).toBeVisible();   // INC-B2b: the change-target row now shows for automatic too (fixedT live for the T# M6 call, zClear greyed)
+  await expect(page.locator('#atc_change_zclear')).toBeDisabled();     // zClear → the machine Safe Z for automatic methods
+  await expect(page.locator('#atc_change_fixedt')).toBeEnabled();      // the T# M6 call CAN target a fixed tool
   await expect(code).toContainText('call the installed T.nc macro');
   await expect(code).toContainText('M6');
   await expect(code).not.toContainText('G53 Z#1306');   // NOT the inline O10102 dance by default
@@ -47,6 +49,39 @@ test('Tool Change wizard: method switching shows the right fields and dialect', 
   await expect(page.locator('#atc_change_auto_params')).toBeHidden();
   await expect(code).toContainText('Manual Tool Change');
   await expect(code).not.toContainText('M154');
+});
+
+test('Tool Change wizard: INC-B2b field gating — target FOLLOWS fixedT in T# M6, greyed inline; dead toggles + zClear greyed', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ddcs_studio_settings', JSON.stringify({
+    atc: { magType: 'straight', magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }, { pocket: 2, tool: 2, x: 30, y: 0, z: -5 }], tools: [{ num: 1, type: 'endmill', dia: 6, length: 40 }, { num: 2, type: 'ballnose', dia: 6, length: 45 }] },
+    outputs: [{ type: 'drawbar', onCode: 'M54', offCode: 'M55' }],
+  })));
+  await openWizard(page, 'atc_change');
+  const code = page.locator('#wiz_atc_change_code');
+  const fixedt = page.locator('#atc_change_fixedt');
+  const toggle = page.locator('#atc_change_callmacro');
+  await page.locator('#atc_change_method').selectOption('generic');
+
+  // T# M6 mode (default): fixedT is LIVE and the emitted target FOLLOWS the field (the T-word).
+  await expect(fixedt).toBeEnabled();
+  await fixedt.selectOption('2');
+  await expect(code).toContainText('T2 M6');
+  await fixedt.selectOption('1');
+  await expect(code).toContainText('T1 M6');   // tracks the field
+
+  // the dead toggles + zClear are GREYED for generic (handled by the changer declaration / installed T.nc; safe Z).
+  await expect(page.locator('#atc_change_m300')).toBeDisabled();
+  await expect(page.locator('#atc_change_cover')).toBeDisabled();
+  await expect(page.locator('#atc_change_confirm')).toBeDisabled();
+  await expect(page.locator('#atc_change_zclear')).toBeDisabled();
+
+  // INLINE mode (callMacro off): fixedT is GREYED — inline can't set the requested tool (#1504); never inert-and-live.
+  await toggle.uncheck();
+  await expect(fixedt).toBeDisabled();
+  await expect(code).toContainText('M54');        // the inline body sources the user codes
+  await expect(code).toContainText('#1504');       // dispatches on #1504 (set by the program's Tn M6, not this field)
+  await expect(code).not.toContainText('T1 M6');   // fixedT does NOT leak a T-word target into the inline body
+  await expect(code).not.toContainText('T2 M6');
 });
 
 test('Tool Change wizard: the callMacro toggle switches the preview between the T# M6 call and the inline dance (INC-C1)', async ({ page }) => {

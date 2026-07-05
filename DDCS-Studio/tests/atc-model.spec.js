@@ -62,15 +62,18 @@ test('INC-B2: the inline fallback (callMacro:false) emits the ONE-SOURCE tncProg
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => !!window.ddcsGetSettings);
   const em = await page.evaluate(async () => {
+    // INC-B2b (4b): the inline body reads the changer config + codes LIVE from settings — set them, don't thread params.
+    const s = window.ddcsGetSettings();
+    s.atc = { magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }] };
+    s.outputs = [{ type: 'drawbar', onCode: 'M54', offCode: 'M55' }];   // NON-default drawbar codes (prove one-source)
+    s.inputs = [];
     const { atcChangeStack } = await import('/wizards/atcChangeWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const gen = (p) => emitMapped(atcChangeStack({ ...p, callMacro: false })).text;
-    const atc = { magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }] };
-    const outputs = [{ type: 'drawbar', onCode: 'M54', offCode: 'M55' }];   // NON-default drawbar codes (prove one-source)
     return {
       firmware: gen({ method: 'firmware' }),
-      generic: gen({ method: 'generic', _atc: atc, _outputs: outputs, _inputs: [] }),
-      disk: gen({ method: 'disk', _atc: atc, _outputs: outputs, _inputs: [] }),
+      generic: gen({ method: 'generic' }),
+      disk: gen({ method: 'disk' }),
     };
   });
   // firmware inline = still the raw O10102 (pneumatic push) — untouched by INC-B2

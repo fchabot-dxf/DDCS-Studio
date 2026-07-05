@@ -138,6 +138,24 @@ function syncChangeMacroBanner(method, callMacro) {
     banner.style.display = show ? '' : 'none';
 }
 
+/**
+ * INC-B2b — the post-field-gating pattern ([[post-field-gating]]): GREY (not hide) a form field the current method/mode
+ * cannot honor, with a tooltip explaining WHY, so the UI never declares an intent the emit can't deliver (valid-by-
+ * construction). Mirrors the probe formWidgets greying (disabled + opacity + title). Preserves the field's original
+ * title (captured once) so un-gating restores it.
+ */
+function gateField(id, gated, why) {
+    const inp = el(id); if (!inp) return;
+    const host = inp.closest('label') || inp;
+    if (host.dataset.origTitle == null) host.dataset.origTitle = host.title || '';
+    inp.disabled = !!gated;
+    // Declared contract with postGating: an op-gated field owns its own disabled state — postGating (which blanket-
+    // re-enables every control in a cap-ON panel) reads this flag and leaves a `data-op-gated=true` field disabled.
+    inp.dataset.opGated = gated ? 'true' : 'false';
+    host.style.opacity = gated ? '.5' : '';
+    host.title = gated ? (why || '') : host.dataset.origTitle;
+}
+
 /** Pop the full magazine editor as a modal with a Done button — the wizard's own table stays read-only/compact. */
 function openMagazineModal(refresh) {
     const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
@@ -276,14 +294,34 @@ export const atcChangeView = {
         const m6Row = el('atc_change_m6_params');           // change position + target
         const autoRow = el('atc_change_auto_params');       // generic/disk magazine toggles
         const fwRow = el('atc_change_fw_params');           // firmware M19 toggle
+        const callMacro = el('atc_change_callmacro')?.checked !== false;
+        const auto = method === 'firmware' || method === 'generic' || method === 'disk';
         if (manualRow) manualRow.style.display = method === 'manual' ? '' : 'none';
-        if (m6Row) m6Row.style.display = method === 'm6' ? '' : 'none';
+        // INC-B2b: the change-target + Z-height row now shows for the AUTOMATIC methods too — grey-not-hide the parts they
+        // can't honor (below), so the "Change to tool" target is settable for the T# M6 call. Hidden only for manual.
+        if (m6Row) m6Row.style.display = method === 'manual' ? 'none' : '';
         if (autoRow) autoRow.style.display = (method === 'generic' || method === 'disk') ? '' : 'none';
         if (fwRow) fwRow.style.display = method === 'firmware' ? '' : 'none';
         const macroRow = el('atc_change_automatic_params');   // INC-C1: the callMacro toggle (all AUTOMATIC methods)
-        if (macroRow) macroRow.style.display = (method === 'firmware' || method === 'generic' || method === 'disk') ? '' : 'none';
-        syncChangeUnverifiedBanner(method, el('atc_change_callmacro')?.checked !== false);   // A2 + INC-C3: red UNVERIFIED only when INLINING those codes (callMacro=false)
-        syncChangeMacroBanner(method, el('atc_change_callmacro')?.checked !== false);   // INC-C2: install-dependency banner for T# M6 mode
+        if (macroRow) macroRow.style.display = auto ? '' : 'none';
+        syncChangeUnverifiedBanner(method, callMacro);   // A2 + INC-C3: red UNVERIFIED only when INLINING those codes (callMacro=false)
+        syncChangeMacroBanner(method, callMacro);   // INC-C2: install-dependency banner for T# M6 mode
+
+        // INC-B2b — GATE the fields a method/mode can't honor (valid-by-construction, tooltip why):
+        // • zClear feeds only the M6-delegate stack; every automatic method uses the machine Safe Z (Settings → ATC).
+        gateField('atc_change_zclear', method !== 'm6' && method !== 'manual',
+            'The automatic tool change uses your machine Safe Z (Settings → ATC). Z change height applies to the M6-delegate method.');
+        // • fixedT: the T# M6 call carries it as the T-word (target follows the field); the INLINE body CANNOT set the
+        //   requested tool — the DDCS #1504 register is populated by a Tn M6, not written inline (grounded: not in the
+        //   confirmed register set; #1300 is the writable one). So grey it in inline mode rather than silently ignore it.
+        gateField('atc_change_fixedt', auto && !callMacro,
+            'Inline mode can’t set the requested tool — the DDCS #1504 register is populated by a Tn M6 call, not written inline. Use the recommended “Call installed T.nc macro” mode to change to a specific tool, or select it in your program.');
+        // • m300 / dustCover / confirm are consumed by NO stack now — the change sequence + its sensor waits come from
+        //   your changer declaration + installed T.nc (Settings → ATC), not these toggles.
+        const dead = method === 'generic' || method === 'disk';
+        gateField('atc_change_m300', dead, 'Handled by your changer declaration + installed T.nc (Settings → ATC) — the inline body sources its sensor waits from your ATC I/O.');
+        gateField('atc_change_cover', dead, 'Handled by your changer declaration + installed T.nc (Settings → ATC).');
+        gateField('atc_change_confirm', dead, 'Handled by your changer declaration + installed T.nc (Settings → ATC).');
 
         const params = {
             method,
@@ -303,12 +341,8 @@ export const atcChangeView = {
             magazine: (s.atc && s.atc.magazine) || [],   // pockets + park XYZ come from Settings → Tool table
             magType: s.atc && s.atc.magType,             // 'disk' → rotate-to-pocket change; else per-pocket moves
             pickup: s.atc && s.atc.pickup,               // disk: the fixed pickup XYZ
-            // INC-B2 (4a): thread the live ATC config + I/O codes at the SAME view seam as magazine — EMIT-ONLY
-            // (underscore-prefixed; NOT in the atc_change marker schema, so not serialized). The callMacro=false
-            // inline body (inlineTncStack → tncProgram) sources the user's declared drawbar/sensor codes from these.
-            _atc: (s.atc) || {},
-            _outputs: s.outputs || [],
-            _inputs: s.inputs || [],
+            // INC-B2b (4b): the inline body's changer config + I/O CODES are read LIVE by inlineTncStack (ddcsGetSettings),
+            // NOT threaded here — that keeps a settings snapshot OUT of the exported op marker and re-emits fresh on reload.
             // INC-B/C1: DEFAULT true — the automatic change emits a T# M6 CALL to the installed T.nc; the #atc_change_callmacro
             // checkbox (INC-C1, guardrail [C]) is the inline-fallback escape hatch — unchecked → the inline body.
             callMacro: el('atc_change_callmacro')?.checked !== false,

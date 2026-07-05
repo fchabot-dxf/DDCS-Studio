@@ -171,13 +171,17 @@ function macroCallStack(params) {
 // INC-B2: the callMacro=false INLINE fallback for the automatic generic/disk methods. Instead of a hand-rolled
 // ASSUMED drawbar dance (the removed autoStack/diskAutoStack), it emits the SAME executable body as ⚙ Generate T.nc
 // (tncProgram, {body:true} = no O-header/M99 wrapper) so the drawbar/sensor codes are ONE-SOURCE from the user's
-// Settings → ATC I/O — never a second hand-roll of the codes. The live atc config + I/O thread via params
-// (_atc/_outputs/_inputs, the same view seam as magazine). Injected as RAW lines: the generator emits a flat
+// Settings → ATC I/O — never a second hand-roll of the codes. Injected as RAW lines: the generator emits a flat
 // Expert-dialect program; re-atomizing to dialect-aware blocks waits for the I5b-2b/c convergence.
-function inlineTncStack(params) {
+// INC-B2b (4b): the changer config + I/O CODES are read LIVE from settings (the ddcsGetSettings accessor), NOT
+// threaded through the op params. This keeps them OUT of the exported marker (no settings snapshot / no bloat) and
+// makes a reloaded file re-emit the user's CURRENT codes (always fresh). test-safe: the app + specs both set the
+// same window global; a pure-Node context (no window) degrades to an empty config.
+function inlineTncStack() {
     const S = []; const { C, RAW } = H(S);
-    const atc = params._atc || {};
-    const io = { outputs: params._outputs || [], inputs: params._inputs || [] };
+    const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+    const atc = s.atc || {};
+    const io = { outputs: s.outputs || [], inputs: s.inputs || [] };
     C('ATC | Tool Change — INLINED change sequence (sources your configured changer + Settings -> ATC I/O codes)');
     C('Prefer the DEFAULT T# M6 call (install the T.nc via Settings -> ATC -> Generate T.nc) — inline is the offline fallback.');
     (tncProgram(atc, io, { body: true }) || '').split('\n').forEach((ln) => RAW(ln));
@@ -192,7 +196,7 @@ export function atcChangeStack(params = {}) {
     switch (method) {
         case 'm6': return m6Stack(params);
         case 'firmware': return firmwareStack(params);                 // the O10102 push station — NOT the assumed drawbar dance; unchanged
-        case 'disk': case 'generic': return inlineTncStack(params);    // INC-B2: one-source inline body via tncProgram (was autoStack/diskAutoStack)
+        case 'disk': case 'generic': return inlineTncStack();          // INC-B2: one-source inline body via tncProgram (was autoStack/diskAutoStack); reads settings LIVE (4b)
         default: return manualStack(params);
     }
 }

@@ -53,7 +53,12 @@ export function applyPostGating() {
         const cap = elm.getAttribute('data-cap');
         const ok = !!caps[cap];
         elm.classList.toggle('cap-off', !ok);
-        elm.querySelectorAll('input, select, textarea, button').forEach((c) => { c.disabled = !ok; });
+        elm.querySelectorAll('input, select, textarea, button').forEach((c) => {
+            // An op VIEW may gate a field by its own method/mode (e.g. atc_change fixedT inline). When the cap IS
+            // available, don't blanket-re-enable such a field — its view owns the disabled state (declared contract).
+            if (ok && c.dataset && c.dataset.opGated === 'true') return;
+            c.disabled = !ok;
+        });
         if (!ok) {
             if (elm.dataset.capTitle === undefined) elm.dataset.capTitle = elm.title || '';
             elm.title = `${post.name}: not supported — ${CAP_WHY[cap] || 'unavailable on this post'}`;
