@@ -108,7 +108,7 @@ export const SETTINGS_DEFAULTS = {
         head: { spindleDia: 80, spindleLen: 200, colletDia: 20, colletLen: 30 }, parts: { spindle: true, collet: true, tool: true },
         // 3D touch probe SIM body sizes (VISUAL ONLY — same contract as head: change the render, never the G-code; the
         // probing radius comes from the Stylus radius field under 3D PROBE DEFAULTS). ballDia defaults to 2× a typical 1mm stylus radius.
-        probe: { bodyDia: 40, bodyLen: 90, stylusLen: 30, ballDia: 4 } },
+        probe: { bodyDia: 40, bodyLen: 20, stylusLen: 30, ballDia: 4 } },
     // Composing assists (Blocks suggestions, Studio editor autocomplete, ghost next-block).
     compose: { suggestions: true, autocomplete: true, ghost: true },
     // ATC: tool-length probe defaults (consumed by the Tool Length wizard) + the tool-offset table.
@@ -382,7 +382,7 @@ function commitHeadDims() {
 // ball (tip), with the dimension inputs sitting ON the drawing at the tick ends. Visual only (never the G-code).
 function renderProbeGui() {
     const svgBox = document.getElementById('set_pv_probe_svg'); if (!svgBox) return;
-    const bD = _gv('set_pv_probe_body_dia', 40), bL = _gv('set_pv_probe_body_len', 90);
+    const bD = _gv('set_pv_probe_body_dia', 40), bL = _gv('set_pv_probe_body_len', 20);
     const stL = _gv('set_pv_probe_stylus_len', 30), ballD = _gv('set_pv_probe_ball_dia', 4);
     const stD = Math.max(2, ballD * 0.6);                                               // stylus shaft (schematic, thinner than the ball)
     const W = 248, H = 212, cx = 112, maxD = Math.max(bD, stD, ballD), totalL = bL + stL + ballD;
@@ -410,7 +410,7 @@ function renderProbeGui() {
 // Commit the on-diagram probe dims to settings (on change/blur). Visual only — stored under preview.probe.
 function commitProbeDims() {
     const s = getSettings(); if (!s.preview) s.preview = {}; const p = s.preview.probe || (s.preview.probe = {});
-    p.bodyDia = _gv('set_pv_probe_body_dia', 40); p.bodyLen = _gv('set_pv_probe_body_len', 90);
+    p.bodyDia = _gv('set_pv_probe_body_dia', 40); p.bodyLen = _gv('set_pv_probe_body_len', 20);
     p.stylusLen = _gv('set_pv_probe_stylus_len', 30); p.ballDia = _gv('set_pv_probe_ball_dia', 4);
     saveSettings();
 }
@@ -1888,7 +1888,7 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_show_tool')) pvp.tool = q('set_pv_show_tool').checked;
         const pvpr = pv.probe || (pv.probe = { ...SETTINGS_DEFAULTS.preview.probe });
         if (q('set_pv_probe_body_dia')) pvpr.bodyDia = num(q('set_pv_probe_body_dia').value, 40);
-        if (q('set_pv_probe_body_len')) pvpr.bodyLen = num(q('set_pv_probe_body_len').value, 90);
+        if (q('set_pv_probe_body_len')) pvpr.bodyLen = num(q('set_pv_probe_body_len').value, 20);
         if (q('set_pv_probe_stylus_len')) pvpr.stylusLen = num(q('set_pv_probe_stylus_len').value, 30);
         if (q('set_pv_probe_ball_dia')) pvpr.ballDia = num(q('set_pv_probe_ball_dia').value, 4);
         const cp = s.compose || (s.compose = { ...SETTINGS_DEFAULTS.compose });
