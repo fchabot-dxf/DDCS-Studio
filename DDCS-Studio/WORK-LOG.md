@@ -747,3 +747,19 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **⚑ RELEASE NOTE for the advisor:** the bump now touches THREE files — `package.json` + `web/index.html` (chip+title) + `web/version.json`. version.json must ride the SAME commit as the bump (the bump script writes all three; commit them together as the release tip).
 
 **NO emit change (pure UX/infra). PASS BACK for review.** NEXT (remaining UX interleave): the DECLARED HELP SLOT; then parity-gap #2 source-chips (gated on the register scout).
+
+## 🔨 turn 271 (cycle 127) — DECLARED HELP SLOT scout → PROPOSE (NO CODE). Full seam table + decomposition in scratchpad/help-slot-scout.md (VS Code tab).
+
+**FINDING: no ONE global place a `help` key can live so all 3 surfaces read it** — they span 3-4 DISTINCT declaration domains, and one surface (built-in wizard forms) is static HTML. Per the dispatch rule ("a surface with no declaration layer → propose"), I propose. But one slice IS genuinely clean + buildable now.
+
+**SEAMS (where each declaration lives):**
+- (c-i) wizard form for PORTED ops (corner) → `def.bindings` `{param,label,…}` → **renderOpForm** (formWidgets.js:373), which ALSO powers the Blocks-tab FORM PANE (blocksApp.js:371). → `b.help`→`title` = CLEAN, one source, TWO surfaces.
+- (c-ii) wizard form for BUILT-IN wizards (atc_change) → STATIC index.html labels + opSchema FIELD_BIND. NOT renderOpForm → NO clean render; needs opSchema `help` + a FIELD_BIND title pass.
+- (a) Blockly param-BLOCK tooltips → the atoms/knobs/sc_* blocks, NOT def.bindings; no `setTooltip` exists today → a distinct renderer (version-pinned setTooltip, blockly-skill).
+- (b) settings I/O rows → the I/O TYPE CATALOG (IN_TYPES/OUT_TYPES) → renderIoTable → CLEAN but a SEPARATE domain.
+
+**So each FIELD's help lives in ONE place (its own declaration), read by its surfaces — but there's no single GLOBAL key.**
+
+**PROPOSED DECOMPOSITION:** 1a (CLEAN, rec) `help` on def.bindings → renderOpForm title (wizard form + Blocks-tab pane; corner seed) — one source, one renderer, two surfaces, proves the slot. 1b I/O-type-catalog help → renderIoTable. 1c Blockly block tooltips (knob/sc_* render → version-pinned setTooltip). 1d built-in static forms (opSchema help + FIELD_BIND title pass). Each hangs on its OWN existing declaration — NO parallel registry.
+
+**RECOMMEND:** build 1a now (clean, two top-used surfaces); 1b/1c/1d as small per-domain follow-ons. The literal "3 renderers reading ONE source" isn't achievable (different declarations) — this is the honest shape. Advisor's call on scope. NO CODE. PASS BACK.
