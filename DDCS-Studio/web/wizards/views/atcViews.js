@@ -1,5 +1,6 @@
 /** views/atcViews.js — the ATC wizard views (length / warmup / change / commissioning test). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
+import { getTncStatus, refreshTncStatus } from '../../ui/tncInstallStatus.js';   // [B] gateway-verified install tri-state
 import { num } from '../ops/util.js';
 import { toolProfileSvg } from '../../viz/toolProfile.js';
 import { renderMagazineTable } from '../../ui/ioTable.js';
@@ -112,11 +113,11 @@ function syncChangeUnverifiedBanner(method, callMacro) {
 }
 
 /**
- * INC-C2 (guardrail A): the install-DEPENDENCY banner. An AUTOMATIC method (firmware/generic/disk) emitting the
- * DEFAULT `T# M6` call (callMacro=true) does NOTHING on the machine unless the operator has installed a T.nc macro on
- * the controller. Prominent, can't-miss reminder. MIRRORS syncChangeUnverifiedBanner (lazy-create above the method
- * rows, then toggle per state) with a distinct amber style so it reads apart from the red UNVERIFIED banner when both
- * show (callMacro=true + generic/disk). Hidden for the inline fallback (callMacro=false) + for m6/manual.
+ * INC-C2 (guardrail A) + [B] gateway-VERIFY: the install-DEPENDENCY banner, now a live TRI-STATE. An AUTOMATIC method
+ * (firmware/generic/disk) emitting the DEFAULT `T# M6` call (callMacro=true) does NOTHING on the machine unless the
+ * operator has installed a T.nc macro. When a gateway is CONNECTED we VERIFY it (tncInstallStatus.getTncStatus — a
+ * declared read-only check, never scraped): GREEN installed-verified · RED not-found-on-controller · AMBER can't
+ * verify (no gateway → today's "install it" text). Hidden for the inline fallback (callMacro=false) + for m6/manual.
  */
 function syncChangeMacroBanner(method, callMacro) {
     const show = !!callMacro && (method === 'firmware' || method === 'generic' || method === 'disk');
@@ -127,16 +128,37 @@ function syncChangeMacroBanner(method, callMacro) {
         banner = document.createElement('div');
         banner.id = 'atc_change_macrodep';
         banner.setAttribute('role', 'alert');
-        banner.style.cssText = 'display:none; margin:4px 0 8px; padding:8px 10px; border:1px solid var(--warning,#f59e0b);'
-            + ' border-left:4px solid var(--warning,#f59e0b); border-radius:5px; background:rgba(245,158,11,0.10);'
-            + ' color:var(--warning,#f59e0b); font-size:12px; line-height:1.5;';
-        banner.innerHTML = '<b>⚠ Calls your installed T.nc macro</b> — this change emits a bare <b>T# M6</b>. Install it'
-            + ' first via <b>Settings → ATC → Generate T.nc</b>, or a bare T# M6 does <b>NOTHING</b> on the machine.'
-            + ' (Uncheck “Call installed T.nc macro” below to inline the full sequence instead.)';
+        // Static shell; renderTncBanner fills the state-varying border/background/color + text (so it can re-render
+        // async on ddcs:tnc-status without clobbering the display the caller sets).
+        banner.style.cssText = 'display:none; margin:4px 0 8px; padding:8px 10px; border-radius:5px; font-size:12px; line-height:1.5;';
         anchor.parentNode.insertBefore(banner, anchor);
     }
+    if (show) { renderTncBanner(banner); refreshTncStatus(); }   // kick a read-only re-verify; the listener re-renders when it lands
     banner.style.display = show ? '' : 'none';
 }
+
+// The three install states → the banner's [border/text-color, background, html] (the value the [B] spec asserts).
+const TNC_BANNER = {
+    installed: ['var(--success,#22c55e)', 'rgba(34,197,94,0.10)',
+        '<b>✓ T.nc installed on the controller</b> — verified via the connected gateway. This T# M6 change will call it.'],
+    missing: ['var(--danger,#ef4444)', 'rgba(239,68,68,0.10)',
+        '<b>⚠ T.nc NOT FOUND on the controller</b> — this change emits a bare <b>T# M6</b> that will do <b>NOTHING</b>.'
+        + ' Generate + install it via <b>Settings → ATC → Generate T.nc</b>.'],
+    unknown: ['var(--warning,#f59e0b)', 'rgba(245,158,11,0.10)',
+        '<b>⚠ Calls your installed T.nc macro</b> — this change emits a bare <b>T# M6</b>. Install it first via'
+        + ' <b>Settings → ATC → Generate T.nc</b>, or a bare T# M6 does <b>NOTHING</b> on the machine.'
+        + ' (Uncheck “Call installed T.nc macro” below to inline the full sequence instead.)'],
+};
+function renderTncBanner(banner) {
+    const [color, bg, html] = TNC_BANNER[getTncStatus()] || TNC_BANNER.unknown;
+    banner.style.border = '1px solid ' + color;
+    banner.style.borderLeft = '4px solid ' + color;
+    banner.style.background = bg;
+    banner.style.color = color;
+    banner.innerHTML = html;
+}
+// A read-only re-verify landed → re-render the banner in place if it's currently shown (never touches its display).
+document.addEventListener('ddcs:tnc-status', () => { const b = el('atc_change_macrodep'); if (b && b.style.display !== 'none') renderTncBanner(b); });
 
 /**
  * INC-B2b — the post-field-gating pattern ([[post-field-gating]]): GREY (not hide) a form field the current method/mode
