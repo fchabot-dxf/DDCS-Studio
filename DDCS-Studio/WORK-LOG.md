@@ -734,3 +734,16 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 **VERIFY — REAL SYMPTOM (drove the actual insert + Settings):** new blocks-roundtrip-toast.spec (2 tests): fresh profile → insert 'drill' → the toast appears (contains "editable block stack" + "Blocks") + the flag persists ('1'); clear the toast DOM → insert again → NO toast (once-ever); the FAQ entry renders with the round-trip text. SCREENSHOTS (VS Code tabs): roundtrip-toast.png (the toast under the inserted drill G-code), roundtrip-faq.png (the FAQ entry expanded in Settings → General → FAQ). Full suite 607 pass / 2 skip (1 known middle-animator flake, retry-passes).
 
 **NO emit change (pure UX). PASS BACK for review.** NEXT (the remaining UX interleaves per NEXT-SESSION QUEUED): the DECLARED HELP SLOT · the WEB VERSION-NUDGE TOAST · then the real remaining corner work (parity-gap #2 source-chips, gated on the register scout).
+
+## 🔨 turn 269 (cycle 127) — WEB VERSION-NUDGE TOAST (the hosted web build can be a stale cached bundle; the exe has a banner, the web had nothing). NO new machinery (reuses toast() + updateCheck's bakedVersion/isNewer). 611 pass / 2 skip.
+
+**BUILT (declare-the-artifact-first, per dispatch):**
+- `scripts/bump-version.cjs`: now ALSO writes `web/version.json {"v":"10.xx"}` at bump time — a DECLARED, cache-bustable source (NOT the index.html chip regexed out of fetched HTML). Created `web/version.json` = {"v":"10.67"} now to match the current chip.
+- `ui/updateCheck.js`: added `checkWebVersion()` — on load + visibilitychange (THROTTLED ~1/hour), `fetch('version.json',{cache:'no-store'})`, compare to `bakedVersion()` via `isNewer()`; on a newer live version → the shared `toast('V10.xx is live — reload to update.')`. Wired via `initWebVersionNudge()` called at the top of `initUpdateCheck()` (runs everywhere; the desktop GitHub banner stays exe-only below). REUSED updateCheck's own helpers + the shared toast — no new machinery.
+- **EXE HARMLESS (verified by logic + the served-app check):** on the exe the relative `version.json` fetch hits the bundled copy (== baked → no toast) or 404s on an old bundle (early return) — no special-case needed.
+
+**VERIFY:** new web-version-nudge.spec (mocked fetch, 3 tests): NEWER live version → toast names the version + 'reload'; live == baked → NO toast (exactly the exe-harmless path); throttle → two rapid checks fetch ONCE. REAL-SYMPTOM in the served app (no mock): version.json=10.67 == baked chip 10.67 → no nudge (confirmed). Full suite 611 pass / 2 skip.
+
+**⚑ RELEASE NOTE for the advisor:** the bump now touches THREE files — `package.json` + `web/index.html` (chip+title) + `web/version.json`. version.json must ride the SAME commit as the bump (the bump script writes all three; commit them together as the release tip).
+
+**NO emit change (pure UX/infra). PASS BACK for review.** NEXT (remaining UX interleave): the DECLARED HELP SLOT; then parity-gap #2 source-chips (gated on the register scout).

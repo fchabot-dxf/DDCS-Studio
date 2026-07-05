@@ -29,4 +29,9 @@ const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 pkg.version = parts.length >= 3 ? v : v + '.0';   // package.json wants 3-part semver
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 
-console.log(`Version bumped to V${v}  (chip + title synced; package.json -> ${pkg.version})`);
+// The DECLARED live-version artifact for the web version-nudge (ui/updateCheck.js): a small, cache-bustable JSON
+// source the deployed app fetches to detect a stale cached bundle — NOT the index.html chip regexed out of HTML.
+const verJsonPath = path.join(__dirname, '..', 'web', 'version.json');
+fs.writeFileSync(verJsonPath, JSON.stringify({ v }) + '\n');
+
+console.log(`Version bumped to V${v}  (chip + title + version.json synced; package.json -> ${pkg.version})`);

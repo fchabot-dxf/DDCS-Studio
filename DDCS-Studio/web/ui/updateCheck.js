@@ -6,6 +6,8 @@
  * .ver chip, asks GitHub for the latest release, and if that's newer shows a dismissible bottom banner with a
  * Download link + the recent commit messages ("what's new"). Public GitHub API, no token, one check per launch.
  */
+import { toast } from './gateway/util.js';   // the shared transient toast (web version-nudge reuses it)
+
 const REPO = 'fchabot-dxf/DDCS-Studio';
 const GW_PORTS = ['8765', '8766', '8767', '8768', '8769'];
 
@@ -60,8 +62,34 @@ function showBanner(tag, dl, body, commits) {
   document.body.appendChild(bar);
 }
 
+// ── WEB version-nudge ────────────────────────────────────────────────────────────────────────────────────
+// The hosted web build can be a stale CACHED bundle (a Zürich user sat on a 3-day-old one — analytics 07-04): the
+// exe has the GitHub update banner above, the web had NOTHING. Poll the DECLARED version.json (written at bump time)
+// and toast a reload-nudge when a newer version is live. Throttled ~1/hour; runs on load + when the tab re-focuses.
+// On the exe the relative fetch hits the bundled copy (== baked, or 404 on an old bundle) → never toasts (harmless).
+const WEB_NUDGE_THROTTLE_MS = 60 * 60 * 1000;   // ~1 check/hour max
+let _lastWebCheck = 0;
+
+async function checkWebVersion() {
+  const now = Date.now();
+  if (now - _lastWebCheck < WEB_NUDGE_THROTTLE_MS) return;   // throttle
+  _lastWebCheck = now;
+  const local = bakedVersion();
+  if (!local) return;
+  let live = null;
+  try { const r = await fetch('version.json', { cache: 'no-store' }); if (!r.ok) return; live = (await r.json()).v; } catch (_) { return; }   // 404 / offline → quiet
+  if (live && isNewer(live, local)) toast(`V${live} is live — reload to update.`);
+}
+
+/** Wire the web version-nudge: check on load + when the tab becomes visible again (throttled). */
+export function initWebVersionNudge() {
+  checkWebVersion();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkWebVersion(); });
+}
+
 export async function initUpdateCheck() {
-  if (!isDesktopApp()) return;                          // exe only — the web build reloads to update
+  initWebVersionNudge();                                 // web build: the version.json reload-nudge (harmless on the exe)
+  if (!isDesktopApp()) return;                          // the GitHub-release banner below is exe only
   const local = bakedVersion();
   if (!local) return;
   let rel;
@@ -84,4 +112,4 @@ export async function initUpdateCheck() {
 }
 
 // Expose helpers for tests (and so the web-exclusion can be asserted).
-if (typeof window !== 'undefined') window.__ddcsUpd = { isNewer, isDesktopApp, bakedVersion, initUpdateCheck };
+if (typeof window !== 'undefined') window.__ddcsUpd = { isNewer, isDesktopApp, bakedVersion, initUpdateCheck, checkWebVersion, initWebVersionNudge, _resetNudgeThrottle: () => { _lastWebCheck = 0; } };
