@@ -233,6 +233,27 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // (already correct per corner) + re-derives the per-corner markers/sim (prefill t109) — reusing the dropdown's OWN change
     // seam, no new param path. Opt-in (only corner-bearing ops); the corner targets sit on the stock corners, distinct from
     // the reposition handles (no hit-test overlap). Absent → the canvas draws no corner targets (unchanged for other ops).
+    // EDGE DATUM VIZ (t339 E3, opt-in — mirror cornerPick's declared detection): an op declaring an `axis` + `dir` enum (a
+    // ONE-wall probe) shows its datum — a highlighted WALL LINE (the probed stock edge) + an APPROACH line from the sim-start
+    // toward it. Edge's datum is a LINE + a direction (vs corner's POINT). PURELY VISUAL (items only; no handle/emit/drag) →
+    // sim-only, byte-parity untouched. Absent (any non-axis/dir op) → no edge glyph (unchanged). Gated on axis+dir; a future
+    // explicit `def.datum` kind could disambiguate if more one-wall variants appear (flagged) — today only edge has axis+dir.
+    const edgeAxisBind = (def.bindings || []).find((b) => b && b.param === 'axis' && b.type === 'enum');
+    const edgeDirBind = (def.bindings || []).find((b) => b && b.param === 'dir' && b.type === 'enum');
+    if (edgeAxisBind && edgeDirBind) {
+        const eAxis = params.axis === 'Y' ? 'Y' : 'X';
+        const ePos = (params.dir || 'pos') !== 'neg';   // pos → the near/0 face; neg → the far face
+        const sp = simStart && simStart.pos && Number.isFinite(+simStart.pos.x) && Number.isFinite(+simStart.pos.y) ? simStart.pos : null;
+        if (eAxis === 'X') {
+            const wx = ePos ? 0 : stock.w;
+            items.push({ kind: 'line', x1: wx, y1: 0, x2: wx, y2: stock.h, cls: 'fc-edge-wall' });                       // the probed wall (a vertical stock edge)
+            if (sp) items.push({ kind: 'line', x1: +sp.x, y1: +sp.y, x2: wx, y2: +sp.y, cls: 'fc-edge-approach' });      // approach: the start → the wall (perpendicular)
+        } else {
+            const wy = ePos ? 0 : stock.h;
+            items.push({ kind: 'line', x1: 0, y1: wy, x2: stock.w, y2: wy, cls: 'fc-edge-wall' });                       // the probed wall (a horizontal stock edge)
+            if (sp) items.push({ kind: 'line', x1: +sp.x, y1: +sp.y, x2: +sp.x, y2: wy, cls: 'fc-edge-approach' });
+        }
+    }
     const cornerBind = (def.bindings || []).find((b) => b && b.param === 'corner' && b.type === 'enum');
     const cornerPick = cornerBind ? {
         corner: params.corner,

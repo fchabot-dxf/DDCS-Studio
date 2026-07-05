@@ -2216,6 +2216,9 @@ button.primary:hover {
 .feature-canvas .fc-axis-y { stroke: #3b7a48; stroke-width: 1.5; }
 .feature-canvas .fc-stock { fill: rgba(80,110,150,0.08); stroke: #46566a; stroke-width: 1.5; }
 .feature-canvas .fc-guide { fill: none; stroke: #2e8b9a; stroke-width: 1; stroke-dasharray: 4 3; }
+/* EDGE datum (t339 E3): the probed WALL LINE (cyan, prominent — the edge you're finding) + the APPROACH travel from the start marker toward it (dashed yellow, the direction). Edge's datum = a LINE + a direction (vs corner's POINT). */
+.feature-canvas .fc-edge-wall { fill: none; stroke: #22d3ee; stroke-width: 2.5; }
+.feature-canvas .fc-edge-approach { fill: none; stroke: #ffcc00; stroke-width: 1.5; stroke-dasharray: 5 4; }
 /* The FEATURE being probed (op-type-declared, stock-overridable): a pocket cavity (blue) or a boss protrusion (green),
    matching the 3D preview's fill colours, so the 2D canvas shows WHAT'S being probed — not just the stock rectangle. */
 .feature-canvas .fc-feature-pocket { fill: rgba(106,143,190,0.18); stroke: #86b6ff; stroke-width: 1.5; }
