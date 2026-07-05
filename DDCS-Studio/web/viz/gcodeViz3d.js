@@ -859,6 +859,7 @@ export class GcodeViz3D {
         this.lineGroups.retract = this._addLine(retractPos, { color: PATH_TYPES.retract.color, opacity: 0.85 });
         this.lineGroups.probe = this._addLine(probeFastPos, { color: PATH_TYPES.probeFast.color, dotted: true });
         this.lineGroups.probeSlow = this._addLine(probeSlowPos, { color: PATH_TYPES.probeSlow.color });
+        if (this.lineGroups.probeSlow) this.lineGroups.probeSlow.renderOrder = 21;   // t319 — the WHITE slow probe renders OVER the fast blue (renderOrder 20) at the collinear re-probe overlap
         this.lineGroups.jog = this._addLine(jogPos, { color: PATH_TYPES.jog.color, opacity: 0.95, dashed: true });
 
         // Ordered "executed trail" overlay: the whole route as one bold line, in travel order, revealed up to

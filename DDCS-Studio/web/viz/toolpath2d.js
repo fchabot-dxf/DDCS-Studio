@@ -226,14 +226,14 @@ export function createToolpath2d(canvas, opts = {}) {
     }
     function strokeSegs(ctx, from, to, alpha, width, zMin, zRange, maxPF) {
         ctx.globalAlpha = alpha;
-        for (let i = from; i < to; i++) {
-            const s = segs[i], t = typeOf(s);
+        const isSlowProbe = (s) => (s.type === 'probe' || s.probe) && (s.feed || 0) > 0 && (s.feed || 0) < maxPF;   // t319 — the WHITE slow re-probe
+        const drawSeg = (s) => {
+            const t = typeOf(s);
             // a 2-axis RAPID is a trans-axis TRAVERSE/reposition vector → colour it by its pass SOURCE (auto=cyan,
-            // manual=amber), MATCHING its start chip. Single-axis rapids (in-axis cross-over, lift/drop, retract) +
-            // probe/feed keep their TYPE colours.
+            // manual=amber). Single-axis rapids + probe/feed keep their TYPE colours.
             const transV = t === 'rapid' && Math.abs((s.x2 || 0) - (s.x1 || 0)) > 0.05 && Math.abs((s.y2 || 0) - (s.y1 || 0)) > 0.05;
             const manualTrav = transV && startSources[s.pass] === 'manual';   // a MANUAL jog travel arcs UP ('rainbow'); AUTO stays straight
-            ctx.strokeStyle = transV ? (startSources[s.pass] === 'manual' ? hexCss(PATH_TYPES.jog.color) : '#22d3ee') : segColor(s, zMin, zRange, maxPF);   // t317 — the MANUAL jog LINE = the one amber #ff9a0d (was the #ffb300 start-marker amber); the AUTO traverse keeps the marker-cyan (a separate glyph-layer colour, not a path type)
+            ctx.strokeStyle = transV ? (startSources[s.pass] === 'manual' ? hexCss(PATH_TYPES.jog.color) : '#22d3ee') : segColor(s, zMin, zRange, maxPF);   // t317 — the MANUAL jog LINE = the one amber; the AUTO traverse keeps the marker-cyan (a separate glyph layer)
             ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
             ctx.setLineDash(t === 'probe' ? [2, 3] : (t === 'rapid' ? [5, 4] : []));   // probe dotted, rapid dashed (match 3D)
             const ax = ptx(s.x1, s.pass), ay = pty(s.y1, s.pass), bx = ptx(s.x2, s.pass), by = pty(s.y2, s.pass);   // each pass rides its own start (INC4)
@@ -243,7 +243,11 @@ export function createToolpath2d(canvas, opts = {}) {
                 ctx.quadraticCurveTo(mx, my - arc, bx, by);
             } else { ctx.lineTo(bx, by); }
             ctx.stroke();
-        }
+        };
+        // t319 — TWO passes so the WHITE slow probe draws LAST and wins the collinear overlap with the fast blue re-probe.
+        // Non-overlapping segments are order-independent → byte-neutral for every non-probe type.
+        for (let i = from; i < to; i++) { const s = segs[i]; if (!isSlowProbe(s)) drawSeg(s); }
+        for (let i = from; i < to; i++) { const s = segs[i]; if (isSlowProbe(s)) drawSeg(s); }
         ctx.globalAlpha = 1; ctx.setLineDash([]);
     }
     function drawPath(ctx, k) {

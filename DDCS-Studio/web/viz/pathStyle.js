@@ -21,7 +21,8 @@ export const PATH_TYPES = {
     rapid:     { color: 0xffcc00, dash: [5, 4], widthScale: 0.6, shape: 'line', label: 'Rapid' },
     feed:      { color: FEED_HIGH, dash: [],    widthScale: 1,   shape: 'line', label: 'Cut', gradient: [FEED_LOW, FEED_HIGH] },
     probeFast: { color: 0x3b82f6, dash: [2, 3], widthScale: 1,   shape: 'line', label: 'Probe' },
-    probeSlow: { color: 0x93c5fd, dash: [2, 3], widthScale: 1,   shape: 'line', label: 'Probe slow' },
+    probeSlow: { color: 0xffffff, dash: [2, 3], widthScale: 1,   shape: 'line', label: 'Probe slow' },   // t319 — WHITE (was #93c5fd); drawn ON TOP of the fast blue at the collinear re-probe overlap
+
     retract:   { color: 0x33cc55, dash: [],     widthScale: 1,   shape: 'line', label: 'Retract' },
     jog:       { color: 0xff9a0d, dash: [5, 4], widthScale: 0.6, shape: 'arc',  label: 'Jog' },   // #ff9a0d = the ONE amber (micro-fix; the 2D had borrowed the #ffb300 start-marker amber)
 };
