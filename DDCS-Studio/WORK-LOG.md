@@ -830,3 +830,18 @@ ALL AUTOMATIC methods at once (firmware/generic/disk) — because the op emit be
 - **C — defer/re-scope:** the form pane already does the functional job; the knob path is for hand-authored/simple wizards, not rich bindingSpecs defs; leave projection unbuilt. Zero regression risk; the visual-consistency gap + knob-help tooltip stay open.
 
 **REC: design-heavy, do NOT ship B. Lean A scoped as (1) read-only reflection pre-tick, (2) the Update guard for a bindingSpecs def (the load-bearing safety piece — a real latent bug regardless of projection), (3) fold in knob-help tooltip. If keeping the increment small, C (defer) is the honest fallback — the campaign's re-authoring vision is better served by editWizardDef (loads the TEMPLATE with pills) + a bindingSpecs-preserving save than by the lossy knob path. NO CODE. PASS BACK.**
+
+## 🔨 turn 283 (cycle 127) — RICH-DEF UPDATE GUARD (SPLIT-A part 1): a bindingSpecs def REFUSES the dev-mode visual Update (block-with-message). Projection + knob-help DEFERRED per the ruling. 618 pass / 2 skip.
+
+**THE INVARIANT, DECLARED ONCE:** `isMaintainedAsData(def)` = `bindingSpecs` present + non-empty (exported from devMode.js). One rule, read by BOTH the dialog (disable Update) and the commit chokepoint (refuse Update). corner is the only such def today; any future bindingSpecs port inherits the guard for free.
+
+**WHY (the hazard the t281 scout confirmed):** the visual Update runs collectAuthoring→buildBindings (flattens the rich bindings to plain {param,blockIndex,key,default}) → userOpFromStack (does NOT set bindingSpecs) → updateUserOp (defs[i]=def, REPLACE). So an Update would silently STRIP bindingSpecs + relTo/when/group/role/section/help/sourceField — the campaign's entire M2 derive mechanism. Block it; Save-as-new (a copy) is already the non-destructive path.
+
+**BUILT (devMode.js only — pure save-flow, NO emit path touched):**
+- `isMaintainedAsData(def)` predicate + export.
+- `saveAsCustomOp`: compute `lockUpdate = isMaintainedAsData(editingDef)`; pass to the dialog; and a belt-and-suspenders commit guard — `if (update && lockUpdate) { alert(WHY); return; }` (the true data-level chokepoint).
+- `openSaveDialog`: when editing + `lockUpdate` — the Update button renders DISABLED (title = the WHY) and the edit-note swaps to "…is maintained as data — Update would strip its data-driven parameters, so it's disabled. Save as new keeps the original and saves a copy." Save-as-new stays the accent/suggested action. Non-locked editing is UNCHANGED.
+
+**VERIFY — REAL SYMPTOM (new rich-def-update-guard.spec, drives the actual dialog via ddcsEditWizardDef + ddcsSaveAsWizard):** (1) corner (bindingSpecs def): the Update button IS disabled + the note contains "maintained as data" + Save button reads "Save as new"; clicking Save-as-new creates a SECOND op AND the original user_corner_data def is BYTE-UNCHANGED (JSON identical, bindingSpecs intact) — the copy is a plain op (no bindingSpecs, the very reason Update is blocked, asserted). (2) a PLAIN user op (param-pill, no bindingSpecs): Update button ENABLED + no "maintained as data" note — the guard is scoped to bindingSpecs defs only, doesn't over-block. Existing gui-blocks-reauthor (plain-op Update-in-place) still green. Full suite 618 pass / 2 skip / 0 fail.
+
+**DEFERRED per the ruling (SPLIT-A part 2): the value-knob PROJECTION + knob-help tooltips** — to the next Blocks-canvas investment (the form pane covers function today; C's logic accepted). merge-preserve rejected as speculative (Save-as-new already IS the non-destructive path). B (pre-tick-only) rejected as a footgun. NO emit change. PASS BACK.

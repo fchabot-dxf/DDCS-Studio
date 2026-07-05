@@ -505,8 +505,20 @@ function openSaveDialog(init, onConfirm) {
     // Non-destructive save: when re-authoring, "Update <name>" overwrites the original (explicit, outline) while the
     // accent "Save as new" makes a separate copy (the safe default — the original is untouched unless you click Update).
     if (init.editing) {
-        const note = q('.blk-dev-editnote'); if (note) { note.textContent = `Editing “${init.editing.label}” — “Update” overwrites it; “Save as new” keeps it and saves a copy.`; note.hidden = false; }
-        const upd = q('.blk-dev-update'); if (upd) { upd.textContent = `Update “${init.editing.label}”`; upd.hidden = false; }
+        const locked = !!init.lockUpdate;   // maintained-as-data (bindingSpecs): Update is disabled (would strip the derive mechanism)
+        const note = q('.blk-dev-editnote');
+        if (note) {
+            note.textContent = locked
+                ? `“${init.editing.label}” is maintained as data — “Update” would strip its data-driven parameters, so it's disabled. “Save as new” keeps the original and saves a copy.`
+                : `Editing “${init.editing.label}” — “Update” overwrites it; “Save as new” keeps it and saves a copy.`;
+            note.hidden = false;
+        }
+        const upd = q('.blk-dev-update');
+        if (upd) {
+            upd.textContent = `Update “${init.editing.label}”`;
+            upd.hidden = false;
+            if (locked) { upd.disabled = true; upd.title = 'Maintained as data — updating here would strip the data-driven parameters. Use “Save as new”, or edit the template.'; upd.style.opacity = '.45'; upd.style.cursor = 'not-allowed'; }
+        }
         q('.blk-dev-save').textContent = 'Save as new';
     }
     const commit = (mode) => {
@@ -519,6 +531,16 @@ function openSaveDialog(init, onConfirm) {
     };
     q('.blk-dev-save').addEventListener('click', () => commit('new'));        // a fresh op, OR "Save as new" (a copy)
     const updBtn = q('.blk-dev-update'); if (updBtn) updBtn.addEventListener('click', () => commit('update'));   // explicit overwrite
+}
+
+// A def MAINTAINED AS DATA carries `bindingSpecs` — its value sockets are re-derived BY IDENTITY over the pruned
+// stack every build (corner's M2 mechanism). The visual knob-save CAN'T preserve that: collectAuthoring→buildBindings
+// flattens the rich bindings to plain ones and userOpFromStack drops bindingSpecs, so a visual Update would silently
+// STRIP the derive mechanism (+ relTo/when/group/role/section/help/sourceField). So such a def REFUSES the visual
+// Update — the non-destructive "Save as new" (a copy) stays the path, and its template is edited at the source. Plain
+// user-op defs (no bindingSpecs) are unaffected. Exported so the save flow + tests read ONE declared rule.
+export function isMaintainedAsData(def) {
+    return !!(def && Array.isArray(def.bindingSpecs) && def.bindingSpecs.length);
 }
 
 // Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)
@@ -545,6 +567,7 @@ function saveAsCustomOp() {
     const blkPanel = (panelBlk && panelBlk.params && panelBlk.params.panel) || null;
     const blkSim = simIntentFromStack(a.opRec.children);   // undefined = no sim block in the stack
     const editingDef = _editingWizard ? listUserOps().find((d) => d.opType === _editingWizard) : null;
+    const lockUpdate = isMaintainedAsData(editingDef);   // a maintained-as-data def refuses the visual Update (see isMaintainedAsData)
 
     // A 2D-point / 2D-rect knob is ONLY drag-to-edit on the Form+2D preview — so default a freshly-authored op that
     // has one to form2d, else the feature is silently hidden behind the form3d default. Still a DECLARATION: a `panel`
@@ -557,6 +580,7 @@ function saveAsCustomOp() {
         sim: blkSim !== undefined ? blkSim : ((editingDef && editingDef.sim) || null),
         knobs: bindings.length,
         editing: editingDef ? { opType: _editingWizard, label: editingDef.label || _editingWizard } : null,
+        lockUpdate,   // maintained-as-data → the dialog disables Update + explains why (Save-as-new stays)
     }, (meta) => {
         const panel = blkPanel || meta.panel;
         let sim = blkSim !== undefined ? blkSim : meta.sim;
@@ -566,6 +590,12 @@ function saveAsCustomOp() {
         // Non-destructive: only an EXPLICIT "Update" (mode 'update') overwrites the re-authored wizard. Anything else —
         // a fresh op, or "Save as new" while editing — creates a SEPARATE wizard, leaving the original untouched.
         const update = meta.mode === 'update' && _editingWizard;
+        // GUARD (belt-and-suspenders; the dialog already disables the Update button): a maintained-as-data def refuses
+        // the visual Update — it would strip bindingSpecs + the rich metadata. Save-as-new (a copy) is the path.
+        if (update && lockUpdate) {
+            alert(`“${(editingDef && editingDef.label) || _editingWizard}” is maintained as data — updating it here would strip its data-driven parameters. Use “Save as new”, or edit its template.`);
+            return;
+        }
         try {
             if (update) {
                 updateUserOp(userOpFromStack(_editingWizard, meta.name, a.opRec.children, bindings, panel, sim));
