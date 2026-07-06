@@ -254,6 +254,16 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (sp) items.push({ kind: 'line', x1: +sp.x, y1: +sp.y, x2: +sp.x, y2: wy, cls: 'fc-edge-approach' });
         }
     }
+    // t345 E6 — the GUI EDGE PICKER (opt-in, MIRROR cornerPick): an axis+dir op gets clickable stock WALLS — click a wall to
+    // SET axis+dir in ONE gesture (FeatureCanvas._drawEdgePick draws the 4 edge strips; onEdgePick writes the dropdowns via
+    // their OWN change seam, so the dropdowns stay as fallback + sync). Form-write only, NO emit change (the emit reads the params).
+    const edgePick = (edgeAxisBind && edgeDirBind) ? {
+        edgeSel: { axis: params.axis === 'Y' ? 'Y' : 'X', dir: (params.dir || 'pos') !== 'neg' ? 'pos' : 'neg' },
+        onEdgePick: (axis, dir) => {
+            const setParam = (param, val) => { const s = (typeof document !== 'undefined') && document.querySelector(`#wiz_user_form [data-param="${param}"]`); if (s && s.value !== val) { s.value = val; s.dispatchEvent(new Event('change', { bubbles: true })); } };
+            setParam('axis', axis); setParam('dir', dir);
+        },
+    } : {};
     const cornerBind = (def.bindings || []).find((b) => b && b.param === 'corner' && b.type === 'enum');
     const cornerPick = cornerBind ? {
         corner: params.corner,
@@ -291,9 +301,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                 } else if (spotOnDrag) spotOnDrag(id, world);
             }
             : spotOnDrag;
-        return { stock, items, handles: allHandles, onDrag: wrappedOnDrag, ...cornerPick };
+        return { stock, items, handles: allHandles, onDrag: wrappedOnDrag, ...cornerPick, ...edgePick };
     }
-    return { stock, items, handles, onDrag: spotOnDrag, ...cornerPick };
+    return { stock, items, handles, onDrag: spotOnDrag, ...cornerPick, ...edgePick };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).

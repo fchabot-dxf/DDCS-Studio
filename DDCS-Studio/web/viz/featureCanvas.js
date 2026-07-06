@@ -99,6 +99,9 @@ export class FeatureCanvas {
                 // t112 — a click on a stock CORNER target sets the `corner` param (the GUI corner-selector).
                 const cn = this._hitCorner(w);
                 if (cn) { if (this.spec.onCornerPick) this.spec.onCornerPick(cn.code); e.preventDefault(); return; }
+                // t345 E6 — a click on a stock EDGE/WALL sets axis+dir in one gesture (the GUI edge picker; mirrors corner-pick).
+                const eg = this._hitEdge(w);
+                if (eg) { if (this.spec.onEdgePick) this.spec.onEdgePick(eg.axis, eg.dir); e.preventDefault(); return; }
             }
             try { svg.setPointerCapture(e.pointerId); } catch (_) {}
             // Grab a handle. For a POSITION handle, precompute the snap "from" points (the handle itself + the path's
@@ -398,6 +401,7 @@ export class FeatureCanvas {
 
         this._drawStockAttach(spec);
         this._drawCornerPick(spec);
+        this._drawEdgePick(spec);   // t345 E6 — the GUI edge/wall picker (opt-in via spec.onEdgePick)
 
         // Snap feedback: a green lock-ring + centre dot on the stock anchor (or part-zero) the dragged position handle
         // is locked onto — so it's obvious when the magnet caught (and which anchor).
@@ -494,6 +498,47 @@ export class FeatureCanvas {
         const tol = 12 / this._tf.scale;
         let best = null, bd = tol;
         this._cornerPts.forEach((p) => { const d = Math.hypot(p.x - w.x, p.y - w.y); if (d <= bd) { bd = d; best = p; } });
+        return best;
+    }
+
+    /** Edge/wall picker (t345 E6) — click a stock WALL to set axis+dir in one gesture (GUI-first, augments the Axis/Direction
+     *  dropdowns; UX parity with the corner picker). 4 clickable EDGE strips: Left(x=0)→X/pos · Right(x=W)→X/neg ·
+     *  Front(y=0)→Y/pos · Back(y=H)→Y/neg (matches edgeStack's axis/dir → the probed wall). The CURRENT wall gets a filled
+     *  class; hover-highlights via CSS. Clicking → spec.onEdgePick(axis, dir) → the emit + the E3 wall glyph + the sim-start
+     *  all follow. Opt-in: only ops whose spec carries onEdgePick (an axis+dir op). Drawn in gHandles (top, clickable). */
+    _drawEdgePick(spec) {
+        this._edgeSegs = null;
+        if (!spec || !spec.onEdgePick || !spec.stock || !(spec.stock.w > 0) || !(spec.stock.h > 0)) return;
+        const w = spec.stock.w, h = spec.stock.h, ox = spec.stock.ox || 0, oy = spec.stock.oy || 0;
+        const sel = spec.edgeSel || {};
+        const curAxis = sel.axis === 'Y' ? 'Y' : 'X', curDir = sel.dir === 'neg' ? 'neg' : 'pos';
+        const edges = [
+            { axis: 'X', dir: 'pos', x1: ox, y1: oy, x2: ox, y2: oy + h },           // left face (x=0)
+            { axis: 'X', dir: 'neg', x1: ox + w, y1: oy, x2: ox + w, y2: oy + h },   // right face (x=W)
+            { axis: 'Y', dir: 'pos', x1: ox, y1: oy, x2: ox + w, y2: oy },           // front face (y=0)
+            { axis: 'Y', dir: 'neg', x1: ox, y1: oy + h, x2: ox + w, y2: oy + h },   // back face (y=H)
+        ];
+        const segs = [];
+        for (const eg of edges) {
+            const a = this._S(eg.x1, eg.y1), b = this._S(eg.x2, eg.y2);
+            const isCur = eg.axis === curAxis && eg.dir === curDir;
+            this.gHandles.appendChild(svgEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, 'data-axis': eg.axis, 'data-dir': eg.dir, class: 'fc-edge-pick' + (isCur ? ' fc-edge-pick-cur' : ''), style: 'cursor:pointer' }));
+            segs.push(eg);
+        }
+        this._edgeSegs = segs;
+    }
+
+    /** Hit-test the edge-pick strips in world units → the nearest wall's {axis, dir} or null (perpendicular dist to the segment). */
+    _hitEdge(w) {
+        if (!this._edgeSegs || !w) return null;
+        const tol = 10 / this._tf.scale;
+        let best = null, bd = tol;
+        for (const s of this._edgeSegs) {
+            const dx = s.x2 - s.x1, dy = s.y2 - s.y1, len2 = dx * dx + dy * dy || 1;
+            let t = ((w.x - s.x1) * dx + (w.y - s.y1) * dy) / len2; t = Math.max(0, Math.min(1, t));
+            const px = s.x1 + t * dx, py = s.y1 + t * dy, d = Math.hypot(px - w.x, py - w.y);
+            if (d <= bd) { bd = d; best = { axis: s.axis, dir: s.dir }; }
+        }
         return best;
     }
 
