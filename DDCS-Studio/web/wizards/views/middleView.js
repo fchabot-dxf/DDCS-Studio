@@ -130,7 +130,7 @@ export const middleView = {
             syncA: el('m_sync_a')?.checked || false,
             slave: el('m_slave')?.value || '3',
             wcs: el('m_wcs')?.value || 'active',
-            dist: el('m_dist')?.value || '20',
+            dist: el('m_dist')?.value || '200',
             retract: el('m_retract')?.value || '2',
             safeZ: el('m_safe_z')?.value || '10',
             safeZFrame: safeZFrameValue('m_safe_z'),   // SPATIAL-MODEL 1c: final-park frame (relative | machine G53)

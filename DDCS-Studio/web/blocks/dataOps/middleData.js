@@ -36,8 +36,8 @@ export const MIDDLE_DEFAULTS = {
     featureType: 'pocket', inAxis: 'auto', transAxis: 'auto', twoAxis: false, circular: false, probeZ: 0, wcs: 'active', syncA: 0,
     // baked value/order swaps (NOT bound in E1)
     axis: 'X', dir1: 'pos', slave: '3',
-    // scalars
-    dist: 20, retract: 2, f_fast: 200, f_slow: 50, port: 3, radius: 2, safeZ: 10, clearOver: 15,
+    // scalars — dist default 200 (t381: 20 was too small to reach the wall on a typical stock → "retract-only"; matches middleStack's fallback + the m_dist form default)
+    dist: 200, retract: 2, f_fast: 200, f_slow: 50, port: 3, radius: 2, safeZ: 10, clearOver: 15,
     crossX: '80', crossY: '80', diagTravel: '50', diagPrimary: '#53',
 };
 

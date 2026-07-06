@@ -51,7 +51,7 @@ export function middleStack(params = {}, opts = {}) {
     const resolvedDir2 = (typeof params.dir2 === 'string') ? params.dir2 : (dir1Plus ? 'neg' : 'pos');
     const dir2Plus = resolvedDir2 === 'pos';
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
-    const dist = num(params.dist, 20), retract = num(params.retract, 2), safeZ = num(params.safeZ, 10);
+    const dist = num(params.dist, 200), retract = num(params.retract, 2), safeZ = num(params.safeZ, 10);   // MAX PROBE default 200 (t381 — 20 was too small to reach the wall → the probe fired short + retracted → "retract-only")
     const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL 1c: relative (default) | machine (G53 final park)
     const clearOver = num(params.clearOver, 15);   // boss AUTO: how high to lift before crossing over the part
     // Boss-AUTO probe-both: the in-axis wall1→wall2 cross-over — the straight TRAVERSE that spans the feature, SEPARATE
