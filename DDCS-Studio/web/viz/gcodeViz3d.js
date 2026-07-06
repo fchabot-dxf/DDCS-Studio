@@ -314,9 +314,10 @@ export class GcodeViz3D {
     }
 
     _positionMarkers() {
+        const off = this._probeXYOff();   // t363 — map each min-XY marker onto the datum-placed stock (physical − datum)
         for (let p = 0; p < this.spindleMarkers.length; p++) {
             const s = this._markerWorld(p);
-            this.spindleMarkers[p].position.set(s.x, s.y, s.z);
+            this.spindleMarkers[p].position.set(s.x - off.x, s.y - off.y, s.z);
         }
         this._highlightSelectedStart();
     }
@@ -575,7 +576,8 @@ export class GcodeViz3D {
         // the engine collision/DRO, else on a corner AUTO reposition pass the head floats off the drawn dog-leg it traces.
         // passAnchorFor → the previous pass's RUNTIME END for a flagged pass (t107), else self (non-corner / manual / pass 0).
         const o = this._anchorToStart ? (passAnchorFor(this.starts, this._passEnds, pass) || this.starts[pass] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
-        this._animTool.position.set((pos.x || 0) + o.x, (pos.y || 0) + o.y, (pos.z || 0) + o.z);
+        const doff = this._probeXYOff();   // t363 — map the live tool onto the datum-placed stock (physical − datum)
+        this._animTool.position.set((pos.x || 0) + o.x - doff.x, (pos.y || 0) + o.y - doff.y, (pos.z || 0) + o.z);
         // Engine-driven trail: bold the executed route up to the tool head (option B — what you see is the path
         // the engine actually ran). Enable trail mode lazily; setAnimate(false)/ddcsStopPreview restores it.
         if (this._trailLine && this._animSegs && this._animSegs.length) {
@@ -781,7 +783,9 @@ export class GcodeViz3D {
             // pass (t107 machine-faithful, via _passEnds — post probe+retract+lift, incl the Z-trust lift), else the
             // static previous start (t94 fallback). NOT its own net-endpoint marker (that double-counts +cross). MANUAL /
             // pass-0 / non-corner fall back to self (mk). The marker SPRITE (_positionMarkers) relocates to the same end+cross.
-            const off = this._anchorToStart ? (passAnchorFor(this.starts, this._passEnds, p) || mk) : { x: 0, y: 0, z: 0 };
+            const rawOff = this._anchorToStart ? (passAnchorFor(this.starts, this._passEnds, p) || mk) : { x: 0, y: 0, z: 0 };
+            const dOff = this._probeXYOff();   // t363 — map the whole route onto the datum-placed stock (physical − datum)
+            const off = { x: rawOff.x - dOff.x, y: rawOff.y - dOff.y, z: rawOff.z };
             // A MANUAL reposition draws a dashed jog from the previous pass's end to this pass's start (the operator
             // physically moves there). An AUTO traverse does NOT — its auto-traverse move (the diagonal) IS the connecting
             // travel, so a jog line here is a PHANTOM (the dashed line that "shouldn't be there" in auto). Gate by source.
@@ -1070,6 +1074,25 @@ export class GcodeViz3D {
     }
 
     // Translucent stock block — WCS zero at the top, min XY corner: X[0..x] Y[0..y] Z[-z..0]
+    // t363 — the datum's offset from the stock's MIN-XY corner: [Dx,Dy,Dz], each = dfrac(n=0/c=0.5/p=1) × the dim. The ONE
+    // source both setStock (to place the stock's datum corner at part-zero) AND the probe geometry (to derive corner − datum)
+    // read — so the stock, the probe path/tool/markers, and FACE-2 features all map onto the SAME part-zero frame.
+    _datumFrac(stock) {
+        const OLD = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
+        let c = (stock && stock.datum) || 'nnp';
+        if (!/^[ncp]{3}$/.test(c)) c = OLD[c] || 'nnp';
+        const f = { n: 0, c: 0.5, p: 1 };
+        return [f[c[0]] * (stock ? stock.x : 0), f[c[1]] * (stock ? stock.y : 0), f[c[2]] * (stock ? stock.z : 0)];
+    }
+    // t363 — the XY datum offset that maps the PROBE geometry (markers/tool/path, authored in the stock MIN-XY frame) onto
+    // the datum-placed stock: SUBTRACT it so a physical point renders at (physical − datum) relative to part-zero. Probe ops
+    // only (start-anchored); a mill/absolute path is already in part-zero coords → zero. Preview-only; the EMIT is untouched.
+    _probeXYOff() {
+        if (!this._anchorToStart || !this._stock) return { x: 0, y: 0 };
+        const D = this._datumFrac(this._stock);
+        return { x: D[0], y: D[1] };
+    }
+
     setStock(stock) {
         const THREE = this.THREE;
         this._stock = stock || null;
@@ -1143,11 +1166,7 @@ export class GcodeViz3D {
             // Datum = which BOX POINT of the stock is part-zero: a 3-char code [X][Y][Z], each n(min)/c(centre)/
             // p(max). Migrate the legacy XY-only fl/fr/bl/br/center (all top-Z). Dx/Dy/Dz = the datum's offset
             // from the stock's min corner, so pg.position places that point at the origin (or the WCS pin).
-            const OLD_DATUM = { fl: 'nnp', fr: 'pnp', bl: 'npp', br: 'ppp', center: 'ccp' };
-            let dcode = stock.datum || 'nnp';
-            if (!/^[ncp]{3}$/.test(dcode)) dcode = OLD_DATUM[dcode] || 'nnp';
-            const dfrac = { n: 0, c: 0.5, p: 1 };
-            const D = [dfrac[dcode[0]] * stock.x, dfrac[dcode[1]] * stock.y, dfrac[dcode[2]] * stock.z];   // [Dx,Dy,Dz] from min corner (Dz: 0=bottom, z=top)
+            const D = this._datumFrac(stock);   // [Dx,Dy,Dz] from min corner (Dz: 0=bottom, z=top) — the ONE datum-offset source (t363)
             // XY follows the datum (the stock's WCS-XY pin — for convenience). Z is the subtle one: an
             // incremental / start-anchored op (a probe) is operator-relative — it references the stock SURFACE, not
             // the datum (the datum is a mill/WCS-Z concept) — so present the stock TOP-AT-0 regardless of datum, so
@@ -1655,8 +1674,9 @@ export class GcodeViz3D {
                 const t1 = this._closestAxisT(this.raycaster.ray, this._dragStart0, this._dragDir);
                 const delta = t1 - this._dragT0;
                 const s = this.starts[this._dragPass] || (this.starts[this._dragPass] = { x: 0, y: 0, z: 0 });
-                s.x = this._dragStart0.x + this._dragDir.x * delta;
-                s.y = this._dragStart0.y + this._dragDir.y * delta;
+                const doff = this._probeXYOff();   // t363 — convert the dragged (datum-relative) gizmo back to the min-XY start
+                s.x = this._dragStart0.x + this._dragDir.x * delta + doff.x;
+                s.y = this._dragStart0.y + this._dragDir.y * delta + doff.y;
                 s.z = this._dragStart0.z + this._dragDir.z * delta;
                 this._rebuild();
                 this.render();
@@ -1722,7 +1742,8 @@ export class GcodeViz3D {
                     : g.axis === 'y' ? new THREE.Vector3(0, 1, 0)
                     : new THREE.Vector3(0, 0, 1);
                 const s = this.starts[g.pass] || { x: 0, y: 0, z: 0 };
-                this._dragStart0 = new THREE.Vector3(s.x, s.y, s.z);
+                const doff = this._probeXYOff();   // t363 — the gizmo renders at (start − datum); drag in that frame, convert back on set
+                this._dragStart0 = new THREE.Vector3(s.x - doff.x, s.y - doff.y, s.z);
                 this.raycaster.setFromCamera(this._ndc(e), this.camera);
                 this._dragT0 = this._closestAxisT(this.raycaster.ray, this._dragStart0, this._dragDir);
                 this._setHighlight(g.pass, g.axis);
