@@ -61,9 +61,11 @@ export const MIDDLE_BINDING_SPECS = [
     // prune-gated optionals — present only in their structural shape (deriveBindings skips when the socket is pruned away)
     { param: 'crossX',    type: 'number', default: 80, optional: true, when: { param: 'featureType', is: 'boss' }, label: 'X Cross-Over', help: 'Boss auto: how far to traverse across the feature from wall 1 to wall 2 in X (≈ feature width + 2× approach).', section: 'GEOMETRY', match: { type: 'assign', var: '#19' }, key: 'value' },
     { param: 'crossY',    type: 'number', default: 80, optional: true, when: { param: 'featureType', is: 'boss' }, label: 'Y Cross-Over', help: 'Boss auto: how far to traverse across the feature from wall 1 to wall 2 in Y (≈ feature width + 2× approach).', section: 'GEOMETRY', match: { type: 'assign', var: '#20' }, key: 'value' },
-    { param: 'diagTravel', type: 'number', default: 50, optional: true, when: { param: 'twoAxis', is: true }, label: 'Diag Travel', help: 'Boss two-axis auto: the diagonal traverse distance from the first axis walls to the perpendicular walls.', section: 'GEOMETRY', match: { type: 'assign', var: '#21' }, key: 'value' },
-    // diagPrimary → #22: NO default → the socket-held expression '#53' (re-centre) holds when untouched (the ② drag target is a later slice)
-    { param: 'diagPrimary', type: 'number', optional: true, when: { param: 'twoAxis', is: true }, label: 'Diag Primary Target', section: 'GEOMETRY', match: { type: 'assign', var: '#22' }, key: 'value' },
+    // diagTravel #21 + diagPrimary #22 are DRAG-DRIVEN by the ② canvas handle (t383) — the SOLE editor. t389 (human): render
+    // them READONLY (display the ②-derived value, not a competing editable input) — the ② drag still writes them via _writeParam.
+    { param: 'diagTravel', type: 'number', default: 50, optional: true, readonly: true, readonlyHint: 'Set by dragging the ② handle on the 2D canvas', when: { param: 'twoAxis', is: true }, label: 'Diag Travel', help: 'Boss two-axis auto: the diagonal traverse distance from the first axis walls to the perpendicular walls — set by dragging the ② handle.', section: 'GEOMETRY', match: { type: 'assign', var: '#21' }, key: 'value' },
+    // diagPrimary → #22: NO default → the socket-held expression '#53' (re-centre) holds when untouched; the ② drag sets it.
+    { param: 'diagPrimary', type: 'number', optional: true, readonly: true, readonlyHint: 'Set by dragging the ② handle on the 2D canvas', when: { param: 'twoAxis', is: true }, label: 'Diag Primary Target', section: 'GEOMETRY', match: { type: 'assign', var: '#22' }, key: 'value' },
 ];
 
 /** The STRUCTURAL toggle bindings — params that drive the guard prune (NO value socket → no blockIndex/match). Each flips

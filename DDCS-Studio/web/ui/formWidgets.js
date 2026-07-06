@@ -53,6 +53,10 @@ function numberWidget(host, b) {
     if (b.socketHeld) { inp.value = ''; inp.placeholder = 'auto'; } else { inp.value = b.default ?? 0; }
     inp.style.cssText = CTRL_CSS + ' width:120px;';
     inp.dataset.param = b.param;   // so a 2D-preview handle can write this field back (drag-to-edit derives from roles)
+    // t389 — a DRAG-DRIVEN binding (e.g. middle's diagTravel #21 / diagPrimary #22, set by the ② canvas handle) renders
+    // READONLY: it DISPLAYS the drag-derived value but is not a competing editable input. A programmatic write (the 2D handle's
+    // _writeParam sets .value + dispatches 'input') still lands + reads back — readOnly only blocks USER typing, not the drag.
+    if (b.readonly) { inp.readOnly = true; inp.title = b.readonlyHint || 'Set by dragging the ② handle on the canvas'; inp.style.opacity = '0.6'; inp.style.cursor = 'default'; }
     // t311 — DECLARE the stepper (spinner) side. Default (unset / 'right') keeps the NATIVE right spinner UNCHANGED
     // (byte-identical). 'left' hides the native spinner and mounts a custom ▲▼ stepper ELEMENT, placed on the LEFT via
     // CSS flex `order` (a declared class, not a per-field hack). The read() closure below binds `inp` either way.

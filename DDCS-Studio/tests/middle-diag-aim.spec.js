@@ -90,3 +90,38 @@ test('② diagAim: the in-place Middle shows the ② handle for boss+probe-both+
   expect(r.untouchedByteIdentical, 'UNTOUCHED: the twin emit is byte-identical to the built-in (the ② handle is preview-only until dragged)').toBe(true);
   expect(r.untouched21, 'UNTOUCHED: #21 stays the default 50').toMatch(/^#21=50 \(/);
 });
+
+/**
+ * t389 (human "the forms arent used, we can use the variable") — Diag Travel (#21) + Diag Primary (#22) are DRAG-DRIVEN by
+ * the ② canvas handle (the SOLE editor), so their form fields render READONLY (display the ②-derived value, not a competing
+ * editable input). A programmatic write (the ② drag's _writeParam) STILL lands (readOnly blocks USER typing only). Emit unchanged.
+ */
+test('② drag-driven fields: Diag Travel/Primary render READONLY (the ② drag is the sole editor)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+  await page.evaluate(async () => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 100, y: 80, z: 20, shape: 'boss', show: true } }); });
+  await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const M = await import('/blocks/dataOps/middleData.js'); try { U.registerUserOp(M.middleDataDef()); } catch (_) {} });
+  await page.evaluate(() => window.openWiz('user_middle_data'));
+  await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
+  await page.evaluate(() => { const s = document.querySelector('#wiz_user_form [data-param="featureType"]'); if (s) { s.value = 'boss'; s.dispatchEvent(new Event('change', { bubbles: true })); } });
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const form = document.getElementById('wiz_user_form');
+    const segAuto = form.querySelector('[data-param="transAxis"] [data-value="auto"]'); if (segAuto) segAuto.click();
+    const labSpan = Array.from(form.querySelectorAll('span')).find((sp) => (sp.textContent || '').trim() === 'Find Both Axes');
+    const cb = labSpan && labSpan.parentElement && labSpan.parentElement.querySelector('.ddcs-switch input');
+    if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
+  await page.waitForTimeout(600);
+  const r = await page.evaluate(() => {
+    const dt = document.querySelector('#wiz_user_form [data-param="diagTravel"]');
+    const dp = document.querySelector('#wiz_user_form [data-param="diagPrimary"]');
+    let dtAfter = null;
+    if (dt) { dt.value = '42'; dt.dispatchEvent(new Event('input', { bubbles: true })); dtAfter = dt.value; }   // the ② drag writes it (programmatic)
+    return { dtRendered: !!dt, dtReadonly: !!(dt && dt.readOnly), dpReadonly: !!(dp && dp.readOnly), dtAfter };
+  });
+  expect(r.dtRendered, 'the Diag Travel field renders (boss + probe-both)').toBe(true);
+  expect(r.dtReadonly, 'Diag Travel (#21) renders READONLY — the ② drag is the sole editor').toBe(true);
+  expect(r.dpReadonly, 'Diag Primary (#22) renders READONLY').toBe(true);
+  expect(r.dtAfter, 'the ② drag (a programmatic write) STILL lands on the readonly field (readOnly blocks USER typing only)').toBe('42');
+});

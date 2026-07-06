@@ -76,6 +76,8 @@ export function deriveBindings(flatStack, specs) {
         if (s.role) b.role = s.role;      // canvas-layout role (x/y/w/h/… — the draggable handle it drives)
         if (s.relTo != null) b.relTo = s.relTo;   // incremental socket: anchor the point to the op's Nth sim-start (drag writes a delta)
         if (s.when) b.when = s.when;   // gated binding — the form field + the canvas handle show it only when whenOk(when, params)
+        if (s.readonly) b.readonly = true;   // t389 — a DRAG-DRIVEN socket: the form field DISPLAYS it (readonly), the canvas handle is the sole editor
+        if (s.readonlyHint) b.readonlyHint = s.readonlyHint;
         out.push(b);
     }
     return out;
