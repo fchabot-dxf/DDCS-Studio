@@ -10,6 +10,7 @@ import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { opSimStarts, resolveRelToIndex } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket); resolveRelToIndex maps a SEMANTIC {row} → the surviving pass
 import { markerWorldOf } from '../../viz/markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the 3D preview ALSO reads, so the Layout handle + the 3D ruby can't diverge
 import { whenOk } from '../../blocks/whenGuard.js';   // a `when`-gated binding-group's handle shows only when its guard passes (③ — the prune-gated start handle)
+import { datumXY } from '../../engine/workpiece.js';   // t359 — the part-zero (datum) position, so the origin crosshair follows the datum (the corner-pick circles stay on the physical corners)
 
 export const PANEL_TYPES = {
     form:        { id: 'form',        label: 'Form only',      viz: false, mode: null },   // single column, no preview
@@ -87,6 +88,12 @@ export function pinnedStartsFor(def, params, spots) {
 export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
+    // t359 — the part-zero crosshair follows the DATUM (the selected part-zero corner/centre), consistent with the stock
+    // modal + the 3D. The corner-pick circles stay on the PHYSICAL corners (cornerDatumXY, datum-independent) — the datum
+    // and the probed corner are INDEPENDENT. Display-only (the crosshair position); the emit is untouched. Default datum
+    // ('nnp') → origin {0,0} = the min-XY corner = the prior behaviour, so nothing shifts unless a non-FL datum is set.
+    const _dp = datumXY({ x: stock.w, y: stock.h, datum: s && s.datum });
+    const origin = { x: (stock.ox || 0) + _dp.x, y: (stock.oy || 0) + _dp.y };
     // t120 — CORNER-MARKER INDEPENDENCE (Option A): the DATUM for the datum-relative marker spots = the CORNER position
     // (cornerXY, per-corner) — so a stored spot re-anchors when the corner changes. Only the corner op has one; absent →
     // no spot logic (other ops keep the incremental-socket behavior). `spots` = the persisted per-group datum-relative spot
@@ -301,9 +308,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                 } else if (spotOnDrag) spotOnDrag(id, world);
             }
             : spotOnDrag;
-        return { stock, items, handles: allHandles, onDrag: wrappedOnDrag, ...cornerPick, ...edgePick };
+        return { stock, items, handles: allHandles, onDrag: wrappedOnDrag, origin, ...cornerPick, ...edgePick };
     }
-    return { stock, items, handles, onDrag: spotOnDrag, ...cornerPick, ...edgePick };
+    return { stock, items, handles, onDrag: spotOnDrag, origin, ...cornerPick, ...edgePick };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
