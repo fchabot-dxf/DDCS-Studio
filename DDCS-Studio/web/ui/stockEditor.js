@@ -13,6 +13,21 @@ import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 import { popReturn, dropReturn, activeReturn } from './navReturn.js';   // central back-navigation: the ✕ returns to wherever we came from
 import { FeatureCanvas } from '../viz/featureCanvas.js';                // M1: the shared 2D top-down canvas (workpiece editor)
 import { getWorkpiece, workpieceBackdrop } from '../engine/workpiece.js';   // M1: the workpiece VIEW + its ONE-source backdrop spec
+import { GcodeViz3D } from '../viz/gcodeViz3d.js';                      // M1b: a stock-ONLY 3D preview (setStock, no toolpath) for depth
+
+// M1b — ONE reused GcodeViz3D for the modal's 3D pane. A fresh WebGLRenderer per open would leak WebGL contexts
+// (browsers cap them); instead we keep a single instance + its host div module-level and RE-PARENT the host into the
+// modal each open (like createPreviewPanel reuses one viz). Its context survives close/reopen. null if three.js is
+// unavailable (e.g. a headless env with no WebGL) → the 3D pane degrades gracefully, the 2D editor still works.
+let _stockViz = null;
+function stockViz() {
+    if (_stockViz) return _stockViz;
+    const host = document.createElement('div');
+    host.style.cssText = 'width:100%; height:100%;';
+    try { _stockViz = new GcodeViz3D(host); _stockViz._animOn = false; _stockViz.__host = host; }
+    catch (e) { _stockViz = null; }
+    return _stockViz;
+}
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 
@@ -45,10 +60,10 @@ export function openStockEditor(anchor, opts) {
     const s = getSettings().stock || {};
     const pop = document.createElement('div');
     pop.className = 'stock-editor-pop';
-    pop.style.cssText = 'position:fixed; left:50%; top:13%; transform:translateX(-50%); z-index:10050;' +
+    pop.style.cssText = 'position:fixed; left:50%; top:9%; transform:translateX(-50%); z-index:10050;' +
         'background:rgba(20,22,28,0.98); border:1px solid rgba(255,255,255,0.14); border-radius:8px;' +
-        'padding:12px 14px; color:#e6ecf2; font-size:12px; width:300px; box-shadow:0 10px 34px rgba(0,0,0,0.55);' +
-        'max-height:82vh; overflow-y:auto;';   // M1: the top-view canvas makes the popover taller — cap + scroll so it fits
+        'padding:12px 14px; color:#e6ecf2; font-size:12px; width:min(720px,96vw); box-shadow:0 10px 34px rgba(0,0,0,0.55);' +
+        'max-height:88vh; overflow-y:auto;';   // M1b DUAL-PANE — forms LEFT + the 2D drag canvas & the 3D depth preview RIGHT (human t355)
     pop.innerHTML = `
         <style>
             .stock-editor-pop input, .stock-editor-pop select { width:100%; box-sizing:border-box; background:#11141a; color:#e6ecf2; border:1px solid #3a414d; border-radius:4px; padding:3px 5px; }
@@ -69,65 +84,110 @@ export function openStockEditor(anchor, opts) {
             <span style="font-weight:bold; letter-spacing:1px; color:#9fb4cc;">STOCK</span>
             <button id="se_close" class="toolbar-btn" style="padding:1px 8px;" title="Close">✕</button>
         </div>
-        <!-- M1: top-view WORKPIECE canvas — a live 2D top-down of the outer block + its features (read-only this slice) -->
-        <div id="se_canvas" style="height:150px; margin-bottom:10px; background:#0d0f14; border:1px solid #2a3340; border-radius:5px; overflow:hidden;"></div>
-        <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:10px;">
-            <label class="col">Template
-                <select id="se_tpl">
-                    <option value="">— template —</option>
+        <!-- M1b DUAL-PANE (human t355): FORMS on the LEFT; the 2D top-view (drag surface) + a stock-only 3D preview on the RIGHT -->
+        <div style="display:flex; gap:14px; align-items:stretch;">
+          <div style="width:250px; flex:0 0 250px; display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <label class="col">Template
+                    <select id="se_tpl">
+                        <option value="">— template —</option>
+                    </select>
+                </label>
+                <div style="display:flex; gap:6px;">
+                    <button id="se_tpl_save" class="toolbar-btn" style="flex:1; padding:3px 5px; font-size:11px;" title="Save current settings as a template">⭐ Save template</button>
+                    <button id="se_tpl_del" class="toolbar-btn" style="flex:1; padding:3px 5px; font-size:11px; display:none;" title="Delete selected template">🗑 Delete</button>
+                </div>
+                <div id="se_tpl_saverow" style="display:none; gap:6px; margin-top:6px;">
+                    <input id="se_tpl_name" type="text" placeholder="Template name…" style="flex:1;">
+                    <button id="se_tpl_ok" class="toolbar-btn" style="padding:3px 9px;" title="Save">✓</button>
+                    <button id="se_tpl_cancel" class="toolbar-btn" style="padding:3px 9px;" title="Cancel">✕</button>
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                <label class="col">X<input id="se_x" type="number" min="0" step="1"></label>
+                <label class="col">Y<input id="se_y" type="number" min="0" step="1"></label>
+                <label class="col">Z<input id="se_z" type="number" min="0" step="1"></label>
+            </div>
+            <label class="col">Shape
+                <select id="se_shape">
+                    <option value="boss">Boss — probe the outside</option>
+                    <option value="pocket">Pocket — probe the inside</option>
+                    <option value="cylinder">Cylinder — rotary stock</option>
                 </select>
             </label>
-            <div style="display:flex; gap:6px;">
-                <button id="se_tpl_save" class="toolbar-btn" style="flex:1; padding:3px 5px; font-size:11px;" title="Save current settings as a template">⭐ Save template</button>
-                <button id="se_tpl_del" class="toolbar-btn" style="flex:1; padding:3px 5px; font-size:11px; display:none;" title="Delete selected template">🗑 Delete</button>
-            </div>
-            <div id="se_tpl_saverow" style="display:none; gap:6px; margin-top:6px;">
-                <input id="se_tpl_name" type="text" placeholder="Template name…" style="flex:1;">
-                <button id="se_tpl_ok" class="toolbar-btn" style="padding:3px 9px;" title="Save">✓</button>
-                <button id="se_tpl_cancel" class="toolbar-btn" style="padding:3px 9px;" title="Cancel">✕</button>
-            </div>
-        </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
-            <label class="col">X<input id="se_x" type="number" min="0" step="1"></label>
-            <label class="col">Y<input id="se_y" type="number" min="0" step="1"></label>
-            <label class="col">Z<input id="se_z" type="number" min="0" step="1"></label>
-        </div>
-        <label class="col" style="margin-bottom:10px;">Shape
-            <select id="se_shape">
-                <option value="boss">Boss — probe the outside</option>
-                <option value="pocket">Pocket — probe the inside</option>
-                <option value="cylinder">Cylinder — rotary stock</option>
-            </select>
-        </label>
-        <label class="col" id="se_dia_row" style="margin-bottom:10px; display:none;">Bar Ø <span style="color:#9fb4cc;font-size:10px;">(optional — the cylinder OD; blank = fills the box, min Y/Z)</span>
-            <input id="se_dia" type="number" min="0" step="0.1" placeholder="min(Y, Z)">
-        </label>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;">
-            <label class="col">Part-zero (datum)
-                <div id="se_datum_pick" class="se-datum-pick" title="Click the box point of the stock that is your part-zero / program origin"></div>
-                <span id="se_datum_name" style="font-size:10px; color:#9fb4cc; text-align:center;"></span>
+            <label class="col" id="se_dia_row" style="display:none;">Bar Ø <span style="color:#9fb4cc;font-size:10px;">(optional — the cylinder OD; blank = fills the box, min Y/Z)</span>
+                <input id="se_dia" type="number" min="0" step="0.1" placeholder="min(Y, Z)">
             </label>
-            <label class="col">Sits at WCS
-                <select id="se_pin" title="Where this stock sits in the machine: the program zero, or pinned to a WCS offset from the table (Settings → Hardware → WCS). This is the stock's WCS — the op runs from its datum.">
-                    <option value="origin">Program zero</option>
-                    <option value="g54">G54</option><option value="g55">G55</option><option value="g56">G56</option>
-                    <option value="g57">G57</option><option value="g58">G58</option><option value="g59">G59</option>
-                </select>
-            </label>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <label class="col">Part-zero (datum)
+                    <div id="se_datum_pick" class="se-datum-pick" title="Click the box point of the stock that is your part-zero / program origin"></div>
+                    <span id="se_datum_name" style="font-size:10px; color:#9fb4cc; text-align:center;"></span>
+                </label>
+                <label class="col">Sits at WCS
+                    <select id="se_pin" title="Where this stock sits in the machine: the program zero, or pinned to a WCS offset from the table (Settings → Hardware → WCS). This is the stock's WCS — the op runs from its datum.">
+                        <option value="origin">Program zero</option>
+                        <option value="g54">G54</option><option value="g55">G55</option><option value="g56">G56</option>
+                        <option value="g57">G57</option><option value="g58">G58</option><option value="g59">G59</option>
+                    </select>
+                </label>
+            </div>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; width:auto;"><input id="se_show" type="checkbox" style="width:auto;"> Show stock in 3D</label>
+            <div style="color:#7f8a99; font-size:11px;">Cylinder lies along the rotary axis (Y = diameter, X = length).</div>
+          </div>
+          <div style="flex:1 1 auto; min-width:300px; display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="font-size:10px; letter-spacing:.5px; color:#9fb4cc;">TOP VIEW — drag the ◇ corner to resize</span>
+                <div id="se_canvas" style="height:230px; background:#0d0f14; border:1px solid #2a3340; border-radius:5px; overflow:hidden;"></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="font-size:10px; letter-spacing:.5px; color:#9fb4cc;">3D — stock depth</span>
+                <div id="se_3d" style="height:230px; background:#05070a; border:1px solid #2a3340; border-radius:5px; overflow:hidden;"></div>
+            </div>
+          </div>
         </div>
-        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; width:auto;"><input id="se_show" type="checkbox" style="width:auto;"> Show stock in 3D</label>
-        <div style="margin-top:10px; color:#7f8a99; font-size:11px;">Cylinder lies along the rotary axis (Y = diameter, X = length).</div>
     `;
     document.body.appendChild(pop);
     _pop = pop;
     makeDraggable(pop, pop.querySelector('.stock-editor-head'));
 
-    // M1 — the top-view WORKPIECE canvas (READ-ONLY this slice; drag-editing is the next). getWorkpiece() projects
-    // the flat stock so the legacy pocket shows as its derived cavity; the shared workpieceBackdrop() is the ONE
-    // source (the same feature glyphs every wizard preview draws). commit() re-renders it on any edit.
+    // M1b — the top-view WORKPIECE canvas with an OUTER resize handle. getWorkpiece() projects the flat stock (the
+    // legacy pocket shows as its derived cavity, still READ-ONLY — feature-drag is M2); workpieceBackdrop() is the ONE
+    // source (same glyphs the wizard previews draw). The size handle sits at the max-XY corner; the min-XY (part-zero)
+    // corner stays FIXED, so the stock grows from its pinned datum corner (the WCS/datum doesn't jump). A drag writes
+    // the FLAT settings.stock.x/y via commit()→applySettings → propagates to the 3D + every wizard preview (the
+    // coherence rule). Two-way: the drag sets the X/Y fields; typing a field re-renders the handle. commit() re-draws.
     const _fc = new FeatureCanvas();
-    const renderWorkpiece = () => { const host = pop.querySelector('#se_canvas'); if (host) _fc.render(host, workpieceBackdrop(getWorkpiece())); };
+    const renderWorkpiece = () => {
+        const host = pop.querySelector('#se_canvas'); if (!host) return;
+        const wp = getWorkpiece();
+        const spec = workpieceBackdrop(wp);
+        const o = wp.outer;
+        if (spec.stock && o && o.x > 0 && o.y > 0) {
+            spec.handles = [{ id: 'size', x: o.x, y: o.y, kind: 'size', label: `${Math.round(o.x)}×${Math.round(o.y)}` }];
+            spec.onDrag = (id, p) => {
+                const nx = Math.max(1, Math.round(p.x)), ny = Math.max(1, Math.round(p.y));
+                const xEl = pop.querySelector('#se_x'), yEl = pop.querySelector('#se_y');
+                if (xEl) xEl.value = String(nx);
+                if (yEl) yEl.value = String(ny);
+                commit();   // FLAT stock.x/y → applySettings → 3D + wizard previews; then re-renders the handle at the new corner
+            };
+        }
+        _fc.render(host, spec);
+    };
     requestAnimationFrame(renderWorkpiece);
+
+    // M1b — the stock-ONLY 3D preview (depth): the reused viz, re-parented into #se_3d. setStock only (no setGcode, no
+    // machine envelope) so the user sees the stock Z + shape update LIVE as they edit. `show:true` so the editor always
+    // renders it regardless of the "Show in 3D" flag. commit() re-sets the stock on every edit; we frame it once.
+    let _vizFit = false;
+    const render3d = () => {
+        const viz = stockViz(); if (!viz) return;
+        const pane = pop.querySelector('#se_3d'); if (!pane) return;
+        if (viz.__host.parentElement !== pane) pane.appendChild(viz.__host);
+        try { viz.setStock({ ...(getSettings().stock || {}), show: true }); } catch (_) {}
+        if (!_vizFit) { try { viz.fitAll && viz.fitAll(); } catch (_) {} _vizFit = true; }
+    };
+    requestAnimationFrame(render3d);
 
     const q = (id) => pop.querySelector('#' + id);
     // Visual datum picker (2D): a TOP-VIEW 3×3 grid for the XY box point (reuses the shared cornergrid — same graphic
@@ -208,7 +268,7 @@ export function openStockEditor(anchor, opts) {
         datum: getDatum(),
         pin: q('se_pin').value,
         show: q('se_show').checked,
-    } }); renderWorkpiece(); };   // M1: reflect the just-committed stock in the top-view canvas (outer + derived features)
+    } }); renderWorkpiece(); render3d(); };   // M1b: reflect the just-committed stock in BOTH the 2D top-view + the 3D depth preview
 
     ['se_x', 'se_y', 'se_z', 'se_shape', 'se_dia', 'se_pin', 'se_show'].forEach((id) => {
         q(id).addEventListener('input', commit);
