@@ -17,6 +17,7 @@ import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
+import { projectWorkpiece, datumXY } from '../engine/workpiece.js';   // M2 — render declared features[] at their datum-relative offset (byte-identical to the legacy 25% inset for a derived pocket)
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
 import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
 import { PATH_TYPES, PATH_STATE, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend (t331 — FEED_LOW/HIGH gradient removed)
@@ -1085,26 +1086,31 @@ export class GcodeViz3D {
             this._rotaryFixture = null;
         }
         if (stock && stock.show && stock.x > 0 && stock.y > 0 && stock.z > 0) {
-            const pocket = stock.shape === 'pocket';
+            // M2 — INSIDE cavities come from the workpiece features[] (declared, or a derived legacy pocket), rendered at
+            // their datum-relative offset. A legacy pocket derives the SAME centred 25% cavity → byte-identical.
+            const cavities = projectWorkpiece(stock).features.filter((f) => f.side === 'inside' && f.shape !== 'round' && f.size);
+            const pocket = cavities.length > 0;
             const fillCol = pocket ? 0x6a8fbe : 0x8fae6a;  // pocket = blue, boss = green
             const edgeCol = pocket ? 0x86b6ff : 0xa6d77c;
             let geo;
             const mat = new THREE.MeshLambertMaterial({ color: fillCol, transparent: true, opacity: this._stockOpacity(), depthWrite: false });   // SHADED (lit) stock; opacity per sim mode
             const mesh = new THREE.Mesh();
             if (pocket) {
-                // Square donut: a frame of material around the cavity. The cavity (the hole,
-                // = stock X×Y) is the probe area; the frame walls are the surrounding stock.
-                // Outer block = the stock dimensions (same as a boss); the cavity is inset by w.
-                const w = Math.max(8, Math.min(stock.x, stock.y) * 0.25); // wall thickness (cavity inset)
+                // Square donut: a frame of material around each cavity. The outer block = the stock dimensions; each
+                // cavity is a through-hole at its datum-relative offset. (A legacy pocket = ONE centred 25%-inset hole.)
+                const dp = datumXY({ x: stock.x, y: stock.y, datum: stock.datum });   // part-zero in stock-local coords
                 const shape = new THREE.Shape();
                 shape.moveTo(0, 0);
                 shape.lineTo(stock.x, 0);
                 shape.lineTo(stock.x, stock.y);
                 shape.lineTo(0, stock.y);
                 shape.lineTo(0, 0);
-                const hole = new THREE.Path();
-                hole.moveTo(w, w); hole.lineTo(stock.x - w, w); hole.lineTo(stock.x - w, stock.y - w); hole.lineTo(w, stock.y - w); hole.lineTo(w, w);
-                shape.holes.push(hole);
+                for (const f of cavities) {
+                    const cx = dp.x + f.pos.x, cy = dp.y + f.pos.y, hx = f.size.x / 2, hy = f.size.y / 2;
+                    const hole = new THREE.Path();
+                    hole.moveTo(cx - hx, cy - hy); hole.lineTo(cx + hx, cy - hy); hole.lineTo(cx + hx, cy + hy); hole.lineTo(cx - hx, cy + hy); hole.lineTo(cx - hx, cy - hy);
+                    shape.holes.push(hole);
+                }
                 geo = new THREE.ExtrudeGeometry(shape, { depth: stock.z, bevelEnabled: false });
                 mesh.position.set(0, 0, -stock.z); // extrude [0,z] → world [-z,0], top at the table
             } else if (stock.shape === 'cylinder') {

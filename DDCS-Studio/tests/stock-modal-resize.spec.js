@@ -25,7 +25,7 @@ test('M1b: dragging the outer handle resizes the stock from the datum corner, sy
     return snap;
   });
 
-  const handle = page.locator('#se_canvas svg .fc-handle[data-hid="size"]');
+  const handle = page.locator('#se_canvas svg .fc-handle[data-hid="outer_size"]');
   await expect(handle, 'the outer block has a resize handle').toBeVisible({ timeout: 5000 });
   await page.waitForTimeout(300);   // rAF fit + draw
 
@@ -39,7 +39,7 @@ test('M1b: dragging the outer handle resizes the stock from the datum corner, sy
 
   // ── (1) DRAG the max-XY corner OUTWARD → grows both dims; fields sync; broadcast fires ──
   const drag = await page.evaluate(async () => {
-    const h = document.querySelector('#se_canvas svg .fc-handle[data-hid="size"]');
+    const h = document.querySelector('#se_canvas svg .fc-handle[data-hid="outer_size"]');
     const svg = h.ownerSVGElement || h.closest('svg');
     const r = h.getBoundingClientRect();
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
@@ -80,7 +80,7 @@ test('M1b: dragging the outer handle resizes the stock from the datum corner, sy
     return {
       stockX: window.ddcsGetSettings().stock.x,
       backdropW: WP.workpieceBackdrop(WP.getWorkpiece()).stock.w,
-      hasHandle: !!document.querySelector('#se_canvas svg .fc-handle[data-hid="size"]'),
+      hasHandle: !!document.querySelector('#se_canvas svg .fc-handle[data-hid="outer_size"]'),
     };
   });
   expect(typed.stockX, 'typing X=200 wrote the flat stock').toBe(200);

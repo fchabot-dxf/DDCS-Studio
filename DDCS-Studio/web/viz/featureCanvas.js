@@ -300,7 +300,10 @@ export class FeatureCanvas {
         if (spec.machine) {
             this._drawMachineFrame(spec.machine);
         } else {
-            const og = this._S(0, 0);
+            // the part-zero crosshair sits at spec.origin (world) when set — so the stock modal's datum moves it to the
+            // selected corner, matching the 3D — else at the min-XY corner (the default for wizard layouts).
+            const ow = spec.origin || { x: 0, y: 0 };
+            const og = this._S(ow.x || 0, ow.y || 0);
             grid.appendChild(svgEl('line', { x1: og.x - 9, y1: og.y, x2: og.x + 9, y2: og.y, class: 'fc-axis-x' }));
             grid.appendChild(svgEl('line', { x1: og.x, y1: og.y - 9, x2: og.x, y2: og.y + 9, class: 'fc-axis-y' }));
         }

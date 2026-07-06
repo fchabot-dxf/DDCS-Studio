@@ -43,6 +43,19 @@ export function legacyPocketInset(x, y) {
 }
 
 /**
+ * Part-zero (the datum) in the outer's MIN-XY frame — the reference a feature's `pos` is measured FROM. The datum
+ * code is 3 chars [X][Y][Z] each n(min)/c(centre)/p(max); the XY pair places part-zero on the block. So a feature
+ * `pos` is a datum-RELATIVE offset (how a CNC operator reads it: distance from program zero), and its canvas/world
+ * position is datumXY + pos. For the default front-left datum ('nnp') datumXY = {0,0}, so pos == the min-XY position.
+ */
+export function datumXY(outer) {
+    const o = outer || {};
+    const code = /^[ncp]{3}$/.test(String(o.datum)) ? String(o.datum) : 'nnp';
+    const f = { n: 0, c: 0.5, p: 1 };
+    return { x: (+o.x || 0) * f[code[0]], y: (+o.y || 0) * f[code[1]] };
+}
+
+/**
  * Synthesize the features[] a LEGACY flat stock implies. Only `shape:'pocket'` implies an interior
  * feature — a centred rectangular cavity inset by the 25% wall, full-depth — matching exactly what the
  * 3D/2D currently draw. boss/box/cylinder imply NO stored feature (they probe the outer outline, so
@@ -52,13 +65,14 @@ export function deriveLegacyFeatures(stock) {
     if (!stock || stock.shape !== 'pocket') return [];
     const x = +stock.x, y = +stock.y, z = +stock.z;
     const w = legacyPocketInset(x, y);
+    const dp = datumXY({ x, y, datum: stock.datum });   // the cavity is CENTRED on the block; its pos is datum-RELATIVE
     return [{
         id: 'legacy',
         shape: 'rect',
         side: 'inside',
-        pos:  { x: x / 2, y: y / 2 },            // centred; outer-local (0,0 = outer min corner — SAME frame as setStock)
-        size: { x: x - 2 * w, y: y - 2 * w },    // the cavity span [w, x-w] × [w, y-w]
-        depth: z,                                // full-through (the extrude depth, gcodeViz3d.js:1108)
+        pos:  { x: x / 2 - dp.x, y: y / 2 - dp.y },   // the block centre as an offset from part-zero ('nnp' → {x/2,y/2})
+        size: { x: x - 2 * w, y: y - 2 * w },         // the cavity span [w, x-w] × [w, y-w]
+        depth: z,                                     // full-through (the extrude depth, gcodeViz3d.js:1108)
     }];
 }
 
@@ -99,17 +113,20 @@ export function workpieceBackdrop(wp, opts) {
     const o = wp && wp.outer;
     if (!o || !(o.x > 0) || !(o.y > 0)) return { stock: null, items: [] };
     const ox = (opts && opts.ox) || 0, oy = (opts && opts.oy) || 0;
+    const dp = datumXY(o);   // part-zero in the canvas MIN-XY frame; a feature's datum-relative pos → canvas = dp + pos
     const items = [];
     for (const f of (wp.features || [])) {
         if (f.side !== 'inside') continue;   // OUTSIDE = the outer outline (the fc-stock rect); INSIDE = a cavity glyph
         const sz = featureSize(wp, f);
         if (!sz) continue;
+        const cx = dp.x + f.pos.x, cy = dp.y + f.pos.y;   // datum-relative offset → canvas position
         if (f.shape === 'round') {
             const r = (sz.d != null ? sz.d : Math.min(sz.x, sz.y)) / 2;
-            items.push({ kind: 'circle', cx: f.pos.x, cy: f.pos.y, r, cls: 'fc-feature-pocket' });   // bore
+            items.push({ kind: 'circle', cx, cy, r, cls: 'fc-feature-pocket' });   // bore
         } else {
-            items.push({ kind: 'rect', x: f.pos.x - sz.x / 2, y: f.pos.y - sz.y / 2, w: sz.x, h: sz.y, cls: 'fc-feature-pocket' });   // pocket cavity
+            items.push({ kind: 'rect', x: cx - sz.x / 2, y: cy - sz.y / 2, w: sz.x, h: sz.y, cls: 'fc-feature-pocket' });   // pocket cavity
         }
     }
-    return { stock: { w: o.x, h: o.y, ox, oy }, items };
+    // origin = part-zero in the canvas frame → the crosshair sits at the selected datum corner (matches the 3D)
+    return { stock: { w: o.x, h: o.y, ox, oy }, items, origin: { x: ox + dp.x, y: oy + dp.y } };
 }

@@ -12,7 +12,7 @@ import { makeDraggable } from './uiUtils.js';
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 import { popReturn, dropReturn, activeReturn } from './navReturn.js';   // central back-navigation: the ✕ returns to wherever we came from
 import { FeatureCanvas } from '../viz/featureCanvas.js';                // M1: the shared 2D top-down canvas (workpiece editor)
-import { getWorkpiece, workpieceBackdrop } from '../engine/workpiece.js';   // M1: the workpiece VIEW + its ONE-source backdrop spec
+import { getWorkpiece, workpieceBackdrop, featureSize, datumXY } from '../engine/workpiece.js';   // M1/M2: the workpiece VIEW + backdrop + side resolver + datum frame
 import { GcodeViz3D } from '../viz/gcodeViz3d.js';                      // M1b: a stock-ONLY 3D preview (setStock, no toolpath) for depth
 
 // M1b — ONE reused GcodeViz3D for the modal's 3D pane. A fresh WebGLRenderer per open would leak WebGL contexts
@@ -131,7 +131,6 @@ export function openStockEditor(anchor, opts) {
                     </select>
                 </label>
             </div>
-            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; width:auto;"><input id="se_show" type="checkbox" style="width:auto;"> Show stock in 3D</label>
             <div style="color:#7f8a99; font-size:11px;">Cylinder lies along the rotary axis (Y = diameter, X = length).</div>
           </div>
           <div style="flex:1 1 auto; min-width:300px; display:flex; flex-direction:column; gap:10px;">
@@ -157,19 +156,50 @@ export function openStockEditor(anchor, opts) {
     // the FLAT settings.stock.x/y via commit()→applySettings → propagates to the 3D + every wizard preview (the
     // coherence rule). Two-way: the drag sets the X/Y fields; typing a field re-renders the handle. commit() re-draws.
     const _fc = new FeatureCanvas();
+    const clampN = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    // M2 — feature editing writes settings.stock.features[]. A LEGACY pocket (currently DERIVED, not stored) MATERIALIZES
+    // into a stored entry on first edit: featuresForEdit() deep-copies the stored features, else the derived ones — so the
+    // first drag persists the (previously implicit) cavity and every later drag edits the stored copy.
+    const featuresForEdit = () => {
+        const st = getSettings().stock || {};
+        const src = (Array.isArray(st.features) && st.features.length) ? st.features : getWorkpiece().features;
+        return src.map((f) => ({ ...f, pos: { ...f.pos }, size: f.size ? { ...f.size } : undefined }));
+    };
+    const writeFeatures = (feats) => { applySettings({ stock: { features: feats } }); renderWorkpiece(); render3d(); };
     const renderWorkpiece = () => {
         const host = pop.querySelector('#se_canvas'); if (!host) return;
         const wp = getWorkpiece();
         const spec = workpieceBackdrop(wp);
         const o = wp.outer;
         if (spec.stock && o && o.x > 0 && o.y > 0) {
-            spec.handles = [{ id: 'size', x: o.x, y: o.y, kind: 'size', label: `${Math.round(o.x)}×${Math.round(o.y)}` }];
+            const dp = datumXY(o);   // part-zero in the canvas frame; a feature's datum-relative pos → canvas = dp + pos
+            spec.handles = [{ id: 'outer_size', x: o.x, y: o.y, kind: 'size', label: `${Math.round(o.x)}×${Math.round(o.y)}` }];
+            // M2 — each INSIDE feature (pocket/bore) gets an ORIGIN handle (its datum-relative OFFSET) + a SIZE handle
+            // (its EXTENT, symmetric about the origin). Dragging writes features[] (materializing a legacy pocket).
+            wp.features.forEach((f, i) => {
+                if (f.side !== 'inside') return;
+                const sz = featureSize(wp, f) || { x: 10, y: 10 };
+                const cx = dp.x + f.pos.x, cy = dp.y + f.pos.y;
+                spec.handles.push({ id: `feat${i}_org`, x: cx, y: cy, kind: 'point', label: `⌖ ${Math.round(f.pos.x)},${Math.round(f.pos.y)}` });
+                spec.handles.push({ id: `feat${i}_size`, x: cx + (sz.x || 10) / 2, y: cy + (sz.y || 10) / 2, kind: 'point', label: `${Math.round(sz.x)}×${Math.round(sz.y)}` });
+            });
             spec.onDrag = (id, p) => {
-                const nx = Math.max(1, Math.round(p.x)), ny = Math.max(1, Math.round(p.y));
-                const xEl = pop.querySelector('#se_x'), yEl = pop.querySelector('#se_y');
-                if (xEl) xEl.value = String(nx);
-                if (yEl) yEl.value = String(ny);
-                commit();   // FLAT stock.x/y → applySettings → 3D + wizard previews; then re-renders the handle at the new corner
+                if (id === 'outer_size') {   // the OUTER resize (M1b) — writes the flat stock.x/y from the datum corner
+                    const nx = Math.max(1, Math.round(p.x)), ny = Math.max(1, Math.round(p.y));
+                    const xEl = pop.querySelector('#se_x'), yEl = pop.querySelector('#se_y');
+                    if (xEl) xEl.value = String(nx); if (yEl) yEl.value = String(ny);
+                    commit(); return;
+                }
+                const m = /^feat(\d+)_(org|size)$/.exec(id); if (!m) return;
+                const i = +m[1], kind = m[2];
+                const feats = featuresForEdit(); const f = feats[i]; if (!f) return;
+                if (kind === 'org') {   // set the datum-relative OFFSET (clamped inside the block)
+                    f.pos = { x: Math.round(clampN(p.x - dp.x, -dp.x, o.x - dp.x)), y: Math.round(clampN(p.y - dp.y, -dp.y, o.y - dp.y)) };
+                } else {                 // set the EXTENT, symmetric about the origin (handle sits at origin + size/2)
+                    const cx = dp.x + f.pos.x, cy = dp.y + f.pos.y;
+                    f.size = { x: Math.max(1, Math.round(2 * (p.x - cx))), y: Math.max(1, Math.round(2 * (p.y - cy))) };
+                }
+                writeFeatures(feats);
             };
         }
         _fc.render(host, spec);
@@ -179,13 +209,17 @@ export function openStockEditor(anchor, opts) {
     // M1b — the stock-ONLY 3D preview (depth): the reused viz, re-parented into #se_3d. setStock only (no setGcode, no
     // machine envelope) so the user sees the stock Z + shape update LIVE as they edit. `show:true` so the editor always
     // renders it regardless of the "Show in 3D" flag. commit() re-sets the stock on every edit; we frame it once.
-    let _vizFit = false;
+    let _last3dKey = null;
     const render3d = () => {
         const viz = stockViz(); if (!viz) return;
         const pane = pop.querySelector('#se_3d'); if (!pane) return;
         if (viz.__host.parentElement !== pane) pane.appendChild(viz.__host);
-        try { viz.setStock({ ...(getSettings().stock || {}), show: true }); } catch (_) {}
-        if (!_vizFit) { try { viz.fitAll && viz.fitAll(); } catch (_) {} _vizFit = true; }
+        const st = getSettings().stock || {};
+        try { viz.setStock({ ...st, show: true }); } catch (_) {}
+        // Re-frame when the DATUM or SHAPE changes — the stock repositions per datum, so re-fit keeps it centred +
+        // matching the MAIN 3D beside the modal; NOT on every dimension tweak (a resize drag would jump). First render fits.
+        const key = `${st.datum}|${st.shape}`;
+        if (key !== _last3dKey) { try { viz.fitAll && viz.fitAll(); } catch (_) {} _last3dKey = key; }
     };
     requestAnimationFrame(render3d);
 
@@ -232,7 +266,6 @@ export function openStockEditor(anchor, opts) {
     q('se_dia').value = s.diameter ?? '';   // SPATIAL-MODEL inc2: the declared bar OD (blank = inferred from the box)
     setDatum(s.datum);
     q('se_pin').value = s.pin || 'origin';
-    q('se_show').checked = s.show !== false;
     // The Bar Ø field is meaningful only for a cylinder (rotary bar) — show it just then.
     const syncDiaRow = () => { const row = q('se_dia_row'); if (row) row.style.display = q('se_shape').value === 'cylinder' ? '' : 'none'; };
     syncDiaRow();
@@ -267,10 +300,10 @@ export function openStockEditor(anchor, opts) {
         diameter: (q('se_shape').value === 'cylinder' && parseFloat(q('se_dia').value) > 0) ? parseFloat(q('se_dia').value) : undefined,
         datum: getDatum(),
         pin: q('se_pin').value,
-        show: q('se_show').checked,
+        show: true,   // the modal has its own 3D pane now (the 'Show in 3D' control was removed); the stock ALWAYS renders in the main 3D
     } }); renderWorkpiece(); render3d(); };   // M1b: reflect the just-committed stock in BOTH the 2D top-view + the 3D depth preview
 
-    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_dia', 'se_pin', 'se_show'].forEach((id) => {
+    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_dia', 'se_pin'].forEach((id) => {
         q(id).addEventListener('input', commit);
         q(id).addEventListener('change', commit);
     });
