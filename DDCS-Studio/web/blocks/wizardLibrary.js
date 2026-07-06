@@ -39,14 +39,14 @@ const BUILTINS = [
     { id: 'atc_warmup', type: 'atc_warmup', label: 'Warm-up', icon: '🔥', group: 'setup' },
     { id: 'wcs', type: 'wcs', label: 'WCS / work offsets', icon: '⊕', group: 'probe' },
     { id: 'homing', type: 'homing', label: 'Homing', icon: '⌖', group: 'probe' },
-    // t339 E4 — IN-PLACE SWAP: the built-in Corner/Edge KEEP their Probe slot (label/icon/group), but `opensAs` re-points the
-    // click to the data-op TWIN (userOpView) — the user sees "Corner"/"Edge" WHERE IT ALWAYS WAS, now data-op-backed (human
-    // t332). The built-in stack (cornerStack/edgeStack + BUILDERS/SCHEMA) stays as the LEGACY SHIM (legacy saved ops render).
-    // The twin's OWN menu entry is HIDDEN (userEntries drops opensAs targets) → no duplicate. ONE-SOURCE: every future port
-    // just declares `opensAs` on its built-in entry (Corner was previously retired-and-RELOCATED to a data-wiz folder — the gap;
-    // this makes it truly in-place, and every later probe port inherits the same mechanism).
+    // t339 E4 — IN-PLACE SWAP: the built-in Corner/Edge/Middle KEEP their Probe slot (label/icon/group), but `opensAs` re-points
+    // the click to the data-op TWIN (userOpView) — the user sees "Corner"/"Edge"/"Middle" WHERE IT ALWAYS WAS, now data-op-backed
+    // (human t332). The built-in stack (cornerStack/edgeStack/middleStack + BUILDERS/SCHEMA) stays as the LEGACY SHIM (legacy saved
+    // ops render). The twin's OWN menu entry is HIDDEN (userEntries drops opensAs targets) → no duplicate. ONE-SOURCE: every future
+    // port just declares `opensAs` on its built-in entry (Corner was previously retired-and-RELOCATED to a data-wiz folder — the
+    // gap; this makes it truly in-place, and every later probe port inherits the same mechanism).
     { id: 'corner', type: 'corner', label: 'Corner', icon: '📐', group: 'probe', opensAs: 'user_corner_data' },
-    { id: 'middle', type: 'middle', label: 'Middle / Bore / Boss', icon: '🎯', group: 'probe' },
+    { id: 'middle', type: 'middle', label: 'Middle / Bore / Boss', icon: '🎯', group: 'probe', opensAs: 'user_middle_data' },
     { id: 'edge', type: 'edge', label: 'Edge', icon: '📏', group: 'probe', opensAs: 'user_edge_data' },
     { id: 'alignment', type: 'alignment', label: 'Align', icon: '🧭', group: 'probe' },
     { id: 'rotary_center', type: 'rotary_center', label: 'Centreline', icon: '', group: 'probe' },

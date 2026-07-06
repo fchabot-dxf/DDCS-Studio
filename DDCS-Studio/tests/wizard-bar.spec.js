@@ -46,12 +46,12 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(bar.center.map((g) => g.label)).toEqual(['Probe', 'ATC', 'Mill']);
   const probe = bar.center[0], atc = bar.center[1], mill = bar.center[2];
 
-  // Probe: WCS uses the generic openWiz; Corner/Middle/Edge/Align use their dedicated 3D-animated openers;
-  // the "Rotary" sub-label divider survives.
+  // Probe: WCS uses the generic openWiz; Corner/Edge/Middle open the data-op TWIN in-place (opensAs); only Align keeps its
+  // dedicated 3D-animated opener; the "Rotary" sub-label divider survives.
   const probeBy = Object.fromEntries(probe.items.map((i) => [i.text.replace(/\s+/g, ' '), i.onclick]));
   expect(probe.items[0].onclick).toBe("openWiz && openWiz('wcs')");
-  // t339 E4 — IN-PLACE SWAP: the built-in Corner + Edge KEEP their Probe slots but `opensAs` opens the data-op TWIN
-  // (openWiz('user_*_data') → userOpView); the built-in views retire (no openCornerWiz/openEdgeWiz); NO separate Data Wiz entry.
+  // t339 E4 — IN-PLACE SWAP: the built-in Corner + Edge + Middle KEEP their Probe slots but `opensAs` opens the data-op TWIN
+  // (openWiz('user_*_data') → userOpView); the built-in menu openers retire (no openCornerWiz/openEdgeWiz/openMiddleWiz); NO separate Data Wiz entry.
   const cornerItem = probe.items.find((i) => /Corner/.test(i.text));
   expect(cornerItem, 'Corner is IN its Probe slot (in-place)').toBeTruthy();
   expect(cornerItem.onclick, 'Corner opens the data-op twin in-place').toBe("openWiz && openWiz('user_corner_data')");
@@ -60,7 +60,10 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(edgeItem, 'Edge is IN its Probe slot (in-place)').toBeTruthy();
   expect(edgeItem.onclick, 'Edge opens the data-op twin in-place').toBe("openWiz && openWiz('user_edge_data')");
   expect(probe.items.some((i) => /openEdgeWiz/.test(i.onclick || '')), 'no openEdgeWiz opener (retired)').toBe(false);
-  expect(probe.items.find((i) => /Middle/.test(i.text)).onclick).toContain('openMiddleWiz');
+  const middleItem = probe.items.find((i) => /Middle/.test(i.text));
+  expect(middleItem, 'Middle is IN its Probe slot (in-place)').toBeTruthy();
+  expect(middleItem.onclick, 'Middle opens the data-op twin in-place').toBe("openWiz && openWiz('user_middle_data')");
+  expect(probe.items.some((i) => /openMiddleWiz/.test(i.onclick || '')), 'no openMiddleWiz opener in the menu (retired; the fn survives as the legacy shim)').toBe(false);
   expect(probe.items.find((i) => /Align/.test(i.text)).onclick).toContain('openAlignmentWiz');
   expect(probe.dividers).toEqual(['Rotary']);
 

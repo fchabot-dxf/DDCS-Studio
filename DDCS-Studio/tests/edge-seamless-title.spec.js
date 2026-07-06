@@ -7,17 +7,18 @@ import { test, expect } from '@playwright/test';
  * as the BLOCKS-TAB identity. A normal user op / additive twin keeps its "<label> — your custom wizard" heading. Display-only →
  * emit BYTE-IDENTICAL.
  */
-test('edge/corner open with the plain built-in title; def.label keeps (data) for the Blocks tab; emit byte-identical', async ({ page }) => {
+test('edge/corner/middle open with the plain built-in title; def.label keeps (data) for the Blocks tab; emit byte-identical', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
 
   // (1) UNIT — builtinLabelForTwin maps the twin → the built-in's plain label; null for a normal user op
   const unit = await page.evaluate(async () => {
     const L = await import('/blocks/wizardLibrary.js');
-    return { edge: L.builtinLabelForTwin('user_edge_data'), corner: L.builtinLabelForTwin('user_corner_data'), drill: L.builtinLabelForTwin('user_drill_data'), bogus: L.builtinLabelForTwin('user_nope') };
+    return { edge: L.builtinLabelForTwin('user_edge_data'), corner: L.builtinLabelForTwin('user_corner_data'), middle: L.builtinLabelForTwin('user_middle_data'), drill: L.builtinLabelForTwin('user_drill_data'), bogus: L.builtinLabelForTwin('user_nope') };
   });
   expect(unit.edge, 'the edge twin titles as the built-in "Edge"').toBe('Edge');
   expect(unit.corner, 'the corner twin titles as the built-in "Corner"').toBe('Corner');
+  expect(unit.middle, 'the middle twin titles as the built-in "Middle / Bore / Boss"').toBe('Middle / Bore / Boss');
   expect(unit.drill, 'a normal/additive twin has no in-place title (keeps its custom heading)').toBe(null);
   expect(unit.bogus, 'an unknown op → null').toBe(null);
 
@@ -33,27 +34,32 @@ test('edge/corner open with the plain built-in title; def.label keeps (data) for
   };
   const edgeTitle = await openTitle('user_edge_data', '/blocks/dataOps/edgeData.js', 'edgeDataDef');
   const cornerTitle = await openTitle('user_corner_data', '/blocks/dataOps/cornerData.js', 'cornerDataDef');
+  const middleTitle = await openTitle('user_middle_data', '/blocks/dataOps/middleData.js', 'middleDataDef');
 
   // (3) the def.label KEEPS '(data)' (the Blocks-tab identity), while the TITLE is plain; emit byte-identical (display-only)
   const rest = await page.evaluate(async () => {
-    const ED = await import('/blocks/dataOps/edgeData.js'); const CD = await import('/blocks/dataOps/cornerData.js');
-    const { edgeStack } = await import('/wizards/edgeWizard.js'); const { cornerStack } = await import('/wizards/cornerWizard.js');
+    const ED = await import('/blocks/dataOps/edgeData.js'); const CD = await import('/blocks/dataOps/cornerData.js'); const MD = await import('/blocks/dataOps/middleData.js');
+    const { edgeStack } = await import('/wizards/edgeWizard.js'); const { cornerStack } = await import('/wizards/cornerWizard.js'); const { middleStack } = await import('/wizards/middleWizard.js');
     const { registerUserOp } = await import('/blocks/userOps.js'); const { builderOf } = await import('/blocks/opBuilders.js'); const { emitMapped } = await import('/blocks/blockEmitter.js');
-    registerUserOp(ED.edgeDataDef()); registerUserOp(CD.cornerDataDef());
-    const eb = builderOf(ED.EDGE_DATA_OPTYPE), cb = builderOf(CD.CORNER_DATA_OPTYPE);
-    const eS = (o) => ({ ...ED.EDGE_DEFAULTS, ...o }), cS = (o) => ({ ...CD.CORNER_DEFAULTS, ...o });
+    registerUserOp(ED.edgeDataDef()); registerUserOp(CD.cornerDataDef()); registerUserOp(MD.middleDataDef());
+    const eb = builderOf(ED.EDGE_DATA_OPTYPE), cb = builderOf(CD.CORNER_DATA_OPTYPE), mb = builderOf(MD.MIDDLE_DATA_OPTYPE);
+    const eS = (o) => ({ ...ED.EDGE_DEFAULTS, ...o }), cS = (o) => ({ ...CD.CORNER_DEFAULTS, ...o }), mS = (o) => ({ ...MD.MIDDLE_DEFAULTS, ...o });
     return {
-      edgeDefLabel: ED.edgeDataDef().label, cornerDefLabel: CD.cornerDataDef().label,
+      edgeDefLabel: ED.edgeDataDef().label, cornerDefLabel: CD.cornerDataDef().label, middleDefLabel: MD.middleDataDef().label,
       emitSame: emitMapped(eb(eS({}))).text === emitMapped(edgeStack(eS({}))).text
         && emitMapped(eb(eS({ axis: 'Y', dir: 'neg', wcs: 'G56' }))).text === emitMapped(edgeStack(eS({ axis: 'Y', dir: 'neg', wcs: 'G56' }))).text
-        && emitMapped(cb(cS({}))).text === emitMapped(cornerStack(cS({}))).text,
+        && emitMapped(cb(cS({}))).text === emitMapped(cornerStack(cS({}))).text
+        && emitMapped(mb(mS({}))).text === emitMapped(middleStack(mS({}))).text
+        && emitMapped(mb(mS({ featureType: 'boss', twoAxis: true, inAxis: 'auto', transAxis: 'auto' }))).text === emitMapped(middleStack(mS({ featureType: 'boss', twoAxis: true, inAxis: 'auto', transAxis: 'auto' }))).text,
     };
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 
   expect(edgeTitle, 'the OPENED Edge wizard title is the plain "Edge" (no "(data)", no "custom wizard")').toBe('Edge');
   expect(cornerTitle, 'the OPENED Corner wizard title is the plain "Corner"').toBe('Corner');
+  expect(middleTitle, 'the OPENED Middle wizard title is the plain "Middle / Bore / Boss"').toBe('Middle / Bore / Boss');
   expect(rest.edgeDefLabel, 'the edge def.label KEEPS "(data)" — the Blocks-tab identity').toBe('Edge (data)');
   expect(rest.cornerDefLabel, 'the corner def.label keeps "(data)"').toBe('Corner (data)');
+  expect(rest.middleDefLabel, 'the middle def.label keeps "(data)"').toBe('Middle (data)');
   expect(rest.emitSame, 'the title is display-only → emit stays byte-identical to the built-ins').toBe(true);
 });
