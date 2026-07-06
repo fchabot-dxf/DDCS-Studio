@@ -220,6 +220,11 @@ export function openStockEditor(anchor, opts) {
         // matching the MAIN 3D beside the modal; NOT on every dimension tweak (a resize drag would jump). First render fits.
         const key = `${st.datum}|${st.shape}`;
         if (key !== _last3dKey) { try { viz.fitAll && viz.fitAll(); } catch (_) {} _last3dKey = key; }
+        // t387 (issue 3, shipped V10.84) — the modal viz runs with _animOn=false (no render LOOP), so setStock updates the
+        // mesh but draws NO frame → the 3D depth pane LAGGED until a viewcube/orbit nudge fired one. Force a frame after every
+        // edit so it repaints LIVE (a dimension/pocket drag shows immediately). fitAll (datum/shape change) already renders →
+        // this covers the no-refit dimension edits; a harmless extra frame otherwise (negligible — we only draw on an edit).
+        else { try { viz.render && viz.render(); } catch (_) {} }
     };
     requestAnimationFrame(render3d);
 
