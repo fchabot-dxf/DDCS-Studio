@@ -17,16 +17,16 @@
  * an axis/dir toggle are LATER slices. `level` follows the corner precedent (a machine constant, baked). SCOPE (E1) =
  * EMIT only — no sim-starts (E2), no in-place swap (E4).
  *
- * NOTE (source-chips): applyProbeSources sources #5/#3/#2 from the controller register on an Expert profile. The built-in
- * middle does NOT source these (unlike cornerStack), so on an Expert profile the twin would DIVERGE (source the register)
- * while the built-in emits the literal. Under the DEFAULT (studio) profile — where the byte-test runs — resolve returns {}
- * → applyProbeSources is a no-op → byte-IDENTICAL. Flagged for the advisor: harmonise later (built-in sources too, or drop it).
+ * NOTE (source-chips, E1-FIX t375): the middle twin does NOT source #5/#3/#2 — DROPPED applyProbeSources so it is byte-
+ * identical to the built-in on ALL profiles (studio AND Expert). Unlike cornerStack (4 srcVal hits), the built-in middle has
+ * ZERO sourcing, so a source-chip hook on the twin ALONE would DIVERGE on an Expert profile (source the register while the
+ * built-in emits the literal). Whether the built-in middle SHOULD source #5/#3/#2 like corner (a probe-param harmonisation)
+ * is a SEPARATE question deferred to the human — if yes, add it to BOTH the built-in + the twin together (keeping byte-identical).
  */
 import { middleStack } from '../../wizards/middleWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive MIDDLE_BINDINGS over a CANONICAL-pruned stack (the boss/twoAxis sockets are prune-gated in the superset)
-import { srcVal, srcNote } from '../../wizards/probeBlocks.js';   // the SAME source functions the built-in uses (controller register over the literal on an Expert profile)
 
 /** Author defaults — match middleStack's num() fallbacks + the built-in Middle field defaults. Structural params baked at
  *  their default shape (pocket / auto travel / single-axis / active-WCS / no-Z / no-sync). axis/dir1 baked X-primary/+. */
@@ -103,26 +103,13 @@ const CANONICAL_BIND = { ...MIDDLE_DEFAULTS, featureType: 'boss', inAxis: 'auto'
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(middleDataStack(MIDDLE_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const MIDDLE_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), MIDDLE_BINDING_SPECS);
 
-// SOURCE-CHIPS — when the user opts a probe field to 'ctrl' (a profile with a native register, e.g. Expert), emit the
-// CONTROLLER register instead of the literal. Applied POST-emit (the template is fixed at def-creation). STUDIO-sourced
-// (the default) or a non-native profile → resolve returns {} → byte-IDENTICAL. See the header NOTE on the built-in divergence.
-const PROBE_SRC_VARS = { port: '#5', fastFeed: '#3', retract: '#2' };
-function applyProbeSources(stack) {
-    const resolve = (typeof window !== 'undefined' && window.ddcsResolveProbeSources) ? window.ddcsResolveProbeSources : null;
-    const sources = resolve ? resolve(['port', 'fastFeed', 'retract']) : {};
-    if (!sources || !Object.keys(sources).length) return stack;
-    const walk = (blocks) => { for (const b of blocks) { if (b && b.type === 'assign' && b.params) { for (const f in PROBE_SRC_VARS) { if (b.params.var === PROBE_SRC_VARS[f] && sources[f]) { b.params.value = String(srcVal(sources[f], b.params.value)); b.params.note = srcNote(sources[f], b.params.note); } } } if (b && b.children) walk(b.children); if (b && b.uiChildren) walk(b.uiChildren); } };
-    walk(stack);
-    return stack;
-}
-
 /** Build the middle-as-data def — same userOpFromStack pattern as corner/edge/drill/slot, PLUS `bindingSpecs` (instantiate
- *  re-derives the value sockets by identity over the pruned superset) + the 8 structural toggles. */
+ *  re-derives the value sockets by identity over the pruned superset) + the 8 structural toggles. NO postInstantiate: the
+ *  built-in middle bakes no scalar-interpolated comment text (no header recompose needed) and does NOT source #5/#3/#2 (no
+ *  source-chips — a hook here would DIVERGE on an Expert profile; see the header NOTE) → the twin is byte-identical on ALL profiles. */
 export function middleDataDef() {
-    const SRC_BY_PARAM = { port: 'port', f_fast: 'fastFeed', retract: 'retract' };
-    const bindings = [...MIDDLE_BINDINGS, ...MIDDLE_STRUCT_BINDINGS].map((b) => (SRC_BY_PARAM[b.param] ? { ...b, sourceField: SRC_BY_PARAM[b.param] } : b));
+    const bindings = [...MIDDLE_BINDINGS, ...MIDDLE_STRUCT_BINDINGS];
     const def = userOpFromStack('middle_data', 'Middle (data)', middleDataStack(MIDDLE_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true });
     def.bindingSpecs = MIDDLE_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
-    def.postInstantiate = applyProbeSources;   // source-chips (byte-identical when studio-sourced)
     return def;
 }

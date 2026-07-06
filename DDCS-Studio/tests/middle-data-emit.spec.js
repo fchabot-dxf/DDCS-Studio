@@ -98,3 +98,50 @@ test('middle-data-emit: data-op == built-in middleStack byte-identical across th
   expect(r.sampleHasProbe, 'the default data-op emits a real probe (G31)').toBe(true);
   expect(r.sampleLen, 'emits substantial G-code').toBeGreaterThan(200);
 });
+
+/**
+ * E1-FIX (t375) — with probe sources ACTIVE (an Expert profile), the middle twin is STILL byte-identical to the built-in.
+ * The built-in middle has ZERO sourcing (unlike corner), so def.postInstantiate=applyProbeSources on the twin ALONE would
+ * have sourced #5/#3/#2 to controller registers and DIVERGED here (studio's sourcesActive=false hid it). applyProbeSources
+ * was DROPPED → the twin emits the literals, matching the built-in. This stubs the source resolver ON to prove it.
+ */
+test('middle-data-emit: byte-identical with probe sources ACTIVE (Expert) — the twin does not source (divergence gone)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+
+  const r = await page.evaluate(async () => {
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { middleDataDef, MIDDLE_DATA_OPTYPE } = await import('/blocks/dataOps/middleData.js');
+    const { emitEquivalence } = await import('/blocks/dataOps/equivalence.js');
+    const { registerUserOp } = await import('/blocks/userOps.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    registerUserOp(middleDataDef());
+    const dataBuilder = builderOf(MIDDLE_DATA_OPTYPE);
+
+    // STUB the source resolver ON (Expert-like): if the twin still sourced #5/#3/#2, it would emit #5=#1078 &c. and DIVERGE.
+    const prev = window.ddcsResolveProbeSources;
+    window.ddcsResolveProbeSources = (fields) => { const m = { port: '#1078', fastFeed: '#1076', retract: '#1077' }; const out = {}; for (const f of (fields || [])) if (m[f]) out[f] = m[f]; return out; };
+    try {
+      const active = window.ddcsResolveProbeSources(['port', 'fastFeed', 'retract']);
+      const sweep = [
+        { featureType: 'pocket', inAxis: 'auto', transAxis: 'auto', twoAxis: false, circular: false, probeZ: false, wcs: 'active', syncA: false },
+        { featureType: 'boss', inAxis: 'auto', transAxis: 'auto', twoAxis: true, circular: false, probeZ: false, wcs: 'active', syncA: false, port: 5, f_fast: 220, retract: 4 },
+      ];
+      const res = emitEquivalence(middleStack, dataBuilder, sweep, {});
+      const dataEmit = emitMapped(dataBuilder(sweep[0])).text;
+      return {
+        sourcesActive: !!(active && Object.keys(active).length),
+        pass: res.pass, firstDiff: res.firstDiff && { a: res.firstDiff.a.slice(0, 900), b: res.firstDiff.b.slice(0, 900) },
+        dataSourcesRegister: /#5=#1078/.test(dataEmit),   // the twin must NOT source #5 to a register (matches the built-in literal)
+        dataKeepsLiteral: /^#5=3 \(/m.test(dataEmit),      // the default port literal
+      };
+    } finally { window.ddcsResolveProbeSources = prev; }
+  });
+
+  expect(r.sourcesActive, 'the stub makes probe sources resolve (Expert-like)').toBe(true);
+  if (!r.pass) console.log('EXPERT DIFF\n--- middleStack ---\n' + (r.firstDiff && r.firstDiff.a) + '\n--- data ---\n' + (r.firstDiff && r.firstDiff.b));
+  expect(r.pass, 'with sources ACTIVE the data-op is STILL byte-identical to the built-in (applyProbeSources dropped)').toBe(true);
+  expect(r.dataSourcesRegister, 'the twin does NOT source #5 to a controller register').toBe(false);
+  expect(r.dataKeepsLiteral, 'the twin keeps the #5 literal (matches the built-in, which never sources)').toBe(true);
+});
