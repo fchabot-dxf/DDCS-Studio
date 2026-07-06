@@ -14,24 +14,26 @@ test('M2: pocket origin (datum-relative offset) + size (extent) drag → feature
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetSettings && window.ddcsOpenStock);
 
-  // ── PURE — the offset is DATUM-RELATIVE, but the render position is datum-invariant (datumXY + pos) ──
+  // ── PURE (Face 2) — feature.pos is PHYSICAL (datum-INVARIANT); the OFFSET is DERIVED (physical − datum) ──
   const pure = await page.evaluate(async () => {
-    const { projectWorkpiece, workpieceBackdrop, datumXY } = await import('/engine/workpiece.js');
+    const { projectWorkpiece, workpieceBackdrop, featureOffset } = await import('/engine/workpiece.js');
     const nnp = projectWorkpiece({ x: 100, y: 80, z: 20, shape: 'pocket', datum: 'nnp' });
     const ccp = projectWorkpiece({ x: 100, y: 80, z: 20, shape: 'pocket', datum: 'ccp' });
     return {
       nnpPos: nnp.features[0].pos, ccpPos: ccp.features[0].pos,
+      nnpOff: featureOffset(nnp, nnp.features[0]), ccpOff: featureOffset(ccp, ccp.features[0]),
       nnpRect: workpieceBackdrop(nnp).items[0], ccpRect: workpieceBackdrop(ccp).items[0],
-      dpCcp: datumXY(ccp.outer),
     };
   });
-  // front-left datum → the block centre is (50,40) FROM part-zero; centre datum → the centre IS part-zero → (0,0)
-  expect(pure.nnpPos, 'front-left datum: offset to the block centre').toEqual({ x: 50, y: 40 });
-  expect(pure.ccpPos, 'centre datum: the centred cavity sits AT part-zero → zero offset').toEqual({ x: 0, y: 0 });
-  // ...yet BOTH render the cavity at the SAME canvas rect (datumXY + pos) — datum-relative pos, datum-invariant render
+  // pos is PHYSICAL (the block centre) at BOTH datums — the feature does NOT move when the datum changes
+  expect(pure.nnpPos, 'pos is PHYSICAL (block centre)').toEqual({ x: 50, y: 40 });
+  expect(pure.ccpPos, 'pos is the SAME physical centre at the centre datum (datum-invariant)').toEqual({ x: 50, y: 40 });
+  // the OFFSET is DERIVED (physical − datum): front-left → {50,40}; centre datum → {0,0} (the centre IS part-zero)
+  expect(pure.nnpOff, 'front-left datum: derived offset to the block centre').toEqual({ x: 50, y: 40 });
+  expect(pure.ccpOff, 'centre datum: the centred cavity sits AT part-zero → zero offset').toEqual({ x: 0, y: 0 });
+  // ...and BOTH render the cavity at the SAME canvas rect — the feature stays put in the 2D regardless of the datum
   expect(pure.nnpRect).toEqual({ kind: 'rect', x: 20, y: 20, w: 60, h: 40, cls: 'fc-feature-pocket' });
   expect(pure.ccpRect).toEqual({ kind: 'rect', x: 20, y: 20, w: 60, h: 40, cls: 'fc-feature-pocket' });
-  expect(pure.dpCcp, 'centre datum sits at the block centre').toEqual({ x: 50, y: 40 });
 
   // ── REAL-SYMPTOM — open a pocket; drag the ORIGIN off-centre → it MATERIALIZES + moves ──
   const snapshot = await page.evaluate(async () => {

@@ -1685,3 +1685,20 @@ featureSize(wp,f) = f.side==='inside' ? f.size : {x:wp.outer.x, y:wp.outer.y, d:
 - FULL SUITE 656 pass / 2 skip / ZERO real fail (1 pre-existing middle-animator flake, passed on retry). corner-marker-parity + corner-atrest (2D==3D at FL) + wizard-pathdatum (mill 2D==3D) + corner-start-datum-drag ALL UNREGRESSED — the shift is PROBE-only (mill untouched) + zero at the FL datum (D=0), and the start-drag round-trips.
 
 **GATE (USER-FACING → human acceptance): PASS BACK the screenshot + the datum-invariant proof.** FACE 1 done: the probe path+tool+markers map onto the datum-placed stock; the datum is a derived-offset display concept, emit byte-identical. QUEUED: FACE 2 (feature.pos PHYSICAL + derived offset — the M2 correction, reusing `_datumFrac`/the datum transform) then the boss-pocket state leak.
+
+## 🔨 turn 365 (cycle 127) — FACE 2: feature.pos PHYSICAL storage + DERIVED offset (the M2 correction; human t364 confirmed FACE 1). 658 pass. 4 files (+1 test, 1 test updated).
+
+**THE M2 MISTAKE (t357) CORRECTED:** feature.pos was stored DATUM-RELATIVE, so changing the datum kept the number and MOVED the feature. Now feature.pos is PHYSICAL (stock-local) and the datum-relative offset is DERIVED — changing the datum re-derives the displayed offset WITHOUT moving the feature (the human's model: "changing the datum changes the offset COORD, not the feature").
+- **workpiece.js:** `deriveLegacyFeatures` pocket pos = the PHYSICAL centre `{x/2, y/2}` (was `{x/2 − dp.x}`); `workpieceBackdrop` draws the cavity at `f.pos` directly (physical → canvas; was `dp + f.pos`); NEW `featureOffset(wp,f)` = physical − datumXY (the DERIVED number the modal shows). The crosshair origin still sits at the datum (datumXY).
+- **stockEditor.js:** the ORIGIN handle sits at the physical `f.pos`; its label shows the DERIVED offset `(pos − dp)`; the drag WRITES the physical pos (clamped 0..outer, was `p − dp`); the SIZE handle resizes about the physical pos.
+- **gcodeViz3d.js:** the pocket cavity hole is cut at the PHYSICAL `f.pos` in the min-XY ExtrudeGeometry — the whole mesh is datum-placed by pg.position, so the cavity RIDES the stock (the datum doesn't move it); dropped the M2 `dp + f.pos` + the now-unused `datumXY` import. Consistent with FACE 1 (stock geometry datum-placed; probe geometry shifted by −D; the feature is part of the stock geometry).
+
+**EMIT byte-identical (confirmed):** feature.pos is a display/preview property; no op reads it (the corner/probe emit is feature-independent). For the DEFAULT datum (nnp, dp=0) physical == the old datum-relative → all M1/M2 tests unchanged (they use nnp).
+
+**VERIFY (assert-the-value + real-symptom) — tests/stock-modal-feature-physical.spec.js green + stock-modal-feature.spec updated:**
+- PURE: a declared pocket at physical {40,25} — pos INVARIANT across datums (nnp/back-right/centre all {40,25}); the 2D backdrop rect INVARIANT (the feature stays put); the DERIVED offset re-derives (nnp {40,25} · back-right {−80,−65} · centre {−20,−20}). A fresh legacy pocket = the physical centre {50,40} (byte-identical baseline).
+- REAL-SYMPTOM: the modal cavity stays at the SAME screen spot when the datum changes FL→back-right (Δ<6px) — only the crosshair + the offset label move. SCREENSHOTS scratchpad/face2_pocket_nnp.png (⌖ 40,25, crosshair front-left) + face2_pocket_tr.png (SAME pocket spot, ⌖ −80,−65, crosshair back-right, the 3D stock datum-placed at the back-right).
+- Updated stock-modal-feature.spec's PURE section: pos PHYSICAL (datum-invariant) + featureOffset derived (was the M2 datum-relative assertion).
+- FULL SUITE 658 pass / 2 skip / ZERO fail — workpiece-seam/stock-modal-canvas/resize/feature/datum + the shared gcodeViz3d + corner specs all green.
+
+**GATE (USER-FACING → human acceptance): PASS BACK the 2 screenshots + the physical-invariant proof.** FACE 2 done: features are physical; the datum is a derived-offset display concept, emit byte-identical. QUEUED: the boss-pocket state leak (the shape/features[] dual-representation).

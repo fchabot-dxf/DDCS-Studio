@@ -17,7 +17,7 @@ import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
-import { projectWorkpiece, datumXY } from '../engine/workpiece.js';   // M2 — render declared features[] at their datum-relative offset (byte-identical to the legacy 25% inset for a derived pocket)
+import { projectWorkpiece } from '../engine/workpiece.js';   // render declared features[] at their PHYSICAL pos on the datum-placed stock (Face 2; byte-identical to the legacy 25% inset for a derived pocket)
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
 import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
 import { PATH_TYPES, PATH_STATE, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend (t331 — FEED_LOW/HIGH gradient removed)
@@ -1119,9 +1119,9 @@ export class GcodeViz3D {
             const mat = new THREE.MeshLambertMaterial({ color: fillCol, transparent: true, opacity: this._stockOpacity(), depthWrite: false });   // SHADED (lit) stock; opacity per sim mode
             const mesh = new THREE.Mesh();
             if (pocket) {
-                // Square donut: a frame of material around each cavity. The outer block = the stock dimensions; each
-                // cavity is a through-hole at its datum-relative offset. (A legacy pocket = ONE centred 25%-inset hole.)
-                const dp = datumXY({ x: stock.x, y: stock.y, datum: stock.datum });   // part-zero in stock-local coords
+                // Square donut: a frame of material around each cavity. The outer block = the stock dimensions; each cavity
+                // is a through-hole at its PHYSICAL (stock-local) pos — the whole mesh is datum-placed by pg.position (Face 2),
+                // so the cavity RIDES the stock; the datum does NOT move it. (A legacy pocket = ONE centred 25%-inset hole.)
                 const shape = new THREE.Shape();
                 shape.moveTo(0, 0);
                 shape.lineTo(stock.x, 0);
@@ -1129,7 +1129,7 @@ export class GcodeViz3D {
                 shape.lineTo(0, stock.y);
                 shape.lineTo(0, 0);
                 for (const f of cavities) {
-                    const cx = dp.x + f.pos.x, cy = dp.y + f.pos.y, hx = f.size.x / 2, hy = f.size.y / 2;
+                    const cx = f.pos.x, cy = f.pos.y, hx = f.size.x / 2, hy = f.size.y / 2;
                     const hole = new THREE.Path();
                     hole.moveTo(cx - hx, cy - hy); hole.lineTo(cx + hx, cy - hy); hole.lineTo(cx + hx, cy + hy); hole.lineTo(cx - hx, cy + hy); hole.lineTo(cx - hx, cy - hy);
                     shape.holes.push(hole);

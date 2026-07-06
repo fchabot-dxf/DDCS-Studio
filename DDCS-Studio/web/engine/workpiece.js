@@ -65,15 +65,21 @@ export function deriveLegacyFeatures(stock) {
     if (!stock || stock.shape !== 'pocket') return [];
     const x = +stock.x, y = +stock.y, z = +stock.z;
     const w = legacyPocketInset(x, y);
-    const dp = datumXY({ x, y, datum: stock.datum });   // the cavity is CENTRED on the block; its pos is datum-RELATIVE
     return [{
         id: 'legacy',
         shape: 'rect',
         side: 'inside',
-        pos:  { x: x / 2 - dp.x, y: y / 2 - dp.y },   // the block centre as an offset from part-zero ('nnp' → {x/2,y/2})
-        size: { x: x - 2 * w, y: y - 2 * w },         // the cavity span [w, x-w] × [w, y-w]
-        depth: z,                                     // full-through (the extrude depth, gcodeViz3d.js:1108)
+        pos:  { x: x / 2, y: y / 2 },         // PHYSICAL (stock-local): the cavity centre — datum-INDEPENDENT (Face 2).
+        size: { x: x - 2 * w, y: y - 2 * w }, // the cavity span [w, x-w] × [w, y-w]
+        depth: z,                             // full-through (the extrude depth, gcodeViz3d.js:1108)
     }];
+}
+
+/** The DERIVED datum-relative offset of a feature (physical − datum) — the NUMBER the modal shows; re-derives when the
+ *  datum changes WITHOUT moving the physical feature (Face 2). The drag writes the PHYSICAL pos; this presents the offset. */
+export function featureOffset(wp, f) {
+    const dp = datumXY(wp && wp.outer);
+    return { x: (f && f.pos ? +f.pos.x || 0 : 0) - dp.x, y: (f && f.pos ? +f.pos.y || 0 : 0) - dp.y };
 }
 
 /**
@@ -113,13 +119,13 @@ export function workpieceBackdrop(wp, opts) {
     const o = wp && wp.outer;
     if (!o || !(o.x > 0) || !(o.y > 0)) return { stock: null, items: [] };
     const ox = (opts && opts.ox) || 0, oy = (opts && opts.oy) || 0;
-    const dp = datumXY(o);   // part-zero in the canvas MIN-XY frame; a feature's datum-relative pos → canvas = dp + pos
+    const dp = datumXY(o);   // part-zero in the canvas MIN-XY frame — the crosshair origin (the feature.pos is PHYSICAL, Face 2)
     const items = [];
     for (const f of (wp.features || [])) {
         if (f.side !== 'inside') continue;   // OUTSIDE = the outer outline (the fc-stock rect); INSIDE = a cavity glyph
         const sz = featureSize(wp, f);
         if (!sz) continue;
-        const cx = dp.x + f.pos.x, cy = dp.y + f.pos.y;   // datum-relative offset → canvas position
+        const cx = ox + f.pos.x, cy = oy + f.pos.y;   // f.pos is PHYSICAL (stock min-XY) → the canvas directly (datum-invariant)
         if (f.shape === 'round') {
             const r = (sz.d != null ? sz.d : Math.min(sz.x, sz.y)) / 2;
             items.push({ kind: 'circle', cx, cy, r, cls: 'fc-feature-pocket' });   // bore

@@ -172,15 +172,16 @@ export function openStockEditor(anchor, opts) {
         const spec = workpieceBackdrop(wp);
         const o = wp.outer;
         if (spec.stock && o && o.x > 0 && o.y > 0) {
-            const dp = datumXY(o);   // part-zero in the canvas frame; a feature's datum-relative pos → canvas = dp + pos
+            const dp = datumXY(o);   // part-zero in the canvas frame — the offset ORIGIN; feature.pos is PHYSICAL (Face 2)
             spec.handles = [{ id: 'outer_size', x: o.x, y: o.y, kind: 'size', label: `${Math.round(o.x)}×${Math.round(o.y)}` }];
-            // M2 — each INSIDE feature (pocket/bore) gets an ORIGIN handle (its datum-relative OFFSET) + a SIZE handle
-            // (its EXTENT, symmetric about the origin). Dragging writes features[] (materializing a legacy pocket).
+            // FACE 2 — each INSIDE feature (pocket/bore) gets an ORIGIN handle (drags the PHYSICAL pos; its label shows the
+            // DERIVED offset = physical − datum) + a SIZE handle (its EXTENT). Changing the datum RE-DERIVES the label WITHOUT
+            // moving the physical feature. Dragging writes features[] (materializing a legacy pocket).
             wp.features.forEach((f, i) => {
                 if (f.side !== 'inside') return;
                 const sz = featureSize(wp, f) || { x: 10, y: 10 };
-                const cx = dp.x + f.pos.x, cy = dp.y + f.pos.y;
-                spec.handles.push({ id: `feat${i}_org`, x: cx, y: cy, kind: 'point', label: `⌖ ${Math.round(f.pos.x)},${Math.round(f.pos.y)}` });
+                const cx = f.pos.x, cy = f.pos.y;   // PHYSICAL (stock min-XY) → the canvas directly
+                spec.handles.push({ id: `feat${i}_org`, x: cx, y: cy, kind: 'point', label: `⌖ ${Math.round(cx - dp.x)},${Math.round(cy - dp.y)}` });
                 spec.handles.push({ id: `feat${i}_size`, x: cx + (sz.x || 10) / 2, y: cy + (sz.y || 10) / 2, kind: 'point', label: `${Math.round(sz.x)}×${Math.round(sz.y)}` });
             });
             spec.onDrag = (id, p) => {
@@ -193,11 +194,10 @@ export function openStockEditor(anchor, opts) {
                 const m = /^feat(\d+)_(org|size)$/.exec(id); if (!m) return;
                 const i = +m[1], kind = m[2];
                 const feats = featuresForEdit(); const f = feats[i]; if (!f) return;
-                if (kind === 'org') {   // set the datum-relative OFFSET (clamped inside the block)
-                    f.pos = { x: Math.round(clampN(p.x - dp.x, -dp.x, o.x - dp.x)), y: Math.round(clampN(p.y - dp.y, -dp.y, o.y - dp.y)) };
-                } else {                 // set the EXTENT, symmetric about the origin (handle sits at origin + size/2)
-                    const cx = dp.x + f.pos.x, cy = dp.y + f.pos.y;
-                    f.size = { x: Math.max(1, Math.round(2 * (p.x - cx))), y: Math.max(1, Math.round(2 * (p.y - cy))) };
+                if (kind === 'org') {   // set the PHYSICAL pos (the world point on the stock), clamped inside the block
+                    f.pos = { x: Math.round(clampN(p.x, 0, o.x)), y: Math.round(clampN(p.y, 0, o.y)) };
+                } else {                 // set the EXTENT, symmetric about the origin (handle sits at pos + size/2)
+                    f.size = { x: Math.max(1, Math.round(2 * (p.x - f.pos.x))), y: Math.max(1, Math.round(2 * (p.y - f.pos.y))) };
                 }
                 writeFeatures(feats);
             };
