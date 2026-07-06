@@ -117,6 +117,14 @@ export function deleteGroup(id) {
 // NOT also surface its OWN menu entry (that would duplicate the slot). Drop any user-op a built-in entry adopts via opensAs.
 // ONE declaration (opensAs on the built-in) drives BOTH the slot re-point AND this hide → they can't drift.
 const OPENS_AS_TARGETS = new Set(BUILTINS.filter((b) => b.opensAs).map((b) => b.opensAs));
+/** t343 E5 — SEAMLESS TITLE: an IN-PLACE port's twin (an opensAs target) shows the BUILT-IN entry's PLAIN label as its opened
+ *  wizard title (e.g. 'Edge' / 'Corner', not the def.label 'Edge (data)') — ONE source: the built-in entry's label drives BOTH
+ *  the menu slot AND the opened title, so they can't drift. The def.label keeps '(data)' as the BLOCKS-TAB identity. Returns
+ *  null for a normal user op (which keeps its "<label> — your custom wizard" heading). */
+export function builtinLabelForTwin(opType) {
+    const b = BUILTINS.find((x) => x.opensAs === opType);
+    return b ? b.label : null;
+}
 function userEntries() {
     return listUserOps().filter((d) => !OPENS_AS_TARGETS.has(d.opType)).map((d) => ({
         id: d.opType,

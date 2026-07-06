@@ -34,13 +34,25 @@ template (blocks) ──→ registerUserOp() ──→ def.panel  (form3d/form2d
 | **Renderer** | Whether a `renderDeclaredLayout` dispatch exists for this kind |
 
 
+## In-place swap — how a probe port takes the built-in's exact menu slot (t341/t343, human t332)
+
+The REUSABLE, ONE-SOURCE mechanism every fan-out probe port inherits (NOT bespoke to any op):
+
+1. **Keep the built-in `BUILTINS` entry at its slot** (label/icon/group) and declare **`opensAs: 'user_<name>_data'`** on it (`wizardLibrary.js`).
+2. `commandDeck.wizItemOnclick` routes an `opensAs` entry to **`openWiz(opensAs)`** → the twin's generic `userOpView` (the `user_` prefix routes there). Precedence over `WIZ_SPECIAL_OPENER` (the 3D-animated built-in opener), which the port is removed from.
+3. `wizardLibrary.userEntries` **hides** the twin's own menu entry (`OPENS_AS_TARGETS`) → no duplicate. Drop the `*_datawiz` group arg from the def. → ONE declaration (`opensAs`) drives BOTH the slot re-point AND the hide (they can't drift).
+4. The **built-in stack stays as a legacy shim** (`<name>Stack` / `BUILDERS.<type>` / `SCHEMA.<type>`) so legacy saved ops still build/render; only the built-in VIEW retires.
+5. **Seamless title** (`wizardLibrary.builtinLabelForTwin`): the opened wizard reads the built-in's PLAIN label (`Edge`/`Corner`) as its title; `def.label` keeps `(data)` as the Blocks-tab identity — one source, no drift.
+
+DONE for **Edge** + **Corner** (retrofit). The MILL/ATC data-ops (drill/slot/surfacing/text/atcWarmup) stay ADDITIVE twins for now (a trivial future `opensAs` application if wanted).
+
 ## Status
 
 | # | Built-in | Status | Wizard | View | HTML panel | Data port | Layout kind | Bindings | Renderer | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
 | # | Built-in | Status | Wizard | View | HTML panel | Data port | Layout kind | Bindings | Renderer | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | **Corner (probe)** | ✅ ported | `cornerWizard.js` | — | — | `cornerPort.js` | `none` | ✅ | 🚫 | Sim intent: `forceMachine: true` (probe op with machine movement). Panel: `form3d`. No layout canvas — uses 3D machine preview. |
+| 0 | **Corner (probe)** | ✅ ported (IN-PLACE) | `cornerWizard.js` | retired → `userOpView` | retired (opens the twin) | `cornerData.js` | `none` | ✅ | 🚫 | The gated pilot. IN-PLACE retrofit (t341): `opensAs` → `user_corner_data` from the Probe slot (was relocated to a data-wiz folder — the gap, now fixed). Panel `form3d+2d`. |
 | 1 | **Drill** | ✅ ported | `drillWizard.js` | `drillView.js` | `#wiz_drill` | `drillData.js` | `drill` | ✅ | ⬜ | Pattern grid/circle/rect/line. Panel: `form3d`. Layout kind registered in `LAYOUT_TYPES`; `renderDrillLayout` not yet implemented. |
 | 2 | **Surfacing** | ✅ ported | `surfacingWizard.js` | `surfacingView.js` | `#wiz_surfacing` | `surfacingData.js` | `surfacing` | ✅ | ⬜ | Rect region + stepover. Panel: `form3d`. Layout kind registered; `renderSurfacingLayout` not yet implemented. |
 | 3 | **Slot** | ✅ ported | `slotWizard.js` | `slotView.js` | `#wiz_slot` | `slotData.js` | `slot` | ✅ | ⬜ | A→B centreline + width. Panel: `form2d`. Layout kind registered; `renderSlotLayout` not yet implemented. |
@@ -48,9 +60,9 @@ template (blocks) ──→ registerUserOp() ──→ def.panel  (form3d/form2d
 | 5 | **ATC warmup** | ✅ ported | `atcWarmupWizard.js` | `atcViews.js` | `#wiz_atc_warmup` | `atcWarmupData.js` | `none` | ✅ | 🚫 | Sim intent: `forceMachine`. Panel: `form3d`. No layout canvas needed. |
 | 6 | **Pocket** | ⬜ not ported | `pocketWizard.js` | `pocketView.js` | `#wiz_pocket` | — | `pocket` | WIP | ⬜ | 4 shapes (rect/circle/polygon/ellipse). Panel: `form3d`. Needs `pocketData.js`, bindings, layout renderer. |
 | 7 | **Contour** | ⬜ not ported | `contourWizard.js` | `contourView.js` | `#wiz_contour` | — | `contour` | WIP | ⬜ | 4 shapes + side (inside/outside). Panel: `form3d`. Needs `contourData.js`, bindings, layout renderer. |
-| 8 | **Edge (probe)** | ⬜ not ported | `edgeWizard.js` | `edgeView.js` | `#wiz_edge` | — | `edge` | WIP | ⬜ | Single-axis edge find. Panel: `form3d`. Has start-marker canvas. |
+| 8 | **Edge (probe)** | ✅ ported (IN-PLACE) | `edgeWizard.js` (+superset) | retired → `userOpView` | retired (opens the twin) | `edgeData.js` | `edge` | ✅ | ✅ | **FAN-OUT PORT #1 (t335–343).** IN-PLACE from the Probe slot (`opensAs` → `user_edge_data`); 6 scalar bindings `#1`–`#6` by var-identity + the axis/dir/wcs guard-superset; ONE `edge`-anchor sim-start (a LINE datum); the wall-line + approach glyph; the built-in `edgeStack` stays byte-identical (legacy shim). Panel `form3d+2d`. |
 | 9 | **Middle (probe)** | ⬜ not ported | `middleWizard.js` | `middleView.js` | `#wiz_middle` | — | `middle` | WIP | ⬜ | 2-axis/boss centre find. Panel: `form3d`. Has per-pass start canvas + TRAVEL-START integration. |
-| 10 | **Corner (probe)** | ✅ ported | — | — | — | `cornerPort.js` | `none` | ✅ | 🚫 | (Same as #0 — now uses 3D machine preview with `forceMachine: true`.) |
+| 10 | **Corner (probe)** | ✅ ported (IN-PLACE) | — | — | — | `cornerData.js` | `none` | ✅ | 🚫 | (Same as #0 — the in-place retrofit t341.) |
 | 11 | **Alignment (probe)** | ⬜ not ported | `alignmentWizard.js` | `alignmentView.js` | `#wiz_alignment` | — | `alignment` | WIP | ⬜ | A→B alignment. Panel: `form3d`. Has A/B start-marker canvas. |
 | 12 | **Rotary Clock (probe)** | ⬜ not ported | `rotaryClockWizard.js` | `rotaryClockView.js` | `#wiz_rotary_clock` | — | `rotary_clock` | WIP | ⬜ | Rotary A-axis. Sim: `showRotaryRig: true`. Panel: `form3d`. |
 | 13 | **Rotary Center (probe)** | ⬜ not ported | `rotaryCenterWizard.js` | `rotaryCenterView.js` | `#wiz_rotary_center` | — | `rotary_center` | WIP | ⬜ | Rotary centre find. Sim: `showRotaryRig: true`. Panel: `form3d`. |

@@ -18,6 +18,7 @@ import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js
 import { opSimStarts } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers feed the 3D preview
 import { createToolpath2d } from '../../viz/toolpath2d.js';   // t309 — the 2D-animation overlay under the Layout SVG (path + red head, driven by the shared engine)
 import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
+import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
 
 // t309 — THE 2D-ANIMATION OVERLAY: a path-only toolpath2d <canvas> UNDER the Layout SVG (behind, pointer-events:none via
 // CSS) so the animated toolpath + red probe head show under the interactive handles. Created ONCE per container (memoised
@@ -105,7 +106,9 @@ function render() {
         host.addEventListener('change', u);
     }
     const usage = el('wiz_user_usage');
-    if (usage) usage.textContent = (_def.label || 'Custom op') + ' — your custom wizard.';
+    // t343 E5 — SEAMLESS TITLE: an IN-PLACE port (opensAs) reads the built-in's PLAIN label ('Edge'/'Corner', no '(data)', no
+    // "custom wizard" suffix) so the user sees the wizard exactly where it always was. A normal user op keeps its custom heading.
+    if (usage) { const seamless = builtinLabelForTwin(_def.opType); usage.textContent = seamless || ((_def.label || 'Custom op') + ' — your custom wizard.'); }
 }
 
 export const userOpView = {
