@@ -27,6 +27,7 @@ import { middleStack } from '../../wizards/middleWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive MIDDLE_BINDINGS over a CANONICAL-pruned stack (the boss/twoAxis sockets are prune-gated in the superset)
+import { makeProvider } from '../../viz/opSimStarts.js';   // E2 — reuse the DECLARED anchor geometry (rowToStart) so the twin's per-pass markers == BUILT_IN.middle
 
 /** Author defaults — match middleStack's num() fallbacks + the built-in Middle field defaults. Structural params baked at
  *  their default shape (pocket / auto travel / single-axis / active-WCS / no-Z / no-sync). axis/dir1 baked X-primary/+. */
@@ -103,13 +104,48 @@ const CANONICAL_BIND = { ...MIDDLE_DEFAULTS, featureType: 'boss', inAxis: 'auto'
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(middleDataStack(MIDDLE_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const MIDDLE_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), MIDDLE_BINDING_SPECS);
 
+/** E2 — the per-pass PREVIEW-START provider, PORTING BUILT_IN.middle (opSimStarts.js) into a declared provider on the twin.
+ *  Middle's pass count is VARIABLE (1→5) with COMPOUND gates (boss ∧ inAxisManual ∧ twoAxis) + OPPOSITE-dir walls (!dir1) —
+ *  which makeProvider's single-{param,is} `when` + @dir1 token can't express directly. So this wraps makeProvider (reusing its
+ *  `rowToStart` anchor geometry — the ONE source, so a boss wall is the SAME edge/@outset math the built-in uses) with:
+ *   (a) DERIVED gate params (_pocket/_boss/_primW2/_sec/_secW2), computed from the SAME boss/twoAxis/inAxisManual derivations
+ *       BUILT_IN.middle uses (incl the legacy approach/findBoth aliases) → the pass STRUCTURE is byte-faithful; and
+ *   (b) RESOLVED side strings (dir1 / opp(dir1) / dir2 / opp(dir2)) — the edge anchor reads 'pos'→−outset / 'neg'→+outset,
+ *       exactly BUILT_IN.middle's outside(ax, plus). The Z-first lead + the pocket centre are 'centre' rows (top / probe plane).
+ *  Result: byte-faithful to BUILT_IN.middle POSITIONS + COUNT (proven vs opSimStarts('middle') in middle-data-emit.spec). The
+ *  count MUST mirror the macro's reposition() calls (length == 1 + the 'REPOSITION:' comment count). SIM-only (emit untouched).
+ *  (The reconcile noted E2 could read featureSize instead — a later slice; the port keeps the built-in positions.) */
+export function middleSimStartsProvider(params, stock) {
+    const p = params || {};
+    const boss = (p.featureType || 'pocket') === 'boss';
+    const twoAxis = !!p.twoAxis || !!p.findBoth;
+    const inAxisManual = (p.inAxis || p.approach) === 'manual';
+    const axis = (p.axis || 'X') === 'Y' ? 'Y' : 'X';
+    const second = axis === 'X' ? 'Y' : 'X';
+    const dir1 = (p.dir1 || 'pos');
+    const dir2 = (typeof p.dir2 === 'string') ? p.dir2 : (dir1 === 'pos' ? 'neg' : 'pos');
+    const opp = (d) => (d === 'pos' ? 'neg' : 'pos');
+    // ONE row per potential pass; the DERIVED `when` gate = the exact BUILT_IN.middle pass structure (order preserved).
+    const rows = [
+        { anchor: 'centre', plane: 'top',   when: { param: '_zlead',  is: true } },   // probe-Z-first: the leading Z-surface pass (over the top, probe down)
+        { anchor: 'centre', plane: 'probe', when: { param: '_pocket', is: true } },    // pocket: one centre pass
+        { anchor: 'edge', axis, side: dir1,       out: '@outset', plane: 'probe', when: { param: '_boss',   is: true } },   // boss primary wall 1
+        { anchor: 'edge', axis, side: opp(dir1),  out: '@outset', plane: 'probe', when: { param: '_primW2', is: true } },   // boss primary wall 2 (in-axis manual → its own pass)
+        { anchor: 'edge', axis: second, side: dir2,      out: '@outset', plane: 'probe', when: { param: '_sec',   is: true } },   // boss two-axis secondary wall 1
+        { anchor: 'edge', axis: second, side: opp(dir2), out: '@outset', plane: 'probe', when: { param: '_secW2', is: true } },   // boss two-axis secondary wall 2 (in-axis manual)
+    ];
+    const gated = { ...p, _zlead: !!p.probeZ, _pocket: !boss, _boss: boss, _primW2: boss && inAxisManual, _sec: boss && twoAxis, _secW2: boss && twoAxis && inAxisManual };
+    return makeProvider(rows)(gated, stock);
+}
+
 /** Build the middle-as-data def — same userOpFromStack pattern as corner/edge/drill/slot, PLUS `bindingSpecs` (instantiate
- *  re-derives the value sockets by identity over the pruned superset) + the 8 structural toggles. NO postInstantiate: the
- *  built-in middle bakes no scalar-interpolated comment text (no header recompose needed) and does NOT source #5/#3/#2 (no
- *  source-chips — a hook here would DIVERGE on an Expert profile; see the header NOTE) → the twin is byte-identical on ALL profiles. */
+ *  re-derives the value sockets by identity over the pruned superset) + the 8 structural toggles + the E2 sim-starts provider.
+ *  NO postInstantiate: the built-in middle bakes no scalar-interpolated comment text (no header recompose needed) and does NOT
+ *  source #5/#3/#2 (no source-chips — a hook here would DIVERGE on an Expert profile; see the header NOTE) → byte-identical on ALL profiles. */
 export function middleDataDef() {
     const bindings = [...MIDDLE_BINDINGS, ...MIDDLE_STRUCT_BINDINGS];
     const def = userOpFromStack('middle_data', 'Middle (data)', middleDataStack(MIDDLE_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true });
     def.bindingSpecs = MIDDLE_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
+    def.simStartsProvider = middleSimStartsProvider;   // E2 — the per-pass preview markers, byte-faithful to BUILT_IN.middle (sim-only)
     return def;
 }
