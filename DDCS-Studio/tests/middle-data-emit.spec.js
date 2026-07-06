@@ -30,19 +30,20 @@ test('middle-data-emit: data-op == built-in middleStack byte-identical across th
     const srcResolved = (typeof window.ddcsResolveProbeSources === 'function') ? window.ddcsResolveProbeSources(['port', 'fastFeed', 'retract']) : {};
     const sourcesActive = !!(srcResolved && Object.keys(srcResolved).length);
 
-    // ── (1) FULL STRUCTURAL sweep — all 896 combos, at default scalars; full-byte (KIND-B text prunes to the same bytes) ──
+    // ── (1) FULL STRUCTURAL sweep — all 1792 combos, at default scalars; full-byte (KIND-B text prunes to the same bytes) ──
     const FEATS = ['pocket', 'boss'], MODES = ['auto', 'manual'], BOOLS = [false, true];
-    const WCSV = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
+    const WCSV = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'], SHAPES = ['dogleg', 'diagonal'];
     const structSweep = [];
     for (const featureType of FEATS)
       for (const inAxis of MODES)
         for (const transAxis of MODES)
-          for (const twoAxis of BOOLS)
-            for (const circular of BOOLS)
-              for (const probeZ of BOOLS)
-                for (const wcs of WCSV)
-                  for (const syncA of BOOLS)
-                    structSweep.push({ featureType, inAxis, transAxis, twoAxis, circular, probeZ, wcs, syncA });
+          for (const travelShape of SHAPES)
+            for (const twoAxis of BOOLS)
+              for (const circular of BOOLS)
+                for (const probeZ of BOOLS)
+                  for (const wcs of WCSV)
+                    for (const syncA of BOOLS)
+                      structSweep.push({ featureType, inAxis, transAxis, travelShape, twoAxis, circular, probeZ, wcs, syncA });
     const structRes = emitEquivalence(middleStack, dataBuilder, structSweep, {});
 
     // ── (2) SCALAR sweep — vary each bound #var; #19..#22 need boss+twoAxis+auto so their sockets are present ──
@@ -87,12 +88,12 @@ test('middle-data-emit: data-op == built-in middleStack byte-identical across th
   expect(r.independentPath, 'data builder is NOT middleStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
   expect(r.bindingCount, 'the 12 bound scalars: 8 always-present (#1-6,#17,#18) + 4 prune-gated (#19,#20,#21,#22)').toBe(12);
-  expect(r.structBindingCount, 'the 8 structural toggles').toBe(8);
+  expect(r.structBindingCount, 'the 9 structural toggles (+ travelShape, t383)').toBe(9);
   expect(r.sourcesActive, 'no probe sources resolve in this env (studio profile) → applyProbeSources is a no-op → the byte-test is meaningful').toBe(false);
   expect(r.wiringFails, 'every DERIVED binding routes to the same assign var middleStack writes').toEqual([]);
   if (!r.struct.pass) console.log('STRUCT FIRST DIFF @ ' + JSON.stringify(r.struct.firstDiff && r.struct.firstDiff.params) + '\n--- middleStack ---\n' + (r.struct.firstDiff && r.struct.firstDiff.a) + '\n--- data def ---\n' + (r.struct.firstDiff && r.struct.firstDiff.b));
-  expect(r.struct.count, 'the structural sweep is the full 896 combos').toBe(896);
-  expect(r.struct.pass, 'data-op == middleStack byte-identical across ALL 896 structural combos (at default scalars)').toBe(true);
+  expect(r.struct.count, 'the structural sweep is the full 1792 combos').toBe(1792);
+  expect(r.struct.pass, 'data-op == middleStack byte-identical across ALL 1792 structural combos (at default scalars)').toBe(true);
   if (!r.scalar.pass) console.log('SCALAR FIRST DIFF @ ' + JSON.stringify(r.scalar.firstDiff && r.scalar.firstDiff.params) + '\n--- middleStack ---\n' + (r.scalar.firstDiff && r.scalar.firstDiff.a) + '\n--- data def ---\n' + (r.scalar.firstDiff && r.scalar.firstDiff.b));
   expect(r.scalar.pass, 'data-op == middleStack byte-identical across the scalar sweep (bound #vars re-injected)').toBe(true);
   expect(r.sampleHasProbe, 'the default data-op emits a real probe (G31)').toBe(true);

@@ -41,7 +41,8 @@ export function middleStack(params = {}, opts = {}) {
     const approach = params.approach === 'manual' ? 'manual' : 'auto';   // LEGACY single toggle — the per-traverse default (back-compat)
     const oneMode = (v) => (v === 'manual' || v === 'auto') ? v : approach;
     const inAxis = oneMode(params.inAxis);        // INC3: wall1→wall2 WITHIN an axis — auto cross-over (#19/#20) vs manual jog
-    const transAxis = oneMode(params.transAxis);   // INC3: X→Y BETWEEN axes — auto diagonal traverse (#21) vs manual jog
+    const transAxis = oneMode(params.transAxis);   // INC3: X→Y BETWEEN axes — auto traverse (#21) vs manual jog
+    const travelShape = params.travelShape === 'diagonal' ? 'diagonal' : 'dogleg';   // t383 (human) — the TRANS-axis AUTO route: dogleg (DEFAULT, routes AROUND the boss like corner) vs a single straight diagonal
     const axis = params.axis === 'Y' ? 'Y' : 'X';
     const dir1Plus = (params.dir1 || 'pos') === 'pos';
     const twoAxis = !!params.twoAxis || !!params.findBoth;
@@ -98,6 +99,8 @@ export function middleStack(params = {}, opts = {}) {
     const inAxisAutoOnly = (kids) => superset ? [GUARD({ param: 'inAxis', is: 'auto' }, kids)] : (inAxis === 'auto' ? kids : []);
     const transAxisFork = (autoKids, manualKids) => superset ? [GUARD({ param: 'transAxis', is: 'auto' }, autoKids), GUARD({ param: 'transAxis', is: 'manual' }, manualKids)] : (transAxis === 'manual' ? manualKids : autoKids);
     const transAxisAutoOnly = (kids) => superset ? [GUARD({ param: 'transAxis', is: 'auto' }, kids)] : (transAxis === 'auto' ? kids : []);
+    // travelShape (dogleg|diagonal) is an ENUM fork NESTED inside the trans-axis AUTO arm (the trans-axis DIAGONAL route only).
+    const tsPair = (doglegKids, diagKids) => superset ? [GUARD({ param: 'travelShape', is: 'dogleg' }, doglegKids), GUARD({ param: 'travelShape', is: 'diagonal' }, diagKids)] : (travelShape === 'diagonal' ? diagKids : doglegKids);
     const twoAxisFork = (onKids, offKids) => superset ? [GUARD({ param: 'twoAxis', is: true }, onKids), GUARD({ param: 'twoAxis', is: false }, offKids)] : (twoAxis ? onKids : offKids);
     const twoAxisOnly = (kids) => superset ? [GUARD({ param: 'twoAxis', is: true }, kids)] : (twoAxis ? kids : []);
     const circularOnly = (kids) => superset ? [GUARD({ param: 'circular', is: true }, kids)] : (circular ? kids : []);
@@ -135,11 +138,12 @@ export function middleStack(params = {}, opts = {}) {
     // primary to #22 (the #52/retract/±#6 cancel so it lands exactly on #22) + the secondary out by the Diag-travel #21, then
     // marks the REPOSITION so the trace anchors the NEXT pass to ②. RETURNS. (Value-identical to the old inline; the #22 note
     // now names the real primary axis rather than a hardcoded "X".)
-    const transTraverseR = () => safeTraverseStack({
+    const transTraverseR = (shape) => safeTraverseStack({
         mode: 'center', axis, second,
         dir1Plus, dir2Plus, diagPrimary, diagTravel: '#21', wall2Var: '#52', radiusVar: '#6',
         lift: '#18', drop: '[0-#18]',
         comment: 'REPOSITION: auto-traverse to the perpendicular walls',
+        dogleg: shape === 'dogleg',   // t383 — DOGLEG (default): secondary out first, then re-centre primary; diagonal: one straight move
     });
     // The two opposite walls' BETWEEN move. POCKET probes both from the centre (nothing). BOSS needs the 2nd face from the
     // far side: the IN-AXIS toggle — MANUAL pauses for the operator to jog over, AUTO traverses over hands-free. RETURNS.
@@ -200,7 +204,7 @@ export function middleStack(params = {}, opts = {}) {
     // toggle MANUAL jogs / AUTO diagonals there. CIRCULAR re-centres to the found primary centre (#53) first so the secondary
     // touches cross the true diameter. The 2-axis path writes BOTH centres to their axes' WCS offsets; the single-axis writes one.
     const twoAxisOn = [
-        ...featBossOnly(transAxisFork(transTraverseR(), repositionR('jog clear, around to the perpendicular walls'))),
+        ...featBossOnly(transAxisFork(tsPair(transTraverseR('dogleg'), transTraverseR('diagonal')), repositionR('jog clear, around to the perpendicular walls'))),
         ...circularOnly([mkMM(axis, '#53')]),
         mkC(`2axis_${axis === 'X' ? 'XtoY' : 'YtoX'}_${resolvedDir2}`),
         ...seqR(second, dir2Plus, 54),

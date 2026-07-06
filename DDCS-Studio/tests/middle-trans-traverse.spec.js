@@ -18,13 +18,14 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
     const stock = { x: 100, y: 80, z: 20 };
     return {
       autoHas21: /#21\s*=/.test(auto),
-      // B-TRANS (b): the PRIMARY (X) leg targets ②'s primary coord via #22 (= #53 re-centre at rest, ②.X when placed); the
-      // SECONDARY (Y) leg travels out by the Diag-travel #21. (dir2=neg → +#21 = Y#21.)
-      autoHasTransMove: /G0 X\[#22-#52-#10-#6\] Y#21/.test(auto),   // #22 = the diagonal X target; −#6 recovers the tool's raw position (#52 comped)
+      // t383 (human) — the trans-axis auto route DEFAULTS to DOGLEG: the SECONDARY (Y) leg travels out by the Diag-travel
+      // #21 FIRST (routes around the boss), THEN the PRIMARY (X) leg re-centres to ②'s primary coord #22 (= #53 at rest,
+      // ②.X when placed). (dir2=neg → +#21 = Y#21.) The `travelShape:'diagonal'` opt-in emits the single straight move instead.
+      autoHasTransMove: /G0 Y#21\nG0 X\[#22-#52-#10-#6\]/.test(auto),   // DOGLEG: Y#21 out, then re-centre X to #22 (−#6 recovers the raw pos, #52 comped)
       autoHasAutoTraverse: /auto-traverse to the perpendicular/.test(auto),
-      // the diagonal move must come BEFORE the REPOSITION (the connecting travel of the PRIOR pass) — else the trace
-      // anchors it to ② and pushes the 2nd probe AWAY (the bug the human caught). So the Y pass starts cleanly at ②.
-      moveBeforeReposition: auto.indexOf('G0 X[#22-#52-#10-#6] Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
+      // the connecting move must come BEFORE the REPOSITION (the travel of the PRIOR pass) — else the trace anchors it to
+      // ② and pushes the 2nd probe AWAY (the bug the human caught). So the Y pass starts cleanly at ②.
+      moveBeforeReposition: auto.indexOf('G0 Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
       manualHas21: /#21/.test(manual),
       manualHasJogPerp: /jog clear, around to the perpendicular/.test(manual),
       legacyAutoMatches: w.generate({ ...base, approach: 'auto' }) === auto,
@@ -34,7 +35,7 @@ test('macro: boss auto trans-axis emits the diagonal traverse (#21); manual jogs
     };
   });
   expect(r.autoHas21, 'auto trans-axis assigns the Diag travel #21').toBe(true);
-  expect(r.autoHasTransMove, 'auto trans-axis targets ②’s primary via #22 (=#53 at rest) + travels out by #21 (B-TRANS fix b)').toBe(true);
+  expect(r.autoHasTransMove, 'auto trans-axis DOGLEG (default): out by #21 (Y) then re-centre to ②’s primary via #22 (=#53 at rest)').toBe(true);
   expect(r.autoHasAutoTraverse, 'auto trans-axis is hands-free, not an operator jog').toBe(true);
   expect(r.moveBeforeReposition, 'the diagonal move is the connecting travel BEFORE the REPOSITION (so the Y pass anchors at ②)').toBe(true);
   expect(r.manualHas21, 'manual has no Diag travel').toBe(false);
@@ -59,7 +60,7 @@ test('the trans diagonal re-centres the PRIMARY axis to ② for BOTH axis orders
     const stock = { x: 40, y: 40, z: 20, shape: 'boss' };   // NORMAL boss (dist=100 clears it → the probes succeed)
     // the diagonal endpoint's PRIMARY coord must land on ②'s primary (= the centre), for X-first AND Y-first
     const primErr = (axis) => {
-      const p = { featureType: 'boss', twoAxis: true, axis, dir1: 'pos', dir2: 'pos', dist: 100, diagTravel: '50', inAxis: 'auto', transAxis: 'auto' };
+      const p = { featureType: 'boss', twoAxis: true, axis, dir1: 'pos', dir2: 'pos', dist: 100, diagTravel: '50', inAxis: 'auto', transAxis: 'auto', travelShape: 'diagonal' };   // the DIAGONAL route makes ONE diagonal segment to trace (dogleg splits into two axis moves)
       const code = w.generate(p), starts = w.inferStarts(p, stock);
       const segs = traceToolpath(code, { stock, start: starts[0], passStarts: starts }).segments || [];
       const diag = segs.filter((s) => (s.type === 'rapid' || s.rapid) && Math.abs(s.x2 - s.x1) > 1 && Math.abs(s.y2 - s.y1) > 1)[0];
@@ -69,7 +70,7 @@ test('the trans diagonal re-centres the PRIMARY axis to ② for BOTH axis orders
     };
     return {
       xFirst: primErr('X'), yFirst: primErr('Y'),
-      reCentreMove: /G0 X\[#22-#52-#10-#6\] Y/.test(w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'pos', dist: 100, inAxis: 'auto', transAxis: 'auto' })),
+      reCentreMove: /G0 X\[#22-#52-#10-#6\] Y/.test(w.generate({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'pos', dist: 100, inAxis: 'auto', transAxis: 'auto', travelShape: 'diagonal' })),
     };
   });
   expect(r.reCentreMove, 'the primary leg targets #22 (=#53 re-centre at rest, ②.X when placed), not a fixed travel').toBe(true);

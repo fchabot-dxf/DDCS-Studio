@@ -217,6 +217,25 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: offX, y: offY, ax, ay, label: destPass != null ? String(destPass) : 'pos', color: srcCol(destPass), manual: reposManual });   // label = the destination PASS NUMBER (1,2,…) — the SOLE owner of the number
         }
     }
+    // t383 (human) — MIDDLE ② DIAGONAL-AIM (opt-in, mirror cornerPick's declared detection): an op with diagTravel + diagPrimary
+    // bindings (middle) whose trans-axis AUTO traverse is emitted (boss + twoAxis + transAxis auto — dogleg OR diagonal, both use
+    // #21) gets a draggable ② handle. Dragging it re-derives diagTravel (#21 = |secondary out-distance from centre|) + diagPrimary
+    // (#22 = the primary coord) so the diagonal/dogleg ENDS on ② — the built-in middleView.tieDiagTravel mapping, PORTED. The ②
+    // handle is the ONLY secondary-start marker in the 2D canvas (the per-pass ②③④ ride the 3D panel), so no marker conflict.
+    const diagTBind = (def.bindings || []).find((b) => b && b.param === 'diagTravel');
+    const diagPBind = (def.bindings || []).find((b) => b && b.param === 'diagPrimary');
+    if (diagTBind && diagPBind && params.featureType === 'boss' && (params.twoAxis || params.findBoth) && (params.transAxis || 'auto') === 'auto' && _writable('diagTravel') && _writable('diagPrimary')) {
+        const primaryX = (params.axis || 'X') !== 'Y';
+        const centreSec = primaryX ? stock.h / 2 : stock.w / 2;
+        const centrePrim = primaryX ? stock.w / 2 : stock.h / 2;
+        const dir1Plus = (params.dir1 || 'pos') === 'pos';
+        const dir2 = (typeof params.dir2 === 'string') ? params.dir2 : (dir1Plus ? 'neg' : 'pos');
+        const sign = dir2 === 'pos' ? -1 : 1;   // the ② side = travelOpp(dir2): dir2 pos → −#21, dir2 neg → +#21 (matches the emit smove)
+        const travel = Math.max(1, num(params.diagTravel, 50));
+        const pp = parseFloat(params.diagPrimary);
+        const prim = Number.isFinite(pp) ? pp : centrePrim;   // '#53' (re-centre, at rest) → the stock centre; a placed ② → its numeric primary coord
+        decls.push({ type: 'diagAim', id: 'diagAim', primaryX, centreSec, sign, travel, prim, fieldTravel: 'diagTravel', fieldPrimary: 'diagPrimary', label: '②' });
+    }
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
     // math (corner/radius) lives in the registry; here `setFields` just routes each {param: value} to its form field.
     const setFields = (m) => { for (const k in m) _writeParam(k, m[k]); };

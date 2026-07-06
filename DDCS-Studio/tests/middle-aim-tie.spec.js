@@ -43,8 +43,10 @@ test('drag ② → #21/diagTravel follows + the trans-axial diagonal ends ON ②
     const stock = window.ddcsGetSettings().stock;
     const diag21 = +document.getElementById('m_diag_travel').value;
     const derived = Math.round(Math.abs(starts[1].y - stock.y / 2));   // the value the tie should have written
-    // re-trace with the CURRENT macro (#21 already updated) + the dragged ② → where does the diagonal END?
-    const params = { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', dist: 100, inAxis: 'auto', transAxis: 'auto', diagTravel: String(diag21) };
+    // re-trace with the CURRENT macro (#21 already updated) + the dragged ② → where does the DIAGONAL END? (t383 made DOGLEG
+    // the default trans route — two axis moves, no diagonal segment to measure — so pin the 'diagonal' route here; the ② tie
+    // (#21 = |②.y − centre.y|) the form drag drives is route-agnostic, and BOTH routes end on ②, so this checks the invariant.)
+    const params = { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', dist: 100, inAxis: 'auto', transAxis: 'auto', travelShape: 'diagonal', diagTravel: String(diag21) };
     const code = w.generate(params);
     const segs = traceToolpath(code, { stock, start: starts[0], passStarts: starts }).segments || [];
     const dseg = segs.filter((s) => (s.type === 'rapid' || s.rapid) && Math.abs(s.x2 - s.x1) > 1 && Math.abs(s.y2 - s.y1) > 1)[0];

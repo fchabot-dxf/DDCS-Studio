@@ -80,6 +80,15 @@ export const CANVAS_GESTURES = {
         place: (d) => ({ x: d.cx + d.nx * d.off, y: d.cy + d.ny * d.off, kind: 'size', label: d.label, value: d.value }),
         drag: (d, w) => ({ [d.field]: clampMin(d.scale * Math.abs((w.x - d.cx) * d.nx + (w.y - d.cy) * d.ny), d.min) }),
     },
+    // MIDDLE ② DIAGONAL-AIM: the trans-axial diagonal ends ON ②. The handle sits at the diagonal target — on the PRIMARY axis
+    // at `prim` (diagPrimary #22, numeric; the stock centre at rest when it holds '#53'), on the SECONDARY axis at
+    // centre ± diagTravel (`sign` from dir2 — the emit's travelOpp side). A drag DECOMPOSES ②'s world into diagPrimary
+    // (#22 = the primary coord) + diagTravel (#21 = |secondary out-distance from the centre|) — the SAME mapping the built-in
+    // middleView.tieDiagTravel used, so the diagonal JOINS ②. `primaryX` = the primary axis is X (so the secondary is Y).
+    diagAim: {
+        place: (d) => { const sec = d.centreSec + d.sign * d.travel; return { x: d.primaryX ? d.prim : sec, y: d.primaryX ? sec : d.prim, kind: 'move', label: d.label }; },
+        drag: (d, w) => { const sec = d.primaryX ? w.y : w.x, prim = d.primaryX ? w.x : w.y; return { [d.fieldTravel]: Math.max(1, Math.round(Math.abs(sec - d.centreSec))), [d.fieldPrimary]: Math.round(prim) }; },
+    },
     // PROBE-VECTOR about an anchor → an axis ENUM + a dir ENUM + a reach scalar (ONE drag = three controls). The handle is
     // the arrow TIP: a probe is AXIS-ALIGNED, so the drag angle SNAPS to the nearest cardinal (|dx|≥|dy| → X else Y; the
     // sign → pos/neg), and the length sets the reach (`d.field`). Anchor (cx,cy) = the probe start; the view draws the

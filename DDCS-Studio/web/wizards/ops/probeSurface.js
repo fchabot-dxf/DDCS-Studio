@@ -72,7 +72,8 @@ export function probeSurfaceStack(p = {}) {
  *   'Press Enter when repositioned' / 2 — middle's reposition() literals).
  *
  * Mode 'in-axis' params: p.move (e.g. '#19')
- * Mode 'center' params: p.dir1Plus, p.dir2Plus, p.diagPrimary ('#22'), p.diagTravel ('#21'), p.wall2Var ('#52'), p.radiusVar ('#6'), p.lastRetract
+ * Mode 'center' params: p.dir1Plus, p.dir2Plus, p.diagPrimary ('#22'), p.diagTravel ('#21'), p.wall2Var ('#52'), p.radiusVar ('#6'), p.lastRetract;
+ *   p.dogleg (bool) — DOGLEG vs diagonal: false (default) = one straight XY diagonal; true = route AROUND (secondary out FIRST, then re-centre the primary).
  * Mode 'seq' params: p.crossX, p.crossY (e.g. '#23', '#24'); p.firstAxis ('X'|'Y', optional) — see the SAFE DOG-LEG note below.
  */
 export function safeTraverseStack(p = {}) {
@@ -105,7 +106,14 @@ export function safeTraverseStack(p = {}) {
         const pmove = `[#22-${p.wall2Var}-${lastRetract}${p.dir1Plus ? '-'+p.radiusVar : '+'+p.radiusVar}]`;
         const smove = p.dir2Plus ? `[0-${p.diagTravel}]` : String(p.diagTravel); // travelOpp logic
         if (p.lift) push('move', { mode: 'rapid', z: p.lift });
-        push('move', { mode: 'rapid', [alc]: pmove, [slc]: smove });
+        if (p.dogleg) {
+            // SAFE DOG-LEG (mirrors mode:'seq' firstAxis): route AROUND the boss — travel the SECONDARY out FIRST (clears
+            // the boss on that side), THEN re-centre the PRIMARY. A single diagonal (the else) could clip the boss corner.
+            push('move', { mode: 'rapid', [slc]: smove });
+            push('move', { mode: 'rapid', [alc]: pmove });
+        } else {
+            push('move', { mode: 'rapid', [alc]: pmove, [slc]: smove });   // one straight XY diagonal
+        }
         if (p.drop) push('move', { mode: 'rapid', z: p.drop });
         if (p.comment) push('comment', { text: p.comment });
         push('distmode', { dist: 'inc' });

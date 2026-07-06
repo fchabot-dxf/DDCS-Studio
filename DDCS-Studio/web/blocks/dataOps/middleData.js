@@ -33,7 +33,7 @@ import { makeProvider } from '../../viz/opSimStarts.js';   // E2 — reuse the D
  *  their default shape (pocket / auto travel / single-axis / active-WCS / no-Z / no-sync). axis/dir1 baked X-primary/+. */
 export const MIDDLE_DEFAULTS = {
     // structural (STRING enums / bools — the guards match by value-equality / !! coercion)
-    featureType: 'pocket', inAxis: 'auto', transAxis: 'auto', twoAxis: false, circular: false, probeZ: 0, wcs: 'active', syncA: 0,
+    featureType: 'pocket', inAxis: 'auto', transAxis: 'auto', travelShape: 'dogleg', twoAxis: false, circular: false, probeZ: 0, wcs: 'active', syncA: 0,
     // baked value/order swaps (NOT bound in E1)
     axis: 'X', dir1: 'pos', slave: '3',
     // scalars — dist default 200 (t381: 20 was too small to reach the wall on a typical stock → "retract-only"; matches middleStack's fallback + the m_dist form default)
@@ -71,7 +71,9 @@ export const MIDDLE_BINDING_SPECS = [
 export const MIDDLE_STRUCT_BINDINGS = [
     { param: 'featureType', type: 'enum', default: MIDDLE_DEFAULTS.featureType, label: 'Feature', help: 'Pocket (find the centre from INSIDE two walls) or Boss (find the centre from OUTSIDE, crossing over the part).', section: 'GEOMETRY', widgetConfig: { options: [['Pocket', 'pocket'], ['Boss', 'boss']] } },
     { param: 'inAxis', type: 'enum', widget: 'segmented', default: MIDDLE_DEFAULTS.inAxis, label: 'In-Axis Travel', help: 'Boss: how to reach wall 2 within an axis — Auto crosses over hands-free (the cross-over distance), Manual pauses for you to jog around.', section: 'GEOMETRY', widgetConfig: { options: [['Manual', 'manual'], ['Auto', 'auto']] } },
-    { param: 'transAxis', type: 'enum', widget: 'segmented', default: MIDDLE_DEFAULTS.transAxis, label: 'Trans-Axis Travel', help: 'Boss two-axis: how to reach the perpendicular walls — Auto diagonals across hands-free, Manual pauses for you to jog.', section: 'GEOMETRY', widgetConfig: { options: [['Manual', 'manual'], ['Auto', 'auto']] } },
+    { param: 'transAxis', type: 'enum', widget: 'segmented', default: MIDDLE_DEFAULTS.transAxis, label: 'Trans-Axis Travel', help: 'Boss two-axis: how to reach the perpendicular walls — Auto crosses hands-free, Manual pauses for you to jog.', section: 'GEOMETRY', widgetConfig: { options: [['Manual', 'manual'], ['Auto', 'auto']] } },
+    // t383 (human) — the TRANS-axis AUTO route SHAPE: Dogleg (default) routes AROUND the boss (secondary out first, then re-centre); Diagonal is one straight move.
+    { param: 'travelShape', type: 'enum', widget: 'segmented', default: MIDDLE_DEFAULTS.travelShape, label: 'Trans Route', help: 'Boss two-axis auto: how the tool crosses from the first-axis walls to the perpendicular walls — Dogleg routes AROUND the boss (two axis moves, never diagonally over the corner), Diagonal is one straight move (faster, relies on clearing the boss).', section: 'GEOMETRY', widgetConfig: { options: [['Dogleg', 'dogleg'], ['Diagonal', 'diagonal']] } },
     { param: 'twoAxis', type: 'bool', default: !!MIDDLE_DEFAULTS.twoAxis, label: 'Find Both Axes', help: 'Also probe the perpendicular axis and set both X and Y — a full centre-find instead of a single axis.', section: 'GEOMETRY' },
     { param: 'circular', type: 'bool', default: !!MIDDLE_DEFAULTS.circular, label: 'Circular', help: 'Round bore/boss: also report the diameter (the opposite-touch span) and re-centre between axes so the touches cross the true diameter.', section: 'GEOMETRY' },
     { param: 'probeZ', type: 'bool', default: !!MIDDLE_DEFAULTS.probeZ, label: 'Probe Z First', help: 'Probe the top surface for Z before the centre-finding — anchors the sideways probes to a real measured Z instead of a jogged guess.', section: 'GEOMETRY' },

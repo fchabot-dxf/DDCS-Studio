@@ -13,7 +13,7 @@ import { test, expect } from '@playwright/test';
  * Also folds in the transTraverse → safeTraverseStack `mode:'center'` dedup (the pre-declared byte-identical
  * extraction, previously ZERO callers): middle no longer hand-rolls the diagonal re-centre.
  */
-test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identical across the full 896-combo structural sweep', async ({ page }) => {
+test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identical across the full 1792-combo structural sweep', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
@@ -26,19 +26,20 @@ test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identic
     const SUP = middleStack({}, { superset: true });
     const supGuardCount = (JSON.stringify(SUP).match(/"type":"guard"/g) || []).length;
 
-    // the FULL structural sweep — every combo sets ALL 8 structural params EXPLICITLY (axis/dir/scalars default on both sides).
+    // the FULL structural sweep — every combo sets ALL 9 structural params EXPLICITLY (axis/dir/scalars default on both sides).
     const FEATS = ['pocket', 'boss'], MODES = ['auto', 'manual'], BOOLS = [false, true];
-    const WCSV = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
+    const WCSV = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'], SHAPES = ['dogleg', 'diagonal'];
     const combos = [];
     for (const featureType of FEATS)
       for (const inAxis of MODES)
         for (const transAxis of MODES)
-          for (const twoAxis of BOOLS)
-            for (const circular of BOOLS)
-              for (const probeZ of BOOLS)
-                for (const wcs of WCSV)
-                  for (const syncA of BOOLS)
-                    combos.push({ featureType, inAxis, transAxis, twoAxis, circular, probeZ, wcs, syncA });
+          for (const travelShape of SHAPES)
+            for (const twoAxis of BOOLS)
+              for (const circular of BOOLS)
+                for (const probeZ of BOOLS)
+                  for (const wcs of WCSV)
+                    for (const syncA of BOOLS)
+                      combos.push({ featureType, inAxis, transAxis, travelShape, twoAxis, circular, probeZ, wcs, syncA });
 
     const diffs = [];
     let leftoverGuards = 0;
@@ -55,36 +56,47 @@ test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identic
   });
 
   expect(r.supGuardCount, 'the superset carries guard blocks (it IS a superset, not accidentally concrete)').toBeGreaterThan(10);
-  expect(r.comboCount, 'the full structural sweep is 2^7 * 7 = 896 combos').toBe(896);
+  expect(r.comboCount, 'the full structural sweep is 2^8 * 7 = 1792 combos').toBe(1792);
   expect(r.leftoverGuards, 'prune leaves ZERO guard blocks (fully collapsed to the concrete shape)').toBe(0);
   if (r.firstDiff) console.log('FIRST DIFF @ ' + JSON.stringify(r.firstDiff.c) + '\n--- PRUNED SUPERSET ---\n' + r.firstDiff.a + '\n--- CONCRETE ---\n' + r.firstDiff.b);
-  expect(r.diffCount, 'prune(superset) is BYTE-IDENTICAL to concrete middleStack for ALL 896 structural combos (the E0 gate)').toBe(0);
+  expect(r.diffCount, 'prune(superset) is BYTE-IDENTICAL to concrete middleStack for ALL 1792 structural combos (the E0 gate)').toBe(0);
 });
 
 /**
- * The transTraverse → safeTraverseStack `mode:'center'` dedup is byte-identical: a boss + twoAxis + transAxis-auto
- * emits the exact re-centre diagonal the pre-dedup inline produced. #22 is now assigned INSIDE mode:'center' (not
- * hand-rolled), the primary leg targets #22 (=diagPrimary #53 at rest), the secondary leg travels out by #21, and the
- * move precedes the REPOSITION so the trace anchors the next pass to ②. (The middle-trans-traverse spec pins the trace.)
+ * The transTraverse routes through safeTraverseStack `mode:'center'` — now with a travelShape fork (t383, human).
+ * DEFAULT = DOGLEG: two moves, the secondary out FIRST (G0 Y#21) then the primary re-centre (G0 X[#22-#52-#10-#6]) —
+ * routes AROUND the boss. travelShape='diagonal' = the pre-dedup SINGLE move (G0 X[#22-#52-#10-#6] Y#21), byte-identical
+ * to the old inline. Both assign #22 (=diagPrimary #53 at rest) + #21 (Diag-travel), and put the connecting move BEFORE
+ * the REPOSITION so the trace anchors the next pass to ②. (The middle-trans-traverse spec pins the trace.)
  */
-test('E0 dedup: transTraverse routes through mode:center byte-identical (the re-centre diagonal)', async ({ page }) => {
+test('E0 dedup: transTraverse mode:center — dogleg (default) two moves + diagonal one move', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const r = await page.evaluate(async () => {
     const { middleStack } = await import('/wizards/middleWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
-    const auto = emitMapped(middleStack({ featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', inAxis: 'auto', transAxis: 'auto' })).text;
+    const base = { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', inAxis: 'auto', transAxis: 'auto' };
+    const dogleg = emitMapped(middleStack({ ...base })).text;                          // DEFAULT = dogleg
+    const diag = emitMapped(middleStack({ ...base, travelShape: 'diagonal' })).text;   // opt-in diagonal
     return {
-      has21: /^#21=50 \(/m.test(auto),                         // the Diag-travel assign (default 50) — emit format `#VAR=VAL ( note )`
-      has22: /^#22=#53 \(/m.test(auto),                        // #22 assigned by mode:center (= diagPrimary default #53)
-      hasDiag: /G0 X\[#22-#52-#10-#6\] Y#21/.test(auto),       // the re-centre diagonal: primary → #22, secondary out by #21
-      hasComment: /auto-traverse to the perpendicular/.test(auto),
-      moveBeforeRepos: auto.indexOf('G0 X[#22-#52-#10-#6] Y#21') < auto.indexOf('auto-traverse to the perpendicular'),
+      has21: /^#21=50 \(/m.test(dogleg),                       // the Diag-travel assign (default 50) — emit format `#VAR=VAL ( note )`
+      has22: /^#22=#53 \(/m.test(dogleg),                      // #22 assigned by mode:center (= diagPrimary default #53)
+      // DOGLEG (default): secondary out FIRST (G0 Y#21), THEN re-centre primary (G0 X[#22-#52-#10-#6]) — routes AROUND
+      doglegTwoMoves: /G0 Y#21\nG0 X\[#22-#52-#10-#6\]/.test(dogleg),
+      doglegNoStraightDiag: !/G0 X\[#22-#52-#10-#6\] Y#21/.test(dogleg),
+      // DIAGONAL (opt-in): one straight XY move — byte-identical to the pre-dedup inline
+      diagOneMove: /G0 X\[#22-#52-#10-#6\] Y#21/.test(diag),
+      diagNoDogleg: !/G0 Y#21\nG0 X/.test(diag),
+      hasComment: /auto-traverse to the perpendicular/.test(dogleg),
+      doglegBeforeRepos: dogleg.indexOf('G0 Y#21') < dogleg.indexOf('auto-traverse to the perpendicular'),
     };
   });
   expect(r.has21, 'the Diag-travel #21 is assigned (boss + twoAxis + transAxis-auto)').toBe(true);
   expect(r.has22, '#22 is assigned by mode:center (= diagPrimary default #53)').toBe(true);
-  expect(r.hasDiag, 'the re-centre diagonal G0 X[#22-#52-#10-#6] Y#21 is byte-identical to the pre-dedup inline').toBe(true);
+  expect(r.doglegTwoMoves, 'DOGLEG (default): G0 Y#21 then G0 X[#22-#52-#10-#6] (secondary out first, then re-centre)').toBe(true);
+  expect(r.doglegNoStraightDiag, 'the dogleg does NOT emit the single straight diagonal').toBe(true);
+  expect(r.diagOneMove, 'DIAGONAL (opt-in): the single straight G0 X[#22-#52-#10-#6] Y#21 (pre-dedup byte-identical)').toBe(true);
+  expect(r.diagNoDogleg, 'the diagonal does NOT split into two axis moves').toBe(true);
   expect(r.hasComment, 'the REPOSITION auto-traverse comment marks the perpendicular pass').toBe(true);
-  expect(r.moveBeforeRepos, 'the diagonal move precedes the REPOSITION (anchors the next pass to ②)').toBe(true);
+  expect(r.doglegBeforeRepos, 'the connecting move precedes the REPOSITION (anchors the next pass to ②)').toBe(true);
 });
