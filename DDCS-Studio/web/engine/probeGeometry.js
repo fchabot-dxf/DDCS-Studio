@@ -6,6 +6,7 @@
  * Pure geometry: no settings / DOM / THREE deps. Frame = STOCK-LOCAL — the box is x∈[0,X] y∈[0,Y]
  * z∈[-Z,0] (top face at z=0), and the caller passes the probe segment A→B in that same frame.
  */
+import { projectWorkpiece } from './workpiece.js';   // t385 — the pocket cavity reads the DECLARED workpiece feature (stock-modal size), not a hardcoded 25% inset
 
 /** Ray vs axis-aligned box (slab method). Returns { hit, tEnter, tExit } parametric along A→B. */
 export function rayBox(A, B, min, max) {
@@ -101,11 +102,19 @@ export function stockProbeStop(A, B, stock, rotaryAxis, tipR = 0) {
     const box = { min: { x: -r, y: -r, z: -stock.z - r }, max: { x: stock.x + r, y: stock.y + r, z: r } };
     const ro = rayBox(A, B, box.min, box.max);
     if (ro.hit) { if (ro.tEnter > 1e-6) take(ro.tEnter); else if (ro.tExit > 1e-6) take(ro.tExit); }
-    if (stock.shape === 'pocket') {                       // a hole in the block — same inset the 3D view renders
-        const w = Math.max(8, Math.min(stock.x, stock.y) * 0.25);
-        const cav = { min: { x: w + r, y: w + r, z: -stock.z }, max: { x: stock.x - w - r, y: stock.y - w - r, z: 0 } };
-        const rc = rayBox(A, B, cav.min, cav.max);
-        if (rc.hit && rc.tEnter <= 1e-6 && rc.tExit > 1e-6) take(rc.tExit);   // probing from inside the hole → its wall
+    if (stock.shape === 'pocket') {                       // a hole in the block → its wall stops a bore probe from inside.
+        // t385 (human) — READ the workpiece FEATURE (getWorkpiece/projectWorkpiece — the stock-modal-defined pocket pos+size),
+        // NOT a hardcoded 25% inset, so the probe STOPS at the RENDERED pocket wall (the size the 3D already draws). A LEGACY
+        // pocket (no features[]) derives the SAME 25% inset via deriveLegacyFeatures → BYTE-IDENTICAL; a modal-defined size
+        // stops at THAT wall. Each inside cavity is a box centred at f.pos, extent f.size (the tool CENTRE stops a tip-r short).
+        for (const f of projectWorkpiece(stock).features) {
+            if (f.side !== 'inside' || !f.size) continue;
+            const cx = (f.pos && +f.pos.x) || stock.x / 2, cy = (f.pos && +f.pos.y) || stock.y / 2;
+            const hx = (+f.size.x || 0) / 2, hy = (+f.size.y || 0) / 2;
+            const cav = { min: { x: cx - hx + r, y: cy - hy + r, z: -stock.z }, max: { x: cx + hx - r, y: cy + hy - r, z: 0 } };
+            const rc = rayBox(A, B, cav.min, cav.max);
+            if (rc.hit && rc.tEnter <= 1e-6 && rc.tExit > 1e-6) take(rc.tExit);   // probing from inside the hole → its wall
+        }
     }
     return tt;
 }

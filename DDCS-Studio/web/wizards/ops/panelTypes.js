@@ -10,7 +10,7 @@ import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { opSimStarts, resolveRelToIndex } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket); resolveRelToIndex maps a SEMANTIC {row} → the surviving pass
 import { markerWorldOf } from '../../viz/markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the 3D preview ALSO reads, so the Layout handle + the 3D ruby can't diverge
 import { whenOk } from '../../blocks/whenGuard.js';   // a `when`-gated binding-group's handle shows only when its guard passes (③ — the prune-gated start handle)
-import { datumXY } from '../../engine/workpiece.js';   // t359 — the part-zero (datum) position, so the origin crosshair follows the datum (the corner-pick circles stay on the physical corners)
+import { datumXY, getWorkpiece, workpieceBackdrop } from '../../engine/workpiece.js';   // t359 — the datum crosshair; t385 — DRAW the workpiece INSIDE cavities (the pocket) from the DECLARED feature (stock-modal size)
 
 export const PANEL_TYPES = {
     form:        { id: 'form',        label: 'Form only',      viz: false, mode: null },   // single column, no preview
@@ -108,6 +108,11 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     const groups = {};
     for (const b of (def.bindings || [])) { if (b.group) (groups[b.group] = groups[b.group] || []).push(b); }
     const items = [], decls = [];
+    // t385 (human) — DRAW the workpiece INSIDE cavities (the pocket) in the 2D layout from the DECLARED workpiece
+    // (getWorkpiece → the stock-modal-defined pos+size), so a Middle probe SHOWS the pocket it finds — matching the 3D
+    // render + the probe-stop (ONE source, no hardcoded inset). Only inside cavities draw; an outer boss/solid has none →
+    // unchanged for corner/edge. Drawn first (behind the handles/glyphs).
+    try { items.push(...(workpieceBackdrop(getWorkpiece(), { ox: stock.ox || 0, oy: stock.oy || 0 }).items || [])); } catch (_) { /* no workpiece → no cavity */ }
     for (const gid in groups) {
         // ③ — a `when`-gated group (e.g. corner's `start` #21/#22, gated on probeZFirst) renders its handle ONLY when the
         // guard passes: its socket is pruned away in the other state, so a handle there would be dead / write a stale param.
