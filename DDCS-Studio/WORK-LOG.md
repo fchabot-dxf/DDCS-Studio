@@ -1717,3 +1717,24 @@ featureSize(wp,f) = f.side==='inside' ? f.size : {x:wp.outer.x, y:wp.outer.y, d:
 - FULL SUITE 658 pass / 2 skip / ZERO real fail (1 pre-existing middle-animator flake, passed on retry).
 
 **GATE (USER-FACING, the LAST blocker → the advisor RELEASES the workpiece-modal milestone): PASS BACK the boss (no cavity) + pocket (cavity) screenshots.** The shape/features[] reconcile is one-source + non-destructive; boss=solid, pocket=cavity, emit byte-identical.
+
+## 🔨 turn 369 (cycle 127) — MIDDLE PORT RECONCILE vs the workpiece foundation (NO CODE; V10.84 released). The t347 scout PREDATED the pivot — this updates + SIMPLIFIES the E-plan. Grounded vs the released workpiece engine.
+
+**GROUNDED:** workpiece.js exports `getWorkpiece`/`projectWorkpiece`/`featureSize`/`featureType`/`workpieceBackdrop` (the reads middle needs); `middleStack` still has 0 `superset` hits (E0 not built); `syncStockShape` (middleView.js:57-68, called :189) is the stock.shape mutation to retire.
+
+**(1) EMIT SIDE — workpiece-INDEPENDENT, HOLDS (confirmed):** E0/E1/E2/E4/E5 are about the G-code template + bindings + menu routing, NOT the stock geometry — the pivot doesn't touch them.
+- **E0 (the GATE, UNCHANGED):** a `{superset:true}` mode for middleStack (0 hits today) — the mechanical heart (11 structural arms, byte-identical prune). STILL the gate; the workpiece changes nothing here.
+- **E1 (emit/data-op, UNCHANGED):** middleData.js — DEFAULTS + BINDING_SPECS by #var identity + STRUCT_BINDINGS + middleDataStack(superset) + middleDataDef via userOpFromStack. Byte-identical.
+- **E2 (sim-starts, UNCHANGED emit — SIMPLER positions):** def.simStartsProvider porting BUILT_IN.middle; the CENTRE-find pass positions can now READ `featureSize(getWorkpiece())` (the workpiece = the size source) instead of hand-computing wall stand-offs from the raw stock.
+- **E4 (opensAs, UNCHANGED):** add `opensAs:'user_middle_data'` to the wizardLibrary middle entry. **E5 (title, UNCHANGED):** builtinLabelForTwin.
+
+**(2) FEATURE/GUI SIDE — SUBSUMED by the workpiece modal (E3/E6 SHRINK):** the boss/pocket glyph + the feature drag now live in the WORKPIECE MODAL (M1/M2, DONE). Middle no longer owns a per-op feature — it REFERENCES the workpiece feature.
+- **E3 (glyph → SHRUNK to REFERENCE):** the ported middle's form3d+2d preview reads `getWorkpiece().features` (the boss/pocket glyph via `workpieceBackdrop`) — no bespoke middle glyph.
+- **E6 (canvas → DROPPED to a LINK):** the feature drag-canvas IS the workpiece modal; middle shows the feature read-only + an Edit-workpiece link opens the modal. No bespoke middle canvas.
+- **RETIRE syncStockShape (middleView.js:57-68, :189):** middle READS the workpiece feature (side/size) instead of MUTATING settings.stock.shape — kills the cross-view coupling (the t347 "shape-mutation-as-communication" smell) via the ONE-source workpiece.
+
+**(3) THE t347 NO-CLEAN-SIZE GAP — RESOLVED:** `featureSize(wp, f)` (inside → f.size, outside → outer) is the ONE size source. Middle DERIVES its reach (pocket) / cross-over (boss = size + 2×approach) / diag-travel FROM the feature size — seeding its emit params (byte-identical, the emit still reads the form/bindings). The workpiece IS the size source; middle no longer needs a bespoke nominal-size param.
+
+**CONFIRMED: E0 is still the gate; NO new integration blocker** (the workpiece engine is released + stable; `getWorkpiece` is the clean seam; syncStockShape retirement is a clean removal). Net: middle is SIMPLER than the t347 scout predicted — the heavy FEATURE/GUI work (glyph + drag + size) is DONE in the modal; the remaining port is E0(gate)→E1→E2→E4→E5 (the emit + in-place, unchanged) + E3/E6 shrink to reads + the syncStockShape retirement.
+
+**ONE RECONCILE FORK (for the advisor/human):** the featureType/size FLOW — (a) middle DERIVES featureType (= f.side) + size (= featureSize) from the referenced workpiece feature (the pivot's one-source ideal; the boss/pocket + size UX lives ONLY in the workpiece modal) vs (b) middle keeps a featureType dropdown as a form param SEEDED from the feature (a lighter transition, two edit points). RECOMMEND (a) per the pivot. Plus F6 (which feature middle probes): single-feature pilot → features[0]; multi-feature → by id (deferred). PASS BACK the reconciled plan (NO CODE).
