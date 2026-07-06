@@ -84,3 +84,32 @@ export function getWorkpiece() {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     return projectWorkpiece(s);
 }
+
+/**
+ * Produce a FeatureCanvas spec { stock:{w,h,ox,oy}, items:[cavity glyphs] } from a workpiece — the ONE
+ * SOURCE for the 2D top-down backdrop (P1/P5 migrate the ~13 hand-rolled stock→{w,h,ox,oy} flattens to
+ * this; the stock modal is its FIRST consumer). The OUTER block is the fc-stock rect (spec.stock). An
+ * INSIDE feature (pocket/bore) draws a filled fc-feature-pocket cavity at its pos+size — the pocket rect
+ * MATCHES middleView.buildFeatureItems exactly (so the modal and the wizard preview draw the identical
+ * cavity), and a legacy pocket (from deriveLegacyFeatures) therefore shows as its derived cavity. OUTSIDE
+ * features (boss/round-boss) ARE the outer outline → shown by fc-stock; how/if they overlay a glyph is a
+ * later (P2 middleView-migration) decision, not made here.
+ */
+export function workpieceBackdrop(wp, opts) {
+    const o = wp && wp.outer;
+    if (!o || !(o.x > 0) || !(o.y > 0)) return { stock: null, items: [] };
+    const ox = (opts && opts.ox) || 0, oy = (opts && opts.oy) || 0;
+    const items = [];
+    for (const f of (wp.features || [])) {
+        if (f.side !== 'inside') continue;   // OUTSIDE = the outer outline (the fc-stock rect); INSIDE = a cavity glyph
+        const sz = featureSize(wp, f);
+        if (!sz) continue;
+        if (f.shape === 'round') {
+            const r = (sz.d != null ? sz.d : Math.min(sz.x, sz.y)) / 2;
+            items.push({ kind: 'circle', cx: f.pos.x, cy: f.pos.y, r, cls: 'fc-feature-pocket' });   // bore
+        } else {
+            items.push({ kind: 'rect', x: f.pos.x - sz.x / 2, y: f.pos.y - sz.y / 2, w: sz.x, h: sz.y, cls: 'fc-feature-pocket' });   // pocket cavity
+        }
+    }
+    return { stock: { w: o.x, h: o.y, ox, oy }, items };
+}

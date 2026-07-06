@@ -11,6 +11,8 @@ import { getSettings, applySettings, STOCK_TEMPLATES } from './settingsPanel.js'
 import { makeDraggable } from './uiUtils.js';
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 import { popReturn, dropReturn, activeReturn } from './navReturn.js';   // central back-navigation: the ✕ returns to wherever we came from
+import { FeatureCanvas } from '../viz/featureCanvas.js';                // M1: the shared 2D top-down canvas (workpiece editor)
+import { getWorkpiece, workpieceBackdrop } from '../engine/workpiece.js';   // M1: the workpiece VIEW + its ONE-source backdrop spec
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 
@@ -45,7 +47,8 @@ export function openStockEditor(anchor, opts) {
     pop.className = 'stock-editor-pop';
     pop.style.cssText = 'position:fixed; left:50%; top:13%; transform:translateX(-50%); z-index:10050;' +
         'background:rgba(20,22,28,0.98); border:1px solid rgba(255,255,255,0.14); border-radius:8px;' +
-        'padding:12px 14px; color:#e6ecf2; font-size:12px; width:300px; box-shadow:0 10px 34px rgba(0,0,0,0.55);';
+        'padding:12px 14px; color:#e6ecf2; font-size:12px; width:300px; box-shadow:0 10px 34px rgba(0,0,0,0.55);' +
+        'max-height:82vh; overflow-y:auto;';   // M1: the top-view canvas makes the popover taller — cap + scroll so it fits
     pop.innerHTML = `
         <style>
             .stock-editor-pop input, .stock-editor-pop select { width:100%; box-sizing:border-box; background:#11141a; color:#e6ecf2; border:1px solid #3a414d; border-radius:4px; padding:3px 5px; }
@@ -66,6 +69,8 @@ export function openStockEditor(anchor, opts) {
             <span style="font-weight:bold; letter-spacing:1px; color:#9fb4cc;">STOCK</span>
             <button id="se_close" class="toolbar-btn" style="padding:1px 8px;" title="Close">✕</button>
         </div>
+        <!-- M1: top-view WORKPIECE canvas — a live 2D top-down of the outer block + its features (read-only this slice) -->
+        <div id="se_canvas" style="height:150px; margin-bottom:10px; background:#0d0f14; border:1px solid #2a3340; border-radius:5px; overflow:hidden;"></div>
         <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:10px;">
             <label class="col">Template
                 <select id="se_tpl">
@@ -116,6 +121,13 @@ export function openStockEditor(anchor, opts) {
     document.body.appendChild(pop);
     _pop = pop;
     makeDraggable(pop, pop.querySelector('.stock-editor-head'));
+
+    // M1 — the top-view WORKPIECE canvas (READ-ONLY this slice; drag-editing is the next). getWorkpiece() projects
+    // the flat stock so the legacy pocket shows as its derived cavity; the shared workpieceBackdrop() is the ONE
+    // source (the same feature glyphs every wizard preview draws). commit() re-renders it on any edit.
+    const _fc = new FeatureCanvas();
+    const renderWorkpiece = () => { const host = pop.querySelector('#se_canvas'); if (host) _fc.render(host, workpieceBackdrop(getWorkpiece())); };
+    requestAnimationFrame(renderWorkpiece);
 
     const q = (id) => pop.querySelector('#' + id);
     // Visual datum picker (2D): a TOP-VIEW 3×3 grid for the XY box point (reuses the shared cornergrid — same graphic
@@ -196,7 +208,7 @@ export function openStockEditor(anchor, opts) {
         datum: getDatum(),
         pin: q('se_pin').value,
         show: q('se_show').checked,
-    } }); };
+    } }); renderWorkpiece(); };   // M1: reflect the just-committed stock in the top-view canvas (outer + derived features)
 
     ['se_x', 'se_y', 'se_z', 'se_shape', 'se_dia', 'se_pin', 'se_show'].forEach((id) => {
         q(id).addEventListener('input', commit);
