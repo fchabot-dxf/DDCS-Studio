@@ -21,8 +21,14 @@
 import { num } from '../wizards/ops/util.js';
 import { barRadius } from '../engine/probeGeometry.js';   // SPATIAL-MODEL inc2: the declared bar radius (stock.diameter ?? min(cross)/2)
 import { whenOk } from '../blocks/whenGuard.js';   // the ONE guard evaluator (shared with the emit-side prune) — declare-never-infer
+import { projectWorkpiece } from '../engine/workpiece.js';   // t385 — a middle probe's CENTRE start = the workpiece pocket centre (its physical pos), so it starts INSIDE an OFF-CENTRE cavity
 
 const n = (v, d) => num(v, d);
+
+// t385 (human) — the INSIDE feature (pocket/bore) physical CENTRE, or null (a boss / no inside feature → the caller uses the
+// stock centre). A middle probe finds a pocket, so its sim START must sit AT the pocket centre — the probe-stop only fires from
+// INSIDE the cavity, so an OFF-CENTRE pocket needs the start to follow its pos (else the probe starts outside → never stops).
+const insideCentre = (stock) => { try { const wp = projectWorkpiece(stock); const f = (wp.features || []).find((x) => x && x.side === 'inside' && x.pos); return f ? { x: +f.pos.x, y: +f.pos.y } : null; } catch (_) { return null; } };
 
 // ── BUILT-IN per-pass start inference (MOVED verbatim from the wizards; pure (params, stock) → [{x,y,z}, …]) ───────────
 const BUILT_IN = {
@@ -30,7 +36,9 @@ const BUILT_IN = {
     // pass (auto or manual) adds the secondary marker(s). The pass count MUST mirror the macro's reposition() calls.
     middle(params, stock) {
         const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
-        const cx = sx / 2, cy = sy / 2, probeZ = -Math.min(5, sz * 0.5);
+        // t385 — a POCKET's centre = the workpiece feature's physical pos (follows an off-centre pocket); a boss / no inside
+        // feature → the stock centre (unchanged). The centre pass + the boss perpendicular both use cx/cy.
+        const ic = insideCentre(stock), cx = ic ? ic.x : sx / 2, cy = ic ? ic.y : sy / 2, probeZ = -Math.min(5, sz * 0.5);
         const centre = { x: cx, y: cy, z: probeZ };
         const boss = (params.featureType || 'pocket') === 'boss';
         const twoAxis = !!params.twoAxis || !!params.findBoth;
@@ -159,7 +167,7 @@ const planeZ = (p, ctx) => {
 
 const rowToStart = (row, ctx) => {
     const z = planeZ(row.plane, ctx);
-    const { sx, sy, cx, cy } = ctx;
+    const { sx, sy, cx, cy, pcx, pcy } = ctx;
     switch (row.anchor) {
         case 'edge': {
             const axis = row.axis === 'Y' ? 'Y' : 'X';
@@ -178,7 +186,7 @@ const rowToStart = (row, ctx) => {
         }
         case 'centre':
         default:
-            return { x: cx, y: cy, z };
+            return { x: pcx != null ? pcx : cx, y: pcy != null ? pcy : cy, z };   // t385 — the pocket CENTRE (an off-centre feature) for a middle probe; a boss / no-inside → the stock centre
     }
 };
 
@@ -190,8 +198,9 @@ export function makeProvider(rows) {
     return (params, stock) => {
         const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
         const dist = n(params && params.dist, 20);
+        const ic = insideCentre(stock);   // t385 — the pocket CENTRE feeds the 'centre' anchor ONLY (a middle probe); 'edge'/'radial' keep the STOCK centre (edge/corner probe the OUTER)
         const ctx = {
-            sx, sy, sz, cx: sx / 2, cy: sy / 2,
+            sx, sy, sz, cx: sx / 2, cy: sy / 2, pcx: ic ? ic.x : sx / 2, pcy: ic ? ic.y : sy / 2,
             outset: Math.max(6, Math.min(dist * 0.6, 15)),        // the standard stand-off (matches built-in middle)
             R: barRadius(stock, sy, sz),                          // bar radius — declared stock.diameter ?? min(cross)/2 (matches built-in rotary)
             params: params || {},
