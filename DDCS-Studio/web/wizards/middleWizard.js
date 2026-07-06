@@ -6,6 +6,15 @@
  * A snippet (its own confirm + N1/N2 error handler + M30). Two-pass probe each wall, average to the centre;
  * 2-axis repeats on the perpendicular axis (in the chosen secondary direction) after a reposition.
  *
+ * ── SUPERSET (E0, t371) ──────────────────────────────────────────────────────────────────────────────────
+ * `middleStack(params, { superset:true })` seeds the data-TWIN as an ALL-ARMS-PRESENT template: every
+ * STRUCTURAL fork (featureType / inAxis / transAxis / twoAxis / circular / probeZ / wcs / syncA) emits BOTH
+ * arms, each wrapped in a `guard` block, so instantiate()/pruneGuards collapses it to either concrete shape.
+ * Superset OFF (the built-in wizard + every existing caller/test) is BYTE-IDENTICAL to today. The same
+ * cornerStack pattern (② B4 M2): a structural toggle becomes a re-authorable prune-selected branch of pure
+ * DATA, not JS-locked structure. NOTE: axis / dir1 / dir2 and the numeric scalars are VALUE/order swaps, not
+ * structural forks — they stay baked here and become bindings in E1 (the data-op + the feature-read slice).
+ *
  * DDCS M350: status #1920/#1921 (2=SUCCESS), trigger pos #1925/#1926, stop #1905/#1906, limit #1915/#1916.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
@@ -13,7 +22,6 @@ import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';   // the shared probe + travel primitives (middle composes them — t131 inc1, ① auto/manual travel)
 import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
-import { travelOwn, travelOpp } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 
 const AX = {
@@ -22,10 +30,13 @@ const AX = {
     Z: { stop: '#1907', limit: '#1917', status: '#1922', result: '#1927', off: 2 },   // Z-surface (probe-Z-first) — reuses twoPass
 };
 const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
+const WCS_VALUES = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
 const sgn = (plus) => (plus ? 'pos' : 'neg');
 
-/** Middle params → its probe-macro block stack. The one source of truth for both displays. */
-export function middleStack(params = {}) {
+/** Middle params → its probe-macro block stack. The one source of truth for both displays.
+ *  `opts.superset` (E0) seeds the TWIN with every structural arm present (each guarded) so pruneGuards can
+ *  collapse it to any concrete shape. OFF is byte-identical to today (the built-in + all existing callers). */
+export function middleStack(params = {}, opts = {}) {
     const featureType = params.featureType === 'boss' ? 'boss' : 'pocket';
     const approach = params.approach === 'manual' ? 'manual' : 'auto';   // LEGACY single toggle — the per-traverse default (back-compat)
     const oneMode = (v) => (v === 'manual' || v === 'auto') ? v : approach;
@@ -64,161 +75,173 @@ export function middleStack(params = {}) {
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const radius = num(params.radius, 2);   // stylus tip radius (#6) — for the DIAMETER (∓2r) + Z-surface (−r) comp; the CENTRE (bisect) needs none
 
+    const superset = !!opts.superset;
+
     const S = [];
-    const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
-    const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); };
-    const IF = (l, o, r, g) => { const b = newBlock('ifgoto'); b.params = { lhs: l, op: o, rhs: r, goto: g }; S.push(b); };
-    const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
-    const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
-    const MM = (ax, ref) => { const b = newBlock('machinemove'); b.params = { axis: ax, to: ref }; S.push(b); };
-    const MV = (ax, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [ax.toLowerCase()]: v }; S.push(b); };
-    const MOVE = (props) => { const b = newBlock('move'); b.params = { mode: 'rapid', ...props }; S.push(b); };   // 2-axis rapid (trans-axis diagonal)
-    const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
-    const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
-    const END = () => S.push(newBlock('endprogram'));
+    // Returning block factories (return ONE block) — every arm composes these, then a fork helper decides guard-vs-concrete.
+    const mkC = (t) => { const b = newBlock('comment'); b.params = { text: t }; return b; };
+    const mkA = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; return b; };
+    const mkIF = (l, o, r, g) => { const b = newBlock('ifgoto'); b.params = { lhs: l, op: o, rhs: r, goto: g }; return b; };
+    const mkGO = (n) => { const b = newBlock('goto'); b.params = { n }; return b; };
+    const mkLB = (n) => { const b = newBlock('label'); b.params = { n }; return b; };
+    const mkMM = (ax, ref) => { const b = newBlock('machinemove'); b.params = { axis: ax, to: ref }; return b; };
+    const mkMV = (ax, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [ax.toLowerCase()]: v }; return b; };
+    const mkMSG = (text) => { const b = newBlock('message'); b.params = { text }; return b; };
+    const mkDM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; return b; };
+    const mkEND = () => newBlock('endprogram');
+
+    // ── SUPERSET fork helpers (E0) — each RETURNS the arm block(s): superset → guarded arms; concrete → the selected arm.
+    // The GUARD wraps one fork arm gated by { param, is }; pruneGuards drops the false arms + unwraps the true one at build.
+    const GUARD = (when, kids) => { const b = newBlock('guard'); b.params = { when }; b.children = kids; return b; };
+    const featBossOnly = (kids) => superset ? [GUARD({ param: 'featureType', is: 'boss' }, kids)] : (featureType === 'boss' ? kids : []);
+    const inAxisFork = (autoKids, manualKids) => superset ? [GUARD({ param: 'inAxis', is: 'auto' }, autoKids), GUARD({ param: 'inAxis', is: 'manual' }, manualKids)] : (inAxis === 'manual' ? manualKids : autoKids);
+    const inAxisAutoOnly = (kids) => superset ? [GUARD({ param: 'inAxis', is: 'auto' }, kids)] : (inAxis === 'auto' ? kids : []);
+    const transAxisFork = (autoKids, manualKids) => superset ? [GUARD({ param: 'transAxis', is: 'auto' }, autoKids), GUARD({ param: 'transAxis', is: 'manual' }, manualKids)] : (transAxis === 'manual' ? manualKids : autoKids);
+    const transAxisAutoOnly = (kids) => superset ? [GUARD({ param: 'transAxis', is: 'auto' }, kids)] : (transAxis === 'auto' ? kids : []);
+    const twoAxisFork = (onKids, offKids) => superset ? [GUARD({ param: 'twoAxis', is: true }, onKids), GUARD({ param: 'twoAxis', is: false }, offKids)] : (twoAxis ? onKids : offKids);
+    const twoAxisOnly = (kids) => superset ? [GUARD({ param: 'twoAxis', is: true }, kids)] : (twoAxis ? kids : []);
+    const circularOnly = (kids) => superset ? [GUARD({ param: 'circular', is: true }, kids)] : (circular ? kids : []);
+    const probeZFork = (onKids, offKids) => superset ? [GUARD({ param: 'probeZ', is: true }, onKids), GUARD({ param: 'probeZ', is: false }, offKids)] : (probeZ ? onKids : offKids);
+    const probeZOnly = (kids) => superset ? [GUARD({ param: 'probeZ', is: true }, kids)] : (probeZ ? kids : []);
+    const wcsLabelOf = (w) => (w === 'active' ? 'Active WCS' : w);
+    // wcs is a 7-way enum fork: the base-address block ('active' reads #578 → computes #70; a fixed G54..G59 uses the literal
+    // base) PLUS the derived wcsLabel (bleeds into the probeZ Z-save note). Returns fn(w,label) per value.
+    const wcsFork = (fn) => superset ? WCS_VALUES.map((w) => GUARD({ param: 'wcs', is: w }, fn(w, wcsLabelOf(w)))) : fn(wcs, wcsLabel);
 
     // One two-pass wall touch via the shared PROBE-SURFACE BLOCK (t131), comp ON → the TRUE wall (the read becomes
     // `#result=[#trigger±#6]`). The centre bisect cancels the ∓#6 (same centre); the diameter ABS[s1-s2] is true (the old
-    // ∓2#6 EVAPORATES); the Z-first comp relocates here from its inline −#6. All VALUE-IDENTICAL. (Replaces the hand-rolled twoPass.)
-    const touch = (ax, plus, resultVar) => {
+    // ∓2#6 EVAPORATES); the Z-first comp relocates here from its inline −#6. All VALUE-IDENTICAL. RETURNS one touch.
+    const touchR = (ax, plus, resultVar) => {
         const av = AX[ax];
-        S.push(...probeSurfaceStack({
+        return probeSurfaceStack({
             axis: ax, dir: plus ? '+' : '-', probeVar: plus ? '#8' : '#7', retractVar: plus ? '#9' : '#10',
             stopVar: av.stop, limitVar: av.limit, limitVal: plus ? '2' : '1',
             feedFast: '#3', feedSlow: '#4', port: '#5', level: 0, twoPass: true,
             raw: av.result, result: resultVar, radius: '#6', compEnable: true,
-        }));
+        });
     };
-    const reposition = (msg) => {
-        // Lift clear, the operator jogs to the next wall, then drop back the SAME amount — all INCREMENTAL (no G53),
-        // so the preview stays start-anchored and fans each pass out to its own marker. The "REPOSITION:" comment is
-        // what the parser counts as a new pass (gcodeParser.js). Delegated to the ONE shared travel primitive
-        // (safeTraverseStack, approach:'manual') — the manual jog-and-wait (no XY move; operator jogs). VALUE-IDENTICAL to
-        // the old inline lift→comment→#1505→ifgoto→drop→G91 (proven byte-for-byte: middle-reposition-refactor.spec). The
-        // caller owns the 'REPOSITION:' prefix; lift/drop stay #17/[0-#17] so the Z-state is unchanged.
-        S.push(...safeTraverseStack({
-            approach: 'manual', lift: '#17', drop: '[0-#17]',
-            comment: `REPOSITION: ${msg || 'jog the probe to the next wall'}`,
-        }));
-    };
-    // Boss, AUTO: clear over the feature to the far side, hands-free. Uses the max probe distance #1 as the
-    // over-estimate of the feature width (the operator already sets it >= the feature for the probes to reach),
-    // so traversing #1+retract past the first face lands beyond the second; then drop back to probe height.
-    const traverseOver = (ax, firstPlus) => { const cv = ax === 'X' ? '#19' : '#20'; MV('Z', '#18'); MV(ax, firstPlus ? cv : `[0-${cv}]`); MV('Z', '[0-#18]'); };
-    // INC3: BOSS trans-axis AUTO traverse — hands-free move from the primary-axis walls across to the perpendicular
-    // (secondary-axis) walls: lift, a 2-axis diagonal step of #21 (Diag travel) toward the secondary first wall, drop.
-    // Emits "REPOSITION:" so the parser counts a NEW pass (the 2nd start ②). Signs follow dir1/dir2; the human tunes #21.
-    const transTraverse = () => {
-        // The lateral travel is the CONNECTING move (lift → diagonal → drop) and MUST come BEFORE the REPOSITION
-        // comment so it belongs to the PRIOR (primary-axis) pass — the trace anchors the NEXT pass to ②, so a move
-        // emitted AFTER the REPOSITION would draw FROM ② and push the 2nd probe away. Then REPOSITION marks the Y pass.
-        // PRIMARY axis: the AUTO in-axis cross-over (#19/#20) flings the tool FAR past centre (in +dir1), so a fixed travel
-        // can't come back — it's WHY the old `travelOwn` X leg went the WRONG WAY (further out) for X-first. Re-centre to the
-        // MEASURED centre #53 instead: the tool sits at wall-2 (#52) + the last retract (seq runs twoPass(!dir1Plus) last →
-        // its rv = #10 / #9), so the incremental step to centre = #53 − #52 − rv. This heads to ②'s primary coord regardless
-        // of axis ORDER (X-first or Y-first — #51-53 are always the PRIMARY axis's). MANUAL in-axis has no cross-over fling
-        // and a different per-pass frame, so keep its directional travel there. SECONDARY axis: travel OUT to ② by the
-        // Diag-travel #21 (the one distance the macro can't measure before it probes that axis — the user tunes it).
-        const lastRetract = dir1Plus ? '#10' : '#9';          // seq runs the last wall touch with !dir1Plus → its retract is #10 (+) / #9 (−)
-        // The tool sits at the wall-2 RAW contact + the last retract, but #52 is now the RADIUS-COMPED wall (the block comps it),
-        // so add the comp back to recover the tool's true position: raw = #52 + (dir1Plus ? +#6 : −#6). Keeps the re-centre EXACT
-        // (path value-identical) despite the comp moving into the walls.
-        // B-TRANS fix (b): UNIFORM primary move (auto + manual) → the diagonal targets ②'s primary coord (#22). Replaces
-        // auto's [#53-…] re-centre (now #22, which DEFAULTS to #53 so at-rest is value-identical) AND manual's wrong-sign
-        // ±#21 (the "runs away" bug). #52 cancels: tool sits at #52+rv+#6, move [#22-#52-rv±#6] lands at #22 = ②.X.
-        A('#22', diagPrimary, 'Diag primary: the diagonal X target — #53 (re-centre, measured NOW) at rest, or ②.X when the ② marker is placed');
-        const pmove = `[#22-#52-${lastRetract}${dir1Plus ? '-#6' : '+#6'}]`;
-        const smove = travelOpp(dir2Plus, '#21', '[0-#21]');  // secondary axis: out toward ② (opposite its first probe dir)
-        MV('Z', '#18');                                  // lift clear of the boss
-        MOVE({ [axis.toLowerCase()]: pmove, [second.toLowerCase()]: smove });   // re-centre the primary + travel out to ②
-        MV('Z', '[0-#18]');                              // back to probe height
-        C('REPOSITION: auto-traverse to the perpendicular walls');   // mark the Y pass (anchored to ②); no operator wait
-        DM('inc');
-    };
-    const between = (ax, firstPlus) => {
-        // The two opposite walls. POCKET probes both from the centre (no move - manual is N/A, never reposition).
-        // BOSS needs the 2nd face from the far side: the IN-AXIS toggle — MANUAL pauses for the operator to jog over,
-        // AUTO traverses over hands-free (#19/#20 cross-over).
-        if (featureType !== 'boss') return;
-        if (inAxis === 'manual') reposition('jog clear, around to the opposite wall'); else traverseOver(ax, firstPlus);
-    };
-    const seq = (ax, firstPlus, base) => {
-        touch(ax, firstPlus, `#${base}`);
-        between(ax, firstPlus);
-        touch(ax, !firstPlus, `#${base + 1}`);
-        A(`#${base + 2}`, `[#${base}+#${base + 1}]/2`);     // centre = midpoint of the two (now radius-comped) walls — ∓#6 cancels
-    };
+    // Lift clear, the operator jogs to the next wall, then drop back the SAME amount — all INCREMENTAL (no G53), so the
+    // preview stays start-anchored and fans each pass out to its own marker. The "REPOSITION:" comment is what the parser
+    // counts as a new pass (gcodeParser.js). Delegated to the ONE shared travel primitive (safeTraverseStack, manual). RETURNS.
+    const repositionR = (msg) => safeTraverseStack({
+        approach: 'manual', lift: '#17', drop: '[0-#17]',
+        comment: `REPOSITION: ${msg || 'jog the probe to the next wall'}`,
+    });
+    // Boss, AUTO in-axis: clear over the feature to the far side, hands-free (the #19/#20 cross-over spans the feature). RETURNS.
+    const traverseOverR = (ax, firstPlus) => { const cv = ax === 'X' ? '#19' : '#20'; return [mkMV('Z', '#18'), mkMV(ax, firstPlus ? cv : `[0-${cv}]`), mkMV('Z', '[0-#18]')]; };
+    // Boss, AUTO trans-axis: the X→Y CONNECTING move (lift → re-centre-primary + travel-out-secondary → drop → REPOSITION mark).
+    // Routed through the shared safeTraverseStack `mode:'center'` (the pre-declared byte-identical dedup) — middle no longer
+    // hand-rolls the diagonal: it assigns #22 (=diagPrimary; #53 re-centre at rest, ②'s primary coord when placed), moves the
+    // primary to #22 (the #52/retract/±#6 cancel so it lands exactly on #22) + the secondary out by the Diag-travel #21, then
+    // marks the REPOSITION so the trace anchors the NEXT pass to ②. RETURNS. (Value-identical to the old inline; the #22 note
+    // now names the real primary axis rather than a hardcoded "X".)
+    const transTraverseR = () => safeTraverseStack({
+        mode: 'center', axis, second,
+        dir1Plus, dir2Plus, diagPrimary, diagTravel: '#21', wall2Var: '#52', radiusVar: '#6',
+        lift: '#18', drop: '[0-#18]',
+        comment: 'REPOSITION: auto-traverse to the perpendicular walls',
+    });
+    // The two opposite walls' BETWEEN move. POCKET probes both from the centre (nothing). BOSS needs the 2nd face from the
+    // far side: the IN-AXIS toggle — MANUAL pauses for the operator to jog over, AUTO traverses over hands-free. RETURNS.
+    const betweenR = (ax, firstPlus) => featBossOnly(inAxisFork(traverseOverR(ax, firstPlus), repositionR('jog clear, around to the opposite wall')));
+    // One axis's two-wall sequence: touch → between → touch → centre-bisect (∓#6 cancels). RETURNS.
+    const seqR = (ax, firstPlus, base) => [
+        ...touchR(ax, firstPlus, `#${base}`),
+        ...betweenR(ax, firstPlus),
+        ...touchR(ax, !firstPlus, `#${base + 1}`),
+        mkA(`#${base + 2}`, `[#${base}+#${base + 1}]/2`),   // centre = midpoint of the two (now radius-comped) walls — ∓#6 cancels
+    ];
 
-    A('#1', dist, 'Max probe distance'); A('#2', retract, 'Retract distance');
-    A('#3', fFast, 'Fast feedrate'); A('#4', fSlow, 'Slow feedrate'); A('#5', port, 'Probe port');
-    A('#6', radius, 'Probe stylus radius');   // declared ONE source for the comp — now EVERY wall touch comps via the block (not just circular/Z)
-    A('#51', 0, 'Wall 1 pos'); A('#52', 0, 'Wall 2 pos'); A('#53', 0, 'Center pos');
-    A('#54', 0, 'Wall 3 pos'); A('#55', 0, 'Wall 4 pos'); A('#56', 0, 'Center pos 2');
-    A('#7', '[0-#1]', 'Negative max probe'); A('#8', '#1', 'Positive max probe');
-    A('#9', '[0-#2]', 'Negative retract'); A('#10', '#2', 'Positive retract'); A('#17', safeZ, 'Safe Z retract');
-    A('#18', clearOver, 'Traverse-over clearance (boss auto: lift this high to clear the part before crossing)');
-    // #19/#20 = the IN-axis cross-over (traverseOver — used ONLY when the in-axis is auto); #21 = the TRANS-axis Diag travel
-    // (transTraverse). Each assigned only when its own auto-traverse is active, so pocket/manual macros stay unchanged.
-    // (#21 no longer references #19/#20 — it's a fixed default — and the trans-axis re-centres to #53, so the cross-over no
-    // longer needs to be assigned for the trans-axis's sake.)
-    if (featureType === 'boss' && inAxis === 'auto') {
-        A('#19', crossX, 'X cross-over: in-axis traverse, wall 1 across to wall 2 (user-set to span the feature, default 80)');
-        A('#20', crossY, 'Y cross-over: in-axis traverse, wall 1 across to wall 2 (user-set to span the feature, default 80)');
-    }
-    if (featureType === 'boss' && transAxis === 'auto' && twoAxis) {
-        A('#21', diagTravel, 'Diag travel: X→Y trans-axis auto-traverse distance (default 50; tune so the 2nd-axis probe reaches ②)');
-    }
-    // NOTE: #22 (the diagonal's X target) is assigned INSIDE transTraverse — AFTER the primary seq measures #53 — because at
-    // rest diagPrimary='#53' and #53 is only known post-probe (assigning it here would capture #53's initial 0).
-    if (wcs === 'active') { A('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'); A('#72', '[#71-1]', 'Zero-based index'); A('#70', '[805+[#72*5]]', 'Base WCS address'); }
-    else A('#70', WCS_BASE[wcs]);
-    A('#1505', '1', probeZ ? 'Hover OVER the stock top (Z datum first). Press Enter - ESC=cancel' : 'Press Enter to probe - ESC=cancel'); IF('#1505', '==', '0', 2); DM('inc');
+    // ── Configuration ──
+    S.push(mkA('#1', dist, 'Max probe distance'), mkA('#2', retract, 'Retract distance'));
+    S.push(mkA('#3', fFast, 'Fast feedrate'), mkA('#4', fSlow, 'Slow feedrate'), mkA('#5', port, 'Probe port'));
+    S.push(mkA('#6', radius, 'Probe stylus radius'));   // declared ONE source for the comp — now EVERY wall touch comps via the block (not just circular/Z)
+    S.push(mkA('#51', 0, 'Wall 1 pos'), mkA('#52', 0, 'Wall 2 pos'), mkA('#53', 0, 'Center pos'));
+    S.push(mkA('#54', 0, 'Wall 3 pos'), mkA('#55', 0, 'Wall 4 pos'), mkA('#56', 0, 'Center pos 2'));
+    S.push(mkA('#7', '[0-#1]', 'Negative max probe'), mkA('#8', '#1', 'Positive max probe'));
+    S.push(mkA('#9', '[0-#2]', 'Negative retract'), mkA('#10', '#2', 'Positive retract'), mkA('#17', safeZ, 'Safe Z retract'));
+    S.push(mkA('#18', clearOver, 'Traverse-over clearance (boss auto: lift this high to clear the part before crossing)'));
+    // #19/#20 = the IN-axis cross-over (traverseOver — boss + inAxis auto ONLY); #21 = the TRANS-axis Diag travel
+    // (transTraverse — boss + transAxis auto + twoAxis ONLY). Each present only when its own auto-traverse is active, so
+    // pocket/manual macros stay unchanged. (#21 is a fixed default; the trans-axis re-centres to #53, so it no longer needs #19/#20.)
+    S.push(...featBossOnly(inAxisAutoOnly([
+        mkA('#19', crossX, 'X cross-over: in-axis traverse, wall 1 across to wall 2 (user-set to span the feature, default 80)'),
+        mkA('#20', crossY, 'Y cross-over: in-axis traverse, wall 1 across to wall 2 (user-set to span the feature, default 80)'),
+    ])));
+    S.push(...featBossOnly(transAxisAutoOnly(twoAxisOnly([
+        mkA('#21', diagTravel, 'Diag travel: X→Y trans-axis auto-traverse distance (default 50; tune so the 2nd-axis probe reaches ②)'),
+    ]))));
+    // NOTE: #22 (the diagonal's primary target) is assigned INSIDE transTraverse — AFTER the primary seq measures #53 —
+    // because at rest diagPrimary='#53' and #53 is only known post-probe (assigning it here would capture #53's initial 0).
+    // ── WCS base address ── 7-way wcs fork: 'active' reads #578 → computes #70; a fixed G54..G59 uses the literal base.
+    S.push(...wcsFork((w, label) => w === 'active'
+        ? [mkA('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'), mkA('#72', '[#71-1]', 'Zero-based index'), mkA('#70', '[805+[#72*5]]', 'Base WCS address')]
+        : [mkA('#70', WCS_BASE[w])]));
+    // ── Confirm start ── KIND-B, 2-way: the prompt text forks on probeZ (Hover OVER the top vs Press Enter to probe).
+    S.push(...probeZFork(
+        [mkA('#1505', '1', 'Hover OVER the stock top (Z datum first). Press Enter - ESC=cancel')],
+        [mkA('#1505', '1', 'Press Enter to probe - ESC=cancel')],
+    ));
+    S.push(mkIF('#1505', '==', '0', 2), mkDM('inc'));
 
     // PROBE-Z-FIRST (declaration): set the Z datum BEFORE the XY work, REUSING middle's own twoPass (no corner copy / no dup),
     // then REUSE reposition() to move to the first wall. The Z probe is its OWN pass (the "REPOSITION:" reposition emits marks
     // the XY as the next pass) → opSimStarts declares a leading Z-pass start so the sim renders Z-pass → reposition → XY faithfully.
-    if (probeZ) {
-        C('Z Surface - set Z datum first');
-        touch('Z', false, '#57');                            // two-pass down-probe the top → #57 = the TRUE surface (the block comps it; −#6 relocated here)
-        A('#[#70+2]', '#57', `Save ${wcsLabel} Z offset`);   // Z0 write — #57 is already radius-compensated by the block (was [#57-#6] inline; value-identical)
-        reposition('jog clear, to the first wall');           // Z pass done → reposition to the XY start (existing helper)
-    }
+    // The Z-save NOTE carries wcsLabel → forks on wcs (via wcsFork inside the probeZ guard).
+    S.push(...probeZOnly([
+        mkC('Z Surface - set Z datum first'),
+        ...touchR('Z', false, '#57'),                       // two-pass down-probe the top → #57 = the TRUE surface (the block comps it; −#6 relocated here)
+        ...wcsFork((w, label) => [mkA('#[#70+2]', '#57', `Save ${label} Z offset`)]),   // Z0 write — #57 is already radius-compensated by the block
+        ...repositionR('jog clear, to the first wall'),      // Z pass done → reposition to the XY start (existing helper)
+    ]));
 
-    seq(axis, dir1Plus, 51);
-    if (twoAxis) {
-        // Between axes: a BOSS moves the probe to the perpendicular walls (a pocket stays at the centre — no reposition).
-        // The TRANS-axis toggle: MANUAL pauses for the operator to jog (INC4 simulates it); AUTO traverses there
-        // hands-free via the Diag-travel (#21). Either way it's a REPOSITION pass → the 2nd start ② appears.
-        if (featureType === 'boss') { if (transAxis === 'manual') reposition('jog clear, around to the perpendicular walls'); else transTraverse(); }
-        // CIRCULAR + 2-axis: re-centre to the found PRIMARY-axis centre (#53, machine frame) before probing the
-        // perpendicular axis, so the secondary touches cross the true diameter instead of an off-centre chord.
-        if (circular) MM(axis, '#53');
-        C(`2axis_${axis === 'X' ? 'XtoY' : 'YtoX'}_${resolvedDir2}`);
-        seq(second, dir2Plus, 54);
-        S.push(safeZParkBlock(safeZFrame, '#17'));   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
+    S.push(...seqR(axis, dir1Plus, 51));
+    // ── Two axes (optional) ── a BOSS moves the probe to the perpendicular walls (a pocket stays at the centre); the TRANS-axis
+    // toggle MANUAL jogs / AUTO diagonals there. CIRCULAR re-centres to the found primary centre (#53) first so the secondary
+    // touches cross the true diameter. The 2-axis path writes BOTH centres to their axes' WCS offsets; the single-axis writes one.
+    const twoAxisOn = [
+        ...featBossOnly(transAxisFork(transTraverseR(), repositionR('jog clear, around to the perpendicular walls'))),
+        ...circularOnly([mkMM(axis, '#53')]),
+        mkC(`2axis_${axis === 'X' ? 'XtoY' : 'YtoX'}_${resolvedDir2}`),
+        ...seqR(second, dir2Plus, 54),
+        safeZParkBlock(safeZFrame, '#17'),   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
         // #53 = centre of the PRIMARY axis, #56 = centre of the SECONDARY — write each to ITS axis's WCS offset
         // (not hardcoded X=0/Y=1, which swapped them when the primary axis was Y).
-        A(`#[#70+${AX[axis].off}]`, '#53'); A(`#[#70+${AX[second].off}]`, '#56');
-    } else {
-        S.push(safeZParkBlock(safeZFrame, '#17'));   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
-        A(`#[#70+${AX[axis].off}]`, '#53');
-    }
-    if (circular) {
-        // Round feature: the opposite-touch span IS the diameter. #58 = primary-axis Ø; with 2-axis, #59 = the
-        // perpendicular Ø and #60 the mean. ABS so the result is direction-agnostic (dir1 pos/neg ordering).
-        // The walls are now the TRUE surfaces (each touch radius-comped by the block), so the opposite-touch span IS the
-        // diameter directly — the old ∓2#6 (boss −, pocket +) EVAPORATES (value-identical: the comp moved into the walls).
-        A('#58', `ABS[#51-#52]`, 'Primary-axis diameter (walls already radius-comped)');
-        if (twoAxis) {
-            A('#59', `ABS[#54-#55]`, 'Secondary-axis diameter (walls already radius-comped)'); A('#60', '[#58+#59]/2', 'Mean diameter');
-            A('#61', '[#58-#59]', 'Out-of-round (primary dia - secondary dia)');   // roundness metric (same as the Circular wizard)
-        }
-        MSG(twoAxis ? 'Centre #53/#56 - mean dia #60 - round #61' : 'Centre #53 - dia #58');
-    }
-    if (params.syncA && (axis === 'Y' || twoAxis)) { const s = params.slave || '3'; A('#74', `[#70+${s}]`); A('#[#74]', '#883'); }
+        mkA(`#[#70+${AX[axis].off}]`, '#53'), mkA(`#[#70+${AX[second].off}]`, '#56'),
+    ];
+    const twoAxisOff = [
+        safeZParkBlock(safeZFrame, '#17'),   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
+        mkA(`#[#70+${AX[axis].off}]`, '#53'),
+    ];
+    S.push(...twoAxisFork(twoAxisOn, twoAxisOff));
 
-    DM('abs'); A('#1505', '-5000'); GO(2);
-    LB(1); DM('inc'); MV('Z', '#17'); DM('abs'); A('#1505', '1'); LB(2); END();
+    // ── Circular (optional) ── round feature: the opposite-touch span IS the diameter (walls already radius-comped, so the old
+    // ∓2#6 EVAPORATES). #58 = primary Ø; with 2-axis, #59 = perpendicular Ø, #60 the mean, #61 out-of-round. ABS → dir-agnostic.
+    S.push(...circularOnly([
+        mkA('#58', 'ABS[#51-#52]', 'Primary-axis diameter (walls already radius-comped)'),
+        ...twoAxisOnly([
+            mkA('#59', 'ABS[#54-#55]', 'Secondary-axis diameter (walls already radius-comped)'),
+            mkA('#60', '[#58+#59]/2', 'Mean diameter'),
+            mkA('#61', '[#58-#59]', 'Out-of-round (primary dia - secondary dia)'),   // roundness metric (same as the Circular wizard)
+        ]),
+        ...twoAxisFork([mkMSG('Centre #53/#56 - mean dia #60 - round #61')], [mkMSG('Centre #53 - dia #58')]),
+    ]));
+
+    // ── Dual-gantry sync (optional) ── a bool block-add guarded on syncA, gated ALSO by (axis==='Y' || twoAxis). axis is baked
+    // here (a value swap, not a structural fork), so in the superset the (axis==='Y') half is a compile-time constant: axis 'Y'
+    // → syncA-only; axis 'X' → syncA nested in twoAxis. Concrete matches the same condition. (slave stays baked — a value follow-on.)
+    const slave = params.slave || '3';
+    const syncKids = [mkA('#74', `[#70+${slave}]`), mkA('#[#74]', '#883')];
+    if (superset) {
+        const gated = (axis === 'Y') ? syncKids : [GUARD({ param: 'twoAxis', is: true }, syncKids)];
+        S.push(GUARD({ param: 'syncA', is: true }, gated));
+    } else if (params.syncA && (axis === 'Y' || twoAxis)) {
+        S.push(...syncKids);
+    }
+
+    // ── Footer + error handler ──
+    S.push(mkDM('abs'), mkA('#1505', '-5000'), mkGO(2));
+    S.push(mkLB(1), mkDM('inc'), mkMV('Z', '#17'), mkDM('abs'), mkA('#1505', '1'), mkLB(2), mkEND());
     return S;
 }
 
