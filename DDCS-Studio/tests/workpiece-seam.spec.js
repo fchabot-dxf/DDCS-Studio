@@ -97,7 +97,7 @@ test('P0 seam: getWorkpiece() projects flat stock byte-identical; features[] rou
 
       const afterMem  = SP.getSettings().stock;                       // in-memory read-back
       const afterDisk = JSON.parse(localStorage.getItem(KEY)).stock;  // persisted (save→load round-trip)
-      const liveWp    = WP.getWorkpiece();                            // the live seam now uses the DECLARED feature
+      const liveWp    = WP.projectWorkpiece({ ...SP.getSettings().stock, shape: 'pocket' });   // a 'pocket' OUTER surfaces the DECLARED inside feature (a boss filters it — t367); the DATA round-trip is asserted via mem/disk
 
       // a partial stock write must PRESERVE features (the {...D,...S,...incoming} merge keeps unrelated keys)
       SP.applySettings({ stock: { shape: 'boss' } });

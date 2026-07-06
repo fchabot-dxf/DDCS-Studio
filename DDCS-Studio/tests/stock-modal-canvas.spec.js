@@ -22,7 +22,7 @@ test('M1a: workpieceBackdrop items match the wizard glyphs; the modal canvas ren
     const none   = workpieceBackdrop(projectWorkpiece({ x: 0, y: 0, z: 0, shape: 'boss' }));   // no dims → no backdrop
     // OFFSET-AWARE: a DECLARED feature at an off-centre pos must render AT that pos (offset flows seam→backdrop→canvas)
     const offset = workpieceBackdrop(projectWorkpiece({
-      x: 120, y: 90, z: 20, shape: 'boss',
+      x: 120, y: 90, z: 20, shape: 'pocket',   // a 'pocket' outer shows the inside cavity (a boss filters it — t367)
       features: [{ id: 'p1', shape: 'rect', side: 'inside', pos: { x: 30, y: 20 }, size: { x: 20, y: 10 } }],
     }));
     return { boss, pocket, cyl, none, offset };

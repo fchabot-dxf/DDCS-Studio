@@ -1702,3 +1702,18 @@ featureSize(wp,f) = f.side==='inside' ? f.size : {x:wp.outer.x, y:wp.outer.y, d:
 - FULL SUITE 658 pass / 2 skip / ZERO fail — workpiece-seam/stock-modal-canvas/resize/feature/datum + the shared gcodeViz3d + corner specs all green.
 
 **GATE (USER-FACING → human acceptance): PASS BACK the 2 screenshots + the physical-invariant proof.** FACE 2 done: features are physical; the datum is a derived-offset display concept, emit byte-identical. QUEUED: the boss-pocket state leak (the shape/features[] dual-representation).
+
+## 🔨 turn 367 (cycle 127) — FIX the BOSS-shows-a-POCKET leak (the LAST release-blocker; human t360). 658 pass. 1 file (+1 test, 3 tests updated).
+
+**THE LEAK (shape/features[] conflation):** `projectWorkpiece` used `features[]` REGARDLESS of `shape` — so a materialized/declared pocket in features[] overrode the shape dropdown, and a BOSS rendered a POCKET cavity (visible in the FACE-2 screenshots where I set shape:'boss' + an inside feature). Reproduced (line 98: `features = features.length ? features : deriveLegacyFeatures(s)` — no shape gate).
+
+**FIX (Option A — projectWorkpiece RESPECTS the shape; the cleanest + non-destructive):** `if (s.shape !== 'pocket') features = features.filter(f => f.side !== 'inside')` — only a `pocket` OUTER shows an interior cavity; boss/box/cylinder filter inside cavities. **ONE SOURCE** (the projection): the 2D backdrop + the 3D setStock (both read projectWorkpiece) reconcile in lockstep — a boss is a solid GREEN box, a pocket a BLUE cavity. **VIEW-filter (non-destructive):** the features[] DATA is PRESERVED, so toggling boss→pocket restores the pocket at its dragged spot (the toggle-loses-the-pocket tradeoff that a data-reconcile would have; flagged). This is the TRANSITIONAL shape-enum↔features[] reconcile; the P5 shape-split (outer rect|round toggle + explicit add/remove-feature) is the cleaner end-state.
+
+**VERIFY (assert-the-value + real-symptom) — tests/boss-pocket-reconcile.spec.js green:**
+- PURE: a stored inside pocket under a BOSS → 0 inside cavities; under a CYLINDER → 0; under a POCKET → 1; a fresh legacy pocket byte-identical (physical centre {50,40}).
+- REAL-SYMPTOM: open a pocket (cavity drawn) → switch the SHAPE dropdown to boss → the cavity DISAPPEARS (0 fc-feature-pocket) while settings.stock.features is PRESERVED (length 1) → switch back to pocket → the cavity is RESTORED. SCREENSHOTS scratchpad/boss_no_cavity.png (solid GREEN 3D boss, no cavity, even with a stored pocket) + pocket_cavity.png (BLUE cavity).
+- EMIT byte-identical: boss == pocket (the shape/features are display-only; the corner probe G-code is shape-independent).
+- FIXED-UP 3 M1/M2 tests that had used shape:'boss' + an inside feature to test the offset (now correctly filtered): stock-modal-canvas offset case → shape 'pocket'; stock-modal-feature-physical → 'pocket'; workpiece-seam round-trip's VIEW check projects a 'pocket' (the DATA round-trip stays asserted via mem/disk). Byte-identical intent preserved.
+- FULL SUITE 658 pass / 2 skip / ZERO real fail (1 pre-existing middle-animator flake, passed on retry).
+
+**GATE (USER-FACING, the LAST blocker → the advisor RELEASES the workpiece-modal milestone): PASS BACK the boss (no cavity) + pocket (cavity) screenshots.** The shape/features[] reconcile is one-source + non-destructive; boss=solid, pocket=cavity, emit byte-identical.

@@ -17,7 +17,7 @@ test('a pocket is PHYSICAL — changing the datum re-derives the offset without 
   // ── PURE — physical pos INVARIANT across datums; 2D render invariant; the OFFSET re-derives (physical − datum) ──
   const pure = await page.evaluate(async (FEAT) => {
     const { projectWorkpiece, workpieceBackdrop, featureOffset, deriveLegacyFeatures } = await import('/engine/workpiece.js');
-    const at = (d) => { const wp = projectWorkpiece({ x: 120, y: 90, z: 20, shape: 'boss', datum: d, features: [FEAT] }); return { pos: wp.features[0].pos, rect: workpieceBackdrop(wp).items[0], off: featureOffset(wp, wp.features[0]) }; };
+    const at = (d) => { const wp = projectWorkpiece({ x: 120, y: 90, z: 20, shape: 'pocket', datum: d, features: [FEAT] }); return { pos: wp.features[0].pos, rect: workpieceBackdrop(wp).items[0], off: featureOffset(wp, wp.features[0]) }; };
     return { nnp: at('nnp'), tr: at('ppp'), cc: at('ccp'), legacy: deriveLegacyFeatures({ x: 100, y: 80, z: 20, shape: 'pocket' })[0] };
   }, FEAT);
   // the PHYSICAL pos is the same at every datum — the feature does not move
@@ -37,7 +37,7 @@ test('a pocket is PHYSICAL — changing the datum re-derives the offset without 
   // ── REAL-SYMPTOM — the modal cavity stays at the SAME screen spot when the datum changes (only crosshair/offset move) ──
   const snapshot = await page.evaluate(() => localStorage.getItem('ddcs_studio_settings'));
   const rectAt = async (datum) => {
-    await page.evaluate(async ({ datum, FEAT }) => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 120, y: 90, z: 20, shape: 'boss', show: true, datum, pin: 'origin', features: [FEAT] } }); window.ddcsOpenStock(); }, { datum, FEAT });
+    await page.evaluate(async ({ datum, FEAT }) => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 120, y: 90, z: 20, shape: 'pocket', show: true, datum, pin: 'origin', features: [FEAT] } }); window.ddcsOpenStock(); }, { datum, FEAT });
     await page.waitForSelector('#se_canvas svg rect.fc-feature-pocket', { state: 'visible', timeout: 5000 });
     await page.waitForTimeout(350);
     return page.evaluate(() => { const b = document.querySelector('#se_canvas svg rect.fc-feature-pocket').getBoundingClientRect(); return { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }; });

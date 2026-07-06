@@ -95,7 +95,12 @@ export function projectWorkpiece(stock) {
         d: s.diameter,                                       // undefined unless a cylinder OD was declared
         datum: s.datum, pin: s.pin, show: s.show,
     };
-    const features = (Array.isArray(s.features) && s.features.length) ? s.features : deriveLegacyFeatures(s);
+    let features = (Array.isArray(s.features) && s.features.length) ? s.features : deriveLegacyFeatures(s);
+    // TRANSITIONAL reconcile (shape-enum ↔ features[]): only a `pocket` OUTER shows an interior cavity. A boss/box/cylinder
+    // shows NO inside cavity — so a stored/materialized pocket doesn't leak through after the shape is switched to boss. The
+    // features[] data is PRESERVED (this filters the VIEW, non-destructive → toggling back to pocket restores it). P5 splits
+    // this into an outer rect|round toggle + explicit add/remove-feature actions; for now the shape enum drives visibility.
+    if (s.shape !== 'pocket') features = features.filter((f) => f.side !== 'inside');
     return { outer, features };
 }
 
