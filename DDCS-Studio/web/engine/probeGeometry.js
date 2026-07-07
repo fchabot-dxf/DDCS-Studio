@@ -101,20 +101,33 @@ export function stockProbeStop(A, B, stock, rotaryAxis, tipR = 0) {
 
     const box = { min: { x: -r, y: -r, z: -stock.z - r }, max: { x: stock.x + r, y: stock.y + r, z: r } };
     const ro = rayBox(A, B, box.min, box.max);
-    if (ro.hit) { if (ro.tEnter > 1e-6) take(ro.tEnter); else if (ro.tExit > 1e-6) take(ro.tExit); }
-    if (stock.shape === 'pocket') {                       // a hole in the block → its wall stops a bore probe from inside.
-        // t385 (human) — READ the workpiece FEATURE (getWorkpiece/projectWorkpiece — the stock-modal-defined pocket pos+size),
-        // NOT a hardcoded 25% inset, so the probe STOPS at the RENDERED pocket wall (the size the 3D already draws). A LEGACY
-        // pocket (no features[]) derives the SAME 25% inset via deriveLegacyFeatures → BYTE-IDENTICAL; a modal-defined size
-        // stops at THAT wall. Each inside cavity is a box centred at f.pos, extent f.size (the tool CENTRE stops a tip-r short).
-        for (const f of projectWorkpiece(stock).features) {
-            if (f.side !== 'inside' || !f.size) continue;
-            const cx = (f.pos && +f.pos.x) || stock.x / 2, cy = (f.pos && +f.pos.y) || stock.y / 2;
-            const hx = (+f.size.x || 0) / 2, hy = (+f.size.y || 0) / 2;
-            const cav = { min: { x: cx - hx + r, y: cy - hy + r, z: -stock.z }, max: { x: cx + hx - r, y: cy + hy - r, z: 0 } };
-            const rc = rayBox(A, B, cav.min, cav.max);
-            if (rc.hit && rc.tEnter <= 1e-6 && rc.tExit > 1e-6) take(rc.tExit);   // probing from inside the hole → its wall
+    // t385 (human) — READ the workpiece FEATURES (getWorkpiece/projectWorkpiece — the stock-modal size + the DECLARED DEPTH),
+    // NOT a hardcoded inset. A DECLARED-DEPTH pocket is a REAL RECESS (a Fusion cut): the top is OPEN over its footprint down to
+    // −depth and the FLOOR is at −depth. So a Z-first probe INSIDE the pocket stops at the FLOOR, not the stock top. A LEGACY /
+    // through pocket (depth ≥ Z) has no floor → the through-hole is UNCHANGED (byte-identical). The tool CENTRE stops a tip-r short.
+    const recesses = (stock.shape === 'pocket')
+        ? projectWorkpiece(stock).features.filter((f) => f.side === 'inside' && f.size).map((f) => {
+            const d0 = Number(f.depth);
+            return { cx: (f.pos && +f.pos.x) || stock.x / 2, cy: (f.pos && +f.pos.y) || stock.y / 2, hx: (+f.size.x || 0) / 2, hy: (+f.size.y || 0) / 2, depth: Number.isFinite(d0) ? Math.max(0, Math.min(d0, stock.z)) : stock.z };
+        }) : [];
+    const inFoot = (x, y, rc) => x > rc.cx - rc.hx + 1e-6 && x < rc.cx + rc.hx - 1e-6 && y > rc.cy - rc.hy + 1e-6 && y < rc.cy + rc.hy - 1e-6;
+    // OUTER box — but its TOP is REMOVED over a declared recess footprint (the pocket opening), so don't stop the probe there.
+    if (ro.hit && ro.tEnter > 1e-6) {
+        const px = A.x + (B.x - A.x) * ro.tEnter, py = A.y + (B.y - A.y) * ro.tEnter, pz = A.z + (B.z - A.z) * ro.tEnter;
+        const openTop = Math.abs(pz - r) < 1e-4 && recesses.some((rc) => rc.depth > 0 && rc.depth < stock.z && inFoot(px, py, rc));
+        if (!openTop) take(ro.tEnter); else if (ro.tExit > 1e-6) take(ro.tExit);
+    } else if (ro.hit && ro.tExit > 1e-6) take(ro.tExit);
+    for (const rc of recesses) {
+        // RECESS FLOOR (declared depth) — the material BELOW the recess; a Z-first probe over the footprint stops at its TOP (−depth).
+        if (rc.depth > 0 && rc.depth < stock.z) {
+            const fb = { min: { x: rc.cx - rc.hx + r, y: rc.cy - rc.hy + r, z: -stock.z - r }, max: { x: rc.cx + rc.hx - r, y: rc.cy + rc.hy - r, z: -rc.depth + r } };
+            const rf = rayBox(A, B, fb.min, fb.max);
+            if (rf.hit) { if (rf.tEnter > 1e-6) take(rf.tEnter); else if (rf.tExit > 1e-6) take(rf.tExit); }
         }
+        // the pocket WALL (bore probe from INSIDE the hole) — the cavity void; stops a sideways probe at the rendered wall.
+        const cav = { min: { x: rc.cx - rc.hx + r, y: rc.cy - rc.hy + r, z: -stock.z }, max: { x: rc.cx + rc.hx - r, y: rc.cy + rc.hy - r, z: 0 } };
+        const rc2 = rayBox(A, B, cav.min, cav.max);
+        if (rc2.hit && rc2.tEnter <= 1e-6 && rc2.tExit > 1e-6) take(rc2.tExit);
     }
     return tt;
 }
