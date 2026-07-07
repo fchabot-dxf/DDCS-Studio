@@ -186,6 +186,7 @@ export function createPreviewPanel(container, opts = {}) {
     // the OLD tool to the station + put the NEW tool on the spindle. lastTool tracks the previous #1300 (the FIRST value
     // seen is the starting tool, NOT a swap). Isolated firmware op (no tool change) → #1300 never flips → no swap.
     let atcChoreo = null, atcStation = null, lastTool = null, deviceIoListener = null;
+    let limitEdges = null, limitIoListener = null;   // H4 (t487) — the home/limit switch devices + their io_change trip listener
     let mode = previewPrefs().defaultView === '2d' ? '2d' : '3d', active = false, segs = [], fitted = false, lastAnchor = null, lastStockKey = '', curAnchor = false;
     let toolPosSubs = [];   // t309 — live-tool-position subscribers (the Layout animation overlay). Fed the SAME engine head as the 3D/2D, in ANY view mode; cb(pos, segIndex) each tick, cb(null,0) on stop.
     let touchSubs = [];      // t319/INC-6 — on-touch (G31 contact) subscribers (the Layout overlay's pulse). cb({pos, axis, feed, slow, pass, speed}).
@@ -610,6 +611,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
         lastTool = null; if (viz && viz.showRetiredTool) viz.showRetiredTool(null);   // P-C.1b: fresh run re-arms the tool-swap watch + clears any retired tool
         if (viz && viz.setStationDevice) { viz.setStationDevice('pusher', false); viz.setStationDevice('pin', false); viz.setStationDevice('collet', false); }   // P-C.2b/3a: devices to rest before the sequence re-animates them
+        if (viz && viz.setLimitSwitchDevice && limitEdges) for (const ed of limitEdges) viz.setLimitSwitchDevice(ed.edge, false);   // H4: home/limit switches to rest — the run re-trips them via io_change
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
         updateRunBtn();
@@ -702,7 +704,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     function setActive(on) {
         active = !!on;
-        if (!active) { stopPlay(); autoStarted = false; if (viz) viz.setActive(false); if (deviceIoListener) { window.removeEventListener('io_change', deviceIoListener); deviceIoListener = null; } return; }   // t181 tidy: drop the ATC device io_change listener when the preview deactivates (the view re-arms via setAtcSwap on next update)
+        if (!active) { stopPlay(); autoStarted = false; if (viz) viz.setActive(false); if (deviceIoListener) { window.removeEventListener('io_change', deviceIoListener); deviceIoListener = null; } if (limitIoListener) { window.removeEventListener('io_change', limitIoListener); limitIoListener = null; } return; }   // t181/H4 tidy: drop the ATC + limit-switch io_change listeners when the preview deactivates (re-armed via setAtcSwap / setLimitSwitches on next update)
         if (mode === '3d') { const v = ensureViz(); if (v) v.setActive(true); }
         else if (mode === '2d' && cv2d) cv2d.style.display = '';   // 2D default: ensure the canvas is visible
         setGcode();
@@ -777,6 +779,27 @@ export function createPreviewPanel(container, opts = {}) {
             window.addEventListener('io_change', deviceIoListener);
         }
     }
+    // Arm the HOME/LIMIT SWITCH devices for this op's preview (Homing H4, t487). Builds a switch body at each fitted
+    // home-end edge (viz.setLimitSwitchDevices) + wires an io_change listener that LIGHTS/PLUNGES the device when its
+    // switch trips — the SAME pattern as the ATC device listener above, keyed by IN_HOME_<axis> / IN_LIMIT_<axis>_<side>
+    // (the H3 live trip pins). edges = [{edge, axis, side, …}] (machine coords) or null/[] to disarm. Reset on play,
+    // dropped on setActive(false).
+    function setLimitSwitches(edges) {
+        limitEdges = (Array.isArray(edges) && edges.length) ? edges : null;
+        if (viz && viz.setLimitSwitchDevices) viz.setLimitSwitchDevices(limitEdges);
+        if (limitIoListener) { window.removeEventListener('io_change', limitIoListener); limitIoListener = null; }
+        if (limitEdges) {
+            limitIoListener = (e) => {
+                const d = e && e.detail; if (!d || !d.pin || !viz || !viz.setLimitSwitchDevice) return;
+                for (const ed of limitEdges) {
+                    const home = `IN_HOME_${ed.axis.toUpperCase()}`;
+                    const lim = `IN_LIMIT_${ed.axis.toUpperCase()}_${String(ed.side).toUpperCase()}`;
+                    if (d.pin === home || d.pin === lim) viz.setLimitSwitchDevice(ed.edge, !!d.state);
+                }
+            };
+            window.addEventListener('io_change', limitIoListener);
+        }
+    }
     // Watch #1300 during play — the FIRST value is the starting tool (no swap); a subsequent change old→new IS a real
     // tool change (a program T#/M6), so retire the OLD tool to the station + put the NEW tool on the spindle. Called
     // from onPositionChange, so the swap lands as the push moves execute (≈ at the push stroke). Firmware-scoped.
@@ -824,7 +847,7 @@ export function createPreviewPanel(container, opts = {}) {
         }
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setAtcSwap, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
         getAnchor: () => curAnchor,                                                       // t309 — the anchored/absolute frame flag (feed the overlay so its path frame matches)
         onToolPos: (cb) => { if (typeof cb === 'function') toolPosSubs.push(cb); return () => { toolPosSubs = toolPosSubs.filter((f) => f !== cb); }; },   // t309 — subscribe to the live engine head (fires in ANY mode); returns an unsubscribe

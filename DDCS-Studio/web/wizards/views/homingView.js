@@ -3,6 +3,8 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { HomingWizard } from '../homingWizard.js';
 import { openHomingSetup } from '../../ui/settingsPanel.js';
+import { axisSpan } from '../../engine/limitSwitches.js';
+import { switchStandoff } from '../../engine/switchTypes.js';
 
 const wizard = new HomingWizard();
 
@@ -30,6 +32,34 @@ function configuredAxes() {
 function orderAxes(selected, homing) {
     const cfg = homing.axes || {};
     return [...selected].sort((p, q) => ((cfg[p] || {}).order || 9) - ((cfg[q] || {}).order || 9));
+}
+
+// The FITTED home-end switch devices for the 3D preview (Homing H4). One per linear axis whose HOME-end limit pin is
+// configured; positioned at the home edge (machine-0 end, from axisSpan) on that axis + the span mid on the other two,
+// styled per its switchType (mechanical/proximity + the H2 standoff). ONE-SOURCE: axisSpan + settings.limits — the same
+// the H3 trip model reads, so the device sits exactly where its switch trips.
+function homingEdges(settings) {
+    const m = settings.machine || {}, limits = settings.limits || {};
+    const midOf = (ax) => { const s = axisSpan(Number(m[ax]) || 0); return (s.lo + s.hi) / 2; };
+    const out = [];
+    for (const axis of ['x', 'y', 'z']) {
+        const travel = Number(m[axis]) || 0;
+        if (!travel) continue;
+        const { lo, hi, homeSide } = axisSpan(travel);
+        const key = axis + (homeSide === 'min' ? 'Min' : 'Max');   // the HOME end's flat-config key (xMin / zMax …)
+        const pin = limits[key + 'Pin'];
+        if (pin === '' || pin == null) continue;                   // no home-end switch fitted → no device
+        const homeCoord = homeSide === 'min' ? lo : hi;            // machine-0 (the home edge)
+        const dir = homeSide === 'min' ? 1 : -1;                   // inward = toward the envelope interior
+        const st = limits[key + 'SwitchType'] || 'mechanical';
+        out.push({
+            edge: `${axis}_${homeSide}`, axis, side: homeSide, dir, switchType: st, standoff: switchStandoff(st),
+            x: axis === 'x' ? homeCoord : midOf('x'),
+            y: axis === 'y' ? homeCoord : midOf('y'),
+            z: axis === 'z' ? homeCoord : midOf('z'),
+        });
+    }
+    return out;
 }
 
 export const homingView = {
@@ -87,6 +117,8 @@ export const homingView = {
         if (ctx && ctx.preview3D) {
             ctx.preview3D(wizard.simProxy(params), 'homingVizContainer', null, null);
             if (ctx.previewMachine) ctx.previewMachine('homingVizContainer', true);
+            // H4 — the home/limit switch DEVICES at each fitted home edge; they light/plunge live as the sim homes each axis.
+            if (ctx.previewLimitSwitches) ctx.previewLimitSwitches('homingVizContainer', homingEdges(settings));
         }
 
         const status = el('homing_status');

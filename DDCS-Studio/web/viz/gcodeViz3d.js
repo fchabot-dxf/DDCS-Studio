@@ -1597,6 +1597,82 @@ export class GcodeViz3D {
         this.render();
     }
 
+    /**
+     * HOME/LIMIT SWITCH DEVICES (Homing H4, t487) — a switch body at each FITTED home-end edge on the FIXED machine
+     * frame (raw machine coords, home at scene 0, like the magazine/station/fork). Styled per the switchType (H2):
+     *   • mechanical → a plunger/lever whose tip reaches the envelope edge (the axis CONTACTS it); plunges + lights on trip.
+     *   • proximity  → a sensor face set back OUTSIDE the edge + a translucent standoff GAP reaching inward by Sn (the
+     *                  non-contact trigger zone, NEVER touched); lights on trip, no movement.
+     * `setLimitSwitchDevice` animates 'made' on the io_change trip (wired in createPreviewPanel, like the ATC devices).
+     * edges = [{ edge, axis, side, x, y, z, dir, switchType, standoff }] (machine coords) or null/[] to clear.
+     */
+    setLimitSwitchDevices(edges) {
+        const THREE = this.THREE;
+        if (this._limitGroup) {
+            this.scene.remove(this._limitGroup);
+            this._limitGroup.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose && m.dispose()); });
+            this._limitGroup = null;
+        }
+        this._limitDevices = {};
+        if (!Array.isArray(edges) || !edges.length) { this.render(); return; }
+        // Box dims with `along` down the switch axis, `cross` on the other two; offset a point `dist` along ±axis.
+        const dims = (axis, along, cross) => axis === 'x' ? [along, cross, cross] : axis === 'y' ? [cross, along, cross] : [cross, cross, along];
+        const shift = (base, axis, dir, dist) => { const p = { ...base }; p[axis] += dir * dist; return p; };
+        const grp = new THREE.Group();
+        for (const e of edges) {
+            const axis = e.axis, dir = e.dir || 1, base = { x: Number(e.x) || 0, y: Number(e.y) || 0, z: Number(e.z) || 0 };
+            const g = new THREE.Group();
+            let dev;
+            const LIT = 0xff2e2e;   // vivid red when a switch is MADE (both types) — reads clearly at envelope scale
+            if (e.switchType === 'proximity') {
+                const col = 0x39c0d8;   // cyan sensor face
+                const face = new THREE.Mesh(new THREE.BoxGeometry(...dims(axis, 5, 28)), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9 }));
+                const fp = shift(base, axis, -dir, 3);   // the face sits just OUTSIDE the edge (never crosses in)
+                face.position.set(fp.x, fp.y, fp.z); g.add(face);
+                // the standoff GAP: a translucent zone from the edge inward by Sn — the trigger distance, never contacted
+                const gap = Math.max(3, Number(e.standoff) || 3);
+                const gm = new THREE.Mesh(new THREE.BoxGeometry(...dims(axis, gap, 20)), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.16, depthWrite: false }));
+                const gp = shift(base, axis, dir, gap / 2);
+                gm.position.set(gp.x, gp.y, gp.z); g.add(gm);
+                dev = { group: g, indicator: face, kind: 'proximity', edgePos: base, axis, dir, restCol: col, litCol: LIT, made: false };
+            } else {
+                const bodyCol = 0x8a94a6;
+                const body = new THREE.Mesh(new THREE.BoxGeometry(...dims(axis, 9, 26)), new THREE.MeshBasicMaterial({ color: bodyCol, transparent: true, opacity: 0.85 }));
+                const bp = shift(base, axis, -dir, 7);   // the switch body sits OUTSIDE the edge
+                body.position.set(bp.x, bp.y, bp.z); g.add(body);
+                // the plunger reaches IN to the edge (contact); rest = tip at the edge, made = depressed a touch
+                const plunger = new THREE.Mesh(new THREE.BoxGeometry(...dims(axis, 10, 9)), new THREE.MeshBasicMaterial({ color: 0xffb033, transparent: true, opacity: 0.98 }));
+                const rest = shift(base, axis, -dir, 4);
+                plunger.position.set(rest.x, rest.y, rest.z); g.add(plunger);
+                dev = { group: g, indicator: plunger, plunger, kind: 'mechanical', edgePos: base, axis, dir, restCol: 0xffb033, litCol: LIT, made: false };
+            }
+            grp.add(g);
+            this._limitDevices[e.edge] = dev;
+        }
+        this._limitGroup = grp; this.scene.add(grp);
+        this.render();
+    }
+
+    /** Animate a home/limit switch device on its io_change trip: 'made' → light (both types) + PLUNGE (mechanical only,
+     *  the axis pressed it); released → rest colour + plunger back out. Proximity never moves (non-contact). H4, t487. */
+    setLimitSwitchDevice(edge, made) {
+        const d = this._limitDevices && this._limitDevices[edge];
+        if (!d) return;
+        d.made = !!made;
+        if (d.indicator && d.indicator.material) d.indicator.material.color.setHex(made ? d.litCol : d.restCol);
+        if (d.kind === 'mechanical' && d.plunger) {
+            const p = { ...d.edgePos }; p[d.axis] += -d.dir * (made ? 6 : 4);   // rest tip near the edge (4); depressed toward the body (6) when made
+            d.plunger.position.set(p.x, p.y, p.z);
+        }
+        this.render();
+    }
+
+    /** Read a switch device's state for tests/tools: its home-edge machine position, whether it's 'made', its kind. */
+    getLimitSwitch(edge) {
+        const d = this._limitDevices && this._limitDevices[edge];
+        return d ? { x: d.edgePos.x, y: d.edgePos.y, z: d.edgePos.z, axis: d.axis, made: d.made, kind: d.kind } : null;
+    }
+
     /** The spindle COLLET open/close (P-C.3a): OPEN (M154 drawbar release) → retract a touch + a cyan "released" tint;
      *  CLOSE (M155 lock) → rest + grey (gripping the shank). Re-applied after _buildAnimTool so a tool-swap rebuild of
      *  the assembly keeps the collet's current state. The collet rides the PART frame with the anim tool (cross-frame). */

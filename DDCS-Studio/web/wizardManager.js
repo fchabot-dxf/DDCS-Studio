@@ -561,6 +561,18 @@ export class WizardManager {
         if (viz && viz.setForkDock) viz.setForkDock(docks || null);
     }
 
+    // Draw the HOME/LIMIT SWITCH devices (Homing H4) in the 3D preview at each fitted home-end edge, on the fixed machine
+    // frame (raw machine coords, like the fork/station). The devices LIGHT/PLUNGE live as the axis reaches the switch —
+    // wired to the H3 io_change trips inside the panel (setLimitSwitches, like setAtcSwap). Opt-in (the Homing wizard) —
+    // call AFTER preview3D + previewMachine. edges = [{edge, axis, side, x, y, z, dir, switchType, standoff}] or null.
+    // SIM/VISUAL only, no emit impact. ONE-SOURCE: the same axisSpan/settings.limits the H3 trip model reads.
+    previewLimitSwitches(containerId, edges) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const panel = host && host.__panel;
+        if (panel && panel.setLimitSwitches) panel.setLimitSwitches(edges || null);
+    }
+
     // Draw the fixed TOOL SETTER (touch-off block) in the 3D preview at its configured machine position, on the fixed
     // machine frame (raw machine coords, like the magazine/stations). Opt-in (the Tool Length + Tool Check wizards) —
     // call AFTER preview3D. setter = settings.probes ({ setterX/Y/Z/W/H }) or null to clear. ONE-SOURCE: the same
