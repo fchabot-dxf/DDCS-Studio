@@ -6924,3 +6924,30 @@ HIGHLIGHT the involved pockets: reused `highlightStation(region, label)` (added 
 - **Option B:** port as M350-ONLY (bake M350, drop cross-dialect) — accept the existing M350-centrism, no restructure. Contradicts the dispatch's "cross-dialect byte-identical" + leaves the latent non-M350 bug.
 
 **PASSED BACK: NEEDS-DESIGN — did NOT port. The blocker is wcsStack's hand-rolled M350-hardcoded, dialect-baked-at-BUILD emit (it bypasses the existing dialect-aware setWorkOffset/readMachine atoms). Recommend Option A (restructure onto those atoms → clean superset twin; it also fixes the latent non-M350 correctness bug, a per-dialect emit change to verify) OR Option B (M350-only). Advisor decides. No code changed.**
+
+## 🔨 turn 473 (cycle 223) — WCS DIALECT-AWARE (Option A): GROUNDED the restructure + found a conflict with the named atom → PASSING BACK the design + the concrete non-M350 before/after for the advisor's review (their explicit review-point) BEFORE baking machine G-code into 5 dialects. No code yet (correctness gate).
+
+**TASK:** restructure wcsStack onto the dialect-aware atoms so the WCS-set FLOW is dialect-aware (M350 byte-identical; non-M350 = the correct per-dialect WCS-set, fixing the M350-hardcoded bug); PASS BACK after the restructure for review of the non-M350 change BEFORE the twin.
+
+**KEY FINDING (the named atom does NOT fit M350 byte-identity):** the M350 WCS-set-AUTO flow is an INTERMEDIATE-VAR indirect form — `#150=#578 · #151=805+[#150-1]*5 · #[#151+off]=#880` — GROUNDED by the dumps SAVE_WCS_XY_AUTO.nc + COPY_WCS.nc (both use `#N=805+[#..-1]*5` then `#[#N]`). The shared `setWorkOffset` atom emits the INLINE form `#[805+[wcs-1]*5+ax]=value` (used by the probe wizards). These are DIFFERENT byte forms. So "restructure onto setWorkOffset" would CHANGE M350 (violates byte-identical + deviates from the dump), and I CANNOT make M350's setWorkOffset match (it would break the probe twins' byte-identity). → M350 needs a DEDICATED path (the advisor's anticipated "new method").
+
+**GROUNDING (each dialect already has setWorkOffset + readMachine + readActiveWcs):** M350 → register inline + DRO #880 + active #578. rs274 → `G10 L20 P<n>` + DRO #5420 + active #5220 (LinuxCNC standard, grounded). grbl → `G10 L20 P<n>` + readMachine=[] (HOST-STREAMED, no #vars) + NO activeWcs. v41 → `G90 G92` + DRO #1500 + activeWcs NULL. dm500 → `G90 G92 ( set datum - VERIFY on hardware )` + DRO #864 + active #455.
+
+**THE non-M350 CHANGE (concrete before→after; fixed G54, zero X+Y):**
+- M350: `#805=#880 · #806=#881` → UNCHANGED (byte-identical).
+- v41: BEFORE `#1512=#880 · #1513=#881` (dialect base + WRONG M350 DRO) → AFTER `G90 G92 X0 Y0` (per v41 setWorkOffset).
+- dm500: BEFORE `#804=#880 · #805=#881` (WRONG DRO) → AFTER `G90 G92 X0 Y0   ( set datum - VERIFY on hardware )`.
+- rs274: BEFORE `#5221=#880 · #5222=#881` (WRONG DRO + should be G10) → AFTER `G10 L20 P1 X0 Y0`.
+- grbl: BEFORE `Error: Dialect does not support direct WCS register writes` → AFTER `G10 L20 P1 X0 Y0` (if we emit it).
+
+**THE FORK (advisor decides):**
+- **Option A (RECOMMENDED — keeps M350 byte-identical):** add a dialect-owned `wcsZeroAtCurrent(opts)` — M350 emits the intermediate-var form VERBATIM (byte-identical + dump-grounded); rs274/grbl → `G10 L20 P<n> <axes>0`; v41/dm500 → `G90 G92 <axes>0`. A NEW method (not composing setWorkOffset), some per-dialect flow duplication, but M350 stays byte-identical.
+- **Option B:** restructure onto setWorkOffset — M350 CHANGES to the inline `#[805+[#578-1]*5+ax]=#880` (a byte-CHANGE, functionally equivalent, uses the shared atom). Simpler, but VIOLATES "M350 byte-identical".
+
+**FLAGS (can't fully ground — advisor confirm the non-M350 SEMANTICS):**
+1. AUTO mode (zero the ACTIVE WCS) can't resolve the P/index on grbl (no activeWcs) OR v41 (activeWcs null). For G10 (rs274/grbl), `P0` = the active WCS in LinuxCNC — GROUND rs274 as `P0` for auto? grbl unknown.
+2. grbl is HOST-STREAMED (readMachine=[], caps.vars=false) — a WCS-zero MACRO may NOT be grbl's model at all (the host sends G10 L20 live). Porting a grbl WCS macro may be a non-goal.
+3. v41/dm500 `G90 G92 <ax>0` is a GLOBAL offset (not a per-WCS register write) — the auto/fixed/sync + the WCS-number distinctions may NOT map to G92 (G92 ignores the WCS). dm500 carries a "VERIFY on hardware" caveat. So the fixed-G55..G59 selection is meaningless under G92 — flag.
+4. sync (dual-gantry slave A/B) is M350-specific (#883/#884) — no non-M350 equivalent grounded.
+
+**PASSED BACK: the design + the concrete non-M350 before/after + the fork (RECOMMEND Option A — keeps M350 byte-identical, the named setWorkOffset atom does NOT, per the dumps) + 4 correctness FLAGS (auto-mode on grbl/v41, grbl host-streamed, G92 ignores the WCS-number, sync non-portable). Confirm the non-M350 semantics + pick A/B, then I build. No machine G-code baked yet (correctness gate, Gate 1).**
