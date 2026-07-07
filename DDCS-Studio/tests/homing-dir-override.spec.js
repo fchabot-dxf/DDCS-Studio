@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * H3 — per-axis HOME DIRECTION: one-source default (the signed envelope) + an explicit override that
- * round-trips. Verifies the REAL symptom on all three legs:
+ * Per-axis HOME DIRECTION: the DECLARED ENVELOPE SIGN is the single source of the home end. Verifies:
  *   1. DEFAULT = the signed machine travel (settings.machine.<axis> sign) — Auto derives it; no second source.
- *   2. OVERRIDE flips BOTH the SEEK (G31) emitted seek-distance sign AND the sim-proxy motion direction.
+ *   2. The SIM home end is ALWAYS the declared machine-0 (envelope sign) — a per-axis dir override can NO LONGER
+ *      diverge it (t491, the human's principle: the direction can't be hand-rolled). This is the fix for the Z=-120
+ *      plunge (a stale dir='-' used to seek the far/bottom end). (The SEEK G31 emit still signs by dir below — that
+ *      output is reconciled to this same home end in the NEXT task; the SIM is the fixed one-source home now.)
  *   3. NATIVE (M98 P501) is byte-UNCHANGED by the override (the controller uses its own config; sim-only there).
  *   4. The dir override round-trips through the op marker codec (it rides the already-declared `config` Struct).
- * The default (Auto / dir unset) stays byte-identical to a config with no `dir` key — the override only changes
- * output when explicitly set.
+ * The default (Auto / dir unset) stays byte-identical to a config with no `dir` key.
  */
 test('homing dir override: signed-envelope default + per-axis override flips seek emit & sim, native unchanged, round-trips', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -86,12 +87,12 @@ test('homing dir override: signed-envelope default + per-axis override flips see
   // Auto with unknown travel defers to the controller register (the documented fallback).
   expect(r.seekAutoNoTravel, 'Auto + unknown envelope → defer to controller #612').toContain('20000*#[612+#100]-10000');
 
-  // 2 H1 (t481): the sim SEEKS THE HOME END. Auto → machine-0 (x=0). The override picks a specific end: + → the +X (max)
-  // far end (300); − → the −X (min) end, which for a +300 envelope IS machine-0 (0). (Was: the buggy signed-travel far end,
-  // and − even drove to −300, OUTSIDE the [0,300] envelope.)
+  // 2 t491: the DECLARED ENVELOPE SIGN is the single source of the home end — the sim ALWAYS homes to machine-0 (x=0)
+  // REGARDLESS of any per-axis dir. A stale dir can NO LONGER diverge the sim to the far end (the Z=-120 plunge). (The
+  // seek-EMIT #102 above still signs by dir — that G31 output is reconciled to this same home end in the NEXT task.)
   expect(r.simAuto, 'sim Auto homes to the machine-0 end (x=0)').toBe(0);
-  expect(r.simPlus, 'override + drives to the +X (max) end = 300').toBe(300);
-  expect(r.simMinus, 'override − drives to the −X (min = machine-0) end = 0').toBe(0);
+  expect(r.simPlus, 'a dir override can NO LONGER diverge the sim — still the declared machine-0 (x=0)').toBe(0);
+  expect(r.simMinus, 'a dir override can NO LONGER diverge the sim — still the declared machine-0 (x=0)').toBe(0);
 
   // 3 NATIVE is byte-unchanged by the override.
   expect(r.nativeMinus, 'native homing emit is identical regardless of dir').toBe(r.nativeAuto);

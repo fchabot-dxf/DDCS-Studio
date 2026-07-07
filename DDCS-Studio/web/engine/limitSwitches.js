@@ -62,11 +62,16 @@ const r3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
  * moves `backoff` mm off the switch INTO the reachable travel (toward the span centre).
  * @returns {{ seek: number, back: number }}  seek = the home end (machine-0 by default); back = the backed-off rest spot
  */
-export function axisHomeMotion(travel, { dir = '', offset = 0, backoff = 5 } = {}) {
+export function axisHomeMotion(travel, { offset = 0, backoff = 5 } = {}) {
     const { lo, hi } = axisSpan(travel);
-    const seek = (dir === '+' ? hi : dir === '-' ? lo : 0) + (Number(offset) || 0);   // Auto → machine-0; +/− → max/min end
+    // The home end is DECLARED by the ENVELOPE SIGN: machine-0 (the ⬤ home marker), which axisSpan places at whichever
+    // end contains 0. ONE SOURCE, valid-by-construction — a per-axis homing `dir` override can NO LONGER diverge the home
+    // to the far end (t491, the human's principle: the home direction IS the declared envelope sign, never hand-rolled /
+    // hardcoded). So Z=-120 ALWAYS homes UP to 0 (the top) regardless of any stale homing.<axis>.dir; a +120 axis homes
+    // to its 0 end. (The G31 seek-EMIT direction — a separate output — is reconciled to this same home end in a follow-up.)
+    const seek = 0 + (Number(offset) || 0);   // machine-0 = the declared home end (always lo or hi per axisSpan)
     const mid = (lo + hi) / 2;
-    const back = seek + (seek <= mid ? 1 : -1) * (Number(backoff) || 0);              // off the switch, toward the interior
+    const back = seek + (seek <= mid ? 1 : -1) * (Number(backoff) || 0);              // off the switch, INTO the reachable travel
     return { seek: r3(seek), back: r3(back) };
 }
 

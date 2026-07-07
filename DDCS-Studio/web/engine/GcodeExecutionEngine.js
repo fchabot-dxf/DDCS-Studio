@@ -890,10 +890,11 @@ export class GcodeExecutionEngine {
                     const cfg = ((s.homing || {}).axes || {})[AX] || {};
                     const travel = AX === 'z' ? num(machine.z, -120) : num(machine[AX], 300);
                     // H1 (t481) — HOME is the MACHINE-0 end (axisHomeMotion, the SAME source as homingSimProxy + axisSpan);
-                    // was the signed-travel far end → the sim drove AWAY from home. The final homed spot is the back-off.
-                    // H3 (t485) — carry BOTH the seek (the home switch, machine-0 end) and the back-off rest spot so the
-                    // motion can pass THROUGH the switch (trip) then settle backed-off (release), like homingSimProxy / O501.
-                    const { seek, back } = axisHomeMotion(travel, { dir: cfg.dir, offset: num(cfg.offset, 0), backoff: num(cfg.backoff, 5) });
+                    // t491 — the DECLARED ENVELOPE SIGN is the single source of the home end; the per-axis dir no longer
+                    // diverges it (so a stale cfg.dir can't make Z=-120 plunge). H3 (t485) — carry BOTH the seek (the home
+                    // switch, machine-0 end) and the back-off rest spot so the motion passes THROUGH the switch (trip) then
+                    // settles backed-off (release), like homingSimProxy / O501.
+                    const { seek, back } = axisHomeMotion(travel, { offset: num(cfg.offset, 0), backoff: num(cfg.backoff, 5) });
                     homedMove = { axis: AX, seek, back };
                 }
                 this.vars.set(1515 + N, 1);   // homed flag #[1515+N] — the controller sets it on real hardware

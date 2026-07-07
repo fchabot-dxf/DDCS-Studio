@@ -249,9 +249,10 @@ export function homingSimProxy(params = {}) {
         const A = ax.toUpperCase();
         if ((ax === 'a' || ax === 'b') && (c.rotary || 'setzero') === 'setzero') { L.push(`G53 ${A}0     ( ${A} set zero )`); return; }
         // H1 (t481) — HOME is the MACHINE-0 end (axisHomeMotion, the ONE source shared with the engine handler + axisSpan).
-        // Was: the SIGNED-TRAVEL far end → the axis drove AWAY from home. c.dir ('' Auto → machine-0; '+'/'−' → max/min end)
-        // is a Homing-block override. The back-off moves off the switch INTO the reachable travel (toward the span centre).
-        const { seek, back } = axisHomeMotion(travel[ax] || 0, { dir: c.dir, offset: num(c.offset, 0), backoff: num(c.backoff, 5) });
+        // t491 — the DECLARED ENVELOPE SIGN is the single source of the home end (the human's principle): a per-axis dir
+        // override can no longer diverge it, so the sim ALWAYS seeks machine-0 (Z=-120 homes UP). The back-off moves off
+        // the switch INTO the reachable travel (toward the span centre).
+        const { seek, back } = axisHomeMotion(travel[ax] || 0, { offset: num(c.offset, 0), backoff: num(c.backoff, 5) });
         L.push(`G53 G0 ${A}${seek}     ( seek ${A} home )`);
         L.push(`G53 G1 ${A}${back} F${Math.round(num(c.slowFeed, 100))}     ( back off )`);
         const s = parseInt(c.slaveFollows, 10);
