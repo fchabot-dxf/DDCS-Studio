@@ -7120,3 +7120,26 @@ HIGHLIGHT the involved pockets: reused `highlightStation(region, label)` (added 
 **FILES:** ui/settingsPanel.js (the outward offset + pad 46) · tests/machine-envelope-field-offset.spec.js (new).
 
 **PASSED BACK: the machine-envelope travel fields are offset CLEAR of the box edges (outward from the centre) + the box margin widened — the envelope + coloured edges read un-obscured; the fields still read + edit each axis. UI-only, no logic/emit change. Full suite 774 pass. Screenshot machine_envelope_fields.png. Ready for the G31-HOMING-OUTPUT next.**
+
+## 🔨 turn 493b (cycle 223) — HOMING PLUNGE: EXHAUSTIVE MAP + ROOT CAUSE FOUND (GATE, no fix per the amendment). The plunge is the SEEK method's EMITTED-MACRO EXECUTION — its G31 seek defaults to the travel sign (−Z for a −120 Z), seeking AWAY from the home switch. Independent of axisHomeMotion (e3aa337 never touched it). NO code changed.
+
+**AMENDMENT (mid-turn PIVOT + GATE):** homing STILL plunges after e3aa337 (human live-confirmed). HOLD the field-offset (committed 7458548 — genuinely done + green, kept). DEEP-EXPLORE (do NOT patch-and-claim — we mis-fixed by testing a config that differs from the human's). MAP every method × path for machine.z=-120; find which plunges + the ROOT cause; rule out stale-cache; note the HEAD version. GATE for review.
+
+**EXHAUSTIVE MAP (machine.z=-120, on HEAD 7458548 — reproduced through the engine, 2 throwaway repro specs, removed):**
+| method | dir | wizard PREVIEW (homingSimProxy) | EMITTED-MACRO EXEC (engine trace, Z min) | verdict |
+|---|---|---|---|---|
+| native | auto/−/+ | Z0 (top) ✅ | −5 ✅ (M98-P501 handler → axisHomeMotion, now dir-free) | CORRECT |
+| **seek** | **auto** | Z0 (top) ✅ | **−20000 ❌ PLUNGE** | **THE BUG** |
+| seek | − | Z0 ✅ | −20000 ❌ PLUNGE | same |
+| seek | + | Z0 ✅ | 0 ✅ (the manual + forces +Z = toward home) | correct-by-override |
+| setzero | any | no-motion ✅ | 0 ✅ | CORRECT |
+
+**CULPRIT: the SEEK method × the EMITTED-MACRO EXECUTION.** The wizard PREVIEW (homingSimProxy → axisHomeMotion) is correct for EVERY method (all Z0) — so the 3D LOOKS fixed — but the ACTUAL emitted G31 macro (what the human PLAYs in the editor) seeks the WRONG way. It BYPASSES axisHomeMotion entirely (a raw `G91 G31 Z[#102]`). e3aa337 only touched axisHomeMotion (preview + the native M98 handler), so the seek emit was never affected — exactly the "next task" I flagged, now confirmed as the live bug.
+
+**ROOT CAUSE:** homingWizard.js:132-146 (the seek method) — `tSign = Math.sign(machine.z)`; `dir = c.dir override, else tSign`; `#102 = dir * 10000`. For Z=−120: tSign=−1 → #102=−10000 → `G91 G31 Z-10000` (×2 passes → −20000) drives Z DOWN toward the far/BOTTOM end, AWAY from the home switch (machine-0/TOP). The seek is INVERTED — it should seek TOWARD machine-0 = **−tSign** (the OPPOSITE of the travel sign). Confirmed: `dir='+'` (forcing +Z) homes to 0. The seek method is "UNVERIFIED on hardware" (its own comment) — the direction was never validated.
+
+**STALE-CACHE:** ruled OUT as the sole cause — the seek plunge is REAL on HEAD (7458548). BUT version.json = **10.97**, and e3aa337 (the preview + native-handler direction fix) is committed but NOT version-bumped/released → a DESKTOP-exe human on V10.97 lacks e3aa337 entirely, so they'd ALSO plunge on native+dir='−' (the M98 handler, pre-fix). The web app (raw from main) has e3aa337 iff pushed. → CONFIRM the human's build (web vs V10.97 exe) + their method (native vs seek).
+
+**THE FIX (GATE — for advisor review, NOT done):** flip the seek Auto direction to seek TOWARD machine-0 (−tSign, opposite the travel sign) — the correct home-seek. This is a byte-identity-breaking EMIT change = the planned "G31-HOMING-OUTPUT" task; the exploration confirms it IS the human's bug. Ground the direction + #612 semantics vs the O501 dump as noted. (Also consider: the seek dir override's '+'/'-' semantics vs the declared envelope sign — same one-source principle as e3aa337.)
+
+**NO code changed this turn-b** (2 throwaway repro specs removed). PASSED BACK the map + culprit + root cause + version note as a GATE.
