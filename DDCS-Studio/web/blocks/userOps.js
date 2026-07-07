@@ -19,7 +19,7 @@ import { registerUserBuilder, unregisterUserBuilder, registerOpLabel, removeOpLa
 import { registerUserSpec, unregisterUserSpec } from './opSchema.js';
 import { setUserSimIntent } from '../viz/opSimContext.js';
 import { setUserSimStarts, makeProvider, setUserSimStock } from '../viz/opSimStarts.js';
-import { pruneGuards } from './whenGuard.js';   // ② B4 M2: collapse guarded structural forks at build (the template carries every arm)
+import { pruneGuards, getUserDeriveGuards, setUserDeriveGuards } from './whenGuard.js';   // ② B4 M2: collapse guarded structural forks at build; t469: inject DERIVED guard keys (pocket _tooSmall) before prune
 import { deriveBindings } from './dataOps/deriveBindings.js';   // re-derive binding indices BY IDENTITY after prune (guarded templates shift per state)
 
 const STORE_KEY = 'ddcs_user_ops';
@@ -412,7 +412,11 @@ function instantiate(def, params) {
     // (their absence is handled per-binding below). A legacy def (no structural bindings) → this is a no-op → byte-identical.
     const p = withGuardDefaults(def, params);
     const clone = JSON.parse(JSON.stringify(def.template || []));
-    pruneGuards(clone, p);
+    // t469 — inject DERIVED guard keys (e.g. pocket's `_tooSmall`, computed from the geometry) so a guard can key on a value
+    // that is NOT any single user param. ONE-SOURCE: the derive lives on the def (registered via setUserDeriveGuards), run
+    // once here, added to the prune params only. No hook → pruneGuards(clone, p) exactly as before (byte-identical).
+    const derive = getUserDeriveGuards(def.opType);
+    pruneGuards(clone, derive ? { ...p, ...derive(p) } : p);
     const flat = flattenBlocks(clone);
     const bindings = def.bindingSpecs ? deriveBindings(flat, def.bindingSpecs) : (def.bindings || []);
     for (const b of bindings) {
@@ -515,6 +519,7 @@ export function registerUserOp(def) {
         : ((Array.isArray(starts) && starts.length) ? makeProvider(starts) : null);
     setUserSimStarts(def.opType, provider, starts);
     setUserSimStock(def.opType, def.simStock);   // t417 E3 — a DECLARED per-op sim-stock (rotary round bar); a LIVE fn (re-attached from the seed, like simStartsProvider)
+    setUserDeriveGuards(def.opType, def.deriveGuards);   // t469 — a DECLARED derive-guards hook (pocket _tooSmall from geometry); a LIVE fn (re-attached from the seed), injected before prune
     return def;
 }
 

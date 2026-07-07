@@ -24,6 +24,7 @@ import { boreDataDef } from './blocks/dataOps/boreData.js';   // fan-out — the
 import { slotDataDef } from './blocks/dataOps/slotData.js';
 import { surfacingDataDef } from './blocks/dataOps/surfacingData.js';
 import { contourDataDef } from './blocks/dataOps/contourData.js';   // E1 mill FEATURE-WRITE port: the flat "Contour (data)" twin — opened IN-PLACE from the built-in Contour slot (opensAs); region-pill→flat reframe, byte-identical
+import { pocketDataDef } from './blocks/dataOps/pocketData.js';   // t469 E1 — the "Pocket (data)" twin (FIRST coarse SUPERSET: strategy + tooSmall guards + the derive-guards hook); in-place from the built-in Pocket slot (opensAs)
 import { textDataDef } from './blocks/dataOps/textData.js';
 import { cornerDataDef } from './blocks/dataOps/cornerData.js';   // corner port (inc B1): additive "Corner (data)" twin
 import { edgeDataDef } from './blocks/dataOps/edgeData.js';   // t339 edge port E1-E4: the "Edge (data)" twin — opened IN-PLACE from the built-in Edge's Probe slot (opensAs)
@@ -157,6 +158,7 @@ class DDCSStudio {
             slotDataDef(),
             surfacingDataDef(),
             contourDataDef(),   // E1 — seed the contour twin so its in-place Contour slot (opensAs) opens a registered op on boot
+            pocketDataDef(),   // t469 E1 — seed the pocket twin (FIRST coarse SUPERSET: strategy + tooSmall guards, derive-guards hook) so its in-place Pocket slot (opensAs) opens a registered op on boot
             textDataDef(),
             cornerDataDef(),
             edgeDataDef(),   // t339 E4 — seed the edge twin so its in-place Probe slot (opensAs) opens a registered op on boot

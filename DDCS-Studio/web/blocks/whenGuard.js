@@ -18,6 +18,16 @@ export function whenOk(when, params) {
     return typeof when.is === 'boolean' ? !!v === when.is : v === when.is;
 }
 
+// ── DERIVE-GUARDS hook (t469) — a per-op DECLARED derive fn that COMPUTES guard value(s) from the resolved params and
+// INJECTS them into the prune params BEFORE pruneGuards, so a GEOMETRY-DERIVED fork (not any single user param) can key a
+// guard. ONE-SOURCE: the derive lives on the def (`def.deriveGuards`), computed once, injected before prune — NOT hand-rolled
+// into the emit. A LIVE fn (dropped on persistence, re-attached from the seed, exactly like setUserSimStock/simStartsProvider).
+// Origin: pocket's `tooSmall` (a pocket smaller than the tool → a drill-plunge instead of a stepover), keyed on `_tooSmall`.
+const USER_DERIVE_GUARDS = new Map();
+/** Register (fn) / clear (null) a user op's derive-guards hook: `(resolvedParams) => ({ _key: value, … })`. */
+export function setUserDeriveGuards(opType, fn) { if (typeof fn === 'function') USER_DERIVE_GUARDS.set(opType, fn); else USER_DERIVE_GUARDS.delete(opType); }
+export function getUserDeriveGuards(opType) { return USER_DERIVE_GUARDS.get(opType) || null; }
+
 /** Prune a block tree for a param state: DROP a `guard` subtree whose `when` is false; UNWRAP a surviving guard (splice
  *  its children up in place). Recurses children + uiChildren; mutates in place (the caller passes a deep clone). After
  *  prune, NO `guard` blocks remain — the tree is the concrete shape for `params`. Returns the same (mutated) array. */

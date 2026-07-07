@@ -65,6 +65,14 @@ export function pocketTooSmall(params = {}) {
     return insetTooSmall(regionDesc(trueRegionParams(params)), r - num(params.wallOffset, 0));
 }
 
+/** The pocket CENTRE (the tooSmall drill-plunge point) — rect = corner+size/2; circle/polygon/ellipse = the shape origin.
+ *  ONE-SOURCE: shared by pocketStack (the concrete drill arm) and the twin's postInstantiate (which rewrites the drill x/y
+ *  from the resolved params, since the frozen superset template bakes them at the DEFAULT geometry). */
+export function pocketDrillCentre(params = {}) {
+    const d = regionDesc(trueRegionParams(params));
+    return d.kind === 'rect' ? { cx: d.x + d.w / 2, cy: d.y + d.h / 2 } : { cx: d.cx, cy: d.cy };
+}
+
 /**
  * Pocket params → its block stack. The one source of truth for both displays. E0 (t467): the pocket geometry rides
  * FLAT pocketfill/pocketwall leaves (region-pill→flat REFRAME, byte-identical to the stepover+contour region-socket
@@ -82,10 +90,8 @@ export function pocketStack(params = {}, opts = {}) {
     const depth = num(params.depth, 4), by = num(params.stepdown, 1.5);
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
 
-    // The pocket centre (the tooSmall drill point) — from the TRUE (pre-inset) region descriptor.
-    const trueDesc = regionDesc(trueRegionParams(params));
-    const cx = trueDesc.kind === 'rect' ? trueDesc.x + trueDesc.w / 2 : trueDesc.cx;
-    const cy = trueDesc.kind === 'rect' ? trueDesc.y + trueDesc.h / 2 : trueDesc.cy;
+    // The pocket centre (the tooSmall drill point) — one source, shared with the twin's postInstantiate.
+    const { cx, cy } = pocketDrillCentre(params);
     const tooSmall = pocketTooSmall(params);
     const bbox = pocketBBox(params);
 

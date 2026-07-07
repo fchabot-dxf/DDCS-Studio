@@ -62,7 +62,7 @@ const BUILTINS = [
     // the block TYPE drill→bore, frontier #1), so Bore needs its OWN helical twin (user_bore_data) — a small follow-on, NOT this wire-up.
     { id: 'drill', type: 'drill', variant: 'drill', label: 'Drill', icon: '', group: 'mill', opensAs: 'user_drill_data' },
     { id: 'bore', type: 'drill', variant: 'bore', label: 'Bore', icon: '', group: 'mill', opensAs: 'user_bore_data' },   // fan-out — IN-PLACE: the Bore slot opens its OWN helical twin (drillStack method='helical' → the bore leaf; byte-identical); the built-in drill/bore stays the legacy shim
-    { id: 'pocket', type: 'pocket', label: 'Pocket', icon: '', group: 'mill' },
+    { id: 'pocket', type: 'pocket', label: 'Pocket', icon: '', group: 'mill', opensAs: 'user_pocket_data' },   // t469 E1 — IN-PLACE: the Pocket slot opens the twin (superset: strategy + tooSmall guards + derive-guards); built-in pocketWizard stays the legacy shim
     { id: 'contour', type: 'contour', label: 'Contour', icon: '', group: 'mill', opensAs: 'user_contour_data' },   // E1 — IN-PLACE: the Contour slot opens the flat twin (region-pill→flat reframe, byte-identical); built-in contourStack stays the legacy shim
     // MILL/ATC IN-PLACE BATCH (t407) — the drill one-liner applied ×4: each single-shape twin goes IN-PLACE via opensAs (the
     // click re-points to the twin, its own Data-Wiz entry auto-hides, the seamless plain title). All single-shape → no Bore-style gap.
