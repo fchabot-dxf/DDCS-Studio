@@ -17,6 +17,24 @@ import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // the sha
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 
+/** The 3 interpolated SUMMARY comments (the 2 header lines + the write-origin line) — extracted to ONE format so the data-op
+ *  twin's postInstantiate can RECOMPOSE them from the resolved params (cornerHeaderComments precedent), keeping twin==built-in
+ *  byte-identical for ALL scalars + the datum/wcs value-swaps (E1). Must reproduce the inline text byte-for-byte (same num()+defaults). */
+export function rotaryCenterHeaderComments(params = {}) {
+    const method = params.method === 'fit' ? 'fit' : 'known';
+    const approach = params.approach === 'guided' ? 'guided' : 'auto';
+    const diameter = num(params.diameter, 76.2), dist = num(params.dist, 30);
+    const retract = num(params.retract, 2), safeZ = num(params.safeZ, 15), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50);
+    const datum = params.datum === 'top' ? 'top' : 'center';
+    const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
+    return {
+        top1: `Rotary centreline | ${method === 'fit' ? '3-point fit' : 'known dia ' + diameter} | Z0 at ${datum === 'top' ? 'OD top' : 'centreline'} | ${wcsLabel}`,
+        top3: `Max probe ${dist}mm | Retract ${retract}mm | Safe Z ${safeZ}mm | Fast ${fFast} | Slow ${fSlow}`,
+        knownHeader: `=== Known diameter: top + two flanks (${approach === 'auto' ? 'auto-centring' : 'operator-guided'}) ===`,   // KNOWN arm only; interpolates approach
+        writeOrigin: `Write work origin (Z0 at ${datum === 'top' ? 'OD top' : 'centreline'})`,
+    };
+}
+
 export function rotaryCenterStack(params = {}, opts = {}) {
     const method = params.method === 'fit' ? 'fit' : 'known';
     const approach = params.approach === 'guided' ? 'guided' : 'auto';   // known-method flanks: hands-free cycle vs operator-jogged
@@ -26,7 +44,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
     const radius = num(params.radius, 2);   // stylus tip radius (#6) — the Z-down top probe lands a radius high, so Zc subtracts it (Yc bisect cancels)
     const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL inc1: relative (default, clearance lift) | machine (G53 park at the absolute Z)
     const src = params.sources || {};
-    const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
+    const wcs = params.wcs || 'active';   // wcsLabel moved into rotaryCenterHeaderComments (the shared header format)
     const wcsArg = wcs === 'active' ? '#578' : String(parseInt(String(wcs).replace('G', ''), 10) - 53);
 
     const superset = !!opts.superset;   // E0 — seed the data-TWIN with BOTH method/approach arms present (each guarded) so pruneGuards collapses to a concrete shape
@@ -72,9 +90,10 @@ export function rotaryCenterStack(params = {}, opts = {}) {
         mkMV('Z', '#17'), mkC(`REPOSITION: ${msg}`), mkCF('Press Enter when repositioned - ESC=cancel', 2), mkMV('Z', '[0-#17]'), mkDM('inc'),
     ];
 
-    C(`Rotary centreline | ${method === 'fit' ? '3-point fit' : 'known dia ' + diameter} | Z0 at ${datum === 'top' ? 'OD top' : 'centreline'} | ${wcsLabel}`);
+    const _hdr = rotaryCenterHeaderComments(params);   // ONE format, shared with the twin's postInstantiate recompose
+    C(_hdr.top1);
     C('Horizontal 4th axis: spin X -> probe top in Z, flanks in Y. Centreline runs along X.');
-    C(`Max probe ${dist}mm | Retract ${retract}mm | Safe Z ${safeZ}mm | Fast ${fFast} | Slow ${fSlow}`);
+    C(_hdr.top3);
     C('Motion Variables');
     A('#1', dist, 'Max probe distance'); A('#2', srcVal(src.retract, retract), srcNote(src.retract, 'Retract'));
     A('#3', srcVal(src.fastFeed, fFast), srcNote(src.fastFeed, 'Fast feed')); A('#4', fSlow, 'Slow feed');
@@ -91,7 +110,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
     // ── KNOWN arm: top + two flanks (a solid bar can't be probed from its axis — approach each flank from OUTSIDE at the
     // centreline; traverses run clear above the bar). GUIDED adds a confirm gate before each touch; AUTO runs hands-free.
     const knownKids = [
-        mkC(`=== Known diameter: top + two flanks (${approach === 'auto' ? 'auto-centring' : 'operator-guided'}) ===`),
+        mkC(_hdr.knownHeader),   // interpolates approach — RECOMPOSED in the twin (value-swap)
         mkA('#57', diameter, 'Known diameter'),   // E0 RESTRUCTURE #1 — dissolve #55=dia/2 → diameter is a single socket (#57) for the E1 value binding
         mkA('#55', '[#57/2]', 'R = known diameter / 2'),
         mkA('#11', '[#55+#2+#6]', 'Flank approach = R + retract + stylus radius (the tool CENTRE must clear the OD by retract — the tip sticks out r)'),
@@ -141,7 +160,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
     // FINAL retract/park via the DECLARED safe-Z frame: relative → MV('Z','#17') BYTE-IDENTICAL; machine → G53 Z#17 (park at
     // the absolute machine Z). #17 = the user's safe-Z value, interpreted per the frame (a clearance, or the absolute Z).
     C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17'));
-    C(`Write work origin (Z0 at ${datum === 'top' ? 'OD top' : 'centreline'})`);
+    C(_hdr.writeOrigin);
     SWO('Y', '#54');                         // Y0 to centreline
     SWO('Z', datum === 'top' ? '#50' : '#56');
 
