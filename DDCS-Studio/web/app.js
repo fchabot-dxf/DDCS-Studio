@@ -17,6 +17,7 @@ import { playClick } from './ui/sound.js';  // click feedback sound
 import { loadUserOps, listUserOps, createUserOp, updateUserOp } from './blocks/userOps.js';   // wizard-maker: register + seed/upgrade user-defined ops
 import { insertUserOp } from './ui/userOpForm.js';   // wizard-maker: generic param form (→ window.ddcsInsertUserOp)
 import { atcWarmupDataDef } from './blocks/dataOps/atcWarmupData.js';
+import { atcLengthDataDef } from './blocks/dataOps/atcLengthData.js';   // t409 — ATC Tool Length light port (new twin, opened IN-PLACE from the ATC Tool Length slot)
 import { drillDataDef } from './blocks/dataOps/drillData.js';
 import { slotDataDef } from './blocks/dataOps/slotData.js';
 import { surfacingDataDef } from './blocks/dataOps/surfacingData.js';
@@ -143,6 +144,7 @@ class DDCSStudio {
         const have = new Set(listUserOps().map((d) => d.opType));
         const seeds = [
             atcWarmupDataDef(),
+            atcLengthDataDef(),   // t409 — ATC Tool Length twin (in-place from the ATC Tool Length slot)
             drillDataDef(),
             slotDataDef(),
             surfacingDataDef(),

@@ -18,6 +18,18 @@ const getDialect = () => { try { return resolveActivePost(getActiveProfile().id)
 // Current-tool var from the active profile (Expert #1300); falls back to the Expert convention where unmapped.
 const curToolVar = (d) => '#' + ((d && d.vars && d.vars.atc && d.vars.atc.currentTool) || 1300);
 
+/** The 2 interpolated SUMMARY header comments — extracted to ONE format so the data-op twin's postInstantiate can RECOMPOSE
+ *  them from the resolved params (declare-never-infer, the cornerHeaderComments precedent), keeping twin==built-in byte-identical
+ *  for ALL scalars (not just defaults). Must reproduce the old inline text byte-for-byte (same num() + defaults as atcLengthStack). */
+export function atcLengthHeaderComments(params = {}) {
+    const blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10), maxDist = num(params.maxDist, 100);
+    const fFast = num(params.f_fast, 300), fSlow = num(params.f_slow, 50);
+    return [
+        `Block Height: ${blockHeight}mm | Safe Z: ${safeZ}mm`,
+        `Fast: ${fFast} | Slow: ${fSlow} | Max Plunge: ${maxDist}mm`,
+    ];
+}
+
 export function atcLengthStack(params = {}) {
     const blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10), maxDist = num(params.maxDist, 100);
     const retract = num(params.retract, 3), fFast = num(params.f_fast, 300), fSlow = num(params.f_slow, 50);
@@ -43,8 +55,8 @@ export function atcLengthStack(params = {}) {
     const END = () => S.push(newBlock('endprogram'));
 
     C('ATC | Tool Length Setter');
-    C(`Block Height: ${blockHeight}mm | Safe Z: ${safeZ}mm`);
-    C(`Fast: ${fFast} | Slow: ${fSlow} | Max Plunge: ${maxDist}mm`);
+    const [hdr1, hdr2] = atcLengthHeaderComments(params);   // ONE format, shared with the twin's postInstantiate recompose
+    C(hdr1); C(hdr2);
     C('=== CONFIGURATION ===');
     A('#1', maxDist, 'Max search distance');
     A('#2', retract, 'Retract distance');
