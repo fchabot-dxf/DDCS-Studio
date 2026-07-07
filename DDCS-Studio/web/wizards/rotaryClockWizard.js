@@ -14,7 +14,7 @@ import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
 
-export function rotaryClockStack(params = {}) {
+export function rotaryClockStack(params = {}, opts = {}) {
     const level = num(params.level, 0), span = num(params.span, 20), dist = num(params.dist, 30);
     const retract = num(params.retract, 2), safeZ = num(params.safeZ, 10), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const safeZFrame = safeZFrameOf(params.safeZFrame);   // relative (default, clearance lift) | machine (G53 park at the absolute Z)
@@ -26,9 +26,18 @@ export function rotaryClockStack(params = {}) {
     const wcsArg = wcs === 'active' ? '#578' : String(parseInt(String(wcs).replace('G', ''), 10) - 53);
     const actLabel = action === 'report' ? 'measure only' : action === 'rotate' ? 'rotate to 0' : 'set A0';
 
+    const superset = !!opts.superset;   // E0 — seed the data-TWIN with ALL action arms present (each guarded) so pruneGuards collapses to a concrete shape
+
     const S = [];
-    const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
-    const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); };
+    // Returning block factories (return ONE block) — the ACTION fork arms compose these; the LINEAR parts push via the C/A/… wrappers.
+    const mkC = (t) => { const b = newBlock('comment'); b.params = { text: t }; return b; };
+    const mkA = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; return b; };
+    const mkRM = (axis, v) => { const b = newBlock('readmachine'); b.params = { axis, var: v }; return b; };
+    const mkSWO = (axis, value) => { const b = newBlock('setworkoffset'); b.params = { wcs: wcsArg, axis, value }; return b; };
+    const mkMV = (axis, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [axis.toLowerCase()]: v }; return b; };
+    // Push wrappers (LINEAR sections). C/A/MV/RM/SWO reuse the mk-factories; the rest push directly.
+    const C = (t) => S.push(mkC(t));
+    const A = (v, val, note) => S.push(mkA(v, val, note));
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
@@ -36,11 +45,19 @@ export function rotaryClockStack(params = {}) {
     const PR = (axis, to, feed) => { const b = newBlock('probe'); b.params = { axis, to, feed, port: '#5', level }; S.push(b); };
     const CK = (axis, goto) => { const b = newBlock('probecheck'); b.params = { axis, goto }; S.push(b); };
     const RD = (axis, v) => { const b = newBlock('proberead'); b.params = { axis, var: v }; S.push(b); };
-    const RM = (axis, v) => { const b = newBlock('readmachine'); b.params = { axis, var: v }; S.push(b); };
-    const SWO = (axis, value) => { const b = newBlock('setworkoffset'); b.params = { wcs: wcsArg, axis, value }; S.push(b); };
-    const MV = (axis, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [axis.toLowerCase()]: v }; S.push(b); };
+    const RM = (axis, v) => S.push(mkRM(axis, v));
+    const SWO = (axis, value) => S.push(mkSWO(axis, value));
+    const MV = (axis, v) => S.push(mkMV(axis, v));
     const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
     const END = () => S.push(newBlock('endprogram'));
+
+    // ── SUPERSET fork helper (E0, mirroring rotaryCenterStack) — the Clock's ONE block-shape fork is action(set|report|rotate).
+    // reference(top|side) + safeZFrame(relative|machine) + wcs are VALUE swaps (same block shape, read from params on BOTH
+    // sides of the E0 gate) → NOT guarded. The A-axis writes (RM/SWO/MV of A) STAY in the concrete arms (E1 binds the A-axis).
+    const GUARD = (when, kids) => { const b = newBlock('guard'); b.params = { when }; b.children = kids; return b; };
+    const actionFork = (setKids, reportKids, rotateKids) => superset
+        ? [GUARD({ param: 'action', is: 'set' }, setKids), GUARD({ param: 'action', is: 'report' }, reportKids), GUARD({ param: 'action', is: 'rotate' }, rotateKids)]
+        : (action === 'report' ? reportKids : action === 'rotate' ? rotateKids : setKids);
 
     const ppZdown = (resultVar) => {   // two-pass probe down (Z-)
         PR('Z', '#7', '#3'); CK('Z', 1); MV('Z', '#10');
@@ -55,7 +72,7 @@ export function rotaryClockStack(params = {}) {
     A('#3', srcVal(src.fastFeed, fFast), srcNote(src.fastFeed, 'Fast feed')); A('#4', fSlow, 'Slow feed');
     A('#5', srcVal(src.port, port), srcNote(src.port, 'Probe port')); A('#6', span, 'Y span between the two flat touches');
     A('#7', '[0-#1]', 'Neg max'); A('#8', '#1', 'Pos max'); A('#9', '[0-#2]', 'Neg retract'); A('#10', '#2', 'Pos retract');
-    A('#17', Math.round(safeZ), 'Safe Z');
+    A('#17', safeZ, 'Safe Z');   // E0 RESTRUCTURE — drop the build-time Math.round(safeZ): the E1 value binding on #17 must land the raw value (byte-identical at the integer default 10)
 
     C('Confirm Start');
     CF('Position over the flat, near A0. Enter to probe - ESC=cancel', 2);
@@ -71,18 +88,23 @@ export function rotaryClockStack(params = {}) {
     A('#53', 'ATAN[[#52-#51]]/[#6]', 'phi = atan2(Zb-Za, span)');
     RM('A', '#54');                          // current A machine position (dialect DRO)
 
-    if (action === 'report') {
-        C('Measure only - A offset left unchanged');
-    } else if (action === 'rotate') {
-        C(`Rotate the flat to ${refLabel}, then zero A there - SPINS THE PART (verify direction)`);
-        A('#58', `[0-#53${refTerm}]`, 'Rotation to reach the reference');
-        MV('A', '#58');                      // rotate part to the reference orientation (incremental)
-        RM('A', '#59');                      // read A machine pos after the rotate (dialect DRO)
-        SWO('A', '#59');                     // set A0 at the reference
-    } else {
-        C(`Set A0 at ${refLabel} without rotating (verify direction on your machine)`);
-        SWO('A', `[#54-#53${refTerm}]`);
-    }
+    // ── ACTION fork (the ONE block-shape fork): set A0 (no rotate) | report (measure only) | rotate to the ref then zero A.
+    // The A-axis writes (RM/SWO/MV of A) + the refTerm value-swap STAY in the concrete arms — E1 binds the A-axis.
+    const setKids = [
+        mkC(`Set A0 at ${refLabel} without rotating (verify direction on your machine)`),
+        mkSWO('A', `[#54-#53${refTerm}]`),
+    ];
+    const reportKids = [
+        mkC('Measure only - A offset left unchanged'),
+    ];
+    const rotateKids = [
+        mkC(`Rotate the flat to ${refLabel}, then zero A there - SPINS THE PART (verify direction)`),
+        mkA('#58', `[0-#53${refTerm}]`, 'Rotation to reach the reference'),
+        mkMV('A', '#58'),                    // rotate part to the reference orientation (incremental)
+        mkRM('A', '#59'),                    // read A machine pos after the rotate (dialect DRO)
+        mkSWO('A', '#59'),                   // set A0 at the reference
+    ];
+    S.push(...actionFork(setKids, reportKids, rotateKids));
 
     C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17'));   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
     DM('abs');
