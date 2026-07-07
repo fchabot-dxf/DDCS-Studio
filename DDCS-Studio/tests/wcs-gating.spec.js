@@ -30,13 +30,14 @@ test('WCS form gates auto/WCS-number/sync per post (M350 all on; rs274 fixed onl
 
     const m350 = await gateFor('ddcs-expert-m350');
     const v41 = await gateFor('ddcs-v41');
+    const dm500 = await gateFor('ddcs-v3-dm500');
     const rs274 = await gateFor('rs274ngc');   // rs274 last → the screenshot shows partial gating (auto+sync greyed, fixed G54 live) + the G10 preview
     await page.evaluate(() => { const x = document.getElementById('w_x'); if (x) { x.checked = true; x.dispatchEvent(new Event('change', { bubbles: true })); } });   // refresh the preview under the active post
     await page.waitForTimeout(150);
     await page.locator('#wiz_wcs').screenshot({ path: 'scratchpad/wcs_gating.png' });
     // restore the default post ('auto') + M350 gating for other specs
     await page.evaluate(async () => { const { setActivePostId } = await import('/wizards/dialects/index.js'); const { applyPostGating } = await import('/ui/postGating.js'); setActivePostId('auto'); applyPostGating(); });
-    console.log('WCS GATING: M350=' + JSON.stringify(m350) + ' rs274=' + JSON.stringify(rs274) + ' v41=' + JSON.stringify(v41));
+    console.log('WCS GATING: M350=' + JSON.stringify(m350) + ' rs274=' + JSON.stringify(rs274) + ' v41=' + JSON.stringify(v41) + ' dm500=' + JSON.stringify(dm500));
 
     // M350 — everything on
     expect(m350.autoOptDisabled, 'M350: auto WCS enabled').toBe(false);
@@ -46,7 +47,11 @@ test('WCS form gates auto/WCS-number/sync per post (M350 all on; rs274 fixed onl
     expect(rs274.autoOptDisabled, 'rs274: auto WCS gated (M350-only)').toBe(true);
     expect(rs274.g54Disabled, 'rs274: fixed G54 enabled (G10 L20 P1)').toBe(false);
     expect(rs274.syncDisabled, 'rs274: sync gated (M350-only)').toBe(true);
-    // v41 — G92 ignores the WCS number: the whole picker inert + sync gated
-    expect(v41.sysDisabled, 'v41: the WCS picker is inert (G92 zeroes the active frame)').toBe(true);
+    // v41 — the active WORK registers (#1506+) are active-WCS-only: the whole picker inert + sync gated
+    expect(v41.sysDisabled, 'v41: the WCS picker is inert (#1506+ zeroes the active frame, no per-WCS index)').toBe(true);
     expect(v41.syncDisabled, 'v41: sync gated').toBe(true);
+    // dm500 — PER-WCS register (#804+): the WCS NUMBER is now MEANINGFUL → G54 enabled (gate dropped); auto+sync still gated
+    expect(dm500.autoOptDisabled, 'dm500: auto gated (M350-only)').toBe(true);
+    expect(dm500.g54Disabled, 'dm500: fixed G54 ENABLED — per-WCS #804 makes the number meaningful (gate dropped)').toBe(false);
+    expect(dm500.syncDisabled, 'dm500: sync gated').toBe(true);
 });

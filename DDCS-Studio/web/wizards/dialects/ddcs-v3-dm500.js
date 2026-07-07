@@ -19,7 +19,7 @@ export const dialect = {
     programModel: 'inline', probeModel: 'move-until-input', dwellUnits: 's',
     vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, atc: null, ax: AX },   // atc null: no confirmed tool-changer firmware model on the DM500
     caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false,
-        wcsAuto: false, wcsFixed: false, wcsSync: false },   // t475 — WCS via G92 (zeroes the ACTIVE frame, no register number); no slave-sync
+        wcsAuto: false, wcsFixed: true, wcsSync: false },   // t477 — WCS via PER-WCS register write #804+ (number MEANINGFUL → gate dropped); auto M350-only; no slave-sync
 
     // move-until-input: arm (M101) → feed move → disarm (M102). probe.nc:23-25.
     probeMove: (axis, dist, { feed = 100 } = {}) => ['M101', `G91 G01 ${axis}${dist} F${feed}`, 'M102'],
@@ -30,13 +30,18 @@ export const dialect = {
     // DM500 macros zero with G92 (defprobe.nc:21) — value is a WORK coord (plate thickness), NOT a machine coord
     // like Expert's register write. Cross-profile value semantics unresolved → VERIFY on hardware.
     setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}   ( set datum - VERIFY on hardware )`],
-    // WCS ZERO-AT-CURRENT (t475) — G92 per the advisor ruling + the existing setWorkOffset caveat. ⚠ FLAG (no DM500 dump):
-    // G92 is a TEMPORARY offset. DM500 IS register-based (wcsBase #804, DRO #864, active #455) — a persistent #804+ direct
-    // write (like M350) may be the correct WCS-zero. Auto/fixed-number/sync GATED off (G92 zeroes the active frame).
+    // WCS ZERO-AT-CURRENT (t477) — PER-WCS register write (offset = current DRO), M350-ANALOGOUS via DM500's OWN registers
+    // (wcsBase #804 stride 4, DRO #864, active #455). NOT G92 (temporary). PER-WCS → the WCS NUMBER is meaningful (gate
+    // dropped). ⚠ FLAG (INFERRED, NOT dump-confirmed): DM500's dumps show G92 (defprobe.nc) + a #400-series auto-datum
+    // (probe.nc) — NO #804-write macro; the offset=DRO form is inferred from the register layout. VERIFY on hardware.
     wcsZeroAtCurrent: (p = {}) => {
-        const axes = [p.axisX && 'X', p.axisY && 'Y', p.axisZ && 'Z'].filter(Boolean);
+        const sys = String(p.sys), auto = sys === '0', axes = [];
+        if (p.axisX) axes.push(0); if (p.axisY) axes.push(1); if (p.axisZ) axes.push(2);
         if (!axes.length) return ['( WCS zero: no axes selected )'];
-        return ['( WCS zero at current - G92 )', `G90 G92 ${axes.map((a) => a + '0').join(' ')}   ( set datum - VERIFY on hardware )`];
+        const L = ['( WCS zero at current - DM500 register write - VERIFY on hardware )'];
+        if (auto) { L.push('#150=#455', '#151=804+[#150-1]*4'); axes.forEach((o) => L.push(`#[#151+${o}]=#${864 + o}`)); }
+        else { const base = 804 + (parseInt(sys, 10) - 54) * 4; axes.forEach((o) => L.push(`#${base + o}=#${864 + o}`)); }
+        return L;
     },
     readActiveWcs: (varName) => [`${varName}=#455`],        // #455/#516 select coord system
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),

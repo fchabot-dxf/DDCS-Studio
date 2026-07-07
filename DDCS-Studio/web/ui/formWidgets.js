@@ -164,6 +164,7 @@ function toggleWidget(host, b) {
     lab.innerHTML = '<input type="checkbox"><span class="ddcs-slider"></span>';
     const cb = lab.querySelector('input');
     cb.checked = !!b.default;
+    cb.dataset.param = b.param;   // [data-param] parity with the other widgets — targetable for post-gating + form-read
     host.append(labelSpan(b), lab);
     // a bool binding commits true/false; a numeric param-block toggle commits 1/0 (it lands in a numeric socket).
     const numeric = b.type === 'number' || b.type === 'int';

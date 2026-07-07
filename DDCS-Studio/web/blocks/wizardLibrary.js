@@ -37,7 +37,7 @@ const GROUPS = [
 const BUILTINS = [
     { id: 'comm', type: 'comm', label: 'Comm / MDI', icon: '💬', group: 'setup' },
     { id: 'atc_warmup', type: 'atc_warmup', label: 'Warm-up', icon: '🔥', group: 'setup', opensAs: 'user_atc_warmup_data' },
-    { id: 'wcs', type: 'wcs', label: 'WCS / work offsets', icon: '⊕', group: 'probe' },
+    { id: 'wcs', type: 'wcs', label: 'WCS / work offsets', icon: '⊕', group: 'probe', opensAs: 'user_wcs_data' },   // t477 E1 — IN-PLACE: the WCS slot opens the twin (dialect-aware wcszero atom); built-in wcsView stays the legacy shim
     { id: 'homing', type: 'homing', label: 'Homing', icon: '⌖', group: 'probe' },
     // t339 E4 — IN-PLACE SWAP: the built-in Corner/Edge/Middle KEEP their Probe slot (label/icon/group), but `opensAs` re-points
     // the click to the data-op TWIN (userOpView) — the user sees "Corner"/"Edge"/"Middle" WHERE IT ALWAYS WAS, now data-op-backed

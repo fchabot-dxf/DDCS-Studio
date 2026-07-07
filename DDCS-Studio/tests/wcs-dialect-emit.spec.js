@@ -42,11 +42,16 @@ test('M350 byte-identical (ZERO) + non-M350 the correct per-dialect WCS-set', as
 
     expect(r.cases).toBe(48);
     expect(r.m350Diffs, 'M350 emit is BYTE-IDENTICAL to the pre-restructure golden across the sweep (ZERO)').toBe(0);
-    // non-M350 correctness: the dialect's WCS-set, NOT the M350-hardcoded #880
+    // non-M350 correctness: the dialect's PERSISTENT WCS-set, NOT the M350-hardcoded #880 and NOT the temporary G92
     expect(r.after['rs274ngc'], 'rs274 emits G10 L20').toContain('G10 L20 P1 X0 Y0');
     expect(r.after['rs274ngc'].includes('#880'), 'rs274 no longer leaks the M350 DRO #880').toBe(false);
     expect(r.after['grbl'], 'grbl emits G10 L20').toContain('G10 L20 P1 X0 Y0');
-    expect(r.after['ddcs-v41'], 'v41 emits G90 G92').toContain('G90 G92 X0 Y0');
+    // v41 — the persistent active WORK registers (#1506-1509=0), grounded in zeroxy/zeroall; NOT G92, NOT #880
+    expect(r.after['ddcs-v41'], 'v41 zeroes the active work registers #1506/#1507').toContain('#1506=0');
+    expect(r.after['ddcs-v41'], 'v41 #1507=0').toContain('#1507=0');
+    expect(r.after['ddcs-v41'].includes('G92'), 'v41 no longer uses the temporary G92').toBe(false);
     expect(r.after['ddcs-v41'].includes('#880'), 'v41 no longer leaks the M350 DRO #880').toBe(false);
-    expect(r.after['ddcs-v3-dm500'], 'dm500 emits G90 G92 + the verify note').toContain('G90 G92 X0 Y0   ( set datum - VERIFY on hardware )');
+    // dm500 — the persistent PER-WCS register write (#804=#864, offset = DRO), M350-analogous; NOT G92
+    expect(r.after['ddcs-v3-dm500'], 'dm500 writes the per-WCS register #804 = the DRO #864').toContain('#804=#864');
+    expect(r.after['ddcs-v3-dm500'].includes('G92'), 'dm500 no longer uses the temporary G92').toBe(false);
 });

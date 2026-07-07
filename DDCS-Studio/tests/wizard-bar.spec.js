@@ -46,10 +46,10 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(bar.center.map((g) => g.label)).toEqual(['Probe', 'ATC', 'Mill']);
   const probe = bar.center[0], atc = bar.center[1], mill = bar.center[2];
 
-  // Probe: WCS uses the generic openWiz; Corner/Edge/Middle/Align open the data-op TWIN in-place (opensAs — the probe
-  // fan-out is complete, t437); the "Rotary" sub-label divider survives.
+  // Probe: WCS/Corner/Edge/Middle/Align all open the data-op TWIN in-place (opensAs — WCS joined the fan-out at t477 as a
+  // dialect-aware static twin); the "Rotary" sub-label divider survives.
   const probeBy = Object.fromEntries(probe.items.map((i) => [i.text.replace(/\s+/g, ' '), i.onclick]));
-  expect(probe.items[0].onclick).toBe("openWiz && openWiz('wcs')");
+  expect(probe.items[0].onclick).toBe("openWiz && openWiz('user_wcs_data')");   // t477 — WCS opens its twin in-place
   // t339 E4 — IN-PLACE SWAP: the built-in Corner + Edge + Middle KEEP their Probe slots but `opensAs` opens the data-op TWIN
   // (openWiz('user_*_data') → userOpView); the built-in menu openers retire (no openCornerWiz/openEdgeWiz/openMiddleWiz); NO separate Data Wiz entry.
   const cornerItem = probe.items.find((i) => /Corner/.test(i.text));

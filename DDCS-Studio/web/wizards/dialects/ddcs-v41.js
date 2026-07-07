@@ -15,7 +15,7 @@ export const dialect = {
     // dro = machine pos #1500-1503; wcsWork = workpiece pos #1506-1509 (what zero*.nc writes); toolTable #1560/#764.
     vars: { dro: 1500, wcsWork: 1506, probeStatus: null, probeTrig: 1500, wcsBase: 1512, wcsStride: 6, activeWcs: null, toolTable: 1560, atc: null, ax: AX },   // atc null: the #1300/#1330 ATC firmware tables are unmapped on V4.1 (the dump shows them as generic "system parameter area")
     caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false,
-        wcsAuto: false, wcsFixed: false, wcsSync: false },   // t475 — WCS via G92 (zeroes the ACTIVE frame, no register number); no active-WCS var; no slave-sync
+        wcsAuto: false, wcsFixed: false, wcsSync: false },   // t477 — WCS via #1506-1509 (ACTIVE work registers, no per-WCS index → number gated); no active-WCS var; no slave-sync
 
     // G91 G31 Z-1000 L#682 Q1 K0 F#106  (probe-float.nc, live). L#682 = probe-selector config param; no P-port word.
     probeMove: (axis, dist, { feed = 100 } = {}) => [`G31 ${axis}${dist} L#682 Q1 K0 F${feed}`],
@@ -26,14 +26,15 @@ export const dialect = {
     // CONFIRMED live (probe-vertex.nc): zero at the probed point with G90 G92 <axis><WORK value> — a work coord,
     // NOT a machine coord like Expert's register write. ("zero here" macros zeroz/zeroxy write #1506-1509 directly.)
     setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}`],
-    // WCS ZERO-AT-CURRENT (t475) — G92 per the advisor ruling. ⚠ FLAG (no V4.1 dump): G92 is a TEMPORARY offset, NOT a
-    // persistent WCS zero. V4.1's OWN "zero here" macros (zeroxy/zeroz) write #1506-1509 DIRECTLY (line 26) — a persistent
-    // register write, consistent with M350's #805+. So the more-grounded persistent form is #1506+ direct writes, not G92.
-    // Auto/fixed-number/sync are GATED off (post-gating): G92 zeroes the active frame regardless of WCS number.
+    // WCS ZERO-AT-CURRENT (t477) — write the active WORK registers to 0 (PERSISTENT), GROUNDED in V4.1's OWN macros:
+    // zeroxy.nc = `#1506=0 #1507=0`, zeroall.nc adds `#1508=0 #1509=0` (X/Y/Z/A = #1506+off). NOT G92 (that's a temporary
+    // offset). ACTIVE-WCS-ONLY: #1506-1509 are the active work registers, no per-WCS index (activeWcs is null) → the WCS
+    // number + auto + sync are GATED off in the form (post-gating). A persistent, dump-grounded correctness fix.
     wcsZeroAtCurrent: (p = {}) => {
-        const axes = [p.axisX && 'X', p.axisY && 'Y', p.axisZ && 'Z'].filter(Boolean);
+        const axes = [];
+        if (p.axisX) axes.push(0); if (p.axisY) axes.push(1); if (p.axisZ) axes.push(2);
         if (!axes.length) return ['( WCS zero: no axes selected )'];
-        return ['( WCS zero at current - G92 )', `G90 G92 ${axes.map((a) => a + '0').join(' ')}`];
+        return ['( WCS zero at current - V4.1 work registers )', ...axes.map((o) => `#${1506 + o}=0`)];
     },
     readActiveWcs: () => [],                                 // TO CONFIRM
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
