@@ -117,6 +117,9 @@ export const homingView = {
         if (ctx && ctx.preview3D) {
             ctx.preview3D(wizard.simProxy(params), 'homingVizContainer', null, null);
             if (ctx.previewMachine) ctx.previewMachine('homingVizContainer', true);
+            // t497 — the homing tool homes in MACHINE coords (no workpiece), so render it in the machine frame: it must
+            // draw at the envelope TOP even with a stock shown, not stock-floor-shifted to the bottom (the watched plunge).
+            if (ctx.previewToolMachineFrame) ctx.previewToolMachineFrame('homingVizContainer', true);
             // H4 — the home/limit switch DEVICES at each fitted home edge; they light/plunge live as the sim homes each axis.
             if (ctx.previewLimitSwitches) ctx.previewLimitSwitches('homingVizContainer', homingEdges(settings));
         }

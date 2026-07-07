@@ -181,6 +181,7 @@ export function createPreviewPanel(container, opts = {}) {
     // loaded, warmup/drawbar with no motion, the parameter-write table). Set by the host via setForceMachine().
     let forceMachine = false;
     let rotaryFixture = false;   // host hint: show the 4th-axis rig (rotary probe ops). Applied to the lazy viz on create + on toggle.
+    let machineFrameTool = false;   // t497 host hint: render the live tool in the MACHINE frame (homing — no stock shift). Re-applied on lazy viz create.
     // P-C.1b: the FIRMWARE ATC tool-swap context. atcChoreo (the push choreography) + atcStation (its region) are armed
     // by the atc_change firmware view; during play we watch #1300 and, on a REAL tool change (a program T#/M6), retire
     // the OLD tool to the station + put the NEW tool on the spindle. lastTool tracks the previous #1300 (the FIRST value
@@ -295,6 +296,7 @@ export function createPreviewPanel(container, opts = {}) {
             setGcode(); replayFromStart();
         };
         if (viz && rotaryFixture && viz.setRotaryFixture) viz.setRotaryFixture(true);   // persist the rig hint across lazy viz creation
+        if (viz && machineFrameTool && viz.setToolMachineFrame) viz.setToolMachineFrame(true);   // t497 — persist the machine-frame tool hint (homing) across lazy viz creation
         return viz;
     }
 
@@ -612,6 +614,10 @@ export function createPreviewPanel(container, opts = {}) {
         lastTool = null; if (viz && viz.showRetiredTool) viz.showRetiredTool(null);   // P-C.1b: fresh run re-arms the tool-swap watch + clears any retired tool
         if (viz && viz.setStationDevice) { viz.setStationDevice('pusher', false); viz.setStationDevice('pin', false); viz.setStationDevice('collet', false); }   // P-C.2b/3a: devices to rest before the sequence re-animates them
         if (viz && viz.setLimitSwitchDevice && limitEdges) for (const ed of limitEdges) viz.setLimitSwitchDevice(ed.edge, false);   // H4: home/limit switches to rest — the run re-trips them via io_change
+        // t497 — seat a MACHINE-FRAME tool (homing) at the start BEFORE the run, so it renders at the top even before the
+        // engine's first onPositionChange (a seek-to-home is a no-move → wouldn't fire it, leaving the tool at the shifted
+        // build spot). The engine then drives it from here.
+        if (viz && machineFrameTool && viz.setToolPosition) viz.setToolPosition(getStartPos() || { x: 0, y: 0, z: 0 });
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
         updateRunBtn();
@@ -755,6 +761,16 @@ export function createPreviewPanel(container, opts = {}) {
         buildDro();   // DRO gains/loses the A/B rows with the rotary rig
     }
 
+    // Host hint: render the live tool in the MACHINE frame (homing — the tool homes in machine coords, no workpiece, so
+    // it must NOT ride the stock-floor part-frame shift). Symmetric with setRotaryFixture — stores the flag so it
+    // survives lazy viz creation (ensureViz re-applies it) and applies straight away if the viz exists. t497.
+    function setToolMachineFrame(on) {
+        on = !!on;
+        if (on === machineFrameTool) return;
+        machineFrameTool = on;
+        if (viz && viz.setToolMachineFrame) viz.setToolMachineFrame(on);
+    }
+
     // Arm the ATC tool-swap + device animation for this op. A 'push' (firmware) or 'pick-place' (generic/disk)
     // choreography arms it; anything else disarms. The swap fires from checkToolSwap (below) on the #1300 flip.
     function setAtcSwap(choreo, region) {
@@ -847,7 +863,7 @@ export function createPreviewPanel(container, opts = {}) {
         }
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
         getAnchor: () => curAnchor,                                                       // t309 — the anchored/absolute frame flag (feed the overlay so its path frame matches)
         onToolPos: (cb) => { if (typeof cb === 'function') toolPosSubs.push(cb); return () => { toolPosSubs = toolPosSubs.filter((f) => f !== cb); }; },   // t309 — subscribe to the live engine head (fires in ANY mode); returns an unsubscribe

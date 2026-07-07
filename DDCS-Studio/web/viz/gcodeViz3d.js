@@ -577,7 +577,14 @@ export class GcodeViz3D {
         // passAnchorFor → the previous pass's RUNTIME END for a flagged pass (t107), else self (non-corner / manual / pass 0).
         const o = this._anchorToStart ? (passAnchorFor(this.starts, this._passEnds, pass) || this.starts[pass] || { x: 0, y: 0, z: 0 }) : { x: 0, y: 0, z: 0 };
         const doff = this._probeXYOff();   // t363 — map the live tool onto the datum-placed stock (physical − datum)
-        this._animTool.position.set((pos.x || 0) + o.x - doff.x, (pos.y || 0) + o.y - doff.y, (pos.z || 0) + o.z);
+        // t497 — MACHINE-FRAME tool (homing): the tool homes in raw MACHINE coords (no workpiece), so it must NOT ride the
+        // stock-floor part-frame shift — else with a stock shown it renders ~stockFloor too LOW (near the envelope bottom)
+        // = the "plunge" the operator watches while the engine + emit are correct. Subtract the part-frame shift so the
+        // animTool's WORLD position lands at the raw machine coord (= engine.pos). The STOCK still rides the shifted frame
+        // (right for cutting ops). Off (default) → the normal part-frame tool.
+        const sh = this._toolMachineFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };
+        this._lastToolPos = pos;
+        this._animTool.position.set((pos.x || 0) + o.x - doff.x - sh.x, (pos.y || 0) + o.y - doff.y - sh.y, (pos.z || 0) + o.z - sh.z);
         // Engine-driven trail: bold the executed route up to the tool head (option B — what you see is the path
         // the engine actually ran). Enable trail mode lazily; setAnimate(false)/ddcsStopPreview restores it.
         if (this._trailLine && this._animSegs && this._animSegs.length) {
@@ -585,6 +592,26 @@ export class GcodeViz3D {
             this._updateTrailTip(this._animTool.position);
         }
         this.render();
+    }
+
+    /** t497 — render the live tool in the MACHINE frame (raw machine coords), ignoring the stock-floor part-frame shift.
+     *  For the HOMING preview: the tool homes in machine coords with no workpiece, so it must draw at the envelope top,
+     *  not stock-floor-shifted to the bottom. Cutting ops leave this off (the tool rides the stock-placed part frame). */
+    setToolMachineFrame(on) {
+        on = !!on;
+        if (on === !!this._toolMachineFrame) return;
+        this._toolMachineFrame = on;
+        // Re-place the tool in the new frame NOW (before any run) so the STATIC pre-play tool also sits at the machine
+        // frame — else the built tool renders at the stock-shifted spot (local 0 → world = partShift) until the engine's
+        // first move. Build it if needed + place at the last pos (default machine-0/home).
+        if (on) { this._ensureAnimTool(); this.setToolPosition(this._lastToolPos || { x: 0, y: 0, z: 0 }); }
+        else if (this._animTool) this.setToolPosition(this._lastToolPos || { x: 0, y: 0, z: 0 });
+    }
+
+    // t497 — re-place a MACHINE-FRAME tool after the part-frame shift changes (setStock/setMachine), so its world position
+    // re-compensates for the new shift and stays at raw machine coords (else it drifts to the stock-shifted spot).
+    _reapplyMachineTool() {
+        if (this._toolMachineFrame && this._animTool) this.setToolPosition(this._lastToolPos || { x: 0, y: 0, z: 0 });
     }
 
     // Grow the bold trail so its tip sits EXACTLY on the tool head, drawing a partial current segment instead of
@@ -1177,6 +1204,7 @@ export class GcodeViz3D {
             // per-stock bed. So nothing extra to draw here.
         }
         this.partFrame.update(this._partShift());   // stock pin / WCS may have changed → re-place op+stock at the stock's WCS
+        this._reapplyMachineTool();   // t497 — the shift changed → re-compensate a machine-frame (homing) tool so it stays at machine coords
         if (this._jogA) this._applyPartRotation(this._jogA, 0);   // keep a manual A jog after a stock rebuild (set above to rest)
         // t419 E4 — RE-DERIVE the rig (a decoupled sim-device) from the possibly-changed stock; a CHILD of _partGroup (built
         // AFTER the A-jog re-apply → inherits the spin + the datum/WCS placement). Only when the rig is on (setStock's no-render
@@ -1390,6 +1418,7 @@ export class GcodeViz3D {
         const THREE = this.THREE;
         this._machine = machine || null;
         this.partFrame.update(this._partShift());   // op + stock ride the STOCK's WCS (machine view); else part-zero at scene 0
+        this._reapplyMachineTool();   // t497 — the shift changed → re-compensate a machine-frame (homing) tool so it stays at machine coords
         if (this.machineBox) { this.scene.remove(this.machineBox); this.machineBox.geometry.dispose(); this.machineBox.material.dispose(); this.machineBox = null; }
         if (this.machineAxes) { this.scene.remove(this.machineAxes); if (this.machineAxes.geometry) this.machineAxes.geometry.dispose(); if (this.machineAxes.material) this.machineAxes.material.dispose(); this.machineAxes = null; }
         const sx = machine ? machine.x : 0, sy = machine ? machine.y : 0, sz = machine ? machine.z : 0;

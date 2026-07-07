@@ -533,6 +533,17 @@ export class WizardManager {
         if (panel && panel.setForceMachine) panel.setForceMachine(on !== false);
     }
 
+    // Render the live tool in the MACHINE frame (raw machine coords), ignoring the stock-floor part-frame shift (t497).
+    // For HOMING: the tool homes in machine coords with no workpiece, so it must draw at the envelope top even when a
+    // stock is shown — else it renders stock-floor-shifted to the bottom (the "plunge" the operator watches). Opt-in
+    // (the Homing wizard) — call AFTER preview3D. VISUAL only; cutting ops leave it off (the tool rides the part frame).
+    previewToolMachineFrame(containerId, on) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const panel = host && host.__panel;
+        if (panel && panel.setToolMachineFrame) panel.setToolMachineFrame(on !== false);   // panel-stored → survives lazy viz creation
+    }
+
     // Draw the ATC magazine (pockets + tool stubs) in the 3D preview on the machine envelope. Opt-in (ATC wizards
     // only) — call AFTER preview3D so the panel/viz exists. pockets = [{x,y,z,dia,length,pocket,tool,color}].
     previewMagazine(containerId, pockets) {
