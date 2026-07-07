@@ -1103,11 +1103,8 @@ export class GcodeViz3D {
         pg.rotation.set(0, 0, 0); // at rest; the play loop re-applies the angle each frame
         if (this.stockMesh) { pg.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
         if (this.stockEdges) { pg.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
-        if (this._rotaryFixture) {   // dark chuck + tailstock "4th-axis" rig (purely visual) — rebuilt below for any shown stock when the rig is on
-            pg.remove(this._rotaryFixture);
-            this._rotaryFixture.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
-            this._rotaryFixture = null;
-        }
+        // t419 E4 — the 4th-axis rig (chuck + tailstock) is a DECOUPLED sim-device now: its lifecycle moved OUT of setStock into
+        // setRotaryRig (mirrors setMagazine), re-derived from the new stock at the END of setStock (still a CHILD of _partGroup).
         if (stock && stock.show && stock.x > 0 && stock.y > 0 && stock.z > 0) {
             // M2 — INSIDE cavities come from the workpiece features[] (declared, or a derived legacy pocket), rendered at
             // their datum-relative offset. A legacy pocket derives the SAME centred 25% cavity → byte-identical.
@@ -1180,23 +1177,40 @@ export class GcodeViz3D {
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
             this.stockEdges = edges; pg.add(edges);
-            // The 4th-axis rig (chuck + tailstock) is a SEPARATE op-specific overlay (opt-in, like ATC's magazine),
-            // INDEPENDENT of the stock SHAPE — so it frames a round bar OR a rectangular part on the rotary axis
-            // (e.g. the rotary clock clocks a flat on a box). pg origin is the stock centre, so place() aligns either way.
-            if (this._showRotaryFixture) {
-                const fAxis = Object.values(getRotaryAxes())[0] || 'x';
-                const fd = { x: stock.x, y: stock.y, z: stock.z };
-                const fCross = fAxis === 'x' ? [fd.y, fd.z] : fAxis === 'y' ? [fd.x, fd.z] : [fd.x, fd.y];
-                // round bar = the inscribed Ø (min cross); a box = the larger cross so the chuck/jaws wrap the part.
-                const fr = (stock.shape === 'cylinder' ? Math.min(fCross[0], fCross[1]) : Math.max(fCross[0], fCross[1])) / 2;
-                // round bar → 3-jaw self-centring; rectangular part → 4-jaw independent on the flat faces (cu/cv).
-                this._buildRotaryFixture(pg, fAxis, fr, fd[fAxis] / 2, { jaws: stock.shape === 'cylinder' ? 3 : 4, cu: fCross[0], cv: fCross[1] });
-            }
             // The table the stock rests on is the GRID floor (a fixed machine-frame surface — see _layoutGrid), not a
             // per-stock bed. So nothing extra to draw here.
         }
         this.partFrame.update(this._partShift());   // stock pin / WCS may have changed → re-place op+stock at the stock's WCS
         if (this._jogA) this._applyPartRotation(this._jogA, 0);   // keep a manual A jog after a stock rebuild (set above to rest)
+        // t419 E4 — RE-DERIVE the rig (a decoupled sim-device) from the possibly-changed stock; a CHILD of _partGroup (built
+        // AFTER the A-jog re-apply → inherits the spin + the datum/WCS placement). Only when the rig is on (setStock's no-render
+        // contract for the stock modal — _showRotaryFixture is false there — stays intact).
+        if (this._showRotaryFixture) this.setRotaryRig(this._rotaryRigSpec());
+    }
+
+    /** t419 E4 — the rig SPEC derived from the current stock (the byte-identical extract of the old inline setStock logic):
+     *  {axis, r, L, jaws, cu, cv}. round bar → the inscribed Ø (min cross) + 3-jaw; a box → the larger cross + 4-jaw. null = no bar. */
+    _rotaryRigSpec() {
+        const stock = this._stock;
+        if (!stock || !(stock.show && stock.x > 0 && stock.y > 0 && stock.z > 0)) return null;
+        const axis = Object.values(getRotaryAxes())[0] || 'x';
+        const fd = { x: stock.x, y: stock.y, z: stock.z };
+        const cross = axis === 'x' ? [fd.y, fd.z] : axis === 'y' ? [fd.x, fd.z] : [fd.x, fd.y];
+        const r = (stock.shape === 'cylinder' ? Math.min(cross[0], cross[1]) : Math.max(cross[0], cross[1])) / 2;
+        return { axis, r, L: fd[axis] / 2, jaws: stock.shape === 'cylinder' ? 3 : 4, cu: cross[0], cv: cross[1] };
+    }
+
+    /** t419 E4 — the DECOUPLED rotary rig sim-device (mirrors setMagazine's dispose/guard/build shape) — BUT the rig group
+     *  is a CHILD of _partGroup (NOT this.scene like the magazine), so it inherits the part SPIN (_applyPartRotation) + the
+     *  datum/WCS placement (pg.position). spec (from _rotaryRigSpec) → build; null → just dispose. Sim-only (no emit). */
+    setRotaryRig(spec) {
+        if (this._rotaryFixture) {
+            if (this._partGroup) this._partGroup.remove(this._rotaryFixture);
+            this._rotaryFixture.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((mm) => mm.dispose && mm.dispose()); });
+            this._rotaryFixture = null;
+        }
+        if (!spec || !this._partGroup) return;
+        this._buildRotaryFixture(this._partGroup, spec.axis, spec.r, spec.L, { jaws: spec.jaws, cu: spec.cu, cv: spec.cv });   // adds to _partGroup + sets this._rotaryFixture
     }
 
     /**
@@ -1260,10 +1274,10 @@ export class GcodeViz3D {
      *  Only the rotary probe wizards turn this on (mirrors setMagazine for ATC), so it never appears elsewhere. */
     setRotaryFixture(on) {
         on = !!on;
-        this._showRotaryJog(on);   // rotary op → reveal the manual A± jog row (hidden for non-rotary ops)
+        this._showRotaryJog(on);   // rotary op → reveal the manual A± jog row (hidden for non-rotary ops) — UI, orthogonal to the mesh
         if (on === this._showRotaryFixture) return;
         this._showRotaryFixture = on;
-        if (this._stock) this.setStock(this._stock);   // rebuild the stock so the rig appears/disappears
+        this.setRotaryRig(on ? this._rotaryRigSpec() : null);   // t419 E4 — just the rig (a decoupled sim-device), NOT a full setStock rebuild
     }
 
     /** Show/hide the manual A-axis jog row in the jog pendant. Only rotary ops (which set the 4th-axis fixture)
