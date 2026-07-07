@@ -7143,3 +7143,24 @@ HIGHLIGHT the involved pockets: reused `highlightStation(region, label)` (added 
 **THE FIX (GATE — for advisor review, NOT done):** flip the seek Auto direction to seek TOWARD machine-0 (−tSign, opposite the travel sign) — the correct home-seek. This is a byte-identity-breaking EMIT change = the planned "G31-HOMING-OUTPUT" task; the exploration confirms it IS the human's bug. Ground the direction + #612 semantics vs the O501 dump as noted. (Also consider: the seek dir override's '+'/'-' semantics vs the declared envelope sign — same one-source principle as e3aa337.)
 
 **NO code changed this turn-b** (2 throwaway repro specs removed). PASSED BACK the map + culprit + root cause + version note as a GATE.
+
+## 🔨 turn 495 (cycle 223) — HOMING PLUNGE = a PREVIEW RENDER bug (NOT the direction), root-caused in the REAL app (GATE, no fix per the amendments). The homing LOGIC is correct (engine homes Z to the top); the RENDERED tool draws ~95mm too low (near the envelope bottom) when a STOCK is shown — that is the plunge the human WATCHES. The seek-G31 direction fix (a separate real bug) was implemented+verified then REVERTED/PARKED per the amendments. Tree back to clean HEAD (7458548).
+
+**AMENDMENTS (mid-turn, SUPERSEDING the seek task):** the human is on Live Server, NATIVE method, WATCHING the 3D preview (NOT pressing Play), and Z PLUNGES; their code preview shows M98P501 (native). DROP stale-cache entirely. My map claimed native preview = Z0 CORRECT → it does NOT match the real app. STOP unit-test repros (homingSimProxy→Z0); DRIVE THE REAL APP + observe the animated preview's rendered Z. GATE: reproduce + report the real path + cause, do NOT fix. The wizard-outputs-G31 want is PARKED.
+
+**DROVE THE REAL APP (playwright, the human's config: machine.z=-120, X=600, Y=-600, native, order Z→X→Y; sampled the ANIMATED rendered tool `viz._animTool` world Z vs `engine.pos.z` vs `partFrame.shift.z`):**
+| | engine.pos.z (logic) | RENDERED worldZ (what the human sees) | partShift.z | stockFloor |
+|---|---|---|---|---|
+| STOCK HIDDEN | −5 … 0 ✅ (homes to the TOP) | −5 … 0 ✅ | 0 | null |
+| **STOCK SHOWN** | −5 … 0 ✅ (homes to the TOP) | **−100 ❌ PLUNGE (near the bottom)** | **−95** | −25 |
+
+**ROOT CAUSE (the REAL path — NOT the direction):** the homing LOGIC is CORRECT — the engine homes Z to machine-0/top (pos −5) in every case (native/preview, any dir). The PLUNGE is a VIZ RENDER bug: `gcodeViz3d._partShift` (z ≈ 1382) shifts the part frame down by `tableFloor − _stockFloorZ` (−120 − (−25) = −95) WHENEVER a stock is shown, and the homing tool rides that shifted part frame — so the RENDERED tool draws ~95 mm below its true machine position, near the envelope BOTTOM. Homing is a MACHINE-FRAME op (the tool homes in machine coords, no workpiece); it must NOT be stock-floor-shifted. The human has a workpiece shown → the homing tool renders at the bottom → the "plunge" they WATCH, even though the code (native M98) + the engine are correct. Confirmed by isolation: stock HIDDEN → rendered worldZ = −5 (correct/top); stock SHOWN → −100 (bottom). NOT the direction (e3aa337 already homes to the top), NOT the emitted-exec (they watch, not play), NOT stale-cache.
+
+**THE SEEK-G31 FIX (a SEPARATE real bug — the emitted seek EXEC plunged to −20000; NOT the human's live bug) — implemented + verified (779 green) then REVERTED/PARKED per the amendments. Documented for re-application:**
+- homingWizard seek (line ~137): `const dir = -tSign` (seek TOWARD machine-0, the declared envelope sign; was +tSign → the far end); #612 fallback when tSign=0. Grounded vs O501 (slib-g.nc: seek signed by #612, G31 P-word = the limit port #[1045+N*3]).
+- GcodeExecutionEngine G31 handler: an ENVELOPE clamp gated to `!this.stock` (homing) — a seek toward an edge stops AT it, a back-off that starts on a switch releases ~there (te>=0 so an on-edge move clamps to a no-op); `import { axisSpan }`. Result: the seek exec homes Z to −5 (top), not −20000.
+- homing-dir-override.spec: seek emit → toward machine-0 regardless of dir; NEW homing-seek-g31.spec (5 tests). ALL reverted this turn (parked).
+
+**GATE — NO fix committed.** The FIX (parked, for the advisor's call): the homing preview must render the tool at its MACHINE position (not the stock-floor-shifted part frame) — a viz-frame fix in `_partShift`/the homing tool placement, independent of the (already-correct) homing direction.
+
+**FILES:** none changed (tree reverted to clean HEAD 7458548; 3 throwaway repro specs removed). PASSED BACK the render root cause + before/after as a GATE.
