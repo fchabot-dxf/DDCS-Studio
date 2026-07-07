@@ -17,7 +17,8 @@ import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveProfile().id) }; } catch (_) { return {}; } };
 import { builderOf, makeOp, _framed, _builderAtoms } from './opBuilders.js';   // the BUILDERS leaf (federated resolver)
-import { flattenBlocks } from './userOps.js';   // ONE pre-order walk shared with devMode (group writeback indexes it)
+import { flattenBlocks, listUserOps } from './userOps.js';   // ONE pre-order walk shared with devMode (group writeback indexes it); listUserOps → seed knob _expose from a data-op's bindings
+import { FN } from './blockly/bridge.js';   // t391 — the Blockly field name (uppercased) for the _expose knob key
 import { regionParamsFromDesc } from '../wizards/pocketWizard.js';
 import { resolveMethod } from '../wizards/atcModel.js';   // fix B: resolve method (incl. legacy mode/magType) for the declared-param reconcile fallback
 import { regionDesc } from '../wizards/ops/region.js';
@@ -362,8 +363,33 @@ export function buildActiveOpStack() {
     const start = framed.find((b) => b && b.type === 'progstart');
     const end = framed.find((b) => b && b.type === 'progend');
     const bare = framed.filter((b) => b && b.type !== 'progstart' && b.type !== 'progend');
+    seedKnobExpose(op.type, bare);   // t391 — a data-op's BOUND params show as PRE-TICKED knobs in the Blocks tab (a binding IS a knob)
     const opC = makeOp(op.type, op.params, bare);   // wrap so the Blocks view shows the op as one group (round-trips)
     return { blocks: (start && end) ? [start, opC, end] : [opC] };
+}
+
+// t391 (human "do knob, it helps me troubleshoot to use Blocks") — SEED `_expose` on a USER op's value-bound atoms so the
+// Blocks tab renders them PRE-TICKED as knobs (a form binding IS a knob — same record). Maps each VALUE binding to its atom by
+// macro-var IDENTITY (bindingSpecs.match.var, robust across prune state) or the frozen blockIndex (legacy ops); sets the atom's
+// `_expose` = { VALUE: { p:param, w:'number' } }, which round-trips via stackBridge (record._expose → block.data) → devMode's
+// augment/restoreExpose ticks the EXPOSE checkbox. ONLY plain-number sockets (a `#var`/expression is skipped — not a knob).
+// Display/provenance-only: no emit change (the _expose rides block.data, never the G-code). Built-in ops / non-user → no-op.
+function seedKnobExpose(opType, bare) {
+    if (!opType || !String(opType).startsWith('user_')) return;
+    const def = listUserOps().find((d) => d.opType === opType);
+    if (!def) return;
+    const specs = def.bindingSpecs
+        ? def.bindingSpecs.filter((s) => s && s.match && s.match.var && s.key).map((s) => ({ param: s.param, var: s.match.var, key: s.key }))
+        : (def.bindings || []).filter((b) => b && b.blockIndex != null && b.key != null).map((b) => ({ param: b.param, blockIndex: b.blockIndex, key: b.key }));
+    if (!specs.length) return;
+    const flat = flattenBlocks(bare);
+    for (const s of specs) {
+        const rec = (s.var != null)
+            ? flat.find((r) => r && r.type === 'assign' && r.params && String(r.params.var) === String(s.var))
+            : flat[s.blockIndex];
+        if (!rec || !rec.params || typeof rec.params[s.key] !== 'number') continue;   // only a plain-number socket is an exposable knob
+        (rec._expose = rec._expose || {})[FN(s.key)] = { p: s.param, w: 'number' };
+    }
 }
 
 /** Seed the Blocks model from the active wizard op — a PREVIEW (not committed into the program), used when the tab
