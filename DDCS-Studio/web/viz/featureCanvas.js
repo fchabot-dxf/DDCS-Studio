@@ -227,10 +227,11 @@ export class FeatureCanvas {
      *  in the build frame); the stock + its attach markers do NOT (they're already in part coords). */
     _disp(x, y) { const p = this._placement || { x: 0, y: 0 }; return this._S(x + (p.x || 0), y + (p.y || 0)); }
 
-    /** A small "↓Nmm" tag at a cavity's centre (world x,y) — the 2D reflection of a DECLARED pocket floor depth. */
+    /** A small "↓Nmm" tag near a cavity's centre — the 2D reflection of a DECLARED pocket floor depth. OFFSET DOWN in
+     *  SCREEN space (constant px, zoom-independent) so it clears the origin drag HANDLE that sits at the cavity centre. */
     _featureDepthLabel(items, wx, wy, depth) {
         const c = this._disp(wx, wy);
-        const t = svgEl('text', { x: c.x, y: c.y, 'text-anchor': 'middle', 'dominant-baseline': 'central', style: 'fill:#bcd0ea; font-size:10px; pointer-events:none;' });
+        const t = svgEl('text', { x: c.x, y: c.y + 15, 'text-anchor': 'middle', 'dominant-baseline': 'central', style: 'fill:#bcd0ea; font-size:10px; paint-order:stroke; stroke:#0d0f14; stroke-width:2px; pointer-events:none;' });
         t.textContent = '↓' + r3(depth) + 'mm';
         items.appendChild(t);
     }

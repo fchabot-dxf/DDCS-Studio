@@ -16,11 +16,11 @@ test('3D floor: an inside cavity with a declared depth gets a floor at top − d
         let viz; try { viz = new GcodeViz3D(host); viz._animOn = false; } catch (e) { return { err: String(e) }; }
         const stock = (depth) => ({ x: 100, y: 80, z: 20, show: true, shape: 'pocket', datum: 'nnp',
             features: [{ id: 'p', shape: 'rect', side: 'inside', pos: { x: 50, y: 40 }, size: { x: 40, y: 30 }, depth }] });
-        viz.setStock(stock(8));    // depth 8 < 20 → a floor
-        const floored = { floors: (viz._pocketFloors || []).map((f) => ({ depth: f.depth, floorZ: f.floorZ })), top: viz._stockTopZ };
-        viz.setStock(stock(20));   // depth 20 == Z → full-through (no floor)
-        const thru = { floors: (viz._pocketFloors || []).length };
-        return { floored, thru };
+        viz.setStock(stock(8));    // depth 8 < 20 → a floor + walls recessing only to −8
+        const floored = { floors: (viz._pocketFloors || []).map((f) => ({ depth: f.depth, floorZ: f.floorZ })), top: viz._stockTopZ, wallDepth: viz._pocketWallDepthZ };
+        viz.setStock(stock(20));   // depth 20 == Z → full-through (walls full-Z, no floor)
+        const thru = { floors: (viz._pocketFloors || []).length, wallDepth: viz._pocketWallDepthZ };
+        return { floored, thru, Z: 20 };
     });
     console.log('POCKET FLOOR: ' + JSON.stringify(r));
     expect(r.err, 'the 3D viz instantiated').toBeUndefined();
@@ -28,7 +28,10 @@ test('3D floor: an inside cavity with a declared depth gets a floor at top − d
     expect(r.floored.floors[0].depth, 'the floor carries the declared depth').toBe(8);
     // the CORE assertion (independent geometric truth): floor-Z == stock top − depth
     expect(r.floored.top - r.floored.floors[0].floorZ, 'floor-Z == top − depth (a real bottom at the cut depth)').toBeCloseTo(8, 5);
+    // BUG C — the WALLS END at the floor: the cavity wall Z-extent == depth (NOT full-Z). A through-hole would be 20.
+    expect(r.floored.wallDepth, 'the pocket WALLS terminate at the floor (extent == depth, solid below) — NOT a full-Z through-hole').toBe(8);
     expect(r.thru.floors, 'a full depth (≥ stock Z) stays a through-cut — NO floor').toBe(0);
+    expect(r.thru.wallDepth, 'a full/undeclared depth keeps full-Z walls (through-hole)').toBe(r.Z);
 });
 
 test.use({ viewport: { width: 1200, height: 900 } });

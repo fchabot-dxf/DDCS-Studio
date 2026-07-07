@@ -1119,36 +1119,39 @@ export class GcodeViz3D {
             const mat = new THREE.MeshLambertMaterial({ color: fillCol, transparent: true, opacity: this._stockOpacity(), depthWrite: false });   // SHADED (lit) stock; opacity per sim mode
             const mesh = new THREE.Mesh();
             if (pocket) {
-                // Square donut: a frame of material around each cavity. The outer block = the stock dimensions; each cavity
-                // is a through-hole at its PHYSICAL (stock-local) pos — the whole mesh is datum-placed by pg.position (Face 2),
-                // so the cavity RIDES the stock; the datum does NOT move it. (A legacy pocket = ONE centred 25%-inset hole.)
-                const shape = new THREE.Shape();
-                shape.moveTo(0, 0);
-                shape.lineTo(stock.x, 0);
-                shape.lineTo(stock.x, stock.y);
-                shape.lineTo(0, stock.y);
-                shape.lineTo(0, 0);
-                for (const f of cavities) {
-                    const cx = f.pos.x, cy = f.pos.y, hx = f.size.x / 2, hy = f.size.y / 2;
-                    const hole = new THREE.Path();
-                    hole.moveTo(cx - hx, cy - hy); hole.lineTo(cx + hx, cy - hy); hole.lineTo(cx + hx, cy + hy); hole.lineTo(cx - hx, cy + hy); hole.lineTo(cx - hx, cy - hy);
-                    shape.holes.push(hole);
-                }
-                geo = new THREE.ExtrudeGeometry(shape, { depth: stock.z, bevelEnabled: false });
-                mesh.position.set(0, 0, -stock.z); // extrude [0,z] → world [-z,0], top at the table
-                // DECLARED POCKET DEPTH — give each cavity a real FLOOR at (top − depth) instead of a bottomless through-cut:
-                // a plug fills the cavity BELOW the floor (mesh-local z [0, z−depth]); the pocket void stays open above it.
-                // A full / undeclared depth (≥ the stock thickness) keeps the through-hole (no plug). depth is a PHYSICAL cut
-                // depth from the top, independent of the datum. (Rect cavities only — round bores aren't 3D-rendered yet.)
+                // DECLARED POCKET DEPTH — a REAL RECESS, not a through-hole with a floating floor. The cavity WALLS terminate
+                // at (top − depth), leaving SOLID stock below: the top "donut" (outer minus the holes) is extruded ONLY to the
+                // recess depth D (the deepest declared floor), and a solid BASE box fills below it (with holes ONLY for the
+                // full/undeclared THROUGH cavities → they stay bored full-Z). A shallower recessed pocket gets a plug that
+                // raises its floor. depth is a PHYSICAL cut from the top (datum-independent). (Rect cavities only — round bores
+                // aren't 3D-rendered yet.) All parts are CHILDREN of the one stock mesh → the −C pivot offset + datum apply once.
+                const clampD = (f) => { const d0 = Number(f.depth); return Math.max(0, Math.min(Number.isFinite(d0) ? d0 : stock.z, stock.z)); };
+                const recessed = cavities.map((f) => ({ f, d: clampD(f) })).filter((c) => c.d > 0 && c.d < stock.z);
+                const D = recessed.length ? Math.max(...recessed.map((c) => c.d)) : stock.z;   // walls recess to the deepest floor; no recess → full-through
+                this._pocketWallDepthZ = D;      // the cavity wall Z-extent (== depth for a single/uniform pocket) — full-Z only when through
                 this._stockTopZ = stock.z / 2;   // the stock top in the pg frame (mesh is centred on the pivot by −C below)
-                for (const f of cavities) {
-                    const d0 = Number(f.depth), d = Math.max(0, Math.min(Number.isFinite(d0) ? d0 : stock.z, stock.z));
-                    if (!(d > 0 && d < stock.z)) continue;   // full-through (undeclared) → leave the through-hole
-                    const plug = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.1, f.size.x - 0.02), Math.max(0.1, f.size.y - 0.02), stock.z - d), mat);
-                    plug.position.set(f.pos.x, f.pos.y, (stock.z - d) / 2);   // mesh-local: fills [0, z−d]; the FLOOR (plug top) sits at local z = z−d
-                    mesh.add(plug);   // a child → inherits the mesh transform (incl. the −C pivot offset); shared material
-                    this._pocketFloors.push({ x: f.pos.x, y: f.pos.y, depth: d, floorZ: stock.z / 2 - d });   // floorZ = top(z/2) − depth
+                const outerRect = () => { const s = new THREE.Shape(); s.moveTo(0, 0); s.lineTo(stock.x, 0); s.lineTo(stock.x, stock.y); s.lineTo(0, stock.y); s.lineTo(0, 0); return s; };
+                const holeOf = (f) => { const cx = f.pos.x, cy = f.pos.y, hx = f.size.x / 2, hy = f.size.y / 2; const h = new THREE.Path(); h.moveTo(cx - hx, cy - hy); h.lineTo(cx + hx, cy - hy); h.lineTo(cx + hx, cy + hy); h.lineTo(cx - hx, cy + hy); h.lineTo(cx - hx, cy - hy); return h; };
+                // (1) the TOP layer — the outer frame with EVERY cavity open, extruded to the recess depth D → the pocket WALLS
+                const top = outerRect();
+                for (const f of cavities) top.holes.push(holeOf(f));
+                geo = new THREE.ExtrudeGeometry(top, { depth: D, bevelEnabled: false });
+                mesh.position.set(0, 0, -D);   // extrude [0,D] → world [−D, 0]: top at 0, the pocket floor at −D
+                // (2) the SOLID BASE below the recess — holes ONLY for THROUGH cavities (undeclared/full depth stay bored)
+                if (D < stock.z) {
+                    const base = outerRect();
+                    for (const c of cavities.map((f) => ({ f, d: clampD(f) }))) if (c.d >= stock.z) base.holes.push(holeOf(c.f));
+                    const bmesh = new THREE.Mesh(new THREE.ExtrudeGeometry(base, { depth: stock.z - D, bevelEnabled: false }), mat);
+                    bmesh.position.set(0, 0, D - stock.z);   // extrude [0,z−D] → world [−z, −D]: the floor top at −D
+                    mesh.add(bmesh);
                 }
+                // (3) a shallower recessed pocket → a plug raising its floor from −D up to −its depth
+                for (const c of recessed) if (c.d < D) {
+                    const plug = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.1, c.f.size.x - 0.02), Math.max(0.1, c.f.size.y - 0.02), D - c.d), mat);
+                    plug.position.set(c.f.pos.x, c.f.pos.y, (D - c.d) / 2);   // fills world [−D, −d] → this pocket's floor at −d
+                    mesh.add(plug);
+                }
+                for (const c of recessed) this._pocketFloors.push({ x: c.f.pos.x, y: c.f.pos.y, depth: c.d, floorZ: stock.z / 2 - c.d });   // floorZ = top(z/2) − depth
             } else if (stock.shape === 'cylinder') {
                 // Rotary cylinder — lies along the declared rotary axis (around X = horizontal
                 // 4th axis, around Z = vertical table). Defaults to X (horizontal) when no rotary
