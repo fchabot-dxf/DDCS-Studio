@@ -51,7 +51,7 @@ const WIZ_GROUP_ICON = { setup: HEADER_ICONS.comm, probe: HEADER_ICONS.probe, at
 const WIZ_SUBLABEL = { rotary_center: 'Rotary' };
 
 // Wizards with a dedicated 3D-animated opener instead of the generic openWiz(type).
-const WIZ_SPECIAL_OPENER = { alignment: 'openAlignmentWiz' };   // corner + edge + middle retired (④/E4) — their entries `opensAs` the data-op twin (in-place, via the generic user-op path); openMiddleWiz survives as the legacy built-in shim
+const WIZ_SPECIAL_OPENER = {};   // corner + edge + middle + ALIGNMENT retired (t437 E3 — the probe fan-out is complete) — their entries `opensAs` the data-op twin (in-place, via the generic user-op path); the legacy openAlignmentWiz/openMiddleWiz shims survive but are no longer menu-routed
 
 // The I/O quick-actions — a bar-special section appended to the Setup dropdown (not library entries).
 const WIZ_IO_SECTION = `

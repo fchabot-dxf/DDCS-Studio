@@ -48,7 +48,7 @@ const BUILTINS = [
     { id: 'corner', type: 'corner', label: 'Corner', icon: '📐', group: 'probe', opensAs: 'user_corner_data' },
     { id: 'middle', type: 'middle', label: 'Middle / Bore / Boss', icon: '🎯', group: 'probe', opensAs: 'user_middle_data' },
     { id: 'edge', type: 'edge', label: 'Edge', icon: '📏', group: 'probe', opensAs: 'user_edge_data' },
-    { id: 'alignment', type: 'alignment', label: 'Align', icon: '🧭', group: 'probe' },
+    { id: 'alignment', type: 'alignment', label: 'Align', icon: '🧭', group: 'probe', opensAs: 'user_alignment_data' },   // t437 E3 — IN-PLACE: the Align slot opens the twin (box + 2 fence starts); completes the probe fan-out; built-in alignmentWizard stays the legacy shim
     { id: 'rotary_center', type: 'rotary_center', label: 'Centreline', icon: '', group: 'probe', opensAs: 'user_rotary_center_data' },   // t421 E5 — IN-PLACE: the Centreline slot opens the twin (round-bar sim + rig + multi-pass starts from E2/E3/E4); built-in rotaryCenterWizard stays the legacy shim
     { id: 'rotary_clock', type: 'rotary_clock', label: 'Clock A0', icon: '🕒', group: 'probe', opensAs: 'user_rotary_clock_data' },   // t429 E3 — IN-PLACE: the Clock A0 slot opens the twin (box + 4-jaw rig + single start from E2); built-in rotaryClockWizard stays the legacy shim
     { id: 'atc_length', type: 'atc_length', label: 'Tool Length', icon: '📏', group: 'atc', opensAs: 'user_atc_length_data' },   // t409 — light NEW port, in-place

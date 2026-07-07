@@ -46,8 +46,8 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(bar.center.map((g) => g.label)).toEqual(['Probe', 'ATC', 'Mill']);
   const probe = bar.center[0], atc = bar.center[1], mill = bar.center[2];
 
-  // Probe: WCS uses the generic openWiz; Corner/Edge/Middle open the data-op TWIN in-place (opensAs); only Align keeps its
-  // dedicated 3D-animated opener; the "Rotary" sub-label divider survives.
+  // Probe: WCS uses the generic openWiz; Corner/Edge/Middle/Align open the data-op TWIN in-place (opensAs — the probe
+  // fan-out is complete, t437); the "Rotary" sub-label divider survives.
   const probeBy = Object.fromEntries(probe.items.map((i) => [i.text.replace(/\s+/g, ' '), i.onclick]));
   expect(probe.items[0].onclick).toBe("openWiz && openWiz('wcs')");
   // t339 E4 — IN-PLACE SWAP: the built-in Corner + Edge + Middle KEEP their Probe slots but `opensAs` opens the data-op TWIN
@@ -64,7 +64,9 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(middleItem, 'Middle is IN its Probe slot (in-place)').toBeTruthy();
   expect(middleItem.onclick, 'Middle opens the data-op twin in-place').toBe("openWiz && openWiz('user_middle_data')");
   expect(probe.items.some((i) => /openMiddleWiz/.test(i.onclick || '')), 'no openMiddleWiz opener in the menu (retired; the fn survives as the legacy shim)').toBe(false);
-  expect(probe.items.find((i) => /Align/.test(i.text)).onclick).toContain('openAlignmentWiz');
+  const alignItem = probe.items.find((i) => /Align/.test(i.text));
+  expect(alignItem.onclick, 'Align opens the data-op twin in-place (opensAs, t437 — the last probe port)').toBe("openWiz && openWiz('user_alignment_data')");
+  expect(probe.items.some((i) => /openAlignmentWiz/.test(i.onclick || '')), 'no openAlignmentWiz opener in the menu (retired; the fn survives as the legacy shim + is unrelated to the ⟳ Align rotate button)').toBe(false);
   expect(probe.dividers).toEqual(['Rotary']);
 
   // ATC: Tool Length + Tool Check now open their data-op twins IN-PLACE (opensAs, t409/t411); the other three via openWiz
