@@ -30,6 +30,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { num } from './ops/util.js';
+import { axisHomeMotion } from '../engine/limitSwitches.js';   // H1 (t481) — the ONE source of the home end (machine-0), shared with the engine handler + axisSpan
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
@@ -243,22 +244,15 @@ export function homingSimProxy(params = {}) {
     const L = [];
     L.push('( SIMULATION PROXY — homing motion model, not the emitted macro )');
     L.push('G90');
-    const homeEnd = (ax) => {
-        const c = cfg[ax] || {};
-        const t = travel[ax] || 0;
-        // Home end follows the SIGNED travel (its sign = home direction). An explicit c.dir — set by a Homing block,
-        // never the settings form — overrides; otherwise derive from the travel sign. offset shifts the landing point.
-        const end = c.dir === '+' ? Math.abs(t) : c.dir === '-' ? -Math.abs(t) : t;
-        return Math.round((end + num(c.offset, 0)) * 1000) / 1000;
-    };
     axes.forEach((ax) => {
         const c = cfg[ax] || {};
         const A = ax.toUpperCase();
         if ((ax === 'a' || ax === 'b') && (c.rotary || 'setzero') === 'setzero') { L.push(`G53 ${A}0     ( ${A} set zero )`); return; }
-        const end = homeEnd(ax);
-        L.push(`G53 G0 ${A}${end}     ( seek ${A} home )`);
-        // back-off a touch toward centre so the homed state isn't sitting on the switch
-        const back = Math.round((end - Math.sign(end || 1) * num(c.backoff, 5)) * 1000) / 1000;
+        // H1 (t481) — HOME is the MACHINE-0 end (axisHomeMotion, the ONE source shared with the engine handler + axisSpan).
+        // Was: the SIGNED-TRAVEL far end → the axis drove AWAY from home. c.dir ('' Auto → machine-0; '+'/'−' → max/min end)
+        // is a Homing-block override. The back-off moves off the switch INTO the reachable travel (toward the span centre).
+        const { seek, back } = axisHomeMotion(travel[ax] || 0, { dir: c.dir, offset: num(c.offset, 0), backoff: num(c.backoff, 5) });
+        L.push(`G53 G0 ${A}${seek}     ( seek ${A} home )`);
         L.push(`G53 G1 ${A}${back} F${Math.round(num(c.slowFeed, 100))}     ( back off )`);
         const s = parseInt(c.slaveFollows, 10);
         if (Number.isInteger(s)) L.push(`( slave idx ${s} follows ${A} )`);

@@ -29,14 +29,15 @@ test('engine runs M98 P501 X2 (home Z): moves to the home end + sets the homed f
     const last = t.segments[t.segments.length - 1];
     return { segCount: t.segments.length, homedZ: eng.vars.get(1517), lastZ: last.z2, lastRapid: last.rapid };
   }, STUB_SETTINGS);
-  // Z travel is -120 (signed → home toward -Z), back-off 5 toward centre → home end = -120 - sign(-120)*5 = -115.
+  // H1 (t481): Z travel -120 → HOME is the MACHINE-0 end (the TOP, z=0), NOT -120. Back-off 5 INTO the travel (down/-Z)
+  // → homed rest = -5 (was the buggy -115, at the FAR/bottom end).
   expect(r.homedZ, '#1517 (Z homed flag) is set').toBe(1);
-  expect(Math.abs(r.lastZ - (-115)) < 1e-6, `Z homed to -115 (got ${r.lastZ})`).toBe(true);
+  expect(Math.abs(r.lastZ - (-5)) < 1e-6, `Z homes at machine-0/top → backed off to -5 (got ${r.lastZ})`).toBe(true);
   expect(r.lastRapid, 'the home move is a rapid').toBe(true);
   expect(r.segCount, 'the home produced a motion segment').toBeGreaterThan(1);
 });
 
-test('M98 P501 X0 (home X) uses the +X signed travel home end', async ({ page }) => {
+test('M98 P501 X0 (home X) drives to the machine-0 home end (NOT the +X far end)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async (stub) => {
     eval(stub);
@@ -47,9 +48,10 @@ test('M98 P501 X0 (home X) uses the +X signed travel home end', async ({ page })
     const last = t.segments[t.segments.length - 1];
     return { homedX: eng.vars.get(1515), lastX: last.x2 };
   }, STUB_SETTINGS);
-  // X travel +300 (home toward +X), back-off 5 → home end = 300 - 5 = 295.
+  // H1 (t481): X travel +300 → HOME is the MACHINE-0 end (x=0), NOT +300. Back-off 5 INTO the travel (+X) → homed rest = +5
+  // (was the buggy 295, at the far +X end).
   expect(r.homedX, '#1515 (X homed flag) is set').toBe(1);
-  expect(Math.abs(r.lastX - 295) < 1e-6, `X homed to 295 (got ${r.lastX})`).toBe(true);
+  expect(Math.abs(r.lastX - 5) < 1e-6, `X homes at machine-0 → backed off to +5 (got ${r.lastX})`).toBe(true);
 });
 
 test('the X-word in M98 P501 X2 is the AXIS INDEX, not a coordinate (no move to X=2)', async ({ page }) => {
@@ -95,6 +97,7 @@ test('the real emitted homing macro (homingStack → Home Z) homes through the e
     return { homedZ: eng.vars.get(1517), lastZ: last ? last.z2 : null, segCount: t.segments.length };
   }, STUB_SETTINGS);
   expect(r.homedZ, 'the emitted native macro set #1517').toBe(1);
-  expect(Math.abs(r.lastZ - (-115)) < 1e-6, `emitted macro homed Z to -115 (got ${r.lastZ})`).toBe(true);
+  // H1 (t481): Z homes to the MACHINE-0 end (top), backed off to -5 (was the buggy -115 at the far/bottom end).
+  expect(Math.abs(r.lastZ - (-5)) < 1e-6, `emitted macro homes Z at machine-0 → -5 (got ${r.lastZ})`).toBe(true);
   expect(r.segCount).toBeGreaterThan(1);
 });

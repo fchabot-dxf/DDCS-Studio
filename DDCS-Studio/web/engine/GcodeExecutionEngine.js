@@ -14,6 +14,7 @@ import { evaluateCondition, validateCondition } from './core/condition.js';
 import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
+import { axisHomeMotion } from './limitSwitches.js';   // H1 (t481) — the ONE source of the home end (machine-0), shared with homingSimProxy + axisSpan
 import { passAnchorFor } from './passAnchor.js';   // t94/t107 — the probe-collision + DRO origin O is a pass's re-park draw-anchor (auto reposition): the RUNTIME END of the previous pass (t107 machine-faithful) via the published _passEnds, else the static previous START (t94)
 
 // Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
@@ -873,11 +874,10 @@ export class GcodeExecutionEngine {
                     const machine = s.machine || {};
                     const cfg = ((s.homing || {}).axes || {})[AX] || {};
                     const travel = AX === 'z' ? num(machine.z, -120) : num(machine[AX], 300);
-                    // Home end follows the SIGNED travel (its sign = home direction); an explicit cfg.dir overrides.
-                    const end = (cfg.dir === '+' ? Math.abs(travel) : cfg.dir === '-' ? -Math.abs(travel) : travel) + num(cfg.offset, 0);
-                    // Final homed spot = home end backed off toward centre, so it isn't sitting on the switch (proxy parity).
-                    const homePos = end - Math.sign(end || 1) * num(cfg.backoff, 5);
-                    homedMove = { axis: AX, machine: Math.round(homePos * 1000) / 1000 };
+                    // H1 (t481) — HOME is the MACHINE-0 end (axisHomeMotion, the SAME source as homingSimProxy + axisSpan);
+                    // was the signed-travel far end → the sim drove AWAY from home. The final homed spot is the back-off.
+                    const { back } = axisHomeMotion(travel, { dir: cfg.dir, offset: num(cfg.offset, 0), backoff: num(cfg.backoff, 5) });
+                    homedMove = { axis: AX, machine: back };
                 }
                 this.vars.set(1515 + N, 1);   // homed flag #[1515+N] — the controller sets it on real hardware
                 this._setStatus(`M98 P501 — home ${(AX || N).toString().toUpperCase()} (axis ${N})`, true);

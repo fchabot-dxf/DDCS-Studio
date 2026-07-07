@@ -48,6 +48,26 @@ export function axisSpan(travel) {
         : { lo: t, hi: 0, homeSide: 'max' };    // -|t| … 0 → home at the max (0) end (e.g. Z top)
 }
 
+const r3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
+
+/**
+ * The HOMING landing points for an axis in MACHINE coords — the ONE SOURCE for the homing sim proxy, the M98-P501
+ * engine handler, AND axisSpan (so they can't diverge on which-end-is-home). H1 (t481): HOME is the MACHINE-0 end (the
+ * homeDir FACT, grounded in geometry.homeDir / the pulled soft-limits: the home end reads ~0, the far/limit end is the
+ * signed travel). This FIXES the old bug where the sim/engine drove to the SIGNED-TRAVEL (far) end — the axis drove
+ * AWAY from home (Z to −120 instead of the top; X even to −300, OUTSIDE the [0,300] envelope). `dir` is a Homing-block
+ * OVERRIDE ('' = Auto → machine-0; '+' = the max end; '−' = the min end). `offset` shifts the seek target; the back-off
+ * moves `backoff` mm off the switch INTO the reachable travel (toward the span centre).
+ * @returns {{ seek: number, back: number }}  seek = the home end (machine-0 by default); back = the backed-off rest spot
+ */
+export function axisHomeMotion(travel, { dir = '', offset = 0, backoff = 5 } = {}) {
+    const { lo, hi } = axisSpan(travel);
+    const seek = (dir === '+' ? hi : dir === '-' ? lo : 0) + (Number(offset) || 0);   // Auto → machine-0; +/− → max/min end
+    const mid = (lo + hi) / 2;
+    const back = seek + (seek <= mid ? 1 : -1) * (Number(backoff) || 0);              // off the switch, toward the interior
+    return { seek: r3(seek), back: r3(back) };
+}
+
 /**
  * Which home/limit switches are tripped by the tool at `toolPosMachine` (machine frame).
  *

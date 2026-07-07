@@ -44,9 +44,10 @@ test('homing dir override: signed-envelope default + per-axis override flips see
       const m = text.match(/G53 G0 X(-?[\d.]+)/);
       return m ? parseFloat(m[1]) : null;
     };
-    const simAuto = simEnd('');     // +300 (signed envelope)
-    const simPlus = simEnd('+');    // +300
-    const simMinus = simEnd('-');   // -300
+    // H1 (t481): the sim seeks the HOME end = machine-0 (0) by default; the dir override picks the max/min end.
+    const simAuto = simEnd('');     // Auto → machine-0 (x=0)
+    const simPlus = simEnd('+');    // + → the +X (max) end = 300
+    const simMinus = simEnd('-');   // − → the −X (min = machine-0) end = 0
 
     // ── NATIVE method: the override must NOT change the emit (M98 P501 reads the controller's own config). ──
     const nativeCfg = (dir) => ({ x: { enable: true, method: 'native', dir } });
@@ -85,10 +86,12 @@ test('homing dir override: signed-envelope default + per-axis override flips see
   // Auto with unknown travel defers to the controller register (the documented fallback).
   expect(r.seekAutoNoTravel, 'Auto + unknown envelope → defer to controller #612').toContain('20000*#[612+#100]-10000');
 
-  // 2 SIM direction flips with the override; Auto follows the +signed travel.
-  expect(r.simMinus, 'sim X end goes negative under override −').toBeLessThan(0);
-  expect(r.simPlus, 'sim X end positive under override +').toBeGreaterThan(0);
-  expect(r.simAuto, 'sim Auto follows the +signed envelope').toBeGreaterThan(0);
+  // 2 H1 (t481): the sim SEEKS THE HOME END. Auto → machine-0 (x=0). The override picks a specific end: + → the +X (max)
+  // far end (300); − → the −X (min) end, which for a +300 envelope IS machine-0 (0). (Was: the buggy signed-travel far end,
+  // and − even drove to −300, OUTSIDE the [0,300] envelope.)
+  expect(r.simAuto, 'sim Auto homes to the machine-0 end (x=0)').toBe(0);
+  expect(r.simPlus, 'override + drives to the +X (max) end = 300').toBe(300);
+  expect(r.simMinus, 'override − drives to the −X (min = machine-0) end = 0').toBe(0);
 
   // 3 NATIVE is byte-unchanged by the override.
   expect(r.nativeMinus, 'native homing emit is identical regardless of dir').toBe(r.nativeAuto);
