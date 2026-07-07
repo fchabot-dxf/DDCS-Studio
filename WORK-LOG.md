@@ -7063,3 +7063,30 @@ HIGHLIGHT the involved pockets: reused `highlightStation(region, label)` (added 
 **HOMING FEATURE COMPLETE (H1-H4):** H1 home-end reconciliation (drive to machine-0) → H2 the switch-type catalog (mechanical/proximity + standoff) → H3 the live trip model wired into the engine (switches fire during a run) → H4 the 3D switch devices (light/plunge as the axis arrives). Sim/visual throughout; the native M98 P501 emit is byte-identical.
 
 **PASSED BACK: H4 done — the home/limit switch DEVICES render at each fitted home edge + light/plunge live on the H3 trips (mechanical plunger contacts; proximity sensor + standoff GAP, never contacted). Mirrors the ATC sim-devices (io_change-driven, panel lifecycle). SIM/VISUAL only, emit BYTE-IDENTICAL. Full suite 768 pass. Screenshot homing_h4_switch_devices.png (the axis at home, switches lit). HOMING H1-H4 COMPLETE.**
+
+## 🔨 turn 489 (cycle 223) — HOMING PLUNGE: REPRODUCED + DIAGNOSED (GATE — the advisor's premise is DISPROVEN; no code fix, pending direction). The no-limit −120 config does NOT plunge (homes to the top correctly); the plunge is a SIGN/dir config issue, and the fix depends on whether we treat it as a user-config error (guide) or a convention change (override). NO code changed.
+
+**TASK:** the human live-reports Z STILL PLUNGES (down to the bottom) instead of rising to the top; machine.z=-120, native; advisor hypothesis = NO limit input → axisHomeMotion/axisSpan falls back to the WRONG end. REPRODUCE the no-limit config, confirm the plunge, fix so Z rises to machine-0/top with NO limit, add a no-limit test, answer the human's "do I need a limit input?".
+
+**REPRODUCED (drive-the-engine, the Z trajectory per config — the real symptom):**
+| config | seek target | physical | result |
+|---|---|---|---|
+| A  z=−120 native (DEFAULT, no limit) | Z0 | 0 = TOP (env 0..−120) | homes UP to 0, back-off −5 → **NO PLUNGE ✅** |
+| B  z=+120 native (no limit) | Z0 | 0 = BOTTOM (env 0..+120) | home IS the bottom → **PLUNGE ❌** |
+| C  z=−120 dir='−' | Z−120 | −120 = bottom | seeks the far/bottom end → **PLUNGE ❌** |
+| D  z=−120 seek-method | Z0 | 0 = TOP | proxy sim correct (the emit is separately flagged) |
+
+**DIAGNOSIS — the advisor's premise is DISPROVEN:** the no-limit −120 default homes Z to the TOP correctly (config A). axisSpan/axisHomeMotion NEVER read a limit pin — the home direction is derived from the SIGNED machine.z travel (dir='' Auto), ONE-source + valid-by-construction (settingsPanel:155-158; the Machine hint:852 "the sign sets the home direction; ⬤ = home = machine 0"). So a MISSING limit input is NOT the cause, and the advisor's literal fix ("home to machine-0") would NOT fix the real cause: for a POSITIVE Z travel, machine-0 IS the bottom.
+
+**THE REAL CAUSE (most likely → least):** (B) the human entered Z travel as a POSITIVE magnitude (+120) — by the documented convention (sign = home direction), home = machine-0 = the BOTTOM of a +Z-up envelope → Z homes DOWN = the plunge. This fits a user setting up "120 mm of Z travel" + asking whether they need a limit. OR (C) the Z homing `dir` override is set to '−' (seeks the far end). Both put HOME at the bottom.
+
+**ANSWER TO THE HUMAN ("do I need an actual limit input?"):** For the DIRECTION — NO. Homing direction comes from the machine config (the SIGNED Z travel), never from a limit switch; a fitted limit only ADDS the on-screen switch DEVICE (H4) that lights during homing. The plunge is a config issue: for a router (spindle homes UP/top), the Z travel must be NEGATIVE (e.g. −120) — the sign says "home at the top, travel down". Entering +120 makes the app home to machine-0 = the BOTTOM → the plunge. Fix on their side: set Z travel to −120 in Machine settings.
+
+**GATE — the fix depends on a frame the advisor/human must decide (NOT byte-identical either way for B):**
+- **Option A (recommended): treat as a USER-CONFIG error + GUIDE.** The direction is correct-by-construction (follows the declared machine.z sign; [[dont-declare-away-user-responsibility]] — the machine.z sign is the user's geometry to own). Add a GUI GUARD: when Z travel is entered POSITIVE, warn inline ("Z usually homes at the top → enter a negative travel, e.g. −120"). Preserves the one-source sign convention + legit +Z machines. Answer the human. Byte-identical.
+- **Option B: convention change** — special-case Z to ALWAYS home at the top (max Z) regardless of sign. Makes +120 "just work" but OVERRIDES the user's declared geometry (inference), breaks the one-source sign convention + legit +Z-up machines. NOT recommended.
+- **Option C: DECLARE homeDir as a first-class per-axis field** (decouple home direction from the travel sign; the code already references a pulled geometry.homeDir), default Z=up. The proper declare-not-infer fix if we want direction independent of the travel sign. Bigger change; future.
+
+**NEEDED:** the human's ACTUAL config to confirm — machine.z sign + homing.axes.z.dir + method. If machine.z is +120 → Option A resolves it. Recommend confirming with the human, then A.
+
+**NO code changed this turn** (throwaway repro spec removed). PASSED BACK for the frame decision (per pause-when-user-questions / confirm-premise-before-regression-blocker — the premise is contradicted + the fix frame is contested).
