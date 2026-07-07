@@ -25,6 +25,7 @@ import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';
+import { opSimStarts } from '../../viz/opSimStarts.js';   // E2 — reuse BUILT_IN.rotary_clock's single sim-start via the registry, so the twin preview matches the built-in
 
 /** Author defaults — match rotaryClockStack's own num() fallbacks + the structural default shape (set A0 / top / active / relative). */
 export const ROTARY_CLOCK_DEFAULTS = {
@@ -153,5 +154,11 @@ export function rotaryClockDataDef() {
     const def = userOpFromStack('rotary_clock_data', 'Rotary Clock (data)', rotaryClockDataStack(ROTARY_CLOCK_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = ROTARY_CLOCK_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.postInstantiate = (stack, resolved) => applyProbeSources(applySafeZFrame(applyReferenceWcs(applyHeaderComments(stack, resolved), resolved), resolved));
+    // E2 — the SINGLE PREVIEW-START provider: reuse BUILT_IN.rotary_clock (opSimStarts.js) VERBATIM via the sim registry
+    // (registerUserOp → setUserSimStarts), NOT the builder → sim-only, emit BYTE-IDENTICAL. ONE start (the clock steps +Y
+    // for the 2nd touch, it does not reposition). NO def.simStock: the clock datums off a FLAT on a rectangular BOX (the
+    // built-in restoreBoxStock intent) — NOT a round bar like the Centreline — so the global box stock is correct; the rig
+    // renders 4-jaw on the box, inherited FREE via the declared sim{rotary:true} + the generic userOpView rig wiring (E5).
+    def.simStartsProvider = (params, stock) => opSimStarts('rotary_clock', params, stock);
     return def;
 }

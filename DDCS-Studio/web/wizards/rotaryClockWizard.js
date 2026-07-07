@@ -13,6 +13,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
+import { opSimStarts } from '../viz/opSimStarts.js';   // E2 — the shared single-start registry (BUILT_IN.rotary_clock) the built-in + twin both read
 
 /** The interpolated SUMMARY texts (the 2 header comments + the 2 action-arm comments + the final message) — extracted to ONE
  *  format so the data-op twin's postInstantiate RECOMPOSES them from the resolved params (rotaryCenterHeaderComments
@@ -140,10 +141,9 @@ export class RotaryClockWizard {
         return emitMapped(rotaryClockStack(params)).text;
     }
 
-    /** Preview start (stock frame): above the flat near the top, offset to point A (-Y half of span). */
-    inferStart(params, stock) {
-        const n = (v, d) => num(v, d);
-        const sy = n(stock && stock.y, 76), sz = n(stock && stock.z, 76), span = n(params.span, 20);
-        return { x: n(stock && stock.x, 150) / 2, y: sy / 2 - span / 2, z: Math.min(5, sz * 0.5) };
-    }
+    /** Preview start (stock frame): above the flat near the top, offset to point A (-Y half of span). Single pass → the
+     *  shared registry (BUILT_IN.rotary_clock) is the ONE source, so the built-in + the data-op twin agree (E2). */
+    inferStart(params, stock) { return this.inferStarts(params, stock)[0]; }
+
+    inferStarts(params, stock) { return opSimStarts('rotary_clock', params, stock); }
 }

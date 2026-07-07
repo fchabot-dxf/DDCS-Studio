@@ -106,6 +106,14 @@ const BUILT_IN = {
             { x: cx, y: cy + flankOff, z: flankZ },  // P3 — macro probes −Y → start the +Y side
         ];
     },
+    // ROTARY_CLOCK — a SINGLE start: the clock datums off a FLAT on a rectangular part (NOT a round bar), doing 2 Z-down
+    // touches a SPAN apart. Start above the flat near the top, offset to POINT A (−Y half the span); the macro probes A,
+    // steps +Y by the span, probes B. One pass (the 2nd touch is a step, not a repositioned start). Mirrors inferStart.
+    rotary_clock(params, stock) {
+        const sx = n(stock && stock.x, 150), sy = n(stock && stock.y, 76), sz = n(stock && stock.z, 76);
+        const span = n(params && params.span, 20);
+        return [{ x: sx / 2, y: sy / 2 - span / 2, z: Math.min(5, sz * 0.5) }];
+    },
 };
 
 // ── USER_* layer: a custom op DECLARES its per-pass sim-starts and registers a provider here (the wizard-maker seam) ───
