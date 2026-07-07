@@ -21,6 +21,15 @@ import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
 
+/** The ONE interpolated SCALAR header comment (tolerance/safeZ/feeds) — extracted so the data-op twin's postInstantiate
+ *  RECOMPOSES it from resolved params (the checkAxis/probeDir comments are guard-handled; only this scalar line is a value-
+ *  swap). F3: tolerance is display-only here (no #var) — it lives ONLY in this comment. Must reproduce the inline text. */
+export function alignmentHeaderComments(params = {}) {
+    const tolerance = num(params.tolerance, 0), safeZ = num(params.safeZ, 10);
+    const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 20);
+    return { top3: `Tolerance: ${tolerance}mm | SafeZ: ${safeZ}mm | Fast: ${fFast} | Slow: ${fSlow}` };
+}
+
 /** Alignment params → its block stack. The one source of truth for both displays, native across posts. `opts.superset`
  *  (E0) carries the checkAxis × probeDir arms GUARDED so pruneGuards collapses to a concrete shape (the twin seam). */
 export function alignmentStack(params = {}, opts = {}) {
@@ -29,9 +38,9 @@ export function alignmentStack(params = {}, opts = {}) {
     const safeZ = num(params.safeZ, 10), dist = num(params.dist, 20), retract = num(params.retract, 2);
     const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL 1c: relative (default) | machine (G53 park)
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 20), port = num(params.port, 0);
-    const tolerance = num(params.tolerance, 0);
-    const src = params.sources || {};
+    const src = params.sources || {};   // tolerance moved into alignmentHeaderComments (display-only, F3)
     const superset = !!opts.superset;   // E0 — carry checkAxis × probeDir arms guarded; prune collapses to the concrete shape
+    const _hdr = alignmentHeaderComments(params);   // the scalar/tolerance header line — ONE format shared with the twin recompose
 
     const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
 
@@ -69,7 +78,7 @@ export function alignmentStack(params = {}, opts = {}) {
         // ── Header ──
         C(`Alignment | Fence along: ${checkAxis} | Probe: ${probeAxis} ${dirLabel}`);
         C(`Misalignment = contact_B - contact_A over the span along ${checkAxis}`);
-        C(`Tolerance: ${tolerance}mm | SafeZ: ${safeZ}mm | Fast: ${fFast} | Slow: ${fSlow}`);
+        C(_hdr.top3);
 
         // ── Motion variables ──
         C('Motion Variables');
