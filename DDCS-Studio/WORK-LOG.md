@@ -2111,3 +2111,23 @@ THEN (later slices): declare `anchor` on corner/edge/②-aim to retire the magic
 
 ### RECOMMENDATION → **BATCH** Slot/Surfacing/Text/atcWarmup:
 the in-place wire-up is a clean one-line opensAs per op (byte-identical, sim renders); drill was the worst-case form and it's functional; the other 4 are single-shape → cleaner flat forms. So batch the 4 wire-ups. The DRILL form-clutter polish (a form-render enhancement for pattern-gating) + the Bore helical twin are SEPARATE follow-ons, not blockers. Files: wizardLibrary.js · drill-in-place.spec.js (new) · edge-seamless-title.spec + wizard-bar.spec (updated for the in-place drill). **NEXT: the advisor rules batch-vs-one; then the 4 twins in-place (+ optionally the Bore twin / form polish).** PASS BACK.
+
+## 🔨 turn 407 (cycle 127) — MILL/ATC IN-PLACE BATCH: Slot + Surfacing + Text + ATC Warm-up finished to IN-PLACE (the drill opensAs one-liner ×4). All 4 pass per-wizard; atc_warmup needed ONE one-source fix (panel form→form3d). Full suite 687 pass.
+
+**WHAT (the drill mechanism ×4 — one opensAs declaration per built-in entry):**
+- `opensAs: 'user_slot_data'` on Slot · `'user_surfacing_data'` on Surfacing · `'user_text_data'` on Text (all mill group) · `'user_atc_warmup_data'` on Warm-up (setup group) — wizardLibrary.js. Each ONE declaration re-points the click to the twin + auto-hides the twin's own Data-Wiz entry (OPENS_AS_TARGETS) + sets the seamless plain title (builtinLabelForTwin). The legacy built-in stacks stay as byte-identical shims. All SINGLE-SHAPE → no Bore-style variant gap.
+- **ONE-SOURCE FIX (atc_warmup panel):** the atc_warmup twin was seeded `panel:'form'` (NO preview pane) but DECLARES `sim:{forceMachine, showMagazine}` — inconsistent (the sim intent can't render in a form-only panel), AND a REGRESSION vs the built-in atcWarmupView (which is twoPane with a 3D machine preview — preview3D + previewMachine, atcViews.js:282-283). FIX: `panel:'form'→'form3d'` (atcWarmupData.js, both the panel block + the userOpFromStack arg). Display-only (panel emits nothing → emit byte-identical) → the declared machine+magazine sim now RENDERS in the in-place wizard, matching the built-in.
+
+**VERIFY EACH per-wizard (tests/mill-atc-in-place.spec.js, 5/5 + 4 screenshots):**
+| wizard | title | emit byte-identical | form (fields) | sim |
+|---|---|---|---|---|
+| Slot | "Slot" | ✅ vs slotStack | ✅ 21 (ax/ay/bx/by/width/toolDia/…) | ✅ 2D toolpath |
+| Surfacing | "Surfacing" | ✅ vs surfacingStack | ✅ 18 (w/h/stepover/strategy/…) | ✅ 3D toolpath |
+| Text | "Text / engrave" | ✅ vs textStack | ✅ 24 (font/height/slant/align/…) | ✅ 2D toolpath |
+| ATC Warm-up | "Warm-up" | ✅ vs atcWarmupStack | ✅ 4 (rpm1/time1/rpm2/time2) | ✅ 3D machine-frame (post-fix) |
+Each: opensAs wired + plain title + the separate Data-Wiz entry RETIRED (one-source hide) + emit BYTE-IDENTICAL to the built-in stack. Screenshots scratchpad/inplace_{slot,surfacing,text,atc_warmup}.png (opened) — atc_warmup shows the green machine envelope + "Spindle Warmup (data) · 19 lines".
+- Updated the pinned wizard-bar routing (Setup: Warm-up→user_atc_warmup_data; Mill: text-svg→user_text_data) — the same stale-routing updates drill/edge/middle needed. edge-seamless-title unaffected (it only unit-checks corner/edge/middle/drill).
+
+**FULL SUITE: 687 passed, 2 skipped, 1 flaky (the known middle-animator stroke-dashoffset timing flake — untouched file), 0 real failures.**
+
+**PER-WIZARD RESULTS (the deliverable):** ALL 4 finished to in-place CLEANLY. NO Bore-style skip (all single-shape, all reusable). ONE one-source gap surfaced + fixed (atc_warmup panel form→form3d — a display consistency, not an emit/reuse issue; the other 3 were clean drill-style one-liners). The BATCH mechanism held — the drill payoff generalizes. Files: wizardLibrary.js · atcWarmupData.js · mill-atc-in-place.spec.js (new) · wizard-bar.spec (updated routing). **NEXT (per dispatch): ATC Tool Length/Check, then the advisor RELEASES the mill in-place milestone.** Rotary stays PAUSED at E0. Deferred (from t405): the Bore helical twin + the drill form-pattern-gating polish. PASS BACK.

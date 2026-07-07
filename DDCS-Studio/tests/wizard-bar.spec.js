@@ -35,7 +35,7 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   const leftOnclicks = bar.left[0].items.map((i) => i.onclick);
   expect(leftOnclicks).toEqual([
     "openWiz && openWiz('comm')",
-    "openWiz && openWiz('atc_warmup')",
+    "openWiz && openWiz('user_atc_warmup_data')",   // t407 — Warm-up opens its data-op twin IN-PLACE (opensAs)
     "ddcsInsertIo && ddcsInsertIo('outpin')",
     "ddcsInsertIo && ddcsInsertIo('waitinput')",
     "ddcsInsertIo && ddcsInsertIo('dwell')",
@@ -73,12 +73,12 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
     "openWiz && openWiz('atc_table')", "openWiz && openWiz('atc_test')",
   ]);
 
-  // Mill: DRILL now opens its data-op twin IN-PLACE (opensAs → openWiz('user_drill_data'), t405); BORE keeps its variant
-  // (peck-only twin → Bore needs its own helical twin). Inline-SVG icons still render (drill) — the bar's SVG map WINS.
+  // Mill: DRILL/Slot/Surfacing/Text now open their data-op twins IN-PLACE (opensAs, t405/t407); BORE keeps its variant
+  // (peck-only twin → Bore needs its own helical twin). Inline-SVG icons still render (drill/text) — the bar's SVG map WINS.
   expect(mill.items[0].onclick).toBe("openWiz && openWiz('user_drill_data')");
   expect(mill.items[1].onclick).toBe("openWiz && openWiz('drill','bore')");
   expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('user_drill_data')").hasSvg).toBe(true);
-  expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('text')").hasSvg).toBe(true);
+  expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('user_text_data')").hasSvg).toBe(true);
 
   // ── live custom group: register a user op + refresh → a "Custom" dropdown appears on the center ──
   await page.evaluate(async () => {

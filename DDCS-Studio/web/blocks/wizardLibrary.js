@@ -36,7 +36,7 @@ const GROUPS = [
 ];
 const BUILTINS = [
     { id: 'comm', type: 'comm', label: 'Comm / MDI', icon: '💬', group: 'setup' },
-    { id: 'atc_warmup', type: 'atc_warmup', label: 'Warm-up', icon: '🔥', group: 'setup' },
+    { id: 'atc_warmup', type: 'atc_warmup', label: 'Warm-up', icon: '🔥', group: 'setup', opensAs: 'user_atc_warmup_data' },
     { id: 'wcs', type: 'wcs', label: 'WCS / work offsets', icon: '⊕', group: 'probe' },
     { id: 'homing', type: 'homing', label: 'Homing', icon: '⌖', group: 'probe' },
     // t339 E4 — IN-PLACE SWAP: the built-in Corner/Edge/Middle KEEP their Probe slot (label/icon/group), but `opensAs` re-points
@@ -64,9 +64,11 @@ const BUILTINS = [
     { id: 'bore', type: 'drill', variant: 'bore', label: 'Bore', icon: '', group: 'mill' },
     { id: 'pocket', type: 'pocket', label: 'Pocket', icon: '', group: 'mill' },
     { id: 'contour', type: 'contour', label: 'Contour', icon: '', group: 'mill' },
-    { id: 'slot', type: 'slot', label: 'Slot', icon: '', group: 'mill' },
-    { id: 'surfacing', type: 'surfacing', label: 'Surfacing', icon: '', group: 'mill' },
-    { id: 'text', type: 'text', label: 'Text / engrave', icon: '✎', group: 'mill' },
+    // MILL/ATC IN-PLACE BATCH (t407) — the drill one-liner applied ×4: each single-shape twin goes IN-PLACE via opensAs (the
+    // click re-points to the twin, its own Data-Wiz entry auto-hides, the seamless plain title). All single-shape → no Bore-style gap.
+    { id: 'slot', type: 'slot', label: 'Slot', icon: '', group: 'mill', opensAs: 'user_slot_data' },
+    { id: 'surfacing', type: 'surfacing', label: 'Surfacing', icon: '', group: 'mill', opensAs: 'user_surfacing_data' },
+    { id: 'text', type: 'text', label: 'Text / engrave', icon: '✎', group: 'mill', opensAs: 'user_text_data' },
 ];
 
 // ── customization layer (per-entry + per-group overrides) ────────────────────────────────────────────────────

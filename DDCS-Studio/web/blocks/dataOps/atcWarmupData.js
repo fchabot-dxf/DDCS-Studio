@@ -53,7 +53,10 @@ export function atcWarmupDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form' } },
+            // t407 IN-PLACE — form3d (was 'form', no pane): the built-in atcWarmupView is twoPane with a 3D machine preview
+            // (preview3D + previewMachine), so the in-place twin must show the SAME so the DECLARED machine+magazine sim renders.
+            // Display-only (panel emits nothing) → emit byte-identical.
+            { type: 'panel', params: { panel: 'form3d' } },
             { type: 'sim', params: { rotary: false, machine: true, magazine: true } },
             {
                 type: 'param_group',
@@ -63,5 +66,5 @@ export function atcWarmupDataDef() {
         ],
         children: exec,
     }];
-    return userOpFromStack('atc_warmup_data', 'Spindle Warmup (data)', stack, ATC_WARMUP_BINDINGS, 'form', { forceMachine: true, showMagazine: true }, 'atc_datawiz');
+    return userOpFromStack('atc_warmup_data', 'Spindle Warmup (data)', stack, ATC_WARMUP_BINDINGS, 'form3d', { forceMachine: true, showMagazine: true }, 'atc_datawiz');
 }
