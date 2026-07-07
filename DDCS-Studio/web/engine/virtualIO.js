@@ -266,6 +266,15 @@ export const LIMIT_SWITCH_PINS = {
 /** The per-axis home switch alias — the limit switch at the machine-0 end of each axis. */
 export const HOME_SWITCH_PINS = { x: 'IN_HOME_X', y: 'IN_HOME_Y', z: 'IN_HOME_Z' };
 
+/** The semantic limit/home input names (the constant set setLimitSwitches always drives). */
+const SEMANTIC_SWITCH_INPUTS = new Set([...Object.values(LIMIT_SWITCH_PINS), ...Object.values(HOME_SWITCH_PINS)]);
+/**
+ * The NUMBERED IN_<pin> inputs setLimitSwitches drove true on its LAST call. Unlike the semantic names (a fixed set,
+ * always in the release loop) the numbered pins are config-driven, so setLimitSwitches must remember which it asserted
+ * to CLEAR them when the tool backs off — else a released switch's numbered pin stays orphaned-on (H3, t485).
+ */
+let _assertedNumberedPins = new Set();
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -283,6 +292,7 @@ export function resetVirtualIO() {
     _pendingHandshakes.clear();
     ioState.outputs.clear();
     ioState.inputs.clear();
+    _assertedNumberedPins = new Set();   // forget the last limit-switch numbered pins (H3, t485)
     console.log('[VIRTUAL IO] State reset — all pins cleared.');
 }
 
@@ -417,10 +427,13 @@ export function setLimitSwitches(trips = []) {
             tripped.set(resolveVirtualPin(Number(t.pin), 'IN'), true);
         }
     }
-    // Drive every limit/home semantic input to its new state (assert the tripped ones, clear the rest),
-    // dispatching io_change only on a real transition so wait loops aren't spammed.
-    const all = [...Object.values(LIMIT_SWITCH_PINS), ...Object.values(HOME_SWITCH_PINS), ...tripped.keys()];
-    for (const name of new Set(all)) {
+    // Drive every limit/home input to its new state (assert the tripped ones, clear the rest), dispatching io_change
+    // only on a real transition so wait loops aren't spammed. The release set = the constant semantic names PLUS the
+    // numbered pins asserted last call (so backing off a switch actually clears its numbered IN_<pin>, not just the
+    // semantic alias — H3, t485). The numbered pins tripped THIS call become the set to release next time.
+    const numberedNow = new Set([...tripped.keys()].filter((n) => !SEMANTIC_SWITCH_INPUTS.has(n)));
+    const all = new Set([...SEMANTIC_SWITCH_INPUTS, ...tripped.keys(), ..._assertedNumberedPins]);
+    for (const name of all) {
         const next = tripped.get(name) === true;
         if ((ioState.inputs.get(name) ?? false) !== next) {
             ioState.inputs.set(name, next);
@@ -430,6 +443,7 @@ export function setLimitSwitches(trips = []) {
             ioState.inputs.set(name, next);
         }
     }
+    _assertedNumberedPins = numberedNow;
 }
 
 // ---------------------------------------------------------------------------

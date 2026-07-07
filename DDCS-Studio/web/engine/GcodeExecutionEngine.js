@@ -7,14 +7,14 @@
  * handshake simulation and probe collision detection.
  */
 
-import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin, ioState } from './virtualIO.js';
+import { resetVirtualIO, setVirtualOutput, getVirtualInput, injectVirtualInput, triggerProbeCollision, resolveVirtualPin, ioState, setLimitSwitches } from './virtualIO.js';
 import { tokenizeWords } from './core/tokenizer.js';
 import { evalExpr, validateExpression } from './core/expression.js';
 import { evaluateCondition, validateCondition } from './core/condition.js';
 import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
-import { axisHomeMotion } from './limitSwitches.js';   // H1 (t481) — the ONE source of the home end (machine-0), shared with homingSimProxy + axisSpan
+import { axisHomeMotion, limitSwitchTrips } from './limitSwitches.js';   // H1 (t481) home-end; H3 (t485) — the live home/limit trip model
 import { passAnchorFor } from './passAnchor.js';   // t94/t107 — the probe-collision + DRO origin O is a pass's re-park draw-anchor (auto reposition): the RUNTIME END of the previous pass (t107 machine-faithful) via the published _passEnds, else the static previous START (t94)
 
 // Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
@@ -535,6 +535,7 @@ export class GcodeExecutionEngine {
             }
             p.pass = this._pass;   // INC4: report the current REPOSITION pass so the live tool anchors to starts[_pass] (not always ①)
             this.onPositionChange(p);
+            this._updateLimitSwitches(p);   // H3 (t485) — trip home/limit switches LIVE as the axis travels toward the edge
         }
         this._nextDelayMs = 16;   // ~60 fps while travelling
     }
@@ -552,6 +553,19 @@ export class GcodeExecutionEngine {
         }
     }
 
+    // H3 (t485) — drive the LIVE home/limit switch inputs from the tool's MACHINE position (mirrors triggerProbeCollision
+    // flipping IN_PROBE_COLLISION when the tool reaches a surface). Called at every position-commit point so IN_LIMIT_* /
+    // IN_HOME_* trip as the axis reaches the edge (respecting the switchType standoff) + release on the back-off. FRAME:
+    // this.pos is PART-frame; machine = (part + wcsOffset) / unitScale — the inverse of the G53/homing map (line ~903).
+    _updateLimitSwitches(pos = this.pos) {
+        if (!pos) return;
+        const s = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings() : null;
+        if (!s || !s.machine) return;
+        const wo = this._wcsOffset || {}, us = this.unitScale || 1;
+        const mp = { x: (pos.x + (wo.x || 0)) / us, y: (pos.y + (wo.y || 0)) / us, z: (pos.z + (wo.z || 0)) / us };
+        setLimitSwitches(limitSwitchTrips(mp, s.machine, s.limits || {}));
+    }
+
     _finishMove() {
         const mv = this._move;
         if (!mv) return;
@@ -560,6 +574,7 @@ export class GcodeExecutionEngine {
         if (typeof this.onPositionChange === 'function') {
             this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z, pass: this._pass });   // INC4: per-pass anchor
         }
+        this._updateLimitSwitches();   // H3 (t485) — the move LANDED: trip/release the home/limit switches at the final position
         if (mv.touchName) this._touchPulse(mv.touchName);
     }
 
@@ -876,8 +891,10 @@ export class GcodeExecutionEngine {
                     const travel = AX === 'z' ? num(machine.z, -120) : num(machine[AX], 300);
                     // H1 (t481) — HOME is the MACHINE-0 end (axisHomeMotion, the SAME source as homingSimProxy + axisSpan);
                     // was the signed-travel far end → the sim drove AWAY from home. The final homed spot is the back-off.
-                    const { back } = axisHomeMotion(travel, { dir: cfg.dir, offset: num(cfg.offset, 0), backoff: num(cfg.backoff, 5) });
-                    homedMove = { axis: AX, machine: back };
+                    // H3 (t485) — carry BOTH the seek (the home switch, machine-0 end) and the back-off rest spot so the
+                    // motion can pass THROUGH the switch (trip) then settle backed-off (release), like homingSimProxy / O501.
+                    const { seek, back } = axisHomeMotion(travel, { dir: cfg.dir, offset: num(cfg.offset, 0), backoff: num(cfg.backoff, 5) });
+                    homedMove = { axis: AX, seek, back };
                 }
                 this.vars.set(1515 + N, 1);   // homed flag #[1515+N] — the controller sets it on real hardware
                 this._setStatus(`M98 P501 — home ${(AX || N).toString().toUpperCase()} (axis ${N})`, true);
@@ -899,17 +916,22 @@ export class GcodeExecutionEngine {
         // home has no motion (homedMove null) but still short-circuits so its X<N> word is never read as a coordinate.
         if (wasNativeHome && !homedMove) { this.ip += 1; return false; }
         if (homedMove) {
-            const target = { ...this.pos };
-            target[homedMove.axis] = homedMove.machine * this.unitScale - (this._wcsOffset[homedMove.axis] || 0);
+            // H3 (t485) — model the real O501 motion (mirrors homingSimProxy's G53 seek/back): SEEK the home switch
+            // (the machine-0 end) then BACK OFF into the travel, so the home switch TRIPS at the seek and RELEASES on
+            // the back-off. Both points map machine → part frame (part = machine·unitScale − wcsOffset — the G53 map).
+            const map = (mach) => mach * this.unitScale - (this._wcsOffset[homedMove.axis] || 0);
+            const seekT = { ...this.pos }; seekT[homedMove.axis] = map(homedMove.seek);   // the home SWITCH (machine-0 end)
+            const target = { ...this.pos }; target[homedMove.axis] = map(homedMove.back);  // the backed-off REST spot
             this.stats.absolute = true;   // a homed axis is a fixed machine position, not start-relative
             if (this._traceSink) {
-                this._traceSink.push({
-                    x1: this.pos.x, y1: this.pos.y, z1: this.pos.z,
-                    x2: target.x, y2: target.y, z2: target.z,
-                    rapid: true, probe: false, type: 'rapid', feed: this.feedVal,
-                    pass: this._pass, line: step.lineIndex,
+                const seg = (from, to) => this._traceSink.push({
+                    x1: from.x, y1: from.y, z1: from.z, x2: to.x, y2: to.y, z2: to.z,
+                    rapid: true, probe: false, type: 'rapid', feed: this.feedVal, pass: this._pass, line: step.lineIndex,
                 });
-                this.pos = target;
+                seg({ ...this.pos }, seekT);
+                this.pos = seekT; this._updateLimitSwitches();   // H3 — SEEK reached the switch → home switch TRIPS
+                seg({ ...this.pos }, target);
+                this.pos = target; this._updateLimitSwitches();  // H3 — BACK-OFF off the switch → RELEASES
                 this.ip += 1;
                 return false;
             }
@@ -917,14 +939,17 @@ export class GcodeExecutionEngine {
             const realMs = this.rapidRate > 0 ? (d / this.rapidRate) * 60000 : 0;
             const speed = this.simSpeed > 0 ? this.simSpeed : 1;
             if (realMs / speed > 50) {
-                this._move = { from: { ...this.pos }, to: target, durMs: realMs, elapsed: 0, last: null, touchName: null };
+                // Animate current → seek (TRIP) → back (RELEASE) as a polyline so the home switch flips LIVE mid-move.
+                this._move = { from: { ...this.pos }, to: target, path: [{ ...this.pos }, seekT, target], durMs: realMs, elapsed: 0, last: null, touchName: null };
                 this._setStatus(`Homing ${homedMove.axis.toUpperCase()} — G0 ${d.toFixed(1)} mm`, true);
                 this._nextDelayMs = 16;
                 this.ip += 1;
                 return false;   // ticks now advance the move; next line runs when it lands
             }
+            this._updateLimitSwitches(seekT);   // H3 — instant home: the axis passes THROUGH the switch (TRIP)…
             this.pos = target;
             if (typeof this.onPositionChange === 'function') this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+            this._updateLimitSwitches();        // …then settles backed-off (RELEASE)
             this.ip += 1;
             return false;
         }
@@ -1090,6 +1115,7 @@ export class GcodeExecutionEngine {
                     line: step.lineIndex,   // source line → lets the preview seek the tool to a clicked code line
                 });
                 this.pos = target;
+                this._updateLimitSwitches();   // H3 (t485) — trace-mode linear commit: trip/release the limit switches (a non-homing run reaching a limit trips too)
                 this.ip += 1;
                 return false;
             }
@@ -1120,6 +1146,7 @@ export class GcodeExecutionEngine {
                 // at each probe contact (B-FLASH-2ND-AXIS). pass 0 ops are unaffected (default already 0).
                 this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z, pass: this._pass });
             }
+            this._updateLimitSwitches();   // H3 (t485) — sub-frame move landed: trip/release the limit switches (a non-homing run that hits a limit trips too)
         } else if (this._traceSink) {
             // Arc (G2/G3) in a trace: linearize into chord segments so the drawn route shows the curve.
             // (Real-time play still steps line-by-line and skips arcs — a separate, pre-existing gap.)
@@ -1140,6 +1167,7 @@ export class GcodeExecutionEngine {
                     prev = pts[i];
                 }
                 this.pos = target;
+                this._updateLimitSwitches();   // H3 (t485) — arc trace commit: trip/release the limit switches
             }
         } else {
             // Arc (G2/G3) in real-time play: walk the linearized arc so the curve actually animates. Direction
@@ -1164,6 +1192,7 @@ export class GcodeExecutionEngine {
                 }
                 this.pos = target;   // sub-frame arc: jump to the end
                 if (typeof this.onPositionChange === 'function') this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z });
+                this._updateLimitSwitches();   // H3 (t485) — arc landed: trip/release the limit switches
             }
         }
 
