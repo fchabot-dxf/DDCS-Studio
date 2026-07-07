@@ -124,6 +124,12 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         const wr = (r) => byRole[r] && _writable(byRole[r].param);   // a role whose param is a settable form field
         // pos handle = a `point` gesture over the x/y params (built only when both are writable — never a dead handle).
         const pos = (ax = 0, ay = 0) => { if (wr('x') && wr('y')) decls.push({ type: 'point', id: gid + '_pos', fx: byRole.x.param, fy: byRole.y.param, x: p('x'), y: p('y'), ax, ay, label: 'pos' }); };
+        // composable GUI (PILOT 2) — a binding may DECLARE its anchor kind+frame explicitly (the `layoutwidget` block) instead
+        // of the role/param-name sniff → SWITCH on anchor.kind. kind 'point' + frame 'stock-min' = an ABSOLUTE PHYSICAL point
+        // (ax=0, the datum model — datum-relative display is a later slice). The role ladder + the corner/edge/② magic-name
+        // sniffs below stay as the FALLBACK (untouched) → corner/edge/middle byte-identical (they declare no anchor).
+        const anchor = groups[gid].map((b) => b && b.anchor).find(Boolean);
+        if (anchor && anchor.kind === 'point') { pos(); continue; }
         if (byRole.x && byRole.y && byRole.w && byRole.h && byRole.slant) {
             const x = p('x'), y = p('y'), w = p('w'), h = p('h'), slant = p('slant');
             const dx = Math.tan(slant / 180 * Math.PI) * h;

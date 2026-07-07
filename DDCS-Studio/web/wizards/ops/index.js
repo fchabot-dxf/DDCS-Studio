@@ -51,6 +51,7 @@ import { layoutBlock } from './layout.js';
 import { simBlock } from './sim.js';
 import { simStartBlock } from './simStart.js';
 import { formFieldBlock } from './formField.js';
+import { layoutWidgetBlock } from './layoutWidget.js';
 import { variableBlock } from './variable.js';
 import { paramBlock } from './param.js';
 import { regionPickBlock } from './regionpick.js';
@@ -85,7 +86,7 @@ export const PALETTE = [
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)
-    paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, formFieldBlock, userRootBlock, paramGroupBlock, sectionBlock, ...STRUCT_CTL_BLOCKS, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations + FORM value-field blocks + titled concern-section + structural-control blocks)
+    paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, formFieldBlock, layoutWidgetBlock, userRootBlock, paramGroupBlock, sectionBlock, ...STRUCT_CTL_BLOCKS, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations + FORM value-field blocks + LAYOUT-2D widget blocks + titled concern-section + structural-control blocks)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 

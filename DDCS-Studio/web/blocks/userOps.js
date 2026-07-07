@@ -312,17 +312,62 @@ export function bindingsToBlocks(specs) {
     });
 }
 
-/** If the template AUTHORS its value bindings as `formfield` blocks, derive them (the composable form). Mirrors
- *  resolvePanelMeta/resolveSimMeta: ADDITIVE — returns null when there are NO formfield blocks, so a hand-written-spec
- *  def (today's corner/edge/middle) is UNTOUCHED / byte-identical. Returns { specs, bindings } — specs drive the emit
- *  re-derivation (def.bindingSpecs), bindings drive the form + schema (deriveBindings over the template). */
+// ── def.bindings (group/role/anchor) ⇄ `layoutwidget` blocks (composable-authoring PILOT 2) — the GUI point-pick ──
+// A `layoutwidget` block DECLARES a canvas handle bound to params. v1 = POINT-PICK: it EXPANDS to two SOCKET-LESS
+// bindings {param, group, role:'x'/'y', anchor:{kind,frame}} — form + canvas only (no match/blockIndex → no emit, so
+// sim/form-only, byte-identical). layoutSpecFromOp's x+y→`point` derivation renders the draggable handle; the drag
+// writes fx/fy (world coords). anchor:{kind:'point', frame:'stock-min'} = an absolute PHYSICAL point (ax=0).
+
+/** The `layoutwidget` blocks in a stack → SOCKET-LESS layout bindings (the group/role/anchor a handle needs). */
+export function layoutBindingsFromStack(children) {
+    const out = []; let n = 0;
+    for (const b of flattenBlocks(children)) {
+        if (!b || b.type !== 'layoutwidget') continue;
+        const p = b.params || {};
+        const anchor = { kind: 'point', frame: p.frame === 'datum' ? 'datum' : 'stock-min' };   // v1: point only
+        const gid = 'lw' + (++n);
+        const xv = Number(p.xval), yv = Number(p.yval);
+        out.push({ param: String(p.fx || 'x'), type: 'number', default: Number.isFinite(xv) ? xv : 0, group: gid, role: 'x', anchor });
+        out.push({ param: String(p.fy || 'y'), type: 'number', default: Number.isFinite(yv) ? yv : 0, group: gid, role: 'y', anchor });
+    }
+    return out;
+}
+
+/** SOCKET-LESS layout bindings → `layoutwidget` block records (the reverse — re-authorable). Pairs each group's x/y. */
+export function layoutBindingsToBlocks(bindings) {
+    const byGroup = {};
+    for (const b of (bindings || [])) if (b && b.group && b.anchor && (b.role === 'x' || b.role === 'y')) (byGroup[b.group] = byGroup[b.group] || {})[b.role] = b;
+    const out = [];
+    for (const g in byGroup) {
+        const x = byGroup[g].x, y = byGroup[g].y;
+        if (!x || !y) continue;
+        out.push({ type: 'layoutwidget', params: {
+            fx: x.param, fy: y.param,
+            anchor: (x.anchor && x.anchor.kind) || 'point', frame: (x.anchor && x.anchor.frame) || 'stock-min',
+            xval: x.default != null ? String(x.default) : '', yval: y.default != null ? String(y.default) : '', label: 'pt',
+        } });
+    }
+    return out;
+}
+
+/** The LIVE-form extra bindings a stack's authoring blocks declare — formfield VALUE fields + layoutwidget GUI handles.
+ *  For devMode.deriveAuthoredDef so a field/handle shows in the form AS YOU AUTHOR IT. Safe (skips on a bad match). */
+export function authoredExtraBindings(children) {
+    return [...formfieldBindings(children), ...layoutBindingsFromStack(children)];
+}
+
+/** If the template AUTHORS its bindings as `formfield` (value) / `layoutwidget` (GUI) blocks, derive them. Mirrors
+ *  resolvePanelMeta/resolveSimMeta: ADDITIVE — returns null when there are NONE, so a hand-written-spec def (today's
+ *  corner/edge/middle) is UNTOUCHED / byte-identical. Returns { specs, bindings } — specs drive the emit re-derivation
+ *  (def.bindingSpecs), bindings drive the form + schema (deriveBindings over the template) + the GUI (group/role/anchor). */
 function resolveBindingsMeta(def) {
     const template = def && Array.isArray(def.template) ? def.template : [];
     const specs = bindingsFromStack(template);
-    if (!specs.length) return null;   // no formfield blocks → keep the hand-written def.bindings/bindingSpecs (byte-identical)
-    // v1: derive over the UNPRUNED template (a formfield-authored op carries no guards yet — a guarded authored op is a later slice).
-    const bindings = deriveBindings(flattenBlocks(template), specs);
-    return { specs, bindings };
+    const layout = layoutBindingsFromStack(template);
+    if (!specs.length && !layout.length) return null;   // no authoring blocks → keep hand-written def.bindings/bindingSpecs (byte-identical)
+    // v1: derive over the UNPRUNED template (an authored op carries no guards yet — a guarded authored op is a later slice).
+    const valueBindings = specs.length ? deriveBindings(flattenBlocks(template), specs) : [];
+    return { specs, bindings: [...valueBindings, ...layout] };
 }
 
 /** The FORM bindings a stack's `formfield` blocks declare (specs → deriveBindings over the stack). For the LIVE Blocks
@@ -436,8 +481,8 @@ export function registerUserOp(def) {
     // corner/edge/middle) is UNTOUCHED / byte-identical. Applied before validate so the derived bindings are validated + used.
     const authored = resolveBindingsMeta(def);
     if (authored) {
-        def.bindingSpecs = authored.specs;
-        const structural = (def.bindings || []).filter((b) => b && b.param != null && b.blockIndex == null);   // preserve hand-written STRUCTURAL toggles (value-field blocks only in v1)
+        if (authored.specs.length) def.bindingSpecs = authored.specs;   // value fields → emit re-derivation (a layout-only op sets none)
+        const structural = (def.bindings || []).filter((b) => b && b.param != null && b.blockIndex == null && !b.group);   // preserve hand-written STRUCTURAL toggles (NOT the layout group bindings)
         def.bindings = [...authored.bindings, ...structural];
     }
     const errs = validateUserOp(def);

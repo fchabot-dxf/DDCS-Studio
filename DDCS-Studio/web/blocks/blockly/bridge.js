@@ -154,6 +154,9 @@ const optionsFor = (def, field) => {
     // FORM value-field block (composable-authoring): the form-widget + the binding value-type dropdowns.
     if (field === 'widget' && def.type === 'formfield') return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list'];
     if (field === 'type' && def.type === 'formfield') return ['number', 'int', 'enum', 'bool', 'string', 'list'];
+    // LAYOUT-2D widget block (composable GUI): the anchor KIND + the coordinate FRAME (v1 = point / stock-min).
+    if (field === 'anchor' && def.type === 'layoutwidget') return ['point'];
+    if (field === 'frame' && def.type === 'layoutwidget') return ['stock-min', 'datum'];
     if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form'];   // the GUI panel-type declaration
     if (field === 'kind' && def.type === 'layout') return ['none', 'corner'];
     if (field === 'value' && def._options) return def._options;   // t154 — a structural-control (sc_*) enum: its dropdown options ride on the generated def (from CORNER_STRUCT_BINDINGS)
