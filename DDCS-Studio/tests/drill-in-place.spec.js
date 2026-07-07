@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test';
  * gap: (1) the built-in Drill opens user_drill_data in-place; (2) the FORM renders the drill knobs (not empty/broken);
  * (3) emit BYTE-IDENTICAL (the drill golden); (4) the SIM renders. BORE stays built-in (the peck-only-twin gap surfaced).
  */
-test('opensAs wiring: Drill opens user_drill_data IN-PLACE, title "Drill", twin retired from mill_datawiz; Bore stays built-in (peck-only-twin gap)', async ({ page }) => {
+test('opensAs wiring: Drill opens user_drill_data IN-PLACE, title "Drill", twin retired from mill_datawiz; Bore opens its OWN helical twin', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio);
     const r = await page.evaluate(async () => {
@@ -27,7 +27,7 @@ test('opensAs wiring: Drill opens user_drill_data IN-PLACE, title "Drill", twin 
     expect(r.drillOpensAs, 'the built-in Drill entry opensAs the twin (the click re-points)').toBe('user_drill_data');
     expect(r.title, 'the seamless in-place title is the built-in plain label "Drill"').toBe('Drill');
     expect(r.twinRetired, 'the twin no longer surfaces its OWN Mill-Data-Wiz entry (one-source hide)').toBe(true);
-    expect(r.boreOpensAs, 'BORE stays built-in — user_drill_data is peck-only (method=helical swaps the block type), so Bore needs its own helical twin').toBeFalsy();
+    expect(r.boreOpensAs, 'BORE now opens its OWN helical twin (user_drill_data is peck-only — method=helical swaps the block type)').toBe('user_bore_data');
 });
 
 test('emit BYTE-IDENTICAL: user_drill_data == the built-in drillStack across a param sweep (the twin is unchanged by the in-place wire)', async ({ page }) => {

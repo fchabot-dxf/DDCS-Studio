@@ -75,10 +75,10 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
     "openWiz && openWiz('atc_table')", "openWiz && openWiz('atc_test')",
   ]);
 
-  // Mill: DRILL/Slot/Surfacing/Text now open their data-op twins IN-PLACE (opensAs, t405/t407); BORE keeps its variant
-  // (peck-only twin → Bore needs its own helical twin). Inline-SVG icons still render (drill/text) — the bar's SVG map WINS.
+  // Mill: DRILL/Slot/Surfacing/Text open their data-op twins IN-PLACE (opensAs, t405/t407); BORE now opens its OWN helical
+  // twin (user_bore_data — the peck twin can't be reused). Inline-SVG icons still render (drill/text) — the bar's SVG map WINS.
   expect(mill.items[0].onclick).toBe("openWiz && openWiz('user_drill_data')");
-  expect(mill.items[1].onclick).toBe("openWiz && openWiz('drill','bore')");
+  expect(mill.items[1].onclick).toBe("openWiz && openWiz('user_bore_data')");
   expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('user_drill_data')").hasSvg).toBe(true);
   expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('user_text_data')").hasSvg).toBe(true);
 

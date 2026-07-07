@@ -20,6 +20,7 @@ import { atcWarmupDataDef } from './blocks/dataOps/atcWarmupData.js';
 import { atcLengthDataDef } from './blocks/dataOps/atcLengthData.js';   // t409 — ATC Tool Length light port (new twin, opened IN-PLACE from the ATC Tool Length slot)
 import { atcCheckDataDef } from './blocks/dataOps/atcCheckData.js';   // t411 — ATC Tool Check light port (inherits the Tool Length recipe)
 import { drillDataDef } from './blocks/dataOps/drillData.js';
+import { boreDataDef } from './blocks/dataOps/boreData.js';   // fan-out — the helical "Bore (data)" twin — opened IN-PLACE from the built-in Bore slot (opensAs); drillStack method='helical', byte-identical
 import { slotDataDef } from './blocks/dataOps/slotData.js';
 import { surfacingDataDef } from './blocks/dataOps/surfacingData.js';
 import { contourDataDef } from './blocks/dataOps/contourData.js';   // E1 mill FEATURE-WRITE port: the flat "Contour (data)" twin — opened IN-PLACE from the built-in Contour slot (opensAs); region-pill→flat reframe, byte-identical
@@ -152,6 +153,7 @@ class DDCSStudio {
             atcLengthDataDef(),   // t409 — ATC Tool Length twin (in-place from the ATC Tool Length slot)
             atcCheckDataDef(),   // t411 — ATC Tool Check twin (in-place from the ATC Tool Check slot)
             drillDataDef(),
+            boreDataDef(),   // fan-out — seed the Bore twin so its in-place Bore slot (opensAs) opens a registered op on boot
             slotDataDef(),
             surfacingDataDef(),
             contourDataDef(),   // E1 — seed the contour twin so its in-place Contour slot (opensAs) opens a registered op on boot
