@@ -50,8 +50,7 @@ test('WCS form gates auto/WCS-number/sync per post (M350 all on; rs274 fixed onl
     // v41 — the active WORK registers (#1506+) are active-WCS-only: the whole picker inert + sync gated
     expect(v41.sysDisabled, 'v41: the WCS picker is inert (#1506+ zeroes the active frame, no per-WCS index)').toBe(true);
     expect(v41.syncDisabled, 'v41: sync gated').toBe(true);
-    // dm500 — PER-WCS register (#804+): the WCS NUMBER is now MEANINGFUL → G54 enabled (gate dropped); auto+sync still gated
-    expect(dm500.autoOptDisabled, 'dm500: auto gated (M350-only)').toBe(true);
-    expect(dm500.g54Disabled, 'dm500: fixed G54 ENABLED — per-WCS #804 makes the number meaningful (gate dropped)').toBe(false);
+    // dm500 — G92 datum (grounded, defprobe): active-frame-driven, WCS-agnostic → the whole picker inert + sync gated (like v41)
+    expect(dm500.sysDisabled, 'dm500: the WCS picker is inert (G92 zeroes the active frame, no WCS number)').toBe(true);
     expect(dm500.syncDisabled, 'dm500: sync gated').toBe(true);
 });

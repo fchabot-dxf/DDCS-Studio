@@ -51,7 +51,7 @@ test('M350 byte-identical (ZERO) + non-M350 the correct per-dialect WCS-set', as
     expect(r.after['ddcs-v41'], 'v41 #1507=0').toContain('#1507=0');
     expect(r.after['ddcs-v41'].includes('G92'), 'v41 no longer uses the temporary G92').toBe(false);
     expect(r.after['ddcs-v41'].includes('#880'), 'v41 no longer leaks the M350 DRO #880').toBe(false);
-    // dm500 — the persistent PER-WCS register write (#804=#864, offset = DRO), M350-analogous; NOT G92
-    expect(r.after['ddcs-v3-dm500'], 'dm500 writes the per-WCS register #804 = the DRO #864').toContain('#804=#864');
-    expect(r.after['ddcs-v3-dm500'].includes('G92'), 'dm500 no longer uses the temporary G92').toBe(false);
+    // dm500 — the DUMP-GROUNDED G92 datum (per defprobe.nc); NOT the inferred/un-dumped #804 register (register-name ≠ macro-usage)
+    expect(r.after['ddcs-v3-dm500'], 'dm500 sets the datum via G92 (grounded in defprobe.nc)').toContain('G90 G92 X0 Y0');
+    expect(r.after['ddcs-v3-dm500'].includes('#804'), 'dm500 does NOT ship the inferred/un-dumped #804 register').toBe(false);
 });

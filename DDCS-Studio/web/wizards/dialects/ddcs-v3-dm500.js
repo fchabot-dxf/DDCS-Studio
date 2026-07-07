@@ -19,7 +19,7 @@ export const dialect = {
     programModel: 'inline', probeModel: 'move-until-input', dwellUnits: 's',
     vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, atc: null, ax: AX },   // atc null: no confirmed tool-changer firmware model on the DM500
     caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false,
-        wcsAuto: false, wcsFixed: true, wcsSync: false },   // t477 — WCS via PER-WCS register write #804+ (number MEANINGFUL → gate dropped); auto M350-only; no slave-sync
+        wcsAuto: false, wcsFixed: false, wcsSync: false },   // t479 — WCS via G92 (grounded, defprobe.nc): active-frame-driven, WCS-agnostic → the number is GATED; auto M350-only; no slave-sync
 
     // move-until-input: arm (M101) → feed move → disarm (M102). probe.nc:23-25.
     probeMove: (axis, dist, { feed = 100 } = {}) => ['M101', `G91 G01 ${axis}${dist} F${feed}`, 'M102'],
@@ -30,18 +30,17 @@ export const dialect = {
     // DM500 macros zero with G92 (defprobe.nc:21) — value is a WORK coord (plate thickness), NOT a machine coord
     // like Expert's register write. Cross-profile value semantics unresolved → VERIFY on hardware.
     setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}   ( set datum - VERIFY on hardware )`],
-    // WCS ZERO-AT-CURRENT (t477) — PER-WCS register write (offset = current DRO), M350-ANALOGOUS via DM500's OWN registers
-    // (wcsBase #804 stride 4, DRO #864, active #455). NOT G92 (temporary). PER-WCS → the WCS NUMBER is meaningful (gate
-    // dropped). ⚠ FLAG (INFERRED, NOT dump-confirmed): DM500's dumps show G92 (defprobe.nc) + a #400-series auto-datum
-    // (probe.nc) — NO #804-write macro; the offset=DRO form is inferred from the register layout. VERIFY on hardware.
+    // WCS ZERO-AT-CURRENT (t479) — TRANSCRIBED from DM500's OWN dump form: set the current position as datum via G92,
+    // GROUNDED in defprobe.nc (`G90 G92 X#2000/2+#2001` &c. — the datum-set is G92). For a NO-PROBE zero-at-current the
+    // offset is 0 → `G90 G92 <axes>0`. NOT #804 (that register is DECLARED but NO dump WRITES it — register-name ≠
+    // macro-usage; we don't ship a guessed register). The #400-series in probe.nc (#402=#400 · #403=1 auto-set-coord flag ·
+    // #404=-#870) is a PROBE-COUPLED auto-datum (it precedes the `G91G01Z#575` probe move; the datum is set ON TOUCH) — a
+    // DIFFERENT, probed flow, so it is NOT part of this no-probe zero-at-current. G92 is ACTIVE-frame-driven (WCS-agnostic)
+    // → the WCS number is gated off (wcsFixed false). ⚠ VERIFY on hardware.
     wcsZeroAtCurrent: (p = {}) => {
-        const sys = String(p.sys), auto = sys === '0', axes = [];
-        if (p.axisX) axes.push(0); if (p.axisY) axes.push(1); if (p.axisZ) axes.push(2);
+        const axes = [p.axisX && 'X', p.axisY && 'Y', p.axisZ && 'Z'].filter(Boolean);
         if (!axes.length) return ['( WCS zero: no axes selected )'];
-        const L = ['( WCS zero at current - DM500 register write - VERIFY on hardware )'];
-        if (auto) { L.push('#150=#455', '#151=804+[#150-1]*4'); axes.forEach((o) => L.push(`#[#151+${o}]=#${864 + o}`)); }
-        else { const base = 804 + (parseInt(sys, 10) - 54) * 4; axes.forEach((o) => L.push(`#${base + o}=#${864 + o}`)); }
-        return L;
+        return ['( WCS zero at current - DM500 G92 datum - VERIFY on hardware )', `G90 G92 ${axes.map((a) => a + '0').join(' ')}`];
     },
     readActiveWcs: (varName) => [`${varName}=#455`],        // #455/#516 select coord system
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),

@@ -6985,3 +6985,19 @@ HIGHLIGHT the involved pockets: reused `highlightStation(region, label)` (added 
 **FLAGS:** (1) dm500 #804 form INFERRED (not dump-confirmed — verify on hardware). (2) grbl host-streamed (WCS macro best-effort; macro-vs-stream = a broader porting concern). (3) FOLLOW-UP — the TWIN (in-place) form gating: postGating targets the BUILT-IN w_* ids; the twin form uses data-param (now targetable after the toggle fix) → gating the in-place surface needs a caps-driven param-gating extension (the built-in form gating is complete + correct). (4) NOTED (advisor's, deferred) — the probe-side setWorkOffset also emits G92 for v41/dm500 (same temp-offset issue).
 
 **PASSED BACK: the FULL WCS port — M350 byte-diff ZERO + v41 #1506 / dm500 #804 (persistent; dm500 inferred) + the twin (byte-identical all dialects, in-place, 6-field form) + the gating + screenshots. Follow-up: the twin-form (in-place) gating.**
+
+## 🔨 turn 479 (cycle 223) — WCS dm500 GROUND-TRUTH FIX (the last before release): DROPPED the inferred #804, TRANSCRIBED the actual dump form (G92, grounded in defprobe.nc). Re-gated (G92 active-driven → number gated). M350/V4.1/grbl/rs274 + the twin UNCHANGED. Full suite 754 pass.
+
+**TASK:** dm500's inferred #804 is NOT in the dumps — do NOT ship the inference (register-name ≠ macro-usage / ddcs-ground-truth). TRANSCRIBE the actual dm500 dump zero-datum form faithfully. RE-ASSESS the WCS-number gating on the actual form. VERIFY dm500 matches the dump (NOT #804); everything else unchanged; twin byte-identical; gating; suite green.
+
+**GROUNDED (read the actual dm500 dumps):** defprobe.nc sets the datum via `G90 G92 X#2000/2+#2001` (+ Y/Z) — DM500's datum-set IS G92 → a no-probe zero-at-current is `G90 G92 <axes>0`. probe.nc's #400-series (`#402=#400` · `#403=1` auto-set-coord flag · `#404=-#870`) is a PROBE-COUPLED auto-datum — it precedes the `G91G01Z#575` probe move + the datum is set ON TOUCH → a DIFFERENT, probed flow, NOT a no-probe zero-at-current (noted, not emitted — emitting it would require a probe move + be an interpretation). NO dump WRITES #804 (declared in the vars but never macro-used) → the #804 form was an INFERENCE → DROPPED.
+
+**FIX:** dm500 wcsZeroAtCurrent → `( WCS zero at current - DM500 G92 datum - VERIFY on hardware ) / G90 G92 <axes>0` (transcribed from defprobe, NOT #804). GATING re-assessed: G92 is ACTIVE-frame-driven (WCS-agnostic — no per-WCS register) → the WCS-number is GATED (dm500 caps wcsFixed true→false; now gates like v41: whole picker inert + sync gated).
+
+**UNCHANGED (re-verified):** M350 #805+ (byte-diff ZERO), V4.1 #1506-1509 (grounded), grbl/rs274 G10 L20. The twin (user_wcs_data) == the built-in byte-identical on ALL dialects (inherits the dm500 G92 via the atom).
+
+**VERIFY:** UPDATED wcs-dialect-emit.spec (dm500 asserts `G90 G92 X0 Y0`, NOT #804) + wcs-gating.spec (dm500 picker inert). M350/V4.1/grbl/rs274 assertions UNCHANGED (pass). wcs-in-place.spec (the twin byte-identical all dialects) passes with the dm500 G92. FULL SUITE 754 pass / 0 fail. 3 files (dm500 dialect + 2 specs).
+
+**dm500 BEFORE→AFTER (this turn):** `#804=#864 · #805=#865` (INFERRED, t477) → `G90 G92 X0 Y0` (DUMP-GROUNDED, defprobe.nc).
+
+**PASSED BACK: the dm500 fix is DUMP-GROUNDED (G92, defprobe.nc), NOT inferred (#804 dropped). The #400-series is DM500's PROBE auto-datum (probe-coupled — noted, not part of the no-probe zero-at-current). Everything else unchanged + byte-identical. Ready for review + RELEASE WCS, then HOMING H1.**
