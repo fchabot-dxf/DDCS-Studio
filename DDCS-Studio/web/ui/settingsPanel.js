@@ -429,7 +429,7 @@ function renderMachineGui() {
     const P = (x, y, z) => [(x - y) * c, (x + y) * s - z];          // iso: +X right-down, +Y left-down, +Z up
     const all = []; for (const x of [0, X]) for (const y of [0, Y]) for (const z of [0, Z]) all.push(P(x, y, z));
     const xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
-    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys), pad = 38;
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys), pad = 46;   // t493 — a wider margin so the offset travel fields sit clear of the box
     const scale = Math.min((W - 2 * pad) / Math.max(1, maxX - minX), (H - 2 * pad) / Math.max(1, maxY - minY));
     const ox = (W - (minX + maxX) * scale) / 2, oy = (H - (minY + maxY) * scale) / 2;
     const S = (x, y, z) => { const p = P(x, y, z); return [ox + p[0] * scale, oy + p[1] * scale]; };
@@ -453,8 +453,12 @@ function renderMachineGui() {
     svg += `<circle cx="${O[0].toFixed(1)}" cy="${O[1].toFixed(1)}" r="3.4" fill="#ffd24a" stroke="#111" stroke-width="0.7"/>`;   // home (machine 0)
     svgBox.innerHTML = svg + '</svg>';
     const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    // Push each travel field OFF its edge midpoint, OUTWARD from the box centre, so the field no longer sits on (and
+    // obscures) the coloured edge — the envelope box reads clear while the field stays beside its own axis (t493).
+    const ctr = mid(O, c111);
+    const outward = (p, d) => { const dx = p[0] - ctr[0], dy = p[1] - ctr[1], L = Math.hypot(dx, dy) || 1; return [p[0] + dx / L * d, p[1] + dy / L * d]; };
     const place = (id, p) => { const el = document.getElementById(id); if (el) { el.style.left = Math.max(0, Math.min(W - 46, p[0] - 23)) + 'px'; el.style.top = Math.max(0, Math.min(H - 18, p[1] - 9)) + 'px'; } };
-    place('set_mach_x', mid(O, c100)); place('set_mach_y', mid(O, c010)); place('set_mach_z', mid(O, c001));
+    place('set_mach_x', outward(mid(O, c100), 30)); place('set_mach_y', outward(mid(O, c010), 30)); place('set_mach_z', outward(mid(O, c001), 30));
 }
 function commitMachine() {
     const s = getSettings(); if (!s.machine) s.machine = {};

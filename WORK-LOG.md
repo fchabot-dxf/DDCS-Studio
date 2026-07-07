@@ -7108,3 +7108,15 @@ HIGHLIGHT the involved pockets: reused `highlightStation(region, label)` (added 
 **FILES:** engine/limitSwitches.js (axisHomeMotion — machine-0 always) · engine/GcodeExecutionEngine.js (drop dir pass) · wizards/homingWizard.js (drop dir pass) · tests/homing-dir-override.spec.js (sim → machine-0 regardless of dir) · tests/homing-declared-direction.spec.js (new).
 
 **PASSED BACK: the divergence FOUND (a stale homing.z.dir='-' seeked the far/bottom end) + FIXED — axisHomeMotion derives the home end from the DECLARED envelope sign (machine-0), so Z=-120 homes UP regardless of any dir. Sim-only, emit BYTE-IDENTICAL. Full suite 772 pass. Screenshot confirms DRO Mach Z=-5 (top), not -120. Next: the G31 seek-emit direction reconciliation.**
+
+## 🔨 turn 493 (cycle 223) — MACHINE-ENVELOPE FIELD-OFFSET (small UI polish; UI-only, no logic/emit). The 3D machine-envelope config's axis-travel fields sat ON the box edges + obscured it; now each is offset CLEAR (outward from the box centre) so the envelope reads well. Full suite 774 pass. Screenshot: machine_envelope_fields.png.
+
+**TASK:** in the 3D MACHINE ENVELOPE view (settingsPanel, under "Show machine envelope in 3D"), the -600/-120/600 travel INPUT FIELDS sit on the envelope edges and obscure the box. Offset them clear of the edges (outward / beside the axis label), keep each associated with its axis. Screenshot the tidied envelope.
+
+**BUILT (settingsPanel.js renderMachineGui, UI-only):** the fields were `place`d at their edge MIDPOINTS (`mid(O, c100)` etc.) — right ON the coloured edges. Now each is pushed OUTWARD from the box centre (`ctr = mid(O, c111)`; a unit-vector offset of 30px off the midpoint) so it leaves the edge line while staying beside its own axis. Also widened the box margin (`pad` 38→46) so the offset fields sit in the margin instead of clamping against the container edge (the 260×200 box fills up for a large 600mm envelope). No change to `commitMachine` / the values / any emit — purely where the field sits.
+
+**VERIFY (real-symptom):** NEW machine-envelope-field-offset.spec — (1) with the human's config (X=600, Y=-600, Z=-120) the fields still READ each axis (600 / -600 / -120) AND each is offset >12px OFF its recomputed edge midpoint (proving it left the edge line); screenshot machine_envelope_fields.png (the box + coloured edges un-obscured, each field beside its axis). (2) editing a field (X→450 + change) still COMMITS to settings.machine.x (the offset is visual-only). FULL SUITE 774 pass / 0 fail (772→774 = the 2 new tests; the shared renderMachineGui pad change broke NO snapshot).
+
+**FILES:** ui/settingsPanel.js (the outward offset + pad 46) · tests/machine-envelope-field-offset.spec.js (new).
+
+**PASSED BACK: the machine-envelope travel fields are offset CLEAR of the box edges (outward from the centre) + the box margin widened — the envelope + coloured edges read un-obscured; the fields still read + edit each axis. UI-only, no logic/emit change. Full suite 774 pass. Screenshot machine_envelope_fields.png. Ready for the G31-HOMING-OUTPUT next.**
