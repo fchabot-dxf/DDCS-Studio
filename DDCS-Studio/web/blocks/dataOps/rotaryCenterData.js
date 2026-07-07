@@ -23,6 +23,7 @@ import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive the value bindings over a CANONICAL-pruned stack (the #57 diameter socket is known-only in the superset)
+import { opSimStarts } from '../../viz/opSimStarts.js';   // E2 — reuse BUILT_IN.rotary_center's per-pass sim-starts (known=1 pass, fit=3) via the registry, so emit stays byte-identical
 
 /** Author defaults — match rotaryCenterStack's own num() fallbacks + the structural default shape (known / auto / centreline / active / relative). */
 export const ROTARY_CENTER_DEFAULTS = {
@@ -150,5 +151,8 @@ export function rotaryCenterDataDef() {
     const def = userOpFromStack('rotary_center_data', 'Rotary Centreline (data)', rotaryCenterDataStack(ROTARY_CENTER_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = ROTARY_CENTER_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.postInstantiate = (stack, resolved) => applyProbeSources(applySafeZFrame(applyDatumWcs(applyHeaderComments(stack, resolved), resolved), resolved));
+    // E2 — the per-pass PREVIEW-START provider: reuse BUILT_IN.rotary_center (opSimStarts.js:86) VERBATIM via the sim registry
+    // (registerUserOp → setUserSimStarts), NOT the builder → sim-only, emit BYTE-IDENTICAL. KNOWN = 1 pass (top); FIT = 3 (top + 2 flanks).
+    def.simStartsProvider = (params, stock) => opSimStarts('rotary_center', params, stock);
     return def;
 }
