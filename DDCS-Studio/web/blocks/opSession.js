@@ -19,10 +19,7 @@ const dialectOpts = () => { try { return { dialect: resolveActivePost(getActiveP
 import { builderOf, makeOp, _framed, _builderAtoms } from './opBuilders.js';   // the BUILDERS leaf (federated resolver)
 import { flattenBlocks, listUserOps } from './userOps.js';   // ONE pre-order walk shared with devMode (group writeback indexes it); listUserOps → seed knob _expose from a data-op's bindings
 import { FN } from './blockly/bridge.js';   // t391 — the Blockly field name (uppercased) for the _expose knob key
-import { regionParamsFromDesc } from '../wizards/pocketWizard.js';
 import { resolveMethod } from '../wizards/atcModel.js';   // fix B: resolve method (incl. legacy mode/magType) for the declared-param reconcile fallback
-import { regionDesc } from '../wizards/ops/region.js';
-import { offsetRegion } from '../wizards/ops/contour.js';
 // find() recurses into block children (incl. op-containers), so reconcilers locate their inner blocks
 // (e.g. a 'stepdown') whether or not the op is wrapped in an op-container.
 const find = (prog, type) => {
@@ -105,25 +102,24 @@ const RECONCILERS = {
     pocket(prog) {
         const down = find(prog, 'stepdown');
         if (!down || !Array.isArray(down.children)) return null;   // too-small fallback (drill) → no reverse
-        const over = down.children.find((c) => c.type === 'stepover'), rg = over && over.params && over.params.region;
-        if (!over || !rg || !rg.params) return null;
-        // The Region is inset by (tool radius − wall offset). Un-inset it with offsetRegion(+inset) (the same kernel
-        // that built it, so all 4 shapes round-trip incl. the polygon cos(π/n) term) → the TRUE descriptor → typed
-        // dims. tool + wallOffset are form-side params (like the tool), read from the form; not reverse-synced.
-        const tool = formNum('p_toolDia', 6), r = tool / 2, inset = r - formNum('p_wallOffset', 0), wb = find(prog, 'wcs');
-        const trueP = regionParamsFromDesc(offsetRegion(regionDesc(rg.params), inset));   // un-inset → typed region params
+        // The FLAT pocketfill atom (E0 region-pill→flat reframe, mirroring contourfill): the TYPED geometry + the tool/
+        // wallOffset ride the block directly (no Region socket), so read the flat dims straight — the atom applies the
+        // inset internally. stepoverPct is now carried as-is (no un-deriving from the absolute stepover).
+        const pf = down.children.find((b) => b.type === 'pocketfill'), p = pf && pf.params;
+        if (!pf || !p) return null;
+        const wb = find(prog, 'wcs');
         const f = {
             p_wcs: (wb && wb.params && wb.params.wcs) || 'active',
-            p_shape: trueP.shape,
+            p_shape: p.shape, p_toolDia: p.toolDia, p_wallOffset: p.wallOffset,
             p_depth: down.params.to, p_stepdown: down.params.by,
-            p_strategy: over.params.strategy === 'parallel' ? 'raster' : 'spiral',
-            p_stepoverPct: tool > 0 ? r3((num(over.params.stepover, 0) / tool) * 100) : undefined,
-            p_feed: over.params.feed, p_plunge: over.params.plunge, p_clearance: over.params.clearance,
+            p_strategy: p.strategy === 'parallel' ? 'raster' : 'spiral',
+            p_stepoverPct: p.stepoverPct,
+            p_feed: p.feed, p_plunge: p.plunge, p_clearance: p.clearance,
         };
-        f.p_originX = r3(trueP.x); f.p_originY = r3(trueP.y);
-        if (trueP.shape === 'circle') { f.p_dia = r3(trueP.w); }
-        else if (trueP.shape === 'polygon') { f.p_dia = r3(trueP.w); f.p_sides = trueP.sides; }
-        else { f.p_w = r3(trueP.w); f.p_h = r3(trueP.h); }   // rect + ellipse
+        f.p_originX = p.originX; f.p_originY = p.originY;
+        if (p.shape === 'circle') { f.p_dia = p.dia; }
+        else if (p.shape === 'polygon') { f.p_dia = p.dia; f.p_sides = p.sides; }
+        else { f.p_w = p.w; f.p_h = p.h; }   // rect + ellipse
         return Object.assign(f, placeFields(prog, 'p_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper
     },
     contour(prog) {

@@ -9,12 +9,13 @@ test('pocket wall offset resizes the tool-centre region (+ bigger, − leaves st
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
     const pw = await import('/wizards/pocketWizard.js');
+    const { pocketInsetRegion } = await import('/wizards/ops/pocketfill.js');
     const findType = (bs, t) => { for (const b of bs) { if (b.type === t) return b; if (b.children) { const f = findType(b.children, t); if (f) return f; } } return null; };
     const regionW = (wallOffset) => {
       const stack = pw.pocketStack({ shape: 'rect', originX: 0, originY: 0, w: 80, h: 60, toolDia: 6, depth: 4, stepdown: 2, strategy: 'raster', wallOffset });
-      const over = findType(stack, 'stepover');                 // the region is the stepover's socket value (params.region)
-      const rg = over && over.params && over.params.region;
-      return rg && rg.params ? { w: rg.params.w, x: rg.params.x } : null;
+      const pf = findType(stack, 'pocketfill');                 // E0 flatten: the FLAT pocketfill leaf carries wallOffset + computes the tool-centre inset internally
+      const rg = pf && pf.params ? pocketInsetRegion(pf.params) : null;   // the inset region descriptor (same value the stepover socket held)
+      return rg ? { w: rg.w, x: rg.x } : null;
     };
     return { zero: regionW(0), big: regionW(2), small: regionW(-2) };
   });

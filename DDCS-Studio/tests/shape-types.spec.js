@@ -12,13 +12,14 @@ test('pocket: polygon insets the circumradius by the tool radius; ellipse insets
   const r = await page.evaluate(async () => {
     const findType = (bs, t) => { for (const b of (bs || [])) { if (!b) continue; if (b.type === t) return b; const f = b.children && findType(b.children, t); if (f) return f; } return null; };
     const pw = await import('/wizards/pocketWizard.js');
+    const { pocketInsetRegion } = await import('/wizards/ops/pocketfill.js');
     const ops = await import('/blocks/opSession.js');
     const rec = await import('/blocks/opRecord.js');
 
     const regionOf = (params) => {
       const stack = pw.pocketStack(params);
-      const over = findType(stack, 'stepover');
-      return over && over.params && over.params.region && over.params.region.params;
+      const pf = findType(stack, 'pocketfill');   // E0 flatten: the FLAT pocketfill leaf holds the typed geometry + computes the tool-centre inset internally
+      return pf && pf.params ? pw.regionParamsFromDesc(pocketInsetRegion(pf.params)) : null;   // → the same inset region-block params the stepover socket held
     };
 
     // Polygon Ø50, 6 sides, tool Ø6 (r=3). The circumradius insets by r/cos(π/6): 25 − 3/cos(30°) ≈ 21.536 → Ø≈43.07.

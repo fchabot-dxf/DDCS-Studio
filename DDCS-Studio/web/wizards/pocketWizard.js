@@ -12,7 +12,6 @@ import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
 import { regionDesc } from './ops/region.js';
-import { offsetRegion } from './ops/contour.js';
 
 /** The TRUE pocket region (rect = corner+size, circle/polygon = centre±R, ellipse = centre±(rx,ry)) — the size you
  *  type, before insetting. Shape-centred at (originX, originY) except rect (its corner). */
@@ -58,46 +57,64 @@ function insetTooSmall(rg, inset) {
     return rg.w - 2 * inset <= 0 || rg.h - 2 * inset <= 0;
 }
 
-/** Pocket params → its block stack. The one source of truth for both displays. */
-export function pocketStack(params = {}) {
+/** Would the pocket inset degenerate (≤0) for these params → too small for the tool to clear (a single centre plunge
+ *  instead of a stepover)? The ONE-SOURCE geometry-derived predicate — drives the concrete build AND the E0 tooSmall
+ *  guard (the twin injects this into the prune params, since it can't be read off any single user param). */
+export function pocketTooSmall(params = {}) {
+    const r = Math.max(0.1, num(params.toolDia, 6)) / 2;
+    return insetTooSmall(regionDesc(trueRegionParams(params)), r - num(params.wallOffset, 0));
+}
+
+/**
+ * Pocket params → its block stack. The one source of truth for both displays. E0 (t467): the pocket geometry rides
+ * FLAT pocketfill/pocketwall leaves (region-pill→flat REFRAME, byte-identical to the stepover+contour region-socket
+ * path) so E1 can bind positionally; `opts.superset` carries BOTH structural forks GUARDED so pruneGuards collapses to
+ * the concrete shape (the twin seam). The forks: `strategy` (raster → parallel clearing + a wall finish; spiral →
+ * concentric clearing, no wall) is a real param → guarded directly; `tooSmall` is GEOMETRY-DERIVED → guarded on the
+ * derived `_tooSmall` key (injected into the prune params by pocketTooSmall). Shapes/side/scalars are E1 value-swaps.
+ */
+export function pocketStack(params = {}, opts = {}) {
+    const superset = !!opts.superset;
     const shape = params.shape || 'rect';
-    const tool = Math.max(0.1, num(params.toolDia, 6)), r = tool / 2;
-    const so = Math.max(0.2, tool * num(params.stepoverPct, 40) / 100);
     const clr = num(params.clearance, 5), feed = num(params.feed, 600), plunge = num(params.plunge, 150);
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const raster = (params.strategy || 'spiral') === 'raster';
     const depth = num(params.depth, 4), by = num(params.stepdown, 1.5);
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
 
-    // tool-centre region, inset by the tool radius MINUS the wall offset (signed): +offset = bigger pocket (cut
-    // oversize), −offset = smaller pocket (leave stock). offset 0 = exact typed size. + too-small detection.
-    // CLEANEST for all 4 shapes: build the TRUE region descriptor, inset it with offsetRegion(-inset) (which knows
-    // each shape's edge-offset, incl. the polygon cos(π/n) term), then map the result back to region-block params.
-    const off = num(params.wallOffset, 0), inset = r - off;
+    // The pocket centre (the tooSmall drill point) — from the TRUE (pre-inset) region descriptor.
     const trueDesc = regionDesc(trueRegionParams(params));
     const cx = trueDesc.kind === 'rect' ? trueDesc.x + trueDesc.w / 2 : trueDesc.cx;
     const cy = trueDesc.kind === 'rect' ? trueDesc.y + trueDesc.h / 2 : trueDesc.cy;
-    const tooSmall = insetTooSmall(trueDesc, inset);
-    const region = newBlock('region');
-    region.params = regionParamsFromDesc(offsetRegion(trueDesc, -inset));
+    const tooSmall = pocketTooSmall(params);
+    const bbox = pocketBBox(params);
 
-    if (tooSmall) {   // pocket smaller than the tool → a single centre plunge, pecking to depth
-        const hole = newBlock('drill');
-        hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr };
-        return [makeStart(params), wcs, makePlace(params, pocketBBox(params), hole), makeEnd(params)];
-    }
+    // The FLAT typed geometry the leaves carry (originX/originY = the shape origin) — one source for both leaves; each
+    // recomputes the inset region + the absolute stepover internally (pocketfill.pocketInsetRegion / stepoverMm).
+    const geom = { shape, originX: ox, originY: oy, w: num(params.w, 80), h: num(params.h, 60), dia: num(params.dia, 50), sides: num(params.sides, 6), wallOffset: num(params.wallOffset, 0), toolDia: num(params.toolDia, 6) };
+    const fillLeaf = (strat) => { const b = newBlock('pocketfill'); b.params = { ...geom, stepoverPct: num(params.stepoverPct, 40), strategy: strat, direction: 'bothways', z: 'z', feed, plunge, clearance: clr }; return b; };   // strat: parallel (raster) | concentric (spiral)
+    const wallLeaf = () => { const b = newBlock('pocketwall'); b.params = { ...geom, z: 'z', feed, plunge, clearance: clr }; return b; };
+    const drillPlace = () => { const hole = newBlock('drill'); hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr }; return makePlace(params, bbox, hole); };
+    const clearPlace = (kids) => { const down = newBlock('stepdown'); down.params = { to: depth, by }; down.children = kids; return makePlace(params, bbox, down); };
+    const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
 
-    const over = newBlock('stepover');
-    over.params = { region, stepover: so, strategy: raster ? 'parallel' : 'concentric', direction: 'bothways', z: 'z', feed, plunge, clearance: clr };
-    const down = newBlock('stepdown');
-    down.params = { to: depth, by };
-    down.children = [over];
-    if (raster) {   // raster leaves the wall un-finished → a Contour finish pass (arc for circles, polygon for rect)
-        const wall = newBlock('contour');   // side 'on': the region is already inset, so this is the inside finish
-        wall.params = { region, side: 'on', tool, z: 'z', feed, plunge, clearance: clr };
-        down.children.push(wall);
+    if (!superset) {   // concrete: the geometry-derived tooSmall + strategy select the arm directly
+        if (tooSmall) return [makeStart(params), wcs, drillPlace(), makeEnd(params)];
+        const kids = [fillLeaf(raster ? 'parallel' : 'concentric')];
+        if (raster) kids.push(wallLeaf());   // raster leaves the wall un-finished → a Contour(on) finish pass
+        return [makeStart(params), wcs, clearPlace(kids), makeEnd(params)];
     }
-    return [makeStart(params), wcs, makePlace(params, pocketBBox(params), down), makeEnd(params)];
+    // superset: BOTH forks present + guarded — tooSmall (drill vs clearing) on the derived `_tooSmall` key, strategy
+    // (parallel+wall vs concentric) on the real param. prune keeps one tooSmall arm + one strategy arm → concrete shape.
+    return [
+        makeStart(params), wcs,
+        GUARD({ param: '_tooSmall', is: true }, [drillPlace()]),
+        GUARD({ param: '_tooSmall', is: false }, [clearPlace([
+            GUARD({ param: 'strategy', is: 'raster' }, [fillLeaf('parallel'), wallLeaf()]),
+            GUARD({ param: 'strategy', is: 'spiral' }, [fillLeaf('concentric')]),
+        ])]),
+        makeEnd(params),
+    ];
 }
 
 export class PocketWizard {
