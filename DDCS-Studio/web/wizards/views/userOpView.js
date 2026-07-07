@@ -16,6 +16,7 @@ import { emitMapped } from '../../blocks/blockEmitter.js';
 import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the stored children for the live preview
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
+import { opSimContext } from '../../viz/opSimContext.js';   // t421 E5 — the DECLARED preview intent (rotary rig, …) so an in-place rotary twin shows its 4th-axis rig (generic mirror of the built-in view + the Blocks tab)
 import { createToolpath2d } from '../../viz/toolpath2d.js';   // t309 — the 2D-animation overlay under the Layout SVG (path + red head, driven by the shared engine)
 import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
 import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
@@ -207,6 +208,15 @@ export const userOpView = {
             if (viz3dBox) viz3dBox.style.display = 'none';
             const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params);
         }
+        // t421 E5 — DECLARED rig intent: a rotary-declaring twin (opSimContext.showRotaryRig, from its stack `sim{rotary:true}`
+        // via setUserSimIntent) shows the 4th-axis rig (chuck + tailstock) in the 3D preview — the GENERIC mirror of the
+        // built-in rotaryCenterView's previewRotaryFixture call + the Blocks tab (blocksApp). Declared, never inferred; a
+        // non-rotary op → false → a harmless no-op (setRotaryFixture early-outs when already off). The 3D box holds the rig:
+        // 'userViz3dContainer' in form3d+2d, 'userVizContainer' in form3d.
+        try {
+            const _rigCont = pt.mode === '3d2d' ? 'userViz3dContainer' : pt.mode === '3d' ? 'userVizContainer' : null;
+            if (_rigCont) mgr.previewRotaryFixture(_rigCont, !!opSimContext(_def.opType).showRotaryRig);
+        } catch (_) { /* op declares no rotary intent → the rig stays off */ }
         const status = el('userVizStatus');
         if (status) status.textContent = (_def.label || 'custom') + ' · ' + (gcode.split('\n').length) + ' lines';
     },

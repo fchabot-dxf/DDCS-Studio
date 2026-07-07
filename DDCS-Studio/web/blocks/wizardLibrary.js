@@ -49,7 +49,7 @@ const BUILTINS = [
     { id: 'middle', type: 'middle', label: 'Middle / Bore / Boss', icon: '🎯', group: 'probe', opensAs: 'user_middle_data' },
     { id: 'edge', type: 'edge', label: 'Edge', icon: '📏', group: 'probe', opensAs: 'user_edge_data' },
     { id: 'alignment', type: 'alignment', label: 'Align', icon: '🧭', group: 'probe' },
-    { id: 'rotary_center', type: 'rotary_center', label: 'Centreline', icon: '', group: 'probe' },
+    { id: 'rotary_center', type: 'rotary_center', label: 'Centreline', icon: '', group: 'probe', opensAs: 'user_rotary_center_data' },   // t421 E5 — IN-PLACE: the Centreline slot opens the twin (round-bar sim + rig + multi-pass starts from E2/E3/E4); built-in rotaryCenterWizard stays the legacy shim
     { id: 'rotary_clock', type: 'rotary_clock', label: 'Clock A0', icon: '🕒', group: 'probe' },
     { id: 'atc_length', type: 'atc_length', label: 'Tool Length', icon: '📏', group: 'atc', opensAs: 'user_atc_length_data' },   // t409 — light NEW port, in-place
     { id: 'atc_check', type: 'atc_check', label: 'Tool Check', icon: '🛡', group: 'atc', opensAs: 'user_atc_check_data' },   // t411 — inherits the Tool Length light-ATC recipe, in-place
