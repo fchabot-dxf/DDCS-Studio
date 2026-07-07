@@ -52,7 +52,7 @@ const BUILTINS = [
     { id: 'rotary_center', type: 'rotary_center', label: 'Centreline', icon: '', group: 'probe' },
     { id: 'rotary_clock', type: 'rotary_clock', label: 'Clock A0', icon: '🕒', group: 'probe' },
     { id: 'atc_length', type: 'atc_length', label: 'Tool Length', icon: '📏', group: 'atc', opensAs: 'user_atc_length_data' },   // t409 — light NEW port, in-place
-    { id: 'atc_check', type: 'atc_check', label: 'Tool Check', icon: '🛡', group: 'atc' },
+    { id: 'atc_check', type: 'atc_check', label: 'Tool Check', icon: '🛡', group: 'atc', opensAs: 'user_atc_check_data' },   // t411 — inherits the Tool Length light-ATC recipe, in-place
     { id: 'atc_change', type: 'atc_change', label: 'Tool Change', icon: '🔧', group: 'atc' },
     { id: 'atc_table', type: 'atc_table', label: 'Tool Table', icon: '📋', group: 'atc' },
     { id: 'atc_test', type: 'atc_test', label: 'ATC Test', icon: '🧪', group: 'atc' },

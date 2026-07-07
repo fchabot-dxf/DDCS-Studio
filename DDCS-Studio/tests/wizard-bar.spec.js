@@ -67,9 +67,9 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(probe.items.find((i) => /Align/.test(i.text)).onclick).toContain('openAlignmentWiz');
   expect(probe.dividers).toEqual(['Rotary']);
 
-  // ATC: Tool Length now opens its data-op twin IN-PLACE (opensAs, t409); the other four via openWiz
+  // ATC: Tool Length + Tool Check now open their data-op twins IN-PLACE (opensAs, t409/t411); the other three via openWiz
   expect(atc.items.map((i) => i.onclick)).toEqual([
-    "openWiz && openWiz('user_atc_length_data')", "openWiz && openWiz('atc_check')", "openWiz && openWiz('atc_change')",
+    "openWiz && openWiz('user_atc_length_data')", "openWiz && openWiz('user_atc_check_data')", "openWiz && openWiz('atc_change')",
     "openWiz && openWiz('atc_table')", "openWiz && openWiz('atc_test')",
   ]);
 

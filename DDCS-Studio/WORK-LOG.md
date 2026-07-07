@@ -2150,3 +2150,20 @@ Each: opensAs wired + plain title + the separate Data-Wiz entry RETIRED (one-sou
 **FULL SUITE: 690 passed, 2 skipped, 1 flaky (the known middle-animator timing flake — untouched), 0 real failures.** The existing built-in atc_length tests (atc-envelope / atc-preview / atc-roundtrip) still pass (the built-in view + op registration stay as the shim; opensAs only re-points the MENU click).
 
 **NO GAP surfaced** — the light-ATC-port recipe (new twin + bindingSpecs + header-recompose + source-chips + in-place) held cleanly. **Tool Check INHERITS this recipe** (atcToolCheckWizard — same static shape, likely the same header/source pattern). Files: atcLengthWizard.js (header helper) · atcLengthData.js (new twin) · app.js (seed) · wizardLibrary.js (opensAs) · atc-length-in-place.spec.js (new) · wizard-bar.spec (routing). **NEXT (per dispatch): ATC Tool Check (same recipe), then the advisor RELEASES the mill/ATC in-place milestone.** Rotary stays PAUSED at E0. PASS BACK.
+
+## 🔨 turn 411 (cycle 127) — ATC TOOL CHECK: the LAST quick win. INHERITED the atc-length light-ATC recipe EXACTLY — NO gap. Full suite 694 pass. The mill/ATC in-place milestone is complete (ready for the advisor's V10.87 release).
+
+**WHAT (the proven light-ATC recipe, applied verbatim + one extra scalar):**
+- **`atcCheckDataDef`** (new blocks/dataOps/atcCheckData.js) via userOpFromStack (mirror atcLengthData.js). Static shape. **8 scalar BINDING_SPECS by #var identity**: #1 maxDist · #2 retract · #3 f_fast · #4 f_slow · #5 port · #6 blockHeight · #19 safeZ · **#20 tolerance** (the check-specific param — Tool Length has 7, Check adds tolerance). `level` baked. Seeded in app.js.
+- **THE TWO SOURCE-TOUCHES (identical recipe):** (a) HEADER RECOMPOSE — source-touch to atcToolCheckWizard.js: extracted the SINGLE interpolated summary line (tolerance/blockHeight/safeZ/fFast/fSlow) into a shared `atcToolCheckHeaderComments(params)` helper (1-element array); `applyHeaderComments` recomposes it from resolved params. (b) SOURCE-CHIPS — `applyProbeSources` rewrites #5 (setterPort) + #6 (blockHeight) to registers on Expert via srcVal/srcNote. postInstantiate = applyHeaderComments(applyProbeSources(stack), resolved).
+- **IN-PLACE:** `opensAs: 'user_atc_check_data'` on the built-in ATC Tool Check entry + form3d + sim forceMachine (the built-in atcCheckView is twoPane with a 3D machine preview).
+
+**VERIFY (tests/atc-check-in-place.spec.js, 3/3 + screenshot):**
+1. **emit BYTE-IDENTICAL to atcToolCheckStack across a scalar sweep on BOTH profiles:** STUDIO (source-chips literal) 0 diffs; EXPERT (resolver stubbed ON → #5/#6 registers) 0 diffs. The sweep varies tolerance/blockHeight/safeZ/maxDist/retract/feeds/port (incl. fractional 25.4/0.25) → the single-line header-recompose + the 8 bindings hold.
+2. **IN-PLACE:** opensAs the twin, title "Tool Check", the atc_datawiz entry RETIRED.
+3. **DRIVE THE APP:** 8-knob non-empty form (incl. tolerance) + the 3D machine-frame sim renders (screenshot scratchpad/atc_check_inplace.png, opened).
+- Updated the pinned wizard-bar ATC routing (atc_check → user_atc_check_data).
+
+**FULL SUITE: 694 passed, 2 skipped, 0 failed.** The existing built-in atc_check tests (atc-envelope / atc-preview / atc-roundtrip) still pass (the built-in stays the shim).
+
+**NO GAP vs Tool Length** — the light-ATC recipe generalized cleanly (only difference: +1 scalar, a single-line header). **THE MILL/ATC IN-PLACE MILESTONE IS COMPLETE:** Drill · Slot · Surfacing · Text · Warm-up (5 in-place finishes) + Tool Length · Tool Check (2 new light ports) — all in-place, byte-identical, forms + sims render. Files: atcToolCheckWizard.js (header helper) · atcCheckData.js (new twin) · app.js (seed) · wizardLibrary.js (opensAs) · atc-check-in-place.spec.js (new) · wizard-bar.spec (routing). **NEXT (per dispatch): the advisor RELEASES the ATC-probe pair as V10.87 → the quick wins are COMPLETE → RESUME Rotary E1 (the superset gate landed t402/c2bfe6e).** Deferred: the Bore helical twin + the drill form-pattern-gating polish. PASS BACK.

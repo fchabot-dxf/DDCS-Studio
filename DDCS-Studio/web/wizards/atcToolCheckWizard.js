@@ -15,6 +15,15 @@ import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
+/** The interpolated SUMMARY header comment — extracted to ONE format so the data-op twin's postInstantiate can RECOMPOSE it
+ *  from the resolved params (the atcLengthHeaderComments precedent), keeping twin==built-in byte-identical for ALL scalars.
+ *  Must reproduce the old inline text byte-for-byte (same num() + defaults as atcToolCheckStack). Returns a 1-element array. */
+export function atcToolCheckHeaderComments(params = {}) {
+    const tol = num(params.tolerance, 0.5), blockHeight = num(params.blockHeight, 50), safeZ = num(params.safeZ, 10);
+    const fFast = num(params.f_fast, 300), fSlow = num(params.f_slow, 50);
+    return [`Tolerance +/-${tol}mm | Block ${blockHeight}mm | Safe Z ${safeZ}mm | Fast ${fFast} | Slow ${fSlow}`];
+}
+
 export function atcToolCheckStack(params = {}) {
     const d = getDialect();
     const toolBase = (d && d.vars && d.vars.toolTable) || 1430;                       // tool-length table base (Expert/DM500 #1430, V4.1 #1560)
@@ -40,7 +49,8 @@ export function atcToolCheckStack(params = {}) {
     const END = () => S.push(newBlock('endprogram'));
 
     C('ATC | Tool Breakage / Length Re-check');
-    C(`Tolerance +/-${tol}mm | Block ${blockHeight}mm | Safe Z ${safeZ}mm | Fast ${fFast} | Slow ${fSlow}`);
+    const [hdr] = atcToolCheckHeaderComments(params);   // ONE format, shared with the twin's postInstantiate recompose
+    C(hdr);
     C('Aborts if the tool is broken, missing, or the wrong length. Compares to tool table.');
     C('=== CONFIGURATION ===');
     A('#1', maxDist, 'Max search distance'); A('#2', retract, 'Retract');
