@@ -1119,39 +1119,16 @@ export class GcodeViz3D {
             const mat = new THREE.MeshLambertMaterial({ color: fillCol, transparent: true, opacity: this._stockOpacity(), depthWrite: false });   // SHADED (lit) stock; opacity per sim mode
             const mesh = new THREE.Mesh();
             if (pocket) {
-                // DECLARED POCKET DEPTH — a REAL RECESS, not a through-hole with a floating floor. The cavity WALLS terminate
-                // at (top − depth), leaving SOLID stock below: the top "donut" (outer minus the holes) is extruded ONLY to the
-                // recess depth D (the deepest declared floor), and a solid BASE box fills below it (with holes ONLY for the
-                // full/undeclared THROUGH cavities → they stay bored full-Z). A shallower recessed pocket gets a plug that
-                // raises its floor. depth is a PHYSICAL cut from the top (datum-independent). (Rect cavities only — round bores
-                // aren't 3D-rendered yet.) All parts are CHILDREN of the one stock mesh → the −C pivot offset + datum apply once.
-                const clampD = (f) => { const d0 = Number(f.depth); return Math.max(0, Math.min(Number.isFinite(d0) ? d0 : stock.z, stock.z)); };
-                const recessed = cavities.map((f) => ({ f, d: clampD(f) })).filter((c) => c.d > 0 && c.d < stock.z);
-                const D = recessed.length ? Math.max(...recessed.map((c) => c.d)) : stock.z;   // walls recess to the deepest floor; no recess → full-through
-                this._pocketWallDepthZ = D;      // the cavity wall Z-extent (== depth for a single/uniform pocket) — full-Z only when through
-                this._stockTopZ = stock.z / 2;   // the stock top in the pg frame (mesh is centred on the pivot by −C below)
-                const outerRect = () => { const s = new THREE.Shape(); s.moveTo(0, 0); s.lineTo(stock.x, 0); s.lineTo(stock.x, stock.y); s.lineTo(0, stock.y); s.lineTo(0, 0); return s; };
-                const holeOf = (f) => { const cx = f.pos.x, cy = f.pos.y, hx = f.size.x / 2, hy = f.size.y / 2; const h = new THREE.Path(); h.moveTo(cx - hx, cy - hy); h.lineTo(cx + hx, cy - hy); h.lineTo(cx + hx, cy + hy); h.lineTo(cx - hx, cy + hy); h.lineTo(cx - hx, cy - hy); return h; };
-                // (1) the TOP layer — the outer frame with EVERY cavity open, extruded to the recess depth D → the pocket WALLS
-                const top = outerRect();
-                for (const f of cavities) top.holes.push(holeOf(f));
-                geo = new THREE.ExtrudeGeometry(top, { depth: D, bevelEnabled: false });
-                mesh.position.set(0, 0, -D);   // extrude [0,D] → world [−D, 0]: top at 0, the pocket floor at −D
-                // (2) the SOLID BASE below the recess — holes ONLY for THROUGH cavities (undeclared/full depth stay bored)
-                if (D < stock.z) {
-                    const base = outerRect();
-                    for (const c of cavities.map((f) => ({ f, d: clampD(f) }))) if (c.d >= stock.z) base.holes.push(holeOf(c.f));
-                    const bmesh = new THREE.Mesh(new THREE.ExtrudeGeometry(base, { depth: stock.z - D, bevelEnabled: false }), mat);
-                    bmesh.position.set(0, 0, D - stock.z);   // extrude [0,z−D] → world [−z, −D]: the floor top at −D
-                    mesh.add(bmesh);
-                }
-                // (3) a shallower recessed pocket → a plug raising its floor from −D up to −its depth
-                for (const c of recessed) if (c.d < D) {
-                    const plug = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.1, c.f.size.x - 0.02), Math.max(0.1, c.f.size.y - 0.02), D - c.d), mat);
-                    plug.position.set(c.f.pos.x, c.f.pos.y, (D - c.d) / 2);   // fills world [−D, −d] → this pocket's floor at −d
-                    mesh.add(plug);
-                }
-                for (const c of recessed) this._pocketFloors.push({ x: c.f.pos.x, y: c.f.pos.y, depth: c.d, floorZ: stock.z / 2 - c.d });   // floorZ = top(z/2) − depth
+                // DECLARED POCKET DEPTH — think FUSION EXTRUSION CUTS: the stock is a SOLID body and each feature is a box
+                // (footprint × depth, at its XYZ) BOOLEAN-SUBTRACTED from it → a CONFINED recess, solid everywhere else, with
+                // NO stock-spanning plane. Built as ONE clean MANIFOLD surface (a translucent stock shows any INTERNAL face,
+                // so a slab/plug stack fails): the boundary = the top cap (outer minus every footprint) · full-height outer
+                // walls · per-pocket walls 0→−depth · a floor quad AT THE POCKET FOOTPRINT ONLY at −depth · the bottom (minus
+                // through footprints). Honors per-feature XY + depth + multiple/multi-Z. A full/undeclared depth (≥ Z) stays a
+                // through-cut. (Rect cavities only — round bores aren't 3D-rendered yet.)
+                geo = this._pocketRecessGeometry(stock, cavities);
+                mat.side = THREE.DoubleSide;   // render the whole confined boundary robustly under translucency (winding-agnostic)
+                mesh.position.set(0, 0, 0);    // geometry is authored in [0,X]×[0,Y]×[−Z,0]; the −C offset below centres it on the pivot
             } else if (stock.shape === 'cylinder') {
                 // Rotary cylinder — lies along the declared rotary axis (around X = horizontal
                 // 4th axis, around Z = vertical table). Defaults to X (horizontal) when no rotary
@@ -1205,6 +1182,54 @@ export class GcodeViz3D {
         // AFTER the A-jog re-apply → inherits the spin + the datum/WCS placement). Only when the rig is on (setStock's no-render
         // contract for the stock modal — _showRotaryFixture is false there — stays intact).
         if (this._showRotaryFixture) this.setRotaryRig(this._rotaryRigSpec());
+    }
+
+    /** Build ONE clean MANIFOLD surface for a stock with declared pocket cuts (the Fusion extrusion-cut model): the boundary
+     *  of (the solid box − each footprint×depth box). No INTERNAL faces → a translucent render shows only the confined recess,
+     *  never a stock-spanning plane. Authored in [0,X]×[0,Y]×[−Z,0]. Sets _pocketFloors / _stockTopZ / _pocketWallDepthZ.
+     *  A full/undeclared depth (≥ Z) is a through-cut (top + bottom open, no floor). DoubleSide is used → winding-agnostic. */
+    _pocketRecessGeometry(stock, cavities) {
+        const THREE = this.THREE;
+        const X = stock.x, Y = stock.y, Z = stock.z;
+        const clampD = (f) => { const d0 = Number(f.depth); return Math.max(0, Math.min(Number.isFinite(d0) ? d0 : Z, Z)); };
+        const feats = cavities.map((f) => ({ x: f.pos.x, y: f.pos.y, hx: Math.max(0.05, f.size.x / 2), hy: Math.max(0.05, f.size.y / 2), d: clampD(f) }));
+        const recessed = feats.filter((f) => f.d > 0 && f.d < Z);
+        const through = feats.filter((f) => f.d >= Z);
+        this._stockTopZ = Z / 2;
+        this._pocketWallDepthZ = recessed.length ? Math.max(...recessed.map((f) => f.d)) : Z;   // the cavity wall Z-extent (== depth; full-Z only when through)
+        this._pocketFloors = recessed.map((f) => ({ x: f.x, y: f.y, depth: f.d, floorZ: Z / 2 - f.d }));   // floorZ = top(Z/2) − depth
+
+        const pos = [];
+        const tri = (a, b, c) => pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
+        const quad = (a, b, c, d) => { tri(a, b, c); tri(a, c, d); };
+        const rect = (f) => ({ x0: f.x - f.hx, x1: f.x + f.hx, y0: f.y - f.hy, y1: f.y + f.hy });
+        // CAPS — outer minus holes, triangulated by ShapeGeometry (lifted to z). TOP: every footprint open; BOTTOM: through only.
+        const capShape = (holes) => {
+            const s = new THREE.Shape(); s.moveTo(0, 0); s.lineTo(X, 0); s.lineTo(X, Y); s.lineTo(0, Y); s.lineTo(0, 0);
+            for (const f of holes) { const r = rect(f); const p = new THREE.Path(); p.moveTo(r.x0, r.y0); p.lineTo(r.x1, r.y0); p.lineTo(r.x1, r.y1); p.lineTo(r.x0, r.y1); p.lineTo(r.x0, r.y0); s.holes.push(p); }
+            return s;
+        };
+        const pushCap = (holes, z) => { const g = new THREE.ShapeGeometry(capShape(holes)).toNonIndexed(); const p = g.attributes.position.array; for (let i = 0; i < p.length; i += 3) pos.push(p[i], p[i + 1], z); g.dispose(); };
+        pushCap(feats, 0);        // TOP cap (z=0)
+        pushCap(through, -Z);     // BOTTOM cap (z=−Z) — solid under recessed pockets
+        // OUTER 4 walls (full height 0 → −Z)
+        quad([0, 0, 0], [X, 0, 0], [X, 0, -Z], [0, 0, -Z]);
+        quad([X, Y, 0], [0, Y, 0], [0, Y, -Z], [X, Y, -Z]);
+        quad([X, 0, 0], [X, Y, 0], [X, Y, -Z], [X, 0, -Z]);
+        quad([0, Y, 0], [0, 0, 0], [0, 0, -Z], [0, Y, -Z]);
+        // PER pocket — 4 inner walls (0 → −depth) + a floor quad AT THE FOOTPRINT (recessed only; through = no floor)
+        for (const f of feats) {
+            const r = rect(f), wz = -f.d;
+            quad([r.x0, r.y0, 0], [r.x1, r.y0, 0], [r.x1, r.y0, wz], [r.x0, r.y0, wz]);
+            quad([r.x1, r.y1, 0], [r.x0, r.y1, 0], [r.x0, r.y1, wz], [r.x1, r.y1, wz]);
+            quad([r.x1, r.y0, 0], [r.x1, r.y1, 0], [r.x1, r.y1, wz], [r.x1, r.y0, wz]);
+            quad([r.x0, r.y1, 0], [r.x0, r.y0, 0], [r.x0, r.y0, wz], [r.x0, r.y1, wz]);
+            if (f.d < Z) quad([r.x0, r.y0, wz], [r.x1, r.y0, wz], [r.x1, r.y1, wz], [r.x0, r.y1, wz]);   // floor at −depth (footprint ONLY — no stock-spanning plane)
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        geo.computeVertexNormals();
+        return geo;
     }
 
     /** t419 E4 — the rig SPEC derived from the current stock (the byte-identical extract of the old inline setStock logic):
