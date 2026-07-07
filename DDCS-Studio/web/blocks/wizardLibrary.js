@@ -50,7 +50,7 @@ const BUILTINS = [
     { id: 'edge', type: 'edge', label: 'Edge', icon: '📏', group: 'probe', opensAs: 'user_edge_data' },
     { id: 'alignment', type: 'alignment', label: 'Align', icon: '🧭', group: 'probe' },
     { id: 'rotary_center', type: 'rotary_center', label: 'Centreline', icon: '', group: 'probe', opensAs: 'user_rotary_center_data' },   // t421 E5 — IN-PLACE: the Centreline slot opens the twin (round-bar sim + rig + multi-pass starts from E2/E3/E4); built-in rotaryCenterWizard stays the legacy shim
-    { id: 'rotary_clock', type: 'rotary_clock', label: 'Clock A0', icon: '🕒', group: 'probe' },
+    { id: 'rotary_clock', type: 'rotary_clock', label: 'Clock A0', icon: '🕒', group: 'probe', opensAs: 'user_rotary_clock_data' },   // t429 E3 — IN-PLACE: the Clock A0 slot opens the twin (box + 4-jaw rig + single start from E2); built-in rotaryClockWizard stays the legacy shim
     { id: 'atc_length', type: 'atc_length', label: 'Tool Length', icon: '📏', group: 'atc', opensAs: 'user_atc_length_data' },   // t409 — light NEW port, in-place
     { id: 'atc_check', type: 'atc_check', label: 'Tool Check', icon: '🛡', group: 'atc', opensAs: 'user_atc_check_data' },   // t411 — inherits the Tool Length light-ATC recipe, in-place
     { id: 'atc_change', type: 'atc_change', label: 'Tool Change', icon: '🔧', group: 'atc' },

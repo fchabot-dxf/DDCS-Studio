@@ -27,6 +27,7 @@ import { cornerDataDef } from './blocks/dataOps/cornerData.js';   // corner port
 import { edgeDataDef } from './blocks/dataOps/edgeData.js';   // t339 edge port E1-E4: the "Edge (data)" twin — opened IN-PLACE from the built-in Edge's Probe slot (opensAs)
 import { middleDataDef } from './blocks/dataOps/middleData.js';   // middle port E1-E4: the "Middle (data)" twin — opened IN-PLACE from the built-in Middle's Probe slot (opensAs)
 import { rotaryCenterDataDef } from './blocks/dataOps/rotaryCenterData.js';   // t413-t421 rotary centreline port E1-E5: the "Rotary Centreline (data)" twin — opened IN-PLACE from the built-in Centreline slot (opensAs); round-bar sim + 4th-axis rig + multi-pass starts
+import { rotaryClockDataDef } from './blocks/dataOps/rotaryClockData.js';   // t423-t429 rotary clock port E0-E3: the "Rotary Clock (data)" twin — opened IN-PLACE from the built-in Clock A0 slot (opensAs); box + 4-jaw rig + single start
 // Edge viz animator (registers `window.EdgeVizAnimator`)
 import './viz/edgeVizAnimator.js';
 // Alignment viz animator (registers `window.AlignVizAnimator`)
@@ -156,6 +157,7 @@ class DDCSStudio {
             edgeDataDef(),   // t339 E4 — seed the edge twin so its in-place Probe slot (opensAs) opens a registered op on boot
             middleDataDef(),   // middle E4 — seed the middle twin so its in-place Probe slot (opensAs) opens a registered op on boot
             rotaryCenterDataDef(),   // t421 E5 — seed the rotary centreline twin so its in-place Centreline slot (opensAs) opens a registered op on boot
+            rotaryClockDataDef(),   // t429 E3 — seed the rotary clock twin so its in-place Clock A0 slot (opensAs) opens a registered op on boot
         ];
         for (const def of seeds) {
             try {
