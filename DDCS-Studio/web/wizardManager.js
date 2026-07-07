@@ -474,7 +474,7 @@ export class WizardManager {
     // Render the wizard's generated G-code in the active wizard's viz area using THE shared preview panel
     // (identical code + UI to Studio main + Blocks). The SVG schematic is hidden (kept in wizards/views/* +
     // _svgPreview.bak.js for the DDCS CAM-menu thumbnails). The wizard feeds its own op code + inferred start.
-    preview3D(gcode, containerId, start, startHints) {
+    preview3D(gcode, containerId, start, startHints, simStock) {
         const svgCont = document.getElementById(containerId);
         if (!svgCont || !svgCont.parentElement) return;
         const parent = svgCont.parentElement; // .viz-container
@@ -498,6 +498,7 @@ export class WizardManager {
                 // land at DISTINCT points (else the degenerate single-start solve). Optional (most ops are 1-pass).
                 getStartHints: () => host.__startHints,
                 getPinnedStarts: () => host.__pinnedStarts,   // t301 MARKER PARITY — datum-PINNED wall worlds (pass → {x,y}) from the Layout's spot store (set by userOpView); a spotted wall HOLDS in the 3D marker instead of riding the Start
+                getStock: () => host.__simStock || null,   // t417 E3 — a per-op SIM-STOCK override (the rotary round bar projected from #57); null → the shared global stock
                 onLine: (i) => this._highlightWizLine(host, i),   // play → highlight the executing line in the CODE PREVIEW (like Studio main)
             });
         }
@@ -505,6 +506,7 @@ export class WizardManager {
         host.__gcode = gcode || '';
         host.__start = start || null;
         host.__startHints = Array.isArray(startHints) ? startHints : null;
+        host.__simStock = simStock || null;   // t417 E3 — the derived per-op sim stock (rotary round bar) or null → the global
         this._activePanel = host.__panel;   // for insert(): read the start the user set/dragged in this preview
         host.__panel.setActive(true);        // mark active + render this op's code
     }

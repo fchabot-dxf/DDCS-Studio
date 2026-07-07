@@ -18,7 +18,7 @@
 import { registerUserBuilder, unregisterUserBuilder, registerOpLabel, removeOpLabel } from './opBuilders.js';
 import { registerUserSpec, unregisterUserSpec } from './opSchema.js';
 import { setUserSimIntent } from '../viz/opSimContext.js';
-import { setUserSimStarts, makeProvider } from '../viz/opSimStarts.js';
+import { setUserSimStarts, makeProvider, setUserSimStock } from '../viz/opSimStarts.js';
 import { pruneGuards } from './whenGuard.js';   // ② B4 M2: collapse guarded structural forks at build (the template carries every arm)
 import { deriveBindings } from './dataOps/deriveBindings.js';   // re-derive binding indices BY IDENTITY after prune (guarded templates shift per state)
 
@@ -514,6 +514,7 @@ export function registerUserOp(def) {
     const provider = (typeof def.simStartsProvider === 'function') ? def.simStartsProvider
         : ((Array.isArray(starts) && starts.length) ? makeProvider(starts) : null);
     setUserSimStarts(def.opType, provider, starts);
+    setUserSimStock(def.opType, def.simStock);   // t417 E3 — a DECLARED per-op sim-stock (rotary round bar); a LIVE fn (re-attached from the seed, like simStartsProvider)
     return def;
 }
 
@@ -579,6 +580,7 @@ export function deleteUserOp(opType) {
     removeOpLabel(opType);            // register touches 4 tables — delete must clear all 4 (was leaking OP_LABELS)
     setUserSimIntent(opType, null);   // clear the declared preview intent
     setUserSimStarts(opType, null);   // clear the declared per-pass sim-starts provider
+    setUserSimStock(opType, null);    // t417 E3 — clear the declared per-op sim-stock
 }
 
 /** Re-register every persisted user op — call ONCE at app start. Returns the count registered. */

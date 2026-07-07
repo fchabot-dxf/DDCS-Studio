@@ -15,7 +15,7 @@ import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the stored children for the live preview
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
-import { opSimStarts } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers feed the 3D preview
+import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
 import { createToolpath2d } from '../../viz/toolpath2d.js';   // t309 — the 2D-animation overlay under the Layout SVG (path + red head, driven by the shared engine)
 import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
 import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
@@ -136,6 +136,10 @@ export const userOpView = {
             const is = row.dataset.whenIs === 'true' ? true : row.dataset.whenIs === 'false' ? false : row.dataset.whenIs;
             row.style.display = whenOk({ param: row.dataset.whenParam, is }, params) ? '' : 'none';
         });
+        // t417 E3 — a per-op SIM-STOCK override (the rotary twin projects a round bar from #57; sim-only, no global mutation).
+        // Feeds BOTH the sim-starts (opSimStarts) AND the preview render (preview3D) so the bar + the flank starts agree.
+        let _simStock = null;
+        try { const _fn = getUserSimStock(_def.opType); const _gs = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; _simStock = _fn ? _fn(params, _gs) : null; } catch (_) { /* op declares no sim-stock */ }
         let gcode = '';
         if (isGroup) {
             // group: no builder — emit the stored children with the form values applied (a pure view, no recordOp).
@@ -160,12 +164,12 @@ export const userOpView = {
             // the 3D sim + the DECLARED per-pass markers in the dedicated 3D box, AND the 2D drag canvas in #userVizContainer.
             if (viz3dBox) viz3dBox.style.display = '';
             let starts = null;
-            try { const stk = window.ddcsGetSettings && window.ddcsGetSettings().stock; starts = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
+            try { const stk = _simStock || (window.ddcsGetSettings && window.ddcsGetSettings().stock); starts = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
             // t301 MARKER PARITY (Seam A feed) — refresh the datum-PINNED wall worlds from the live spot store BEFORE the panel
             // re-renders, so a spotted wall HOLDS in the 3D marker (computePassStarts reads host.__pinnedStarts). Empty spots → null → the pure-auto chain, byte-identical.
             const _phost = viz3dIn('userViz3dContainer');   // the SAME one-level-up derivation the panel + the drag path use (a two-level querySelector can match the OTHER pane's .wiz-viz3d in form3d+2d)
             if (_phost) _phost.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots);
-            mgr.preview3D(gcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null);
+            mgr.preview3D(gcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock);
             const c = el('userVizContainer');
             if (c) {
                 c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none';
@@ -198,7 +202,7 @@ export const userOpView = {
             }
         } else if (pt.mode === '3d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
-            const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(gcode, 'userVizContainer');
+            const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(gcode, 'userVizContainer', null, null, _simStock);
         } else if (pt.mode === '2d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
             const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params);

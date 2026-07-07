@@ -123,6 +123,13 @@ export function setUserSimStarts(opType, provider, rows) {
     else { USER_STARTS.delete(opType); USER_START_ROWS.delete(opType); }
 }
 
+// ── USER_* sim-STOCK layer (t417 E3) — a custom op DECLARES a DERIVED preview stock (e.g. the rotary round bar projected
+// from #57) so its sim renders it WITHOUT mutating the global settings.stock. A provider is `(params, stock) => stock`.
+// In-memory (a LIVE fn, dropped on persistence, re-attached from the seed like the sim-starts provider). Read per render.
+const USER_SIM_STOCK = new Map();
+export function setUserSimStock(opType, fn) { if (typeof fn === 'function') USER_SIM_STOCK.set(opType, fn); else USER_SIM_STOCK.delete(opType); }
+export function getUserSimStock(opType) { return USER_SIM_STOCK.get(opType) || null; }
+
 /** Resolve a binding's `relTo` to an index into the WHEN-FILTERED sim-starts for this op + params (② B4 step 4a — the
  *  semantic anchor). A NUMBER passes through (back-compat: it already meant a filtered index). A SEMANTIC {row:'wall1'}
  *  resolves to the row's position among the SURVIVING rows — the SAME whenOk filter opSimStarts + the engine `_pass`

@@ -146,6 +146,10 @@ export function probeAxis(raw) {
 
 export function createPreviewPanel(container, opts = {}) {
     const get = (k) => (typeof opts[k] === 'function' ? opts[k]() : opts[k]);
+    // E3 (rotary round-bar) — a per-op SIM-STOCK override: if the op declares `getStock` (a DERIVED preview stock, e.g. the
+    // rotary round bar projected from #57), use it for THIS panel's viz/engine/trace; else the shared global stock. Sim-only,
+    // no settings.stock mutation. Every other op omits getStock → previewStock() === stockForViz() (byte-identical behaviour).
+    const previewStock = () => { try { const s = (typeof opts.getStock === 'function') ? opts.getStock() : null; return s || stockForViz(); } catch (_) { return stockForViz(); } };
     container.classList.add('preview-panel');
     if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
     container.insertAdjacentHTML('beforeend', PANEL_HTML);
@@ -169,7 +173,7 @@ export function createPreviewPanel(container, opts = {}) {
         setGcode(); replayFromStart();                   // #18: re-run the sim from the new start
     }
     const t2 = createToolpath2d(cv2d, { onStartDrag });
-    t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
+    t2.setMachine(machineForViz()); t2.setStock(previewStock()); t2.setWcs(wcsForViz());   // 2D mirrors the 3D scene
 
     let viz = null;            // GcodeViz3D (lazy — only when 3D is shown and WebGL is available)
     // forceMachine: a host hint that this op is INHERENTLY machine-frame (ATC tool changes move in G53) so the
@@ -276,7 +280,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     function ensureViz() {
         if (viz) return viz;
-        try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(stockForViz()); viz.setMachine(machineForViz()); applyPreviewSettings(); }
+        try { viz = new GcodeViz3D(container); viz._gizmoPx = 36; viz._animOn = false; viz.setStock(previewStock()); viz.setMachine(machineForViz()); applyPreviewSettings(); }
         catch (e) { console.warn('preview 3D unavailable — using 2D', e); viz = null; setMode('2d'); }
         // Dragging the 3D start marker is a user override (like the 2D handle) — record it so getStartPos() reads it.
         if (viz) viz.onStartChange = (starts) => {   // a 3D jog/drag (any pass) → sync the shared starts, PIN the moved pass, re-trace + replay (#18, INC2)
@@ -307,7 +311,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (engine) return engine;
         engine = new GcodeExecutionEngine({
             autoAnswer: window.ioPanel ? window.ioPanel.isAutoSensors() : true,
-            stock: stockForViz(),
+            stock: previewStock(),
             wcsOffset: wcsForViz(),
             simSpeed: simSpeed(),
             createVarStore: opts.createVarStore || null,
@@ -435,7 +439,7 @@ export function createPreviewPanel(container, opts = {}) {
         // scheduleLiveRestart only re-plays on a G-CODE change, so it would otherwise leave _passStarts stale. Gated to
         // code===lastRunCode so a G-code-changing edit (handled by the re-play) never feeds the OLD running pass new starts.
         if (engine && engine.running && code === lastRunCode) engine._passStarts = (passStarts && passStarts.length) ? passStarts : null;
-        const stk = stockForViz(), mch = machineForViz(), wo = wcsForViz() || {};
+        const stk = previewStock(), mch = machineForViz(), wo = wcsForViz() || {};
         let parsed;
         try {
             // passStarts → the engine fires each REPOSITION pass's probe from ITS start ② (Part 1), so boss-both collides.
@@ -489,7 +493,7 @@ export function createPreviewPanel(container, opts = {}) {
                 // stock top-at-0 AND no machine envelope; an absolute / WCS op (mill, WCS setup) shows the MACHINE
                 // frame — datum-aware stock + the envelope. The op's coordinate nature decides it, not the host.
                 if (anchor !== lastAnchor) {
-                    v.setStock(stockForViz());
+                    v.setStock(previewStock());
                     v.setMachine(anchor ? null : machineForViz());     // probe → no envelope; mill → per settings
                     lastAnchor = anchor;                               // (the 2D's anchor/machine are set above, for both views)
                 }

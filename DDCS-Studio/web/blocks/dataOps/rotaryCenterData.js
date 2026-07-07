@@ -24,6 +24,8 @@ import { srcVal, srcNote } from '../../wizards/probeBlocks.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive the value bindings over a CANONICAL-pruned stack (the #57 diameter socket is known-only in the superset)
 import { opSimStarts } from '../../viz/opSimStarts.js';   // E2 — reuse BUILT_IN.rotary_center's per-pass sim-starts (known=1 pass, fit=3) via the registry, so emit stays byte-identical
+import { num } from '../../wizards/ops/util.js';
+import { rotaryAxisOf } from '../../engine/probeGeometry.js';   // E3 — which Cartesian axis the round bar lies along (the rotary axis)
 
 /** Author defaults — match rotaryCenterStack's own num() fallbacks + the structural default shape (known / auto / centreline / active / relative). */
 export const ROTARY_CENTER_DEFAULTS = {
@@ -154,5 +156,18 @@ export function rotaryCenterDataDef() {
     // E2 — the per-pass PREVIEW-START provider: reuse BUILT_IN.rotary_center (opSimStarts.js:86) VERBATIM via the sim registry
     // (registerUserOp → setUserSimStarts), NOT the builder → sim-only, emit BYTE-IDENTICAL. KNOWN = 1 pass (top); FIT = 3 (top + 2 flanks).
     def.simStartsProvider = (params, stock) => opSimStarts('rotary_center', params, stock);
+    // E3 — the ROUND-BAR sim read (retire activateCylinderStock for the TWIN path; F3 pre-ruled): DERIVE a round-bar preview
+    // stock from #57 (the bar Ø — the USER's clean control, dont-declare-away-user-responsibility) WITHOUT mutating the global
+    // settings.stock. Registered via setUserSimStock → userOpView feeds it to the preview (viz + engine + sim-starts). Sim-only
+    // → emit BYTE-IDENTICAL. Mirrors activateCylinderStock's cross-square, but the Ø comes from #57 (not the max cross dim).
+    def.simStock = (params, stock) => {
+        const cur = stock || {};
+        const dia = num(params && params.diameter, ROTARY_CENTER_DEFAULTS.diameter);   // #57
+        let axis = 'x'; try { axis = rotaryAxisOf((typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().motors)) || 'x'; } catch (_) { /* default X */ }
+        const cross = axis === 'x' ? ['y', 'z'] : axis === 'y' ? ['x', 'z'] : ['x', 'y'];
+        const dims = { x: num(cur.x, 150), y: num(cur.y, 76.2), z: num(cur.z, 76.2) };
+        dims[cross[0]] = dia; dims[cross[1]] = dia;   // the cross-section = the bar Ø (barRadius = diameter/2)
+        return { ...cur, ...dims, diameter: dia, shape: 'cylinder', datum: 'nnp', pin: 'origin', show: true };
+    };
     return def;
 }
