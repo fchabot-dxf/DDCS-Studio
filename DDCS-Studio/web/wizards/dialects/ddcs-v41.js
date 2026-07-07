@@ -14,7 +14,8 @@ export const dialect = {
     programModel: 'inline', probeModel: 'g31', dwellUnits: 'ms',
     // dro = machine pos #1500-1503; wcsWork = workpiece pos #1506-1509 (what zero*.nc writes); toolTable #1560/#764.
     vars: { dro: 1500, wcsWork: 1506, probeStatus: null, probeTrig: 1500, wcsBase: 1512, wcsStride: 6, activeWcs: null, toolTable: 1560, atc: null, ax: AX },   // atc null: the #1300/#1330 ATC firmware tables are unmapped on V4.1 (the dump shows them as generic "system parameter area")
-    caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false },   // G31 L#682; success read from DRO #1502; no confirmed pick&place ATC model
+    caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false,
+        wcsAuto: false, wcsFixed: false, wcsSync: false },   // t475 — WCS via G92 (zeroes the ACTIVE frame, no register number); no active-WCS var; no slave-sync
 
     // G91 G31 Z-1000 L#682 Q1 K0 F#106  (probe-float.nc, live). L#682 = probe-selector config param; no P-port word.
     probeMove: (axis, dist, { feed = 100 } = {}) => [`G31 ${axis}${dist} L#682 Q1 K0 F${feed}`],
@@ -25,6 +26,15 @@ export const dialect = {
     // CONFIRMED live (probe-vertex.nc): zero at the probed point with G90 G92 <axis><WORK value> — a work coord,
     // NOT a machine coord like Expert's register write. ("zero here" macros zeroz/zeroxy write #1506-1509 directly.)
     setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}`],
+    // WCS ZERO-AT-CURRENT (t475) — G92 per the advisor ruling. ⚠ FLAG (no V4.1 dump): G92 is a TEMPORARY offset, NOT a
+    // persistent WCS zero. V4.1's OWN "zero here" macros (zeroxy/zeroz) write #1506-1509 DIRECTLY (line 26) — a persistent
+    // register write, consistent with M350's #805+. So the more-grounded persistent form is #1506+ direct writes, not G92.
+    // Auto/fixed-number/sync are GATED off (post-gating): G92 zeroes the active frame regardless of WCS number.
+    wcsZeroAtCurrent: (p = {}) => {
+        const axes = [p.axisX && 'X', p.axisY && 'Y', p.axisZ && 'Z'].filter(Boolean);
+        if (!axes.length) return ['( WCS zero: no axes selected )'];
+        return ['( WCS zero at current - G92 )', `G90 G92 ${axes.map((a) => a + '0').join(' ')}`];
+    },
     readActiveWcs: () => [],                                 // TO CONFIRM
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
     dwell: (sec) => [`G04 P${Math.round(sec * 1000)}`],     // ms (firmware G04P1000)

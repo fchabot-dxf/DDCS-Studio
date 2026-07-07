@@ -22,7 +22,8 @@ export const dialect = {
     // probeStatus #5070 (:302), activeWcs #5220 (:308), wcsBase #5221 stride 20 (:309 + :258 "/20"),
     // dro #5420-28 current-position (:321), toolTable #5401-09 active-tool offsets (:320-321, #5400=tool# :319).
     vars: { dro: 5420, probeStatus: 5070, probeTrig: 5061, wcsBase: 5221, wcsStride: 20, activeWcs: 5220, toolTable: 5401, ax: AX },
-    caps: { vars: true, flow: 'oword', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false },   // G38.2 alarms on no-contact; structured O-word flow
+    caps: { vars: true, flow: 'oword', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false,
+        wcsAuto: false, wcsFixed: true, wcsSync: false },   // t475 — WCS via G10 L20 P<n> (fixed WCS targetable); auto gated (M350-only ruling); no slave-sync
 
     // G38.2 Z-10 F100  (probe-hole.ngc:22 "G91 G38.2 X#1000"; gridprobe.ngc:35 "G38.2Z#8"). G38.2 ALARMs on
     // no-contact (host/controller catches) ⇒ probeStatus folds away, like Centroid's M115. `port`/`level` unused.
@@ -36,6 +37,15 @@ export const dialect = {
     // G10 L20 P1 X<val>  (sets WCS P so current pos = val). wcsExpr = active-WCS index 1..9. Standard RS274NGC
     // (LinuxCNC §G10; grblHAL gcode.c G10 modal :74). The clean DDCS-#[805+] equivalent.
     setWorkOffset: (wcsExpr, axis, value) => [`G10 L20 P${wcsExpr} ${axis}${value}`],
+    // WCS ZERO-AT-CURRENT (t475) — G10 L20 P<n> <axes>0 sets WCS n so the CURRENT position reads 0 (no DRO read; the
+    // controller computes the offset). Standard RS274NGC (LinuxCNC §G10). Fixed WCS → P1-6; auto is GATED off (post-gating,
+    // M350-only per the ruling) — P0 (the active WCS) is the fallback. sync is M350-only (gated). A CORRECTNESS fix vs the old M350-hardcoded #805.
+    wcsZeroAtCurrent: (p = {}) => {
+        const axes = [p.axisX && 'X', p.axisY && 'Y', p.axisZ && 'Z'].filter(Boolean);
+        if (!axes.length) return ['( WCS zero: no axes selected )'];
+        const n = String(p.sys) === '0' ? 0 : (parseInt(p.sys, 10) - 53);   // resolveParams coerces '0'→0 → normalize
+        return ['( WCS zero at current - G10 L20 )', `G10 L20 P${n} ${axes.map((a) => a + '0').join(' ')}`];
+    },
     readActiveWcs: (varName) => [`${varName}=#5220`],   // #5220 = active coord-system number 1=G54… (ngc_params.c:308)
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
     dwell: (sec) => [`G4 P${sec}`],   // P = SECONDS in RS274NGC (gridprobe/LinuxCNC dwell)

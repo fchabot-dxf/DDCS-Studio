@@ -18,7 +18,8 @@ export const dialect = {
     programModel: 'streamed', probeModel: 'g38', dwellUnits: 's',
     g53NeedsVar: false,   // grbl G53 takes a literal coord directly (no #var staging — grbl has no #vars)
     vars: { dro: null, probeStatus: null, probeTrig: null, wcsBase: null, wcsStride: null, activeWcs: null, toolTable: null, ax: AX },
-    caps: { vars: false, flow: 'none', probeStatusCheck: false, hmi: false, toolTable: false, probePort: false },   // streamed; host owns the logic
+    caps: { vars: false, flow: 'none', probeStatusCheck: false, hmi: false, toolTable: false, probePort: false,
+        wcsAuto: false, wcsFixed: true, wcsSync: false },   // t475 — WCS via G10 L20 P<n>; auto gated (no active-WCS var); no slave-sync (host-streamed — a WCS macro is best-effort)
 
     probeMove: (axis, dist, { feed = 100 } = {}) => [`G38.2 ${axis}${dist} F${feed}`],   // result pushed as [PRB:…] over serial
     probeStatus: () => [],          // [] — no in-program status var (host reads [PRB:…:1/0])
@@ -26,6 +27,15 @@ export const dialect = {
     readMachine: () => [],          // [] — no #vars; host reads the status report (<…|MPos:…>)
     machineMove: (axis, ref) => [`G53 G0 ${axis}${ref}`],   // machine-frame rapid (literal coord; G90 + G0 on the block)
     setWorkOffset: (wcsExpr, axis, value) => [`G10 L20 P${wcsExpr} ${axis}${value}`],   // grbl 1.1 supports G10 L2/L20
+    // WCS ZERO-AT-CURRENT (t475) — G10 L20 P<n> <axes>0 (grbl 1.1). BEST-EFFORT + FLAG: grbl is HOST-STREAMED (caps.vars
+    // false, readMachine []) — the host normally sends G10 L20 LIVE, so a WCS-zero MACRO may be a non-goal (a broader
+    // porting question). Auto is GATED off (no active-WCS var); sync M350-only (gated). Emitting the correct inline G10 anyway.
+    wcsZeroAtCurrent: (p = {}) => {
+        const axes = [p.axisX && 'X', p.axisY && 'Y', p.axisZ && 'Z'].filter(Boolean);
+        if (!axes.length) return ['( WCS zero: no axes selected )'];
+        const n = String(p.sys) === '0' ? 0 : (parseInt(p.sys, 10) - 53);   // resolveParams coerces '0'→0 → normalize
+        return ['( WCS zero at current - G10 L20 )', `G10 L20 P${n} ${axes.map((a) => a + '0').join(' ')}`];
+    },
     readActiveWcs: () => [],        // [] — no #vars
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
     dwell: (sec) => [`G4 P${sec}`], // P = seconds

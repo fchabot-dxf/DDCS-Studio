@@ -43,7 +43,11 @@ export function getDialect(profileId) {
 //   probePort        the probe move takes a port/level word (G31 P/L) — false for G38.2 / move-until-input
 //   flowStreamable   in-program flow runs while STREAMING (false on grblHAL: O-word flow is SD/littlefs-only)
 // Defaults = the DDCS Expert profile (the fullest); a dialect's own `caps` overrides what it lacks.
-const DEFAULT_CAPS = { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, flowStreamable: true };
+const DEFAULT_CAPS = { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, flowStreamable: true,
+    // WCS zero-at-current gating (t475): wcsAuto = zero the ACTIVE WCS (needs an active-WCS var — M350-only per the ruling);
+    // wcsFixed = target a SPECIFIC WCS register (M350 #805+ / rs274·grbl G10 P<n>; FALSE for G92 posts that ignore the number);
+    // wcsSync = the dual-gantry slave write (M350 #883/#884 only). Defaults = the Expert-full (M350) profile; posts override.
+    wcsAuto: true, wcsFixed: true, wcsSync: true };
 
 /** Capability flags for a post id (the dialect's own `caps`, merged over the Expert-full defaults). */
 export function getCaps(id) { return { ...DEFAULT_CAPS, ...((DIALECTS[id] && DIALECTS[id].caps) || {}) }; }

@@ -14,12 +14,15 @@ const CAP_FIELDS = {
     // move-until-input (DM500) probe without them, and V4.1 fixes them in firmware — so they're moot there.
     probePort: ['c_port', 'c_level', 'c_q', 'm_port', 'm_level', 'm_q', 'p_port', 'p_level', 'p_q',
                 'al_port', 'al_level', 'al_q', 'circ_q', 'rc_q', 'rcl_q'],
+    // t475 — the WCS dual-gantry slave sync is an M350 register write (#883/#884); no equivalent on other posts.
+    wcsSync: ['w_sync', 'w_slave'],
 };
 const CAP_WHY = {
     probePort: 'probes without a G31 P/L/Q word (G38.2 / move-until-input / fixed in firmware)',
     toolTable: 'no in-program tool table / ATC on this controller (e.g. grbl)',
     hmi: 'no in-program operator prompts on this controller',
     vars: 'no #variables on this controller',
+    wcsSync: 'dual-gantry slave sync is an M350 register write (#883/#884); no equivalent on this post',
 };
 
 export function applyPostGating() {
@@ -44,6 +47,28 @@ export function applyPostGating() {
                 if (f.dataset.origTitle !== undefined) { f.title = f.dataset.origTitle; delete f.dataset.origTitle; }
                 if (wrap) wrap.title = '';
             }
+        }
+    }
+
+    // t475 — WCS w_sys OPTION-level gating (finer than a whole field): the AUTO option needs an active-WCS var (wcsAuto,
+    // M350-only per the ruling); the FIXED G54-59 need a TARGETABLE WCS register (wcsFixed — FALSE for G92 posts that zero
+    // the active frame regardless of number). If the current selection gets gated, fall back to the first enabled option.
+    const wsys = document.getElementById('w_sys');
+    if (wsys && wsys.options) {
+        for (const o of wsys.options) {
+            const ok = o.value === '0' ? !!caps.wcsAuto : !!caps.wcsFixed;
+            o.disabled = !ok;
+            o.title = ok ? '' : (o.value === '0'
+                ? `${post.name}: auto-WCS needs the controller active-WCS variable; pick a fixed WCS`
+                : `${post.name}: G92 zeroes the active WCS; this post can't target a specific register`);
+        }
+        const noneOk = ![...wsys.options].some((o) => !o.disabled);   // G92 posts: no option applies → the whole picker is inert
+        wsys.disabled = noneOk;
+        const wrap = wsys.closest('div') || wsys.parentElement;
+        if (wrap) wrap.classList.toggle('cap-off', noneOk || !!(wsys.selectedOptions[0] && wsys.selectedOptions[0].disabled));
+        if (wsys.selectedOptions[0] && wsys.selectedOptions[0].disabled) {
+            const firstOk = [...wsys.options].find((o) => !o.disabled);
+            if (firstOk) { wsys.value = firstOk.value; wsys.dispatchEvent(new Event('change', { bubbles: true })); }
         }
     }
 

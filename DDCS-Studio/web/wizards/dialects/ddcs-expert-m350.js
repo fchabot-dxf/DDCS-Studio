@@ -29,6 +29,27 @@ export const dialect = {
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],
     // #[805+[idx-1]*5+ax]=value   (SAVE_WCS_XY_AUTO.nc:21-26). base 805, stride 5; X=base,Y=+1,Z=+2,A=+3
     setWorkOffset: (wcsExpr, axis, value) => [`#[805+[${wcsExpr}-1]*5+${AX[axis]}]=${value}`],
+    // WCS ZERO-AT-CURRENT (t475) — zero the selected WCS axes = the current DRO. M350: DIRECT #805+ register writes (NO
+    // G10). Dump-grounded: SAVE_WCS_XY_AUTO.nc / COPY_WCS.nc use the INTERMEDIATE-VAR indirect form (#N=805+[#..-1]*5 then
+    // #[#N]), NOT setWorkOffset's inline form — so this is a dedicated atom (setWorkOffset can't reproduce it byte-identical,
+    // and can't change: the probe twins depend on it). BYTE-IDENTICAL to the pre-restructure wcsStack (its own golden).
+    wcsZeroAtCurrent: (p = {}) => {
+        const sys = String(p.sys), slave = String(p.slave), auto = sys === '0', axes = [];   // resolveParams coerces '0'→0/'3'→3 → normalize
+        if (p.axisX) axes.push(0); if (p.axisY) axes.push(1); if (p.axisZ) axes.push(2);
+        const so = slave === '3' ? 3 : 4, sLabel = slave === '3' ? 'A' : 'B';
+        const L = ['( WCS | Direct register writes )', '( M350 Ready - G10 not used )'];
+        if (auto) {
+            L.push('( Auto-detect active WCS from #578 )', '#150=#578', '#151=805+[#150-1]*5', '( Zero selected axes )');
+            axes.forEach((o) => L.push(`#[#151+${o}]=#${880 + o}`));
+            if (p.sync) L.push(`( Dual Gantry Sync - Slave ${sLabel} )`, `#152=[#151+${so}] ( Base WCS + Slave Offset )`, `#[#152]=#88${slave}`);
+        } else {
+            const base = 805 + (parseInt(sys, 10) - 54) * 5;
+            L.push(`( Fixed WCS: G${sys} - Base address #${base} )`, '( Zero selected axes )');
+            axes.forEach((o) => L.push(`#${base + o}=#${880 + o}`));
+            if (p.sync) L.push(`( Dual Gantry Sync - Slave ${sLabel} )`, `#${base + so}=#88${slave}`);
+        }
+        return L;
+    },
     // #578 = active WCS index 1=G54… (COPY_WCS.nc:15). ⚠️ STALE after an in-program G-word WCS switch: a
     // G54..G59 changes the modal frame but does NOT update #578 (CONFIRMED on machine 2026-06-19, DIAG_g53setup.nc).
     // So #578 reflects the panel/variable selector, not a mid-program G-word. Only read it when no in-program

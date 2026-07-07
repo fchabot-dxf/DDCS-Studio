@@ -18,7 +18,8 @@ export const dialect = {
     id: 'ddcs-v3-dm500', name: 'DDCS V3 / DM500',
     programModel: 'inline', probeModel: 'move-until-input', dwellUnits: 's',
     vars: { dro: 864, probeStatus: null, probeTrig: 864, wcsBase: 804, wcsStride: 4, activeWcs: 455, toolTable: 1430, atc: null, ax: AX },   // atc null: no confirmed tool-changer firmware model on the DM500
-    caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false },   // M101/G01/M102 halts on the probe input; manual tool change only
+    caps: { vars: true, flow: 'goto', probeStatusCheck: false, hmi: false, toolTable: true, probePort: false, atc: false,
+        wcsAuto: false, wcsFixed: false, wcsSync: false },   // t475 — WCS via G92 (zeroes the ACTIVE frame, no register number); no slave-sync
 
     // move-until-input: arm (M101) → feed move → disarm (M102). probe.nc:23-25.
     probeMove: (axis, dist, { feed = 100 } = {}) => ['M101', `G91 G01 ${axis}${dist} F${feed}`, 'M102'],
@@ -29,6 +30,14 @@ export const dialect = {
     // DM500 macros zero with G92 (defprobe.nc:21) — value is a WORK coord (plate thickness), NOT a machine coord
     // like Expert's register write. Cross-profile value semantics unresolved → VERIFY on hardware.
     setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}   ( set datum - VERIFY on hardware )`],
+    // WCS ZERO-AT-CURRENT (t475) — G92 per the advisor ruling + the existing setWorkOffset caveat. ⚠ FLAG (no DM500 dump):
+    // G92 is a TEMPORARY offset. DM500 IS register-based (wcsBase #804, DRO #864, active #455) — a persistent #804+ direct
+    // write (like M350) may be the correct WCS-zero. Auto/fixed-number/sync GATED off (G92 zeroes the active frame).
+    wcsZeroAtCurrent: (p = {}) => {
+        const axes = [p.axisX && 'X', p.axisY && 'Y', p.axisZ && 'Z'].filter(Boolean);
+        if (!axes.length) return ['( WCS zero: no axes selected )'];
+        return ['( WCS zero at current - G92 )', `G90 G92 ${axes.map((a) => a + '0').join(' ')}   ( set datum - VERIFY on hardware )`];
+    },
     readActiveWcs: (varName) => [`${varName}=#455`],        // #455/#516 select coord system
     distMode: (mode) => (mode === 'inc' ? 'G91' : 'G90'),
     dwell: (sec) => [`G04 P${sec}`],                        // P = SECONDS (probe.nc, slib.nc G82 P#9)

@@ -1,0 +1,476 @@
+{
+ "m350": {
+  "0": {
+   "p": {
+    "sys": "0",
+    "axisX": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+0]=#880"
+  },
+  "1": {
+   "p": {
+    "sys": "0",
+    "axisX": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+0]=#880\n( Dual Gantry Sync - Slave A )\n#152=[#151+3] ( Base WCS + Slave Offset )\n#[#152]=#883"
+  },
+  "2": {
+   "p": {
+    "sys": "0",
+    "axisX": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+0]=#880\n( Dual Gantry Sync - Slave B )\n#152=[#151+4] ( Base WCS + Slave Offset )\n#[#152]=#884"
+  },
+  "3": {
+   "p": {
+    "sys": "0",
+    "axisX": true,
+    "axisY": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+0]=#880\n#[#151+1]=#881"
+  },
+  "4": {
+   "p": {
+    "sys": "0",
+    "axisX": true,
+    "axisY": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+0]=#880\n#[#151+1]=#881\n( Dual Gantry Sync - Slave A )\n#152=[#151+3] ( Base WCS + Slave Offset )\n#[#152]=#883"
+  },
+  "5": {
+   "p": {
+    "sys": "0",
+    "axisX": true,
+    "axisY": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+0]=#880\n#[#151+1]=#881\n( Dual Gantry Sync - Slave B )\n#152=[#151+4] ( Base WCS + Slave Offset )\n#[#152]=#884"
+  },
+  "6": {
+   "p": {
+    "sys": "0",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+0]=#880\n#[#151+1]=#881\n#[#151+2]=#882"
+  },
+  "7": {
+   "p": {
+    "sys": "0",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+0]=#880\n#[#151+1]=#881\n#[#151+2]=#882\n( Dual Gantry Sync - Slave A )\n#152=[#151+3] ( Base WCS + Slave Offset )\n#[#152]=#883"
+  },
+  "8": {
+   "p": {
+    "sys": "0",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+0]=#880\n#[#151+1]=#881\n#[#151+2]=#882\n( Dual Gantry Sync - Slave B )\n#152=[#151+4] ( Base WCS + Slave Offset )\n#[#152]=#884"
+  },
+  "9": {
+   "p": {
+    "sys": "0",
+    "axisY": true,
+    "axisZ": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+1]=#881\n#[#151+2]=#882"
+  },
+  "10": {
+   "p": {
+    "sys": "0",
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+1]=#881\n#[#151+2]=#882\n( Dual Gantry Sync - Slave A )\n#152=[#151+3] ( Base WCS + Slave Offset )\n#[#152]=#883"
+  },
+  "11": {
+   "p": {
+    "sys": "0",
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Auto-detect active WCS from #578 )\n#150=#578\n#151=805+[#150-1]*5\n( Zero selected axes )\n#[#151+1]=#881\n#[#151+2]=#882\n( Dual Gantry Sync - Slave B )\n#152=[#151+4] ( Base WCS + Slave Offset )\n#[#152]=#884"
+  },
+  "12": {
+   "p": {
+    "sys": "54",
+    "axisX": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880"
+  },
+  "13": {
+   "p": {
+    "sys": "54",
+    "axisX": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n( Dual Gantry Sync - Slave A )\n#808=#883"
+  },
+  "14": {
+   "p": {
+    "sys": "54",
+    "axisX": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n( Dual Gantry Sync - Slave B )\n#809=#884"
+  },
+  "15": {
+   "p": {
+    "sys": "54",
+    "axisX": true,
+    "axisY": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n#806=#881"
+  },
+  "16": {
+   "p": {
+    "sys": "54",
+    "axisX": true,
+    "axisY": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n#806=#881\n( Dual Gantry Sync - Slave A )\n#808=#883"
+  },
+  "17": {
+   "p": {
+    "sys": "54",
+    "axisX": true,
+    "axisY": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n#806=#881\n( Dual Gantry Sync - Slave B )\n#809=#884"
+  },
+  "18": {
+   "p": {
+    "sys": "54",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n#806=#881\n#807=#882"
+  },
+  "19": {
+   "p": {
+    "sys": "54",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n#806=#881\n#807=#882\n( Dual Gantry Sync - Slave A )\n#808=#883"
+  },
+  "20": {
+   "p": {
+    "sys": "54",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n#806=#881\n#807=#882\n( Dual Gantry Sync - Slave B )\n#809=#884"
+  },
+  "21": {
+   "p": {
+    "sys": "54",
+    "axisY": true,
+    "axisZ": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#806=#881\n#807=#882"
+  },
+  "22": {
+   "p": {
+    "sys": "54",
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#806=#881\n#807=#882\n( Dual Gantry Sync - Slave A )\n#808=#883"
+  },
+  "23": {
+   "p": {
+    "sys": "54",
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#806=#881\n#807=#882\n( Dual Gantry Sync - Slave B )\n#809=#884"
+  },
+  "24": {
+   "p": {
+    "sys": "55",
+    "axisX": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#810=#880"
+  },
+  "25": {
+   "p": {
+    "sys": "55",
+    "axisX": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#810=#880\n( Dual Gantry Sync - Slave A )\n#813=#883"
+  },
+  "26": {
+   "p": {
+    "sys": "55",
+    "axisX": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#810=#880\n( Dual Gantry Sync - Slave B )\n#814=#884"
+  },
+  "27": {
+   "p": {
+    "sys": "55",
+    "axisX": true,
+    "axisY": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#810=#880\n#811=#881"
+  },
+  "28": {
+   "p": {
+    "sys": "55",
+    "axisX": true,
+    "axisY": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#810=#880\n#811=#881\n( Dual Gantry Sync - Slave A )\n#813=#883"
+  },
+  "29": {
+   "p": {
+    "sys": "55",
+    "axisX": true,
+    "axisY": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#810=#880\n#811=#881\n( Dual Gantry Sync - Slave B )\n#814=#884"
+  },
+  "30": {
+   "p": {
+    "sys": "55",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#810=#880\n#811=#881\n#812=#882"
+  },
+  "31": {
+   "p": {
+    "sys": "55",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#810=#880\n#811=#881\n#812=#882\n( Dual Gantry Sync - Slave A )\n#813=#883"
+  },
+  "32": {
+   "p": {
+    "sys": "55",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#810=#880\n#811=#881\n#812=#882\n( Dual Gantry Sync - Slave B )\n#814=#884"
+  },
+  "33": {
+   "p": {
+    "sys": "55",
+    "axisY": true,
+    "axisZ": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#811=#881\n#812=#882"
+  },
+  "34": {
+   "p": {
+    "sys": "55",
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#811=#881\n#812=#882\n( Dual Gantry Sync - Slave A )\n#813=#883"
+  },
+  "35": {
+   "p": {
+    "sys": "55",
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G55 - Base address #810 )\n( Zero selected axes )\n#811=#881\n#812=#882\n( Dual Gantry Sync - Slave B )\n#814=#884"
+  },
+  "36": {
+   "p": {
+    "sys": "59",
+    "axisX": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#830=#880"
+  },
+  "37": {
+   "p": {
+    "sys": "59",
+    "axisX": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#830=#880\n( Dual Gantry Sync - Slave A )\n#833=#883"
+  },
+  "38": {
+   "p": {
+    "sys": "59",
+    "axisX": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#830=#880\n( Dual Gantry Sync - Slave B )\n#834=#884"
+  },
+  "39": {
+   "p": {
+    "sys": "59",
+    "axisX": true,
+    "axisY": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#830=#880\n#831=#881"
+  },
+  "40": {
+   "p": {
+    "sys": "59",
+    "axisX": true,
+    "axisY": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#830=#880\n#831=#881\n( Dual Gantry Sync - Slave A )\n#833=#883"
+  },
+  "41": {
+   "p": {
+    "sys": "59",
+    "axisX": true,
+    "axisY": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#830=#880\n#831=#881\n( Dual Gantry Sync - Slave B )\n#834=#884"
+  },
+  "42": {
+   "p": {
+    "sys": "59",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#830=#880\n#831=#881\n#832=#882"
+  },
+  "43": {
+   "p": {
+    "sys": "59",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#830=#880\n#831=#881\n#832=#882\n( Dual Gantry Sync - Slave A )\n#833=#883"
+  },
+  "44": {
+   "p": {
+    "sys": "59",
+    "axisX": true,
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#830=#880\n#831=#881\n#832=#882\n( Dual Gantry Sync - Slave B )\n#834=#884"
+  },
+  "45": {
+   "p": {
+    "sys": "59",
+    "axisY": true,
+    "axisZ": true,
+    "sync": false
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#831=#881\n#832=#882"
+  },
+  "46": {
+   "p": {
+    "sys": "59",
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "3"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#831=#881\n#832=#882\n( Dual Gantry Sync - Slave A )\n#833=#883"
+  },
+  "47": {
+   "p": {
+    "sys": "59",
+    "axisY": true,
+    "axisZ": true,
+    "sync": true,
+    "slave": "4"
+   },
+   "emit": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G59 - Base address #830 )\n( Zero selected axes )\n#831=#881\n#832=#882\n( Dual Gantry Sync - Slave B )\n#834=#884"
+  }
+ },
+ "before": {
+  "ddcs-v41": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #1512 )\n( Zero selected axes )\n#1512=#880\n#1513=#881",
+  "ddcs-v3-dm500": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #804 )\n( Zero selected axes )\n#804=#880\n#805=#881",
+  "rs274ngc": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n#806=#881",
+  "grbl": "( WCS | Direct register writes )\n( M350 Ready - G10 not used )\n( Fixed WCS: G54 - Base address #805 )\n( Zero selected axes )\n#805=#880\n#806=#881"
+ },
+ "sweepLen": 48,
+ "defaultProfile": "ddcs-expert-m350"
+}
