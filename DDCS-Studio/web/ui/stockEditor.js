@@ -12,7 +12,7 @@ import { makeDraggable } from './uiUtils.js';
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 import { popReturn, dropReturn, activeReturn } from './navReturn.js';   // central back-navigation: the ✕ returns to wherever we came from
 import { FeatureCanvas } from '../viz/featureCanvas.js';                // M1: the shared 2D top-down canvas (workpiece editor)
-import { getWorkpiece, workpieceBackdrop, featureSize, datumXY } from '../engine/workpiece.js';   // M1/M2: the workpiece VIEW + backdrop + side resolver + datum frame
+import { getWorkpiece, workpieceBackdrop, featureSize, featureType, datumXY } from '../engine/workpiece.js';   // M1/M2: the workpiece VIEW + backdrop + side resolver + type + datum frame
 import { GcodeViz3D } from '../viz/gcodeViz3d.js';                      // M1b: a stock-ONLY 3D preview (setStock, no toolpath) for depth
 
 // M1b — ONE reused GcodeViz3D for the modal's 3D pane. A fresh WebGLRenderer per open would leak WebGL contexts
@@ -132,6 +132,8 @@ export function openStockEditor(anchor, opts) {
                 </label>
             </div>
             <div style="color:#7f8a99; font-size:11px;">Cylinder lies along the rotary axis (Y = diameter, X = length).</div>
+            <!-- DECLARED pocket DEPTH — the user owns the number (declare-not-derive); the previews render a real floor -->
+            <div id="se_features"></div>
           </div>
           <div style="flex:1 1 auto; min-width:300px; display:flex; flex-direction:column; gap:10px;">
             <div style="display:flex; flex-direction:column; gap:3px;">
@@ -203,6 +205,30 @@ export function openStockEditor(anchor, opts) {
             };
         }
         _fc.render(host, spec);
+        renderFeatureDepths(wp);
+    };
+    // DECLARED pocket DEPTH — a form field per INSIDE feature (pocket/bore). The user owns the number (declare-not-derive);
+    // editing persists to feature.depth (materializing a legacy pocket) → the 3D floors the cavity at (top − depth), the 2D
+    // labels it. A full/undeclared depth (≥ the stock Z) is a through-cut. depth is a PHYSICAL cut depth from the top.
+    const renderFeatureDepths = (wp) => {
+        const featHost = pop.querySelector('#se_features'); if (!featHost) return;
+        const zz = wp.outer && wp.outer.z;
+        const inside = (wp.features || []).map((f, i) => ({ f, i })).filter((x) => x.f && x.f.side === 'inside');
+        if (!inside.length) { featHost.innerHTML = ''; return; }
+        const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Pocket');
+        featHost.innerHTML = '<div style="font-size:10px; letter-spacing:.5px; color:#9fb4cc; margin-top:2px;">POCKET DEPTH — cut from the top</div>'
+            + inside.map(({ f, i }) => {
+                const dv = Number.isFinite(Number(f.depth)) ? Number(f.depth) : (zz || 0);
+                const thru = zz && dv >= zz;
+                return `<label class="col" style="font-size:11px;">${cap(featureType(f) || 'pocket')} ${i + 1} depth (mm)`
+                    + `<input class="se-feat-depth" data-fi="${i}" type="number" min="0" step="0.5" value="${dv}"`
+                    + ` title="Cut depth from the stock top. ${thru ? 'Full-through (≥ stock Z) — no floor.' : 'Floor at top − depth.'}"></label>`;
+            }).join('');
+        featHost.querySelectorAll('.se-feat-depth').forEach((inp) => inp.addEventListener('change', () => {
+            const fi = +inp.dataset.fi, feats = featuresForEdit(), f = feats[fi]; if (!f) return;
+            f.depth = Math.max(0, Number(inp.value) || 0);
+            writeFeatures(feats);   // persist → re-render 2D + 3D (the floor)
+        }));
     };
     requestAnimationFrame(renderWorkpiece);
 

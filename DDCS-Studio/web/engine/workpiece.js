@@ -131,11 +131,14 @@ export function workpieceBackdrop(wp, opts) {
         const sz = featureSize(wp, f);
         if (!sz) continue;
         const cx = ox + f.pos.x, cy = oy + f.pos.y;   // f.pos is PHYSICAL (stock min-XY) → the canvas directly (datum-invariant)
+        // DECLARED sub-through DEPTH → tag the glyph so the 2D reflects the floor (a label); a full/undeclared depth (≥ the
+        // stock Z, or unset) is a through-cut → no tag, so existing backdrops (legacy pocket / no-depth features) are unchanged.
+        const dep = (typeof f.depth === 'number' && f.depth > 0 && o.z > 0 && f.depth < o.z) ? { depth: f.depth } : {};
         if (f.shape === 'round') {
             const r = (sz.d != null ? sz.d : Math.min(sz.x, sz.y)) / 2;
-            items.push({ kind: 'circle', cx, cy, r, cls: 'fc-feature-pocket' });   // bore
+            items.push({ kind: 'circle', cx, cy, r, cls: 'fc-feature-pocket', ...dep });   // bore
         } else {
-            items.push({ kind: 'rect', x: cx - sz.x / 2, y: cy - sz.y / 2, w: sz.x, h: sz.y, cls: 'fc-feature-pocket' });   // pocket cavity
+            items.push({ kind: 'rect', x: cx - sz.x / 2, y: cy - sz.y / 2, w: sz.x, h: sz.y, cls: 'fc-feature-pocket', ...dep });   // pocket cavity
         }
     }
     // origin = part-zero in the canvas frame → the crosshair sits at the selected datum corner (matches the 3D)

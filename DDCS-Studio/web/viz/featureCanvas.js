@@ -227,6 +227,14 @@ export class FeatureCanvas {
      *  in the build frame); the stock + its attach markers do NOT (they're already in part coords). */
     _disp(x, y) { const p = this._placement || { x: 0, y: 0 }; return this._S(x + (p.x || 0), y + (p.y || 0)); }
 
+    /** A small "↓Nmm" tag at a cavity's centre (world x,y) — the 2D reflection of a DECLARED pocket floor depth. */
+    _featureDepthLabel(items, wx, wy, depth) {
+        const c = this._disp(wx, wy);
+        const t = svgEl('text', { x: c.x, y: c.y, 'text-anchor': 'middle', 'dominant-baseline': 'central', style: 'fill:#bcd0ea; font-size:10px; pointer-events:none;' });
+        t.textContent = '↓' + r3(depth) + 'mm';
+        items.appendChild(t);
+    }
+
     /** client (CSS px) → viewBox units, accounting for viewBox scaling. */
     _clientToVB(clientX, clientY) {
         const p = this.svg.createSVGPoint();
@@ -326,12 +334,14 @@ export class FeatureCanvas {
             if (it.kind === 'circle') {
                 const c = this._disp(it.cx, it.cy);
                 items.appendChild(svgEl('circle', { cx: c.x, cy: c.y, r: it.r * this._tf.scale, class: cls }));
+                if (it.depth != null) this._featureDepthLabel(items, it.cx, it.cy, it.depth);
             } else if (it.kind === 'line') {
                 const a = this._disp(it.x1, it.y1), b = this._disp(it.x2, it.y2);
                 items.appendChild(svgEl('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: cls }));
             } else if (it.kind === 'rect') {
                 const p = this._disp(it.x, it.y + it.h);
                 items.appendChild(svgEl('rect', { x: p.x, y: p.y, width: it.w * this._tf.scale, height: it.h * this._tf.scale, class: cls }));
+                if (it.depth != null) this._featureDepthLabel(items, it.x + it.w / 2, it.y + it.h / 2, it.depth);
             }
         });
 

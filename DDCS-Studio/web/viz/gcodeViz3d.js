@@ -1097,11 +1097,14 @@ export class GcodeViz3D {
         const THREE = this.THREE;
         this._stock = stock || null;
         this._stockFloorZ = null;   // stock bottom in part-local Z (datum-aware) → the table/grid floor; set below
+        this._pocketFloors = [];    // DECLARED pocket-depth floors: [{x,y,depth,floorZ}] (floorZ in the pg frame; stock top = z/2) — for the depth assertion
+        this._stockTopZ = null;     // the stock top in the pg frame (= z/2) → floor-Z == top − depth
         // The stock lives in a part group so a rotary move can spin it about its own axis.
         if (!this._partGroup) { this._partGroup = new THREE.Group(); this.partFrame.add(this._partGroup); }   // stock rides the part frame
         const pg = this._partGroup;
         pg.rotation.set(0, 0, 0); // at rest; the play loop re-applies the angle each frame
-        if (this.stockMesh) { pg.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
+        // dispose the stock mesh + any pocket-floor plug children (shared material — dispose only their geometries)
+        if (this.stockMesh) { this.stockMesh.traverse((o) => { if (o !== this.stockMesh && o.geometry) o.geometry.dispose(); }); pg.remove(this.stockMesh); this.stockMesh.geometry.dispose(); this.stockMesh.material.dispose(); this.stockMesh = null; }
         if (this.stockEdges) { pg.remove(this.stockEdges); this.stockEdges.geometry.dispose(); this.stockEdges.material.dispose(); this.stockEdges = null; }
         // t419 E4 — the 4th-axis rig (chuck + tailstock) is a DECOUPLED sim-device now: its lifecycle moved OUT of setStock into
         // setRotaryRig (mirrors setMagazine), re-derived from the new stock at the END of setStock (still a CHILD of _partGroup).
@@ -1133,6 +1136,19 @@ export class GcodeViz3D {
                 }
                 geo = new THREE.ExtrudeGeometry(shape, { depth: stock.z, bevelEnabled: false });
                 mesh.position.set(0, 0, -stock.z); // extrude [0,z] → world [-z,0], top at the table
+                // DECLARED POCKET DEPTH — give each cavity a real FLOOR at (top − depth) instead of a bottomless through-cut:
+                // a plug fills the cavity BELOW the floor (mesh-local z [0, z−depth]); the pocket void stays open above it.
+                // A full / undeclared depth (≥ the stock thickness) keeps the through-hole (no plug). depth is a PHYSICAL cut
+                // depth from the top, independent of the datum. (Rect cavities only — round bores aren't 3D-rendered yet.)
+                this._stockTopZ = stock.z / 2;   // the stock top in the pg frame (mesh is centred on the pivot by −C below)
+                for (const f of cavities) {
+                    const d0 = Number(f.depth), d = Math.max(0, Math.min(Number.isFinite(d0) ? d0 : stock.z, stock.z));
+                    if (!(d > 0 && d < stock.z)) continue;   // full-through (undeclared) → leave the through-hole
+                    const plug = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.1, f.size.x - 0.02), Math.max(0.1, f.size.y - 0.02), stock.z - d), mat);
+                    plug.position.set(f.pos.x, f.pos.y, (stock.z - d) / 2);   // mesh-local: fills [0, z−d]; the FLOOR (plug top) sits at local z = z−d
+                    mesh.add(plug);   // a child → inherits the mesh transform (incl. the −C pivot offset); shared material
+                    this._pocketFloors.push({ x: f.pos.x, y: f.pos.y, depth: d, floorZ: stock.z / 2 - d });   // floorZ = top(z/2) − depth
+                }
             } else if (stock.shape === 'cylinder') {
                 // Rotary cylinder — lies along the declared rotary axis (around X = horizontal
                 // 4th axis, around Z = vertical table). Defaults to X (horizontal) when no rotary
