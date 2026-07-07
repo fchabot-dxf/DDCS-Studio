@@ -291,6 +291,30 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (sp) items.push({ kind: 'line', x1: +sp.x, y1: +sp.y, x2: +sp.x, y2: wy, cls: 'fc-edge-approach' });
         }
     }
+    // ROTARY DATUM VIZ (t465, opt-in — MIRROR the edge wall-glyph): a rotary op declaring a `diameter` binding (rotaryCenter)
+    // or a `span` binding (rotaryClock) shows its DATUM in the 2D top-view. rotaryCenter → the bar CENTRELINE (the rotary
+    // A-axis, a dash-dot line at the stock Y-centre running along X) + a dot at the bar centre (the found Z0 datum point).
+    // rotaryClock → the SPAN SEGMENT (the two Z-down touches A→B, `span` apart in Y, mirroring the rotary_clock sim-start) +
+    // the two touch dots. PURELY VISUAL (items only; no handle/emit/drag) → sim-only, byte-parity untouched. Absent (any
+    // non-rotary op) → no glyph (unchanged). `diameter`/`span` are GLOBALLY-UNIQUE binding params so the gate can't misfire.
+    // FLAGGED design choice (NOT drawn): whether/how to indicate the clock's A0 REFERENCE direction (top +Z vs +Y side) — a
+    // rotation is edge-on in a top-view, so it has no unambiguous 2D rendering; the concrete probe geometry is shown instead.
+    const rotCenterBind = (def.bindings || []).find((b) => b && b.param === 'diameter');
+    const rotClockBind  = (def.bindings || []).find((b) => b && b.param === 'span');
+    if (rotCenterBind) {
+        const cyAxis = stock.h / 2;                                    // the rotary A-axis runs along X at the stock Y-centre (the bar axis = the datum)
+        const rotR = Math.max(2, Math.min(stock.w, stock.h) * 0.02);
+        items.push({ kind: 'line', x1: 0, y1: cyAxis, x2: stock.w, y2: cyAxis, cls: 'fc-rotary-axis' });   // the bar centreline (the Y datum reference)
+        items.push({ kind: 'circle', cx: stock.w / 2, cy: cyAxis, r: rotR, cls: 'fc-rotary-datum' });      // the bar-centre datum point (Z0)
+    } else if (rotClockBind) {
+        const cx = stock.w / 2, cy = stock.h / 2;
+        const span = Number.isFinite(+params.span) ? +params.span : 20;   // the Y distance between the two touches (fallback matches rotary_clock's)
+        const ay = cy - span / 2, by = cy + span / 2;                      // touch A (−Y half-span) → touch B (+Y), matching rotary_clock's sim-start
+        const rotR = Math.max(2, Math.min(stock.w, stock.h) * 0.02);
+        items.push({ kind: 'line', x1: cx, y1: ay, x2: cx, y2: by, cls: 'fc-rotary-span' });   // the measured flat segment (A→B, span apart in Y)
+        items.push({ kind: 'circle', cx, cy: ay, r: rotR, cls: 'fc-rotary-touch' });           // touch A
+        items.push({ kind: 'circle', cx, cy: by, r: rotR, cls: 'fc-rotary-touch' });           // touch B
+    }
     // t345 E6 — the GUI EDGE PICKER (opt-in, MIRROR cornerPick): an axis+dir op gets clickable stock WALLS — click a wall to
     // SET axis+dir in ONE gesture (FeatureCanvas._drawEdgePick draws the 4 edge strips; onEdgePick writes the dropdowns via
     // their OWN change seam, so the dropdowns stay as fallback + sync). Form-write only, NO emit change (the emit reads the params).

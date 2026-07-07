@@ -2219,6 +2219,11 @@ button.primary:hover {
 /* EDGE datum (t339 E3): the probed WALL LINE (cyan, prominent — the edge you're finding) + the APPROACH travel from the start marker toward it (dashed yellow, the direction). Edge's datum = a LINE + a direction (vs corner's POINT). */
 .feature-canvas .fc-edge-wall { fill: none; stroke: #22d3ee; stroke-width: 2.5; }
 .feature-canvas .fc-edge-approach { fill: none; stroke: #ffcc00; stroke-width: 1.5; stroke-dasharray: 5 4; }
+/* ROTARY datum (t465): rotaryCenter → the bar CENTRELINE (cyan dash-dot — the A-axis / Y datum) + a cyan dot at the bar centre (Z0). rotaryClock → the SPAN segment (solid cyan — the measured flat, A→B) + amber touch dots (the 2 Z-down probes). Same cyan=datum / amber=probe language as the edge glyph. */
+.feature-canvas .fc-rotary-axis { fill: none; stroke: #22d3ee; stroke-width: 1.75; stroke-dasharray: 10 3 2 3; }
+.feature-canvas .fc-rotary-datum { fill: #22d3ee; stroke: #0b3b44; stroke-width: 0.5; }
+.feature-canvas .fc-rotary-span { fill: none; stroke: #22d3ee; stroke-width: 2.5; }
+.feature-canvas .fc-rotary-touch { fill: #ffcc00; stroke: #7a5b00; stroke-width: 0.5; }
 /* The FEATURE being probed (op-type-declared, stock-overridable): a pocket cavity (blue) or a boss protrusion (green),
    matching the 3D preview's fill colours, so the 2D canvas shows WHAT'S being probed — not just the stock rectangle. */
 .feature-canvas .fc-feature-pocket { fill: rgba(106,143,190,0.18); stroke: #86b6ff; stroke-width: 1.5; }
