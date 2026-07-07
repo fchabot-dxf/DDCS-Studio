@@ -18,7 +18,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack } from './userOps.js';
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, formfieldBindings } from './userOps.js';
 import { createWizard } from './wizardLibrary.js';
 import { workspaceToStack } from './blockly/stackBridge.js';
 import { openRegionEditor } from '../ui/regionEditor.js';   // the "make your own datum" authoring editor
@@ -56,7 +56,7 @@ function isAtom(blk) {
     // block's panel-type field and the param_group block's group-name field (t161 — both authoring labels, not values).
     // Value-bearing atoms (assign / param / move / …) are untouched → the value-knob expose path (deriveAuthoredDef / EXPOSE_) still works.
     const def = BLOCKS[blk.type];
-    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group'));   // t148 section + t154 structural-control + t161 panel/param_group: authoring metadata / guard drivers, not exposable values
+    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield (composable-authoring): authoring metadata / guard drivers, not exposable values
 }
 
 // the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).
@@ -164,7 +164,11 @@ export function deriveAuthoredDef(ws) {
     if (!a) return null;
     const inlineBindings = buildBindings(a.exposures);
     const paramBindings = extractParamBlocks(a.opRec.children, new Set(inlineBindings.map((b) => b.param)));
-    return { bindings: [...inlineBindings, ...paramBindings], children: a.opRec.children, varErr: a.varErr };
+    // composable-authoring PILOT 1: `formfield` blocks in the stack ALSO declare form fields (the BINDING_SPEC round-trip)
+    // → show them in the LIVE form as authored. Dedup vs the inline/param knobs (a param can't be declared twice).
+    const seen = new Set([...inlineBindings, ...paramBindings].map((b) => b.param));
+    const fieldBindings = formfieldBindings(a.opRec.children).filter((b) => !seen.has(b.param));
+    return { bindings: [...inlineBindings, ...paramBindings, ...fieldBindings], children: a.opRec.children, varErr: a.varErr };
 }
 
 // Framing knobs auto-surfaced into a hand-built group's form (parity with built-in ops whose stacks carry framing):
@@ -540,7 +544,14 @@ function openSaveDialog(init, onConfirm) {
 // Update — the non-destructive "Save as new" (a copy) stays the path, and its template is edited at the source. Plain
 // user-op defs (no bindingSpecs) are unaffected. Exported so the save flow + tests read ONE declared rule.
 export function isMaintainedAsData(def) {
-    return !!(def && Array.isArray(def.bindingSpecs) && def.bindingSpecs.length);
+    if (!(def && Array.isArray(def.bindingSpecs) && def.bindingSpecs.length)) return false;
+    // LOCK LIFTS (composable-authoring PILOT 1): once every bindingSpec is authored as a `formfield` block in the def's
+    // template, the visual save round-trips them LOSSLESSLY (userOps.bindingsFromStack reconstructs def.bindingSpecs), so
+    // the lock is unnecessary. A hand-written-spec def (no formfield blocks — today's corner/edge/middle) has none of its
+    // specs authored as blocks → stays LOCKED (byte-identical, unchanged). Partial coverage stays locked (a save would drop
+    // the un-authored specs).
+    const authored = new Set(bindingsFromStack((def && def.template) || []).map((s) => s.param));
+    return !def.bindingSpecs.every((s) => authored.has(s.param));
 }
 
 // Register the current op's STACK as a custom WIZARD — a bar button (+ its form). Reads the ticked exposures (if any)

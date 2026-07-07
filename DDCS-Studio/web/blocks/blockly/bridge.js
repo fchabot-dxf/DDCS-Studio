@@ -151,6 +151,9 @@ const optionsFor = (def, field) => {
     // source of truth: spread the canonical CANVAS_ROLE_WIDGETS (also feeds the dev-mode dropdown) so the two author
     // surfaces can't drift. (The import closes a benign cycle — this list is read lazily here, never at module-eval.)
     if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle', ...CANVAS_ROLE_WIDGETS];
+    // FORM value-field block (composable-authoring): the form-widget + the binding value-type dropdowns.
+    if (field === 'widget' && def.type === 'formfield') return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list'];
+    if (field === 'type' && def.type === 'formfield') return ['number', 'int', 'enum', 'bool', 'string', 'list'];
     if (field === 'panel' && def.type === 'panel') return ['form3d', 'form2d', 'form'];   // the GUI panel-type declaration
     if (field === 'kind' && def.type === 'layout') return ['none', 'corner'];
     if (field === 'value' && def._options) return def._options;   // t154 — a structural-control (sc_*) enum: its dropdown options ride on the generated def (from CORNER_STRUCT_BINDINGS)

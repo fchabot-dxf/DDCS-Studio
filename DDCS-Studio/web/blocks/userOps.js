@@ -252,6 +252,88 @@ function resolveLayoutMeta(def) {
     return stackLayout !== undefined ? stackLayout : ((def && def.layout) || null);
 }
 
+// ── def.bindingSpecs ⇄ `formfield` blocks (composable-authoring PILOT 1) — the FORM-value-field round-trip ──
+// The blocks-native twin of a deriveBindings SPEC row: a `formfield` block in the PRESENTATION mouth DECLARES one wizard
+// form field bound to a macro var. Mirrors simStartsFromStack/simStartsToBlocks exactly (metadata blocks, emit nothing).
+// The socket link is by macro-var IDENTITY (match:{type:'assign',var}) — the F2 ruling — NOT a param-name join, so
+// deriveBindings re-finds the flat index over the pruned stack (prune-safe). v1 = assign-var sockets (the value fields).
+
+/** The `formfield` blocks in a stack → deriveBindings SPEC rows. An EMPTY dflt = socket-held (no `default` → the
+ *  template's baked expression holds, deriveBindings.js:64). Widget 'number' is omitted (the default), so a hand-written
+ *  spec that omits `widget` round-trips byte-identically. */
+export function bindingsFromStack(children) {
+    return flattenBlocks(children).filter((b) => b && b.type === 'formfield').map((b) => {
+        const p = b.params || {};
+        const spec = {
+            param: String(p.param || 'value'),
+            type: BINDING_TYPES.has(p.type) ? p.type : 'number',
+            match: { type: 'assign', var: String(p.matchvar || '#1') },
+            key: String(p.key || 'value'),
+        };
+        if (p.dflt !== '' && p.dflt != null && Number.isFinite(Number(p.dflt))) spec.default = Number(p.dflt);   // else socket-held (no default)
+        if (p.label) spec.label = String(p.label);
+        if (p.help) spec.help = String(p.help);
+        if (p.section) spec.section = String(p.section);
+        if (p.widget && p.widget !== 'number') spec.widget = String(p.widget);   // 'number' = the default widget → omitted
+        const wc = {};
+        if ((p.widget === 'dropdown' || p.widget === 'segmented') && p.options) { const o = parseParamOptions(p.options); if (o.length) wc.options = o; }
+        if (p.widget === 'number' || p.widget === 'slider') {
+            for (const [k, fk] of [['min', 'nmin'], ['max', 'nmax'], ['step', 'nstep']]) if (p[fk] !== '' && p[fk] != null && Number.isFinite(Number(p[fk]))) wc[k] = Number(p[fk]);
+            if (p.units) wc.units = String(p.units);
+        }
+        if (Object.keys(wc).length) spec.widgetConfig = wc;
+        if (p.optional === true || p.optional === 'true' || p.optional === 'TRUE') spec.optional = true;
+        if (p.readonly === true || p.readonly === 'true' || p.readonly === 'TRUE') { spec.readonly = true; if (p.readonlyhint) spec.readonlyHint = String(p.readonlyhint); }
+        if (p.whenparam) spec.when = { param: String(p.whenparam), is: p.whenis === 'true' ? true : p.whenis === 'false' ? false : String(p.whenis) };
+        return spec;
+    });
+}
+
+/** deriveBindings SPEC rows → `formfield` block records (every field set, so recToJson's fields/dropdowns stay valid).
+ *  The reverse of bindingsFromStack — renders a hand-written spec set (corner/edge/middle's *_BINDING_SPECS) AS blocks in
+ *  the Blockly view so a ported wizard is authorable/re-authorable. Only VALUE specs (a `match` — a value socket); a
+ *  structural binding (no match) is a later slice. */
+export function bindingsToBlocks(specs) {
+    const wcStr = (wc) => (wc && wc.options ? wc.options.map(([l, v]) => (String(l) === String(v) ? String(v) : `${l}=${v}`)).join(', ') : '');
+    return (specs || []).filter((s) => s && s.match).map((s) => {
+        const wc = s.widgetConfig || {};
+        const w = s.when || null;
+        return { type: 'formfield', params: {
+            param: s.param, widget: s.widget || 'number', label: s.label || '',
+            dflt: s.default === undefined ? '' : String(s.default),
+            matchvar: String((s.match && s.match.var) || '#1'), key: s.key || 'value', type: s.type || 'number',
+            section: s.section || '', help: s.help || '',
+            optional: !!s.optional, readonly: !!s.readonly, readonlyhint: s.readonlyHint || '',
+            whenparam: w ? String(w.param) : '', whenis: w ? String(w.is) : '',
+            options: wcStr(wc),
+            nmin: wc.min != null ? String(wc.min) : '', nmax: wc.max != null ? String(wc.max) : '',
+            nstep: wc.step != null ? String(wc.step) : '', units: wc.units || '',
+        } };
+    });
+}
+
+/** If the template AUTHORS its value bindings as `formfield` blocks, derive them (the composable form). Mirrors
+ *  resolvePanelMeta/resolveSimMeta: ADDITIVE — returns null when there are NO formfield blocks, so a hand-written-spec
+ *  def (today's corner/edge/middle) is UNTOUCHED / byte-identical. Returns { specs, bindings } — specs drive the emit
+ *  re-derivation (def.bindingSpecs), bindings drive the form + schema (deriveBindings over the template). */
+function resolveBindingsMeta(def) {
+    const template = def && Array.isArray(def.template) ? def.template : [];
+    const specs = bindingsFromStack(template);
+    if (!specs.length) return null;   // no formfield blocks → keep the hand-written def.bindings/bindingSpecs (byte-identical)
+    // v1: derive over the UNPRUNED template (a formfield-authored op carries no guards yet — a guarded authored op is a later slice).
+    const bindings = deriveBindings(flattenBlocks(template), specs);
+    return { specs, bindings };
+}
+
+/** The FORM bindings a stack's `formfield` blocks declare (specs → deriveBindings over the stack). For the LIVE Blocks
+ *  form (devMode.deriveAuthoredDef): a formfield-authored field shows in the form AS YOU AUTHOR IT. Safe — returns [] on
+ *  an unmatched var (an in-progress edit) instead of throwing. */
+export function formfieldBindings(children) {
+    const specs = bindingsFromStack(children);
+    if (!specs.length) return [];
+    try { return deriveBindings(flattenBlocks(children), specs); } catch (_) { return []; }
+}
+
 // Drop counter-based block ids so a stored template is stable (ids are reassigned on emit). (Same rule as opGlow.)
 function stripIds(v) {
     if (Array.isArray(v)) return v.map(stripIds);
@@ -348,6 +430,16 @@ export function validateUserOp(def) {
 
 /** Install a user-op def into the LIVE user-layer builder + spec + label registries (runtime only — no persistence). */
 export function registerUserOp(def) {
+    // composable-authoring (PILOT 1): if the template AUTHORS its value bindings as `formfield` blocks, derive
+    // def.bindingSpecs (the emit re-derivation, by var-identity) + def.bindings (the form + schema) FROM them. ADDITIVE —
+    // resolveBindingsMeta returns null when there are no formfield blocks, so a hand-written-spec def (today's
+    // corner/edge/middle) is UNTOUCHED / byte-identical. Applied before validate so the derived bindings are validated + used.
+    const authored = resolveBindingsMeta(def);
+    if (authored) {
+        def.bindingSpecs = authored.specs;
+        const structural = (def.bindings || []).filter((b) => b && b.param != null && b.blockIndex == null);   // preserve hand-written STRUCTURAL toggles (value-field blocks only in v1)
+        def.bindings = [...authored.bindings, ...structural];
+    }
     const errs = validateUserOp(def);
     if (errs.length) throw new Error('invalid user op: ' + errs.join('; '));
     const builder = (params) => {
