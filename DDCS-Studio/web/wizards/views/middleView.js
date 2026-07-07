@@ -4,6 +4,7 @@ import { safeZFrameValue } from '../../ui/safeZFrameToggle.js';   // SPATIAL-MOD
 import { MiddleWizard } from '../middleWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { getWorkpiece, workpieceBackdrop } from '../../engine/workpiece.js';   // flatten-migration: draw the DECLARED workpiece cavity at its OFFSET (byte-identical to the legacy centered inset for a derived pocket)
 
 const wizard = new MiddleWizard();
 const layout = new FeatureCanvas();
@@ -45,7 +46,9 @@ function buildFeatureItems(sw, sh, stock) {
     if (!(sw > 0 && sh > 0)) return [];
     const shape = stock && stock.shape;
     if (shape === 'cylinder') return [{ kind: 'circle', cx: sw / 2, cy: sh / 2, r: Math.min(sw, sh) * 0.4, cls: 'fc-feature-boss' }];   // round bar / boss
-    if (shape === 'pocket') { const w = Math.max(8, Math.min(sw, sh) * 0.25); return [{ kind: 'rect', x: w, y: w, w: sw - 2 * w, h: sh - 2 * w, cls: 'fc-feature-pocket' }]; }   // inner CAVITY
+    // POCKET → read the DECLARED workpiece cavity so it renders at its OFFSET (a legacy pocket derives the SAME centered 25%
+    // inset → byte-identical; a stock-modal-declared off-centre pocket draws at its real pos+size — the ONE source, no inset).
+    if (shape === 'pocket') { try { return workpieceBackdrop(getWorkpiece(), { ox: 0, oy: 0 }).items || []; } catch (_) { return []; } }
     return [{ kind: 'rect', x: 0, y: 0, w: sw, h: sh, cls: 'fc-feature-boss' }];   // BOSS block (the probe approaches it from outside)
 }
 

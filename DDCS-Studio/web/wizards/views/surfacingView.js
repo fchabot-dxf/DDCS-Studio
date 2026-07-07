@@ -6,6 +6,7 @@ import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
+import { workpieceFeatureItems } from '../../engine/workpiece.js';
 
 const wizard = new SurfacingWizard();
 const layout = new FeatureCanvas();
@@ -40,7 +41,7 @@ function buildSurfacingSpec(params, stock) {
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
         placement: pl.placement,
-        items: [{ kind: 'rect', x: ox, y: oy, w, h }],
+        items: [...workpieceFeatureItems(pl.stockOx, pl.stockOy), { kind: 'rect', x: ox, y: oy, w, h }],
         handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,

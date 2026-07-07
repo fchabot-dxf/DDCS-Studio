@@ -7,6 +7,7 @@ import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
 import { regionDesc } from '../ops/region.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
+import { workpieceFeatureItems } from '../../engine/workpiece.js';
 
 const wizard = new PocketWizard();
 const layout = new FeatureCanvas();
@@ -65,7 +66,7 @@ function buildPocketSpec(params, stock) {
     const pl = placementSpec(params, pocketBBox(params), 'p_');
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
-        placement: pl.placement, items, paths, handles,
+        placement: pl.placement, items: [...workpieceFeatureItems(pl.stockOx, pl.stockOy), ...items], paths, handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
         onDrag, onEdit,

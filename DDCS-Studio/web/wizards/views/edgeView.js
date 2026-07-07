@@ -3,6 +3,7 @@ import { el, UIUtils } from '../../ui/uiUtils.js';
 import { EdgeWizard } from '../edgeWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
+import { workpieceFeatureItems } from '../../engine/workpiece.js';
 
 const wizard = new EdgeWizard();
 const layout = new FeatureCanvas();
@@ -28,7 +29,7 @@ function renderEdgeStartCanvas(panel, params, stock) {
     const handles = [{ id: 'start:0', x: +s0.x || 0, y: +s0.y || 0, kind: 'move', label: '1' }];
     const spec = {
         stock: (sw > 0 && sh > 0) ? { w: sw, h: sh, ox: 0, oy: 0 } : null,
-        placement: { x: 0, y: 0 }, items, handles,
+        placement: { x: 0, y: 0 }, items: [...workpieceFeatureItems(0, 0), ...items], handles,
         onDrag: (id, world) => {
             const z = (+s0.z) || 0;
             panel.onStartDrag({ x: world.x, y: world.y, z }, 0);   // SIM ONLY: the probe BEGINS here (userStarts[0], persists, beats the hint) — does NOT touch MAX PROBE

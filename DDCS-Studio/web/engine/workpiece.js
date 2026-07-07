@@ -104,6 +104,14 @@ export function projectWorkpiece(stock) {
     return { outer, features };
 }
 
+/** The DECLARED workpiece feature GLYPHS (inside cavities at their real pos+size) for a 2D-preview backdrop — the ONE source
+ *  every wizard canvas draws so a declared OFF-CENTRE pocket renders in EVERY preview (a legacy pocket → the centered 25%
+ *  inset, byte-identical). Safe (returns [] on no workpiece). `ox/oy` = the stock canvas offset (pass the view's stock {ox,oy}
+ *  so the cavity aligns with its stock rect). Outer (boss/box) stocks yield NO items → byte-identical for the legacy case. */
+export function workpieceFeatureItems(ox = 0, oy = 0) {
+    try { return workpieceBackdrop(getWorkpiece(), { ox, oy }).items || []; } catch (_) { return []; }
+}
+
 /** The LIVE reader — mirrors stockForViz (createPreviewPanel.js:54): project whatever settings.stock is now. */
 export function getWorkpiece() {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;

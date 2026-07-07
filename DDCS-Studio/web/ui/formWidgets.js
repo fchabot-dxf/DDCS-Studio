@@ -13,6 +13,7 @@
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 import { buildRegions, paintRegions, regionValueFromEvent, regionLabel } from './regionPickSvg.js';
 import { FeatureCanvas } from '../viz/featureCanvas.js';
+import { workpieceFeatureItems } from '../engine/workpiece.js';
 import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inline source dot the built-in forms use, on sourceField bindings
 
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -259,7 +260,7 @@ function xyPadWidget(host, primary, group) {
     const c = canvasHost(host, primary), layout = new FeatureCanvas();
     const draw = () => layout.render(c, {
         stock: { w: bd.w, h: bd.h, ox: bd.ox, oy: bd.oy },
-        items: [{ kind: 'hole', x, y, n: 1, r: Math.max(1, bd.w * 0.012) }],
+        items: [...workpieceFeatureItems(bd.ox, bd.oy), { kind: 'hole', x, y, n: 1, r: Math.max(1, bd.w * 0.012) }],
         handles: [{ id: 'pt', x, y, kind: 'move', label: 'pos' }],
         onDrag: (id, w) => { x = clamp(w.x, bd.ox, bd.ox + bd.w); y = clamp(w.y, bd.oy, bd.oy + bd.h); draw(); host.dispatchEvent(new Event('input', { bubbles: true })); },
     });
@@ -288,7 +289,7 @@ export function buildCoordEditor(host, initial, onChange, cfg = {}) {
     const layout = new FeatureCanvas();
     const draw = () => layout.render(cv, {
         stock: { w: bd.w, h: bd.h, ox: bd.ox, oy: bd.oy },
-        items: points.map((p, i) => ({ kind: 'hole', x: p.x, y: p.y, n: i + 1, r: Math.max(1.5, bd.w * 0.012) })),
+        items: [...workpieceFeatureItems(bd.ox, bd.oy), ...points.map((p, i) => ({ kind: 'hole', x: p.x, y: p.y, n: i + 1, r: Math.max(1.5, bd.w * 0.012) }))],
         handles: points.map((p, i) => ({ id: 'p' + i, x: p.x, y: p.y, kind: 'move' })),
         onDrag: (id, w) => { const i = +id.slice(1); if (points[i]) { points[i] = { x: clamp(w.x, bd.ox, bd.ox + bd.w), y: clamp(w.y, bd.oy, bd.oy + bd.h) }; renderList(); draw(); fire(); } },
     });
@@ -372,7 +373,7 @@ function rectPadWidget(host, primary, group) {
     const c = canvasHost(host, primary), layout = new FeatureCanvas();
     const draw = () => layout.render(c, {
         stock: { w: bd.w, h: bd.h, ox: bd.ox, oy: bd.oy },
-        items: [{ kind: 'rect', x, y, w, h }],
+        items: [...workpieceFeatureItems(bd.ox, bd.oy), { kind: 'rect', x, y, w, h }],
         handles: [
             { id: 'origin', x, y, kind: 'move', label: 'xy' },
             { id: 'size', x: x + w, y: y + h, kind: 'size', label: 'W', value: w },

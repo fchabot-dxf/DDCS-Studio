@@ -6,6 +6,7 @@ import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
 import { populateToolSelect, toolFieldMap, getTool } from '../toolPicker.js';
 import { placementSpec, placementParams } from '../ops/placement.js';
 import { mountPathAnchor } from '../../ui/pathAnchorField.js';
+import { workpieceFeatureItems } from '../../engine/workpiece.js';
 
 const wizard = new TextWizard();
 const layout = new FeatureCanvas();
@@ -50,7 +51,7 @@ function buildTextSpec(params, stock) {
     const pl = placementSpec(params, textBBox(params), 'tx_');   // opt-in: stays at x/y unless you pick a stock corner
     return {
         stock: (stock && stock.x > 0 && stock.y > 0) ? { w: stock.x, h: stock.y, ox: pl.stockOx, oy: pl.stockOy } : null,
-        placement: pl.placement, items, handles,
+        placement: pl.placement, items: [...workpieceFeatureItems(pl.stockOx, pl.stockOy), ...items], handles,
         pathDatum: pl.pathDatum, stockDatum: pl.stockDatum, stockAttach: pl.stockAttach,
         onPathDatum: pl.onPathDatum, onStockAttach: pl.onStockAttach,
         onDrag, onEdit,
