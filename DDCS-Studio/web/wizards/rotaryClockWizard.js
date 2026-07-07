@@ -14,17 +14,36 @@ import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
 
+/** The interpolated SUMMARY texts (the 2 header comments + the 2 action-arm comments + the final message) — extracted to ONE
+ *  format so the data-op twin's postInstantiate RECOMPOSES them from the resolved params (rotaryCenterHeaderComments
+ *  precedent, E1). Must reproduce the inline text byte-for-byte (same num() + defaults). */
+export function rotaryClockHeaderComments(params = {}) {
+    const action = ['set', 'report', 'rotate'].includes(params.action) ? params.action : 'set';
+    const span = num(params.span, 20), dist = num(params.dist, 30);
+    const retract = num(params.retract, 2), safeZ = num(params.safeZ, 10), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50);
+    const refLabel = params.reference === 'side' ? '+Y side (3 o clock)' : 'top (+Z)';
+    const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
+    const actLabel = action === 'report' ? 'measure only' : action === 'rotate' ? 'rotate to 0' : 'set A0';
+    return {
+        top1: `Rotary clock | ${actLabel} | ref ${refLabel} | span ${span}mm | ${wcsLabel}`,
+        top3: `Max probe ${dist}mm | Retract ${retract}mm | Safe Z ${safeZ}mm | Fast ${fFast} | Slow ${fSlow}`,
+        setArm: `Set A0 at ${refLabel} without rotating (verify direction on your machine)`,
+        rotateArm: `Rotate the flat to ${refLabel}, then zero A there - SPINS THE PART (verify direction)`,
+        msg: action === 'report' ? 'Flat tilt #53 deg (measured)' : 'Flat tilt #53 deg - A datum set',
+    };
+}
+
 export function rotaryClockStack(params = {}, opts = {}) {
     const level = num(params.level, 0), span = num(params.span, 20), dist = num(params.dist, 30);
     const retract = num(params.retract, 2), safeZ = num(params.safeZ, 10), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const safeZFrame = safeZFrameOf(params.safeZFrame);   // relative (default, clearance lift) | machine (G53 park at the absolute Z)
     const src = params.sources || {};
     const action = ['set', 'report', 'rotate'].includes(params.action) ? params.action : 'set';
-    const refAngle = params.reference === 'side' ? 90 : 0, refLabel = refAngle ? '+Y side (3 o clock)' : 'top (+Z)';
+    const refAngle = params.reference === 'side' ? 90 : 0;   // refLabel/actLabel/wcsLabel moved into rotaryClockHeaderComments (E1 shared format)
     const refTerm = refAngle ? `-${refAngle}` : '';
-    const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
+    const wcs = params.wcs || 'active';
     const wcsArg = wcs === 'active' ? '#578' : String(parseInt(String(wcs).replace('G', ''), 10) - 53);
-    const actLabel = action === 'report' ? 'measure only' : action === 'rotate' ? 'rotate to 0' : 'set A0';
+    const _hdr = rotaryClockHeaderComments(params);   // ONE format, shared with the twin's postInstantiate recompose
 
     const superset = !!opts.superset;   // E0 — seed the data-TWIN with ALL action arms present (each guarded) so pruneGuards collapses to a concrete shape
 
@@ -64,9 +83,9 @@ export function rotaryClockStack(params = {}, opts = {}) {
         PR('Z', '#7', '#4'); CK('Z', 1); RD('Z', resultVar); MV('Z', '#10');
     };
 
-    C(`Rotary clock | ${actLabel} | ref ${refLabel} | span ${span}mm | ${wcsLabel}`);
+    C(_hdr.top1);
     C('Indicate a flat: probe two points across it in Y, find tilt, datum A. No centreline needed.');
-    C(`Max probe ${dist}mm | Retract ${retract}mm | Safe Z ${safeZ}mm | Fast ${fFast} | Slow ${fSlow}`);
+    C(_hdr.top3);
     C('Motion Variables');
     A('#1', dist, 'Max probe distance'); A('#2', srcVal(src.retract, retract), srcNote(src.retract, 'Retract'));
     A('#3', srcVal(src.fastFeed, fFast), srcNote(src.fastFeed, 'Fast feed')); A('#4', fSlow, 'Slow feed');
@@ -91,14 +110,14 @@ export function rotaryClockStack(params = {}, opts = {}) {
     // ── ACTION fork (the ONE block-shape fork): set A0 (no rotate) | report (measure only) | rotate to the ref then zero A.
     // The A-axis writes (RM/SWO/MV of A) + the refTerm value-swap STAY in the concrete arms — E1 binds the A-axis.
     const setKids = [
-        mkC(`Set A0 at ${refLabel} without rotating (verify direction on your machine)`),
+        mkC(_hdr.setArm),
         mkSWO('A', `[#54-#53${refTerm}]`),
     ];
     const reportKids = [
         mkC('Measure only - A offset left unchanged'),
     ];
     const rotateKids = [
-        mkC(`Rotate the flat to ${refLabel}, then zero A there - SPINS THE PART (verify direction)`),
+        mkC(_hdr.rotateArm),
         mkA('#58', `[0-#53${refTerm}]`, 'Rotation to reach the reference'),
         mkMV('A', '#58'),                    // rotate part to the reference orientation (incremental)
         mkRM('A', '#59'),                    // read A machine pos after the rotate (dialect DRO)
@@ -108,7 +127,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
 
     C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17'));   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
     DM('abs');
-    MSG(action === 'report' ? 'Flat tilt #53 deg (measured)' : 'Flat tilt #53 deg - A datum set');
+    MSG(_hdr.msg);
     GO(2);
     LB(1); DM('inc'); MV('Z', '#17'); DM('abs'); A('#1505', '1', 'Probe failed - no contact');
     LB(2); END();
