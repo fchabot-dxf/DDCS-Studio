@@ -96,9 +96,9 @@ export const SETTINGS_DEFAULTS = {
                    setterPort: 'studio', setterLevel: 'studio', blockHeight: 'studio' },
     },
     limits: {
-        xMinPin: '', xMinLevel: 0, xMaxPin: '', xMaxLevel: 0,
-        yMinPin: '', yMinLevel: 0, yMaxPin: '', yMaxLevel: 0,
-        zMinPin: '', zMinLevel: 0, zMaxPin: '', zMaxLevel: 0
+        xMinPin: '', xMinLevel: 0, xMinSwitchType: 'mechanical', xMaxPin: '', xMaxLevel: 0, xMaxSwitchType: 'mechanical',
+        yMinPin: '', yMinLevel: 0, yMinSwitchType: 'mechanical', yMaxPin: '', yMaxLevel: 0, yMaxSwitchType: 'mechanical',
+        zMinPin: '', zMinLevel: 0, zMinSwitchType: 'mechanical', zMaxPin: '', zMaxLevel: 0, zMaxSwitchType: 'mechanical'
     },
     // Which hardware tabs are shown (manual toggles, persisted). Defaults match the M350 profile:
     // Probes + Limits on, ATC off (no clutter unless you have a tool changer). Fully manual so non-bridge
@@ -183,9 +183,9 @@ export const SETTINGS_DEFAULTS = {
 // syncFlatFromIO() mirrors edits back to the flat fields so the sim + wizards keep working
 // until they read the arrays directly (stage 3). Pin ranges: inputs 1–24, outputs 1–20.
 const LIMIT_AXES = [
-    ['x_min', 'Limit X−', 'xMinPin', 'xMinLevel'], ['x_max', 'Limit X+', 'xMaxPin', 'xMaxLevel'],
-    ['y_min', 'Limit Y−', 'yMinPin', 'yMinLevel'], ['y_max', 'Limit Y+', 'yMaxPin', 'yMaxLevel'],
-    ['z_min', 'Limit Z−', 'zMinPin', 'zMinLevel'], ['z_max', 'Limit Z+', 'zMaxPin', 'zMaxLevel'],
+    ['x_min', 'Limit X−', 'xMinPin', 'xMinLevel', 'xMinSwitchType'], ['x_max', 'Limit X+', 'xMaxPin', 'xMaxLevel', 'xMaxSwitchType'],
+    ['y_min', 'Limit Y−', 'yMinPin', 'yMinLevel', 'yMinSwitchType'], ['y_max', 'Limit Y+', 'yMaxPin', 'yMaxLevel', 'yMaxSwitchType'],
+    ['z_min', 'Limit Z−', 'zMinPin', 'zMinLevel', 'zMinSwitchType'], ['z_max', 'Limit Z+', 'zMaxPin', 'zMaxLevel', 'zMaxSwitchType'],
 ];
 
 export function migrateIO(s) {
@@ -197,8 +197,8 @@ export function migrateIO(s) {
         s.inputs.push({ id: 'setter', type: 'setter', label: 'Tool Setter', pin: p.setterPin ?? '', level: p.setterLevel ?? 0,
             x: p.setterX, y: p.setterY, z: p.setterZ, w: p.setterW, h: p.setterH });
         const L = s.limits || {};
-        for (const [axis, label, pinK, lvlK] of LIMIT_AXES) {
-            if (L[pinK] !== '' && L[pinK] != null) s.inputs.push({ id: 'limit_' + axis, type: 'limit', axis, label, pin: L[pinK], level: L[lvlK] || 0 });
+        for (const [axis, label, pinK, lvlK, swK] of LIMIT_AXES) {
+            if (L[pinK] !== '' && L[pinK] != null) s.inputs.push({ id: 'limit_' + axis, type: 'limit', axis, label, pin: L[pinK], level: L[lvlK] || 0, switchType: L[swK] || 'mechanical' });
         }
     }
     // t189 (declare-fix): backfill the DECLARED waitCode on legacy ATC sensor rows. Before this, the io-tab live-light
@@ -217,11 +217,11 @@ function syncFlatFromIO(s) {
     if (probe) { s.probes.probePin = probe.pin; s.probes.probeLevel = probe.level; }
     if (setter) Object.assign(s.probes, { setterPin: setter.pin, setterLevel: setter.level, setterX: setter.x, setterY: setter.y, setterZ: setter.z, setterW: setter.w, setterH: setter.h });
     s.limits = s.limits || {};
-    for (const [, , pinK, lvlK] of LIMIT_AXES) { s.limits[pinK] = ''; s.limits[lvlK] = 0; }
+    for (const [, , pinK, lvlK, swK] of LIMIT_AXES) { s.limits[pinK] = ''; s.limits[lvlK] = 0; s.limits[swK] = 'mechanical'; }
     for (const inp of (s.inputs || [])) {
         if (inp.type !== 'limit') continue;
         const row = LIMIT_AXES.find(a => a[0] === inp.axis);
-        if (row) { s.limits[row[2]] = inp.pin; s.limits[row[3]] = inp.level || 0; }
+        if (row) { s.limits[row[2]] = inp.pin; s.limits[row[3]] = inp.level || 0; s.limits[row[4]] = inp.switchType || 'mechanical'; }
     }
 }
 

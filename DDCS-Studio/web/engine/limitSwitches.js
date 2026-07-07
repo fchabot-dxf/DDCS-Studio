@@ -22,14 +22,16 @@
  * / null means that switch isn't fitted, so it never trips.
  */
 
+import { switchStandoff } from './switchTypes.js';   // H2 (t483) — per-edge proximity standoff (non-contact trip Sn before the edge)
+
 /** The six envelope edges, in the order ioTable/settingsPanel use, with their flat-config keys. */
 export const LIMIT_EDGES = [
-    { edge: 'x_min', axis: 'x', side: 'min', pinKey: 'xMinPin', levelKey: 'xMinLevel' },
-    { edge: 'x_max', axis: 'x', side: 'max', pinKey: 'xMaxPin', levelKey: 'xMaxLevel' },
-    { edge: 'y_min', axis: 'y', side: 'min', pinKey: 'yMinPin', levelKey: 'yMinLevel' },
-    { edge: 'y_max', axis: 'y', side: 'max', pinKey: 'yMaxPin', levelKey: 'yMaxLevel' },
-    { edge: 'z_min', axis: 'z', side: 'min', pinKey: 'zMinPin', levelKey: 'zMinLevel' },
-    { edge: 'z_max', axis: 'z', side: 'max', pinKey: 'zMaxPin', levelKey: 'zMaxLevel' },
+    { edge: 'x_min', axis: 'x', side: 'min', pinKey: 'xMinPin', levelKey: 'xMinLevel', switchTypeKey: 'xMinSwitchType' },
+    { edge: 'x_max', axis: 'x', side: 'max', pinKey: 'xMaxPin', levelKey: 'xMaxLevel', switchTypeKey: 'xMaxSwitchType' },
+    { edge: 'y_min', axis: 'y', side: 'min', pinKey: 'yMinPin', levelKey: 'yMinLevel', switchTypeKey: 'yMinSwitchType' },
+    { edge: 'y_max', axis: 'y', side: 'max', pinKey: 'yMaxPin', levelKey: 'yMaxLevel', switchTypeKey: 'yMaxSwitchType' },
+    { edge: 'z_min', axis: 'z', side: 'min', pinKey: 'zMinPin', levelKey: 'zMinLevel', switchTypeKey: 'zMinSwitchType' },
+    { edge: 'z_max', axis: 'z', side: 'max', pinKey: 'zMaxPin', levelKey: 'zMaxLevel', switchTypeKey: 'zMaxSwitchType' },
 ];
 
 const EPS = 1e-6;
@@ -90,17 +92,20 @@ export function limitSwitchTrips(toolPosMachine, machine, ioConfig = {}) {
     const M = machine || {};
     const trips = [];
 
+    const defOf = (ax, side) => LIMIT_EDGES.find((e) => e.axis === ax && e.side === side);
     for (const ax of ['x', 'y', 'z']) {
         const pos = Number(P[ax]);
         if (!Number.isFinite(pos)) continue;
         const { lo, hi, homeSide } = axisSpan(M[ax]);
 
-        // min edge: tool at/below lo. max edge: tool at/above hi.
-        const atMin = pos <= lo + EPS;
-        const atMax = pos >= hi - EPS;
-        for (const hit of [atMin && 'min', atMax && 'max']) {
+        // H2 (t483) — the SWITCH-TYPE standoff per edge: a PROXIMITY sensor trips its standoff Sn BEFORE the edge
+        // (non-contact), so its trip position shifts INWARD by Sn; a MECHANICAL switch (Sn=0) trips AT the edge.
+        const minDef = defOf(ax, 'min'), maxDef = defOf(ax, 'max');
+        const minTrip = lo + switchStandoff(ioConfig[minDef.switchTypeKey]);   // min edge is at the bottom → trip Sn above it
+        const maxTrip = hi - switchStandoff(ioConfig[maxDef.switchTypeKey]);   // max edge is at the top → trip Sn below it
+        // min edge: tool at/below the (standoff-adjusted) min trip. max edge: tool at/above the max trip.
+        for (const [hit, def, trip] of [[pos <= minTrip + EPS && 'min', minDef, minTrip], [pos >= maxTrip - EPS && 'max', maxDef, maxTrip]]) {
             if (!hit) continue;
-            const def = LIMIT_EDGES.find((e) => e.axis === ax && e.side === hit);
             const pin = ioConfig[def.pinKey];
             if (pin === '' || pin == null) continue;   // switch not fitted on this edge → can't trip
             trips.push({
@@ -111,7 +116,7 @@ export function limitSwitchTrips(toolPosMachine, machine, ioConfig = {}) {
                 level: Number(ioConfig[def.levelKey]) || 0,
                 isHome: hit === homeSide,              // the machine-0 end is the home switch
                 pos,
-                edgePos: hit === 'min' ? lo : hi,
+                edgePos: trip,                         // the STANDOFF-adjusted trip position (proximity trips Sn before the edge)
             });
         }
     }

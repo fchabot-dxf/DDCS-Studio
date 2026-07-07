@@ -9,6 +9,7 @@
  * pin can't be double-assigned. Choosing a type in "+ Add" drops a row pre-expanded with its params.
  */
 import { toolOptionsHTML, getTool } from '../wizards/toolPicker.js';
+import { SWITCH_TYPES } from '../engine/switchTypes.js';   // H2 (t483) — the declared limit switch-type catalog (mechanical / proximity)
 
 const INPUT_TYPES = [
     { type: 'probe',  label: '3D Probe', help: 'The touch-probe / edge-finder input — its trigger fires G31 to record the touched position (the corner/edge wizards read it).' },
@@ -90,6 +91,13 @@ export function renderIoTable(container, kind, list, onChange) {
             LIMIT_AXES.forEach(([a, l]) => { const o = document.createElement('option'); o.value = a; o.textContent = l; if (row.axis === a) o.selected = true; ax.appendChild(o); });
             ax.addEventListener('change', () => { row.axis = ax.value; onChange(); });
             tr.appendChild(field('Axis', ax, 56));
+
+            // H2 (t483) — the per-EDGE switch-type picker (mechanical AT the edge / proximity Sn BEFORE it). Stored as
+            // row.switchType; syncs to settings.limits.<edge>SwitchType → the sim's trip standoff. SIM-CONFIG only (no macro).
+            const stw = document.createElement('select');
+            SWITCH_TYPES.forEach((s) => { const o = document.createElement('option'); o.value = s.type; o.textContent = s.label; o.title = s.help || ''; if ((row.switchType || 'mechanical') === s.type) o.selected = true; stw.appendChild(o); });
+            stw.addEventListener('change', () => { row.switchType = stw.value; onChange(); });
+            tr.appendChild(field('Switch type', stw, 104));
         }
 
         // Pin picker (free-pin aware: pins used by other rows are disabled)
@@ -148,7 +156,7 @@ export function renderIoTable(container, kind, list, onChange) {
             ? { id: uid('in'), type: sel.value, label: def.label, pin: '', level: 0 }
             : { id: uid('out'), type: sel.value, label: def.label, pin: '', onCode: def.onCode || '', offCode: def.offCode || '' };
         if (isInput && sel.value === 'setter') Object.assign(row, { x: 0, y: 0, z: 0, w: 20, h: 20 });
-        if (isInput && sel.value === 'limit') row.axis = 'x_min';
+        if (isInput && sel.value === 'limit') Object.assign(row, { axis: 'x_min', switchType: 'mechanical' });
         list.push(row); onChange(); rerender();
     });
     add.appendChild(sel); add.appendChild(btn);
