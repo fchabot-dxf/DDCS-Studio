@@ -13,6 +13,7 @@ import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
 import { regionDesc } from './ops/region.js';
 import { contourRegion } from './ops/contour.js';
+import { contourFillBlock } from './ops/contourfill.js';   // the FLAT twin atom — contourStack emits it (byte-identical to the old region-socket contour)
 
 /** The OFFSET toolpath footprint on the stock (the side-offset contour's bounds) — shared by the stack (for
  *  PlaceOnStock's snapshot) and the 2D view, so 2D and 3D place identically. */
@@ -37,15 +38,25 @@ function regionParams(params = {}) {
     return { shape: 'rect', x: ox, y: oy, w: num(params.w, 80), h: num(params.h, 60) };
 }
 
-/** Contour params → its block stack. The one source of truth for both displays. */
+/** The FLAT contourfill geometry params (shape + all 4 dims present; the atom picks w×h vs dia+sides by shape). Mirrors
+ *  regionParams by VALUE so regionDesc(regionFromFlat(this)) == regionDesc(regionParams(params)) → emit byte-identical. */
+function contourFlatParams(params = {}) {
+    return {
+        shape: params.shape || 'rect', x: num(params.originX, 0), y: num(params.originY, 0),
+        w: num(params.w, 80), h: num(params.h, 60), dia: num(params.dia, 50), sides: num(params.sides, 6),
+    };
+}
+
+/** Contour params → its block stack. The one source of truth for both displays. The geometry rides a FLAT `contourfill`
+ *  atom (the region-pill→flat reframe) instead of a nested Region SOCKET — so the twin binds each dim positionally —
+ *  and emits BYTE-IDENTICAL (contourfill rebuilds the same region descriptor + reuses the same emit kernels). */
 export function contourStack(params = {}) {
     const feed = num(params.feed, 400), plunge = num(params.plunge, 200), clearance = num(params.clearance, 5);
     const depth = num(params.depth, 4), stepdown = num(params.stepdown, 1.5);
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
 
-    const region = newBlock('region'); region.params = regionParams(params);   // the TRUE profile boundary
-    const contour = newBlock('contour');
-    contour.params = { region, side: params.side || 'outside', tool: num(params.toolDia, 6), z: 'z', feed, plunge, clearance };
+    const contour = newBlock('contourfill');
+    contour.params = { ...contourFlatParams(params), side: params.side || 'outside', tool: num(params.toolDia, 6), z: 'z', feed, plunge, clearance };
     const down = newBlock('stepdown');
     down.params = { to: depth, by: stepdown };
     down.children = [contour];

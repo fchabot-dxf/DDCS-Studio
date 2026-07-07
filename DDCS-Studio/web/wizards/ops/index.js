@@ -19,6 +19,7 @@ import { boreBlock, helicalBore } from './bore.js';
 import { lineBlock, lineCut } from './line.js';
 import { slotBlock, slotPath } from './slot.js';
 import { contourBlock } from './contour.js';
+import { contourFillBlock } from './contourfill.js';   // the FLAT contour twin atom (region-pill→flat reframe)
 import { regionBlock } from './region.js';
 import { stepoverBlock, fillStrategy } from './stepover.js';
 import { surfaceFillBlock } from './surfaceFill.js';
@@ -76,7 +77,7 @@ import { evalExpr } from './expr.js';
 export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
     moveBlock, arcBlock, probeBlock, machineMoveBlock, homeBlock, pathModeBlock,   // Move (+ G53 machine-coord move + G28 home + G64/G61 path mode)
-    lineBlock, slotBlock, boreBlock, drillBlock, contourBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + contour/profile [+ pocket-wall finish] + native canned cycles G81-85/G80)
+    lineBlock, slotBlock, boreBlock, drillBlock, contourBlock, contourFillBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + contour/profile [contour=region-socket for pocket-wall; contourfill=flat for the twin] + native canned cycles G81-85/G80)
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, stepdownBlock, placeOnStockBlock, rotateBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align)
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, toolOffsetBlock,   // Coordinates (WCS + dist-mode + G17-19 plane + work-offset/tool-table write)

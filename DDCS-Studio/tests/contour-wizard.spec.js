@@ -88,8 +88,9 @@ test('contour op round-trips: BUILDERS.contour → reconcile reads the TRUE boun
     const stack = cw.contourStack(params);
     const find = (arr, t) => { for (const b of (arr || [])) { if (!b) continue; if (b.type === t) return b; const f = b.children && find(b.children, t); if (f) return f; } return null; };
     const down = find(stack, 'stepdown');
-    const contour = down && down.children.find((b) => b.type === 'contour');
-    const region = contour && contour.params.region;
+    // The geometry now rides the FLAT contourfill atom (region-pill→flat reframe) — no nested Region socket.
+    const contour = down && down.children.find((b) => b.type === 'contourfill');
+    const region = contour && contour.params;   // flat: {shape,x,y,w,h,dia,sides,side,tool,...}
 
     // Drive the reconciler the same way the app does: record the op, build its op-stack into the program,
     // then reverse-sync from the (un-edited) block program.
@@ -99,9 +100,9 @@ test('contour op round-trips: BUILDERS.contour → reconcile reads the TRUE boun
     const back = ops.reconcileActiveOp();              // read the block program back → form fields
 
     return {
-      regionShape: region && region.params && region.params.shape,
-      regionW: region && region.params && region.params.w,
-      regionX: region && region.params && region.params.x,
+      regionShape: region && region.shape,
+      regionW: region && region.w,
+      regionX: region && region.x,
       side: contour && contour.params.side,
       tool: contour && contour.params.tool,
       reconciled: back,

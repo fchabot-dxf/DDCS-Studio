@@ -129,20 +129,21 @@ const RECONCILERS = {
     contour(prog) {
         const down = find(prog, 'stepdown');
         if (!down || !Array.isArray(down.children)) return null;
-        const c = down.children.find((b) => b.type === 'contour'), rg = c && c.params && c.params.region;
-        if (!c || !rg || !rg.params) return null;
-        // The Region IS the TRUE profile boundary (the Contour atom applies the side offset), so read it straight.
+        // The FLAT contourfill atom (region-pill→flat reframe): geometry rides the block directly, no Region socket.
+        const c = down.children.find((b) => b.type === 'contourfill'), p = c && c.params;
+        if (!c || !p) return null;
+        // The geometry IS the TRUE profile boundary (the atom applies the side offset), so read the flat dims straight.
         const wb = find(prog, 'wcs');
         const f = {
             ct_wcs: (wb && wb.params && wb.params.wcs) || 'active',
-            ct_shape: rg.params.shape, ct_side: c.params.side || 'outside', ct_toolDia: c.params.tool,
+            ct_shape: p.shape, ct_side: p.side || 'outside', ct_toolDia: p.tool,
             ct_depth: down.params.to, ct_stepdown: down.params.by,
-            ct_feed: c.params.feed, ct_plunge: c.params.plunge, ct_clearance: c.params.clearance,
+            ct_feed: p.feed, ct_plunge: p.plunge, ct_clearance: p.clearance,
         };
-        f.ct_originX = rg.params.x; f.ct_originY = rg.params.y;
-        if (rg.params.shape === 'circle') { f.ct_dia = rg.params.w; }
-        else if (rg.params.shape === 'polygon') { f.ct_dia = rg.params.w; f.ct_sides = rg.params.sides; }
-        else { f.ct_w = rg.params.w; f.ct_h = rg.params.h; }   // rect + ellipse
+        f.ct_originX = p.x; f.ct_originY = p.y;
+        if (p.shape === 'circle') { f.ct_dia = p.dia; }
+        else if (p.shape === 'polygon') { f.ct_dia = p.dia; f.ct_sides = p.sides; }
+        else { f.ct_w = p.w; f.ct_h = p.h; }   // rect + ellipse
         return Object.assign(f, placeFields(prog, 'ct_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper
     },
     drill(prog) {

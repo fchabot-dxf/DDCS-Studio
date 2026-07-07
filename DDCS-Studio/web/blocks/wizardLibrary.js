@@ -63,7 +63,7 @@ const BUILTINS = [
     { id: 'drill', type: 'drill', variant: 'drill', label: 'Drill', icon: '', group: 'mill', opensAs: 'user_drill_data' },
     { id: 'bore', type: 'drill', variant: 'bore', label: 'Bore', icon: '', group: 'mill' },
     { id: 'pocket', type: 'pocket', label: 'Pocket', icon: '', group: 'mill' },
-    { id: 'contour', type: 'contour', label: 'Contour', icon: '', group: 'mill' },
+    { id: 'contour', type: 'contour', label: 'Contour', icon: '', group: 'mill', opensAs: 'user_contour_data' },   // E1 — IN-PLACE: the Contour slot opens the flat twin (region-pill→flat reframe, byte-identical); built-in contourStack stays the legacy shim
     // MILL/ATC IN-PLACE BATCH (t407) — the drill one-liner applied ×4: each single-shape twin goes IN-PLACE via opensAs (the
     // click re-points to the twin, its own Data-Wiz entry auto-hides, the seamless plain title). All single-shape → no Bore-style gap.
     { id: 'slot', type: 'slot', label: 'Slot', icon: '', group: 'mill', opensAs: 'user_slot_data' },

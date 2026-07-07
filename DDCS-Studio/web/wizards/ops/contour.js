@@ -33,8 +33,9 @@ export function contourRegion(p) {
     return offsetRegion(coerceRegion(p.region), sideOffset(p.side || 'on', num(p.tool, 6) / 2));
 }
 
-/** Crisp circular contour: rapid to the rim, plunge, one full G3 circle, retract. */
-function circleTrace(rg, z, clr, feed, plunge) {
+/** Crisp circular contour: rapid to the rim, plunge, one full G3 circle, retract. Exported so the FLAT twin atom
+ *  (contourfill — the region-pill→flat reframe) reuses the EXACT circle emit → byte-identical to this region-socket atom. */
+export function circleTrace(rg, z, clr, feed, plunge) {
     const x = r3(rg.cx + rg.r), y = r3(rg.cy);
     return [`G0 Z${r3(clr)}`, `G0 X${x} Y${y}`, `G1 Z${r3(z)} F${plunge}`, `G3 X${x} Y${y} I${r3(-rg.r)} J0 F${feed}   ( contour )`];
 }
