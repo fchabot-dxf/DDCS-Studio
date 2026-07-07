@@ -166,9 +166,11 @@ export class FeatureCanvas {
             this._draw(this.spec, this._vw, this._vh);
         }, { passive: false });
 
-        // Double-click empty space → re-frame (resume auto-fit).
+        // Double-click a handle → an inline DUAL-INPUT editor (type the value instead of dragging); empty space → re-frame.
         svg.addEventListener('dblclick', (e) => {
-            if (!this.spec || !this._tf || this._hit(this._toWorld(e))) return;
+            if (!this.spec || !this._tf) return;
+            const hit = this._hit(this._toWorld(e));
+            if (hit) { if (hit.edit && this.spec.onEditDual) { e.preventDefault(); e.stopPropagation(); this._editDual(hit); } return; }
             this._userAdjusted = false;
             this._tf = this._fit(this.spec, this._vw, this._vh);
             this._draw(this.spec, this._vw, this._vh);
@@ -617,5 +619,33 @@ export class FeatureCanvas {
         const cancel = () => { if (done) return; done = true; inp.remove(); };
         inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') commit(); else if (e.key === 'Escape') cancel(); });
         inp.addEventListener('blur', commit);
+    }
+
+    /** DUAL inline editor (double-click a handle): two labelled number inputs (X/Y for a position handle, W/H for a size
+     *  handle) overlaid at the handle → spec.onEditDual(id, [a, b]) on Enter/blur, Esc cancels. The handle opts in via
+     *  `h.edit = { labels:[l1,l2], vals:[v1,v2] }`. Generic — every wizard's handles become dual-typeable this way. */
+    _editDual(h) {
+        if (!this.spec || !this.spec.onEditDual || !h.edit) return;
+        const old = this.container.querySelector('.fc-dim-edit-dual'); if (old) old.remove();
+        const c = this._disp(h.x, h.y);
+        const labels = h.edit.labels || ['X', 'Y'], vals = h.edit.vals || [0, 0];
+        const box = document.createElement('div');
+        box.className = 'fc-dim-edit-dual';
+        box.style.cssText = `position:absolute; left:${c.x + 12}px; top:${c.y - 12}px; z-index:21; display:flex; align-items:center; gap:3px; background:var(--panel,#161b22); color:var(--text-main,#dfe6ee); border:1px solid var(--accent,#4af); border-radius:4px; padding:2px 4px; box-shadow:0 3px 10px rgba(0,0,0,0.5);`;
+        const inputs = [];
+        for (let i = 0; i < 2; i++) {
+            const lab = document.createElement('span'); lab.textContent = labels[i]; lab.style.cssText = 'font-size:10px; color:#9fb4cc;';
+            const inp = document.createElement('input'); inp.type = 'number'; inp.step = 'any'; inp.value = r3(vals[i]);
+            inp.style.cssText = 'width:52px; font-size:12px; padding:1px 3px; background:#0d0f14; color:var(--text-main,#dfe6ee); border:1px solid #3a414d; border-radius:3px;';
+            box.appendChild(lab); box.appendChild(inp); inputs.push(inp);
+        }
+        this.container.appendChild(box);
+        inputs[0].focus(); inputs[0].select();
+        let done = false;
+        const commit = () => { if (done) return; done = true; const a = parseFloat(inputs[0].value), b = parseFloat(inputs[1].value); box.remove(); if (Number.isFinite(a) && Number.isFinite(b)) this.spec.onEditDual(h.id, [a, b]); };
+        const cancel = () => { if (done) return; done = true; box.remove(); };
+        box.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } else if (e.key === 'Escape') { e.preventDefault(); cancel(); } });
+        box.addEventListener('focusout', (e) => { if (!box.contains(e.relatedTarget)) commit(); });   // leaving the box (not tabbing between the 2 inputs) commits
+        box.addEventListener('pointerdown', (e) => e.stopPropagation());   // don't let the canvas start a pan/drag
     }
 }

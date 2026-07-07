@@ -175,7 +175,9 @@ export function openStockEditor(anchor, opts) {
         const o = wp.outer;
         if (spec.stock && o && o.x > 0 && o.y > 0) {
             const dp = datumXY(o);   // part-zero in the canvas frame — the offset ORIGIN; feature.pos is PHYSICAL (Face 2)
-            spec.handles = [{ id: 'outer_size', x: o.x, y: o.y, kind: 'size', label: `${Math.round(o.x)}×${Math.round(o.y)}` }];
+            // DOUBLE-CLICK a handle → an inline DUAL field (type instead of drag): the outer + feature SIZE handles carry W/H,
+            // the feature OFFSET handle carries X/Y (the datum-relative offset, matching its label). See onEditDual below.
+            spec.handles = [{ id: 'outer_size', x: o.x, y: o.y, kind: 'size', label: `${Math.round(o.x)}×${Math.round(o.y)}`, edit: { labels: ['W', 'H'], vals: [o.x, o.y] } }];
             // FACE 2 — each INSIDE feature (pocket/bore) gets an ORIGIN handle (drags the PHYSICAL pos; its label shows the
             // DERIVED offset = physical − datum) + a SIZE handle (its EXTENT). Changing the datum RE-DERIVES the label WITHOUT
             // moving the physical feature. Dragging writes features[] (materializing a legacy pocket).
@@ -183,16 +185,16 @@ export function openStockEditor(anchor, opts) {
                 if (f.side !== 'inside') return;
                 const sz = featureSize(wp, f) || { x: 10, y: 10 };
                 const cx = f.pos.x, cy = f.pos.y;   // PHYSICAL (stock min-XY) → the canvas directly
-                spec.handles.push({ id: `feat${i}_org`, x: cx, y: cy, kind: 'point', label: `⌖ ${Math.round(cx - dp.x)},${Math.round(cy - dp.y)}` });
-                spec.handles.push({ id: `feat${i}_size`, x: cx + (sz.x || 10) / 2, y: cy + (sz.y || 10) / 2, kind: 'point', label: `${Math.round(sz.x)}×${Math.round(sz.y)}` });
+                spec.handles.push({ id: `feat${i}_org`, x: cx, y: cy, kind: 'point', label: `⌖ ${Math.round(cx - dp.x)},${Math.round(cy - dp.y)}`, edit: { labels: ['X', 'Y'], vals: [cx - dp.x, cy - dp.y] } });
+                spec.handles.push({ id: `feat${i}_size`, x: cx + (sz.x || 10) / 2, y: cy + (sz.y || 10) / 2, kind: 'point', label: `${Math.round(sz.x)}×${Math.round(sz.y)}`, edit: { labels: ['W', 'H'], vals: [sz.x || 10, sz.y || 10] } });
             });
+            const setOuter = (w, h) => {   // shared by the outer drag + the dual-field type: write the flat stock.x/y + commit
+                const xEl = pop.querySelector('#se_x'), yEl = pop.querySelector('#se_y');
+                if (xEl) xEl.value = String(Math.max(1, Math.round(w))); if (yEl) yEl.value = String(Math.max(1, Math.round(h)));
+                commit();
+            };
             spec.onDrag = (id, p) => {
-                if (id === 'outer_size') {   // the OUTER resize (M1b) — writes the flat stock.x/y from the datum corner
-                    const nx = Math.max(1, Math.round(p.x)), ny = Math.max(1, Math.round(p.y));
-                    const xEl = pop.querySelector('#se_x'), yEl = pop.querySelector('#se_y');
-                    if (xEl) xEl.value = String(nx); if (yEl) yEl.value = String(ny);
-                    commit(); return;
-                }
+                if (id === 'outer_size') { setOuter(p.x, p.y); return; }   // the OUTER resize (M1b) — from the datum corner
                 const m = /^feat(\d+)_(org|size)$/.exec(id); if (!m) return;
                 const i = +m[1], kind = m[2];
                 const feats = featuresForEdit(); const f = feats[i]; if (!f) return;
@@ -201,6 +203,17 @@ export function openStockEditor(anchor, opts) {
                 } else {                 // set the EXTENT, symmetric about the origin (handle sits at pos + size/2)
                     f.size = { x: Math.max(1, Math.round(2 * (p.x - f.pos.x))), y: Math.max(1, Math.round(2 * (p.y - f.pos.y))) };
                 }
+                writeFeatures(feats);
+            };
+            // DOUBLE-CLICK → TYPE (the same targets as the drag): outer W/H → stock.x/y; feature W/H → f.size; feature X/Y →
+            // f.pos = the DATUM-RELATIVE offset + datum (matching the ⌖ label). Enter/blur commits, Esc cancels (in FeatureCanvas).
+            spec.onEditDual = (id, [a, b]) => {
+                if (id === 'outer_size') { setOuter(a, b); return; }
+                const m = /^feat(\d+)_(org|size)$/.exec(id); if (!m) return;
+                const i = +m[1], kind = m[2];
+                const feats = featuresForEdit(); const f = feats[i]; if (!f) return;
+                if (kind === 'org') f.pos = { x: Math.round(clampN(a + dp.x, 0, o.x)), y: Math.round(clampN(b + dp.y, 0, o.y)) };   // offset → physical
+                else f.size = { x: Math.max(1, Math.round(a)), y: Math.max(1, Math.round(b)) };
                 writeFeatures(feats);
             };
         }
