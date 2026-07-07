@@ -2315,3 +2315,54 @@ These are CONCRETE atoms (readmachine/setworkoffset/move) kept by prune, and the
 5. **emit BYTE-IDENTICAL** — twin == rotaryClockStack across a 5-row action/reference/wcs/safeZFrame/scalar sweep (the menu/seed wire never touches the stack).
 
 **FULL SUITE: 713 passed, 2 skipped, 0 failed.** Shared wizardLibrary.js + app.js touched → NO regression (the pinned wizard-bar / edge-seamless-title routing tests green; blocks-rotary-rig green). Files: web/blocks/wizardLibrary.js · web/app.js · tests/rotary-clock-in-place.spec.js (new). **THE ROTARY PORT IS COMPLETE — both wizards (Centreline V10.88 + Clock) are IN-PLACE + VERIFIED, ready for the advisor's V10.89 release.** NEXT (per dispatch): Alignment (the next probe wizard). PASS BACK.
+
+## 🔨 turn 431 (cycle 127) — ALIGNMENT PORT SCOUT (the LAST probe-fan-out port; NO CODE, map only). Rotary COMPLETE + V10.89. Ground: alignmentWizard.js + alignmentView.js + opSimStarts.js + the M350 dumps + [[alignment-real-correction]].
+
+### THE HEADLINE — alignment is the SIMPLEST port yet (no bar, no rig, sim already exists, emit already portable, emit-only by design)
+
+```
+                 CENTRELINE/CLOCK (rotary)          ALIGNMENT
+  sim device     round bar / box + 4th-axis RIG     DEFAULT BOX, no rig, no device  ← edge/middle pattern
+  simStock       yes (bar) / no (box)               NO (default box)
+  sim-starts     BUILT_IN + provider (new)          BUILT_IN.alignment ALREADY EXISTS (2 starts A/B)
+  emit path      emitMapped (portable)              emitMapped (portable) ✓ same
+  twin exists?   no (from-scratch)                  no (from-scratch)
+  ground-truth   golden own emit (no dump)          golden own emit (no ANGLE dump) ✓ same
+  structural fork action / method+approach           checkAxis / probeDir  (axis-letter swaps)
+```
+
+### 1. INHERIT vs ALIGNMENT-SPECIFIC
+- **INHERITS verbatim:** userOpFromStack twin · #var bindings by identity (deriveBindingsFor + def.bindingSpecs) · opensAs in-place + builtinLabelForTwin + app.js seed · **def.simStartsProvider = opSimStarts('alignment') — BUILT_IN.alignment ALREADY EXISTS** (2 starts A/B, checkAxis-aware) · applySafeZFrame (park) + applyHeaderComments (the interpolated header) recompose · applyProbeSources (#2/#3/#5 source-chips — alignment sources retract/fastFeed/port, SAME set).
+- **ALIGNMENT-SPECIFIC:** the fence-angle measurement (2 touches A→B, atan(delta/span)→#1512) — the op's purpose, already block-based. NO simStock/rig (default box). The checkAxis(X|Y) axis-letter swap. tolerance is a COMMENT-ONLY param (no #var). #1510/#1511/#1512 result registers = concrete atoms that pass through (like the rotary A-axis atoms).
+
+### 2. EMIT PATH
+alignmentStack(params) → emitMapped → PORTABLE (dialect-aware atoms), like corner/edge/middle/rotary. NO hand-roll. NO existing emit-only twin (from-scratch, mirror rotary).
+
+### 3. FORKS — structural vs value-swap (THE key design decision)
+- **checkAxis (X|Y)** — fence axis. Flips checkAxis↔probeAxis → the axis LETTER on ~10 atoms (RM checkAxis; PR/CK/RD/MV probeAxis in twoPass, called for A+B) + interpolated comments. SAME block shape.
+- **probeDir (pos|neg)** — swaps probeVar/retractVar (#8/#7, #9/#10) on ~8 atoms + the dirLabel comment. SAME block shape.
+- **safeZFrame (relative|machine)** — the park block swap. VALUE-SWAP, recompose (applySafeZFrame, reuse verbatim).
+- **NO other structural forks** (the confirm gates fold by DIALECT via emitMapped, not a param).
+- **THE FORK DECISION:** checkAxis/probeDir are value-swaps in the strict sense (the E0 gate reads them from params on both sides → byte-identical WITHOUT guards). BUT the TWIN must respond, and recomposing the axis-letter/probe-var on ~18 atoms is FRAGILE (vs the rotary's 1 refTerm / 1 wcsArg). **RECOMMEND: GUARD checkAxis × probeDir (4 arms)** — the guard/prune mechanism carries the arms so the twin needs NO axis recompose (only the simple safeZFrame/header/source recompose, exactly the clock's clean twin). Cost: a 4-arm superset (vs the clock's 3-arm action). This DEVIATES from "value-swaps don't need guards" — justified because the recompose surface is pervasive. FLAG for the advisor: guard-both (4 arms, clean twin) vs guard-checkAxis-only (2 arms, recompose probeDir's ~8 vars) vs pure-recompose (0 guards, heaviest twin).
+
+### 4. THE SIM
+alignmentView reads the GLOBAL BOX stock, preview3D(inferStart, inferStarts). NO activateCylinderStock/restoreBoxStock/previewRotaryFixture/previewMachine. def.simStartsProvider = opSimStarts('alignment') → 2 starts (A/B spread along the fence, near the edge, z=min(5,sz/2)). NO def.simStock (default box), NO rig, NO forceMachine — this is the EDGE/MIDDLE multi-start-probe-on-box pattern, NOT rotary. sim intent block: no rotary/machine (omit or all-false). panel form3d+2d.
+
+### 5. GROUND-TRUTH
+NO dumped alignment ANGLE macro. xy_fence_finder_FINAL.nc is a POSITION finder (finds X/Y fence coords for G54) — 0 matches for #1512/ATAN/angle/misalign → a DIFFERENT op. The alignment ANGLE (atan → #1512) is Studio-original → GOLDEN-SNAPSHOT its own emit (INDEPENDENT TRUTH = concrete alignmentStack superset:false), exactly like rotary. The fence-finder is a reference for the two-pass fence-probe PATTERN only.
+
+### 6. THE DEFERRED BOUNDARY (G68 real-correction) — CONFIRMED DEFERRED
+The wizard is ALREADY emit-only: measures the angle → #1510/#1511/#1512 + MSG; NO G68/rotate. Per [[alignment-real-correction]]: DDCS Expert has NO G68; the REAL correction (rotate the program by #1512) is a SEPARATE, ALREADY-BUILT feature — web/data/rotateProgram.js + the ⟳ Align editor button (path 2, shipped 2026-06-20). Path 1 (the #763/Pr263 native write) is unbuilt/unconfirmed. So the PORT is EMIT-ONLY (port the measurement wizard to the twin); the G68/#763 correction stays OUT of scope + DEFERRED. ✓
+
+### FLAGS (advisor calls)
+- **[F1] The fork mechanism:** guard checkAxis×probeDir (4 arms, clean twin — RECOMMENDED) vs guard-checkAxis-only vs pure-recompose. Determines E0/E1 shape.
+- **[F2] The #20 restructure:** #20=`[0-${safeZ}]` BAKES the safeZ literal (`[0-10]`), inconsistent with the #9=`[0-#2]` pattern + it DESYNCS under a safeZ binding. RECOMMEND restructuring #20 → `[0-#19]` (reference the #var, matches the established pair pattern, enables the binding). This CHANGES the shipped emit by one line (`[0-10]`→`[0-#19]`, semantically identical: #19=10). Since ground-truth is our OWN golden, acceptable — but it changes the shipped macro, so FLAG for OK.
+- **[F3] tolerance is COMMENT-ONLY** (no #var, the macro never compares against it) — port it as a header-comment value-swap (informational). Confirm the advisor wants it kept display-only (vs given a #var/gate).
+
+### PROPOSED E-DECOMPOSITION (mirrors the clock E0-E3, assuming [F1]=guard-both)
+- **E0** — superset gate: alignmentStack(params,{superset}) guards checkAxis(X|Y)×probeDir(pos|neg)=4 arms; golden own emit; the #20→[0-#19] restructure [F2]. Verify prune==concrete BYTE-IDENTICAL across checkAxis×probeDir×safeZFrame×scalars.
+- **E1** — twin: userOpFromStack + 6 #var bindings (dist/retract/f_fast/f_slow/port/safeZ; tolerance comment-only) + checkAxis+probeDir struct-bindings + safeZFrame/header/source recompose. Byte-diff ZERO both profiles.
+- **E2** — sim: def.simStartsProvider = opSimStarts('alignment') (2 starts A/B); confirm the box + 2 markers render (NO rig/simStock/machine). Assert-the-value parity.
+- **E3** — opensAs in-place + seamless title + seed + RELEASE — COMPLETES the probe fan-out (corner/edge/middle/centreline/clock/alignment all in-place).
+
+PASS BACK (no code — scout). Awaiting the [F1]/[F2]/[F3] calls, then E0.
