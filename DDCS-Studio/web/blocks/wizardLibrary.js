@@ -56,7 +56,11 @@ const BUILTINS = [
     { id: 'atc_change', type: 'atc_change', label: 'Tool Change', icon: '🔧', group: 'atc' },
     { id: 'atc_table', type: 'atc_table', label: 'Tool Table', icon: '📋', group: 'atc' },
     { id: 'atc_test', type: 'atc_test', label: 'ATC Test', icon: '🧪', group: 'atc' },
-    { id: 'drill', type: 'drill', variant: 'drill', label: 'Drill', icon: '', group: 'mill' },
+    // QUICK-WINS PILOT (t405) — the DRILL peck twin goes IN-PLACE via opensAs (mirror corner/edge/middle E4/E5): the built-in
+    // keeps its Mill slot, the click re-points to user_drill_data, the twin's own Mill-Data-Wiz entry auto-hides (OPENS_AS_TARGETS),
+    // the title reads plain "Drill" (builtinLabelForTwin). BORE stays built-in: user_drill_data is PECK-only (method=helical swaps
+    // the block TYPE drill→bore, frontier #1), so Bore needs its OWN helical twin (user_bore_data) — a small follow-on, NOT this wire-up.
+    { id: 'drill', type: 'drill', variant: 'drill', label: 'Drill', icon: '', group: 'mill', opensAs: 'user_drill_data' },
     { id: 'bore', type: 'drill', variant: 'bore', label: 'Bore', icon: '', group: 'mill' },
     { id: 'pocket', type: 'pocket', label: 'Pocket', icon: '', group: 'mill' },
     { id: 'contour', type: 'contour', label: 'Contour', icon: '', group: 'mill' },

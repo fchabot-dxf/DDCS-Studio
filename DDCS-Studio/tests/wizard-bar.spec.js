@@ -73,11 +73,11 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
     "openWiz && openWiz('atc_table')", "openWiz && openWiz('atc_test')",
   ]);
 
-  // Mill: drill carries its variant; inline-SVG icons render (drill); `text` is given an emoji in the library
-  // but the bar's SVG map WINS, so it must render an svg (icon precedence).
-  expect(mill.items[0].onclick).toBe("openWiz && openWiz('drill','drill')");
+  // Mill: DRILL now opens its data-op twin IN-PLACE (opensAs → openWiz('user_drill_data'), t405); BORE keeps its variant
+  // (peck-only twin → Bore needs its own helical twin). Inline-SVG icons still render (drill) — the bar's SVG map WINS.
+  expect(mill.items[0].onclick).toBe("openWiz && openWiz('user_drill_data')");
   expect(mill.items[1].onclick).toBe("openWiz && openWiz('drill','bore')");
-  expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('drill','drill')").hasSvg).toBe(true);
+  expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('user_drill_data')").hasSvg).toBe(true);
   expect(mill.items.find((i) => i.onclick === "openWiz && openWiz('text')").hasSvg).toBe(true);
 
   // ── live custom group: register a user op + refresh → a "Custom" dropdown appears on the center ──

@@ -19,8 +19,8 @@ test('edge/corner/middle open with the plain built-in title; def.label keeps (da
   expect(unit.edge, 'the edge twin titles as the built-in "Edge"').toBe('Edge');
   expect(unit.corner, 'the corner twin titles as the built-in "Corner"').toBe('Corner');
   expect(unit.middle, 'the middle twin titles as the built-in "Middle / Bore / Boss"').toBe('Middle / Bore / Boss');
-  expect(unit.drill, 'a normal/additive twin has no in-place title (keeps its custom heading)').toBe(null);
-  expect(unit.bogus, 'an unknown op → null').toBe(null);
+  expect(unit.drill, 'the drill twin now titles as the built-in "Drill" (finished to in-place, t405)').toBe('Drill');
+  expect(unit.bogus, 'an unknown op → null (a normal/additive twin keeps its custom heading)').toBe(null);
 
   // (2) REAL-SYMPTOM — open each in-place twin; the wizard usage/title reads the PLAIN built-in label
   const openTitle = async (optype, defFactoryPath, factory) => {
