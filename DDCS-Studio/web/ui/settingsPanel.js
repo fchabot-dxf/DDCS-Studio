@@ -219,6 +219,7 @@ export function migrateIO(s) {
     // One-time, keyed on the stable seeded id (not the label).
     const ATC_SENSOR_WAIT = { drawbar_released_atc: 'M301', drawbar_clamped_atc: 'M302', spindle_stopped_atc: 'M300' };
     for (const r of s.inputs) if (r && r.group === 'atc' && !r.waitCode && ATC_SENSOR_WAIT[r.id]) r.waitCode = ATC_SENSOR_WAIT[r.id];
+    backfillHomeSwitches(s);   // t534 — one-time: an EXISTING config gets its missing per-axis home end (the seed skipped it)
     return s;
 }
 
@@ -238,6 +239,32 @@ function syncFlatFromIO(s) {
         const row = LIMIT_AXES.find(a => a[0] === inp.axis);
         if (row) { s.limits[row[2]] = inp.pin; s.limits[row[3]] = inp.level || 0; s.limits[row[4]] = inp.switchType || 'mechanical'; s.limits[row[5]] = !!inp.home; }
     }
+}
+
+// t534 — ONE-TIME, FLAG-GUARDED home-switch BACKFILL for an EXISTING config that predates the t502 seed. That seed only ran
+// inside `inputs.length===0`; a config already populated (probe/setter rows) SKIPPED it → NO <edge>Home → homing fell back to
+// the travel-SIGN guess (a +Z envelope homes to machine-0 = the BOTTOM = the plunge the human watches). This ADDS the MISSING
+// per-axis home END so declaredHomeEdgeSide drives homing. Runs ONCE (`_ioHomeBackfill`) so a later user DELETION STAYS deleted.
+// Never duplicates: if the axis already has a limit row, mark home on it (prefer the default end's row); only ADD a row when the
+// axis has none. ≤1 home per axis (only one end is marked/added). X/Y home at MIN; Z homes UP to z_max/top (router-standard).
+function backfillHomeSwitches(s) {
+    if (s._ioHomeBackfill) return;          // ran once — respect a later user deletion (never re-add)
+    s._ioHomeBackfill = 1;
+    if (!Array.isArray(s.inputs)) s.inputs = [];
+    const DEFAULT_END = { x: 'x_min', y: 'y_min', z: 'z_max' }, LABEL = { x_min: 'Home X', y_min: 'Home Y', z_max: 'Home Z' };
+    let changed = false;
+    for (const axis of ['x', 'y', 'z']) {
+        const rows = s.inputs.filter((r) => r && r.type === 'limit' && String(r.axis || '').startsWith(axis + '_'));
+        if (rows.some((r) => r.home)) continue;   // this axis already DECLARES a home end — leave it alone
+        const defEnd = DEFAULT_END[axis];
+        if (rows.length) {                          // prefer marking an EXISTING fitted row (its end IS where the switch is)
+            (rows.find((r) => r.axis === defEnd) || rows[0]).home = true; changed = true;
+        } else {                                    // no row on this axis → add the default home row, pin UNASSIGNED, editable
+            s.inputs.push({ id: 'limit_' + defEnd, type: 'limit', axis: defEnd, label: LABEL[defEnd], pin: '', level: 0, switchType: 'mechanical', home: true });
+            changed = true;
+        }
+    }
+    if (changed) syncFlatFromIO(s);   // mirror the new/updated Home flags into the flat settings.limits (declaredHomeEdgeSide reads these)
 }
 
 // Deep-merge a persisted homing config over the defaults: top-level scalars, then per-axis fields, so a partial
@@ -271,6 +298,8 @@ function loadSettings() {
             const p = JSON.parse(raw);
             const merged = migrateIO({
                 toolsSeeded: p.toolsSeeded === true,
+                _ioHomeBackfill: p._ioHomeBackfill,   // t534 — carry the one-time backfill flag so it doesn't re-run (+ re-add a user-deleted switch) each load
+
                 stock: { ...SETTINGS_DEFAULTS.stock, ...(p.stock || {}) },
                 stockTemplates: Array.isArray(p.stockTemplates) ? p.stockTemplates : [],
                 machine: { ...SETTINGS_DEFAULTS.machine, ...(p.machine || {}) },

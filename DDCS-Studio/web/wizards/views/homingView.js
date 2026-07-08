@@ -3,7 +3,7 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { HomingWizard } from '../homingWizard.js';
 import { openHomingSetup } from '../../ui/settingsPanel.js';
-import { axisSpan } from '../../engine/limitSwitches.js';
+import { axisSpan, declaredHomeEdgeSide } from '../../engine/limitSwitches.js';
 import { switchStandoff } from '../../engine/switchTypes.js';
 
 const wizard = new HomingWizard();
@@ -38,22 +38,27 @@ function orderAxes(selected, homing) {
 // configured; positioned at the home edge (machine-0 end, from axisSpan) on that axis + the span mid on the other two,
 // styled per its switchType (mechanical/proximity + the H2 standoff). ONE-SOURCE: axisSpan + settings.limits — the same
 // the H3 trip model reads, so the device sits exactly where its switch trips.
-function homingEdges(settings) {
+export function homingEdges(settings) {
     const m = settings.machine || {}, limits = settings.limits || {};
     const midOf = (ax) => { const s = axisSpan(Number(m[ax]) || 0); return (s.lo + s.hi) / 2; };
     const out = [];
     for (const axis of ['x', 'y', 'z']) {
         const travel = Number(m[axis]) || 0;
         if (!travel) continue;
-        const { lo, hi, homeSide } = axisSpan(travel);
-        const key = axis + (homeSide === 'min' ? 'Min' : 'Max');   // the HOME end's flat-config key (xMin / zMax …)
+        const { lo, hi } = axisSpan(travel);
+        // t534 — the DEVICE sits at the DECLARED home end (declaredHomeEdgeSide) the MOTION drives to; fall back to the
+        // travel-sign machine-0 end only when NO home is declared. This kills the motion-vs-device divergence (a +Z envelope's
+        // sign end is the BOTTOM, but the declared z_max home + the motion go to the TOP — the device now follows the motion).
+        const declared = declaredHomeEdgeSide(axis, limits);
+        const side = declared || axisSpan(travel).homeSide;
+        const key = axis + (side === 'min' ? 'Min' : 'Max');       // the HOME end's flat-config key (xMin / zMax …)
         const pin = limits[key + 'Pin'];
-        if (pin === '' || pin == null) continue;                   // no home-end switch fitted → no device
-        const homeCoord = homeSide === 'min' ? lo : hi;            // machine-0 (the home edge)
-        const dir = homeSide === 'min' ? 1 : -1;                   // inward = toward the envelope interior
+        if ((pin === '' || pin == null) && !declared) continue;    // no switch fitted AND no declared home → no device (a DECLARED home draws even unpinned — the backfilled home reference)
+        const homeCoord = side === 'min' ? lo : hi;                // the home edge coordinate
+        const dir = side === 'min' ? 1 : -1;                       // inward = toward the envelope interior
         const st = limits[key + 'SwitchType'] || 'mechanical';
         out.push({
-            edge: `${axis}_${homeSide}`, axis, side: homeSide, dir, switchType: st, standoff: switchStandoff(st),
+            edge: `${axis}_${side}`, axis, side, dir, switchType: st, standoff: switchStandoff(st),
             x: axis === 'x' ? homeCoord : midOf('x'),
             y: axis === 'y' ? homeCoord : midOf('y'),
             z: axis === 'z' ? homeCoord : midOf('z'),
