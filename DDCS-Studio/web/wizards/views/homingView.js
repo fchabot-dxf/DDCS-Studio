@@ -85,7 +85,7 @@ export const homingView = {
             const on = (ax in prevState) ? prevState[ax] : (c.enable !== false);
             return `<label style="display:flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border,#3a4150); border-radius:6px;">
                 <input type="checkbox" class="homing-run-ax" data-axis="${ax}" ${on ? 'checked' : ''}/>
-                <b>${AX_LABEL[ax]}</b> <span style="opacity:.65; font-size:11px;">${METHOD_LABEL[c.method || 'native'] || c.method}</span>
+                <b>${AX_LABEL[ax]}</b> <span style="opacity:.65; font-size:11px;">${METHOD_LABEL[c.method || 'seek'] || c.method}</span>
             </label>`;
         }).join('');
         host.querySelectorAll('.homing-run-ax').forEach((cb) => {

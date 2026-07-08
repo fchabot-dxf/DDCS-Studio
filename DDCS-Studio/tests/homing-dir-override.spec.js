@@ -5,8 +5,8 @@ import { test, expect } from '@playwright/test';
  *   1. DEFAULT = the signed machine travel (settings.machine.<axis> sign) — Auto derives it; no second source.
  *   2. The SIM home end is ALWAYS the declared machine-0 (envelope sign) — a per-axis dir override can NO LONGER
  *      diverge it (t491, the human's principle: the direction can't be hand-rolled). This is the fix for the Z=-120
- *      plunge (a stale dir='-' used to seek the far/bottom end). (The SEEK G31 emit still signs by dir below — that
- *      output is reconciled to this same home end in the NEXT task; the SIM is the fixed one-source home now.)
+ *      plunge (a stale dir='-' used to seek the far/bottom end). t499: the SEEK G31 emit's AUTO direction is now
+ *      RECONCILED to this same machine-0 home end (-tSign, toward home) — an EXPLICIT dir override still forces it.
  *   3. NATIVE (M98 P501) is byte-UNCHANGED by the override (the controller uses its own config; sim-only there).
  *   4. The dir override round-trips through the op marker codec (it rides the already-declared `config` Struct).
  * The default (Auto / dir unset) stays byte-identical to a config with no `dir` key.
@@ -28,7 +28,7 @@ test('homing dir override: signed-envelope default + per-axis override flips see
     const seekCfg = (dir) => ({ x: { enable: true, method: 'seek', backoff: 5, seekPasses: 1, dir } });
     const seekParams = (dir, extra) => ({ axes: ['x'], config: seekCfg(dir), machine, ...extra });
 
-    const seekAuto = emit(seekParams(''));      // Auto → derive from the +300 envelope → +10000
+    const seekAuto = emit(seekParams(''));      // Auto → seek TOWARD machine-0 (home) = -tSign; +300 envelope → -10000
     const seekPlus = emit(seekParams('+'));     // forced + → +10000
     const seekMinus = emit(seekParams('-'));    // forced − → -10000
 
@@ -79,8 +79,9 @@ test('homing dir override: signed-envelope default + per-axis override flips see
   // 1+2 SEEK emit: the seek-distance literal is signed by the resolved direction.
   expect(r.seekMinus, 'override − flips the seek distance negative').toContain('#102=-10000');
   expect(r.seekPlus, 'override + → positive seek distance').toContain('#102=10000');
-  // Auto derives + from the +300 envelope (NOT the controller #612 path — travel is known).
-  expect(r.seekAuto, 'Auto with a known +envelope → +10000 (one source)').toContain('#102=10000');
+  // t499 — Auto now seeks TOWARD the declared home (machine-0) = -tSign, the SAME end the sim homes to (one source).
+  // For the +300 envelope home is the min (0) end, so the seek runs NEGATIVE (-10000), NOT toward the +300 far end.
+  expect(r.seekAuto, 'Auto seeks toward machine-0/home (+envelope → -10000), NOT the far end').toContain('#102=-10000');
   expect(r.seekAuto, 'Auto with a known envelope does NOT fall back to #612').not.toContain('#[612');
   // Default is byte-identical whether dir is '' or absent entirely.
   expect(r.seekNoDirKey, 'a config with NO dir key emits identically to Auto').toBe(r.seekAuto);
@@ -88,8 +89,8 @@ test('homing dir override: signed-envelope default + per-axis override flips see
   expect(r.seekAutoNoTravel, 'Auto + unknown envelope → defer to controller #612').toContain('20000*#[612+#100]-10000');
 
   // 2 t491: the DECLARED ENVELOPE SIGN is the single source of the home end — the sim ALWAYS homes to machine-0 (x=0)
-  // REGARDLESS of any per-axis dir. A stale dir can NO LONGER diverge the sim to the far end (the Z=-120 plunge). (The
-  // seek-EMIT #102 above still signs by dir — that G31 output is reconciled to this same home end in the NEXT task.)
+  // REGARDLESS of any per-axis dir. A stale dir can NO LONGER diverge the sim to the far end (the Z=-120 plunge). (t499:
+  // the seek-EMIT Auto #102 above is now reconciled to this SAME machine-0 home end; an EXPLICIT dir override still signs it.)
   expect(r.simAuto, 'sim Auto homes to the machine-0 end (x=0)').toBe(0);
   expect(r.simPlus, 'a dir override can NO LONGER diverge the sim — still the declared machine-0 (x=0)').toBe(0);
   expect(r.simMinus, 'a dir override can NO LONGER diverge the sim — still the declared machine-0 (x=0)').toBe(0);

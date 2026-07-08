@@ -11,9 +11,12 @@
  * GROUND TRUTH (DDCS Expert M350, verified vs fndzero.nc / fndY.nc):
  *   native per-axis home   M98 P501 X<N>     (N = axis index 0=X 1=Y 2=Z 3=A 4=B) — uses the controller's config
  *                                            AND sets the homed flag itself (we do NOT write #[1515+N] for it)
- *   G31 granular seek       transparent raw G31  — UNVERIFIED faithful re-derivation of O501 (slib-g.nc); no
- *                                                  firmware flag write, so we set #[1515+N] ourselves. Advanced
- *                                                  path only; native M98 P501 is the robust default.
+ *   G31 granular seek       transparent raw G31  — the WIZARD'S DEFAULT OUTPUT (t499): the seek params (feed / dir /
+ *                                                  port P#[1045+N*3] / level L#[1047+N*3]) are VISIBLE in the emitted
+ *                                                  G-code, not hidden inside the controller's O501 macro. A faithful
+ *                                                  re-derivation of O501 (slib-g.nc); no firmware flag write, so we set
+ *                                                  #[1515+N] ourselves. `native` (M98 P501) stays a SEPARATE option
+ *                                                  (the controller built-in Homing Setup), reachable per-axis.
  *   per-axis params         port #[1045+N*3] · level #[1047+N*3] · seek speed #[607+N] · seek dir #[612+N]
  *   machine coord #[880+N] · homed flag #[1515+N] (A=#1518) · soft-limit enable #655 (0=off/1=on)
  *   set-current-as-home     #[880+N]=0 then #[1515+N]=1   (NO motion)
@@ -76,7 +79,7 @@ export function homingStack(params = {}) {
     const homeAxis = (ax) => {
         const c = cfg[ax] || {};
         const N = AX_IDX[ax], L = AX_LABEL[ax];
-        const method = c.method || 'native';
+        const method = c.method || 'seek';   // t499 — the WIZARD defaults to G31 seek (visible params); native is a separate setup option
 
         // Homed-flag + machine-coord are written at their RESOLVED literal address (e.g. Z=#1517, #882) to match
         // Homed-flag / machine-coord at their RESOLVED literal address (e.g. Z=#1517, #882). The native path does
@@ -129,12 +132,15 @@ export function homingStack(params = {}) {
             //    point" (O501 lines 251-298, machine-specific #622-626 + rotary remap) is NOT mirrored — it depends
             //    on per-machine reference offsets we don't carry, and the home itself is complete without it.
             //
-            //    DIRECTION (granular per-axis): c.dir '+'/'-' wins; else the SIGNED machine-travel sign; else fall
-            //    back to the controller's own #612 register (20000*#612-10000 → ±10000). Signs the seek distance.
+            //    DIRECTION (t499 — reconciled to the declared home end, the same one-source the SIM uses): the seek goes
+            //    TOWARD machine-0 (the ⬤ home marker, DECLARED by the envelope sign) = -tSign — OPPOSITE the signed travel,
+            //    which runs AWAY from home into the envelope. For Z=-120 (home at the TOP) this seeks UP (+10000), NOT down
+            //    toward the -120 far end (the old +tSign "plunge"). c.dir '+'/'-' still FORCES it (explicit override); else
+            //    -tSign; else (unknown envelope, tSign=0) defer to the controller's own #612 register (20000*#612-10000).
             const backoff = num(c.backoff, 5);                       // back-off / release-clear distance (mm)
             const seekDist = 10000;                                  // O501: ±10000 signed seek distance
             const tSign = Math.sign(num((params.machine || {})[ax], 0)); // signed-travel sign (0 if unknown)
-            const dir = c.dir === '+' ? 1 : c.dir === '-' ? -1 : (tSign || 0); // 0 ⇒ defer to controller #612
+            const dir = c.dir === '+' ? 1 : c.dir === '-' ? -1 : (-tSign || 0); // Auto → toward machine-0/home; 0 ⇒ defer to #612
             const passes = Math.max(1, Math.round(num(c.seekPasses, 2)));     // O501 multi-pass (#606); default 2
 
             C(`Home ${L} — G31 GRANULAR SEEK (transparent re-derivation of O501)`);

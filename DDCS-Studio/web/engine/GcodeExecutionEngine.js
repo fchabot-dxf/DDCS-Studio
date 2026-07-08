@@ -14,7 +14,7 @@ import { evaluateCondition, validateCondition } from './core/condition.js';
 import { loadProgram as loadProgramText, stripLine } from './core/program.js';
 import { arcPoints } from './core/arc.js';
 import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
-import { axisHomeMotion, limitSwitchTrips } from './limitSwitches.js';   // H1 (t481) home-end; H3 (t485) — the live home/limit trip model
+import { axisHomeMotion, limitSwitchTrips, axisSpan } from './limitSwitches.js';   // H1 (t481) home-end; H3 (t485) — the live home/limit trip model; t499 — axisSpan for the homing-seek envelope clamp
 import { passAnchorFor } from './passAnchor.js';   // t94/t107 — the probe-collision + DRO origin O is a pass's re-park draw-anchor (auto reposition): the RUNTIME END of the previous pass (t107 machine-faithful) via the published _passEnds, else the static previous START (t94)
 
 // Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
@@ -1069,6 +1069,31 @@ export class GcodeExecutionEngine {
                     const motors = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().motors : null;
                     const tipR = (probes && Number.isFinite(probes.radius)) ? probes.radius : 0;   // DECLARED probe tip radius → collide the SURFACE
                     tt = stockProbeStop(aStart, bEnd, this.stock, rotaryAxisOf(motors), tipR);
+                }
+
+                // HOMING seek clamp (t499): a G31 with NO stock to trip on and NOT the setter is the homing wizard's
+                // G31 switch-seek. The real controller stops it at the home/limit switch = the machine envelope EDGE;
+                // the Studio sim has no stock geometry for it, so clamp the seek to the envelope span so it homes to the
+                // switch (machine-0 end) instead of running the full ±10000 to the far corner (the "-20000 plunge" when
+                // PLAYED). Machine frame: part = machine·unitScale − wcsOffset (the same G53 map used above). te>=0 so an
+                // on-edge seek (already at the switch) clamps to a no-op, then the G01 back-off releases off it.
+                // LIMITATION: gated on !this.stock, so a homing G31 played INSIDE a program with a stock shown isn't
+                // clamped yet — the robust one-source fix is to stop on limitSwitchTrips (the H3 model); a follow-up.
+                if (tt == null && !this.stock && !(probes && probePort === probes.setterPin)) {
+                    const machine = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().machine : null;
+                    if (machine) {
+                        let te = null;
+                        for (const a of ['x', 'y', 'z']) {
+                            const d = target[a] - this.pos[a];
+                            if (Math.abs(d) < 1e-9) continue;                        // not moving on this axis
+                            const { lo, hi } = axisSpan(Number(machine[a]) || 0);
+                            const wo = this._wcsOffset[a] || 0;
+                            const edge = (d > 0 ? hi : lo) * this.unitScale - wo;    // the envelope face the seek runs into
+                            const t = (edge - this.pos[a]) / d;                      // fraction of the move that reaches it
+                            if (t >= 0 && t <= 1 && (te == null || t < te)) te = t;  // first edge crossed
+                        }
+                        if (te != null) tt = te;
+                    }
                 }
                 if (tt != null) {
                     // Clamp the recorded target to the contact surface (in LOCAL coords).

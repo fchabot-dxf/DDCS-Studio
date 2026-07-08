@@ -1686,7 +1686,7 @@
                 </div>
                 </div><!-- /.wiz-visual -->
                 <div class="wiz-controls">
-                <div class="wiz-usage">Generate a safe machine-homing macro. Each axis homes by its method from <b>Homing Setup</b> (native = the controller's built-in home, the safest default). Tick the axes to home this run; the sequence follows your saved order. The 3D preview runs a motion model of the homing (the emitted macro uses the controller's M98 home subs).</div>
+                <div class="wiz-usage">Generate a machine-homing macro. Each axis homes by its method from <b>Homing Setup</b> — the default is <b>switch seek (G31)</b>, which emits explicit homing with the seek params (feed/dir/port) visible in the G-code; <b>native</b> uses the controller's built-in M98 home instead. Tick the axes to home this run; the sequence follows your saved order. The 3D preview runs a motion model of the homing.</div>
 
                 <span class="section-label">HOME THIS RUN</span>
                 <div id="homing_axes" class="grid-3" style="margin-top:8px; gap:8px;"></div>

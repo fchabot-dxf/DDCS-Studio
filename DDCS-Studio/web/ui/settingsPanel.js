@@ -157,8 +157,10 @@ export const SETTINGS_DEFAULTS = {
     // force it. It signs the SEEK (G31) emitted direction + the sim animation; native (M98 P501) reads the
     // controller's OWN config so the override is sim/informational only for it. When dir='' AND the envelope sign
     // is unknown (0), the seek path defers to the controller's #612 register (read at runtime by M98 P503).
-    //   method: 'native'  — controller built-in M98 P501 X<idx> (safest; uses the controller's own config + flag)
-    //           'seek'     — low-level switch-seek + back-off + slow re-seek (M98 P503), composed in the macro
+    //   method: 'seek'     — DEFAULT (t499): explicit G31 switch-seek + back-off + slow re-seek, params VISIBLE in the
+    //                        emitted G-code (feed/dir/port), a faithful re-derivation of O501 — the WIZARD's output
+    //           'native'   — controller built-in M98 P501 X<idx> (the SEPARATE Homing Setup; uses the controller's own
+    //                        config + flag, params hidden inside its O501 macro) — still selectable per-axis
     //           'setzero'  — set current position AS home (#[880+N]=0, #[1515+N]=1) — NO motion
     //   slaveFollows: ''|axisIdx — a dual-axis gantry SLAVE; homing this (master) axis syncs the slave coord +
     //                 marks it homed (#883=#881; #1518=1). Gantry SQUARING is manual — Studio emits no auto-square.
@@ -169,9 +171,9 @@ export const SETTINGS_DEFAULTS = {
     homing: {
         philosophy: 'sequential',
         axes: {
-            x: { enable: true,  order: 2, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
-            y: { enable: true,  order: 3, method: 'native', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
-            z: { enable: true,  order: 1, method: 'native', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
+            x: { enable: true,  order: 2, method: 'seek', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
+            y: { enable: true,  order: 3, method: 'seek', seekFeed: 800, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
+            z: { enable: true,  order: 1, method: 'seek', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'switch', continuous: false },
             a: { enable: false, order: 4, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'setzero', continuous: true },
             b: { enable: false, order: 5, method: 'setzero', seekFeed: 600, backoff: 5, slowFeed: 100, offset: 0, dir: '', slaveFollows: '', rotary: 'setzero', continuous: true }
         }

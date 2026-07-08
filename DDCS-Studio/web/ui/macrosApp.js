@@ -123,7 +123,7 @@ export function initMacrosApp() {
                         <div class="settings-hint" id="mac_desc_sysstart">Executes automatically when the controller boots up. Used to set default machine states, trigger auto-homing, or restore WCS.</div>
                         <div id="sysstart_list">
                             <div class="settings-hint" style="margin-top: 12px; font-weight: 600;">1. AUTO-HOME SEQUENCE</div>
-                            <div class="settings-hint">The numbered list sets the home <b>sequence</b> (▲▼ to reorder). <b>Native</b> runs the controller's built-in home (safest). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave.</div>
+                            <div class="settings-hint">The numbered list sets the home <b>sequence</b> (▲▼ to reorder). <b>Switch seek (G31)</b> is the default — it emits explicit G31 homing with the seek params (feed/dir/port) VISIBLE in the G-code. <b>Native (M98 P501)</b> runs the controller's own built-in home instead (params hidden in its macro). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave.</div>
                             <div id="set_homing_tag" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
                             <label class="settings-check" style="margin-bottom:6px;"><input type="checkbox" id="set_homing_simul"> Simultaneous (emit calls back-to-back, still in this order)</label>
                             <div id="set_homing_axes"></div>
@@ -859,7 +859,7 @@ function renderHomingGui() {
                 <button type="button" class="hm-down" title="Home later" style="cursor:pointer; background:none; border:none; color:var(--text-main);">▼</button>
                 <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
                 <input type="hidden" class="hm-order" value="${pos + 1}">
-                <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'native')}</select></label>
+                <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'seek')}</select></label>
                 <label style="font-size:12px;" title="Home direction. Auto derives it from the signed machine travel (envelope) — one source. + / − force it. Signs the switch-seek (G31) move and the sim animation; for native (M98 P501) the controller uses its OWN config, so the override is sim/informational only.">Home dir <select class="hm-dir">${dirOpts(c.dir || '')}</select></label>
             </div>
             <div class="hm-motion" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
