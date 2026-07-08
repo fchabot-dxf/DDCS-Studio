@@ -103,3 +103,13 @@ export function ioInputSupported() {
     const caps = getCaps(d.id) || {};
     return !!(caps.flow === 'oword' || caps.inputRead);   // RS274/grblHAL M66, or DDCS Expert generic poll (matches the waitinput atom gate)
 }
+
+/** The Wait-Input EDGE options for the active post — DIALECT-AWARE. RS274/grblHAL (oword M66 L1-L4) support all four edges;
+ *  a DDCS post reads a LEVEL not an edge (cnc.js waitInput: high/rise→1, fall/low→0), so it shows HIGH/LOW only. Returns
+ *  { options, alias } — the alias maps a stored rise→high / fall→low for the HIGHLIGHT only (the value + emit are unchanged;
+ *  on a DDCS post rise≡high and fall≡low, so a hidden rise/fall still emits correctly per the existing atom mapping). */
+export function ioEdgeOptions() {
+    const d = getDialect(); const caps = (d && getCaps(d.id)) || {};
+    if (caps.flow === 'oword') return { options: [['Rise', 'rise'], ['Fall', 'fall'], ['High', 'high'], ['Low', 'low']] };
+    return { options: [['High', 'high'], ['Low', 'low']], alias: { rise: 'high', fall: 'low' } };
+}

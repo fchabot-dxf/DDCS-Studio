@@ -16,11 +16,16 @@ import { FeatureCanvas } from '../viz/featureCanvas.js';
 import { workpieceFeatureItems } from '../engine/workpiece.js';
 import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inline source dot the built-in forms use, on sourceField bindings
 import { getOutputs, getInputs } from './settingsPanel.js';   // t522 — the declared-I/O picker lists settings.outputs/inputs BY NAME (live)
-import { ioInputSupported } from '../wizards/ioStepWizard.js';   // t522 — the mode-picker greys the INPUT segment on a post without wait-on-input
+import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
 
 // t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
 // widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
 const SEG_GATE_PREDS = { ioInput: () => ioInputSupported() };
+
+// t526 — DIALECT-AWARE segmented OPTIONS (a declarative key → a live { options, alias }). A binding declares
+// widgetConfig.optionsBy = '<key>'; the segment renders THAT option set (narrowed per the active post) with the
+// static widgetConfig.options as the fallback. `alias` maps a stored value to a shown one for the HIGHLIGHT only.
+const SEG_OPTS_PREDS = { ioEdge: () => ioEdgeOptions() };
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const ROW_CSS = 'display:flex; align-items:center; justify-content:space-between; gap:14px; margin:9px 0;';
@@ -167,11 +172,16 @@ function declaredIoWidget(host, b) {
 // structural toggle (travelApproach) reprunes exactly as the dropdown did. Opt-in via widget:'segmented'.
 function segmentedWidget(host, b) {
     host.style.cssText = ROW_CSS;
-    const opts = ((b.widgetConfig && b.widgetConfig.options) || []).map((o) => (Array.isArray(o) ? o : [o, o]));
+    // t526 — DIALECT-AWARE options: a `optionsBy` key selects a live { options, alias } (e.g. the Wait-Input Edge narrows to
+    // High/Low on a level-only DDCS post); else the static widgetConfig.options. `alias` highlights a stored rise→high for
+    // display only (read() still returns the raw value → emit unchanged).
+    const optCfg = (b.widgetConfig && b.widgetConfig.optionsBy && SEG_OPTS_PREDS[b.widgetConfig.optionsBy]) ? SEG_OPTS_PREDS[b.widgetConfig.optionsBy]() : { options: (b.widgetConfig && b.widgetConfig.options) || [] };
+    const opts = (optCfg.options || []).map((o) => (Array.isArray(o) ? o : [o, o]));
+    const alias = optCfg.alias || {};
     let cur = b.default;
     const seg = document.createElement('div');
     seg.className = 'seg-control'; seg.setAttribute('role', 'group'); seg.dataset.param = b.param;   // [data-param] parity with the select
-    const sync = () => { for (const bt of seg.children) { const on = bt.dataset.value === String(cur); bt.classList.toggle('seg-on', on); bt.setAttribute('aria-pressed', String(on)); } };
+    const sync = () => { const shown = (alias[cur] != null) ? alias[cur] : cur; for (const bt of seg.children) { const on = bt.dataset.value === String(shown); bt.classList.toggle('seg-on', on); bt.setAttribute('aria-pressed', String(on)); } };
     for (const [label, value] of opts) {
         const bt = document.createElement('button');
         bt.type = 'button'; bt.className = 'seg-btn'; bt.textContent = String(label); bt.dataset.value = String(value);
