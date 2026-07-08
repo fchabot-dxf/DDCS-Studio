@@ -76,30 +76,27 @@ test('homing dir override: signed-envelope default + per-axis override flips see
     };
   });
 
-  // 1+2 SEEK emit: the seek-distance literal is signed by the resolved direction.
-  expect(r.seekMinus, 'override − flips the seek distance negative').toContain('#102=-10000');
-  expect(r.seekPlus, 'override + → positive seek distance').toContain('#102=10000');
-  // t499 — Auto now seeks TOWARD the declared home (machine-0) = -tSign, the SAME end the sim homes to (one source).
-  // For the +300 envelope home is the min (0) end, so the seek runs NEGATIVE (-10000), NOT toward the +300 far end.
-  expect(r.seekAuto, 'Auto seeks toward machine-0/home (+envelope → -10000), NOT the far end').toContain('#102=-10000');
-  expect(r.seekAuto, 'Auto with a known envelope does NOT fall back to #612').not.toContain('#[612');
-  // Default is byte-identical whether dir is '' or absent entirely.
-  expect(r.seekNoDirKey, 'a config with NO dir key emits identically to Auto').toBe(r.seekAuto);
-  // Auto with unknown travel defers to the controller register (the documented fallback).
-  expect(r.seekAutoNoTravel, 'Auto + unknown envelope → defer to controller #612').toContain('20000*#[612+#100]-10000');
+  // t536 (change 3) — the c.dir override is DROPPED: a stale saved dir can NO LONGER steer the SEEK EMIT (the t491 bug
+  // class). All three (auto / + / −) are IDENTICAL; for X=+300 (no declared home) the seek runs toward machine-0/home =
+  // NEGATIVE (the -tSign fallback). The DECLARED home end is the only steering source.
+  expect(r.seekPlus, 'a stale dir=+ can NO LONGER flip the seek — identical to Auto').toBe(r.seekAuto);
+  expect(r.seekMinus, 'a stale dir=− can NO LONGER flip the seek — identical to Auto').toBe(r.seekAuto);
+  expect(r.seekAuto, 'X=+300 (no declared home) seeks toward machine-0/home = a NEGATIVE G31 X').toMatch(/G31 X-\d/);
+  expect(r.seekNoDirKey, 'a config with NO dir key emits identically to Auto (dir irrelevant)').toBe(r.seekAuto);
+  expect(r.seekAuto, 'no #612 controller-register fallback — the simple readable shape').not.toContain('#612');
+  expect(r.seekAutoNoTravel, 'unknown envelope no longer defers to #612 (dropped)').not.toContain('#612');
 
-  // 2 t491: the DECLARED ENVELOPE SIGN is the single source of the home end — the sim ALWAYS homes to machine-0 (x=0)
-  // REGARDLESS of any per-axis dir. A stale dir can NO LONGER diverge the sim to the far end (the Z=-120 plunge). (t499:
-  // the seek-EMIT Auto #102 above is now reconciled to this SAME machine-0 home end; an EXPLICIT dir override still signs it.)
+  // the sim ALSO homes to machine-0 regardless of dir (unchanged — simProxy never read dir)
   expect(r.simAuto, 'sim Auto homes to the machine-0 end (x=0)').toBe(0);
-  expect(r.simPlus, 'a dir override can NO LONGER diverge the sim — still the declared machine-0 (x=0)').toBe(0);
-  expect(r.simMinus, 'a dir override can NO LONGER diverge the sim — still the declared machine-0 (x=0)').toBe(0);
+  expect(r.simPlus, 'a dir override can NOT diverge the sim — still machine-0 (x=0)').toBe(0);
+  expect(r.simMinus, 'a dir override can NOT diverge the sim — still machine-0 (x=0)').toBe(0);
 
-  // 3 NATIVE is byte-unchanged by the override.
-  expect(r.nativeMinus, 'native homing emit is identical regardless of dir').toBe(r.nativeAuto);
-  expect(r.nativeAuto, 'native emits the M98 P501 home call').toContain('M98P501X0');
+  // t536 (change 1) — a LINEAR axis with a saved method:'native' is IGNORED by the wizard → G31, NOT M98 P501; dir-independent.
+  expect(r.nativeMinus, 'the wizard emit is identical regardless of the ignored dir').toBe(r.nativeAuto);
+  expect(r.nativeAuto, 'method:native on a LINEAR axis → the wizard emits G31 (ignores it)').toContain('G31');
+  expect(r.nativeAuto, 'the wizard does NOT emit M98 P501 for a linear axis').not.toContain('M98P501');
 
-  // 4 ROUND-TRIP through the op marker codec.
+  // the config (incl. the now-IGNORED dir) still round-trips through the op marker codec (stored, just not emitted)
   expect(r.roundtripOp).toBe('homing');
-  expect(r.roundtripDir, 'per-axis dir survives the marker round-trip').toEqual({ x: '-', y: '', z: '+' });
+  expect(r.roundtripDir, 'the per-axis dir still rides the config Struct through the marker (stored, ignored by emit)').toEqual({ x: '-', y: '', z: '+' });
 });

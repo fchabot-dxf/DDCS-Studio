@@ -58,7 +58,7 @@ test('a +120 axis homes to its declared 0 end (the envelope sign), regardless of
     expect(r.plus, 'still the declared 0 end').toBe(0);
 });
 
-test('emit BYTE-IDENTICAL — the home-end reconciliation is sim-only (native M98 P501 unchanged by dir)', async ({ page }) => {
+test('t536 — a LINEAR axis with a SAVED method:native emits the SIMPLE G31 (the wizard IGNORES the saved method), dir-independent', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio);
     const r = await page.evaluate(async () => {
@@ -67,8 +67,11 @@ test('emit BYTE-IDENTICAL — the home-end reconciliation is sim-only (native M9
         const emit = (dir) => emitMapped(homingStack({ axes: ['z'], config: { z: { method: 'native', dir } }, machine: { z: -120 } })).text;
         return { auto: emit(''), minus: emit('-') };
     });
-    expect(r.minus, 'the native homing emit is byte-identical regardless of dir (sim-only fix)').toBe(r.auto);
-    expect(r.auto.includes('M98'), 'still emits the M98 P501 home call').toBe(true);
+    // the WIZARD is G31-only for linear axes (the human 4×): a SAVED method:'native' is IGNORED → G31, not M98 P501.
+    expect(r.auto, 'a saved native method on Z → the wizard STILL emits G31 (ignores it)').toContain('G31');
+    expect(r.auto, 'the wizard does NOT emit the native M98 P501 for a linear axis').not.toContain('M98P501');
+    // and dir is dropped → the emit is byte-identical regardless of the stale saved dir
+    expect(r.minus, 'the wizard homing emit is byte-identical regardless of the (ignored) dir').toBe(r.auto);
 });
 
 test.use({ viewport: { width: 1300, height: 950 } });

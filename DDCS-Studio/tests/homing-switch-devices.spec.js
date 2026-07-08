@@ -124,7 +124,7 @@ test('(5) emit BYTE-IDENTICAL — H4 is sim/visual only and does not touch the e
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         return emitMapped(homingStack({ axes: ['z'], config: { z: { method: 'native' } }, machine: { z: -120 } })).text;
     });
-    expect(emit.includes('M98'), 'the native homing macro still emits M98 P501').toBe(true);
+    expect(emit.includes('G31'), 'the wizard homing emit is G31 (t536 — the saved native is ignored for a linear axis)').toBe(true);
     expect(/switchdevice|limitswitch|proximity|standoff|IN_HOME|IN_LIMIT/i.test(emit), 'the emitted macro references NO switch device / limit IO (visual-only)').toBe(false);
 });
 

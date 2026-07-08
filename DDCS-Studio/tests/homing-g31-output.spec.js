@@ -26,14 +26,18 @@ test('the homing wizard emits G31 by default (params visible), NOT M98 P501; see
     // The wizard's output is G31 — NOT the M98 P501 native call that hides the params in the controller macro.
     expect(r.zEmit, 'default output is a G31 seek').toContain('G31');
     expect(r.zEmit, 'default output is NOT the native M98 P501 macro call').not.toContain('M98P501');
-    // Z=-120: home is the TOP (machine-0) → seek UP = POSITIVE (+10000), NOT down toward the -120 far end (the plunge).
-    expect(r.zEmit, 'Z=-120 seeks UP toward machine-0/home (+10000), not the far end').toContain('#102=10000');
-    // X=+300: home is the min (0) end → seek NEGATIVE toward it (-10000).
-    expect(r.xEmit, 'X=+300 seeks toward machine-0/home (-10000)').toContain('#102=-10000');
-    // Params VISIBLE in the G-code + grounded vs O501 (P = limit port #[1045+N*3], L = active level #[1047+N*3]).
-    expect(r.zEmit, 'seek G31 P-word = the limit port (O501 line 190)').toContain('P#[1045+#100*3]');
-    expect(r.zEmit, 'seek G31 L-word = the active level (O501 line 190)').toContain('L#[1047+#100*3]');
-    expect(r.zEmit, 'the fast seek feed is emitted (visible param)').toContain('F#22');
+    // t536 — the SIMPLE readable shape: a G31 seek toward home over ~the travel span + margin (NOT ±10000), feed/port/level
+    // visible. Z=-120 (no declared home) → home is the TOP (machine-0) → seek UP = POSITIVE; X=+300 → the min end → NEGATIVE.
+    expect(r.zEmit, 'Z=-120 seeks UP toward machine-0/home (a POSITIVE, span-sized seek — not ±10000)').toMatch(/G31 Z\d+(\.\d+)? F600 P#1051 L#1053/);
+    expect(r.xEmit, 'X=+300 seeks toward machine-0/home (a NEGATIVE seek)').toMatch(/G31 X-\d+(\.\d+)? F\d+ P#1045 L#1047/);
+    expect(r.zEmit, 'the fast seek feed is a plain, visible value (not a #var)').toContain('F600');
+    // the opaque O501 machinery is GONE — a human can read every line
+    expect(r.zEmit, 'no 7-read debounce vote').not.toMatch(/debounce/i);
+    expect(r.zEmit, 'no GOTO/label soup').not.toMatch(/GOTO4|N4[0-9]/);
+    expect(r.zEmit, 'no ±10000 magic seek distance').not.toContain('10000');
+    // the datum + homed flag are set at the resolved literal registers (Z → #882 coord, #1517 flag)
+    expect(r.zEmit, 'sets the Z machine-coord datum').toContain('#882=0');
+    expect(r.zEmit, 'sets the Z homed flag').toContain('#1517=1');
 });
 
 // Drive the ACTUAL wizard with a STOCK shown: the code panel shows G31 (not M98) AND the rendered tool seeks to the
@@ -61,7 +65,7 @@ test('REAL APP: the homing wizard code panel shows G31 (not M98), params visible
     const code = await page.evaluate(() => document.getElementById('wiz_homing_code').textContent || '');
     expect(code, 'the emitted homing code shown to the user is G31').toContain('G31');
     expect(code, 'the emitted homing code is NOT M98 P501 (params no longer hidden in the O501 macro)').not.toContain('M98P501');
-    expect(code, 'the seek port param is visible in the code panel').toContain('P#[1045');
+    expect(code, 'the seek port param (a limit-port register) is visible in the code panel').toMatch(/P#\d+/);
 });
 
 test('REAL APP: with a STOCK SHOWN, the G31 homing preview tool seeks to the switch/top (~-5), NOT plunging', async ({ page }) => {

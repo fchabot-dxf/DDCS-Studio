@@ -101,7 +101,7 @@ test('emit BYTE-IDENTICAL — the H3 trip model is sim-only and does not touch t
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         return emitMapped(homingStack({ axes: ['z'], config: { z: { method: 'native' } }, machine: { z: -120 } })).text;
     });
-    expect(emit.includes('M98'), 'the native homing macro still emits M98 P501').toBe(true);
+    expect(emit.includes('G31'), 'the wizard homing emit is G31 (t536 — the saved native is ignored for a linear axis)').toBe(true);
     expect(/IN_LIMIT|IN_HOME|limitSwitch|setLimitSwitch|switchType|standoff/i.test(emit), 'the emitted macro references NO limit/home switch IO (the trip model is sim-only)').toBe(false);
 });
 
