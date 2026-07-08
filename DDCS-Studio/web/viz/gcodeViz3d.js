@@ -17,6 +17,7 @@ import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
+import { switchTypeOf } from '../engine/switchTypes.js';   // t512 — the DECLARED switch-type render glyph ('sensor-face' vs 'plunger'), so optical/hall draw non-contact (not the hardcoded 'proximity' string)
 import { projectWorkpiece } from '../engine/workpiece.js';   // render declared features[] at their PHYSICAL pos on the datum-placed stock (Face 2; byte-identical to the legacy 25% inset for a derived pocket)
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
 import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
@@ -1653,7 +1654,10 @@ export class GcodeViz3D {
             const g = new THREE.Group();
             let dev;
             const LIT = 0xff2e2e;   // vivid red when a switch is MADE (both types) — reads clearly at envelope scale
-            if (e.switchType === 'proximity') {
+            // t512 — the glyph is DECLARED by the switch type's `render` field ('sensor-face' = non-contact | 'plunger' = contact),
+            // NOT the hardcoded 'proximity' string: mechanical → plunger; proximity/optical/hall (all non-contact) → the sensor face.
+            const nonContact = switchTypeOf(e.switchType).render === 'sensor-face';
+            if (nonContact) {
                 const col = 0x39c0d8;   // cyan sensor face
                 const face = new THREE.Mesh(new THREE.BoxGeometry(...dims(axis, 5, 28)), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9 }));
                 const fp = shift(base, axis, -dir, 3);   // the face sits just OUTSIDE the edge (never crosses in)
@@ -1663,7 +1667,7 @@ export class GcodeViz3D {
                 const gm = new THREE.Mesh(new THREE.BoxGeometry(...dims(axis, gap, 20)), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.16, depthWrite: false }));
                 const gp = shift(base, axis, dir, gap / 2);
                 gm.position.set(gp.x, gp.y, gp.z); g.add(gm);
-                dev = { group: g, indicator: face, kind: 'proximity', edgePos: base, axis, dir, restCol: col, litCol: LIT, made: false };
+                dev = { group: g, indicator: face, kind: e.switchType || 'proximity', edgePos: base, axis, dir, restCol: col, litCol: LIT, made: false };   // t512 — the actual non-contact type (optical/hall/proximity); never 'mechanical' → never plunges
             } else {
                 const bodyCol = 0x8a94a6;
                 const body = new THREE.Mesh(new THREE.BoxGeometry(...dims(axis, 9, 26)), new THREE.MeshBasicMaterial({ color: bodyCol, transparent: true, opacity: 0.85 }));
@@ -1682,8 +1686,9 @@ export class GcodeViz3D {
         this.render();
     }
 
-    /** Animate a home/limit switch device on its io_change trip: 'made' → light (both types) + PLUNGE (mechanical only,
-     *  the axis pressed it); released → rest colour + plunger back out. Proximity never moves (non-contact). H4, t487. */
+    /** Animate a home/limit switch device on its io_change trip: 'made' → light (all types) + PLUNGE (mechanical/contact
+     *  only, the axis pressed it); released → rest colour + plunger back out. Non-contact types (proximity/optical/hall)
+     *  never move. H4, t487; t512 — the contact test is `kind === 'mechanical'` (the declared plunger glyph), not per-type. */
     setLimitSwitchDevice(edge, made) {
         const d = this._limitDevices && this._limitDevices[edge];
         if (!d) return;
