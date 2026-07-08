@@ -7375,3 +7375,27 @@ The `+ Add input` MODAL rendered BEHIND the settings panel — `openAddIoModal` 
 **FILES:** web/blocks/dataOps/commData.js (NEW) · web/blocks/wizardLibrary.js (opensAs) · web/app.js (seed) · web/wizards/ops/panelTypes.js (commscreen) · web/wizards/views/userOpView.js (commscreen branch + host) · web/ui/formWidgets.js (textWidget data-param parity) · web/wizards/communicationWizard.js (E0 toast-guard fix) · tests/comm-twin.spec.js (NEW) · tests/comm-in-place.spec.js (NEW) · tests/comm-e0-superset.spec.js (toast-guard derive) · tests/wizard-bar.spec.js (onclick expectation).
 
 **PASSED BACK: Comm PORT COMPLETE — the user_comm_data twin is byte-identical to commStack (0 diffs × the type sweep × HMI+non-HMI) AND opens IN-PLACE (opensAs, plain title, twin hidden) with a live DDCS-screen preview (declared commscreen panel view). Surfaced+fixed a generic parity gap (textWidget data-param). Shipped the E0 toast-guard fix (corrects 388b4c8). Full suite 802 pass. NEXT (increment 2) = the grouped I/O-step wizard (Set Output / Wait Input / Dwell, one mode-picker, declared-I/O by name).**
+
+## 🔨 turn 520 (cycle 223) — SETUP/IO increment 2, E1: the grouped I/O-step wizard EMIT CORE + superset gate (the machine-critical foundation), verified. NEW files only (no shared-file change → no regression risk).
+
+**TASK:** Build a NEW grouped 'I/O step' data-op wizard — ONE wizard, mode = output/input/dwell, replacing the 3 quick-insert atoms; Output/Input reference the DECLARED I/O BY NAME (settings.outputs/inputs) with a RAW-PIN fallback; Wait-Input Expert-gated; data-op twin pattern (opensAs, in-place); Blockly round-trip; menu rewiring.
+
+**DECOMPOSED (as comm/alignment were E0→E3) — E1 THIS turn = the EMIT CORE + the superset gate (the hardest, machine-critical piece: correct G-code for 3 modes × declared/raw × dialect). E2 = the twin def + form + register + in-place + postGating. E3 = Blockly round-trip + the SETUP-menu rewiring.** Rationale: I/O emits control REAL outputs (coolant/vacuum/drawbar) + polls REAL inputs — verifying the G-code against ground truth first de-risks the whole feature; the form/menu/Blockly are mechanical follow-ons.
+
+**BUILT — `wizards/ioStepWizard.js` (NEW):**
+- `ioStepStack(params, {superset})` — the data-op source (mirrors commStack): the concrete build is the imperative per-mode emit; the SUPERSET carries the 3 mode arms + the declared/raw fork GUARDED (guard keys `_mode` / `_outDeclared` / `_inDeclared`) so the twin's pruneGuards collapses to the concrete shape. Emits the SAME leaf atoms (outpin/waitinput/dwell) so the Blocks palette + round-trip are unchanged; a DECLARED output emits its configured on/off M-code as a RAW line (dialect-independent — the user's M-code IS the truth).
+- **SEPARATION (the fix vs my first cut):** `resolveIoParams(p)` reads settings (getOutputs/getInputs) and folds the DECLARED row's values into the params (outDeclared/outOn/outOff/outLabel · inDeclared/inPin/inLabel); `ioStepStack` is then PURE over those params. So the E0 gate is a clean prune==concrete (no sentinels in the builder), and the twin (E2) will bake SENTINELS in its SUPERSET_PARAMS + swap them in postInstantiate (the Comm-twin recompose pattern). `ioStepStackResolved` = the concrete quick-insert/preview emit.
+- `ioInputSupported()` — Wait-Input availability (caps.flow==='oword' || caps.inputRead), matching the waitinput atom gate; the form greys the Input mode on non-Expert via this.
+
+**VERIFY (io-step-emit.spec, NEW) — the G-code is CORRECT (ground-truth), not just present:**
+- output DECLARED (Coolant M8/M9): on → `( Coolant — on )` + `M8`; off → `M9`.
+- output RAW pin 4: `M58 ( output P4 on )` (DDCS M(50+2n)=M58).
+- input DECLARED pin 5 (rise): `( Wait: X min )` + `WHILE [#[1520+5] != 1] DO1 / G04 P10 / END1` (slib O10300 Expert poll).
+- input RAW pin 7 (fall): the WHILE-poll of pin 7, level 0.
+- dwell 2 s: `G04 P2000` (Expert P = ms).
+- Wait-Input supported = true on Expert.
+- **E0 superset GATE:** prune(ioStepStack superset, {resolved, ...derive}) == concrete across mode × declared/raw × (Expert + V4.1) = 0 diffs, 0 leftover guards, guardMax > 3.
+
+**FILES:** wizards/ioStepWizard.js (NEW) · tests/io-step-emit.spec.js (NEW). No existing file modified this increment.
+
+**PASSED BACK: I/O-step wizard E1 done — the EMIT CORE is verified machine-correct (output→the declared on/off M-code or raw M(50+2n); input→the Expert WHILE-poll of the declared/raw pin, slib O10300; dwell→G04 P ms) across modes × declared/raw × Expert+V4.1, and the superset gate holds (prune==concrete). This is the twin's foundation. E2 = the twin def (deriveGuards + bindingSpecs + the sentinel recompose for the declared-I/O values) + the mode-picker form + register + opensAs in-place + postGating (grey Input on non-Expert). E3 = Blockly round-trip + the SETUP-menu I/O entries open the wizard (raw atoms stay in the Blocks palette). Form mockup in the pass-back. NOT claimed done — E1 is the verified emit foundation.**
