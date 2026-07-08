@@ -338,7 +338,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // renders EVERY marker as a DRAGGABLE handle here (labelled A, B, …). A drag routes to the marker's onDrag (userOpView
     // writes the FRACTION param → the ONE source). Distinct from the sim-only pass-0 ○ below (which those ops don't use).
     if (Array.isArray(simMarkers) && simMarkers.length) {
-        const markerHandles = simMarkers.map((m, i) => ({ id: '__simstart' + i, x: +m.pos.x, y: +m.pos.y, kind: 'move', label: m.label || String(i + 1), color: '#39c0d8' }));
+        // t532 — noSnap: a sim-start probe point is a FREE position (anywhere in reach), NOT a feature to seat on the stock —
+        // so it must NOT snap to stock corners/edges (the snap CAUGHT it at the perimeter → "can't exit the stock", the human's bug).
+        const markerHandles = simMarkers.map((m, i) => ({ id: '__simstart' + i, x: +m.pos.x, y: +m.pos.y, kind: 'move', noSnap: true, label: m.label || String(i + 1), color: '#39c0d8' }));
         const onDragMarkers = (id, world) => {
             const mi = markerHandles.findIndex((h) => h.id === id);
             if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });

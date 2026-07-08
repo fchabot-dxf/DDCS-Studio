@@ -106,7 +106,7 @@ export class FeatureCanvas {
             try { svg.setPointerCapture(e.pointerId); } catch (_) {}
             // Grab a handle. For a POSITION handle, precompute the snap "from" points (the handle itself + the path's
             // 9 bbox anchors) so any path corner/edge/centre can snap onto a stock anchor while dragging.
-            if (hit) this.active = { id: hit.id, kind: hit.kind, snapOffsets: hit.kind === 'move' ? this._snapOffsets(hit) : null };
+            if (hit) this.active = { id: hit.id, kind: hit.kind, noSnap: !!hit.noSnap, snapOffsets: (hit.kind === 'move' && !hit.noSnap) ? this._snapOffsets(hit) : null };
             else this.pan = this._clientToVB(e.clientX, e.clientY); // else pan the background
             svg.style.cursor = 'grabbing';
             e.preventDefault();
@@ -119,11 +119,17 @@ export class FeatureCanvas {
                     let w = this._toWorld(e);
                     // A POSITION ('move') handle snaps onto a stock anchor (corner/edge/centre) or part-zero when close,
                     // so you can drop the path exactly on a stock feature. Other handles (size/width) don't snap.
-                    const sn = (this.active.kind === 'move') ? this._snapToAnchor(w) : null;
+                    const sn = (this.active.kind === 'move' && !this.active.noSnap) ? this._snapToAnchor(w) : null;
                     this._snap = sn ? { x: sn.target.x, y: sn.target.y } : null;   // ring on the stock anchor that caught it
                     if (sn) w = { x: sn.x, y: sn.y };
                     const p = this._placement || { x: 0, y: 0 };
                     this.spec.onDrag(this.active.id, { x: w.x - (p.x || 0), y: w.y - (p.y || 0) });
+                    // t532 — PAN the view to FOLLOW the handle when it nears the viewport edge, so a handle dragged PAST the
+                    // stock stays VISIBLE (the auto-fit is frozen during a drag to avoid swim; without this a handle walks off
+                    // the frozen viewBox = "stuck at the perimeter"). SCOPED to noSnap markers = the FREE-position sim-start
+                    // probe points (alignment/rotary) that are meant to leave the stock — NOT corner/path/ATC handles, whose
+                    // exact drag coords + anti-flicker (the wall holds) must not be perturbed by a pan. Translate only, then redraw.
+                    if (this.active.noSnap && this._followHandle()) this._draw(this.spec, this._vw, this._vh);
                 }
                 e.preventDefault();
             } else if (this.pan) {
@@ -229,6 +235,24 @@ export class FeatureCanvas {
 
     _S(x, y) { const t = this._tf; return { x: t.cx + (x - t.cxw) * t.scale, y: t.cy - (y - t.cyw) * t.scale }; }
     _W(sx, sy) { const t = this._tf; return { x: t.cxw + (sx - t.cx) / t.scale, y: t.cyw - (sy - t.cy) / t.scale }; }
+    /** t532 — auto-pan the (drag-frozen) viewBox so the ACTIVE handle stays ≥ a margin inside the viewport. Follows the
+     *  handle's ACTUAL rendered position (this.spec.handles, i.e. the CLAMPED value post-onDrag) — NOT the raw cursor world,
+     *  which is unclamped and would run the pan off past the envelope. Translate ONLY (scale fixed → no swim). Returns true
+     *  if it panned. Lets a dragged handle move PAST the stock edge while staying visible (else it strands off the frozen viewBox). */
+    _followHandle() {
+        const t = this._tf; if (!t || !this.active || !(this._vw > 0) || !(this._vh > 0)) return false;
+        const h = (this.spec.handles || []).find((x) => String(x.id) === String(this.active.id));
+        if (!h || !isFinite(h.x) || !isFinite(h.y)) return false;
+        const p = this._placement || { x: 0, y: 0 };
+        const s = this._S(h.x + (p.x || 0), h.y + (p.y || 0)), m = 80;   // keep the handle ≥ 80px from every edge
+        let dx = 0, dy = 0;
+        if (s.x < m) dx = s.x - m; else if (s.x > this._vw - m) dx = s.x - (this._vw - m);
+        if (s.y < m) dy = s.y - m; else if (s.y > this._vh - m) dy = s.y - (this._vh - m);
+        if (!dx && !dy) return false;
+        t.cxw += dx / t.scale;   // shift the world-centre so the handle moves back toward the interior
+        t.cyw -= dy / t.scale;   // Y flips (screen-down = world-up)
+        return true;
+    }
     /** World→screen WITH the toolpath placement applied. Pattern items/handles ride the placement (they're authored
      *  in the build frame); the stock + its attach markers do NOT (they're already in part coords). */
     _disp(x, y) { const p = this._placement || { x: 0, y: 0 }; return this._S(x + (p.x || 0), y + (p.y || 0)); }
