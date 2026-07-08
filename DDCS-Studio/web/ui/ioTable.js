@@ -195,7 +195,9 @@ export function renderIoTable(container, kind, list, onChange) {
 function openAddIoModal(isInput, TYPES, onAdd) {
     const ov = document.createElement('div');
     ov.className = 'io-add-modal';
-    ov.style.cssText = 'position:fixed; inset:0; z-index:10080; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center;';
+    // z-index 13100 — ABOVE the settings-overlay (12000, styles.css) + the suggestion dropdown (13000), below blockly (20000).
+    // The I/O table lives INSIDE the settings panel, so this modal must sit on top of it (10080 rendered it BEHIND — t504).
+    ov.style.cssText = 'position:fixed; inset:0; z-index:13100; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center;';
     const box = document.createElement('div');
     box.style.cssText = 'background:#f4f1ea; color:#2a2a2a; width:min(560px,92vw); max-height:86vh; overflow:auto; border-radius:10px; padding:20px 22px; box-shadow:0 10px 40px rgba(0,0,0,.5);';
     const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };

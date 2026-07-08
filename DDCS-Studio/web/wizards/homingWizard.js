@@ -33,7 +33,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { num } from './ops/util.js';
-import { axisHomeMotion } from '../engine/limitSwitches.js';   // H1 (t481) — the ONE source of the home end (machine-0), shared with the engine handler + axisSpan
+import { axisHomeMotion, declaredHomeEdgeSide } from '../engine/limitSwitches.js';   // the ONE source of the home end — the DECLARED home switch (settings.limits.<edge>Home), shared with the engine handler
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
@@ -132,15 +132,18 @@ export function homingStack(params = {}) {
             //    point" (O501 lines 251-298, machine-specific #622-626 + rotary remap) is NOT mirrored — it depends
             //    on per-machine reference offsets we don't carry, and the home itself is complete without it.
             //
-            //    DIRECTION (t499 — reconciled to the declared home end, the same one-source the SIM uses): the seek goes
-            //    TOWARD machine-0 (the ⬤ home marker, DECLARED by the envelope sign) = -tSign — OPPOSITE the signed travel,
-            //    which runs AWAY from home into the envelope. For Z=-120 (home at the TOP) this seeks UP (+10000), NOT down
-            //    toward the -120 far end (the old +tSign "plunge"). c.dir '+'/'-' still FORCES it (explicit override); else
-            //    -tSign; else (unknown envelope, tSign=0) defer to the controller's own #612 register (20000*#612-10000).
+            //    DIRECTION (t504 — signed TOWARD the DECLARED HOME SWITCH, settings.limits.<edge>Home; sign-agnostic): the
+            //    seek runs toward the declared home edge — max edge → +1 (UP toward the top), min edge → -1. For Z with
+            //    zMaxHome this seeks UP (+10000) whether machine.z is + or − (the positive-Z plunge is gone — no more
+            //    travel-sign guess). c.dir '+'/'-' still FORCES it (explicit override); else the declared edge; else (NO
+            //    declared home) fall back to -tSign; else (unknown envelope, tSign=0) defer to the controller's #612.
             const backoff = num(c.backoff, 5);                       // back-off / release-clear distance (mm)
             const seekDist = 10000;                                  // O501: ±10000 signed seek distance
-            const tSign = Math.sign(num((params.machine || {})[ax], 0)); // signed-travel sign (0 if unknown)
-            const dir = c.dir === '+' ? 1 : c.dir === '-' ? -1 : (-tSign || 0); // Auto → toward machine-0/home; 0 ⇒ defer to #612
+            const tSign = Math.sign(num((params.machine || {})[ax], 0)); // signed-travel sign (fallback only)
+            const homeSide = declaredHomeEdgeSide(ax, params.limits); // 'min'|'max'|null — the DECLARED home switch end
+            const dir = c.dir === '+' ? 1 : c.dir === '-' ? -1
+                      : homeSide === 'max' ? 1 : homeSide === 'min' ? -1
+                      : (-tSign || 0);                               // no declared home → sign-derived; 0 ⇒ defer to #612
             const passes = Math.max(1, Math.round(num(c.seekPasses, 2)));     // O501 multi-pass (#606); default 2
 
             C(`Home ${L} — G31 GRANULAR SEEK (transparent re-derivation of O501)`);
@@ -237,14 +240,16 @@ export function homingStack(params = {}) {
  * the existing engine runs. This shows the homing ORDER and the final homed state. It is kept SEPARATE from
  * generate() (never mixed into the inserted macro).
  *
- * Home END machine coord: the machine travel (settings.machine.x/y/z) is SIGNED (sign = home direction). We
- * home toward that signed end and land at the home `offset` (usually 0). A slave that follows its master moves
- * with it (same target). Rotary set-zero axes just snap to 0 (no travel to model).
+ * Home END machine coord: the DECLARED HOME SWITCH (settings.limits.<edge>Home, via axisHomeMotion) — its edge
+ * coordinate, NOT machine-0. So Z with zMaxHome seeks to the TOP (hi) whether machine.z is + or − (SIGN-AGNOSTIC;
+ * the sim tool rises to the declared switch and STOPS there — the rapid ENDS at the switch edge, then a short
+ * back-off). A slave that follows its master moves with it (same target). Rotary set-zero axes just snap to 0.
  */
 export function homingSimProxy(params = {}) {
     const axes = Array.isArray(params.axes) ? params.axes.filter((a) => AX_IDX[a] != null) : [];
     const cfg = params.config || {};
     const machine = params.machine || {};
+    const limits = params.limits || {};   // t504 — the DECLARED home switch per edge (settings.limits.<edge>Home)
     const travel = { x: num(machine.x, 300), y: num(machine.y, 300), z: num(machine.z, -120), a: 0, b: 0 };
 
     const L = [];
@@ -254,11 +259,11 @@ export function homingSimProxy(params = {}) {
         const c = cfg[ax] || {};
         const A = ax.toUpperCase();
         if ((ax === 'a' || ax === 'b') && (c.rotary || 'setzero') === 'setzero') { L.push(`G53 ${A}0     ( ${A} set zero )`); return; }
-        // H1 (t481) — HOME is the MACHINE-0 end (axisHomeMotion, the ONE source shared with the engine handler + axisSpan).
-        // t491 — the DECLARED ENVELOPE SIGN is the single source of the home end (the human's principle): a per-axis dir
-        // override can no longer diverge it, so the sim ALWAYS seeks machine-0 (Z=-120 homes UP). The back-off moves off
-        // the switch INTO the reachable travel (toward the span centre).
-        const { seek, back } = axisHomeMotion(travel[ax] || 0, { offset: num(c.offset, 0), backoff: num(c.backoff, 5) });
+        // t504 — HOME is the DECLARED HOME SWITCH end (settings.limits.<edge>Home), read by axisHomeMotion — NOT machine-0.
+        // The sim rapids TO the declared switch edge (the rapid ENDS there → the tool STOPS at the switch), then backs off
+        // INTO the reachable travel. Z with zMaxHome → the TOP (hi) for BOTH signs (the positive-Z plunge is gone). No
+        // declared home → fall back to the sign-derived machine-0 end (no regression).
+        const { seek, back } = axisHomeMotion(travel[ax] || 0, { offset: num(c.offset, 0), backoff: num(c.backoff, 5), axis: ax, limits });
         L.push(`G53 G0 ${A}${seek}     ( seek ${A} home )`);
         L.push(`G53 G1 ${A}${back} F${Math.round(num(c.slowFeed, 100))}     ( back off )`);
         const s = parseInt(c.slaveFollows, 10);

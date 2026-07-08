@@ -131,6 +131,10 @@ test('the "+ Add input" entry-point is a MODAL type-picker (not an inline dropdo
     expect(await page.evaluate(() => !document.querySelector('#io_add_host select')), 'the add entry-point is not an inline dropdown').toBe(true);
     await page.getByRole('button', { name: '+ Add input' }).click();
     await expect(page.locator('.io-add-modal')).toBeVisible();
+    // the modal must stack ABOVE the settings-overlay (z-index 12000) — the I/O table lives inside it, so 10080 rendered
+    // the modal BEHIND the panel (t504 amendment). 13100 > 12000 (and > the 13000 suggestion dropdown), below blockly 20000.
+    const z = await page.evaluate(() => +getComputedStyle(document.querySelector('.io-add-modal')).zIndex);
+    expect(z, `the add modal sits above the settings overlay (z=${z} > 12000)`).toBeGreaterThan(12000);
     // the modal offers the input types (cards with help)
     const cards = await page.evaluate(() => [...document.querySelectorAll('.io-add-modal .io-add-type')].map((b) => b.getAttribute('data-type')));
     expect(cards.includes('limit') && cards.includes('probe') && cards.includes('sensor'), 'the modal offers the input types').toBe(true);

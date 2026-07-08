@@ -53,25 +53,42 @@ export function axisSpan(travel) {
 const r3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
 
 /**
- * The HOMING landing points for an axis in MACHINE coords — the ONE SOURCE for the homing sim proxy, the M98-P501
- * engine handler, AND axisSpan (so they can't diverge on which-end-is-home). H1 (t481): HOME is the MACHINE-0 end (the
- * homeDir FACT, grounded in geometry.homeDir / the pulled soft-limits: the home end reads ~0, the far/limit end is the
- * signed travel). This FIXES the old bug where the sim/engine drove to the SIGNED-TRAVEL (far) end — the axis drove
- * AWAY from home (Z to −120 instead of the top; X even to −300, OUTSIDE the [0,300] envelope). `dir` is a Homing-block
- * OVERRIDE ('' = Auto → machine-0; '+' = the max end; '−' = the min end). `offset` shifts the seek target; the back-off
- * moves `backoff` mm off the switch INTO the reachable travel (toward the span centre).
- * @returns {{ seek: number, back: number }}  seek = the home end (machine-0 by default); back = the backed-off rest spot
+ * The DECLARED home edge for an axis — read from `settings.limits.<edge>Home` (the per-edge Home flag declared on the
+ * limit-switch row in the I/O section, t502). This is the ONE source for WHICH END is home, replacing the machine
+ * travel-SIGN inference (`axisSpan.homeSide` → machine-0) that WAS the positive-Z plunge (a +Z envelope makes machine-0
+ * the BOTTOM). Returns 'min' | 'max' when an end is declared home, else null (→ the caller falls back to the sign-derived
+ * end, no regression; the I/O seed guarantees X/Y/Z each carry one). The UI enforces ≤1 home per axis; if both are set
+ * (shouldn't happen) max wins deterministically.
+ * @param {string} axis   - 'x' | 'y' | 'z'
+ * @param {object} [limits] - flat settings.limits ({ <axis>MinHome / <axis>MaxHome booleans })
+ * @returns {'min'|'max'|null}
  */
-export function axisHomeMotion(travel, { offset = 0, backoff = 5 } = {}) {
+export function declaredHomeEdgeSide(axis, limits) {
+    const a = String(axis || '').toLowerCase();
+    const L = limits || {};
+    if (L[a + 'MaxHome']) return 'max';
+    if (L[a + 'MinHome']) return 'min';
+    return null;   // no declared home end → caller uses the sign-derived fallback
+}
+
+/**
+ * The HOMING landing points for an axis in MACHINE coords — the ONE SOURCE for the homing sim proxy + the M98-P501
+ * engine handler (so they can't diverge on which-end-is-home). The home end is the DECLARED HOME SWITCH
+ * (`settings.limits.<edge>Home`, via declaredHomeEdgeSide): its edge coordinate is `lo` (min end) or `hi` (max end),
+ * whichever is declared — so Z with `zMaxHome` homes to the TOP (`hi`) whether machine.z is + or − (SIGN-AGNOSTIC; this
+ * is the t504 plunge fix). Pass `{ axis, limits }` to read the declaration; WITHOUT them (or when no end is declared)
+ * it FALLS BACK to the sign-derived machine-0 end (`axisSpan.homeSide`) — the pre-t504 behavior, no regression. `axisSpan`
+ * stays the PURE geometric span (used by limitSwitchTrips/homingEdges) — the declared-home read lives only here, at the
+ * home-TARGET layer. `offset` shifts the seek; the back-off moves `backoff` mm off the switch INTO the reachable travel.
+ * @returns {{ seek: number, back: number }}  seek = the DECLARED home edge coord; back = the backed-off rest spot
+ */
+export function axisHomeMotion(travel, { offset = 0, backoff = 5, axis, limits } = {}) {
     const { lo, hi } = axisSpan(travel);
-    // The home end is DECLARED by the ENVELOPE SIGN: machine-0 (the ⬤ home marker), which axisSpan places at whichever
-    // end contains 0. ONE SOURCE, valid-by-construction — a per-axis homing `dir` override can NO LONGER diverge the home
-    // to the far end (t491, the human's principle: the home direction IS the declared envelope sign, never hand-rolled /
-    // hardcoded). So Z=-120 ALWAYS homes UP to 0 (the top) regardless of any stale homing.<axis>.dir; a +120 axis homes
-    // to its 0 end. (The G31 seek-EMIT direction — a separate output — is reconciled to this same home end in a follow-up.)
-    const seek = 0 + (Number(offset) || 0);   // machine-0 = the declared home end (always lo or hi per axisSpan)
+    const side = declaredHomeEdgeSide(axis, limits) || axisSpan(travel).homeSide;   // DECLARED switch, else sign-derived machine-0
+    const homeCoord = side === 'min' ? lo : hi;                                     // the declared home edge's machine coordinate
+    const seek = homeCoord + (Number(offset) || 0);
     const mid = (lo + hi) / 2;
-    const back = seek + (seek <= mid ? 1 : -1) * (Number(backoff) || 0);              // off the switch, INTO the reachable travel
+    const back = seek + (seek <= mid ? 1 : -1) * (Number(backoff) || 0);            // off the switch, INTO the reachable travel
     return { seek: r3(seek), back: r3(back) };
 }
 

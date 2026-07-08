@@ -107,7 +107,7 @@ export const homingView = {
         const selected = host ? [...host.querySelectorAll('.homing-run-ax')].filter((c) => c.checked).map((c) => c.getAttribute('data-axis')) : [];
         const axes = orderAxes(selected, homing);
 
-        const params = { axes, config: homing.axes || {}, softLimits: (settings.machine || {}).softLimits !== false, machine: settings.machine || {} };   // re-enable #655 iff the machine uses soft limits
+        const params = { axes, config: homing.axes || {}, softLimits: (settings.machine || {}).softLimits !== false, machine: settings.machine || {}, limits: settings.limits || {} };   // re-enable #655 iff soft limits; limits = the DECLARED home switch per edge (t504)
         const gcode = wizard.generate(params);
         el('wiz_homing_code').innerHTML = UIUtils.formatGCode(gcode);
 
