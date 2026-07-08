@@ -17,7 +17,7 @@ const fmtLine = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' ').replace(/
  * no Program Start/End — because it's inserted mid-program. The one source of truth for both displays.
  * #1505 popup / #1503 status / #2070 input / #2042-43 beep — the (msg) goes verbatim in the Set# value.
  */
-export function commStack(params = {}) {
+export function commStack(params = {}, opts = {}) {
     const S = [];
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
     const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); };
@@ -29,69 +29,115 @@ export function commStack(params = {}) {
     // non-HMI FALLBACK branches below; it was CALLED but never defined → a ReferenceError aborted commStack/generate on any
     // post without caps.hmi (Comm was broken there). Mirrors alignmentWizard's MSG (newBlock('message')).
     const MSG = (t) => { const b = newBlock('message'); b.params = { text: t }; S.push(b); };
+    // E0 (t516) — the data-op twin port. `opts.superset` carries the STRUCTURAL forks GUARDED so pruneGuards collapses to the
+    // concrete shape (the alignment/rotaryClock E0 pattern): type(popup/status/input/beep/dwell) × the HMI cap × popupMode ×
+    // the conditional slots/color/dest/dwell. The guard keys use DERIVED numeric/boolean params (_hmi/_popupMode/_statusMode/
+    // _useColor/_hasDwell/_hasDest/_hasCyc, injected by the twin's deriveGuards + the E0 test) so a value-typed fork guards
+    // cleanly. Concrete (superset:false) is the untouched imperative build → BYTE-IDENTICAL, and prune(superset)==concrete.
+    const GUARD = (when, kids) => { const b = newBlock('guard'); b.params = { when }; b.children = kids; return b; };
+    const cap = (fn) => { const n = S.length; fn(); return S.splice(n); };   // capture the blocks fn pushes (for GUARD children)
+    const superset = !!opts.superset;
 
     const dialect = getDialect();
     if (!dialect) { C('Error: No dialect loaded'); return S; }
     const caps = getCaps(dialect.id);
 
     const type = params.type;
-    if (['popup', 'status', 'input'].includes(type)) {   // data slots
-        if (params.slot1) A('#1510', params.slot1);
-        if (params.slot2) A('#1511', params.slot2);
-        if (params.slot3) A('#1512', params.slot3);
-        if (params.slot4) A('#1513', params.slot4);
-    }
+    // ── data slots (#1510-1513) — each present iff its param is truthy (only popup/status/input set them; beep/dwell never do) ──
+    const SLOTS = [['slot1', '#1510'], ['slot2', '#1511'], ['slot3', '#1512'], ['slot4', '#1513']];
+    if (superset) { for (const [p, v] of SLOTS) S.push(GUARD({ param: p, is: true }, cap(() => A(v, params[p])))); }
+    else if (['popup', 'status', 'input'].includes(type)) { for (const [p, v] of SLOTS) if (params[p]) A(v, params[p]); }
+
     const msg = fmtCtrl(params.msg);
-    if (type === 'popup') {
-        const mode = Number(params.popupMode);
-        if (!caps.hmi) {
-            C(`Fallback: Controller does not support HMI popups`);
-            MSG(msg);
-            if (mode === 1 || mode === 3) RAW('M00 ( Pause for operator acknowledgement )');
+
+    // ── POPUP arm (its own hmi fork; the HMI side forks on popupMode 1/3/toast) ──
+    const popupFallback = () => {
+        C(`Fallback: Controller does not support HMI popups`); MSG(msg);
+        const m00 = () => RAW('M00 ( Pause for operator acknowledgement )');
+        if (superset) S.push(GUARD({ param: '_popupMode', is: 1 }, cap(m00)), GUARD({ param: '_popupMode', is: 3 }, cap(m00)));
+        else { const mode = Number(params.popupMode); if (mode === 1 || mode === 3) m00(); }
+    };
+    const popupHmiOk = () => { C('Popup - OK/Cancel'); RAW(dialect.hmiPrompt(msg, 1).join('\n')); IF('#1505', '==', '0', 9); C('--- action if OK ---'); LB(9); };
+    const popupHmiBinary = () => { C('Popup - Binary Choice'); RAW(dialect.hmiPrompt(msg, 3).join('\n')); IF('#1505', '==', '0', 8); C('--- ENTER action ---'); GO(9); LB(8); C('--- ESC action ---'); LB(9); };
+    const popupHmiToast = () => { C('Popup - Toast'); RAW(dialect.hmiToast ? dialect.hmiToast(msg).join('\n') : dialect.hmiPrompt(msg, -5000).join('\n')); };
+    const popupHmi = () => {
+        if (superset) S.push(GUARD({ param: '_popupMode', is: 1 }, cap(popupHmiOk)), GUARD({ param: '_popupMode', is: 3 }, cap(popupHmiBinary)), GUARD({ param: '_popupMode', is: 0 }, cap(popupHmiToast)));
+        else { const mode = Number(params.popupMode); if (mode === 1) popupHmiOk(); else if (mode === 3) popupHmiBinary(); else popupHmiToast(); }
+    };
+    const popupArm = () => {
+        if (superset) S.push(GUARD({ param: '_hmi', is: false }, cap(popupFallback)), GUARD({ param: '_hmi', is: true }, cap(popupHmi)));
+        else if (!caps.hmi) popupFallback(); else popupHmi();
+    };
+
+    // ── STATUS arm ──
+    const line = fmtLine(params.msg);
+    const statusMode = (params.statusMode != null && params.statusMode !== '') ? Number(params.statusMode) : 1;
+    const statusFallback = () => { C('Fallback: Status bar text not supported'); MSG(line); };
+    const statusHmi = () => {
+        const setColor = () => A('#2039', Number(params.statusColor), 'Status bar color - BGR');
+        const restColor = () => A('#2039', '-1', 'Restore default color');
+        const dwellRaw = () => RAW(`G4 P${Number(params.statusDwell)}  ( Dwell - keep message visible )`);
+        if (superset) {
+            S.push(GUARD({ param: '_useColor', is: true }, cap(setColor)));
+            A('#1503', `${statusMode}(${line})`);
+            S.push(GUARD({ param: '_useColor', is: true }, cap(restColor)), GUARD({ param: '_hasStatusDwell', is: true }, cap(dwellRaw)));
         } else {
-            if (mode === 1) { C('Popup - OK/Cancel'); RAW(dialect.hmiPrompt(msg, 1).join('\n')); IF('#1505', '==', '0', 9); C('--- action if OK ---'); LB(9); }
-            else if (mode === 3) { C('Popup - Binary Choice'); RAW(dialect.hmiPrompt(msg, 3).join('\n')); IF('#1505', '==', '0', 8); C('--- ENTER action ---'); GO(9); LB(8); C('--- ESC action ---'); LB(9); }
-            else { C('Popup - Toast'); RAW(dialect.hmiToast ? dialect.hmiToast(msg).join('\n') : dialect.hmiPrompt(msg, -5000).join('\n')); }
+            const useColor = params.statusColor != null && Number(params.statusColor) !== -1;
+            const dwell = (params.statusDwell && Number(params.statusDwell) > 0) ? Number(params.statusDwell) : 0;
+            if (useColor) setColor();
+            A('#1503', `${statusMode}(${line})`);
+            if (useColor) restColor();
+            if (dwell > 0 && statusMode !== -3000) dwellRaw();
         }
-    } else if (type === 'status') {
-        const line = fmtLine(params.msg);
-        const useColor = params.statusColor != null && Number(params.statusColor) !== -1;
-        const mode = (params.statusMode != null && params.statusMode !== '') ? Number(params.statusMode) : 1;
-        const dwell = (params.statusDwell && Number(params.statusDwell) > 0) ? Number(params.statusDwell) : 0;
-        C(mode === -3000 ? 'Persistent Status Bar' : 'Status Bar Update');
-        if (!caps.hmi) {
-            C('Fallback: Status bar text not supported');
-            MSG(line);
-        } else {
-            if (useColor) A('#2039', Number(params.statusColor), 'Status bar color - BGR');
-            A('#1503', `${mode}(${line})`); // Still hardcoded for now, but guarded by hmi cap
-            if (useColor) A('#2039', '-1', 'Restore default color');
-            if (dwell > 0 && mode !== -3000) RAW(`G4 P${dwell}  ( Dwell - keep message visible )`);
-        }
-    } else if (type === 'input') {
-        const idNum = Number(String(params.id).replace('#', ''));
-        const useId = (Number.isFinite(idNum) && idNum >= 50 && idNum <= 499) ? idNum : 100;
-        if (!caps.hmi) {
-            C('Fallback: Numeric input not supported');
-            MSG(`Missing input for #${useId}: ${msg}`);
-            RAW('M00 ( Pause to manually edit variable if needed )');
-        } else {
-            C('Numeric Input - DDCS Safe');
-            RAW(dialect.hmiInput ? dialect.hmiInput(`#${useId}`, msg).join('\n') : `#2070=${useId}(${msg})`);
-            if (params.dest && String(params.dest).trim() !== '') A(String(params.dest), `#${useId}`, 'Copy to persistent');
-        }
-    } else if (type === 'beep') {
+    };
+    const statusArm = () => {
+        C(statusMode === -3000 ? 'Persistent Status Bar' : 'Status Bar Update');
+        if (superset) S.push(GUARD({ param: '_hmi', is: false }, cap(statusFallback)), GUARD({ param: '_hmi', is: true }, cap(statusHmi)));
+        else if (!caps.hmi) statusFallback(); else statusHmi();
+    };
+
+    // ── INPUT arm ──
+    const idNum = Number(String(params.id).replace('#', ''));
+    const useId = (Number.isFinite(idNum) && idNum >= 50 && idNum <= 499) ? idNum : 100;
+    const inputFallback = () => { C('Fallback: Numeric input not supported'); MSG(`Missing input for #${useId}: ${msg}`); RAW('M00 ( Pause to manually edit variable if needed )'); };
+    const inputHmi = () => {
+        C('Numeric Input - DDCS Safe');
+        RAW(dialect.hmiInput ? dialect.hmiInput(`#${useId}`, msg).join('\n') : `#2070=${useId}(${msg})`);
+        const copyDest = () => A(String(params.dest), `#${useId}`, 'Copy to persistent');
+        if (superset) S.push(GUARD({ param: '_hasDest', is: true }, cap(copyDest)));
+        else if (params.dest && String(params.dest).trim() !== '') copyDest();
+    };
+    const inputArm = () => {
+        if (superset) S.push(GUARD({ param: '_hmi', is: false }, cap(inputFallback)), GUARD({ param: '_hmi', is: true }, cap(inputHmi)));
+        else if (!caps.hmi) inputFallback(); else inputHmi();
+    };
+
+    // ── BEEP arm (cyc fork) ──
+    const beepArm = () => {
         const dur = (params.val != null && params.val !== '') ? params.val : 500;
-        const cyc = (params.cycle != null && params.cycle !== '') ? Number(params.cycle) : 0;
-        if (cyc > 0) { C(`System Beep - ${Math.round(dur / (cyc * 2))} pulses of ${cyc}ms`); A('#2043', cyc, 'Pulse width ms'); A('#2042', dur, 'Total duration ms'); }
-        else { C('System Beep'); A('#2042', dur, 'Beep duration ms'); }
-    } else if (type === 'dwell') {
-        C('Dwell');
-        if (dialect && dialect.dwell) RAW(dialect.dwell(params.val).join('\n'));
-        else RAW(`G4 P${params.val}`);
-    } else {
-        C(`Unknown communication type: ${type}`);
-    }
+        const beepCyc = () => { const cyc = Number(params.cycle); C(`System Beep - ${Math.round(dur / (cyc * 2))} pulses of ${cyc}ms`); A('#2043', cyc, 'Pulse width ms'); A('#2042', dur, 'Total duration ms'); };
+        const beepPlain = () => { C('System Beep'); A('#2042', dur, 'Beep duration ms'); };
+        if (superset) S.push(GUARD({ param: '_hasCyc', is: true }, cap(beepCyc)), GUARD({ param: '_hasCyc', is: false }, cap(beepPlain)));
+        else { const cyc = (params.cycle != null && params.cycle !== '') ? Number(params.cycle) : 0; if (cyc > 0) beepCyc(); else beepPlain(); }
+    };
+
+    // ── DWELL arm ──
+    const dwellArm = () => { C('Dwell'); if (dialect && dialect.dwell) RAW(dialect.dwell(params.val).join('\n')); else RAW(`G4 P${params.val}`); };
+
+    if (superset) {
+        S.push(
+            GUARD({ param: 'type', is: 'popup' }, cap(popupArm)),
+            GUARD({ param: 'type', is: 'status' }, cap(statusArm)),
+            GUARD({ param: 'type', is: 'input' }, cap(inputArm)),
+            GUARD({ param: 'type', is: 'beep' }, cap(beepArm)),
+            GUARD({ param: 'type', is: 'dwell' }, cap(dwellArm)),
+        );
+    } else if (type === 'popup') popupArm();
+    else if (type === 'status') statusArm();
+    else if (type === 'input') inputArm();
+    else if (type === 'beep') beepArm();
+    else if (type === 'dwell') dwellArm();
+    else C(`Unknown communication type: ${type}`);
     return S;
 }
 
