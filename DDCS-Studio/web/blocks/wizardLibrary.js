@@ -36,6 +36,7 @@ const GROUPS = [
 ];
 const BUILTINS = [
     { id: 'comm', type: 'comm', label: 'Comm / MDI', icon: '💬', group: 'setup', opensAs: 'user_comm_data' },   // t518 1b-ii — IN-PLACE: the Comm slot opens the data-op twin (superset: type × hmi × mode × conditional forks, deriveGuards + value-bearing recompose); built-in communicationWizard stays the legacy shim
+    { id: 'io_step', type: 'io_step', label: 'I/O Step', icon: '⚡', group: 'setup', opensAs: 'user_io_step' },   // t522 E2 — the grouped I/O-step wizard (output/input/dwell), IN-PLACE: opens the data-op twin (declared-I/O by name + raw-pin fallback); the raw atoms stay in the Blocks palette
 
     { id: 'atc_warmup', type: 'atc_warmup', label: 'Warm-up', icon: '🔥', group: 'setup', opensAs: 'user_atc_warmup_data' },
     { id: 'wcs', type: 'wcs', label: 'WCS / work offsets', icon: '⊕', group: 'probe', opensAs: 'user_wcs_data' },   // t477 E1 — IN-PLACE: the WCS slot opens the twin (dialect-aware wcszero atom); built-in wcsView stays the legacy shim

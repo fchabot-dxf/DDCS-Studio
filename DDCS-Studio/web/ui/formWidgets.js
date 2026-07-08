@@ -15,6 +15,12 @@ import { buildRegions, paintRegions, regionValueFromEvent, regionLabel } from '.
 import { FeatureCanvas } from '../viz/featureCanvas.js';
 import { workpieceFeatureItems } from '../engine/workpiece.js';
 import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inline source dot the built-in forms use, on sourceField bindings
+import { getOutputs, getInputs } from './settingsPanel.js';   // t522 — the declared-I/O picker lists settings.outputs/inputs BY NAME (live)
+import { ioInputSupported } from '../wizards/ioStepWizard.js';   // t522 — the mode-picker greys the INPUT segment on a post without wait-on-input
+
+// t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
+// widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
+const SEG_GATE_PREDS = { ioInput: () => ioInputSupported() };
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 const ROW_CSS = 'display:flex; align-items:center; justify-content:space-between; gap:14px; margin:9px 0;';
@@ -135,6 +141,27 @@ function dropdownWidget(host, b) {
     return { read: () => ({ [b.param]: numeric ? numOr(sel.value, b.default ?? 0) : sel.value }) };
 }
 
+// t522 — the DECLARED-I/O picker: a dropdown that lists settings.outputs / settings.inputs BY NAME (live) plus a
+// "Raw pin…" fallback. Value = the row id (or 'raw'). widgetConfig.kind = 'output' | 'input'. The I/O-step wizard
+// resolves the id → the row's on/off M-code (output) / poll pin (input) at emit; relabel-proof (id join, not the label).
+function declaredIoWidget(host, b) {
+    host.style.cssText = ROW_CSS;
+    const kind = (b.widgetConfig && b.widgetConfig.kind) || 'output';
+    const rows = (kind === 'output' ? getOutputs() : getInputs()) || [];
+    const sel = document.createElement('select');
+    sel.style.cssText = CTRL_CSS + ' min-width:120px;';
+    sel.dataset.param = b.param;
+    const opts = [['Raw pin…', 'raw'], ...rows.filter((r) => r && r.label).map((r) => [r.label, String(r.id)])];
+    for (const [lab, val] of opts) {
+        const op = document.createElement('option');
+        op.value = String(val); op.textContent = String(lab);
+        if (String(val) === String(b.default)) op.selected = true;
+        sel.appendChild(op);
+    }
+    host.append(labelSpan(b), sel);
+    return { read: () => ({ [b.param]: sel.value }) };
+}
+
 // t323 — SEGMENTED control: a small enum (2-3 values) as a compact [ Auto | Manual ] toggle, both states VISIBLE (the
 // selected one highlighted), one click writes the enum value. REUSES the enum read()/change path (no emit change) so a
 // structural toggle (travelApproach) reprunes exactly as the dropdown did. Opt-in via widget:'segmented'.
@@ -167,6 +194,24 @@ function segmentedWidget(host, b) {
                 autoBtn.style.opacity = ok ? '' : '0.4'; autoBtn.style.cursor = ok ? '' : 'not-allowed';
             }
             if (!ok && String(cur) === 'auto') { cur = 'manual'; sync(); seg.dispatchEvent(new Event('change', { bubbles: true })); }
+        };
+        applyGate();
+        const onSettings = () => { if (!seg.isConnected) { window.removeEventListener('ddcs:settings-changed', onSettings); return; } applyGate(); };
+        if (typeof window !== 'undefined') window.addEventListener('ddcs:settings-changed', onSettings);
+    }
+    // t522 — generic segment gate: grey ONE segment (e.g. Input on a post without wait-on-input) + fall to a fallback.
+    if (b.widgetConfig && b.widgetConfig.gateSeg && SEG_GATE_PREDS[b.widgetConfig.gateSeg.pred]) {
+        const g = b.widgetConfig.gateSeg, pred = SEG_GATE_PREDS[g.pred];
+        const gBtn = [...seg.children].find((bt) => bt.dataset.value === String(g.value));
+        const applyGate = () => {
+            const ok = pred();
+            if (gBtn) {
+                gBtn.disabled = !ok;
+                gBtn.setAttribute('data-op-gated', ok ? 'off' : 'on');   // survives postGating's blanket cap-ON re-enable
+                gBtn.title = ok ? '' : (g.tip || '');
+                gBtn.style.opacity = ok ? '' : '0.4'; gBtn.style.cursor = ok ? '' : 'not-allowed';
+            }
+            if (!ok && String(cur) === String(g.value)) { cur = g.fallback; sync(); seg.dispatchEvent(new Event('change', { bubbles: true })); }
         };
         applyGate();
         const onSettings = () => { if (!seg.isConnected) { window.removeEventListener('ddcs:settings-changed', onSettings); return; } applyGate(); };
@@ -418,6 +463,7 @@ export const FORM_WIDGETS = {
     segmented: segmentedWidget,
     toggle: toggleWidget,
     text: textWidget,
+    'declared-io': declaredIoWidget,
     'corner-grid': cornerGridWidget,
     'region-pick': regionPickWidget,
     'coord-list': coordListWidget,
@@ -457,6 +503,9 @@ export function renderOpForm(host, bindings) {
         // #21/#22, visible only under probeZFirst). Purely a marker; the widget still renders + reads (dead when hidden).
         const w = Array.isArray(spec) ? spec[0] : spec;
         if (w && w.when && w.when.param) { row.dataset.whenParam = w.when.param; row.dataset.whenIs = String(w.when.is); }
+        // t522 — COMPOUND gate: `whenAll` is an array of {param, is} ANDed together (e.g. the I/O-step raw-pin field, shown
+        // only when mode=output AND outputRef=raw). The single `when` can't express two conditions; the view evals all.
+        if (w && Array.isArray(w.whenAll)) row.dataset.whenAll = JSON.stringify(w.whenAll.map((c) => ({ param: c.param, is: c.is })));
         try { readers.push(renderFormWidget(row, spec).read); }
         catch (e) { console.warn('widget render failed for', label, e); }
         host.appendChild(row);

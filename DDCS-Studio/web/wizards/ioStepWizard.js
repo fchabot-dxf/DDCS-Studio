@@ -77,7 +77,7 @@ export function ioStepStack(params = {}, opts = {}) {
     // ── INPUT arm: a DECLARED input polls its configured pin (label as a comment); RAW → the pin directly. The atom's
     //    per-dialect emit handles the WHILE-poll (Expert) / M66 (RS274) / hint (V4.1/DM500). ──
     const inDeclared = () => { C(`Wait: ${params.inLabel}`); WAITIN({ pin: params.inPin, mode: params.mode2 || 'rise', timeout: num(params.timeout, 0), var: params.var || '#5399' }); };
-    const inRaw = () => WAITIN({ pin: num(params.pin, 0), mode: params.mode2 || 'rise', timeout: num(params.timeout, 0), var: params.var || '#5399' });
+    const inRaw = () => WAITIN({ pin: num(params.waitPin != null ? params.waitPin : params.pin, 0), mode: params.mode2 || 'rise', timeout: num(params.timeout, 0), var: params.var || '#5399' });
     const inputArm = () => {
         if (superset) S.push(GUARD({ param: '_inDeclared', is: true }, cap(inDeclared)), GUARD({ param: '_inDeclared', is: false }, cap(inRaw)));
         else if (params.inDeclared) inDeclared(); else inRaw();

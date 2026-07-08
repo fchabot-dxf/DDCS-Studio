@@ -152,9 +152,15 @@ export const userOpView = {
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
         const fhost = el('wiz_user_form');
-        if (fhost) fhost.querySelectorAll('[data-when-param]').forEach((row) => {
-            const is = row.dataset.whenIs === 'true' ? true : row.dataset.whenIs === 'false' ? false : row.dataset.whenIs;
-            row.style.display = whenOk({ param: row.dataset.whenParam, is }, params) ? '' : 'none';
+        if (fhost) fhost.querySelectorAll('[data-when-param], [data-when-all]').forEach((row) => {
+            let ok;
+            if (row.dataset.whenAll) {   // t522 — COMPOUND gate: AND of all conditions
+                try { ok = JSON.parse(row.dataset.whenAll).every((c) => whenOk(c, params)); } catch (_) { ok = true; }
+            } else {
+                const is = row.dataset.whenIs === 'true' ? true : row.dataset.whenIs === 'false' ? false : row.dataset.whenIs;
+                ok = whenOk({ param: row.dataset.whenParam, is }, params);
+            }
+            row.style.display = ok ? '' : 'none';
         });
         // t417 E3 — a per-op SIM-STOCK override (the rotary twin projects a round bar from #57; sim-only, no global mutation).
         // Feeds BOTH the sim-starts (opSimStarts) AND the preview render (preview3D) so the bar + the flank starts agree.
