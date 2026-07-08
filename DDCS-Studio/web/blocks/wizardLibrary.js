@@ -35,7 +35,8 @@ const GROUPS = [
     { id: 'custom', label: 'Custom', section: 'center' },   // user ops land here by default (re-groupable)
 ];
 const BUILTINS = [
-    { id: 'comm', type: 'comm', label: 'Comm / MDI', icon: '💬', group: 'setup' },
+    { id: 'comm', type: 'comm', label: 'Comm / MDI', icon: '💬', group: 'setup', opensAs: 'user_comm_data' },   // t518 1b-ii — IN-PLACE: the Comm slot opens the data-op twin (superset: type × hmi × mode × conditional forks, deriveGuards + value-bearing recompose); built-in communicationWizard stays the legacy shim
+
     { id: 'atc_warmup', type: 'atc_warmup', label: 'Warm-up', icon: '🔥', group: 'setup', opensAs: 'user_atc_warmup_data' },
     { id: 'wcs', type: 'wcs', label: 'WCS / work offsets', icon: '⊕', group: 'probe', opensAs: 'user_wcs_data' },   // t477 E1 — IN-PLACE: the WCS slot opens the twin (dialect-aware wcszero atom); built-in wcsView stays the legacy shim
     { id: 'homing', type: 'homing', label: 'Homing', icon: '⌖', group: 'probe' },

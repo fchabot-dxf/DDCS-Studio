@@ -33,6 +33,7 @@ import { middleDataDef } from './blocks/dataOps/middleData.js';   // middle port
 import { rotaryCenterDataDef } from './blocks/dataOps/rotaryCenterData.js';   // t413-t421 rotary centreline port E1-E5: the "Rotary Centreline (data)" twin — opened IN-PLACE from the built-in Centreline slot (opensAs); round-bar sim + 4th-axis rig + multi-pass starts
 import { rotaryClockDataDef } from './blocks/dataOps/rotaryClockData.js';   // t423-t429 rotary clock port E0-E3: the "Rotary Clock (data)" twin — opened IN-PLACE from the built-in Clock A0 slot (opensAs); box + 4-jaw rig + single start
 import { alignmentDataDef } from './blocks/dataOps/alignmentData.js';   // t431-t437 alignment port E0-E3 (the LAST probe): the "Alignment (data)" twin — opened IN-PLACE from the built-in Align slot (opensAs); box + 2 fence starts, no rig
+import { commDataDef } from './blocks/dataOps/commData.js';   // t518 1b-ii — the "Communication (data)" twin (Setup/IO port): opened IN-PLACE from the built-in Comm slot (opensAs); superset type × hmi × mode × conditional forks + value-bearing recompose
 // Edge viz animator (registers `window.EdgeVizAnimator`)
 import './viz/edgeVizAnimator.js';
 // Alignment viz animator (registers `window.AlignVizAnimator`)
@@ -168,6 +169,7 @@ class DDCSStudio {
             rotaryCenterDataDef(),   // t421 E5 — seed the rotary centreline twin so its in-place Centreline slot (opensAs) opens a registered op on boot
             rotaryClockDataDef(),   // t429 E3 — seed the rotary clock twin so its in-place Clock A0 slot (opensAs) opens a registered op on boot
             alignmentDataDef(),   // t437 E3 — seed the alignment twin so its in-place Align slot (opensAs) opens a registered op on boot (completes the probe fan-out)
+            commDataDef(),   // t518 1b-ii — seed the Comm/MDI twin so its in-place Comm slot (opensAs) opens a registered op on boot (completes the Setup/IO Comm port)
         ];
         for (const def of seeds) {
             try {

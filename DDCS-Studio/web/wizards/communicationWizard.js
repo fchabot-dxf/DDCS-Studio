@@ -61,7 +61,9 @@ export function commStack(params = {}, opts = {}) {
     const popupHmiBinary = () => { C('Popup - Binary Choice'); RAW(dialect.hmiPrompt(msg, 3).join('\n')); IF('#1505', '==', '0', 8); C('--- ENTER action ---'); GO(9); LB(8); C('--- ESC action ---'); LB(9); };
     const popupHmiToast = () => { C('Popup - Toast'); RAW(dialect.hmiToast ? dialect.hmiToast(msg).join('\n') : dialect.hmiPrompt(msg, -5000).join('\n')); };
     const popupHmi = () => {
-        if (superset) S.push(GUARD({ param: '_popupMode', is: 1 }, cap(popupHmiOk)), GUARD({ param: '_popupMode', is: 3 }, cap(popupHmiBinary)), GUARD({ param: '_popupMode', is: 0 }, cap(popupHmiToast)));
+        // the toast arm is the "else" (mode NOT 1 and NOT 3 — e.g. the form's -5000) → un-guardable by a single value, so it
+        // rides the DERIVED boolean `_popupToast` (= mode !== 1 && mode !== 3), injected by deriveGuards / the E0 test.
+        if (superset) S.push(GUARD({ param: '_popupMode', is: 1 }, cap(popupHmiOk)), GUARD({ param: '_popupMode', is: 3 }, cap(popupHmiBinary)), GUARD({ param: '_popupToast', is: true }, cap(popupHmiToast)));
         else { const mode = Number(params.popupMode); if (mode === 1) popupHmiOk(); else if (mode === 3) popupHmiBinary(); else popupHmiToast(); }
     };
     const popupArm = () => {

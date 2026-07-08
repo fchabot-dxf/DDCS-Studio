@@ -17,6 +17,8 @@ import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the s
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
 import { opSimContext } from '../../viz/opSimContext.js';   // t421 E5 — the DECLARED preview intent (rotary rig, …) so an in-place rotary twin shows its 4th-axis rig (generic mirror of the built-in view + the Blocks tab)
+import { CommunicationWizard } from '../communicationWizard.js';   // t518 — the Comm twin's 'commscreen' panel renders this wizard's DDCS-screen mock (pure fn of params)
+const _commWizard = new CommunicationWizard();
 import { createToolpath2d } from '../../viz/toolpath2d.js';   // t309 — the 2D-animation overlay under the Layout SVG (path + red head, driven by the shared engine)
 import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
 import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
@@ -177,6 +179,9 @@ export const userOpView = {
         const pt = panelType(_def.panel);
         const viz3dBox = el('userViz3dBox');
         const viz3dIn = (id) => { const c = el(id); return (c && c.parentElement) ? c.parentElement.querySelector('.wiz-viz3d') : null; };
+        // t518 — the Comm 'commscreen' preview host is a sibling in #userVizContainer; drop any stale one at the top of EVERY
+        // render so it never leaks into another op's 3D/2D pane (self-cleaning; the commscreen branch re-creates it fresh).
+        { const c0 = el('userVizContainer'); const h0 = c0 && c0.querySelector('.comm-screen-host'); if (h0 && pt.mode !== 'commscreen') h0.remove(); }
         if (pt.mode === '3d2d') {
             // form3d+2d — the built-in probe pattern generalized (edge/middle: 3D base + 2D overlay, never either/or):
             // the 3D sim + the DECLARED per-pass markers in the dedicated 3D box, AND the 2D drag canvas in #userVizContainer.
@@ -236,6 +241,17 @@ export const userOpView = {
         } else if (pt.mode === '2d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
             const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params);
+        } else if (pt.mode === 'commscreen') {
+            // t518 — Comm/MDI: a live mock of the DDCS controller screen (popup / status / input / beep) instead of a toolpath.
+            if (viz3dBox) viz3dBox.style.display = 'none';
+            const c = el('userVizContainer');
+            if (c) {
+                c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none';   // hide the shared 3D pane
+                let host = c.querySelector('.comm-screen-host');
+                if (!host) { host = document.createElement('div'); host.className = 'comm-screen-host'; c.appendChild(host); }
+                host.style.display = '';
+                try { host.innerHTML = _commWizard.generateScreenPreview(params); } catch (_) { host.innerHTML = ''; }
+            }
         }
         // t421 E5 — DECLARED rig intent: a rotary-declaring twin (opSimContext.showRotaryRig, from its stack `sim{rotary:true}`
         // via setUserSimIntent) shows the 4th-axis rig (chuck + tailstock) in the 3D preview — the GENERIC mirror of the

@@ -23,6 +23,7 @@ test('E0 GATE: prune(commStack superset) == concrete commStack byte-identical ac
             return {
                 _hmi: !!caps.hmi,
                 _popupMode: Number(p.popupMode),
+                _popupToast: !(Number(p.popupMode) === 1 || Number(p.popupMode) === 3),   // the toast "else" arm (form value -5000)
                 _useColor: p.statusColor != null && Number(p.statusColor) !== -1,
                 _hasStatusDwell: !!(p.statusDwell && Number(p.statusDwell) > 0 && sm !== -3000),
                 _hasDest: !!(p.dest && String(p.dest).trim() !== ''),
@@ -30,7 +31,7 @@ test('E0 GATE: prune(commStack superset) == concrete commStack byte-identical ac
             };
         };
         const combos = [
-            { type: 'popup', msg: 'Load part', popupMode: 0 },
+            { type: 'popup', msg: 'Load part', popupMode: -5000 },   // toast — the real form value (the "else" arm)
             { type: 'popup', msg: 'OK?', popupMode: 1 },
             { type: 'popup', msg: 'A / B', popupMode: 3, slot1: 'X', slot3: 'Z' },
             { type: 'status', msg: 'Running', statusMode: 1 },

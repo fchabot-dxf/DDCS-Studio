@@ -17,6 +17,7 @@ export const PANEL_TYPES = {
     form3d:      { id: 'form3d',      label: 'Form + 3D',      viz: true,  mode: '3d' },   // form + the shared 3D preview (default)
     form2d:      { id: 'form2d',      label: 'Form + 2D',      viz: true,  mode: '2d' },   // form + a 2D stock layout of the op's xy/rect params
     'form3d+2d': { id: 'form3d+2d',   label: 'Form + 3D + 2D', viz: true,  mode: '3d2d' }, // BOTH: the 3D sim (+ declared per-pass markers) AND the 2D drag canvas (the built-in probe pattern, generalized — a visual data-op like Corner (data))
+    commscreen:  { id: 'commscreen',  label: 'Form + DDCS screen', viz: true, mode: 'commscreen' },   // t518 — the Comm/MDI twin: form + a live mock of the controller's popup/status/input/beep screen (communicationWizard.generateScreenPreview) instead of a 3D toolpath
 };
 export const DEFAULT_PANEL = 'form3d';
 export const panelType = (id) => PANEL_TYPES[id] || PANEL_TYPES[DEFAULT_PANEL];

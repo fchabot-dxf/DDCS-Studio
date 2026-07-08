@@ -196,6 +196,7 @@ function textWidget(host, b) {
     const inp = document.createElement('input');
     inp.type = 'text'; inp.value = b.default ?? '';
     inp.style.cssText = CTRL_CSS + ' width:150px;';
+    inp.dataset.param = b.param;   // [data-param] parity with the other widgets — targetable for post-gating / source-chips / form-read (the Comm text fields surfaced the gap)
     host.append(labelSpan(b), inp);
     return { read: () => ({ [b.param]: inp.value }) };
 }

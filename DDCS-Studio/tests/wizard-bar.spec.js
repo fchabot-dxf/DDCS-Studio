@@ -34,7 +34,7 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(bar.left[0].label).toBe('Setup');
   const leftOnclicks = bar.left[0].items.map((i) => i.onclick);
   expect(leftOnclicks).toEqual([
-    "openWiz && openWiz('comm')",
+    "openWiz && openWiz('user_comm_data')",   // t518 — Comm opens its data-op twin IN-PLACE (opensAs)
     "openWiz && openWiz('user_atc_warmup_data')",   // t407 — Warm-up opens its data-op twin IN-PLACE (opensAs)
     "ddcsInsertIo && ddcsInsertIo('outpin')",
     "ddcsInsertIo && ddcsInsertIo('waitinput')",
