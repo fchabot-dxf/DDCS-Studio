@@ -96,9 +96,9 @@ export const SETTINGS_DEFAULTS = {
                    setterPort: 'studio', setterLevel: 'studio', blockHeight: 'studio' },
     },
     limits: {
-        xMinPin: '', xMinLevel: 0, xMinSwitchType: 'mechanical', xMaxPin: '', xMaxLevel: 0, xMaxSwitchType: 'mechanical',
-        yMinPin: '', yMinLevel: 0, yMinSwitchType: 'mechanical', yMaxPin: '', yMaxLevel: 0, yMaxSwitchType: 'mechanical',
-        zMinPin: '', zMinLevel: 0, zMinSwitchType: 'mechanical', zMaxPin: '', zMaxLevel: 0, zMaxSwitchType: 'mechanical'
+        xMinPin: '', xMinLevel: 0, xMinSwitchType: 'mechanical', xMinHome: false, xMaxPin: '', xMaxLevel: 0, xMaxSwitchType: 'mechanical', xMaxHome: false,
+        yMinPin: '', yMinLevel: 0, yMinSwitchType: 'mechanical', yMinHome: false, yMaxPin: '', yMaxLevel: 0, yMaxSwitchType: 'mechanical', yMaxHome: false,
+        zMinPin: '', zMinLevel: 0, zMinSwitchType: 'mechanical', zMinHome: false, zMaxPin: '', zMaxLevel: 0, zMaxSwitchType: 'mechanical', zMaxHome: false
     },
     // Which hardware tabs are shown (manual toggles, persisted). Defaults match the M350 profile:
     // Probes + Limits on, ATC off (no clutter unless you have a tool changer). Fully manual so non-bridge
@@ -185,9 +185,9 @@ export const SETTINGS_DEFAULTS = {
 // syncFlatFromIO() mirrors edits back to the flat fields so the sim + wizards keep working
 // until they read the arrays directly (stage 3). Pin ranges: inputs 1–24, outputs 1–20.
 const LIMIT_AXES = [
-    ['x_min', 'Limit X−', 'xMinPin', 'xMinLevel', 'xMinSwitchType'], ['x_max', 'Limit X+', 'xMaxPin', 'xMaxLevel', 'xMaxSwitchType'],
-    ['y_min', 'Limit Y−', 'yMinPin', 'yMinLevel', 'yMinSwitchType'], ['y_max', 'Limit Y+', 'yMaxPin', 'yMaxLevel', 'yMaxSwitchType'],
-    ['z_min', 'Limit Z−', 'zMinPin', 'zMinLevel', 'zMinSwitchType'], ['z_max', 'Limit Z+', 'zMaxPin', 'zMaxLevel', 'zMaxSwitchType'],
+    ['x_min', 'Limit X−', 'xMinPin', 'xMinLevel', 'xMinSwitchType', 'xMinHome'], ['x_max', 'Limit X+', 'xMaxPin', 'xMaxLevel', 'xMaxSwitchType', 'xMaxHome'],
+    ['y_min', 'Limit Y−', 'yMinPin', 'yMinLevel', 'yMinSwitchType', 'yMinHome'], ['y_max', 'Limit Y+', 'yMaxPin', 'yMaxLevel', 'yMaxSwitchType', 'yMaxHome'],
+    ['z_min', 'Limit Z−', 'zMinPin', 'zMinLevel', 'zMinSwitchType', 'zMinHome'], ['z_max', 'Limit Z+', 'zMaxPin', 'zMaxLevel', 'zMaxSwitchType', 'zMaxHome'],
 ];
 
 export function migrateIO(s) {
@@ -199,9 +199,20 @@ export function migrateIO(s) {
         s.inputs.push({ id: 'setter', type: 'setter', label: 'Tool Setter', pin: p.setterPin ?? '', level: p.setterLevel ?? 0,
             x: p.setterX, y: p.setterY, z: p.setterZ, w: p.setterW, h: p.setterH });
         const L = s.limits || {};
-        for (const [axis, label, pinK, lvlK, swK] of LIMIT_AXES) {
-            if (L[pinK] !== '' && L[pinK] != null) s.inputs.push({ id: 'limit_' + axis, type: 'limit', axis, label, pin: L[pinK], level: L[lvlK] || 0, switchType: L[swK] || 'mechanical' });
+        let seededLimit = false;
+        for (const [axis, label, pinK, lvlK, swK, homeK] of LIMIT_AXES) {
+            if (L[pinK] !== '' && L[pinK] != null) { s.inputs.push({ id: 'limit_' + axis, type: 'limit', axis, label, pin: L[pinK], level: L[lvlK] || 0, switchType: L[swK] || 'mechanical', home: !!L[homeK] }); seededLimit = true; }
         }
+        // t502 — a FRESH machine (no legacy flat-limit pins) STARTS with a HOME switch per LINEAR axis, editable, PIN left
+        // UNASSIGNED. This DECLARES the home END out of the box instead of an empty table + the travel-sign guess (the
+        // positive-Z plunge). Z homes UP → z_max/top (router-standard + this human's machine); X/Y default to the min end.
+        // All user-editable (axis end / switch type / pin). One home per axis by construction (one row each).
+        if (!seededLimit) {
+            for (const [edge, label] of [['x_min', 'Home X'], ['y_min', 'Home Y'], ['z_max', 'Home Z']]) {
+                s.inputs.push({ id: 'limit_' + edge, type: 'limit', axis: edge, label, pin: '', level: 0, switchType: 'mechanical', home: true });
+            }
+        }
+        syncFlatFromIO(s);   // mirror the seeded rows (incl. the per-edge Home flags) into the flat settings.limits on first load
     }
     // t189 (declare-fix): backfill the DECLARED waitCode on legacy ATC sensor rows. Before this, the io-tab live-light
     // INFERRED the wait M-code by parsing the label text — which broke the moment the label was renamed (P-C.2d).
@@ -219,11 +230,13 @@ function syncFlatFromIO(s) {
     if (probe) { s.probes.probePin = probe.pin; s.probes.probeLevel = probe.level; }
     if (setter) Object.assign(s.probes, { setterPin: setter.pin, setterLevel: setter.level, setterX: setter.x, setterY: setter.y, setterZ: setter.z, setterW: setter.w, setterH: setter.h });
     s.limits = s.limits || {};
-    for (const [, , pinK, lvlK, swK] of LIMIT_AXES) { s.limits[pinK] = ''; s.limits[lvlK] = 0; s.limits[swK] = 'mechanical'; }
+    // t502 — also mirror the per-edge HOME flag (row.home → <edge>Home). This DECLARES which fitted switch is the home
+    // reference for its axis (to replace the machine-sign GUESS in homing, increment 2). Cleared to false each sync.
+    for (const [, , pinK, lvlK, swK, homeK] of LIMIT_AXES) { s.limits[pinK] = ''; s.limits[lvlK] = 0; s.limits[swK] = 'mechanical'; s.limits[homeK] = false; }
     for (const inp of (s.inputs || [])) {
         if (inp.type !== 'limit') continue;
         const row = LIMIT_AXES.find(a => a[0] === inp.axis);
-        if (row) { s.limits[row[2]] = inp.pin; s.limits[row[3]] = inp.level || 0; s.limits[row[4]] = inp.switchType || 'mechanical'; }
+        if (row) { s.limits[row[2]] = inp.pin; s.limits[row[3]] = inp.level || 0; s.limits[row[4]] = inp.switchType || 'mechanical'; s.limits[row[5]] = !!inp.home; }
     }
 }
 

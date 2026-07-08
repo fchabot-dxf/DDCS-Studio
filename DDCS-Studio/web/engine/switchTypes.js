@@ -10,6 +10,8 @@
 export const SWITCH_TYPES = [
     { type: 'mechanical', label: 'Mechanical', help: 'A contact switch (micro / roller / plunger) — trips AT the envelope edge.', standoff: 0, render: 'plunger' },
     { type: 'proximity',  label: 'Proximity',  help: 'A non-contact inductive / capacitive sensor — trips at its sensing distance (Sn) BEFORE the edge.', standoff: 3, render: 'sensor-face' },
+    { type: 'optical',    label: 'Optical',    help: 'A non-contact photo-interrupter (optical slot / beam-break) — trips just BEFORE the edge as the flag breaks the beam.', standoff: 1, render: 'sensor-face' },
+    { type: 'hall',       label: 'Hall effect', help: 'A non-contact hall-effect / magnetic sensor — trips just BEFORE the edge as the magnet nears it.', standoff: 1, render: 'sensor-face' },
 ];
 
 /** The switch-type def for a stored type value — MECHANICAL is the default (for '' / unknown / a legacy row). */

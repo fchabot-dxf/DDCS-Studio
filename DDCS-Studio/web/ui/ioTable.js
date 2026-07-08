@@ -9,7 +9,7 @@
  * pin can't be double-assigned. Choosing a type in "+ Add" drops a row pre-expanded with its params.
  */
 import { toolOptionsHTML, getTool } from '../wizards/toolPicker.js';
-import { SWITCH_TYPES } from '../engine/switchTypes.js';   // H2 (t483) — the declared limit switch-type catalog (mechanical / proximity)
+import { SWITCH_TYPES } from '../engine/switchTypes.js';   // H2 (t483) — the declared limit switch-type catalog (mechanical / proximity / optical / hall)
 
 const INPUT_TYPES = [
     { type: 'probe',  label: '3D Probe', help: 'The touch-probe / edge-finder input — its trigger fires G31 to record the touched position (the corner/edge wizards read it).' },
@@ -98,6 +98,31 @@ export function renderIoTable(container, kind, list, onChange) {
             SWITCH_TYPES.forEach((s) => { const o = document.createElement('option'); o.value = s.type; o.textContent = s.label; o.title = s.help || ''; if ((row.switchType || 'mechanical') === s.type) o.selected = true; stw.appendChild(o); });
             stw.addEventListener('change', () => { row.switchType = stw.value; onChange(); });
             tr.appendChild(field('Switch type', stw, 104));
+
+            // HOME flag (t502) — DECLARE which fitted switch is the HOME reference for its axis. Today homing GUESSES the
+            // home end from the settings.machine travel SIGN (axisSpan.homeSide) — which is the positive-Z plunge; this
+            // toggle declares it instead (homing reads settings.limits.<edge>Home in increment 2). At most ONE home per
+            // axis: marking home on one end CLEARS the other end of the same axis. Stored as row.home → mirrored to
+            // settings.limits.<edge>Home in syncFlatFromIO. DECLARE-not-infer, one-source with the fitted switch.
+            const homeWrap = document.createElement('label');
+            homeWrap.style.cssText = 'display:flex; flex-direction:column; gap:2px; font-size:10px; color:#6b6150; align-items:center;';
+            homeWrap.appendChild(document.createTextNode('Home'));
+            const homeCb = document.createElement('input');
+            homeCb.type = 'checkbox';
+            homeCb.className = 'io-home-cb';
+            homeCb.checked = !!row.home;
+            homeCb.title = 'Home switch — this end is the home reference for its axis (only one end per axis can be Home).';
+            homeCb.style.cssText = 'width:18px; height:18px; margin-top:3px; cursor:pointer;';
+            homeCb.addEventListener('change', () => {
+                row.home = homeCb.checked;
+                if (row.home) {   // enforce at most ONE home per axis — clear the other end(s) of the SAME axis
+                    const axPrefix = String(row.axis || '').split('_')[0];
+                    list.forEach((r) => { if (r !== row && r.type === 'limit' && String(r.axis || '').split('_')[0] === axPrefix) r.home = false; });
+                }
+                onChange(); rerender();
+            });
+            homeWrap.appendChild(homeCb);
+            tr.appendChild(homeWrap);
         }
 
         // Pin picker (free-pin aware: pins used by other rows are disabled)
@@ -143,24 +168,86 @@ export function renderIoTable(container, kind, list, onChange) {
         container.appendChild(tr);
     });
 
-    // "+ Add" tool: type dropdown → drops a row pre-expanded with that type's params.
+    // "+ Add" (t502) — opens a MODAL type-picker (each type with its help) + a name, then drops the row pre-expanded for
+    // full in-row config. Replaces the cramped inline dropdown; the in-row editing above is unchanged.
     const add = document.createElement('div');
-    add.style.cssText = 'display:flex; gap:8px; align-items:center; margin-top:12px;';
-    const sel = document.createElement('select'); sel.style.cssText = INP;
-    TYPES.forEach(t => { const o = document.createElement('option'); o.value = t.type; o.textContent = t.label; sel.appendChild(o); });
+    add.style.cssText = 'margin-top:12px;';
     const btn = document.createElement('button'); btn.className = 'toolbar-btn settings-io';
     btn.textContent = isInput ? '+ Add input' : '+ Add output';
-    btn.addEventListener('click', () => {
-        const def = TYPES.find(x => x.type === sel.value) || {};
+    btn.addEventListener('click', () => openAddIoModal(isInput, TYPES, (type, label) => {
+        const def = TYPES.find(x => x.type === type) || {};
         const row = isInput
-            ? { id: uid('in'), type: sel.value, label: def.label, pin: '', level: 0 }
-            : { id: uid('out'), type: sel.value, label: def.label, pin: '', onCode: def.onCode || '', offCode: def.offCode || '' };
-        if (isInput && sel.value === 'setter') Object.assign(row, { x: 0, y: 0, z: 0, w: 20, h: 20 });
-        if (isInput && sel.value === 'limit') Object.assign(row, { axis: 'x_min', switchType: 'mechanical' });
+            ? { id: uid('in'), type, label: (label && label.trim()) || def.label, pin: '', level: 0 }
+            : { id: uid('out'), type, label: (label && label.trim()) || def.label, pin: '', onCode: def.onCode || '', offCode: def.offCode || '' };
+        if (isInput && type === 'setter') Object.assign(row, { x: 0, y: 0, z: 0, w: 20, h: 20 });
+        if (isInput && type === 'limit') Object.assign(row, { axis: 'x_min', switchType: 'mechanical', home: false });
         list.push(row); onChange(); rerender();
-    });
-    add.appendChild(sel); add.appendChild(btn);
+    }));
+    add.appendChild(btn);
     container.appendChild(add);
+}
+
+/**
+ * The "+ Add input/output" MODAL (t502): a TYPE picker (cards showing each type's label + help) + a Name field, then Add.
+ * Replaces the inline dropdown so the type choice is clear (help visible per type). onAdd(type, name) creates the row
+ * (in-row config is kept). Self-contained overlay (matches the app's ad-hoc modal pattern) — Esc / backdrop / Cancel close.
+ */
+function openAddIoModal(isInput, TYPES, onAdd) {
+    const ov = document.createElement('div');
+    ov.className = 'io-add-modal';
+    ov.style.cssText = 'position:fixed; inset:0; z-index:10080; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center;';
+    const box = document.createElement('div');
+    box.style.cssText = 'background:#f4f1ea; color:#2a2a2a; width:min(560px,92vw); max-height:86vh; overflow:auto; border-radius:10px; padding:20px 22px; box-shadow:0 10px 40px rgba(0,0,0,.5);';
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    document.addEventListener('keydown', onKey);
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+
+    const h = document.createElement('div');
+    h.textContent = isInput ? 'Add input' : 'Add output';
+    h.style.cssText = 'font-size:16px; font-weight:700; margin-bottom:4px;';
+    const sub = document.createElement('div');
+    sub.textContent = `Pick the ${isInput ? 'input' : 'output'} type, then name it — you can configure the rest on the row.`;
+    sub.style.cssText = 'font-size:12px; opacity:.7; margin-bottom:14px;';
+    box.appendChild(h); box.appendChild(sub);
+
+    let selected = TYPES[0].type;
+    const nameInp = document.createElement('input');
+    nameInp.type = 'text';
+    nameInp.style.cssText = INP + ' width:100%; box-sizing:border-box; margin-top:3px;';
+
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px;';
+    const cards = [];
+    const paint = () => cards.forEach((c) => { const on = c.type === selected; c.el.style.borderColor = on ? '#6b7b3a' : 'rgba(90,75,40,0.25)'; c.el.style.background = on ? '#eef2e0' : '#fff'; });
+    const pick = (t) => { selected = t; const def = TYPES.find((x) => x.type === t) || {}; nameInp.value = def.label || t; paint(); };
+    TYPES.forEach((t) => {
+        const card = document.createElement('button');
+        card.type = 'button'; card.className = 'io-add-type'; card.setAttribute('data-type', t.type);
+        card.style.cssText = 'text-align:left; border:2px solid rgba(90,75,40,0.25); border-radius:8px; padding:9px 11px; background:#fff; cursor:pointer;';
+        card.innerHTML = `<div style="font-weight:700; font-size:13px;">${t.label}</div>` + (t.help ? `<div style="font-size:10.5px; opacity:.65; margin-top:3px; line-height:1.3;">${t.help}</div>` : '');
+        card.addEventListener('click', () => pick(t.type));
+        grid.appendChild(card); cards.push({ type: t.type, el: card });
+    });
+    box.appendChild(grid);
+
+    const nameWrap = document.createElement('label');
+    nameWrap.style.cssText = 'display:block; font-size:11px; color:#6b6150; margin-bottom:16px;';
+    nameWrap.appendChild(document.createTextNode('Name'));
+    nameWrap.appendChild(nameInp);
+    box.appendChild(nameWrap);
+
+    const btns = document.createElement('div');
+    btns.style.cssText = 'display:flex; justify-content:flex-end; gap:8px;';
+    const cancel = document.createElement('button'); cancel.className = 'toolbar-btn'; cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', close);
+    const addb = document.createElement('button'); addb.className = 'toolbar-btn settings-io io-add-confirm'; addb.textContent = isInput ? 'Add input' : 'Add output';
+    addb.addEventListener('click', () => { onAdd(selected, nameInp.value); close(); });
+    btns.appendChild(cancel); btns.appendChild(addb);
+    box.appendChild(btns);
+
+    ov.appendChild(box); document.body.appendChild(ov);
+    pick(selected);
 }
 
 /**
