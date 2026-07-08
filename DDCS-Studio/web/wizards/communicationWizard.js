@@ -25,6 +25,10 @@ export function commStack(params = {}) {
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const RAW = (t) => { const b = newBlock('raw'); b.params = { text: t }; S.push(b); };
+    // t514 — the `message` atom (dialect-aware: hmiToast on HMI posts, an operator comment on non-HMI). Used ONLY in the
+    // non-HMI FALLBACK branches below; it was CALLED but never defined → a ReferenceError aborted commStack/generate on any
+    // post without caps.hmi (Comm was broken there). Mirrors alignmentWizard's MSG (newBlock('message')).
+    const MSG = (t) => { const b = newBlock('message'); b.params = { text: t }; S.push(b); };
 
     const dialect = getDialect();
     if (!dialect) { C('Error: No dialect loaded'); return S; }
