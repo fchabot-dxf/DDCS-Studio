@@ -133,5 +133,10 @@ export function alignmentDataDef() {
     // registry (registerUserOp → setUserSimStarts), NOT the builder → sim-only, emit BYTE-IDENTICAL. 2 starts (A/B along the
     // fence). NO def.simStock: alignment probes a fence on the DEFAULT BOX (no round bar) — the global box stock is correct.
     def.simStartsProvider = (params, stock) => opSimStarts('alignment', params, stock);
+    // t508 Fork 1 — the DECLARED marker→param binding: each per-pass sim-start marker DRAGS the ONE source (the fraction
+    // params). Marker 0 (point A) → params.ax/ay, marker 1 (point B) → params.bx/by, as FRACTIONS of the stock. The generic
+    // in-place canvas (userOpView) reads this to make BOTH markers draggable → writes the fractions → re-read by opSimStarts +
+    // the emit + round-trip. Declared here (not hardcoded in the view); a generic seam, scoped to alignment for now.
+    def.simStartParams = [{ x: 'ax', y: 'ay' }, { x: 'bx', y: 'by' }];
     return def;
 }

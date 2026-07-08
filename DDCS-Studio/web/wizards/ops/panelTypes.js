@@ -85,7 +85,7 @@ export function pinnedStartsFor(def, params, spots) {
     return Object.keys(out).length ? out : null;
 }
 
-export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts) {
+export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
     // t359 — the part-zero crosshair follows the DATUM (the selected part-zero corner/centre), consistent with the stock
@@ -333,6 +333,18 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (sel && sel.value !== code) { sel.value = code; sel.dispatchEvent(new Event('change', { bubbles: true })); }
         },
     } : {};
+    // t508 Fork 1 — DECLARED marker→param handles: an op that binds each sim-start marker to a param (def.simStartParams)
+    // renders EVERY marker as a DRAGGABLE handle here (labelled A, B, …). A drag routes to the marker's onDrag (userOpView
+    // writes the FRACTION param → the ONE source). Distinct from the sim-only pass-0 ○ below (which those ops don't use).
+    if (Array.isArray(simMarkers) && simMarkers.length) {
+        const markerHandles = simMarkers.map((m, i) => ({ id: '__simstart' + i, x: +m.pos.x, y: +m.pos.y, kind: 'move', label: m.label || String(i + 1), color: '#39c0d8' }));
+        const onDragMarkers = (id, world) => {
+            const mi = markerHandles.findIndex((h) => h.id === id);
+            if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });
+            else if (spotOnDrag) spotOnDrag(id, world);
+        };
+        return { stock, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, ...cornerPick, ...edgePick };
+    }
     // t73 — the SIM-ONLY first-start marker also shows on the Layout canvas (a SECOND renderer of createPreviewPanel's
     // userStarts pass-0, never emitted): a hollow ◇ for spatial reference alongside the emitting reposition handles. It is
     // VISUAL here (excluded from the hit-test) because pass-0 always coincides with a reposition ANCHOR whose emitting handle
@@ -369,10 +381,10 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).
 let _layout = null;
-export function renderLayout2D(container, def, params, simStart, sources, passEnds, spots, setSpots, panelStarts) {
+export function renderLayout2D(container, def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers) {
     if (!container) return null;
     if (!_layout) _layout = new FeatureCanvas();
-    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts));
+    _layout.render(container, layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers));
     return _layout;   // t309 — hand back the FeatureCanvas so the Layout host can pin an animation overlay to its transform (getTransform/onTransform)
 }
 

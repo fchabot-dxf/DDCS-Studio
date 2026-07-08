@@ -77,6 +77,22 @@ let _mgr = null;
 // session; t122 — CLEARED per wizard OPEN (onShow), NOT per opType (every corner instance shares the opType, so a per-type
 // reset leaked one instance's drags into the next → a baked, NON-byte-identical emit for a freshly-opened corner).
 let _layoutSpots = {};    // { [groupId]: { dx, dy } } datum-relative; cleared per wizard OPEN (onShow)
+// t508 Fork 1 — the dragged sim-start FRACTIONS for an op that DECLARES a marker→param binding (def.simStartParams, e.g.
+// alignment: marker 0 → ax/ay, marker 1 → bx/by). A drag writes the fraction (world / stock) here; update() merges it into
+// the op params → recorded (persist + round-trip) + re-read by opSimStarts (the marker moves) + the emit. ONE source, ALL
+// surfaces. Seeded from the op's params on EDIT (setForm); cleared per fresh OPEN (onShow).
+let _simStartFracs = {};
+
+/** Write a dragged sim-start marker's WORLD point as a FRACTION of the stock into _simStartFracs, per the op's declared
+ *  marker→param binding (def.simStartParams[i] = {x:paramX, y:paramY}). No binding / no stock → no-op. */
+function writeSimStartFrac(def, i, world, stock) {
+    const spb = def && def.simStartParams && def.simStartParams[i];
+    const sx = stock && Number(stock.x), sy = stock && Number(stock.y);
+    if (!spb || !(sx > 0) || !(sy > 0) || !world) return false;
+    _simStartFracs[spb.x] = Math.max(0, Math.min(1, (+world.x || 0) / sx));
+    _simStartFracs[spb.y] = Math.max(0, Math.min(1, (+world.y || 0) / sy));
+    return true;
+}
 
 /** The manager sets the def before opening (resolved from the type). Also picks the panel layout. */
 export function setUserOpDef(def) {
@@ -121,7 +137,7 @@ export const userOpView = {
     inputIds: [],               // dynamic — the form wires its own delegated listener in render()
     probeSrcFields: {},         // keep the shared probe-source decorator a no-op
 
-    onShow(mgr) { _mgr = mgr; _layoutSpots = {}; applyPanel(); render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical)
+    onShow(mgr) { _mgr = mgr; _layoutSpots = {}; _simStartFracs = {}; applyPanel(); render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical); t508 clear the sim-start fractions too
 
     update(mgr) {
         _mgr = mgr;
@@ -130,6 +146,7 @@ export const userOpView = {
         if (!isGroup && !builderOf(_def.opType)) return;
         const params = {};
         for (const read of _readers) { try { Object.assign(params, read()); } catch (_) { /* skip a broken widget */ } }
+        Object.assign(params, _simStartFracs);   // t508 — the dragged sim-start FRACTIONS (the declared marker→param source) → recorded + read by opSimStarts + the emit
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
         const fhost = el('wiz_user_form');
@@ -193,10 +210,22 @@ export const userOpView = {
                     // immediately-following simStart.onDrag → panel.onStartDrag → setGcode → computePassStarts reads the fresh pins
                     // (the 3D wall holds this same frame, coincident with the Layout).
                     const setSpots = (next) => { _layoutSpots = next || {}; if (host) host.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots); };
-                    const simStart = (panel && pos0 && typeof panel.onStartDrag === 'function')
-                        ? { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } }
-                        : (pos0 ? { pos: pos0 } : null);
-                    const fc = renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps);   // t301 Seam C — feed the panel's SHARED passStarts so the Layout reads the wall world from the ONE source the 3D marker uses (no parallel opSimStarts/cornerXY position derive)
+                    // t508 Fork 1 — an op that DECLARES a marker→param binding (def.simStartParams) renders EACH sim-start marker
+                    // as a DRAGGABLE handle whose drag writes the FRACTION param (world / stock) → merged into params → recorded +
+                    // re-read by opSimStarts (the marker moves) + the emit. ONE source, ALL surfaces (replaces the sim-only pass-0
+                    // ○ for these ops). Absent (corner/edge) → the existing single sim-only Start marker (unchanged).
+                    const spb = _def && _def.simStartParams;
+                    const stkNow = _simStock || (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+                    const simMarkers = (spb && Array.isArray(starts))
+                        ? spb.map((_m, i) => (starts[i] && Number.isFinite(+starts[i].x)) ? {
+                            pos: starts[i], label: String.fromCharCode(65 + i),   // A, B, …
+                            onDrag: (world) => { if (writeSimStartFrac(_def, i, world, stkNow)) mgr.update(); },
+                        } : null).filter(Boolean)
+                        : null;
+                    const simStart = (spb || !(panel && pos0 && typeof panel.onStartDrag === 'function'))
+                        ? (pos0 && !spb ? { pos: pos0 } : null)
+                        : { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } };
+                    const fc = renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps, simMarkers);   // t301 Seam C + t508 simMarkers (declared marker→param handles)
                     wireAnimOverlay(c, fc, panel, ps, passEnds, sources);   // t309 — the 2D-animation overlay under the SVG (created once, fed the shared trace each render; driven by the panel's engine via onToolPos)
                 };
                 renderLayoutWithSim();
@@ -222,7 +251,14 @@ export const userOpView = {
     },
 
     // EDIT seeding (manager._seedForm): show the op's params in the widgets, then update() re-reads them.
-    setForm(params) { _seed = params || {}; render(); },
+    setForm(params) {
+        _seed = params || {};
+        // t508 — seed the dragged sim-start fractions from the op's params so re-opening shows the handles where they were.
+        _simStartFracs = {};
+        const spb = (_def && _def.simStartParams) || [];
+        for (const m of spb) for (const k of [m.x, m.y]) if (k && _seed[k] != null && _seed[k] !== '') _simStartFracs[k] = Number(_seed[k]);
+        render();
+    },
 
     // Increment 2 — INSERT for a group: read the form values and write them surgically back into the group op's
     // STORED children (opSession.setGroupChildParams), keyed by the bindings' (blockIndex, key). The form is a pure
