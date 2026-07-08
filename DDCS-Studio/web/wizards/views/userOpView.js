@@ -139,6 +139,11 @@ export const userOpView = {
     inputIds: [],               // dynamic — the form wires its own delegated listener in render()
     probeSrcFields: {},         // keep the shared probe-source decorator a no-op
 
+    // t524 — a data-op opened with a VARIANT pre-selects its `mode` param: the grouped I/O-step wizard's SETUP-menu buttons
+    // (Set Output / Wait Input / Dwell) open user_io_step with the matching mode. Only ops that HAVE a `mode` binding; runs
+    // before onShow→render so the seeded default shows. A fresh open (no variant) is unaffected; opensAs entries pass none.
+    applyVariant(variant) { if (variant != null && variant !== '' && _def && (_def.bindings || []).some((b) => b.param === 'mode')) _seed = { ...(_seed || {}), mode: variant }; },
+
     onShow(mgr) { _mgr = mgr; _layoutSpots = {}; _simStartFracs = {}; applyPanel(); render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical); t508 clear the sim-start fractions too
 
     update(mgr) {

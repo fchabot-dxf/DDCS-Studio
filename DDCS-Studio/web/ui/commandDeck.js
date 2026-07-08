@@ -53,12 +53,14 @@ const WIZ_SUBLABEL = { rotary_center: 'Rotary' };
 // Wizards with a dedicated 3D-animated opener instead of the generic openWiz(type).
 const WIZ_SPECIAL_OPENER = {};   // corner + edge + middle + ALIGNMENT retired (t437 E3 — the probe fan-out is complete) — their entries `opensAs` the data-op twin (in-place, via the generic user-op path); the legacy openAlignmentWiz/openMiddleWiz shims survive but are no longer menu-routed
 
-// The I/O quick-actions — a bar-special section appended to the Setup dropdown (not library entries).
+// The I/O quick-actions — a bar-special section appended to the Setup dropdown (not library entries). t524 — these now
+// OPEN the grouped I/O-step wizard PRE-SELECTING the matching mode (the variant → userOpView.applyVariant seeds `mode`),
+// instead of the raw-text caret insert. The raw atoms (outpin/waitinput/dwell) stay available in the Blocks palette.
 const WIZ_IO_SECTION = `
                             <div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">I/O</div>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('outpin')">⚡ Set Output</button>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('waitinput')">⏱ Wait Input</button>
-                            <button onclick="ddcsInsertIo && ddcsInsertIo('dwell')">⏳ Dwell</button>`;
+                            <button onclick="openWiz && openWiz('user_io_step','output')">⚡ Set Output</button>
+                            <button onclick="openWiz && openWiz('user_io_step','input')">⏱ Wait Input</button>
+                            <button onclick="openWiz && openWiz('user_io_step','dwell')">⏳ Dwell</button>`;
 
 const _escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // An untrusted value placed inside onclick="fn('…')": JS-escape (\, ') then HTML-attr-escape (&, ", <, >) — but NOT '.
