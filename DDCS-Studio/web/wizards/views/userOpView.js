@@ -99,9 +99,12 @@ function machineReachXY() {
     } catch (_) { return null; }
 }
 
-/** Write a dragged sim-start marker's WORLD point as a FRACTION of the stock into _simStartFracs, per the op's declared
- *  marker→param binding (def.simStartParams[i] = {x:paramX, y:paramY}). No binding / no stock → no-op. */
-function writeSimStartFrac(def, i, world, stock) {
+/** Write a dragged sim-start marker's WORLD point into _simStartFracs, per the op's declared marker→param binding
+ *  (def.simStartParams[i]). Default: {x:paramX, y:paramY} → the FRACTION (world/stock). t530 — a `relSpanFrom` marker
+ *  (rotary clock's B) instead writes a MM SPAN = (this.worldY − starts[relSpanFrom].worldY) to its `y` param, so B's drag
+ *  sets #6 ADDITIVELY (the span field stays the ONE source — field + drag both edit it). `starts` = the resolved marker
+ *  worlds (for the relative reference). No binding / no stock → no-op. */
+function writeSimStartFrac(def, i, world, stock, starts) {
     const spb = def && def.simStartParams && def.simStartParams[i];
     const sx = stock && Number(stock.x), sy = stock && Number(stock.y);
     if (!spb || !(sx > 0) || !(sy > 0) || !world) return false;
@@ -111,8 +114,18 @@ function writeSimStartFrac(def, i, world, stock) {
     const R = machineReachXY();
     const wx = R ? Math.max(R.xMin, Math.min(R.xMax, (+world.x || 0))) : (+world.x || 0);
     const wy = R ? Math.max(R.yMin, Math.min(R.yMax, (+world.y || 0))) : (+world.y || 0);
-    _simStartFracs[spb.x] = wx / sx;
-    _simStartFracs[spb.y] = wy / sy;
+    if (spb.relSpanFrom != null) {   // t530 — RELATIVE-SPAN marker (rotary clock B): Y-drag → a mm span from marker A
+        const aY = (Array.isArray(starts) && starts[spb.relSpanFrom]) ? (Number(starts[spb.relSpanFrom].y) || 0) : 0;
+        const span = Math.max(1, wy - aY);   // span in mm, ≥ 1mm (B is +Y from A)
+        // `span` is a FORM field (#6, the ONE source) — write the FIELD, not a parallel _simStartFracs (which would OVERRIDE
+        // a later typed value). So the drag AND the numeric field are two editors of the one #6; update() re-reads the field.
+        const fld = spb.y && el('wiz_user_form') && el('wiz_user_form').querySelector(`[data-param="${spb.y}"]`);
+        if (fld) fld.value = String(Math.round(span * 1000) / 1000);
+        else if (spb.y) _simStartFracs[spb.y] = span;
+        return true;
+    }
+    if (spb.x) _simStartFracs[spb.x] = wx / sx;
+    if (spb.y) _simStartFracs[spb.y] = wy / sy;
     return true;
 }
 
@@ -255,7 +268,7 @@ export const userOpView = {
                     const simMarkers = (spb && Array.isArray(starts))
                         ? spb.map((_m, i) => (starts[i] && Number.isFinite(+starts[i].x)) ? {
                             pos: starts[i], label: String.fromCharCode(65 + i),   // A, B, …
-                            onDrag: (world) => { if (writeSimStartFrac(_def, i, world, stkNow)) mgr.update(); },
+                            onDrag: (world) => { if (writeSimStartFrac(_def, i, world, stkNow, starts)) mgr.update(); },
                         } : null).filter(Boolean)
                         : null;
                     const simStart = (spb || !(panel && pos0 && typeof panel.onStartDrag === 'function'))
@@ -303,7 +316,9 @@ export const userOpView = {
         // t508 — seed the dragged sim-start fractions from the op's params so re-opening shows the handles where they were.
         _simStartFracs = {};
         const spb = (_def && _def.simStartParams) || [];
-        for (const m of spb) for (const k of [m.x, m.y]) if (k && _seed[k] != null && _seed[k] !== '') _simStartFracs[k] = Number(_seed[k]);
+        // a relSpanFrom marker's `y` param is a FORM field (the #6 one source) — seeded via the form, NOT _simStartFracs (which
+        // would override the field). Seed only the true drag-only fraction params (x/y of a normal marker; x of a span marker).
+        for (const m of spb) for (const k of (m.relSpanFrom != null ? [m.x] : [m.x, m.y])) if (k && _seed[k] != null && _seed[k] !== '') _simStartFracs[k] = Number(_seed[k]);
         render();
     },
 

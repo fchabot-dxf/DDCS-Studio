@@ -31,6 +31,7 @@ import { opSimStarts } from '../../viz/opSimStarts.js';   // E2 — reuse BUILT_
 export const ROTARY_CLOCK_DEFAULTS = {
     action: 'set', reference: 'top', wcs: 'active', safeZFrame: 'relative',
     dist: 30, retract: 2, f_fast: 200, f_slow: 50, port: 3, span: 20, safeZ: 10, level: 0,
+    clkAx: '', clkAy: '',   // t530 — SIM-ONLY point-A position (fractions of stock); empty → the centre-straddling default. The emit never uses A's absolute pos (the operator jogs there); B = A + span (#6), and dragging B writes #6.
 };
 
 /** The bindable scalars → the `assign` macro var each writes (by identity). #2/#3/#5 are ALSO source-chip vars. #6 is the
@@ -160,5 +161,9 @@ export function rotaryClockDataDef() {
     // built-in restoreBoxStock intent) — NOT a round bar like the Centreline — so the global box stock is correct; the rig
     // renders 4-jaw on the box, inherited FREE via the declared sim{rotary:true} + the generic userOpView rig wiring (E5).
     def.simStartsProvider = (params, stock) => opSimStarts('rotary_clock', params, stock);
+    // t530 — TWO draggable Layout handles (the human): marker A = the start position (writes clkAx/clkAy — sim-only), marker
+    // B = A + span, its Y-drag writes the #6 SPAN (a `relSpanFrom` marker: span = B.y − A.y). ADDITIVE — the #6 field stays
+    // the ONE source (drag B OR type #6, both edit it); emit BYTE-IDENTICAL (A's pos never emits; #6 is unchanged as a param).
+    def.simStartParams = [{ x: 'clkAx', y: 'clkAy' }, { y: 'span', relSpanFrom: 0 }];
     return def;
 }

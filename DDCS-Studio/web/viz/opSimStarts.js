@@ -104,13 +104,21 @@ const BUILT_IN = {
             { x: cx, y: cy + flankOff, z: flankZ },  // P3 — macro probes −Y → start the +Y side
         ];
     },
-    // ROTARY_CLOCK — a SINGLE start: the clock datums off a FLAT on a rectangular part (NOT a round bar), doing 2 Z-down
-    // touches a SPAN apart. Start above the flat near the top, offset to POINT A (−Y half the span); the macro probes A,
-    // steps +Y by the span, probes B. One pass (the 2nd touch is a step, not a repositioned start). Mirrors inferStart.
+    // ROTARY_CLOCK — the clock datums off a FLAT on a rectangular part (NOT a round bar), doing 2 Z-down touches a SPAN
+    // apart. TWO points: A above the flat (default centre −Y half the span) + B = A + span in +Y. The macro probes A, steps
+    // +Y by #6, probes B (the 2nd touch is a +Y step from A, not a repositioned start). t530 — BOTH are DRAGGABLE handles:
+    // A writes its position (clkAx/clkAy fractions, sim-only — the emit doesn't use A's absolute pos, the operator jogs there),
+    // B's Y-drag writes the SPAN #6 (B.y − A.y, a relative-span drag). Absent overrides → the centre-straddling default.
     rotary_clock(params, stock) {
         const sx = n(stock && stock.x, 150), sy = n(stock && stock.y, 76), sz = n(stock && stock.z, 76);
-        const span = n(params && params.span, 20);
-        return [{ x: sx / 2, y: sy / 2 - span / 2, z: Math.min(5, sz * 0.5) }];
+        const span = n(params && params.span, 20), z = Math.min(5, sz * 0.5);
+        const fr = (v) => (v === '' || v == null || isNaN(Number(v))) ? null : Number(v);
+        const ax = fr(params && params.clkAx), ay = fr(params && params.clkAy);
+        // A's default is the stock CENTRE — SPAN-INDEPENDENT so dragging B (which sets span = B.y − A.y) doesn't move A
+        // (a span-coupled default would feed back: bigger span → A shifts → bigger span). A is the operator's jog-to start
+        // (sim-only, never emitted); B = A + span is the 2nd Z-down touch.
+        const A = { x: ax != null ? ax * sx : sx / 2, y: ay != null ? ay * sy : sy / 2, z };
+        return [A, { x: A.x, y: A.y + span, z }];
     },
 };
 
