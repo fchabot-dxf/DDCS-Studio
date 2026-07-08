@@ -20,10 +20,12 @@ import { srcVal, srcNote } from '../../wizards/probeBlocks.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';
 import { opSimStarts } from '../../viz/opSimStarts.js';   // E2 — reuse the EXISTING BUILT_IN.alignment (2 starts A/B) via the sim registry, so the twin preview matches the built-in
+import { getWorkpiece } from '../../engine/workpiece.js';   // t510 Fork 2 — the op instance's stock (outer block) → the AUTO travel coords
+import { alignPointsXY, alignEffectiveTravel } from '../../wizards/ops/alignPoints.js';   // t510 — the ONE source of the points + the effective travel mode
 
 /** Author defaults — match alignmentStack's own num() fallbacks + the structural default shape (X fence / pos probe / relative). */
 export const ALIGNMENT_DEFAULTS = {
-    checkAxis: 'X', probeDir: 'pos', safeZFrame: 'relative',
+    checkAxis: 'X', probeDir: 'pos', safeZFrame: 'relative', travel: 'auto',
     dist: 20, retract: 2, f_fast: 200, f_slow: 20, port: 0, safeZ: 10, tolerance: 0, level: 0,
 };
 
@@ -40,6 +42,10 @@ export const ALIGNMENT_BINDING_SPECS = [
 
 /** STRUCTURAL toggles — drive the 4-arm guards (NO value socket). checkAxis(X|Y fence) + probeDir(pos|neg). */
 export const ALIGNMENT_STRUCT_BINDINGS = [
+    // t510 Fork 2 — the TRAVEL mode (guards the auto/manual arms). AUTO rapids to the 2 declared handle positions (safe-Z
+    // travel), then probes — no jog, no Confirm. MANUAL = jog to each + Confirm (the handles are HINTS). AUTO needs a stock:
+    // the segmented AUTO option greys with no stock (gateAuto → data-op-gated, tooltip); the effective mode falls back to MANUAL.
+    { param: 'travel',    type: 'enum', widget: 'segmented', default: ALIGNMENT_DEFAULTS.travel,    label: 'Travel',     help: 'AUTO: the wizard rapids to the two probe-point handles (needs a stock) and probes each. MANUAL: you jog to each point + Confirm (the handles are preview hints).', section: 'GEOMETRY', widgetConfig: { options: [['Auto', 'auto'], ['Manual', 'manual']], gateAuto: true } },
     { param: 'checkAxis', type: 'enum', widget: 'segmented', default: ALIGNMENT_DEFAULTS.checkAxis, label: 'Fence Axis', help: 'The machine axis the fence runs ALONG (the probe moves in the perpendicular axis).', section: 'GEOMETRY', widgetConfig: { options: [['X', 'X'], ['Y', 'Y']] } },
     { param: 'probeDir',  type: 'enum', widget: 'segmented', default: ALIGNMENT_DEFAULTS.probeDir,  label: 'Probe Dir',  help: 'Which way the probe approaches the fence: positive (+) or negative (−) along the perpendicular axis.', section: 'GEOMETRY', widgetConfig: { options: [['+', 'pos'], ['−', 'neg']] } },
 ];
@@ -101,6 +107,25 @@ function applySafeZFrame(stack, resolved) {
     return stack;
 }
 
+// t510 Fork 2 — RECOMPOSE the AUTO travel-move coords from the OP'S STOCK × the fraction params (the ONE source). The
+// superset's AUTO arm carries PLACEHOLDER (0,0) MV X/Y moves (built no-stock, prune keeps them when the effective travel is
+// AUTO); when a usable stock exists, rewrite the numeric X/Y move params IN ORDER [A.x,B.x] / [A.y,B.y] from alignPointsXY —
+// so the TWIN emits AUTO BYTE-IDENTICAL to alignmentStack AUTO. MANUAL (no stock / manual chosen) → no travelTo moves → no-op.
+const r3align = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
+function applyAlignAutoTravel(stack, resolved) {
+    const stock = (getWorkpiece() || {}).outer || null;
+    if (alignEffectiveTravel(resolved || {}, stock) !== 'auto') return stack;   // MANUAL — no AUTO moves to bind (byte-identical)
+    const [A, B] = alignPointsXY(resolved || {}, stock);
+    const xs = [A.x, B.x], ys = [A.y, B.y];
+    let xi = 0, yi = 0;   // the only NUMERIC x/y moves are the 2 travelTo points (twoPass/park moves are #var); rewrite in order
+    for (const b of flattenBlocks(stack)) {
+        if (!b || b.type !== 'move' || !b.params) continue;
+        if (typeof b.params.x === 'number' && xi < xs.length) b.params.x = r3align(xs[xi++]);
+        if (typeof b.params.y === 'number' && yi < ys.length) b.params.y = r3align(ys[yi++]);
+    }
+    return stack;
+}
+
 // SOURCE-CHIPS (corner/atc/rotary precedent): on Expert, rewrite #2 (retract) / #3 (fastFeed) / #5 (port) to the register.
 const PROBE_SRC_VARS = { port: '#5', fastFeed: '#3', retract: '#2' };
 function applyProbeSources(stack) {
@@ -128,7 +153,10 @@ export function alignmentDataDef() {
     const bindings = [...valueBindings, ...ALIGNMENT_STRUCT_BINDINGS, ...ALIGNMENT_VALUESWAP_BINDINGS];
     const def = userOpFromStack('alignment_data', 'Alignment (data)', alignmentDataStack(ALIGNMENT_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = ALIGNMENT_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
-    def.postInstantiate = (stack, resolved) => applyProbeSources(applySafeZFrame(applyHeaderComments(stack, resolved), resolved));
+    // t510 Fork 2 — inject the EFFECTIVE travel (auto only with a usable stock; else manual) into the prune params, so the
+    // superset collapses to the right travel arm even when the user picked AUTO but no stock exists (→ MANUAL, E1/E3 safe).
+    def.deriveGuards = (p) => ({ travel: alignEffectiveTravel(p, (getWorkpiece() || {}).outer || null) });
+    def.postInstantiate = (stack, resolved) => applyProbeSources(applyAlignAutoTravel(applySafeZFrame(applyHeaderComments(stack, resolved), resolved), resolved));
     // E2 — the per-pass PREVIEW-START provider: reuse the EXISTING BUILT_IN.alignment (opSimStarts.js) VERBATIM via the sim
     // registry (registerUserOp → setUserSimStarts), NOT the builder → sim-only, emit BYTE-IDENTICAL. 2 starts (A/B along the
     // fence). NO def.simStock: alignment probes a fence on the DEFAULT BOX (no round bar) — the global box stock is correct.

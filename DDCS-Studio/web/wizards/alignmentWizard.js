@@ -20,7 +20,7 @@ import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
-import { alignPointsXY } from './ops/alignPoints.js';   // t506 — the ONE source of the 2 probe points (fractions of the stock)
+import { alignPointsXY, alignEffectiveTravel } from './ops/alignPoints.js';   // t506/t510 — the ONE source of the 2 probe points + the effective travel mode
 
 const r3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
 
@@ -48,8 +48,8 @@ export function alignmentStack(params = {}, opts = {}) {
     // safe-Z, then probes — no jog, no Confirm. MANUAL: today's behaviour (operator jogs to each + Confirm; the points are
     // preview HINTS only, emit byte-identical). AUTO needs a stock reference (greyed in the form without one). Point coords
     // are stock-frame mm (WCS part-zero at the stock datum corner); the sim markers read the SAME source so they agree.
-    const canAuto = !!(params.stock && Number(params.stock.x) > 0 && Number(params.stock.y) > 0);   // AUTO needs a stock reference
-    const travel = (params.travel === 'manual' || !canAuto) ? 'manual' : 'auto';   // no stock → MANUAL (byte-identical, safe)
+    const travel = alignEffectiveTravel(params, params.stock);   // AUTO needs a usable stock; else MANUAL (byte-identical) — ONE source, shared with the twin
+    const guardTravel = superset;   // E0 — the superset carries BOTH travel arms guarded (prune collapses to the effective mode)
     const [ptA, ptB] = alignPointsXY(params, params.stock || {});
 
     const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
@@ -118,10 +118,17 @@ export function alignmentStack(params = {}, opts = {}) {
         A('#52', 0, 'Delta: B - A wander'); A('#53', 0, 'Span absolute value'); A('#54', 0, 'Misalignment angle degrees');
         A('#70', 0, 'Point A checkAxis machine coord'); A('#71', 0, 'Point B checkAxis machine coord'); A('#72', 0, 'Span signed: B - A');
 
+        // E0 (t510) — capture the blocks a fn pushes to `b`, so the SUPERSET can wrap the travel-arrival sub-sequence in a
+        // GUARD (auto/manual arm). The CONCRETE build calls the arm fn directly (byte-identical); the superset guards BOTH,
+        // and pruneGuards collapses to the effective travel mode → prune(superset) == concrete.
+        const capture = (fn) => { const save = b.length; fn(); return b.splice(save); };
+
         // ── Point A ──
         C(`===== POINT A: First probe along ${checkAxis} fence =====`);
-        if (travel === 'auto') { C(`AUTO travel to point A (X${r3(ptA.x)} Y${r3(ptA.y)}), safe-Z then descend`); travelTo(ptA.x, ptA.y); }
-        else { C('Position probe at point A along the fence, at probing height'); CF('Press Enter when in position at point A - ESC=cancel', 2); }
+        const aAuto = () => { C('AUTO travel to point A, safe-Z then descend'); travelTo(ptA.x, ptA.y); };   // coords ride the moves (the twin recomposes them from its stock) — NOT the comment, so superset/concrete match
+        const aManual = () => { C('Position probe at point A along the fence, at probing height'); CF('Press Enter when in position at point A - ESC=cancel', 2); };
+        if (guardTravel) b.push(GUARD({ param: 'travel', is: 'auto' }, capture(aAuto)), GUARD({ param: 'travel', is: 'manual' }, capture(aManual)));
+        else if (travel === 'auto') aAuto(); else aManual();
         RM(checkAxis, '#70');                          // record check-axis machine coord (dialect DRO var)
         DM('inc');
         twoPass('#50');
@@ -130,18 +137,17 @@ export function alignmentStack(params = {}, opts = {}) {
 
         // ── Point B ──
         C(`===== POINT B: Second probe along ${checkAxis} fence =====`);
-        if (travel === 'auto') {
-            C(`AUTO travel to point B (X${r3(ptB.x)} Y${r3(ptB.y)}), safe-Z then descend`); travelTo(ptB.x, ptB.y);
-            RM(checkAxis, '#71');
-            A('#72', '[#71-#70]', `Span = B - A along ${checkAxis}`);
-            DM('inc');                                // travelTo already descended — go straight to the probe passes
-        } else {
+        const bAuto = () => {
+            C('AUTO travel to point B, safe-Z then descend'); travelTo(ptB.x, ptB.y);
+            RM(checkAxis, '#71'); A('#72', '[#71-#70]', `Span = B - A along ${checkAxis}`); DM('inc');   // travelTo already descended
+        };
+        const bManual = () => {
             C(`REPOSITION: jog to point B along the ${checkAxis} fence - keep same Y/Z`);
             CF('Press Enter when in position at point B - ESC=cancel', 2);
-            RM(checkAxis, '#71');
-            A('#72', '[#71-#70]', `Span = B - A along ${checkAxis}`);
-            DM('inc'); MV('Z', '#20');                // descend back to probe height
-        }
+            RM(checkAxis, '#71'); A('#72', '[#71-#70]', `Span = B - A along ${checkAxis}`); DM('inc'); MV('Z', '#20');   // descend back to probe height
+        };
+        if (guardTravel) b.push(GUARD({ param: 'travel', is: 'auto' }, capture(bAuto)), GUARD({ param: 'travel', is: 'manual' }, capture(bManual)));
+        else if (travel === 'auto') bAuto(); else bManual();
         twoPass('#51');
         DM('abs');
 

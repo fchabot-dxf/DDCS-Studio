@@ -41,3 +41,15 @@ export function alignPointsXY(params = {}, stock = {}) {
     const [A, B] = alignPoints(params);
     return [{ x: A.fx * sx, y: A.fy * sy }, { x: B.fx * sx, y: B.fy * sy }];
 }
+
+/** A usable stock for AUTO = a positive-XY block (the fractions resolve to real coords). */
+export function alignStockUsable(stock) { return !!(stock && Number(stock.x) > 0 && Number(stock.y) > 0); }
+
+/**
+ * The EFFECTIVE travel mode — the ONE source shared by the JS builder (alignmentStack), the twin's prune derive, and the
+ * twin's applyAlignAutoTravel recompose, so all three agree. AUTO needs a usable stock: `manual` chosen OR no stock → MANUAL
+ * (so `user_alignment_data` without a stock emits byte-identical to the old MANUAL, E1/E3); else AUTO. Default (unset) = auto.
+ */
+export function alignEffectiveTravel(params, stock) {
+    return ((params && params.travel === 'manual') || !alignStockUsable(stock)) ? 'manual' : 'auto';
+}

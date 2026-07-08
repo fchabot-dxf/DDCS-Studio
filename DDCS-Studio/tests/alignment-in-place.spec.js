@@ -38,7 +38,7 @@ test('E3 emit BYTE-IDENTICAL: user_alignment_data == alignmentStack across the c
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { alignmentStack } = await import('/wizards/alignmentWizard.js');
         const { ALIGNMENT_DEFAULTS } = await import('/blocks/dataOps/alignmentData.js');
-        const D = ALIGNMENT_DEFAULTS;
+        const D = { ...ALIGNMENT_DEFAULTS, travel: 'manual' };   // t510 — the sweep pins the MANUAL emit (stock-independent, byte-identical); AUTO byte-identity is its own test
         const sweep = [
             D,
             { ...D, checkAxis: 'Y' },

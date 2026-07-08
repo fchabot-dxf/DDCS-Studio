@@ -25,9 +25,11 @@ test('E0 GATE: prune(alignmentStack superset) == concrete alignmentStack, byte-i
 
         let diffCount = 0, leftoverGuards = 0, supGuardMax = 0, firstDiff = null;
         for (const c of combos) {
-            const sup = alignmentStack(c, { superset: true });   // all 4 checkAxis×probeDir arms present, each guarded
+            const sup = alignmentStack(c, { superset: true });   // all checkAxis×probeDir × travel arms present, each guarded
             supGuardMax = Math.max(supGuardMax, (JSON.stringify(sup).match(/"type":"guard"/g) || []).length);
-            pruneGuards(sup, c);                                  // collapse to the concrete shape for c
+            // t510 — prune with the EFFECTIVE travel: this sweep has no stock → MANUAL (the concrete resolves the same via
+            // alignEffectiveTravel). The AUTO arm's stock-bound coords are recomposed in postInstantiate → the E1 full-build test.
+            pruneGuards(sup, { ...c, travel: 'manual' });         // collapse to the concrete MANUAL shape for c
             if (JSON.stringify(sup).includes('"type":"guard"')) leftoverGuards++;
             const a = emitMapped(sup).text;                      // the pruned superset
             const b = emitMapped(alignmentStack(c, { superset: false })).text;   // the concrete (INDEPENDENT path)

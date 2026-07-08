@@ -19,7 +19,7 @@ test('E1 byte-diff ZERO: user_alignment_data == alignmentStack across 8 structur
         const { alignmentStack } = await import('/wizards/alignmentWizard.js');
         registerUserOp(alignmentDataDef());   // NOT seeded yet → register for the test
         const build = builderOf('user_alignment_data');
-        const D = ALIGNMENT_DEFAULTS;
+        const D = { ...ALIGNMENT_DEFAULTS, travel: 'manual' };   // t510 — the STRUCTURAL/scalar sweep pins the MANUAL emit (stock-independent, byte-identical to pre-AUTO); AUTO byte-identity = its own test
 
         const CHECK = ['X', 'Y'], DIR = ['pos', 'neg'], FR = ['relative', 'machine'];
         const structCombos = [];
@@ -95,8 +95,9 @@ test('E2 sim-starts: the twin POSITIONS + COUNT == the EXISTING BUILT_IN.alignme
                 posFails++; if (!firstFail) firstFail = { c, reason: 'pos', i, twin: twin[i], builtin: builtin[i] }; break;
             }
         }
-        const emitSame = emitMapped(builderOf('user_alignment_data')({ ...D })).text === emitMapped(alignmentStack({ ...D })).text
-            && emitMapped(builderOf('user_alignment_data')({ ...D, checkAxis: 'Y', probeDir: 'neg' })).text === emitMapped(alignmentStack({ ...D, checkAxis: 'Y', probeDir: 'neg' })).text;
+        const M = { ...D, travel: 'manual' };   // t510 — compare the MANUAL emit (stock-independent, byte-identical); AUTO byte-identity is its own test
+        const emitSame = emitMapped(builderOf('user_alignment_data')({ ...M })).text === emitMapped(alignmentStack({ ...M })).text
+            && emitMapped(builderOf('user_alignment_data')({ ...M, checkAxis: 'Y', probeDir: 'neg' })).text === emitMapped(alignmentStack({ ...M, checkAxis: 'Y', probeDir: 'neg' })).text;
         return { posFails, countFails, firstFail, emitSame };
     });
     if (r.firstFail) console.log('E2 SIM-START FAIL: ' + JSON.stringify(r.firstFail));

@@ -152,6 +152,26 @@ function segmentedWidget(host, b) {
         seg.appendChild(bt);
     }
     sync();
+    // t510 — gateAuto: AUTO needs a stock reference. GREY the 'auto' segment (tooltip) when no usable stock, and fall the
+    // value to 'manual'; re-enable when a stock is placed (the settings-changed event, dynamic while the form is open).
+    // `data-op-gated` survives postGating's blanket cap-ON re-enable (op-view gating owns the disabled state).
+    if (b.widgetConfig && b.widgetConfig.gateAuto) {
+        const autoBtn = [...seg.children].find((bt) => bt.dataset.value === 'auto');
+        const stockOk = () => { const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; return !!(s && Number(s.x) > 0 && Number(s.y) > 0 && s.show !== false); };
+        const applyGate = () => {
+            const ok = stockOk();
+            if (autoBtn) {
+                autoBtn.disabled = !ok;
+                autoBtn.setAttribute('data-op-gated', ok ? 'off' : 'on');
+                autoBtn.title = ok ? '' : 'Place a stock/datum to use AUTO';
+                autoBtn.style.opacity = ok ? '' : '0.4'; autoBtn.style.cursor = ok ? '' : 'not-allowed';
+            }
+            if (!ok && String(cur) === 'auto') { cur = 'manual'; sync(); seg.dispatchEvent(new Event('change', { bubbles: true })); }
+        };
+        applyGate();
+        const onSettings = () => { if (!seg.isConnected) { window.removeEventListener('ddcs:settings-changed', onSettings); return; } applyGate(); };
+        if (typeof window !== 'undefined') window.addEventListener('ddcs:settings-changed', onSettings);
+    }
     host.append(labelSpan(b), seg);
     const numeric = b.type === 'number' || b.type === 'int';
     return { read: () => ({ [b.param]: numeric ? numOr(cur, b.default ?? 0) : cur }) };
