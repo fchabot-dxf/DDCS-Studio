@@ -19,6 +19,7 @@
  */
 
 import { num } from '../wizards/ops/util.js';
+import { alignPointsXY } from '../wizards/ops/alignPoints.js';   // t506 — the ONE declared source of the 2 alignment probe points (fractions)
 import { barRadius } from '../engine/probeGeometry.js';   // SPATIAL-MODEL inc2: the declared bar radius (stock.diameter ?? min(cross)/2)
 import { whenOk } from '../blocks/whenGuard.js';   // the ONE guard evaluator (shared with the emit-side prune) — declare-never-infer
 import { projectWorkpiece } from '../engine/workpiece.js';   // t385 — a middle probe's CENTRE start = the workpiece pocket centre (its physical pos), so it starts INSIDE an OFF-CENTRE cavity
@@ -63,18 +64,15 @@ const BUILT_IN = {
         return [...lead, ...prim, ...sec];                           // [Z?] + primary + the trans pass (auto or manual) secondary
     },
 
-    // ALIGNMENT — probe A, reposition (jog to B along the fence), probe B → 2 passes. Spread A/B along the checkAxis so
-    // both markers are DISTINCT (else both probes start at the same spot). Probe height = just above the stock top.
+    // ALIGNMENT — probe A, reposition (jog to B along the fence), probe B → 2 passes. t506: the 2 markers now read the ONE
+    // declared source (alignPoints — params.ax/ay/bx/by fractions of the stock), REPLACING the old fixed 0.3/0.7 inference,
+    // so a dragged handle moves the sim marker (the same source drives the 2D canvas + the AUTO emit). Probe height = just
+    // above the stock top. Empty fractions fall back to the checkAxis default spread (near the far edge) inside alignPoints.
     alignment(params, stock) {
-        const sx = n(stock && stock.x, 150), sy = n(stock && stock.y, 100), sz = n(stock && stock.z, 25);
-        const checkAxis = (params && params.checkAxis) === 'Y' ? 'Y' : 'X';   // fence runs along this
+        const sy = n(stock && stock.y, 100), sz = n(stock && stock.z, 25);
         const z = Math.min(5, sz * 0.5);
-        if (checkAxis === 'X') {
-            // Fence along X → A and B differ in X (spread along X), near the +Y edge; probe moves in Y.
-            return [{ x: sx * 0.3, y: sy * 0.85, z }, { x: sx * 0.7, y: sy * 0.85, z }];
-        }
-        // Fence along Y → A and B differ in Y; probe moves in X.
-        return [{ x: sx * 0.85, y: sy * 0.3, z }, { x: sx * 0.85, y: sy * 0.7, z }];
+        const [A, B] = alignPointsXY(params || {}, { x: n(stock && stock.x, 150), y: sy });
+        return [{ x: A.x, y: A.y, z }, { x: B.x, y: B.y, z }];
     },
 
     // ROTARY_CENTER — KNOWN = 1 hands-free pass; FIT repositions twice → 3 passes, spread to DISTINCT points around the

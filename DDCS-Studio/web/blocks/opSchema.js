@@ -103,6 +103,8 @@ export const SCHEMA = {
         checkAxis: Enum(), probeDir: Enum(), safeZ: N(), safeZFrame: Enum(), dist: N(null, 'maxDist'), retract: N(),
         f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'),
         tolerance: N(), sources: Struct(), qStop: N(),
+        // t506 — the ONE-SOURCE probe points (fractions of the stock) + the travel mode; round-trip through the op marker.
+        travel: Enum(), ax: N(), ay: N(), bx: N(), by: N(),
     },
     atc_length: {
         blockHeight: N(), safeZ: N(), maxDist: N(), retract: N(), f_fast: N('F', 'feedFast'),
