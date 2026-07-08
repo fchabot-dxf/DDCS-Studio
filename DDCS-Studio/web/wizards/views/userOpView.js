@@ -85,14 +85,34 @@ let _layoutSpots = {};    // { [groupId]: { dx, dy } } datum-relative; cleared p
 // surfaces. Seeded from the op's params on EDIT (setForm); cleared per fresh OPEN (onShow).
 let _simStartFracs = {};
 
+/** The machine ENVELOPE reach in the WCS/stock frame (the stock corner sits at the WCS origin): a WCS coord `w` maps to
+ *  machine `workOrigin + w`, reachable while `0 ≤ workOrigin + w ≤ span` → `w ∈ [-workOrigin, span - workOrigin]`. Null if
+ *  no envelope is configured (then the drag is unbounded — the stock is never the bound). */
+function machineReachXY() {
+    try {
+        const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;
+        if (!m) return null;
+        const spanX = Math.abs(Number(m.x) || 0), spanY = Math.abs(Number(m.y) || 0);
+        if (!(spanX > 0) || !(spanY > 0)) return null;
+        const wo = m.workOrigin || {}, woX = Number(wo.x) || 0, woY = Number(wo.y) || 0;
+        return { xMin: -woX, xMax: spanX - woX, yMin: -woY, yMax: spanY - woY };
+    } catch (_) { return null; }
+}
+
 /** Write a dragged sim-start marker's WORLD point as a FRACTION of the stock into _simStartFracs, per the op's declared
  *  marker→param binding (def.simStartParams[i] = {x:paramX, y:paramY}). No binding / no stock → no-op. */
 function writeSimStartFrac(def, i, world, stock) {
     const spb = def && def.simStartParams && def.simStartParams[i];
     const sx = stock && Number(stock.x), sy = stock && Number(stock.y);
     if (!spb || !(sx > 0) || !(sy > 0) || !world) return false;
-    _simStartFracs[spb.x] = Math.max(0, Math.min(1, (+world.x || 0) / sx));
-    _simStartFracs[spb.y] = Math.max(0, Math.min(1, (+world.y || 0) / sy));
+    // t528 — UNCLAMP from the stock: the stock is a REFERENCE, never a hard bound. The only real limit is REACHABILITY =
+    // the machine ENVELOPE. Clamp the WORLD to the envelope reach; the FRACTION (world/stock) then resolves BEYOND [0,1]
+    // freely (a probe point past the stock edge, still within reach). No envelope → unbounded (still never the stock).
+    const R = machineReachXY();
+    const wx = R ? Math.max(R.xMin, Math.min(R.xMax, (+world.x || 0))) : (+world.x || 0);
+    const wy = R ? Math.max(R.yMin, Math.min(R.yMax, (+world.y || 0))) : (+world.y || 0);
+    _simStartFracs[spb.x] = wx / sx;
+    _simStartFracs[spb.y] = wy / sy;
     return true;
 }
 

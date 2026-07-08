@@ -216,6 +216,10 @@ export class FeatureCanvas {
         });
         (spec.handles || []).forEach((h) => acc(h.x + px, h.y + py));
         (spec.paths || []).forEach((pth) => (pth.pts || []).forEach((p) => acc(p.x + px, p.y + py)));
+        // t528 — a MARGIN around the stock: since a handle can now be dragged PAST the stock edge (envelope-bound, not
+        // stock-bound), keep a band of empty space around the stock so a just-past-the-edge handle stays VISIBLE + grabbable
+        // (the fit already unions the handles above; this guarantees breathing room even when a handle sits right on the edge).
+        if (spec.stock) { const pad = 0.15 * Math.max(Number(spec.stock.w) || 0, Number(spec.stock.h) || 0); if (pad > 0) { acc(sox - pad, soy - pad); acc(sox + spec.stock.w + pad, soy + spec.stock.h + pad); } }
         let w = x1 - x0, h = y1 - y0;
         if (!(w > 1)) { x0 -= 50; x1 += 50; w = x1 - x0; }
         if (!(h > 1)) { y0 -= 50; y1 += 50; h = y1 - y0; }

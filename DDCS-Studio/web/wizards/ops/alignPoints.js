@@ -10,7 +10,10 @@
  * Neutral module (no wizard/viz imports) so alignmentWizard, opSimStarts, and alignmentView can all read it without a cycle.
  */
 
-const frac = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Math.max(0, Math.min(1, Number(v)));
+// t528 — NO [0,1] clamp: the stock is a REFERENCE, not a hard bound. A fraction beyond [0,1] resolves to a probe point
+// PAST the stock edge (still within machine reach) — the handle's only real limit is the envelope (enforced at the drag,
+// userOpView.writeSimStartFrac). Keep the numeric / empty-default handling (an empty field → the checkAxis default).
+const frac = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
 
 /** The default A/B fractions for a checkAxis — spread along the fence axis, near the far (0.85) edge (mirrors the old 0.3/0.7). */
 export function alignDefaultPoints(checkAxis) {
