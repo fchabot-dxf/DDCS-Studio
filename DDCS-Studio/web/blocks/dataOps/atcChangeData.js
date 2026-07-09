@@ -19,6 +19,9 @@
  */
 import { atcChangeStack, atcChangeEffectiveArm } from '../../wizards/atcChangeWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { atcCombo } from '../../wizards/atcModel.js';
+import { motionToSimGcode, interpCtxFromAtc } from '../../wizards/atcInterpreter.js';
+import { magazinePockets } from '../../wizards/views/atcViews.js';   // the shared 3D-magazine pocket list (linear + disk)
 
 export const ATC_CHANGE_DATA_OPTYPE = 'user_atc_change_data';
 
@@ -30,15 +33,23 @@ export const ATC_CHANGE_DEFAULTS = { method: 'm6', callMacro: true, x: 100, y: 1
 /** The op params (the run-form): the METHOD picker + the callMacro toggle (the two routing drivers) + the scalars each arm
  *  uses. All FORM fields (no value socket — the recompose bakes every value from the routed arm via atcChangeStack). The
  *  per-method gating (which fields a method honours) lands in E2. */
+const AUTO = ['firmware', 'generic', 'disk'];   // the AUTOMATIC methods (the gating pivot)
 export const ATC_CHANGE_STRUCT_BINDINGS = [
     { param: 'method', type: 'enum', widget: 'dropdown', default: ATC_CHANGE_DEFAULTS.method, label: 'Method', help: 'How the tool change happens: delegate to the controller (M6), a manual hand swap, the firmware push station (O10102), or an inline magazine / disk change.', section: 'METHOD', widgetConfig: { options: [['Delegate to controller (M6)', 'm6'], ['Manual (hand swap)', 'manual'], ['Firmware push (O10102)', 'firmware'], ['Magazine pick & place', 'generic'], ['Disk carousel', 'disk']] } },
-    { param: 'callMacro', type: 'bool', default: ATC_CHANGE_DEFAULTS.callMacro, label: 'Call installed T.nc', help: 'Automatic methods call your installed T.nc (T# M6); uncheck for the inline offline fallback (sources Settings → ATC I/O).', section: 'METHOD' },
-    { param: 'fixedT', type: 'number', default: ATC_CHANGE_DEFAULTS.fixedT, label: 'Change to tool', help: 'The target tool number (0 = the tool from a preceding program Txx).', section: 'METHOD' },
+    // callMacro only applies to the AUTOMATIC methods (T# M6 call ↔ inline fallback) → shown only there.
+    { param: 'callMacro', type: 'bool', default: ATC_CHANGE_DEFAULTS.callMacro, label: 'Call installed T.nc', help: 'Automatic methods call your installed T.nc (T# M6); uncheck for the inline offline fallback (sources Settings → ATC I/O).', section: 'METHOD', when: { param: 'method', in: AUTO } },
+    // fixedT is GREYED for auto+inline: the inline body can't set the requested tool (#1504 is a Tn M6 register).
+    { param: 'fixedT', type: 'number', default: ATC_CHANGE_DEFAULTS.fixedT, label: 'Change to tool', help: 'The target tool number (0 = the tool from a preceding program Txx).', section: 'METHOD', gate: { all: [{ param: 'method', in: AUTO }, { param: 'callMacro', is: false }], tip: 'Inline mode can’t set the requested tool — the DDCS #1504 register is populated by a Tn M6 call, not written inline. Use the recommended “Call installed T.nc macro” mode to change to a specific tool, or select it in your program.' } },
     { param: 'x', type: 'number', default: ATC_CHANGE_DEFAULTS.x, label: 'Change / Park X', help: 'The MACHINE X the head parks at for the change.', section: 'POSITION' },
     { param: 'y', type: 'number', default: ATC_CHANGE_DEFAULTS.y, label: 'Change / Park Y', help: 'The MACHINE Y the head parks at for the change.', section: 'POSITION' },
-    { param: 'z', type: 'number', default: ATC_CHANGE_DEFAULTS.z, label: 'Park Z', help: 'The MACHINE Z the head retracts to for a manual swap.', section: 'POSITION' },
-    { param: 'zClear', type: 'number', default: ATC_CHANGE_DEFAULTS.zClear, label: 'Z change height', help: 'The MACHINE Z the M6-delegate retracts to before the change (automatic methods use the machine Safe Z).', section: 'POSITION' },
-    { param: 'orient', type: 'bool', default: ATC_CHANGE_DEFAULTS.orient, label: 'M19 orient before unclamp', help: 'Orient the spindle (M19) before the firmware push unclamps.', section: 'FIRMWARE' },
+    // Park Z is only the MANUAL hand-swap retract.
+    { param: 'z', type: 'number', default: ATC_CHANGE_DEFAULTS.z, label: 'Park Z', help: 'The MACHINE Z the head retracts to for a manual swap.', section: 'POSITION', when: { param: 'method', is: 'manual' } },
+    // Z change height feeds only the M6-delegate; auto methods use the machine Safe Z (Settings → ATC) → greyed for auto.
+    { param: 'zClear', type: 'number', default: ATC_CHANGE_DEFAULTS.zClear, label: 'Z change height', help: 'The MACHINE Z the M6-delegate retracts to before the change (automatic methods use the machine Safe Z).', section: 'POSITION', gate: { param: 'method', in: AUTO, tip: 'The automatic tool change uses your machine Safe Z (Settings → ATC). Z change height applies to the M6-delegate method.' } },
+    // M19 orient is only the FIRMWARE push.
+    { param: 'orient', type: 'bool', default: ATC_CHANGE_DEFAULTS.orient, label: 'M19 orient before unclamp', help: 'Orient the spindle (M19) before the firmware push unclamps.', section: 'FIRMWARE', when: { param: 'method', is: 'firmware' } },
+    // t566 — the "ATC Settings…" button (an action widget; contributes no param) opens Settings → ATC (magazine, drawbar I/O, changer).
+    { param: '_setup', type: 'bool', widget: 'action', action: 'atcSettings', default: false, label: 'ATC Settings…', help: 'Open Settings → ATC: the magazine, the drawbar / sensor I/O, and the changer model the automatic methods use.', section: 'METHOD' },
 ];
 
 /** The wrapped `user_root` template — the E0 superset (all 5 method arms guarded), machine-frame sim (ATC = G53): FORCE the
@@ -127,5 +138,16 @@ export function atcChangeDataDef() {
     const def = userOpFromStack('atc_change_data', 'Tool Change (data)', atcChangeDataStack(ATC_CHANGE_DEFAULTS), [...ATC_CHANGE_STRUCT_BINDINGS], 'form3d', { forceMachine: true, showMagazine: true, toolMachineFrame: true }, 'atc_datawiz');
     def.deriveGuards = atcChangeDeriveGuards;
     def.postInstantiate = (stack, resolved) => applyAtcChangeRecompose(stack, resolved);
+    // t566 — the CHOREOGRAPHY sim: the AUTOMATIC methods emit a bare `T# M6` (macroCall) or the inline body, but the preview
+    // animates the interpreter's assumed pick&place / push motion (the legacy atcChangeView path). m6/manual → null → the
+    // real emit's own moves animate. Read live settings; the machine + magazine tiles come from the declared sim intent.
+    def.simGcode = (params) => {
+        const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+        const cmb = atcCombo(params, s.atc);
+        const interpret = !!(cmb && cmb.motion && (cmb.motion.candidate || ['firmware', 'generic', 'disk'].includes(cmb.method)));
+        if (!interpret) return null;
+        try { return motionToSimGcode(cmb, interpCtxFromAtc(s.atc || {}, magazinePockets(s.atc || {}), { outputs: s.outputs || [], inputs: s.inputs || [] })); }
+        catch (_) { return null; }
+    };
     return def;
 }

@@ -26,6 +26,12 @@ import { pruneGuards, getUserDeriveGuards, setUserDeriveGuards } from './whenGua
 const USER_STATUS_HINT = new Map();
 export function setUserStatusHint(opType, fn) { if (typeof fn === 'function') USER_STATUS_HINT.set(opType, fn); else USER_STATUS_HINT.delete(opType); }
 export function getUserStatusHint(opType) { return USER_STATUS_HINT.get(opType) || null; }
+// t566 — the DECLARED sim-GCODE override registry (a LIVE fn per op, re-attached from the seed like statusHint). `(resolved)
+// → gcode string | null`: an op whose PREVIEW motion differs from its EMIT (the ATC change's automatic methods emit a bare
+// `T# M6` but the sim animates the choreography INTERPRETER's assumed path) returns the sim gcode; null → preview the emit.
+const USER_SIM_GCODE = new Map();
+export function setUserSimGcode(opType, fn) { if (typeof fn === 'function') USER_SIM_GCODE.set(opType, fn); else USER_SIM_GCODE.delete(opType); }
+export function getUserSimGcode(opType) { return USER_SIM_GCODE.get(opType) || null; }
 import { deriveBindings } from './dataOps/deriveBindings.js';   // re-derive binding indices BY IDENTITY after prune (guarded templates shift per state)
 
 const STORE_KEY = 'ddcs_user_ops';
@@ -527,6 +533,7 @@ export function registerUserOp(def) {
     setUserSimStock(def.opType, def.simStock);   // t417 E3 — a DECLARED per-op sim-stock (rotary round bar); a LIVE fn (re-attached from the seed, like simStartsProvider)
     setUserDeriveGuards(def.opType, def.deriveGuards);   // t469 — a DECLARED derive-guards hook (pocket _tooSmall from geometry); a LIVE fn (re-attached from the seed), injected before prune
     setUserStatusHint(def.opType, def.statusHint);   // t554 — a DECLARED in-place status HINT (homing's unset-travel warning); a LIVE fn (re-attached from the seed, like the others)
+    setUserSimGcode(def.opType, def.simGcode);   // t566 — a DECLARED sim-gcode override (the ATC change choreography); a LIVE fn (re-attached from the seed, like the others)
     return def;
 }
 

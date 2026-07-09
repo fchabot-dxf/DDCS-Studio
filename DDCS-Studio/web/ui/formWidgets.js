@@ -476,6 +476,7 @@ function actionWidget(host, b) {
     btn.style.cssText = 'padding:6px 14px; border-radius:6px; border:1px solid var(--border,#3a4150); background:var(--panel,#232833); color:var(--text-main,#dfe6ef); cursor:pointer; font-size:13px;';
     btn.addEventListener('click', () => {
         if (b.action === 'homingSetup') import('./settingsPanel.js').then((m) => m.openHomingSetup && m.openHomingSetup()).catch(() => {});
+        else if (b.action === 'atcSettings') import('./settingsPanel.js').then((m) => m.openAtcSetup && m.openAtcSetup()).catch(() => {});   // t566 — the Tool Change twin's "ATC Settings…" (magazine, drawbar I/O, changer)
     });
     host.appendChild(btn);
     return { read: () => ({}) };
@@ -528,10 +529,15 @@ export function renderOpForm(host, bindings) {
         // ③ — a `when`-gated binding tags its row so the view can show/hide it from the live params (e.g. corner's start
         // #21/#22, visible only under probeZFirst). Purely a marker; the widget still renders + reads (dead when hidden).
         const w = Array.isArray(spec) ? spec[0] : spec;
-        if (w && w.when && w.when.param) { row.dataset.whenParam = w.when.param; row.dataset.whenIs = String(w.when.is); }
-        // t522 — COMPOUND gate: `whenAll` is an array of {param, is} ANDed together (e.g. the I/O-step raw-pin field, shown
+        // ③ — a `when`-gated binding tags its row (the FULL condition as JSON, so `in`/`not` carry — t566) so the view
+        // SHOWS/HIDES it from the live params (corner's start #21/#22 under probeZFirst; callMacro under the auto methods).
+        if (w && w.when && w.when.param) row.dataset.when = JSON.stringify(w.when);
+        // t522 — COMPOUND gate: `whenAll` is an array of conditions ANDed together (e.g. the I/O-step raw-pin field, shown
         // only when mode=output AND outputRef=raw). The single `when` can't express two conditions; the view evals all.
-        if (w && Array.isArray(w.whenAll)) row.dataset.whenAll = JSON.stringify(w.whenAll.map((c) => ({ param: c.param, is: c.is })));
+        if (w && Array.isArray(w.whenAll)) row.dataset.whenAll = JSON.stringify(w.whenAll.map((c) => ({ param: c.param, is: c.is, in: c.in, not: c.not })));
+        // t566 — a `gate`-conditioned binding GREYS (not hides) its field when the condition holds, with a `tip` (the ATC
+        // change gating: zClear greyed for auto, fixedT greyed for auto+inline). `{param,in|is|not,tip}` or `{all:[…],tip}`.
+        if (w && w.gate) row.dataset.gate = JSON.stringify(w.gate);
         try { readers.push(renderFormWidget(row, spec).read); }
         catch (e) { console.warn('widget render failed for', label, e); }
         host.appendChild(row);

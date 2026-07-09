@@ -13,7 +13,7 @@ import { renderOpForm } from '../../ui/formWidgets.js';
 import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
-import { flattenBlocks, getUserStatusHint } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel)
+import { flattenBlocks, getUserStatusHint, getUserSimGcode } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography)
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
 import { opSimContext } from '../../viz/opSimContext.js';   // t421 E5 — the DECLARED preview intent (rotary rig, …) so an in-place rotary twin shows its 4th-axis rig (generic mirror of the built-in view + the Blocks tab)
@@ -209,15 +209,26 @@ export const userOpView = {
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
         const fhost = el('wiz_user_form');
         const gp = { ...params, _oword: activePostOword() };   // t538 — the live params + a dialect gate flag (`_oword`)
-        if (fhost) fhost.querySelectorAll('[data-when-param], [data-when-all]').forEach((row) => {
+        if (fhost) fhost.querySelectorAll('[data-when], [data-when-all]').forEach((row) => {
             let ok;
             if (row.dataset.whenAll) {   // t522 — COMPOUND gate: AND of all conditions
                 try { ok = JSON.parse(row.dataset.whenAll).every((c) => whenOk(c, gp)); } catch (_) { ok = true; }
-            } else {
-                const is = row.dataset.whenIs === 'true' ? true : row.dataset.whenIs === 'false' ? false : row.dataset.whenIs;
-                ok = whenOk({ param: row.dataset.whenParam, is }, gp);
+            } else {   // t566 — the full condition as JSON (param/is/in/not) → whenOk
+                try { ok = whenOk(JSON.parse(row.dataset.when), gp); } catch (_) { ok = true; }
             }
             row.style.display = ok ? '' : 'none';
+        });
+        // t566 — GREY-gate: a `gate`-conditioned field greys (not hides) when the condition holds, with a `tip` (the ATC
+        // change gating — zClear for auto, fixedT for auto+inline). `data-op-gated` survives postGating's cap-ON re-enable.
+        if (fhost) fhost.querySelectorAll('[data-gate]').forEach((row) => {
+            let spec; try { spec = JSON.parse(row.dataset.gate); } catch (_) { return; }
+            const off = Array.isArray(spec.all) ? spec.all.every((c) => whenOk(c, gp)) : whenOk(spec, gp);
+            const inp = row.querySelector('[data-param]');
+            if (!inp) return;
+            inp.disabled = off;
+            inp.setAttribute('data-op-gated', off ? 'on' : 'off');
+            inp.title = off && spec.tip ? spec.tip : '';
+            row.style.opacity = off ? '0.5' : '';
         });
         // t417 E3 — a per-op SIM-STOCK override (the rotary twin projects a round bar from #57; sim-only, no global mutation).
         // Feeds BOTH the sim-starts (opSimStarts) AND the preview render (preview3D) so the bar + the flank starts agree.
@@ -235,6 +246,11 @@ export const userOpView = {
         }
         const codeEl = el('wiz_user_code');
         if (codeEl) codeEl.innerHTML = UIUtils.formatGCode(gcode);
+        // t566 — a DECLARED sim-gcode OVERRIDE: an op whose PREVIEW motion differs from its EMIT (the ATC change's automatic
+        // methods emit a bare `T# M6` but the sim animates the choreography INTERPRETER's assumed path) previews that instead.
+        // The CODE preview above stays the real emit; only the 3D animation swaps. null / no hook → preview the emit (unchanged).
+        let previewGcode = gcode;
+        try { const _sg = getUserSimGcode(_def.opType); if (_sg) { const _o = _sg(params); if (_o) previewGcode = _o; } } catch (_) { /* op declares no sim-gcode override */ }
         // preview per panel type: 3D toolpath, a 2D stock layout, BOTH (form3d+2d), or nothing (form-only).
         // The .wiz-viz3d pane is created by preview3D as a sibling INSIDE the target container's .viz-container, so
         // toggle it box-scoped (not a bare `#wiz_user .wiz-viz3d` first-match — two boxes exist for form3d+2d, and
@@ -255,7 +271,7 @@ export const userOpView = {
             // re-renders, so a spotted wall HOLDS in the 3D marker (computePassStarts reads host.__pinnedStarts). Empty spots → null → the pure-auto chain, byte-identical.
             const _phost = viz3dIn('userViz3dContainer');   // the SAME one-level-up derivation the panel + the drag path use (a two-level querySelector can match the OTHER pane's .wiz-viz3d in form3d+2d)
             if (_phost) _phost.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots);
-            mgr.preview3D(gcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock);
+            mgr.preview3D(previewGcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock);
             const c = el('userVizContainer');
             if (c) {
                 c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none';
@@ -300,7 +316,7 @@ export const userOpView = {
             }
         } else if (pt.mode === '3d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
-            const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(gcode, 'userVizContainer', null, null, _simStock);
+            const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, 'userVizContainer', null, null, _simStock);
         } else if (pt.mode === '2d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
             const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params);

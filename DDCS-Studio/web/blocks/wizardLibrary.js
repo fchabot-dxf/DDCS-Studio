@@ -55,7 +55,7 @@ const BUILTINS = [
     { id: 'rotary_clock', type: 'rotary_clock', label: 'Clock A0', icon: '🕒', group: 'probe', opensAs: 'user_rotary_clock_data' },   // t429 E3 — IN-PLACE: the Clock A0 slot opens the twin (box + 4-jaw rig + single start from E2); built-in rotaryClockWizard stays the legacy shim
     { id: 'atc_length', type: 'atc_length', label: 'Tool Length', icon: '📏', group: 'atc', opensAs: 'user_atc_length_data' },   // t409 — light NEW port, in-place
     { id: 'atc_check', type: 'atc_check', label: 'Tool Check', icon: '🛡', group: 'atc', opensAs: 'user_atc_check_data' },   // t411 — inherits the Tool Length light-ATC recipe, in-place
-    { id: 'atc_change', type: 'atc_change', label: 'Tool Change', icon: '🔧', group: 'atc' },
+    { id: 'atc_change', type: 'atc_change', label: 'Tool Change', icon: '🔧', group: 'atc', opensAs: 'user_atc_change_data' },   // t566 E2 — IN-PLACE: the Tool Change slot opens the twin (5-method _arm superset + M2 static-arm graft + inlineTnc live-view + per-method gating; FORCE_MACHINE + WITH_MAGAZINE + choreography sim); built-in atcChangeWizard stays the legacy shim
     { id: 'atc_table', type: 'atc_table', label: 'Tool Table', icon: '📋', group: 'atc' },
     { id: 'atc_test', type: 'atc_test', label: 'ATC Test', icon: '🧪', group: 'atc', opensAs: 'user_atc_test_data' },   // t560 E2 — IN-PLACE: the ATC Test slot opens the twin (mode superset + pockets unroll + declared-I/O one-source; FORCE_MACHINE + WITH_MAGAZINE sim); built-in atcTestWizard stays the legacy shim
     // QUICK-WINS PILOT (t405) — the DRILL peck twin goes IN-PLACE via opensAs (mirror corner/edge/middle E4/E5): the built-in

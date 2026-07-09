@@ -11,10 +11,14 @@
  * (viz→blocks is the natural dependency direction; no blocks→viz edge.)
  */
 
-/** Does a `{param,is}` guard hold for these params? No guard → always true. Boolean `is` coerces (!!v); else strict ===. */
+/** Does a `{param,is}` condition hold for these params? No condition → always true. Forms: `{param, in:[…]}` = set
+ *  membership; `{param, not:v}` = negation; `{param, is:v}` = equality (boolean `is` coerces !!v, else strict ===). The
+ *  in/not forms (t566) let a form gate express "method ∈ {firmware,generic,disk}" / "≠ manual" the single `is` can't. */
 export function whenOk(when, params) {
     if (!when) return true;
     const v = (params || {})[when.param];
+    if (Array.isArray(when.in)) return when.in.includes(v);
+    if ('not' in when) return v !== when.not;
     return typeof when.is === 'boolean' ? !!v === when.is : v === when.is;
 }
 
