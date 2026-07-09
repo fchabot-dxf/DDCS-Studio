@@ -267,6 +267,18 @@ function backfillHomeSwitches(s) {
     if (changed) syncFlatFromIO(s);   // mirror the new/updated Home flags into the flat settings.limits (declaredHomeEdgeSide reads these)
 }
 
+// t594 — Pull-from-controller: DECLARE a per-axis home END from the controller's derived homeEdge. Writes the IO limit ROWS
+// (the source syncFlatFromIO mirrors to the flat settings.limits <edge>Home). ≤1 home/axis: mark the home-end row (prefer an
+// existing fitted row at that end; ADD it — pin unassigned, editable — when the axis has none), clear the other end's home flag.
+// The caller runs syncFlatFromIO after (once). `edge` = 'min' | 'max'.
+function applyHomeEdge(s, axis, edge) {
+    if (!Array.isArray(s.inputs)) s.inputs = [];
+    const wantAxis = axis + '_' + edge, LABEL = { x: 'Home X', y: 'Home Y', z: 'Home Z' };
+    const rows = s.inputs.filter((r) => r && r.type === 'limit' && String(r.axis || '').startsWith(axis + '_'));
+    rows.forEach((r) => { r.home = (r.axis === wantAxis); });   // ≤1/axis: the home end ON, the other end OFF
+    if (!rows.some((r) => r.axis === wantAxis)) s.inputs.push({ id: 'limit_' + wantAxis, type: 'limit', axis: wantAxis, label: LABEL[axis], pin: '', level: 0, switchType: 'mechanical', home: true });
+}
+
 // Deep-merge a persisted homing config over the defaults: top-level scalars, then per-axis fields, so a partial
 // save can't drop fields. Idempotent. A legacy 'zfirst' philosophy maps to 'sequential' (the order field now
 // drives the sequence); a legacy per-axis method:'dual' (auto-squaring, removed) falls back to native + its slave.
@@ -1605,18 +1617,35 @@ function wireSettingsOverlay(ov) {
             const ar = table[active - 1] || { x: 0, y: 0, z: 0 };
             cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[active - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table, active } });
         } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: '—', kind: 'note' });
-        // Machine envelope / travel — from the controller's soft-limit params (gateway /api/profile geometry).
-        const tv = hwProfile && hwProfile.geometry && hwProfile.geometry.travel;
+        // Machine envelope / home / feeds — from the controller's soft-limit + homing params (gateway /api/profile geometry).
+        // t594 — signed travel per axis (magnitude × homeDir), the per-axis Home EDGE (→ settings.limits <edge>Home), and the
+        // homing feeds. A SENTINEL axis (travel null: both soft-limit ends ±9999) shows 'not declared on the controller' + stays
+        // user-owned. A homeEdgeConflict axis (the dir bit disagrees with the soft-limit far reach) is flagged (soft-limit shown).
+        const geo = hwProfile && hwProfile.geometry;
+        const tv = geo && geo.travel;
+        const hd = (geo && geo.homeDir) || {};
+        const he = (geo && geo.homeEdge) || {};
+        const hec = (geo && geo.homeEdgeConflict) || {};
         const mc = _ddcsSettings.machine || {};
-        if (tv && [tv.x, tv.y, tv.z].some((v) => v != null && v > 0)) {
-            const tx = (tv.x > 0 ? tv.x : mc.x), ty = (tv.y > 0 ? tv.y : mc.y), tz = (tv.z > 0 ? tv.z : mc.z);
-            const changed = (tv.x > 0 && tv.x !== mc.x) || (tv.y > 0 && tv.y !== mc.y) || (tv.z > 0 && tv.z !== mc.z);
-            // homeDir (±1 per axis) = the homing direction → the travel SIGN. From geometry.homeDir when the gateway
-            // exposes the controller's homing-direction param, else inferred from a signed travel value.
-            const hd = (hwProfile.geometry && hwProfile.geometry.homeDir) || null;
-            cands.push({ group: 'Machine envelope', label: 'Travel X/Y/Z', value: `${tx} × ${ty} × ${tz} mm`, changed, kind: 'travel', data: { x: tv.x, y: tv.y, z: tv.z, homeDir: hd } });
+        const AX = [['x', 'X'], ['y', 'Y'], ['z', 'Z']];
+        const declared = tv ? AX.filter(([a]) => tv[a] != null && tv[a] > 0) : [];
+        const signed = (a) => (hd[a] || (tv[a] < 0 ? -1 : 1)) * Math.abs(tv[a] || 0);
+        if (declared.length) {
+            const edgeLabel = (a) => he[a] ? (he[a] === 'max' ? 'MAX-home' : 'min-home') + (hec[a] ? ' ⚠dir-bit differs' : '') : '';
+            const desc = declared.map(([a, L]) => `${L} ${signed(a) > 0 ? '+' : ''}${signed(a)}${he[a] ? ' (' + edgeLabel(a) + ')' : ''}`).join(' · ');
+            const changed = declared.some(([a]) => signed(a) !== mc[a]) || AX.some(([a]) => he[a] && !(_ddcsSettings.limits || {})[a + (he[a] === 'max' ? 'Max' : 'Min') + 'Home']);
+            cands.push({ group: 'Machine envelope', label: 'Travel + home switches', value: desc, changed, kind: 'travel', data: { travel: tv, homeDir: hd, homeEdge: he, homeEdgeConflict: hec } });
+            // sentinel axes → a review NOTE so the user knows to fill them (never silently left at the default).
+            const undeclared = AX.filter(([a]) => !(tv[a] != null && tv[a] > 0));
+            for (const [, L] of undeclared) notes.push({ group: 'Machine envelope', label: `${L} not declared on the controller`, value: 'soft limits off (±9999) — set your travel', kind: 'note' });
         } else if (hwProfile && hwProfile.id) {
-            notes.push({ group: 'Machine envelope', label: 'Not set', value: 'soft limits off — keeping current', kind: 'note' });
+            notes.push({ group: 'Machine envelope', label: 'Not declared on the controller', value: 'soft limits off — keeping current', kind: 'note' });
+        }
+        // Homing feeds — seed Studio's Homing Setup (seekFeed = the homing speed #107-109; slowFeed = the precision #118).
+        const hf = geo && geo.homingFeeds;
+        if (hf && hf.speed) {
+            const seek = Math.round(hf.speed.x || hf.speed.y || hf.speed.z || 0), slow = Math.round(hf.precision || 0);
+            if (seek > 0) cands.push({ group: 'Homing', label: 'Homing feeds', value: `Seek ${seek} · Slow ${slow} mm/min`, changed: true, kind: 'homingFeeds', data: { speed: hf.speed, precision: hf.precision } });
         }
         return { connected, candidates: cands.concat(notes), controller: (hwProfile && hwProfile.id) ? { id: hwProfile.id, name: hwProfile.name } : null };
     }
@@ -1633,16 +1662,34 @@ function wireSettingsOverlay(ov) {
         checked.filter((c) => c.kind === 'length').forEach((c) => upsertToolLength(a, c.data.num, c.data.length));
         const wcs = checked.find((c) => c.kind === 'wcs');
         if (wcs) { const m = (_ddcsSettings.machine || (_ddcsSettings.machine = {})); m.wcs = { active: wcs.data.active, table: wcs.data.table }; syncWorkOrigin(m); }
+        for (const c of checked.filter((c) => c.kind === 'hardware')) { try { await applyHardwareProfile(c.data); } catch (e) { /* ignore */ } }
+        // t594 — the machine GEOMETRY apply runs AFTER the hardware loop so it is AUTHORITATIVE over applyControllerProfile
+        // (which, from the same pulled profile, sets an UNSIGNED travel + can rebuild inputs[]): the SIGNED envelope, the per-
+        // axis HOME EDGE (→ settings.limits <edge>Home, via the IO rows syncFlatFromIO mirrors), landing last so they stick.
         const tvc = checked.find((c) => c.kind === 'travel');
         if (tvc) {
             const mm = _ddcsSettings.machine || (_ddcsSettings.machine = {});
-            const hd = tvc.data.homeDir || {};
-            // Travel SIGN = homing direction: use the pulled homeDir if present, else the pulled value's own sign,
-            // else keep the user's current sign. Magnitude is the controller's soft-limit span.
+            const tv = tvc.data.travel || {}, hd = tvc.data.homeDir || {}, he = tvc.data.homeEdge || {};
+            // Travel SIGN = homing direction: the pulled homeDir, else the pulled value's own sign, else keep the user's
+            // sign. Magnitude = the soft-limit far reach. A sentinel axis (tv[a] null) → magnitude 0 → UNTOUCHED (user-owned).
             const set = (cur, v, dir) => { const mag = Math.abs(v || 0); if (!mag) return cur; const s = dir || (v < 0 ? -1 : (cur < 0 ? -1 : 1)); return s * mag; };
-            mm.x = set(mm.x, tvc.data.x, hd.x); mm.y = set(mm.y, tvc.data.y, hd.y); mm.z = set(mm.z, tvc.data.z, hd.z);
+            mm.x = set(mm.x, tv.x, hd.x); mm.y = set(mm.y, tv.y, hd.y); mm.z = set(mm.z, tv.z, hd.z);
+            let touched = false;
+            for (const a of ['x', 'y', 'z']) if (he[a] === 'min' || he[a] === 'max') { applyHomeEdge(_ddcsSettings, a, he[a]); touched = true; }
+            if (touched) syncFlatFromIO(_ddcsSettings);   // mirror the IO home rows → the flat settings.limits (declaredHomeEdgeSide reads these)
         }
-        for (const c of checked.filter((c) => c.kind === 'hardware')) { try { await applyHardwareProfile(c.data); } catch (e) { /* ignore */ } }
+        // t594 — Homing feeds → settings.homing.axes[*]: seekFeed = the homing speed (#107-109), slowFeed = the precision (#118).
+        const hfc = checked.find((c) => c.kind === 'homingFeeds');
+        if (hfc) {
+            const h = _ddcsSettings.homing || (_ddcsSettings.homing = { axes: {} });
+            h.axes = h.axes || {};
+            const sp = hfc.data.speed || {}, prec = Math.round(hfc.data.precision || 0);
+            for (const a of ['x', 'y', 'z']) {
+                const ax = h.axes[a] || (h.axes[a] = {}), s = Math.round(sp[a] || sp.x || 0);
+                if (s > 0) ax.seekFeed = s;
+                if (prec > 0) ax.slowFeed = prec;
+            }
+        }
         saveSettings(); fill();
         const mt = ov.querySelector('#atc_magazine'); if (mt) renderMagazineTable(mt, _ddcsSettings.atc, atcOnChange);
         renderLibSummary();
