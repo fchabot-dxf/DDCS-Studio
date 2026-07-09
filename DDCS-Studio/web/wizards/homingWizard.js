@@ -48,12 +48,19 @@ const AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
  *   softLimits: re-enable #655 at the end iff the machine uses soft limits (sourced from machine.softLimits)
  * A frameless snippet — inserted mid-program like the other setup macros.
  */
-export function homingStack(params = {}) {
+export function homingStack(params = {}, opts = {}) {
     const S = [];
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
     const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); };
     const RAW = (t) => { const b = newBlock('raw'); b.params = { text: t }; S.push(b); };
     const END = () => S.push(newBlock('endprogram'));
+    // t546 E0 — the data-op twin seam. superset:true carries EVERY axis's home block GUARDED by its run-tick (_run<AX>), so
+    // pruneGuards collapses to the selected set → byte-identical to the concrete build. capture() grabs the blocks homeAxis
+    // pushes so the SUPERSET can wrap each per-axis sub-sequence in a guard; the CONCRETE calls homeAxis directly (unchanged).
+    const superset = !!opts.superset;
+    const ALL_AXES = ['x', 'y', 'z', 'a', 'b'];   // the fixed superset order (canonical); the run-ORDER reorder is the twin's unroll (E1)
+    const capture = (fn) => { const save = S.length; fn(); return S.splice(save); };
+    const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
 
     const dialect = getDialect();
     if (!dialect) { C('Error: No dialect loaded'); return S; }
@@ -73,7 +80,7 @@ export function homingStack(params = {}) {
         return S;
     }
 
-    if (!axes.length) { C('No axes selected to home.'); END(); return S; }
+    if (!superset && !axes.length) { C('No axes selected to home.'); END(); return S; }   // superset carries all axes guarded (the twin prunes to the selection)
 
     // Per-method emit for one axis. All math is on the axis INDEX N (0=X..4=B), matching the verified macros.
     const homeAxis = (ax) => {
@@ -159,7 +166,13 @@ export function homingStack(params = {}) {
         }
     };
 
-    axes.forEach(homeAxis);
+    // t546 E0 — SUPERSET: every axis's home block guarded by its run-tick (_run<AX>), canonical order; prune collapses to the
+    // selected set. CONCRETE: emit the selected axes in the resolved run-order (unchanged, byte-identical).
+    if (superset) {
+        ALL_AXES.forEach((ax) => S.push(GUARD({ param: '_run' + ax.toUpperCase(), is: true }, capture(() => homeAxis(ax)))));
+    } else {
+        axes.forEach(homeAxis);
+    }
 
     // Re-enable soft limits at the end (a belt-and-braces guarantee that homing leaves limits ON). #655 is
     // global; setting it 1 is idempotent. Skip if the user disabled the re-enable (e.g. soft limits not used).
