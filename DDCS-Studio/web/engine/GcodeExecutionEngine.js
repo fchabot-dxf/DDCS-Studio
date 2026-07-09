@@ -1061,7 +1061,12 @@ export class GcodeExecutionEngine {
                 // t94 — for an AUTO reposition pass, O is the RE-PARK draw-anchor (previous start), NOT its net-endpoint
                 // marker: the dog-leg is incremental (in local pos), so O(re-park) + local(dog-leg incl. +cross) lands the
                 // probe fire + #1925-1927 exactly on ② the marker. Net-endpoint O double-counts +cross (fires off-face).
-                const O = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
+                // t572 — when the tool is SEATED at an absolute initial position (seatStart/homing: `pos` already carries the
+                // world position), the pass-anchor/_stockOffset must NOT be added again — else aStart double-counts (2×the seat)
+                // and the probe-vs-stock ray misses the fence entirely (alignment's horizontal G31 never collided). O = 0 then,
+                // so aStart = the tool's real world pos. (Homing seeks in the MACHINE frame → still miss the part-frame stock →
+                // the seek clamp below handles them, unchanged.)
+                const O = this._initialPos ? { x: 0, y: 0, z: 0 } : (passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 });
                 const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
                 const bEnd = { x: O.x + target.x, y: O.y + target.y, z: O.z + target.z };
                 const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };

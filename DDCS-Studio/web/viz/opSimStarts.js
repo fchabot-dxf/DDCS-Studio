@@ -70,7 +70,11 @@ const BUILT_IN = {
     // drag moves B. Probe height = just above the stock top. Empty ax/ay fall back to the checkAxis anchor default.
     alignment(params, stock) {
         const sy = n(stock && stock.y, 100), sz = n(stock && stock.z, 25);
-        const z = Math.min(5, sz * 0.5);
+        // t572 — alignment probes HORIZONTALLY into the FENCE (the stock wall), so the seat is at PROBING HEIGHT: a few mm
+        // DOWN the wall (BELOW the stock top), not above it — else the horizontal G31 passes OVER the stock and never collides.
+        // (The emit's in-place contract: "at probing height", below the top edge.) B seats at the same wall height; the emit's
+        // lift/descend around the span jog returns the tool here to probe B.
+        const z = -Math.min(5, sz * 0.5);
         const [A, B] = alignMarkersXY(params || {}, { x: n(stock && stock.x, 150), y: sy });   // A = the sim-only anchor; B = A + the declared span along checkAxis
         return [{ x: A.x, y: A.y, z }, { x: B.x, y: B.y, z }];
     },
