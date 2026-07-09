@@ -321,8 +321,13 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // non-rotary op) → no glyph (unchanged). `diameter`/`span` are GLOBALLY-UNIQUE binding params so the gate can't misfire.
     // FLAGGED design choice (NOT drawn): whether/how to indicate the clock's A0 REFERENCE direction (top +Z vs +Y side) — a
     // rotation is edge-on in a top-view, so it has no unambiguous 2D rendering; the concrete probe geometry is shown instead.
-    const rotCenterBind = (def.bindings || []).find((b) => b && b.param === 'diameter');
-    const rotClockBind  = (def.bindings || []).find((b) => b && b.param === 'span');
+    // t570 — SCOPE the rotary datum glyph to ROTARY ops. `span` is NO LONGER globally-unique: alignment (t544) added a `span`
+    // binding (the A→B probe span), so keying purely on the binding MISFIRED — the rotary-clock span rail + touch dots drew on
+    // the alignment layout, DUPLICATING its A/B drag handles (the human: "not much use"). Gate on the op being rotary so a
+    // non-rotary op that happens to bind `span`/`diameter` shows no glyph (alignment → only its A/B handles + the traced path).
+    const isRotaryOp = /rotary/i.test(def.opType || '');
+    const rotCenterBind = isRotaryOp && (def.bindings || []).find((b) => b && b.param === 'diameter');
+    const rotClockBind  = isRotaryOp && (def.bindings || []).find((b) => b && b.param === 'span');
     if (rotCenterBind) {
         const cyAxis = stock.h / 2;                                    // the rotary A-axis runs along X at the stock Y-centre (the bar axis = the datum)
         const rotR = Math.max(2, Math.min(stock.w, stock.h) * 0.02);

@@ -61,7 +61,7 @@ export const ATC_DIALECT = {
 };
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, initialPos = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, initialPos = null, continuous = false, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
         // Time-true playback: moves take distance/feedrate (rapids at rapidRate),
         // divided by simSpeed (1 = real time). Slow probes crawl, rapids zip.
@@ -91,6 +91,10 @@ export class GcodeExecutionEngine {
         // (byte-identical to every existing sim). The homing preview seeds it from the draggable machine-frame Start so
         // the ABSOLUTE G53 homing route draws FROM the Start to the switch (dragging the Start re-traces the travel live).
         this._initialPos = (initialPos && Number.isFinite(+initialPos.x)) ? { x: +initialPos.x || 0, y: +initialPos.y || 0, z: +initialPos.z || 0 } : null;
+        // t570 — CONTINUOUS trace: an op whose AUTO reposition is a real machine TRAVERSE (the tool moves itself A→B, e.g.
+        // alignment's auto-traverse) is ONE continuous path from the initial seat — the per-pass origin RESET (which is for a
+        // MANUAL re-park) would break the A→B continuity, stranding the 2nd pass at the local origin. Default off (byte-identical).
+        this._continuous = !!continuous;
         // Per-pass operator starts (one per REPOSITION pass) in STOCK coords. After a reposition the operator re-parks
         // the probe at the NEXT start (②③④), so the probe-vs-stock collision must run from THAT pass's start, not the
         // pass-0 _stockOffset (① — else a boss-both's 2nd-axis probe fires from ① into open space and misses). Set
@@ -661,7 +665,7 @@ export class GcodeExecutionEngine {
         // Manual REPOSITION (uniform "REPOSITION:" comment the wizards emit): the operator re-parks the probe by
         // hand → start a new pass at the program origin, exactly as gcodeParser does, so each pass is start-anchored
         // and the preview gives it its own draggable start marker. Detected on the RAW line (it's a comment).
-        if (/reposition:/i.test(step.raw)) {
+        if (/reposition:/i.test(step.raw) && !this._continuous) {
             // t107 machine-faithful — RECORD the finishing pass's RUNTIME world-END (its anchor O + local pos, so it
             // includes probe+retract+lift, collision-clamped) BEFORE the reset. The NEXT pass's dog-leg + probe fire
             // emanate from HERE when it's an anchorsAtPrev pass (passAnchorFor reads _passEnds), not from the static

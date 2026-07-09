@@ -26,6 +26,7 @@ export function traceToolpath(text, opts = {}) {
         stockOffset: opts.start || null,
         wcsOffset: opts.wcsOffset || null,   // work origin in MACHINE coords → G53 moves draw in the part frame
         initialPos: opts.initialPos || null,   // t540 — seed the tool's START position (homing: the draggable machine-frame Start)
+        continuous: opts.continuous || false,   // t570 — an AUTO-traverse op (alignment) is ONE continuous path from the seat (no per-pass origin reset)
         createVarStore: opts.createVarStore || null,
     });
     eng._passStarts = opts.passStarts || null;   // Part 1: per-pass starts → the probe collision fires from each pass's start ②

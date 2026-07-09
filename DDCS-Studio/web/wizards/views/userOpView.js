@@ -110,6 +110,18 @@ function machineReachXY() {
  *  (rotary clock's B) instead writes a MM SPAN = (this.worldY − starts[relSpanFrom].worldY) to its `y` param, so B's drag
  *  sets #6 ADDITIVELY (the span field stays the ONE source — field + drag both edit it). `starts` = the resolved marker
  *  worlds (for the relative reference). No binding / no stock → no-op. */
+/** The span axis for a relSpanFrom marker: a declared literal (spb.spanAxis) OR read LIVE from a form param (spb.spanAxisFrom,
+ *  e.g. alignment's checkAxis); default Y (rotary clock). */
+function spanAxisOf(spb) {
+    let axis = spb.spanAxis === 'X' ? 'X' : 'Y';
+    if (spb.spanAxisFrom) {
+        const host = el('wiz_user_form') && el('wiz_user_form').querySelector(`[data-param="${spb.spanAxisFrom}"]`);
+        let v = host && host.value;                                                  // select / input
+        if ((v == null || v === '') && host) { const on = host.querySelector('.seg-on'); v = on && on.dataset.value; }   // segmented widget → the selected button
+        if (v === 'X' || v === 'Y') axis = v;
+    }
+    return axis;
+}
 function writeSimStartFrac(def, i, world, stock, starts) {
     const spb = def && def.simStartParams && def.simStartParams[i];
     const sx = stock && Number(stock.x), sy = stock && Number(stock.y);
@@ -120,30 +132,31 @@ function writeSimStartFrac(def, i, world, stock, starts) {
     const R = machineReachXY();
     const wx = R ? Math.max(R.xMin, Math.min(R.xMax, (+world.x || 0))) : (+world.x || 0);
     const wy = R ? Math.max(R.yMin, Math.min(R.yMax, (+world.y || 0))) : (+world.y || 0);
-    if (spb.relSpanFrom != null) {   // t530/t544 — RELATIVE-SPAN marker: drag along an axis → a mm span from the anchor marker
-        const aM = (Array.isArray(starts) && starts[spb.relSpanFrom]) || {};
-        // t544 — the span AXIS: a declared literal (spb.spanAxis) OR read LIVE from a form param (spb.spanAxisFrom, e.g.
-        // alignment's checkAxis so the span runs along the fence); default Y (rotary clock — B is +Y from A).
-        let axis = spb.spanAxis === 'X' ? 'X' : 'Y';
-        if (spb.spanAxisFrom) {
-            const host = el('wiz_user_form') && el('wiz_user_form').querySelector(`[data-param="${spb.spanAxisFrom}"]`);
-            let v = host && host.value;                                                  // select / input
-            if ((v == null || v === '') && host) { const on = host.querySelector('.seg-on'); v = on && on.dataset.value; }   // segmented widget → the selected button
-            if (v === 'X' || v === 'Y') axis = v;
-        }
+    // Write a mm SPAN (relSpanFrom marker) from `worldPos` along `axis`, relative to the anchor `aM`, into the span field.
+    const writeSpan = (spb2, aM, worldPos) => {
+        const axis = spanAxisOf(spb2);
         const aPos = axis === 'X' ? (Number(aM.x) || 0) : (Number(aM.y) || 0);
-        const wPos = axis === 'X' ? wx : wy;
-        const raw = wPos - aPos;
-        const span = spb.signed ? raw : Math.max(1, raw);   // t544 — signed (alignment: B either side of A); default floored ≥1mm (rotary clock B is +Y)
-        // `span` is a FORM field (the ONE source) — write the FIELD, not a parallel _simStartFracs (which would OVERRIDE
-        // a later typed value). So the drag AND the numeric field are two editors of the one span; update() re-reads the field.
-        const fld = spb.y && el('wiz_user_form') && el('wiz_user_form').querySelector(`[data-param="${spb.y}"]`);
+        const raw = (axis === 'X' ? worldPos.x : worldPos.y) - aPos;
+        const span = spb2.signed ? raw : Math.max(1, raw);   // t544 — signed (alignment: B either side of A); default floored ≥1mm (rotary clock B is +Y)
+        // `span` is a FORM field (the ONE source) — write the FIELD, not a parallel _simStartFracs (which would OVERRIDE a
+        // later typed value). So the drag AND the numeric field are two editors of the one span; update() re-reads the field.
+        const fld = spb2.y && el('wiz_user_form') && el('wiz_user_form').querySelector(`[data-param="${spb2.y}"]`);
         if (fld) fld.value = String(Math.round(span * 1000) / 1000);
-        else if (spb.y) _simStartFracs[spb.y] = span;
+        else if (spb2.y) _simStartFracs[spb2.y] = span;
+    };
+    if (spb.relSpanFrom != null) {   // t530/t544 — RELATIVE-SPAN marker (B): drag along an axis → a mm span from the anchor (A). A stays.
+        writeSpan(spb, (Array.isArray(starts) && starts[spb.relSpanFrom]) || {}, { x: wx, y: wy });
         return true;
     }
+    // The ANCHOR marker (A): write its fraction.
     if (spb.x) _simStartFracs[spb.x] = wx / sx;
     if (spb.y) _simStartFracs[spb.y] = wy / sy;
+    // t570 — HANDLES ARE INDEPENDENT: if a DEPENDENT `relSpanFrom` marker (B = A + span) anchors on THIS marker, dragging THIS
+    // one (A) must NOT carry the dependent (B). Recompute the dependent's SPAN so B's ABSOLUTE position stays PUT
+    // (span = B_abs − A_new). B's world before this drag is `starts[dj]`. (Typing the span field is the ONE deliberate
+    // B-moves-relative-to-A direction — unchanged; dragging B moves only B — unchanged.)
+    const dj = (def.simStartParams || []).findIndex((m) => m && m.relSpanFrom === i);
+    if (dj >= 0 && Array.isArray(starts) && starts[dj]) writeSpan(def.simStartParams[dj], { x: wx, y: wy }, starts[dj]);
     return true;
 }
 
@@ -351,6 +364,10 @@ export const userOpView = {
                     if (mgr.previewMachine) mgr.previewMachine(_rigCont, true);
                     if (mgr.previewToolMachineFrame) mgr.previewToolMachineFrame(_rigCont, true);
                 }
+                // t570 — a DECLARED SEAT-AT-START intent (opSimContext.seatAtStart from the stack sim{seatStart:true}): seat the
+                // trace/engine INITIAL POSITION at the draggable Start (marker A), so the drawn path begins at A (alignment probes
+                // A in place). The homing initialPos seam WITHOUT the machine-frame render (alignment is a LOCAL/part-frame probe).
+                if (mgr.previewSeatAtStart) mgr.previewSeatAtStart(_rigCont, !!_ctx.seatAtStart);
                 // t560 — a DECLARED magazine intent (opSimContext.showMagazine, from the stack sim{magazine:true}): render the
                 // ATC magazine tiles (pockets + tool stubs) on the envelope — the GENERIC mirror of atc_change/atc_table's
                 // previewMagazine (the atc_test twin's pocket dry-run visits these). Read live from settings.atc; a non-ATC op

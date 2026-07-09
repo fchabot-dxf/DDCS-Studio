@@ -544,6 +544,15 @@ export class WizardManager {
         if (panel && panel.setToolMachineFrame) panel.setToolMachineFrame(on !== false);   // panel-stored → survives lazy viz creation
     }
 
+    // t570 — SEAT the trace/engine initial position at the draggable Start (marker A). The homing initialPos seam WITHOUT the
+    // machine-frame tool render (alignment: an in-place probe whose drawn path must begin at A, not origin). Call AFTER preview3D.
+    previewSeatAtStart(containerId, on) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const panel = host && host.__panel;
+        if (panel && panel.setSeatAtStart) panel.setSeatAtStart(on !== false);
+    }
+
     // Draw the ATC magazine (pockets + tool stubs) in the 3D preview on the machine envelope. Opt-in (ATC wizards
     // only) — call AFTER preview3D so the panel/viz exists. pockets = [{x,y,z,dia,length,pocket,tool,color}].
     previewMagazine(containerId, pockets) {

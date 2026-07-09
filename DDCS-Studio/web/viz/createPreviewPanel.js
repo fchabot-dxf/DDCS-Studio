@@ -182,6 +182,8 @@ export function createPreviewPanel(container, opts = {}) {
     let forceMachine = false;
     let rotaryFixture = false;   // host hint: show the 4th-axis rig (rotary probe ops). Applied to the lazy viz on create + on toggle.
     let machineFrameTool = false;   // t497 host hint: render the live tool in the MACHINE frame (homing — no stock shift). Re-applied on lazy viz create.
+    let seatAtStart = false;   // t570 host hint: SEAT the trace/engine INITIAL POSITION at the draggable Start (marker A) — the homing initialPos seam WITHOUT the machine-frame tool render (alignment: an in-place probe on the WCS/part frame; the drawn path must begin at A, not origin).
+    const startSeated = () => machineFrameTool || seatAtStart;   // either hint seats the initial position at the Start (homing's machine-frame tool implies it; alignment opts in without the machine-frame render)
     // P-C.1b: the FIRMWARE ATC tool-swap context. atcChoreo (the push choreography) + atcStation (its region) are armed
     // by the atc_change firmware view; during play we watch #1300 and, on a REAL tool change (a program T#/M6), retire
     // the OLD tool to the station + put the NEW tool on the spindle. lastTool tracks the previous #1300 (the FIRST value
@@ -446,14 +448,14 @@ export function createPreviewPanel(container, opts = {}) {
         let parsed;
         try {
             // passStarts → the engine fires each REPOSITION pass's probe from ITS start ② (Part 1), so boss-both collides.
-            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: wcsForViz(), passStarts, initialPos: machineFrameTool ? st : null });   // t540 — homing: the ABSOLUTE route draws FROM the draggable machine-frame Start (a drag re-traces the travel)
+            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: wcsForViz(), passStarts, initialPos: startSeated() ? st : null, continuous: seatAtStart });   // t540 homing / t570 alignment: the route draws FROM the draggable Start (marker A) — a drag re-traces the travel
             // (b) Faithful machine frame: an ABSOLUTE (mill) program's G53 / machine moves must resolve to where the
             // part actually SITS in the envelope, not at part-zero. Part-zero's machine Z = the table + the datum's
             // height above the stock bottom. Re-trace once with that as the work-origin Z so e.g. `G53 Z0` (the
             // end "safe Z" retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin.
             if (mch && mch.show && stk && stk.x > 0 && parsed.stats && parsed.stats.absolute) {
                 const z = Math.min(0, mch.z || 0) + datumZFrac(stk.datum) * (Number(stk.z) || 0);
-                parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: { x: wo.x || 0, y: wo.y || 0, z }, passStarts, initialPos: machineFrameTool ? st : null });
+                parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: { x: wo.x || 0, y: wo.y || 0, z }, passStarts, initialPos: startSeated() ? st : null, continuous: seatAtStart });
             }
         } catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
@@ -515,7 +517,7 @@ export function createPreviewPanel(container, opts = {}) {
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
                 if (v.setSimMode) v.setSimMode(((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'mill');   // probe = translucent stock, mill = solid
-                if (machineFrameTool && v.setToolPosition) v.setToolPosition(getStartPos() || { x: 0, y: 0, z: 0 });   // t540 — seat the PRE-PLAY tool at the draggable Start (machine frame), coherent with the Start-anchored route (play() re-seats it too)
+                if (startSeated() && v.setToolPosition) v.setToolPosition(getStartPos() || { x: 0, y: 0, z: 0 });   // t540 homing / t570 alignment — seat the PRE-PLAY tool at the draggable Start, coherent with the Start-anchored route (play() re-seats it too)
             }
         }
         const s = parsed.stats || {};
@@ -603,7 +605,8 @@ export function createPreviewPanel(container, opts = {}) {
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
         eng.stock = stockForViz();
         eng._stockOffset = getStartPos() || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
-        eng._initialPos = machineFrameTool ? (getStartPos() || null) : null;   // t540 — homing: the tool STARTS at the draggable machine-frame Start so the absolute route animates Start→switch (drag → replayFromStart re-runs from the new Start)
+        eng._initialPos = startSeated() ? (getStartPos() || null) : null;   // t540 homing / t570 alignment: the tool STARTS at the draggable Start (marker A) so the route animates Start→… (drag → replayFromStart re-runs from the new Start)
+        eng._continuous = seatAtStart;   // t570 — alignment's auto-traverse is ONE continuous path A→B (no per-pass origin reset)
         eng._passStarts = (passStarts && passStarts.length) ? passStarts : null;   // Part 1: each REPOSITION pass probes from ITS start ② (boss-both)
         eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };          // G53 machine moves draw in the part frame (see trace.js)
         if (mode === '3d') ensureViz();
@@ -619,7 +622,7 @@ export function createPreviewPanel(container, opts = {}) {
         // t497 — seat a MACHINE-FRAME tool (homing) at the start BEFORE the run, so it renders at the top even before the
         // engine's first onPositionChange (a seek-to-home is a no-move → wouldn't fire it, leaving the tool at the shifted
         // build spot). The engine then drives it from here.
-        if (viz && machineFrameTool && viz.setToolPosition) viz.setToolPosition(getStartPos() || { x: 0, y: 0, z: 0 });
+        if (viz && startSeated() && viz.setToolPosition) viz.setToolPosition(getStartPos() || { x: 0, y: 0, z: 0 });
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
         updateRunBtn();
@@ -774,6 +777,15 @@ export function createPreviewPanel(container, opts = {}) {
         if (viz && viz.setToolMachineFrame) viz.setToolMachineFrame(on);
     }
 
+    // Host hint: SEAT the trace/engine initial position at the draggable Start (marker A) — the homing initialPos seam WITHOUT
+    // the machine-frame tool RENDER (alignment: an in-place probe whose drawn path must begin at A, on the part frame). t570.
+    function setSeatAtStart(on) {
+        on = !!on;
+        if (on === seatAtStart) return;
+        seatAtStart = on;
+        if (active) setGcode();   // re-trace so the route re-seats at the Start (a no-op render otherwise)
+    }
+
     // Arm the ATC tool-swap + device animation for this op. A 'push' (firmware) or 'pick-place' (generic/disk)
     // choreography arms it; anything else disarms. The swap fires from checkToolSwap (below) on the #1300 flip.
     function setAtcSwap(choreo, region) {
@@ -866,7 +878,7 @@ export function createPreviewPanel(container, opts = {}) {
         }
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
         getAnchor: () => curAnchor,                                                       // t309 — the anchored/absolute frame flag (feed the overlay so its path frame matches)
         onToolPos: (cb) => { if (typeof cb === 'function') toolPosSubs.push(cb); return () => { toolPosSubs = toolPosSubs.filter((f) => f !== cb); }; },   // t309 — subscribe to the live engine head (fires in ANY mode); returns an unsubscribe
