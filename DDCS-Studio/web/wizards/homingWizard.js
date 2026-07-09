@@ -48,6 +48,71 @@ const AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
  *   softLimits: re-enable #655 at the end iff the machine uses soft limits (sourced from machine.softLimits)
  * A frameless snippet — inserted mid-program like the other setup macros.
  */
+/**
+ * The per-axis home block sequence (ONE source, shared by homingStack + the user_homing_data twin's E1 unroll/recompose).
+ * A LINEAR axis emits the simple G31 seek (t536); a rotary A/B emits setzero. The seek is SETTINGS-dependent: distance =
+ * |machine span| + margin toward the DECLARED home end (declaredHomeEdgeSide); an unset (0) span → the SKIP comment (t540,
+ * structure-changing — this is why the twin RECOMPOSES from settings, not a static value-swap). config (feeds/backoff/slave)
+ * rides the op; machine/limits ride the CURRENT settings. Returns a fresh block array (never mutates a shared buffer).
+ */
+export function homeAxisBlocks(ax, config, machine, limits) {
+    const B = [];
+    const c = config || {};
+    const N = AX_IDX[ax], L = AX_LABEL[ax];
+    const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; B.push(b); };
+    const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; B.push(b); };
+    const RAW = (t) => { const b = newBlock('raw'); b.params = { text: t }; B.push(b); };
+    // t536 — the WIZARD is G31-only for linear axes; a rotary A/B is setzero. (native is dead here — never selected — kept for parity.)
+    const method = (ax === 'a' || ax === 'b') ? 'setzero' : 'seek';
+    const flagVar = `#${1515 + N}`, coordVar = `#${880 + N}`;
+    // A dual-axis SLAVE that follows this master: copy its machine coord to the slave + mark it homed (fndzero.nc tail).
+    const syncSlave = () => {
+        const s = parseInt(c.slaveFollows, 10);
+        if (!Number.isInteger(s) || s < 0 || s > 4 || s === N) return;
+        C(`Sync slave axis ${s} to ${L} (gantry slave)`);
+        A(`#${880 + s}`, coordVar, `slave coord = ${L} coord`);
+        A(`#${1515 + s}`, '1', 'slave homed flag');
+    };
+    if (method === 'native') {
+        C(`Home ${L} — native (controller config)`);
+        RAW(`M98P501X${N}     ( home ${L} - axis ${N} )`);
+        syncSlave();
+        return B;
+    }
+    if (method === 'setzero') {
+        // Set the CURRENT position as machine home — no motion. (#[880+N]=0 then mark homed.)
+        C(`Home ${L} — set current position as home (no motion)`);
+        A(coordVar, '0', `${L} machine coord = 0 here`);
+        A(flagVar, '1', `${L} homed flag`);
+        syncSlave();
+        return B;
+    }
+    // ── G31 HOME SEEK — simple + readable (t536). DIRECTION = the DECLARED home end (declaredHomeEdgeSide); max → +1 (UP),
+    //    min → -1; no declared home → -tSign (toward machine-0), unknown envelope → +1. An unset span → the SKIP comment.
+    const backoff = num(c.backoff, 5);
+    const fastF = Math.round(num(c.seekFeed, 600)) || 600;
+    const slowF = Math.round(num(c.slowFeed, 100)) || 100;
+    const tSign = Math.sign(num((machine || {})[ax], 0));
+    const homeSide = declaredHomeEdgeSide(ax, limits);
+    const dir = homeSide === 'max' ? 1 : homeSide === 'min' ? -1 : (-tSign || 1);
+    const span = Math.abs(num((machine || {})[ax], 0));
+    if (!(span > 0)) { C(`Home ${L} — SET ${ax.toUpperCase()} TRAVEL (machine envelope) first; homing SKIPPED for this axis`); return B; }
+    const seekDist = r3(dir * (span + 20));
+    const P = `P#${1045 + N * 3}`, Lw = `L#${1047 + N * 3}`;
+    const endLabel = homeSide === 'max' ? 'max (top)' : homeSide === 'min' ? 'min' : (dir > 0 ? 'max' : 'min');
+    C(`Home ${L} — G31 seek to the ${endLabel} home switch`);
+    RAW('G91     ( incremental moves )');
+    RAW(`G31 ${L}${seekDist} F${fastF} ${P} ${Lw}     ( fast seek to the home switch )`);
+    RAW(`G01 ${L}${r3(-dir * backoff)} F${slowF}     ( back off the switch )`);
+    RAW(`G31 ${L}${r3(dir * (backoff + 2))} F${slowF} ${P} ${Lw}     ( slow re-touch for accuracy )`);
+    A(coordVar, '0', `${L} machine coord = 0 (home datum)`);
+    A(flagVar, '1', `${L} homed flag`);
+    RAW(`G01 ${L}${r3(-dir * backoff)} F${slowF}     ( clearance back-off )`);
+    RAW('G90     ( back to absolute )');
+    syncSlave();
+    return B;
+}
+
 export function homingStack(params = {}, opts = {}) {
     const S = [];
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
@@ -82,89 +147,8 @@ export function homingStack(params = {}, opts = {}) {
 
     if (!superset && !axes.length) { C('No axes selected to home.'); END(); return S; }   // superset carries all axes guarded (the twin prunes to the selection)
 
-    // Per-method emit for one axis. All math is on the axis INDEX N (0=X..4=B), matching the verified macros.
-    const homeAxis = (ax) => {
-        const c = cfg[ax] || {};
-        const N = AX_IDX[ax], L = AX_LABEL[ax];
-        // t536 (change 1) — the WIZARD IGNORES the saved per-axis method (the human 4×: "wizard is g31 only"). A LINEAR
-        // axis ALWAYS emits the G31 seek; a rotary A/B emits setzero (the sensible method — no linear travel to seek).
-        // Native M98 stays reachable ONLY via the separate Homing Setup (its machinery below is kept, just not wizard-routed).
-        const method = (ax === 'a' || ax === 'b') ? 'setzero' : 'seek';
-
-        // Homed-flag + machine-coord are written at their RESOLVED literal address (e.g. Z=#1517, #882) to match
-        // Homed-flag / machine-coord at their RESOLVED literal address (e.g. Z=#1517, #882). The native path does
-        // NOT write the homed flag — M98 P501 sets it itself (fndzero.nc never writes it for switch-homed axes), and
-        // a manual write would falsely mark the axis homed if the home failed/alarmed. The flag is written ONLY where
-        // the controller doesn't: slave-sync, set-current-as-home, and the G31 granular-seek path.
-        const flagVar = `#${1515 + N}`, coordVar = `#${880 + N}`;
-
-        // A dual-axis SLAVE that follows this master (e.g. A slaved to Y): after the master homes, copy its machine
-        // coord to the slave and mark the slave homed — the verified fndzero.nc / fndY.nc tail (`#883=#881; #1518=1`).
-        // (Gantry SQUARING is done manually by the operator — Studio only syncs the slave coordinate.)
-        const syncSlave = () => {
-            const s = parseInt(c.slaveFollows, 10);
-            if (!Number.isInteger(s) || s < 0 || s > 4 || s === N) return;
-            C(`Sync slave axis ${s} to ${L} (gantry slave)`);
-            A(`#${880 + s}`, coordVar, `slave coord = ${L} coord`);
-            A(`#${1515 + s}`, '1', 'slave homed flag');
-        };
-
-        if (method === 'native') {
-            // Controller built-in home — uses ITS configured switch/dir/speed AND sets the homed flag itself. The
-            // safest method (fndzero.nc). No manual #[1515+N] write here (see above).
-            C(`Home ${L} — native (controller config)`);
-            RAW(`M98P501X${N}     ( home ${L} - axis ${N} )`);
-            syncSlave();
-            return;
-        }
-
-        if (method === 'setzero') {
-            // Set the CURRENT position as machine home — no motion. (#[880+N]=0 then mark homed.)
-            C(`Home ${L} — set current position as home (no motion)`);
-            A(coordVar, '0', `${L} machine coord = 0 here`);
-            A(flagVar, '1', `${L} homed flag`);
-            syncSlave();
-            return;
-        }
-
-        if (method === 'seek') {
-            // ── G31 HOME SEEK — SIMPLE + READABLE (t536, replacing the opaque O501 re-derivation). The old path emitted a
-            //    7-read "debounce" that summed the SAME input 7× (it debounced nothing), a limit-vs-home GOTO guard, and a
-            //    feed-halving multi-pass loop — a human couldn't read it ("wtf is this code"). This is the whole seek:
-            //      fast G31 to the home switch → back off a few mm → ONE slow G31 re-touch (accuracy) → set the datum +
-            //      homed flag → clearance back-off. Every line is plain. UNVERIFIED on hardware; the Setup/native M98 path
-            //      stays the controller-flagged option (this wizard is G31-only for linear axes — the human's 4× request).
-            //
-            //    DIRECTION (change 3): the DECLARED HOME END is the ONLY source (declaredHomeEdgeSide) — max → +1 (UP, to
-            //    the top), min → -1. NO c.dir override (a stale saved dir can no longer steer the seek away — the t491 bug
-            //    class). Fallback when NO home is declared: -tSign (toward machine-0); unknown envelope (tSign 0) → +1.
-            const backoff = num(c.backoff, 5);                          // back-off + clearance distance (mm)
-            const fastF = Math.round(num(c.seekFeed, 600)) || 600;      // fast seek feed (mm/min)
-            const slowF = Math.round(num(c.slowFeed, 100)) || 100;      // slow re-touch feed (accuracy)
-            const tSign = Math.sign(num((params.machine || {})[ax], 0)); // signed-travel sign (fallback only)
-            const homeSide = declaredHomeEdgeSide(ax, params.limits);   // 'min'|'max'|null — the DECLARED home switch end
-            const dir = homeSide === 'max' ? 1 : homeSide === 'min' ? -1 : (-tSign || 1);
-            const span = Math.abs(num((params.machine || {})[ax], 0));
-            // t540 — NO SILENT FALLBACK: an unset/0 travel has no meaningful seek distance. SKIP the axis + surface it
-            // (a comment), instead of fabricating a 300mm span. Configured machines (span > 0) are unaffected.
-            if (!(span > 0)) { C(`Home ${L} — SET ${ax.toUpperCase()} TRAVEL (machine envelope) first; homing SKIPPED for this axis`); return; }
-            const seekDist = r3(dir * (span + 20));                     // toward the home end, ~the travel span + margin (NOT ±10000)
-            const P = `P#${1045 + N * 3}`, Lw = `L#${1047 + N * 3}`;     // home-input PORT / active-LEVEL registers (as today)
-            const endLabel = homeSide === 'max' ? 'max (top)' : homeSide === 'min' ? 'min' : (dir > 0 ? 'max' : 'min');
-
-            C(`Home ${L} — G31 seek to the ${endLabel} home switch`);
-            RAW('G91     ( incremental moves )');
-            RAW(`G31 ${L}${seekDist} F${fastF} ${P} ${Lw}     ( fast seek to the home switch )`);
-            RAW(`G01 ${L}${r3(-dir * backoff)} F${slowF}     ( back off the switch )`);
-            RAW(`G31 ${L}${r3(dir * (backoff + 2))} F${slowF} ${P} ${Lw}     ( slow re-touch for accuracy )`);
-            A(coordVar, '0', `${L} machine coord = 0 (home datum)`);
-            A(flagVar, '1', `${L} homed flag`);
-            RAW(`G01 ${L}${r3(-dir * backoff)} F${slowF}     ( clearance back-off )`);
-            RAW('G90     ( back to absolute )');
-            syncSlave();
-            return;
-        }
-    };
+    // Per-axis emit — via the SHARED module builder (homeAxisBlocks) so the twin's E1 unroll/recompose reads the SAME source.
+    const homeAxis = (ax) => { for (const b of homeAxisBlocks(ax, cfg[ax], params.machine, params.limits)) S.push(b); };
 
     // t546 E0 — SUPERSET: every axis's home block guarded by its run-tick (_run<AX>), canonical order; prune collapses to the
     // selected set. CONCRETE: emit the selected axes in the resolved run-order (unchanged, byte-identical).
