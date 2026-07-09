@@ -1807,6 +1807,10 @@
                 initHeaderPost();
             } catch (err) { console.error('header post init failed', err); }
             try {
+                const { initRatePrompt } = await import('./ui/ratePrompt.js');
+                initRatePrompt();                 // t598 — session counter + the success-moment rate toast + the ⭐ menu entry
+            } catch (err) { console.error('rate prompt init failed', err); }
+            try {
                 const { maybeAutoOpenSetupChecklist } = await import('./ui/setupChecklist.js');
                 maybeAutoOpenSetupChecklist();    // first-run health check (auto-opens once unless dismissed); also reopenable from the quick-menu
             } catch (err) { console.error('setup checklist init failed', err); }

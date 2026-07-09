@@ -463,6 +463,7 @@ export class WizardManager {
                 }
             } catch (e) { /* preview is optional */ }
             playClick();
+            try { window.dispatchEvent(new CustomEvent('ddcs:op-inserted')); } catch (_) { /* t598 — the success moment: rate-prompt counter + trigger (ratePrompt.js listens) */ }
         } else {
             console.warn('WizardManager: No visible wizard or empty code.');
         }

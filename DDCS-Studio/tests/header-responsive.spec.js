@@ -62,11 +62,13 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
 
   // Program actions present (Open/Save/Save-as-custom-wizard, plus load/insert/clear/export/standalone).
   // Copy moved to a floating #editor-copy-btn (editor-chrome work, 30492fc), so it's no longer a quick-menu action.
-  const programActions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]:not([data-act="settings"]):not([data-act="checklist"])').count();
+  const programActions = await page.locator('#hdrPostMenu .hdr-quick-item[data-act]:not([data-act="settings"]):not([data-act="checklist"]):not([data-act="rate"])').count();
   expect(programActions, 'eight program actions (incl. Save as custom wizard)').toBe(8);
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="wizard"]').count(), 'Save as custom wizard row present').toBe(1);
   // Settings opens as a modal from the menu.
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… row present').toBe(1);
+  // t598 — the always-available Rate / Feedback utility entry (alongside Settings / checklist).
+  expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="rate"]').count(), 'Rate / Feedback row present').toBe(1);
   // Exactly one active post and one active theme are checked.
   const postChecked = await page.locator('#hdrPostMenu .hdr-quick-item[data-post][aria-checked="true"]').count();
   const themeChecked = await page.locator('#hdrPostMenu .hq-theme-chip[data-theme][aria-checked="true"]').count();

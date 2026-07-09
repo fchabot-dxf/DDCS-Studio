@@ -64,6 +64,7 @@ function runQuickAction(act) {
             break;
         case 'settings': window.openSettings?.(); break;
         case 'checklist': window.openSetupChecklist?.(); break;
+        case 'rate': window.ddcsOpenRate?.(); break;   // t598 — the always-available Rate / Feedback path (opens the repo)
     }
 }
 
@@ -137,6 +138,10 @@ export function initHeaderPost() {
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
             + '<span class="hdr-quick-lbl">Settings…</span></button>';
+        // t598 — ALWAYS-AVAILABLE "Rate / Feedback" (the unprompted path — opens the GitHub repo to star / give feedback).
+        const rateRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭐ Rate / Feedback</span></button>';
 
         menu.innerHTML = '<div class="hdr-quick-head">Program</div>'
             + HQ_ACTIONS.map(actionRow).join('')
@@ -144,7 +149,7 @@ export function initHeaderPost() {
             + actionRow(HQ_STANDALONE)
             + '<div class="hdr-quick-sep"></div>' + postSub
             + themeSection
-            + '<div class="hdr-quick-sep"></div>' + checklistRow + settingsRow;
+            + '<div class="hdr-quick-sep"></div>' + checklistRow + settingsRow + rateRow;
 
         btn.title = `Quick actions — open / save / load / export, post-processor (${activeName}), theme. Click to open.`;
         btn.setAttribute('aria-label', `Quick actions (post-processor: ${activeName})`);
