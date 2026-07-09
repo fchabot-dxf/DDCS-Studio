@@ -19,9 +19,14 @@
 // 4th-axis fixture (chuck + tailstock): the rotary probe ops frame a bar/part on the A-axis.
 const ROTARY_RIG = new Set(['rotary_clock', 'rotary_center']);
 // Pin to the MACHINE frame so the envelope always draws: ATC tool changes are inherently G53 (even when a given
-// trace — auto-change with no tool, warmup/drawbar with no motion, the table-write macro — doesn't reach a G53),
-// and homing/sysstart is a machine-frame operation.
-const FORCE_MACHINE = new Set(['atc_length', 'atc_check', 'atc_warmup', 'atc_change', 'atc_test', 'atc_table', 'homing']);
+// trace — auto-change with no tool, warmup/drawbar with no motion, the table-write macro — doesn't reach a G53).
+// NOTE: a machine-frame-TOOL op (toolMachineFrame — homing, atc_test/change/table) is NOT listed here: it IMPLIES
+// forceMachine (a machine-frame tool op always draws the envelope), derived below (t590 E3 — one intent, not three flags).
+const FORCE_MACHINE = new Set(['atc_length', 'atc_check', 'atc_warmup', 'atc_change', 'atc_test', 'atc_table']);
+// Render the tool in RAW machine coords + ignore the workpiece for collision: homing (a switch-seek). This is THE declared
+// "machine-frame op" intent — it IMPLIES forceMachine (draw the envelope) AND seatAtStart (seat the initial position), so an
+// op declares it ONCE instead of three coupled flags. (The ATC twins declare toolMachine via their own sim block → USER_INTENT.)
+const MACHINE_FRAME_TOOL = new Set(['homing']);
 // Carries an ATC magazine (pockets + tool stubs on the envelope): the ops that actually move tools to/from pockets.
 const WITH_MAGAZINE = new Set(['atc_change', 'atc_table']);
 
@@ -48,14 +53,17 @@ export function setUserSimIntent(opType, intent) {
  * (the default local-frame, no-rig, no-magazine preview).
  */
 export function opSimContext(opType) {
+    // t590 E3 — the "machine-frame op" intent (toolMachineFrame) IMPLIES forceMachine + seatAtStart: a machine-frame tool op
+    // always draws the envelope and seats its initial position at the Start. So an op declares ONE intent, not three coupled
+    // flags; forceMachine/seatAtStart derive here (byte-identical — homing/the ATC twins already set all three).
     const u = USER_INTENT.get(opType);
-    if (u) return { showRotaryRig: !!u.showRotaryRig, forceMachine: !!u.forceMachine, showMagazine: !!u.showMagazine, toolMachineFrame: !!u.toolMachineFrame, seatAtStart: !!u.seatAtStart };
+    const tmf = u ? !!u.toolMachineFrame : MACHINE_FRAME_TOOL.has(opType);
     return {
-        showRotaryRig: ROTARY_RIG.has(opType),
-        forceMachine: FORCE_MACHINE.has(opType),
-        showMagazine: WITH_MAGAZINE.has(opType),
-        toolMachineFrame: opType === 'homing',   // t552 — the built-in homing renders its tool in the machine frame (t497)
-        seatAtStart: opType === 'homing',   // t570 — the machine-frame tool implies seating the initial position at the Start
+        showRotaryRig: u ? !!u.showRotaryRig : ROTARY_RIG.has(opType),
+        forceMachine: tmf || (u ? !!u.forceMachine : FORCE_MACHINE.has(opType)),   // machine-frame tool ⟹ force the envelope
+        showMagazine: u ? !!u.showMagazine : WITH_MAGAZINE.has(opType),
+        toolMachineFrame: tmf,
+        seatAtStart: tmf || (u ? !!u.seatAtStart : false),   // machine-frame tool ⟹ seat at the Start (alignment opts in without tmf)
     };
 }
 
