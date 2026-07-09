@@ -14,8 +14,25 @@ import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { resolveAction } from './atcInterpreter.js';
+import { GRIPS } from './atcModel.js';
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
+
+// ONE-SOURCE the drawbar / sensor M-codes from the user's declared ATC I/O (Settings → ATC I/O = settings.outputs/inputs),
+// via the SAME GRIPS.drawbar declaration + resolveAction the tool-change emit reads — NOT hand-rolled literals (t558). No ATC
+// / no override → resolveAction returns the canonical defaults (M154/M155 · M301/M302 · M300) → byte-identical to the old
+// literals; a declared override → the emitted codes TRACK it. [[machine-facts-vs-macro]] [[ddcs-ground-truth-reference]]
+const _codeNum = (c) => { const n = parseInt(String(c == null ? '' : c).replace(/[^0-9]/g, ''), 10); return Number.isFinite(n) ? n : 0; };
+function drawbarCodes() {
+    const s = (typeof window !== 'undefined' && window.ddcsGetSettings) ? (window.ddcsGetSettings() || {}) : {};
+    const io = { outputs: s.outputs || [], inputs: s.inputs || [] };
+    const g = GRIPS.drawbar;
+    const rel = resolveAction(g.release[0], io);    // { code: RELEASE output, wait: released-sensor input }
+    const lock = resolveAction(g.clamp[0], io);     // { code: LOCK output,    wait: locked-sensor input }
+    const stop = resolveAction({ waitFn: 'spindle_stopped', wait: g.stopWait }, io);   // spindle-stopped sensor input
+    return { release: _codeNum(rel.code), released: _codeNum(rel.wait), lock: _codeNum(lock.code), locked: _codeNum(lock.wait), stopped: _codeNum(stop.wait) };
+}
 
 function H(S) {
     return {
@@ -38,18 +55,19 @@ function drawbarStack(params) {
     const cycles = Math.max(1, num(params.cycles, 10));
     const dwellSec = Math.max(0, num(params.dwellMs, 500)) / 1000;   // dwell atom takes seconds → native units per post
     const S = []; const { C, A, IF, LB, SPOFF, COOLOFF, MC, DW, MSG, END } = H(S);
+    const mc = drawbarCodes();   // t558 — the drawbar/sensor M-codes ONE-SOURCED from Settings → ATC I/O (defaults = the old literals)
     C('ATC | Drawbar Cycle Test - commissioning');
-    C(`${cycles} release/lock cycles - sensors M301/M302 verified each cycle`);
+    C(`${cycles} release/lock cycles - sensors M${mc.released}/M${mc.locked} verified each cycle`);
     C('NO tool in the spindle. A hang on a wait = that sensor/valve needs adjusting');
     C('=== CONFIGURATION ===');
     A('#100', 1, 'Cycle counter'); A('#101', cycles, 'Cycles');
     SPOFF(); COOLOFF();
-    MC(300, 'Wait: spindle-stopped sensor');
+    MC(mc.stopped, 'Wait: spindle-stopped sensor');
     LB(10); C('CYCLE START');
     MSG('Cycle #100: RELEASE');
-    MC(154, 'Drawbar RELEASE'); MC(301, 'Wait: drawbar-released sensor'); DW(dwellSec);
+    MC(mc.release, 'Drawbar RELEASE'); MC(mc.released, 'Wait: drawbar-released sensor'); DW(dwellSec);
     MSG('Cycle #100: LOCK');
-    MC(155, 'Drawbar LOCK'); MC(302, 'Wait: tool-locked sensor'); DW(dwellSec);
+    MC(mc.lock, 'Drawbar LOCK'); MC(mc.locked, 'Wait: tool-locked sensor'); DW(dwellSec);
     A('#100', '[#100+1]', 'Next cycle');
     IF('#100', '<=', '#101', 10);
     C('Complete - drawbar left LOCKED');
