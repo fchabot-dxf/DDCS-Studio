@@ -29,36 +29,52 @@ const AX_FROM_LABEL = { X: 'x', Y: 'y', Z: 'z', A: 'a', B: 'b' };
  *  op stores only the axis selection, so this is a template constant (never a frozen user snapshot — recomposed from settings). */
 const TEMPLATE_MACHINE = { x: 300, y: 300, z: -120 };
 
-/** Author defaults — mirror the run-form (the twin-default rule): the safe Z,X,Y home order + soft-limit re-enable ON. */
-export const HOMING_DEFAULTS = { axes: ['z', 'x', 'y'], softLimits: true, machine: TEMPLATE_MACHINE };
+/** Author defaults — mirror the run-form (the twin-default rule): home Z/X/Y (the safe fndzero order comes from settings) +
+ *  soft-limit re-enable ON. The RUN-FORM is per-axis boolean ticks (run_<ax>); the ORDER + per-axis config live in settings. */
+export const HOMING_DEFAULTS = { run_z: true, run_x: true, run_y: true, run_a: false, run_b: false, softLimits: true, machine: TEMPLATE_MACHINE };
 
 export const HOMING_DATA_OPTYPE = 'user_homing_data';
 
-/** The op params (the run-form): the ORDERED axis selection + the soft-limit re-enable flag. Per-axis config = settings. */
+/** The op params (the run-form): a per-axis RUN TICK (boolean checkbox) + the soft-limit re-enable flag. The execution ORDER
+ *  + per-axis feeds/back-off/declared-home come from settings (Homing Setup) — read at emit, so the twin tracks live config. */
 export const HOMING_STRUCT_BINDINGS = [
-    { param: 'axes', type: 'list', default: HOMING_DEFAULTS.axes, label: 'Axes', help: 'Which axes to home this run, in execution order (reorder in Homing Setup). The per-axis feeds/back-off + declared home switch come from Homing Setup / the machine config.', section: 'GEOMETRY' },
+    { param: 'run_z', type: 'bool', default: HOMING_DEFAULTS.run_z, label: 'Home Z', help: 'Home the Z axis this run.', section: 'GEOMETRY' },
+    { param: 'run_x', type: 'bool', default: HOMING_DEFAULTS.run_x, label: 'Home X', help: 'Home the X axis this run.', section: 'GEOMETRY' },
+    { param: 'run_y', type: 'bool', default: HOMING_DEFAULTS.run_y, label: 'Home Y', help: 'Home the Y axis this run.', section: 'GEOMETRY' },
+    { param: 'run_a', type: 'bool', default: HOMING_DEFAULTS.run_a, label: 'Home A', help: 'Home the A (rotary) axis — set current position as home (no seek).', section: 'GEOMETRY' },
+    { param: 'run_b', type: 'bool', default: HOMING_DEFAULTS.run_b, label: 'Home B', help: 'Home the B (rotary) axis — set current position as home (no seek).', section: 'GEOMETRY' },
     { param: 'softLimits', type: 'bool', default: HOMING_DEFAULTS.softLimits, label: 'Re-enable soft limits', help: 'Re-enable #655 (soft limits) after homing.', section: 'GEOMETRY' },
 ];
 
-/** The wrapped user_root template — the E0 superset (all axes guarded), machine-frame sim (homing is G53). */
+/** The wrapped user_root template — the E0 superset (all axes guarded), machine-frame sim (homing is G53): FORCED envelope +
+ *  the live tool in RAW machine coords (toolMachine, t497) so it homes at the top even with a stock shown. */
 export function homingDataStack(params = HOMING_DEFAULTS) {
     const exec = homingStack(params, { superset: true });
     return [{
         type: 'user_root', params: {},
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d+2d' } },
-            { type: 'sim', params: { rotary: false, machine: true, magazine: false } },
+            { type: 'sim', params: { rotary: false, machine: true, magazine: false, toolMachine: true } },
             { type: 'param_group', params: { group: 'Homing' }, children: [] },
         ],
         children: exec,
     }];
 }
 
-/** The DERIVED guard keys — the _run<AX> ticks from the op's ordered `axes`, so pruneGuards collapses the template to the selection. */
+/** The ORDERED axis selection from params — an explicit `axes` list (tests/round-trip) OR the run-ticks sorted by the
+ *  settings home ORDER (the run-form path). Order-independent for the guards; ordered for the emit unroll. */
+function axesOf(p, config) {
+    if (Array.isArray(p.axes)) return p.axes.filter((a) => AX_IDX[a] != null);
+    const cfg = config || {};
+    return ALL_AXES.filter((ax) => !!p['run_' + ax]).sort((a, b) => (Number((cfg[a] || {}).order) || 9) - (Number((cfg[b] || {}).order) || 9));
+}
+
+/** The DERIVED guard keys — the _run<AX> ticks from the op's selection (list OR run-ticks), so pruneGuards collapses the
+ *  template to the selection. Order-INDEPENDENT (the guards only gate presence; the emit unroll handles the run-order). */
 export function homingDeriveGuards(p) {
-    const axes = Array.isArray(p.axes) ? p.axes : [];
+    const sel = Array.isArray(p.axes) ? p.axes : ALL_AXES.filter((a) => !!p['run_' + a]);
     const o = {};
-    for (const a of ALL_AXES) o['_run' + a.toUpperCase()] = axes.includes(a);
+    for (const a of ALL_AXES) o['_run' + a.toUpperCase()] = sel.includes(a);
     return o;
 }
 
@@ -66,6 +82,13 @@ export function homingDeriveGuards(p) {
 function currentSettings() {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings() : {};
     return { config: ((s.homing || {}).axes) || {}, machine: s.machine || {}, limits: s.limits || {} };
+}
+
+/** The mid-envelope machine-frame START anchor (t540) — the draggable Start the homing sim runs FROM. From settings.machine
+ *  (never emitted). The in-place preview passes this as the start; the panel seeds it as the engine initialPos (machineFrameTool). */
+export function homingMidStart() {
+    const m = currentSettings().machine || {};
+    return { x: (Number(m.x) || 0) / 2, y: (Number(m.y) || 0) / 2, z: (Number(m.z) || 0) / 2 };
 }
 
 // The per-axis arms of a homing op-container's children, keyed by axis, in template order. Splits on the "Home <L>" head.
@@ -101,7 +124,7 @@ function blockRole(b) {
  */
 function applyHomingRecompose(stack, resolved) {
     const st = currentSettings();
-    const order = (Array.isArray(resolved.axes) ? resolved.axes : []).filter((a) => AX_IDX[a] != null);
+    const order = axesOf(resolved, st.config);
     const opBlk = flattenBlocks(stack).find((b) => b && b.type === 'op' && b.opType === 'homing');
     if (!opBlk || !Array.isArray(opBlk.children)) return stack;
     // the FRESH emit (the ONE source) → its header + tail (rebuilt, machine-generated) + the per-axis arms for the swap
@@ -135,5 +158,8 @@ export function homingDataDef() {
     const def = userOpFromStack('homing_data', 'Homing (data)', homingDataStack(HOMING_DEFAULTS), [...HOMING_STRUCT_BINDINGS], 'form3d+2d', { forceMachine: true }, 'setup_datawiz');
     def.deriveGuards = homingDeriveGuards;
     def.postInstantiate = (stack, resolved) => applyHomingRecompose(stack, resolved);
+    // t552 — the draggable machine-frame START anchor (mid-envelope): the in-place preview passes starts[0] as the start,
+    // seeded as the engine initialPos (machineFrameTool), so the homing sim runs FROM it (t540). Sim-only, never emitted.
+    def.simStartsProvider = () => [homingMidStart()];
     return def;
 }

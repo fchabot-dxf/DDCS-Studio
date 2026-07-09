@@ -40,19 +40,21 @@ test('opSimContext: declared op-type → preview intent', async ({ page }) => {
   const s = r.sample;
   // Rotary probe ops → the 4th-axis rig (and NOT a machine/magazine op).
   for (const op of ['rotary_clock', 'rotary_center']) {
-    expect(s[op]).toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false });
+    expect(s[op]).toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false, toolMachineFrame: false });
   }
   // ATC tool-moving ops → machine frame + magazine.
   for (const op of ['atc_change', 'atc_table']) {
-    expect(s[op]).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: true });
+    expect(s[op]).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: true, toolMachineFrame: false });
   }
-  // ATC ops without a tool move + homing → machine frame, NO magazine.
-  for (const op of ['atc_warmup', 'atc_length', 'homing']) {
-    expect(s[op]).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: false });
+  // ATC ops without a tool move → machine frame, NO magazine (the tool is NOT machine-frame).
+  for (const op of ['atc_warmup', 'atc_length']) {
+    expect(s[op]).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: false, toolMachineFrame: false });
   }
+  // HOMING → machine frame + the tool in RAW machine coords (t552 toolMachineFrame).
+  expect(s.homing).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: false, toolMachineFrame: true });
   // Cutting ops + non-rotary probes → plain local-frame preview (all false).
   for (const op of ['pocket', 'surfacing', 'edge', 'unknown']) {
-    expect(s[op]).toEqual({ showRotaryRig: false, forceMachine: false, showMagazine: false });
+    expect(s[op]).toEqual({ showRotaryRig: false, forceMachine: false, showMagazine: false, toolMachineFrame: false });
   }
 
   // programSimContext: the UNION across a multi-op program (the Blocks-tab preview renders the whole stack).

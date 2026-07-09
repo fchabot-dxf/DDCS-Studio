@@ -49,11 +49,12 @@ export function setUserSimIntent(opType, intent) {
  */
 export function opSimContext(opType) {
     const u = USER_INTENT.get(opType);
-    if (u) return { showRotaryRig: !!u.showRotaryRig, forceMachine: !!u.forceMachine, showMagazine: !!u.showMagazine };
+    if (u) return { showRotaryRig: !!u.showRotaryRig, forceMachine: !!u.forceMachine, showMagazine: !!u.showMagazine, toolMachineFrame: !!u.toolMachineFrame };
     return {
         showRotaryRig: ROTARY_RIG.has(opType),
         forceMachine: FORCE_MACHINE.has(opType),
         showMagazine: WITH_MAGAZINE.has(opType),
+        toolMachineFrame: opType === 'homing',   // t552 — the built-in homing renders its tool in the machine frame (t497)
     };
 }
 

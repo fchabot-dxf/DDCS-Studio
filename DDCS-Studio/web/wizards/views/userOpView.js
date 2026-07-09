@@ -322,8 +322,20 @@ export const userOpView = {
         // 'userViz3dContainer' in form3d+2d, 'userVizContainer' in form3d.
         try {
             const _rigCont = pt.mode === '3d2d' ? 'userViz3dContainer' : pt.mode === '3d' ? 'userVizContainer' : null;
-            if (_rigCont) mgr.previewRotaryFixture(_rigCont, !!opSimContext(_def.opType).showRotaryRig);
-        } catch (_) { /* op declares no rotary intent → the rig stays off */ }
+            const _ctx = opSimContext(_def.opType);
+            if (_rigCont) {
+                mgr.previewRotaryFixture(_rigCont, !!_ctx.showRotaryRig);
+                // t552 — DECLARED MACHINE-FRAME-TOOL intent (opSimContext.toolMachineFrame from the stack `sim{toolMachine:true}`,
+                // homing): FORCE the envelope box (regardless of settings.machine.show) + render the live tool in RAW machine
+                // coords (t497), so homing draws at the envelope top with a stock shown. The GENERIC mirror of homingView's calls.
+                // GATED on toolMachineFrame (the homing intent), NOT plain forceMachine — a probe op (corner) declares forceMachine
+                // for the whole-program preview but its IN-PLACE probe preview must stay LOCAL-frame (the legacy behaviour).
+                if (_ctx.toolMachineFrame) {
+                    if (mgr.previewMachine) mgr.previewMachine(_rigCont, true);
+                    if (mgr.previewToolMachineFrame) mgr.previewToolMachineFrame(_rigCont, true);
+                }
+            }
+        } catch (_) { /* op declares no rig/machine intent → harmless no-ops */ }
         const status = el('userVizStatus');
         if (status) status.textContent = (_def.label || 'custom') + ' · ' + (gcode.split('\n').length) + ' lines';
     },

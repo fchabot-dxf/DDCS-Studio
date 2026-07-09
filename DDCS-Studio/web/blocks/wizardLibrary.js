@@ -40,7 +40,7 @@ const BUILTINS = [
 
     { id: 'atc_warmup', type: 'atc_warmup', label: 'Warm-up', icon: '🔥', group: 'setup', opensAs: 'user_atc_warmup_data' },
     { id: 'wcs', type: 'wcs', label: 'WCS / work offsets', icon: '⊕', group: 'probe', opensAs: 'user_wcs_data' },   // t477 E1 — IN-PLACE: the WCS slot opens the twin (dialect-aware wcszero atom); built-in wcsView stays the legacy shim
-    { id: 'homing', type: 'homing', label: 'Homing', icon: '⌖', group: 'probe' },
+    { id: 'homing', type: 'homing', label: 'Homing', icon: '⌖', group: 'probe', opensAs: 'user_homing_data' },   // t552 — IN-PLACE: the Homing slot opens the twin (machine-frame preview: forced envelope + draggable Start + plays the real emit); the built-in homingWizard stays the legacy shim
     // t339 E4 — IN-PLACE SWAP: the built-in Corner/Edge/Middle KEEP their Probe slot (label/icon/group), but `opensAs` re-points
     // the click to the data-op TWIN (userOpView) — the user sees "Corner"/"Edge"/"Middle" WHERE IT ALWAYS WAS, now data-op-backed
     // (human t332). The built-in stack (cornerStack/edgeStack/middleStack + BUILDERS/SCHEMA) stays as the LEGACY SHIM (legacy saved

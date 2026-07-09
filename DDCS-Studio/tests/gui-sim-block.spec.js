@@ -40,7 +40,7 @@ test('gui sim block: registered, checkbox fields, emits nothing, declares def.si
   expect(r.emitted.toLowerCase(), 'sim block emits no G-code').not.toContain('sim');
   expect(r.emitted.length, 'the move still emitted').toBeGreaterThan(0);
   // precedence helper
-  expect(r.declares).toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false });
+  expect(r.declares).toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false, toolMachineFrame: false });
   expect(r.empty, 'a sim block declaring nothing → null intent').toBeNull();
   expect(r.none, 'no sim block → undefined (caller falls back to the dev-panel checkboxes)').toBeUndefined();
 
