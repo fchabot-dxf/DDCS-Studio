@@ -94,9 +94,24 @@ function pocketsStack(params) {
     return S;
 }
 
-export function atcTestStack(params = {}) {
+export function atcTestStack(params = {}, opts = {}) {
+    // t556 E0 — the data-op twin seam. superset:true carries BOTH mode arms GUARDED by `mode` (drawbar | pockets), so
+    // pruneGuards collapses to the chosen mode → byte-identical to the concrete build. Each arm is built from the current
+    // params (the pockets arm UNROLLS the magazine; the drawbar arm is the counted GOTO loop) — the twin (E1) re-unrolls the
+    // pockets from the CURRENT settings.atc.magazine at instantiation. deriveGuards injects the EFFECTIVE mode for the prune.
+    if (opts.superset) {
+        const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
+        return [
+            GUARD({ param: 'mode', is: 'drawbar' }, drawbarStack(params)),
+            GUARD({ param: 'mode', is: 'pockets' }, pocketsStack(params)),
+        ];
+    }
     return (params.mode === 'pockets') ? pocketsStack(params) : drawbarStack(params);
 }
+
+/** The EFFECTIVE mode — the ONE source shared by the concrete build + the twin's prune derive: `pockets` iff explicitly
+ *  chosen, else `drawbar` (the concrete default). So an unset mode collapses the superset to the drawbar arm, byte-identical. */
+export function atcTestEffectiveMode(params) { return (params && params.mode === 'pockets') ? 'pockets' : 'drawbar'; }
 
 export class AtcTestWizard {
     generate(params) {
