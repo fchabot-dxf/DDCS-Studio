@@ -20,28 +20,52 @@
  * viz-provided stock-floor depth in, {x,y,z} machine coords out.
  */
 
+/** Read the WCS / pin table ONCE — the shared source both the machine-frame part offset (partZeroShift) and the part-frame
+ *  stock pin (stockPinOffset) derive from, so how the pin is indexed + which fallback fires can't drift between renderers.
+ *  `isPinned` = the stock declares a real WCS pin AND a table exists (matches _partShift's pinned branch — NOT whether the
+ *  row resolves; a pinned-but-missing row stays at 0, it does NOT fall to the active-WCS fallback). */
+function readWcs(machine, stock) {
+    const m = machine, s = stock;
+    const shown = !!(m && m.show && m.x && m.y && m.z);
+    const wt = m && m.wcs && m.wcs.table;
+    const wo = (m && m.workOrigin) || {};
+    const pin = s && s.pin;
+    const isPinned = !!(pin && pin !== 'origin' && Array.isArray(wt));
+    const pinRow = isPinned ? (wt[parseInt(String(pin).replace(/[^0-9]/g, ''), 10) - 54] || null) : null;   // 'g54' → table[0]
+    const activeRow = (Array.isArray(wt) && wt[(((m && m.wcs && m.wcs.active) || 1) - 1)]) || null;
+    return { m, s, shown, wo, isPinned, pinRow, activeRow };
+}
+
 /** THE part-frame offset — machine coords of part-zero. XY = the stock's "Sits at WCS" pin (its table row), else the active
  *  WCS row / machine.workOrigin fallback (mirrors wcsForViz EXACTLY — t173). Z = the FIXED machine table minus the stock-floor
  *  depth (`stockFloorZ`, the stock bottom in part-local Z; a viz value — XY-only renderers pass null → the pin's WCS-Z). No
  *  envelope shown → {0,0,0} (part-zero at scene 0, the per-op view). Extracted verbatim from gcodeViz3d._partShift (t582). */
 export function partZeroShift(machine, stock, stockFloorZ) {
-    const m = machine, s = stock;
-    if (!(m && m.show && m.x && m.y && m.z)) return { x: 0, y: 0, z: 0 };
+    const r = readWcs(machine, stock);
+    if (!r.shown) return { x: 0, y: 0, z: 0 };
     let x = 0, y = 0, wcsZ = 0;   // XY — the stock's WCS (G54 XY): the persistent fixture position.
-    const pin = s && s.pin, wt = m.wcs && m.wcs.table;
-    if (pin && pin !== 'origin' && Array.isArray(wt)) {
-        const t = wt[parseInt(String(pin).replace(/[^0-9]/g, ''), 10) - 54];   // 'g54' → table[0]
-        if (t) { x = Number(t.x) || 0; y = Number(t.y) || 0; wcsZ = Number(t.z) || 0; }
+    if (r.isPinned) {
+        if (r.pinRow) { x = Number(r.pinRow.x) || 0; y = Number(r.pinRow.y) || 0; wcsZ = Number(r.pinRow.z) || 0; }
     } else {
         // No stock pinned to a WCS (ATC/machine-frame preview): sit at the ACTIVE WCS so a G53 move CANCELS to raw machine
         // coords on the fixed envelope (t163). Mirror wcsForViz's fallback: active table row, else workOrigin, else 0.
-        const a = (Array.isArray(wt) && wt[(((m.wcs && m.wcs.active) || 1) - 1)]) || m.workOrigin;
+        const a = r.activeRow || r.wo;
         if (a) { x = Number(a.x) || 0; y = Number(a.y) || 0; }
     }
     // Z — the stock rests on the FIXED machine table; Z0 floats at the datum height (the stored WCS-Z is volatile per part).
-    const tableFloor = Math.min(0, m.z), stockShown = s && s.show && s.z > 0 && stockFloorZ != null;
+    const tableFloor = Math.min(0, r.m.z), stockShown = r.s && r.s.show && r.s.z > 0 && stockFloorZ != null;
     const z = stockShown ? tableFloor - stockFloorZ : wcsZ;
     return { x, y, z };
+}
+
+/** The 2D top-down STOCK PIN — the fixture offset of the stock from part-zero in the PART frame: the stock's WCS table row
+ *  MINUS the active work origin, ONLY when the stock is explicitly pinned (else {0,0} — an unpinned stock IS part-zero).
+ *  Same table read as partZeroShift (ONE source: the pin index + lookup can't drift); the part-frame base subtracts
+ *  workOrigin (partZeroShift is machine-frame). Byte-identical to toolpath2d's former local stockPin() (t584). */
+export function stockPinOffset(machine, stock) {
+    const r = readWcs(machine, stock);
+    if (!r.pinRow) return { x: 0, y: 0 };
+    return { x: (Number(r.pinRow.x) || 0) - (Number(r.wo.x) || 0), y: (Number(r.pinRow.y) || 0) - (Number(r.wo.y) || 0) };
 }
 
 export class PartFrame {

@@ -14,6 +14,7 @@
  */
 import { traceToolpath } from '../engine/trace.js';
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE draws from the RUNTIME END of the previous pass (t107 machine-faithful, via passEnds), else the static previous START (t94), not its own net-endpoint marker
+import { stockPinOffset } from './sceneFrame.js';   // t584 PREVIEW-PARITY E2b — the stock's WCS pin from THE ONE declared frame source (shared with the 3D's partZeroShift), so the 2D pin can't drift from the 3D/engine
 import { PATH_TYPES, PATH_STATE, HEAD, TOUCH_PULSE, pulsePx, hexCss } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette (type × state) + the touch-pulse token, shared with the 3D + the legend (t331 — feedRgb gradient removed)
 
 // Colours + progress states are the ONE declared source in viz/pathStyle.js (t317) — rapid=yellow(dashed),
@@ -70,13 +71,9 @@ export function createToolpath2d(canvas, opts = {}) {
     // _anchorToStart (gcodeViz3d): an ANCHORED op (incremental/probe) EMANATES from the operator START marker (the
     // spindle pos) — the 3D's +starts[0] — while an ABSOLUTE/mill op rides the stock's WCS pin (#13). When anchored the
     // panel sets machine=null → the scene is LOCAL (pin=0) → the stock sits at part-zero and the start marker AT the path origin.
-    const stockPin = () => {
-        const s = stock;
-        if (!s || !s.pin || s.pin === 'origin' || !(machine && machine.wcs && machine.wcs.table)) return { x: 0, y: 0 };
-        const gi = parseInt(String(s.pin).replace(/[^0-9]/g, ''), 10) - 54;
-        const t = machine.wcs.table[gi], wo = machine.workOrigin || {};
-        return t ? { x: (Number(t.x) || 0) - (wo.x || 0), y: (Number(t.y) || 0) - (wo.y || 0) } : { x: 0, y: 0 };
-    };
+    // t584 — the stock's WCS-pin offset comes from THE ONE declared frame source (sceneFrame.stockPinOffset), shared with
+    // the 3D's partZeroShift (same table read → no drift). Part-frame base: table[pin] − workOrigin; unpinned → {0,0}.
+    const stockPin = () => stockPinOffset(machine, stock);
     // PATH transform: anchored → emanate from a pass's start marker (INC4: each REPOSITION pass rides its OWN start ②,
     // not always pass-0/①, so a boss-both 2nd-axis probe sits at ②); else → the stock WCS pin (#13). Single-pass /
     // no pass → pass 0, so existing single-pass behaviour is unchanged.
