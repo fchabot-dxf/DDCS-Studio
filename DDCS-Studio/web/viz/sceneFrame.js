@@ -58,6 +58,18 @@ export function partZeroShift(machine, stock, stockFloorZ) {
     return { x, y, z };
 }
 
+/** The WCS offset (machine coords) for a 1-based WCS index — table[idx-1], else machine.workOrigin, else {0,0,0}. The DRO's
+ *  Mach column (Work + this) and the engine's G53 read it from THE ONE table (no local lookup). The ACTIVE index is the
+ *  caller's: a program G54-G59 line overrides the settings-active for the SIM (createPreviewPanel.simActiveWcs) — this stays
+ *  a pure lookup so the override lives at the call site (pass the resolved active index). Byte-identical to the former local
+ *  activeWcsOffset / wcsForViz table read (t588). */
+export function wcsOffsetAt(machine, idx) {
+    const m = machine;
+    if (!m) return { x: 0, y: 0, z: 0 };
+    const w = m.wcs, r = w && Array.isArray(w.table) && w.table[((idx || (w && w.active) || 1)) - 1];
+    return r ? { x: +r.x || 0, y: +r.y || 0, z: +r.z || 0 } : (m.workOrigin || { x: 0, y: 0, z: 0 });
+}
+
 /** The 2D top-down STOCK PIN — the fixture offset of the stock from part-zero in the PART frame: the stock's WCS table row
  *  MINUS the active work origin, ONLY when the stock is explicitly pinned (else {0,0} — an unpinned stock IS part-zero).
  *  Same table read as partZeroShift (ONE source: the pin index + lookup can't drift); the part-frame base subtracts

@@ -20,6 +20,7 @@ import { GcodeViz3D } from './gcodeViz3d.js';
 import { createToolpath2d } from './toolpath2d.js';
 import { LEGEND_ROWS } from './pathStyle.js';   // t317 — the ONE declared path-visual palette (the legend reads it, can't drift from the renderers)
 import { traceToolpath } from '../engine/trace.js';
+import { wcsOffsetAt } from './sceneFrame.js';   // t588 PREVIEW-PARITY E2d — THE ONE WCS table read (the DRO Mach + the engine G53 + the 2D frame all read it; no local lookup)
 import { GcodeExecutionEngine } from '../engine/index.js';
 import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
@@ -57,13 +58,9 @@ const toolsForViz = () => { const a = (window.ddcsGetSettings && window.ddcsGetS
 // SOURCE: derive it straight from the G54-G59 table row for the active WCS, NOT the machine.workOrigin cache — that
 // cache is only refreshed by syncWorkOrigin() (settingsPanel) and is stale {0,0,0} until the user touches the table, so
 // reading it made Mach == Work. workOrigin stays the fallback for legacy paths / before a table exists.
-const wcsForViz = () => {
-    const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;
-    if (!m) return null;
-    const w = m.wcs, r = w && Array.isArray(w.table) && w.table[(w.active || 1) - 1];
-    if (r) return { x: +r.x || 0, y: +r.y || 0, z: +r.z || 0 };
-    return m.workOrigin || null;
-};
+// t588 PREVIEW-PARITY E2d — read the SETTINGS-active WCS offset from THE ONE frame source (sceneFrame.wcsOffsetAt); no local
+// table lookup. Preserves the null-when-no-machine contract (callers `|| {0,0,0}`); wcsOffsetAt never returns null when m exists.
+const wcsForViz = () => { const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null; return m ? wcsOffsetAt(m, (m.wcs && m.wcs.active) || 1) : null; };
 const machineForViz = () => (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;   // envelope: travel + show + ox/oy/oz (drawn by viz.setMachine, gated on machine.show)
 const previewPrefs = () => (window.ddcsGetSettings && window.ddcsGetSettings().preview) || {};   // Settings → Preview tab
 // Z-fraction of the stock datum (0=bottom, 0.5=centre, 1=top) — the datum's height above the stock bottom, as a
@@ -206,11 +203,9 @@ export function createPreviewPanel(container, opts = {}) {
     const droEl = q('.pp-dro'), droWcsEl = q('.pp-dro-wcs'), droBody = q('.pp-dro-tbl tbody');
     let simActiveWcs = null;   // #4: a G54-G59 PROGRAM LINE overrides the active WCS for the SIM/DRO ONLY (never settings.machine.wcs.active); reset each run
     const activeWcsIdx = () => { if (simActiveWcs) return simActiveWcs; const m = machineForViz(); return (m && m.wcs && m.wcs.active) || 1; };
-    const activeWcsOffset = () => {   // Mach = Work + this; follows the program-driven active WCS once a G54-G59 line fired, else the settings active
-        const m = machineForViz(); if (!m) return { x: 0, y: 0, z: 0 };
-        const w = m.wcs, r = w && Array.isArray(w.table) && w.table[activeWcsIdx() - 1];
-        return r ? { x: +r.x || 0, y: +r.y || 0, z: +r.z || 0 } : (m.workOrigin || { x: 0, y: 0, z: 0 });
-    };
+    // Mach = Work + this; follows the program-driven active WCS once a G54-G59 line fired (simActiveWcs → activeWcsIdx),
+    // else the settings active. t588 — reads THE ONE frame source (wcsOffsetAt); the sim override lives in activeWcsIdx, passed in.
+    const activeWcsOffset = () => wcsOffsetAt(machineForViz(), activeWcsIdx());
     const activeWcsName = () => 'G' + (53 + activeWcsIdx());   // table[0]=G54
     let droAxes = ['x', 'y', 'z'];
     function buildDro() {
