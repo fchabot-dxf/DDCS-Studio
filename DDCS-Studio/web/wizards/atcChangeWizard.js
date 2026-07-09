@@ -188,17 +188,32 @@ function inlineTncStack() {
     return S;
 }
 
-export function atcChangeStack(params = {}) {
+// The EFFECTIVE arm — the ONE routing (method × callMacro → the 5 distinct builders), shared by the concrete build, the E0
+// superset prune, and the E1 twin's deriveGuards. INC-B: the AUTOMATIC methods (firmware/generic/disk) DEFAULT to a T# M6
+// CALL to the installed T.nc (callMacro !== false); callMacro === false is the INLINE fallback (firmware → the O10102 push;
+// generic/disk → the live-settings tncProgram body). m6/manual are method-only (m6 delegates; manual is a hand-swap).
+export function atcChangeEffectiveArm(params = {}) {
     const method = resolveMethod(params);
-    // INC-B: the AUTOMATIC methods (firmware/generic/disk) DEFAULT to a T# M6 CALL to the installed T.nc (callMacro !== false).
-    // callMacro === false is the INLINE fallback. m6/manual are unchanged (m6 already delegates; manual is a hand-swap).
-    if ((method === 'firmware' || method === 'generic' || method === 'disk') && params.callMacro !== false) return macroCallStack(params);
+    if ((method === 'firmware' || method === 'generic' || method === 'disk') && params.callMacro !== false) return 'macroCall';
     switch (method) {
-        case 'm6': return m6Stack(params);
-        case 'firmware': return firmwareStack(params);                 // the O10102 push station — NOT the assumed drawbar dance; unchanged
-        case 'disk': case 'generic': return inlineTncStack();          // INC-B2: one-source inline body via tncProgram (was autoStack/diskAutoStack); reads settings LIVE (4b)
-        default: return manualStack(params);
+        case 'm6': return 'm6';
+        case 'firmware': return 'firmware';                            // the O10102 push station — NOT the assumed drawbar dance
+        case 'disk': case 'generic': return 'inlineTnc';              // INC-B2: one-source inline body via tncProgram; reads settings LIVE (4b)
+        default: return 'manual';
     }
+}
+
+const ARM_BUILDERS = { m6: m6Stack, manual: manualStack, macroCall: macroCallStack, firmware: firmwareStack, inlineTnc: inlineTncStack };
+
+export function atcChangeStack(params = {}, opts = {}) {
+    // t562 E0 — the data-op twin seam. superset:true carries EVERY method arm GUARDED by the DERIVED `_arm` key (the effective
+    // routing), so pruneGuards collapses to the chosen arm → byte-identical to the concrete build. Each arm builds from the
+    // current params/settings (the inlineTnc arm reads Settings → ATC I/O LIVE); the twin (E1) injects `_arm` via deriveGuards.
+    if (opts.superset) {
+        const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
+        return Object.keys(ARM_BUILDERS).map((arm) => GUARD({ param: '_arm', is: arm }, ARM_BUILDERS[arm](params)));
+    }
+    return ARM_BUILDERS[atcChangeEffectiveArm(params)](params);
 }
 
 export class AtcChangeWizard {
