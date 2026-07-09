@@ -16,7 +16,7 @@
  * NOT registered/opened in-place yet (E2). The per-axis config (feeds/backoff/slave) lives in settings.homing.axes (Homing
  * Setup), read at emit — the op stores only the axis SELECTION + order (`axes`) + the soft-limit re-enable flag.
  */
-import { homingStack, homeAxisBlocks } from '../../wizards/homingWizard.js';
+import { homingStack, homingUnsetAxes } from '../../wizards/homingWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 
 const ALL_AXES = ['x', 'y', 'z', 'a', 'b'];
@@ -44,6 +44,8 @@ export const HOMING_STRUCT_BINDINGS = [
     { param: 'run_a', type: 'bool', default: HOMING_DEFAULTS.run_a, label: 'Home A', help: 'Home the A (rotary) axis — set current position as home (no seek).', section: 'GEOMETRY' },
     { param: 'run_b', type: 'bool', default: HOMING_DEFAULTS.run_b, label: 'Home B', help: 'Home the B (rotary) axis — set current position as home (no seek).', section: 'GEOMETRY' },
     { param: 'softLimits', type: 'bool', default: HOMING_DEFAULTS.softLimits, label: 'Re-enable soft limits', help: 'Re-enable #655 (soft limits) after homing.', section: 'GEOMETRY' },
+    // t554 — the 'Homing Setup…' button (an `action` widget; contributes no param) opens the setup modal (order + per-axis config).
+    { param: '_setup', type: 'bool', widget: 'action', action: 'homingSetup', default: false, label: 'Homing Setup…', help: 'Open Homing Setup: the per-axis order, feeds, back-off + the declared home switch.', section: 'GEOMETRY' },
 ];
 
 /** The wrapped user_root template — the E0 superset (all axes guarded), machine-frame sim (homing is G53): FORCED envelope +
@@ -161,5 +163,12 @@ export function homingDataDef() {
     // t552 — the draggable machine-frame START anchor (mid-envelope): the in-place preview passes starts[0] as the start,
     // seeded as the engine initialPos (machineFrameTool), so the homing sim runs FROM it (t540). Sim-only, never emitted.
     def.simStartsProvider = () => [homingMidStart()];
+    // t554 — the in-place unset-travel HINT (the t540 behaviour): a run-axis whose machine envelope travel is unset is SKIPPED;
+    // surface it in the panel status. Read live from settings (config/machine) via the ordered selection.
+    def.statusHint = (params) => {
+        const st = currentSettings();
+        const unset = homingUnsetAxes({ axes: axesOf(params || {}, st.config), machine: st.machine, config: st.config });
+        return unset.length ? `  ⚠ Set ${unset.join(' / ')} travel in Machine settings — ${unset.length > 1 ? 'those axes are' : 'that axis is'} skipped (no envelope).` : '';
+    };
     return def;
 }

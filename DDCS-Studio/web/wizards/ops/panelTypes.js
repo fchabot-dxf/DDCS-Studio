@@ -11,6 +11,21 @@ import { opSimStarts, resolveRelToIndex } from '../../viz/opSimStarts.js';   // 
 import { markerWorldOf } from '../../viz/markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the 3D preview ALSO reads, so the Layout handle + the 3D ruby can't diverge
 import { whenOk } from '../../blocks/whenGuard.js';   // a `when`-gated binding-group's handle shows only when its guard passes (③ — the prune-gated start handle)
 import { datumXY, getWorkpiece, workpieceBackdrop } from '../../engine/workpiece.js';   // t359 — the datum crosshair; t385 — DRAW the workpiece INSIDE cavities (the pocket) from the DECLARED feature (stock-modal size)
+import { opSimContext } from '../../viz/opSimContext.js';   // t554 — the DECLARED machine-frame-layout intent (homing's sim{toolMachine:true})
+import { axisSpan, declaredHomeEdgeSide } from '../../engine/limitSwitches.js';   // t554 — the machine envelope span + the declared <edge>Home for the layout's HOME glyph
+
+// t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
+// settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
+function machineFrameSpec() {
+    try {
+        const st = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings() : {};
+        const m = st.machine || {}, limits = st.limits || {};
+        const X = Number(m.x) || 0, Y = Number(m.y) || 0;
+        if (!(Math.abs(X) > 0) || !(Math.abs(Y) > 0)) return null;   // no envelope → fall back to the stock layout
+        const homeOf = (axis, travel) => { const sp = axisSpan(travel); const side = declaredHomeEdgeSide(axis, limits) || sp.homeSide; return side === 'min' ? sp.lo : sp.hi; };
+        return { x: X, y: Y, z: Number(m.z) || 0, homeX: homeOf('x', X), homeY: homeOf('y', Y) };
+    } catch (_) { return null; }
+}
 
 export const PANEL_TYPES = {
     form:        { id: 'form',        label: 'Form only',      viz: false, mode: null },   // single column, no preview
@@ -89,6 +104,12 @@ export function pinnedStartsFor(def, params, spots) {
 export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
+    // t554 — MACHINE-FRAME layout flavor (DECLARED via the op's sim{toolMachine:true} → opSimContext.toolMachineFrame; homing):
+    // draw the ENVELOPE rectangle + the declared HOME corner glyph INSTEAD of a stock backdrop (no stock, no switch art). The
+    // Start handle + toolpath + all other logic are unchanged — only the backdrop swaps. `stockOut`=null → no fc-stock rect.
+    const machine = (def && def.opType && opSimContext(def.opType).toolMachineFrame) ? machineFrameSpec() : null;
+    const stockOut = machine ? null : stock;
+    const machSpread = machine ? { machine } : {};
     // t359 — the part-zero crosshair follows the DATUM (the selected part-zero corner/centre), consistent with the stock
     // modal + the 3D. The corner-pick circles stay on the PHYSICAL corners (cornerDatumXY, datum-independent) — the datum
     // and the probed corner are INDEPENDENT. Display-only (the crosshair position); the emit is untouched. Default datum
@@ -346,7 +367,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });
             else if (spotOnDrag) spotOnDrag(id, world);
         };
-        return { stock, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, ...machSpread, ...cornerPick, ...edgePick };
     }
     // t73 — the SIM-ONLY first-start marker also shows on the Layout canvas (a SECOND renderer of createPreviewPanel's
     // userStarts pass-0, never emitted): a hollow ◇ for spatial reference alongside the emitting reposition handles. It is
@@ -377,9 +398,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                 } else if (spotOnDrag) spotOnDrag(id, world);
             }
             : spotOnDrag;
-        return { stock, items, handles: allHandles, onDrag: wrappedOnDrag, origin, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: allHandles, onDrag: wrappedOnDrag, origin, ...machSpread, ...cornerPick, ...edgePick };
     }
-    return { stock, items, handles, onDrag: spotOnDrag, origin, ...cornerPick, ...edgePick };
+    return { stock: stockOut, items, handles, onDrag: spotOnDrag, origin, ...machSpread, ...cornerPick, ...edgePick };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).

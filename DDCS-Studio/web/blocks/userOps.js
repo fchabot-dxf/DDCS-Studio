@@ -20,6 +20,12 @@ import { registerUserSpec, unregisterUserSpec } from './opSchema.js';
 import { setUserSimIntent } from '../viz/opSimContext.js';
 import { setUserSimStarts, makeProvider, setUserSimStock } from '../viz/opSimStarts.js';
 import { pruneGuards, getUserDeriveGuards, setUserDeriveGuards } from './whenGuard.js';   // ② B4 M2: collapse guarded structural forks at build; t469: inject DERIVED guard keys (pocket _tooSmall) before prune
+
+// t554 — the DECLARED in-place status-HINT registry (a LIVE fn per op, re-attached from the seed like deriveGuards/simStartsProvider,
+// since functions drop on persistence). `(resolvedParams) => string`; the generic userOpView appends it to the panel status.
+const USER_STATUS_HINT = new Map();
+export function setUserStatusHint(opType, fn) { if (typeof fn === 'function') USER_STATUS_HINT.set(opType, fn); else USER_STATUS_HINT.delete(opType); }
+export function getUserStatusHint(opType) { return USER_STATUS_HINT.get(opType) || null; }
 import { deriveBindings } from './dataOps/deriveBindings.js';   // re-derive binding indices BY IDENTITY after prune (guarded templates shift per state)
 
 const STORE_KEY = 'ddcs_user_ops';
@@ -520,6 +526,7 @@ export function registerUserOp(def) {
     setUserSimStarts(def.opType, provider, starts);
     setUserSimStock(def.opType, def.simStock);   // t417 E3 — a DECLARED per-op sim-stock (rotary round bar); a LIVE fn (re-attached from the seed, like simStartsProvider)
     setUserDeriveGuards(def.opType, def.deriveGuards);   // t469 — a DECLARED derive-guards hook (pocket _tooSmall from geometry); a LIVE fn (re-attached from the seed), injected before prune
+    setUserStatusHint(def.opType, def.statusHint);   // t554 — a DECLARED in-place status HINT (homing's unset-travel warning); a LIVE fn (re-attached from the seed, like the others)
     return def;
 }
 
@@ -584,6 +591,7 @@ export function deleteUserOp(opType) {
     unregisterUserSpec(opType);
     removeOpLabel(opType);            // register touches 4 tables — delete must clear all 4 (was leaking OP_LABELS)
     setUserSimIntent(opType, null);   // clear the declared preview intent
+    setUserStatusHint(opType, null);   // t554 — clear the declared status hint
     setUserSimStarts(opType, null);   // clear the declared per-pass sim-starts provider
     setUserSimStock(opType, null);    // t417 E3 — clear the declared per-op sim-stock
 }

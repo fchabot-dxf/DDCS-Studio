@@ -13,7 +13,7 @@ import { renderOpForm } from '../../ui/formWidgets.js';
 import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
-import { flattenBlocks } from '../../blocks/userOps.js';   // group: index the stored children for the live preview
+import { flattenBlocks, getUserStatusHint } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel)
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
 import { opSimContext } from '../../viz/opSimContext.js';   // t421 E5 — the DECLARED preview intent (rotary rig, …) so an in-place rotary twin shows its 4th-axis rig (generic mirror of the built-in view + the Blocks tab)
@@ -337,7 +337,10 @@ export const userOpView = {
             }
         } catch (_) { /* op declares no rig/machine intent → harmless no-ops */ }
         const status = el('userVizStatus');
-        if (status) status.textContent = (_def.label || 'custom') + ' · ' + (gcode.split('\n').length) + ' lines';
+        // t554 — an optional DECLARED status hint (def.statusHint(params) → a string): homing surfaces the unset-travel warning
+        // ("⚠ Set Z travel …", the t540 behaviour) in-place. Generic seam; a def without one → no hint (unchanged).
+        let _hint = ''; try { const hf = getUserStatusHint(_def.opType); if (hf) _hint = hf(params) || ''; } catch (_) { /* hint is optional */ }
+        if (status) status.textContent = (_def.label || 'custom') + ' · ' + (gcode.split('\n').length) + ' lines' + _hint;
     },
 
     // EDIT seeding (manager._seedForm): show the op's params in the widgets, then update() re-reads them.

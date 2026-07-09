@@ -466,6 +466,21 @@ function rectPadWidget(host, primary, group) {
     return { read: () => ({ [bx.param]: r3(x), [by.param]: r3(y), [bw.param]: r3(w), [bh.param]: r3(h) }) };
 }
 
+// t554 — an ACTION button (contributes NO param): opens a modal declared by `b.action` (e.g. homing's 'Homing Setup…').
+// A lazy dynamic import avoids a formWidgets↔settingsPanel cycle. read() returns {} so renderOpForm's reader loop is happy.
+function actionWidget(host, b) {
+    host.style.cssText = ROW_CSS;
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.textContent = b.label || 'Open…';
+    btn.dataset.param = b.param;
+    btn.style.cssText = 'padding:6px 14px; border-radius:6px; border:1px solid var(--border,#3a4150); background:var(--panel,#232833); color:var(--text-main,#dfe6ef); cursor:pointer; font-size:13px;';
+    btn.addEventListener('click', () => {
+        if (b.action === 'homingSetup') import('./settingsPanel.js').then((m) => m.openHomingSetup && m.openHomingSetup()).catch(() => {});
+    });
+    host.appendChild(btn);
+    return { read: () => ({}) };
+}
+
 export const FORM_WIDGETS = {
     number: numberWidget,
     slider: sliderWidget,
@@ -473,6 +488,7 @@ export const FORM_WIDGETS = {
     segmented: segmentedWidget,
     toggle: toggleWidget,
     text: textWidget,
+    action: actionWidget,
     'declared-io': declaredIoWidget,
     'corner-grid': cornerGridWidget,
     'region-pick': regionPickWidget,

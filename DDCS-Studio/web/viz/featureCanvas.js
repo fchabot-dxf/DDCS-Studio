@@ -475,14 +475,18 @@ export class FeatureCanvas {
         };
         label(x1 + off, cyw, '+X', '#ff6b6b'); label(x0 - off, cyw, '-X', '#ff6b6b');
         label(cxw, y1 + off, '+Y', '#5fd35f'); label(cxw, y0 - off, '-Y', '#5fd35f');
-        // machine HOME at coord 0 (a corner) — a dot + short +X/+Y axis arms so the frame's origin + directions read clearly.
-        const o = this._S(0, 0), arm = Math.max(16, span * 0.11 * this._tf.scale);
+        // machine HOME — a dot + short axis arms pointing INTO the envelope. Default machine-0 (ATC); a DECLARED home corner
+        // (m.homeX/homeY, e.g. homing's <edge>Home: zMaxHome / xMinHome) marks the actual home end. Arms point toward centre.
+        const hasHome = Number.isFinite(+m.homeX) || Number.isFinite(+m.homeY);
+        const hx = +m.homeX || 0, hy = +m.homeY || 0;
+        const o = this._S(hx, hy), arm = Math.max(16, span * 0.11 * this._tf.scale);
+        const inX = hasHome ? (hx <= cxw ? 1 : -1) : 1, inY = hasHome ? (hy <= cyw ? 1 : -1) : 1;   // point INTO the envelope
         const axis = (dx, dy, color) => this.gHandles.appendChild(svgEl('line', { x1: o.x, y1: o.y, x2: o.x + dx, y2: o.y + dy, stroke: color, 'stroke-width': 2, style: 'pointer-events:none' }));
-        axis(arm, 0, '#ff6b6b');    // +X → (screen right)
-        axis(0, -arm, '#5fd35f');   // +Y ↑ (world +Y is screen up)
+        axis(inX * arm, 0, '#ff6b6b');     // toward the reachable X (screen right = world +X)
+        axis(0, -inY * arm, '#5fd35f');    // toward the reachable Y (screen up = world +Y)
         this.gHandles.appendChild(svgEl('circle', { cx: o.x, cy: o.y, r: 3.4, fill: '#e6edf5', stroke: '#0b0e13', 'stroke-width': 1, style: 'pointer-events:none' }));
-        const hl = svgEl('text', { x: o.x + 7, y: o.y + 15, fill: '#9fb0c3', style: 'font:600 10px system-ui,sans-serif; pointer-events:none;' });
-        hl.textContent = 'HOME 0,0'; this.gHandles.appendChild(hl);
+        const hl = svgEl('text', { x: o.x + 7 * inX, y: o.y + 15, fill: '#9fb0c3', 'text-anchor': inX < 0 ? 'end' : 'start', style: 'font:600 10px system-ui,sans-serif; pointer-events:none;' });
+        hl.textContent = hasHome ? 'HOME' : 'HOME 0,0'; this.gHandles.appendChild(hl);
     }
 
     /** Stock-attach markers — small squares on the stock's 9 points (corners/edges/centre). Click one to choose which
