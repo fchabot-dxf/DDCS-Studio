@@ -106,6 +106,24 @@ test('a REAL wizard insert (the success moment) fires the toast AFTER the op com
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('ddcs_rate')).successfulInserts), 'the insert counter bumped to the threshold').toBe(5);
 });
 
+test('the toast slides in on show (a one-time entrance animation)', async ({ page }) => {
+    await boot(page, { sessionCount: 2, successfulInserts: 4, lastSessionDay: TODAY() });
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:op-inserted')));
+    await page.waitForSelector('.ddcs-rate-toast');
+    const anim = await page.evaluate(() => { const s = getComputedStyle(document.querySelector('.ddcs-rate-toast')); return { name: s.animationName, dur: s.animationDuration }; });
+    expect(anim.name, 'the slide-in keyframe is applied on show').toBe('ddcs-rate-in');
+    expect(anim.dur, '~250ms entrance').toBe('0.25s');
+});
+
+test('prefers-reduced-motion → the toast shows instantly (no animation)', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });   // set BEFORE the toast renders so the media query applies
+    await boot(page, { sessionCount: 2, successfulInserts: 4, lastSessionDay: TODAY() });
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:op-inserted')));
+    await page.waitForSelector('.ddcs-rate-toast');
+    const name = await page.evaluate(() => getComputedStyle(document.querySelector('.ddcs-rate-toast')).animationName);
+    expect(name, 'reduced-motion disables the entrance animation').toBe('none');
+});
+
 test('the header ⋮ menu Rate/Feedback entry shows the toast with BOTH destinations (GitHub + email)', async ({ page }) => {
     await boot(page, { state: 'done' });   // even after "done", the unprompted menu path stays available
     await page.click('#hdrPostBtn');
