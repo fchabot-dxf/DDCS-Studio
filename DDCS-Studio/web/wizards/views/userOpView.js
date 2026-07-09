@@ -340,6 +340,19 @@ export const userOpView = {
                     // ○ for these ops). Absent (corner/edge) → the existing single sim-only Start marker (unchanged).
                     const spb = _def && _def.simStartParams;
                     const stkNow = _simStock || (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
+                    // t592 PREVIEW DRAGS WRITE THE PROGRAM — route a PREVIEW-PANEL marker drag (the 3D gizmo / the 2D top handle,
+                    // per pass) through THE SAME declared writer the Layout marker uses (writeSimStartFrac): a declared op's preview
+                    // drag writes the BOUND params (fraction / relSpanFrom span, envelope-clamped, handles independent) → recorded +
+                    // re-emitted → every surface (form field, Layout handle, sim marker, emit) follows. Non-declared op / an unbound
+                    // pass → false → the panel keeps its sim-only userStarts behavior (a manual-jog start is legitimately sim-only).
+                    if (panel && typeof panel.setMarkerDragWriter === 'function') {
+                        panel.setMarkerDragWriter((pass, world) => {
+                            const spbNow = _def && _def.simStartParams;   // read the CURRENT def live — a later non-declared op short-circuits (no stale write)
+                            if (!spbNow || !spbNow[pass]) return false;
+                            if (writeSimStartFrac(_def, pass, world, stkNow, starts)) { mgr.update(); return true; }
+                            return false;
+                        });
+                    }
                     const simMarkers = (spb && Array.isArray(starts))
                         ? spb.map((_m, i) => (starts[i] && Number.isFinite(+starts[i].x)) ? {
                             pos: starts[i], label: String.fromCharCode(65 + i),   // A, B, …

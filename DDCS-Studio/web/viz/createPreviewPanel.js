@@ -158,12 +158,21 @@ export function createPreviewPanel(container, opts = {}) {
     let userStarts = [];   // INC2: per-pass USER overrides (a jog or a drag) — these BEAT the wizard's inferStarts HINT so an edited ② STICKS (the hint only positions an un-touched pass)
     let lastPassSources = [];   // t81 — the latest per-pass reposition sources (auto/manual), exposed (getPassSources) so the Layout canvas colours its handles to MATCH the top panel
     let lastPassEnds = null;    // t107 — the latest per-pass runtime world-ENDs from the trace, exposed (getPassEnds) so the Layout canvas relocates its reposition marker + anchors the END-relative drag to the SAME runtime END
+    // t592 PREVIEW DRAGS WRITE THE PROGRAM — a host writer for an op that DECLARES a marker→param binding (simStartParams):
+    // a preview-panel marker drag (this 2D top handle OR the 3D gizmo) routes through THE SAME writer the Layout canvas uses
+    // (userOpView.writeSimStartFrac), so it writes the BOUND PARAMS (fraction / relSpanFrom span, with the envelope clamp +
+    // handle independence) → recorded + re-emitted → every surface follows. Returns true when it wrote (→ skip the sim-only
+    // userStarts write below; the host's re-render moves the marker from the params). Absent / returns false → today's sim-only
+    // behavior (a manual-jog start on a non-declared op is legitimately sim-only — the DECLARED line).
+    let markerDragWriter = null;
+    function setMarkerDragWriter(fn) { markerDragWriter = (typeof fn === 'function') ? fn : null; }
     // A per-pass start drag from ANY view — the 2D toolpath handle, the 3D marker, or the feature-canvas ②-aim handle —
     // records it as the USER override (a sim-only DECLARED value: it BEATS the inferStarts hint + persists), mirrors to the
     // 3D marker, then re-traces + replays from the new start. ONE seam, so every view edits the SAME userStarts (the
     // feature-canvas drag is just another writer of it — exposed on the panel return for the view-owned canvas).
     function onStartDrag(pos, pass) {
         const p = pass | 0, np = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 };
+        if (markerDragWriter && markerDragWriter(p, np)) return;   // t592 — a declared op: the bound params were written + the host re-rendered; the marker follows the param, so no sim-only userStarts override
         passStarts[p] = np; userStarts[p] = np;          // shared source of truth + USER override (beats the hint, persists)
         if (p === 0) curStart = np;                      // pass 0 = the operator start getStartPos() reads
         if (viz && viz.starts) viz.starts[p] = np;       // mirror to the 3D marker
@@ -285,6 +294,16 @@ export function createPreviewPanel(container, opts = {}) {
         // Dragging the 3D start marker is a user override (like the 2D handle) — record it so getStartPos() reads it.
         if (viz) viz.onStartChange = (starts) => {   // a 3D jog/drag (any pass) → sync the shared starts, PIN the moved pass, re-trace + replay (#18, INC2)
             if (!Array.isArray(starts) || !starts.length) return;
+            // t592 — a DECLARED op (simStartParams): route the MOVED marker through the host param writer (the SAME writer the
+            // Layout + 2D handle use), so a 3D-gizmo drag writes the bound params/emit. The envelope clamp + handle independence
+            // live in writeSimStartFrac. On a write, the host re-renders (the marker follows the param) → skip the sim-only pin.
+            if (markerDragWriter) {
+                for (let p = 0; p < starts.length; p++) {
+                    const s = starts[p]; if (!s) continue;
+                    const np = { x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }, cur = passStarts[p];
+                    if (cur && (cur.x !== np.x || cur.y !== np.y || cur.z !== np.z) && markerDragWriter(p, np)) return;
+                }
+            }
             starts.forEach((s, p) => {
                 const np = { x: +s.x || 0, y: +s.y || 0, z: +s.z || 0 }, cur = passStarts[p];
                 if (!cur || cur.x !== np.x || cur.y !== np.y || cur.z !== np.z) userStarts[p] = np;   // pin only the pass that actually MOVED (the jogged one) → its edit beats the hint
@@ -915,7 +934,7 @@ export function createPreviewPanel(container, opts = {}) {
         }
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setMarkerDragWriter, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
         getSimConfig: () => simConfig(lastAbsolute),                                       // t580 PREVIEW-PARITY E1 — THE ONE config the route traced from + play() feeds the engine (read-only; parity checks assert eng._* == this)
         getAnchor: () => curAnchor,                                                       // t309 — the anchored/absolute frame flag (feed the overlay so its path frame matches)
