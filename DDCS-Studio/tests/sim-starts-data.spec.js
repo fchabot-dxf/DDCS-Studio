@@ -27,12 +27,13 @@ test('(a) PROOF-OF-SUFFICIENCY: a built-in pattern as def.sim.starts rows == its
     const middleGot = makeProvider(middleRows)(pM, stockM);
     const middleWant = opSimStarts('middle', pM, stockM);
 
-    // ALIGNMENT (fence along X): two fraction passes near the +Y edge — exercises frac + top
+    // ALIGNMENT (fence along X): A = the anchor fraction near the +Y edge; B = A + the declared span (t544: 45 + 50 = 95mm =
+    // 0.6333 of the 150 stock) — exercises frac + top. (B is A+span mm, not a fixed fraction; expressed here at this stock.)
     const stockA = { x: 150, y: 100, z: 25 };
-    const pA = { checkAxis: 'X' };
+    const pA = { checkAxis: 'X', span: 50 };
     const alignRows = [
       { anchor: 'frac', fx: 0.3, fy: 0.85, plane: 'top' },
-      { anchor: 'frac', fx: 0.7, fy: 0.85, plane: 'top' },
+      { anchor: 'frac', fx: (45 + 50) / 150, fy: 0.85, plane: 'top' },   // A.x(45) + span(50) = 95mm
     ];
     const alignGot = makeProvider(alignRows)(pA, stockA);
     const alignWant = opSimStarts('alignment', pA, stockA);

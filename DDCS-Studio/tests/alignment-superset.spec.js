@@ -18,18 +18,19 @@ test('E0 GATE: prune(alignmentStack superset) == concrete alignmentStack, byte-i
         const { pruneGuards } = await import('/blocks/whenGuard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
 
-        const CHECK = ['X', 'Y'], DIR = ['pos', 'neg'], FRAME = ['relative', 'machine'];
+        const { alignEffectiveTravel } = await import('/wizards/ops/alignPoints.js');
+        const CHECK = ['X', 'Y'], DIR = ['pos', 'neg'], TRAVEL = ['auto', 'manual'];   // t544 — sweep BOTH travel arms
         const combos = [];
-        for (const checkAxis of CHECK) for (const probeDir of DIR) for (const safeZFrame of FRAME)
-            combos.push({ checkAxis, probeDir, safeZFrame });
+        for (const checkAxis of CHECK) for (const probeDir of DIR) for (const travel of TRAVEL)
+            combos.push({ checkAxis, probeDir, travel, span: 55 });
 
         let diffCount = 0, leftoverGuards = 0, supGuardMax = 0, firstDiff = null;
         for (const c of combos) {
             const sup = alignmentStack(c, { superset: true });   // all checkAxis×probeDir × travel arms present, each guarded
             supGuardMax = Math.max(supGuardMax, (JSON.stringify(sup).match(/"type":"guard"/g) || []).length);
-            // t510 — prune with the EFFECTIVE travel: this sweep has no stock → MANUAL (the concrete resolves the same via
-            // alignEffectiveTravel). The AUTO arm's stock-bound coords are recomposed in postInstantiate → the E1 full-build test.
-            pruneGuards(sup, { ...c, travel: 'manual' });         // collapse to the concrete MANUAL shape for c
+            // t544 — prune with the EFFECTIVE travel (auto default | manual) — the SAME the concrete alignmentStack resolves
+            // via alignEffectiveTravel. AUTO no longer binds stock coords (the span is a plain #73 scalar) → prune==concrete.
+            pruneGuards(sup, { ...c, travel: alignEffectiveTravel(c) });   // collapse to the concrete shape for c
             if (JSON.stringify(sup).includes('"type":"guard"')) leftoverGuards++;
             const a = emitMapped(sup).text;                      // the pruned superset
             const b = emitMapped(alignmentStack(c, { superset: false })).text;   // the concrete (INDEPENDENT path)

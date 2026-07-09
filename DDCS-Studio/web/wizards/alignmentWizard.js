@@ -20,7 +20,7 @@ import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
-import { alignPointsXY, alignEffectiveTravel } from './ops/alignPoints.js';   // t506/t510 — the ONE source of the 2 probe points + the effective travel mode
+import { alignSpan, alignEffectiveTravel } from './ops/alignPoints.js';   // t544 — the ONE source of the A→B span + the effective travel mode (AUTO no longer needs a stock)
 
 const r3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
 
@@ -44,13 +44,13 @@ export function alignmentStack(params = {}, opts = {}) {
     const src = params.sources || {};   // tolerance moved into alignmentHeaderComments (display-only, F3)
     const superset = !!opts.superset;   // E0 — carry checkAxis × probeDir arms guarded; prune collapses to the concrete shape
     const _hdr = alignmentHeaderComments(params);   // the scalar/tolerance header line — ONE format shared with the twin recompose
-    // t506 — TRAVEL mode. AUTO (default): the wizard RAPIDS to the 2 declared probe points (frac × stock, one source) at
-    // safe-Z, then probes — no jog, no Confirm. MANUAL: today's behaviour (operator jogs to each + Confirm; the points are
-    // preview HINTS only, emit byte-identical). AUTO needs a stock reference (greyed in the form without one). Point coords
-    // are stock-frame mm (WCS part-zero at the stock datum corner); the sim markers read the SAME source so they agree.
-    const travel = alignEffectiveTravel(params, params.stock);   // AUTO needs a usable stock; else MANUAL (byte-identical) — ONE source, shared with the twin
+    // t544 — TRAVEL mode. AUTO (default): probe A WHERE THE MACHINE IS (no travel, no Confirm — the corner/edge contract),
+    // then the ONLY auto-jog: lift to safe-Z, step the DECLARED SPAN along the checkAxis fence as a RELATIVE move, descend,
+    // probe B. MANUAL: today's behaviour (operator jogs to each + Confirm) — byte-identical. AUTO no longer needs a stock
+    // (the span is plain mm, not a fraction × stock); handle A is a sim-only START anchor (never emitted).
+    const travel = alignEffectiveTravel(params);   // purely the user's choice now (auto default | manual) — ONE source, shared with the twin
     const guardTravel = superset;   // E0 — the superset carries BOTH travel arms guarded (prune collapses to the effective mode)
-    const [ptA, ptB] = alignPointsXY(params, params.stock || {});
+    const span = alignSpan(params);   // the A→B span (mm along checkAxis, signed) — AUTO's relative jog
 
     const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
 
@@ -85,16 +85,6 @@ export function alignmentStack(params = {}, opts = {}) {
             RD(probeAxis, resultVar); MV(probeAxis, retractVar);
         };
 
-        // t506 AUTO travel: rapid to a declared probe point (stock-frame WCS coords) at safe-Z, then descend to probe
-        // clearance. Replaces the operator jog + Confirm gate. WCS part-zero at the stock datum corner; the sim markers
-        // read the SAME source (alignPoints), so the rendered handle, the sim, and these moves agree by construction.
-        const travelTo = (px, py) => {
-            DM('abs');
-            MV('Z', '#19');                        // up to safe-Z (clear the workpiece before the XY rapid)
-            MV('X', r3(px)); MV('Y', r3(py));      // rapid to the declared point
-            MV('Z', '#2');                         // descend to probe clearance (just above the top)
-        };
-
         // ── Header ──
         C(`Alignment | Fence along: ${checkAxis} | Probe: ${probeAxis} ${dirLabel}`);
         C(`Misalignment = contact_B - contact_A over the span along ${checkAxis}`);
@@ -125,7 +115,9 @@ export function alignmentStack(params = {}, opts = {}) {
 
         // ── Point A ──
         C(`===== POINT A: First probe along ${checkAxis} fence =====`);
-        const aAuto = () => { C('AUTO travel to point A, safe-Z then descend'); travelTo(ptA.x, ptA.y); };   // coords ride the moves (the twin recomposes them from its stock) — NOT the comment, so superset/concrete match
+        // t544 — AUTO probes A WHERE THE MACHINE IS: no travel, no Confirm (the corner/edge contract — position first, run).
+        // Declare the A->B span (#73) here (AUTO-only, so MANUAL stays byte-identical); the point-B jog steps it.
+        const aAuto = () => { A('#73', r3(span), `A->B span along ${checkAxis} (declared)`); C('AUTO: probe point A in place - position the tool at A before running (no travel to A)'); };
         const aManual = () => { C('Position probe at point A along the fence, at probing height'); CF('Press Enter when in position at point A - ESC=cancel', 2); };
         if (guardTravel) b.push(GUARD({ param: 'travel', is: 'auto' }, capture(aAuto)), GUARD({ param: 'travel', is: 'manual' }, capture(aManual)));
         else if (travel === 'auto') aAuto(); else aManual();
@@ -138,8 +130,13 @@ export function alignmentStack(params = {}, opts = {}) {
         // ── Point B ──
         C(`===== POINT B: Second probe along ${checkAxis} fence =====`);
         const bAuto = () => {
-            C('AUTO travel to point B, safe-Z then descend'); travelTo(ptB.x, ptB.y);
-            RM(checkAxis, '#71'); A('#72', '[#71-#70]', `Span = B - A along ${checkAxis}`); DM('inc');   // travelTo already descended
+            // AUTO's ONLY jog: at safe-Z (lifted after A), step the declared span along the fence (RELATIVE), then descend
+            // back to A's probe height. Mirrors the MANUAL tail (RM/#72/descend) — only the operator jog+Confirm is replaced.
+            // "REPOSITION: … auto-traverse" so the sim counts 2 passes (A/B) + colours B's marker as an AUTO traverse (see
+            // GcodeExecutionEngine pass detection) — the same 2-pass reposition the MANUAL arm produces, just tool-driven.
+            C(`REPOSITION: auto-traverse the declared span (#73) along the ${checkAxis} fence, then descend to probe B`);
+            DM('inc'); MV(checkAxis, '#73'); DM('abs');   // relative jog by the span (replaces the operator jog + Confirm)
+            RM(checkAxis, '#71'); A('#72', '[#71-#70]', `Span = B - A along ${checkAxis}`); DM('inc'); MV('Z', '#20');   // descend back to probe height
         };
         const bManual = () => {
             C(`REPOSITION: jog to point B along the ${checkAxis} fence - keep same Y/Z`);

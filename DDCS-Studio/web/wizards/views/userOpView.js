@@ -119,11 +119,23 @@ function writeSimStartFrac(def, i, world, stock, starts) {
     const R = machineReachXY();
     const wx = R ? Math.max(R.xMin, Math.min(R.xMax, (+world.x || 0))) : (+world.x || 0);
     const wy = R ? Math.max(R.yMin, Math.min(R.yMax, (+world.y || 0))) : (+world.y || 0);
-    if (spb.relSpanFrom != null) {   // t530 — RELATIVE-SPAN marker (rotary clock B): Y-drag → a mm span from marker A
-        const aY = (Array.isArray(starts) && starts[spb.relSpanFrom]) ? (Number(starts[spb.relSpanFrom].y) || 0) : 0;
-        const span = Math.max(1, wy - aY);   // span in mm, ≥ 1mm (B is +Y from A)
-        // `span` is a FORM field (#6, the ONE source) — write the FIELD, not a parallel _simStartFracs (which would OVERRIDE
-        // a later typed value). So the drag AND the numeric field are two editors of the one #6; update() re-reads the field.
+    if (spb.relSpanFrom != null) {   // t530/t544 — RELATIVE-SPAN marker: drag along an axis → a mm span from the anchor marker
+        const aM = (Array.isArray(starts) && starts[spb.relSpanFrom]) || {};
+        // t544 — the span AXIS: a declared literal (spb.spanAxis) OR read LIVE from a form param (spb.spanAxisFrom, e.g.
+        // alignment's checkAxis so the span runs along the fence); default Y (rotary clock — B is +Y from A).
+        let axis = spb.spanAxis === 'X' ? 'X' : 'Y';
+        if (spb.spanAxisFrom) {
+            const host = el('wiz_user_form') && el('wiz_user_form').querySelector(`[data-param="${spb.spanAxisFrom}"]`);
+            let v = host && host.value;                                                  // select / input
+            if ((v == null || v === '') && host) { const on = host.querySelector('.seg-on'); v = on && on.dataset.value; }   // segmented widget → the selected button
+            if (v === 'X' || v === 'Y') axis = v;
+        }
+        const aPos = axis === 'X' ? (Number(aM.x) || 0) : (Number(aM.y) || 0);
+        const wPos = axis === 'X' ? wx : wy;
+        const raw = wPos - aPos;
+        const span = spb.signed ? raw : Math.max(1, raw);   // t544 — signed (alignment: B either side of A); default floored ≥1mm (rotary clock B is +Y)
+        // `span` is a FORM field (the ONE source) — write the FIELD, not a parallel _simStartFracs (which would OVERRIDE
+        // a later typed value). So the drag AND the numeric field are two editors of the one span; update() re-reads the field.
         const fld = spb.y && el('wiz_user_form') && el('wiz_user_form').querySelector(`[data-param="${spb.y}"]`);
         if (fld) fld.value = String(Math.round(span * 1000) / 1000);
         else if (spb.y) _simStartFracs[spb.y] = span;

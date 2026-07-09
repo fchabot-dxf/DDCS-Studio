@@ -19,7 +19,7 @@
  */
 
 import { num } from '../wizards/ops/util.js';
-import { alignPointsXY } from '../wizards/ops/alignPoints.js';   // t506 — the ONE declared source of the 2 alignment probe points (fractions)
+import { alignMarkersXY } from '../wizards/ops/alignPoints.js';   // t544 — the ONE source of the 2 alignment markers: A (sim-only anchor) + B (A + the declared span along checkAxis)
 import { barRadius } from '../engine/probeGeometry.js';   // SPATIAL-MODEL inc2: the declared bar radius (stock.diameter ?? min(cross)/2)
 import { whenOk } from '../blocks/whenGuard.js';   // the ONE guard evaluator (shared with the emit-side prune) — declare-never-infer
 import { projectWorkpiece } from '../engine/workpiece.js';   // t385 — a middle probe's CENTRE start = the workpiece pocket centre (its physical pos), so it starts INSIDE an OFF-CENTRE cavity
@@ -64,14 +64,14 @@ const BUILT_IN = {
         return [...lead, ...prim, ...sec];                           // [Z?] + primary + the trans pass (auto or manual) secondary
     },
 
-    // ALIGNMENT — probe A, reposition (jog to B along the fence), probe B → 2 passes. t506: the 2 markers now read the ONE
-    // declared source (alignPoints — params.ax/ay/bx/by fractions of the stock), REPLACING the old fixed 0.3/0.7 inference,
-    // so a dragged handle moves the sim marker (the same source drives the 2D canvas + the AUTO emit). Probe height = just
-    // above the stock top. Empty fractions fall back to the checkAxis default spread (near the far edge) inside alignPoints.
+    // ALIGNMENT — probe A, step the span to B along the fence, probe B → 2 markers. t544: A = the SIM-ONLY start anchor
+    // (params.ax/ay fractions × stock, draggable, never emitted); B = A + the declared SPAN along checkAxis (alignMarkersXY,
+    // the ONE source shared with the 2D canvas + the span field). Dragging A moves both markers; the span field / handle B's
+    // drag moves B. Probe height = just above the stock top. Empty ax/ay fall back to the checkAxis anchor default.
     alignment(params, stock) {
         const sy = n(stock && stock.y, 100), sz = n(stock && stock.z, 25);
         const z = Math.min(5, sz * 0.5);
-        const [A, B] = alignPointsXY(params || {}, { x: n(stock && stock.x, 150), y: sy });
+        const [A, B] = alignMarkersXY(params || {}, { x: n(stock && stock.x, 150), y: sy });   // A = the sim-only anchor; B = A + the declared span along checkAxis
         return [{ x: A.x, y: A.y, z }, { x: B.x, y: B.y, z }];
     },
 

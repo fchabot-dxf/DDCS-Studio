@@ -6,21 +6,21 @@ import { test, expect } from '@playwright/test';
  * fraction >1, bounded only by the machine envelope (settings.machine span); the sim marker follows past the stock edge.
  */
 
-test('alignPoints allows fractions beyond [0,1] (a probe point past the stock edge)', async ({ page }) => {
+test('the A anchor allows fractions beyond [0,1] (a probe point past the stock edge)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
-        const { alignPoints, alignPointsXY } = await import('/wizards/ops/alignPoints.js');
+        const { alignAnchor, alignMarkersXY } = await import('/wizards/ops/alignPoints.js');
         return {
-            beyond: alignPoints({ ax: 1.4, ay: -0.2, bx: 0.5, by: 0.5 })[0],   // A past the far edge (1.4) + below (-0.2)
-            xy: alignPointsXY({ ax: 1.4, ay: 0.5 }, { x: 200, y: 120 })[0],     // 1.4 × 200 = 280 (past the 200 edge)
-            emptyDefault: alignPoints({ checkAxis: 'X' })[0],                    // empty → the checkAxis default (still valid)
+            beyond: alignAnchor({ ax: 1.4, ay: -0.2 }),                         // A past the far edge (1.4) + below (-0.2)
+            xy: alignMarkersXY({ ax: 1.4, ay: 0.5 }, { x: 200, y: 120 })[0],    // A: 1.4 × 200 = 280 (past the 200 edge)
+            emptyDefault: alignAnchor({ checkAxis: 'X' }),                       // empty → the checkAxis default (still valid)
         };
     });
     expect(r.beyond.fx, 'ax=1.4 is NOT clamped to 1').toBeCloseTo(1.4, 5);
     expect(r.beyond.fy, 'ay=-0.2 is NOT clamped to 0').toBeCloseTo(-0.2, 5);
     expect(r.xy.x, '1.4 × 200mm stock = 280mm (past the stock edge)').toBeCloseTo(280, 3);
-    expect(r.emptyDefault.fx, 'an empty field still falls to the checkAxis default').toBeCloseTo(0.3, 5);
+    expect(r.emptyDefault.fx, 'an empty field still falls to the checkAxis anchor default').toBeCloseTo(0.3, 5);
 });
 
 test.use({ viewport: { width: 1400, height: 1000 } });
