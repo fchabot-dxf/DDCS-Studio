@@ -21,6 +21,7 @@ import { atcLengthDataDef } from './blocks/dataOps/atcLengthData.js';   // t409 
 import { atcCheckDataDef } from './blocks/dataOps/atcCheckData.js';   // t411 — ATC Tool Check light port (inherits the Tool Length recipe)
 import { atcTestDataDef } from './blocks/dataOps/atcTestData.js';   // t556-t560 ATC Test port — the "ATC Test (data)" twin: opened IN-PLACE from the built-in ATC Test slot (opensAs); mode superset + pockets unroll + M2 recompose + declared-I/O one-source + machine-frame/magazine sim
 import { atcChangeDataDef } from './blocks/dataOps/atcChangeData.js';   // t562-t566 ATC Change port — the "Tool Change (data)" twin: opened IN-PLACE from the built-in Tool Change slot (opensAs); 5-method _arm superset + M2 static-arm graft + inlineTnc live-view + per-method field gating + machine/magazine/choreography sim
+import { atcTableDataDef } from './blocks/dataOps/atcTableData.js';   // t568 ATC Table port (THE LAST WIZARD) — the "Tool Table (data)" twin: opened IN-PLACE from the built-in Tool Table slot (opensAs); include-toggle superset + live-view rows (unroll from Settings → Tool table)
 import { drillDataDef } from './blocks/dataOps/drillData.js';
 import { boreDataDef } from './blocks/dataOps/boreData.js';   // fan-out — the helical "Bore (data)" twin — opened IN-PLACE from the built-in Bore slot (opensAs); drillStack method='helical', byte-identical
 import { slotDataDef } from './blocks/dataOps/slotData.js';
@@ -161,6 +162,7 @@ class DDCSStudio {
             atcCheckDataDef(),   // t411 — ATC Tool Check twin (in-place from the ATC Tool Check slot)
             atcTestDataDef(),   // t560 E2 — seed the ATC Test twin so its in-place ATC Test slot (opensAs) opens a registered op on boot (mode superset + pockets unroll + declared-I/O one-source + machine-frame/magazine sim)
             atcChangeDataDef(),   // t566 E2 — seed the Tool Change twin so its in-place Tool Change slot (opensAs) opens a registered op on boot (5-method _arm superset + M2 static-arm graft + inlineTnc live-view + per-method gating + choreography sim)
+            atcTableDataDef(),   // t568 — seed the Tool Table twin (THE LAST WIZARD) so its in-place Tool Table slot (opensAs) opens a registered op on boot (include-toggle superset + live-view rows from Settings → Tool table)
             drillDataDef(),
             boreDataDef(),   // fan-out — seed the Bore twin so its in-place Bore slot (opensAs) opens a registered op on boot
             slotDataDef(),

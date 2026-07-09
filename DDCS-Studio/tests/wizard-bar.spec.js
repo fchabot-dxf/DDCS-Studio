@@ -67,10 +67,10 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(probe.items.some((i) => /openAlignmentWiz/.test(i.onclick || '')), 'no openAlignmentWiz opener in the menu (retired; the fn survives as the legacy shim + is unrelated to the ⟳ Align rotate button)').toBe(false);
   expect(probe.dividers).toEqual(['Rotary']);
 
-  // ATC: Tool Length + Tool Check + Tool Change + ATC Test now open their data-op twins IN-PLACE (opensAs, t409/t411/t566/t560); atc_table (last) via openWiz
+  // ATC: EVERY wizard now opens its data-op twin IN-PLACE (opensAs) — the port campaign is complete (t409/t411/t566/t568/t560)
   expect(atc.items.map((i) => i.onclick)).toEqual([
     "openWiz && openWiz('user_atc_length_data')", "openWiz && openWiz('user_atc_check_data')", "openWiz && openWiz('user_atc_change_data')",
-    "openWiz && openWiz('atc_table')", "openWiz && openWiz('user_atc_test_data')",
+    "openWiz && openWiz('user_atc_table_data')", "openWiz && openWiz('user_atc_test_data')",
   ]);
 
   // Mill: DRILL/Slot/Surfacing/Text open their data-op twins IN-PLACE (opensAs, t405/t407); BORE now opens its OWN helical

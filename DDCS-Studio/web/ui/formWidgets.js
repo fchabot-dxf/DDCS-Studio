@@ -477,6 +477,7 @@ function actionWidget(host, b) {
     btn.addEventListener('click', () => {
         if (b.action === 'homingSetup') import('./settingsPanel.js').then((m) => m.openHomingSetup && m.openHomingSetup()).catch(() => {});
         else if (b.action === 'atcSettings') import('./settingsPanel.js').then((m) => m.openAtcSetup && m.openAtcSetup()).catch(() => {});   // t566 — the Tool Change twin's "ATC Settings…" (magazine, drawbar I/O, changer)
+        else if (b.action === 'atcTableEdit') import('./settingsPanel.js').then((m) => m.openAtcSetup && m.openAtcSetup()).catch(() => {});   // t568 — the Tool Table twin's "Edit table…" (the ONE tool library + magazine editor)
     });
     host.appendChild(btn);
     return { read: () => ({}) };
