@@ -387,6 +387,8 @@ class Ops:
     _SOFT_NEG = (161, 162, 163)
     _SOFT_POS = (166, 167, 168)
     _HOMING_DIR = (112, 113, 114)
+    _HOMING_SPEED = (107, 108, 109)   # per-axis homing feed (X/Y/Z); #118 = homing precision (seed Studio's Homing Setup)
+    _HOMING_PRECISION = 118
     _MACH_ZERO = (235, 236, 237)
     _ACTIVE_WCS = 78
     _WCS_BASE = 305
@@ -404,11 +406,39 @@ class Ops:
             except (IndexError, TypeError):
                 return default
 
-        def span(neg_i, pos_i):  # travel = pos - neg; a ±9999 sentinel on either end means "no soft limit"
-            neg, pos = at(neg_i, -self._SENTINEL), at(pos_i, self._SENTINEL)
-            if abs(neg) >= self._SENTINEL or abs(pos) >= self._SENTINEL or pos <= neg:
+        def far_reach(i):
+            """The signed FAR-END machine coord of axis i = the reach from home. The machine homes to an extreme, so
+            the home end reads ~0 and the far end ~±span → the SIGNED far value IS machine.<axis>. A ±9999 sentinel end
+            means 'no soft limit that side'; when only ONE end is sentinel the other IS the far reach (the human's X:
+            neg=-9999 sentinel, pos=756 → far +756). BOTH ends sentinel → None (the axis is not soft-limited → NOT
+            declared on the controller; the human's Z). Both real → the larger-magnitude end is the far reach (Y:
+            neg=-776, pos=+5 → the home end is ~+5, the far reach is -776)."""
+            neg, pos = at(self._SOFT_NEG[i], -self._SENTINEL), at(self._SOFT_POS[i], self._SENTINEL)
+            neg_sent, pos_sent = abs(neg) >= self._SENTINEL, abs(pos) >= self._SENTINEL
+            if neg_sent and pos_sent:
                 return None
-            return round(pos - neg, 4)
+            if neg_sent:
+                return pos
+            if pos_sent:
+                return neg
+            return neg if abs(neg) >= abs(pos) else pos
+
+        def travel(i):  # the |signed far reach| — the axis EXTENT (Studio scales it by homeDir for the sign). None = undeclared.
+            fr = far_reach(i)
+            return None if fr is None else round(abs(fr), 4)
+
+        def home_edge(i):
+            """The declared home END ('min'|'max') per axis + a conflict flag. PRIMARY = the homing-direction param
+            (#112-114: 0 → home at the MIN end, 1 → the MAX end). The soft-limit far reach (when the axis IS declared)
+            CONFIRMS it — home sits OPPOSITE the far end (far +X ⇒ home min; far -Y ⇒ home max) — and WINS on a
+            disagreement (the soft-limit machine coords are unambiguous; the dir bit's polarity is [TO TEST]). Returns
+            (end | None, conflict) — end is None only when neither signal exists."""
+            hd = at(self._HOMING_DIR[i], None)
+            dir_end = ("min" if int(hd) == 0 else "max") if hd is not None else None
+            fr = far_reach(i)
+            sl_end = None if fr is None else ("min" if fr >= 0 else "max")
+            end = sl_end or dir_end
+            return end, bool(sl_end and dir_end and sl_end != dir_end)
 
         def home_sign(i):
             """Travel SIGN (±1) Studio's sim needs = which side of machine-zero (home) the working envelope
@@ -441,10 +471,11 @@ class Ops:
             b = self._WCS_BASE + w * self._WCS_STRIDE
             table["g%d" % (54 + w)] = [round(at(b), 4), round(at(b + 1), 4), round(at(b + 2), 4)]
 
+        he = {axis: home_edge(i) for i, axis in enumerate(("x", "y", "z"))}
         prof["geometry"] = {
-            "travel": {"x": span(self._SOFT_NEG[0], self._SOFT_POS[0]),
-                       "y": span(self._SOFT_NEG[1], self._SOFT_POS[1]),
-                       "z": span(self._SOFT_NEG[2], self._SOFT_POS[2])},
+            # travel = the axis EXTENT magnitude (sentinel-aware far reach: X 756, Y 776; None = the controller
+            # doesn't declare that axis — the human's Z: both ends ±9999). Studio scales it by homeDir for the sign.
+            "travel": {"x": travel(0), "y": travel(1), "z": travel(2)},
             "softLimits": {"xMin": at(self._SOFT_NEG[0]), "xMax": at(self._SOFT_POS[0]),
                            "yMin": at(self._SOFT_NEG[1]), "yMax": at(self._SOFT_POS[1]),
                            "zMin": at(self._SOFT_NEG[2]), "zMax": at(self._SOFT_POS[2])},
@@ -453,6 +484,13 @@ class Ops:
             # homeDir = the derived ±1 travel sign Studio consumes (geometry.homeDir); homingDir above is the
             # raw 0/1 param it's derived from, kept for debugging.
             "homeDir": {"x": home_sign(0), "y": home_sign(1), "z": home_sign(2)},
+            # homeEdge = the declared HOME END per axis ('min'|'max') → Studio's per-axis <edge>Home limit row (t594);
+            # homeEdgeConflict = the homing-dir bit disagrees with the soft-limit far reach (Studio flags it, prefers soft-limit).
+            "homeEdge": {"x": he["x"][0], "y": he["y"][0], "z": he["z"][0]},
+            "homeEdgeConflict": {"x": he["x"][1], "y": he["y"][1], "z": he["z"][1]},
+            # homingFeeds = the per-axis homing feed (#107-109) + precision (#118) to seed Studio's Homing Setup.
+            "homingFeeds": {"speed": {"x": at(self._HOMING_SPEED[0]), "y": at(self._HOMING_SPEED[1]), "z": at(self._HOMING_SPEED[2])},
+                            "precision": at(self._HOMING_PRECISION)},
             "machZero": {"x": at(self._MACH_ZERO[0]), "y": at(self._MACH_ZERO[1]), "z": at(self._MACH_ZERO[2])},
         }
         prof["wcs"] = {
