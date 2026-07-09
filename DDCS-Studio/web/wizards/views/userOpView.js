@@ -18,6 +18,7 @@ import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
 import { opSimContext } from '../../viz/opSimContext.js';   // t421 E5 — the DECLARED preview intent (rotary rig, …) so an in-place rotary twin shows its 4th-axis rig (generic mirror of the built-in view + the Blocks tab)
 import { CommunicationWizard } from '../communicationWizard.js';   // t518 — the Comm twin's 'commscreen' panel renders this wizard's DDCS-screen mock (pure fn of params)
+import { magazinePockets } from './atcViews.js';   // t560 — a DECLARED magazine intent (sim{magazine:true}) renders the ATC magazine tiles in-place (generic mirror of atc_change/atc_table)
 const _commWizard = new CommunicationWizard();
 import { createToolpath2d } from '../../viz/toolpath2d.js';   // t309 — the 2D-animation overlay under the Layout SVG (path + red head, driven by the shared engine)
 import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
@@ -333,6 +334,14 @@ export const userOpView = {
                 if (_ctx.toolMachineFrame) {
                     if (mgr.previewMachine) mgr.previewMachine(_rigCont, true);
                     if (mgr.previewToolMachineFrame) mgr.previewToolMachineFrame(_rigCont, true);
+                }
+                // t560 — a DECLARED magazine intent (opSimContext.showMagazine, from the stack sim{magazine:true}): render the
+                // ATC magazine tiles (pockets + tool stubs) on the envelope — the GENERIC mirror of atc_change/atc_table's
+                // previewMagazine (the atc_test twin's pocket dry-run visits these). Read live from settings.atc; a non-ATC op
+                // → magazine:false → no-op. Call AFTER preview3D (done above).
+                if (_ctx.showMagazine && mgr.previewMagazine) {
+                    const _s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+                    mgr.previewMagazine(_rigCont, magazinePockets(_s.atc || {}));
                 }
             }
         } catch (_) { /* op declares no rig/machine intent → harmless no-ops */ }

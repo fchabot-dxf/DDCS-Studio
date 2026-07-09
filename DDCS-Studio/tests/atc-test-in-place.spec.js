@@ -1,0 +1,79 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * ATC TEST E2 (t560) — COMPLETES port 1 of 3. The user_atc_test_data twin is seeded + wired IN-PLACE via the built-in ATC
+ * Test slot's `opensAs`. VERIFY: the slot opensAs the twin (plain title, twin retired) · opSimContext carries FORCE_MACHINE +
+ * WITH_MAGAZINE + the machine-frame intent · the in-place panel renders the form (both modes' fields) + the emit preview + the
+ * machine-frame 3D sim with the magazine · the E0/E1 emit sweeps + M2 stay green (their own specs) · full suite green.
+ */
+const OPTYPE = 'user_atc_test_data';
+
+test('opensAs wiring: ATC Test opens the twin IN-PLACE (plain title, twin retired) + opSimContext carries machine+magazine', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram);
+    const r = await page.evaluate(async (OPTYPE) => {
+        const WL = await import('/blocks/wizardLibrary.js');
+        const { opSimContext } = await import('/viz/opSimContext.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const entries = WL.listEntries();
+        const slot = entries.find((e) => e.id === 'atc_test');
+        const twinEntry = entries.find((e) => e.type === OPTYPE);
+        return { opensAs: slot && slot.opensAs, title: WL.builtinLabelForTwin(OPTYPE), twinRetired: !twinEntry, registered: !!builderOf(OPTYPE), ctx: opSimContext(OPTYPE) };
+    }, OPTYPE);
+    expect(r.registered, 'the twin is seeded/registered on boot').toBe(true);
+    expect(r.opensAs, 'the built-in ATC Test slot opensAs the twin').toBe(OPTYPE);
+    expect(r.title, 'the seamless in-place title is the built-in plain label').toBe('ATC Test');
+    expect(r.twinRetired, "the twin's own atc_datawiz menu entry is retired (no duplicate slot)").toBe(true);
+    expect(r.ctx.forceMachine, 'FORCE_MACHINE membership carries → the sim forces the envelope').toBe(true);
+    expect(r.ctx.showMagazine, 'WITH_MAGAZINE membership carries → the sim renders the magazine').toBe(true);
+    expect(r.ctx.toolMachineFrame, 'the machine-frame intent carries (atc_test is a G53 machine op, like homing)').toBe(true);
+});
+
+test.use({ viewport: { width: 1400, height: 1000 } });
+test('DRIVE: ATC Test opens IN-PLACE — both modes render their fields + the emit preview + the machine+magazine 3D sim', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    // seed a 3-pocket magazine into the live settings so the pockets dry-run unrolls + the 3D magazine tiles render
+    await page.evaluate(() => {
+        const real = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+        window.__realSettings = real;
+        window.ddcsGetSettings = () => ({
+            ...window.__realSettings,
+            atc: { ...(window.__realSettings.atc || {}), magazine: [{ tool: 1, x: 100, y: 50, z: -20, pocket: 1 }, { tool: 2, x: 150, y: 50, z: -20, pocket: 2 }, { tool: 3, x: 200, y: 50, z: -20, pocket: 3 }], tools: [{ num: 1, type: 'endmill', dia: 6 }, { num: 2, type: 'endmill', dia: 6 }, { num: 3, type: 'drill', dia: 5 }] },
+        });
+    });
+    await page.evaluate((op) => window.openWiz(op), OPTYPE);
+    await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
+    await page.waitForTimeout(500);
+
+    // DRAWBAR mode (the default) — the form renders all 7 fields as def params; the emit preview is the drawbar cycle
+    const drawbar = await page.evaluate(() => {
+        const f = document.getElementById('wiz_user_form');
+        const params = Array.from(f.querySelectorAll('[data-param]')).map((e) => e.getAttribute('data-param'));
+        const code = (document.getElementById('wiz_user_code') || {}).textContent || '';
+        const canvas = document.querySelector('#wiz_user canvas');
+        return { params: [...new Set(params)], code, hasViz: !!canvas };
+    });
+    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_test_inplace_drawbar.png' });
+
+    // switch to POCKETS mode via the segmented widget → the emit unrolls the 3 taught pockets
+    await page.click('.seg-control[data-param="mode"] button[data-value="pockets"]');
+    await page.waitForTimeout(500);
+    const pockets = await page.evaluate(() => {
+        const code = (document.getElementById('wiz_user_code') || {}).textContent || '';
+        const canvas = document.querySelector('#wiz_user canvas');
+        return { code, hasViz: !!canvas };
+    });
+    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_test_inplace_pockets.png' });
+
+    // the form fields ARE the def params (mode + drawbar + pockets)
+    for (const p of ['mode', 'cycles', 'dwellMs', 'first', 'count', 'zClear', 'descend']) {
+        expect(drawbar.params.includes(p), `the in-place form renders the "${p}" knob (a def param)`).toBe(true);
+    }
+    expect(drawbar.code, 'drawbar mode: the emit preview is the drawbar cycle test').toMatch(/Drawbar|M154/);
+    expect(drawbar.hasViz, 'the 3D machine-frame sim renders').toBe(true);
+    expect(pockets.code, 'pockets mode: the emit preview unrolls pocket 1').toContain('Pocket 1');
+    expect(pockets.code, 'pockets mode: the emit preview unrolls the 3rd taught pocket (live magazine)').toContain('Pocket 3');
+    expect(pockets.hasViz, 'the 3D sim renders in pockets mode too').toBe(true);
+    console.log('ATC-TEST IN-PLACE: fields=' + drawbar.params.join(',') + ' | pockets lines=' + pockets.code.split('\n').length);
+});

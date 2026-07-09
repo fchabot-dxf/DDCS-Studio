@@ -19,6 +19,7 @@ import { insertUserOp } from './ui/userOpForm.js';   // wizard-maker: generic pa
 import { atcWarmupDataDef } from './blocks/dataOps/atcWarmupData.js';
 import { atcLengthDataDef } from './blocks/dataOps/atcLengthData.js';   // t409 — ATC Tool Length light port (new twin, opened IN-PLACE from the ATC Tool Length slot)
 import { atcCheckDataDef } from './blocks/dataOps/atcCheckData.js';   // t411 — ATC Tool Check light port (inherits the Tool Length recipe)
+import { atcTestDataDef } from './blocks/dataOps/atcTestData.js';   // t556-t560 ATC Test port — the "ATC Test (data)" twin: opened IN-PLACE from the built-in ATC Test slot (opensAs); mode superset + pockets unroll + M2 recompose + declared-I/O one-source + machine-frame/magazine sim
 import { drillDataDef } from './blocks/dataOps/drillData.js';
 import { boreDataDef } from './blocks/dataOps/boreData.js';   // fan-out — the helical "Bore (data)" twin — opened IN-PLACE from the built-in Bore slot (opensAs); drillStack method='helical', byte-identical
 import { slotDataDef } from './blocks/dataOps/slotData.js';
@@ -157,6 +158,7 @@ class DDCSStudio {
             atcWarmupDataDef(),
             atcLengthDataDef(),   // t409 — ATC Tool Length twin (in-place from the ATC Tool Length slot)
             atcCheckDataDef(),   // t411 — ATC Tool Check twin (in-place from the ATC Tool Check slot)
+            atcTestDataDef(),   // t560 E2 — seed the ATC Test twin so its in-place ATC Test slot (opensAs) opens a registered op on boot (mode superset + pockets unroll + declared-I/O one-source + machine-frame/magazine sim)
             drillDataDef(),
             boreDataDef(),   // fan-out — seed the Bore twin so its in-place Bore slot (opensAs) opens a registered op on boot
             slotDataDef(),

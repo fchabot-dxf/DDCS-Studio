@@ -67,10 +67,10 @@ test('wizard bar renders from the library (groups, I/O, openers, icons, live cus
   expect(probe.items.some((i) => /openAlignmentWiz/.test(i.onclick || '')), 'no openAlignmentWiz opener in the menu (retired; the fn survives as the legacy shim + is unrelated to the ⟳ Align rotate button)').toBe(false);
   expect(probe.dividers).toEqual(['Rotary']);
 
-  // ATC: Tool Length + Tool Check now open their data-op twins IN-PLACE (opensAs, t409/t411); the other three via openWiz
+  // ATC: Tool Length + Tool Check + ATC Test now open their data-op twins IN-PLACE (opensAs, t409/t411/t560); the other two via openWiz
   expect(atc.items.map((i) => i.onclick)).toEqual([
     "openWiz && openWiz('user_atc_length_data')", "openWiz && openWiz('user_atc_check_data')", "openWiz && openWiz('atc_change')",
-    "openWiz && openWiz('atc_table')", "openWiz && openWiz('atc_test')",
+    "openWiz && openWiz('atc_table')", "openWiz && openWiz('user_atc_test_data')",
   ]);
 
   // Mill: DRILL/Slot/Surfacing/Text open their data-op twins IN-PLACE (opensAs, t405/t407); BORE now opens its OWN helical

@@ -45,16 +45,17 @@ export const ATC_TEST_STRUCT_BINDINGS = [
     { param: 'descend', type: 'bool', default: ATC_TEST_DEFAULTS.descend, label: 'Descend to pocket Z', help: 'Also descend to each pocket’s taught Z at the stop (a full-height alignment check), then retract.', section: 'POCKETS' },
 ];
 
-/** The wrapped `user_root` template — the E0 superset (both mode arms guarded), machine-frame sim (ATC = G53) with the
- *  magazine rendered (FORCE_MACHINE + WITH_MAGAZINE, the built-in atc_test intent). The pockets arm is seeded with a sample
- *  magazine so the Blocks view shows real visit-arms; instantiation recomposes it from the live magazine. */
+/** The wrapped `user_root` template — the E0 superset (both mode arms guarded), machine-frame sim (ATC = G53): FORCE the
+ *  envelope + render the tool in RAW machine coords (toolMachine, like homing — atc_test is a G53 machine op, not a local
+ *  probe) + the ATC magazine tiles (WITH_MAGAZINE). The pockets arm is seeded with a sample magazine so the Blocks view shows
+ *  real visit-arms; instantiation recomposes it from the live magazine. */
 export function atcTestDataStack(params = ATC_TEST_DEFAULTS) {
     const exec = atcTestStack({ ...params, magazine: (params.magazine || TEMPLATE_MAGAZINE) }, { superset: true });
     return [{
         type: 'user_root', params: {},
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d' } },
-            { type: 'sim', params: { rotary: false, machine: true, magazine: true, toolMachine: false } },
+            { type: 'sim', params: { rotary: false, machine: true, magazine: true, toolMachine: true } },
             { type: 'param_group', params: { group: 'ATC Test' }, children: [] },
         ],
         children: exec,
@@ -162,7 +163,7 @@ function applyAtcTestRecompose(stack, resolved) {
 /** Build the atc-test-as-data def — the E0 superset template + deriveGuards (the mode) + the unroll/recompose in
  *  postInstantiate. Byte-identical to atcTestStack across the mode × magazine-size × drawbar-count sweep. NO opensAs yet (E2). */
 export function atcTestDataDef() {
-    const def = userOpFromStack('atc_test_data', 'ATC Test (data)', atcTestDataStack(ATC_TEST_DEFAULTS), [...ATC_TEST_STRUCT_BINDINGS], 'form3d', { forceMachine: true, showMagazine: true }, 'atc_datawiz');
+    const def = userOpFromStack('atc_test_data', 'ATC Test (data)', atcTestDataStack(ATC_TEST_DEFAULTS), [...ATC_TEST_STRUCT_BINDINGS], 'form3d', { forceMachine: true, showMagazine: true, toolMachineFrame: true }, 'atc_datawiz');
     def.deriveGuards = atcTestDeriveGuards;
     def.postInstantiate = (stack, resolved) => applyAtcTestRecompose(stack, resolved);
     return def;

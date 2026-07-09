@@ -57,7 +57,7 @@ const BUILTINS = [
     { id: 'atc_check', type: 'atc_check', label: 'Tool Check', icon: '🛡', group: 'atc', opensAs: 'user_atc_check_data' },   // t411 — inherits the Tool Length light-ATC recipe, in-place
     { id: 'atc_change', type: 'atc_change', label: 'Tool Change', icon: '🔧', group: 'atc' },
     { id: 'atc_table', type: 'atc_table', label: 'Tool Table', icon: '📋', group: 'atc' },
-    { id: 'atc_test', type: 'atc_test', label: 'ATC Test', icon: '🧪', group: 'atc' },
+    { id: 'atc_test', type: 'atc_test', label: 'ATC Test', icon: '🧪', group: 'atc', opensAs: 'user_atc_test_data' },   // t560 E2 — IN-PLACE: the ATC Test slot opens the twin (mode superset + pockets unroll + declared-I/O one-source; FORCE_MACHINE + WITH_MAGAZINE sim); built-in atcTestWizard stays the legacy shim
     // QUICK-WINS PILOT (t405) — the DRILL peck twin goes IN-PLACE via opensAs (mirror corner/edge/middle E4/E5): the built-in
     // keeps its Mill slot, the click re-points to user_drill_data, the twin's own Mill-Data-Wiz entry auto-hides (OPENS_AS_TARGETS),
     // the title reads plain "Drill" (builtinLabelForTwin). BORE stays built-in: user_drill_data is PECK-only (method=helical swaps
