@@ -469,11 +469,11 @@ const _gvs = (id, d) => { const el = document.getElementById(id); const n = Numb
 function renderMachineGui() {
     const svgBox = document.getElementById('set_mach_env_svg'); if (!svgBox) return;
     const X = _gvs('set_mach_x', 300), Y = _gvs('set_mach_y', 300), Z = _gvs('set_mach_z', 120);
-    const W = 260, H = 200, c = Math.cos(Math.PI / 6), s = Math.sin(Math.PI / 6);
+    const W = 200, H = 200, c = Math.cos(Math.PI / 6), s = Math.sin(Math.PI / 6);   // t540 — square box (fits the 200px cell); the travel fields moved OUT to the column beside it
     const P = (x, y, z) => [(x - y) * c, (x + y) * s - z];          // iso: +X right-down, +Y left-down, +Z up
     const all = []; for (const x of [0, X]) for (const y of [0, Y]) for (const z of [0, Z]) all.push(P(x, y, z));
     const xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
-    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys), pad = 46;   // t493 — a wider margin so the offset travel fields sit clear of the box
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys), pad = 26;   // t540 — the box no longer reserves margin for floating fields (they're in the column), so it can fill the cell
     const scale = Math.min((W - 2 * pad) / Math.max(1, maxX - minX), (H - 2 * pad) / Math.max(1, maxY - minY));
     const ox = (W - (minX + maxX) * scale) / 2, oy = (H - (minY + maxY) * scale) / 2;
     const S = (x, y, z) => { const p = P(x, y, z); return [ox + p[0] * scale, oy + p[1] * scale]; };
@@ -496,13 +496,8 @@ function renderMachineGui() {
     }
     svg += `<circle cx="${O[0].toFixed(1)}" cy="${O[1].toFixed(1)}" r="3.4" fill="#ffd24a" stroke="#111" stroke-width="0.7"/>`;   // home (machine 0)
     svgBox.innerHTML = svg + '</svg>';
-    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-    // Push each travel field OFF its edge midpoint, OUTWARD from the box centre, so the field no longer sits on (and
-    // obscures) the coloured edge — the envelope box reads clear while the field stays beside its own axis (t493).
-    const ctr = mid(O, c111);
-    const outward = (p, d) => { const dx = p[0] - ctr[0], dy = p[1] - ctr[1], L = Math.hypot(dx, dy) || 1; return [p[0] + dx / L * d, p[1] + dy / L * d]; };
-    const place = (id, p) => { const el = document.getElementById(id); if (el) { el.style.left = Math.max(0, Math.min(W - 46, p[0] - 23)) + 'px'; el.style.top = Math.max(0, Math.min(H - 18, p[1] - 9)) + 'px'; } };
-    place('set_mach_x', outward(mid(O, c100), 30)); place('set_mach_y', outward(mid(O, c010), 30)); place('set_mach_z', outward(mid(O, c001), 30));
+    // t540 — the travel fields are a static COLUMN beside the box now (see the Machine-tab HTML); no per-field absolute
+    // placement here. The box still redraws live from the typed values (this whole fn runs on each input).
 }
 function commitMachine() {
     const s = getSettings(); if (!s.machine) s.machine = {};
@@ -616,6 +611,10 @@ function buildSettingsOverlay() {
             #settings-app .settings-done { background: var(--accent); color: #fff; border: none; border-radius: var(--radius, 5px); padding: 7px 24px; font-size: 13px; font-weight: 600; cursor: pointer; transition: filter 120ms; }
             #settings-app .settings-done:hover { filter: brightness(1.12); }
             #settings-app .dim-edit { position: absolute; width: 50px; padding: 1px 2px; font-size: 11px; text-align: center; background: var(--panel); color: var(--text-main); border: 1px solid var(--accent); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
+            /* t540 — the machine-envelope TRAVEL fields flow in a clean COLUMN beside the 3D box (not floating on it). Static overrides the .dim-edit absolute. */
+            #settings-app .mach-col-field { position: static; width: 74px; text-align: right; padding: 3px 6px; box-shadow: none; }
+            #settings-app .mach-travel-row { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 12px; }
+            #settings-app .mach-travel-row .mach-ax { width: 12px; display: inline-block; text-align: center; }
         </style>
             <div class="settings-head">
                 <div style="display: flex; align-items: center; gap: 16px;">
@@ -898,11 +897,17 @@ function buildSettingsOverlay() {
                     <div class="settings-section">
                         <div class="settings-section-title">MACHINE ENVELOPE (mm)</div>
                         <div class="settings-hint">Travel per axis, edited on the envelope. The <b>sign sets the home direction</b>: <code>X 300</code> homes at one end and travels +X; <code>X -300</code> homes at the other and travels −X. The ⬤ marks home (machine 0); the coloured edges are the travels.</div>
-                        <div id="set_mach_env_gui" style="position:relative; width:260px; height:200px; margin:6px 0;">
-                            <div id="set_mach_env_svg" style="position:absolute; inset:0;"></div>
-                            <input type="number" id="set_mach_x" class="dim-edit" step="1" title="X travel (mm) — sign sets the home direction">
-                            <input type="number" id="set_mach_y" class="dim-edit" step="1" title="Y travel (mm) — sign sets the home direction">
-                            <input type="number" id="set_mach_z" class="dim-edit" step="1" title="Z travel (mm) — sign sets the home direction">
+                        <!-- t540 — the 3D envelope box + a CLEAN COLUMN of travel fields beside it (X red / Y green / Z blue, axis-matched),
+                             instead of the fields floating over (and overlapping on) the box corners. The box updates live as you type. -->
+                        <div id="set_mach_env_gui" style="display:flex; align-items:center; gap:16px; margin:6px 0;">
+                            <div style="position:relative; width:200px; height:200px; flex:0 0 auto;">
+                                <div id="set_mach_env_svg" style="position:absolute; inset:0;"></div>
+                            </div>
+                            <div style="display:flex; flex-direction:column; gap:8px;">
+                                <label class="mach-travel-row"><span class="mach-ax" style="color:#e0564f;">X</span><input type="number" id="set_mach_x" class="dim-edit mach-col-field" step="1" title="X travel (mm) — sign sets the home direction"></label>
+                                <label class="mach-travel-row"><span class="mach-ax" style="color:#5fbf6a;">Y</span><input type="number" id="set_mach_y" class="dim-edit mach-col-field" step="1" title="Y travel (mm) — sign sets the home direction"></label>
+                                <label class="mach-travel-row"><span class="mach-ax" style="color:#5a8fe0;">Z</span><input type="number" id="set_mach_z" class="dim-edit mach-col-field" step="1" title="Z travel (mm) — sign sets the home direction"></label>
+                            </div>
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
                         <label class="settings-check" title="Soft limits (#655). On = the controller bounds travel to this envelope, so the box closes. Off = no software bound — the box opens, unbounded in the travel direction (still pinned at home). Studio never writes #655 to the controller; this mirrors the machine's own setting (pull it)."><input type="checkbox" id="set_mach_softlimit"> Enable soft limits (#655) — closes the envelope</label>

@@ -1,7 +1,7 @@
 /** views/homingView.js — Homing wizard view. A lean run-form: pick which axes to home this run; order +
  *  per-axis method come from the saved Homing Setup config (settings.homing). Opens the setup modal too. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { HomingWizard } from '../homingWizard.js';
+import { HomingWizard, homingUnsetAxes } from '../homingWizard.js';
 import { openHomingSetup } from '../../ui/settingsPanel.js';
 
 const wizard = new HomingWizard();
@@ -89,7 +89,12 @@ export const homingView = {
         // controller executes — so the order + final homed state are visualizable. preview pinned to the
         // machine frame (homing is inherently G53 / machine-coordinate).
         if (ctx && ctx.preview3D) {
-            ctx.preview3D(wizard.simProxy(params), 'homingVizContainer', null, null);
+            // t540 — a sim-only draggable START marker (machine frame): default MID-ENVELOPE, the homing sim runs FROM it
+            // (the tool travels Start → switch). Never emitted. The panel's own curStart persists a drag across updates; we
+            // pass a STABLE mid-envelope default (derived from the machine envelope) so an un-dragged marker doesn't jitter.
+            const mch = settings.machine || {};
+            const mid = { x: (Number(mch.x) || 0) / 2, y: (Number(mch.y) || 0) / 2, z: (Number(mch.z) || 0) / 2 };
+            ctx.preview3D(wizard.simProxy(params), 'homingVizContainer', mid, null);
             if (ctx.previewMachine) ctx.previewMachine('homingVizContainer', true);
             // t497 — the homing tool homes in MACHINE coords (no workpiece), so render it in the machine frame: it must
             // draw at the envelope TOP even with a stock shown, not stock-floor-shifted to the bottom (the watched plunge).
@@ -99,13 +104,16 @@ export const homingView = {
             // (layer 2) — those are separate from these meshes. (Previously: ctx.previewLimitSwitches(…, homingEdges(settings)).)
         }
 
+        // t540 — a VISIBLE hint for run-axes whose machine ENVELOPE travel is unset (the sim skips them, no fictional span).
+        const unset = homingUnsetAxes(params);
+        const unsetHint = unset.length ? `  ⚠ Set ${unset.join(' / ')} travel in Machine settings — ${unset.length > 1 ? 'those axes are' : 'that axis is'} skipped (no envelope).` : '';
         const status = el('homing_status');
         if (status) {
-            status.textContent = axes.length
+            status.textContent = (axes.length
                 ? `Home ${axes.map((a) => AX_LABEL[a]).join(' → ')}${homing.philosophy === 'simultaneous' ? ' (simultaneous)' : ''}`
-                : 'No axes selected — tick an axis to home.';
+                : 'No axes selected — tick an axis to home.') + unsetHint;
         }
         const vizStatus = el('homingVizStatus');
-        if (vizStatus) vizStatus.textContent = axes.length ? `Homing sim: ${axes.map((a) => AX_LABEL[a]).join(' → ')}` : 'Homing — no axes selected';
+        if (vizStatus) vizStatus.textContent = (axes.length ? `Homing sim: ${axes.map((a) => AX_LABEL[a]).join(' → ')}` : 'Homing — no axes selected') + unsetHint;
     },
 };

@@ -82,9 +82,13 @@ test('REAL APP: with a STOCK SHOWN, the G31 homing preview tool seeks to the swi
         await page.waitForTimeout(110);
     }
     const w = out.map((s) => s.w).filter((v) => v != null);
-    const wMin = Math.min(...w), wMax = Math.max(...w);
+    const ez = out.map((s) => s.ez).filter((v) => v != null);
+    const wMin = Math.min(...w), wMax = Math.max(...w), ezMin = Math.min(...ez);
     expect(wMax >= -6, `the rendered tool reaches the switch/top (worldZ max=${wMax}), NOT the -100 bottom`).toBe(true);
-    expect(wMin >= -8, `the rendered tool never plunges near the envelope bottom (worldZ min=${wMin})`).toBe(true);
+    // t540 — the tool now STARTS at the mid-envelope draggable Start and travels UP to the switch, so it legitimately
+    // occupies mid-Z (was pinned near the top). The t497 "no plunge" property is that the RENDERED tool TRACKS engine.pos.z
+    // (machine frame): assert wMin matches the engine's min, so a stock-floor plunge (w≈-100 while engine≈-60..-5) fails.
+    expect(Math.abs(wMin - ezMin) < 3, `the rendered tool TRACKS engine.pos.z (worldZ min=${wMin}, engine min=${ezMin}) — no stock-floor plunge`).toBe(true);
     await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_g31_tool_at_switch.png' });
 });
 

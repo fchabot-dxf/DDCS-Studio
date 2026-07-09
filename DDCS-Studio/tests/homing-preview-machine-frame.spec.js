@@ -36,18 +36,23 @@ async function homingRenderedZ(page, stockShown) {
         await page.waitForTimeout(110);
     }
     const ez = out.map((s) => s.ez).filter((v) => v != null), w = out.map((s) => s.w).filter((v) => v != null);
-    return { ezMin: Math.min(...ez), ezMax: Math.max(...ez), wMin: Math.min(...w), wMax: Math.max(...w) };
+    const last = [...out].reverse().find((s) => s.ez != null && s.w != null) || {};   // t540 — the SETTLED (homed rest) sample; the switch-touch peak (0) is a transient the sampling skips
+    return { ezMin: Math.min(...ez), ezMax: Math.max(...ez), wMin: Math.min(...w), wMax: Math.max(...w), ezLast: last.ez, wLast: last.w };
 }
 
 test('REAL APP: with a STOCK SHOWN, the rendered homing tool reaches the TOP (~-5), matching engine.pos.z — NOT -100', async ({ page }) => {
     const r = await homingRenderedZ(page, true);
-    // the engine homes to the top (-5) — the logic was always correct
-    expect(r.ezMax, 'engine.pos.z reaches the machine-0/top home').toBe(0);
-    expect(r.ezMin, 'engine backs off to -5').toBe(-5);
+    // t540 — the engine now STARTS at the mid-envelope draggable Start (z=-120 → -60) and homes UP to the top switch (0),
+    // settling backed off at -5 (ezLast). (Was: started AT the top, ezMax=0 / ezMin=-5.) The switch-touch 0 is a transient
+    // the 110ms sampling skips (engine.pos updates at segment completion) — so assert the START + SETTLED, not the peak.
+    expect(r.ezMin, 'engine STARTS at the mid-envelope Start (z=-120 → -60)').toBe(-60);
+    expect(r.ezLast, 'engine settles backed off from the top switch (-5)').toBe(-5);
     // THE FIX: the RENDERED tool now tracks the engine (top ~-5), NOT the stock-floor-shifted bottom (~-100)
     expect(r.wMax >= -6, `the rendered tool reaches the TOP (worldZ max=${r.wMax}), NOT the bottom`).toBe(true);
-    expect(r.wMin >= -8, `the rendered tool never drops near the envelope bottom (worldZ min=${r.wMin}); the plunge is gone`).toBe(true);
-    expect(Math.abs(r.wMin - r.ezMin) < 2, `the rendered worldZ (${r.wMin}) matches the engine pos (${r.ezMin})`).toBe(true);
+    // t540 — the tool now STARTS at the mid-envelope draggable Start and travels UP to the switch, so wMin is the Start
+    // (mid-Z), not the top (was: wMin >= -8, which assumed the tool starts PINNED at the top). The t497 "no plunge" guard
+    // is the TRACKING below: the rendered worldZ matches engine.pos.z; a stock-floor plunge decouples them by ~95mm.
+    expect(Math.abs(r.wMin - r.ezMin) < 2, `the rendered worldZ (${r.wMin}) matches the engine pos (${r.ezMin}) — no stock-floor plunge`).toBe(true);
 });
 
 test('REAL APP: with the STOCK HIDDEN, the rendered homing tool is still at the TOP (~-5)', async ({ page }) => {

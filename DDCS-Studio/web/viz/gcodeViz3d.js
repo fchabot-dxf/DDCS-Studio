@@ -811,9 +811,17 @@ export class GcodeViz3D {
             // pass (t107 machine-faithful, via _passEnds — post probe+retract+lift, incl the Z-trust lift), else the
             // static previous start (t94 fallback). NOT its own net-endpoint marker (that double-counts +cross). MANUAL /
             // pass-0 / non-corner fall back to self (mk). The marker SPRITE (_positionMarkers) relocates to the same end+cross.
-            const rawOff = this._anchorToStart ? (passAnchorFor(this.starts, this._passEnds, p) || mk) : { x: 0, y: 0, z: 0 };
+            // t540 — MACHINE-FRAME tool (homing): the absolute route is normalized-from-0, then POSITIONED at `off`. For
+            // homing, anchor `off` to the draggable Start (mk) in RAW machine coords — minus the part-frame shift, exactly
+            // like the live tool at ~line 588 — so the drawn seek path EMANATES FROM the Start and coincides with the
+            // animated tool (which rides engine.pos, seeded at the Start via initialPos). A Start drag re-traces (new deltas)
+            // + repositions the route here. Cutting ops (toolMachineFrame off) keep the normal part-frame off (unchanged).
+            const machTool = !!this._toolMachineFrame;
+            const rawOff = machTool ? (this.starts[p] || { x: 0, y: 0, z: 0 })
+                : (this._anchorToStart ? (passAnchorFor(this.starts, this._passEnds, p) || mk) : { x: 0, y: 0, z: 0 });
             const dOff = this._probeXYOff();   // t363 — map the whole route onto the datum-placed stock (physical − datum)
-            const off = { x: rawOff.x - dOff.x, y: rawOff.y - dOff.y, z: rawOff.z };
+            const sh = machTool ? this.partFrame.shift : { x: 0, y: 0, z: 0 };   // t540 — homing route sits at raw machine coords (like the tool), not the stock-floor-shifted part frame
+            const off = { x: rawOff.x - dOff.x - sh.x, y: rawOff.y - dOff.y - sh.y, z: rawOff.z - sh.z };
             // A MANUAL reposition draws a dashed jog from the previous pass's end to this pass's start (the operator
             // physically moves there). An AUTO traverse does NOT — its auto-traverse move (the diagonal) IS the connecting
             // travel, so a jog line here is a PHANTOM (the dashed line that "shouldn't be there" in auto). Gate by source.
@@ -1415,6 +1423,10 @@ export class GcodeViz3D {
 
     // Wireframe machine envelope (fixed machine coords; home at scene 0) + machine-zero axes. The PART frame carries
     // op/stock to the stock's WCS instead, so the envelope never moves.
+    // t540 — a machine-frame op forces the envelope box regardless of settings.machine.show (set by the panel's
+    // setForceMachine, via the Homing wizard's previewMachine). Re-draws the box with the current machine.
+    setForceMachineBox(on) { this._forceMachineBox = !!on; this.setMachine(this._machine); }
+
     setMachine(machine) {
         const THREE = this.THREE;
         this._machine = machine || null;
@@ -1423,7 +1435,9 @@ export class GcodeViz3D {
         if (this.machineBox) { this.scene.remove(this.machineBox); this.machineBox.geometry.dispose(); this.machineBox.material.dispose(); this.machineBox = null; }
         if (this.machineAxes) { this.scene.remove(this.machineAxes); if (this.machineAxes.geometry) this.machineAxes.geometry.dispose(); if (this.machineAxes.material) this.machineAxes.material.dispose(); this.machineAxes = null; }
         const sx = machine ? machine.x : 0, sy = machine ? machine.y : 0, sz = machine ? machine.z : 0;
-        if (machine && machine.show && sx && sy && sz) {
+        // t540 — a MACHINE-FRAME op (homing / forceMachine ATC) FORCES the envelope box regardless of settings.machine.show:
+        // its motion IS machine-frame, so the box is its reference. The `show` toggle only governs ordinary part-frame views.
+        if (machine && (machine.show || this._forceMachineBox) && sx && sy && sz) {
             const src = new THREE.BoxGeometry(Math.abs(sx), Math.abs(sy), Math.abs(sz));   // |travel| — the sign is just the home direction
             const eg = new THREE.EdgesGeometry(src);
             src.dispose();

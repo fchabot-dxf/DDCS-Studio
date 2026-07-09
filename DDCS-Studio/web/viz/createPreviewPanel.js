@@ -446,14 +446,14 @@ export function createPreviewPanel(container, opts = {}) {
         let parsed;
         try {
             // passStarts → the engine fires each REPOSITION pass's probe from ITS start ② (Part 1), so boss-both collides.
-            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: wcsForViz(), passStarts });
+            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: wcsForViz(), passStarts, initialPos: machineFrameTool ? st : null });   // t540 — homing: the ABSOLUTE route draws FROM the draggable machine-frame Start (a drag re-traces the travel)
             // (b) Faithful machine frame: an ABSOLUTE (mill) program's G53 / machine moves must resolve to where the
             // part actually SITS in the envelope, not at part-zero. Part-zero's machine Z = the table + the datum's
             // height above the stock bottom. Re-trace once with that as the work-origin Z so e.g. `G53 Z0` (the
             // end "safe Z" retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin.
             if (mch && mch.show && stk && stk.x > 0 && parsed.stats && parsed.stats.absolute) {
                 const z = Math.min(0, mch.z || 0) + datumZFrac(stk.datum) * (Number(stk.z) || 0);
-                parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: { x: wo.x || 0, y: wo.y || 0, z }, passStarts });
+                parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: { x: wo.x || 0, y: wo.y || 0, z }, passStarts, initialPos: machineFrameTool ? st : null });
             }
         } catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
         segs = parsed.segments || [];
@@ -515,6 +515,7 @@ export function createPreviewPanel(container, opts = {}) {
                 v.setSegments(parsed, !fitted); fitted = true;
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
                 if (v.setSimMode) v.setSimMode(((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'mill');   // probe = translucent stock, mill = solid
+                if (machineFrameTool && v.setToolPosition) v.setToolPosition(getStartPos() || { x: 0, y: 0, z: 0 });   // t540 — seat the PRE-PLAY tool at the draggable Start (machine frame), coherent with the Start-anchored route (play() re-seats it too)
             }
         }
         const s = parsed.stats || {};
@@ -602,6 +603,7 @@ export function createPreviewPanel(container, opts = {}) {
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
         eng.stock = stockForViz();
         eng._stockOffset = getStartPos() || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
+        eng._initialPos = machineFrameTool ? (getStartPos() || null) : null;   // t540 — homing: the tool STARTS at the draggable machine-frame Start so the absolute route animates Start→switch (drag → replayFromStart re-runs from the new Start)
         eng._passStarts = (passStarts && passStarts.length) ? passStarts : null;   // Part 1: each REPOSITION pass probes from ITS start ② (boss-both)
         eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };          // G53 machine moves draw in the part frame (see trace.js)
         if (mode === '3d') ensureViz();
@@ -745,6 +747,7 @@ export function createPreviewPanel(container, opts = {}) {
     // G-code, and re-renders if active so the change shows immediately.
     function setForceMachine(on) {
         on = !!on;
+        if (viz && viz.setForceMachineBox) viz.setForceMachineBox(on);   // t540 — a machine-frame op FORCES the envelope box regardless of settings.machine.show
         if (on === forceMachine) return;
         forceMachine = on;
         lastAnchor = null;   // force the anchor/envelope block in setGcode to re-evaluate

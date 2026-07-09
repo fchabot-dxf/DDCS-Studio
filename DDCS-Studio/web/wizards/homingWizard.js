@@ -138,7 +138,10 @@ export function homingStack(params = {}) {
             const homeSide = declaredHomeEdgeSide(ax, params.limits);   // 'min'|'max'|null — the DECLARED home switch end
             const dir = homeSide === 'max' ? 1 : homeSide === 'min' ? -1 : (-tSign || 1);
             const span = Math.abs(num((params.machine || {})[ax], 0));
-            const seekDist = r3(dir * (span > 0 ? span + 20 : 300));    // toward the home end, ~the travel span + margin (NOT ±10000)
+            // t540 — NO SILENT FALLBACK: an unset/0 travel has no meaningful seek distance. SKIP the axis + surface it
+            // (a comment), instead of fabricating a 300mm span. Configured machines (span > 0) are unaffected.
+            if (!(span > 0)) { C(`Home ${L} — SET ${ax.toUpperCase()} TRAVEL (machine envelope) first; homing SKIPPED for this axis`); return; }
+            const seekDist = r3(dir * (span + 20));                     // toward the home end, ~the travel span + margin (NOT ±10000)
             const P = `P#${1045 + N * 3}`, Lw = `L#${1047 + N * 3}`;     // home-input PORT / active-LEVEL registers (as today)
             const endLabel = homeSide === 'max' ? 'max (top)' : homeSide === 'min' ? 'min' : (dir > 0 ? 'max' : 'min');
 
@@ -192,8 +195,6 @@ export function homingSimProxy(params = {}) {
     const cfg = params.config || {};
     const machine = params.machine || {};
     const limits = params.limits || {};   // t504 — the DECLARED home switch per edge (settings.limits.<edge>Home)
-    const travel = { x: num(machine.x, 300), y: num(machine.y, 300), z: num(machine.z, -120), a: 0, b: 0 };
-
     const L = [];
     L.push('( SIMULATION PROXY — homing motion model, not the emitted macro )');
     L.push('G90');
@@ -201,17 +202,31 @@ export function homingSimProxy(params = {}) {
         const c = cfg[ax] || {};
         const A = ax.toUpperCase();
         if ((ax === 'a' || ax === 'b') && (c.rotary || 'setzero') === 'setzero') { L.push(`G53 ${A}0     ( ${A} set zero )`); return; }
+        // t540 — NO SILENT FALLBACK: an unset/0 axis travel is a real config gap, NOT a fictional -120/300 span. SKIP the
+        // axis (no made-up motion) and surface it (a visible comment here + homingView's hint via homingUnsetAxes).
+        const travel = num(machine[ax], 0);
+        if (!(Math.abs(travel) > 0)) { L.push(`( SET ${A} TRAVEL — ${A} machine envelope is unset; homing skipped for this axis )`); return; }
         // t504 — HOME is the DECLARED HOME SWITCH end (settings.limits.<edge>Home), read by axisHomeMotion — NOT machine-0.
         // The sim rapids TO the declared switch edge (the rapid ENDS there → the tool STOPS at the switch), then backs off
-        // INTO the reachable travel. Z with zMaxHome → the TOP (hi) for BOTH signs (the positive-Z plunge is gone). No
-        // declared home → fall back to the sign-derived machine-0 end (no regression).
-        const { seek, back } = axisHomeMotion(travel[ax] || 0, { offset: num(c.offset, 0), backoff: num(c.backoff, 5), axis: ax, limits });
+        // INTO the reachable travel. Z with zMaxHome → the TOP (hi) for BOTH signs. No declared home → the sign-derived end.
+        const { seek, back } = axisHomeMotion(travel, { offset: num(c.offset, 0), backoff: num(c.backoff, 5), axis: ax, limits });
         L.push(`G53 G0 ${A}${seek}     ( seek ${A} home )`);
         L.push(`G53 G1 ${A}${back} F${Math.round(num(c.slowFeed, 100))}     ( back off )`);
         const s = parseInt(c.slaveFollows, 10);
         if (Number.isInteger(s)) L.push(`( slave idx ${s} follows ${A} )`);
     });
     return L.join('\n');
+}
+
+/** t540 — the LINEAR run-axes whose machine envelope travel is UNSET/0 (uppercased, e.g. ['Z']). The homing view shows a
+ *  visible 'set … travel' hint for these + the sim skips them (no fictional span). Rotary set-zero axes never need a span. */
+export function homingUnsetAxes(params = {}) {
+    const axes = Array.isArray(params.axes) ? params.axes.filter((a) => AX_IDX[a] != null) : [];
+    const machine = params.machine || {}, cfg = params.config || {};
+    return axes.filter((ax) => {
+        if ((ax === 'a' || ax === 'b') && ((cfg[ax] || {}).rotary || 'setzero') === 'setzero') return false;
+        return !(Math.abs(num(machine[ax], 0)) > 0);
+    }).map((a) => a.toUpperCase());
 }
 
 export class HomingWizard {

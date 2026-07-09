@@ -61,7 +61,7 @@ export const ATC_DIALECT = {
 };
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, initialPos = null, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
         // Time-true playback: moves take distance/feedrate (rapids at rapidRate),
         // divided by simSpeed (1 = real time). Slow probes crawl, rapids zip.
@@ -87,6 +87,10 @@ export class GcodeExecutionEngine {
         // runs. The probe-vs-stock collision test adds this so probes touch the real surface; the recorded
         // route stays origin-relative (the viz offsets it by the start marker). Default = origin.
         this._stockOffset = stockOffset || { x: 0, y: 0, z: 0 };
+        // t540 — the tool's INITIAL position (PART frame), where the sim STARTS before the first move. Default origin
+        // (byte-identical to every existing sim). The homing preview seeds it from the draggable machine-frame Start so
+        // the ABSOLUTE G53 homing route draws FROM the Start to the switch (dragging the Start re-traces the travel live).
+        this._initialPos = (initialPos && Number.isFinite(+initialPos.x)) ? { x: +initialPos.x || 0, y: +initialPos.y || 0, z: +initialPos.z || 0 } : null;
         // Per-pass operator starts (one per REPOSITION pass) in STOCK coords. After a reposition the operator re-parks
         // the probe at the NEXT start (②③④), so the probe-vs-stock collision must run from THAT pass's start, not the
         // pass-0 _stockOffset (① — else a boss-both's 2nd-axis probe fires from ① into open space and misses). Set
@@ -246,7 +250,7 @@ export class GcodeExecutionEngine {
         this._clearAutoTimers();
         this.vars = this.createVarStore();
         this._mirrorInputVar(null);   // seed the #[1520+N] input window from the (now-cleared) virtual inputs
-        this.pos = { x: 0, y: 0, z: 0 };
+        this.pos = this._initialPos ? { ...this._initialPos } : { x: 0, y: 0, z: 0 };   // t540 — homing seeds the Start here (see constructor)
         this.absolute = true;
         this.unitScale = 1;
         this.motion = 0;
@@ -1077,9 +1081,16 @@ export class GcodeExecutionEngine {
                 // switch (machine-0 end) instead of running the full ±10000 to the far corner (the "-20000 plunge" when
                 // PLAYED). Machine frame: part = machine·unitScale − wcsOffset (the same G53 map used above). te>=0 so an
                 // on-edge seek (already at the switch) clamps to a no-op, then the G01 back-off releases off it.
-                // LIMITATION: gated on !this.stock, so a homing G31 played INSIDE a program with a stock shown isn't
-                // clamped yet — the robust one-source fix is to stop on limitSwitchTrips (the H3 model); a follow-up.
-                if (tt == null && !this.stock && !(probes && probePort === probes.setterPin)) {
+                // t540 — the clamp now applies even with a STOCK shown: it only kicks in when the STOCK-trip did NOT fire
+                // (tt == null), so a real probe that touches the stock is unaffected (tt set → skipped), while a homing G31
+                // that SEEKS PAST the stock to the switch stops at the envelope EDGE instead of overshooting the full seek
+                // distance (the human's played-homing "tool ends at the top-backoff", stock shown). (Was gated on !this.stock.)
+                // But it must fire ONLY for a HOME/LIMIT-switch seek (the homing G31's port = a limit register, e.g. #1051) —
+                // NOT for a TOUCH-PROBE that legitimately MISSES the stock (a boss-both ①-miss runs the FULL seek → the macro's
+                // error branch). So exclude the touch-probe pin + the setter pin: what's left is a home/limit seek (or an
+                // unconfigured port → still clamp, matching the old no-stock homing default).
+                const isTouchProbe = probes && (probePort === probes.setterPin || probePort === probes.probePin);
+                if (tt == null && !isTouchProbe) {
                     const machine = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().machine : null;
                     if (machine) {
                         let te = null;
