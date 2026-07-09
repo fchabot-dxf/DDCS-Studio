@@ -8173,3 +8173,100 @@ Gateway test (test_pull_geometry.py) still PASS. Full Studio suite 903 pass, 2 s
 **PASSED BACK (do NOT claim fixed — the advisor two-method verifies): the Rate/Feedback prompt is built. ONE declared trigger config; a PURE gate (unit-tested over every threshold/cooldown/version/state combo); localStorage counters (session once/day, insert on commit); fired ONLY after a successful wizard INSERT (wizardManager emits ddcs:op-inserted → onInsertComplete), suppressed while a sim runs. The toast (GUI-first, no modal): [⭐ Rate on GitHub] [✉ Send feedback] [Later] [Never] — Rate opens the repo, Send feedback (HUMAN AMENDMENT) opens a mailto to dansemur@gmail.com with a version-prefilled body (address baked into the shipped app — the human accepted the scraper exposure, swappable for an alias later), Later +14d, Never permanent. An always-available ⋮ 'Rate / Feedback' menu entry (the unprompted path) shows the toast. Analytics rate_shown/clicked/feedback/later/never via window.ddcsTrack (no-op until the Worker URL is set). VERIFIED (rate-prompt, 8 tests): the gate combos, a REAL insert → the toast (op count grows), Later/Never persist across reload, below-threshold + sim-running suppress, the menu shows both destinations, feedback records done + fires rate_feedback. Screenshots t598_rate_toast/menu. Full suite 911 pass. Over to your two-method verify + the human."
 
 ## 🔨 turn 600 — TINY polish: the rate toast gains a gentle SLIDE-IN entrance (fade + 16px rise, 250ms ease-out) on show; runs ONCE (the element is created once, guarded — no re-render re-trigger). prefers-reduced-motion → animation:none (instant). CSS-only (the @keyframes ddcs-rate-in + the .ddcs-rate-toast animation + the reduced-motion media query), isolated to that one class; no position/size/content change. VERIFIED (rate-prompt, 2 new tests + 8 existing = 10 pass): the toast shows animationName ddcs-rate-in @ 0.25s; under emulated reduced-motion, animationName none. FILES: web/styles.css · tests/rate-prompt.spec.js. PASSED BACK (do NOT claim fixed): the slide-in entrance is added, reduced-motion respected, all rate tests green.
+
+
+## 🔨 turn 602 (cycle 224) — BUG SCOUT: DDCS DIALECT CORRECTNESS (V3/DM500 + V4.1 + Expert). READ-ONLY report, NO code/test changes. Method: my dialect-atoms read + 3 parallel scout agents (caps/gating · test-coverage · FINDINGS cross-check). Full ranked report below (F1-F12 + coverage debt + positives). Passed the condensed headline to the advisor; fixes to be dispatched after the human reviews.
+
+# DDCS DIALECT-CORRECTNESS SCOUT — findings report (t602, READ-ONLY, no code/tests changed)
+
+Audited the 3 DDCS posts' emit paths (ddcs-expert-m350 / ddcs-v41 / ddcs-v3-dm500) vs ground truth (the dumps under bridge/controllers/{expert-m350,v4.1,dm500}, the dialect files' own [CONFIRMED]/[TO CONFIRM] tags, FINDINGS.md, the ddcs-expert skill). Method: my own dialect-atoms read + 3 parallel scout agents (caps/gating · test-coverage · FINDINGS cross-check).
+
+## ROOT CAUSE behind most leaks (the load-bearing fact)
+`applyCapGating` (blocks/blockEmitter.js:276) EARLY-RETURNS when `caps.vars && caps.flow!=='none'`. V4.1 AND DM500 both satisfy that → **per-line cap-gating does NOTHING for them** (it only ever fires for grbl, vars:false). So any hardcoded Expert register in a hand-written wizard stack passes through VERBATIM on V4.1/DM500. The dialect-ATOM layer degrades correctly; the leaks are all in hand-written wizard stacks that BYPASS the atoms.
+
+---
+## RANKED FINDINGS
+
+### F1 — [HIGH · CONFIRMED-in-code · DANGEROUS] Probe/WCS WIZARDS emit literal Expert registers on V4.1/DM500 → wrong branch + WRONG OFFSET written
+Files: wizards/edgeWizard.js:56,64,78,96-97 · cornerWizard.js:23-24,246,337,344,349 · middleWizard.js:28-29,182,238,247-248 · alignmentWizard.js:168 · rotaryCenterWizard.js:48,80,170 · rotaryClockWizard.js:46,133 · probeBlocks.js:21-22,119 (+ their byte-identical data twins edgeData/cornerData/… which reuse the same stacks) · blockEmitter.js:276 (the gate no-op).
+Dialects: V4.1, DM500. These wizards route ONLY the probe MOVE (probe/proberead/readmachine) through the dialect (which degrades correctly). Everything AROUND it is hand-emitted as generic assign/ifgoto blocks with LITERAL Expert var numbers:
+- `IF #1920!=2 GOTO1` (status block #1920+ax) — V4.1 has NO status var (result = post-probe DRO #1502); DM500 none (#864). On V4.1/DM500 this reads an UNMAPPED register → wrong branch → the WCS is then set from a garbage #1925. **The dangerous one: a wrong work offset gets written.**
+- `#1505=…` HMI prompts hand-emitted (not dialect.hmiPrompt, which returns [] on V4.1/DM500) — silently no-op; on V4.1 #1505 is itself "unconfirmed".
+- `#[805+[#72*5]]` WCS base-math + write — Expert #805/stride-5; V4.1 is #1512/stride-6+G92, DM500 #804/stride-4+G92.
+Ground truth: the dialect files provide probecheck/hmi/setworkoffset/wcszero atoms that DO degrade per-post — the wizards just don't use them for these lines. Fix direction: route the status-check, HMI prompt, and WCS base/write through the existing dialect atoms, OR gate these probe panels on caps (probeStatusCheck / native-WCS). NOTE: entirely UNSWEPT — the probe family has zero V4.1/DM500 test coverage (see COVERAGE).
+
+### F2 — [HIGH · CONFIRMED-in-code] ATC wizards gate on `toolTable` (true on V4.1/DM500), never on `atc` (a DEAD cap) → Expert-only ATC M-codes leak
+Files: index.html:1309,1330,1356,1382,1411,1475 (all six ATC panels are data-cap="toolTable") · atcChangeWizard.js:111-121 (firmwareStack) · atcModel.js:39,43-44 · atcLengthWizard.js:91-92 · atcToolCheckWizard.js:87-89 · caps.atc declared (ddcs-v41.js:17, ddcs-v3-dm500.js:21 = false) but READ NOWHERE (only a doc comment atcTableWizard.js:9).
+Dialects: V4.1 (live), DM500 (no ATC hardware, but also ungated). Because gating keys on toolTable (true on both posts), NO ATC wizard greys out. Leaks: firmwareStack emits Expert pneumatic M-codes M159/M157/M160/M163/M156/M161 + M19 and #1306/#1320-1326 as RAW lines UNCONDITIONALLY; atc_test DRAWBAR mode → drawbar M154/M155 + sensor-wait M300/M301/M302; atc_length/check → #1505 + default #1300. (atcTableWizard.js:48-53 IS the honest exception — pockets gated on d.vars.atc.) Fix: switch the pick&place/firmware/drawbar panels (wiz_atc_change, wiz_atc_test) to data-cap="atc" + guard firmwareStack/drawbar on caps.atc.
+
+### F3 — [HIGH · CONFIRMED-in-code] Comm "Dwell" is 1000× too long on ALL 3 DDCS posts
+Files: wizards/communicationWizard.js:127 (`dialect.dwell(params.val)`) · commData.js:55 (val field = `label:'Value', help:'Beep duration / dwell ms.'`, default 500) · CONTRAST wizards/atcTestWizard.js:56 (`num(params.dwellMs,500)/1000` — the CORRECT conversion).
+Dialects: Expert, V4.1, DM500 (all). The comm `val` is MILLISECONDS but is passed straight to `dialect.dwell(sec)` which expects SECONDS (no ÷1000). Result: a 500 ms dwell → Expert/V4.1 `G04 P${round(500*1000)}` = `G04 P500000` (=500 s); DM500 `G04 P500` (P=seconds, =500 s). Ground truth: the dwell atom's contract is seconds→native-per-post (atcTestWizard.js:56 comment + all three dialects' dwell(sec)). Fix: `dialect.dwell(params.val / 1000)`. ⚠ Check whether the comm emit tests (comm-twin/comm-e0-superset) golden-match the current WRONG output (a green test asserting the bug — assert-the-value-not-the-change).
+
+### F4 — [MEDIUM · CONFIRMED-in-code / KNOWN-OPEN] setWorkOffset ATOM writes a MACHINE-coord value into a G92 WORK offset on V4.1/DM500 → wrong datum
+Files: wizards/ops/setworkoffset.js:24-26 (value default `#50` = the probe-result machine coord) · ddcs-v41.js:28 (`G90 G92 ${axis}${value}`) · ddcs-v3-dm500.js:31-32.
+Dialects: V4.1, DM500 (Expert correct — register write). The one value flows to BOTH a register-write (Expert, machine coord) and a G92 (V4.1/DM500, which interprets it as a WORK coord) → the datum lands wrong. Self-flagged: ddcs-v3-dm500.js:31 "Cross-profile value semantics unresolved → VERIFY on hardware." (Distinct from F1: this is the STANDALONE WCS op's atom; the probe wizards in F1 bypass it entirely.) Fix: derive the G92 work value correctly, or gate the probe-side WCS-set on the G92 posts until resolved.
+
+### F5 — [MEDIUM · CONFIRMED-in-code emits / SUSPECT it executes] DM500 machineMove emits G53 that is NOT in the dump — LIVE on every retract/park
+File: ddcs-v3-dm500.js:8,29,77 (`G53 ${axis}${ref}`, self-flagged TO CONFIRM) · CALLED by wizards/cuttingBlocks.js:43-59 (every retract / safe-Z / park routes through d.machineMove). Dialect: DM500. The DM500 dump never uses G53 (safe-Z retract = M98 P101 / work-frame G90 G0); G53 is "gated by config #395" (unconfirmed). So EVERY DM500 cutting program emits `G53 Z#var` retracts the controller may reject. (Expert G53 CONFIRMED-on-machine expert-m350/FINDINGS.md:457-470; V4.1 G0 G53 dump-confirmed.) Fix: confirm #395/G53 on DM500, else emit the dump's M98 P101 safe-Z.
+
+### F6 — [MEDIUM · CONFIRMED-in-code emits / SUSPECT it parses] DM500 `!=` → `NE` operator is not in the dump — the generic If-Goto emits it unconditionally
+File: ddcs-v3-dm500.js:15 (`OP = {'!=':'NE',…}`, "NE not actually in the dump"), :49 · EMITTED by wizards/ops/flow.js:24-25 (the generic If-Goto block DEFAULTS op:'!=' → `dialect.ifGoto(…,'!=',…)` → `IF a NE b GOTO` on DM500). Dialect: DM500. Any user/wizard `!=` branch (not just probe-status, which folds away) routes here → `NE` the controller may reject. Fix: confirm NE on hardware, or rewrite `!=` as an inverted EQ/skip for DM500, or lint-warn.
+
+### F7 — [MEDIUM · SUSPECT] outPin emits M(50+2n) for ALL DDCS incl. V4.1/DM500 — the #1552+ mapping is Expert-slib only
+File: wizards/ops/cnc.js:69-71 (keyed on isDDCS, not a cap). Dialects: V4.1, DM500. The M50-M91 → #1552+n mapping is grounded ONLY in Expert slib O10050-O10091; V4.1/DM500 output M-codes are unconfirmed, yet the atom treats all three DDCS the same. (waitInput right beside it correctly gates on inputRead + folds to a comment on V4.1/DM500 — outPin has no such guard.) Fix: an outPin/ioWrite cap (Expert-confirmed) or verify the mapping on V4.1/DM500.
+
+### F8 — [LOW · SUSPECT · default-safe] corner/middle hardcode the #883 slave-sync write (not the dialect)
+Files: cornerWizard.js:337 (`mkA('#[#74]','#883')`), middleWizard.js:238. Dialects: V4.1, DM500. postGating.js:17-18 correctly greys w_sync/w_slave on wcsSync:false and the arm is off by default, so the built-in panel can't enable it — BUT the write is hand-emitted (#883 = Expert #88{slave}), not via dialect.wcsZeroAtCurrent, so a loaded program / Blocks-twin edit setting syncA:true would leak #883 on V4.1/DM500 with no gate. Fix: emit sync via the dialect (or drop the arm when !caps.wcsSync).
+
+### F9 — [LOW] DM500 setWorkOffset ships a "( set datum - VERIFY on hardware )" comment INTO the emitted program
+File: ddcs-v3-dm500.js:32. A dev-flag comment reaches the operator's G-code (harmless — comments ignored — but unprofessional in shipped output). Fix: keep the caveat in the code, not the emit.
+
+### F10 — [LOW] Dead caps + Expert-specific defaults + stale comments
+`probeStatusCheck` cap has NO consumer (index.js:40 — dead flag; the degrade actually happens because probeStatus() returns []) · toolOffset default tool var `#1300` is Expert's currentTool (wizards/ops/measure.js:29; vars.atc null on V4.1/DM500 → default references a non-existent register) · V4.1 readActiveWcs returns [] (ddcs-v41.js:39, "TO CONFIRM") · DM500 readActiveWcs `#455` (ddcs-v3-dm500.js:45) — default_vars_v3.js:211 labels #455="CONT", NOT coord-select (weakly grounded; but unused — no emit path exercises it) · stale comment blocks/dataOps/wcsData.js:8 claims "dm500 #804" but the DM500 dialect emits G92, never #804 (comment-only). All minor.
+
+### F11 — [MEDIUM · SUSPECT · Expert-only] ATC generator branches on `#1504` = "requested tool" (a Studio ASSUMPTION, not confirmed)
+File: data/atcGenerator.js:38,40,60 (`IF #1504==#1300 GOTO999`, `IF #1504==<tool> GOTO…`) · asserted at ddcs-expert-m350.js:13-17 (atc.targetTool:1504). Dialect: ddcs-expert-m350 (ATC is Expert-only). `#1504` is NOT in FINDINGS.md nor the Expert variable DB (default_vars.js has no 1504 row); project memory flags it as an unconfirmed Studio assumption. The generated ATC branches bake in `#1504` as the `Tn M6` requested tool. (The generator header honestly flags "GENERATED TEMPLATE, NOT validated on a live ATC.") Fix: confirm `#1504` on-machine, or keep the assumption visible in the emitted comment / gate ATC generation.
+
+### F12 — [MEDIUM · SUSPECT · verify-at-machine] Dwell UNITS/reliability on V4.1/DM500 are unconfirmed (independent of F3)
+Files: ddcs-v41.js:41 (G04 P${sec*1000} ms) · ddcs-v3-dm500.js:47 (G04 P${sec} SECONDS). v4.1/FINDINGS.md:95 warns "G4 dwell timing is INCONSISTENT … don't depend on G4 for pacing [HYPOTHESIS]" — the Expert ms confirmation (expert-m350/FINDINGS.md:503-514) does NOT transfer to V4.1. DM500 seconds is dump-grounded but "NOT hardware-tested" (no DM500 owned). So the dwell UNITS themselves (ms on V4.1, seconds on DM500) are inherited/assumed, not bench-confirmed. (This is separate from F3, the comm ÷1000 bug — F3 is wrong on ALL posts incl. Expert; F12 is the units being unverified on the two non-Expert posts.) Fix: bench-confirm V4.1 G04 P units/reliability + DM500 seconds; don't inherit the Expert ms result.
+
+### ⚠ SAFETY CONSEQUENCE (documented degrade, worth surfacing) — a probe MISS is not branch-detected on V4.1/DM500
+V4.1/DM500 set `probeStatus:null` and honestly fold the post-probe status check to `[]` (ddcs-v41.js:22, ddcs-v3-dm500.js:26, ops/measure.js:15-19) rather than inventing a status register (the CORRECT, honest choice). CONSEQUENCE: a probe that does NOT make contact is NOT detected/branched on V4.1/DM500 — the macro proceeds as if it touched (Expert's `IF #1920!=2 GOTO1` alarm has no equivalent). This is inherent to those controllers lacking a status var, but it means a no-contact probe on V4.1/DM500 sets the datum from a non-contact position. Not a code bug — a documented safety limitation to flag to the operator (a review-row / emitted warning comment).
+
+## OUT OF SCOPE (checked — do NOT reach the web emit)
+The FINDINGS [HYPOTHESIS]/[TO TEST] items for soft-limit values (#162/#166), homing-dir (#112-114), I/O pins (#489-579), probe-config (#670-676), and the V4.1 gantry-sync var numbers feed the BRIDGE Python profile/geometry mapping (the t594 pull path), NOT web/wizards/dialects or web/data — they don't reach emitted G-code, so they're outside this dialect-emit audit.
+
+## CAREFUL / CLEAN (verified honest, from the FINDINGS cross-check)
+Expert probe status/result regs #1920-1927 are CONFIRMED via the official Variables-ENG CSV (not a hypothesis) · #1506-1509 namespace divergence handled (V4.1 dialect keys its own wcsWork:1506 off the V4.1 var list; varMap.js scoped Expert-only) · G10 never emitted + an active linter ERROR E-G10MOVE (validate.js:101) · G43 avoided (ops/measure.js writes the tool table directly, the CONFIRMED path) · #578 emitted as a bare G54 word (read-only for auto-detect, staleness caveat documented).
+
+---
+## TEST-COVERAGE GAPS (latent-bug space — the ops with NO V4.1/DM500 emit assertion)
+Only **WCS write** (wcsData.js) has genuine V4.1 AND DM500 byte coverage (wcs-in-place / wcs-emit-resolved / wcs-dialect-emit, 5-dialect sweeps). Per-line atom forms are round-tripped for V4.1 in blocks-dialect-decode.spec.js — but **DM500's move-until-input probe triplet is EXCLUDED there as a known gap**. Otherwise:
+- **Probe family — ZERO V4.1/DM500 coverage (highest risk, = F1's danger unswept):** corner (corner-data-emit +~13 specs), edge (edge-data-emit), middle (middle-data-emit/superset), alignment (alignment-data-emit/fork2/superset/span-verify), rotary center + rotary clock — ALL "studio + Expert" only, no post switch.
+- **homing — no post sweep:** homing-data-emit/simple-emit/superset iterate machine-sign/limit-edge, not posts (V4.1 G0 G53 + #1500 DRO, DM500 unverified).
+- **Mill ops (pocket/contour/bore/drill/slot/surfacing/text):** cross-dialect only via grbl+rs274ngc, never V4.1/DM500.
+- **ATC test/warmup/check/length:** no V4.1 sweep (DM500 N/A by caps.atc:false). (atc_change + atc_table DO have V4.1 twin sweeps.)
+Highest-value adds: V4.1 + DM500 emit assertions for corner/edge/middle/alignment/rotary + homing.
+
+---
+## POSITIVES — checked and CLEAN (honest per-post degrade)
+- Homing: non-Expert posts emit ONLY comments, no executable G31 (homingWizard.js:141-145). ✓
+- waitInput: cap-guarded (inputRead, Expert-only) → folds to a comment on V4.1/DM500 (cnc.js:80,92-95). ✓
+- Comm HMI: caps.hmi-gated → popupFallback/statusFallback/inputFallback on V4.1/DM500 (communicationWizard.js:71,98,114). ✓
+- WCS set/zero ATOMS + wcszero: route through the dialect → G92 on V4.1/DM500, no #805/#883 leak (setworkoffset.js:27, wcszero.js:13). ✓ (the value-semantics gap F4 is separate.)
+- postGating: w_sys AUTO/FIXED options gated on wcsAuto/wcsFixed (postGating.js:56-72); probePort G31 P/L/Q fields greyed (postGating.js:15). ✓
+- atc_test dwell: correctly converts dwellMs÷1000 (atcTestWizard.js:56). ✓
+- ioStep M66 timeout/var fields: gated on _oword (RS274-only) (ioStepData.js:91-92). ✓
+
+## THE HEADLINE (fix priority order)
+1. **F1** — the probe wizards write a WRONG WORK OFFSET on V4.1/DM500 (literal #1920 status + #805-math WCS + #1505 HMI bypass the dialect; per-line gating is a no-op on vars:true posts). DANGEROUS + entirely unswept. Corner/edge/middle/alignment/rotary.
+2. **F2** — ATC wizards leak Expert pneumatic/drawbar M-codes on V4.1 (gate on `toolTable`, never the DEAD `atc` cap).
+3. **F3** — comm Dwell 1000× too long on ALL 3 posts (missing ÷1000 that atcTestWizard has).
+4. **F4** — the standalone WCS setWorkOffset atom feeds a MACHINE coord to G92 on V4.1/DM500 (wrong datum; the "known-open" value-semantics gap; confirmed via rotaryCenterWizard's SWO(#50/#56)).
+5. **F5/F6** — DM500 emits G53 (every retract, via cuttingBlocks) + `!= → NE` (every generic If-Goto, via flow.js) — both NOT in the DM500 dump; CONFIRMED-in-code emits, SUSPECT they execute/parse.
+6. **F7/F11/F12** + the ⚠ probe-miss safety limitation — verify-at-machine class (outPin M50+2n, ATC #1504 assumption, dwell units on V4.1/DM500, no probe-miss branch on V4.1/DM500).
+7. **F8/F9/F10** — low (hardcoded #883 sync default-safe, a "VERIFY on hardware" comment shipped in DM500 output, dead caps + Expert-specific defaults + stale comments).
+
+## TEST-DEBT PRIORITY (highest latent-bug value)
+Add V4.1 + DM500 emit assertions to the PROBE FAMILY (corner/edge/middle/alignment/rotary) + homing FIRST — that is exactly where F1's wrong-offset danger lives with ZERO current coverage; then the mill ops on V4.1/DM500 (they only sweep grbl/rs274ngc today). A test here would have caught F1.
