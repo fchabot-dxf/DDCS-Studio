@@ -1644,6 +1644,8 @@ export class GcodeViz3D {
             this._limitGroup = null;
         }
         this._limitDevices = {};
+        // t538 — the ONLY caller path (homingView → previewLimitSwitches → panel.setLimitSwitches → this) was removed, so this
+        // is now dormant (no switch-device meshes are drawn — the human's request). Intact/uninvoked; re-enable = restore a caller.
         if (!Array.isArray(edges) || !edges.length) { this.render(); return; }
         // Box dims with `along` down the switch axis, `cross` on the other two; offset a point `dist` along ±axis.
         const dims = (axis, along, cross) => axis === 'x' ? [along, cross, cross] : axis === 'y' ? [cross, along, cross] : [cross, cross, along];

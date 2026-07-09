@@ -385,6 +385,23 @@ class DDCSStudio {
     }
 }
 
+// t538 — DEV BUILD STAMP: when a dev server / the ES-module session cache serves STALE modules, the header version chip
+// (V10.97) can't tell you WHAT you're running — burning turns on "is my page stale?". HEAD-fetch the served app.js's
+// Last-Modified (the entry module's mtime, no-store) → window.__ddcsBuild + a boot log + the .ver chip TOOLTIP, so "what am
+// I running" is a visible fact. Dev-cheap (one HEAD, no build pipeline); silent no-op when packaged / no server. Tracks app.js.
+(async () => {
+    try {
+        const res = await fetch(new URL('app.js', import.meta.url).href, { method: 'HEAD', cache: 'no-store' });
+        const lm = res && res.headers.get('last-modified');
+        if (!lm) return;
+        const stamp = new Date(lm).toISOString().replace('T', ' ').slice(0, 19) + 'Z';
+        window.__ddcsBuild = stamp;
+        console.log('[DDCS] served app.js build: ' + stamp + '  (window.__ddcsBuild)');
+        const setTip = () => { const v = document.querySelector('.ver'); if (v) v.title = 'app.js build: ' + stamp + ' — served mtime; if it is older than your last edit, the tree is stale (hard-reload).'; };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setTip); else setTip();
+    } catch (_) { /* packaged / no server → no stamp */ }
+})();
+
 // Initialize application when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {

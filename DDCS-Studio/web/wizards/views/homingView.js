@@ -3,8 +3,6 @@
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { HomingWizard } from '../homingWizard.js';
 import { openHomingSetup } from '../../ui/settingsPanel.js';
-import { axisSpan, declaredHomeEdgeSide } from '../../engine/limitSwitches.js';
-import { switchStandoff } from '../../engine/switchTypes.js';
 
 const wizard = new HomingWizard();
 
@@ -34,38 +32,9 @@ function orderAxes(selected, homing) {
     return [...selected].sort((p, q) => ((cfg[p] || {}).order || 9) - ((cfg[q] || {}).order || 9));
 }
 
-// The FITTED home-end switch devices for the 3D preview (Homing H4). One per linear axis whose HOME-end limit pin is
-// configured; positioned at the home edge (machine-0 end, from axisSpan) on that axis + the span mid on the other two,
-// styled per its switchType (mechanical/proximity + the H2 standoff). ONE-SOURCE: axisSpan + settings.limits — the same
-// the H3 trip model reads, so the device sits exactly where its switch trips.
-export function homingEdges(settings) {
-    const m = settings.machine || {}, limits = settings.limits || {};
-    const midOf = (ax) => { const s = axisSpan(Number(m[ax]) || 0); return (s.lo + s.hi) / 2; };
-    const out = [];
-    for (const axis of ['x', 'y', 'z']) {
-        const travel = Number(m[axis]) || 0;
-        if (!travel) continue;
-        const { lo, hi } = axisSpan(travel);
-        // t534 — the DEVICE sits at the DECLARED home end (declaredHomeEdgeSide) the MOTION drives to; fall back to the
-        // travel-sign machine-0 end only when NO home is declared. This kills the motion-vs-device divergence (a +Z envelope's
-        // sign end is the BOTTOM, but the declared z_max home + the motion go to the TOP — the device now follows the motion).
-        const declared = declaredHomeEdgeSide(axis, limits);
-        const side = declared || axisSpan(travel).homeSide;
-        const key = axis + (side === 'min' ? 'Min' : 'Max');       // the HOME end's flat-config key (xMin / zMax …)
-        const pin = limits[key + 'Pin'];
-        if ((pin === '' || pin == null) && !declared) continue;    // no switch fitted AND no declared home → no device (a DECLARED home draws even unpinned — the backfilled home reference)
-        const homeCoord = side === 'min' ? lo : hi;                // the home edge coordinate
-        const dir = side === 'min' ? 1 : -1;                       // inward = toward the envelope interior
-        const st = limits[key + 'SwitchType'] || 'mechanical';
-        out.push({
-            edge: `${axis}_${side}`, axis, side, dir, switchType: st, standoff: switchStandoff(st),
-            x: axis === 'x' ? homeCoord : midOf('x'),
-            y: axis === 'y' ? homeCoord : midOf('y'),
-            z: axis === 'z' ? homeCoord : midOf('z'),
-        });
-    }
-    return out;
-}
+// t538 — the H4 home-end switch-DEVICE placement (homingEdges) is REMOVED with the device meshes (the human doesn't want the
+// switch boxes drawn). Homing direction still reads the DECLARED Home rows (settings.limits.<edge>Home) via axisHomeMotion in
+// the emit/sim; the trip model + the I/O-panel lights are separate and untouched.
 
 export const homingView = {
     type: 'homing',
@@ -90,7 +59,7 @@ export const homingView = {
             const on = (ax in prevState) ? prevState[ax] : (c.enable !== false);
             return `<label style="display:flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border,#3a4150); border-radius:6px;">
                 <input type="checkbox" class="homing-run-ax" data-axis="${ax}" ${on ? 'checked' : ''}/>
-                <b>${AX_LABEL[ax]}</b> <span style="opacity:.65; font-size:11px;">${METHOD_LABEL[c.method || 'seek'] || c.method}</span>
+                <b>${AX_LABEL[ax]}</b> <span style="opacity:.65; font-size:11px;">${METHOD_LABEL[(ax === 'a' || ax === 'b') ? 'setzero' : 'seek']}</span>
             </label>`;
         }).join('');
         host.querySelectorAll('.homing-run-ax').forEach((cb) => {
@@ -125,8 +94,9 @@ export const homingView = {
             // t497 — the homing tool homes in MACHINE coords (no workpiece), so render it in the machine frame: it must
             // draw at the envelope TOP even with a stock shown, not stock-floor-shifted to the bottom (the watched plunge).
             if (ctx.previewToolMachineFrame) ctx.previewToolMachineFrame('homingVizContainer', true);
-            // H4 — the home/limit switch DEVICES at each fitted home edge; they light/plunge live as the sim homes each axis.
-            if (ctx.previewLimitSwitches) ctx.previewLimitSwitches('homingVizContainer', homingEdges(settings));
+            // t538 — the 3D home/limit switch DEVICE MESHES are REMOVED (the human doesn't want the floating switch box in
+            // the preview). Homing direction still reads the DECLARED Home rows (layer 1) + the trip model/I/O lights stay
+            // (layer 2) — those are separate from these meshes. (Previously: ctx.previewLimitSwitches(…, homingEdges(settings)).)
         }
 
         const status = el('homing_status');

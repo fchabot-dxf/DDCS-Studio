@@ -56,26 +56,9 @@ test('backfill adds the missing home ends (once); homing then drives to the DECL
     expect(r.motion.z500noHome, 'contrast: no declared home → +500 seeks 0 = the OLD plunge').toBe(0);
 });
 
-test('(e) homingEdges draws the switch DEVICE at the DECLARED home end for BOTH Z signs (even unpinned)', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram);
-    const r = await page.evaluate(async () => {
-        const { homingEdges } = await import('/wizards/views/homingView.js');
-        const dev = (z) => (homingEdges({ machine: { x: 600, y: 600, z }, limits: { zMaxHome: true } }) || []).find((d) => d.axis === 'z') || null;
-        const devNoHome = (homingEdges({ machine: { x: 600, y: 600, z: 500 }, limits: { zMinPin: 3 } }) || []).find((d) => d.axis === 'z') || null;   // a fitted z_min switch, NO declared home → sign fallback
-        const p500 = dev(500), pneg = dev(-120);
-        return {
-            pos500: p500 && { side: p500.side, z: p500.z }, posNeg: pneg && { side: pneg.side, z: pneg.z },
-            noHomeSide: devNoHome && devNoHome.side,   // no declared home → sign fallback (min for +Z = the bottom)
-        };
-    });
-    console.log('DEVICE: ' + JSON.stringify(r));
-    expect(r.pos500 && r.pos500.side, 'z=+500 device at the DECLARED max end (top), not the sign min').toBe('max');
-    expect(r.pos500 && Math.round(r.pos500.z), 'the +500 device Z sits at the top (500)').toBe(500);
-    expect(r.posNeg && r.posNeg.side, 'z=-120 device also at the declared max (top)').toBe('max');
-    expect(r.posNeg && Math.round(r.posNeg.z), 'the -120 device Z sits at the top (0)').toBe(0);
-    expect(r.noHomeSide, 'sanity: with NO declared home, +Z falls back to the sign end (min = bottom) — the old divergence').toBe('min');
-});
+// t538 — the (e) homingEdges device-placement test is REMOVED: the H4 switch-device meshes were removed (the human doesn't
+// want them drawn), so homingEdges no longer exists. The DECLARED-home-end direction is still covered by the motion tests
+// above (axisHomeMotion / homingSimProxy target the declared top) — that's what actually drives homing.
 
 test.use({ viewport: { width: 1400, height: 1000 } });
 test('REAL APP (the human config): an existing config reloads → z_max Home backfilled → homing preview homes UP; screenshot', async ({ page }) => {

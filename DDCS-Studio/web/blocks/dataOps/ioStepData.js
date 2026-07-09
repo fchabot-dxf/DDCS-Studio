@@ -85,8 +85,11 @@ export const IO_STEP_BINDINGS = [
     // INPUT
     { param: 'inputRef', type: 'string', default: 'raw', label: 'Input', help: 'Pick a declared input (polls its pin) or a raw pin.', section: 'GEOMETRY', when: { param: 'mode', is: 'input' }, widget: 'declared-io', widgetConfig: { kind: 'input' } },
     { param: 'mode2', type: 'enum', default: 'rise', label: 'Edge', help: 'Wait for the input edge/level. DDCS reads a LEVEL (High/Low); RS274/grblHAL support all four edges.', section: 'GEOMETRY', when: { param: 'mode', is: 'input' }, widget: 'segmented', widgetConfig: { options: [['Rise', 'rise'], ['Fall', 'fall'], ['High', 'high'], ['Low', 'low']], optionsBy: 'ioEdge' } },
-    { param: 'timeout', type: 'number', default: 0, label: 'Timeout (ms)', help: 'RS274 M66 timeout (0 = wait forever).', section: 'GEOMETRY', when: { param: 'mode', is: 'input' } },
-    { param: 'var', type: 'string', default: '#5399', label: 'Result var', help: 'RS274 M66 result variable.', section: 'GEOMETRY', when: { param: 'mode', is: 'input' } },
+    // t538 — Timeout (M66 Q) + Result var (M66 result #var) are RS274/grblHAL-ONLY: a DDCS Expert WHILE-poll ignores the
+    // timeout and writes NO result var, so both are DEAD there. Gate them on the post (whenAll _oword:true) — shown on
+    // RS274/grblHAL, HIDDEN on a DDCS post (dialect-aware, like the Edge field). Emit unchanged (visibility only).
+    { param: 'timeout', type: 'number', default: 0, label: 'Timeout (ms)', help: 'RS274/grblHAL M66 timeout (0 = wait forever). Ignored by a DDCS poll.', section: 'GEOMETRY', whenAll: [{ param: 'mode', is: 'input' }, { param: '_oword', is: true }] },
+    { param: 'var', type: 'string', default: '#5399', label: 'Result var', help: 'RS274/grblHAL M66 result variable. Unused by a DDCS poll.', section: 'GEOMETRY', whenAll: [{ param: 'mode', is: 'input' }, { param: '_oword', is: true }] },
     { param: 'waitPin', type: 'number', default: 0, label: 'Raw pin', help: 'Input pin — used when no declared input is picked.', section: 'GEOMETRY', whenAll: [{ param: 'mode', is: 'input' }, { param: 'inputRef', is: 'raw' }] },
     // DWELL
     { param: 'sec', type: 'number', default: 1, label: 'Seconds', help: 'Pause this many seconds (G04 P).', section: 'GEOMETRY', when: { param: 'mode', is: 'dwell' } },

@@ -21,6 +21,11 @@ import { CommunicationWizard } from '../communicationWizard.js';   // t518 — t
 const _commWizard = new CommunicationWizard();
 import { createToolpath2d } from '../../viz/toolpath2d.js';   // t309 — the 2D-animation overlay under the Layout SVG (path + red head, driven by the shared engine)
 import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
+import { resolveActivePost, getCaps } from '../dialects/index.js';   // t538 — dialect-aware row gate (`_oword`): hide M66-only fields on a non-oword post
+import { getActiveProfile } from '../../shared/js/profiles/controllerProfiles.js';
+// t538 — the active post is RS274/grblHAL (o-word / M66)? Injected as the `_oword` gate param so a binding can hide a
+// dialect-specific field (e.g. the I/O-step Result-var/Timeout, which are M66-only and dead on a DDCS WHILE-poll).
+const activePostOword = () => { try { return getCaps(resolveActivePost(getActiveProfile().id).id).flow === 'oword'; } catch (_) { return false; } };
 import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
 
 // t309 — THE 2D-ANIMATION OVERLAY: a path-only toolpath2d <canvas> UNDER the Layout SVG (behind, pointer-events:none via
@@ -190,13 +195,14 @@ export const userOpView = {
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
         const fhost = el('wiz_user_form');
+        const gp = { ...params, _oword: activePostOword() };   // t538 — the live params + a dialect gate flag (`_oword`)
         if (fhost) fhost.querySelectorAll('[data-when-param], [data-when-all]').forEach((row) => {
             let ok;
             if (row.dataset.whenAll) {   // t522 — COMPOUND gate: AND of all conditions
-                try { ok = JSON.parse(row.dataset.whenAll).every((c) => whenOk(c, params)); } catch (_) { ok = true; }
+                try { ok = JSON.parse(row.dataset.whenAll).every((c) => whenOk(c, gp)); } catch (_) { ok = true; }
             } else {
                 const is = row.dataset.whenIs === 'true' ? true : row.dataset.whenIs === 'false' ? false : row.dataset.whenIs;
-                ok = whenOk({ param: row.dataset.whenParam, is }, params);
+                ok = whenOk({ param: row.dataset.whenParam, is }, gp);
             }
             row.style.display = ok ? '' : 'none';
         });
