@@ -53,20 +53,16 @@ test('(3) an UNSET axis travel surfaces a visible hint + the sim SKIPS that axis
         const status = document.getElementById('homing_status');
         const vizStatus = document.getElementById('homingVizStatus');
         const code = document.getElementById('wiz_homing_code').textContent || '';
-        const { homingSimProxy } = await import('/wizards/homingWizard.js');
-        const params = { axes: ['z', 'x', 'y'], config: {}, machine: { x: 600, y: 400, z: 0 }, limits: { zMaxHome: true, xMinHome: true, yMinHome: true } };
-        const proxy = homingSimProxy(params);
-        return { status: status ? status.textContent : '', vizStatus: vizStatus ? vizStatus.textContent : '', code, proxy };
+        return { status: status ? status.textContent : '', vizStatus: vizStatus ? vizStatus.textContent : '', code };
     });
     // the visible hint names Z + says 'set … travel'
     expect(r.status.toLowerCase(), 'the run status shows the unset-travel hint for Z').toContain('set z');
     expect(r.status.toLowerCase()).toContain('travel');
     expect(r.vizStatus.toLowerCase(), 'the viz status shows the hint too').toContain('set z');
-    // the emit SKIPS Z (no G31 Z seek) but still homes X + Y
-    expect(r.code, 'Z homing is skipped in the emit (unset envelope)').not.toMatch(/G31 Z/);
+    // t542 — the preview PLAYS the emit (no proxy). The emit SKIPS Z (a visible SET-TRAVEL comment, no fabricated seek)
+    // but still homes X + Y — so nothing fictional is simulated for the unset axis.
+    expect(r.code, 'Z homing is skipped in the emit (unset envelope), with a visible SET-TRAVEL comment').toMatch(/SET Z TRAVEL/i);
+    expect(r.code, 'no fabricated Z seek move for the unset axis').not.toMatch(/G31 Z/);
     expect(r.code, 'X still homes (configured envelope)').toMatch(/G31 X/);
-    // the sim proxy skips Z (a visible SET-TRAVEL comment, no fabricated G53 Z move)
-    expect(r.proxy, 'the sim proxy surfaces the unset Z as a comment').toMatch(/SET Z TRAVEL/i);
-    expect(r.proxy, 'the sim proxy does NOT fabricate a Z seek move').not.toMatch(/G53 G0 Z/);
     await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_unset_travel_hint.png' });
 });

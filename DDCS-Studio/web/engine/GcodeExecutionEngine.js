@@ -880,8 +880,9 @@ export class GcodeExecutionEngine {
             } else if (m === 98 && Math.round(wm.P) === 501 && wm.X != null && Number.isFinite(wm.X)) {
                 // NATIVE HOMING — M98 P501 X<N> (N = axis index 0=X 1=Y 2=Z 3=A 4=B). The homingWizard emits this
                 // for the `native` method; the real controller runs subprogram O501 (its switch/dir/speed config) and
-                // sets the homed flag itself. The sim has no controller, so we MODEL it exactly like homingSimProxy:
-                // home end = SIGNED machine travel (settings.machine[ax]) + offset, then a short back-off toward centre,
+                // sets the homed flag itself. The sim has no controller, so we MODEL the motion here (the ONLY homing
+                // motion model left after t542 removed the preview proxy — this handler stays for native M98 played in the
+                // editor): home end = SIGNED machine travel (settings.machine[ax]) + offset, then a short back-off toward centre,
                 // and we set the homed flag #[1515+N] ourselves (sim-only state, like the probe-result vars). Scoped
                 // to P501 only — M98 P503/other subs stay unhandled (follow-up). Here X is the axis INDEX, not a coord,
                 // so this is short-circuited after the wait guard (the coordinate-move path never sees wm.X).
@@ -897,7 +898,7 @@ export class GcodeExecutionEngine {
                     // machine-0. Z with zMaxHome homes to the TOP (hi) whether machine.z is + or − (the positive-Z plunge is
                     // gone; no declared home → sign-derived machine-0 fallback). H3 (t485) — carry BOTH the seek (the home
                     // switch edge) and the back-off rest spot so the motion passes THROUGH the switch (trip) then settles
-                    // backed-off (release), like homingSimProxy / O501.
+                    // backed-off (release), like the real O501.
                     const { seek, back } = axisHomeMotion(travel, { offset: num(cfg.offset, 0), backoff: num(cfg.backoff, 5), axis: AX, limits: s.limits });
                     homedMove = { axis: AX, seek, back };
                 }
@@ -921,7 +922,7 @@ export class GcodeExecutionEngine {
         // home has no motion (homedMove null) but still short-circuits so its X<N> word is never read as a coordinate.
         if (wasNativeHome && !homedMove) { this.ip += 1; return false; }
         if (homedMove) {
-            // H3 (t485) — model the real O501 motion (mirrors homingSimProxy's G53 seek/back): SEEK the home switch
+            // H3 (t485) — model the real O501 motion (a G53 seek/back): SEEK the home switch
             // (the machine-0 end) then BACK OFF into the travel, so the home switch TRIPS at the seek and RELEASES on
             // the back-off. Both points map machine → part frame (part = machine·unitScale − wcsOffset — the G53 map).
             const map = (mach) => mach * this.unitScale - (this._wcsOffset[homedMove.axis] || 0);

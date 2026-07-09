@@ -33,7 +33,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { num, r3 } from './ops/util.js';
-import { axisHomeMotion, declaredHomeEdgeSide } from '../engine/limitSwitches.js';   // the ONE source of the home end — the DECLARED home switch (settings.limits.<edge>Home), shared with the engine handler
+import { declaredHomeEdgeSide } from '../engine/limitSwitches.js';   // the ONE source of the home end — the DECLARED home switch (settings.limits.<edge>Home), shared with the engine handler + the emit
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
@@ -176,47 +176,9 @@ export function homingStack(params = {}) {
     return [{ type: 'op', opType: 'homing', label: `Home ${axes.map((a) => AX_LABEL[a]).join(' ')}`, children: S, collapsed: true }];
 }
 
-/**
- * SIMULATION PROXY — engine-runnable G-code that VISUALISES homing, NOT the real macro.
- *
- * The emitted macro homes via the controller-native subs (M98 P501/P503), which the Studio sim engine can't
- * execute. So for the ▶ Simulate path we model the motion: for each axis in the configured order, rapid it to
- * its home END (machine frame, per the configured seek direction), then a short back-off — plain G53/G1 moves
- * the existing engine runs. This shows the homing ORDER and the final homed state. It is kept SEPARATE from
- * generate() (never mixed into the inserted macro).
- *
- * Home END machine coord: the DECLARED HOME SWITCH (settings.limits.<edge>Home, via axisHomeMotion) — its edge
- * coordinate, NOT machine-0. So Z with zMaxHome seeks to the TOP (hi) whether machine.z is + or − (SIGN-AGNOSTIC;
- * the sim tool rises to the declared switch and STOPS there — the rapid ENDS at the switch edge, then a short
- * back-off). A slave that follows its master moves with it (same target). Rotary set-zero axes just snap to 0.
- */
-export function homingSimProxy(params = {}) {
-    const axes = Array.isArray(params.axes) ? params.axes.filter((a) => AX_IDX[a] != null) : [];
-    const cfg = params.config || {};
-    const machine = params.machine || {};
-    const limits = params.limits || {};   // t504 — the DECLARED home switch per edge (settings.limits.<edge>Home)
-    const L = [];
-    L.push('( SIMULATION PROXY — homing motion model, not the emitted macro )');
-    L.push('G90');
-    axes.forEach((ax) => {
-        const c = cfg[ax] || {};
-        const A = ax.toUpperCase();
-        if ((ax === 'a' || ax === 'b') && (c.rotary || 'setzero') === 'setzero') { L.push(`G53 ${A}0     ( ${A} set zero )`); return; }
-        // t540 — NO SILENT FALLBACK: an unset/0 axis travel is a real config gap, NOT a fictional -120/300 span. SKIP the
-        // axis (no made-up motion) and surface it (a visible comment here + homingView's hint via homingUnsetAxes).
-        const travel = num(machine[ax], 0);
-        if (!(Math.abs(travel) > 0)) { L.push(`( SET ${A} TRAVEL — ${A} machine envelope is unset; homing skipped for this axis )`); return; }
-        // t504 — HOME is the DECLARED HOME SWITCH end (settings.limits.<edge>Home), read by axisHomeMotion — NOT machine-0.
-        // The sim rapids TO the declared switch edge (the rapid ENDS there → the tool STOPS at the switch), then backs off
-        // INTO the reachable travel. Z with zMaxHome → the TOP (hi) for BOTH signs. No declared home → the sign-derived end.
-        const { seek, back } = axisHomeMotion(travel, { offset: num(c.offset, 0), backoff: num(c.backoff, 5), axis: ax, limits });
-        L.push(`G53 G0 ${A}${seek}     ( seek ${A} home )`);
-        L.push(`G53 G1 ${A}${back} F${Math.round(num(c.slowFeed, 100))}     ( back off )`);
-        const s = parseInt(c.slaveFollows, 10);
-        if (Number.isInteger(s)) L.push(`( slave idx ${s} follows ${A} )`);
-    });
-    return L.join('\n');
-}
+// t542 — homingSimProxy (a hand-made G53 motion model) is DELETED. It existed only because the pre-b0a9791 M98 emit
+// wasn't engine-runnable; the wizard is G31-only now and the emit plays to M30 (t540). The 3D preview plays the REAL
+// emitted G-code (homingView → HomingWizard.generate), the SAME execution the editor does — one simulator, one truth.
 
 /** t540 — the LINEAR run-axes whose machine envelope travel is UNSET/0 (uppercased, e.g. ['Z']). The homing view shows a
  *  visible 'set … travel' hint for these + the sim skips them (no fictional span). Rotary set-zero axes never need a span. */
@@ -234,10 +196,5 @@ export class HomingWizard {
         recordOp('homing', params);
         return emitMapped(homingStack(params)).text;
     }
-
-    /** Engine-runnable motion model for the shared 3D preview (see homingSimProxy). */
-    simProxy(params) { return homingSimProxy(params); }
-
-    /** Preview start hint: the spindle's current spot is fine; homing pulls toward the machine ends. */
-    inferStart() { return null; }
+    // t542 — the 3D preview plays generate()'s REAL emitted code (not a proxy), so simProxy()/inferStart() are gone.
 }

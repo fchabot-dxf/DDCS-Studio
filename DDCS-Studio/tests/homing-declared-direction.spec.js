@@ -13,12 +13,11 @@ test('the DECLARED envelope sign wins: machine.z=-120 homes Z to the TOP (0), NO
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings);
     const r = await page.evaluate(async () => {
-        const { homingSimProxy } = await import('/wizards/homingWizard.js');
+        const { axisHomeMotion } = await import('/engine/limitSwitches.js');
         const { GcodeExecutionEngine } = await import('/engine/index.js');
-        const zSeek = (dir) => {
-            const t = homingSimProxy({ axes: ['z'], config: { z: { method: 'native', dir } }, machine: { z: -120 } });
-            const m = t.match(/G53 G0 Z(-?[\d.]+)/); return m ? parseFloat(m[1]) : null;
-        };
+        // t542 — the hand-made simProxy is DELETED; the declared home TARGET is axisHomeMotion (the ONE source the emit +
+        // the M98 engine handler both read), which takes NO dir → a stale per-axis dir simply cannot enter it.
+        const seek = axisHomeMotion(-120, { axis: 'z', limits: {}, backoff: 5 }).seek;
         // the M98 engine handler with a STALE dir (the human's divergence): the final Z must be -5 (the TOP backed off),
         // NOT -115 (backed off from the far/bottom -120 end = the plunge).
         const engineLastZ = (dir) => {
@@ -31,14 +30,12 @@ test('the DECLARED envelope sign wins: machine.z=-120 homes Z to the TOP (0), NO
             return tr.segments[tr.segments.length - 1].z2;
         };
         return {
-            simAuto: zSeek(''), simMinus: zSeek('-'), simPlus: zSeek('+'),
+            seek,
             engAuto: engineLastZ(''), engMinus: engineLastZ('-'), engPlus: engineLastZ('+'),
         };
     });
-    // the sim seeks the TOP (0) for EVERY dir — a stale dir='-' can no longer plunge to -120
-    expect(r.simAuto, 'Auto → the declared home = the TOP (Z0)').toBe(0);
-    expect(r.simMinus, 'a STALE dir=- can NO LONGER diverge → still the TOP (Z0), NOT the -120 plunge').toBe(0);
-    expect(r.simPlus, 'dir=+ → still the declared TOP (Z0)').toBe(0);
+    // the declared home TARGET is the TOP (0) — and axisHomeMotion has no dir, so a stale dir CANNOT diverge it
+    expect(r.seek, 'the declared home target = the TOP (Z0), NOT the -120 plunge; no dir input can change it').toBe(0);
     // the native M98 handler homes to the TOP → backed off to -5 (NOT -115 = backed off from the far -120 end)
     expect(r.engAuto, 'native M98: homes to the top, back-off -5').toBe(-5);
     expect(r.engMinus, 'native M98 with a STALE dir=-: STILL the top (-5), NOT the -120 plunge (-115)').toBe(-5);
@@ -49,13 +46,11 @@ test('a +120 axis homes to its declared 0 end (the envelope sign), regardless of
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetSettings);
     const r = await page.evaluate(async () => {
-        const { homingSimProxy } = await import('/wizards/homingWizard.js');
-        const zSeek = (dir) => { const t = homingSimProxy({ axes: ['z'], config: { z: { method: 'native', dir } }, machine: { z: 120 } }); const m = t.match(/G53 G0 Z(-?[\d.]+)/); return m ? parseFloat(m[1]) : null; };
-        return { auto: zSeek(''), minus: zSeek('-'), plus: zSeek('+') };
+        // t542 — proxy deleted; the declared home target = axisHomeMotion (no dir input). +120 envelope → home at the 0 end.
+        const { axisHomeMotion } = await import('/engine/limitSwitches.js');
+        return { seek: axisHomeMotion(120, { axis: 'z', limits: {}, backoff: 5 }).seek };
     });
-    expect(r.auto, '+120 declared → home at the 0 end (machine-0)').toBe(0);
-    expect(r.minus, 'a dir override cannot diverge it → still 0').toBe(0);
-    expect(r.plus, 'still the declared 0 end').toBe(0);
+    expect(r.seek, '+120 declared → home at the 0 end (machine-0); axisHomeMotion has no dir to diverge it').toBe(0);
 });
 
 test('t536 — a LINEAR axis with a SAVED method:native emits the SIMPLE G31 (the wizard IGNORES the saved method), dir-independent', async ({ page }) => {
@@ -89,11 +84,11 @@ test('DRIVE THE APP: with a STALE dir=-, machine.z=-120 still homes Z UP to the 
     await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
     await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
     await page.evaluate(() => window.ddcsStudio.wizardManager.update());
-    // run the homing sim
-    await page.evaluate(() => { const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); });
-    await page.waitForTimeout(2000);
-    // the sim seeks Z to the TOP (0) even with the stale dir=- (the fix); the tool rests backed off just below the top
-    const seek = await page.evaluate(async () => { const { homingSimProxy } = await import('/wizards/homingWizard.js'); const t = homingSimProxy({ axes: ['z'], config: { z: { method: 'native', dir: '-' } }, machine: { z: -120 } }); const m = t.match(/G53 G0 Z(-?[\d.]+)/); return m ? parseFloat(m[1]) : null; });
-    expect(seek, 'even with a stale dir=-, the sim seeks Z to the TOP (0), not the -120 plunge').toBe(0);
+    // t542 — PLAY the REAL emitted homing code (the preview no longer uses a proxy). simSpeed up the slow re-touch so it
+    // settles fast, then assert the PLAYED engine homed Z to the TOP (-5, backed off), NOT the -120 plunge (-115).
+    await page.evaluate(() => { const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 60; });
+    await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine && !p.engine.running; }, null, { timeout: 20000 });
+    const endZ = await page.evaluate(() => +window.ddcsStudio.wizardManager._activePanel.engine.pos.z.toFixed(1));
+    expect(endZ, 'even with a stale dir=-, the PLAYED real emit homes Z to the TOP (~-5), not the -120 plunge (-115)').toBeGreaterThan(-8);
     await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_declared_dir_top.png' });
 });

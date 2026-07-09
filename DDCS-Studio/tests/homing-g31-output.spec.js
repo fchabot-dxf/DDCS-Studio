@@ -70,7 +70,8 @@ test('REAL APP: the homing wizard code panel shows G31 (not M98), params visible
 
 test('REAL APP: with a STOCK SHOWN, the G31 homing preview tool seeks to the switch/top (~-5), NOT plunging', async ({ page }) => {
     await driveHomingWizard(page);
-    await page.evaluate(() => { const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); });
+    // t542 — the preview plays the REAL emit (slow F100 re-touches); simSpeed it so the trajectory lands in the sampling window.
+    await page.evaluate(() => { const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 20; });
     const out = [];
     for (let i = 0; i < 22; i++) {
         out.push(await page.evaluate(() => {

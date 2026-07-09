@@ -85,16 +85,18 @@ export const homingView = {
         const gcode = wizard.generate(params);
         el('wiz_homing_code').innerHTML = UIUtils.formatGCode(gcode);
 
-        // 3D preview runs the SIM PROXY (engine-runnable homing-motion model), NOT the real M98 macro the
-        // controller executes — so the order + final homed state are visualizable. preview pinned to the
-        // machine frame (homing is inherently G53 / machine-coordinate).
+        // t542 — the 3D preview plays the REAL EMITTED G-code (the SAME `gcode` shown in the code panel above + inserted into
+        // the editor), through the SAME engine the editor uses — NOT a hand-made proxy. The old homingSimProxy existed only
+        // because the pre-b0a9791 M98 emit wasn't engine-runnable; the wizard is G31-only now and t540 proved the emit plays
+        // to M30 with the port-gated seek stop. One simulator, one truth → a preview-vs-editor divergence (the line-8 class)
+        // is impossible. The machine-frame pin + the Start seeding (initialPos) + tool-machine-frame stay (below).
         if (ctx && ctx.preview3D) {
             // t540 — a sim-only draggable START marker (machine frame): default MID-ENVELOPE, the homing sim runs FROM it
             // (the tool travels Start → switch). Never emitted. The panel's own curStart persists a drag across updates; we
             // pass a STABLE mid-envelope default (derived from the machine envelope) so an un-dragged marker doesn't jitter.
             const mch = settings.machine || {};
             const mid = { x: (Number(mch.x) || 0) / 2, y: (Number(mch.y) || 0) / 2, z: (Number(mch.z) || 0) / 2 };
-            ctx.preview3D(wizard.simProxy(params), 'homingVizContainer', mid, null);
+            ctx.preview3D(gcode, 'homingVizContainer', mid, null);
             if (ctx.previewMachine) ctx.previewMachine('homingVizContainer', true);
             // t497 — the homing tool homes in MACHINE coords (no workpiece), so render it in the machine frame: it must
             // draw at the envelope TOP even with a stock shown, not stock-floor-shifted to the bottom (the watched plunge).

@@ -11,12 +11,12 @@ import { test, expect } from '@playwright/test';
  *   4. The dir override round-trips through the op marker codec (it rides the already-declared `config` Struct).
  * The default (Auto / dir unset) stays byte-identical to a config with no `dir` key.
  */
-test('homing dir override: signed-envelope default + per-axis override flips seek emit & sim, native unchanged, round-trips', async ({ page }) => {
+test('homing dir override: signed-envelope default; a stale dir can NO LONGER flip the seek emit (dropped); native → G31; round-trips', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
   const r = await page.evaluate(async () => {
-    const { homingStack, homingSimProxy } = await import('/wizards/homingWizard.js');
+    const { homingStack } = await import('/wizards/homingWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { markerLine, parseMarker } = await import('/blocks/opSchema.js');
 
@@ -39,16 +39,8 @@ test('homing dir override: signed-envelope default + per-axis override flips see
     // Auto with UNKNOWN travel (machine.x absent) → defers to the controller's #612 register (not a literal).
     const seekAutoNoTravel = emit({ axes: ['x'], config: seekCfg(''), machine: {} });
 
-    // ── SIM PROXY on X (positive travel 300). The seek line is `G53 G0 X<end>`; the sign of <end> is the dir. ──
-    const simEnd = (dir) => {
-      const text = homingSimProxy({ axes: ['x'], config: { x: { method: 'seek', backoff: 5, dir } }, machine });
-      const m = text.match(/G53 G0 X(-?[\d.]+)/);
-      return m ? parseFloat(m[1]) : null;
-    };
-    // H1 (t481): the sim seeks the HOME end = machine-0 (0) by default; the dir override picks the max/min end.
-    const simAuto = simEnd('');     // Auto → machine-0 (x=0)
-    const simPlus = simEnd('+');    // + → the +X (max) end = 300
-    const simMinus = simEnd('-');   // − → the −X (min = machine-0) end = 0
+    // t542 — the hand-made simProxy is DELETED (the preview plays the real emit); the home-end truth is the emit's G31
+    // direction (asserted above) + axisHomeMotion — no separate proxy to assert. (Was: a G53 G0 X<end> sim-end check.)
 
     // ── NATIVE method: the override must NOT change the emit (M98 P501 reads the controller's own config). ──
     const nativeCfg = (dir) => ({ x: { enable: true, method: 'native', dir } });
@@ -67,7 +59,6 @@ test('homing dir override: signed-envelope default + per-axis override flips see
 
     return {
       seekAuto, seekPlus, seekMinus, seekNoDirKey, seekAutoNoTravel,
-      simAuto, simPlus, simMinus,
       nativeAuto, nativeMinus,
       roundtripDir: parsed && parsed.params && parsed.params.config
         ? { x: parsed.params.config.x.dir, y: parsed.params.config.y.dir, z: parsed.params.config.z.dir }
@@ -85,11 +76,6 @@ test('homing dir override: signed-envelope default + per-axis override flips see
   expect(r.seekNoDirKey, 'a config with NO dir key emits identically to Auto (dir irrelevant)').toBe(r.seekAuto);
   expect(r.seekAuto, 'no #612 controller-register fallback — the simple readable shape').not.toContain('#612');
   expect(r.seekAutoNoTravel, 'unknown envelope no longer defers to #612 (dropped)').not.toContain('#612');
-
-  // the sim ALSO homes to machine-0 regardless of dir (unchanged — simProxy never read dir)
-  expect(r.simAuto, 'sim Auto homes to the machine-0 end (x=0)').toBe(0);
-  expect(r.simPlus, 'a dir override can NOT diverge the sim — still machine-0 (x=0)').toBe(0);
-  expect(r.simMinus, 'a dir override can NOT diverge the sim — still machine-0 (x=0)').toBe(0);
 
   // t536 (change 1) — a LINEAR axis with a saved method:'native' is IGNORED by the wizard → G31, NOT M98 P501; dir-independent.
   expect(r.nativeMinus, 'the wizard emit is identical regardless of the ignored dir').toBe(r.nativeAuto);

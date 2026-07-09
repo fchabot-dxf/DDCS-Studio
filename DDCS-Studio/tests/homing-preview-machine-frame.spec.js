@@ -24,7 +24,9 @@ async function homingRenderedZ(page, stockShown) {
     await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
     await page.evaluate(() => window.updateWiz && window.updateWiz());
     await page.waitForTimeout(300);
-    await page.evaluate(() => { const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); });
+    // t542 — the preview now plays the REAL emit (G31 with slow F100 re-touches, ~12s for 3 axes at real speed); simSpeed
+    // it up so the FULL trajectory (mid Start -> seek -> settle) lands inside the sampling window below (was the proxy's ~1s).
+    await page.evaluate(() => { const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 20; });
     const out = [];
     for (let i = 0; i < 22; i++) {
         out.push(await page.evaluate(() => {
@@ -92,8 +94,8 @@ test('DRIVE THE APP: the homing tool renders AT THE TOP with a stock shown — s
     await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
     await page.evaluate(() => window.updateWiz && window.updateWiz());
     await page.waitForTimeout(300);
-    await page.evaluate(() => { const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); });
-    await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine && !p.engine.running; }, null, { timeout: 10000 });
+    await page.evaluate(() => { const host = document.getElementById('homingVizContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 60; });   // t542 — real emit is slower (slow re-touch); speed it so it settles inside the wait
+    await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine && !p.engine.running; }, null, { timeout: 20000 });
     const w = await page.evaluate(() => { const p = window.ddcsStudio.wizardManager._activePanel; p.viz._animTool.updateWorldMatrix(true, false); return +p.viz._animTool.getWorldPosition(new (p.viz.THREE.Vector3)()).z.toFixed(1); });
     expect(w >= -8, `the homing tool rests at the TOP (worldZ=${w}) with a stock shown, not the -100 bottom`).toBe(true);
     await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_tool_at_top_with_stock.png' });

@@ -2,10 +2,11 @@ import { test, expect } from '@playwright/test';
 
 // H1 — native homing (M98 P501 X<N>) is run by the execution engine.
 //
-// The homing WIZARD PREVIEW models the motion via homingSimProxy (plain G53 moves). But the RAW emitted homing
-// macro is literal `M98 P501 X<N>` lines, and the engine had NO M98 handler — so an editor Simulate of an inserted
-// homing macro silently skipped it (no motion, no homed flag). These tests pin the fix: the engine now models the
-// native home (rapid to the signed-travel home end + back-off, like the proxy) and sets the homed flag #[1515+N].
+// A RAW emitted homing macro can contain literal `M98 P501 X<N>` lines (the Setup-inserted native path), and the engine
+// had NO M98 handler — so an editor Simulate of an inserted native homing macro silently skipped it (no motion, no homed
+// flag). These tests pin the fix: the engine models the native home (rapid to the declared home end + back-off) and sets
+// the homed flag #[1515+N]. (t542 — the WIZARD PREVIEW now plays the real emitted G31 code, not a proxy; this M98 handler
+// stays for native code played in the editor.)
 test.use({ viewport: { width: 1000, height: 800 } });
 
 // Deterministic machine/homing config injected so the home-end math is checkable regardless of app defaults.

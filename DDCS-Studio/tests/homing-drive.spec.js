@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * HOMING H1 — DRIVE THE APP: the home-end reconciliation. The homing sim (homingSimProxy, rendered in the wizard's 3D)
- * now drives each axis to the TRUE home end = MACHINE-0 (Z to the top/0, NOT -120; X/Y to 0), aligned with axisSpan +
- * the M98-P501 engine handler. Real-symptom: open the wizard, assert the sim's seek line lands on machine-0, screenshot.
+ * HOMING H1 — DRIVE THE APP: the home-end reconciliation. Each axis drives to the TRUE home end = MACHINE-0 (Z to the
+ * top/0, NOT -120; X/Y to 0), from the ONE source axisHomeMotion (aligned with axisSpan + the M98-P501 engine handler +
+ * the emitted G31). Real-symptom: open the wizard (the preview plays the real emit, t542), assert the home target, screenshot.
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 test('the homing sim drives every axis to the machine-0 home end (NOT the far/signed-travel end) + screenshot', async ({ page }) => {
@@ -19,13 +19,13 @@ test('the homing sim drives every axis to the machine-0 home end (NOT the far/si
     const machine = { x: -300, y: 200, z: -120 };
     await page.evaluate((m) => { Object.assign(window.ddcsGetSettings().machine, m); }, machine);
     const r = await page.evaluate(async (M) => {
-        const { homingSimProxy } = await import('/wizards/homingWizard.js');
-        const { axisSpan } = await import('/engine/limitSwitches.js');
-        const text = homingSimProxy({ axes: ['x', 'y', 'z'], config: { x: { method: 'native' }, y: { method: 'native' }, z: { method: 'native' } }, machine: M });
-        const seek = (A) => { const m = text.match(new RegExp('G53 G0 ' + A + '(-?[\\d.]+)')); return m ? parseFloat(m[1]) : null; };
+        // t542 — the hand-made simProxy is DELETED (the preview plays the real emit). The home END each axis drives to is
+        // axisHomeMotion (the ONE source the emit + the M98 handler read) = machine-0 for this envelope, NOT the far end.
+        const { axisSpan, axisHomeMotion } = await import('/engine/limitSwitches.js');
+        const seek = (axis) => axisHomeMotion(M[axis], { axis, limits: {}, backoff: 5 }).seek;
         // BEFORE (the buggy signed-travel formula) = the FAR end the axes plunged toward (the symptom).
         const oldFar = { x: M.x, y: M.y, z: M.z };   // x -300 (left) · z -120 (down) — the plunge
-        return { xSeek: seek('X'), ySeek: seek('Y'), zSeek: seek('Z'), oldFar, zHomeSide: axisSpan(M.z).homeSide, xHomeSide: axisSpan(M.x).homeSide };
+        return { xSeek: seek('x'), ySeek: seek('y'), zSeek: seek('z'), oldFar, zHomeSide: axisSpan(M.z).homeSide, xHomeSide: axisSpan(M.x).homeSide };
     }, machine);
     await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_at_home.png' });
     console.log('HOMING: symptom(old far end)=' + JSON.stringify(r.oldFar) + ' → fix(seek)= X:' + r.xSeek + ' Y:' + r.ySeek + ' Z:' + r.zSeek);

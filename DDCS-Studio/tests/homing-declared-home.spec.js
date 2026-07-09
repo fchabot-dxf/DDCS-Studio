@@ -10,21 +10,19 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1300, height: 950 } });
 
 // ── DETERMINISTIC: the home TARGET + emit direction are the declared TOP (z_max = hi) for BOTH signs. ──
-test('axisHomeMotion / simProxy / G31 all target the DECLARED home edge (z_max = TOP), sign-agnostic', async ({ page }) => {
+test('axisHomeMotion + the emitted G31 target the DECLARED home edge (z_max = TOP), sign-agnostic', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio);
     const r = await page.evaluate(async () => {
         const { axisHomeMotion, declaredHomeEdgeSide } = await import('/engine/limitSwitches.js');
-        const { homingSimProxy, homingStack } = await import('/wizards/homingWizard.js');
+        const { homingStack } = await import('/wizards/homingWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const zMax = { zMaxHome: true }, zMin = { zMinHome: true };
         const seekOf = (travel, limits) => axisHomeMotion(travel, { axis: 'z', limits, backoff: 5 }).seek;
-        const proxySeek = (z, limits) => (homingSimProxy({ axes: ['z'], config: { z: {} }, machine: { z }, limits }).match(/G53 G0 Z([-\d.]+)/) || [])[1];
         const g31Dist = (z, limits) => (emitMapped(homingStack({ axes: ['z'], config: { z: { enable: true } }, machine: { z }, limits })).text.match(/G31 Z(-?[\d.]+)/) || [])[1];   // t536 — the simple shape's first (fast) G31 Z seek distance (span-sized, signed toward the home end)
         return {
             side: { neg: declaredHomeEdgeSide('z', zMax), noDecl: declaredHomeEdgeSide('z', {}) },
             seek: { negMax: seekOf(-120, zMax), posMax: seekOf(500, zMax), posMin: seekOf(500, zMin), posNoDecl: seekOf(500, {}) },
-            proxy: { neg: proxySeek(-120, zMax), pos: proxySeek(500, zMax) },
             g31: { neg: g31Dist(-120, zMax), pos: g31Dist(500, zMax) },
         };
     });
@@ -38,9 +36,8 @@ test('axisHomeMotion / simProxy / G31 all target the DECLARED home edge (z_max =
     expect(r.seek.posMin, 'Z=+500, zMinHome → seek the bottom (lo=0) — proves it reads the flag').toBe(0);
     // no declaration → the sign-derived machine-0 fallback (no regression)
     expect(r.seek.posNoDecl, 'Z=+500, no declared home → sign-derived machine-0 (0)').toBe(0);
-    // the sim proxy seeks the declared TOP for both signs
-    expect(Number(r.proxy.neg), 'proxy Z=-120 → seek Z0 (top)').toBe(0);
-    expect(Number(r.proxy.pos), 'proxy Z=+500 → seek Z500 (top), not Z0').toBe(500);
+    // t542 — the hand-made simProxy is DELETED (the preview plays the real emit); the declared-edge target lives in
+    // axisHomeMotion (asserted above) + the emitted G31 direction (below), the ONE source. No proxy assertion.
     // the emitted G31 seeks UP (a POSITIVE, span-sized distance) toward z_max for BOTH signs (t536 simple shape)
     expect(Number(r.g31.neg), 'G31 Z=-120 seeks UP (positive) toward z_max').toBeGreaterThan(0);
     expect(Number(r.g31.pos), 'G31 Z=+500 seeks UP (positive) toward z_max, NOT down toward machine-0').toBeGreaterThan(0);
