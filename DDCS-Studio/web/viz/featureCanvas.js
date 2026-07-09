@@ -307,8 +307,18 @@ export class FeatureCanvas {
 
         // --- grid ---------------------------------------------------------
         const tl = this._W(0, 0), br = this._W(VW, VH);
-        const minX = Math.min(tl.x, br.x), maxX = Math.max(tl.x, br.x);
-        const minY = Math.min(tl.y, br.y), maxY = Math.max(tl.y, br.y);
+        let minX = Math.min(tl.x, br.x), maxX = Math.max(tl.x, br.x);
+        let minY = Math.min(tl.y, br.y), maxY = Math.max(tl.y, br.y);
+        // t578 — for a MACHINE frame, FIT the grid to the envelope + a small machine-coord margin (clamped to the viewport, so a
+        // zoom-in still fills the pane). The grid then FRAMES the envelope exactly instead of sprawling across the whole pane
+        // (or reading undersized). Part/stock layouts (no spec.machine) keep the full-viewport grid.
+        if (spec.machine) {
+            const X = Number(spec.machine.x) || 0, Y = Number(spec.machine.y) || 0;
+            const ex0 = Math.min(0, X), ex1 = Math.max(0, X), ey0 = Math.min(0, Y), ey1 = Math.max(0, Y);
+            const mgn = Math.max(Math.abs(X), Math.abs(Y), 10) * 0.04;   // a small, uniform border around the envelope
+            minX = Math.max(minX, ex0 - mgn); maxX = Math.min(maxX, ex1 + mgn);
+            minY = Math.max(minY, ey0 - mgn); maxY = Math.min(maxY, ey1 + mgn);
+        }
         const step = niceStep(16 / this._tf.scale);
         const major = step * 5;
         const line = (x1, y1, x2, y2, cls) => {

@@ -784,6 +784,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (on === machineFrameTool) return;
         machineFrameTool = on;
         if (viz && viz.setToolMachineFrame) viz.setToolMachineFrame(on);
+        if (active) setGcode();   // t578 — a machine-frame flip changes the trace FRAME (machine coords + seat + stock-ignore); RE-TRACE so the seated route lands NOW (mirrors setSeatAtStart). Without this the first render kept the pre-seat origin route until the next edit/drag ('on open it's not connecting the start and probe, only after first drag').
     }
 
     // Host hint: SEAT the trace/engine initial position at the draggable Start (marker A) — the homing initialPos seam WITHOUT

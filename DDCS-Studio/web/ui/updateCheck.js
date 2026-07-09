@@ -87,8 +87,44 @@ export function initWebVersionNudge() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) checkWebVersion(); });
 }
 
+// ── DEV stale-page banner (t578) ─────────────────────────────────────────────────────────────────────────
+// A dev pitfall: the browser serves a CACHED page/modules while the bumped build moved on — you debug a ghost (more than
+// one homing "bug" this session was a stale page). On boot (localhost dev only) re-fetch the build stamp (version.json,
+// cache no-store) and compare to the LOADED page's baked stamp (the .ver chip). Served stamp NEWER → the loaded page is
+// stale → a persistent RED 'stale page — reload' banner. Dev-only: the hosted web auto-deploys (a reload always fixes it →
+// the toast above suffices) and the exe's relative version.json == baked (never stale).
+function isDevServer() {
+  try {
+    const loopback = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    return loopback && !isDesktopApp();   // dev = the local static web server (http-server), NOT the exe's gateway loopback ports
+  } catch (_) { return false; }
+}
+
+function showStaleBanner(live, loaded) {
+  if (document.querySelector('.ddcs-stale-bar')) return;
+  const bar = document.createElement('div');
+  bar.className = 'ddcs-stale-bar';
+  bar.innerHTML = `<span class="stale-msg">⚠ stale page — loaded <b>V${escapeHtml(loaded)}</b>, server has <b>V${escapeHtml(live)}</b></span>`
+    + `<button class="stale-reload" type="button">Reload</button>`;
+  bar.querySelector('.stale-reload').addEventListener('click', () => { try { location.reload(); } catch (_) { /* */ } });
+  document.body.appendChild(bar);
+}
+
+/** Dev-only: re-fetch the build stamp (no-store) and, if it's newer than the loaded page's baked chip, show the red stale
+ *  banner. Returns true iff the banner was shown (testable by forcing a stamp mismatch). No-op off the dev server. */
+export async function checkStalePage() {
+  if (!isDevServer()) return false;
+  const loaded = bakedVersion();
+  if (!loaded) return false;
+  let live = null;
+  try { const r = await fetch('version.json', { cache: 'no-store' }); if (!r.ok) return false; live = (await r.json()).v; } catch (_) { return false; }   // 404 / offline → quiet
+  if (live && isNewer(live, loaded)) { showStaleBanner(live, loaded); return true; }
+  return false;
+}
+
 export async function initUpdateCheck() {
   initWebVersionNudge();                                 // web build: the version.json reload-nudge (harmless on the exe)
+  checkStalePage();                                      // t578 — dev-only: a persistent red banner when the loaded page is stale (no-op off localhost)
   if (!isDesktopApp()) return;                          // the GitHub-release banner below is exe only
   const local = bakedVersion();
   if (!local) return;
@@ -112,4 +148,4 @@ export async function initUpdateCheck() {
 }
 
 // Expose helpers for tests (and so the web-exclusion can be asserted).
-if (typeof window !== 'undefined') window.__ddcsUpd = { isNewer, isDesktopApp, bakedVersion, initUpdateCheck, checkWebVersion, initWebVersionNudge, _resetNudgeThrottle: () => { _lastWebCheck = 0; } };
+if (typeof window !== 'undefined') window.__ddcsUpd = { isNewer, isDesktopApp, isDevServer, bakedVersion, initUpdateCheck, checkWebVersion, initWebVersionNudge, checkStalePage, _resetNudgeThrottle: () => { _lastWebCheck = 0; } };

@@ -27,6 +27,17 @@ function machineFrameSpec() {
     } catch (_) { return null; }
 }
 
+// t578 — the WCS offset (work origin in MACHINE coords): where part-zero sits inside the fixed envelope, so the machine-frame
+// stock RIDES its WCS. Mirrors createPreviewPanel.wcsForViz (the ONE source): the active G54-G59 table row, else machine.workOrigin.
+function wcsOffsetXY() {
+    try {
+        const m = (typeof window !== 'undefined' && window.ddcsGetSettings) ? (window.ddcsGetSettings().machine || {}) : {};
+        const w = m.wcs, r = w && Array.isArray(w.table) && w.table[(w.active || 1) - 1];
+        if (r) return { x: +r.x || 0, y: +r.y || 0 };
+        const wo = m.workOrigin || {}; return { x: +wo.x || 0, y: +wo.y || 0 };
+    } catch (_) { return { x: 0, y: 0 }; }
+}
+
 export const PANEL_TYPES = {
     form:        { id: 'form',        label: 'Form only',      viz: false, mode: null },   // single column, no preview
     form3d:      { id: 'form3d',      label: 'Form + 3D',      viz: true,  mode: '3d' },   // form + the shared 3D preview (default)
@@ -104,17 +115,21 @@ export function pinnedStartsFor(def, params, spots) {
 export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
-    // t554 — MACHINE-FRAME layout flavor (DECLARED via the op's sim{toolMachine:true} → opSimContext.toolMachineFrame; homing):
-    // draw the ENVELOPE rectangle + the declared HOME corner glyph INSTEAD of a stock backdrop (no stock, no switch art). The
-    // Start handle + toolpath + all other logic are unchanged — only the backdrop swaps. `stockOut`=null → no fc-stock rect.
-    const machine = (def && def.opType && opSimContext(def.opType).toolMachineFrame) ? machineFrameSpec() : null;
-    const stockOut = machine ? null : stock;
-    const machSpread = machine ? { machine } : {};
     // t359 — the part-zero crosshair follows the DATUM (the selected part-zero corner/centre), consistent with the stock
     // modal + the 3D. The corner-pick circles stay on the PHYSICAL corners (cornerDatumXY, datum-independent) — the datum
     // and the probed corner are INDEPENDENT. Display-only (the crosshair position); the emit is untouched. Default datum
     // ('nnp') → origin {0,0} = the min-XY corner = the prior behaviour, so nothing shifts unless a non-FL datum is set.
     const _dp = datumXY({ x: stock.w, y: stock.h, datum: s && s.datum });
+    // t554 — MACHINE-FRAME layout flavor (DECLARED via the op's sim{toolMachine:true} → opSimContext.toolMachineFrame; homing):
+    // draw the ENVELOPE rectangle + the declared HOME corner glyph as the backdrop (machine coords). t578 — the STOCK now RIDES
+    // its WCS inside the FIXED envelope: position it so its DATUM corner lands at the work origin (machine coords) — min-XY corner
+    // = wcs − datumXY. (Part frame: stock at origin, unchanged.) The homing switch-seek still IGNORES this stock for COLLISION
+    // (createPreviewPanel stk=null) — here it's render-only, so the envelope + route + HOME + stock all read as one machine frame.
+    const machine = (def && def.opType && opSimContext(def.opType).toolMachineFrame) ? machineFrameSpec() : null;
+    const stockOut = machine
+        ? (() => { const wcs = wcsOffsetXY(); return { w: stock.w, h: stock.h, ox: wcs.x - _dp.x, oy: wcs.y - _dp.y }; })()
+        : stock;
+    const machSpread = machine ? { machine } : {};
     const origin = { x: (stock.ox || 0) + _dp.x, y: (stock.oy || 0) + _dp.y };
     // t120 — CORNER-MARKER INDEPENDENCE (Option A): the DATUM for the datum-relative marker spots = the CORNER position
     // (cornerXY, per-corner) — so a stored spot re-anchors when the corner changes. Only the corner op has one; absent →

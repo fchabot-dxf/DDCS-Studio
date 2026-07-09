@@ -271,6 +271,32 @@ export const userOpView = {
         const pt = panelType(_def.panel);
         const viz3dBox = el('userViz3dBox');
         const viz3dIn = (id) => { const c = el(id); return (c && c.parentElement) ? c.parentElement.querySelector('.wiz-viz3d') : null; };
+        // t421/t552/t560/t570 — apply the DECLARED sim intent (opSimContext) to the op's preview panel:
+        //  · rotary rig (showRotaryRig, sim{rotary}) — the 4th-axis chuck+tailstock (generic mirror of rotaryCenterView).
+        //  · machine-frame + tool-machine-frame (toolMachineFrame, sim{toolMachine}, HOMING) — FORCE the envelope + render the
+        //    tool in raw machine coords; a probe op's forceMachine stays LOCAL (gated on toolMachineFrame, not plain forceMachine).
+        //  · seat-at-start (seatAtStart, sim{seatStart}, ALIGNMENT) — seat the trace/engine initial pos at the draggable Start.
+        //  · magazine (showMagazine, sim{magazine}, ATC) — the pocket tiles on the envelope.
+        // t578 — the TRACE-affecting bits (machine frame, seat) MUST land BEFORE the 2D layout overlay reads panel.getSegments(),
+        // so a FRESH open feeds the overlay the SAME seated machine-frame route a drag does (the reported 'on open it's not
+        // connecting the start and probe, only after first drag' = the intent used to land AFTER renderLayoutWithSim). Idempotent
+        // (the panel setters early-return when unchanged), so the plain-3D tail call below is a harmless no-op for 3d2d.
+        const applySimIntent = (rigCont) => {
+            if (!rigCont) return;
+            try {
+                const ctx = opSimContext(_def.opType);
+                mgr.previewRotaryFixture(rigCont, !!ctx.showRotaryRig);
+                if (ctx.toolMachineFrame) {
+                    if (mgr.previewMachine) mgr.previewMachine(rigCont, true);
+                    if (mgr.previewToolMachineFrame) mgr.previewToolMachineFrame(rigCont, true);
+                }
+                if (mgr.previewSeatAtStart) mgr.previewSeatAtStart(rigCont, !!ctx.seatAtStart);
+                if (ctx.showMagazine && mgr.previewMagazine) {
+                    const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+                    mgr.previewMagazine(rigCont, magazinePockets(s.atc || {}));
+                }
+            } catch (_) { /* op declares no rig/machine intent → harmless no-ops */ }
+        };
         // t518 — the Comm 'commscreen' preview host is a sibling in #userVizContainer; drop any stale one at the top of EVERY
         // render so it never leaks into another op's 3D/2D pane (self-cleaning; the commscreen branch re-creates it fresh).
         { const c0 = el('userVizContainer'); const h0 = c0 && c0.querySelector('.comm-screen-host'); if (h0 && pt.mode !== 'commscreen') h0.remove(); }
@@ -285,6 +311,7 @@ export const userOpView = {
             const _phost = viz3dIn('userViz3dContainer');   // the SAME one-level-up derivation the panel + the drag path use (a two-level querySelector can match the OTHER pane's .wiz-viz3d in form3d+2d)
             if (_phost) _phost.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots);
             mgr.preview3D(previewGcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock);
+            applySimIntent('userViz3dContainer');   // t578 — seat the machine-frame/seat intent BEFORE the layout overlay reads the trace, so the fresh-open route connects Start→seeks→HOME (the drag's own re-feed already had the intent set)
             const c = el('userVizContainer');
             if (c) {
                 c.style.display = ''; const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none';
@@ -345,39 +372,9 @@ export const userOpView = {
                 try { host.innerHTML = _commWizard.generateScreenPreview(params); } catch (_) { host.innerHTML = ''; }
             }
         }
-        // t421 E5 — DECLARED rig intent: a rotary-declaring twin (opSimContext.showRotaryRig, from its stack `sim{rotary:true}`
-        // via setUserSimIntent) shows the 4th-axis rig (chuck + tailstock) in the 3D preview — the GENERIC mirror of the
-        // built-in rotaryCenterView's previewRotaryFixture call + the Blocks tab (blocksApp). Declared, never inferred; a
-        // non-rotary op → false → a harmless no-op (setRotaryFixture early-outs when already off). The 3D box holds the rig:
-        // 'userViz3dContainer' in form3d+2d, 'userVizContainer' in form3d.
-        try {
-            const _rigCont = pt.mode === '3d2d' ? 'userViz3dContainer' : pt.mode === '3d' ? 'userVizContainer' : null;
-            const _ctx = opSimContext(_def.opType);
-            if (_rigCont) {
-                mgr.previewRotaryFixture(_rigCont, !!_ctx.showRotaryRig);
-                // t552 — DECLARED MACHINE-FRAME-TOOL intent (opSimContext.toolMachineFrame from the stack `sim{toolMachine:true}`,
-                // homing): FORCE the envelope box (regardless of settings.machine.show) + render the live tool in RAW machine
-                // coords (t497), so homing draws at the envelope top with a stock shown. The GENERIC mirror of homingView's calls.
-                // GATED on toolMachineFrame (the homing intent), NOT plain forceMachine — a probe op (corner) declares forceMachine
-                // for the whole-program preview but its IN-PLACE probe preview must stay LOCAL-frame (the legacy behaviour).
-                if (_ctx.toolMachineFrame) {
-                    if (mgr.previewMachine) mgr.previewMachine(_rigCont, true);
-                    if (mgr.previewToolMachineFrame) mgr.previewToolMachineFrame(_rigCont, true);
-                }
-                // t570 — a DECLARED SEAT-AT-START intent (opSimContext.seatAtStart from the stack sim{seatStart:true}): seat the
-                // trace/engine INITIAL POSITION at the draggable Start (marker A), so the drawn path begins at A (alignment probes
-                // A in place). The homing initialPos seam WITHOUT the machine-frame render (alignment is a LOCAL/part-frame probe).
-                if (mgr.previewSeatAtStart) mgr.previewSeatAtStart(_rigCont, !!_ctx.seatAtStart);
-                // t560 — a DECLARED magazine intent (opSimContext.showMagazine, from the stack sim{magazine:true}): render the
-                // ATC magazine tiles (pockets + tool stubs) on the envelope — the GENERIC mirror of atc_change/atc_table's
-                // previewMagazine (the atc_test twin's pocket dry-run visits these). Read live from settings.atc; a non-ATC op
-                // → magazine:false → no-op. Call AFTER preview3D (done above).
-                if (_ctx.showMagazine && mgr.previewMagazine) {
-                    const _s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
-                    mgr.previewMagazine(_rigCont, magazinePockets(_s.atc || {}));
-                }
-            }
-        } catch (_) { /* op declares no rig/machine intent → harmless no-ops */ }
+        // Apply the DECLARED rig/machine/seat/magazine intent (see applySimIntent above) for the plain-3D mode — the 3d2d mode
+        // already applied it right after preview3D, BEFORE its layout overlay read the trace (t578 fresh-open connectivity).
+        if (pt.mode === '3d') applySimIntent('userVizContainer');
         const status = el('userVizStatus');
         // t554 — an optional DECLARED status hint (def.statusHint(params) → a string): homing surfaces the unset-travel warning
         // ("⚠ Set Z travel …", the t540 behaviour) in-place. Generic seam; a def without one → no hint (unchanged).
