@@ -10,17 +10,15 @@ test('the A anchor allows fractions beyond [0,1] (a probe point past the stock e
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
-        const { alignAnchor, alignMarkersXY } = await import('/wizards/ops/alignPoints.js');
+        const { alignMarkersXY } = await import('/wizards/ops/alignPoints.js');
         return {
-            beyond: alignAnchor({ ax: 1.4, ay: -0.2 }),                         // A past the far edge (1.4) + below (-0.2)
-            xy: alignMarkersXY({ ax: 1.4, ay: 0.5 }, { x: 200, y: 120 })[0],    // A: 1.4 × 200 = 280 (past the 200 edge)
-            emptyDefault: alignAnchor({ checkAxis: 'X' }),                       // empty → the checkAxis default (still valid)
+            xy: alignMarkersXY({ ax: 1.4, ay: 0.5 }, { x: 200, y: 120 })[0],    // A DRAGGED: along-X 1.4 × 200 = 280 (past the edge), perp-Y 0.5 × 120 = 60
+            defA: alignMarkersXY({ checkAxis: 'X' }, { x: 200, y: 120 })[0],     // empty → the default: A just OUTSIDE the probed −Y fence
         };
     });
-    expect(r.beyond.fx, 'ax=1.4 is NOT clamped to 1').toBeCloseTo(1.4, 5);
-    expect(r.beyond.fy, 'ay=-0.2 is NOT clamped to 0').toBeCloseTo(-0.2, 5);
-    expect(r.xy.x, '1.4 × 200mm stock = 280mm (past the stock edge)').toBeCloseTo(280, 3);
-    expect(r.emptyDefault.fx, 'an empty field still falls to the checkAxis anchor default').toBeCloseTo(0.3, 5);
+    expect(r.xy.x, 'a dragged along-fence fraction 1.4 × 200mm = 280mm is NOT clamped to the stock edge').toBeCloseTo(280, 3);
+    expect(r.xy.y, 'the perp fraction 0.5 × 120mm = 60').toBeCloseTo(60, 3);
+    expect(r.defA.y < 0, 't574 — the empty default seats A OUTSIDE the probed −Y fence (below y=0)').toBe(true);
 });
 
 test.use({ viewport: { width: 1400, height: 1000 } });

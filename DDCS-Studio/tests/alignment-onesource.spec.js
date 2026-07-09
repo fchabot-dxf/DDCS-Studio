@@ -11,32 +11,31 @@ test('opSimStarts.alignment = A (the anchor fraction) + B (A + the declared span
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio);
     const r = await page.evaluate(async () => {
-        const { alignAnchor, alignMarkersXY, alignSpan } = await import('/wizards/ops/alignPoints.js');
+        const { alignMarkersXY, alignSpan } = await import('/wizards/ops/alignPoints.js');
         const { AlignmentWizard } = await import('/wizards/alignmentWizard.js');
         const w = new AlignmentWizard();
         const stock = { x: 150, y: 100, z: 25 };
-        const def = w.inferStarts({ checkAxis: 'X', span: 50 }, stock);                 // default anchor + span 50
-        const draggedA = w.inferStarts({ checkAxis: 'X', ax: 0.5, ay: 0.5, span: 50 }, stock);  // A anchor moved
+        const def = w.inferStarts({ checkAxis: 'X', span: 50 }, stock);                 // default: A OUTSIDE the probed fence + span 50
+        const draggedA = w.inferStarts({ checkAxis: 'X', ax: 0.5, ay: 0.5, span: 50 }, stock);  // A anchor DRAGGED (fractions)
         const biggerSpan = w.inferStarts({ checkAxis: 'X', span: 80 }, stock);          // span 80 → B moves
         return {
-            anchorFrac: alignAnchor({ checkAxis: 'X' }),
             defA: { x: def[0].x, y: def[0].y }, defB: { x: def[1].x, y: def[1].y },
             dragA: { x: draggedA[0].x, y: draggedA[0].y }, dragAB: { x: draggedA[1].x, y: draggedA[1].y },
             spanB: { x: biggerSpan[1].x, y: biggerSpan[1].y },
             spanY: (() => { const [A, B] = alignMarkersXY({ checkAxis: 'Y', ax: 0.85, ay: 0.3, span: 40 }, stock); return { A, B }; })(),
         };
     });
-    // A's anchor default (checkAxis X) = 0.3/0.85; B = A + span along X (checkAxis)
-    expect(r.anchorFrac).toEqual({ fx: 0.3, fy: 0.85 });
-    expect(r.defA).toEqual({ x: 45, y: 85 });          // 0.3*150, 0.85*100 — the anchor
-    expect(r.defB).toEqual({ x: 95, y: 85 });          // A.x + span(50) = 45+50, same Y (span along X)
-    // dragging A's anchor moves BOTH markers (B tracks A + span)
+    // t574 — the DEFAULT (checkAxis X, probeDir default pos → the −Y face): A ALONG the fence at 0.3, PERPENDICULAR just OUTSIDE
+    // the face (retract 2 + 2 = 4mm below y=0 → −4); B rides A's approach line (same Y), offset by the span along X.
+    expect(r.defA).toEqual({ x: 45, y: -4 });          // 0.3*150 along X; −(retract+2) below the −Y face
+    expect(r.defB).toEqual({ x: 95, y: -4 });          // A.x + span(50), same approach Y
+    // dragging A's anchor (fractions) → B tracks A + span (rides A's line)
     expect(r.dragA).toEqual({ x: 75, y: 50 });         // 0.5*150, 0.5*100
-    expect(r.dragAB).toEqual({ x: 125, y: 50 });       // A.x + span(50)
-    // a bigger span moves ONLY B (A anchor fixed)
-    expect(r.spanB).toEqual({ x: 125, y: 85 });        // 45 + 80
-    // checkAxis Y → the span runs along Y (B = A + span in Y)
-    expect(r.spanY.A).toEqual({ x: 127.5, y: 30 });    // 0.85*150, 0.3*100
+    expect(r.dragAB).toEqual({ x: 125, y: 50 });       // A.x + span(50), same Y
+    // a bigger span moves ONLY B (A fixed)
+    expect(r.spanB).toEqual({ x: 125, y: -4 });        // 45 + 80, same approach Y
+    // checkAxis Y (dragged ax=0.85 perp / ay=0.3 along) → the span runs along Y (B = A + span in Y)
+    expect(r.spanY.A).toEqual({ x: 127.5, y: 30 });    // perp 0.85*150, along 0.3*100
     expect(r.spanY.B).toEqual({ x: 127.5, y: 70 });    // A.y + span(40)
 });
 

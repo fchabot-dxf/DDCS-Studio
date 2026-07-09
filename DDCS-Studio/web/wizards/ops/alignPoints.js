@@ -21,38 +21,50 @@ export const DEFAULT_ALIGN_SPAN = 50;
 
 // t528 — NO [0,1] clamp on A's anchor fraction: the stock is a REFERENCE, not a hard bound (a handle past the stock edge
 // resolves to a real machine point; the only real limit is the envelope, enforced at the drag in userOpView.writeSimStartFrac).
-const frac = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+const setF = (v) => (v !== '' && v != null && !isNaN(Number(v)));
+const DEFAULT_ALONG_FRAC = 0.3;   // A's default position ALONG the fence (part-way); B rides to A+span (≈0.7 for the default span)
 
-/** The default A-anchor fraction for a checkAxis — a sensible spot ON the fence (near the far edge, part-way along). */
-export function alignDefaultAnchor(checkAxis) {
-    return (checkAxis === 'Y')
-        ? { fx: 0.85, fy: 0.3 }    // fence along Y → A sits at the +X edge, low in Y (span steps +Y toward B)
-        : { fx: 0.3, fy: 0.85 };   // fence along X → A sits high in Y, part-way along X (span steps +X toward B)
-}
-
-/** The sim-only A anchor as a FRACTION {fx,fy} (stored value wins; empty → the checkAxis default). B is DERIVED (A+span). */
-export function alignAnchor(params = {}) {
-    const checkAxis = params.checkAxis === 'Y' ? 'Y' : 'X';
-    const d = alignDefaultAnchor(checkAxis);
-    return { fx: frac(params.ax, d.fx), fy: frac(params.ay, d.fy) };
+/**
+ * The PROBED FENCE FACE for a (checkAxis × probeDir) combo (t574 — the RULED model): alignment probes the stock wall whose
+ * outward normal OPPOSES the probe direction, approached from OUTSIDE. checkAxis picks the probe axis (X→probe Y; Y→probe X);
+ * probeDir picks the SIGN. `{ perp, sign }`: `perp` = the axis the probe travels (the tool's PERPENDICULAR-to-fence axis);
+ * `sign` = +1 → the tool sits ABOVE the +face (probes −, hits the +face); −1 → BELOW the −face (probes +, hits the −face).
+ *   X,+ → probe +Y → the −Y face (sign −1); X,− → +Y face (sign +1); Y,+ → −X face (−1); Y,− → +X face (+1).
+ */
+export function alignProbedFace(checkAxis, probeDir) {
+    const perp = checkAxis === 'Y' ? 'x' : 'y';   // fence along Y → probe X; fence along X → probe Y
+    const sign = probeDir === 'neg' ? 1 : -1;     // probeDir+ (probe +) → the − face (below); probeDir− (probe −) → the + face (above)
+    return { perp, sign };
 }
 
 /** The declared A→B span (mm along checkAxis), signed. */
 export function alignSpan(params = {}) { return num(params.span, DEFAULT_ALIGN_SPAN); }
 
 /**
- * The 2 SIM markers as stock-frame COORDINATES (mm): A = the anchor fraction × stock; B = A + span along the checkAxis.
- * SIM-ONLY (the preview markers + the sim start) — the emit never uses these (A is probed in place, B is a relative jog).
+ * The 2 SIM markers as stock-frame COORDINATES (mm) — the t574 RULED model. A = an APPROACH POINT: ALONG the fence at the
+ * default fraction (or the dragged ax/ay), PERPENDICULAR = just OUTSIDE the probed face (an approach standoff ~ retract+2mm,
+ * face-derived per checkAxis × probeDir) so the default sits OUTSIDE the stock and the probe collides by construction. A is
+ * FREELY draggable both axes; B RIDES A's approach line (B.perp == A.perp) offset by the span ALONG the fence. SIM-ONLY (the
+ * preview markers + the sim start) — the emit never uses these (A is probed in place, B is a relative jog).
  * @returns {[{x:number,y:number},{x:number,y:number}]}  [A, B]
  */
 export function alignMarkersXY(params = {}, stock = {}) {
     const sx = (stock && Number(stock.x)) || 0, sy = (stock && Number(stock.y)) || 0;
-    const A = alignAnchor(params);
-    const ax = A.fx * sx, ay = A.fy * sy;
-    const span = alignSpan(params);
     const checkAxis = params.checkAxis === 'Y' ? 'Y' : 'X';
-    const B = checkAxis === 'X' ? { x: ax + span, y: ay } : { x: ax, y: ay + span };
-    return [{ x: ax, y: ay }, B];
+    const probeDir = params.probeDir === 'neg' ? 'neg' : 'pos';
+    const span = alignSpan(params);
+    const standoff = num(params.retract, 2) + 2;   // the marker sits this far OUTSIDE the probed face (a probing standoff)
+    const { sign } = alignProbedFace(checkAxis, probeDir);
+    // the PERPENDICULAR default: just outside the face — sign −1 → below the − face (0 − standoff); +1 → above the + face (dim + standoff)
+    const perpDefault = (dim) => sign < 0 ? -standoff : dim + standoff;
+    if (checkAxis === 'X') {
+        const ax = (setF(params.ax) ? Number(params.ax) : DEFAULT_ALONG_FRAC) * sx;                 // ALONG the fence (X)
+        const ay = setF(params.ay) ? Number(params.ay) * sy : perpDefault(sy);                      // PERPENDICULAR (Y): just outside the ∓Y face
+        return [{ x: ax, y: ay }, { x: ax + span, y: ay }];                                         // B rides A's line (== ay), offset by the span along X
+    }
+    const ay = (setF(params.ay) ? Number(params.ay) : DEFAULT_ALONG_FRAC) * sy;                     // ALONG the fence (Y)
+    const ax = setF(params.ax) ? Number(params.ax) * sx : perpDefault(sx);                          // PERPENDICULAR (X): just outside the ∓X face
+    return [{ x: ax, y: ay }, { x: ax, y: ay + span }];                                             // B rides A's line (== ax), offset by the span along Y
 }
 
 /**

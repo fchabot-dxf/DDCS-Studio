@@ -27,14 +27,14 @@ test('(a) PROOF-OF-SUFFICIENCY: a built-in pattern as def.sim.starts rows == its
     const middleGot = makeProvider(middleRows)(pM, stockM);
     const middleWant = opSimStarts('middle', pM, stockM);
 
-    // ALIGNMENT (fence along X): A = the anchor fraction near the +Y edge; B = A + the declared span (t544: 45 + 50 = 95mm =
-    // 0.6333 of the 150 stock) — exercises frac + the PROBE plane (t572: a few mm DOWN the wall, at PROBING HEIGHT — the
-    // horizontal fence G31 must be below the top to collide, not above it). (B is A+span mm, not a fixed fraction; expressed here.)
+    // ALIGNMENT (fence along X, probeDir default pos → the −Y face): A ALONG the fence (0.3), PERPENDICULAR just OUTSIDE the
+    // probed face (t574 — (retract 2 + 2) = 4mm below y=0 → −4mm = −0.04 of the 100 stock), at the PROBE plane (t572: a few mm
+    // DOWN the wall). B rides A's approach line (same Y), offset by the span (45 + 50 = 95mm). (B is A+span mm, expressed here.)
     const stockA = { x: 150, y: 100, z: 25 };
     const pA = { checkAxis: 'X', span: 50 };
     const alignRows = [
-      { anchor: 'frac', fx: 0.3, fy: 0.85, plane: 'probe' },
-      { anchor: 'frac', fx: (45 + 50) / 150, fy: 0.85, plane: 'probe' },   // A.x(45) + span(50) = 95mm
+      { anchor: 'frac', fx: 0.3, fy: -0.04, plane: 'probe' },
+      { anchor: 'frac', fx: (45 + 50) / 150, fy: -0.04, plane: 'probe' },   // A.x(45) + span(50) = 95mm; same approach Y
     ];
     const alignGot = makeProvider(alignRows)(pA, stockA);
     const alignWant = opSimStarts('alignment', pA, stockA);
