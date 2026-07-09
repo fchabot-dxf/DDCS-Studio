@@ -195,6 +195,7 @@ export function createPreviewPanel(container, opts = {}) {
     let touchSubs = [];      // t319/INC-6 — on-touch (G31 contact) subscribers (the Layout overlay's pulse). cb({pos, axis, feed, slow, pass, speed}).
     let lastPass = 0;        // the live tool's current pass index (from onPositionChange) — the pulse rides the SAME per-pass anchored frame as the head
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
+    let lastAbsolute = false;   // t580 PREVIEW-PARITY E1 — the last trace's absolute-ness (mill G90/G53), so play() picks the SAME mill part-Z work origin the drawn route did (simConfig)
 
     // DRO — a dual numeric readout mirroring the DDCS controller: Work (the tool's program position) + Mach. Work comes
     // straight from onPositionChange; Mach = Work + the ACTIVE WCS offset. `activeWcsOffset()` is the SINGLE swap-point:
@@ -431,6 +432,45 @@ export function createPreviewPanel(container, opts = {}) {
         return next;
     }
 
+    // t580 PREVIEW-PARITY E1 — THE ONE sim config: the SINGLE source both the static route trace AND the animated run read,
+    // so the drawn route can NEVER be configured differently from the played tool. Every 'works-here-wrong-there' bug this
+    // session was config DRIFT between the two call sites (setGcode's traceToolpath vs play()'s eng._*): the wcsOffset (homing
+    // → machine coords; mill → part-Z) and the stock (previewStock vs stockForViz) were set in parallel and fell out of sync.
+    // `absolute` (from the last trace's stats) selects the mill part-Z work origin; a probe/homing op ignores it.
+    const simStock = () => machineFrameTool ? null : previewStock();   // a homing SWITCH-SEEK ignores the workpiece for COLLISION (rendered separately); the op sim-stock (rotary bar) wins over the global, for BOTH consumers
+    function simWcsOffset(absolute, stk) {
+        if (machineFrameTool) return { x: 0, y: 0, z: 0 };   // a machine-frame route/run draws in MACHINE coords (no work-origin shift — the recurring few-inch delta)
+        const wo = wcsForViz() || { x: 0, y: 0, z: 0 };
+        const mch = machineForViz();
+        // faithful machine frame for an ABSOLUTE (mill) program: part-zero's machine Z = the table + the datum height above the
+        // stock bottom, so a `G53 Z0` (end safe-Z retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin.
+        if (mch && mch.show && stk && stk.x > 0 && absolute) {
+            return { x: wo.x || 0, y: wo.y || 0, z: Math.min(0, mch.z || 0) + datumZFrac(stk.datum) * (Number(stk.z) || 0) };
+        }
+        return { x: wo.x || 0, y: wo.y || 0, z: wo.z || 0 };
+    }
+    function simConfig(absolute) {
+        const st = getStartPos(), seat = startSeated(), stk = simStock();
+        return {
+            stock: stk,
+            start: st || { x: 0, y: 0, z: 0 },                 // the operator start (stockOffset — probes test from here)
+            initialPos: seat ? (st || null) : null,            // t540/t570 — seat the tool at the draggable Start (homing machine-frame / alignment)
+            continuous: seatAtStart,                           // t570 — an auto-traverse op is ONE continuous path (no per-pass origin reset)
+            passStarts,                                        // per-pass starts (multi-point probe collision fires from each)
+            wcsOffset: simWcsOffset(absolute, stk),
+        };
+    }
+    // Apply the ONE config to the LIVE animation engine (the trace consumes it via traceToolpath opts).
+    function applySimConfig(eng, absolute) {
+        const c = simConfig(absolute);
+        eng.stock = c.stock;
+        eng._stockOffset = c.start;
+        eng._initialPos = c.initialPos;   // already seat-gated in simConfig
+        eng._continuous = c.continuous;
+        eng._passStarts = (c.passStarts && c.passStarts.length) ? c.passStarts : null;
+        eng._wcsOffset = c.wcsOffset;
+    }
+
     function setGcode(text) {
         const code = text != null ? text : (get('getGcode') || '');
         // Inferred operator start (wizard preview): probes test from the real tool position so an incremental
@@ -444,29 +484,23 @@ export function createPreviewPanel(container, opts = {}) {
         // scheduleLiveRestart only re-plays on a G-CODE change, so it would otherwise leave _passStarts stale. Gated to
         // code===lastRunCode so a G-code-changing edit (handled by the re-play) never feeds the OLD running pass new starts.
         if (engine && engine.running && code === lastRunCode) engine._passStarts = (passStarts && passStarts.length) ? passStarts : null;
-        // t576 — a MACHINE-FRAME (homing) route is a machine SWITCH-SEEK: it must IGNORE the workpiece (the G31 seeks the
-        // home/limit switch at the envelope EDGE, not a stock face). So the COLLISION trace gets NO stock → the seek clamp
-        // reaches the home edge instead of stopping at the stock the route now overlaps (the stock is still RENDERED at its WCS
-        // by the layout/3D — the collision stock ≠ the drawn stock). Non-homing ops keep the stock (they probe/cut it).
-        const stk = machineFrameTool ? null : previewStock(), mch = machineForViz(), wo = wcsForViz() || {};
+        // t580 PREVIEW-PARITY E1 — the drawn route is traced from THE ONE simConfig() (the same source play() feeds the engine),
+        // so it can't be configured differently from the played tool. simConfig encodes the machine-frame stock-ignore (a homing
+        // switch-seek reaches the envelope home edge, not the workpiece), the machine-coords wcsOffset (no few-inch shift), the
+        // seat, continuous, and the per-pass starts. Non-homing ops keep the stock (they probe/cut it) — see simStock/simWcsOffset.
+        const stk = simStock(), mch = machineForViz();
         let parsed;
         try {
-            // passStarts → the engine fires each REPOSITION pass's probe from ITS start ② (Part 1), so boss-both collides.
-            // t576 — a MACHINE-FRAME route (homing, machineFrameTool) draws in MACHINE coords so its G53 seeks land ON the
-            // envelope's home edges — ONE pin with the drawn envelope + HOME glyph. NO work-origin shift (wcsForViz would draw
-            // the PART frame — the recurring few-inch delta vs the envelope). Alignment (seatAtStart, NOT machineFrameTool)
-            // keeps the PART frame (its markers/route/stock all sit at the WCS).
-            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: machineFrameTool ? { x: 0, y: 0, z: 0 } : wcsForViz(), passStarts, initialPos: startSeated() ? st : null, continuous: seatAtStart });   // t540 homing / t570 alignment: the route draws FROM the draggable Start
-            // (b) Faithful machine frame: an ABSOLUTE (mill) program's G53 / machine moves must resolve to where the
-            // part actually SITS in the envelope, not at part-zero. Part-zero's machine Z = the table + the datum's
-            // height above the stock bottom. Re-trace once with that as the work-origin Z so e.g. `G53 Z0` (the
-            // end "safe Z" retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin. NOT for a
-            // machine-frame (homing) route — that IS machine coords already (no part-Z shift).
+            // Pass 1: the base config (absolute unknown until traced). An ABSOLUTE (mill) program then re-traces with the
+            // part-Z work origin (b): part-zero's machine Z = the table + the datum height above the stock bottom, so a `G53 Z0`
+            // (end safe-Z retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin — simWcsOffset
+            // encodes this, gated on `absolute` (a homing/machine-frame or non-mill op returns the base, so the re-trace is a no-op).
+            parsed = traceToolpath(code, simConfig(false));
             if (!machineFrameTool && mch && mch.show && stk && stk.x > 0 && parsed.stats && parsed.stats.absolute) {
-                const z = Math.min(0, mch.z || 0) + datumZFrac(stk.datum) * (Number(stk.z) || 0);
-                parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: { x: wo.x || 0, y: wo.y || 0, z }, passStarts, initialPos: startSeated() ? st : null, continuous: seatAtStart });
+                parsed = traceToolpath(code, simConfig(true));
             }
         } catch (e) { console.warn('trace failed', e); parsed = { segments: [], stats: {} }; }
+        lastAbsolute = !!(parsed.stats && parsed.stats.absolute);   // play() reads this so its wcsOffset matches the route's final trace (mill part-Z parity)
         segs = parsed.segments || [];
         // t107 — the per-pass RUNTIME world-ENDs from the trace (machine-faithful re-park anchors: post probe+retract+lift,
         // collision-clamped). Fed to BOTH views so an anchorsAtPrev pass draws its dog-leg FROM where the tool actually is +
@@ -612,12 +646,10 @@ export function createPreviewPanel(container, opts = {}) {
         simActiveWcs = null;   // #4: each run reverts to the settings active WCS; the program's G54-G59 lines re-drive it (display only)
         eng.simSpeed = simSpeed();
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
-        eng.stock = machineFrameTool ? null : stockForViz();   // t576 — a homing SWITCH-SEEK ignores the workpiece (seeks the envelope-edge switch), so the played tool homes PAST the stock to the switch (matching the 2D route); the stock is still RENDERED
-        eng._stockOffset = getStartPos() || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
-        eng._initialPos = startSeated() ? (getStartPos() || null) : null;   // t540 homing / t570 alignment: the tool STARTS at the draggable Start (marker A) so the route animates Start→… (drag → replayFromStart re-runs from the new Start)
-        eng._continuous = seatAtStart;   // t570 — alignment's auto-traverse is ONE continuous path A→B (no per-pass origin reset)
-        eng._passStarts = (passStarts && passStarts.length) ? passStarts : null;   // Part 1: each REPOSITION pass probes from ITS start ② (boss-both)
-        eng._wcsOffset = wcsForViz() || { x: 0, y: 0, z: 0 };          // G53 machine moves draw in the part frame (see trace.js)
+        // t580 PREVIEW-PARITY E1 — configure the ANIMATION engine from THE ONE simConfig() (the same source the drawn route
+        // traced from), so the played tool can't diverge: the homing switch-seek stock-ignore, the machine-coords/mill-part-Z
+        // wcsOffset (lastAbsolute, from the route's final trace), the seat, continuous, and the per-pass starts — all one source.
+        applySimConfig(eng, lastAbsolute);
         if (mode === '3d') ensureViz();
         if (viz && viz.setSimSpeed) viz.setSimSpeed(simSpeed());   // probe discs fade in SIM time (track the speed button)
         if (viz && viz.resetProbe) viz.resetProbe();    // SLICE 3: fresh probe-WCS each run (superimposed on the stock-WCS)
@@ -890,6 +922,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
+        getSimConfig: () => simConfig(lastAbsolute),                                       // t580 PREVIEW-PARITY E1 — THE ONE config the route traced from + play() feeds the engine (read-only; parity checks assert eng._* == this)
         getAnchor: () => curAnchor,                                                       // t309 — the anchored/absolute frame flag (feed the overlay so its path frame matches)
         onToolPos: (cb) => { if (typeof cb === 'function') toolPosSubs.push(cb); return () => { toolPosSubs = toolPosSubs.filter((f) => f !== cb); }; },   // t309 — subscribe to the live engine head (fires in ANY mode); returns an unsubscribe
         onProbeTouch: (cb) => { if (typeof cb === 'function') touchSubs.push(cb); return () => { touchSubs = touchSubs.filter((f) => f !== cb); }; },   // t319 — subscribe to G31 contacts (the Layout pulse); cb({pos, axis, feed, slow, pass, speed})
