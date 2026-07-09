@@ -444,16 +444,25 @@ export function createPreviewPanel(container, opts = {}) {
         // scheduleLiveRestart only re-plays on a G-CODE change, so it would otherwise leave _passStarts stale. Gated to
         // code===lastRunCode so a G-code-changing edit (handled by the re-play) never feeds the OLD running pass new starts.
         if (engine && engine.running && code === lastRunCode) engine._passStarts = (passStarts && passStarts.length) ? passStarts : null;
-        const stk = previewStock(), mch = machineForViz(), wo = wcsForViz() || {};
+        // t576 — a MACHINE-FRAME (homing) route is a machine SWITCH-SEEK: it must IGNORE the workpiece (the G31 seeks the
+        // home/limit switch at the envelope EDGE, not a stock face). So the COLLISION trace gets NO stock → the seek clamp
+        // reaches the home edge instead of stopping at the stock the route now overlaps (the stock is still RENDERED at its WCS
+        // by the layout/3D — the collision stock ≠ the drawn stock). Non-homing ops keep the stock (they probe/cut it).
+        const stk = machineFrameTool ? null : previewStock(), mch = machineForViz(), wo = wcsForViz() || {};
         let parsed;
         try {
             // passStarts → the engine fires each REPOSITION pass's probe from ITS start ② (Part 1), so boss-both collides.
-            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: wcsForViz(), passStarts, initialPos: startSeated() ? st : null, continuous: seatAtStart });   // t540 homing / t570 alignment: the route draws FROM the draggable Start (marker A) — a drag re-traces the travel
+            // t576 — a MACHINE-FRAME route (homing, machineFrameTool) draws in MACHINE coords so its G53 seeks land ON the
+            // envelope's home edges — ONE pin with the drawn envelope + HOME glyph. NO work-origin shift (wcsForViz would draw
+            // the PART frame — the recurring few-inch delta vs the envelope). Alignment (seatAtStart, NOT machineFrameTool)
+            // keeps the PART frame (its markers/route/stock all sit at the WCS).
+            parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: machineFrameTool ? { x: 0, y: 0, z: 0 } : wcsForViz(), passStarts, initialPos: startSeated() ? st : null, continuous: seatAtStart });   // t540 homing / t570 alignment: the route draws FROM the draggable Start
             // (b) Faithful machine frame: an ABSOLUTE (mill) program's G53 / machine moves must resolve to where the
             // part actually SITS in the envelope, not at part-zero. Part-zero's machine Z = the table + the datum's
             // height above the stock bottom. Re-trace once with that as the work-origin Z so e.g. `G53 Z0` (the
-            // end "safe Z" retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin.
-            if (mch && mch.show && stk && stk.x > 0 && parsed.stats && parsed.stats.absolute) {
+            // end "safe Z" retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin. NOT for a
+            // machine-frame (homing) route — that IS machine coords already (no part-Z shift).
+            if (!machineFrameTool && mch && mch.show && stk && stk.x > 0 && parsed.stats && parsed.stats.absolute) {
                 const z = Math.min(0, mch.z || 0) + datumZFrac(stk.datum) * (Number(stk.z) || 0);
                 parsed = traceToolpath(code, { stock: stk, start: st, wcsOffset: { x: wo.x || 0, y: wo.y || 0, z }, passStarts, initialPos: startSeated() ? st : null, continuous: seatAtStart });
             }
@@ -603,7 +612,7 @@ export function createPreviewPanel(container, opts = {}) {
         simActiveWcs = null;   // #4: each run reverts to the settings active WCS; the program's G54-G59 lines re-drive it (display only)
         eng.simSpeed = simSpeed();
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
-        eng.stock = stockForViz();
+        eng.stock = machineFrameTool ? null : stockForViz();   // t576 — a homing SWITCH-SEEK ignores the workpiece (seeks the envelope-edge switch), so the played tool homes PAST the stock to the switch (matching the 2D route); the stock is still RENDERED
         eng._stockOffset = getStartPos() || { x: 0, y: 0, z: 0 };   // probes test from the operator start (see trace.js)
         eng._initialPos = startSeated() ? (getStartPos() || null) : null;   // t540 homing / t570 alignment: the tool STARTS at the draggable Start (marker A) so the route animates Start→… (drag → replayFromStart re-runs from the new Start)
         eng._continuous = seatAtStart;   // t570 — alignment's auto-traverse is ONE continuous path A→B (no per-pass origin reset)
