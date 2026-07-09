@@ -14,7 +14,7 @@
 import { initCube, cubeFaceAt, highlightCubeFace, pickCube } from './navCube.js';
 import { setupJogPendant } from './jogPendant.js';
 import { toolHalfProfile } from './toolProfile.js';
-import { PartFrame } from './sceneFrame.js';
+import { PartFrame, partZeroShift } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
 import { switchTypeOf } from '../engine/switchTypes.js';   // t512 — the DECLARED switch-type render glyph ('sensor-face' vs 'plunger'), so optical/hall draw non-contact (not the hardcoded 'proximity' string)
@@ -1391,35 +1391,10 @@ export class GcodeViz3D {
         }
     }
 
-    // The part-frame offset = machine coords of part-zero. The whole setup (op + stock) sits at the STOCK's WCS
-    // (its "Sits at WCS" pin, looked up in the WCS table) when the machine envelope is shown; else 0 (part-zero at
-    // scene 0, the per-op view). ONE source for op + stock so they never diverge. See machine-frame-sim-spec.
-    _partShift() {
-        const m = this._machine, s = this._stock;
-        if (!(m && m.show && m.x && m.y && m.z)) return { x: 0, y: 0, z: 0 };
-        // XY — the stock's WCS (G54 XY): the persistent fixture position.
-        let x = 0, y = 0, wcsZ = 0;
-        const pin = s && s.pin, wt = m.wcs && m.wcs.table;
-        if (pin && pin !== 'origin' && Array.isArray(wt)) {
-            const t = wt[parseInt(String(pin).replace(/[^0-9]/g, ''), 10) - 54];   // 'g54' → table[0]
-            if (t) { x = Number(t.x) || 0; y = Number(t.y) || 0; wcsZ = Number(t.z) || 0; }
-        } else {
-            // No stock pinned to a WCS (e.g. an ATC/machine-frame preview: G53 tool changes, no real workpiece). Sit the
-            // part frame at the ACTIVE WCS so a G53/machine move — which the engine offsets by the active wcsOffset —
-            // CANCELS to raw machine coords on the FIXED envelope, aligned with the magazine (t163). XY only; Z stays per
-            // the datum (absolute-machine-Z is deferred to P-B). Mirror wcsForViz's fallback chain EXACTLY (t173): the
-            // active WCS TABLE row, else m.workOrigin (a partial/legacy profile — workOrigin set but no table — else the
-            // engine offsets G53 by workOrigin while this returns 0 → the path drifts off the raw-machine magazine), else 0.
-            const a = (Array.isArray(wt) && wt[(((m.wcs && m.wcs.active) || 1) - 1)]) || m.workOrigin;
-            if (a) { x = Number(a.x) || 0; y = Number(a.y) || 0; }
-        }
-        // Z — the stock rests on the FIXED machine table; Z0 floats at the datum height (you re-zero Z per part, so
-        // the stored WCS-Z is ignored — it's volatile). Real Z control is per-path code (offZ + the datum-Z offset),
-        // not the sim placement. No stock → just the WCS-Z. (Absolute-machine-Z view is deferred to machine-frame fidelity.)
-        const tableFloor = Math.min(0, m.z), stockShown = s && s.show && s.z > 0 && this._stockFloorZ != null;
-        const z = stockShown ? tableFloor - this._stockFloorZ : wcsZ;
-        return { x, y, z };
-    }
+    // The part-frame offset = machine coords of part-zero — THE declared frame source (sceneFrame.partZeroShift), read by
+    // every renderer so the 3D group, the 2D pin, the layout, and the DRO can't drift (t582 ONE FRAME SOURCE). The viz
+    // supplies its stock-floor depth (_stockFloorZ, the datum-aware stock bottom in part-local Z) for the table/grid Z.
+    _partShift() { return partZeroShift(this._machine, this._stock, this._stockFloorZ); }
 
     // Wireframe machine envelope (fixed machine coords; home at scene 0) + machine-zero axes. The PART frame carries
     // op/stock to the stock's WCS instead, so the envelope never moves.
