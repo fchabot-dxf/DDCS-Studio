@@ -80,3 +80,48 @@ test('E1: the twin emit TRACKS live settings — change the Z travel / flip a Ho
     expect(Number(r.seekB), 'changed Z travel to 600 → the NEXT emit seeks 620 (tracked live, not frozen at 140)').toBe(620);
     expect(Number(r.seekC), 'flipped to zMinHome → the seek direction flips (now -620 toward the min end)').toBe(-620);
 });
+
+/**
+ * E2 M2 RULING (t550) — the emit operates on the OP'S OWN STORED STACK: a Blocks edit (an added/edited child atom) SURVIVES
+ * the settings recompose, AND the settings-dependent values still track a settings change. The recompose UNROLLS/VALUE-SWAPS
+ * in place — it never regenerates arms in a way that discards the edit. (This is the north-star gate the rebuild shape was
+ * approved against.)
+ */
+test('E2 ruling: a Blocks edit SURVIVES the settings recompose (in-place on the stored stack) + the seek still tracks settings', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const r = await page.evaluate(async () => {
+        const { homingDataDef } = await import('/blocks/dataOps/homingData.js');
+        const { registerUserOp } = await import('/blocks/userOps.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { flattenBlocks } = await import('/blocks/userOps.js');
+        const def = homingDataDef();
+        registerUserOp(def);
+        const build = builderOf('user_homing_data');
+        const cfg = { z: { enable: true, backoff: 5, seekFeed: 800, slowFeed: 100 } };
+
+        // instantiate: Z travel -120, zMaxHome → seek |120|+20 = 140
+        window.__s = { machine: { z: -120, x: 300, y: 300 }, limits: { zMaxHome: true }, homing: { axes: cfg } };
+        window.ddcsGetSettings = () => window.__s;
+        const stack = build({ axes: ['z'], softLimits: true });
+
+        // MUTATE a child atom (as a Blocks edit would) — inject a user comment INSIDE the Z arm
+        const op = flattenBlocks(stack).find((b) => b.type === 'op' && b.opType === 'homing');
+        const zi = op.children.findIndex((b) => b.type === 'comment' && /^Home Z/.test((b.params && b.params.text) || ''));
+        op.children.splice(zi + 1, 0, { type: 'comment', params: { text: 'USER BEEP - do not lose me' } });
+        const emitBefore = emitMapped(stack).text;
+
+        // settings change: Z travel -120 → 600 → the recompose (on the STORED, EDITED stack) must UPDATE the seek AND KEEP the edit
+        window.__s = { machine: { z: 600, x: 300, y: 300 }, limits: { zMaxHome: true }, homing: { axes: cfg } };
+        const recomposed = def.postInstantiate(stack, { axes: ['z'], softLimits: true });
+        const emitAfter = emitMapped(recomposed).text;
+
+        const seek = (t) => (t.match(/G31 Z(-?[\d.]+)/) || [])[1];
+        return { before: emitBefore, after: emitAfter, seekBefore: seek(emitBefore), seekAfter: seek(emitAfter) };
+    });
+    expect(r.before, 'the edit is present in the initial emit').toContain('USER BEEP - do not lose me');
+    expect(r.after, 'the Blocks edit SURVIVES the settings recompose (the emit is on the stored stack, not a rebuild)').toContain('USER BEEP - do not lose me');
+    expect(Number(r.seekBefore), 'initial: Z=-120 → seek 140').toBe(140);
+    expect(Number(r.seekAfter), 'after the edit: the seek STILL tracks the settings change (Z=600 → 620)').toBe(620);
+});
