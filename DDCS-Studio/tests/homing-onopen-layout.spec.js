@@ -95,3 +95,37 @@ test('(2) GRID frames the envelope + a small margin (not the whole pane)', async
     }
     expect(L.grid.r - L.grid.x, 'the grid is narrower than the full pane (bounded to the envelope)').toBeLessThan(L.paneW * 0.95);
 });
+
+// t586 PREVIEW-PARITY E2c — the layout stock now reads part-zero from THE ONE frame source (sceneFrame.partZeroShift), so it
+// coincides with the 3D stock. BEHAVIOR FIX vs t578's local wcsOffsetXY (which used the ACTIVE WCS): a stock pinned to a
+// NON-active WCS follows its PIN like the 3D. Here G54 is active but the stock is pinned to G55 → the stock must sit at G55.
+test('(4b) E2c: the layout stock follows its PIN (not the active WCS) — coincides with the 3D partZeroShift', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+    await page.evaluate(() => {
+        const s = window.ddcsGetSettings();
+        // G54 (active) = {50,30}; G55 = {200,150}. The stock is pinned to G55 — so it must ride G55, NOT the active G54.
+        s.machine = { x: 600, y: 400, z: -120, show: true, workOrigin: { x: 50, y: 30, z: 0 }, wcs: { active: 1, table: [{ x: 50, y: 30, z: -10 }, { x: 200, y: 150, z: -10 }] } };
+        s.homing = { axes: { z: { enable: true, order: 1 }, x: { enable: true, order: 2 }, y: { enable: true, order: 3 } } };
+        s.limits = { zMaxHome: true, xMinHome: true, yMinHome: true };
+        s.stock = { show: true, x: 100, y: 80, z: 25, datum: 'nnp', pin: 'G55' };
+        s.preview = s.preview || {}; s.preview.autoLoop = false;
+    });
+    await page.evaluate(() => window.openWiz('user_homing_data'));
+    await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
+    await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
+    await page.waitForTimeout(600);
+    const L = await readLayout(page);
+    const d = stockDatumMachine(L);
+    // the 3D's source of truth for the same op — the parity target
+    const pz = await page.evaluate(async () => {
+        const { partZeroShift } = await import('/viz/sceneFrame.js');
+        const s = window.ddcsGetSettings();
+        return partZeroShift(s.machine, s.stock, null);
+    });
+    expect(L.stk, 'the stock renders').not.toBeNull();
+    expect(Math.abs(d.x - 200), 'the stock datum follows the G55 PIN x (200), not the active G54 (50)').toBeLessThan(5);
+    expect(Math.abs(d.y - 150), 'the stock datum follows the G55 PIN y (150), not the active G54 (30)').toBeLessThan(5);
+    // and it COINCIDES with the 3D's declared frame source (partZeroShift) — one source, no drift
+    expect(Math.abs(d.x - pz.x) + Math.abs(d.y - pz.y), 'the layout stock corner == the 3D partZeroShift (one frame source)').toBeLessThan(5);
+});

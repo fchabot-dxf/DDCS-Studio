@@ -13,6 +13,7 @@ import { whenOk } from '../../blocks/whenGuard.js';   // a `when`-gated binding-
 import { datumXY, getWorkpiece, workpieceBackdrop } from '../../engine/workpiece.js';   // t359 — the datum crosshair; t385 — DRAW the workpiece INSIDE cavities (the pocket) from the DECLARED feature (stock-modal size)
 import { opSimContext } from '../../viz/opSimContext.js';   // t554 — the DECLARED machine-frame-layout intent (homing's sim{toolMachine:true})
 import { axisSpan, declaredHomeEdgeSide } from '../../engine/limitSwitches.js';   // t554 — the machine envelope span + the declared <edge>Home for the layout's HOME glyph
+import { partZeroShift } from '../../viz/sceneFrame.js';   // t586 PREVIEW-PARITY E2c — THE ONE frame source: the layout stock rides part-zero (the stock PIN) exactly like the 3D, no local WCS math
 
 // t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
 // settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
@@ -27,16 +28,6 @@ function machineFrameSpec() {
     } catch (_) { return null; }
 }
 
-// t578 — the WCS offset (work origin in MACHINE coords): where part-zero sits inside the fixed envelope, so the machine-frame
-// stock RIDES its WCS. Mirrors createPreviewPanel.wcsForViz (the ONE source): the active G54-G59 table row, else machine.workOrigin.
-function wcsOffsetXY() {
-    try {
-        const m = (typeof window !== 'undefined' && window.ddcsGetSettings) ? (window.ddcsGetSettings().machine || {}) : {};
-        const w = m.wcs, r = w && Array.isArray(w.table) && w.table[(w.active || 1) - 1];
-        if (r) return { x: +r.x || 0, y: +r.y || 0 };
-        const wo = m.workOrigin || {}; return { x: +wo.x || 0, y: +wo.y || 0 };
-    } catch (_) { return { x: 0, y: 0 }; }
-}
 
 export const PANEL_TYPES = {
     form:        { id: 'form',        label: 'Form only',      viz: false, mode: null },   // single column, no preview
@@ -121,13 +112,15 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // ('nnp') → origin {0,0} = the min-XY corner = the prior behaviour, so nothing shifts unless a non-FL datum is set.
     const _dp = datumXY({ x: stock.w, y: stock.h, datum: s && s.datum });
     // t554 — MACHINE-FRAME layout flavor (DECLARED via the op's sim{toolMachine:true} → opSimContext.toolMachineFrame; homing):
-    // draw the ENVELOPE rectangle + the declared HOME corner glyph as the backdrop (machine coords). t578 — the STOCK now RIDES
-    // its WCS inside the FIXED envelope: position it so its DATUM corner lands at the work origin (machine coords) — min-XY corner
-    // = wcs − datumXY. (Part frame: stock at origin, unchanged.) The homing switch-seek still IGNORES this stock for COLLISION
-    // (createPreviewPanel stk=null) — here it's render-only, so the envelope + route + HOME + stock all read as one machine frame.
+    // draw the ENVELOPE rectangle + the declared HOME corner glyph as the backdrop (machine coords). t578 — the STOCK RIDES its
+    // WCS inside the FIXED envelope. t586 PREVIEW-PARITY E2c — read part-zero from THE ONE frame source (sceneFrame.partZeroShift,
+    // the SAME transform the 3D uses): the stock's DATUM corner lands at part-zero (min-XY = partZeroShift − datumXY), so the
+    // layout stock coincides with the 3D stock. BEHAVIOR FIX vs t578's local wcsOffsetXY (the ACTIVE WCS): a stock pinned to a
+    // NON-active WCS now follows its PIN like the 3D (before: it sat at the active WCS). Unpinned is unchanged (both = the active
+    // fallback). The homing switch-seek still IGNORES this stock for COLLISION (createPreviewPanel stk=null) — render-only here.
     const machine = (def && def.opType && opSimContext(def.opType).toolMachineFrame) ? machineFrameSpec() : null;
     const stockOut = machine
-        ? (() => { const wcs = wcsOffsetXY(); return { w: stock.w, h: stock.h, ox: wcs.x - _dp.x, oy: wcs.y - _dp.y }; })()
+        ? (() => { const pz = partZeroShift((typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().machine) || null, s, null); return { w: stock.w, h: stock.h, ox: pz.x - _dp.x, oy: pz.y - _dp.y }; })()
         : stock;
     const machSpread = machine ? { machine } : {};
     const origin = { x: (stock.ox || 0) + _dp.x, y: (stock.oy || 0) + _dp.y };
