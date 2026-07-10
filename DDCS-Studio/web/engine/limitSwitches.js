@@ -72,6 +72,22 @@ export function declaredHomeEdgeSide(axis, limits) {
 }
 
 /**
+ * t670 — the DECLARED seek DIRECTION for a ROTARY axis home switch. A rotary axis has NO min/max envelope edge, so its
+ * home direction can't be derived (declaredHomeEdgeSide returns null for A/B) — it must be DECLARED on the rotary
+ * home-switch I/O row (settings.limits.<axis>HomeDir), the honest one source. Returns +1 (positive / A+), -1 (negative
+ * / A−), or null when no direction is declared (→ the axis is not seek-homable; the emit shows the honest skip comment).
+ * @param {string} axis   - 'a' | 'b'
+ * @param {object} [limits] - flat settings.limits ({ <axis>HomeDir })
+ * @returns {1|-1|null}
+ */
+export function rotaryHomeDir(axis, limits) {
+    const d = (limits || {})[String(axis || '').toLowerCase() + 'HomeDir'];
+    if (d === 'pos' || d === '+' || d === 1 || d === '1' || d === 'cw') return 1;
+    if (d === 'neg' || d === '-' || d === -1 || d === '-1' || d === 'ccw') return -1;
+    return null;   // no declared direction → not seek-homable (honest)
+}
+
+/**
  * The HOMING landing points for an axis in MACHINE coords — the ONE SOURCE for the homing sim proxy + the M98-P501
  * engine handler (so they can't diverge on which-end-is-home). The home end is the DECLARED HOME SWITCH
  * (`settings.limits.<edge>Home`, via declaredHomeEdgeSide): its edge coordinate is `lo` (min end) or `hi` (max end),

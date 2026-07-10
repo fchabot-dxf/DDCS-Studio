@@ -34,7 +34,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { num, r3 } from './ops/util.js';
-import { declaredHomeEdgeSide } from '../engine/limitSwitches.js';   // the ONE source of the home end — the DECLARED home switch (settings.limits.<edge>Home), shared with the engine handler + the emit
+import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // the ONE source of the home end — the DECLARED home switch (settings.limits.<edge>Home / <axis>HomeDir), shared with the engine handler + the emit
 import { slaveAxes } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing derives the slave sync from it
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
@@ -64,8 +64,9 @@ export function homeAxisBlocks(ax, config, machine, limits) {
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; B.push(b); };
     const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; B.push(b); };
     const RAW = (t) => { const b = newBlock('raw'); b.params = { text: t }; B.push(b); };
-    // t536 — the WIZARD is G31-only for linear axes; a rotary A/B is setzero. (native is dead here — never selected — kept for parity.)
-    const method = (ax === 'a' || ax === 'b') ? 'setzero' : 'seek';
+    // t536/t670 — LINEAR axes always G31-seek; a rotary A/B is set-zero OR switch-seek per the DECLARED method (c.rotary).
+    const isRotary = (ax === 'a' || ax === 'b');
+    const method = isRotary ? ((c.rotary === 'seek' || c.rotary === 'switch') ? 'seek' : 'setzero') : 'seek';
     const flagVar = `#${1515 + N}`, coordVar = `#${880 + N}`;
     // A dual-axis SLAVE that follows this master: copy its machine coord to the slave + mark it homed (fndzero.nc tail).
     const syncSlave = () => {
@@ -86,6 +87,33 @@ export function homeAxisBlocks(ax, config, machine, limits) {
         C(`Home ${L} — set current position as home (no motion)`);
         A(coordVar, '0', `${L} machine coord = 0 here`);
         A(flagVar, '1', `${L} homed flag`);
+        syncSlave();
+        return B;
+    }
+    // ── t670 — ROTARY SWITCH-SEEK (A/B). DIRECTION = the DECLARED home switch (rotaryHomeDir — a rotary axis has no
+    //    envelope edge, so it can't be inferred like linear). DISTANCE = continuous → 360+margin; bounded → the declared
+    //    rotary span (|machine[ax]| in degrees) +margin, else 360. Feeds/back-off in DEGREES. Mirrors the linear arm shape;
+    //    registers extend by index at N=3/4 (A: P#1054 L#1056 / #883 / #1518; B: P#1057 L#1059 / #884 / #1519 — fndzero X4).
+    if (isRotary) {   // method === 'seek' here (setzero returned above)
+        const rdir = rotaryHomeDir(ax, limits);
+        if (rdir == null) { C(`Home ${L} — declare a home switch + seek direction in Setup → I/O (rotary has no envelope edge); homing SKIPPED for this axis`); return B; }
+        const backoff = num(c.backoff, 5);
+        const fastF = Math.round(num(c.seekFeed, 600)) || 600;
+        const slowF = Math.round(num(c.slowFeed, 100)) || 100;
+        const continuous = !!c.continuous;
+        const span = Math.abs(num((machine || {})[ax], 0));
+        const reach = (continuous || !(span > 0)) ? 360 : span;
+        const seekDist = r3(rdir * (reach + 20));
+        const P = `P#${1045 + N * 3}`, Lw = `L#${1047 + N * 3}`;
+        C(`Home ${L} — G31 rotary seek to the home switch (${continuous || !(span > 0) ? 'continuous 360°' : 'within ' + r3(span) + '°'}, ${rdir > 0 ? 'positive' : 'negative'})`);
+        RAW('G91     ( incremental moves )');
+        RAW(`G31 ${L}${seekDist} F${fastF} ${P} ${Lw}     ( fast seek to the home switch )`);
+        RAW(`G01 ${L}${r3(-rdir * backoff)} F${slowF}     ( back off the switch )`);
+        RAW(`G31 ${L}${r3(rdir * (backoff + 2))} F${slowF} ${P} ${Lw}     ( slow re-touch for accuracy )`);
+        A(coordVar, '0', `${L} machine coord = 0 (home datum)`);
+        A(flagVar, '1', `${L} homed flag`);
+        RAW(`G01 ${L}${r3(-rdir * backoff)} F${slowF}     ( clearance back-off )`);
+        RAW('G90     ( back to absolute )');
         syncSlave();
         return B;
     }
@@ -213,7 +241,7 @@ export function homingUnsetAxes(params = {}) {
     const axes = Array.isArray(params.axes) ? params.axes.filter((a) => AX_IDX[a] != null) : [];
     const machine = params.machine || {}, cfg = params.config || {};
     return axes.filter((ax) => {
-        if ((ax === 'a' || ax === 'b') && ((cfg[ax] || {}).rotary || 'setzero') === 'setzero') return false;
+        if (ax === 'a' || ax === 'b') return false;   // t670 — a rotary axis never needs a LINEAR travel span (set-zero = no motion; switch-seek = 360°/switch)
         return !(Math.abs(num(machine[ax], 0)) > 0);
     }).map((a) => a.toUpperCase());
 }

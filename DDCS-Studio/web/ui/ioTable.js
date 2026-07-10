@@ -16,6 +16,7 @@ const INPUT_TYPES = [
     { type: 'touch',  label: 'Touch-plate (ground)', help: 'A grounded touch-plate input for tool-length / Z-zero touch-off.' },
     { type: 'setter', label: 'Tool Setter' },
     { type: 'limit',  label: 'Limit switch', help: 'An axis limit / home switch input — the machine references off it (pick which axis end below).' },
+    { type: 'home',   label: 'Rotary home switch', help: 'A home / index switch for a ROTARY A/B axis. A rotary axis has no min/max travel edge, so homing seeks it in a DECLARED direction (pick the axis + seek direction below).' },
     { type: 'estop',  label: 'E-stop' },
     { type: 'sensor', label: 'Sensor', help: 'A digital input the program WAITS on before continuing. The ATC change waits on three: drawbar released (M301), drawbar clamped (M302), spindle stopped (M300).' },
 ];
@@ -125,6 +126,19 @@ export function renderIoTable(container, kind, list, onChange) {
             tr.appendChild(homeWrap);
         }
 
+        // t670 — a ROTARY home/index switch: pick the axis (A/B) + the seek DIRECTION (there is no min/max edge to derive
+        // it from). Stored as row.axis ('a'|'b') + row.dir ('pos'|'neg'); syncFlatFromIO mirrors → settings.limits.<ax>HomeDir.
+        if (isInput && row.type === 'home') {
+            const ax = document.createElement('select');
+            [['a', 'A'], ['b', 'B']].forEach(([a, l]) => { const o = document.createElement('option'); o.value = a; o.textContent = l; if ((row.axis || 'a') === a) o.selected = true; ax.appendChild(o); });
+            ax.addEventListener('change', () => { row.axis = ax.value; onChange(); });
+            tr.appendChild(field('Axis', ax, 48));
+            const dir = document.createElement('select');
+            [['pos', 'Positive (A+)'], ['neg', 'Negative (A−)']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; o.title = v === 'pos' ? 'Seek toward increasing angle (often CCW) until the switch trips.' : 'Seek toward decreasing angle (often CW) until the switch trips.'; if ((row.dir || 'pos') === v) o.selected = true; dir.appendChild(o); });
+            dir.addEventListener('change', () => { row.dir = dir.value; onChange(); });
+            tr.appendChild(field('Seek dir', dir, 110));
+        }
+
         // Pin picker (free-pin aware: pins used by other rows are disabled)
         const pin = document.createElement('select');
         const none = document.createElement('option'); none.value = ''; none.textContent = '—'; pin.appendChild(none);
@@ -181,6 +195,7 @@ export function renderIoTable(container, kind, list, onChange) {
             : { id: uid('out'), type, label: (label && label.trim()) || def.label, pin: '', onCode: def.onCode || '', offCode: def.offCode || '' };
         if (isInput && type === 'setter') Object.assign(row, { x: 0, y: 0, z: 0, w: 20, h: 20 });
         if (isInput && type === 'limit') Object.assign(row, { axis: 'x_min', switchType: 'mechanical', home: false });
+        if (isInput && type === 'home') Object.assign(row, { axis: 'a', dir: 'pos' });   // t670 — rotary home/index switch
         list.push(row); onChange(); rerender();
     }));
     add.appendChild(btn);

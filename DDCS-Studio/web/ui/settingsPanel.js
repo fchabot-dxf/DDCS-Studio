@@ -23,7 +23,7 @@ import { renderCloudLogin } from './cloudAccount.js';
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 — no-LAN machine-truth: drop the controller's dump folder → derive geometry → the review modal
-import { declaredHomeEdgeSide } from '../engine/limitSwitches.js';   // t628 — the DECLARED home switch drives the seek direction (one source); the Homing section shows the derived end read-only
+import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
@@ -249,6 +249,16 @@ function syncFlatFromIO(s) {
         if (inp.type !== 'limit') continue;
         const row = LIMIT_AXES.find(a => a[0] === inp.axis);
         if (row) { s.limits[row[2]] = inp.pin; s.limits[row[3]] = inp.level || 0; s.limits[row[4]] = inp.switchType || 'mechanical'; s.limits[row[5]] = !!inp.home; }
+    }
+    // t670 — ROTARY home/index switches (a/b): mirror row {type:'home', axis, dir, pin, level} → <ax>HomeDir/Pin/Level.
+    // A rotary axis has no min/max edge, so its home DIRECTION is declared here (the one source homeAxisBlocks reads).
+    for (const ax of ['a', 'b']) { s.limits[ax + 'HomeDir'] = ''; s.limits[ax + 'HomePin'] = ''; s.limits[ax + 'HomeLevel'] = 0; }
+    for (const inp of (s.inputs || [])) {
+        if (inp.type !== 'home') continue;
+        const ax = inp.axis === 'b' ? 'b' : 'a';
+        s.limits[ax + 'HomeDir'] = inp.dir || '';
+        s.limits[ax + 'HomePin'] = inp.pin;
+        s.limits[ax + 'HomeLevel'] = inp.level || 0;
     }
 }
 
@@ -645,9 +655,23 @@ function renderHomingGui() {
     const machine = getSettings().machine || {}, limits = getSettings().limits || {};
     const motors = getSettings().motors || {};
     const slaveIdxFollowing = (ax) => slaveFollowing(motors, ax);   // t648 — the slave (idx) that follows this master, DERIVED from the Axes declaration (one source)
-    const methodText = (ax) => (ax === 'a' || ax === 'b') ? 'Set zero (no motion)' : 'Switch seek (G31)';
+    // t670 — rotary axes: the METHOD is a real choice (Set zero | Switch seek); linear stays fixed "Switch seek (G31)".
+    const rotSeeking = (ax) => (ax === 'a' || ax === 'b') && ((cfg[ax] || {}).rotary === 'seek' || (cfg[ax] || {}).rotary === 'switch');
+    const methodHtml = (ax) => {
+        if (ax !== 'a' && ax !== 'b') return '<span style="font-size:12px; color:var(--text-dim);">Method <b style="color:var(--text-main);">Switch seek (G31)</b></span>';
+        const cur = rotSeeking(ax) ? 'seek' : 'setzero';
+        return `<span style="font-size:12px; color:var(--text-dim);">Method <select class="hm-rotmode" style="font-size:12px; padding:1px 3px;" title="Rotary axes: Set zero (mark the current position as home, no motion) or Switch seek (G31 seek to a declared home switch).">`
+            + `<option value="setzero"${cur === 'setzero' ? ' selected' : ''}>Set zero (no motion)</option>`
+            + `<option value="seek"${cur === 'seek' ? ' selected' : ''}>Switch seek (G31)</option></select></span>`;
+    };
     const homeEndHtml = (ax) => {
-        if (ax === 'a' || ax === 'b') return '<span style="font-size:12px; color:var(--text-dim);">— (set-zero: no seek)</span>';
+        if (ax === 'a' || ax === 'b') {
+            if (!rotSeeking(ax)) return '<span style="font-size:12px; color:var(--text-dim);">— (set-zero: no seek)</span>';
+            const rd = rotaryHomeDir(ax, limits), L = HOMING_AX_LABEL[ax];
+            return rd == null
+                ? '<span class="hm-home-end" style="font-size:12px;" title="No rotary home switch declared → not seek-homable. Declare a home/index switch + direction in Settings → Hardware → Input.">dir: <b>—</b> <span style="color:var(--text-dim);">— declare a switch · </span><a href="#" class="hm-io-link" style="color:var(--accent);">declare in I/O</a></span>'
+                : `<span class="hm-home-end" style="font-size:12px;" title="G31 rotary seek direction — from the DECLARED home switch (Settings → Hardware → Input). One source.">dir: <b>${L}${rd > 0 ? '+' : '−'}</b> <span style="color:var(--text-dim);">— from the declared switch</span></span>`;
+        }
         const side = declaredHomeEdgeSide(ax, limits);
         const tSign = Math.sign(num(machine[ax], 0));
         const end = side === 'max' ? 'MAX' : side === 'min' ? 'min' : ((-tSign || 1) > 0 ? 'MAX' : 'min');
@@ -665,10 +689,10 @@ function renderHomingGui() {
                 <button type="button" class="hm-down" title="Home later" style="cursor:pointer; background:none; border:none; color:var(--text-main);">▼</button>
                 <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
                 <input type="hidden" class="hm-order" value="${pos + 1}">
-                <span style="font-size:12px; color:var(--text-dim);">Method <b style="color:var(--text-main);">${methodText(ax)}</b></span>
+                ${methodHtml(ax)}
                 ${homeEndHtml(ax)}
             </div>
-            <div class="hm-motion" style="display:${rotary ? 'none' : 'flex'}; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+            <div class="hm-motion" style="display:${(rotary && !rotSeeking(ax)) ? 'none' : 'flex'}; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
                 <label>Seek feed <input type="number" class="hm-seekfeed" value="${num(c.seekFeed, 800)}" style="width:60px;"></label>
                 <label>Back-off <input type="number" class="hm-backoff" value="${num(c.backoff, 5)}" step="0.5" style="width:54px;"></label>
                 <label>Slow feed <input type="number" class="hm-slowfeed" value="${num(c.slowFeed, 100)}" style="width:60px;"></label>

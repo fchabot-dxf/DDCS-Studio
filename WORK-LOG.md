@@ -9088,3 +9088,28 @@ G90
 ```
 
 ### RISK to flag: #[880+N] for A/B = #883/#884 are the SAME registers the dual-Y GANTRY sync uses (#883=#881). No clash — a rotary axis is role-exclusive with 'slave' (a slave is never homed independently), so #883 is A's machine coord in both roles. Worth the advisor's eye. Awaiting the ruling; NO code written this turn.
+
+## 2026-07-10 (t670) — ROTARY HOMING: BUILT (advisor ruled all 5 forks; A+B switch-seek)
+The rotary A/B axes are now homeable by SWITCH-SEEK (declared home switch + direction), not just set-zero. Full suite 976 passed / 2 skipped (+6 rotary tests). LINEAR homing byte-identical throughout (the linear branch untouched; 7/7 homing regression + the twin's 66-combo byte-diff-zero sweep green).
+
+### THE EMIT (homingWizard.js homeAxisBlocks — a NEW rotary-seek branch; the linear branch UNTOUCHED)
+- Method fork (line 68): `method = isRotary ? (c.rotary==='seek'||'switch' ? 'seek' : 'setzero') : 'seek'` (reads the ALREADY-STORED c.rotary; linear always seek).
+- Rotary seek arm mirrors the linear arm in DEGREES: `G31 A<dir*(360+20 continuous | span+20 bounded)> F<seek> P#[1045+N*3] L#[1047+N*3]` → back-off `G01 A<-dir*backoff>` → slow re-touch `G31 A<dir*(backoff+2)> P L` (F modal-carried) → `#[880+N]=0` (home datum) + `#[1515+N]=1` (homed) → clearance → G90. Registers extend by index, USAGE-confirmed from the O501 dump: A(N=3)=P#1054/L#1056/#883/#1518, B(N=4)=P#1057/L#1059/#884/#1519 (fndzero homes B via M98P501X4).
+- DIRECTION = rotaryHomeDir(ax, limits) (the DECLARED home switch — a rotary axis has no envelope edge, so declaredHomeEdgeSide can't derive it). No declared dir → the HONEST skip comment ("declare a home switch + seek direction in Setup → I/O"), like the linear unset-travel skip.
+- homingUnsetAxes: a rotary axis (a/b) is NEVER linear-travel-unset-skipped (set-zero = no motion; seek = 360°/switch).
+- Dual-Y guard: homingRunParams already excludes a SLAVE-role axis from homing (#883/#884 = the A/B machine coords the gantry sync uses; role-exclusive with rotary, so no clash) — asserted in the spec (a slave A gets NO seek arm; its master's homing syncs it).
+
+### THE DECLARATION (limitSwitches.js + ioTable.js + settingsPanel syncFlatFromIO — the HONEST home/index switch)
+- rotaryHomeDir(axis, limits) (limitSwitches.js): reads settings.limits.<axis>HomeDir → +1 (pos) / -1 (neg) / null (undeclared → not seek-homable). Mirrors declaredHomeEdgeSide (the one source).
+- A NEW I/O input type 'home' (ioTable.js): a rotary home/index switch row {axis:a|b, dir:pos|neg, pin, level} — NO synthetic min/max edge (the advisor's ruling: declare the real thing). Renders an axis (A/B) + seek-direction (Positive A+ / Negative A−) picker + the generic pin/level.
+- syncFlatFromIO mirrors the 'home' rows → settings.limits.<ax>HomeDir/HomePin/HomeLevel (cleared+rebuilt each sync, like the limit edges).
+
+### THE UI (settingsPanel renderHomingGui) — a REAL method choice for rotary only
+- Rotary A/B: the fixed "Set zero (no motion)" text becomes a `<select class="hm-rotmode">` (Set zero | Switch seek); commitHoming already reads it → c.rotary. Linear keeps the fixed "Switch seek (G31)" text.
+- The derived-direction display: seeking rotary shows "dir: A+ — from the declared switch" (from rotaryHomeDir), or "dir: — · declare a switch in I/O" when undeclared (the t628 home-end pattern). The motion inputs (seek/back-off/slow feed) un-hide when the rotary method is seek.
+
+### THE SIM — AUTOMATIC (no new sim code): the emit produces an A-word move + motors.a.role='rotary' → getRotaryAxes maps A around its Cartesian axis → gcodeViz3d._applyPartRotation spins the part in the homing preview.
+
+### VERIFY (real-symptom) — tests/rotary-homing.spec.js (NEW, 6)
+(1) rotary A emit at N=3 (G31 A380 F1000 P#1054 L#1056 continuous / A200 bounded 180° / A-380 negative dir, #883/#1518) + B at N=4 (P#1057 L#1059 / #884 / #1519); (2) no declared dir → honest SKIP + no G31; set-zero → no motion; LINEAR X unchanged (P#1045 L#1047); (3) dual-Y exclusivity — a slave-role A emits NO seek arm (synced from Y instead); (4) the DATA TWIN recomposes the rotary seek arm BYTE-IDENTICAL to homingStack (E1 unroll covers it); (5) the sim rotary map (getRotaryAxes.a='x') is populated → the preview spins A; (6) REAL APP — the method select renders for rotary ONLY (X keeps fixed text) + the rotary home I/O row syncs settings.limits.aHomeDir. Linear/twin/gantry/IO regression green (112 homing+IO specs). V4.1 stays DEFERRED (its A home is fully eng-named — #154/#180/#202/#207 deg/#238/#243 — but its homing is refusal-gated + a different G31 form). Screenshot scratchpad/rotary-homing-ui.png: X/Y/Z fixed text + home-end, A = method dropdown + "dir: A+ — from the declared switch" + motion inputs + continuous.
+Files: engine/limitSwitches.js, wizards/homingWizard.js, ui/ioTable.js, ui/settingsPanel.js, tests/rotary-homing.spec.js (new).
