@@ -8574,3 +8574,71 @@ Asked: is the Home-dir dropdown (`c.dir`) inert for the G31 seek? YES. Facts:
 - Two MISLEADING labels as a result: (a) the Machine→Homing section hint says "Home direction defaults to Auto (the envelope travel sign above)" — but the actual default is the DECLARED HOME SWITCH, envelope-sign is only the fallback; (b) the dropdown's own tooltip claims it "Signs the switch-seek (G31) move and the sim animation" — it does neither.
 - Also (adjacent, not asked): `c.method` is inert for LINEAR axes too — homeAxisBlocks:66 hardcodes `method = (a/b) ? 'setzero' : 'seek'`, so the native/set-zero options on X/Y/Z are dead (intentional per the t536 "G31-only for linear" note, but the dropdown still offers them).
 - NOT redesigned — reporting for a ruling: options range from removing the dir dropdown (declared switch is the one source) to wiring c.dir as an OVERRIDE of declaredHomeEdgeSide, to just fixing the two misleading labels.
+
+---
+## 2026-07-10 (t628) — Homing section: REMOVE the inert dir/method dropdowns → derived read-only home-end + fixed method text; fix the misleading labels (advisor ruling on the t626 report)
+
+### THE GUI CHANGE (settingsPanel.js renderHomingGui — GUI-only; settings shape + homingStack emit UNCHANGED)
+Per the advisor ruling on the t626 c.dir facts (the dropdowns were inert; homeAxisBlocks derives the seek dir from the DECLARED home switch + hardcodes the method from the axis):
+- **Removed the per-axis Home-dir `<select>`** (`.hm-dir`) — inert (`c.dir` never read) and its tooltip lied. **Replaced with a READ-ONLY derived home-end display** per linear axis (the pull-review detail-row pattern), computed from `declaredHomeEdgeSide(ax, settings.limits)` + the envelope sign fallback — MIRRORS homeAxisBlocks:96-97 exactly: switch declared → `home: MAX/min — from the declared switch`; none → `home: <envelope-sign end> — envelope-sign fallback · [declare a switch in I/O]` where the link calls `_settingsNavTo('hardware','set_tab_input')`. Rotary A/B show `— (set-zero: no seek)`.
+- **Removed the Method `<select>`** (`.hm-method`) — inert (homeAxisBlocks:66 hardcodes `method = a/b ? 'setzero' : 'seek'`). Replaced with FIXED text: X/Y/Z `Switch seek (G31)`, A/B `Set zero (no motion)`.
+- **Removed the rotary `.hm-rotmode` switch/set-zero dropdown** — only `setzero` is real for A/B (verified: homeAxisBlocks honors set-zero only; `c.rotary` is read solely by homingUnsetAxes for the span-skip, not for method). Kept the `continuous (mod 360)` checkbox.
+- The `.hm-motion` feeds row is now shown for X/Y/Z, hidden for A/B (was: shown when method==='seek'; method is fixed now so it's axis-driven). Kept `.hm-slave` (slaveFollows) + `.hm-continuous`.
+- **commitHoming**: guarded the `.hm-method` read (`g('.hm-method') ? … : (prev.method||'seek')`) — the dropdown is gone; `.hm-dir`/`.hm-rotmode` were already guarded. So `c.dir`/`c.method`/`c.rotary` STAY STORED (inert data; the reconciler reads them) → settings.homing shape UNCHANGED.
+
+### CONSEQUENTIAL CLEANUP (my dropdown removal orphaned these)
+- Removed `const HOMING_METHODS` (only the deleted `methodOpts` used it).
+- `#set_homing_tag` said "DDCS Expert M350 — full methods available" / "…advanced methods are disabled" — both reference a method picker that no longer exists → made honest: Expert → '' (blank), non-Expert → "Active post is unverified for homing — verify the emitted G-code on your controller."
+
+### THE 2 MISLEADING LABELS FIXED
+- Section hint (`#set_homing_section`): dropped the dead "Native (M98 P501)" option + the "Home direction defaults to Auto (envelope travel sign)" lie → now: method is fixed (G31 seek X/Y/Z, set-zero A/B) + the home end is derived from the DECLARED home switch (Settings → Hardware → Input), envelope-sign only as the no-switch fallback.
+- The dir-dropdown tooltip is gone with the dropdown.
+
+### ⚠ DISCOVERED + FIXED — a PRE-EXISTING t626 REGRESSION the suite mislabelled "flaky" (homingView.js)
+Running the moved-homing specs surfaced 6 HARD failures (homing-start-marker a/b/c/d, io-home-backfill:64, switch-glyph-declared:11): `ReferenceError: axes is not defined` at homingView.js:105 when the homing wizard opens with a `#homing_status` present. ROOT CAUSE: MY OWN t626 refactor (commit af6046d) removed the `axes`/`homing` locals from homingView.update() but left three references (`axes.length`/`axes.map` at 105/106/110, `homing.philosophy` at 106). This is a HARD crash, NOT load-flakiness — the advisor's t626 full-suite listed exactly these as the "~24 flaky". CONFIRMED pre-existing: `git stash` my settingsPanel edit → the same tests still fail on the clean committed tree (so NOT caused by t628). FIX: restored `const axes = params.axes || []` + `const homing = getHoming()` (one-source with the contract helper; the status LABELS only — `gcode = wizard.generate(params)` at :76 is untouched so the emit is byte-identical). This is cleaning my own prior mess in the feature I'm working on; flagging it for the advisor since it's outside the literal t628 GUI scope.
+
+### VERIFY (real-symptom)
+- New tests/homing-derived-home-end.spec.js (1 test, drives the REAL I/O checkbox): open Settings → Machine → Homing → assert NO `.hm-dir`/`.hm-method`/`.hm-rotmode` selects, the Z method reads "Switch seek (G31)", the Z home-end reads "home: MAX — … declared switch" (z_max Home declared); the emit seeks Z toward MAX (`G31 Z520 F600`). BYTE-IDENTITY guard: poisoning `c.dir='+'`/`c.method='native'` does NOT change the emit (they're inert). Then FLIP the real I/O `.io-home-cb` (check z_min Home → auto-clears z_max, same axis) → settings.limits.zMinHome=true, zMaxHome=false → back to Machine → Homing → the Z home-end display now reads "home: min" AND the emit follows the SAME source (`G31 Z-520 F600`). Display + emit are one source, no drift.
+- Existing moved-homing specs stay green (no selector edits needed — they touch `.hm-seekfeed`/`.homing-axis-row`, both kept): homing-config-machine-tab (2), homing-sysstart-real (2).
+- FULL SUITE: 934 passed, 2 skipped, 0 failed (3.2m). (t626 was 909 passed w/ ~24 "flaky" — the homingView fix converted the 6 hard-failing homing/io tests to reliably passing, + my new test.)
+- Screenshots: homing-derived-max.png, homing-derived-min.png (scratchpad).
+
+---
+## 2026-07-10 (t630) — COMM-ATOM SIBLING — investigation + GATE (premise correction + the atom map + the design rulings)
+
+INVESTIGATION ONLY this turn (no source edits). Threw a throwaway in-browser harness (deleted) that emits commStack per type-fork arm × 5 posts via `emitMapped(commStack(p), { dialect: getDialect(id) })` — the same fold path the probe E-series uses. Findings + a GATE, because the mapping has contract-level + correctness forks (new dialect seams across 6 files; a ground-truth quirk; the twin un-freeze is architectural).
+
+### PREMISE CORRECTION — the "MSG never defined → ReferenceError" is STALE
+`const MSG = (t) => newBlock('message')` is DEFINED at communicationWizard.js:31, added at commit 4d4f943 ("define MSG — the undefined MSG crashed Comm on every non-HMI post"). The scout t4xx report predates it. Harness: ZERO pageerrors, ZERO `THREW:` across all 9 arms × 5 posts — commStack does NOT crash on any post now. So "fix the crash" is already done (as a band-aid `newBlock('message')`, which IS the message atom). The advisor's "fix as part of the rewire, not a band-aid" still applies — see below.
+
+### THE REAL BUG — a per-post EXECUTABLE-REGISTER LEAK (the twin "freeze")
+The concrete built-in is fine on a non-HMI ACTIVE post (commStack picks the caps.hmi=false FALLBACK branch → comments/MSG, no #-writes). The LEAK is on the FOLD path (the data-op twin, or any emit that re-maps to another post): commStack builds for the ACTIVE post's caps + BAKES the HMI RAW, so re-emitting on v41/dm500 leaks executable Expert registers. Evidence (built active-Expert, folded to the post):
+- popup toast → `#1505=-5000(msg)` leaks onto v41 + dm500 (they have no #1505).
+- status     → `#1503=<mode>(line)` + `#2039` colour leak onto v41 + dm500.
+- input      → `#2070=<id>(msg)` leaks onto v41 + dm500.
+- beep       → `#2042`/`#2043` leak onto v41 + dm500.
+- dwell      → `G04 P500` leaks with the WRONG UNITS (Expert P=ms baked; dm500 P=seconds → should be P0.5).
+- (grbl already degrades these to `( gated: … )` via emitMapped's raw-#-gate; rs274 passes them through.)
+ROOT: the HMI-vs-degrade FORK is decided at BUILD time by `caps.hmi` (concrete) / `activeCaps().hmi` in commDeriveGuards (twin superset `_hmi` guard), NOT carried into the atoms. And the HMI lines are RAW(dialect.xxx()) baked at build time, so emitMapped can't re-fold them. The atom-emitted parts (ifgoto/assign/comment/message) DO fold per-post correctly — only the baked-RAW + the _hmi fork are frozen. This is exactly why the DM500 comm twin was frozen.
+
+### THE ATOM MAP (per type-fork arm) — reuse / new-seam / GATE
+| arm            | current Expert bytes                                   | target                                  | non-HMI degrade         |
+|----------------|--------------------------------------------------------|-----------------------------------------|-------------------------|
+| popup toast    | `#1505=-5000(msg)` (RAW)                                | REUSE `message` atom (hmiToast)         | `( MSG: text )`         |
+| popup OK/Cancel| `#1505=1(msg)` + `IF #1505==0 GOTO9` (RAW+ifgoto)       | REUSE `confirm` atom (hmiPrompt+ifGoto) | folds to [] (see R5)    |
+| popup binary   | `#1505=1(msg)` (mode 3 IGNORED) + 2-way branch          | confirm-like — QUIRK (see R2)           | folds to []             |
+| status         | `#1503=<mode>(line)` (assign) + `#2039` colour + `G4 P` | NEW seam `hmiStatus` (see R3)           | `( status: … )`         |
+| input          | `#2070=<useId>(msg)` (RAW) + dest assign                | REUSE `asknumber` atom (hmiInput) + dest| `( ASK … )` (see R5)    |
+| beep           | `#2042=dur` / `#2043=cyc` (assign)                       | NEW seam `hmiBeep` OR GATE (see R4)     | `( beep … )`            |
+| dwell          | `G04 P500` (RAW, wrong units off-Expert)                | REUSE `dwell` atom (dialect.dwell)      | per-post P units        |
+Existing atoms confirmed registered + dialect-aware (ops/hmi.js + ops/index.js:71,89; ops/dwell.js): message, confirm, asknumber, hmiline, hmiconfirm, pause, dwell. So 4 of 7 arms are byte-checkable REUSES; status + beep need comm-specific seams the advisor pre-sanctioned ("add comm-specific seams ONLY where comm's Expert bytes differ").
+
+### RULINGS NEEDED (GATE — no code past here) — R1/R2 are load-bearing; R3-R6 are mechanical once R1 is set
+- **R1 (architecture / un-freeze):** remove the `_hmi` GUARD fork from the commStack superset and let each ATOM carry the HMI-vs-degrade decision per `dialect.caps.hmi` (message/confirm/asknumber already degrade themselves). That's what un-freezes the twin (the fork stops being baked by activeCaps()). Confirm this is the intended shape (atoms decide, not a guard).
+- **R2 (ground-truth / byte-diff):** the binary popup emits `#1505=1` because Expert `hmiPrompt(msg, MODE)` IGNORES the mode arg — so Binary(3) and OK/Cancel(1) both write `#1505=1`. Is `#1505=1` CORRECT for a binary choice, or should it be `#1505=3` (the form's popupMode)? If it's a bug, fixing it BREAKS byte-diff-ZERO (moves the Expert golden) — need a ruling: preserve the quirk, or fix + move the golden (verify vs the M350 dumps first).
+- **R3 (status seam shape):** `hmiStatus(mode, line)` → Expert `#1503=<mode>(<line>)`, non-HMI → `( status: <line> )`? And keep #2039 colour + the visibility dwell as their existing forms (assign / `dwell` atom) guarded, or fold colour into the seam? (Colour + dwell leak too.)
+- **R4 (beep):** does beep FIT the hmiline/hmiconfirm pattern (a register write that degrades to a comment) → a `hmiBeep(dur, cyc)` seam? Or GATE it as actuation (not a message/prompt idiom — the advisor listed input/status/prompts/messages, NOT beep)?
+- **R5 (fallback M00):** OK/Cancel + input add `M00 ( Pause … )` in the NON-HMI fallback so the operator can act. The confirm/asknumber atoms fold to []/comment on non-HMI → the M00 is LOST. Append a conditional `pause` atom on non-HMI only? (It must NOT appear on Expert.)
+- **R6 (text pipeline):** the atoms clean() the text (paren-strip); commStack uses fmtCtrl (newline→` / `) / fmtLine. Byte-identical for simple msgs; differ on multi-line msgs. Align the atoms to comm's fmtCtrl, or accept clean() (byte-diff only on newline msgs)?
+
+NEXT (post-ruling): rewire commStack onto the atoms per R1, add the R3/R4 seams byte-diff-ZERO on Expert, drop the _hmi guard + remove the RAW bakes, un-freeze the twin (verify twin==built-in per dialect), extend corner-post-fold (or a comm sibling spec) with comm per-post truth + non-HMI negatives (no #1505/#1503/#2070/#2042 leak), full suite.
