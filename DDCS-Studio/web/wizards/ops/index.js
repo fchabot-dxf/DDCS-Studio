@@ -64,6 +64,7 @@ import { progStartBlock, progEndBlock } from './program.js';
 import { labelBlock, gotoBlock, ifGotoBlock } from './flow.js';
 import { probeReadBlock, probeCheckBlock, readMachineBlock, toolOffsetBlock } from './measure.js';
 import { setWorkOffsetBlock } from './setworkoffset.js';
+import { wcsBaseIntoBlock, wcsWriteBlock } from './wcsIndirect.js';   // F1/E1 — the probe-family WCS-write (Expert #[#70]/#73 indirect / other posts G92)
 import { wcsZeroBlock } from './wcszero.js';   // t475 — WCS zero-at-current, dialect-aware at emit (M350 register / rs274·grbl G10 L20 / v41·dm500 G92)
 import { assignBlock } from './assign.js';
 import { radiuscompBlock } from './radiuscomp.js';
@@ -82,7 +83,7 @@ export const PALETTE = [
     lineBlock, slotBlock, boreBlock, drillBlock, contourBlock, contourFillBlock, pocketFillBlock, pocketWallBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + contour/profile [contour=region-socket for pocket-wall; contourfill/pocketfill/pocketwall=flat for the twins] + native canned cycles G81-85/G80)
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, stepdownBlock, placeOnStockBlock, rotateBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align)
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
-    wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, wcsZeroBlock, toolOffsetBlock,   // Coordinates (WCS select + dist-mode + G17-19 plane + work-offset/WCS-zero-at-current/tool-table write)
+    wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, wcsBaseIntoBlock, wcsWriteBlock, wcsZeroBlock, toolOffsetBlock,   // Coordinates (WCS select + dist-mode + G17-19 plane + work-offset/probe-family base+indirect-write/WCS-zero-at-current/tool-table write)
     progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)
     probeReadBlock, readMachineBlock, radiuscompBlock,         // Probing (probe/DRO capture + stylus-radius comp)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock, hmilineBlock, cornerConfigBlock, guardBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input + corner #1505 note + corner-macro config + when-guard fork container)

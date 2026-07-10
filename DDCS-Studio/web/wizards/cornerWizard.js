@@ -24,7 +24,6 @@ const AX = {
     Y: { status: '#1921', result: '#1926', off: 1 },
     Z: { status: '#1922', result: '#1927', off: 2 },
 };
-const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
 
 // corner → probe directions (FL=X+Y+ FR=X−Y+ BL=X+Y− BR=X−Y−). ONE source read by cornerStack's concrete xDir/yDir, the
 // ③b superset forks (cornerFork/csFork/axesOf), the sim-marker reposition helper (cornerReposOffsets), AND the sim-marker
@@ -139,6 +138,11 @@ export function cornerStack(params = {}, opts = {}) {
     // (byte-identical to the old assign it replaces), V4.1/DM500 = the instruction as a plain comment (no unmapped #1505 write).
     const HMI = (value, note) => { const b = newBlock('hmiline'); b.params = { value: String(value), note: note || '' }; S.push(b); };
     const mkHMI = (value, note) => { const b = newBlock('hmiline'); b.params = { value: String(value), note: note || '' }; return b; };
+    // WCS write via the profile-aware atoms (F1/E1): Expert = the #[#70]/#73 INDIRECT idiom (byte-identical to the old literals),
+    // V4.1/DM500 = the post's G92 datum (via setWorkOffset). mkWcsBase = the base-address compute; mkWcsWrite = one axis write.
+    const mkWcsBase = (w) => { const b = newBlock('wcsbaseinto'); b.params = { wcs: w, base: '#70' }; return b; };
+    const mkWcsWrite = (spec) => { const b = newBlock('wcswrite'); b.params = { ...spec }; return b; };
+    const wcsArgOf = (w) => (w === 'active' ? '#578' : String(parseInt(String(w).replace('G', ''), 10) - 53));
     // zPair: a Z-varying fork with BOTH arms — superset guards each; concrete pushes the matching arm inline (today's shape).
     const zPair = (onKids, offKids) => { if (superset) S.push(GUARD(WHEN_Z, onKids), GUARD(WHEN_NZ, offKids)); else S.push(...(probeZ ? onKids : offKids)); };
     // zOnly: a Z-ONLY block-add (no off-arm) — superset guards it on; concrete emits it only when probeZ.
@@ -196,10 +200,9 @@ export function cornerStack(params = {}, opts = {}) {
             compEnable: true, trailingRetract: false, compNote: `Trigger Pos ${compOp} Radius`,
         })];   // rawAxis → the trigger register folds per post (Expert #1925/#1926 byte-identical; V4.1 #1500+; DM500 #864+)
         if (ax === 'X') {
-            out.push(...wcsFork((w, label) => [mkA('#[#70]', '#102', `Save to ${label} X`)]));   // note forks on wcs (value/target constant)
+            out.push(...wcsFork((w, label) => [mkWcsWrite({ axis: 'X', wcs: wcsArgOf(w), offset: 0, value: '#102', note: `Save to ${label} X` })]));   // Expert `#[#70]=#102`; V4.1/DM500 `G90 G92 X#102`
         } else {
-            out.push(mkA('#73', '[#70+1]', 'WCS Y Address'));
-            out.push(...wcsFork((w, label) => [mkA('#[#73]', '#101', `Save to ${label} Y`)]));
+            out.push(...wcsFork((w, label) => [mkWcsWrite({ axis: 'Y', wcs: wcsArgOf(w), offset: 1, addrVar: '#73', addrNote: 'WCS Y Address', value: '#101', note: `Save to ${label} Y` })]));   // Expert `#73=[#70+1]`+`#[#73]=#101`; else `G90 G92 Y#101`
         }
         // Z-TRUST (Option B): the per-wall lift-to-safe-Z is #17 (=safeZ+scanDepth) when probeZ ON (unchanged), but #19 (=safeZ
         // ONLY) when probeZ OFF — scanDepth is meaningless without a measured surface, so the off-path travels at the DECLARED
@@ -245,11 +248,9 @@ export function cornerStack(params = {}, opts = {}) {
         mkA('#24', params.cross1_y || (ax.fA === 'Y' ? own(ax.yd) : opp(ax.yd)), 'Wall 1 to Wall 2 traverse (Y)'),
     ]));
 
-    // ── WCS base address ── 7-way wcs fork: 'active' reads #578 → computes #70; a fixed G54..G59 uses the literal base.
-    const wcsBaseBlocks = (w) => w === 'active'
-        ? [mkC('Read Active WCS'), mkA('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'), mkA('#72', '[#71-1]', 'Zero-based index'), mkA('#70', '[805+[#72*5]]', 'Base WCS address')]
-        : [mkC(`Target: ${w}`), mkA('#70', WCS_BASE[w], 'Base WCS address')];
-    S.push(...wcsFork((w) => wcsBaseBlocks(w)));
+    // ── WCS base address ── 7-way wcs fork via the wcsbaseinto atom: Expert 'active' reads #578→#70 / a fixed G54..G59 uses the
+    // literal base (byte-identical to the old literals); posts with no WCS table (V4.1/DM500 G92) emit nothing here.
+    S.push(...wcsFork((w) => [mkWcsBase(w)]));
 
     // ── Confirm + incremental ── KIND-B, 2-way: OVER/OUTSIDE forks on probeZFirst, the corner NAME on corner → cornerFork(zPairR).
     C('Confirm Start');
@@ -258,16 +259,16 @@ export function cornerStack(params = {}, opts = {}) {
     DM('inc');
 
     // ── Z surface (optional) ── probeZFirst-only block-add: the Z-surface touch + the Z→wall1 reposition.
-    // Z-surface touch via the shared block. The comp writes the WCS Z directly (#[#73]=[#1927-#6]); preComp sets the indirect
-    // address #73 right before the comp (kept in place → byte-identical). trailingRetract:false → the corner does its own
-    // safe-Z retract + the travel to the first wall.
-    // The compNote carries the derived wcsLabel → forks on wcs (via wcsFork in the zOnly below); everything else is constant.
-    const zSurfaceProbe = (label) => probeSurfaceStack({
-        axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
-        twoPass: true, raw: '#1927', rawAxis: 'Z', result: '#[#73]', radius: '#6', compEnable: true,
-        trailingRetract: false, preComp: [{ var: '#73', value: '[#70+2]', note: 'WCS Z Address' }],
-        compNote: `Save ${label} Z offset - machine coord (− stylus radius)`,
-    });
+    // Z-surface touch via the shared block with skipComp — the probe+check emit alone; the FUSED comp+WCS-write moves to the
+    // Z wcswrite atom so it folds per post (Expert `#73=[#70+2]`+`#[#73]=[#1927-#6]` byte-identical; V4.1/DM500 `G90 G92 Z[#1502-#6]`).
+    // The label + wcs fork on wcs (via wcsFork in the zOnly below). trailingRetract:false → the corner does its own safe-Z retract.
+    const zSurfaceProbe = (w, label) => [
+        ...probeSurfaceStack({
+            axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
+            twoPass: true, raw: '#1927', rawAxis: 'Z', radius: '#6', compEnable: true, trailingRetract: false, skipComp: true,
+        }),
+        mkWcsWrite({ axis: 'Z', wcs: wcsArgOf(w), offset: 2, addrVar: '#73', addrNote: 'WCS Z Address', rawAxis: 'Z', radius: '#6', compDir: '-', note: `Save ${label} Z offset - machine coord (− stylus radius)` }),
+    ];
     // ② B4 step 3 (anchor): the 'REPOSITION:' comment makes the engine count Z→wall1 as its own pass (3 passes = 3 markers
     // under probeZFirst). ② B4 step 4b: it forks on travelApproach (auto seq move vs #1505 jog prompt) → taPair NESTED inside
     // the probeZFirst guard. manual: lift #19, jog, no drop (the wall-1 step plunges) — mirrors auto's Z.
@@ -281,7 +282,7 @@ export function cornerStack(params = {}, opts = {}) {
         comment: 'REPOSITION: Traverse to first wall',
         approach, promptNote: 'Jog clear, over to the first wall. Press Enter',
     });
-    zOnly([...wcsFork((w, label) => zSurfaceProbe(label)), ...taPair(() => zWall1('auto'), () => zWall1('manual'))]);
+    zOnly([...wcsFork((w, label) => zSurfaceProbe(w, label)), ...taPair(() => zWall1('auto'), () => zWall1('manual'))]);
 
     // ── Two walls, in the chosen order ──
     // Z-first shifts EVERY step number +1 (Z-surface takes Step 1) — a KIND-B fork, so each Step label is a guarded comment
@@ -337,8 +338,9 @@ export function cornerStack(params = {}, opts = {}) {
     // RACKS a dual gantry (the two rails skew). Keep ONLY the benign dual-axis WCS-OFFSET sync (no motion — updates the A DRO).
     const syncBlocks = [
         mkC('Dual Gantry Sync'),
-        mkA('#74', `[#70+${slave}]`, 'Base WCS + Slave Offset'),
-        mkA('#[#74]', '#883', 'Sync A offset with Y'),
+        // Expert: `#74=[#70+slave]`+`#[#74]=#883` (byte-identical). #883 is the Expert slave DRO — there is NO cross-post
+        // equivalent, so off-Expert this degrades to an honest comment (no G92 guess) via offComment.
+        mkWcsWrite({ axis: 'A', wcs: wcsArgOf(wcs), offset: Number(slave), addrVar: '#74', addrNote: 'Base WCS + Slave Offset', value: '#883', note: 'Sync A offset with Y', offComment: 'Dual-gantry A sync skipped — no #883 slave-DRO equivalent on this controller' }),
     ];
     if (superset) S.push(GUARD({ param: 'syncA', is: true }, syncBlocks));
     else if (params.syncA) S.push(...syncBlocks);

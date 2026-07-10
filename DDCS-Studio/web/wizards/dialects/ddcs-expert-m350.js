@@ -30,6 +30,22 @@ export const dialect = {
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],
     // #[805+[idx-1]*5+ax]=value   (SAVE_WCS_XY_AUTO.nc:21-26). base 805, stride 5; X=base,Y=+1,Z=+2,A=+3
     setWorkOffset: (wcsExpr, axis, value) => [`#[805+[${wcsExpr}-1]*5+${AX[axis]}]=${value}`],
+    // wcsBaseInto(wcs) — the WCS-table BASE-address compute into #70, the dump-grounded INDIRECT idiom shared by the probe
+    // wizards (SAVE_WCS_XY_AUTO.nc: read #578 → base #70; a fixed G54..G59 uses the literal base). Non-Expert posts use G92
+    // (no base) so their wcsbaseinto atom emits []. Byte-identical to corner/edge/middle's old literal base-compute.
+    wcsBaseInto: (wcs) => wcs === 'active'
+        ? ['( Read Active WCS )', '#71=#578 ( Active WCS index: 1=G54 2=G55 etc )', '#72=[#71-1] ( Zero-based index )', '#70=[805+[#72*5]] ( Base WCS address )']
+        : [`( Target: ${wcs} )`, `#70=${805 + (parseInt(String(wcs).replace('G', ''), 10) - 54) * 5} ( Base WCS address )`],
+    // wcsWriteIndirect({offset, addrVar, value, note, addrNote}) — write `value` to the WCS slot #70+offset via the INDIRECT
+    // form (SAVE_WCS_XY_AUTO.nc:21-26). offset 0 → the base itself `#[#70]=v`; offset>0 → compute the address into addrVar
+    // (#73/#74) then `#[addrVar]=v`. Notes are paren-stripped like the assign/comp lines. This is the byte-exact partner of
+    // wcsBaseInto — setWorkOffset's INLINE form can't reproduce it (same reason wcsZeroAtCurrent is dedicated; probe twins depend on it).
+    wcsWriteIndirect: ({ offset, addrVar, value, note, addrNote }) => {
+        const n = (s) => String(s ?? '').replace(/[()]/g, '').trim();
+        const wr = (tgt, v, nt) => (n(nt) ? `${tgt}=${v} ( ${n(nt)} )` : `${tgt}=${v}`);
+        if (!Number(offset)) return [wr('#[#70]', value, note)];
+        return [wr(addrVar, `[#70+${offset}]`, addrNote), wr(`#[${addrVar}]`, value, note)];
+    },
     // WCS ZERO-AT-CURRENT (t475) — zero the selected WCS axes = the current DRO. M350: DIRECT #805+ register writes (NO
     // G10). Dump-grounded: SAVE_WCS_XY_AUTO.nc / COPY_WCS.nc use the INTERMEDIATE-VAR indirect form (#N=805+[#..-1]*5 then
     // #[#N]), NOT setWorkOffset's inline form — so this is a dedicated atom (setWorkOffset can't reproduce it byte-identical,

@@ -8388,3 +8388,25 @@ The WCS write is spread across 5 byte-locked sites: base-compute (wcsFork: activ
 
 ### SAFETY FLAG (advisor's ride-along) — probe-MISS on V4.1/DM500 is a PRE-EXISTING silent-continue
 probeSurface's probecheck atom folds to `[]` on V4.1/DM500 (no status var) → the `IF #status!=2 GOTO<err>` VANISHES → a probe miss is NOT detected → the macro continues (never reaches the error handler). This PRE-DATES E1 (probecheck already folded). Surfacing it per the advisor's "audit the fail-branch per op" note: V4.1 detects success via the post-probe DRO, DM500 by motion-halt — detecting+surfacing a MISS there needs a real design (not a status-var GOTO). Flagged for a safety increment; not introduced by this change.
+
+---
+## 2026-07-09 (t612) — F1/E1 corner CLASS 3: the WCS-write atoms — DONE (byte-identical). Corner E1 COMPLETE.
+
+The last + most byte-critical leak-class. Advisor approved Option-A shape; built per the WORK-LOG design.
+
+### The atoms (2 new) + the Expert seams
+- Expert dialect gained TWO seams (the dump-grounded indirect idiom, SAVE_WCS_XY_AUTO.nc): `wcsBaseInto(wcs)` (active → `#71=#578;#72=[#71-1];#70=[805+[#72*5]]`, fixed Gnn → `#70=<base>`) and `wcsWriteIndirect({offset,addrVar,value,note,addrNote})` (offset 0 → `#[#70]=v`; offset>0 → `<addrVar>=[#70+offset]`+`#[addrVar]=v`; notes paren-stripped). setWorkOffset's INLINE form can't reproduce these byte-for-byte → dedicated seams (same rationale as wcsZeroAtCurrent; the probe twins depend on the exact bytes).
+- New wizards/ops/wcsIndirect.js: `wcsbaseinto` atom (Expert → dialect.wcsBaseInto; no-WCS-table posts → []) + `wcswrite` atom (Expert → dialect.wcsWriteIndirect the indirect form; other posts → dialect.setWorkOffset = G92, which ALREADY exists + is correct). wcswrite resolves its VALUE as a literal (X/Y/sync) OR a radius-comped TRIGGER (Z, via rawAxis+probeTrigVar, per post); an Expert-only value with no cross-post equivalent (the #883 sync) degrades to an honest comment off-Expert (offComment) — no G92 guess. Registered in ops/index.js (Coordinates).
+
+### The fused-Z (the hard part)
+probeSurface gained a `skipComp` flag: the Z-surface probe emits probe+check ALONE, and the Z `wcswrite` SUBSUMES the comp. Expert: `#73=[#70+2]`+`#[#73]=[#1927-#6]` (byte-for-byte, same order as the old preComp+radiuscomp); V4.1/DM500: `G90 G92 Z[#1502-#6]` / `Z[#866-#6]` (the comp folds INTO the G92, using the per-post trigger). The Z write stays exactly where it was in the stack → order preserved.
+
+### cornerWizard rewire (5 sites) + orphan cleanup
+base-compute → `mkWcsBase(w)` (wcsbaseinto); X `#[#70]=#102` → wcswrite{offset:0}; Y `#73=[#70+1]`+`#[#73]=#101` → wcswrite{offset:1,addrVar:#73} (the addr line folds into the atom); Z → skipComp + wcswrite{offset:2,rawAxis:Z}; sync → wcswrite{offset:slave,addrVar:#74,value:#883,offComment}. Removed the now-orphaned `WCS_BASE` const + `wcsBaseBlocks` helper (my change made them unused).
+
+### VERIFY (byte target captured BEFORE, diffed AFTER)
+- Expert byte-IDENTICAL: the full active+probeZ+syncA emit + the fixed-G55 emit match the pre-change bytes exactly (base #70, `#[#70]=#102`, `#73=[#70+1]`/`#[#73]=#101`, `#73=[#70+2]`/`#[#73]=[#1927-#6]`, `#74=[#70+3]`/`#[#74]=#883`, `#70=810`). FULL corner suite (101) + probe-surface + dialect-decode green — every corner×seq×probeZ×wcs×travel combo AND the twin (corner-data-*).
+- V4.1: `G90 G92 X#102`/`Y#101`/`Z[#1502-#6]`, NO #70/#805/#[table] machinery, sync → the honest comment. DM500: same with #866 + the "VERIFY on hardware" note. corner-post-fold.spec.js extended with the WCS per-post numeric truth (assert VALUES + negative asserts: no #805/#70 table math, no executable =#883).
+
+### CORNER E1 IS COMPLETE — all 3 leak-classes fold per post, Expert byte-diff ZERO
+probe-status (already clean, probecheck) + trigger-read + HMI + WCS-write. The mechanisms (probeTrigVar / hmiline / wcsbaseinto+wcswrite + skipComp) are now proven ONCE on corner; E2 edge + E3 middle INHERIT the same seams/atoms. The probe-miss-on-V4.1/DM500 safety gap stays a designed increment AFTER the E-series (advisor-adopted; not built here).
