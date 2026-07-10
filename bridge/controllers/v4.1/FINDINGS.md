@@ -91,8 +91,11 @@ format: l<N>" only on-screen); checkpoint granularity is the current substitute 
   **re-reads the file from disk every cycle**, so the PC *can* feed a running program by overwriting
   its file over SMB. So a software dispatcher **is** possible over SMB after all (via the file, not
   vars); only the **one-time bootstrap Start** needs a trigger. Serial → fallback, not required.
-- Note: `G4` dwell timing is **inconsistent** (a `P45000` looked like ~45 s once, but a `P3000` in a
-  loop spun thousands of cycles in seconds) — don't depend on `G4` for pacing. `[HYPOTHESIS]`
+- **`G04 P` is MILLISECONDS** `[CONFIRMED]` — a `P45000` dwell ran ~45 s (45000 ms), matching the firmware
+  `G04P1000` idiom; the dialect emits `dwellUnits:'ms'` (`G04 P${round(sec*1000)}`). (t642 — resolves the old
+  dwell-UNITS question.) SEPARATELY, the dwell **pacing RELIABILITY** is inconsistent (a `P3000` in a loop spun
+  thousands of cycles in seconds) — don't depend on `G4` for loop pacing. `[HYPOTHESIS]` (this caveat is about
+  reliability, NOT the P unit.)
 
 ## Triggering & remote job-swap — the autonomy path `[CONFIRMED]` ⭐
 - **File-reload works:** overwrite the *already-selected* job file over SMB, then press **Start again

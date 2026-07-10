@@ -1445,7 +1445,7 @@
                 <div id="atc_change_m6_params">
                     <div class="param-grid">
                         <label>Z change height (mach)<input type="number" id="atc_change_zclear" value="0" class="num-input"></label>
-                        <label title="Which tool to change to. 'From program' uses the M6 Txx target (#1504); or pick a tool from the magazine to generate a standalone test change.">Change to tool<select id="atc_change_fixedt"><option value="0">From program (M6 Txx)</option></select></label>
+                        <label title="Which tool to change to. 'From program' uses the standard M6 Txx call (the T word requests the tool). NOTE: #1504 as the 'requested tool' register is a Studio ASSUMPTION — only #1300 (tool-in-spindle) is confirmed-writable; the T# M6 call itself is standard, but do not rely on reading #1504 to know the request. Or pick a tool from the magazine to generate a standalone test change.">Change to tool<select id="atc_change_fixedt"><option value="0">From program (M6 Txx)</option></select></label>
                     </div>
                     <div class="wiz-usage">Parks safely (G53 Z to the change height, then G53 X/Y to the change position) then emits a bare <b>M6</b> — the controller runs its own working tool-change handler. The change position reuses Park X/Y from the magazine settings.</div>
                 </div>

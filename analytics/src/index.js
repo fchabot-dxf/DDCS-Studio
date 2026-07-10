@@ -54,14 +54,14 @@ export default {
 
     // dev = the client's own browser flag, OR this request comes from a registered dev network.
     let dev = ev.dev ? '1' : '0';
-    if (env.DEV_IPS && ip) {
+    // t642 — the DEV_IPS KV touch runs ONLY on the once-per-session events (visit / app_launch), not per event: a tagged
+    // device re-registers its network (self-heals on ISP IP rotation), an UNtagged device is checked against the registry.
+    // Every OTHER event (feature) carries the dev flag from its OWN payload (ev.dev) — the client sets it once and sends it —
+    // so the previously per-EVENT KV GET collapses to ~one read per session. (Trade: a non-tagged device on a dev network
+    // only inherits the network-dev tag on its session events, not its feature events — acceptable for the read savings.)
+    if (env.DEV_IPS && ip && (event === 'visit' || event === 'app_launch')) {
       if (dev === '1') {
-        // A tagged device keeps THIS network registered & fresh — so its other devices inherit dev, and it
-        // self-heals when your ISP rotates your IP (next visit re-registers the new one). Once-per-session
-        // events only, to keep KV writes low.
-        if (event === 'visit' || event === 'app_launch') {
-          try { await env.DEV_IPS.put('ip:' + ip, '1', { expirationTtl: DEV_TTL }); } catch { /* ignore */ }
-        }
+        try { await env.DEV_IPS.put('ip:' + ip, '1', { expirationTtl: DEV_TTL }); } catch { /* ignore */ }
       } else {
         try { if (await env.DEV_IPS.get('ip:' + ip)) dev = '1'; } catch { /* KV miss/err → treat as not-dev */ }
       }

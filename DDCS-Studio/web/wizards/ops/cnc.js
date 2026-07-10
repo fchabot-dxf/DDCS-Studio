@@ -56,17 +56,19 @@ export const cancelCycleBlock = {
 export const outPinBlock = {
     type: 'outpin', label: 'Output Pin', kind: 'leaf', category: 'Signals',
     defaults: { pin: 0, state: 'on', sync: true }, fields: ['pin', 'state', 'sync'],
-    gate: (d) => (isOword(d) || isDDCS(d)) ? null : 'no generic output — use an M-Code atom',
+    // t642 F6 — the DDCS raw-output M(50+2n) is the EXPERT scriptable-I/O family (slib O10050-O10091, writing #1552+n) — the
+    // SAME macro-I/O the input-poll uses (caps.inputRead). It is NOT in the V4.1/DM500 firmware (no M50/M51/#1552 there), so
+    // gate it on caps.inputRead like waitInput: Expert emits M(50+2n); V4.1/DM500 get an honest hint (use a specific M-Code).
+    gate: (d) => (isOword(d) || (isDDCS(d) && d.caps && d.caps.inputRead)) ? null : 'no generic scriptable output — use a specific M-Code atom (V4.1/DM500 lack the raw-output macro)',
     // Digital output, per post:
     //   RS274/grblHAL → M62/M63 (synced) / M64/M65 (immediate) P<n>.
-    //   DDCS          → raw output bit via M50/M52/M54… (set) / M51/M53/M55… (clear), i.e. M(50+2n)/M(51+2n);
-    //                   these map to #1552+n in the firmware I/O macros (slib O10050-O10091). Pins 0-20.
-    //   classic grbl  → no generic output → honest hint (use the M-Code atom).
+    //   DDCS Expert   → raw output bit via M50/M52/M54… (set) / M51/M53/M55… (clear), i.e. M(50+2n)/M(51+2n); #1552+n (slib O10050-O10091). Pins 0-20.
+    //   V4.1/DM500/grbl → no generic scriptable output → honest hint (use the specific M-Code atom).
     emit: (p, dx, dy, dialect) => {
         const on = p.state !== 'off';
         const pin = Math.max(0, Math.round(num(p.pin, 0)));
         if (isOword(dialect)) return [`M${p.sync ? (on ? 62 : 63) : (on ? 64 : 65)} P${pin}`];
-        if (isDDCS(dialect)) {
+        if (isDDCS(dialect) && dialect.caps && dialect.caps.inputRead) {
             if (pin > 20) return [`( output P${pin} out of range - DDCS raw outputs are pins 0-20 [M50-M91] )`];
             return [`M${(on ? 50 : 51) + pin * 2}   ( output P${pin} ${on ? 'on' : 'off'} )`];
         }

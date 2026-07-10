@@ -10,15 +10,16 @@ test('controller-specific atoms gate by the active post', async ({ page }) => {
     const { BLOCKS } = await import('/wizards/ops/index.js');
     const { getDialect, getCaps } = await import('/wizards/dialects/index.js');
     const dl = (id) => ({ id, name: id, caps: getCaps(id) });
-    const ddcs = dl('ddcs-v41'), grbl = dl('grbl'), hal = dl('grblhal');
+    const ddcs = dl('ddcs-v41'), expert = dl('ddcs-expert-m350'), grbl = dl('grbl'), hal = dl('grblhal');
     const g = (type, d) => { const f = BLOCKS[type] && BLOCKS[type].gate; return f ? f(d) : 'NO_GATE'; };
     return {
       // classic grbl: no canned cycles / no G64 P / no generic output
       drillGrbl: g('drillcycle', grbl), drillDdcs: g('drillcycle', ddcs),
       pathGrbl: g('pathmode', grbl), pathDdcs: g('pathmode', ddcs),
-      // Output Pin: real codes on DDCS + oword, gated on classic grbl
-      outDdcs: g('outpin', ddcs), outHal: g('outpin', hal), outGrbl: g('outpin', grbl),
-      // Wait Input: oword-only
+      // Output Pin: the DDCS raw-output M50+2n is the EXPERT scriptable-I/O family (t642 F6) → un-gated on Expert + oword,
+      // gated on V4.1/DM500 (no scriptable output) and classic grbl.
+      outExpert: g('outpin', expert), outDdcs: g('outpin', ddcs), outHal: g('outpin', hal), outGrbl: g('outpin', grbl),
+      // Wait Input: oword + Expert (caps.inputRead) only
       waitHal: g('waitinput', hal), waitDdcs: g('waitinput', ddcs),
     };
   });
@@ -26,9 +27,10 @@ test('controller-specific atoms gate by the active post', async ({ page }) => {
   expect(r.drillDdcs).toBeNull();            // runs on DDCS
   expect(r.pathGrbl).toBeTruthy();
   expect(r.pathDdcs).toBeNull();
-  expect(r.outDdcs).toBeNull();              // DDCS emits M50/M51
+  expect(r.outExpert).toBeNull();            // Expert emits M50/M51 (caps.inputRead)
+  expect(r.outDdcs).toBeTruthy();            // t642 F6 — V4.1 has no scriptable raw output → gated (honest hint)
   expect(r.outHal).toBeNull();               // oword emits M62-65
   expect(r.outGrbl).toBeTruthy();            // grbl has no generic output
   expect(r.waitHal).toBeNull();              // oword has M66
-  expect(r.waitDdcs).toBeTruthy();           // DDCS uses named sensor M-codes
+  expect(r.waitDdcs).toBeTruthy();           // DDCS V4.1 uses named sensor M-codes
 });
