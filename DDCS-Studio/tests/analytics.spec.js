@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('web analytics fires visit + feature beacons with the right payload', async ({ page }) => {
   await page.addInitScript(() => {
+    window.__ddcsForceTrack = true;   // opt this beacon-payload test back in past the automated-browser guard (endpoint below is a fake, captured locally — no real Worker request)
     window.DDCS_ANALYTICS_URL = 'https://example.test/e';
     window.__beacons = [];
     navigator.sendBeacon = (url, blob) => {

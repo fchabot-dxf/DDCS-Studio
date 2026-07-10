@@ -8460,3 +8460,12 @@ base → mkWcsBase (wcsbaseinto); confirm → mkConfirm (hmiconfirm); trigger �
 
 ### E2 COMPLETE — E3 middle now inherits ALL of it
 middle shares the SAME probeSurface (stop/limit + trigger), safeTraverseStack (manual reposition), the #70 WCS idiom (incl. #[#70+2] direct), and #1505 prompts → the seams are all in place; E3 is the middle rewire + its per-post sweep.
+
+---
+## 2026-07-09 (t616 amendment) — Analytics KV-write guards (Cloudflare free-tier protection)
+
+Disjoint from edge (the human's CF free-tier warning). Two client-side guards in ui/analytics.js so a heavy dev/test day can't blow the KV free tier.
+
+- **(1) Tests fire ZERO analytics.** off() now returns true for `navigator.webdriver` (Playwright/any automated browser) + any `window.__ddcsNoTrack` harness → the suites' hundreds of app boots send NO beacons to the Worker (each dev boot would otherwise be a KV write). The ONE beacon-payload test (analytics.spec.js) opts back in via `window.__ddcsForceTrack` (its endpoint is a fake `example.test` + a captured sendBeacon → no real request).
+- **(2) Dev-refresh throttled once/day.** The dev-network refresh is a server-side KV WRITE only for `visit`/`app_launch` with dev=1 (Worker index.js:62-64). New `devFlag(event)` sends dev=1 on the day's FIRST visit/app_launch (a localStorage `ddcs_dev_day` stamp) and dev=0 on later same-day ones → the Worker READS KV instead (cheap, 100k/day) and still resolves dev via the registered network. So a heavy dev day writes ~1 KV op, not hundreds. Non-visit events keep dev=1 (they never trigger a KV write). User events untouched (reads).
+- **VERIFY:** tests/analytics-kv-guard.spec.js — (a) a Playwright boot + an explicit ddcsTrack() make ZERO requests to ddcs-analytics (request listener asserts []); (b) devFlag: first visit→1, same-day second→0, feature→1, next-day→1. analytics.spec.js still passes (opted in). Full suite green.

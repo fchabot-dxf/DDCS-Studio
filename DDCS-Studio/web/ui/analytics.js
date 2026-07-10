@@ -19,11 +19,31 @@ function endpoint() {
 
 function off() {
   try {
+    // Automated browsers (Playwright/WebDriver) + any harness that sets window.__ddcsNoTrack fire NOTHING — the test
+    // suites boot the app hundreds of times, and each live beacon is a Worker request (dev boots = a KV write). Zero.
+    if (typeof navigator !== 'undefined' && navigator.webdriver && !(typeof window !== 'undefined' && window.__ddcsForceTrack)) return true;   // __ddcsForceTrack: the one beacon-payload test opts back in (its endpoint is a fake, captured locally)
+    if (typeof window !== 'undefined' && window.__ddcsNoTrack) return true;
     if (navigator.doNotTrack === '1' || window.doNotTrack === '1') return true;
     if (localStorage.getItem('ddcs_no_analytics') === '1') return true;
   } catch (_) { /* storage blocked — fall through */ }
   return false;
 }
+
+// The `dev` flag to SEND. A dev-tagged browser refreshes its network IP in KV on each visit/app_launch (a server-side WRITE,
+// Worker index.js:62-64). Throttle that to ONCE PER DAY via a localStorage day-stamp: the day's first visit/app_launch sends
+// dev=1 (refresh); later same-day ones send dev=0 → the Worker READS KV instead (cheap, 100k/day) and still resolves dev. So a
+// heavy dev day writes ~1 KV op, not hundreds. Non-visit events keep dev=1 (they never trigger a KV write). Free-tier safe.
+function devFlag(event) {
+  if (!isDev()) return 0;
+  if (event !== 'visit' && event !== 'app_launch') return 1;   // feature/etc — dev-attributed, no server-side KV write
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    if (localStorage.getItem('ddcs_dev_day') === today) return 0;   // already refreshed today → dev=0 (Worker reads KV)
+    localStorage.setItem('ddcs_dev_day', today);
+  } catch (_) { /* storage blocked → just refresh */ }
+  return 1;
+}
+if (typeof window !== 'undefined') window.__ddcsDevFlag = devFlag;   // test hook (the throttle is off()-gated in track)
 
 function anonId() {
   try {
@@ -62,7 +82,7 @@ export function track(event, name = '') {
   const body = JSON.stringify({
     event, name, id: anonId(), app: isExe() ? 'exe' : 'web',
     version: version(), os: (navigator.platform || navigator.userAgent || '').slice(0, 32),
-    dev: isDev() ? 1 : 0,
+    dev: devFlag(event),   // dev=1 throttled to once/day per browser (KV-write guard); other same-day dev boots send 0 (Worker reads KV)
   });
   try {
     // text/plain → a CORS "simple request" (no preflight); fire-and-forget, survives page unload.
