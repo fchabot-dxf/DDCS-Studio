@@ -98,10 +98,28 @@ export const dialect = {
     spindle: (dir, rpm) => [`${dir === 'ccw' ? 'M4' : 'M3'} S${rpm}`],   // M3.nc / M4.nc
     spindleOff: () => ['M5'],
     coolant: (on) => [on ? 'M8' : 'M9'],   // flood M8 / off M9 (mist M7 not present in dump)
-    hmiPrompt: (msg) => [`#1505=1(${msg})`],      // blocking OK/Cancel; ESC sets #1505=0
+    hmiPrompt: (msg, mode = 1) => [`#1505=${mode}(${msg})`],   // blocking dialog; #1505=<mode> 1=OK/Cancel, 3=binary (appcode/communicationWizard.nc:7,15); ESC sets #1505=0
     hmiCancelVar: '#1505',                        // the prompt's cancel signal — ESC sets it to 0 (confirmBlock bails on it)
     hmiToast: (msg) => [`#1505=-5000(${msg})`],   // display-only banner
     hmiInput: (varName, prompt) => [`#2070=${String(varName).replace('#', '')}(${prompt})`],   // blocking numeric input
+    // hmiStatus — the status-bar idiom (comm's status arm): #2039 colour set (BGR) + #1503=<mode>(<line>) + #2039 restore + an
+    // optional visibility dwell. Byte-identical to comm's old assign/RAW sequence. Off-HMI posts have no hmiStatus → the atom
+    // degrades to a `( status: <line> )` comment (status text is OUTPUT — keep the meaning). Bytes verified vs appcode/communicationWizard.nc:29-32,36.
+    hmiStatus: (mode, line, opts = {}) => {
+        const out = [];
+        const c = opts.color;
+        const hasC = c != null && c !== '' && Number(c) !== -1;
+        if (hasC) out.push(`#2039=${c} ( Status bar color - BGR )`);
+        out.push(`#1503=${mode}(${line})`);
+        if (hasC) out.push('#2039=-1 ( Restore default color )');
+        if (Number(opts.dwell) > 0 && Number(mode) !== -3000) out.push(`G4 P${opts.dwell}  ( Dwell - keep message visible )`);
+        return out;
+    },
+    // beep — the system-beep idiom (comm's beep arm): #2043 pulse width (pulsed) + #2042 total/plain duration. Byte-identical to
+    // comm's old assign pair. Off-HMI posts have no beep → the atom folds to [] (a beep has no meaning to keep off-controller).
+    beep: (dur, cyc) => Number(cyc) > 0
+        ? [`#2043=${cyc} ( Pulse width ms )`, `#2042=${dur} ( Total duration ms )`]
+        : [`#2042=${dur} ( Beep duration ms )`],
     // hmiLine — a bare #1505 note write in the WIZARD's spaced assign form `#1505=<v> ( <note> )` (v=1 prompt / -5000 banner /
     // 1 error). This is the corner-family probe-message form (byte-identical to its old `assign` block); posts WITHOUT scripted
     // HMI (V4.1/DM500/…) have no hmiLine, so the hmiline atom degrades it to a plain comment (the instruction survives, no #1505).

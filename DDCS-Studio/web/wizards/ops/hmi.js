@@ -53,14 +53,15 @@ export const hmiConfirmBlock = {
 
 export const confirmBlock = {
     type: 'confirm', label: 'Confirm', kind: 'leaf', category: 'Control',
-    defaults: { msg: 'Press Enter to continue', cancel: 2 }, fields: ['msg', 'cancel'],
-    // Operator OK/Cancel gate: the controller's blocking prompt (dialect.hmiPrompt → Expert `#1505=1(msg)`)
-    // PLUS an ESC→cancel jump to <cancel>. PROFILE-AWARE: on controllers with no scripted prompt (V4.1/DM500
-    // hmiPrompt → []) the whole gate folds to nothing, so the macro runs straight through (the operator just
-    // positions the tool and starts the program). One granular block for "confirm or bail".
+    defaults: { msg: 'Press Enter to continue', cancel: 2, mode: 1, pauseOnDegrade: false }, fields: ['msg', 'cancel', 'mode', 'pauseOnDegrade'],
+    // Operator OK/Cancel gate: the controller's blocking prompt (dialect.hmiPrompt → Expert `#1505=<mode>(msg)`, mode 1=OK/Cancel,
+    // 3=binary) PLUS an ESC→cancel jump to <cancel>. PROFILE-AWARE: on controllers with no scripted prompt (V4.1/DM500 hmiPrompt →
+    // []) the gate degrades. `mode` (default 1) + `pauseOnDegrade` (default false) DEFAULT TO THE PRIOR BEHAVIOUR so every existing
+    // caller (alignment/ATC/rotary confirms) is byte-identical; comm's operator popups opt into pauseOnDegrade so a BLOCKING dialog
+    // still BLOCKS off-HMI — it folds to `( msg )` + M0 (the operator reads it, presses Cycle Start). One granular block for "confirm or bail".
     emit: (p, dx, dy, dialect) => {
-        const prompt = dialect.hmiPrompt(clean(p.msg));
-        if (!prompt.length) return [];                       // no scripted HMI on this controller → fold
+        const prompt = dialect.hmiPrompt(clean(p.msg), num(p.mode, 1));
+        if (!prompt.length) return p.pauseOnDegrade ? [`( ${clean(p.msg)} )`, 'M0'] : [];   // no scripted HMI → fold (or block-degrade for operator dialogs)
         if (!dialect.hmiCancelVar) return prompt;            // prompt has no cancel signal (e.g. RS274 M0 pause) → no bail jump
         const lbl = Math.max(0, Math.round(num(p.cancel, 2)));
         return [...prompt, ...dialect.ifGoto(dialect.hmiCancelVar, '==', '0', lbl)];   // ESC sets cancelVar=0 → bail to <cancel>
@@ -83,12 +84,40 @@ export const messageBlock = {
     },
 };
 
+export const hmiStatusBlock = {
+    // The status-bar idiom (comm's status arm): a colour-wrapped #1503 write + an optional visibility dwell. PROFILE-AWARE via
+    // dialect.hmiStatus (Expert = the exact #2039/#1503/#2039/G4 bytes); a post with NO hmiStatus (V4.1/DM500/grbl/rs274/centroid —
+    // #1503 is DDCS-specific) degrades to a `( status: <line> )` comment (the status text is OUTPUT — keep the meaning, no unmapped register).
+    type: 'hmistatus', label: 'HMI Status', kind: 'leaf', category: 'Control',
+    defaults: { mode: 1, line: '', color: -1, dwell: 0 }, fields: ['mode', 'line', 'color', 'dwell'],
+    emit: (p, dx, dy, dialect) => {
+        const line = clean(p.line);
+        const mode = (p.mode == null || p.mode === '') ? 1 : Number(p.mode);
+        if (dialect && typeof dialect.hmiStatus === 'function') return dialect.hmiStatus(mode, line, { color: p.color, dwell: p.dwell });
+        return line ? [`( status: ${line} )`] : [];   // honest degrade — the status text as a comment, no unmapped #1503/#2039
+    },
+};
+
+export const hmiBeepBlock = {
+    // The system-beep idiom (comm's beep arm): #2043 pulse width (pulsed) + #2042 duration. PROFILE-AWARE via dialect.beep (Expert =
+    // the exact bytes); a post with NO beep folds to [] — a beep is HMI FEEDBACK with no off-controller meaning to keep (R4).
+    type: 'hmibeep', label: 'HMI Beep', kind: 'leaf', category: 'Control',
+    defaults: { dur: 500, cyc: 0 }, fields: ['dur', 'cyc'],
+    emit: (p, dx, dy, dialect) => {
+        if (dialect && typeof dialect.beep === 'function') return dialect.beep(num(p.dur, 500), num(p.cyc, 0));
+        return [];   // no scripted beep → nothing (no meaning to keep)
+    },
+};
+
 export const askNumberBlock = {
     type: 'asknumber', label: 'Ask Number', kind: 'leaf', category: 'Control',
     defaults: { var: '#100', prompt: 'enter value' }, fields: ['var', 'prompt'],
+    // Blocking numeric entry (dialect.hmiInput → Expert `#2070=<n>(prompt)`). Off-HMI (hmiInput → []) it's a BLOCKING operator
+    // dialog, so it degrades to `( prompt )` + M0 + a note that the target var KEEPS ITS PRIOR VALUE (no guessed input) — the
+    // operator edits the var if needed, then Cycle Start. (Contrast the probe-flow hmiconfirm, which folds comment-NO-pause.)
     emit: (p, dx, dy, dialect) => {
         const v = (p.var || '#100').trim(), pr = clean(p.prompt);
         const out = dialect.hmiInput(v, pr);
-        return out.length ? out : [`( ASK ${v}: ${pr} - controller has no scripted input )`];
+        return out.length ? out : [`( ${pr} )`, 'M0', `( no scripted input - ${v} keeps its prior value; edit it then Cycle Start )`];
     },
 };

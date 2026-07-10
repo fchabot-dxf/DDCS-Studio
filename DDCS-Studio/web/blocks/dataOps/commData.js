@@ -15,12 +15,9 @@
 import { commStack } from '../../wizards/communicationWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
-import { getCaps, resolveActivePost } from '../../wizards/dialects/index.js';
-import { getActiveProfile } from '../../shared/js/profiles/controllerProfiles.js';
-
+// t632 — the twin no longer reads the active post (the _hmi guard is gone; the atoms fold per-post at emit time = the un-freeze).
 const fmtCtrl = (m) => String(m || '').replace(/\r\n|\r|\n/g, ' / ').replace(/\s*\/\s*/g, ' / ').trim();
 const fmtLine = (m) => String(m || '').replace(/\r\n|\r|\n/g, ' ').replace(/\s+/g, ' ').trim();
-const activeCaps = () => { try { return getCaps(resolveActivePost(getActiveProfile().id).id); } catch (_) { return { hmi: true }; } };
 
 // ── SENTINELS — the superset bakes these; applyCommRecompose swaps them for the resolved values (clean tokens: no chars
 //    fmtCtrl/fmtLine transform, so they survive the format verbatim; a distinctive id/dest so the computed useId + var swap). ──
@@ -61,16 +58,20 @@ export const COMM_VALUESWAP_BINDINGS = [
     { param: 'slot4', type: 'string', default: COMM_DEFAULTS.slot4, label: 'Button 4', help: 'Binary-popup button label.', section: 'GEOMETRY', when: { param: 'popupMode', is: 3 } },
 ];
 
-// VALUE bindings by #var identity over the pruned stack — the clean scalar sockets (slots, beep dur/cyc, status colour).
-// OPTIONAL: each is prune-gated (present only in its type/hmi/conditional arm) → deriveBindings SKIPs it when absent.
+// VALUE bindings by identity over the pruned stack — the clean scalar sockets. Slots stay #1510-1513 assigns; the status
+// colour/dwell + beep dur/cyc now ride the dialect-aware ATOMS (hmistatus/hmibeep) instead of leaky #2039/#2042/#2043 assigns.
+// OPTIONAL: each is prune-gated (present only in its type/conditional arm) → deriveBindings SKIPs it when absent. EXPLICIT
+// defaults (not socketHeld): the colour/dwell/cyc emit-by-value now lives in the atom (no _useColor/_hasStatusDwell prune), so
+// the binding must ALWAYS set the resolved value — incl. the "off" default (-1 / '' / 0) — not keep the superset's baked sentinel.
 export const COMM_BINDING_SPECS = [
     { param: 'slot1', type: 'string', match: { type: 'assign', var: '#1510' }, key: 'value', optional: true },
     { param: 'slot2', type: 'string', match: { type: 'assign', var: '#1511' }, key: 'value', optional: true },
     { param: 'slot3', type: 'string', match: { type: 'assign', var: '#1512' }, key: 'value', optional: true },
     { param: 'slot4', type: 'string', match: { type: 'assign', var: '#1513' }, key: 'value', optional: true },
-    { param: 'statusColor', type: 'number', match: { type: 'assign', params: { var: '#2039', note: 'Status bar color - BGR' } }, key: 'value', optional: true },
-    { param: 'val', type: 'number', match: { type: 'assign', var: '#2042' }, key: 'value', optional: true },   // beep total duration = val
-    { param: 'cycle', type: 'number', match: { type: 'assign', var: '#2043' }, key: 'value', optional: true },  // beep pulse width = cycle
+    { param: 'statusColor', type: 'number', default: COMM_DEFAULTS.statusColor, match: { type: 'hmistatus' }, key: 'color', optional: true },
+    { param: 'statusDwell', type: 'number', default: COMM_DEFAULTS.statusDwell, match: { type: 'hmistatus' }, key: 'dwell', optional: true },
+    { param: 'val', type: 'number', default: COMM_DEFAULTS.val, match: { type: 'hmibeep' }, key: 'dur', optional: true },   // beep total duration = val
+    { param: 'cycle', type: 'number', default: COMM_DEFAULTS.cycle, match: { type: 'hmibeep' }, key: 'cyc', optional: true },  // beep pulse width = cycle
 ];
 
 /** The wrapped user_root template — the superset (all arms), byte-transparent wrap (mirror the sibling *DataStack). */
@@ -86,15 +87,15 @@ export function commDataStack(params = SUPERSET_PARAMS) {
     }];
 }
 
-// ── the DERIVED guard keys — pruneGuards uses these to collapse the value-typed forks (the alignment/pocket precedent). ──
+// ── the DERIVED guard keys — pruneGuards uses these to collapse the value-typed forks. ──
+// t632 — the HMI-vs-degrade fork (_hmi) is GONE: each atom carries it at emit time (the un-freeze), so the twin folds per-post.
+// _useColor / _hasStatusDwell are gone too: the hmistatus atom owns the #2039/G4 emit-by-value (colour!=-1, dwell>0), so those
+// bits ride the atom's bound colour/dwell params (COMM_BINDING_SPECS) instead of pruned blocks. _hasCyc stays (the pulsed vs
+// plain COMMENT genuinely differs).
 export function commDeriveGuards(p) {
-    const sm = (p.statusMode != null && p.statusMode !== '') ? Number(p.statusMode) : 1;
     return {
-        _hmi: !!activeCaps().hmi,
         _popupMode: Number(p.popupMode),
         _popupToast: !(Number(p.popupMode) === 1 || Number(p.popupMode) === 3),
-        _useColor: p.statusColor != null && Number(p.statusColor) !== -1,
-        _hasStatusDwell: !!(p.statusDwell && Number(p.statusDwell) > 0 && sm !== -3000),
         _hasDest: !!(p.dest && String(p.dest).trim() !== ''),
         _hasCyc: (p.cycle != null && p.cycle !== '') ? Number(p.cycle) > 0 : false,
     };
@@ -109,24 +110,30 @@ function applyCommRecompose(stack, resolved) {
     const idNum = Number(String(p.id).replace('#', ''));
     const useId = (Number.isFinite(idNum) && idNum >= 50 && idNum <= 499) ? idNum : 100;
     const sm = (p.statusMode != null && p.statusMode !== '') ? Number(p.statusMode) : 1;
-    const dwellN = String(Number(p.statusDwell)), valN = String(p.val == null ? '' : p.val);
     const swap = (s) => String(s == null ? '' : s)
         .split(SENT.msg).join(msgFmt)
         .split(SENT.dest).join(String(p.dest || ''))
         .split(SENT.slot1).join(String(p.slot1 || '')).split(SENT.slot2).join(String(p.slot2 || ''))
         .split(SENT.slot3).join(String(p.slot3 || '')).split(SENT.slot4).join(String(p.slot4 || ''))
-        .split(String(SENT_DWELL)).join(dwellN).split(String(SENT_VAL)).join(valN)   // the numeric RAW values (status-dwell / dwell)
         .split('#' + SENT_USEID).join('#' + useId).split(String(SENT_USEID)).join(String(useId));
     for (const b of flat) {
         if (!b || !b.params) continue;
+        // t632 — the value-bearing MESSAGE now rides the dialect-aware atoms (the toast message, the confirm prompt, the input
+        // asknumber, the status line) instead of baked RAW; swap the sentinel in each. The status #1503 mode+line and the dwell
+        // seconds are COMPOSITES rebuilt from resolved params (not scalar sockets); colour/dwell/dur/cyc are bound (BINDING_SPECS).
         if (b.type === 'raw' && b.params.text != null) b.params.text = swap(b.params.text);
         else if (b.type === 'message' && b.params.text != null) b.params.text = swap(b.params.text);
+        else if (b.type === 'confirm' && b.params.msg != null) b.params.msg = swap(b.params.msg);   // popup OK/Cancel + binary prompt
+        else if (b.type === 'asknumber') {                                                          // numeric-input prompt + target #var
+            if (b.params.prompt != null) b.params.prompt = swap(b.params.prompt);
+            if (b.params.var != null) b.params.var = swap(b.params.var);
+        }
+        else if (b.type === 'hmistatus') { b.params.line = fmtLine(p.msg); b.params.mode = sm; }     // composite mode+line
+        else if (b.type === 'dwell') { b.params.sec = (Number(p.val) || 0) / 1000; }                 // ms → seconds (dialect.dwell handles the P units per post)
         else if (b.type === 'comment' && b.params.text != null) b.params.text = swap(b.params.text);
         else if (b.type === 'assign') {
-            // #1503 status = `${mode}(${line})` — rebuild from the resolved mode + message (composite, not a scalar socket)
-            if (b.params.var === '#1503') b.params.value = `${sm}(${fmtLine(p.msg)})`;
             // STRING values carry sentinels (e.g. the dest-copy `#${useId}`); NUMBER values are bound sockets — leave them typed
-            else if (typeof b.params.value === 'string') b.params.value = swap(b.params.value);
+            if (typeof b.params.value === 'string') b.params.value = swap(b.params.value);
             // the dest assign — its VAR is the sentinel dest → the resolved dest var
             if (b.params.var === SENT.dest) b.params.var = String(p.dest || '');
         }

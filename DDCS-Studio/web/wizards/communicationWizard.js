@@ -4,11 +4,9 @@
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { recordOp } from '../blocks/opRecord.js';
-import { resolveActivePost, getCaps } from './dialects/index.js';
-import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
-const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
-
+// t632 — commStack is now DIALECT-AGNOSTIC (the HMI idioms are dialect-aware atoms that fold at emit time); it no longer
+// resolves the active post at build time (that build-time bake was the twin freeze).
 const fmtCtrl = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' / ').replace(/\s*\/\s*/g, ' / ').trim();
 const fmtLine = (msg) => String(msg || '').replace(/\r\n|\r|\n/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -21,26 +19,33 @@ export function commStack(params = {}, opts = {}) {
     const S = [];
     const C = (t) => { const b = newBlock('comment'); b.params = { text: t }; S.push(b); };
     const A = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; S.push(b); };
-    const IF = (lhs, op, rhs, g) => { const b = newBlock('ifgoto'); b.params = { lhs, op, rhs, goto: g }; S.push(b); };
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
-    const RAW = (t) => { const b = newBlock('raw'); b.params = { text: t }; S.push(b); };
-    // t514 — the `message` atom (dialect-aware: hmiToast on HMI posts, an operator comment on non-HMI). Used ONLY in the
-    // non-HMI FALLBACK branches below; it was CALLED but never defined → a ReferenceError aborted commStack/generate on any
-    // post without caps.hmi (Comm was broken there). Mirrors alignmentWizard's MSG (newBlock('message')).
-    const MSG = (t) => { const b = newBlock('message'); b.params = { text: t }; S.push(b); };
+    // t632 — the HMI idioms are now DIALECT-AWARE ATOMS (the probe E-series treatment) that fold per-post at EMIT time, NOT
+    // RAW baked with the build-time dialect + gated by a build-time _hmi fork (that froze the twin: it emitted the ACTIVE
+    // post's Expert bytes on every post → leaks on V4.1/DM500). Each atom self-degrades per the target dialect.caps:
+    //   toast  → message   (hmiToast → Expert #1505=-5000(t); off-HMI `( MSG: t )`)
+    //   OK/Cancel + binary → confirm (hmiPrompt(msg,mode) → Expert #1505=<mode>(msg) + IF; off-HMI `( msg )` + M0, pauseOnDegrade)
+    //   status → hmistatus (Expert #2039/#1503/#2039/G4; off-HMI `( status: line )`)
+    //   input  → asknumber (hmiInput → Expert #2070; off-HMI `( prompt )` + M0 + keeps-prior-value note)
+    //   beep   → hmibeep   (Expert #2043/#2042; off-HMI [])
+    //   dwell  → dwell     (dialect.dwell → correct P units per post; the old RAW baked Expert's P and leaked wrong units)
+    // So commStack no longer reads the active dialect at all — it's dialect-agnostic DATA the emitter maps. R2: the popup
+    // prompt honours its MODE (1 OK/Cancel, 3 binary) per appcode/communicationWizard.nc:7,15 (the old hmiPrompt ignored it).
+    const MSGB = (t) => { const b = newBlock('message'); b.params = { text: t }; S.push(b); };
+    const CONFIRM = (msg, cancel, mode) => { const b = newBlock('confirm'); b.params = { msg, cancel, mode, pauseOnDegrade: true }; S.push(b); };
+    const ASK = (varName, prompt) => { const b = newBlock('asknumber'); b.params = { var: varName, prompt }; S.push(b); };
+    const STATUS = (mode, line, color, dwell) => { const b = newBlock('hmistatus'); b.params = { mode, line, color, dwell }; S.push(b); };
+    const BEEP = (dur, cyc) => { const b = newBlock('hmibeep'); b.params = { dur, cyc }; S.push(b); };
+    const DWELL = (sec) => { const b = newBlock('dwell'); b.params = { sec }; S.push(b); };
     // E0 (t516) — the data-op twin port. `opts.superset` carries the STRUCTURAL forks GUARDED so pruneGuards collapses to the
-    // concrete shape (the alignment/rotaryClock E0 pattern): type(popup/status/input/beep/dwell) × the HMI cap × popupMode ×
-    // the conditional slots/color/dest/dwell. The guard keys use DERIVED numeric/boolean params (_hmi/_popupMode/_statusMode/
-    // _useColor/_hasDwell/_hasDest/_hasCyc, injected by the twin's deriveGuards + the E0 test) so a value-typed fork guards
-    // cleanly. Concrete (superset:false) is the untouched imperative build → BYTE-IDENTICAL, and prune(superset)==concrete.
+    // concrete shape: type(popup/status/input/beep/dwell) × popupMode × the conditional slots/dest/cyc. The HMI-vs-degrade fork
+    // is GONE (R1) — each atom carries it at emit time — so the twin folds per-post like every other wizard (un-freeze). The
+    // guard keys use DERIVED params (_popupMode/_popupToast/_hasDest/_hasCyc, injected by the twin's deriveGuards) so a value-
+    // typed fork guards cleanly. Concrete (superset:false) is the untouched imperative build → BYTE-IDENTICAL, prune(superset)==concrete.
     const GUARD = (when, kids) => { const b = newBlock('guard'); b.params = { when }; b.children = kids; return b; };
     const cap = (fn) => { const n = S.length; fn(); return S.splice(n); };   // capture the blocks fn pushes (for GUARD children)
     const superset = !!opts.superset;
-
-    const dialect = getDialect();
-    if (!dialect) { C('Error: No dialect loaded'); return S; }
-    const caps = getCaps(dialect.id);
 
     const type = params.type;
     // ── data slots (#1510-1513) — each present iff its param is truthy (only popup/status/input set them; beep/dwell never do) ──
@@ -50,85 +55,48 @@ export function commStack(params = {}, opts = {}) {
 
     const msg = fmtCtrl(params.msg);
 
-    // ── POPUP arm (its own hmi fork; the HMI side forks on popupMode 1/3/toast) ──
-    const popupFallback = () => {
-        C(`Fallback: Controller does not support HMI popups`); MSG(msg);
-        const m00 = () => RAW('M00 ( Pause for operator acknowledgement )');
-        if (superset) S.push(GUARD({ param: '_popupMode', is: 1 }, cap(m00)), GUARD({ param: '_popupMode', is: 3 }, cap(m00)));
-        else { const mode = Number(params.popupMode); if (mode === 1 || mode === 3) m00(); }
-    };
-    const popupHmiOk = () => { C('Popup - OK/Cancel'); RAW(dialect.hmiPrompt(msg, 1).join('\n')); IF('#1505', '==', '0', 9); C('--- action if OK ---'); LB(9); };
-    const popupHmiBinary = () => { C('Popup - Binary Choice'); RAW(dialect.hmiPrompt(msg, 3).join('\n')); IF('#1505', '==', '0', 8); C('--- ENTER action ---'); GO(9); LB(8); C('--- ESC action ---'); LB(9); };
-    const popupHmiToast = () => { C('Popup - Toast'); RAW(dialect.hmiToast ? dialect.hmiToast(msg).join('\n') : dialect.hmiPrompt(msg, -5000).join('\n')); };
-    const popupHmi = () => {
+    // ── POPUP arm (forks on popupMode 1/3/toast; the atom owns the HMI-vs-degrade) ──
+    const popupOkCancel = () => { C('Popup - OK/Cancel'); CONFIRM(msg, 9, 1); C('--- action if OK ---'); LB(9); };
+    const popupBinary = () => { C('Popup - Binary Choice'); CONFIRM(msg, 8, 3); C('--- ENTER action ---'); GO(9); LB(8); C('--- ESC action ---'); LB(9); };
+    const popupToast = () => { C('Popup - Toast'); MSGB(msg); };
+    const popupArm = () => {
         // the toast arm is the "else" (mode NOT 1 and NOT 3 — e.g. the form's -5000) → un-guardable by a single value, so it
         // rides the DERIVED boolean `_popupToast` (= mode !== 1 && mode !== 3), injected by deriveGuards / the E0 test.
-        if (superset) S.push(GUARD({ param: '_popupMode', is: 1 }, cap(popupHmiOk)), GUARD({ param: '_popupMode', is: 3 }, cap(popupHmiBinary)), GUARD({ param: '_popupToast', is: true }, cap(popupHmiToast)));
-        else { const mode = Number(params.popupMode); if (mode === 1) popupHmiOk(); else if (mode === 3) popupHmiBinary(); else popupHmiToast(); }
-    };
-    const popupArm = () => {
-        if (superset) S.push(GUARD({ param: '_hmi', is: false }, cap(popupFallback)), GUARD({ param: '_hmi', is: true }, cap(popupHmi)));
-        else if (!caps.hmi) popupFallback(); else popupHmi();
+        if (superset) S.push(GUARD({ param: '_popupMode', is: 1 }, cap(popupOkCancel)), GUARD({ param: '_popupMode', is: 3 }, cap(popupBinary)), GUARD({ param: '_popupToast', is: true }, cap(popupToast)));
+        else { const mode = Number(params.popupMode); if (mode === 1) popupOkCancel(); else if (mode === 3) popupBinary(); else popupToast(); }
     };
 
-    // ── STATUS arm ──
+    // ── STATUS arm (the hmistatus atom owns #2039 colour + #1503 + the visibility dwell, degrading as one unit) ──
     const line = fmtLine(params.msg);
     const statusMode = (params.statusMode != null && params.statusMode !== '') ? Number(params.statusMode) : 1;
-    const statusFallback = () => { C('Fallback: Status bar text not supported'); MSG(line); };
-    const statusHmi = () => {
-        const setColor = () => A('#2039', Number(params.statusColor), 'Status bar color - BGR');
-        const restColor = () => A('#2039', '-1', 'Restore default color');
-        const dwellRaw = () => RAW(`G4 P${Number(params.statusDwell)}  ( Dwell - keep message visible )`);
-        if (superset) {
-            S.push(GUARD({ param: '_useColor', is: true }, cap(setColor)));
-            A('#1503', `${statusMode}(${line})`);
-            S.push(GUARD({ param: '_useColor', is: true }, cap(restColor)), GUARD({ param: '_hasStatusDwell', is: true }, cap(dwellRaw)));
-        } else {
-            const useColor = params.statusColor != null && Number(params.statusColor) !== -1;
-            const dwell = (params.statusDwell && Number(params.statusDwell) > 0) ? Number(params.statusDwell) : 0;
-            if (useColor) setColor();
-            A('#1503', `${statusMode}(${line})`);
-            if (useColor) restColor();
-            if (dwell > 0 && statusMode !== -3000) dwellRaw();
-        }
-    };
     const statusArm = () => {
         C(statusMode === -3000 ? 'Persistent Status Bar' : 'Status Bar Update');
-        if (superset) S.push(GUARD({ param: '_hmi', is: false }, cap(statusFallback)), GUARD({ param: '_hmi', is: true }, cap(statusHmi)));
-        else if (!caps.hmi) statusFallback(); else statusHmi();
+        STATUS(statusMode, line, params.statusColor, params.statusDwell);
     };
 
     // ── INPUT arm ──
     const idNum = Number(String(params.id).replace('#', ''));
     const useId = (Number.isFinite(idNum) && idNum >= 50 && idNum <= 499) ? idNum : 100;
-    const inputFallback = () => { C('Fallback: Numeric input not supported'); MSG(`Missing input for #${useId}: ${msg}`); RAW('M00 ( Pause to manually edit variable if needed )'); };
-    const inputHmi = () => {
+    const inputArm = () => {
         C('Numeric Input - DDCS Safe');
-        RAW(dialect.hmiInput ? dialect.hmiInput(`#${useId}`, msg).join('\n') : `#2070=${useId}(${msg})`);
+        ASK(`#${useId}`, msg);
         const copyDest = () => A(String(params.dest), `#${useId}`, 'Copy to persistent');
         if (superset) S.push(GUARD({ param: '_hasDest', is: true }, cap(copyDest)));
         else if (params.dest && String(params.dest).trim() !== '') copyDest();
     };
-    const inputArm = () => {
-        if (superset) S.push(GUARD({ param: '_hmi', is: false }, cap(inputFallback)), GUARD({ param: '_hmi', is: true }, cap(inputHmi)));
-        else if (!caps.hmi) inputFallback(); else inputHmi();
-    };
 
-    // ── BEEP arm (cyc fork) ──
+    // ── BEEP arm (cyc fork — the pulsed vs plain COMMENT differs; the hmibeep atom owns the #2042/#2043 register fork) ──
     const beepArm = () => {
         const dur = (params.val != null && params.val !== '') ? params.val : 500;
-        const beepCyc = () => { const cyc = Number(params.cycle); C(`System Beep - ${Math.round(dur / (cyc * 2))} pulses of ${cyc}ms`); A('#2043', cyc, 'Pulse width ms'); A('#2042', dur, 'Total duration ms'); };
-        const beepPlain = () => { C('System Beep'); A('#2042', dur, 'Beep duration ms'); };
+        const beepCyc = () => { const cyc = Number(params.cycle); C(`System Beep - ${Math.round(dur / (cyc * 2))} pulses of ${cyc}ms`); BEEP(dur, cyc); };
+        const beepPlain = () => { C('System Beep'); BEEP(dur, 0); };
         if (superset) S.push(GUARD({ param: '_hasCyc', is: true }, cap(beepCyc)), GUARD({ param: '_hasCyc', is: false }, cap(beepPlain)));
         else { const cyc = (params.cycle != null && params.cycle !== '') ? Number(params.cycle) : 0; if (cyc > 0) beepCyc(); else beepPlain(); }
     };
 
-    // ── DWELL arm ──
-    // t604 (scout F3) — `val` is MILLISECONDS (commData: "dwell ms", default 500); dialect.dwell()'s contract is SECONDS
-    // (Expert/V4.1 P=round(sec*1000) ms, DM500 P=sec). The bug shoved ms straight in → G04 P500000 (500 s) on Expert/V4.1.
-    // Convert at the call site (÷1000), mirroring atcTestWizard.js:56. The comm wizard bakes the ACTIVE dialect into a RAW
-    // line at BUILD time (getDialect() above) — so the STACK is per-post correct: Expert P500 / V4.1 P500 / DM500 P0.5.
-    const dwellArm = () => { C('Dwell'); const sec = (Number(params.val) || 0) / 1000; if (dialect && dialect.dwell) RAW(dialect.dwell(sec).join('\n')); else RAW(`G4 P${sec}`); };
+    // ── DWELL arm — the dwell atom folds per-post (Expert P=ms, DM500 P=sec). `val` is MILLISECONDS (commData: "dwell ms");
+    //    dialect.dwell()'s contract is SECONDS, so convert (÷1000). The old RAW baked the ACTIVE post's P and leaked wrong units.
+    const dwellArm = () => { C('Dwell'); DWELL((Number(params.val) || 0) / 1000); };
 
     if (superset) {
         S.push(
