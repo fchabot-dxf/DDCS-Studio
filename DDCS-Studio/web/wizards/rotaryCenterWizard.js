@@ -64,6 +64,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
     const GO = (n) => { const b = newBlock('goto'); b.params = { n }; S.push(b); };
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
+    const HMI = (value, note) => { const b = newBlock('hmiline'); b.params = { value: String(value), note: note || '', var: '#1505' }; S.push(b); };   // Expert #1505 note / off-HMI a comment
     const END = () => S.push(newBlock('endprogram'));
 
     // ── SUPERSET fork helpers (E0, mirroring middleStack) — each RETURNS the arm block(s): superset → guarded arms; concrete
@@ -81,7 +82,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
     const touchR = (axis, plus, resultVar, comp) => probeSurfaceStack({
         axis, dir: plus ? '+' : '-', probeVar: plus ? '#8' : '#7', retractVar: plus ? '#9' : '#10',
         feedFast: '#3', feedSlow: '#4', port: '#5', level, twoPass: true,
-        raw: TRIG[axis], result: resultVar, radius: '#6', compEnable: comp,
+        raw: TRIG[axis], rawAxis: axis, result: resultVar, radius: '#6', compEnable: comp,   // rawAxis → trigger folds per post
     });
     const repositionR = (msg) => [
         // Lift clear, operator jogs to the flank, then drop back the SAME amount — all INCREMENTAL (no G53).
@@ -167,7 +168,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
     DM('abs');
     MSG('Centreline Y#54 Z#56 - R#55');
     GO(2);
-    LB(1); DM('inc'); MV('Z', '#17'); DM('abs'); A('#1505', '1', 'Probe failed - no contact');
+    LB(1); DM('inc'); MV('Z', '#17'); DM('abs'); HMI('1', 'Probe failed - no contact');
     LB(2); END();
     return S;
 }

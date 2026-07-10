@@ -69,6 +69,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
     const SWO = (axis, value) => S.push(mkSWO(axis, value));
     const MV = (axis, v) => S.push(mkMV(axis, v));
     const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
+    const HMI = (value, note) => { const b = newBlock('hmiline'); b.params = { value: String(value), note: note || '', var: '#1505' }; S.push(b); };   // Expert #1505 note / off-HMI a comment
     const END = () => S.push(newBlock('endprogram'));
 
     // ── SUPERSET fork helper (E0, mirroring rotaryCenterStack) — the Clock's ONE block-shape fork is action(set|report|rotate).
@@ -130,7 +131,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
     DM('abs');
     MSG(_hdr.msg);
     GO(2);
-    LB(1); DM('inc'); MV('Z', '#17'); DM('abs'); A('#1505', '1', 'Probe failed - no contact');
+    LB(1); DM('inc'); MV('Z', '#17'); DM('abs'); HMI('1', 'Probe failed - no contact');
     LB(2); END();
     return S;
 }

@@ -105,7 +105,7 @@ export const dialect = {
     // hmiLine — a bare #1505 note write in the WIZARD's spaced assign form `#1505=<v> ( <note> )` (v=1 prompt / -5000 banner /
     // 1 error). This is the corner-family probe-message form (byte-identical to its old `assign` block); posts WITHOUT scripted
     // HMI (V4.1/DM500/…) have no hmiLine, so the hmiline atom degrades it to a plain comment (the instruction survives, no #1505).
-    hmiLine: (value, note) => { const n = String(note ?? '').replace(/[()]/g, '').trim(); return [n ? `#1505=${value} ( ${n} )` : `#1505=${value}`]; },
+    hmiLine: (value, note, varName = '#1505') => { const n = String(note ?? '').replace(/[()]/g, '').trim(); return [n ? `${varName}=${value} ( ${n} )` : `${varName}=${value}`]; },
 
     // recognize(line): the PARSE INVERSE of the dialect-specific emit above (the rest is decoded by the shared
     // core parser). Returns { type, params } or null. Probe/status/DRO reads are syntactically just `#x=#sys`

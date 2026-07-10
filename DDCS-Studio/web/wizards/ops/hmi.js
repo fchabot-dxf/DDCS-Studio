@@ -21,12 +21,13 @@ export const hmilineBlock = {
     // so the operator instruction SURVIVES without an unmapped #1505 write. Distinct from `confirm` (which adds an ESC/GOTO
     // gate + uses the no-space hmiPrompt form) — this is a bare note, no branch, matching corner's exact bytes.
     type: 'hmiline', label: 'HMI Line', kind: 'leaf', category: 'Control',
-    defaults: { value: '1', note: '' }, fields: ['value', 'note'],
+    defaults: { value: '1', note: '', var: '#1505' }, fields: ['value', 'note', 'var'],
     emit: (p, dx, dy, dialect) => {
         const value = (p.value === '' || p.value == null) ? '0' : String(p.value);
         const note = clean(p.note);
-        if (dialect && typeof dialect.hmiLine === 'function') return dialect.hmiLine(value, note);
-        return note ? [`( ${note} )`] : [];   // honest degrade — the instruction as a comment, no unmapped register write
+        const varName = p.var || '#1505';   // default the HMI message register; alignment's RESULT lines pass #1510/#1511/#1512
+        if (dialect && typeof dialect.hmiLine === 'function') return dialect.hmiLine(value, note, varName);
+        return note ? [`( ${note} )`] : [];   // honest degrade — the note as a comment (keeps the meaning), no unmapped register write
     },
 };
 

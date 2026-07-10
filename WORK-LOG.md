@@ -8492,3 +8492,25 @@ middle's reconciler (opSession.js) read raw `assign` blocks (#[#70+off] writes, 
 
 ### THE E-SERIES PROBE FAMILY IS COMPLETE
 corner (E1) + edge (E2) + middle (E3) all fold per post, Expert byte-diff ZERO; rotary + alignment were already atoms (E0). The remaining F1 follow-ons: the probe-MISS-on-V4.1/DM500 SAFETY increment (advisor-adopted, after the E-series) + F2 (ATC) / F4-F7.
+
+---
+## 2026-07-09 (t620) — F1/E4+E5 alignment + rotary RESIDUE: COMPLETE (Expert byte-identical). My "already atoms" claim was wrong — the advisor's sweep found real leaks.
+
+The advisor's verify-e45-scope.mjs disproved E0's "rotary+alignment already atoms" claim: alignment leaked the Expert HMI RESULT registers + a #1505 fail; rotary inlined raw trigger reads + #1505 fails. Ruled fixes built.
+
+### The ONE seam extension (ruled)
+- **hmiline gains an optional `var` param** (default #1505). Expert seam `hmiLine(value, note, varName='#1505')` → `${varName}=${value} ( ${note} )` (byte-identical; existing corner/edge/middle callers + hmiconfirm pass no var → #1505 unchanged). Off-HMI still folds to `( note )` — the note carries the meaning. Alignment's RESULT lines pass #1510/#1511/#1512.
+
+### E4 — ALIGNMENT
+- The Expert HMI RESULT display registers `#1510=#52 ( Delta… )` / `#1511=#53 ( Span… )` / `#1512=#54 ( Angle… )` → hmiline with var=#151x. Off-HMI they fold to the note as a COMMENT (the wizard's OUTPUT must not vanish silently — ruled). The `#1505=1 ( Probe failed or zero span… )` fail → hmiline. Its trigger reads already fold (proberead/readmachine atoms — no #192x leak). Its #70/#71/#72 are SCRATCH user vars (valid on all DDCS; the `#70=#1500` is the already-folded V4.1 DRO read) — LEFT as ruled (the sweep regex flags #70 but they're fine).
+
+### E5 — ROTARY
+- **rotary-center:** touchR's probeSurface `raw: TRIG[axis]` gained `rawAxis: axis` → the Z/Y trigger reads fold (Expert #1927/#1926 byte-identical, V4.1 #1502/#1501, DM500 #866/#865). The `#1505=1 ( Probe failed - no contact )` fail → hmiline.
+- **rotary-clock:** the `#1505=1 ( Probe failed - no contact )` fail → hmiline (no trigger leak — its reads already fold).
+
+### VERIFY
+- The advisor's scope check: the REAL leaks are GONE — 0 lines matching #151x/#1505/#192x/#88x on V4.1/DM500 (was 30). The 9 lines still flagged are ONLY the #70/#71/#72 scratch (ruled fine; #70=#1500 is the folded DRO read).
+- Expert byte-IDENTICAL: alignment + rotary + probe-surface + dialect-decode = 70 green (both wizards' combos + the twins, incl. alignment-data-emit). corner-post-fold.spec.js extended with alignment + rotary per-post truth + negatives (no #151x/#1505/#192x; RESULT lines survive as comments; per-post trigger). 7/7 post-fold green. Full suite green.
+
+### THE ENTIRE E-SERIES (probe family) IS NOW TRULY COMPLETE
+corner (E1) + edge (E2) + middle (E3) + alignment (E4) + rotary center/clock (E5) — ALL fold per post, Expert byte-diff ZERO, V4.1/DM500 zero executable Expert registers. Remaining F1: the probe-MISS safety increment (advisor-adopted) + F2 (ATC) / F4-F7.

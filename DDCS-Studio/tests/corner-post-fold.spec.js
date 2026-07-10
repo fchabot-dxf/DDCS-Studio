@@ -160,3 +160,56 @@ test('MIDDLE folds per post — Expert byte-identical (bare base, direct writes,
         expect(line(t[id], /slave-DRO/), `${id} sync → honest comment`).toContain('no #883 slave-DRO equivalent');
     }
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ALIGNMENT + ROTARY (E4/E5) — the residue. Alignment writes the Expert HMI RESULT registers #1510/#1511/#1512 +
+// a #1505 fail (→ hmiline with a `var`; off-HMI the RESULT lines keep their meaning as a comment). Rotary-center
+// inlines raw trigger reads (→ rawAxis) + a #1505 fail; rotary-clock just the #1505 fail (→ hmiline).
+async function emitOf(page, mod, stackName, params) {
+    return page.evaluate(async ([mod, stackName, params]) => {
+        const m = await import(mod);
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { getDialect } = await import('/wizards/dialects/index.js');
+        const out = {};
+        for (const id of ['ddcs-expert-m350', 'ddcs-v41', 'ddcs-v3-dm500']) out[id] = emitMapped(m[stackName](params), { dialect: getDialect(id) }).text;
+        return out;
+    }, [mod, stackName, params]);
+}
+
+test('ALIGNMENT folds per post — Expert #151x RESULT + #1505 fail byte-identical; V4.1/DM500 keep the meaning as comments (no register write)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const t = await emitOf(page, '/wizards/alignmentWizard.js', 'alignmentStack', { checkAxis: 'X' });
+    const E = t['ddcs-expert-m350'];
+    expect(line(E, /Delta: fence wander in probe axis/)).toBe('#1510=#52 ( Delta: fence wander in probe axis )');   // the RESULT write, not the #52 delta computation
+    expect(line(E, /Span: absolute distance/)).toBe('#1511=#53 ( Span: absolute distance along check axis )');
+    expect(line(E, /Angle: misalignment in degrees/)).toBe('#1512=#54 ( Angle: misalignment in degrees )');
+    expect(line(E, /Probe failed or zero span/)).toBe('#1505=1 ( Probe failed or zero span - check position )');
+    for (const id of ['ddcs-v41', 'ddcs-v3-dm500']) {
+        // the RESULT lines survive as comments (their meaning is the wizard's OUTPUT), with NO register write
+        expect(line(t[id], /Delta: fence wander in probe axis/), `${id} delta → comment`).toBe('( Delta: fence wander in probe axis )');
+        expect(line(t[id], /Angle: misalignment in degrees/), `${id} angle → comment`).toBe('( Angle: misalignment in degrees )');
+        expect(t[id], `${id} no #151x result-register write`).not.toMatch(/#151[0-9]=/);
+        expect(t[id], `${id} no #1505 write`).not.toMatch(/#1505=/);
+    }
+});
+
+test('ROTARY center+clock fold per post — Expert trigger #192x + #1505 fail byte-identical; V4.1/DM500 per-post trigger, no #1505', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const c = await emitOf(page, '/wizards/rotaryCenterWizard.js', 'rotaryCenterStack', {});
+    const k = await emitOf(page, '/wizards/rotaryClockWizard.js', 'rotaryClockStack', {});
+    // Expert: the Z trigger read (#1927) + the #1505 fail, byte-identical
+    expect(line(c['ddcs-expert-m350'], /^#50=\[#1927/)).toBe('#50=[#1927-#6] ( surface = trigger +/- stylus radius )');
+    expect(line(c['ddcs-expert-m350'], /Probe failed - no contact/)).toBe('#1505=1 ( Probe failed - no contact )');
+    expect(line(k['ddcs-expert-m350'], /Probe failed - no contact/)).toBe('#1505=1 ( Probe failed - no contact )');
+    for (const id of ['ddcs-v41', 'ddcs-v3-dm500']) {
+        expect(c[id], `center ${id} no #1927/#1926 trigger literal`).not.toMatch(/#192[0-9]/);
+        expect(c[id], `center ${id} no #1505 write`).not.toMatch(/#1505=/);
+        expect(k[id], `clock ${id} no #1505 write`).not.toMatch(/#1505=/);
+        expect(line(k[id], /Probe failed - no contact/), `clock ${id} fail → comment`).toBe('( Probe failed - no contact )');
+    }
+    // the Z trigger uses each post's OWN register (V4.1 #1502, DM500 #866)
+    expect(line(c['ddcs-v41'], /^#50=\[/)).toContain('#50=[#1502-#6]');
+    expect(line(c['ddcs-v3-dm500'], /^#50=\[/)).toContain('#50=[#866-#6]');
+});

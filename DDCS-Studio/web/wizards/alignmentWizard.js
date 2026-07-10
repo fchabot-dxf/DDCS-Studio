@@ -76,6 +76,9 @@ export function alignmentStack(params = {}, opts = {}) {
         const RD = (axis, v) => { const x = newBlock('proberead'); x.params = { axis, var: v }; b.push(x); };
         const MV = (axis, v) => { const x = newBlock('move'); x.params = { mode: 'rapid', [axis.toLowerCase()]: v }; b.push(x); };
         const MSG = (text) => { const x = newBlock('message'); x.params = { text }; b.push(x); };
+        // F1/E4 — profile-aware #1505/#151x note via the hmiline atom (var opt-in): Expert `var=value ( note )` byte-identical,
+        // off-HMI a comment carrying the note (the RESULT lines keep their meaning as text; no unmapped register write).
+        const HMI = (value, note, varName) => { const x = newBlock('hmiline'); x.params = { value: String(value), note: note || '', var: varName || '#1505' }; b.push(x); };
         const END = () => b.push(newBlock('endprogram'));
 
         // Two-pass probe of the fence (fast → check → retract → slow → check → read → retract), all granular atoms.
@@ -156,16 +159,17 @@ export function alignmentStack(params = {}, opts = {}) {
         A('#54', 'ATAN[#52]/[#53]', 'Misalignment angle (deg) = atan2(delta, span) — two-operand atan[a]/[b] form');
         b.push(safeZParkBlock(safeZFrame, '#19')); DM('abs');   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
 
-        // ── Results ──
+        // ── Results ── the Expert HMI RESULT display registers (Delta/Span/Angle). Off-HMI they fold to comments that keep the
+        // meaning as text (the wizard's OUTPUT must not vanish silently) — no unmapped #151x write on V4.1/DM500.
         C('===== RESULTS =====');
-        A('#1510', '#52', 'Delta: fence wander in probe axis');
-        A('#1511', '#53', 'Span: absolute distance along check axis');
-        A('#1512', '#54', 'Angle: misalignment in degrees');
+        HMI('#52', 'Delta: fence wander in probe axis', '#1510');
+        HMI('#53', 'Span: absolute distance along check axis', '#1511');
+        HMI('#54', 'Angle: misalignment in degrees', '#1512');
         MSG('Drift=#1510mm Span=#1511mm Angle=#1512deg');   // #vars (DDCS substitutes them); printf %.3f isn't — hmiToast on Expert, comment on V4.1/DM500
 
         // ── Footer + error handler ──
         GO(2);
-        LB(1); DM('abs'); A('#1505', '1', 'Probe failed or zero span - check position');
+        LB(1); DM('abs'); HMI('1', 'Probe failed or zero span - check position');
         LB(2); END();
         return b;
     };
