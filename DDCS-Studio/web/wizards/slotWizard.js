@@ -7,6 +7,7 @@
  * two editors of this one stack.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
@@ -76,6 +77,6 @@ export function slotStack(params = {}) {
 export class SlotWizard {
     generate(params) {
         recordOp('slot', params);   // let the Blocks tab open this op as its stack
-        return emitMapped(slotStack(params)).text;
+        return emitMapped(slotStack(params), activeDialectOpts()).text;
     }
 }

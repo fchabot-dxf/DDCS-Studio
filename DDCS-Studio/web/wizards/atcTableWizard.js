@@ -10,6 +10,7 @@
  * (#1330) writes are UNVERIFIED — running this macro is itself the bench test (assignment is harmless either way).
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { resolveActivePost } from './dialects/index.js';
@@ -89,6 +90,6 @@ export function atcTableStack(params = {}, opts = {}) {
 export class AtcTableWizard {
     generate(params) {
         recordOp('atc_table', params);
-        return emitMapped(atcTableStack(params)).text;
+        return emitMapped(atcTableStack(params), activeDialectOpts()).text;
     }
 }

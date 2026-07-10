@@ -8,6 +8,7 @@
  * through the active dialect like every other cutting wizard.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makePlace } from '../blocks/programFraming.js';
 import { layoutText, textContours } from './textGeometry.js';
@@ -63,6 +64,6 @@ export function textStack(params = {}) {
 export class TextWizard {
     generate(params) {
         recordOp('text', params);
-        return emitMapped(textStack(params)).text;
+        return emitMapped(textStack(params), activeDialectOpts()).text;
     }
 }

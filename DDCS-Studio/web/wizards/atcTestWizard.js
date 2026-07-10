@@ -10,6 +10,7 @@
  * Both run in the Studio simulator (Run + Auto sensors) before the first powered test.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { resolveActivePost } from './dialects/index.js';
@@ -134,6 +135,6 @@ export function atcTestEffectiveMode(params) { return (params && params.mode ===
 export class AtcTestWizard {
     generate(params) {
         recordOp('atc_test', params);
-        return emitMapped(atcTestStack(params)).text;
+        return emitMapped(atcTestStack(params), activeDialectOpts()).text;
     }
 }

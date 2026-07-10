@@ -8642,3 +8642,53 @@ Existing atoms confirmed registered + dialect-aware (ops/hmi.js + ops/index.js:7
 - **R6 (text pipeline):** the atoms clean() the text (paren-strip); commStack uses fmtCtrl (newline→` / `) / fmtLine. Byte-identical for simple msgs; differ on multi-line msgs. Align the atoms to comm's fmtCtrl, or accept clean() (byte-diff only on newline msgs)?
 
 NEXT (post-ruling): rewire commStack onto the atoms per R1, add the R3/R4 seams byte-diff-ZERO on Expert, drop the _hmi guard + remove the RAW bakes, un-freeze the twin (verify twin==built-in per dialect), extend corner-post-fold (or a comm sibling spec) with comm per-post truth + non-HMI negatives (no #1505/#1503/#2070/#2042 leak), full suite.
+
+---
+## 2026-07-10 (t632) — COMM-ATOM SIBLING — HMI idioms → dialect-aware atoms; un-freeze the DM500 comm twin (advisor rulings R1-R6)
+
+BUILT the rewire per the advisor's 6 rulings. Comm's HMI idioms were RAW baked with the BUILD-TIME dialect + gated by a build-time `_hmi` fork (that froze the twin: it emitted the ACTIVE post's Expert bytes on every post → executable-register leaks on V4.1/DM500). Now each idiom is a DIALECT-AWARE ATOM that folds at EMIT time (the probe E-series treatment), so commStack is dialect-AGNOSTIC data the emitter maps per post.
+
+### PREMISE (from t630): the MSG "crash" was already band-aided (4d4f943) — no ReferenceError on any post. The REAL fix = the leak/freeze.
+
+### THE ATOM MAP (built)
+- toast → `message` (hmiToast → Expert #1505=-5000(t); off-HMI `( MSG: t )`).
+- OK/Cancel + binary → `confirm` (hmiPrompt(msg,MODE) → Expert #1505=<mode>(msg) + IF; off-HMI `( msg )` + M0).
+- status → NEW `hmistatus` seam+atom (Expert #2039 colour + #1503=<mode>(line) + #2039 restore + G4 dwell; off-HMI `( status: line )`).
+- input → `asknumber` (hmiInput → Expert #2070; off-HMI `( prompt )` + M0 + a "#var keeps its prior value" note).
+- beep → NEW `hmibeep` seam+atom (Expert #2043/#2042; off-HMI []).
+- dwell → `dwell` atom (dialect.dwell → correct P units per post; the old RAW baked Expert's P and leaked wrong units to DM500).
+
+### CHANGES
+- **ddcs-expert-m350.js**: `hmiPrompt(msg, mode=1)` now HONOURS the mode (R2 — the old form ignored it, so binary wrongly wrote #1505=1; the M350 dump appcode/communicationWizard.nc:15 is #1505=3). Added `hmiStatus(mode,line,{color,dwell})` + `beep(dur,cyc)` seams (Expert-only; every other post lacks them → the atom degrades). Bytes verified vs the dump.
+- **ops/hmi.js**: `confirm` +`mode`(default 1) +`pauseOnDegrade`(default false) — BOTH default to the PRIOR behaviour so the 9 OTHER callers (alignment/ATC/rotary/middle confirms) are byte-identical; comm opts into pauseOnDegrade → a blocking dialog degrades to `( msg )`+M0 (R5). `asknumber` degrade → `( prompt )` + M0 + keeps-prior-value note (R5; asknumber has no other users). NEW `hmistatus` + `hmibeep` atoms.
+- **ops/index.js**: registered hmistatus + hmibeep in the Control palette.
+- **communicationWizard.js**: commStack rewired onto the atoms; DROPPED the RAW bakes, the `_hmi`/`_useColor`/`_hasStatusDwell` forks, the fallback branches, AND `getDialect()`/`caps` (commStack no longer reads the active post — that WAS the freeze). R2 binary emits `#1505=3`.
+- **commData.js (the twin)**: `commDeriveGuards` dropped `_hmi`/`_useColor`/`_hasStatusDwell` (the atom carries the HMI-vs-degrade + emit-by-value now); kept `_popupMode`/`_popupToast`/`_hasDest`/`_hasCyc`. `COMM_BINDING_SPECS` rebound statusColor/statusDwell → hmistatus.color/dwell, val/cycle → hmibeep.dur/cyc (EXPLICIT defaults — the old `_useColor`/`_hasStatusDwell` prune is gone so the binding must always set the resolved value incl. the "off" default). `applyCommRecompose` handles the new block types (confirm.msg, asknumber.var/prompt, hmistatus.line/mode, dwell.sec) + removed the #1503 composite + the SENT_DWELL/SENT_VAL swaps (now bound/recomposed). Removed the orphaned activeCaps + its imports.
+
+### VERIFY (real-symptom, per-post)
+- **comm-post-fold.spec.js (NEW)**: Expert register truth per arm (vs the dump; binary asserts #1505=3); V4.1/DM500 = ZERO leaks (#1505/#1503/#2070/#2039/#2042/#2043) + M0 present for every blocking dialog + correct dwell units (Expert G04 P1000 vs DM500 G04 P1, NO baked-ms leak); the data-op TWIN == the built-in commStack byte-for-byte on ALL 5 posts (the un-freeze).
+- **comm-dwell-units.spec.js (UPDATED)**: was written UNDER the freeze ("DM500 twin dwell reads P500, a KNOWN limitation") — now asserts the un-frozen behaviour: DM500 folds to G04 P0.5 on BOTH the stack AND the twin, via `{dialect}` (the old test assumed the baked architecture via setActiveProfile, which no longer drives emitMapped since commStack is dialect-agnostic).
+- Byte-diff-ZERO Expert on every arm except the R2 binary line, proven against the captured golden. The 9 confirm/message-atom callers (corner/edge/middle/alignment/rotary + ATC) stay byte-identical (verified: corner-post-fold + alignment/atc/rotary twins all green).
+- FULL SUITE: 935 passed / 2 skipped / 0 failed (3.2m), zero flaky this run.
+
+### KNOWN SECONDARY (noted, not fixed — advisor deprioritised rs274/grbl)
+The popup OK/Cancel + binary structure is GOTO-flavoured (prompt + `IF #1505==0 GOTO<cancel>` + label). It's byte-correct on Expert/V4.1/DM500. On **rs274ngc** the confirm atom omits the ifGoto (no hmiCancelVar) but commStack's `LB(cancel)` still emits `o<n> endif` → an UNMATCHED o-word (rs274 models flow as if/endif skip-blocks, which don't map to an OK/Cancel gate). This was differently-broken pre-t632 too (it branched on an unset #1505). grbl is fine (labels fold to comments). The twin==built-in on rs274/grbl regardless. Perfecting rs274 popup-branch → o-word mapping is a separate concern.
+
+---
+## 2026-07-10 (t634) — PREVIEW DIALECT PARITY — thread the active post into the wizard preview emit (assessed the sim first; shipped)
+
+The wizard PREVIEW (code panel + 3D/2D sim) emitted `emitMapped(stack).text` with NO dialect → DEFAULT_DIALECT (Expert) on every post, so it LIED on V4.1/DM500 (showed Expert #1925/#805 instead of the real #1500/#864). INSERT already folds per post (programModel/opGlow/opSession all pass dialectOpts()). This threads the active post's dialect into the preview emit so preview text == insert text per post.
+
+### ASSESS FIRST (the advisor's gate) — CAN THE SIM PLAY NON-EXPERT FORMS? → YES, ship (no gate)
+GcodeExecutionEngine is DIALECT-AGNOSTIC by design: it takes NO dialect, parses G31/IF/GOTO/WHILE/assigns generically (`gcodes.includes(31)` = probe regardless of the L#682/Q1/K0 trailing params), has EXPLICIT DM500 move-until-input handling (M101 arms → next G01 is a probe → M102 disarms; "DM500 has no G31"), and POPULATES ALL dialect DRO bases (#880/#1500/#864/#5420) every step so a read-machine on any post returns the real coord. Empirical trace (throwaway harness, deleted) of corner/edge/drill emit per post: ALL drawable=true, ZERO skipped, SAME probe counts (corner 4, edge 2) on Expert/V4.1/DM500. G92 (V4.1/DM500 WCS write) is NOT explicitly handled → COSMETIC only (a WCS offset; the toolpath still draws — verified drawable). So the non-Expert forms play → SHIP.
+
+### THE FIX (scoped to the preview path, NOT a global emitMapped default flip)
+emitMapped is intentionally STATELESS (the dialect is threaded at the call site — that's how every other emit path does it; the wizard generate()s just never got the seam). So the fix threads it at the call site, consistent with the architecture:
+- NEW `wizards/previewEmit.js` — `activeDialectOpts()` = `{ dialect: resolveActivePost(getActiveProfile().id) }` (the same shape opGlow/opSession/programModel use).
+- Threaded into ALL 22 wizard `generate()` methods (`emitMapped(xxxStack(params), activeDialectOpts()).text`) via a perl pass (import + arg; verified 22/22 got both) + `views/userOpView.js` (the data-op preview, 2 emit sites).
+- NOT touched (out of the preview scope): `ui/macrosApp.js` sysstart Generate still emits Expert-default — a SEPARATE latent gap (the boot macro should arguably fold per post too); flagging, not fixing.
+
+### VERIFY (real-symptom + unit)
+- NEW tests/preview-dialect-parity.spec.js: (1) UNIT — for Expert/V4.1/DM500, `wizard.generate(P)` == the INSERT-path emit `emitMapped(stack, {dialect})` per post; the CORNER preview trigger reads #1925 (Expert) / #1500 (V4.1, no #1925) / #864 (DM500, no #1925); the preview genuinely CHANGES per post; the sim traces every post's EDGE emit to a drawable route WITH probes (drawable + probe>0). (2) REAL-SYMPTOM — set V4.1 active, openWiz('edge') → the #wiz_edge_code panel shows the V4.1 emit (NO #1925); switch to Expert → the panel re-renders with #1925 (byte-changed). Screenshots preview-v41.png + preview-expert.png.
+- Expert preview UNCHANGED byte-for-byte: with Expert active, activeDialectOpts()={dialect:Expert} == the old DEFAULT_DIALECT, so generate() is identical to before (proven: generate()==emitMapped(stack,{dialect:Expert})).
+- FULL SUITE: 937 passed / 2 skipped / 0 failed (3.2m), zero flaky this run (tests without setActiveProfile default to Expert → unchanged; the 22-wizard change is transparent to them).

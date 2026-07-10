@@ -22,6 +22,7 @@
  * model below (generic/disk) is an ASSUMPTION carried from earlier guesses — kept only for backward-compat.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { resolveActivePost } from './dialects/index.js';
@@ -219,6 +220,6 @@ export function atcChangeStack(params = {}, opts = {}) {
 export class AtcChangeWizard {
     generate(params) {
         recordOp('atc_change', params);
-        return emitMapped(atcChangeStack(params)).text;
+        return emitMapped(atcChangeStack(params), activeDialectOpts()).text;
     }
 }

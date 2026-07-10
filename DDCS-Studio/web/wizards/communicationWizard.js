@@ -3,6 +3,7 @@
  * Generates G-code for controller communication and UI interactions
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 
 // t632 — commStack is now DIALECT-AGNOSTIC (the HMI idioms are dialect-aware atoms that fold at emit time); it no longer
@@ -154,7 +155,7 @@ export class CommunicationWizard {
 
     generate(params) {
         recordOp('comm', params);   // let the Blocks tab open this op as its stack
-        return emitMapped(commStack(params)).text;
+        return emitMapped(commStack(params), activeDialectOpts()).text;
     }
 
     /**

@@ -7,6 +7,7 @@
  * stack; the kernels (patternPoints / peckDrill / helicalBore) live in ops/ and are shared.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { patternPoints } from './ops/index.js';
@@ -43,7 +44,7 @@ export function drillStack(params = {}) {
 export class DrillWizard {
     generate(params) {
         recordOp('drill', params);   // let the Blocks tab open this op as its stack
-        return emitMapped(drillStack(params)).text;   // placement is baked into the stack (drillStack)
+        return emitMapped(drillStack(params), activeDialectOpts()).text;   // placement is baked into the stack (drillStack)
     }
 
     /** Preview/sim start hint (work frame): origin; the pattern is drawn from there. */

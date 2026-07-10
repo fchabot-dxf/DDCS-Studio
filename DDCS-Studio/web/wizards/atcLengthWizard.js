@@ -8,6 +8,7 @@
  * (#1430 Expert/DM500, #1560 V4.1), the status-check folding and the confirm gate all come from the dialect.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
@@ -97,6 +98,6 @@ export function atcLengthStack(params = {}) {
 export class AtcLengthWizard {
     generate(params) {
         recordOp('atc_length', params);
-        return emitMapped(atcLengthStack(params)).text;
+        return emitMapped(atcLengthStack(params), activeDialectOpts()).text;
     }
 }

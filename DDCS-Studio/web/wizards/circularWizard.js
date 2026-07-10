@@ -8,6 +8,7 @@
  * sequence. New work uses the Middle wizard.
  */
 import { emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { middleStack, MiddleWizard } from './middleWizard.js';
 
@@ -33,7 +34,7 @@ export function circularStack(params = {}) {
 export class CircularWizard {
     generate(params) {
         recordOp('circular', params);
-        return emitMapped(circularStack(params)).text;
+        return emitMapped(circularStack(params), activeDialectOpts()).text;
     }
 
     inferStart(params, stock) {

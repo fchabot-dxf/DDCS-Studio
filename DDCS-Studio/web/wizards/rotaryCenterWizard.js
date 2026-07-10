@@ -10,6 +10,7 @@
  *   fit   — no diameter: probe 3 points on the Y-Z circle and solve centre + R. ADVANCED — verify on machine.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (rotary composes it — t129 inc1)
@@ -176,7 +177,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
 export class RotaryCenterWizard {
     generate(params) {
         recordOp('rotary_center', params);
-        return emitMapped(rotaryCenterStack(params)).text;
+        return emitMapped(rotaryCenterStack(params), activeDialectOpts()).text;
     }
 
     /** Preview start (stock frame): above the cylinder top, centred, ready to probe down. */

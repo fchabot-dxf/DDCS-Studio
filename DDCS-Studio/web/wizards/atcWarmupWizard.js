@@ -7,6 +7,7 @@
  * the active dialect. Form and Blocks view are two editors of this one stack.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 
@@ -49,6 +50,6 @@ export function atcWarmupStack(params = {}) {
 export class AtcWarmupWizard {
     generate(params) {
         recordOp('atc_warmup', params);
-        return emitMapped(atcWarmupStack(params)).text;
+        return emitMapped(atcWarmupStack(params), activeDialectOpts()).text;
     }
 }

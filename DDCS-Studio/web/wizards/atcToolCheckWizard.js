@@ -7,6 +7,7 @@
  * Re-measures with the same convention as the Tool Length wizard (length = MachineZ − block height).
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
@@ -94,6 +95,6 @@ export function atcToolCheckStack(params = {}) {
 export class AtcToolCheckWizard {
     generate(params) {
         recordOp('atc_check', params);
-        return emitMapped(atcToolCheckStack(params)).text;
+        return emitMapped(atcToolCheckStack(params), activeDialectOpts()).text;
     }
 }

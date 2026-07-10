@@ -8,6 +8,7 @@
  * and faces the whole top) and no wall pass. Rect only; raster → parallel rows, else concentric rings.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
@@ -47,6 +48,6 @@ export class SurfacingWizard {
         const w = num(params.w, 100), h = num(params.h, 80);
         // Emit THROUGH the block stack — the same stack the Blocks tab renders/edits.
         const stack = (w <= 0 || h <= 0) ? [makeStart(params), makeEnd(params)] : surfacingStack(params);
-        return emitMapped(stack).text;
+        return emitMapped(stack, activeDialectOpts()).text;
     }
 }

@@ -9,6 +9,7 @@
  * tilt phi = ATAN[(Zb-Za)/span]. Datum A so the level orientation reads A0 (set / report / rotate).
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
@@ -139,7 +140,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
 export class RotaryClockWizard {
     generate(params) {
         recordOp('rotary_clock', params);
-        return emitMapped(rotaryClockStack(params)).text;
+        return emitMapped(rotaryClockStack(params), activeDialectOpts()).text;
     }
 
     /** Preview start (stock frame): above the flat near the top, offset to point A (-Y half of span). Single pass → the

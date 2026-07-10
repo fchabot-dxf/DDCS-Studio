@@ -13,6 +13,7 @@ import { renderOpForm } from '../../ui/formWidgets.js';
 import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
+import { activeDialectOpts } from '../previewEmit.js';   // t634 — the data-op preview folds per the ACTIVE post (== insert), not Expert-default
 import { flattenBlocks, getUserStatusHint, getUserSimGcode } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography)
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
@@ -250,11 +251,11 @@ export const userOpView = {
         let gcode = '';
         if (isGroup) {
             // group: no builder — emit the stored children with the form values applied (a pure view, no recordOp).
-            try { gcode = emitMapped(applyGroupParams(_def, params)).text; }
+            try { gcode = emitMapped(applyGroupParams(_def, params), activeDialectOpts()).text; }
             catch (e) { gcode = '( error generating: ' + ((e && e.message) || e) + ' )'; }
         } else {
             recordOp(_def.opType, params);                   // make it the active op → shared insert() commits/replaces it
-            try { gcode = emitMapped(builderOf(_def.opType)(params)).text; }
+            try { gcode = emitMapped(builderOf(_def.opType)(params), activeDialectOpts()).text; }
             catch (e) { gcode = '( error generating: ' + ((e && e.message) || e) + ' )'; }
         }
         const codeEl = el('wiz_user_code');

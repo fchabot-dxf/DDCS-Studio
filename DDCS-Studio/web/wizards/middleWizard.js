@@ -18,6 +18,7 @@
  * DDCS M350: status #1920/#1921 (2=SUCCESS), trigger pos #1925/#1926, stop #1905/#1906, limit #1915/#1916.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';   // the shared probe + travel primitives (middle composes them — t131 inc1, ① auto/manual travel)
@@ -259,7 +260,7 @@ export function middleStack(params = {}, opts = {}) {
 export class MiddleWizard {
     generate(params) {
         recordOp('middle', params);   // let the Blocks tab open this op as its stack
-        return emitMapped(middleStack(params)).text;
+        return emitMapped(middleStack(params), activeDialectOpts()).text;
     }
 
     /**

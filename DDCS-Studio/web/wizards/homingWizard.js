@@ -29,6 +29,7 @@
  * a clear "unverified on <model>" note and emit NOTHING executable for homing (no guessed sequence).
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
@@ -209,7 +210,7 @@ export function homingUnsetAxes(params = {}) {
 export class HomingWizard {
     generate(params) {
         recordOp('homing', params);
-        return emitMapped(homingStack(params)).text;
+        return emitMapped(homingStack(params), activeDialectOpts()).text;
     }
     // t542 — the 3D preview plays generate()'s REAL emitted code (not a proxy), so simProxy()/inferStart() are gone.
 }

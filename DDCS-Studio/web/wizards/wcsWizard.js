@@ -10,6 +10,7 @@
  * leaked M350 registers onto every controller. The auto|fixed × axes × sync forks are COMPUTED inside the atom.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
@@ -31,7 +32,7 @@ export class WCSWizard {
         // Preview the ACTIVE post's WCS-set (the wcszero atom is dialect-aware at emit) — reflects a post override the same
         // way the old build-time getDialect did, so a v41/rs274 profile shows its G92 / G10 form, not the M350 default.
         let dialect = null; try { dialect = resolveActivePost(getActiveProfile().id); } catch (_) { /* default */ }
-        return emitMapped(wcsStack(params), dialect ? { dialect } : {}).text;   // a snippet: no Program Start/End blocks
+        return emitMapped(wcsStack(params), dialect ? { dialect } : {}, activeDialectOpts()).text;   // a snippet: no Program Start/End blocks
     }
 
     getWCSName(sys) { return sys === '0' ? 'Active WCS' : `G${sys}`; }
