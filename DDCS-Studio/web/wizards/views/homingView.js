@@ -1,7 +1,7 @@
 /** views/homingView.js — Homing wizard view. A lean run-form: pick which axes to home this run; order +
  *  per-axis method come from the saved Homing Setup config (settings.homing). Opens the setup modal too. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { HomingWizard, homingUnsetAxes } from '../homingWizard.js';
+import { HomingWizard, homingUnsetAxes, homingRunParams } from '../homingWizard.js';
 import { openHomingSetup } from '../../ui/settingsPanel.js';
 
 const wizard = new HomingWizard();
@@ -22,15 +22,8 @@ function configuredAxes() {
     return out;
 }
 
-// Resolve the home ORDER for this run. The per-axis `order` field is the first-class, user-set sequence
-// (rearranged in Homing Setup; default Z=1 X=2 Y=3 = the safe fndzero.nc order). generate() emits the M98
-// calls in exactly this order. (A slave that follows its master is emitted right after the master by the
-// builder's syncSlave(), so it doesn't need its own slot.) 'simultaneous' is just a flag — a macro still
-// emits the calls sequentially in this order (the controller can't truly home in parallel from a macro).
-function orderAxes(selected, homing) {
-    const cfg = homing.axes || {};
-    return [...selected].sort((p, q) => ((cfg[p] || {}).order || 9) - ((cfg[q] || {}).order || 9));
-}
+// The home ORDER + the enabled/configured selection now live in homingRunParams (homingWizard.js) — the ONE contract
+// shape shared with the Macros sysstart Generate so the two paths can't drift (the .order field is the user-set sequence).
 
 // t538 — the H4 home-end switch-DEVICE placement (homingEdges) is REMOVED with the device meshes (the human doesn't want the
 // switch boxes drawn). Homing direction still reads the DECLARED Home rows (settings.limits.<edge>Home) via axisHomeMotion in
@@ -73,15 +66,13 @@ export const homingView = {
 
     update(ctx) {
         const settings = window.ddcsGetSettings ? window.ddcsGetSettings() : {};
-        const homing = settings.homing || { axes: {} };
         // Build the axis rows every update (buildAxes preserves current ticks) so the list always reflects the
         // configured axes/methods and timing can't leave it empty.
         this.buildAxes();
         const host = el('homing_axes');
         const selected = host ? [...host.querySelectorAll('.homing-run-ax')].filter((c) => c.checked).map((c) => c.getAttribute('data-axis')) : [];
-        const axes = orderAxes(selected, homing);
-
-        const params = { axes, config: homing.axes || {}, softLimits: (settings.machine || {}).softLimits !== false, machine: settings.machine || {}, limits: settings.limits || {} };   // re-enable #655 iff soft limits; limits = the DECLARED home switch per edge (t504)
+        // the ONE contract shape (shared with the Macros sysstart Generate) — pass the per-run TICKS as the selection.
+        const params = homingRunParams(settings, { selected });
         const gcode = wizard.generate(params);
         el('wiz_homing_code').innerHTML = UIUtils.formatGCode(gcode);
 

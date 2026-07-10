@@ -18,7 +18,7 @@ import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
 import { makeZip, downloadBytes } from '../data/zip.js';
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
-import { homingStack } from '../wizards/homingWizard.js';
+import { homingStack, homingRunParams } from '../wizards/homingWizard.js';   // homingRunParams = the ONE contract shape (t626) so sysstart generate matches the wizard emit (was passing the raw object → empty stub)
 import { emitMapped } from '../blocks/blockEmitter.js';
 
 let _wired = false;
@@ -672,8 +672,7 @@ export function initMacrosApp() {
             }
             
             // sysstart.nc
-            const h = getSettings().homing || {};
-            let syscode = emitMapped(homingStack(h)).text || '';
+            let syscode = emitMapped(homingStack(homingRunParams(getSettings()))).text || '';   // t626 — the contract shape → the REAL homing sequence
             const custom = String(getSettings().sysstartCustomGcode || '').trim();
             if (custom) syscode += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
             syscode += '\nM30\n';
@@ -768,8 +767,7 @@ export function initMacrosApp() {
         q('sysstart_gen').addEventListener('click', () => {
             const out = q('sysstart_out');
             if (!out) return;
-            const h = getSettings().homing || {};
-            let code = emitMapped(homingStack(h)).text || '';
+            let code = emitMapped(homingStack(homingRunParams(getSettings()))).text || '';   // t626 — the contract shape (enabled axes, ordered) → the REAL homing sequence, not the empty stub
             const custom = String(q('sysstart_custom_gcode').value || '').trim();
             if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
             code += '\nM30\n';
@@ -780,8 +778,7 @@ export function initMacrosApp() {
 
     if (q('sysstart_push')) {
         q('sysstart_push').addEventListener('click', async () => {
-            const h = getSettings().homing || {};
-            let code = emitMapped(homingStack(h)).text || '';
+            let code = emitMapped(homingStack(homingRunParams(getSettings()))).text || '';   // t626 — the contract shape (enabled axes, ordered) → the REAL homing sequence, not the empty stub
             const custom = String(q('sysstart_custom_gcode').value || '').trim();
             if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
             code += '\nM30\n';

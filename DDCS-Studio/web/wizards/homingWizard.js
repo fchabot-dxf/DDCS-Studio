@@ -173,6 +173,24 @@ export function homingStack(params = {}, opts = {}) {
     return [{ type: 'op', opType: 'homing', label: `Home ${axes.map((a) => AX_LABEL[a]).join(' ')}`, children: S, collapsed: true }];
 }
 
+/** homingRunParams(settings, opts) — the ONE contract shape for homingStack, mirroring what homingView built inline
+ *  (homingView.js:84). BOTH the Homing wizard AND the Macros sysstart Generate call this, so the two paths can't drift
+ *  again (t626 — the sysstart path used to pass settings.homing raw, an OBJECT where axes must be an ordered ARRAY, so it
+ *  emitted the empty "(none)" stub — it never homed). `opts.selected` = an explicit axis list (the wizard's per-run ticks);
+ *  default = the ENABLED configured axes (the boot macro homes what the config enables). Axes ordered by the per-axis `order`.
+ *  config / machine / limits / softLimits mirror homingView.js:84 exactly, so the two emits stay byte-identical. */
+export function homingRunParams(settings = {}, opts = {}) {
+    const homing = settings.homing || { axes: {} };
+    const cfg = homing.axes || {};
+    const m = settings.motors || {};
+    const configured = ['x', 'y', 'z'];
+    if (m.a && m.a.role && m.a.role !== 'unused') configured.push('a');
+    if (m.b && m.b.role && m.b.role !== 'unused') configured.push('b');
+    const selected = Array.isArray(opts.selected) ? opts.selected : configured.filter((ax) => (cfg[ax] || {}).enable !== false);
+    const axes = [...selected].sort((p, q) => ((cfg[p] || {}).order || 9) - ((cfg[q] || {}).order || 9));
+    return { axes, config: cfg, softLimits: (settings.machine || {}).softLimits !== false, machine: settings.machine || {}, limits: settings.limits || {} };
+}
+
 // t542 — homingSimProxy (a hand-made G53 motion model) is DELETED. It existed only because the pre-b0a9791 M98 emit
 // wasn't engine-runnable; the wizard is G31-only now and the emit plays to M30 (t540). The 3D preview plays the REAL
 // emitted G-code (homingView → HomingWizard.generate), the SAME execution the editor does — one simulator, one truth.
