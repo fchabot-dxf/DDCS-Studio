@@ -1770,7 +1770,15 @@ function wireSettingsOverlay(ov) {
         const obj = (n) => { const x = values[String(n)]; return x && x.available ? x : null; };   // {value,userSet,default?}
         const cands = [], notes = [];   // notes = explicit "not readable / not available / at default" rows
         // Hardware & I/O
-        if (hwProfile && hwProfile.id) { connected = true; cands.push({ group: 'Hardware & I/O', label: `Profile “${hwProfile.name}”`, value: 'tabs + pin map', changed: true, kind: 'hardware', data: hwProfile }); }
+        if (hwProfile && hwProfile.id) {
+            connected = true;
+            const det = hwProfile.detected || {};   // t650 — the PROFILE-ID detail: the raw identification reply, so the review shows WHICH controller answered (never guessed)
+            const idDetail = [
+                { label: 'controller id', raw: hwProfile.id, derived: hwProfile.name || '' },
+                { label: 'detected', raw: `${det.family || 'unknown'}${det.firmware ? ' · fw ' + det.firmware : ''}`, derived: det.ip ? '@ ' + det.ip : (hwProfile.source || 'baseline') },
+            ];
+            cands.push({ group: 'Hardware & I/O', label: `Profile “${hwProfile.name}”`, value: 'tabs + pin map', changed: true, kind: 'hardware', data: hwProfile, detail: idDetail });
+        }
         else notes.push({ group: 'Hardware & I/O', label: 'Not available', value: 'no gateway profile', kind: 'note' });
         // ATC magazine (pocket XYZ tables)
         let magReadable = false, magCount = 0;
@@ -1834,6 +1842,9 @@ function wireSettingsOverlay(ov) {
                 if (he[a]) detail.push({ label: `${L} home edge`, raw: `dir bit ${hd[a] > 0 ? '+1' : (hd[a] < 0 ? '−1' : '0')}${hec[a] ? ' · far soft-limit end DISAGREES' : ' · far soft-limit end agrees'}`, derived: `home ${edgeLabel(a)}` });
             });
             cands.push({ group: 'Machine envelope', label: 'Travel + home switches', value: desc, changed, kind: 'travel', data: { travel: tv, homeDir: hd, homeEdge: he, homeEdgeConflict: hec }, detail });
+            // t650 — honesty: when the controller has soft limits DISABLED (V4.1 #234=0), the envelope VALUES are still the
+            // declared config but are NOT enforced by the machine — surface that as the reason (never silently imply they're live).
+            if (geo && geo.softLimitEnabled === false) notes.push({ group: 'Machine envelope', label: 'Soft limits DISABLED on the controller', value: 'the travel values above are the declared config, not enforced (enable them on the controller)', kind: 'note' });
             // sentinel axes → a review NOTE so the user knows to fill them (never silently left at the default); show the RAW sentinel reply.
             const undeclared = AX.filter(([a]) => !(tv[a] != null && tv[a] > 0));
             for (const [a, L] of undeclared) notes.push({ group: 'Machine envelope', label: `${L} not declared on the controller`, value: `raw ${slRaw(a)} → ±9999 sentinel → undeclared`, kind: 'note' });
@@ -1851,6 +1862,13 @@ function wireSettingsOverlay(ov) {
                 cands.push({ group: 'Homing', label: 'Homing feeds', value: `Seek ${seek} · Slow ${slow} mm/min`, changed: true, kind: 'homingFeeds', data: { speed: hf.speed, precision: hf.precision }, detail });
             }
         }
+        // Gantry topology (t650, folds in the t648 ruling) — the declared dual-axis slave(s) from settings.motors (SEEDED from the
+        // dump's dual binding on pull, seedGantryFromHoming). A review DETAIL row so the operator sees the machine's gantry, from Axes.
+        const gslaves = slaveAxes(_ddcsSettings.motors || {});
+        if (gslaves.length) {
+            const gdetail = gslaves.map((s) => ({ label: `${s.ax.toUpperCase()} axis`, raw: 'gantry slave', derived: `follows ${String(s.follows).toUpperCase()}` }));
+            notes.push({ group: 'Gantry', label: 'Dual-axis gantry', value: gslaves.map((s) => `${s.ax.toUpperCase()} → ${String(s.follows).toUpperCase()}`).join(' · '), kind: 'note', detail: gdetail });
+        } else notes.push({ group: 'Gantry', label: 'No gantry slave declared', value: 'single motor per axis (from Axes)', kind: 'note' });
         // reason (only meaningful when !connected): no-gateway = the bridge never answered; no-controller = bridge up, machine didn't respond.
         return { connected, candidates: cands.concat(notes), controller: (hwProfile && hwProfile.id) ? { id: hwProfile.id, name: hwProfile.name } : null, reason: connected ? null : (gatewayReached ? 'no-controller' : 'no-gateway') };
     }

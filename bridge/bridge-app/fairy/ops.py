@@ -310,6 +310,11 @@ class Ops:
         family = det.get("family")
         if family == "v4.1":
             prof = {**self._CONTROLLERS["v4.1"], "detected": det}
+            params = self._read_setting_params()   # 1500×f64; schema differs from the Expert but the decode is the same
+            if params is not None:
+                prof["source"] = "controller"
+                prof["paramCount"] = len(params)
+                self._map_geometry_to_profile_v41(params, prof, self._read_eng() or "")   # eng = the MEANING (by name), setting = the VALUES
             return prof
         # Expert M350, or unknown → default to the Expert baseline + live-setting refinement (as before).
         prof = {**self._CONTROLLERS["expert-m350"], "detected": det}
@@ -394,6 +399,22 @@ class Ops:
     _WCS_BASE = 305
     _WCS_STRIDE = 5
     _SENTINEL = 9999.0
+
+    # ── V4.1 geometry: DERIVED BY NAME from the firmware `eng` dictionary (declare-not-hardcode, t650 amendment). The `eng`
+    # is a self-describing param-definition file the controller ships (assets/firmware/.../eng, also on SYSDISK):
+    #   #235 -t1 -s1"Soft-limited postion value of X--" -s2"unit" -m11 -min=-9999 -max=9999
+    # so the MEANING comes from the eng (parsed once), the VALUES from the live/captured `setting`. This future-proofs any DDCS
+    # family shipping an eng and avoids the two-controllers index trap (controllers/README.md). Confirmed vs the June capture:
+    # #234 Enable-soft-limit = 0 (DISABLED on this rig — surfaced honestly), #235-237/#240-242 soft-limit neg/pos pairs
+    # (X/Y/Z = -3830/-3900/-800 · 0/0/0), #199-202 home dir, #204-207 home search speed, #209-212 positioning speed.
+    _ENG_NAME = {   # the eng-name patterns → the geometry role (case-insensitive; the firmware's "postion" typo tolerated)
+        "enable":   r"enable\s+soft",
+        "softNeg":  r"soft.?limited\s+po\w+\s+value\s+of\s+{AX}--",
+        "softPos":  r"soft.?limited\s+po\w+\s+value\s+of\s+{AX}\+\+",
+        "homeDir":  r"{AX}\s+axis\s+home\s+direction",
+        "seek":     r"{AX}\s+axis\s+home\s+search\s+speed",
+        "slow":     r"{AX}\s+axis\s+home\s+positioning\s+speed",
+    }
 
     def _map_geometry_to_profile(self, params, prof):
         """Emit `geometry` (travel / soft-limits / homing / mach-zero) + `wcs` (active index, offset table,
@@ -499,6 +520,118 @@ class Ops:
             "table": table,
         }
 
+    def _parse_eng(self, text):
+        """Parse the controller's self-describing `eng` param dictionary → {index: {name, unit, group, type, enums}}.
+        A DECLARED, reusable parser (any DDCS family shipping an eng future-proofs for free). Read-only; never raises.
+        Line form: `#235 -t1 -s1"<name>" -s2"<unit>" -m11 -min=… -max=… -i0"<enum0>" -i1"<enum1>"`."""
+        out = {}
+        for line in (text or "").splitlines():
+            m = re.match(r"\s*#(\d+)\b", line)
+            if not m:
+                continue
+            nm = re.search(r'-s1"([^"]*)"', line)
+            un = re.search(r'-s2"([^"]*)"', line)
+            grp = re.search(r"-m(\d+)", line)
+            typ = re.search(r"-t(\d+)", line)
+            out[int(m.group(1))] = {
+                "name": nm.group(1) if nm else "", "unit": un.group(1) if un else "",
+                "group": int(grp.group(1)) if grp else None, "type": int(typ.group(1)) if typ else None,
+                "enums": {int(a): b for a, b in re.findall(r'-i(\d+)"([^"]*)"', line)},
+            }
+        return out
+
+    def _v41_geo_indices(self, eng):
+        """Resolve the geometry/homing param indices from the eng BY NAME (never a hardcoded index). Returns a dict of
+        role → index (or per-axis {x,y,z} → index); a role not found in this firmware's eng resolves to None (→ N/A)."""
+        def find(pat):
+            rx = re.compile(pat, re.I)
+            for i in sorted(eng):
+                if rx.search(eng[i]["name"]):
+                    return i
+            return None
+        idx = {"enable": find(self._ENG_NAME["enable"])}
+        for role in ("softNeg", "softPos", "homeDir", "seek", "slow"):
+            idx[role] = {ax: find(self._ENG_NAME[role].format(AX=ax.upper())) for ax in ("x", "y", "z")}
+        return idx
+
+    def _map_geometry_to_profile_v41(self, params, prof, eng_text):
+        """V4.1 geometry DERIVED BY NAME from the eng (the MEANING) + the live/captured `setting` (the VALUES). The eng
+        gives a soft-limit neg/pos PAIR per axis (X--/X++ …) exactly like the Expert, so the SAME far-reach/home derivation
+        applies. The Enable-soft-limit flag (#234) is surfaced honestly (0 = disabled → the envelope values are the declared
+        config, not enforced). WCS work offsets stay N/A on V4.1 (HIGH vars #1506+, not in the setting/uservar param space).
+        Read-only; never raises. `geometryRaw` carries the resolved indices + raw values so the review shows the ground."""
+        eng = self._parse_eng(eng_text)
+        gi = self._v41_geo_indices(eng)
+
+        def at(i, default=0.0):
+            if i is None:
+                return default
+            try:
+                v = params[i]
+                return float(v) if isinstance(v, (int, float)) else default
+            except (IndexError, TypeError):
+                return default
+        def has(i):
+            return i is not None and 0 <= i < len(params)
+
+        SENT = self._SENTINEL
+        neg_i, pos_i, dir_i = gi["softNeg"], gi["softPos"], gi["homeDir"]
+        seek_i, slow_i = gi["seek"], gi["slow"]
+
+        def far_reach(ax):   # the SIGNED far-end machine coord: the larger-|·| soft-limit end (sentinel-aware). None = undeclared.
+            neg, pos = at(neg_i[ax], -SENT), at(pos_i[ax], SENT)
+            neg_s, pos_s = abs(neg) >= SENT, abs(pos) >= SENT
+            if neg_s and pos_s:
+                return None
+            if neg_s:
+                return pos
+            if pos_s:
+                return neg
+            if neg == 0 and pos == 0:
+                return None
+            return neg if abs(neg) >= abs(pos) else pos
+        def travel(ax):
+            fr = far_reach(ax)
+            return None if fr is None else round(abs(fr), 4)
+        def home_sign(ax):   # PRIMARY = soft-limit machine coords; FALLBACK = the home-direction bit (0=neg→+1, 1=pos→-1)
+            neg, pos = at(neg_i[ax], -SENT), at(pos_i[ax], SENT)
+            no, po = abs(neg) < SENT, abs(pos) < SENT
+            if no and po and (neg + pos) != 0:
+                return 1 if (neg + pos) > 0 else -1
+            if po and pos != 0:
+                return 1 if pos > 0 else -1
+            if no and neg != 0:
+                return 1 if neg > 0 else -1
+            hd = at(dir_i[ax], None) if has(dir_i[ax]) else None
+            return None if hd is None else (1 if int(hd) == 0 else -1)
+        def home_edge(ax):   # ('min'|'max', conflict): soft-limit far end is PRIMARY, the home-dir bit CONFIRMS/conflicts (soft-limit wins)
+            fr = far_reach(ax)
+            sl = None if fr is None else ("min" if fr >= 0 else "max")
+            hd = at(dir_i[ax], None) if has(dir_i[ax]) else None
+            de = None if hd is None else ("min" if int(hd) == 0 else "max")
+            return (sl or de), bool(sl and de and sl != de)
+
+        axes = ("x", "y", "z")
+        he = {ax: home_edge(ax) for ax in axes}
+        enable = at(gi["enable"], 1.0) if has(gi["enable"]) else 1.0
+        speed = {ax: (at(seek_i[ax]) if has(seek_i[ax]) else None) for ax in axes}
+        any_speed = any(v for v in speed.values())
+        prof["geometry"] = {
+            "travel": {ax: travel(ax) for ax in axes},
+            "softLimits": {"xMin": at(neg_i["x"]), "xMax": at(pos_i["x"]), "yMin": at(neg_i["y"]),
+                           "yMax": at(pos_i["y"]), "zMin": at(neg_i["z"]), "zMax": at(pos_i["z"])},
+            "homeDir": {ax: home_sign(ax) for ax in axes},
+            "homeEdge": {ax: he[ax][0] for ax in axes},
+            "homeEdgeConflict": {ax: he[ax][1] for ax in axes},
+            # homing feeds ARE grounded on V4.1 (eng-named): search speed = seek, positioning speed = slow.
+            "homingFeeds": ({"speed": speed, "precision": (at(slow_i["x"]) if has(slow_i["x"]) else None)} if any_speed else None),
+            "machZero": None,                                   # not a named V4.1 param → N/A
+            "softLimitEnabled": bool(int(enable)) if has(gi["enable"]) else None,   # #234 — surfaced honestly (0 = disabled)
+        }
+        prof["geometryRaw"] = {"indices": {"softNeg": neg_i, "softPos": pos_i, "enable": gi["enable"], "homeDir": dir_i, "seek": seek_i},
+                               "softLimitEnabled": enable}
+        prof["wcs"] = None   # UNGROUNDABLE on V4.1: work offsets are HIGH vars (#1506+), not in the setting/uservar param space. N/A.
+
     # Expected `setting` shape + anchor sanity for the Expert — used to confirm the live file decoded
     # as aligned f64 params (not garbage / a wrong-controller dump). Anchors are [CONFIRMED] in FINDINGS:
     # #266/#267 baud code, #279 Modbus 0/1, #284 net-boot 0/1/2, #296 parity, #297 stop.
@@ -578,6 +711,23 @@ class Ops:
             try:
                 return list(struct.unpack("<%dd" % n, raw[: n * 8]))
             except struct.error:
+                continue
+        return None
+
+    def _read_eng(self):
+        """Read the controller's self-describing `eng` param dictionary (TEXT) from SYSDISK. Returns str, or None if
+        unreachable/unreadable. Read-only; never raises. Same share logic as _read_setting_params (eng lives on SYSDISK)."""
+        if not self.controller_reachable():
+            return None
+        candidates = [os.path.join(self.cfg.expert_dest, "eng")]
+        dest = (self.cfg.expert_dest or "").rstrip("\\/")
+        if dest.upper().endswith("CNCDISK"):
+            candidates.append(os.path.join(dest[: -len("CNCDISK")] + "SYSDISK", "eng"))
+        for full in candidates:
+            try:
+                with open(full, "rb") as f:
+                    return f.read().decode("utf-8", "replace")
+            except OSError:
                 continue
         return None
 
