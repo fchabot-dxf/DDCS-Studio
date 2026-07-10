@@ -31,6 +31,7 @@ export const dialect = {
     probeStatus: () => [],   // [] — G38.2 alarms on no-contact; success param #5070 exists but no in-program GOTO branch
     // #50=#5061  (probe-hole.ngc:19 "#1001=#5061", :31 "#1005=#5062"). Trigger-position block #5061+axis (ngc_params.c:301)
     probeRead: (axis, varName) => [`${varName}=#${5061 + AX[axis]}`],
+    probeTrigVar: (axis) => `#${5061 + AX[axis]}`,   // trigger register per axis — #5061-5069 (ngc_params.c:301)
     // #50=#5420  (ngc_params.c:321 work_position #5420-28). Current position in the active frame.
     readMachine: (axis, varName) => [`${varName}=#${5420 + AX[axis]}`],
     machineMove: (axis, ref) => [`G53 G0 ${axis}${ref}`],   // machine-frame rapid; ref may be a literal or #var (gcode.c:65 G53 non-modal)

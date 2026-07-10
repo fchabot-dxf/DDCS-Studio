@@ -67,7 +67,7 @@ import { setWorkOffsetBlock } from './setworkoffset.js';
 import { wcsZeroBlock } from './wcszero.js';   // t475 — WCS zero-at-current, dialect-aware at emit (M350 register / rs274·grbl G10 L20 / v41·dm500 G92)
 import { assignBlock } from './assign.js';
 import { radiuscompBlock } from './radiuscomp.js';
-import { pauseBlock, messageBlock, askNumberBlock, confirmBlock } from './hmi.js';
+import { pauseBlock, messageBlock, askNumberBlock, confirmBlock, hmilineBlock } from './hmi.js';
 import { cornerConfigBlock } from './corner_config.js';
 import { pathModeBlock, drillCycleBlock, cancelCycleBlock, outPinBlock, waitInputBlock } from './cnc.js';
 import { stopBlock, planeBlock, feedModeBlock, homeBlock, callBlock, returnBlock } from './more.js';
@@ -85,7 +85,7 @@ export const PALETTE = [
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, wcsZeroBlock, toolOffsetBlock,   // Coordinates (WCS select + dist-mode + G17-19 plane + work-offset/WCS-zero-at-current/tool-table write)
     progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)
     probeReadBlock, readMachineBlock, radiuscompBlock,         // Probing (probe/DRO capture + stylus-radius comp)
-    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock, cornerConfigBlock, guardBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input + corner-macro config + when-guard fork container)
+    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock, hmilineBlock, cornerConfigBlock, guardBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input + corner #1505 note + corner-macro config + when-guard fork container)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)

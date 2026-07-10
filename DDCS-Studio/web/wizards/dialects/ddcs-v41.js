@@ -21,6 +21,7 @@ export const dialect = {
     probeMove: (axis, dist, { feed = 100 } = {}) => [`G31 ${axis}${dist} L#682 Q1 K0 F${feed}`],
     probeStatus: () => [],                                   // no status var — success read from post-probe DRO #1502 (probe-fix.nc)
     probeRead: (axis, varName) => [`${varName}=#${1500 + AX[axis]}`],   // post-probe machine pos #1500+ax (probe-fix.nc: #108=#1502)
+    probeTrigVar: (axis) => `#${1500 + AX[axis]}`,   // trigger register per axis — post-probe machine pos #1500/#1501/#1502 (no #1925 here)
     readMachine: (axis, varName) => [`${varName}=#${1500 + AX[axis]}`], // DRO X#1500/Y#1501/Z#1502/A#1503 (safez.nc)
     machineMove: (axis, ref) => [`G0 G53 ${axis}${ref}`],   // CONFIRMED live: probe-fix.nc "G0G53Z#102" (G0 + G53)
     // CONFIRMED live (probe-vertex.nc): zero at the probed point with G90 G92 <axis><WORK value> — a work coord,

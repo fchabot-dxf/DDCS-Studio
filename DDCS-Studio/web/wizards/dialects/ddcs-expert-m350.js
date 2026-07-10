@@ -23,6 +23,7 @@ export const dialect = {
     probeStatus: (axis, label) => [`IF #${1920 + AX[axis]}!=2 GOTO${label}`],
     // #50=#1927   (words.nc:12). trigger-position block #1925+axis
     probeRead: (axis, varName) => [`${varName}=#${1925 + AX[axis]}`],
+    probeTrigVar: (axis) => `#${1925 + AX[axis]}`,   // the trigger register per axis (for an inline read, e.g. radius-comp) — #1925/#1926/#1927
     // #57=#882   (SAVE_WCS_XY_AUTO.nc:16). machine-DRO block #880+axis
     readMachine: (axis, varName) => [`${varName}=#${880 + AX[axis]}`],
     // G53 Z#99   (snippets.nc:4). NO G0 prefix; ref MUST be a #var on M350 (a literal fails)
@@ -73,6 +74,10 @@ export const dialect = {
     hmiCancelVar: '#1505',                        // the prompt's cancel signal — ESC sets it to 0 (confirmBlock bails on it)
     hmiToast: (msg) => [`#1505=-5000(${msg})`],   // display-only banner
     hmiInput: (varName, prompt) => [`#2070=${String(varName).replace('#', '')}(${prompt})`],   // blocking numeric input
+    // hmiLine — a bare #1505 note write in the WIZARD's spaced assign form `#1505=<v> ( <note> )` (v=1 prompt / -5000 banner /
+    // 1 error). This is the corner-family probe-message form (byte-identical to its old `assign` block); posts WITHOUT scripted
+    // HMI (V4.1/DM500/…) have no hmiLine, so the hmiline atom degrades it to a plain comment (the instruction survives, no #1505).
+    hmiLine: (value, note) => { const n = String(note ?? '').replace(/[()]/g, '').trim(); return [n ? `#1505=${value} ( ${n} )` : `#1505=${value}`]; },
 
     // recognize(line): the PARSE INVERSE of the dialect-specific emit above (the rest is decoded by the shared
     // core parser). Returns { type, params } or null. Probe/status/DRO reads are syntactically just `#x=#sys`

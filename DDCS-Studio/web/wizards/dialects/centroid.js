@@ -25,6 +25,7 @@ export const dialect = {
     probeMove: (axis, dist, { feed = 10, port = 3 } = {}) => [`M115 /${axis}${dist} P${port} F${feed}`],
     probeStatus: () => [],   // [] — M115 errors out on no-contact (manual:868); no in-program status read
     probeRead: () => [],     // [] — stops AT contact; define the point with setWorkOffset (G92), no trigger var
+    probeTrigVar: () => null, // null — no trigger var; an inline read must degrade honestly
     readMachine: () => [],   // TO CONFIRM — machine-pos system var is in operators manual §11.2.16, not in dump
     // G53 Z.5 / G53 X1  (manual:135-136). Machine-frame move; ref may be a LITERAL or #var (unlike DDCS,
     // which requires a #var). Optional trailing "L<feedrate>" (manual:174 "G53 X1 Y-1 L200").

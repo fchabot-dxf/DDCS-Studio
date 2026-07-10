@@ -135,6 +135,10 @@ export function cornerStack(params = {}, opts = {}) {
     const WHEN_Z = { param: 'probeZFirst', is: true }, WHEN_NZ = { param: 'probeZFirst', is: false };
     const mkC = (t) => { const b = newBlock('comment'); b.params = { text: t }; return b; };
     const mkA = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; return b; };
+    // HMI note (#1505 on Expert) via the profile-aware `hmiline` atom: Expert = the spaced `#1505=<v> ( <note> )` form
+    // (byte-identical to the old assign it replaces), V4.1/DM500 = the instruction as a plain comment (no unmapped #1505 write).
+    const HMI = (value, note) => { const b = newBlock('hmiline'); b.params = { value: String(value), note: note || '' }; S.push(b); };
+    const mkHMI = (value, note) => { const b = newBlock('hmiline'); b.params = { value: String(value), note: note || '' }; return b; };
     // zPair: a Z-varying fork with BOTH arms — superset guards each; concrete pushes the matching arm inline (today's shape).
     const zPair = (onKids, offKids) => { if (superset) S.push(GUARD(WHEN_Z, onKids), GUARD(WHEN_NZ, offKids)); else S.push(...(probeZ ? onKids : offKids)); };
     // zOnly: a Z-ONLY block-add (no off-arm) — superset guards it on; concrete emits it only when probeZ.
@@ -188,9 +192,9 @@ export function cornerStack(params = {}, opts = {}) {
         const compOp = dir === '+' ? '+' : '-';   // boss: wall is at trigger ± stylus radius
         const out = [...probeSurfaceStack({
             axis: ax, dir: compOp, probeVar, retractVar, feedFast: '#3', feedSlow: '#4', port: '#5', level,
-            twoPass: true, raw: av.result, result: ax === 'X' ? '#102' : '#101', radius: '#6',
+            twoPass: true, raw: av.result, rawAxis: ax, result: ax === 'X' ? '#102' : '#101', radius: '#6',
             compEnable: true, trailingRetract: false, compNote: `Trigger Pos ${compOp} Radius`,
-        })];
+        })];   // rawAxis → the trigger register folds per post (Expert #1925/#1926 byte-identical; V4.1 #1500+; DM500 #864+)
         if (ax === 'X') {
             out.push(...wcsFork((w, label) => [mkA('#[#70]', '#102', `Save to ${label} X`)]));   // note forks on wcs (value/target constant)
         } else {
@@ -250,7 +254,7 @@ export function cornerStack(params = {}, opts = {}) {
     // ── Confirm + incremental ── KIND-B, 2-way: OVER/OUTSIDE forks on probeZFirst, the corner NAME on corner → cornerFork(zPairR).
     C('Confirm Start');
     const startPrompt = (z, c) => `${z ? 'Hover OVER the' : 'Hover OUTSIDE the'} ${c} corner material. Press Enter`;
-    S.push(...cornerFork((c) => zPairR([mkA('#1505', '1', startPrompt(true, c))], [mkA('#1505', '1', startPrompt(false, c))])));
+    S.push(...cornerFork((c) => zPairR([mkHMI('1', startPrompt(true, c))], [mkHMI('1', startPrompt(false, c))])));
     DM('inc');
 
     // ── Z surface (optional) ── probeZFirst-only block-add: the Z-surface touch + the Z→wall1 reposition.
@@ -260,7 +264,7 @@ export function cornerStack(params = {}, opts = {}) {
     // The compNote carries the derived wcsLabel → forks on wcs (via wcsFork in the zOnly below); everything else is constant.
     const zSurfaceProbe = (label) => probeSurfaceStack({
         axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level,
-        twoPass: true, raw: '#1927', result: '#[#73]', radius: '#6', compEnable: true,
+        twoPass: true, raw: '#1927', rawAxis: 'Z', result: '#[#73]', radius: '#6', compEnable: true,
         trailingRetract: false, preComp: [{ var: '#73', value: '[#70+2]', note: 'WCS Z Address' }],
         compNote: `Save ${label} Z offset - machine coord (− stylus radius)`,
     });
@@ -341,12 +345,12 @@ export function cornerStack(params = {}, opts = {}) {
 
     // ── Footer + error handler ──
     DM('abs');
-    S.push(...cornerFork((c) => [mkA('#1505', '-5000', `Corner ${c} found`)]));   // KIND-B: the corner NAME forks on corner
+    S.push(...cornerFork((c) => [mkHMI('-5000', `Corner ${c} found`)]));   // KIND-B: the corner NAME forks on corner
     GO(2);
     C('=== ERROR HANDLER ===');
     LB(1);
     DM('inc'); MV('Z', '#17'); DM('abs');
-    A('#1505', '1', 'ERROR: Probe failed to trigger');
+    HMI('1', 'ERROR: Probe failed to trigger');
     LB(2); END();
     return S;
 }

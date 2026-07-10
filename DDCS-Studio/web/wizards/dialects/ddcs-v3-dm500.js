@@ -25,6 +25,7 @@ export const dialect = {
     probeMove: (axis, dist, { feed = 100 } = {}) => ['M101', `G91 G01 ${axis}${dist} F${feed}`, 'M102'],
     probeStatus: () => [],                                   // implicit — motion halts on input; no status var
     probeRead: (axis, varName) => [`${varName}=#${864 + AX[axis]}`],    // capture machine DRO at contact (probe.nc:4-6)
+    probeTrigVar: (axis) => `#${864 + AX[axis]}`,   // trigger register per axis — DRO at contact #864/#865/#866 (no #1925 here)
     readMachine: (axis, varName) => [`${varName}=#${864 + AX[axis]}`],  // DRO X#864/Y#865/Z#866/A#867
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],      // G53 gated by config #395; dump safe-Z is M98 P101 — TO CONFIRM
     // DM500 macros zero with G92 (defprobe.nc:21) — value is a WORK coord (plate thickness), NOT a machine coord

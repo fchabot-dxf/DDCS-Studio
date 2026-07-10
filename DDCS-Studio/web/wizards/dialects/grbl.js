@@ -24,6 +24,7 @@ export const dialect = {
     probeMove: (axis, dist, { feed = 100 } = {}) => [`G38.2 ${axis}${dist} F${feed}`],   // result pushed as [PRB:…] over serial
     probeStatus: () => [],          // [] — no in-program status var (host reads [PRB:…:1/0])
     probeRead: () => [],            // [] — no #vars; host captures the probe report
+    probeTrigVar: () => null,       // null — no in-program trigger var (host reads [PRB:…]); an inline read must degrade honestly
     readMachine: () => [],          // [] — no #vars; host reads the status report (<…|MPos:…>)
     machineMove: (axis, ref) => [`G53 G0 ${axis}${ref}`],   // machine-frame rapid (literal coord; G90 + G0 on the block)
     setWorkOffset: (wcsExpr, axis, value) => [`G10 L20 P${wcsExpr} ${axis}${value}`],   // grbl 1.1 supports G10 L2/L20

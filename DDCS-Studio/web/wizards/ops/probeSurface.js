@@ -14,7 +14,7 @@
  * trigger #1925 is latched at the probe, so reading it before/after the retract is the same value — functional-identical).
  *
  * params: axis · dir('+'/'-') · probeVar · retractVar · feedFast · feedSlow · port · level · twoPass(=true) ·
- *         raw · result · radius · compEnable(=true) · failGoto(=1) · comment · compNote · stopVar · limitVar · limitVal
+ *         raw · rawAxis(opt-in: dialect trigger reg per post) · result · radius · compEnable(=true) · failGoto(=1) · comment · compNote · stopVar · limitVar · limitVal
  */
 import { newBlock } from '../../blocks/blockEmitter.js';
 
@@ -41,8 +41,9 @@ export function probeSurfaceStack(p = {}) {
     }
     // optional pre-comp setup the wizard needs right before the comp (e.g. an indirect result address `#73=[#70+2]`)
     (p.preComp || []).forEach((a) => push('assign', { var: a.var, value: String(a.value), note: a.note || '' }));
-    // READ + RADIUS-COMP → the TRUE surface (one line; byte-identical with the legacy assign #result=[#raw±#6])
-    push('radiuscomp', { raw: p.raw, result: p.result, radius: p.radius || '#6', dir, enable: p.compEnable !== false, note: p.compNote || 'surface = trigger +/- stylus radius' });
+    // READ + RADIUS-COMP → the TRUE surface (one line; byte-identical with the legacy assign #result=[#raw±#6]). `rawAxis`
+    // (opt-in) lets the comp ask the DIALECT for the trigger register per post (Expert = the same literal → byte-identical).
+    push('radiuscomp', { raw: p.raw, rawAxis: p.rawAxis, result: p.result, radius: p.radius || '#6', dir, enable: p.compEnable !== false, note: p.compNote || 'surface = trigger +/- stylus radius' });
     // final retract (after the read) — default ON (edge); a wizard that retracts AFTER its OWN WCS write sets trailingRetract:false
     if (p.trailingRetract !== false) push('move', { mode: 'rapid', [lc]: p.retractVar });
 

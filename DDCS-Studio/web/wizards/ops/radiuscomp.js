@@ -6,22 +6,33 @@
  * It is a DECLARED, TOGGLEABLE property: `enable` ON (default) → `#result=[#raw <dir> #radius]` (the TRUE surface);
  * `enable` OFF → `#result=#raw` (raw passthrough, the un-compensated tool-centre). Correct-by-default, reversible by a
  * config flip — never a big deal to change later. Emits exactly the legacy `assign` line, so a migration is byte-identical.
- *   raw    — the probe trigger var (#1925/#1926/#1927)
- *   result — where to store the compensated surface (#50/#101/…)
- *   radius — the stylus radius var or literal (#6)
- *   dir    — '+' (surface is +axis of the trigger) or '-'
+ *   raw     — the probe trigger var literal (#1925/#1926/#1927) — the Expert fallback when rawAxis is unset/unsupported
+ *   rawAxis — OPT-IN: 'X'|'Y'|'Z' → ask the active DIALECT for the trigger register per axis (per-post, see below)
+ *   result  — where to store the compensated surface (#50/#101/…)
+ *   radius  — the stylus radius var or literal (#6)
+ *   dir     — '+' (surface is +axis of the trigger) or '-'
  */
 export const radiuscompBlock = {
     type: 'radiuscomp', label: 'Radius comp', kind: 'leaf', category: 'Probing',
     defaults: { raw: '#1925', result: '#50', radius: '#6', dir: '+', enable: true, note: '' },
-    fields: ['raw', 'result', 'radius', 'dir', 'enable', 'note'],
-    emit: (p) => {
-        const result = p.result || '#50', raw = p.raw || '#1925';
+    fields: ['raw', 'rawAxis', 'result', 'radius', 'dir', 'enable', 'note'],
+    emit: (p, dx, dy, dialect) => {
+        const result = p.result || '#50';
+        // rawAxis (OPT-IN) — ASK THE DIALECT for the trigger register per axis (the probe-trigger seam) instead of an inlined
+        // Expert literal: Expert resolves to the IDENTICAL #1925/#1926/#1927 (the comp line stays byte-for-byte unchanged),
+        // V4.1 → #1500+ax, DM500 → #864+ax. A post with NO readable trigger (grbl/centroid: probeTrigVar()=null) → honest
+        // degrade: a comment, no executable guess. UNSET rawAxis (every existing caller) → the literal `raw` exactly as before.
+        let raw = p.raw || '#1925', noTrig = false;
+        if (p.rawAxis && dialect && typeof dialect.probeTrigVar === 'function') {
+            const r = dialect.probeTrigVar(p.rawAxis);
+            if (r) raw = r; else noTrig = true;
+        }
+        const n = String(p.note ?? '').replace(/[()]/g, '').trim();
+        if (noTrig) return [`( ${result} not set — no probe-trigger readback on this controller${n ? ' (' + n + ')' : ''} )`];
         const on = p.enable !== false && p.enable !== 'false' && p.enable !== 0;   // default ON (correct-by-default)
         // ONE bracket convention, no inner spaces — `[#1925+#6]` — matching the DDCS M350 dump style (`Z[#113-2]`). The
         // spacing is functionally a no-op (DDCS parses both); this is consistency, not correctness. (Was the `spaced` param.)
         const expr = on ? `[${raw}${p.dir === '-' ? '-' : '+'}${p.radius || '#6'}]` : raw;
-        const n = String(p.note ?? '').replace(/[()]/g, '').trim();
         return [n ? `${result}=${expr} ( ${n} )` : `${result}=${expr}`];
     },
 };

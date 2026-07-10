@@ -14,6 +14,22 @@ import { num } from './util.js';
 /** Strip parens from operator text so it can't break the `(…)` the host message/comment forms wrap it in. */
 const clean = (s) => String(s == null ? '' : s).replace(/[()]/g, '').trim();
 
+export const hmilineBlock = {
+    // A bare controller-message write — the corner/probe family's #1505 note (start prompt / "found" banner / error).
+    // PROFILE-AWARE: Expert emits its WIZARD-spaced `#1505=<value> ( <note> )` form (byte-identical to the old `assign`
+    // block it replaces); a post with NO scripted HMI (dialect.hmiLine absent → V4.1/DM500/…) degrades to a plain comment
+    // so the operator instruction SURVIVES without an unmapped #1505 write. Distinct from `confirm` (which adds an ESC/GOTO
+    // gate + uses the no-space hmiPrompt form) — this is a bare note, no branch, matching corner's exact bytes.
+    type: 'hmiline', label: 'HMI Line', kind: 'leaf', category: 'Control',
+    defaults: { value: '1', note: '' }, fields: ['value', 'note'],
+    emit: (p, dx, dy, dialect) => {
+        const value = (p.value === '' || p.value == null) ? '0' : String(p.value);
+        const note = clean(p.note);
+        if (dialect && typeof dialect.hmiLine === 'function') return dialect.hmiLine(value, note);
+        return note ? [`( ${note} )`] : [];   // honest degrade — the instruction as a comment, no unmapped register write
+    },
+};
+
 export const confirmBlock = {
     type: 'confirm', label: 'Confirm', kind: 'leaf', category: 'Control',
     defaults: { msg: 'Press Enter to continue', cancel: 2 }, fields: ['msg', 'cancel'],
