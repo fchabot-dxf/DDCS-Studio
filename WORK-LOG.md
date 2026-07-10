@@ -8533,3 +8533,26 @@ The E-series is CLOSED (advisor released V10.105). New feature: the Pull-from-co
 ### VERIFY (against the REAL June capture)
 - New tests/pull-review-detail.spec.js drives the modal with the June geometry (X 756 home MIN, Y -776 home MAX, Z sentinel) and asserts the DETAIL VALUES in the DOM (numbers, not just presence): X env `min -9999 · max 756` → `+756`; Y env → `-776`; X `min-home`, Y `MAX-home`; feeds `2000`/`150`; the Z sentinel note shows `9999`+`sentinel/undeclared`. Plus the no-gateway error path still shows the visible error. Screenshot: scratchpad/pull-detail-expanded.png (opened for the human).
 - pull-modal-stacking + pull-machine-truth stay green (9/9 with the new spec). Full suite green.
+
+---
+## 2026-07-10 (t624) — HOMING CONFIG MOVES HOME (human ruled): the per-axis homing GUI relocated from Macros → Settings → Machine → Homing
+
+The homing config edits settings.homing = MACHINE PROFILE data (pull-seeded feeds, wizard-emit-consumed), but the editable GUI lived in Macros → sysstart and the wizard gear tab-SWITCHED there (context lost, no return). MOVED it home.
+
+### (1) The GUI moved to Settings → Machine → Homing (one-source, next to the envelope it references)
+- Relocated the constants (HOMING_AX_IDX/LABEL/METHODS) + homingConfiguredAxes + homingPostIsExpert (a copy — macros keeps its own for the advstart/sysstart filename decision) + renderHomingGui + commitHoming + homingMove from macrosApp.js → settingsPanel.js (VERBATIM; getSettings/saveSettings/num are all module-scope there). Placed exactly where the (previously ASPIRATIONAL) comment at settingsPanel.js:523 claimed it lived — the comment is now TRUE.
+- New HOMING `settings-section` (#set_homing_section) in the Machine tab (#set_tab_machine), right after the envelope. renderMachineGui() now calls renderHomingGui(); the simul + reset handlers wired alongside the envelope handlers.
+- settings.homing shape UNCHANGED (verified: the wizard emit + pull-seeding read it unchanged).
+
+### (2) The wizard gear → Settings OVER the wizard, with return (the openAtcSetup pattern)
+- openHomingSetup() now: openSettings({ group:'hardware', panel:'set_tab_machine', scrollTo:'set_homing_section', returnToken: pushReturn('Wizard', ()=>{}) }). Added a `scrollTo` option to openSettings (scrollIntoView the section). So the gear opens Settings on top of the still-mounted wizard, lands on the Homing section, and closing Settings drops back into the wizard (return-glow + the depth-1 token, exactly like ATC).
+
+### (3) Macros → sysstart keeps its macro bits + a summary/link
+- Replaced the editable homing DOM (tag/simul/axes/reset) with a read-only `#sysstart_homing_summary` (renderHomingSummary reads settings.homing → "Sequence Z → X → Y · Z switch-seek @600 · …") + a `#sysstart_homing_link` button that opens Settings → Machine → Homing (plain nav, no wizard-return). KEPT the boot-G-code textarea + Generate/Push (the sysstart GENERATION is UNTOUCHED — byte-identical).
+
+### PRE-EXISTING BUG FLAGGED (not touched — byte-identity constraint)
+The macros sysstart Generate/Push call homingStack(getSettings().homing) with the WRONG shape (settings.homing.axes is an OBJECT; homingStack expects an ordered ARRAY + config), so it emits the empty "(none)/No axes selected" stub — it has NEVER emitted a real homing sequence from that path. The WORKING path is the wizard (homingView.js:84, correct params). I did NOT fix it (the "generation byte-identical" constraint says preserve it) — flagging for a follow-up: point the sysstart Generate at the same param shape homingView builds.
+
+### VERIFY (real-symptom)
+- New tests/homing-config-machine-tab.spec.js: (a) open the Homing wizard → click the gear → Settings renders OVER the wizard (elementFromPoint) at Machine → Homing with the per-axis rows → EDIT the Z seek feed → settings.homing.axes.z.seekFeed = 1234 AND the homing EMIT (homingStack) contains 1234 → close Settings → the wizard is still there (return). (b) the Macros sysstart panel shows the summary "Z → X → Y … switch-seek" + the link, and the editable #set_homing_axes is GONE from Macros. Both green. Tightened homing-inplace-e3 to assert #set_tab_machine + the homing rows (was a loose modal selector). homing + machine + cam-slot + macros suites (84) green. Screenshots: homing-settings-over-wizard.png (the section next to the envelope) + homing-macros-summary.png. Full suite green.
+- Stale comments now TRUE: homingWizard.js:2-3 ("Settings → Hardware → Machine → Homing"), settingsPanel.js:523 (the section renders here now), openSettings:2576 ("open straight to Hardware → Machine (homing section)").

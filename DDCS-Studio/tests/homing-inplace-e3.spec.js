@@ -25,11 +25,15 @@ test('the Homing Setup… button renders in-place + opens the setup modal', asyn
     const btn = await page.evaluate(() => { const b = document.querySelector('#wiz_user_form [data-param="_setup"]'); return { present: !!b, text: b ? b.textContent : '' }; });
     expect(btn.present, 'the Homing Setup button renders in the in-place form').toBe(true);
     expect(btn.text.toLowerCase()).toContain('homing setup');
-    // click → the Homing Setup modal opens
+    // click → t624: the gear opens Settings → Machine → Homing (over the wizard), where the config now lives
     await page.click('#wiz_user_form [data-param="_setup"]');
-    await page.waitForTimeout(400);
-    const modalOpen = await page.evaluate(() => /homing/i.test((document.body.textContent || '')) && !!document.querySelector('.settings-modal, #settings-app, [class*="modal"], [class*="setup"]'));
-    expect(modalOpen, 'clicking the button opens the Homing Setup modal').toBe(true);
+    await page.waitForSelector('#settings-overlay.active #set_homing_section', { timeout: 6000 });
+    const opened = await page.evaluate(() => ({
+        machVisible: !!document.getElementById('set_tab_machine') && document.getElementById('set_tab_machine').offsetParent !== null,
+        rows: document.querySelectorAll('#set_homing_axes .homing-axis-row').length,
+    }));
+    expect(opened.machVisible, 'the gear lands on the Machine tab').toBe(true);
+    expect(opened.rows, 'the per-axis homing config rows render there').toBeGreaterThan(0);
     await page.screenshot({ path: 'scratchpad/homing_inplace_setup_modal.png' });
 });
 

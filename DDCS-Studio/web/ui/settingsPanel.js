@@ -510,6 +510,7 @@ function renderMachineGui() {
     svgBox.innerHTML = svg + '</svg>';
     // t540 — the travel fields are a static COLUMN beside the box now (see the Machine-tab HTML); no per-field absolute
     // placement here. The box still redraws live from the typed values (this whole fn runs on each input).
+    renderHomingGui();   // t624 — the per-axis homing section lives in this tab now (next to the envelope it references)
 }
 function commitMachine() {
     const s = getSettings(); if (!s.machine) s.machine = {};
@@ -521,11 +522,129 @@ function commitMachine() {
 }
 
 // ── HOMING profile (Machine tab section) ──────────────────────────────────────────────────────────────────
-// Per-axis homing config, rendered + edited inline (no separate modal). Travel/home-direction reference the
-// envelope above (machine.x/y/z); this section adds per-axis method/feeds/back-off/offset + sequence order +
-// dual-axis SLAVE SYNC ("Slave follows") + rotary mode. (Auto-squaring is NOT emitted — the operator squares the
-// gantry manually; Studio only syncs the slave coordinate when the master homes.) Commits live via saveSettings().
+// Per-axis homing config, rendered + edited inline (no separate modal), RIGHT NEXT TO the envelope it references.
+// Travel/home-direction reference the envelope above (machine.x/y/z); this section adds per-axis method/feeds/
+// back-off/offset + sequence order + dual-axis SLAVE SYNC ("Slave follows") + rotary mode. (Auto-squaring is NOT
+// emitted — the operator squares the gantry manually; Studio only syncs the slave coordinate when the master homes.)
+// t624 — MOVED here from Macros → sysstart (it edits settings.homing, which is MACHINE PROFILE data — pull-seeded,
+// wizard-emit-consumed). The Macros sysstart panel keeps only its macro bits + a summary/link to this section.
+// Commits live via saveSettings(); settings.homing shape is UNCHANGED (the wizard emit + twin + pull-seeding read it).
 const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
+const HOMING_AX_IDX = { x: 0, y: 1, z: 2, a: 3, b: 4 };
+const HOMING_AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
+const HOMING_METHODS = [
+    { v: 'native', label: 'Native (M98 P501)' },
+    { v: 'setzero', label: 'Set zero (no motion)' },
+    { v: 'seek', label: 'Switch seek (G31)' },
+];
+function homingConfiguredAxes() {
+    const s = getSettings();
+    const m = (s.motors) || {};
+    const out = ['x', 'y', 'z'];
+    if (m.a && m.a.role && m.a.role !== 'unused') out.push('a');
+    if (m.b && m.b.role && m.b.role !== 'unused') out.push('b');
+    return out;
+}
+function homingPostIsExpert() {
+    try {
+        const ap = localStorage.getItem('ddcs_active_post');
+        if (ap && ap !== 'auto') return ap === 'ddcs-expert-m350';
+        return (localStorage.getItem('ddcs_controller_profile') || 'ddcs-expert-m350') === 'ddcs-expert-m350';
+    } catch (_) { return true; }
+}
+function renderHomingGui() {
+    const host = document.getElementById('set_homing_axes'); if (!host) return;
+    const h = getSettings().homing || (getSettings().homing = { philosophy: 'sequential', axes: {} });
+    const cfg = h.axes || {};
+    const expert = homingPostIsExpert();
+    const list = homingConfiguredAxes();
+    const tag = document.getElementById('set_homing_tag');
+    if (tag) tag.textContent = expert ? 'DDCS Expert M350 — full methods available.' : 'Active post is unverified for homing — native home only; advanced methods are disabled.';
+    if (document.getElementById('set_homing_simul')) document.getElementById('set_homing_simul').checked = h.philosophy === 'simultaneous';
+
+    const ordered = [...list].sort((p, q) => ((cfg[p] || {}).order || HOMING_AX_IDX[p] + 1) - ((cfg[q] || {}).order || HOMING_AX_IDX[q] + 1));
+    const methodOpts = (sel) => HOMING_METHODS.map((m) => {
+        const dis = !expert && m.v !== 'native';
+        return `<option value="${m.v}"${m.v === sel ? ' selected' : ''}${dis ? ' disabled title="Unverified on this post"' : ''}>${m.label}</option>`;
+    }).join('');
+    const followOpts = (sel) => `<option value="">none</option>` + list.map((a) => `<option value="${HOMING_AX_IDX[a]}"${String(HOMING_AX_IDX[a]) === String(sel) ? ' selected' : ''}>${HOMING_AX_LABEL[a]} (idx ${HOMING_AX_IDX[a]})</option>`).join('');
+    // Home-direction override: '' = Auto (derive from the signed machine-travel sign), '+' / '-' force it.
+    const dirOpts = (sel) => [['', 'Auto (envelope)'], ['+', '+'], ['-', '−']].map(([v, lbl]) => `<option value="${v}"${v === (sel || '') ? ' selected' : ''}>${lbl}</option>`).join('');
+
+    host.innerHTML = ordered.map((ax, pos) => {
+        const c = cfg[ax] || {}, rotary = ax === 'a' || ax === 'b';
+        return `<div class="homing-axis-row" data-axis="${ax}" style="border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; font-weight:700;">${pos + 1}</span>
+                <button type="button" class="hm-up" title="Home earlier" style="cursor:pointer; background:none; border:none; color:var(--text-main);">▲</button>
+                <button type="button" class="hm-down" title="Home later" style="cursor:pointer; background:none; border:none; color:var(--text-main);">▼</button>
+                <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
+                <input type="hidden" class="hm-order" value="${pos + 1}">
+                <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'seek')}</select></label>
+                <label style="font-size:12px;" title="Home direction. Auto derives it from the signed machine travel (envelope) — one source. + / − force it. Signs the switch-seek (G31) move and the sim animation; for native (M98 P501) the controller uses its OWN config, so the override is sim/informational only.">Home dir <select class="hm-dir">${dirOpts(c.dir || '')}</select></label>
+            </div>
+            <div class="hm-motion" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label>Seek feed <input type="number" class="hm-seekfeed" value="${num(c.seekFeed, 800)}" style="width:60px;"></label>
+                <label>Back-off <input type="number" class="hm-backoff" value="${num(c.backoff, 5)}" step="0.5" style="width:54px;"></label>
+                <label>Slow feed <input type="number" class="hm-slowfeed" value="${num(c.slowFeed, 100)}" style="width:60px;"></label>
+                <label>Home offset <input type="number" class="hm-offset" value="${num(c.offset, 0)}" step="0.5" style="width:54px;"></label>
+            </div>
+            <div class="hm-slave" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label title="Dual-axis gantry: homing this axis syncs the slave's coordinate and marks it homed. Squaring is done manually by the operator.">Slave axis follows <select class="hm-follow">${followOpts(c.slaveFollows)}</select></label>
+            </div>
+            ${rotary ? `<div class="hm-rotary" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <label>Rotary <select class="hm-rotmode"><option value="setzero"${(c.rotary || 'setzero') === 'setzero' ? ' selected' : ''}>set zero</option><option value="switch"${(c.rotary || 'setzero') === 'setzero' ? '' : ' selected'}>switch home</option></select></label>
+                <label><input type="checkbox" class="hm-continuous" ${c.continuous ? 'checked' : ''}/> continuous (mod 360)</label>
+            </div>` : ''}
+        </div>`;
+    }).join('');
+
+    host.querySelectorAll('.homing-axis-row').forEach((row) => {
+        const methodSel = row.querySelector('.hm-method');
+        const sync = () => {
+            row.querySelector('.hm-motion').style.display = methodSel.value === 'seek' ? 'flex' : 'none';
+        };
+        sync();
+        row.querySelectorAll('input,select').forEach((f) => f.addEventListener('change', () => { commitHoming(); renderHomingGui(); }));
+        row.querySelector('.hm-up').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), -1));
+        row.querySelector('.hm-down').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), +1));
+    });
+}
+function commitHoming() {
+    const host = document.getElementById('set_homing_axes'); if (!host) return;
+    const h = getSettings().homing || (getSettings().homing = { philosophy: 'sequential', axes: {} });
+    const axes = h.axes || (h.axes = {});
+    host.querySelectorAll('.homing-axis-row').forEach((row, idx) => {
+        const ax = row.getAttribute('data-axis'), g = (s) => row.querySelector(s), prev = axes[ax] || {};
+        axes[ax] = {
+            ...prev,
+            enable: g('.hm-enable').checked,
+            order: num(g('.hm-order').value, idx + 1),
+            method: g('.hm-method').value,
+            seekFeed: num(g('.hm-seekfeed').value, prev.seekFeed || 800),
+            backoff: num(g('.hm-backoff').value, prev.backoff || 5),
+            slowFeed: num(g('.hm-slowfeed').value, prev.slowFeed || 100),
+            offset: num(g('.hm-offset').value, prev.offset || 0),
+            dir: g('.hm-dir') ? g('.hm-dir').value : (prev.dir || ''),
+            slaveFollows: g('.hm-follow').value,
+            rotary: g('.hm-rotmode') ? g('.hm-rotmode').value : (prev.rotary || 'setzero'),
+            continuous: g('.hm-continuous') ? g('.hm-continuous').checked : !!prev.continuous,
+        };
+    });
+    const simul = document.getElementById('set_homing_simul');
+    h.philosophy = (simul && simul.checked) ? 'simultaneous' : 'sequential';
+    saveSettings();
+}
+function homingMove(ax, delta) {
+    commitHoming();
+    const h = getSettings().homing, cfg = h.axes;
+    const list = homingConfiguredAxes().sort((p, q) => (cfg[p].order || 9) - (cfg[q].order || 9));
+    const i = list.indexOf(ax), j = i + delta;
+    if (i < 0 || j < 0 || j >= list.length) return;
+    const a = cfg[list[i]], b = cfg[list[j]], t = a.order; a.order = b.order; b.order = t;
+    saveSettings();
+    renderHomingGui();
+}
 
 // The WCS table (G54–G59 offsets, machine coords of each part-zero) + which one is active. workOrigin (used by
 // the sim for G53/program placement) is derived from the active row. Pulled from the controller, editable offline.
@@ -923,6 +1042,16 @@ function buildSettingsOverlay() {
                         </div>
                         <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
                         <label class="settings-check" title="Soft limits (#655). On = the controller bounds travel to this envelope, so the box closes. Off = no software bound — the box opens, unbounded in the travel direction (still pinned at home). Studio never writes #655 to the controller; this mirrors the machine's own setting (pull it)."><input type="checkbox" id="set_mach_softlimit"> Enable soft limits (#655) — closes the envelope</label>
+                    </div>
+                    <div class="settings-section" id="set_homing_section">
+                        <div class="settings-section-title">HOMING</div>
+                        <div class="settings-hint">The numbered list sets the home <b>sequence</b> (▲▼ to reorder). <b>Switch seek (G31)</b> is the default — explicit G31 homing with the seek params (feed/dir/port) VISIBLE in the G-code. <b>Native (M98 P501)</b> runs the controller's own built-in home. Home direction defaults to <b>Auto</b> (the envelope travel sign above). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave. The Macros → sysstart hook reads this profile.</div>
+                        <div id="set_homing_tag" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
+                        <label class="settings-check" style="margin-bottom:6px;"><input type="checkbox" id="set_homing_simul"> Simultaneous (emit calls back-to-back, still in this order)</label>
+                        <div id="set_homing_axes"></div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="set_homing_reset" type="button">↺ Safe default (Z → X → Y)</button>
+                        </div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">AXES</div>
@@ -2330,6 +2459,15 @@ function wireSettingsOverlay(ov) {
     // Machine envelope GUI: typing redraws the iso box (origin follows the signs); on commit persist so the 3D updates.
     ['set_mach_x', 'set_mach_y', 'set_mach_z'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderMachineGui); el.addEventListener('change', commitMachine); } });
     { const el = q('set_mach_softlimit'); if (el) el.addEventListener('change', () => { commitMachine(); renderMachineGui(); }); }   // soft-limit toggle redraws the box closed/open
+    // HOMING section (t624, moved here from Macros → sysstart) — the simultaneous flag + the safe-default reset (the per-axis
+    // row inputs + ▲▼ are wired inside renderHomingGui on each render).
+    if (q('set_homing_simul')) q('set_homing_simul').addEventListener('change', commitHoming);
+    if (q('set_homing_reset')) q('set_homing_reset').addEventListener('click', () => {
+        commitHoming();
+        const cfg = (getSettings().homing || {}).axes || {}, rank = { z: 1, x: 2, y: 3, a: 4, b: 5 };
+        for (const ax in cfg) cfg[ax].order = rank[ax] || 9;
+        saveSettings(); renderHomingGui();
+    });
     showGroup('general');
 
     // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).
@@ -2439,6 +2577,8 @@ export function openSettings(nav) {
     // group is actually given: a nav with just { returnToken } (the in-wizard ⚙) must NOT navigate, or showGroup
     // (undefined) would blank the sidebar — leave the panel on its current/last group instead.
     if (nav && nav.group && _settingsNavTo) { try { _settingsNavTo(nav.group, nav.panel); } catch (_) { /* noop */ } }
+    // Optional scroll-to-section: land ON a section (e.g. the Homing section within the Machine tab).
+    if (nav && nav.scrollTo) { try { setTimeout(() => { const el = document.getElementById(nav.scrollTo); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'auto' }); }, 0); } catch (_) { /* noop */ } }
     // Glow the panel when we arrived via a return path (e.g. the Setup checklist) — the ambient "leaving here walks
     // you back" cue, matching the edit-form glow. Off for a normal open.
     const app = document.getElementById('settings-app');
@@ -2451,10 +2591,11 @@ export function openSettings(nav) {
     window.ddcsTrack?.('feature', 'settings');
 }
 
-/** Open the Homing setup in the Macros app (the wizard's "⚙ Homing setup" link). */
+/** Open Settings at Machine → Homing — the wizard's "⚙ Homing setup" link. Mirrors openAtcSetup: opens OVER the wizard
+ *  (mounted behind) with a return token so Settings shows the return-glow and closing it drops back into the wizard.
+ *  Lands on the Machine tab scrolled to the Homing section (t624 — the homing config moved here from Macros → sysstart). */
 export function openHomingSetup() {
-    if (window.showApp) { try { window.showApp('macros'); } catch (_) { /* noop */ } }
-    if (window.showMacrosPanel) { window.showMacrosPanel('macros_panel_sysstart'); }
+    openSettings({ group: 'hardware', panel: 'set_tab_machine', scrollTo: 'set_homing_section', returnToken: pushReturn('Wizard', () => {}) });
 }
 /** Open Settings at the ATC tab — the in-wizard "⚙ ATC Settings…" link (magazine, drawbar I/O, length-probe params).
  *  Registers a return so Settings shows the return-glow and closing it drops back to the wizard mounted behind it. */
