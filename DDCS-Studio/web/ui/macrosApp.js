@@ -53,6 +53,10 @@ export function initMacrosApp() {
             #macros-app .settings-sidebar .tree-level-2.active { padding-left: 29px; }
             #macros-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
         </style>
+        <div id="macros_header" style="display:flex; align-items:center; gap:10px; padding:8px 16px; border-bottom:1px solid var(--border); background:var(--panel); flex:0 0 auto;">
+            <span style="font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:var(--text-dim); opacity:.6;">Controller</span>
+            <button id="macros_ctrl_chip" class="toolbar-btn settings-io" title="The active controller profile — everything here (boot macro, deploy, WCS) is generated for it. Click to change it in Settings → Controller." style="font-size:12px; padding:3px 10px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;">⚙ <span id="macros_ctrl_name">…</span></button>
+        </div>
         <div class="settings-body">
             <div class="settings-sidebar">
                 <details open style="margin-top: 4px; padding-left: 10px;">
@@ -117,24 +121,21 @@ export function initMacrosApp() {
                 <div id="macros_panel_sysstart" style="display:none;">
                     <div class="settings-section">
                         <div class="settings-section-title" id="mac_title_sysstart">SYSSTART.NC (BOOT HOOK)</div>
-                        <div class="settings-hint" id="mac_desc_sysstart">Executes automatically when the controller boots up. Used to set default machine states, trigger auto-homing, or restore WCS.</div>
+                        <div class="settings-hint" id="mac_desc_sysstart">The macro the controller runs automatically at boot (auto-home, WCS restore, pin setup). It's a <b>stored macro</b> saved with your Profile — edit it directly here (your edits stick and export/import with the profile), or Regenerate it from your homing profile.</div>
                         <div id="sysstart_list">
-                            <div class="settings-hint" style="margin-top: 12px; font-weight: 600;">1. AUTO-HOME SEQUENCE</div>
-                            <div class="settings-hint">The per-axis homing profile (sequence, method, feeds, back-off, slave sync) is <b>machine-profile data</b> — it's configured in <b>Settings → Machine → Homing</b> (next to the envelope it derives home direction from). This hook reads it and emits the boot macro.</div>
-                            <div id="sysstart_homing_summary" class="settings-hint" style="font-size:12px; margin:6px 0;"></div>
-                            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:6px;">
-                                <button class="toolbar-btn settings-io" id="sysstart_homing_link" type="button">⚙ Configure in Settings → Machine → Homing</button>
-                            </div>
+                            <div class="settings-hint" style="margin-top: 12px; font-weight: 600;">BOOT MACRO</div>
+                            <div class="settings-hint">Edit freely — your changes persist. <b>Regenerate</b> rebuilds the body from <b>Settings → Machine → Homing</b> + the additional G-code below (it asks first if you've hand-edited). <b>Push</b> sends exactly what's in this box.</div>
+                            <textarea id="sysstart_body" spellcheck="false" placeholder="( boot macro — Regenerate from the homing profile, or type your own )" style="width:100%; height:220px; margin-top:6px; font:12px/1.45 monospace; box-sizing:border-box; background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px;"></textarea>
+                            <div class="settings-hint" id="sysstart_editnote" style="font-size:11px; margin-top:4px; opacity:0.75;"></div>
 
-                            <div class="settings-hint" style="margin-top: 20px; font-weight: 600;">2. ADDITIONAL BOOT G-CODE</div>
-                            <div class="settings-hint">Runs immediately after homing finishes. Use this for <code>G54</code> restores, variable setup, or pin toggles.</div>
-                            <textarea id="sysstart_custom_gcode" spellcheck="false" placeholder="(e.g. G54&#10;#100 = 1)" style="width:100%; height:80px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box; background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px;"></textarea>
-                            
+                            <div class="settings-hint" style="margin-top: 18px; font-weight: 600;">ADDITIONAL BOOT G-CODE <span style="font-weight:normal; opacity:0.7;">(regeneration input)</span></div>
+                            <div class="settings-hint">Appended after the homing sequence when you Regenerate. Use this for <code>G54</code> restores, variable setup, or pin toggles.</div>
+                            <textarea id="sysstart_custom_gcode" spellcheck="false" placeholder="(e.g. G54&#10;#100 = 1)" style="width:100%; height:70px; margin-top:6px; font:12px/1.4 monospace; box-sizing:border-box; background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px;"></textarea>
+
                             <div class="settings-row" style="margin-top:12px;">
-                                <button class="toolbar-btn settings-io" id="sysstart_gen">⬇ Generate sysstart.nc</button>
+                                <button class="toolbar-btn settings-io" id="sysstart_regen">↻ Regenerate from homing profile</button>
                                 <button class="toolbar-btn settings-io" id="sysstart_push">⬆ Push to controller</button>
                             </div>
-                            <textarea id="sysstart_out" readonly spellcheck="false" style="display:none; width:100%; height:160px; margin-top:8px; font:12px/1.45 monospace; background:#1a1a1a; color:#d8d8d8; border:1px solid #888; border-radius:4px; padding:8px; box-sizing:border-box;"></textarea>
                         </div>
                     </div>
                 </div>
@@ -250,6 +251,16 @@ export function initMacrosApp() {
     window.showMacrosPanel = mShowPanel;
     mMainTabs.forEach((t) => t.addEventListener('click', () => mShowPanel(t.dataset.target)));
     mShowPanel('macros_panel_mcode');
+
+    // t656 (amend 2) — the SELECTED CONTROLLER chip in the Macros header strip: what everything here is generated for.
+    // Click → Settings → Controller (the openSettings deep-link). Re-renders on a profile switch, like the rest.
+    function renderMacrosCtrlChip() {
+        const n = q('macros_ctrl_name'); if (!n) return;
+        n.textContent = (getActiveProfile() || {}).name || 'DDCS Expert M350';
+    }
+    if (q('macros_ctrl_chip')) q('macros_ctrl_chip').addEventListener('click', () => { if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' }); });
+    renderMacrosCtrlChip();
+    window.addEventListener('ddcs:settings-changed', () => { renderMacrosCtrlChip(); if (typeof updateSysstartEditNote === 'function') updateSysstartEditNote(); });   // profile switch → the chip + the stored-body mismatch note re-render
 
     // --- Macros: author controller macros (M-code O100nn / K-button key-N); saved in the profile. ---
     const macrosArr = () => (getSettings().macros || (getSettings().macros = []));
@@ -450,6 +461,42 @@ export function initMacrosApp() {
     renderKbuttons();
     renderSystemHooks();
 
+    // ── AUTOSTART = a STORED, profile-persisted macro (t656, user design). The body is an editable ARTIFACT
+    //    (settings.autostartBody, saved via saveSettings → exports/imports with the profile, survives sessions), like
+    //    the M-code / K-button siblings. Regenerate rebuilds it from the homing profile + the additional G-code (both
+    //    STORED inputs → deterministic); hand edits STICK until an explicit regenerate (confirm before clobbering).
+    function buildAutostartBody() {
+        let code = emitMapped(homingStack(homingRunParams(getSettings())), activeDialectOpts()).text || '';   // t626/t646 — the REAL homing sequence, per active post
+        code = code.replace(/\s*M30\s*$/, '');   // t656 — strip the homing emit's trailing M30: the additional G-code must run BEFORE the program end, and the body ends with ONE M30 (a human caught the double-M30 + dead trailing custom)
+        const custom = String(getSettings().sysstartCustomGcode || '').trim();
+        if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom;
+        code += '\nM30\n';
+        return code;
+    }
+    const curProfileId = () => (getActiveProfile() || {}).id || 'ddcs-expert-m350';
+    const curProfileName = () => (getActiveProfile() || {}).name || 'DDCS Expert M350';
+    // Record the body + WHICH profile it was built for (t656 amend 1: the selected controller drives everything).
+    function storeAutostartBody(body, handEdited) { getSettings().autostartBody = body; getSettings().autostartHandEdited = !!handEdited; getSettings().autostartProfileId = curProfileId(); saveSettings(); }
+    function updateSysstartEditNote() {
+        const n = q('sysstart_editnote'); if (!n) return;
+        const genFor = getSettings().autostartProfileId, cur = curProfileId();
+        if (genFor && genFor !== cur) {   // t656 amend 1 — a stored body built under a DIFFERENT profile than the selected one is FLAGGED (can't masquerade)
+            n.innerHTML = `⚠ Generated for <b>${genFor}</b> — Regenerate for the selected <b>${curProfileName()}</b> before pushing (it would otherwise send the wrong controller's boot macro).`;
+            n.style.color = 'var(--warn, #d1902b)';
+            return;
+        }
+        n.style.color = '';
+        n.textContent = getSettings().autostartHandEdited
+            ? '✎ Hand-edited since the last regenerate — Regenerate will ask before overwriting.'
+            : 'In sync with the homing profile — Regenerate rebuilds it; edit to customize (your edits stick).';
+    }
+    if (q('sysstart_body')) {
+        // MIGRATE: first open with no stored body → seed it via one regenerate (for the SELECTED profile) so it's never empty.
+        if (getSettings().autostartBody == null) storeAutostartBody(buildAutostartBody(), false);
+        q('sysstart_body').value = getSettings().autostartBody || '';
+        q('sysstart_body').addEventListener('input', (e) => { getSettings().autostartBody = e.target.value; getSettings().autostartHandEdited = true; saveSettings(); updateSysstartEditNote(); });   // a hand edit keeps the recorded profile (it's still that profile's body, edited)
+        updateSysstartEditNote();
+    }
     if (q('sysstart_custom_gcode')) {
         q('sysstart_custom_gcode').value = getSettings().sysstartCustomGcode || '';
         q('sysstart_custom_gcode').addEventListener('change', (e) => {
@@ -512,13 +559,14 @@ export function initMacrosApp() {
                     body: body
                 });
             } else if (file === 'sysstart.nc' || file === 'advstart.nc') {
-                // Since sysstart generated is heavily structured, we can't easily parse it back to the homing form UI.
-                // We'll just append it to the custom G-code area if they want to pull it.
+                // t656 — the pulled boot macro IS the stored body (edit it directly in the sysstart panel). It's an EXTERNAL
+                // body (the machine's real boot macro), so it's hand-edited — a Regenerate would overwrite it (with a confirm).
                 if (strategy === 'replace') {
-                    getSettings().sysstartCustomGcode = content;
+                    getSettings().autostartBody = content;
                 } else if (strategy === 'merge') {
-                    getSettings().sysstartCustomGcode = (getSettings().sysstartCustomGcode || '') + '\n\n' + content;
+                    getSettings().autostartBody = (getSettings().autostartBody || '') + '\n\n' + content;
                 }
+                getSettings().autostartHandEdited = true;
             }
         }
         
@@ -558,6 +606,7 @@ export function initMacrosApp() {
         renderMcodes();
         renderKbuttons();
         if (q('sysstart_custom_gcode')) q('sysstart_custom_gcode').value = getSettings().sysstartCustomGcode || '';
+        if (q('sysstart_body')) { q('sysstart_body').value = getSettings().autostartBody || ''; if (typeof updateSysstartEditNote === 'function') updateSysstartEditNote(); }   // t656 — a pulled boot macro lands in the stored body editor
         q('macros_sync_modal').style.display = 'none';
     };
 
@@ -672,12 +721,10 @@ export function initMacrosApp() {
                 html += `<label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:2px 4px; border-radius:4px;"><input type="checkbox" value="${file}" checked> ${file}</label>`;
             }
             
-            // sysstart.nc
-            let syscode = emitMapped(homingStack(homingRunParams(getSettings())), activeDialectOpts()).text || '';   // t626 — the contract shape → the REAL homing sequence; t646 — per-active-post emit
-            const custom = String(getSettings().sysstartCustomGcode || '').trim();
-            if (custom) syscode += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
-            syscode += '\nM30\n';
-            if (syscode.trim() !== 'M30') {
+            // sysstart.nc — the STORED boot macro (t656; edited/regenerated in the sysstart panel). Fall back to a fresh
+            // build if it was never seeded (e.g. Deploy opened before the sysstart panel migrated it).
+            const syscode = String(getSettings().autostartBody != null ? getSettings().autostartBody : buildAutostartBody());
+            if (syscode.trim() && syscode.trim() !== 'M30') {
                 const file = (homingPostIsExpert() || isV41) ? 'advstart.nc' : 'sysstart.nc';
                 currentSyncFiles[file] = syscode;
                 html += `<label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; padding:2px 4px; border-radius:4px;"><input type="checkbox" value="${file}" checked> ${file}</label>`;
@@ -764,26 +811,20 @@ export function initMacrosApp() {
         });
     }
 
-    if (q('sysstart_gen')) {
-        q('sysstart_gen').addEventListener('click', () => {
-            const out = q('sysstart_out');
-            if (!out) return;
-            let code = emitMapped(homingStack(homingRunParams(getSettings())), activeDialectOpts()).text || '';   // t626 — the contract shape (enabled axes, ordered) → the REAL homing sequence, not the empty stub; t646 — per-active-post emit
-            const custom = String(q('sysstart_custom_gcode').value || '').trim();
-            if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
-            code += '\nM30\n';
-            out.value = code;
-            out.style.display = 'block';
+    if (q('sysstart_regen')) {
+        q('sysstart_regen').addEventListener('click', () => {
+            // t656 — no silent clobber: a hand-edited body is confirmed before a fresh rebuild overwrites it.
+            if (getSettings().autostartHandEdited && !confirm('Regenerate will OVERWRITE the boot macro you hand-edited with a fresh build from the homing profile + the additional G-code.\n\nOverwrite your edits?')) return;
+            const body = buildAutostartBody();
+            storeAutostartBody(body, false);   // t656 amend 1 — records the SELECTED profile the body was built for
+            const t = q('sysstart_body'); if (t) t.value = body;
+            updateSysstartEditNote();
         });
     }
 
     if (q('sysstart_push')) {
         q('sysstart_push').addEventListener('click', async () => {
-            let code = emitMapped(homingStack(homingRunParams(getSettings())), activeDialectOpts()).text || '';   // t626 — the contract shape (enabled axes, ordered) → the REAL homing sequence, not the empty stub; t646 — per-active-post emit
-            const custom = String(q('sysstart_custom_gcode').value || '').trim();
-            if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
-            code += '\nM30\n';
-
+            const code = String(getSettings().autostartBody || '');   // t656 — send EXACTLY the STORED body (the editor IS the source of truth), not a re-emit
             const filename = (homingPostIsExpert() || isV41) ? 'advstart.nc' : 'sysstart.nc';
             if (!confirm(`Write ${filename} to the controller?\n\nThe existing ${filename} will be backed up.`)) return;
             try {
@@ -793,10 +834,6 @@ export function initMacrosApp() {
             } catch (err) { alert('Push failed: ' + (err && err.message ? err.message : err)); }
         });
     }
-
-    // t624 — the homing simul/reset handlers + the per-axis GUI moved to Settings → Machine → Homing (with the config).
-    renderHomingSummary();
-    if (q('sysstart_homing_link')) q('sysstart_homing_link').addEventListener('click', () => openSettings({ group: 'hardware', panel: 'set_tab_machine', scrollTo: 'set_homing_section' }));
 
 // --- Sysstart GENERATION (the homing CONFIG GUI moved to Settings → Machine → Homing, t624). homingPostIsExpert stays
 // here — the advstart/sysstart FILENAME decision (below) reads it; homingConfiguredAxes moved with the GUI. ---
@@ -808,19 +845,8 @@ function homingPostIsExpert() {
     } catch (_) { return true; }
 }
 
-// renderHomingSummary — the read-only recap shown in the Macros → sysstart panel (the editable per-axis GUI is now in
-// Settings → Machine → Homing). Reads settings.homing and lists the ordered/enabled axes + method + feeds.
-function renderHomingSummary() {
-    const el = document.getElementById('sysstart_homing_summary'); if (!el) return;
-    const h = getSettings().homing || { philosophy: 'sequential', axes: {} };
-    const cfg = h.axes || {};
-    const enabled = Object.keys(cfg).filter((ax) => cfg[ax] && cfg[ax].enable !== false).sort((p, q) => (cfg[p].order || 9) - (cfg[q].order || 9));
-    if (!enabled.length) { el.textContent = 'No axes enabled to home.'; return; }
-    const METHOD_LBL = { native: 'native', setzero: 'set-zero', seek: 'switch-seek' };
-    const seq = enabled.map((ax) => ax.toUpperCase()).join(' → ');
-    const parts = enabled.map((ax) => `${ax.toUpperCase()} ${METHOD_LBL[cfg[ax].method] || cfg[ax].method || 'switch-seek'}${cfg[ax].method === 'seek' || !cfg[ax].method ? ' @' + num(cfg[ax].seekFeed, 800) : ''}`);
-    el.textContent = `${h.philosophy === 'simultaneous' ? 'Simultaneous' : 'Sequence'} ${seq} · ${parts.join(' · ')}`;
-}
+// t656 — renderHomingSummary REMOVED: the homing-summary recap section was dropped from the Macros → sysstart panel
+// (the boot macro is now a stored, editable body; the homing profile stays in Settings → Machine → Homing).
 
     // --- CAM Pack Builder (Phase 1): author CAM-menu slots (form + macro), auto-allocate #11xx, export. ---
     const CAMPACK_KEY = 'ddcs_campack';

@@ -351,6 +351,11 @@ function loadSettings() {
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
                 macros: Array.isArray(p.macros) ? p.macros : [],
+                // t656 — the STORED autostart macro + its regen inputs persist with the profile (survive reload, export/import).
+                sysstartCustomGcode: typeof p.sysstartCustomGcode === 'string' ? p.sysstartCustomGcode : '',
+                autostartBody: typeof p.autostartBody === 'string' ? p.autostartBody : undefined,   // undefined = never seeded → the panel migrates it on first open
+                autostartHandEdited: !!p.autostartHandEdited,
+                autostartProfileId: typeof p.autostartProfileId === 'string' ? p.autostartProfileId : undefined,   // t656 amend 1 — the profile the body was built for (mismatch note)
             });
             seedGantryFromHoming(merged.motors, p.homing);   // t648 — a pulled dual-gantry dump seeds the slave axes role (one source)
             if (!merged.toolsSeeded && (!Array.isArray(merged.atc.tools) || merged.atc.tools.length === 0)) {

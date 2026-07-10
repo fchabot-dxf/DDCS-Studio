@@ -8923,3 +8923,28 @@ The review's WCS section reads via /api/vars (#var reads); V4.1 declines #15xx �
 - NEW tests/pull-v41-wcs.spec.js: the review modal renders the V4.1 WCS rows from hwProfile.wcs (coord1) when /api/vars is empty — G54 row shows -300.29, flagged active-from-coord1, all 6 systems present; APPLY lands the G54 offsets in settings.machine.wcs.
 - Existing pull tests (pull-review-detail/pull-machine-truth, the Expert WCS path) green; full suite 950 passed / 2 skipped.
 - LIVE V4.1 pull: not run here (no rig); coord1 is on the live SYSDISK (same as setting/eng), read the same way. The gateway restart the advisor is surfacing to the user is what makes the live pull serve this. Files: bridge/bridge-app/fairy/ops.py, bridge/bridge-app/tests/test_pull_geometry.py, DDCS-Studio/web/ui/settingsPanel.js, DDCS-Studio/tests/pull-v41-wcs.spec.js (new).
+
+## 2026-07-10 (t656) — AUTOSTART = A STORED MACRO + SIMPLE EDITOR (user design) + 3 amendments (user live-caught 2 real bugs)
+The Macros → sysstart panel is now a plain editable editor over a STORED, profile-persisted body — the homing-summary section is dropped. Full suite 954 passed / 2 skipped.
+
+### THE STORED-MACRO MODEL (macrosApp.js)
+- settings.autostartBody = the boot macro, an editable ARTIFACT (like the M-code/K-button siblings). Persisted via saveSettings; I ADDED it (+ autostartHandEdited, autostartProfileId, and the pre-existing-but-dropped sysstartCustomGcode) to settingsPanel loadSettings' explicit reconstruction so it SURVIVES reload + exports/imports with the profile (loadSettings had no `...p` spread → these top-level keys were being dropped; sysstartCustomGcode never persisted before — latent bug, now fixed).
+- buildAutostartBody() (one source, replaces 3 duplicated inline emits): homingStack(homingRunParams, activeDialectOpts) + the additional-G-code + ONE M30.
+- Regenerate: rebuilds the body from the homing profile + the additional G-code; if the body was hand-edited it CONFIRMS before overwriting (no silent clobber); records the profile.
+- Body textarea: edit → save + mark hand-edited (edits stick until an explicit regenerate).
+- Push: writes EXACTLY the stored body (writeSysfile + backup). Deploy modal + the pull-from-controller path also read/write the stored body (a pulled boot macro lands in the editor, marked hand-edited).
+- Migrate: first open with no stored body → seed via one regenerate.
+
+### DOUBLE-M30 FIX (a human caught it mid-turn)
+The body ended with TWO M30 (homingStack's endprogram atom emits M30, and buildAutostartBody appended another) — and worse, the additional G-code was appended AFTER the first M30 (dead code, never runs). Fix: strip the homing emit's trailing M30, append the custom G-code, then ONE M30. Test asserts exactly one `^M30$` + the custom G-code sits before it.
+
+### AMEND 1 (user live-caught): THE SELECTED CONTROLLER DRIVES EVERYTHING
+The user saw a body headed "DDCS Expert M350" while V4.1 was selected — the body was seeded when Expert was active, then went stale after the profile switch (buildAutostartBody DOES thread activeDialectOpts + homingStack reads the active profile, so a body built under the selected profile is correct; the issue is a stale body after a switch). Fix: (a) record settings.autostartProfileId = the active profile at each seed/regenerate; (b) a MISMATCH NOTE flags a stored body built under a DIFFERENT profile than the selected one ("⚠ Generated for <X> — Regenerate for the selected <name> before pushing"), so a stale cross-controller body can't masquerade; Regenerate rebuilds for the selected post (V4.1 → the honest homing refusal, NO Expert #1517/#882 registers) + clears the note. Verified end-to-end.
+
+### AMEND 2 (user ask): the SELECTED-CONTROLLER CHIP in the Macros header strip
+Added a slim header row in the previously-empty full-width strip at the top of the Macros tab: "CONTROLLER · ⚙ <active profile name>", click → Settings → Controller (openSettings deep-link). Re-renders on `ddcs:settings-changed` (a profile switch). Screenshot: the chip shows DDCS V4.1 + the amber mismatch note below.
+
+### QUEUED FOLLOW-UP (per amend 1.3, do NOT enable this turn): VERIFY V4.1 HOMING EMIT
+On V4.1 the boot macro's homing part is homingStack's HONEST refusal (unverified post) — correct for now. The V4.1 homing emit is now LARGELY GROUNDED and warrants its own increment: the V4.1 G31 form (G31 <axis><dist> L#682 Q1 K0 F<feed>, ddcs-v41.js probeMove), the eng-named HOME PORTS #151-154 (X/Y/Z/A axis home port), the HOME ACTIVE LEVELS #177-180, the HOME DIRECTION #199-202, and the HOME SEARCH/POSITIONING speeds #204-207 / #209-212 (t650/t654 eng grounding). A future increment can turn homingStack's V4.1 refusal into a real, grounded G31 home sequence (hardware-confirm before enabling).
+
+VERIFY: tests/autostart-stored-macro.spec.js (NEW, 4 tests): persist across reload + export/import; Regenerate byte-equal to homingStack+suffix with EXACTLY ONE M30 + the additional G-code before it + the clobber-confirm; Push payload == the stored body; amend1/2 — the chip shows the active profile + updates on switch, a stale Expert body is flagged under V4.1, Regenerate rebuilds the V4.1 body (refusal, no Expert regs). Updated homing-sysstart-real (Regenerate → stored body, summary gone) + homing-config-machine-tab (the stored-editor panel, summary/link gone). Full suite 954 passed / 2 skipped. Files: macrosApp.js, settingsPanel.js, tests/autostart-stored-macro.spec.js (new), homing-sysstart-real.spec.js, homing-config-machine-tab.spec.js.

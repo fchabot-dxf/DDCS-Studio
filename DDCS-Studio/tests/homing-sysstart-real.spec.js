@@ -51,7 +51,7 @@ test('homingRunParams drives the REAL homing sequence, byte-equal to the wizard 
     expect(r.stub).not.toMatch(/G31/);
 });
 
-test('the Macros → sysstart GENERATE button now writes the real homing sequence (real-symptom drive)', async ({ page }) => {
+test('the Macros → sysstart REGENERATE rebuilds the real homing sequence into the STORED body (t656 real-symptom drive)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetSettings && window.showApp);
     await page.evaluate((S) => { Object.assign(window.ddcsGetSettings(), S); }, SETTINGS);
@@ -59,11 +59,18 @@ test('the Macros → sysstart GENERATE button now writes the real homing sequenc
     await page.waitForFunction(() => window.showMacrosPanel, null, { timeout: 8000 });
     await page.evaluate(() => window.showMacrosPanel('macros_panel_sysstart'));
     await page.waitForTimeout(200);
-    await page.click('#sysstart_gen');
+    page.on('dialog', (d) => d.accept());   // any clobber-confirm → accept (a fresh seed isn't hand-edited, so usually none)
+    await page.click('#sysstart_regen');
     await page.waitForTimeout(200);
-    const out = await page.evaluate(() => (document.getElementById('sysstart_out') || {}).value || '');
-    expect(out, 'the generated sysstart carries the real G31 homing sequence, not the stub').toMatch(/G31 Z\S+ F600/);
+    const out = await page.evaluate(() => (document.getElementById('sysstart_body') || {}).value || '');
+    expect(out, 'the regenerated body carries the real G31 homing sequence, not the stub').toMatch(/G31 Z\S+ F600/);
     expect(out).toMatch(/G31 X\S+ F800/);
     expect(out).not.toMatch(/No axes selected to home/);
     expect(out, 'still wraps with M30').toMatch(/M30/);
+    // t656 — the regenerated body is STORED (the editor is the source of truth; Push sends exactly this)
+    const stored = await page.evaluate(() => window.ddcsGetSettings().autostartBody);
+    expect(stored, 'the body is stored in settings.autostartBody').toBe(out);
+    // the homing-summary section is GONE from the panel (dropped)
+    const gone = await page.evaluate(() => !document.getElementById('sysstart_homing_summary') && !document.getElementById('sysstart_gen') && !document.getElementById('sysstart_out'));
+    expect(gone, 'the homing-summary section + the old Generate/output are removed').toBe(true);
 });

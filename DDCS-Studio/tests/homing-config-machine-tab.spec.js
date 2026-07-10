@@ -66,25 +66,34 @@ test('the wizard gear opens Settings OVER the wizard at Machine → Homing, edit
     expect(back.wizThere, 'the wizard is still there after closing Settings (return)').toBe(true);
 });
 
-test('the Macros → sysstart panel shows a homing SUMMARY + a link to Settings (no editable axes there anymore)', async ({ page }) => {
+test('the Macros → sysstart panel is a STORED, editable boot-macro editor (t656) — the homing summary + link are GONE', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetSettings && window.showApp);
     await page.evaluate(() => {
         const s = window.ddcsGetSettings();
+        s.machine = { x: 600, y: 400, z: 500, softLimits: true };
+        s.limits = { zMaxHome: true, xMinHome: true, yMinHome: true };
         s.homing = { philosophy: 'sequential', axes: { z: { enable: true, order: 1, method: 'seek', seekFeed: 600 }, x: { enable: true, order: 2, method: 'seek', seekFeed: 800 }, y: { enable: true, order: 3, method: 'seek', seekFeed: 800 } } };
+        s.autostartBody = undefined; s.autostartHandEdited = false;   // fresh → the panel migrates (seeds) the body on open
     });
-    await page.evaluate(() => window.showApp('macros'));   // macros app inits lazily on first switch (sets window.showMacrosPanel + renders the summary)
+    await page.evaluate(() => window.showApp('macros'));   // macros app inits lazily on first switch (seeds + wires the stored body)
     await page.waitForFunction(() => window.showMacrosPanel, null, { timeout: 8000 });
     await page.evaluate(() => window.showMacrosPanel('macros_panel_sysstart'));
     await page.waitForTimeout(300);
     const info = await page.evaluate(() => ({
-        summary: (document.getElementById('sysstart_homing_summary') || {}).textContent || '',
-        hasLink: !!document.getElementById('sysstart_homing_link'),
-        noAxesEditor: !document.getElementById('set_homing_axes'),   // the editable per-axis GUI is gone from Macros
+        body: (document.getElementById('sysstart_body') || {}).value || '',
+        hasEditor: !!document.getElementById('sysstart_body'),
+        hasRegen: !!document.getElementById('sysstart_regen'),
+        droppedSection: !document.getElementById('sysstart_homing_summary') && !document.getElementById('sysstart_homing_link') && !document.getElementById('sysstart_gen'),
+        noAxesEditor: !document.getElementById('set_homing_axes'),   // the editable per-axis GUI stays in Settings → Machine → Homing
     }));
-    expect(info.summary, 'the summary lists the home sequence + feeds').toMatch(/Z → X → Y/);
-    expect(info.summary).toMatch(/switch-seek/);
-    expect(info.hasLink, 'the "Configure in Settings → Machine → Homing" link is present').toBe(true);
-    expect(info.noAxesEditor, 'the editable per-axis GUI no longer lives in Macros (one-source)').toBe(true);
+    expect(info.hasEditor, 'the stored boot-macro editor is present').toBe(true);
+    expect(info.hasRegen, 'the Regenerate button is present').toBe(true);
+    // MIGRATED (seeded) with the REAL homing sequence, not empty
+    expect(info.body, 'the body is seeded from the homing profile (G31 sequence)').toMatch(/G31 Z\S+ F600/);
+    expect(info.body, 'the seeded body wraps with M30').toMatch(/M30/);
+    // the dropped section: the homing summary + the Settings link + the old Generate are GONE
+    expect(info.droppedSection, 'the homing-summary section + link + old Generate are removed').toBe(true);
+    expect(info.noAxesEditor, 'the editable per-axis GUI never lived in Macros (one-source)').toBe(true);
     await page.locator('#macros_panel_sysstart').screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/homing-macros-summary.png' });
 });
