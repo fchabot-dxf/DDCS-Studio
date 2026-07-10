@@ -108,18 +108,46 @@ def test_v41_travel_signs_edges():
     assert g["homeEdgeConflict"]["x"] is True and g["homeEdgeConflict"]["y"] is False, g["homeEdgeConflict"]
 
 
-def test_v41_feeds_grounded_and_enable_and_wcs_na():
-    """Homing feeds ARE eng-grounded (search speed 5000/5000/1500). Soft limits DISABLED (#234=0) surfaced. WCS = N/A."""
+def test_v41_feeds_grounded_and_enable():
+    """Homing feeds ARE eng-grounded (search speed 5000/5000/1500). Soft limits DISABLED (#234=0) surfaced."""
     prof = _v41_prof_from_capture()
     g = prof["geometry"]
     assert g["homingFeeds"]["speed"] == {"x": 5000.0, "y": 5000.0, "z": 1500.0}, g["homingFeeds"]
     assert g["softLimitEnabled"] is False, g["softLimitEnabled"]              # #234 = 0 → honestly surfaced
-    assert g["machZero"] is None and prof["wcs"] is None, prof                # high vars, not in setting/uservar → N/A
+    assert g["machZero"] is None, g
     assert prof["geometryRaw"]["indices"]["softNeg"] == {"x": 235, "y": 236, "z": 237}, prof["geometryRaw"]
+
+
+# ── V4.1 WCS from the SYSDISK coord1 file (t654). Block index = the coord-system enum (block 1 = G54). The June backup
+# has G54 = (-300.29, -116.06, 1547.27) at block 1; the exact values must land in the wcs payload at G54.
+_V41_COORD1 = os.path.normpath(os.path.join(_HERE, "..", "..", "controllers", "v4.1", "assets", "system-backup", "current", "coord1"))
+
+
+def test_v41_wcs_from_coord1_lands_at_g54():
+    """The coord1 block 1 (= G54 per the enum + selcoord.rc) lands EXACTLY at wcs.table.g54; the empty systems are 0; the
+    ext row (block 8) never leaks into G54..G59. Active = setting #16 (0=G53 → Studio default G54)."""
+    coord1 = list(struct.unpack("<54d", open(_V41_COORD1, "rb").read()[:432]))
+    params = list(struct.unpack("<1500d", open(_V41_CAPTURE, "rb").read()[:12000]))
+    prof = {}
+    Ops(None, None)._map_wcs_to_profile_v41(params, prof, coord1)
+    w = prof["wcs"]
+    assert w is not None, "coord1 present → wcs payload built"
+    assert w["table"]["g54"] == [-300.29, -116.06, 1547.268], w["table"]["g54"]   # the EXACT June values, at G54
+    assert w["table"]["g55"] == [0.0, 0.0, 0.0] and w["table"]["g59"] == [0.0, 0.0, 0.0], w["table"]
+    # active: setting #16 = 0 (G53) → Studio's G54 default (1); workOrigin = the active row
+    assert w["active"] == 1, w["active"]
+    assert w["workOrigin"] == {"x": -300.29, "y": -116.06, "z": 1547.268}, w["workOrigin"]
+
+
+def test_v41_wcs_none_when_coord1_unreadable():
+    """No coord1 (unreachable / bench-declined) → wcs stays N/A (never guessed), same honest fallback as before."""
+    prof = {}
+    Ops(None, None)._map_wcs_to_profile_v41([0.0] * 1500, prof, None)
+    assert "wcs" not in prof or prof["wcs"] is None, prof
 
 
 if __name__ == "__main__":
     for name, fn in sorted((n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)):
         fn()
         print("  ok  ", name)
-    print("PASS — Expert (X 756/min, Y 776/max, Z undeclared, feeds 2000/150) + V4.1 eng-by-name (travel 3830/3900/800, home MAX, feeds 5000/5000/1500, soft-limits DISABLED, WCS N/A)")
+    print("PASS — Expert (756/min · 776/max · feeds 2000/150) + V4.1 eng-by-name (travel 3830/3900/800 · home MAX · feeds 5000/5000/1500 · soft-limits DISABLED) + V4.1 WCS from coord1 (G54 = -300.29/-116.06/1547.27 at block 1)")

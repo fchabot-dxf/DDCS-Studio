@@ -315,6 +315,7 @@ class Ops:
                 prof["source"] = "controller"
                 prof["paramCount"] = len(params)
                 self._map_geometry_to_profile_v41(params, prof, self._read_eng() or "")   # eng = the MEANING (by name), setting = the VALUES
+                self._map_wcs_to_profile_v41(params, prof, self._read_coord1())            # WCS table from the SYSDISK coord1 file (t654)
             return prof
         # Expert M350, or unknown → default to the Expert baseline + live-setting refinement (as before).
         prof = {**self._CONTROLLERS["expert-m350"], "detected": det}
@@ -415,6 +416,14 @@ class Ops:
         "seek":     r"{AX}\s+axis\s+home\s+search\s+speed",
         "slow":     r"{AX}\s+axis\s+home\s+positioning\s+speed",
     }
+    # ── V4.1 WCS store (t654). The 6-axis coordinate table lives in the SYSDISK `coord1` file (54 × f64 = 9 systems × 6 axes
+    # X,Y,Z,A,B,C), NOT in `setting`/uservar — so we READ THE FILE. Block index = the firmware's "current coordinate system"
+    # ENUM (default_vars_v3.js #16: 0=G53, 1=G54, 2=G55, … 6=G59, 7=MACH), so G54 = block 1 … G59 = block 6 (block 0 = G53).
+    # PINNED by 3 grounds: (1) selcoord.rc binds the dialog rows ~1512-1|G54 … ~1542-1|G59 (G54=#1512, stride 6); (2) the #16
+    # enum orders the file; (3) the June backup coord1 has the ONLY taught row at block 1 (= G54: X-300.29 Y-116.06 Z1547.27),
+    # block 0 (G53) zero — the default first-taught WCS. Active system = setting #16 (0=G53 … 7=MACH; 1..6 → Studio G54..G59).
+    _V41_ACTIVE_WCS = 16       # setting "current coordinate system": 0=G53, 1=G54, … 6=G59, 7=MACH
+    _V41_COORD_STRIDE = 6      # coord1: 6 axes per system; the block index IS the coord-system enum (block 1 = G54)
 
     def _map_geometry_to_profile(self, params, prof):
         """Emit `geometry` (travel / soft-limits / homing / mach-zero) + `wcs` (active index, offset table,
@@ -630,7 +639,33 @@ class Ops:
         }
         prof["geometryRaw"] = {"indices": {"softNeg": neg_i, "softPos": pos_i, "enable": gi["enable"], "homeDir": dir_i, "seek": seek_i},
                                "softLimitEnabled": enable}
-        prof["wcs"] = None   # UNGROUNDABLE on V4.1: work offsets are HIGH vars (#1506+), not in the setting/uservar param space. N/A.
+        prof["wcs"] = None   # default N/A; _map_wcs_to_profile_v41 fills it from the SYSDISK coord1 file when readable (t654)
+
+    def _map_wcs_to_profile_v41(self, params, prof, coord1):
+        """V4.1 WCS table + active system from the SYSDISK `coord1` file (t654) — the SAME payload shape the Expert branch
+        emits, so the review modal renders the V4.1 WCS rows for free. coord1 is block-indexed by the coordinate-system enum
+        (block 0 = G53, block 1 = G54, … block 6 = G59), 6 axes per block; the active system is setting #16. Read-only;
+        never raises. coord1 unreadable → wcs stays whatever the geometry mapper set (None)."""
+        if not coord1 or len(coord1) < 7 * self._V41_COORD_STRIDE:   # need at least G53..G59 (blocks 0..6)
+            return
+        def cell(block, ax):
+            i = block * self._V41_COORD_STRIDE + ax
+            try:
+                v = coord1[i]
+                return round(float(v), 4) if isinstance(v, (int, float)) else 0.0
+            except (IndexError, TypeError):
+                return 0.0
+        # G54 = block 1 … G59 = block 6 (the enum: block 0 = G53). Table keyed g54..g59, [X,Y,Z] like the Expert.
+        table = {"g%d" % (54 + w): [cell(w + 1, 0), cell(w + 1, 1), cell(w + 1, 2)] for w in range(6)}
+        # active = setting #16 (0=G53 … 6=G59, 7=MACH) → Studio's 1-based G54..G59 index; G53/MACH (0/7) → default G54.
+        try:
+            enum = int(params[self._V41_ACTIVE_WCS]) if isinstance(params[self._V41_ACTIVE_WCS], (int, float)) else 0
+        except (IndexError, TypeError):
+            enum = 0
+        active = enum if 1 <= enum <= 6 else 1
+        wo = table["g%d" % (53 + active)]
+        prof["wcs"] = {"active": active, "workOrigin": {"x": wo[0], "y": wo[1], "z": wo[2]}, "table": table}
+        prof["wcsRaw"] = {"activeEnum": enum, "block1IsG54": True}   # the pin, surfaced for the review's transparency
 
     # Expected `setting` shape + anchor sanity for the Expert — used to confirm the live file decoded
     # as aligned f64 params (not garbage / a wrong-controller dump). Anchors are [CONFIRMED] in FINDINGS:
@@ -728,6 +763,32 @@ class Ops:
                 with open(full, "rb") as f:
                     return f.read().decode("utf-8", "replace")
             except OSError:
+                continue
+        return None
+
+    def _read_coord1(self):
+        """Decode the V4.1 `coord1` file as little-endian f64 — the coordinate-system table (9 systems × 6 axes = 54 f64,
+        block index = the 'current coordinate system' enum: 0=G53, 1=G54, … 6=G59). On SYSDISK, same share as `setting`.
+        Returns list[float], or None if unreachable/unreadable. Read-only; never raises."""
+        import struct
+        if not self.controller_reachable():
+            return None
+        candidates = [os.path.join(self.cfg.expert_dest, "coord1")]
+        dest = (self.cfg.expert_dest or "").rstrip("\\/")
+        if dest.upper().endswith("CNCDISK"):
+            candidates.append(os.path.join(dest[: -len("CNCDISK")] + "SYSDISK", "coord1"))
+        for full in candidates:
+            try:
+                with open(full, "rb") as f:
+                    raw = f.read()
+            except OSError:
+                continue
+            n = len(raw) // 8
+            if n == 0:
+                continue
+            try:
+                return list(struct.unpack("<%dd" % n, raw[: n * 8]))
+            except struct.error:
                 continue
         return None
 

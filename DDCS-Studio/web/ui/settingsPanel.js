@@ -1815,6 +1815,16 @@ function wireSettingsOverlay(ov) {
             const ar = table[active - 1] || { x: 0, y: 0, z: 0 };
             const detail = table.map((r, i) => ({ label: `${WCS_NAMES[i]}${i === active - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === active - 1 ? '← active' : '' }));   // DETAIL: all 6 systems' raw offsets, active flagged
             cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[active - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table, active }, detail });
+        } else if (hwProfile && hwProfile.wcs && hwProfile.wcs.table) {
+            // t654 — the vars endpoint declines #15xx on V4.1, so the WCS came from the gateway's FILE read (coord1) as the
+            // hwProfile.wcs payload (same shape the Expert emits). Render the SAME rows + apply path (→ settings.machine.wcs).
+            const wp = hwProfile.wcs, wa = (wp.active >= 1 && wp.active <= 6) ? Math.round(wp.active) : 1;
+            const ftab = WCS_NAMES.map((_, i) => { const r = wp.table['g' + (54 + i)] || [0, 0, 0]; return { x: +r[0] || 0, y: +r[1] || 0, z: +r[2] || 0 }; });
+            if (ftab.some((r) => r.x || r.y || r.z)) {
+                const ar = ftab[wa - 1] || { x: 0, y: 0, z: 0 };
+                const detail = ftab.map((r, i) => ({ label: `${WCS_NAMES[i]}${i === wa - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === wa - 1 ? '← active (from coord1)' : '' }));
+                cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[wa - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table: ftab, active: wa }, detail });
+            } else notes.push({ group: 'WCS table (G54–G59)', label: 'All zero', value: 'controller reports no taught WCS offsets (coord1)', kind: 'note' });
         } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: 'controller returned no non-zero WCS offsets', kind: 'note' });
         // Machine envelope / home / feeds — from the controller's soft-limit + homing params (gateway /api/profile geometry).
         // t594 — signed travel per axis (magnitude × homeDir), the per-axis Home EDGE (→ settings.limits <edge>Home), and the

@@ -8900,3 +8900,26 @@ VERIFY (assert the value + real symptom):
 - 2D: the machine-coord Start falls INSIDE the drawn (machine-frame) envelope; the pre-fix work-shifted envelope [−276,500] would EXCLUDE it (the bug). New __t2env debug hook (peer of __t2starts).
 - NEGATIVE CONTROL: a WORK-frame op (corner) keeps machineFrame OFF → the marker rides the WCS pin unchanged (corner-atrest-parity + the OFF case in the 2D test both green); homing-preview-machine-frame (the machine-frame TOOL) still green (my _positionMarkers change is the same gate).
 - Full suite 949 passed / 2 skipped. Files: viz/gcodeViz3d.js, viz/toolpath2d.js, viz/createPreviewPanel.js, tests/homing-start-marker-frame.spec.js (new).
+
+## 2026-07-10 (t654) — V4.1 WCS PULL via coord1 — closes the WCS N/A from t650 (the user's pull-WCS ask)
+The V4.1 WCS table lives in the SYSDISK `coord1` file (54×f64 = 9 systems × 6 axes), NOT in setting/uservar (the vars endpoint declines #15xx). Read the file → emit the same wcs payload the Expert branch produces → the review rows land. Full suite 950 passed / 2 skipped; Python geometry tests 9/9.
+
+### THE PIN — block 1 = G54 (3 independent grounds; NO gate needed)
+1. REGISTER MAP (firmware selcoord.rc, the system-backup): the dialog binds `~1512-1|G54 … ~1518-1|G55 … ~1542-1|G59` → G54=#1512, stride 6 (matches the V4.1 dialect wcsBase:1512).
+2. FILE ORDER (default_vars_v3.js #16 "current coordinate system" ENUM): 0=G53, 1=G54, 2=G55, … 6=G59, 7=MACH → the coord1 block index IS the enum, so block 0=G53, block 1=G54, … block 6=G59, block 7=MACH, block 8=ext.
+3. VALUE CROSS-CHECK (June backup coord1): block 1 is the ONLY taught system — G54 = X-300.29 Y-116.06 Z1547.268 (round-4); block 0 (G53) zero (the default first-taught WCS); block 8 (ext) Z-2; the active selector setting #16 = 0 (G53 — the rig's current frame). Decoded + verified against the file.
+
+### BUILD (ops.py)
+- `_read_coord1()` — read the coord1 f64 array from SYSDISK (READ-ONLY, same share logic as _read_setting_params/_read_eng).
+- `_map_wcs_to_profile_v41(params, prof, coord1)` — table keyed g54..g59 = coord1 blocks 1..6 [X,Y,Z]; active = setting #16 mapped to Studio's 1-based G54..G59 (G53/MACH → default G54); workOrigin = the active row. SAME payload shape as the Expert `_map_geometry_to_profile` wcs (table + active + workOrigin). coord1 unreadable → wcs stays None (honest). `wcsRaw` surfaces the pin (block1IsG54, activeEnum).
+- profile() V4.1 branch reads coord1 alongside setting + eng, calls the wcs mapper.
+- Expert WCS-table read: UNCHANGED (already emitted prof["wcs"]; regression intact).
+
+### STUDIO (settingsPanel scanController)
+The review's WCS section reads via /api/vars (#var reads); V4.1 declines #15xx → anyWcs false. Added a FALLBACK: when the readVars path finds nothing but hwProfile.wcs.table exists (the coord1 file-read), build the SAME WCS candidate (6 rows g54..g59, active flagged "← active (from coord1)") + the SAME apply path (kind:'wcs' → settings.machine.wcs + syncWorkOrigin). Expert (readVars serves #805) is untouched.
+
+### VERIFY
+- test_pull_geometry.py 9/9: NEW test_v41_wcs_from_coord1_lands_at_g54 asserts the coord1 block 1 lands EXACTLY at wcs.table.g54 = [-300.29, -116.06, 1547.268], G55/G59 = 0, active = 1 (from #16=0 → G54 default), workOrigin = the G54 row; test_v41_wcs_none_when_coord1_unreadable = honest N/A fallback; Expert regression intact.
+- NEW tests/pull-v41-wcs.spec.js: the review modal renders the V4.1 WCS rows from hwProfile.wcs (coord1) when /api/vars is empty — G54 row shows -300.29, flagged active-from-coord1, all 6 systems present; APPLY lands the G54 offsets in settings.machine.wcs.
+- Existing pull tests (pull-review-detail/pull-machine-truth, the Expert WCS path) green; full suite 950 passed / 2 skipped.
+- LIVE V4.1 pull: not run here (no rig); coord1 is on the live SYSDISK (same as setting/eng), read the same way. The gateway restart the advisor is surfacing to the user is what makes the live pull serve this. Files: bridge/bridge-app/fairy/ops.py, bridge/bridge-app/tests/test_pull_geometry.py, DDCS-Studio/web/ui/settingsPanel.js, DDCS-Studio/tests/pull-v41-wcs.spec.js (new).
