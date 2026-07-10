@@ -118,3 +118,45 @@ test('EDGE folds per post — Expert byte-identical (confirm+ESC, stop/limit, di
     expect(line(t['ddcs-v41'], /^#50=\[/)).toContain('#50=[#1500+#6]');
     expect(line(t['ddcs-v3-dm500'], /^#50=\[/)).toContain('#50=[#864+#6]');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MIDDLE (E3) — inherits corner/edge's seams. Base is the BARE wcsbaseinto (no comments); writes are DIRECT #[#70+off];
+// sync is the indirect #883. E3 also KILLS A LIVE BUG: middle's ESC `IF #1505==0 GOTO2` used to emit on V4.1/DM500 with
+// #1505 never set → the probe was SKIPPED. Now the prompt+ESC fold together (hmiconfirm) → a comment with no IF.
+async function emitMiddle(page, params) {
+    return page.evaluate(async (params) => {
+        const { middleStack } = await import('/wizards/middleWizard.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { getDialect } = await import('/wizards/dialects/index.js');
+        const out = {};
+        for (const id of ['ddcs-expert-m350', 'ddcs-v41', 'ddcs-v3-dm500']) out[id] = emitMapped(middleStack(params), { dialect: getDialect(id) }).text;
+        return out;
+    }, params);
+}
+
+test('MIDDLE folds per post — Expert byte-identical (bare base, direct writes, #883 sync); V4.1/DM500 G92, no Expert registers, ESC-IF gone', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const t = await emitMiddle(page, { featureType: 'boss', axis: 'X', twoAxis: true, probeZ: true, syncA: true });
+    const E = t['ddcs-expert-m350'];
+    // Expert: the exact bytes — bare base (NO "( Read Active WCS )"), spaced prompt + ESC, direct writes, #883 sync
+    expect(line(E, /^#71=#578/)).toBe('#71=#578 ( Active WCS index: 1=G54 2=G55 etc )');
+    expect(E, 'middle base omits the ( Read Active WCS ) comment (bare)').not.toMatch(/\( Read Active WCS \)/);
+    expect(line(E, /Hover OVER the stock top/)).toBe('#1505=1 ( Hover OVER the stock top Z datum first. Press Enter - ESC=cancel )');
+    expect(line(E, /^IF #1505==0/)).toBe('IF #1505==0 GOTO2');
+    expect(line(E, /Save Active WCS Z offset/)).toBe('#[#70+2]=#57 ( Save Active WCS Z offset )');
+    expect(line(E, /^#\[#70\+0\]=#53/)).toBe('#[#70+0]=#53');
+    expect(line(E, /^#\[#74\]=#883/)).toBe('#[#74]=#883');
+    // V4.1 / DM500: G92, NO Expert registers, and the ESC IF is GONE (the killed mis-branch)
+    for (const id of ['ddcs-v41', 'ddcs-v3-dm500']) {
+        expect(line(t[id], /Hover OVER the stock top/), `${id} prompt → comment`).toBe('( Hover OVER the stock top Z datum first. Press Enter - ESC=cancel )');
+        expect(t[id], `${id} the ESC IF #1505 is GONE (mis-branch killed)`).not.toMatch(/IF #1505/);
+        expect(t[id], `${id} no #1505 write`).not.toMatch(/#1505=/);
+        expect(t[id], `${id} no #70/#805 table math`).not.toMatch(/#70|#\[805/);
+        expect(t[id], `${id} no G31 stop/limit`).not.toMatch(/#190[0-9]|#191[0-9]/);
+        expect(t[id], `${id} no executable #883`).not.toMatch(/=#883/);
+        expect(line(t[id], /G92 Z#57/), `${id} Z → G92`).toContain('G90 G92 Z#57');
+        expect(line(t[id], /G92 X#53/), `${id} X → G92`).toContain('G90 G92 X#53');
+        expect(line(t[id], /slave-DRO/), `${id} sync → honest comment`).toContain('no #883 slave-DRO equivalent');
+    }
+});

@@ -29,7 +29,6 @@ const AX = {
     Y: { stop: '#1906', limit: '#1916', status: '#1921', result: '#1926', off: 1 },
     Z: { stop: '#1907', limit: '#1917', status: '#1922', result: '#1927', off: 2 },   // Z-surface (probe-Z-first) — reuses twoPass
 };
-const WCS_BASE = { G54: 805, G55: 810, G56: 815, G57: 820, G58: 825, G59: 830 };
 const WCS_VALUES = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'];
 const sgn = (plus) => (plus ? 'pos' : 'neg');
 
@@ -82,7 +81,6 @@ export function middleStack(params = {}, opts = {}) {
     // Returning block factories (return ONE block) — every arm composes these, then a fork helper decides guard-vs-concrete.
     const mkC = (t) => { const b = newBlock('comment'); b.params = { text: t }; return b; };
     const mkA = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; return b; };
-    const mkIF = (l, o, r, g) => { const b = newBlock('ifgoto'); b.params = { lhs: l, op: o, rhs: r, goto: g }; return b; };
     const mkGO = (n) => { const b = newBlock('goto'); b.params = { n }; return b; };
     const mkLB = (n) => { const b = newBlock('label'); b.params = { n }; return b; };
     const mkMM = (ax, ref) => { const b = newBlock('machinemove'); b.params = { axis: ax, to: ref }; return b; };
@@ -90,6 +88,13 @@ export function middleStack(params = {}, opts = {}) {
     const mkMSG = (text) => { const b = newBlock('message'); b.params = { text }; return b; };
     const mkDM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; return b; };
     const mkEND = () => newBlock('endprogram');
+    // F1/E3 — the proven profile-aware seams (inherited from corner/edge). Expert byte-identical; V4.1/DM500 fold. Middle's
+    // WCS base is the BARE variant (no annotation comments); its WCS writes are DIRECT `#[#70+off]`; the sync is the indirect #883.
+    const mkWcsBase = (w) => { const b = newBlock('wcsbaseinto'); b.params = { wcs: w, base: '#70', bare: true }; return b; };
+    const mkWcsWrite = (spec) => { const b = newBlock('wcswrite'); b.params = { ...spec }; return b; };
+    const wcsArgOf = (w) => (w === 'active' ? '#578' : String(parseInt(String(w).replace('G', ''), 10) - 53));
+    const mkHMI = (value, note) => { const b = newBlock('hmiline'); b.params = { value: String(value), note: note || '' }; return b; };
+    const mkConfirm = (value, note, cancel) => { const b = newBlock('hmiconfirm'); b.params = { value: String(value), note: note || '', cancel }; return b; };
 
     // ── SUPERSET fork helpers (E0) — each RETURNS the arm block(s): superset → guarded arms; concrete → the selected arm.
     // The GUARD wraps one fork arm gated by { param, is }; pruneGuards drops the false arms + unwraps the true one at build.
@@ -120,7 +125,7 @@ export function middleStack(params = {}, opts = {}) {
             axis: ax, dir: plus ? '+' : '-', probeVar: plus ? '#8' : '#7', retractVar: plus ? '#9' : '#10',
             stopVar: av.stop, limitVar: av.limit, limitVal: plus ? '2' : '1',
             feedFast: '#3', feedSlow: '#4', port: '#5', level: 0, twoPass: true,
-            raw: av.result, result: resultVar, radius: '#6', compEnable: true,
+            raw: av.result, rawAxis: ax, result: resultVar, radius: '#6', compEnable: true,   // rawAxis → trigger folds per post
         });
     };
     // Lift clear, the operator jogs to the next wall, then drop back the SAME amount — all INCREMENTAL (no G53), so the
@@ -177,16 +182,17 @@ export function middleStack(params = {}, opts = {}) {
     ]))));
     // NOTE: #22 (the diagonal's primary target) is assigned INSIDE transTraverse — AFTER the primary seq measures #53 —
     // because at rest diagPrimary='#53' and #53 is only known post-probe (assigning it here would capture #53's initial 0).
-    // ── WCS base address ── 7-way wcs fork: 'active' reads #578 → computes #70; a fixed G54..G59 uses the literal base.
-    S.push(...wcsFork((w, label) => w === 'active'
-        ? [mkA('#71', '#578', 'Active WCS index: 1=G54 2=G55 etc'), mkA('#72', '[#71-1]', 'Zero-based index'), mkA('#70', '[805+[#72*5]]', 'Base WCS address')]
-        : [mkA('#70', WCS_BASE[w])]));
-    // ── Confirm start ── KIND-B, 2-way: the prompt text forks on probeZ (Hover OVER the top vs Press Enter to probe).
+    // ── WCS base address ── 7-way wcs fork via the wcsbaseinto atom (bare: middle omits the comments): Expert 'active' reads
+    // #578→#70 / a fixed G54..G59 uses the literal base (byte-identical); posts with no WCS table (V4.1/DM500 G92) emit nothing.
+    S.push(...wcsFork((w) => [mkWcsBase(w)]));
+    // ── Confirm start ── KIND-B, 2-way: the prompt text forks on probeZ (Hover OVER the top vs Press Enter to probe). The
+    // spaced prompt + the ESC IF are ONE hmiconfirm now → off-HMI BOTH fold to a comment (KILLS the live V4.1/DM500 mis-branch:
+    // today the ESC `IF #1505==0 GOTO2` emitted with #1505 never set → the probe was SKIPPED). Expert byte-identical.
     S.push(...probeZFork(
-        [mkA('#1505', '1', 'Hover OVER the stock top (Z datum first). Press Enter - ESC=cancel')],
-        [mkA('#1505', '1', 'Press Enter to probe - ESC=cancel')],
+        [mkConfirm('1', 'Hover OVER the stock top (Z datum first). Press Enter - ESC=cancel', 2)],
+        [mkConfirm('1', 'Press Enter to probe - ESC=cancel', 2)],
     ));
-    S.push(mkIF('#1505', '==', '0', 2), mkDM('inc'));
+    S.push(mkDM('inc'));
 
     // PROBE-Z-FIRST (declaration): set the Z datum BEFORE the XY work, REUSING middle's own twoPass (no corner copy / no dup),
     // then REUSE reposition() to move to the first wall. The Z probe is its OWN pass (the "REPOSITION:" reposition emits marks
@@ -195,7 +201,7 @@ export function middleStack(params = {}, opts = {}) {
     S.push(...probeZOnly([
         mkC('Z Surface - set Z datum first'),
         ...touchR('Z', false, '#57'),                       // two-pass down-probe the top → #57 = the TRUE surface (the block comps it; −#6 relocated here)
-        ...wcsFork((w, label) => [mkA('#[#70+2]', '#57', `Save ${label} Z offset`)]),   // Z0 write — #57 is already radius-compensated by the block
+        ...wcsFork((w, label) => [mkWcsWrite({ axis: 'Z', wcs: wcsArgOf(w), offset: 2, value: '#57', note: `Save ${label} Z offset`, direct: true })]),   // Z0 write (#57 comped); Expert #[#70+2]=#57 / else G92 Z#57
         ...repositionR('jog clear, to the first wall'),      // Z pass done → reposition to the XY start (existing helper)
     ]));
 
@@ -211,11 +217,11 @@ export function middleStack(params = {}, opts = {}) {
         safeZParkBlock(safeZFrame, '#17'),   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
         // #53 = centre of the PRIMARY axis, #56 = centre of the SECONDARY — write each to ITS axis's WCS offset
         // (not hardcoded X=0/Y=1, which swapped them when the primary axis was Y).
-        mkA(`#[#70+${AX[axis].off}]`, '#53'), mkA(`#[#70+${AX[second].off}]`, '#56'),
+        mkWcsWrite({ axis, wcs: wcsArgOf(wcs), offset: AX[axis].off, value: '#53', direct: true }), mkWcsWrite({ axis: second, wcs: wcsArgOf(wcs), offset: AX[second].off, value: '#56', direct: true }),
     ];
     const twoAxisOff = [
         safeZParkBlock(safeZFrame, '#17'),   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
-        mkA(`#[#70+${AX[axis].off}]`, '#53'),
+        mkWcsWrite({ axis, wcs: wcsArgOf(wcs), offset: AX[axis].off, value: '#53', direct: true }),
     ];
     S.push(...twoAxisFork(twoAxisOn, twoAxisOff));
 
@@ -235,7 +241,8 @@ export function middleStack(params = {}, opts = {}) {
     // here (a value swap, not a structural fork), so in the superset the (axis==='Y') half is a compile-time constant: axis 'Y'
     // → syncA-only; axis 'X' → syncA nested in twoAxis. Concrete matches the same condition. (slave stays baked — a value follow-on.)
     const slave = params.slave || '3';
-    const syncKids = [mkA('#74', `[#70+${slave}]`), mkA('#[#74]', '#883')];
+    // Expert `#74=[#70+slave]`+`#[#74]=#883` (byte-identical); #883 has no cross-post equivalent → honest comment off-Expert.
+    const syncKids = [mkWcsWrite({ axis: 'A', wcs: wcsArgOf(wcs), offset: Number(slave), addrVar: '#74', value: '#883', offComment: 'Dual-gantry A sync skipped — no #883 slave-DRO equivalent on this controller' })];
     if (superset) {
         const gated = (axis === 'Y') ? syncKids : [GUARD({ param: 'twoAxis', is: true }, syncKids)];
         S.push(GUARD({ param: 'syncA', is: true }, gated));
@@ -243,9 +250,9 @@ export function middleStack(params = {}, opts = {}) {
         S.push(...syncKids);
     }
 
-    // ── Footer + error handler ──
-    S.push(mkDM('abs'), mkA('#1505', '-5000'), mkGO(2));
-    S.push(mkLB(1), mkDM('inc'), mkMV('Z', '#17'), mkDM('abs'), mkA('#1505', '1'), mkLB(2), mkEND());
+    // ── Footer + error handler ── the bare #1505 success/fail codes via hmiline (Expert #1505=<v>; off-HMI nothing, no text).
+    S.push(mkDM('abs'), mkHMI('-5000', ''), mkGO(2));
+    S.push(mkLB(1), mkDM('inc'), mkMV('Z', '#17'), mkDM('abs'), mkHMI('1', ''), mkLB(2), mkEND());
     return S;
 }
 

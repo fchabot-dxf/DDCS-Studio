@@ -8469,3 +8469,26 @@ Disjoint from edge (the human's CF free-tier warning). Two client-side guards in
 - **(1) Tests fire ZERO analytics.** off() now returns true for `navigator.webdriver` (Playwright/any automated browser) + any `window.__ddcsNoTrack` harness → the suites' hundreds of app boots send NO beacons to the Worker (each dev boot would otherwise be a KV write). The ONE beacon-payload test (analytics.spec.js) opts back in via `window.__ddcsForceTrack` (its endpoint is a fake `example.test` + a captured sendBeacon → no real request).
 - **(2) Dev-refresh throttled once/day.** The dev-network refresh is a server-side KV WRITE only for `visit`/`app_launch` with dev=1 (Worker index.js:62-64). New `devFlag(event)` sends dev=1 on the day's FIRST visit/app_launch (a localStorage `ddcs_dev_day` stamp) and dev=0 on later same-day ones → the Worker READS KV instead (cheap, 100k/day) and still resolves dev via the registered network. So a heavy dev day writes ~1 KV op, not hundreds. Non-visit events keep dev=1 (they never trigger a KV write). User events untouched (reads).
 - **VERIFY:** tests/analytics-kv-guard.spec.js — (a) a Playwright boot + an explicit ddcsTrack() make ZERO requests to ddcs-analytics (request listener asserts []); (b) devFlag: first visit→1, same-day second→0, feature→1, next-day→1. analytics.spec.js still passes (opted in). Full suite green.
+
+---
+## 2026-07-09 (t618) — F1/E3 middle: COMPLETE (Expert byte-identical) + KILLS a live V4.1/DM500 mis-branch bug. The E-series probe family is DONE.
+
+Middle inherits the corner/edge seams. Converted as ONE unit; Expert byte-diff ZERO. Middle needed no NEW seams — one param on an existing one.
+
+### Conversions (all through the proven seams)
+- **WCS base** (7-way) → the wcsbaseinto atom with `bare:true` — middle omits the `( Read Active WCS )`/`( Target )` comments + the fixed-#70 note (the SAME #70 idiom, terser). Added a `bare` param to dialect.wcsBaseInto (Expert seam) + the atom; corner/edge (comments) unchanged.
+- **start/hover prompt + ESC** → hmiconfirm INSIDE probeZFork (prompt text forks, the ESC is now part of the atom). **KILLS A LIVE BUG:** today middle emits the prompt `#1505=1 ( … )` AND the ESC `IF #1505==0 GOTO2` on V4.1/DM500 — but #1505 is never set there → `IF #1505==0` is TRUE → GOTO2 → the whole probe is SKIPPED (a silent no-op). hmiconfirm folds BOTH to a comment with NO ESC IF off-HMI → the probe runs.
+- **trigger reads** (touchR) → rawAxis:ax on probeSurface (Expert #1925 byte-identical, V4.1 #1500, DM500 #864).
+- **WCS writes** → wcswrite DIRECT: Z `#[#70+2]=#57`, the two-axis `#[#70+0]=#53`/`#[#70+1]=#56` (no notes), single-axis; the `#74=[#70+slave]`+`#[#74]=#883` dual-gantry sync → wcswrite INDIRECT with offComment (honest comment off-Expert, corner precedent).
+- **footer toast/error** (`#1505=-5000` / `#1505=1`, no text) → hmiline (Expert byte-identical; off-HMI → nothing, no text).
+- ALREADY folded through the shared seams (verified, NOT re-touched): stop/limit (#1905/#1915 via probeguard), the manual REPOSITION prompt+ESC (via safeTraverseStack→hmiconfirm), the circular `#1505=-5000(…)` message (the message atom). Removed the orphaned WCS_BASE const + mkIF helper.
+
+### The RECONCILER (reverse-sync) — updated for the new block types
+middle's reconciler (opSession.js) read raw `assign` blocks (#[#70+off] writes, #71=#578, #70) to recover m_axis/m_wcs/etc. Those are now wcswrite/wcsbaseinto ATOMS → it returned null (3 round-trip tests failed). Updated it to read the atoms: wcsWrites = the DIRECT wcswrite atoms (axis ← offset); wcs ← the wcsbaseinto atom's `wcs` param. The EMITTED text was byte-identical throughout — only the block REPRESENTATION changed, so the reverse-sync had to track it (declare-not-infer: read the recorded block, not the text).
+
+### VERIFY
+- Expert byte-IDENTICAL: captured the full middle emit BEFORE, diffed AFTER = identical (bare base, prompt+ESC, direct writes, #883 sync, footer). middle + corner + edge + probe-surface + dialect-decode + reconcile = 155 green (every combo + twins + the 3 reconciler round-trips fixed). middle-data-emit (Expert byte) green.
+- V4.1/DM500: ZERO Expert registers — base gone, prompt→comment with NO ESC IF (mis-branch KILLED), no #1905/#1915, writes→G90 G92 X#53/Z#57, trigger #1500/#864, sync→honest comment, footer→nothing. corner-post-fold.spec.js extended with middle's per-post truth + the ESC-IF-gone assertion. Full suite green.
+
+### THE E-SERIES PROBE FAMILY IS COMPLETE
+corner (E1) + edge (E2) + middle (E3) all fold per post, Expert byte-diff ZERO; rotary + alignment were already atoms (E0). The remaining F1 follow-ons: the probe-MISS-on-V4.1/DM500 SAFETY increment (advisor-adopted, after the E-series) + F2 (ATC) / F4-F7.

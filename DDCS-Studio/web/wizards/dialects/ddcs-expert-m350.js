@@ -37,9 +37,15 @@ export const dialect = {
     // wcsBaseInto(wcs) — the WCS-table BASE-address compute into #70, the dump-grounded INDIRECT idiom shared by the probe
     // wizards (SAVE_WCS_XY_AUTO.nc: read #578 → base #70; a fixed G54..G59 uses the literal base). Non-Expert posts use G92
     // (no base) so their wcsbaseinto atom emits []. Byte-identical to corner/edge/middle's old literal base-compute.
-    wcsBaseInto: (wcs) => wcs === 'active'
-        ? ['( Read Active WCS )', '#71=#578 ( Active WCS index: 1=G54 2=G55 etc )', '#72=[#71-1] ( Zero-based index )', '#70=[805+[#72*5]] ( Base WCS address )']
-        : [`( Target: ${wcs} )`, `#70=${805 + (parseInt(String(wcs).replace('G', ''), 10) - 54) * 5} ( Base WCS address )`],
+    wcsBaseInto: (wcs, opts = {}) => {
+        const bare = !!(opts && opts.bare);   // middle omits the annotation comments + the fixed-#70 note (same idiom, terser)
+        if (wcs === 'active') {
+            const rows = ['#71=#578 ( Active WCS index: 1=G54 2=G55 etc )', '#72=[#71-1] ( Zero-based index )', '#70=[805+[#72*5]] ( Base WCS address )'];
+            return bare ? rows : ['( Read Active WCS )', ...rows];
+        }
+        const base = 805 + (parseInt(String(wcs).replace('G', ''), 10) - 54) * 5;
+        return bare ? [`#70=${base}`] : [`( Target: ${wcs} )`, `#70=${base} ( Base WCS address )`];
+    },
     // wcsWriteIndirect({offset, addrVar, value, note, addrNote}) — write `value` to the WCS slot #70+offset via the INDIRECT
     // form (SAVE_WCS_XY_AUTO.nc:21-26). offset 0 → the base itself `#[#70]=v`; offset>0 → compute the address into addrVar
     // (#73/#74) then `#[addrVar]=v`. Notes are paren-stripped like the assign/comp lines. This is the byte-exact partner of

@@ -169,18 +169,17 @@ const RECONCILERS = {
         const all = [];
         (function walk(arr) { for (const b of (arr || [])) { if (!b) continue; all.push(b); if (b.children) walk(b.children); } })(prog);
         const asn = (v) => all.find((b) => b.type === 'assign' && b.params && b.params.var === v);
-        const wcsWrites = all.filter((b) => b.type === 'assign' && b.params && /^#\[#70\+/.test(b.params.var));
+        // E3 (F1) — the WCS base + writes are now the wcsbaseinto / wcswrite atoms (not raw assigns). Read them from there.
+        const wcsWrites = all.filter((b) => b.type === 'wcswrite' && b.params && b.params.direct);   // the DIRECT #[#70+off] writes
         if (!asn('#53') || !wcsWrites.length) return null;   // not a middle op
         const cm = all.find((b) => b.type === 'comment' && b.params && /^2axis_/.test(b.params.text || ''));
         const twoAxis = !!cm || all.some((b) => b.type === 'assign' && b.params && b.params.var === '#56' && /\[#54\+#55\]/.test(b.params.value || ''));
         const m = cm && /^2axis_(XtoY|YtoX)_(pos|neg)$/.exec(cm.params.text);
         const axis = m ? (m[1] === 'XtoY' ? 'X' : 'Y')
-                       : (/\+0\]/.test(wcsWrites[0].params.var) ? 'X' : 'Y');   // single-axis: the offset is the axis
+                       : (Number(wcsWrites[0].params.offset) === 0 ? 'X' : 'Y');   // single-axis: the write offset is the axis
         const circular = all.some((b) => b.type === 'assign' && b.params && b.params.var === '#58' && /ABS\[#51-#52\]/.test(b.params.value || ''));
-        const wb = asn('#70');                               // active path has #71=#578; fixed path sets #70 to a literal
-        const active = all.some((b) => b.type === 'assign' && b.params && b.params.var === '#71' && b.params.value === '#578');
-        const wcsByBase = { 805: 'G54', 810: 'G55', 815: 'G56', 820: 'G57', 825: 'G58', 830: 'G59' };
-        const wcs = active ? 'active' : (wb && wcsByBase[Math.round(num(wb.params.value, 0))]) || 'active';
+        const baseAtom = all.find((b) => b.type === 'wcsbaseinto');   // the base atom carries the wcs directly ('active' / G54..G59)
+        const wcs = (baseAtom && baseAtom.params && baseAtom.params.wcs) || 'active';
         const f = { m_circular: circular, m_both: twoAxis, m_axis: axis, m_wcs: wcs };
         if (m) f.m_dir2 = m[2];
         // INC3: the per-traverse toggles + Diag travel, recoverable from the BOSS structure — the in-axis traverse is a

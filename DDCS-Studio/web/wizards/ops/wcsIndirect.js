@@ -14,9 +14,9 @@ import { num } from './util.js';
 
 export const wcsBaseIntoBlock = {
     type: 'wcsbaseinto', label: 'WCS Base', kind: 'leaf', category: 'Coordinates',
-    defaults: { wcs: 'active', base: '#70' }, fields: ['wcs', 'base'],
+    defaults: { wcs: 'active', base: '#70', bare: false }, fields: ['wcs', 'base', 'bare'],
     emit: (p, dx, dy, dialect) => {
-        if (dialect && typeof dialect.wcsBaseInto === 'function') return dialect.wcsBaseInto(p.wcs || 'active');
+        if (dialect && typeof dialect.wcsBaseInto === 'function') return dialect.wcsBaseInto(p.wcs || 'active', { bare: !!p.bare });
         return [];   // no WCS table on this post (G92 datum) → no base compute
     },
 };
