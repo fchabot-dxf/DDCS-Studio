@@ -12,10 +12,41 @@ export const probeReadBlock = {
     emit: (p, dx, dy, dialect) => dialect.probeRead(p.axis || 'Z', p.var || '#50'),
 };
 
+export const probeStartBlock = {
+    // t638 — capture the pre-probe machine DRO into the dialect's DECLARED miss-scratch register, so the following probecheck
+    // can tell a MISS (the axis reached the FULL commanded travel = no contact) from a real contact. ONLY on DRO-compare posts
+    // (V4.1/DM500: a declared `missScratch` + a readable `probeTrigVar`); Expert (status-var check) and posts with no miss-check
+    // fold to [] → byte-identical. Emitted BEFORE each probe by probeSurface; the compare is in probecheck (after the probe).
+    type: 'probestart', label: 'Probe Start', kind: 'leaf', category: 'Probing',
+    defaults: { axis: 'Z' }, fields: ['axis'],
+    emit: (p, dx, dy, dialect) => (dialect && dialect.missScratch && typeof dialect.probeTrigVar === 'function'
+        ? [`${dialect.missScratch}=${dialect.probeTrigVar(p.axis || 'Z')}`]
+        : []),
+};
+
 export const probeCheckBlock = {
     type: 'probecheck', label: 'Probe Check', kind: 'leaf', category: 'Control',
-    defaults: { axis: 'Z', goto: 1 }, fields: ['axis', 'goto'],   // jump to label <goto> if the probe didn't trigger
-    emit: (p, dx, dy, dialect) => dialect.probeStatus(p.axis || 'Z', Math.max(0, Math.round(num(p.goto, 1)))),
+    // Branch to <goto> if the probe DIDN'T contact. PROFILE-AWARE, three ways:
+    //  (1) STATUS-VAR posts (Expert) → `IF #192x != 2 GOTO<goto>` (dialect.probeStatus; BYTE-IDENTICAL to before).
+    //  (2) DRO-COMPARE posts (V4.1/DM500: no status var, a declared `missScratch`) → the probe reached the FULL commanded
+    //      travel (start + seek) within `eps` == NO CONTACT: `IF #[dro] >= [#scratch + seek - eps] GOTO<goto>` (dir '+';
+    //      mirrored `<=` + `+eps` for '-'). `#scratch` = the pre-probe DRO captured by probestart; `seek`/`dir`/`eps` come from
+    //      probeSurface. NOTE: a real touch inside the LAST `eps` of travel reads as a miss — inherent to DRO-compare (eps default 0.05mm).
+    //  (3) NEITHER (grbl/rs274/centroid) → an HONEST comment, never a guessed register.
+    defaults: { axis: 'Z', goto: 1, dir: '+', seek: '', eps: 0.05 }, fields: ['axis', 'goto', 'dir', 'seek', 'eps'],
+    emit: (p, dx, dy, dialect) => {
+        const axis = p.axis || 'Z';
+        const goto = Math.max(0, Math.round(num(p.goto, 1)));
+        const status = (typeof dialect.probeStatus === 'function') ? dialect.probeStatus(axis, goto) : [];
+        if (status.length) return status;                                   // (1) Expert status-var check — unchanged
+        if (dialect.missScratch && typeof dialect.probeTrigVar === 'function' && p.seek != null && p.seek !== '') {
+            const dro = dialect.probeTrigVar(axis), s = dialect.missScratch, eps = num(p.eps, 0.05);
+            const op = p.dir === '-' ? '<=' : '>=';
+            const rhs = p.dir === '-' ? `[${s}+${p.seek}+${eps}]` : `[${s}+${p.seek}-${eps}]`;
+            return dialect.ifGoto(dro, op, rhs, goto);                       // (2) DRO-compare (reached full travel = miss)
+        }
+        return ['( no probe-miss check on this post - verify contact )'];   // (3) honest degrade
+    },
 };
 
 export const readMachineBlock = {

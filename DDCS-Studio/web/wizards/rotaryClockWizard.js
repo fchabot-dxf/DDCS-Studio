@@ -64,7 +64,10 @@ export function rotaryClockStack(params = {}, opts = {}) {
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
     const CF = (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); };
     const PR = (axis, to, feed) => { const b = newBlock('probe'); b.params = { axis, to, feed, port: '#5', level }; S.push(b); };
-    const CK = (axis, goto) => { const b = newBlock('probecheck'); b.params = { axis, goto }; S.push(b); };
+    // t638 — probe-MISS safety: ST captures the pre-probe DRO (V4.1/DM500; [] on Expert); CK carries dir/seek so the DRO-compare
+    // branches on a no-contact. The Clock only probes Z DOWN (seek #7, dir '-'). Expert keeps its #192x check byte-identical.
+    const ST = (axis) => { const b = newBlock('probestart'); b.params = { axis }; S.push(b); };
+    const CK = (axis, goto) => { const b = newBlock('probecheck'); b.params = { axis, goto, dir: '-', seek: '#7', eps: 0.05 }; S.push(b); };
     const RD = (axis, v) => { const b = newBlock('proberead'); b.params = { axis, var: v }; S.push(b); };
     const RM = (axis, v) => S.push(mkRM(axis, v));
     const SWO = (axis, value) => S.push(mkSWO(axis, value));
@@ -82,8 +85,8 @@ export function rotaryClockStack(params = {}, opts = {}) {
         : (action === 'report' ? reportKids : action === 'rotate' ? rotateKids : setKids);
 
     const ppZdown = (resultVar) => {   // two-pass probe down (Z-)
-        PR('Z', '#7', '#3'); CK('Z', 1); MV('Z', '#10');
-        PR('Z', '#7', '#4'); CK('Z', 1); RD('Z', resultVar); MV('Z', '#10');
+        ST('Z'); PR('Z', '#7', '#3'); CK('Z', 1); MV('Z', '#10');
+        ST('Z'); PR('Z', '#7', '#4'); CK('Z', 1); RD('Z', resultVar); MV('Z', '#10');
     };
 
     C(_hdr.top1);

@@ -73,7 +73,10 @@ export function alignmentStack(params = {}, opts = {}) {
         const CF = (msg, cancel) => { const x = newBlock('confirm'); x.params = { msg, cancel }; b.push(x); };
         const RM = (axis, v) => { const x = newBlock('readmachine'); x.params = { axis, var: v }; b.push(x); };
         const PR = (axis, to, feed) => { const x = newBlock('probe'); x.params = { axis, to, feed, port: '#5', level: num(params.level, 0) }; b.push(x); };
-        const CK = (axis, goto) => { const x = newBlock('probecheck'); x.params = { axis, goto }; b.push(x); };
+        // t638 — probe-MISS safety: ST captures the pre-probe DRO (V4.1/DM500; [] on Expert); CK carries dir+seek so the DRO-
+        // compare branches to the fail label on a no-contact. Expert keeps its #192x status check byte-identical (dir/seek ignored).
+        const ST = (axis) => { const x = newBlock('probestart'); x.params = { axis }; b.push(x); };
+        const CK = (axis, goto) => { const x = newBlock('probecheck'); x.params = { axis, goto, dir: plus ? '+' : '-', seek: probeVar, eps: 0.05 }; b.push(x); };
         const RD = (axis, v) => { const x = newBlock('proberead'); x.params = { axis, var: v }; b.push(x); };
         const MV = (axis, v) => { const x = newBlock('move'); x.params = { mode: 'rapid', [axis.toLowerCase()]: v }; b.push(x); };
         const MSG = (text) => { const x = newBlock('message'); x.params = { text }; b.push(x); };
@@ -84,8 +87,8 @@ export function alignmentStack(params = {}, opts = {}) {
 
         // Two-pass probe of the fence (fast → check → retract → slow → check → read → retract), all granular atoms.
         const twoPass = (resultVar) => {
-            PR(probeAxis, probeVar, '#3'); CK(probeAxis, 1); MV(probeAxis, retractVar);
-            PR(probeAxis, probeVar, '#4'); CK(probeAxis, 1);
+            ST(probeAxis); PR(probeAxis, probeVar, '#3'); CK(probeAxis, 1); MV(probeAxis, retractVar);
+            ST(probeAxis); PR(probeAxis, probeVar, '#4'); CK(probeAxis, 1);
             RD(probeAxis, resultVar); MV(probeAxis, retractVar);
         };
 

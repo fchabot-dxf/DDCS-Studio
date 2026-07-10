@@ -168,7 +168,7 @@ export class GcodeExecutionEngine {
             const stripped = stripLine(raw);
             if (!stripped) return;
 
-            const ifMatch = stripped.match(/^IF\s+(.+?)\s+GOTO\s*(\d+)$/i);
+            const ifMatch = stripped.match(/^IF\s+(.+?)\s*GOTO\s*(\d+)$/i);
             if (ifMatch) {
                 const condition = ifMatch[1].trim();
                 if (!condition) {
@@ -743,7 +743,9 @@ export class GcodeExecutionEngine {
             return false;
         }
 
-        const ifMatch = line.match(/^IF\s+(.+?)\s+GOTO\s*(\d+)$/i);
+        // `\s*GOTO` (t638): the space before GOTO is OPTIONAL — V4.1 emits its IF-GOTO with NO space (`IF #1500>=[…]GOTO1`,
+        // probe-h.nc:7); the old `\s+GOTO` never matched it, so V4.1 branches (incl. the probe-miss check) silently no-op'd in the sim.
+        const ifMatch = line.match(/^IF\s+(.+?)\s*GOTO\s*(\d+)$/i);
         if (ifMatch) {
             const conditionText = ifMatch[1].trim().replace(/^\[|\]$/g, '');
             const targetLabel = Number.parseInt(ifMatch[2], 10);

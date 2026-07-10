@@ -27,18 +27,26 @@ export function probeSurfaceStack(p = {}) {
     const lc = axis.toLowerCase();
     const dir = p.dir === '-' ? '-' : '+';
     const port = p.port || '#5', level = p.level ?? 0, failGoto = p.failGoto ?? 1;
+    // t638 — the probe-MISS check. On STATUS-VAR posts (Expert) probecheck is `IF #192x!=2 GOTO<fail>`. On DRO-COMPARE posts
+    // (V4.1/DM500 — no status var) a MISS is caught by capturing the pre-probe DRO (probestart) then testing whether the axis
+    // reached the FULL commanded travel (start + seek) within `eps` → branch to the SAME <failGoto>. `eps` is a DECLARED
+    // tolerance (default 0.05mm — a real touch inside the last eps of travel reads as a miss; inherent to DRO-compare). probestart
+    // folds to [] on Expert, so Expert is byte-identical. dir + seek(=probeVar) drive the compare direction.
+    const eps = p.eps ?? 0.05;
 
     if (p.comment) push('comment', { text: p.comment });
     // G31 stop-mode / limit-protection preamble via the profile-aware probeguard atom: Expert emits #1905=0/#1915=<v>
     // (byte-identical), posts whose probe form doesn't consume them (V4.1/DM500) fold to [].
     if (p.stopVar || p.limitVar) push('probeguard', { stopVar: p.stopVar || '', limitVar: p.limitVar || '', limitVal: p.limitVal ?? '' });
 
+    push('probestart', { axis });                                             // capture the pre-probe DRO (V4.1/DM500; [] on Expert)
     push('probe', { axis, to: p.probeVar, feed: p.feedFast, port, level });   // fast find
-    push('probecheck', { axis, goto: failGoto });
+    push('probecheck', { axis, goto: failGoto, dir, seek: p.probeVar, eps }); // miss → GOTO <fail>
     push('move', { mode: 'rapid', [lc]: p.retractVar });                       // retract before the slow re-probe
     if (p.twoPass !== false) {                                                 // slow accurate re-probe
+        push('probestart', { axis });
         push('probe', { axis, to: p.probeVar, feed: p.feedSlow, port, level });
-        push('probecheck', { axis, goto: failGoto });
+        push('probecheck', { axis, goto: failGoto, dir, seek: p.probeVar, eps });
     }
     // skipComp — the caller does the read+comp ITSELF (e.g. the corner Z-surface: the comp is FUSED into the WCS write, which
     // folds per post via the wcswrite atom). We still emit the probe+check above; the caller appends the comped WCS write.

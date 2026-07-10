@@ -62,7 +62,7 @@ import { mathBlock } from './math.js';
 import { machineMoveBlock, endProgramBlock, mcodeBlock, rawBlock } from './macro.js';
 import { progStartBlock, progEndBlock } from './program.js';
 import { labelBlock, gotoBlock, ifGotoBlock } from './flow.js';
-import { probeReadBlock, probeCheckBlock, readMachineBlock, probeGuardBlock, toolOffsetBlock } from './measure.js';
+import { probeReadBlock, probeCheckBlock, probeStartBlock, readMachineBlock, probeGuardBlock, toolOffsetBlock } from './measure.js';
 import { setWorkOffsetBlock } from './setworkoffset.js';
 import { wcsBaseIntoBlock, wcsWriteBlock } from './wcsIndirect.js';   // F1/E1 — the probe-family WCS-write (Expert #[#70]/#73 indirect / other posts G92)
 import { wcsZeroBlock } from './wcszero.js';   // t475 — WCS zero-at-current, dialect-aware at emit (M350 register / rs274·grbl G10 L20 / v41·dm500 G92)
@@ -85,7 +85,7 @@ export const PALETTE = [
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, wcsBaseIntoBlock, wcsWriteBlock, wcsZeroBlock, toolOffsetBlock,   // Coordinates (WCS select + dist-mode + G17-19 plane + work-offset/probe-family base+indirect-write/WCS-zero-at-current/tool-table write)
     progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)
-    probeReadBlock, readMachineBlock, probeGuardBlock, radiuscompBlock,         // Probing (probe/DRO capture + G31 stop/limit guard + stylus-radius comp)
+    probeReadBlock, readMachineBlock, probeStartBlock, probeGuardBlock, radiuscompBlock,         // Probing (probe/DRO capture + pre-probe DRO capture for the miss-check + G31 stop/limit guard + stylus-radius comp)
     countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock, hmilineBlock, hmiConfirmBlock, hmiStatusBlock, hmiBeepBlock, cornerConfigBlock, guardBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input + probe #1505 note + spaced confirm gate + comm status-bar/beep idioms + corner-macro config + when-guard fork container)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)

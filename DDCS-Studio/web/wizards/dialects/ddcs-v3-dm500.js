@@ -26,6 +26,11 @@ export const dialect = {
     probeStatus: () => [],                                   // implicit — motion halts on input; no status var
     probeRead: (axis, varName) => [`${varName}=#${864 + AX[axis]}`],    // capture machine DRO at contact (probe.nc:4-6)
     probeTrigVar: (axis) => `#${864 + AX[axis]}`,   // trigger register per axis — DRO at contact #864/#865/#866 (no #1925 here)
+    // t638 — DECLARED probe-miss scratch register. DM500 move-until-input has NO status var + does NOT alarm on no-input (the
+    // G01 completes to full travel), so a MISS is caught by a POST-PROBE DRO COMPARE (probe.nc grounds #864-866 as the DRO).
+    // #190 is verified FREE — outside Studio's #1-74/#101/#102/#578 AND the DM500 firmware macro locals (executable macros write
+    // #1-33/#104-108/#402-404) — a general-purpose macro var, not a system reg.
+    missScratch: '#190',
     readMachine: (axis, varName) => [`${varName}=#${864 + AX[axis]}`],  // DRO X#864/Y#865/Z#866/A#867
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],      // G53 gated by config #395; dump safe-Z is M98 P101 — TO CONFIRM
     // DM500 macros zero with G92 (defprobe.nc:21) — value is a WORK coord (plate thickness), NOT a machine coord

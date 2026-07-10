@@ -22,6 +22,11 @@ export const dialect = {
     probeStatus: () => [],                                   // no status var — success read from post-probe DRO #1502 (probe-fix.nc)
     probeRead: (axis, varName) => [`${varName}=#${1500 + AX[axis]}`],   // post-probe machine pos #1500+ax (probe-fix.nc: #108=#1502)
     probeTrigVar: (axis) => `#${1500 + AX[axis]}`,   // trigger register per axis — post-probe machine pos #1500/#1501/#1502 (no #1925 here)
+    // t638 — DECLARED probe-miss scratch register. V4.1 has NO probe status var, so a MISS is caught by a POST-PROBE DRO
+    // COMPARE: probestart captures the pre-probe DRO here, probecheck tests whether the axis reached the full commanded travel
+    // (= no contact). #190 is verified FREE — outside Studio's emitted #1-74/#101/#102/#578 AND the V4.1 firmware macro locals
+    // (executable macros write #0-148 + #490-536; read #101-148) — a general-purpose macro var, not a system #1400+/#1500+ reg.
+    missScratch: '#190',
     readMachine: (axis, varName) => [`${varName}=#${1500 + AX[axis]}`], // DRO X#1500/Y#1501/Z#1502/A#1503 (safez.nc)
     machineMove: (axis, ref) => [`G0 G53 ${axis}${ref}`],   // CONFIRMED live: probe-fix.nc "G0G53Z#102" (G0 + G53)
     // CONFIRMED live (probe-vertex.nc): zero at the probed point with G90 G92 <axis><WORK value> — a work coord,

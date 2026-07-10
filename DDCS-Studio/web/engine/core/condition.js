@@ -9,17 +9,18 @@ import { evalExpr, validateExpression } from './expression.js';
 
 const COMPARATOR_RE = /^(.*?)(==|!=|<=|>=|<|>)(.*)$/;
 
+// FANUC/DM500 word operators → C-style. DM500 GLUES the operator to its operands (probe.nc `#571EQ0`, the miss-check
+// `#864GE[…]`) — there is NO word boundary between a digit and `GE`/`EQ`, so the old `\bOP\b` never matched the glued form and
+// DM500 IF/WHILE conditions silently evaluated false in the sim. DDCS conditions contain no alpha identifiers other than these
+// operators (operands are #vars / numbers / brackets / arithmetic), so matching them boundary-free is unambiguous. Longest-first
+// (GE before GT so `GE` isn't shadowed). (Expert/V4.1/Centroid emit symbolic ops → these replacements are a no-op for them.)
+const WORD_OP = { EQ: '==', NE: '!=', GE: '>=', LE: '<=', GT: '>', LT: '<' };
 export function normalizeCondition(expr) {
     if (expr == null) return '';
     return String(expr)
         .trim()
-        .replace(/\bEQ\b/gi, '==')
-        .replace(/\bNE\b/gi, '!=')
-        .replace(/\bGT\b/gi, '>')
-        .replace(/\bLT\b/gi, '<')
-        .replace(/\bGE\b/gi, '>=')
-        .replace(/\bLE\b/gi, '<=')
-        .replace(/\b<>\b/g, '!=')
+        .replace(/EQ|NE|GE|LE|GT|LT/gi, (m) => WORD_OP[m.toUpperCase()])
+        .replace(/<>/g, '!=')
         .replace(/(?<![<>!=])=(?![<>!=])/g, '==');
 }
 

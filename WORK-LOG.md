@@ -8720,3 +8720,27 @@ The Studio probe is **INCREMENTAL** (corner/edge: `probeVar = dir==='+' ? '#8' :
 - (Secondary) DM500: same DRO-compare (it continues to full travel) — confirm you want the compare there too vs a "declared behavior" comment; the grounding says the compare is valid (it does NOT alarm).
 
 NEXT (post-ruling): build per the confirmed mechanism + scratch var; Expert byte-diff ZERO (full probe suite); V4.1/DM500 carry start-capture + compare + GOTO on every probe (corner/edge/middle/alignment/rotary + twins), asserting the compare register/target/label; a simulated MISS in the exec engine takes the fail branch (not the WCS write); zero new leaks; suite green.
+
+---
+## 2026-07-10 (t638) — PROBE-MISS SAFETY — BUILT per the advisor's rulings A/B/C + the required declared tolerance (eps)
+
+The bug (safety-critical): on V4.1/DM500 the probecheck folded to [] → a probe MISS was silently ignored → the macro wrote a WRONG WCS. Fixed: a POST-PROBE DRO COMPARE branches to the SAME failGoto when the axis reached the FULL commanded travel = no contact.
+
+### VAR-MAP AUDIT (ruling A — the scratch is DIALECT-DECLARED, chosen after auditing the executable firmware macros)
+Clean audit of the executable `.nc` macros (not the param-table docs): V4.1 firmware WRITES #0-148 (gaps) + #490-536; READS #101-148. DM500 firmware WRITES #1-33/#104-108/#402-404. Studio wizards emit #1-74/#101/#102/#578. → **#190 is verified FREE** on both (outside every range, in the general-purpose macro range, NOT a system #800+/#1500+ reg). Declared as `missScratch: '#190'` on the V4.1 + DM500 dialects (one source, auditable). A dialect WITHOUT the declaration → the atom emits an HONEST comment (never a guessed register).
+
+### THE MECHANISM (ruling B/C + eps)
+- **probestart atom** (NEW, ops/measure.js): captures the pre-probe DRO into the declared scratch — V4.1 `#190=#[1500+ax]`, DM500 `#190=#[864+ax]`, Expert/others → [] (byte-identical). Emitted BEFORE each probe.
+- **probecheck atom** (extended): (1) STATUS posts (Expert) → `IF #192x!=2 GOTO` unchanged; (2) DRO-COMPARE posts (V4.1/DM500) → `IF #[dro] >= [#190 + seek - eps] GOTO<fail>` (dir '+'; mirrored `<=` + `+eps` for '-') — reached the full travel within eps = miss; (3) neither → an honest comment. `eps` = a DECLARED tolerance (probeSurface param, default **0.05mm** — a real touch inside the last eps of travel reads as a miss; inherent to DRO-compare, noted in the atom docs). dir/seek/eps come from the caller.
+- **probeSurface** emits probestart before each probe + threads dir + seek(=probeVar) + eps to probecheck. **alignment + rotaryClock** hand-roll their probes (not via probeSurface) → threaded the same (ST + CK dir/seek). So ALL six probe wizards (corner/edge/middle/alignment/rotaryCenter/rotaryClock) carry the miss-check. (atcLength/atcToolCheck also emit probecheck but aren't in the advisor's list → they get the honest-comment degrade, not the compare — a noted follow-up.)
+
+### THE SIM (the safety bar) — two PRE-EXISTING engine gaps found + fixed so the sim can model the V4.1/DM500 miss branch
+The exec engine could NOT branch on either post's IF-GOTO (so the miss branch never fired in the sim):
+1. **V4.1 no-space GOTO**: the engine's IF-GOTO regex required `\s+GOTO`, but V4.1 emits `IF #1500>=[…]GOTO1` (NO space, probe-h.nc:7). Fixed → `\s*GOTO` (2 sites) — backward-compatible (Expert's spaced form still matches), strictly-improving (V4.1 branches never worked before).
+2. **DM500 glued word-ops**: the condition normalizer's `\bGE\b` never matched the glued `#864GE[…]` (no word boundary between `4` and `G`; `#571EQ0` has none on either side). Fixed → boundary-free word-op replace (DDCS conditions have no alpha operands, so it's unambiguous). Only DM500 word-op conditions change (from broken to working); Expert/V4.1/Centroid emit symbolic ops → no-op.
+
+### VERIFY
+- **tests/probe-miss-check.spec.js (NEW)**: all 6 probe wizards on V4.1 carry `#190=#15xx` (capture) + `IF #15xx <op> [#190+…] GOTO` (compare→fail); DM500 the word-op form; Expert keeps `IF #1920!=2 GOTO` with NO #190/compare (byte-identical); the scratch #190 is written/read exactly once per probe pass (no collision, no double-write).
+- **tests/probe-miss-sim.spec.js (NEW)**: (1) REAL EMIT — a V4.1 edge traced with no stock (guaranteed miss) takes the fail branch: the result #50 stays 0, the `G90 G92 X#50` WCS write is SKIPPED; the DRO reached start+seek (a genuine full-travel miss). (2) CONTROLLED — the engine branches correctly on BOTH the V4.1 no-space and DM500 word-op compare forms (miss→branch, contact→write).
+- Expert byte-diff ZERO across the full probe family (corner-post-fold + corner/edge/alignment-data-emit + the twins — all green; probestart folds to [], probecheck unchanged).
+- FULL SUITE: 940 passed / 2 skipped / 0 failed (3.2m), zero flaky this run.
