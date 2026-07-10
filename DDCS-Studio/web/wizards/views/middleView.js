@@ -5,6 +5,7 @@ import { MiddleWizard } from '../middleWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { getWorkpiece, workpieceBackdrop } from '../../engine/workpiece.js';   // flatten-migration: draw the DECLARED workpiece cavity at its OFFSET (byte-identical to the legacy centered inset for a derived pocket)
+import { slaveFollowing } from '../../engine/gantry.js';   // t648 — the Dual-Gantry Sync A field gates on the DECLARED topology (a Y-slave in Settings → Axes), one source
 
 const wizard = new MiddleWizard();
 const layout = new FeatureCanvas();
@@ -185,6 +186,25 @@ export const middleView = {
         const crossBlock = el('m_crossover_block'); if (crossBlock) crossBlock.classList.toggle('hidden', !inAxisAuto);
         // TRAVEL-START inc2a: the DIAG TRAVEL field is GONE from the UI — #21 is DERIVED from the dragged ② (tieDiagTravel).
         // m_diag_block stays permanently hidden (no show-toggle); the readonly input persists the derived value + round-trips.
+
+        // t648 — the Dual-Gantry Sync A field GATES on the DECLARED machine topology (a Y-slave in Settings → Hardware →
+        // Machine → Axes), NOT a free per-op checkbox. No Y-slave → grey + uncheck (nothing to sync); a Y-slave declared →
+        // enable + DERIVE the slave index (A=3/B=4) from the topology (one source). The EMIT stays byte-identical (it still
+        // honours params.syncA); this is a VIEW gate, so the middleStack + the data-op twin are untouched.
+        const gSlaveIdx = slaveFollowing((window.ddcsGetSettings && window.ddcsGetSettings().motors) || {}, 'y');
+        const gSync = el('m_sync_a'), gSlave = el('m_slave');
+        if (gSync) {
+            const hasSlave = gSlaveIdx != null;
+            gSync.disabled = !hasSlave;
+            if (hasSlave) gSync.removeAttribute('data-op-gated'); else { gSync.setAttribute('data-op-gated', 'true'); gSync.checked = false; }
+            const lbl = gSync.closest('label');
+            if (lbl) { lbl.style.opacity = hasSlave ? '' : '0.5'; lbl.title = hasSlave
+                ? 'Dual-gantry: writes the found centre to the slave-axis WCS, keeping the twin-motor gantry squared.'
+                : 'No gantry slave declared — set an axis to “Gantry slave” in Settings → Hardware → Machine → Axes to enable.'; }
+        }
+        if (gSlave && gSlaveIdx != null) gSlave.value = String(gSlaveIdx);   // derive the slave index from the topology
+        params.syncA = el('m_sync_a')?.checked || false;   // re-read after the gate (an un-topology'd machine can't force the sync on)
+        params.slave = el('m_slave')?.value || '3';
 
         const gcode = wizard.generate(params);
         el('wiz_middle_code').innerHTML = UIUtils.formatGCode(gcode);

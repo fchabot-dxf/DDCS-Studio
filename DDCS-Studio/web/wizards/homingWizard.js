@@ -35,6 +35,7 @@ import { resolveActivePost } from './dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { num, r3 } from './ops/util.js';
 import { declaredHomeEdgeSide } from '../engine/limitSwitches.js';   // the ONE source of the home end — the DECLARED home switch (settings.limits.<edge>Home), shared with the engine handler + the emit
+import { slaveAxes } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing derives the slave sync from it
 
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
@@ -184,12 +185,22 @@ export function homingRunParams(settings = {}, opts = {}) {
     const homing = settings.homing || { axes: {} };
     const cfg = homing.axes || {};
     const m = settings.motors || {};
+    // t648 — a SLAVE-role axis is NEVER independently homed (the master's homing syncs it); exclude it like 'unused'.
     const configured = ['x', 'y', 'z'];
-    if (m.a && m.a.role && m.a.role !== 'unused') configured.push('a');
-    if (m.b && m.b.role && m.b.role !== 'unused') configured.push('b');
+    if (m.a && m.a.role && m.a.role !== 'unused' && m.a.role !== 'slave') configured.push('a');
+    if (m.b && m.b.role && m.b.role !== 'unused' && m.b.role !== 'slave') configured.push('b');
     const selected = Array.isArray(opts.selected) ? opts.selected : configured.filter((ax) => (cfg[ax] || {}).enable !== false);
     const axes = [...selected].sort((p, q) => ((cfg[p] || {}).order || 9) - ((cfg[q] || {}).order || 9));
-    return { axes, config: cfg, softLimits: (settings.machine || {}).softLimits !== false, machine: settings.machine || {}, limits: settings.limits || {} };
+    // t648 — DERIVE the slave sync from the axes declaration (the ONE SOURCE): inject the slave's index into the MASTER's
+    // config as slaveFollows so homeAxisBlocks.syncSlave emits `#[880+idx]=masterCoord`+`#[1515+idx]=1`. Only when a slave is
+    // DECLARED — else cfg is untouched, so every non-gantry config (incl. a legacy stored slaveFollows) is byte-identical.
+    let config = cfg;
+    const slaves = slaveAxes(m);
+    if (slaves.length) {
+        config = { ...cfg };
+        for (const { idx, follows } of slaves) config[follows] = { ...(cfg[follows] || {}), slaveFollows: String(idx) };
+    }
+    return { axes, config, softLimits: (settings.machine || {}).softLimits !== false, machine: settings.machine || {}, limits: settings.limits || {} };
 }
 
 // t542 — homingSimProxy (a hand-made G53 motion model) is DELETED. It existed only because the pre-b0a9791 M98 emit

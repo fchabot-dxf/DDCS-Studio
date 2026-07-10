@@ -23,6 +23,7 @@ import { renderCloudLogin } from './cloudAccount.js';
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { declaredHomeEdgeSide } from '../engine/limitSwitches.js';   // t628 — the DECLARED home switch drives the seek direction (one source); the Homing section shows the derived end read-only
+import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
 // --- Tool library ----------------------------------------------------------
@@ -300,6 +301,23 @@ function mergeHoming(p) {
     return out;
 }
 
+// t648 — seed the gantry SLAVE role from the dump's DUAL binding (the same one mergeHoming reads at :296 for slaveFollows).
+// A pulled dual-gantry dump carries homing.axes[master] = { method:'dual', dual:{ slaveIdx } }; mirror it into the axes ONE
+// SOURCE (settings.motors[slave] = { role:'slave', follows:master }) so the whole app — homing sync, the sim, the Axes UI,
+// the middle gate — derives from the declaration. Idempotent; fires while the raw dual binding is present (motors then persists).
+function seedGantryFromHoming(motors, pHoming) {
+    if (!motors) return motors;
+    const axes = (pHoming && pHoming.axes) || {};
+    const AXOF = { 3: 'a', 4: 'b' };   // slave axis INDEX → name (A/B are the only slaveable axes)
+    for (const master of ['x', 'y', 'z']) {
+        const a = axes[master];
+        const idx = a && a.dual && a.dual.slaveIdx != null ? a.dual.slaveIdx : null;
+        const slaveAx = idx != null ? AXOF[idx] : null;
+        if (slaveAx) motors[slaveAx] = { ...(motors[slaveAx] || {}), role: 'slave', follows: master };
+    }
+    return motors;
+}
+
 let _ddcsSettings = loadSettings();
 // Migrate any legacy dense / bare-number tool storage to the sparse library shape (one pass, idempotent).
 if (_ddcsSettings.atc) _ddcsSettings.atc.tools = libraryTools(_ddcsSettings.atc);
@@ -334,6 +352,7 @@ function loadSettings() {
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
                 macros: Array.isArray(p.macros) ? p.macros : [],
             });
+            seedGantryFromHoming(merged.motors, p.homing);   // t648 — a pulled dual-gantry dump seeds the slave axes role (one source)
             if (!merged.toolsSeeded && (!Array.isArray(merged.atc.tools) || merged.atc.tools.length === 0)) {
                 merged.atc.tools = standardTools();
             }
@@ -522,6 +541,46 @@ function commitMachine() {
     saveSettings();
 }
 
+// ── AXES (A/B roles) — a VERTICAL per-axis list matching the homing cards (t648). Each axis is one card: a role select
+// + its DEPENDENT field inline (rotary → spins-around; Gantry slave → follows). The role is the ONE SOURCE the sim
+// (getRotaryAxes), homing (slave sync + card), and pull all derive from. Re-renders on change so the dependent field
+// tracks the role, and re-renders the homing GUI so a slave declaration immediately drops the slave's homing card.
+const AXIS_CARDS = ['a', 'b'];
+const AX_ROLES = [['unused', 'Unused'], ['linear', 'Linear'], ['rotary', 'Rotary'], ['slave', 'Gantry slave']];
+function _optList(pairs, sel) { return pairs.map(([v, lbl]) => `<option value="${v}"${v === sel ? ' selected' : ''}>${lbl}</option>`).join(''); }
+function renderAxesGui() {
+    const host = document.getElementById('set_axes_list'); if (!host) return;
+    const m = getSettings().motors || {};
+    host.innerHTML = AXIS_CARDS.map((ax) => {
+        const mo = m[ax] || {}, role = mo.role || 'unused';
+        const around = mo.around || (ax === 'a' ? 'x' : 'y'), follows = mo.follows || 'y';
+        const dep = role === 'rotary'
+            ? `<label>spins around <select class="ax-around">${_optList([['x', 'X'], ['y', 'Y'], ['z', 'Z']], around)}</select></label>`
+            : role === 'slave'
+            ? `<label title="Gantry slave: this axis mirrors the master — homed WITH the master (its coordinate synced), never independently.">follows <select class="ax-follows">${_optList([['x', 'X'], ['y', 'Y']], follows)}</select></label>`
+            : '';
+        return `<div class="axis-card" data-axis="${ax}" style="border:1px solid var(--border); border-radius:6px; padding:8px 10px; margin-bottom:8px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <span style="font-weight:600; min-width:16px;">${HOMING_AX_LABEL[ax]}</span>
+            <label>role <select class="ax-role">${_optList(AX_ROLES, role)}</select></label>
+            ${dep}
+        </div>`;
+    }).join('');
+    host.querySelectorAll('.axis-card select').forEach((sel) => sel.addEventListener('change', () => { commitAxes(); renderAxesGui(); renderHomingGui(); }));
+}
+function commitAxes() {
+    const host = document.getElementById('set_axes_list'); if (!host) return;
+    const m = getSettings().motors || (getSettings().motors = {});
+    host.querySelectorAll('.axis-card').forEach((card) => {
+        const ax = card.getAttribute('data-axis'), g = (s) => card.querySelector(s), prev = m[ax] || {};
+        const role = g('.ax-role').value;
+        // keep BOTH around + follows stored (inert when not the active dependent) so toggling role back doesn't lose the pick
+        const around = g('.ax-around') ? g('.ax-around').value : (prev.around || (ax === 'a' ? 'x' : 'y'));
+        const follows = g('.ax-follows') ? g('.ax-follows').value : (prev.follows || 'y');
+        m[ax] = { role, around, follows };
+    });
+    saveSettings();
+}
+
 // ── HOMING profile (Machine tab section) ──────────────────────────────────────────────────────────────────
 // Per-axis homing config, rendered + edited inline (no separate modal), RIGHT NEXT TO the envelope it references.
 // Travel/home-direction reference the envelope above (machine.x/y/z); this section adds per-axis method/feeds/
@@ -533,12 +592,14 @@ function commitMachine() {
 const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const HOMING_AX_IDX = { x: 0, y: 1, z: 2, a: 3, b: 4 };
 const HOMING_AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
+const AX_OF_IDX = { 0: 'x', 1: 'y', 2: 'z', 3: 'a', 4: 'b' };   // t648 — idx → axis name (the reverse of HOMING_AX_IDX; for the derived slave display)
 function homingConfiguredAxes() {
     const s = getSettings();
     const m = (s.motors) || {};
     const out = ['x', 'y', 'z'];
-    if (m.a && m.a.role && m.a.role !== 'unused') out.push('a');
-    if (m.b && m.b.role && m.b.role !== 'unused') out.push('b');
+    // t648 — a SLAVE-role axis is never independently homed (the master syncs it), so it gets no homing card — excluded like 'unused'.
+    if (m.a && m.a.role && m.a.role !== 'unused' && m.a.role !== 'slave') out.push('a');
+    if (m.b && m.b.role && m.b.role !== 'unused' && m.b.role !== 'slave') out.push('b');
     return out;
 }
 function homingPostIsExpert() {
@@ -559,12 +620,13 @@ function renderHomingGui() {
     if (document.getElementById('set_homing_simul')) document.getElementById('set_homing_simul').checked = h.philosophy === 'simultaneous';
 
     const ordered = [...list].sort((p, q) => ((cfg[p] || {}).order || HOMING_AX_IDX[p] + 1) - ((cfg[q] || {}).order || HOMING_AX_IDX[q] + 1));
-    const followOpts = (sel) => `<option value="">none</option>` + list.map((a) => `<option value="${HOMING_AX_IDX[a]}"${String(HOMING_AX_IDX[a]) === String(sel) ? ' selected' : ''}>${HOMING_AX_LABEL[a]} (idx ${HOMING_AX_IDX[a]})</option>`).join('');
     // t628 (advisor ruling) — the seek DIRECTION is DERIVED from the declared home switch (declaredHomeEdgeSide, one source),
     // shown read-only; the METHOD is FIXED (homeAxisBlocks: G31 seek for X/Y/Z, set-zero for A/B). The old Home-dir + Method
     // dropdowns were INERT — the emit ignores c.dir/c.method — so they're removed. c.dir/c.method stay STORED (inert data;
     // the reconciler reads them) → settings shape + homingStack emit are UNCHANGED. The home-end mirrors homeAxisBlocks:96-97.
     const machine = getSettings().machine || {}, limits = getSettings().limits || {};
+    const motors = getSettings().motors || {};
+    const slaveIdxFollowing = (ax) => slaveFollowing(motors, ax);   // t648 — the slave (idx) that follows this master, DERIVED from the Axes declaration (one source)
     const methodText = (ax) => (ax === 'a' || ax === 'b') ? 'Set zero (no motion)' : 'Switch seek (G31)';
     const homeEndHtml = (ax) => {
         if (ax === 'a' || ax === 'b') return '<span style="font-size:12px; color:var(--text-dim);">— (set-zero: no seek)</span>';
@@ -594,9 +656,12 @@ function renderHomingGui() {
                 <label>Slow feed <input type="number" class="hm-slowfeed" value="${num(c.slowFeed, 100)}" style="width:60px;"></label>
                 <label>Home offset <input type="number" class="hm-offset" value="${num(c.offset, 0)}" step="0.5" style="width:54px;"></label>
             </div>
-            <div class="hm-slave" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
-                <label title="Dual-axis gantry: homing this axis syncs the slave's coordinate and marks it homed. Squaring is done manually by the operator.">Slave axis follows <select class="hm-follow">${followOpts(c.slaveFollows)}</select></label>
-            </div>
+            ${(() => {   // t648 — the slave is DECLARED in the Axes section (motors[ax]={role:'slave',follows}); the homing card shows it READ-ONLY (derived, the t628 home-end pattern). No editable dropdown — one source.
+                const sl = slaveIdxFollowing(ax);
+                return sl == null ? '' : `<div class="hm-slave" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+                <span class="hm-slave-derived" title="Dual-axis gantry: homing ${HOMING_AX_LABEL[ax]} syncs the slave's coordinate and marks it homed. Squaring is done manually by the operator. Declared in Settings → Hardware → Machine → Axes.">syncs slave <b>${HOMING_AX_LABEL[AX_OF_IDX[sl]]}</b> <span style="color:var(--text-dim);">— from Axes</span></span>
+            </div>`;
+            })()}
             ${rotary ? `<div class="hm-rotary" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
                 <label><input type="checkbox" class="hm-continuous" ${c.continuous ? 'checked' : ''}/> continuous (mod 360)</label>
             </div>` : ''}
@@ -627,7 +692,7 @@ function commitHoming() {
             slowFeed: num(g('.hm-slowfeed').value, prev.slowFeed || 100),
             offset: num(g('.hm-offset').value, prev.offset || 0),
             dir: g('.hm-dir') ? g('.hm-dir').value : (prev.dir || ''),
-            slaveFollows: g('.hm-follow').value,
+            slaveFollows: g('.hm-follow') ? g('.hm-follow').value : (prev.slaveFollows || ''),   // t648 — the editable dropdown retired to the derived Axes display; keep the stored value inert for the reconciler (t628 dir/method pattern)
             rotary: g('.hm-rotmode') ? g('.hm-rotmode').value : (prev.rotary || 'setzero'),
             continuous: g('.hm-continuous') ? g('.hm-continuous').checked : !!prev.continuous,
         };
@@ -1056,13 +1121,8 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">AXES</div>
-                        <div class="settings-hint">X/Y/Z are linear. Set A/B to <b>rotary</b> for a 4th/5th rotary axis — the 3D sim then spins the part on those axes' moves. One machine config covers both 3-axis and rotary jobs (the program decides).</div>
-                        <div class="settings-grid">
-                            <label>A — role<select id="set_axis_a_role"><option value="unused">Unused</option><option value="linear">Linear</option><option value="rotary">Rotary</option></select></label>
-                            <label>A — spins around<select id="set_axis_a_around"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label>
-                            <label>B — role<select id="set_axis_b_role"><option value="unused">Unused</option><option value="linear">Linear</option><option value="rotary">Rotary</option></select></label>
-                            <label>B — spins around<select id="set_axis_b_around"><option value="x">X</option><option value="y">Y</option><option value="z">Z</option></select></label>
-                        </div>
+                        <div class="settings-hint">X/Y/Z are linear. Set A/B to <b>Rotary</b> (the 3D sim spins the part on those axes' moves) or <b>Gantry slave</b> (a twin-motor axis that mirrors a master — homed with the master, never independently). One machine config covers 3-axis, rotary, and dual-gantry jobs.</div>
+                        <div id="set_axes_list"></div>
                     </div>
                 </div>
 
@@ -1463,13 +1523,7 @@ function wireSettingsOverlay(ov) {
         renderWcsTable(q('set_mach_wcs_table'), s.machine);
         q('set_mach_show').checked = !!s.machine.show;
         if (q('set_mach_softlimit')) q('set_mach_softlimit').checked = !!s.machine.softLimits;
-        if (q('set_axis_a_role')) {
-            const mo = s.motors || {};
-            q('set_axis_a_role').value = (mo.a && mo.a.role) || 'unused';
-            q('set_axis_a_around').value = (mo.a && mo.a.around) || 'x';
-            q('set_axis_b_role').value = (mo.b && mo.b.role) || 'unused';
-            q('set_axis_b_around').value = (mo.b && mo.b.around) || 'y';
-        }
+        renderAxesGui();   // t648 — the vertical per-axis role list (was static A/B role+around selects)
 
         q('set_probe_pin').value = s.probes.probePin;
         q('set_probe_level').value = s.probes.probeLevel;
@@ -2408,13 +2462,7 @@ function wireSettingsOverlay(ov) {
         const out = q('atc_tnc_out'); if (out && out.value) UIUtils.downloadFile('T.nc', out.value);
     });
 
-    // Machine → AXES: persist axis roles on change so the sim knows which axes are rotary (+ orientation).
-    ['a', 'b'].forEach((ax) => {
-        const role = q('set_axis_' + ax + '_role'), around = q('set_axis_' + ax + '_around');
-        const apply = () => { _ddcsSettings.motors = _ddcsSettings.motors || {}; _ddcsSettings.motors[ax] = { role: role.value, around: around.value }; saveSettings(); };
-        if (role) role.addEventListener('change', apply);
-        if (around) around.addEventListener('change', apply);
-    });
+    // Machine → AXES: the vertical per-axis role list (renderAxesGui) attaches its own change listeners (commit + re-render), so no static wiring here (t648).
 
         // Two-level tab logic: main L1 (General | Hardware) → filters sidebar items.
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
@@ -2425,7 +2473,7 @@ function wireSettingsOverlay(ov) {
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
         sideTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
-        if (id === 'set_tab_machine') renderMachineGui();   // axis list tracks motors; re-render on open
+        if (id === 'set_tab_machine') { renderMachineGui(); renderAxesGui(); }   // envelope box + the vertical axis-role list track motors; re-render on open (t648)
         if (id === 'set_tab_input') renderIoTable(ov.querySelector('#io_input_table'), 'input', getInputs(), syncIO);
         if (id === 'set_tab_output') renderIoTable(ov.querySelector('#io_output_table'), 'output', getOutputs(), syncIO);
         if (id === 'set_tab_atc') renderAtcSetup();
