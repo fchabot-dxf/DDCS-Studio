@@ -316,9 +316,13 @@ export class GcodeViz3D {
 
     _positionMarkers() {
         const off = this._probeXYOff();   // t363 — map each min-XY marker onto the datum-placed stock (physical − datum)
+        // t652 — a machine-frame op's Start is ALREADY in machine coords; the markers ride the part frame (offset by the WCS
+        // shift), so CANCEL that shift for a machine-frame op — exactly how the tool (:586) and the route (:823) already do it.
+        // Without this the Start marker double-shifts by the work origin (user-reported: G54 Y-500 pushed it outside the envelope).
+        const sh = this._toolMachineFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };
         for (let p = 0; p < this.spindleMarkers.length; p++) {
             const s = this._markerWorld(p);
-            this.spindleMarkers[p].position.set(s.x - off.x, s.y - off.y, s.z);
+            this.spindleMarkers[p].position.set(s.x - off.x - sh.x, s.y - off.y - sh.y, s.z - sh.z);
         }
         this._highlightSelectedStart();
     }

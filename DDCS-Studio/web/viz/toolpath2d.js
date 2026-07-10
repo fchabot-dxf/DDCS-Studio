@@ -58,6 +58,7 @@ export function createToolpath2d(canvas, opts = {}) {
     let startEmits = [];             // per-pass emitting flag [bool,…] → marker SHAPE (emitting=filled ◆, sim-only=hollow ◇) — orthogonal to the colour
     let passEnds = null;             // t107 — per-pass RUNTIME world-ENDs (from the trace): an anchorsAtPrev pass anchors its route at passEnds[p-1] (machine-faithful) + relocates its marker to end+cross; null → t94 static-start
     let toolPos = null;              // LIVE tool/probe position from the sim (engine onPositionChange) → the moving head marker
+    let machineFrame = false;        // t652 — a machine-frame op (homing = toolMachineFrame): the Start + route are ALREADY machine coords, so draw the WHOLE 2D in the machine frame (envelope raw, no work-origin shift) to match the 3D + keep the Start inside the envelope
     let drag = null, dragStart = null;   // dragStart = the per-pass start INDEX being dragged (null = none)
     const anim = { playing: false, k: 0, raf: null };
     const pulses = [];          // t319/INC-6 — active on-touch pulses [{x,y,pass,axis,slow,prog,speed,flashes,last}]; drawn as the HONEST top-view projection (Z=circle, X/Y wall=line)
@@ -97,14 +98,19 @@ export function createToolpath2d(canvas, opts = {}) {
     const pty = (y, pass) => ty(y + passOff(pass).y);
     // STOCK-PIN transform: the stock + the draggable start HANDLE ride the WCS pin. When anchored, machine=null →
     // pin=0, so the handle sits AT the start (= where the anchored path emanates); when absolute, both ride the pin (#13).
-    const sptx = (x) => tx(x + stockPin().x);
-    const spty = (y) => ty(y + stockPin().y);
+    // t652 — a machine-frame op's Start is ALREADY in machine coords: it rides NO work-origin/stock-pin shift (like the 3D marker
+    // cancels the part frame). The envelope is drawn raw-machine too (below), so the Start lands inside it. Else → the stock WCS pin.
+    const startPin = () => machineFrame ? { x: 0, y: 0 } : stockPin();
+    const sptx = (x) => tx(x + startPin().x);
+    const spty = (y) => ty(y + startPin().y);
 
     // ---- scene geometry (program/work frame; part-zero at 0,0) ----
     function envelopeRect() {
         const m = machine;
         if (!m || !m.show || !m.x || !m.y || !m.z) return null;
-        const wo = m.workOrigin || {}, wx = wo.x || 0, wy = wo.y || 0;
+        // t652 — a machine-frame op draws the envelope in RAW machine coords (home at 0), matching its machine-coord Start +
+        // route (and the 3D). A WORK-frame op shifts the envelope by −workOrigin so the WCS-pinned setup sits correctly inside it.
+        const wo = machineFrame ? {} : (m.workOrigin || {}), wx = wo.x || 0, wy = wo.y || 0;
         return { minX: Math.min(0, m.x) - wx, maxX: Math.max(0, m.x) - wx, minY: Math.min(0, m.y) - wy, maxY: Math.max(0, m.y) - wy };
     }
     function stockRect() {
@@ -175,6 +181,7 @@ export function createToolpath2d(canvas, opts = {}) {
         drawLabels(ctx, foot, step, w, h);
         if (starts.length) drawStartHandles(ctx);
         canvas.__t2starts = starts.map((s, i) => ({ i, sx: sptx(s.x), sy: spty(s.y), x: s.x, y: s.y, source: startSources[i] || 'auto', emits: !!startEmits[i] }));   // debug + tests: the drawn per-pass start handles + colour source + SHAPE (emits)
+        { const e = envelopeRect(); canvas.__t2env = e ? { minX: e.minX, minY: e.minY, maxX: e.maxX, maxY: e.maxY } : null; }   // t652 — debug + tests: the drawn envelope's MACHINE bounds (the marker's machine coord must fall inside)
         canvas.__t2cursor = cursor;   // debug + tests
         if (cursor) { if (cursor.snapped) drawSnap(ctx, cursor); drawReadout(ctx, cursor, w, h); }
     }
@@ -319,6 +326,7 @@ export function createToolpath2d(canvas, opts = {}) {
     function setSegments(next) { segs = next || []; if (view) paint(); else fit(); }
     function setMachine(m) { machine = m || null; if (view) paint(); }
     function setStock(s) { stock = s || null; if (view) paint(); }
+    function setMachineFrame(on) { machineFrame = !!on; if (view) paint(); }   // t652 — homing/machine-frame op: draw the whole 2D in the machine frame
     function setWcs(w) { wcs = w || null; }
     function setGridStep(s) { gridStep = Number(s) || 0; if (view) paint(); }
     function setStarts(arr) { starts = Array.isArray(arr) ? arr.filter(Boolean).map((p) => ({ x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, anchorsAtPrev: !!p.anchorsAtPrev })) : []; if (view) paint(); }   // per-pass operator starts (①②…); t94 keep anchorsAtPrev so passOff resolves the route draw-anchor
@@ -391,7 +399,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('pointermove', (e) => {
         if (!view) return;
         const r = canvas.getBoundingClientRect();
-        if (dragStart != null) { const p = stockPin(), cur = starts[dragStart], d = markerWorld(dragStart), drift = { x: d.x - (cur ? cur.x : 0), y: d.y - (cur ? cur.y : 0) }; starts[dragStart] = { x: (e.clientX - r.left - view.ox) / view.scale - p.x - drift.x, y: (view.oy - (e.clientY - r.top)) / view.scale - p.y - drift.y, z: cur ? cur.z : 0, anchorsAtPrev: cur ? cur.anchorsAtPrev : false }; paint(); return; }   // un-pin: handle drawn at +pin → program start = drawn − pin; t94 keep anchorsAtPrev; t107 subtract the passEnds relocation drift so the DISPLAYED (relocated) marker follows the cursor (pass-0 sim-only = drift 0, unchanged)
+        if (dragStart != null) { const p = startPin(), cur = starts[dragStart], d = markerWorld(dragStart), drift = { x: d.x - (cur ? cur.x : 0), y: d.y - (cur ? cur.y : 0) }; starts[dragStart] = { x: (e.clientX - r.left - view.ox) / view.scale - p.x - drift.x, y: (view.oy - (e.clientY - r.top)) / view.scale - p.y - drift.y, z: cur ? cur.z : 0, anchorsAtPrev: cur ? cur.anchorsAtPrev : false }; paint(); return; }   // un-pin: handle drawn at +pin → program start = drawn − pin (t652: startPin=0 for a machine-frame op, the exact inverse of the display sptx); t94 keep anchorsAtPrev; t107 subtract the passEnds relocation drift (pass-0 sim-only = drift 0)
         if (drag) { view.ox = drag.ox + (e.clientX - drag.x); view.oy = drag.oy + (e.clientY - drag.y); paint(); return; }
         const px = e.clientX - r.left, py = e.clientY - r.top, snap = snapPoint(px, py);
         cursor = snap ? { x: snap.x, y: snap.y, snapped: true } : { x: (px - view.ox) / view.scale, y: (view.oy - py) / view.scale, snapped: false };
@@ -407,7 +415,7 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
     return {
-        setGcode, setSegments, setMachine, setStock, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, setViewTransform, pulse, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setMachineFrame, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, setViewTransform, pulse, redraw, fit, play, stop, toggle, seek,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

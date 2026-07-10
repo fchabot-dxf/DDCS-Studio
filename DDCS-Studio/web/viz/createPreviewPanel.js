@@ -526,6 +526,7 @@ export function createPreviewPanel(container, opts = {}) {
         // (G90/G53 mill) op sits at its own coords. forceMachine (ATC) pins to the machine frame regardless.
         curAnchor = !forceMachine && !(parsed.stats && parsed.stats.absolute);
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
+        if (t2.setMachineFrame) t2.setMachineFrame(machineFrameTool);   // t652 — machine-frame op → the 2D draws in raw machine coords (Start + envelope), matching the 3D (robust vs lazy init)
         t2.setStarts(passStarts);   // the draggable 2D start handles — ALL per-pass starts, numbered (①②…)
         // t83 — per-pass reposition source (auto=cyan/straight, manual=amber/arc). PREFER the DECLARED source (the op's sim
         // provider — e.g. corner reads it from the LIVE param travelApproach), over the engine's G-code-TEXT inference
@@ -830,6 +831,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (on === machineFrameTool) return;
         machineFrameTool = on;
         if (viz && viz.setToolMachineFrame) viz.setToolMachineFrame(on);
+        if (t2 && t2.setMachineFrame) t2.setMachineFrame(on);   // t652 — the 2D draws the machine frame too (Start + envelope raw machine coords), matching the 3D
         if (active) setGcode();   // t578 — a machine-frame flip changes the trace FRAME (machine coords + seat + stock-ignore); RE-TRACE so the seated route lands NOW (mirrors setSeatAtStart). Without this the first render kept the pre-seat origin route until the next edit/drag ('on open it's not connecting the start and probe, only after first drag').
     }
 

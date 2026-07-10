@@ -8884,3 +8884,19 @@ The advisor (user-called) corrected the grounding: DON'T reverse-engineer the se
 - Studio: the review surfaces "Soft limits DISABLED on the controller" when geo.softLimitEnabled === false (honest reason).
 
 RE-VERIFY (eng-derived): test_pull_geometry.py 7/7 — Expert regression intact + NEW V4.1 cases pass through the real Ops methods: the parser NAMES the indices (softNeg #235-237, softPos #240-242, enable #234 enum, seek #204-206), travel 3830/3900/800, home MAX, X's home-dir conflict flagged, feeds 5000/5000/1500, softLimitEnabled False, WCS None. Studio pull tests 9/9 with the new profile-id/gantry/soft-limit-disabled rows; full suite 947 passed / 2 skipped. Files (this amendment): bridge/bridge-app/fairy/ops.py, bridge/bridge-app/tests/test_pull_geometry.py, DDCS-Studio/web/ui/settingsPanel.js.
+
+## 2026-07-10 (t652) — HOMING START-MARKER FRAME BUG (user-reported t647) — the machine-frame Start double-shifted by the WCS
+A homing op is toolMachineFrame — its Start marker is ALREADY in machine coords. The toolpath + tool already ignore the part-frame WCS shift (gcodeViz3d :586/:823), but the START MARKER did not, so with a non-zero WCS (G54 Y-500 on a 756/-776 machine) the 2D/3D previews double-shifted it OUTSIDE the envelope; the LAYOUT read the frame correctly. Full suite 949 passed / 2 skipped.
+
+REPRODUCED FIRST (the user's config shape): tests/homing-start-marker-frame.spec.js — machine 756/-776 + workOrigin Y-500; the 3D marker world Y != the declared machine-coord Start (off by the work origin), outside the envelope. Confirmed, then fixed.
+
+FIX (gate the start-marker transform on toolMachineFrame the SAME way the toolpath already is — not per-canvas hacks):
+- 3D (gcodeViz3d._positionMarkers): the markers ride the part frame (offset by partZeroShift = the WCS shift); CANCEL that shift for a machine-frame op — `sh = this._toolMachineFrame ? this.partFrame.shift : {0,0,0}` — mirroring the tool (:586) and the route (:823). So the machine-coord Start renders at its machine coord (world = local + shift cancels).
+- 2D (toolpath2d): a new `machineFrame` flag (setMachineFrame) draws the WHOLE 2D in the machine frame for a machine-frame op — the envelope in RAW machine coords (no −workOrigin shift) AND the Start with no stock-pin (`startPin() = machineFrame ? 0 : stockPin()`), so the Start + route + envelope share one machine frame (matching the 3D) and the Start sits inside the envelope. The drag-back inverts the SAME display transform (line 402: stockPin → startPin), so a 2D drag writes the correct machine coord.
+- createPreviewPanel wires t2.setMachineFrame(machineFrameTool) in setToolMachineFrame + the render (robust vs lazy init). The 3D drag is delta-based (frame-invariant) so it's unaffected.
+
+VERIFY (assert the value + real symptom):
+- 3D: the marker's WORLD Y == the declared machine-coord Start Y (no double-shift) + inside [machine.y, 0]. Screenshot: the tool + Start sit inside the envelope on the machine floor.
+- 2D: the machine-coord Start falls INSIDE the drawn (machine-frame) envelope; the pre-fix work-shifted envelope [−276,500] would EXCLUDE it (the bug). New __t2env debug hook (peer of __t2starts).
+- NEGATIVE CONTROL: a WORK-frame op (corner) keeps machineFrame OFF → the marker rides the WCS pin unchanged (corner-atrest-parity + the OFF case in the 2D test both green); homing-preview-machine-frame (the machine-frame TOOL) still green (my _positionMarkers change is the same gate).
+- Full suite 949 passed / 2 skipped. Files: viz/gcodeViz3d.js, viz/toolpath2d.js, viz/createPreviewPanel.js, tests/homing-start-marker-frame.spec.js (new).
