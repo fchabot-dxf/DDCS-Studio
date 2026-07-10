@@ -8410,3 +8410,29 @@ base-compute → `mkWcsBase(w)` (wcsbaseinto); X `#[#70]=#102` → wcswrite{offs
 
 ### CORNER E1 IS COMPLETE — all 3 leak-classes fold per post, Expert byte-diff ZERO
 probe-status (already clean, probecheck) + trigger-read + HMI + WCS-write. The mechanisms (probeTrigVar / hmiline / wcsbaseinto+wcswrite + skipComp) are now proven ONCE on corner; E2 edge + E3 middle INHERIT the same seams/atoms. The probe-miss-on-V4.1/DM500 safety gap stays a designed increment AFTER the E-series (advisor-adopted; not built here).
+
+---
+## 2026-07-09 (t614) — F1/E2 edge: GATE — edge surfaced 3 idioms corner did NOT have (NO CODE, per the advisor's rule)
+
+Converting edge through corner's proven seams, edge surfaced THREE novel idioms. The advisor's dispatch: "If edge surfaces an idiom corner did NOT have, GATE and describe it rather than improvising a new seam." Gating with recommendations.
+
+### INHERITED classes (convert cleanly with the proven seams — no new mechanism)
+- probe-STATUS: already folds (edge's probeSurface uses probecheck → [] on V4.1/DM500). ✓
+- WCS BASE compute (#71/#72/#70): → the wcsbaseinto atom (Expert base / non-Expert []). ✓
+- HMI toast/error (#1505=-5000 "Edge found" / #1505=1 "Probe failed"): → the hmiline atom (spaced Expert / comment off-post). ✓
+- TRIGGER read (#50=[#1925+#6] via probeSurface radiuscomp): → pass rawAxis:axis (Expert #1925 byte-identical, V4.1 #1500, DM500 #864). ✓
+
+### NOVEL idiom 1 — the ESC-CANCEL IF (`IF #1505==0 GOTO2` right after the start prompt)
+Edge's start is a CONFIRM gate: `#1505=1 ( Press Enter to probe X pos - ESC=cancel )` THEN `IF #1505==0 GOTO2` (ESC sets #1505=0 → skip to end). Corner's start was a BARE note (hmiline, no ESC IF). Problem: if I fold the prompt via hmiline (→ a comment) but leave the IF, then on V4.1/DM500 #1505 is NEVER set → `IF #1505==0` is TRUE → GOTO2 → the probe is SKIPPED (a silent no-op / mis-branch). So the prompt + ESC are ONE unit that must fold together. The `confirm` atom folds BOTH (hmiPrompt→[] + the ESC ifGoto→[]) — but its Expert prompt is the NO-SPACE `#1505=1(msg)` + it uses hmiCancelVar, which does NOT byte-match edge's SPACED `#1505=1 ( ... )`. RECOMMEND: a spaced-confirm seam (hmiline's sibling) — an atom whose Expert form is the spaced `#1505=1 ( note )` + `IF #1505==0 GOTO<n>` and which folds BOTH lines to [] off-HMI. (NOTE: corner's MANUAL-travel arm (safeTraverseStack) has the SAME ESC IF, left unconverted in E1 — this seam closes that shared gap too.)
+
+### NOVEL idiom 2 — the G31 STOP/LIMIT protection registers (`#1905=0` "Stop mode: decelerate" + `#1915=2` "Limit protect")
+Emitted by probeSurface's stopVar/limitVar (edge passes AX.stop/AX.limit; corner passed NEITHER). These are Expert-G31 behaviour config (#1905-1907 stop-mode, #1915-1917 limit-protect). V4.1's G31 form (`G31 X L#682 Q1 K0 F`) doesn't use them; DM500 has no G31 (M101/G01/M102). So they're unmapped Expert literals on V4.1/DM500 → the "zero Expert registers" goal fails. RECOMMEND: fold them at the probeSurface seam — either a dialect seam `probeGuard({stop, limit})` (Expert emits the two assigns / non-G31 posts → []) OR gate the stopVar/limitVar assigns on a cap (probeStatusCheck / a new g31Protect). MIDDLE uses the same stop/limit → this seam serves E3 too.
+
+### NOVEL idiom 3 — the DIRECT-NESTED WCS write (`#[#70+off]=#50`)
+Edge writes `#[#70+0]=#50` (X) / `#[#70+1]=#50` (Y) — the DIRECT nested form. Corner's wcsWriteIndirect emits `#[#70]=v` (offset 0) or `#73=[#70+off]`+`#[#73]=v` (offset>0, the temp form). Edge's `#[#70+0]` (with the +0) and `#[#70+1]` (direct, no #73) are DIFFERENT bytes. RECOMMEND: add a `direct` mode to wcsWriteIndirect → Expert `#[#70+offset]=value` (byte-identical to edge); non-Expert delegates to setWorkOffset (G92) exactly as today. MIDDLE uses `#[#70+2]=#57` (direct) too → shared.
+
+### ENTANGLEMENT + why NO partial convert
+base↔write are coupled (fold the base but not the write → `#[#70+0]` references an undefined #70) and prompt↔ESC are coupled (fold the prompt but not the ESC → mis-branch). So edge converts as ONE unit AFTER the ruling — a half-convert introduces bugs. Expert byte target captured (edge X-pos emit); Expert byte-diff must stay ZERO.
+
+### RECOMMENDATION (one line)
+All 3 are small, natural extensions of the proven pattern: a spaced-confirm seam (idiom 1), a probeSurface stop/limit fold (idiom 2), a `direct` mode on wcsWriteIndirect (idiom 3). All three ALSO serve E3 middle. Awaiting your ruling on the 3 before I build edge (+ E3 middle then inherits them).
