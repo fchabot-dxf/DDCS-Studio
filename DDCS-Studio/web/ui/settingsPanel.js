@@ -1621,8 +1621,9 @@ function wireSettingsOverlay(ov) {
         }
         if (anyWcs) {
             const ar = table[active - 1] || { x: 0, y: 0, z: 0 };
-            cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[active - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table, active } });
-        } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: '—', kind: 'note' });
+            const detail = table.map((r, i) => ({ label: `${WCS_NAMES[i]}${i === active - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === active - 1 ? '← active' : '' }));   // DETAIL: all 6 systems' raw offsets, active flagged
+            cands.push({ group: 'WCS table (G54–G59)', label: `${WCS_NAMES[active - 1]} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table, active }, detail });
+        } else notes.push({ group: 'WCS table (G54–G59)', label: 'Not readable / all zero', value: 'controller returned no non-zero WCS offsets', kind: 'note' });
         // Machine envelope / home / feeds — from the controller's soft-limit + homing params (gateway /api/profile geometry).
         // t594 — signed travel per axis (magnitude × homeDir), the per-axis Home EDGE (→ settings.limits <edge>Home), and the
         // homing feeds. A SENTINEL axis (travel null: both soft-limit ends ±9999) shows 'not declared on the controller' + stays
@@ -1632,18 +1633,26 @@ function wireSettingsOverlay(ov) {
         const hd = (geo && geo.homeDir) || {};
         const he = (geo && geo.homeEdge) || {};
         const hec = (geo && geo.homeEdgeConflict) || {};
+        const sl = (geo && geo.softLimits) || {};   // the RAW soft-limit registers per axis (min/max) — the detail rows show these → the derived travel
         const mc = _ddcsSettings.machine || {};
         const AX = [['x', 'X'], ['y', 'Y'], ['z', 'Z']];
+        const slRaw = (a) => (sl[a + 'Min'] != null || sl[a + 'Max'] != null) ? `min ${sl[a + 'Min'] ?? '—'} · max ${sl[a + 'Max'] ?? '—'}` : 'not returned';
         const declared = tv ? AX.filter(([a]) => tv[a] != null && tv[a] > 0) : [];
         const signed = (a) => (hd[a] || (tv[a] < 0 ? -1 : 1)) * Math.abs(tv[a] || 0);
         if (declared.length) {
             const edgeLabel = (a) => he[a] ? (he[a] === 'max' ? 'MAX-home' : 'min-home') + (hec[a] ? ' ⚠dir-bit differs' : '') : '';
             const desc = declared.map(([a, L]) => `${L} ${signed(a) > 0 ? '+' : ''}${signed(a)}${he[a] ? ' (' + edgeLabel(a) + ')' : ''}`).join(' · ');
             const changed = declared.some(([a]) => signed(a) !== mc[a]) || AX.some(([a]) => he[a] && !(_ddcsSettings.limits || {})[a + (he[a] === 'max' ? 'Max' : 'Min') + 'Home']);
-            cands.push({ group: 'Machine envelope', label: 'Travel + home switches', value: desc, changed, kind: 'travel', data: { travel: tv, homeDir: hd, homeEdge: he, homeEdgeConflict: hec } });
-            // sentinel axes → a review NOTE so the user knows to fill them (never silently left at the default).
+            // DETAIL rows (user ask t622): per axis, the RAW soft-limit registers → the signed-travel result, and the dir-bit + soft-limit cross-check → the home-edge verdict.
+            const detail = [];
+            declared.forEach(([a, L]) => {
+                detail.push({ label: `${L} envelope`, raw: `soft-limits ${slRaw(a)}`, derived: `travel ${signed(a) > 0 ? '+' : ''}${signed(a)} mm` });
+                if (he[a]) detail.push({ label: `${L} home edge`, raw: `dir bit ${hd[a] > 0 ? '+1' : (hd[a] < 0 ? '−1' : '0')}${hec[a] ? ' · far soft-limit end DISAGREES' : ' · far soft-limit end agrees'}`, derived: `home ${edgeLabel(a)}` });
+            });
+            cands.push({ group: 'Machine envelope', label: 'Travel + home switches', value: desc, changed, kind: 'travel', data: { travel: tv, homeDir: hd, homeEdge: he, homeEdgeConflict: hec }, detail });
+            // sentinel axes → a review NOTE so the user knows to fill them (never silently left at the default); show the RAW sentinel reply.
             const undeclared = AX.filter(([a]) => !(tv[a] != null && tv[a] > 0));
-            for (const [, L] of undeclared) notes.push({ group: 'Machine envelope', label: `${L} not declared on the controller`, value: 'soft limits off (±9999) — set your travel', kind: 'note' });
+            for (const [a, L] of undeclared) notes.push({ group: 'Machine envelope', label: `${L} not declared on the controller`, value: `raw ${slRaw(a)} → ±9999 sentinel → undeclared`, kind: 'note' });
         } else if (hwProfile && hwProfile.id) {
             notes.push({ group: 'Machine envelope', label: 'Not declared on the controller', value: 'soft limits off — keeping current', kind: 'note' });
         }
@@ -1651,7 +1660,12 @@ function wireSettingsOverlay(ov) {
         const hf = geo && geo.homingFeeds;
         if (hf && hf.speed) {
             const seek = Math.round(hf.speed.x || hf.speed.y || hf.speed.z || 0), slow = Math.round(hf.precision || 0);
-            if (seek > 0) cands.push({ group: 'Homing', label: 'Homing feeds', value: `Seek ${seek} · Slow ${slow} mm/min`, changed: true, kind: 'homingFeeds', data: { speed: hf.speed, precision: hf.precision } });
+            if (seek > 0) {
+                const detail = [];   // DETAIL: the raw homing-speed registers (#107-109 seek / #118 precision) → the seeded values
+                AX.forEach(([a, L]) => { if (hf.speed[a] != null) detail.push({ label: `${L} seek`, raw: `#${107 + AX.findIndex(([x]) => x === a)} = ${hf.speed[a]} mm/min`, derived: `${Math.round(hf.speed[a])}` }); });
+                detail.push({ label: 'precision (slow)', raw: `#118 = ${hf.precision ?? '—'} mm/min`, derived: `${slow}` });
+                cands.push({ group: 'Homing', label: 'Homing feeds', value: `Seek ${seek} · Slow ${slow} mm/min`, changed: true, kind: 'homingFeeds', data: { speed: hf.speed, precision: hf.precision }, detail });
+            }
         }
         // reason (only meaningful when !connected): no-gateway = the bridge never answered; no-controller = bridge up, machine didn't respond.
         return { connected, candidates: cands.concat(notes), controller: (hwProfile && hwProfile.id) ? { id: hwProfile.id, name: hwProfile.name } : null, reason: connected ? null : (gatewayReached ? 'no-controller' : 'no-gateway') };
@@ -1727,6 +1741,12 @@ function wireSettingsOverlay(ov) {
                 #import-modal .im-tag.def { background: rgba(128,128,128,.18); color: var(--text-dim); }
                 #import-modal .im-tag.na { background: transparent; color: var(--text-dim); font-style: italic; }
                 #import-modal .im-note-row { cursor: default; opacity: .85; }
+                #import-modal .im-detail { padding: 1px 0 7px 30px; display: flex; flex-direction: column; gap: 3px; }
+                #import-modal .im-drow { display: grid; grid-template-columns: 118px 1fr auto auto; align-items: baseline; gap: 8px; font-size: 11px; }
+                #import-modal .im-dlbl { color: var(--text-dim); }
+                #import-modal .im-draw { font-family: monospace; color: var(--text-main); font-size: 11px; }
+                #import-modal .im-darr { color: var(--text-dim); }
+                #import-modal .im-dder { font-family: monospace; color: #3cb24f; white-space: nowrap; font-size: 11px; }
                 #import-modal .im-foot { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
                 #import-modal .im-only { font-size: 11.5px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; cursor: pointer; }
             </style>
@@ -1762,17 +1782,23 @@ function wireSettingsOverlay(ov) {
         if (_importController && _importController.id && _importController.id !== getActiveProfile().id) {   // pulling will change the dialect
             html += `<div class="im-banner">Connected controller: <b>${_importController.name}</b> — applying <b>Hardware &amp; I/O</b> switches your machine profile + post from <b>${getActiveProfile().name}</b> to it.</div>`;
         }
+        // DETAIL sub-rows (t622) — the RAW value read AND the derivation per row, always visible (the user came to REVIEW).
+        const detailHtml = (c) => (c.detail && c.detail.length)
+            ? '<div class="im-detail">' + c.detail.map((d) => `<div class="im-drow"><span class="im-dlbl">${d.label}</span><span class="im-draw">${d.raw}</span>${d.derived ? `<span class="im-darr">→</span><span class="im-dder">${d.derived}</span>` : '<span></span><span></span>'}</div>`).join('') + '</div>'
+            : '';
         Object.keys(groups).forEach((g) => {
             html += `<div class="im-group">${g}</div>`;
             groups[g].forEach((c) => {
-                if (isNote(c)) {   // explicit "not readable / not available / at default" — informational, not tickable
+                if (isNote(c)) {   // explicit "not readable / not available / at default" — informational, not tickable; shows the RAW reply
                     html += `<div class="im-row im-note-row"><span></span><span class="im-lbl">${c.label}</span><span class="im-val">${c.value}</span><span class="im-tag na">n/a</span></div>`;
+                    html += detailHtml(c);
                     return;
                 }
                 const i = _importCands.indexOf(c);
                 html += `<label class="im-row"><input type="checkbox" data-cand="${i}"${c.checked ? ' checked' : ''}>`
                     + `<span class="im-lbl">${c.label}</span><span class="im-val">${c.value}</span>`
                     + `<span class="im-tag ${c.changed ? 'chg' : 'def'}">${c.changed ? 'changed' : 'default'}</span></label>`;
+                html += detailHtml(c);
             });
         });
         if (onlyChanged && hiddenDefaults) html += `<div class="im-empty">+${hiddenDefaults} value${hiddenDefaults > 1 ? 's' : ''} at factory default — untick “Show only changed” to add them.</div>`;

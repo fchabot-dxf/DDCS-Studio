@@ -8514,3 +8514,22 @@ The advisor's verify-e45-scope.mjs disproved E0's "rotary+alignment already atom
 
 ### THE ENTIRE E-SERIES (probe family) IS NOW TRULY COMPLETE
 corner (E1) + edge (E2) + middle (E3) + alignment (E4) + rotary center/clock (E5) — ALL fold per post, Expert byte-diff ZERO, V4.1/DM500 zero executable Expert registers. Remaining F1: the probe-MISS safety increment (advisor-adopted) + F2 (ATC) / F4-F7.
+
+---
+## 2026-07-09 (t622) — PULL-REVIEW DETAIL ROWS (user's direct ask: "see more detail of what was found, envelope etc")
+
+The E-series is CLOSED (advisor released V10.105). New feature: the Pull-from-controller review modal now shows always-visible DETAIL sub-rows — the RAW value read AND the derivation, per row. UX: always-expanded (the user came to REVIEW; everything visible beats click-to-expand), GUI-first.
+
+### The detail rows (presentation of data the scan already returns — additive payload only)
+- **scanController** (settingsPanel.js): each derived candidate gained a `detail` array of `{label, raw, derived}`, sourced from the geometry the scan ALREADY returns (extended additively where needed): `sl = geo.softLimits` (the RAW soft-limit registers) is now read for the envelope detail. No gateway-protocol change, no re-query.
+  - ENVELOPE per axis: `soft-limits min <slMin> · max <slMax>` → `travel <signed> mm` (e.g. X `min -9999 · max 756` → `+756`; Y `min -776 · max 5` → `-776`).
+  - HOME EDGE per axis: `dir bit <±1> · far soft-limit end agrees/DISAGREES` → `home <min-home|MAX-home ⚠dir-bit differs>`.
+  - SENTINEL/undeclared axis (Z): the NOTE now shows the RAW reply — `raw min -9999 · max 9999 → ±9999 sentinel → undeclared`.
+  - HOMING FEEDS: per-axis `#107-109 = <raw> mm/min` → `<seed>`, plus `#118 = <raw>` → `<slow>`.
+  - WCS table: all 6 systems' raw offsets (`X.. Y.. Z..`), the active one flagged `← active`.
+  - Enriched the N/A notes (WCS "controller returned no non-zero WCS offsets") so a skipped row explains WHY.
+- **renderImportReview**: a `detailHtml(c)` renders the `detail` sub-rows (label · raw · → · derived) under each candidate; the apply/cancel flow + the z-stacking (13100 tier) are untouched. New `.im-detail/.im-drow/...` CSS (muted label, monospace raw, green derived).
+
+### VERIFY (against the REAL June capture)
+- New tests/pull-review-detail.spec.js drives the modal with the June geometry (X 756 home MIN, Y -776 home MAX, Z sentinel) and asserts the DETAIL VALUES in the DOM (numbers, not just presence): X env `min -9999 · max 756` → `+756`; Y env → `-776`; X `min-home`, Y `MAX-home`; feeds `2000`/`150`; the Z sentinel note shows `9999`+`sentinel/undeclared`. Plus the no-gateway error path still shows the visible error. Screenshot: scratchpad/pull-detail-expanded.png (opened for the human).
+- pull-modal-stacking + pull-machine-truth stay green (9/9 with the new spec). Full suite green.
