@@ -19,8 +19,11 @@ function isPywebview() { return !!(window.pywebview && window.pywebview.api); }
 export function buildProfile() {
     const db = getDB();
     const ap = (() => { try { return getActiveProfile(); } catch (e) { return null; } })();
+    const lib = window.ddcsProfileLib;   // t658 — the named-profile library: the active profile's NAME rides the export JSON
+    const name = (() => { try { return lib ? (lib.activeProfile() || {}).name || '' : ''; } catch (e) { return ''; } })();
     return {
         version: PROFILE_VERSION,
+        name,                                 // t658 — the user's profile name (import lands it as a named library profile)
         controllerId: ap ? ap.id : '',        // which controller this profile is for → load restores the dialect/post
         controllerName: ap ? ap.name : '',
         settings: getSettings(),
@@ -69,12 +72,26 @@ export async function exportProfile() {
     setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
+// t658 — a loaded/imported profile becomes a NAMED entry in the local library (a FULL swap, not a merge); prompt for a
+// name (prefilled from the export's own name). Falls back to applyProfile (merge) only if the library isn't loaded.
+function landImportedProfile(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    if (window.ddcsProfileLib && window.ddcsProfileLib.importAsProfile) {
+        const suggested = obj.name || obj.controllerName || '';
+        const name = (typeof window.prompt === 'function') ? window.prompt('Name this imported profile:', suggested) : suggested;
+        if (name == null) return;   // cancelled
+        window.ddcsProfileLib.importAsProfile(obj, name.trim());
+    } else {
+        applyProfile(obj);
+    }
+}
+
 export async function importProfile() {
     // Desktop (.exe): read the local file via the Python bridge
     if (isPywebview() && window.pywebview.api.loadProfile) {
         try {
             const json = await window.pywebview.api.loadProfile();
-            if (json) applyProfile(JSON.parse(json));
+            if (json) landImportedProfile(JSON.parse(json));
             return;
         } catch (e) { /* fall back to file picker */ }
     }
@@ -87,7 +104,7 @@ export async function importProfile() {
         if (!f) return;
         const r = new FileReader();
         r.onload = (e) => {
-            try { applyProfile(JSON.parse(e.target.result)); }
+            try { landImportedProfile(JSON.parse(e.target.result)); }
             catch (err) { console.error('Invalid profile JSON', err); }
         };
         r.readAsText(f);

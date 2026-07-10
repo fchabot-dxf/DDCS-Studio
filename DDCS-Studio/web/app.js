@@ -57,6 +57,7 @@ import './ui/settingsPanel.js';
 
 // Profile store (one JSON = settings + user variables; pywebview file-I/O ready)
 import './data/profileStore.js';
+import './data/profileLibrary.js';   // t658 — the local named-profile library (window.ddcsProfileLib)
 
 // Virtual I/O simulation — browser-only mock of hardware handshakes (ATC, drawbar, etc.)
 // Used by the Studio's G-code simulation/preview engine to animate full macro cycles

@@ -786,6 +786,23 @@ export function applySettings(incoming) {
     if (_fillSettingsInputs) _fillSettingsInputs();
 }
 
+// FULL SETTINGS SWAP (t658 profile switch) — replace the live settings ENTIRELY with `incoming`; NEVER a partial merge (a
+// profile switch must not blend the outgoing profile's values). Rebuilds through the ONE canonical reconstruction
+// (loadSettings' defaults + explicit keys, so every one-source seam — motors/gantry, homing, WCS, autostartProfileId — is
+// carried), then copies into the LIVE _ddcsSettings IN PLACE (the ~36 readers hold this reference; never reassign it).
+export function replaceSettings(incoming) {
+    if (!incoming || typeof incoming !== 'object') return;
+    let prev = null; try { prev = localStorage.getItem(DDCS_SETTINGS_KEY); } catch (e) { /* */ }
+    let staged;
+    try { localStorage.setItem(DDCS_SETTINGS_KEY, JSON.stringify(incoming)); staged = loadSettings(); }
+    finally { try { if (prev != null) localStorage.setItem(DDCS_SETTINGS_KEY, prev); } catch (e) { /* */ } }
+    for (const k of Object.keys(_ddcsSettings)) if (!(k in staged)) delete _ddcsSettings[k];   // drop keys the target lacks — a true swap
+    Object.assign(_ddcsSettings, staged);
+    saveSettings();
+    if (Array.isArray(_ddcsSettings.inputs)) syncFlatFromIO(_ddcsSettings);   // mirror the swapped I/O into the flat limits (declaredHomeEdgeSide reads these)
+    if (_fillSettingsInputs) _fillSettingsInputs();
+}
+
 function buildSettingsOverlay() {
     const parent = document.getElementById('settings-app');
     if (!parent) return;
@@ -928,32 +945,36 @@ function buildSettingsOverlay() {
                         <label class="settings-check"><input type="checkbox" id="set_cp_ghost"> Suggestion box — a floating box of likely next blocks on the canvas (click, or Tab takes the first)</label>
                     </div>
                 </div>
-                <!-- GENERAL: PROFILE -->
+                <!-- GENERAL: PROFILE (t658 — profile-first: a named profile is the unit; the controller is a property, in its own section) -->
                 <div id="set_tab_profile">
                     <div class="settings-section">
-                        <div class="settings-section-title">CONTROLLER</div>
-                        <div class="settings-row">
-                            <select id="set_profile" title="Controller profile — presets the hardware your machine has" style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
-                            <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins) from the bridged controller. Offline controllers like the DDCS 3.1: use Import profile.">↧ Pull from controller</button>
+                        <div class="settings-section-title">PROFILE</div>
+                        <div class="settings-row" style="align-items:center;">
+                            <input type="text" id="set_profile_name" placeholder="Name this machine config…" title="This profile's name (rename freely)" style="flex:1; min-width:160px; background:var(--bg); color:var(--text-main); border:1px solid var(--border); border-radius:4px; font-size:14px; font-weight:600; padding:5px 8px;">
+                            <button class="toolbar-btn settings-io" id="set_profile_delete" title="Delete this profile (the last profile can't be deleted)">🗑 Delete</button>
                         </div>
-                        <div class="settings-hint">Which controller you have (DDCS Expert, 4.1, …) — sets the G-code dialect/post and presets your hardware tabs. (The <b>Profile</b> below saves your actual settings + variables for it.)</div>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">POST PROCESSOR</div>
-                        <div class="settings-row">
-                            <select id="set_post" title="Which controller's G-code to generate. 'Follow machine profile' uses your machine's native post; override to emit code for another controller." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
+                        <div class="settings-hint" id="set_profile_name_hint" style="margin-top:4px;"></div>
+                        <div id="set_profile_list" style="display:flex; flex-direction:column; gap:4px; margin-top:10px;"></div>
+                        <div class="settings-row" style="margin-top:8px;">
+                            <button class="toolbar-btn settings-io" id="set_profile_new_base">＋ New profile</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_new_dup">⧉ Duplicate current</button>
                         </div>
-                        <div class="settings-hint" id="set_post_hint">Which controller's G-code the Blocks view generates. Defaults to your machine's post; override to target another controller.</div>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">PROFILE (settings + variables)</div>
-                        <div class="settings-row">
-                            <button class="toolbar-btn settings-io" id="set_profile_export">⬇ Export profile</button>
-                            <button class="toolbar-btn settings-io" id="set_profile_import">⬆ Import profile</button>
+                        <div class="settings-hint">Named saved states — several for the same controller (different tables / fixtures) is fine. Switching swaps EVERYTHING: envelope, WCS, boot macro, variables.</div>
+                        <div class="settings-row" style="margin-top:12px;">
+                            <button class="toolbar-btn settings-io" id="set_profile_export">⬇ Export</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_import">⬆ Import</button>
                             <button class="toolbar-btn settings-io" id="set_profile_cloud_save">☁ Save to cloud</button>
                             <button class="toolbar-btn settings-io" id="set_profile_cloud_load">☁ Load from cloud</button>
                         </div>
-                        <div class="settings-hint">One JSON with your machine/stock/limits + user variables. The desktop app saves it to a local file automatically; <b>Save/Load to cloud</b> keeps named profiles in your own Google Drive (Settings → Cloud) — pull at the machine, load on a remote PC for a faithful sim.</div>
+                        <div class="settings-hint">Export the active profile as one JSON (the name rides with it). Import lands it as a new named profile. <b>Save/Load to cloud</b> keeps named profiles in your Google Drive (Settings → Cloud).</div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">CONTROLLER</div>
+                        <div class="settings-row" style="align-items:center;">
+                            <select id="set_profile" title="The working controller — this profile's dialect/post, envelope, WCS and boot macro are all generated for it. Change it to retarget this profile." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
+                            <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins + WCS) from the bridged controller. Offline controllers: use Import profile.">↧ Pull from controller</button>
+                        </div>
+                        <div class="settings-hint" id="set_controller_hint">The controller this profile targets — dialect, envelope, WCS and the boot macro are all generated for it. Changing it retargets THIS profile (to generate for another controller temporarily, duplicate the profile instead).</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">EDITOR</div>
@@ -1661,11 +1682,44 @@ function wireSettingsOverlay(ov) {
                 if (factory) _ddcsSettings.macros = JSON.parse(JSON.stringify(factory));
             }
 
+            setActivePostId('auto');   // t658 — the CONTROLLER dropdown IS the working controller; the emit follows it (no separate post override)
             saveSettings();
             fill();
             applyHardwareTabs();
-            fillPostOptions();   // refresh the "Follow machine profile (…)" label for the new machine
+            fillPostOptions();
+            if (window.ddcsProfileLib) window.ddcsProfileLib.saveActiveSnapshot();   // t658 — the controller is THIS profile's property; record the change
+            renderProfileLibrary();
         });
+
+    // ── t658 — the NAMED-PROFILE LIBRARY UI (profile-first). window.ddcsProfileLib is loaded in app.js. ──
+    const profLib = () => window.ddcsProfileLib || null;
+    function renderProfileLibrary() {
+        const L = profLib(); if (!L) return;
+        const active = L.activeProfile() || {};
+        const unnamed = L.needsName();   // profiles are only ever user-named; the migrated config prompts (non-blocking-but-persistent) until named
+        const nameEl = q('set_profile_name');
+        if (nameEl) { if (document.activeElement !== nameEl) nameEl.value = active.name || ''; nameEl.placeholder = unnamed ? ('e.g. ' + getActiveProfile().name + ' — name this config…') : 'Name this machine config…'; }
+        const nameHint = q('set_profile_name_hint');
+        if (nameHint) { nameHint.textContent = unnamed ? '⚠ Name your machine config to save it as a profile (it works as-is; type a name above — a suggestion is prefilled).' : ''; nameHint.style.color = unnamed ? 'var(--warn,#d1902b)' : ''; }
+        const listEl = q('set_profile_list');
+        if (listEl) {
+            listEl.innerHTML = L.listProfiles().map((p) => {
+                const on = p.id === active.id, ctrl = (CONTROLLER_PROFILES[p.controllerId] || {}).name || p.controllerId;
+                return '<button class="toolbar-btn settings-io prof-row" data-pid="' + p.id + '" style="text-align:left; padding:6px 10px; ' + (on ? 'border-color:var(--accent); font-weight:700;' : '') + '">' + (on ? '● ' : '○ ') + (p.name ? p.name : '(unnamed)') + '  <span style="opacity:.6; font-weight:400;">· ' + ctrl + '</span></button>';
+            }).join('');
+            listEl.querySelectorAll('.prof-row').forEach((b) => b.addEventListener('click', () => { if (b.dataset.pid === active.id) return; L.switchProfile(b.dataset.pid); afterProfileChange(); }));
+        }
+        const delBtn = q('set_profile_delete'); if (delBtn) delBtn.disabled = L.listProfiles().length <= 1;
+    }
+    function afterProfileChange() { fillProfileOptions(); fillPostOptions(); fill(); applyHardwareTabs(); renderProfileLibrary(); }
+    // profiles are ONLY ever USER-NAMED (t658 amend): New + Duplicate always prompt; an empty name cancels (no auto-names).
+    const promptName = (msg, def) => { const n = window.prompt(msg, def || ''); if (n == null) return null; const t = String(n).trim(); return t || null; };
+    if (q('set_profile_name')) q('set_profile_name').addEventListener('change', (e) => { const L = profLib(); if (!L) return; L.renameProfile(L.activeProfileId(), e.target.value); renderProfileLibrary(); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); });
+    if (q('set_profile_delete')) q('set_profile_delete').addEventListener('click', () => { const L = profLib(); if (!L) return; const a = L.activeProfile(); if (L.listProfiles().length <= 1) { alert('The last profile can\'t be deleted.'); return; } if (!confirm('Delete the profile “' + (a.name || 'unnamed') + '”? This can\'t be undone.')) return; L.deleteProfile(a.id); afterProfileChange(); });
+    if (q('set_profile_new_dup')) q('set_profile_new_dup').addEventListener('click', () => { const L = profLib(); if (!L) return; const name = promptName('Name the duplicate profile:'); if (name == null) return; L.createProfile({ from: 'dup', name }); afterProfileChange(); });
+    if (q('set_profile_new_base')) q('set_profile_new_base').addEventListener('click', () => { const L = profLib(); if (!L) return; const name = promptName('Name the new profile:'); if (name == null) return; L.createProfile({ from: 'baseline', controllerId: getActiveProfile().id, name }); afterProfileChange(); });
+    renderProfileLibrary();
+    window.addEventListener('ddcs:settings-changed', () => { try { renderProfileLibrary(); } catch (e) { /* */ } });
         // When a gateway answers (same-origin in the gateway-served/exe face, or via the ?api= dev
         // override), fetch the controller's own profile and offer it in the list (shown as
         // "… (from controller)"). Silently ignored if offline / not bridged (hosted Studio).
