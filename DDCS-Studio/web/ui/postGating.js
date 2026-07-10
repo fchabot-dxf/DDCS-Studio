@@ -20,6 +20,7 @@ const CAP_FIELDS = {
 const CAP_WHY = {
     probePort: 'probes without a G31 P/L/Q word (G38.2 / move-until-input / fixed in firmware)',
     toolTable: 'no in-program tool table / ATC on this controller (e.g. grbl)',
+    atc: 'no pneumatic tool-changer model on this controller — the drawbar/pusher/pocket dance is DDCS-Expert only',
     hmi: 'no in-program operator prompts on this controller',
     vars: 'no #variables on this controller',
     wcsSync: 'dual-gantry slave sync is an M350 register write (#883/#884); no equivalent on this post',

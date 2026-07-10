@@ -42,8 +42,8 @@ function H(S) {
         SPOFF: () => { const b = newBlock('spindle'); b.params = { rpm: 0 }; S.push(b); },
         COOLOFF: () => { const b = newBlock('coolant'); b.params = { flow: 'off' }; S.push(b); },
         MM: (axis, to) => { const b = newBlock('machinemove'); b.params = { axis, to }; S.push(b); },
-        MC: (code, note) => { const b = newBlock('mcode'); b.params = { code, note }; S.push(b); },
-        RAW: (text) => { const b = newBlock('raw'); b.params = { text }; S.push(b); },
+        MC: (code, note, cap) => { const b = newBlock('mcode'); b.params = { code, note, ...(cap ? { cap } : {}) }; S.push(b); },
+        RAW: (text, cap) => { const b = newBlock('raw'); b.params = { text, ...(cap ? { cap } : {}) }; S.push(b); },   // t640 — cap:'atc' folds the pneumatic codes on a non-ATC post
         CF: (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); },
         PAUSE: () => S.push(newBlock('pause')),
         MSG: (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); },
@@ -108,18 +108,20 @@ function firmwareStack(params) {
     C('Source: SYSDISK/slib-m.nc O10102 — pneumatic push/eject (vacuum + locating pin + pusher + dust cover).');
     C('Driven by #1306 (highest Z) + #1320-1326 (push start/end/retreat), feeds #563/#1327, dwell #1322.');
     C('VERIFY on the machine: these G53 stations + #1306/#1320-1326 must be taught in the controller first.');
-    if (orient) MC(19, 'Spindle orient (M19) before unclamp');
-    RAW('M159  ( vacuum pump OFF )');
-    RAW('M157  ( locating cylinder CLOSE )');
-    RAW('G53 Z#1306 F#563  ( highest Z when changing )');
-    RAW('G53 X#1320 Y#1321 F#563  ( move to push start )');
-    RAW('M160  ( pusher OPEN )');
-    RAW('G04 P#1322  ( pusher dwell )');
-    RAW('G53 X#1323 Y#1324 F#1327  ( move to push end )');
-    RAW('M163  ( dust collector OFF )');
-    RAW('G53 X#1325 Y#1326 F#563  ( retreat position after push )');
-    RAW('M156  ( locating cylinder OPEN )');
-    RAW('M161  ( pusher CLOSE )');
+    // t640 — the firmware push dance is ALL ATC pneumatics (M19 orient + M15x/M16x cylinders/vacuum/dust + G53 moves on the
+    // ATC push registers #1306/#1320-1326): DECLARE cap:'atc' so every line folds to a comment on a non-ATC post (V4.1/DM500).
+    if (orient) MC(19, 'Spindle orient (M19) before unclamp', 'atc');
+    RAW('M159  ( vacuum pump OFF )', 'atc');
+    RAW('M157  ( locating cylinder CLOSE )', 'atc');
+    RAW('G53 Z#1306 F#563  ( highest Z when changing )', 'atc');
+    RAW('G53 X#1320 Y#1321 F#563  ( move to push start )', 'atc');
+    RAW('M160  ( pusher OPEN )', 'atc');
+    RAW('G04 P#1322  ( pusher dwell )', 'atc');
+    RAW('G53 X#1323 Y#1324 F#1327  ( move to push end )', 'atc');
+    RAW('M163  ( dust collector OFF )', 'atc');
+    RAW('G53 X#1325 Y#1326 F#563  ( retreat position after push )', 'atc');
+    RAW('M156  ( locating cylinder OPEN )', 'atc');
+    RAW('M161  ( pusher CLOSE )', 'atc');
     END();
     return S;
 }
@@ -185,7 +187,8 @@ function inlineTncStack() {
     const io = { outputs: s.outputs || [], inputs: s.inputs || [] };
     C('ATC | Tool Change — INLINED change sequence (sources your configured changer + Settings -> ATC I/O codes)');
     C('Prefer the DEFAULT T# M6 call (install the T.nc via Settings -> ATC -> Generate T.nc) — inline is the offline fallback.');
-    (tncProgram(atc, io, { body: true }) || '').split('\n').forEach((ln) => RAW(ln));
+    // t640 — the inlined body is the user's drawbar/sensor pneumatic dance → cap:'atc' folds it on a non-ATC post.
+    (tncProgram(atc, io, { body: true }) || '').split('\n').forEach((ln) => RAW(ln, 'atc'));
     return S;
 }
 

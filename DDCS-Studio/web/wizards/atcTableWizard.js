@@ -19,7 +19,7 @@ import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 const getDialect = () => { try { return resolveActivePost(getActiveProfile().id); } catch (_) { return null; } };
 
 const CB = (text) => { const b = newBlock('comment'); b.params = { text }; return b; };
-const AB = (v, value, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(value), note: note || '' }; return b; };
+const AB = (v, value, note, cap) => { const b = newBlock('assign'); b.params = { var: v, value: String(value), note: note || '', ...(cap ? { cap } : {}) }; return b; };   // t640 — cap:'atc' folds ATC-register writes on a non-ATC post
 
 // The TOOL-LENGTHS section (one assign per library tool with a length) — a per-row unroll from params.tools.
 function lengthsSection(params, toolBase) {
@@ -36,9 +36,9 @@ function pocketsSection(params, atc) {
     if (!mag.length) S.push(CB('(no pockets in the magazine)'));
     mag.forEach((p, i) => {
         const idx = num(p.pocket, i + 1);
-        S.push(AB(`#${atc.pocketX + idx - 1}`, num(p.x, 0), `Pocket ${idx} X`));
-        S.push(AB(`#${atc.pocketY + idx - 1}`, num(p.y, 0), `Pocket ${idx} Y`));
-        S.push(AB(`#${atc.pocketZ + idx - 1}`, num(p.z, 0), `Pocket ${idx} Z`));
+        S.push(AB(`#${atc.pocketX + idx - 1}`, num(p.x, 0), `Pocket ${idx} X`, 'atc'));
+        S.push(AB(`#${atc.pocketY + idx - 1}`, num(p.y, 0), `Pocket ${idx} Y`, 'atc'));
+        S.push(AB(`#${atc.pocketZ + idx - 1}`, num(p.z, 0), `Pocket ${idx} Z`, 'atc'));
     });
     return S;
 }

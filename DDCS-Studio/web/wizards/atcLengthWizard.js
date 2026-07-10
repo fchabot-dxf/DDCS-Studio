@@ -48,7 +48,11 @@ export function atcLengthStack(params = {}) {
     const SPOFF = () => { const b = newBlock('spindle'); b.params = { rpm: 0 }; S.push(b); };
     const COOLOFF = () => { const b = newBlock('coolant'); b.params = { flow: 'off' }; S.push(b); };
     const PR = (to, feed) => { const b = newBlock('probe'); b.params = { axis: 'Z', to, feed, port: '#5', level }; S.push(b); };
-    const CK = (goto) => { const b = newBlock('probecheck'); b.params = { axis: 'Z', goto }; S.push(b); };
+    // t640 — probe-MISS safety (a missed tool-setter writes a WRONG TOOL OFFSET, same severity as a wrong WCS). ST captures the
+    // pre-probe DRO (V4.1/DM500; [] on Expert); CK carries dir '-' + seek '#7' (the negative plunge) → the DRO-compare branches
+    // to the fail label on a no-contact. Expert keeps its #192x status check byte-identical.
+    const ST = () => { const b = newBlock('probestart'); b.params = { axis: 'Z' }; S.push(b); };
+    const CK = (goto) => { const b = newBlock('probecheck'); b.params = { axis: 'Z', goto, dir: '-', seek: '#7', eps: 0.05 }; S.push(b); };
     const RD = (v) => { const b = newBlock('proberead'); b.params = { axis: 'Z', var: v }; S.push(b); };
     const TO = (tool, value) => { const b = newBlock('tooloffset'); b.params = { tool, value }; S.push(b); };
     const MV = (axis, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [axis.toLowerCase()]: v }; S.push(b); };
@@ -74,9 +78,9 @@ export function atcLengthStack(params = {}) {
     SPOFF(); COOLOFF();                       // spindle & coolant OFF before probing
     DM('inc');
     C('Step 1: Fast Probe Down');
-    PR('#7', '#3'); CK(1); MV('Z', '#10');
+    ST(); PR('#7', '#3'); CK(1); MV('Z', '#10');
     C('Step 2: Slow Precision Touch');
-    PR('#7', '#4'); CK(1);
+    ST(); PR('#7', '#4'); CK(1);
     DM('abs');
     C('Calculate and store the tool length offset');
     RD('#101');                               // machine Z trigger (dialect: #1927 / #1502 / #866)

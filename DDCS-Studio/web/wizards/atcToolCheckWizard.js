@@ -43,7 +43,10 @@ export function atcToolCheckStack(params = {}) {
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
     const CF = (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); };
     const PR = (to, feed) => { const b = newBlock('probe'); b.params = { axis: 'Z', to, feed, port: '#5', level }; S.push(b); };
-    const CK = (goto) => { const b = newBlock('probecheck'); b.params = { axis: 'Z', goto }; S.push(b); };
+    // t640 — probe-MISS safety (a missed tool-setter re-check writes a WRONG length). ST captures the pre-probe DRO (V4.1/DM500;
+    // [] on Expert); CK carries dir '-' + seek '#7' (negative plunge) → the DRO-compare branches to the no-contact fault (LB 1).
+    const ST = () => { const b = newBlock('probestart'); b.params = { axis: 'Z' }; S.push(b); };
+    const CK = (goto) => { const b = newBlock('probecheck'); b.params = { axis: 'Z', goto, dir: '-', seek: '#7', eps: 0.05 }; S.push(b); };
     const RD = (v) => { const b = newBlock('proberead'); b.params = { axis: 'Z', var: v }; S.push(b); };
     const MV = (axis, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [axis.toLowerCase()]: v }; S.push(b); };
     const MSG = (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); };
@@ -65,9 +68,9 @@ export function atcToolCheckStack(params = {}) {
     CF('Hover tool over the setter. Press Enter', 2);
     DM('inc');
     C('Fast probe down');
-    PR('#7', '#3'); CK(1); MV('Z', '#10');
+    ST(); PR('#7', '#3'); CK(1); MV('Z', '#10');
     C('Slow precision touch');
-    PR('#7', '#4'); CK(1);
+    ST(); PR('#7', '#4'); CK(1);
     DM('abs');
     C('Measure + compare to the stored tool length');
     RD('#51');                                // machine Z trigger

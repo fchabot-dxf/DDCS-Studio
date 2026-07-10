@@ -8744,3 +8744,23 @@ The exec engine could NOT branch on either post's IF-GOTO (so the miss branch ne
 - **tests/probe-miss-sim.spec.js (NEW)**: (1) REAL EMIT — a V4.1 edge traced with no stock (guaranteed miss) takes the fail branch: the result #50 stays 0, the `G90 G92 X#50` WCS write is SKIPPED; the DRO reached start+seek (a genuine full-travel miss). (2) CONTROLLED — the engine branches correctly on BOTH the V4.1 no-space and DM500 word-op compare forms (miss→branch, contact→write).
 - Expert byte-diff ZERO across the full probe family (corner-post-fold + corner/edge/alignment-data-emit + the twins — all green; probestart folds to [], probecheck unchanged).
 - FULL SUITE: 940 passed / 2 skipped / 0 failed (3.2m), zero flaky this run.
+
+---
+## 2026-07-10 (t640) — THE ATC DIALECT BUNDLE — cap-gate fix + applyCapGating early-return + tool-setter probe-miss
+
+GROUNDING: caps per dialect — `atc:true` on Expert ONLY (V4.1/DM500 atc:false, vars.atc:null); `toolTable:true` on EVERY DDCS post. So the 6 ATC panels' `data-cap="toolTable"` NEVER greyed on V4.1. Concrete leaks (dumped): atcTest **drawbar** mode emits M154/M155 (drawbar) + M300-302 (sensor waits); atcChange **firmware** emits M159/M157/M160/M163/M156/M161 + M19 + G53 on #1306/#1320-1326; atcTable pockets #1330/#1350/#1370. The M-codes are USER-configured (generic) so applyCapGating can't pattern-match them; and the leak is on the FOLD path (built on Expert, folded to V4.1) so a wizard-side `if(!atc)` fold can't catch it. The intended per-line gate (`requires` — blockEmitter.js:100 comment) was DOCUMENTED BUT UNBUILT.
+
+### THE MECHANISM (Part 2) — a DECLARED per-block cap, gated at emit
+- blockEmitter: `tag(line, src, cap)` carries an optional cap (from the source block's `params.cap`); only the leaf emit tags it (structural kinds don't); translate/rotate preserve it. `applyCapGating` CLOSED the blanket early-return (`if (caps.vars && caps.flow !== 'none') return` — it assumed "#vars+flow ⇒ fully capable", but a post can run #vars+flow yet lack `atc`; that's the dead-cap hole) and added: a line whose block DECLARED a cap the active post lacks folds to `( gated: … )`. On a fully-capable post (Expert: every cap ON) every branch is false → byte-identical no-op. This catches the leak on BOTH the built-in AND the fold path (the emit gate runs on the folded lines).
+
+### THE DECLARATIONS (Part 1) — cap:'atc' on the ATC pneumatics + the UI cap
+- atcTestWizard drawbar: the drawbar/sensor MC codes → cap:'atc'. atcChangeWizard: the firmware push dance (M19 + M15x/M16x + the ATC-register G53 moves) + the inlineTnc body → cap:'atc'. atcTableWizard: the pocket-register (#1330/#1350/#1370) assigns → cap:'atc' (tool-length writes stay — valid on V4.1). MC/RAW/AB helpers gained an optional cap param.
+- UI: `wiz_atc_change` + `wiz_atc_test` panels `data-cap="toolTable"` → `"atc"` (the pneumatic ops grey on a non-ATC post); the tool-table ops (length/check/table/warmup) stay `toolTable` (valid on V4.1). postGating CAP_WHY.atc added for an honest tooltip.
+
+### TOOL-SETTER PROBE-MISS (Part 3) — the t638 follow-up
+atcLength + atcToolCheck hand-roll a Z-down tool-setter probe (seek `#7`=`[0-#1]` negative plunge) + emit probecheck. Threaded probestart + CK(dir '-', seek '#7', eps 0.05) exactly like the probe family → on V4.1/DM500 a MISSED setter (writes a WRONG TOOL OFFSET, same severity as a wrong WCS) now branches to the existing fault label instead of continuing. Expert keeps its per-axis #192x (Z=#1922) check byte-identical.
+
+### VERIFY
+- **tests/atc-cap-gate.spec.js (NEW)**: V4.1 folds every pneumatic M-code (M154/M155/M300-302 + M159/M157/M160/M163/M156/M161) to `( gated: … )` (no bare executable M-code); Expert emits them unchanged. The applyCapGating fix is asserted on the exact case that slipped the early-return (a cap:'atc' M154 AFTER a #var line on the vars+flow V4.1 post — now gated, the #var line kept). The tool-setter probes carry `#190=#15xx` + the dir-'-' DRO-compare on V4.1; Expert keeps #192x, no #190.
+- Expert byte-diff ZERO: the ATC twins (atc-change-twin/atc-table-twin/atc-test-superset) + atc-dialect/atc-interpreter + corner-post-fold + the probe-miss specs all green (the cap marker doesn't change Expert output; applyCapGating is a no-op on Expert).
+- FULL SUITE: 939 passed / 2 skipped / **1 flaky = middle-animator.spec.js:119** (a CSS stroke-dashoffset ANIMATION-timing test, unrelated to emit — I touched no viz/animator code). RE-RAN IT IN ISOLATION: still flaky (retried-passed) → pre-existing timing flake, NOT a t640 regression. (+ the new atc-cap-gate spec passes → 940.)

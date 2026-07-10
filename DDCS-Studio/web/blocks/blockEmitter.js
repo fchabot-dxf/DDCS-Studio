@@ -37,7 +37,9 @@ export function newBlock(type) {
 }
 
 /** One emitted line + its provenance: src = ancestry [outer…inner] of owning block ids, or null = program-owned. */
-const tag = (line, src) => ({ line, src });
+// t640 — a line may carry a DECLARED cap requirement (from its source block's params.cap): applyCapGating folds it to a
+// comment when the active post lacks that cap (e.g. the ATC pneumatic/drawbar M-codes carry cap:'atc'). Only leaf emit tags a cap.
+const tag = (line, src, cap) => (cap ? { line, src, cap } : { line, src });
 
 /** Resolve a value socket → a number: a literal, a scalar/expression string, or a Reporter record
  *  (Variable/Math) evaluated recursively via its def's `reduce` (Math operands resolve through `rc`). */
@@ -186,7 +188,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const s = placeShiftFromParams(p, liveExtent(block.children, scope));
         if (!s.x && !s.y && !s.z) return inner;
         const moved = translateProgram(inner.map((t) => t.line).join('\n'), s.x, s.y, s.z).text.split('\n');
-        return inner.map((t, i) => ({ line: moved[i], src: t.src }));   // keep each line's provenance (1:1 translate)
+        return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 translate)
     }
 
     if (def.kind === 'rotate') {               // ROTATE / ALIGN: emit the wrapped op(s), then rotate every absolute XY
@@ -195,7 +197,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const ang = num(p.angle, 0), px = num(p.pivotX, 0), py = num(p.pivotY, 0);
         if (!ang) return inner;                // 0° → pass through untouched
         const moved = rotateProgram(inner.map((t) => t.line).join('\n'), ang, px, py).text.split('\n');
-        return inner.map((t, i) => ({ line: moved[i], src: t.src }));   // keep each line's provenance (1:1 rotate)
+        return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 rotate)
     }
 
     if (def.kind === 'container') {            // STAMP child(ren) at each point (skip 1-based indices in p.skip)
@@ -226,7 +228,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         return out;
     }
 
-    return def.emit(p, dx, dy, dialect).map((ln) => tag(ln, own));   // leaf / move standalone (dialect = active profile)
+    return def.emit(p, dx, dy, dialect).map((ln) => tag(ln, own, block.params && block.params.cap));   // leaf / move standalone (dialect = active profile; carry a declared cap requirement)
 }
 
 /** Fold the program → { text, lines, map }. map[i] = ancestry of block ids producing line i (null = a seam).
@@ -273,10 +275,17 @@ function applyModalFeed(T) {
  *  DM500 / LinuxCNC / grblHAL) gate nothing. (Per-line can leave a lone runnable move — inherent to macro work.) */
 function applyCapGating(T, dialect) {
     const caps = getCaps(dialect.id);
-    if (caps.vars && caps.flow !== 'none') return;   // runs #vars + flow → nothing to gate
+    // t640 — NO blanket early-return. The old `if (caps.vars && caps.flow !== 'none') return` assumed "#vars + flow ⇒ fully
+    // capable ⇒ nothing to gate", but a post can run #vars + flow yet LACK other caps (atc/pneumatic, …) → Expert-only ATC
+    // drawbar M-codes slipped straight through onto V4.1/DM500. Run per-line gating ALWAYS; on a fully-capable post (Expert:
+    // every cap ON) every branch below is false → a true no-op (byte-identical). Cheap: one linear pass.
     for (const t of T) {
         const code = (t.line || '').trim();
         if (!code || code.startsWith('(') || code.startsWith(';')) continue;   // blank / already a comment
+        // (1) DECLARED cap gate: the source block asked for a cap the active post lacks (declare-not-infer — e.g. the ATC
+        //     pneumatic/drawbar M-codes carry cap:'atc'; V4.1/DM500 have caps.atc=false → fold the line to an honest comment).
+        if (t.cap && !caps[t.cap]) { t.line = `( gated: ${code.replace(/[()]/g, '').trim()} )`; continue; }
+        // (2) #vars / flow the post can't run.
         const hasVar = /#\d|#\[/.test(code);
         const isFlow = /^(IF\b|GOTO\b|N\d|o\d+ )/.test(code);
         if ((!caps.vars && hasVar) || (caps.flow === 'none' && (isFlow || hasVar))) {

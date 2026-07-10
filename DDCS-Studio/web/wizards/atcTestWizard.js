@@ -44,7 +44,7 @@ function H(S) {
         SPOFF: () => { const b = newBlock('spindle'); b.params = { rpm: 0 }; S.push(b); },
         COOLOFF: () => { const b = newBlock('coolant'); b.params = { flow: 'off' }; S.push(b); },
         MM: (axis, to) => { const b = newBlock('machinemove'); b.params = { axis, to }; S.push(b); },
-        MC: (code, note) => { const b = newBlock('mcode'); b.params = { code, note }; S.push(b); },
+        MC: (code, note, cap) => { const b = newBlock('mcode'); b.params = { code, note, ...(cap ? { cap } : {}) }; S.push(b); },
         DW: (sec) => { const b = newBlock('dwell'); b.params = { sec }; S.push(b); },
         CF: (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); },
         MSG: (text) => { const b = newBlock('message'); b.params = { text }; S.push(b); },
@@ -63,12 +63,14 @@ function drawbarStack(params) {
     C('=== CONFIGURATION ===');
     A('#100', 1, 'Cycle counter'); A('#101', cycles, 'Cycles');
     SPOFF(); COOLOFF();
-    MC(mc.stopped, 'Wait: spindle-stopped sensor');
+    // t640 — the drawbar/sensor M-codes are ATC pneumatics: DECLARE cap:'atc' so they fold to a comment on a non-ATC post
+    // (V4.1/DM500) instead of leaking Expert-only pneumatic codes. applyCapGating gates them per-line (built-in AND fold path).
+    MC(mc.stopped, 'Wait: spindle-stopped sensor', 'atc');
     LB(10); C('CYCLE START');
     MSG('Cycle #100: RELEASE');
-    MC(mc.release, 'Drawbar RELEASE'); MC(mc.released, 'Wait: drawbar-released sensor'); DW(dwellSec);
+    MC(mc.release, 'Drawbar RELEASE', 'atc'); MC(mc.released, 'Wait: drawbar-released sensor', 'atc'); DW(dwellSec);
     MSG('Cycle #100: LOCK');
-    MC(mc.lock, 'Drawbar LOCK'); MC(mc.locked, 'Wait: tool-locked sensor'); DW(dwellSec);
+    MC(mc.lock, 'Drawbar LOCK', 'atc'); MC(mc.locked, 'Wait: tool-locked sensor', 'atc'); DW(dwellSec);
     A('#100', '[#100+1]', 'Next cycle');
     IF('#100', '<=', '#101', 10);
     C('Complete - drawbar left LOCKED');
