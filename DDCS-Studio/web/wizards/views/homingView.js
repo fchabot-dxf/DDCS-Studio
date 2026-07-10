@@ -100,6 +100,11 @@ export const homingView = {
         // t540 — a VISIBLE hint for run-axes whose machine ENVELOPE travel is unset (the sim skips them, no fictional span).
         const unset = homingUnsetAxes(params);
         const unsetHint = unset.length ? `  ⚠ Set ${unset.join(' / ')} travel in Machine settings — ${unset.length > 1 ? 'those axes are' : 'that axis is'} skipped (no envelope).` : '';
+        // t628 — the status labels read the ORDERED home set + philosophy from the contract helper / saved config. (The t626
+        // refactor removed the old `axes`/`homing` locals but left these three references → a hard ReferenceError when the
+        // wizard opens with a #homing_status present; the t626 suite mislabelled it "flaky". Restored, one-source with params.)
+        const axes = params.axes || [];
+        const homing = getHoming();
         const status = el('homing_status');
         if (status) {
             status.textContent = (axes.length

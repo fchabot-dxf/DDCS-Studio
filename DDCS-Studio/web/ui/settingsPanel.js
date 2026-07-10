@@ -22,6 +22,7 @@ import { tncProgram } from '../wizards/atcModel.js';   // INC-B2: the ONE shared
 import { renderCloudLogin } from './cloudAccount.js';
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
+import { declaredHomeEdgeSide } from '../engine/limitSwitches.js';   // t628 — the DECLARED home switch drives the seek direction (one source); the Homing section shows the derived end read-only
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
 // --- Tool library ----------------------------------------------------------
@@ -532,11 +533,6 @@ function commitMachine() {
 const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 const HOMING_AX_IDX = { x: 0, y: 1, z: 2, a: 3, b: 4 };
 const HOMING_AX_LABEL = { x: 'X', y: 'Y', z: 'Z', a: 'A', b: 'B' };
-const HOMING_METHODS = [
-    { v: 'native', label: 'Native (M98 P501)' },
-    { v: 'setzero', label: 'Set zero (no motion)' },
-    { v: 'seek', label: 'Switch seek (G31)' },
-];
 function homingConfiguredAxes() {
     const s = getSettings();
     const m = (s.motors) || {};
@@ -559,17 +555,26 @@ function renderHomingGui() {
     const expert = homingPostIsExpert();
     const list = homingConfiguredAxes();
     const tag = document.getElementById('set_homing_tag');
-    if (tag) tag.textContent = expert ? 'DDCS Expert M350 — full methods available.' : 'Active post is unverified for homing — native home only; advanced methods are disabled.';
+    if (tag) tag.textContent = expert ? '' : 'Active post is unverified for homing — verify the emitted G-code on your controller.';
     if (document.getElementById('set_homing_simul')) document.getElementById('set_homing_simul').checked = h.philosophy === 'simultaneous';
 
     const ordered = [...list].sort((p, q) => ((cfg[p] || {}).order || HOMING_AX_IDX[p] + 1) - ((cfg[q] || {}).order || HOMING_AX_IDX[q] + 1));
-    const methodOpts = (sel) => HOMING_METHODS.map((m) => {
-        const dis = !expert && m.v !== 'native';
-        return `<option value="${m.v}"${m.v === sel ? ' selected' : ''}${dis ? ' disabled title="Unverified on this post"' : ''}>${m.label}</option>`;
-    }).join('');
     const followOpts = (sel) => `<option value="">none</option>` + list.map((a) => `<option value="${HOMING_AX_IDX[a]}"${String(HOMING_AX_IDX[a]) === String(sel) ? ' selected' : ''}>${HOMING_AX_LABEL[a]} (idx ${HOMING_AX_IDX[a]})</option>`).join('');
-    // Home-direction override: '' = Auto (derive from the signed machine-travel sign), '+' / '-' force it.
-    const dirOpts = (sel) => [['', 'Auto (envelope)'], ['+', '+'], ['-', '−']].map(([v, lbl]) => `<option value="${v}"${v === (sel || '') ? ' selected' : ''}>${lbl}</option>`).join('');
+    // t628 (advisor ruling) — the seek DIRECTION is DERIVED from the declared home switch (declaredHomeEdgeSide, one source),
+    // shown read-only; the METHOD is FIXED (homeAxisBlocks: G31 seek for X/Y/Z, set-zero for A/B). The old Home-dir + Method
+    // dropdowns were INERT — the emit ignores c.dir/c.method — so they're removed. c.dir/c.method stay STORED (inert data;
+    // the reconciler reads them) → settings shape + homingStack emit are UNCHANGED. The home-end mirrors homeAxisBlocks:96-97.
+    const machine = getSettings().machine || {}, limits = getSettings().limits || {};
+    const methodText = (ax) => (ax === 'a' || ax === 'b') ? 'Set zero (no motion)' : 'Switch seek (G31)';
+    const homeEndHtml = (ax) => {
+        if (ax === 'a' || ax === 'b') return '<span style="font-size:12px; color:var(--text-dim);">— (set-zero: no seek)</span>';
+        const side = declaredHomeEdgeSide(ax, limits);
+        const tSign = Math.sign(num(machine[ax], 0));
+        const end = side === 'max' ? 'MAX' : side === 'min' ? 'min' : ((-tSign || 1) > 0 ? 'MAX' : 'min');
+        return side
+            ? `<span class="hm-home-end" style="font-size:12px;" title="G31 seek direction — derived from the DECLARED home switch (Settings → Hardware → Input). One source.">home: <b>${end}</b> <span style="color:var(--text-dim);">— from the declared switch</span></span>`
+            : `<span class="hm-home-end" style="font-size:12px;" title="No home switch declared → the seek direction falls back to the machine-envelope travel sign. Declare one in Settings → Hardware → Input.">home: <b>${end}</b> <span style="color:var(--text-dim);">— envelope-sign fallback · </span><a href="#" class="hm-io-link" style="color:var(--accent);">declare a switch in I/O</a></span>`;
+    };
 
     host.innerHTML = ordered.map((ax, pos) => {
         const c = cfg[ax] || {}, rotary = ax === 'a' || ax === 'b';
@@ -580,10 +585,10 @@ function renderHomingGui() {
                 <button type="button" class="hm-down" title="Home later" style="cursor:pointer; background:none; border:none; color:var(--text-main);">▼</button>
                 <label style="font-weight:600;"><input type="checkbox" class="hm-enable" ${c.enable !== false ? 'checked' : ''}/> ${HOMING_AX_LABEL[ax]}</label>
                 <input type="hidden" class="hm-order" value="${pos + 1}">
-                <label style="font-size:12px;">Method <select class="hm-method">${methodOpts(c.method || 'seek')}</select></label>
-                <label style="font-size:12px;" title="Home direction. Auto derives it from the signed machine travel (envelope) — one source. + / − force it. Signs the switch-seek (G31) move and the sim animation; for native (M98 P501) the controller uses its OWN config, so the override is sim/informational only.">Home dir <select class="hm-dir">${dirOpts(c.dir || '')}</select></label>
+                <span style="font-size:12px; color:var(--text-dim);">Method <b style="color:var(--text-main);">${methodText(ax)}</b></span>
+                ${homeEndHtml(ax)}
             </div>
-            <div class="hm-motion" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
+            <div class="hm-motion" style="display:${rotary ? 'none' : 'flex'}; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
                 <label>Seek feed <input type="number" class="hm-seekfeed" value="${num(c.seekFeed, 800)}" style="width:60px;"></label>
                 <label>Back-off <input type="number" class="hm-backoff" value="${num(c.backoff, 5)}" step="0.5" style="width:54px;"></label>
                 <label>Slow feed <input type="number" class="hm-slowfeed" value="${num(c.slowFeed, 100)}" style="width:60px;"></label>
@@ -593,21 +598,17 @@ function renderHomingGui() {
                 <label title="Dual-axis gantry: homing this axis syncs the slave's coordinate and marks it homed. Squaring is done manually by the operator.">Slave axis follows <select class="hm-follow">${followOpts(c.slaveFollows)}</select></label>
             </div>
             ${rotary ? `<div class="hm-rotary" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; font-size:12px;">
-                <label>Rotary <select class="hm-rotmode"><option value="setzero"${(c.rotary || 'setzero') === 'setzero' ? ' selected' : ''}>set zero</option><option value="switch"${(c.rotary || 'setzero') === 'setzero' ? '' : ' selected'}>switch home</option></select></label>
                 <label><input type="checkbox" class="hm-continuous" ${c.continuous ? 'checked' : ''}/> continuous (mod 360)</label>
             </div>` : ''}
         </div>`;
     }).join('');
 
     host.querySelectorAll('.homing-axis-row').forEach((row) => {
-        const methodSel = row.querySelector('.hm-method');
-        const sync = () => {
-            row.querySelector('.hm-motion').style.display = methodSel.value === 'seek' ? 'flex' : 'none';
-        };
-        sync();
         row.querySelectorAll('input,select').forEach((f) => f.addEventListener('change', () => { commitHoming(); renderHomingGui(); }));
         row.querySelector('.hm-up').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), -1));
         row.querySelector('.hm-down').addEventListener('click', () => homingMove(row.getAttribute('data-axis'), +1));
+        const io = row.querySelector('.hm-io-link');
+        if (io) io.addEventListener('click', (e) => { e.preventDefault(); if (_settingsNavTo) _settingsNavTo('hardware', 'set_tab_input'); });
     });
 }
 function commitHoming() {
@@ -620,7 +621,7 @@ function commitHoming() {
             ...prev,
             enable: g('.hm-enable').checked,
             order: num(g('.hm-order').value, idx + 1),
-            method: g('.hm-method').value,
+            method: g('.hm-method') ? g('.hm-method').value : (prev.method || 'seek'),
             seekFeed: num(g('.hm-seekfeed').value, prev.seekFeed || 800),
             backoff: num(g('.hm-backoff').value, prev.backoff || 5),
             slowFeed: num(g('.hm-slowfeed').value, prev.slowFeed || 100),
@@ -1045,7 +1046,7 @@ function buildSettingsOverlay() {
                     </div>
                     <div class="settings-section" id="set_homing_section">
                         <div class="settings-section-title">HOMING</div>
-                        <div class="settings-hint">The numbered list sets the home <b>sequence</b> (▲▼ to reorder). <b>Switch seek (G31)</b> is the default — explicit G31 homing with the seek params (feed/dir/port) VISIBLE in the G-code. <b>Native (M98 P501)</b> runs the controller's own built-in home. Home direction defaults to <b>Auto</b> (the envelope travel sign above). For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave. The Macros → sysstart hook reads this profile.</div>
+                        <div class="settings-hint">The numbered list sets the home <b>sequence</b> (▲▼ to reorder). Method is fixed: X/Y/Z home by <b>switch seek (G31)</b> — explicit G31 with the seek params (feed/back-off) VISIBLE in the G-code; rotary A/B <b>set zero</b> in place (no seek). The <b>home end</b> shown per axis is derived from the <b>declared home switch</b> (Settings → Hardware → Input) — one source; with no switch declared it falls back to the envelope travel sign above. For a dual-axis gantry, set the master's <b>slave axis follows</b> so homing the master syncs the slave. The Macros → sysstart hook reads this profile.</div>
                         <div id="set_homing_tag" style="font-size:11px; opacity:.7; margin-bottom:6px;"></div>
                         <label class="settings-check" style="margin-bottom:6px;"><input type="checkbox" id="set_homing_simul"> Simultaneous (emit calls back-to-back, still in this order)</label>
                         <div id="set_homing_axes"></div>
