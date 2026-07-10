@@ -124,7 +124,11 @@ export function commStack(params = {}, opts = {}) {
     };
 
     // ── DWELL arm ──
-    const dwellArm = () => { C('Dwell'); if (dialect && dialect.dwell) RAW(dialect.dwell(params.val).join('\n')); else RAW(`G4 P${params.val}`); };
+    // t604 (scout F3) — `val` is MILLISECONDS (commData: "dwell ms", default 500); dialect.dwell()'s contract is SECONDS
+    // (Expert/V4.1 P=round(sec*1000) ms, DM500 P=sec). The bug shoved ms straight in → G04 P500000 (500 s) on Expert/V4.1.
+    // Convert at the call site (÷1000), mirroring atcTestWizard.js:56. The comm wizard bakes the ACTIVE dialect into a RAW
+    // line at BUILD time (getDialect() above) — so the STACK is per-post correct: Expert P500 / V4.1 P500 / DM500 P0.5.
+    const dwellArm = () => { C('Dwell'); const sec = (Number(params.val) || 0) / 1000; if (dialect && dialect.dwell) RAW(dialect.dwell(sec).join('\n')); else RAW(`G4 P${sec}`); };
 
     if (superset) {
         S.push(
