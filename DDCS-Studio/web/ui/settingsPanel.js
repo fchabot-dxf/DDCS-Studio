@@ -145,6 +145,10 @@ export const SETTINGS_DEFAULTS = {
     // Lives in settings so it rides the profile snapshot / full-swap / Export-Import / cloud automatically (one source).
     // Only USER-EDITED files land here; unedited baseline files display their declared seed (data/controllerFileSeeds).
     workspace: {},
+    // t664 (E3) — USER-ADDED files in the Macros tab: [{ path, title, sub }]. The declared baseline tree is immutable;
+    // these are the user's own files (added / renamed / deleted). Bodies live in `workspace` above; this is just the list
+    // so the tree renders them under "My files". Rides the profile like workspace (one source).
+    workspaceFiles: [],
     // Axis roles — X/Y/Z linear; A/B optionally rotary. The sim reads this to spin the solid on a
     // rotary-axis move (around the declared Cartesian axis). Two rotary axes are allowed (A and B).
     motors: {
@@ -357,6 +361,8 @@ function loadSettings() {
                 macros: Array.isArray(p.macros) ? p.macros : [],
                 // t662 (E1) — the per-file workspace bodies ride the profile (must be listed or loadSettings drops it).
                 workspace: (p.workspace && typeof p.workspace === 'object' && !Array.isArray(p.workspace)) ? p.workspace : {},
+                // t664 (E3) — the user-added file list rides the profile too.
+                workspaceFiles: Array.isArray(p.workspaceFiles) ? p.workspaceFiles : [],
                 // t656 — the STORED autostart macro + its regen inputs persist with the profile (survive reload, export/import).
                 sysstartCustomGcode: typeof p.sysstartCustomGcode === 'string' ? p.sysstartCustomGcode : '',
                 autostartBody: typeof p.autostartBody === 'string' ? p.autostartBody : undefined,   // undefined = never seeded → the panel migrates it on first open

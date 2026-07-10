@@ -208,15 +208,57 @@ export function initMacrosApp() {
         PANEL_IDS.forEach((p) => { const el = q(p); if (el) el.style.display = (p === btn.dataset.target) ? '' : 'none'; });
         if (btn.dataset.file) openFileEditor(btn.dataset.file);
     }
-    function renderFileTree() {
+    // t664 (E3) — the user's OWN files (add/rename/delete). They live in settings.workspaceFiles (the list) + their body
+    // in settings.workspace (like a baseline edit), so they ride the profile. The declared baseline is IMMUTABLE.
+    const userFilesArr = () => (getSettings().workspaceFiles || (getSettings().workspaceFiles = []));
+    const isUserFile = (path) => userFilesArr().some((f) => f.path === path);
+    // Validate a proposed user-file name → a normalized name (adds .nc if no .nc/.rc), or null (alerts why).
+    function validFileName(raw, cid, exclude) {
+        let n = String(raw == null ? '' : raw).trim();
+        if (!n) return null;
+        if (/[\\/]/.test(n)) { alert('File names can’t contain slashes.'); return null; }
+        if (!/\.(nc|rc)$/i.test(n)) n += '.nc';   // DDCS macro convention
+        if (flattenFiles(cid).some((e) => e.path.toLowerCase() === n.toLowerCase())) { alert('“' + n + '” is a built-in controller file — pick another name.'); return null; }
+        if (userFilesArr().some((f) => f.path.toLowerCase() === n.toLowerCase() && f.path.toLowerCase() !== String(exclude || '').toLowerCase())) { alert('You already have a file named “' + n + '”.'); return null; }
+        return n;
+    }
+    function addUserFile() {
+        const cid = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
+        const name = validFileName(window.prompt('New file name (e.g. myprobe.nc):', ''), cid);
+        if (!name) return;
+        userFilesArr().push({ path: name, title: name, sub: 'Your file' });
+        (getSettings().workspace || (getSettings().workspace = {}))[name] = '';
+        saveSettings();
+        renderFileTree(name);   // rebuild + open the new file
+    }
+    function renameUserFile(path) {
+        const cid = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
+        const name = validFileName(window.prompt('Rename file:', path), cid, path);
+        if (!name || name === path) return;
+        const f = userFilesArr().find((x) => x.path === path); if (f) { f.path = name; f.title = name; }
+        const ws = getSettings().workspace || (getSettings().workspace = {});
+        ws[name] = typeof ws[path] === 'string' ? ws[path] : ''; delete ws[path];
+        saveSettings();
+        renderFileTree(name);
+    }
+    function deleteUserFile(path) {
+        if (!confirm('Delete “' + path + '”? It’s removed from this profile.')) return;
+        const arr = userFilesArr(); const i = arr.findIndex((x) => x.path === path); if (i >= 0) arr.splice(i, 1);
+        if (getSettings().workspace) delete getSettings().workspace[path];
+        saveSettings();
+        renderFileTree();
+    }
+
+    function renderFileTree(selectPath) {
         const host = q('macros_tree'); if (!host) return;
         const cid = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
         const decl = fileTreeFor(cid);
-        const fileBtn = (f, level) => {
+        const fileBtn = (f, level, user) => {
             const target = f.panel || 'macros_panel_file';
             const fileAttr = f.panel ? '' : ` data-file="${esc(f.path)}"`;
-            return `<button class="settings-tab tree-level-${level}" data-target="${target}"${fileAttr} style="margin-top:2px; line-height:1.3;">`
-                + `<div style="text-transform:none; font-size:12px;">${esc(f.title || f.path)}</div>`
+            const dot = user ? '<span style="color:var(--accent); margin-right:4px;" aria-hidden="true">•</span>' : '';
+            return `<button class="settings-tab tree-level-${level}" data-target="${target}"${fileAttr}${user ? ' data-user="1"' : ''} style="margin-top:2px; line-height:1.3;">`
+                + `<div style="text-transform:none; font-size:12px;">${dot}${esc(f.title || f.path)}</div>`
                 + `<div style="font-size:9px; font-weight:normal; opacity:.6; margin-top:2px;">${esc(f.sub || '')}</div></button>`;
         };
         const renderNodes = (nodes, level) => nodes.map((n) => {
@@ -224,45 +266,57 @@ export function initMacrosApp() {
                 + renderNodes(n.children || [], level + 1) + `</details>`;
             return fileBtn(n, level);
         }).join('');
-        host.innerHTML = renderNodes(decl.tree || [], 1)
-            || '<div class="settings-hint" style="padding:8px 4px;">No declared files for this controller yet.</div>';
+        // "My files/" — the user's own files (E3), visually distinct (accent dot), under their own group.
+        const users = userFilesArr();
+        const userGroup = users.length
+            ? `<details open style="margin-top:6px;"><summary class="sidebar-group-label" style="padding-left:4px; font-size:11px; cursor:pointer; outline:none;">My files/</summary>`
+                + users.map((f) => fileBtn({ path: f.path, title: f.title || f.path, sub: f.sub || 'Your file' }, 2, true)).join('') + `</details>`
+            : '';
+        host.innerHTML = (renderNodes(decl.tree || [], 1) || '<div class="settings-hint" style="padding:8px 4px;">No declared files for this controller yet.</div>')
+            + userGroup
+            + `<button id="mac_add_file" class="toolbar-btn settings-io" style="width:calc(100% - 8px); margin:10px 4px 0; justify-content:center;">＋ New file</button>`;
         host.querySelectorAll('.settings-tab').forEach((b) => b.addEventListener('click', () => selectTreeItem(b)));
+        if (q('mac_add_file')) q('mac_add_file').addEventListener('click', addUserFile);
         // transport: DM500 (export) has no LAN → hide the global pull/deploy buttons (per-file Export replaces them).
         const lan = decl.transport !== 'export';
         if (q('mac_btn_global_pull')) q('mac_btn_global_pull').style.display = lan ? '' : 'none';
         if (q('mac_btn_global_push')) q('mac_btn_global_push').style.display = lan ? '' : 'none';
-        const first = host.querySelector('.settings-tab');
-        if (first) selectTreeItem(first);   // default-select the first file (Expert → slib-m.nc / M-codes)
+        const btns = [...host.querySelectorAll('.settings-tab')];
+        const target = (selectPath && btns.find((b) => b.dataset.file === selectPath)) || btns[0];
+        if (target) selectTreeItem(target);   // open the requested file, else the first (Expert → slib-m.nc / M-codes)
     }
 
-    // The generalized simple editor for a declared plain file. Body stored IN THE PROFILE (settings.workspace[path]); an
-    // unedited file DISPLAYS its declared dump seed; editing persists into the workspace. Transport per the declaration.
+    // The generalized simple editor. Body stored IN THE PROFILE (settings.workspace[path]). A baseline file DISPLAYS its
+    // declared dump seed until edited (→ Revert to default); a USER file is renamable/deletable. Transport per declaration.
     function openFileEditor(path) {
         const panel = q('macros_panel_file'); if (!panel) return;
         const cid = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
-        const entry = flattenFiles(cid).find((e) => e.path === path) || { path, title: path, sub: '' };
+        const user = isUserFile(path);
+        const entry = user ? { path, title: path, sub: 'Your file' } : (flattenFiles(cid).find((e) => e.path === path) || { path, title: path, sub: '' });
         const isExport = fileTreeFor(cid).transport === 'export';
         const ws = getSettings().workspace || (getSettings().workspace = {});
         const edited = typeof ws[path] === 'string';
-        const seed = seedBody(cid, path);
+        const seed = user ? '' : seedBody(cid, path);
         const body = edited ? ws[path] : seed;
+        const canRevert = !user;   // BASELINE files are immutable structure — their EDITS revert to the shipped default
         panel.innerHTML = `
             <div class="settings-section">
-                <div class="settings-section-title">${esc(entry.title || path)}</div>
+                <div class="settings-section-title">${esc(entry.title || path)}${user ? ' <span style="font-size:11px; font-weight:normal; opacity:.6;">· your file</span>' : ''}</div>
                 <div class="settings-hint">${esc(entry.sub || '')} — a <b>stored file</b> saved with your Profile (edits persist, and ride Export/Import + cloud). ${isExport ? 'This controller has no LAN link — <b>Export</b> the file to copy it over by USB.' : '<b>Push</b> sends it to the controller.'}</div>
                 <textarea id="macfile_body" spellcheck="false" style="width:100%; height:300px; margin-top:8px; font:12px/1.45 monospace; box-sizing:border-box; background:var(--bg); color:var(--text-main); border:1px solid var(--border); border-radius:4px; padding:8px;" placeholder="( ${esc(path)} — type the file body, or leave empty )"></textarea>
                 <div class="settings-hint" id="macfile_note" style="font-size:11px; margin-top:4px; opacity:.75;"></div>
                 <div class="settings-row" style="margin-top:12px;">
-                    ${isExport
-                        ? `<button class="toolbar-btn settings-io" id="macfile_send">⬇ Export (save file)</button>`
-                        : `<button class="toolbar-btn settings-io" id="macfile_send">⬆ Push to controller</button>`}
-                    ${seed ? `<button class="toolbar-btn settings-io" id="macfile_revert" title="Discard your edits — go back to the baseline copy Studio ships for this controller.">↺ Revert to baseline</button>` : ''}
+                    <button class="toolbar-btn settings-io" id="macfile_send">${isExport ? '⬇ Export (save file)' : '⬆ Push to controller'}</button>
+                    ${user
+                        ? `<button class="toolbar-btn settings-io" id="macfile_rename">✎ Rename</button><button class="toolbar-btn settings-io" id="macfile_delete" title="Delete this file from the profile.">🗑 Delete</button>`
+                        : (canRevert ? `<button class="toolbar-btn settings-io" id="macfile_revert" title="Discard your edits — restore the baseline copy Studio ships for this controller.">↺ Revert to default</button>` : '')}
                 </div>
             </div>`;
         const ta = panel.querySelector('#macfile_body');
         const note = panel.querySelector('#macfile_note');
         ta.value = body;
         const setNote = () => {
+            if (user) { note.textContent = '● Your file — stored in this profile' + (isExport ? ' (Export to USB).' : ' (Push to the controller).'); return; }
             const e = typeof getSettings().workspace[path] === 'string';
             note.textContent = e ? '● Edited — stored in this profile.' : (seed ? '○ Showing the shipped baseline (edit to store your own in this profile).' : '○ Empty — no baseline shipped; type your own (stored in this profile).');
         };
@@ -279,11 +333,14 @@ export function initMacrosApp() {
                 .catch((e) => alert('Push failed: ' + (e && e.message ? e.message : e)))
                 .finally(() => { send.disabled = false; send.textContent = orig; });
         });
+        const rename = panel.querySelector('#macfile_rename'); if (rename) rename.addEventListener('click', () => renameUserFile(path));
+        const del = panel.querySelector('#macfile_delete'); if (del) del.addEventListener('click', () => deleteUserFile(path));
         const revert = panel.querySelector('#macfile_revert');
         if (revert) revert.addEventListener('click', () => {
-            if (!confirm('Discard your edits to “' + path + '” and restore the shipped baseline?')) return;
-            delete getSettings().workspace[path]; saveSettings();
-            ta.value = seed; setNote();
+            if (!confirm('Discard your edits to “' + path + '” and restore the default baseline?')) return;
+            if (getSettings().workspace) delete getSettings().workspace[path];
+            saveSettings();
+            openFileEditor(path);   // refresh: now unedited → shows the seed again
         });
     }
 
