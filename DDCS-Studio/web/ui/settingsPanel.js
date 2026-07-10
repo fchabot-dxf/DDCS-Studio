@@ -141,6 +141,10 @@ export const SETTINGS_DEFAULTS = {
     // 'mcode' (O100nn → Mnn, called from a program) | 'kbutton' (key-1..7.nc, a panel button) | 'program'
     // (a named .nc). Authored in the Macros tab; rides in Export/Import/cloud via buildProfile.
     macros: [],
+    // t662 (E1) — the FILE WORKSPACE: { '<path>': '<body>' } for the controller's editable baseline files (Macros tab).
+    // Lives in settings so it rides the profile snapshot / full-swap / Export-Import / cloud automatically (one source).
+    // Only USER-EDITED files land here; unedited baseline files display their declared seed (data/controllerFileSeeds).
+    workspace: {},
     // Axis roles — X/Y/Z linear; A/B optionally rotary. The sim reads this to spin the solid on a
     // rotary-axis move (around the declared Cartesian axis). Two rotary axes are allowed (A and B).
     motors: {
@@ -351,6 +355,8 @@ function loadSettings() {
                 inputs: Array.isArray(p.inputs) ? p.inputs : [],
                 outputs: Array.isArray(p.outputs) ? p.outputs : [],
                 macros: Array.isArray(p.macros) ? p.macros : [],
+                // t662 (E1) — the per-file workspace bodies ride the profile (must be listed or loadSettings drops it).
+                workspace: (p.workspace && typeof p.workspace === 'object' && !Array.isArray(p.workspace)) ? p.workspace : {},
                 // t656 — the STORED autostart macro + its regen inputs persist with the profile (survive reload, export/import).
                 sysstartCustomGcode: typeof p.sysstartCustomGcode === 'string' ? p.sysstartCustomGcode : '',
                 autostartBody: typeof p.autostartBody === 'string' ? p.autostartBody : undefined,   // undefined = never seeded → the panel migrates it on first open

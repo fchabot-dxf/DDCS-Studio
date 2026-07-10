@@ -8,6 +8,9 @@ import { getSettings, saveSettings, openSettings } from './settingsPanel.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { makeClient } from '../shared/js/client.js';
+import { fileTreeFor, flattenFiles } from '../data/controllerFiles.js';   // t662 (E1) — the per-controller file-tree declaration
+import { seedBody } from '../data/controllerFileSeeds.js';                 // t662 (E1) — first-open dump seeds for plain files
+import { UIUtils } from './uiUtils.js';                                    // t662 (E1) — downloadFile for the no-LAN (DM500) export transport
 import * as slotPack from '../data/slotPack.js';
 import { bmpDataUrl } from '../data/bmp.js';
 import { openIconEditor } from './iconEditor.js';
@@ -59,47 +62,9 @@ export function initMacrosApp() {
         </div>
         <div class="settings-body">
             <div class="settings-sidebar">
-                <details open style="margin-top: 4px; padding-left: 10px;">
-                    <summary class="sidebar-group-label" style="font-size: 11px; cursor: pointer; outline: none; padding-left: 4px; margin-left: -4px;">SYSDISK/</summary>
-                    
-                    <button class="settings-tab tree-level-1 active" data-target="macros_panel_mcode" style="margin-top: 4px; line-height: 1.3;">
-                        <div id="mac_lbl_slib" style="text-transform: none; font-size: 12px;">slib-m.nc</div>
-                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Custom M-codes</div>
-                    </button>
-                    
-                    <button class="settings-tab tree-level-1" data-target="macros_panel_sysstart" id="mac_btn_sysstart" style="margin-top: 2px; line-height: 1.3;">
-                        <div id="mac_lbl_sysstart" style="text-transform: none; font-size: 12px;">sysstart.nc</div>
-                        <div id="mac_sub_sysstart" style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Boot initialization</div>
-                    </button>
-                    
-                    <button class="settings-tab tree-level-1" data-target="macros_panel_tnc" id="mac_btn_tnc" style="margin-top: 2px; line-height: 1.3;">
-                        <div style="text-transform: none; font-size: 12px;">T.nc</div>
-                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Tool change hook</div>
-                    </button>
-                    
-                    <button class="settings-tab tree-level-1" data-target="macros_panel_error" id="mac_btn_error" style="margin-top: 2px; line-height: 1.3;">
-                        <div style="text-transform: none; font-size: 12px;">error.nc</div>
-                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Alarm / fault hook</div>
-                    </button>
-                    
-                    <button class="settings-tab tree-level-1" data-target="macros_panel_probe" id="mac_btn_probe" style="margin-top: 2px; line-height: 1.3;">
-                        <div style="text-transform: none; font-size: 12px;">probe.nc</div>
-                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">Native probing</div>
-                    </button>
-                    
-                    <button class="settings-tab tree-level-1" data-target="macros_panel_kbtn" id="mac_btn_kbtn" style="margin-top: 2px; line-height: 1.3;">
-                        <div style="text-transform: none; font-size: 12px;">key-N.nc</div>
-                        <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">K-buttons</div>
-                    </button>
-                    
-                    <details open id="mac_grp_cam_details" style="margin-top: 2px;">
-                        <summary class="sidebar-group-label" id="mac_grp_cam" style="padding-left: 12px; font-size: 11px; cursor: pointer; outline: none; margin-left: 4px;">CAM/</summary>
-                        <button class="settings-tab tree-level-2" data-target="macros_panel_cam" id="mac_btn_cam" style="line-height: 1.3;">
-                            <div style="text-transform: none; font-size: 12px;">macro_camN.nc</div>
-                            <div style="font-size: 9px; font-weight: normal; opacity: 0.6; margin-top: 2px;">CAM Pack Builder</div>
-                        </button>
-                    </details>
-                </details>
+                <!-- t662 (E1) — declaration-driven file tree: renderFileTree() builds THIS from the active controller's
+                     declaration (data/controllerFiles). Expert entries wrap today's builder panels; V4.1/DM500 = plain editors. -->
+                <div id="macros_tree" style="display:flex; flex-direction:column; gap:2px; margin-top:4px;"></div>
                 <div style="flex: 1;"></div>
                 <div style="padding: 12px 4px 4px; border-top: 1px solid var(--border); margin-top: 16px;">
                     <button id="mac_btn_global_pull" class="toolbar-btn settings-io" style="width:100%; margin-bottom:8px; display:flex; justify-content:center; align-items:center; background: var(--bg); color: var(--text-main); border: 1px solid var(--border);">⬇ Load from controller</button>
@@ -195,6 +160,9 @@ export function initMacrosApp() {
                         <div id="cam_slots" style="margin-top:6px;"></div>
                     </div>
                 </div>
+                <!-- t662 (E1) — the GENERALIZED simple editor (the autostart stored-editor pattern, per file). Rendered by
+                     openFileEditor() for any declared plain file; the body is stored in settings.workspace[path]. -->
+                <div id="macros_panel_file" style="display:none;"></div>
             </div>
         </div>
         <div id="macros_sync_modal" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.6); z-index:100; align-items:center; justify-content:center;">
@@ -222,35 +190,102 @@ export function initMacrosApp() {
     `;
 
     const q = (id) => root.querySelector('#' + id);
-    // Dialect capabilities
-    const dialectId = (getSettings().machine || {}).post || 'ddcs-expert-m350';
-    const isExpert = dialectId === 'ddcs-expert-m350';
-    const isV41 = dialectId === 'ddcs-v4.1';
-    
-    // Apply dynamic visibilities
-    if (q('mac_lbl_slib')) q('mac_lbl_slib').textContent = (isExpert || isV41) ? 'slib-m.nc' : 'slib.nc';
-    
-    if (isV41) {
-        if (q('mac_lbl_sysstart')) q('mac_lbl_sysstart').textContent = 'advstart.nc';
-        if (q('mac_sub_sysstart')) q('mac_sub_sysstart').textContent = 'Advanced start hook';
-        if (q('mac_title_sysstart')) q('mac_title_sysstart').textContent = 'ADVSTART.NC (V4.1 START HOOK)';
-        if (q('mac_btn_error')) q('mac_btn_error').style.display = 'none';
-        if (q('mac_grp_cam_details')) q('mac_grp_cam_details').style.display = 'none';
-    } else if (!isExpert) {
-        if (q('mac_btn_sysstart')) q('mac_btn_sysstart').style.display = 'none';
-        if (q('mac_btn_error')) q('mac_btn_error').style.display = 'none';
-        if (q('mac_grp_cam_details')) q('mac_grp_cam_details').style.display = 'none';
-    }
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-    const PANEL_IDS = ['macros_panel_mcode', 'macros_panel_sysstart', 'macros_panel_tnc', 'macros_panel_error', 'macros_panel_probe', 'macros_panel_kbtn', 'macros_panel_cam'];
-    const mMainTabs = [...root.querySelectorAll('.settings-tab')];
+    const PANEL_IDS = ['macros_panel_mcode', 'macros_panel_sysstart', 'macros_panel_tnc', 'macros_panel_error', 'macros_panel_probe', 'macros_panel_kbtn', 'macros_panel_cam', 'macros_panel_file'];
+    // Show a panel (external API + Expert builder wraps). Active class is managed per-item by the tree click handler.
     const mShowPanel = (id) => {
         PANEL_IDS.forEach((p) => { const el = q(p); if (el) el.style.display = (p === id) ? '' : 'none'; });
-        mMainTabs.forEach((b) => b.classList.toggle('active', b.dataset.target === id));
+        root.querySelectorAll('#macros_tree .settings-tab').forEach((b) => b.classList.toggle('active', b.dataset.target === id && !b.dataset.file));
     };
     window.showMacrosPanel = mShowPanel;
-    mMainTabs.forEach((t) => t.addEventListener('click', () => mShowPanel(t.dataset.target)));
-    mShowPanel('macros_panel_mcode');
+
+    // ── t662 (E1) — the DECLARATION-DRIVEN FILE TREE. The active controller's declaration (data/controllerFiles) builds
+    // the sidebar ALWAYS (offline included). Expert entries carry `panel` → wrap today's builder panels (byte-identical);
+    // plain entries carry `editable` → open the generalized simple editor. Re-renders on a controller switch. ──
+    function selectTreeItem(btn) {
+        root.querySelectorAll('#macros_tree .settings-tab').forEach((b) => b.classList.toggle('active', b === btn));
+        PANEL_IDS.forEach((p) => { const el = q(p); if (el) el.style.display = (p === btn.dataset.target) ? '' : 'none'; });
+        if (btn.dataset.file) openFileEditor(btn.dataset.file);
+    }
+    function renderFileTree() {
+        const host = q('macros_tree'); if (!host) return;
+        const cid = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
+        const decl = fileTreeFor(cid);
+        const fileBtn = (f, level) => {
+            const target = f.panel || 'macros_panel_file';
+            const fileAttr = f.panel ? '' : ` data-file="${esc(f.path)}"`;
+            return `<button class="settings-tab tree-level-${level}" data-target="${target}"${fileAttr} style="margin-top:2px; line-height:1.3;">`
+                + `<div style="text-transform:none; font-size:12px;">${esc(f.title || f.path)}</div>`
+                + `<div style="font-size:9px; font-weight:normal; opacity:.6; margin-top:2px;">${esc(f.sub || '')}</div></button>`;
+        };
+        const renderNodes = (nodes, level) => nodes.map((n) => {
+            if (n.group) return `<details open style="margin-top:2px;"><summary class="sidebar-group-label" style="padding-left:${level === 1 ? 4 : 12}px; font-size:11px; cursor:pointer; outline:none;">${esc(n.group)}</summary>`
+                + renderNodes(n.children || [], level + 1) + `</details>`;
+            return fileBtn(n, level);
+        }).join('');
+        host.innerHTML = renderNodes(decl.tree || [], 1)
+            || '<div class="settings-hint" style="padding:8px 4px;">No declared files for this controller yet.</div>';
+        host.querySelectorAll('.settings-tab').forEach((b) => b.addEventListener('click', () => selectTreeItem(b)));
+        // transport: DM500 (export) has no LAN → hide the global pull/deploy buttons (per-file Export replaces them).
+        const lan = decl.transport !== 'export';
+        if (q('mac_btn_global_pull')) q('mac_btn_global_pull').style.display = lan ? '' : 'none';
+        if (q('mac_btn_global_push')) q('mac_btn_global_push').style.display = lan ? '' : 'none';
+        const first = host.querySelector('.settings-tab');
+        if (first) selectTreeItem(first);   // default-select the first file (Expert → slib-m.nc / M-codes)
+    }
+
+    // The generalized simple editor for a declared plain file. Body stored IN THE PROFILE (settings.workspace[path]); an
+    // unedited file DISPLAYS its declared dump seed; editing persists into the workspace. Transport per the declaration.
+    function openFileEditor(path) {
+        const panel = q('macros_panel_file'); if (!panel) return;
+        const cid = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
+        const entry = flattenFiles(cid).find((e) => e.path === path) || { path, title: path, sub: '' };
+        const isExport = fileTreeFor(cid).transport === 'export';
+        const ws = getSettings().workspace || (getSettings().workspace = {});
+        const edited = typeof ws[path] === 'string';
+        const seed = seedBody(cid, path);
+        const body = edited ? ws[path] : seed;
+        panel.innerHTML = `
+            <div class="settings-section">
+                <div class="settings-section-title">${esc(entry.title || path)}</div>
+                <div class="settings-hint">${esc(entry.sub || '')} — a <b>stored file</b> saved with your Profile (edits persist, and ride Export/Import + cloud). ${isExport ? 'This controller has no LAN link — <b>Export</b> the file to copy it over by USB.' : '<b>Push</b> sends it to the controller.'}</div>
+                <textarea id="macfile_body" spellcheck="false" style="width:100%; height:300px; margin-top:8px; font:12px/1.45 monospace; box-sizing:border-box; background:var(--bg); color:var(--text-main); border:1px solid var(--border); border-radius:4px; padding:8px;" placeholder="( ${esc(path)} — type the file body, or leave empty )"></textarea>
+                <div class="settings-hint" id="macfile_note" style="font-size:11px; margin-top:4px; opacity:.75;"></div>
+                <div class="settings-row" style="margin-top:12px;">
+                    ${isExport
+                        ? `<button class="toolbar-btn settings-io" id="macfile_send">⬇ Export (save file)</button>`
+                        : `<button class="toolbar-btn settings-io" id="macfile_send">⬆ Push to controller</button>`}
+                    ${seed ? `<button class="toolbar-btn settings-io" id="macfile_revert" title="Discard your edits — go back to the baseline copy Studio ships for this controller.">↺ Revert to baseline</button>` : ''}
+                </div>
+            </div>`;
+        const ta = panel.querySelector('#macfile_body');
+        const note = panel.querySelector('#macfile_note');
+        ta.value = body;
+        const setNote = () => {
+            const e = typeof getSettings().workspace[path] === 'string';
+            note.textContent = e ? '● Edited — stored in this profile.' : (seed ? '○ Showing the shipped baseline (edit to store your own in this profile).' : '○ Empty — no baseline shipped; type your own (stored in this profile).');
+        };
+        setNote();
+        ta.addEventListener('input', () => { (getSettings().workspace || (getSettings().workspace = {}))[path] = ta.value; saveSettings(); setNote(); });
+        const send = panel.querySelector('#macfile_send');
+        if (send) send.addEventListener('click', () => {
+            const content = ta.value;
+            if (isExport) { UIUtils.downloadFile(path, content); return; }
+            if (!confirm('Push “' + path + '” to the controller? This overwrites the file on the machine.')) return;
+            const orig = send.textContent; send.disabled = true; send.textContent = 'Pushing…';
+            makeClient().writeSysfile(path, content, 'write')
+                .then((r) => { alert(r && r.ok ? ('Pushed “' + path + '”.' + (r.backup ? ' (backup: ' + r.backup + ')' : '')) : ('Push failed: ' + ((r && r.error) || 'no controller'))); })
+                .catch((e) => alert('Push failed: ' + (e && e.message ? e.message : e)))
+                .finally(() => { send.disabled = false; send.textContent = orig; });
+        });
+        const revert = panel.querySelector('#macfile_revert');
+        if (revert) revert.addEventListener('click', () => {
+            if (!confirm('Discard your edits to “' + path + '” and restore the shipped baseline?')) return;
+            delete getSettings().workspace[path]; saveSettings();
+            ta.value = seed; setNote();
+        });
+    }
 
     // t656 (amend 2) — the SELECTED CONTROLLER chip in the Macros header strip: what everything here is generated for.
     // Click → Settings → Controller (the openSettings deep-link). Re-renders on a profile switch, like the rest.
@@ -260,7 +295,14 @@ export function initMacrosApp() {
     }
     if (q('macros_ctrl_chip')) q('macros_ctrl_chip').addEventListener('click', () => { if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' }); });
     renderMacrosCtrlChip();
-    window.addEventListener('ddcs:settings-changed', () => { renderMacrosCtrlChip(); if (typeof updateSysstartEditNote === 'function') updateSysstartEditNote(); });   // profile switch → the chip + the stored-body mismatch note re-render
+    renderFileTree();   // t662 (E1) — build the ACTIVE controller's file tree at mount
+    let _lastTreeCtrl = (getActiveProfile() || {}).id;
+    window.addEventListener('ddcs:settings-changed', () => {
+        renderMacrosCtrlChip();
+        const cid = (getActiveProfile() || {}).id;
+        if (cid !== _lastTreeCtrl) { _lastTreeCtrl = cid; renderFileTree(); }   // rebuild the tree ONLY on a controller switch (not on every edit → the editor keeps focus)
+        if (typeof updateSysstartEditNote === 'function') updateSysstartEditNote();
+    });
 
     // --- Macros: author controller macros (M-code O100nn / K-button key-N); saved in the profile. ---
     const macrosArr = () => (getSettings().macros || (getSettings().macros = []));
