@@ -1488,7 +1488,13 @@ function wireSettingsOverlay(ov) {
         // factory "default", and you tick what to apply. Everything here is PROFILE data — equally settable by
         // hand and saved/loaded via Export/Import profile (the desktop app auto-saves it on every change).
         const pullBtn = q('set_profile_pull');
-        if (pullBtn) pullBtn.addEventListener('click', () => openImportModal());
+        if (pullBtn) pullBtn.addEventListener('click', async () => {
+            // Always give immediate feedback: disable + a busy label while the pull runs, and ALWAYS restore (even on error) —
+            // a settings overlay clip used to swallow the whole gesture; the modal now renders on top (z 13100) so the busy/error shows.
+            const orig = pullBtn.textContent;
+            pullBtn.disabled = true; pullBtn.textContent = '↧ Pulling…';
+            try { await openImportModal(); } finally { pullBtn.disabled = false; pullBtn.textContent = orig; }
+        });
     }
 
     // Apply a controller-sourced profile (from the gateway): set hardware tabs + rebuild inputs[] from its pin map.
@@ -1565,8 +1571,8 @@ function wireSettingsOverlay(ov) {
     async function scanController() {
         // Read using the CONNECTED controller's dialect (from its profile), not the current active one — otherwise
         // the #var numbers (pockets/tooltable/WCS) won't match the machine we're actually pulling from.
-        let hwProfile = null;
-        try { hwProfile = await makeClient().profile(); } catch (e) { /* offline */ }
+        let hwProfile = null, gatewayReached = false;   // gatewayReached: the bridge ANSWERED (even if the controller didn't) → distinguishes no-gateway from no-controller in the error
+        try { hwProfile = await makeClient().profile(); gatewayReached = true; } catch (e) { /* gateway not reachable */ }
         const d = (hwProfile && hwProfile.id) ? getDialect(hwProfile.id) : activeDialect();
         const atc = d.vars && d.vars.atc;
         const tb = (d.vars && d.vars.toolTable) || 1430;
@@ -1576,7 +1582,7 @@ function wireSettingsOverlay(ov) {
         for (let k = 0; k < 6 * wcsStride; k++) need.add(wcsBase + k);
         for (let i = 0; i < MAX; i++) { need.add(tb + i); if (atc) { need.add(atc.pocketX + i); need.add(atc.pocketY + i); need.add(atc.pocketZ + i); } }
         let values = {}, connected = false;
-        try { const res = await makeClient().readVars([...need].map(String)); connected = !!(res && res.connected); values = (res && res.values) || {}; } catch (e) { /* offline */ }
+        try { const res = await makeClient().readVars([...need].map(String)); gatewayReached = true; connected = !!(res && res.connected); values = (res && res.values) || {}; } catch (e) { /* gateway not reachable */ }
         const obj = (n) => { const x = values[String(n)]; return x && x.available ? x : null; };   // {value,userSet,default?}
         const cands = [], notes = [];   // notes = explicit "not readable / not available / at default" rows
         // Hardware & I/O
@@ -1647,7 +1653,8 @@ function wireSettingsOverlay(ov) {
             const seek = Math.round(hf.speed.x || hf.speed.y || hf.speed.z || 0), slow = Math.round(hf.precision || 0);
             if (seek > 0) cands.push({ group: 'Homing', label: 'Homing feeds', value: `Seek ${seek} · Slow ${slow} mm/min`, changed: true, kind: 'homingFeeds', data: { speed: hf.speed, precision: hf.precision } });
         }
-        return { connected, candidates: cands.concat(notes), controller: (hwProfile && hwProfile.id) ? { id: hwProfile.id, name: hwProfile.name } : null };
+        // reason (only meaningful when !connected): no-gateway = the bridge never answered; no-controller = bridge up, machine didn't respond.
+        return { connected, candidates: cands.concat(notes), controller: (hwProfile && hwProfile.id) ? { id: hwProfile.id, name: hwProfile.name } : null, reason: connected ? null : (gatewayReached ? 'no-controller' : 'no-gateway') };
     }
     async function applyCandidates(checked) {
         const a = _ddcsSettings.atc || (_ddcsSettings.atc = {});
@@ -1702,7 +1709,8 @@ function wireSettingsOverlay(ov) {
         m.id = 'import-modal';
         m.innerHTML = `
             <style>
-                #import-modal { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+                /* z-index 13100 — ABOVE the settings-overlay (12000, styles.css); this modal opens FROM WITHIN Settings, so at the old 1000 it rendered BURIED behind the overlay (the "Pull from controller" silent-no-op the human hit). Matches ioTable's 13100. */
+                #import-modal { position: fixed; inset: 0; z-index: 13100; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
                 #import-modal.active { display: flex; }
                 #import-modal .im-panel { background: var(--panel); color: var(--text-main); border: 1px solid var(--border); border-radius: var(--radius, 6px); width: min(620px, 95vw); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
                 #import-modal .im-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
@@ -1786,8 +1794,16 @@ function wireSettingsOverlay(ov) {
         m.querySelector('#import-apply').disabled = true;
         m.classList.add('active');
         let scan;
-        try { scan = await scanController(); } catch (e) { scan = { connected: false, candidates: [] }; }
-        if (!scan.connected) { body.innerHTML = '<div class="im-empty">Not bridged to a controller — run the desktop app / gateway, or Import a saved profile instead.</div>'; return; }
+        try { scan = await scanController(); } catch (e) { scan = { connected: false, candidates: [], reason: 'no-gateway' }; }
+        if (!scan.connected) {
+            // Distinguish WHY (the modal is now z-index 13100, so this message is actually visible — see the #import-modal z fix):
+            //   no-controller = the bridge answered but the machine didn't; no-gateway (default) = the bridge itself is unreachable.
+            const msg = scan.reason === 'no-controller'
+                ? 'The gateway is running, but the controller didn’t respond — check the machine is powered on and connected. Or Import a saved profile instead.'
+                : 'Gateway not reachable — is the bridge / desktop app running? Or Import a saved profile instead.';
+            body.innerHTML = '<div class="im-empty">' + msg + '</div>';
+            return;
+        }
         _importController = scan.controller || null;
         _importCands = scan.candidates.map((c) => ({ ...c, checked: !!c.changed }));   // pre-tick what the operator changed
         renderImportReview();
@@ -1871,7 +1887,8 @@ function wireSettingsOverlay(ov) {
         m.id = 'toollib-modal';
         m.innerHTML = `
             <style>
-                #toollib-modal { position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+                /* z-index 13100 — opens FROM WITHIN Settings; above the settings-overlay (12000) so it isn't buried (was 1000). */
+                #toollib-modal { position: fixed; inset: 0; z-index: 13100; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
                 #toollib-modal.active { display: flex; }
                 #toollib-modal .tl-panel { background: var(--panel); color: var(--text-main); border: 1px solid var(--border); border-radius: var(--radius, 6px); width: min(980px, 95vw); max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
                 #toollib-modal .tl-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
@@ -2187,7 +2204,7 @@ function wireSettingsOverlay(ov) {
         if (!m) {
             m = document.createElement('div'); m.id = 'cloudprof-modal';
             m.innerHTML = '<style>'
-                + '#cloudprof-modal { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); }'
+                + '#cloudprof-modal { position:fixed; inset:0; z-index:13100; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); }'   /* 13100: opens from within Settings — above the 12000 overlay (was 1000, buried) */
                 + '#cloudprof-modal .cp-panel { background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:var(--radius,6px); width:min(460px,94vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.5); }'
                 + '#cloudprof-modal .cp-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); font-weight:700; }'
                 + '#cloudprof-modal .cp-head button { background:transparent; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; }'
