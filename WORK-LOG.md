@@ -8692,3 +8692,31 @@ emitMapped is intentionally STATELESS (the dialect is threaded at the call site 
 - NEW tests/preview-dialect-parity.spec.js: (1) UNIT — for Expert/V4.1/DM500, `wizard.generate(P)` == the INSERT-path emit `emitMapped(stack, {dialect})` per post; the CORNER preview trigger reads #1925 (Expert) / #1500 (V4.1, no #1925) / #864 (DM500, no #1925); the preview genuinely CHANGES per post; the sim traces every post's EDGE emit to a drawable route WITH probes (drawable + probe>0). (2) REAL-SYMPTOM — set V4.1 active, openWiz('edge') → the #wiz_edge_code panel shows the V4.1 emit (NO #1925); switch to Expert → the panel re-renders with #1925 (byte-changed). Screenshots preview-v41.png + preview-expert.png.
 - Expert preview UNCHANGED byte-for-byte: with Expert active, activeDialectOpts()={dialect:Expert} == the old DEFAULT_DIALECT, so generate() is identical to before (proven: generate()==emitMapped(stack,{dialect:Expert})).
 - FULL SUITE: 937 passed / 2 skipped / 0 failed (3.2m), zero flaky this run (tests without setActiveProfile default to Expert → unchanged; the 22-wizard change is transparent to them).
+
+---
+## 2026-07-10 (t636) — PROBE-MISS SAFETY — GROUNDED at source; GATE (the incremental probe needs a pre-probe start-capture + a scratch-var decision)
+
+GROUNDING ONLY this turn (no source edits; threw a dump harness, deleted). The advisor said GROUND FIRST + GATE with specifics. Grounding is DONE + confirms the design is viable, but revealed a complication the "extend the probecheck atom" framing didn't account for → GATE for a ruling before building safety-critical code.
+
+### THE BUG (confirmed in the Studio emit)
+On V4.1/DM500 the `probecheck` atom folds to [] — the edge/corner probe emit has the two `IF #1920!=2 GOTO1` slots simply ABSENT after each G31, then it writes the WCS from the (possibly wrong) DRO. A MISS is silently ignored → wrong WCS. The fail label (N1) is emitted but UNREACHABLE on V4.1/DM500.
+
+### GROUNDING (at source — the real firmware macros, not names)
+- **V4.1** (`.../ddcsv4/probe-float.nc`, `probe-fix.nc`, `probe-h.nc`): the probe form is `G91 G31 <ax><±dist> L#682 Q1 K0 F<f>` (INCREMENTAL). The post-probe machine position is the DRO **#[1500+ax]** — CONFIRMED: probe-fix.nc does `#108=#1502` + `#1556=#1502` right after the G31; safez.nc reads #1500-1503. There is NO status var and the firmware macros do NO miss-check → on a miss the G31 completes the full commanded travel (no alarm) and #[1500+ax] reads the FULL-TRAVEL end. (register-name-is-not-macro-usage satisfied: #1500-1503 are macro-referenced + confirmed live 2026-06-13.)
+- **DM500** (`install/probe.nc`, `defprobe.nc`): move-until-input = `M101 / G91 G01 <ax>-<d> F / M102`. On NO input the G01 COMPLETES to full travel (it's a plain feed the input would have interrupted) — no alarm. The DRO is **#[864+ax]** — CONFIRMED: probe.nc does `#20=#864 / #21=#865 / #22=#866`. Firmware does NO miss-check either.
+- So BOTH posts: silent-miss is inherent, both continue-to-full-travel, both leave a readable DRO to compare. The DRO-compare design is sound.
+
+### THE COMPLICATION (why this is a GATE, not a straight build)
+The Studio probe is **INCREMENTAL** (corner/edge: `probeVar = dir==='+' ? '#8' : '#7'` = ±max, emitted under `G91`). So "compare the probed position vs the full commanded seek target" needs `target = start_DRO + seek` — which requires CAPTURING the start DRO **before** the probe. The current `probecheck` runs AFTER the probe, so a single after-probe atom can't know the pre-probe start. And the comparison operator is DIRECTION-dependent (dir '+' → miss ⟺ DRO ≥ target; dir '-' → DRO ≤ target). So the mechanism is bigger than "extend the atom": probeSurface must emit a pre-probe start-capture (dialect-conditional: [] on Expert) + thread dir/seek to the probecheck seam.
+
+### PROPOSED MECHANISM (for the advisor to confirm/refine)
+1. New `probestart` atom in probeSurface BEFORE each `probe`: V4.1 `#<s>=#[1500+ax]`, DM500 `#<s>=#[864+ax]`, Expert → [] (folds away → Expert byte-diff ZERO).
+2. `probecheck` seam gains dir+seek (probeSurface already has `dir` + `probeVar`): V4.1/DM500 emit `IF #[dro] <op> [#<s> + <seek>] GOTO <failGoto>` (op = dir '+'→'>=' / '-'→'<='); Expert unchanged (`IF #192x!=2 GOTO`).
+3. The failGoto plumbing + per-wizard error labels stay as-is (probeSurface already threads failGoto).
+
+### THE DECISION NEEDED (GATE — safety-critical)
+- **The scratch var `#<s>`**. The #var namespace is GLOBAL on these controllers. Studio probe wizards already emit #1-#73 (+ #50 result, #70-73 WCS) AND #74/#101/#102/#578; the V4.1 firmware probe macros use #100-#109. A colliding scratch SILENTLY CORRUPTS the probe (a false target → false miss/pass). Options: (A) a DIALECT-declared miss-scratch reg per non-status post, set to a verified-free # (I'll audit the full firmware var maps first); (B) probeSurface threads a caller-declared free var (each wizard names one from its own scheme). Recommend (A) — one declared source per post, grounded to a firmware-free scratch.
+- **Confirm the pre-probe start-capture restructure of probeSurface** is acceptable (the dispatch said "extend the probecheck atom"; grounding shows it also needs the pre-probe capture step).
+- (Secondary) DM500: same DRO-compare (it continues to full travel) — confirm you want the compare there too vs a "declared behavior" comment; the grounding says the compare is valid (it does NOT alarm).
+
+NEXT (post-ruling): build per the confirmed mechanism + scratch var; Expert byte-diff ZERO (full probe suite); V4.1/DM500 carry start-capture + compare + GOTO on every probe (corner/edge/middle/alignment/rotary + twins), asserting the compare register/target/label; a simulated MISS in the exec engine takes the fail branch (not the WCS write); zero new leaks; suite green.
