@@ -9048,3 +9048,43 @@ The DM500 `setting` is NOT the index=offset·8 layout Expert/V4.1 use — decodi
 - tests/dump-import-ui.spec.js (NEW, 2) — REAL SYMPTOM: drop a V4.1 dump (setting+eng+coord1) → the review modal derives the envelope (3830) + WCS G54 (-300.29) by name → Apply writes settings.machine.wcs.table[0] = {-300.29,-116.06,1547.268} + machine.x = 3830 (no gateway); drop a DM500 dump → honest "named from the eng, values N/A" note + the resolved #375/#379 rows + NO travel candidate (nothing inferred/applied). Screenshot scratchpad/dump-import-dm500.png. Network-pull regression green (pull-machine-truth, pull-modal-stacking, pull-review-detail, pull-v41-wcs = 10/10).
 ### NOT this turn (honest scope): the DM500 setting-layout grounding (refine on a real dump — the values stay N/A until then). Python side unchanged (the JS is the port; the goldens read the same fixtures the Python tests pin).
 Files: data/dumpImport.js (new), ui/settingsPanel.js, tests/dump-import-golden.spec.js (new), tests/dump-import-ui.spec.js (new).
+
+## 2026-07-10 (t668) — ROTARY HOMING: GROUNDED DESIGN (gate — NO CODE; advisor rules, then I build)
+A machine-moving feature → grounded the firmware registers + mapped the Studio seams; the design + forks + gaps are below for the advisor's ruling.
+
+### REGISTER GROUNDING (firmware; register-name-is-not-macro-usage satisfied — verified by actual G31 usage)
+- EXPERT home-all `fndzero.nc` homes each axis via `M98P501X<N>` (the O501 sub in slib-g.nc), N = 0/1/2/3/4 = X/Y/Z/A/B. The captured machine's fndzero: `X0`(X) `X1`(Y, A=gantry-slave→#883=#881) `X2`(Z) **`X4`(Home B — rotary axis, "Has Switch") + `#1519=1`**. So the firmware ALREADY homes a rotary axis by switch-seek via the SAME sub.
+- O501 is indexed by `#1`; every per-axis home register is `#[base+#1*step]` and IS macro-referenced in the G31 seek: **ENABLE `#[1046+N*3]`, PORT `#[1045+N*3]` (G31 P word), LEVEL `#[1047+N*3]` (G31 L word), DIRECTION `#[612+N]`, FAST FEED `#[607+N]`**. They EXTEND to N=3 (A) and N=4 (B): A → port #1054 / level #1056 / enable #1055 / dir #615 / feed #610; B → #1057 / #1059 / #1058 / #616 / #611. Homed-flag `#[1515+N]` → A=#1518, B=#1519; home-coord `#[880+N]` → A=#883, B=#884.
+- Studio's OWN `homeAxisBlocks` already emits `G31 <ax><dist> F.. P#[1045+N*3] L#[1047+N*3]` for LINEAR axes — the SAME index pattern, so it extends to A/B by index (P#1054 L#1056 for A). Studio emits its own G31, NOT M98P501.
+- **GAP (Expert):** the Expert `eng` does NOT name the A/B home port/level/direction params (they live only in the O501 macro-var space #1054/#1056/#615) → they can't be derived BY NAME on a pull/dump-import (unlike V4.1). The user declares the A home switch in the I/O model (same as the linear home switches). The emit's `P#1054 L#1056` still references the firmware's configured regs — fine.
+- **V4.1 (deferred):** its eng FULLY names the A rotary home config — port #154, level #180, direction #202, search speed #207 (deg/min), positioning speed #212, back distance #222 (deg), **soft-limits #238/#243 (deg → BOUNDED rotary)**. BUT V4.1 homing is still refusal-gated (unverified post) AND its G31 form differs (`A<dist> L#682`, no P). So a V4.1 rotary arm waits for the V4.1-homing hardware-confirm increment. Note what it needs: un-gate V4.1 homing + the V4.1 G31 form + #154/#180/#202 references + degrees.
+
+### STUDIO SEAMS (the fork points, mapped)
+- Emit method fork: `homingWizard.js:68` — `method = (ax==='a'||'b') ? 'setzero' : 'seek'` (hardcoded by axis name; ignores the ALREADY-STORED `c.rotary`). Set-zero emits only the homed-flag assigns (no motion). The seek branch (98-102) takes direction from `declaredHomeEdgeSide` + distance from `machine[ax]` span — neither works for rotary.
+- `declaredHomeEdgeSide` (limitSwitches.js:66) returns `null` for A/B (the whole model is x/y/z × min/max; LIMIT_EDGES/LIMIT_AXES enumerate only linear edges). A rotary axis has no envelope edge → the seek direction must be DECLARED.
+- The I/O limit model (LIMIT_AXES in settingsPanel.js:198 + ioTable.js:30; syncFlatFromIO:238) has NO A/B rows and no single-ended-switch concept — only `<axis><Min|Max>` edges → flat `<edge>Home/Pin/Level`.
+- Machine→Homing UI (`renderHomingGui`, settingsPanel.js:648) FIXES "Set zero (no motion)" for A/B; `commitHoming:714` ALREADY reads `.hm-rotmode → c.rotary` (the select just isn't rendered); motion inputs hidden for rotary (line 671). A "continuous (mod 360)" checkbox exists (683).
+- SIM: AUTOMATIC — if the emit produces an A-word move and `motors.a.role==='rotary'`, `gcodeViz3d._applyPartRotation` spins the part (getRotaryAxes → around). No sim code needed.
+- Twin: homingData.js recomposes from homeAxisBlocks (a fork propagates), but the arm-split regex `/^Home ([XYZAB])\b/` + the "A/B no seek" help text (44-45) need the head-comment kept + the help updated.
+
+### THE FORKS — for the advisor's RULING
+- **FORK A — the rotary home-switch DECLARATION (I/O).** Rotary has no min/max edge. RECOMMEND a NEW honest row concept: a rotary "home/index switch" `{ axis:'a', type:'home', pin, level, dir:'cw'|'ccw' }` mirrored by syncFlatFromIO → `aHomePin/aHomeLevel/aHomeDir`. (NOT a synthetic min/max edge — that's dishonest; a rotary index switch genuinely IS a different kind.) This is a DECLARE, not a hack.
+- **FORK B — the seek DIRECTION source.** declaredHomeEdgeSide can't derive it. RECOMMEND: the DECLARED direction on the home-switch row is primary (honest — no envelope to infer from); optionally SEED it from the A soft-limit sign where bounded (V4.1 #238/#243). Mirrors [[homing-direction-declared-by-envelope-sign]] (the home end is DECLARED, never inferred from travel).
+- **FORK C — the METHOD choice UI.** The t628 fixed "Set zero (no motion)" → a real choice **Set zero | Switch seek** for rotary axes only, with the derived-direction display (like the linear home-end). commitHoming is ready; render `<select class="hm-rotmode">` + un-hide the motion inputs when seeking; homeAxisBlocks:68 reads c.rotary.
+- **FORK D — the SEEK DISTANCE (continuous vs bounded).** Continuous (the existing mod-360 checkbox) → seek `dir*(360+margin)`; bounded (A soft-limits exist) → seek `dir*(span+margin)`. Back-off + slow re-touch in DEGREES, mirroring linear.
+- **FORK E — scope.** Expert rotary seek NOW (registers confirmed). B is also rotary-homeable (fndzero X4) — do BOTH A and B, or A first? V4.1 rotary DEFERRED (refusal-gated + different G31 form).
+
+### PROPOSED EMIT (Expert A, mirrors the linear arm; degrees; P#1054 L#1056)
+```
+( Home A — G31 seek to the declared home switch )
+G91
+G31 A<dir*(360+margin | span+margin)> F<seekFeed deg/min> P#1054 L#1056   ( fast seek )
+G01 A<-dir*backoff> F<slowFeed>                                            ( back off the switch )
+G31 A<dir*(backoff+2)> F<slowFeed> P#1054 L#1056                           ( slow re-touch )
+#883 = 0        ( A machine coord = 0, home datum )
+#1518 = 1       ( A homed flag )
+G01 A<-dir*backoff> F<slowFeed>                                            ( clearance )
+G90
+```
+
+### RISK to flag: #[880+N] for A/B = #883/#884 are the SAME registers the dual-Y GANTRY sync uses (#883=#881). No clash — a rotary axis is role-exclusive with 'slave' (a slave is never homed independently), so #883 is A's machine coord in both roles. Worth the advisor's eye. Awaiting the ruling; NO code written this turn.
