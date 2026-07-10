@@ -8287,3 +8287,46 @@ Add V4.1 + DM500 emit assertions to the PROBE FAMILY (corner/edge/middle/alignme
 - **TWO findings to report (NOT fixed — out of scope for F3's units bug):**
   1. **DM500 comm TWIN form-freeze (deeper, separate).** The user_comm_data TWIN emits the Expert ms-form on DM500 (dwell reads P500, not the stack's P0.5) — a 1000x bug reappearing in the TWIN. Root cause is NOT dwell-specific: the twin superset is baked ONCE at registration with the Expert dialect, and the recompose swaps VALUES not FORMS, so EVERY dialect-dependent RAW (dwell, hmiInput #2070, ...) freezes at Expert. The comm-twin + comm-e0-superset sweeps only cover expert+v41 (both ms-form), so they never catch it. Proper fix needs a twin-per-dialect bake OR routing dialect-dependent lines through atoms + feeding emitMapped the profileId — an architectural call for the human/advisor. My test documents this explicitly (asserts twin==stack ONLY on expert+v41, with a NOTE).
   2. **comm statusDwell (communicationWizard.js:81) — same class, DM500 wrong.** `dwellRaw = () => RAW(\`G4 P${Number(params.statusDwell)} ...\`)` emits a raw G4 P<ms> integer. Correct on Expert/V4.1 (P=ms) but WRONG on DM500 (P=seconds) — a 1000x under-dwell there (P<ms> read as seconds). It's a hardcoded G4, not a dialect.dwell() call, so it wasn't in F3's ÷1000 scope; flagging for a follow-up (route it through dialect.dwell(ms/1000) like the main dwell).
+
+---
+## 2026-07-09 (t606) — F1/E0: PROBE-FAMILY EXPERT-LITERAL LEAK — audit ledger + mechanism proposal (NO CODE)
+
+E0 = audit + map + propose the mechanism, pass back BEFORE building (advisor rules, then E1 builds corner).
+
+### The disease (confirmed) + the one-line mechanism
+The probe wizards' `xxxStack` builders emit dialect-BLIND `assign`/`ifgoto` blocks carrying LITERAL Expert registers. The real program emit (programModel.js:176 `emitMapped(stack, dialectOpts())`) DOES pass the active post's dialect, and dialect-aware ATOMS resolve per-post at emit time — so the FIX is: **route each literal through the semantic atom that already exists** (they fold via the dialect seams, which are ALREADY declared honestly on all 3 posts). This is the SAME mechanism that fixes the comm-twin form-freeze (atoms resolve at emit, not baked at build).
+
+### Seams already declared per-post (NOT the bug — the wizards just bypass them)
+| semantic | Expert | V4.1 | DM500 | atom (exists) |
+|---|---|---|---|---|
+| probe-status check | `IF #1920+ax!=2 GOTOn` | `[]` (no status var) | `[]` (motion halts on input) | `probecheck` (measure.js:16) |
+| probe trigger read | `#v=#1925+ax` | `#v=#1500+ax` | `#v=#864+ax` | `proberead` (measure.js:10) |
+| DRO read | `#v=#880+ax` | `#v=#1500+ax` | `#v=#864+ax` | `readmachine` (measure.js:22) |
+| WCS write | `#[805+[wcs-1]*5+ax]=v` (INLINE) | `G90 G92 axis v` | `G90 G92 axis v (VERIFY)` | `setworkoffset` (setworkoffset.js:25) |
+| HMI prompt / toast / input | `#1505=1(m)` / `#1505=-5000(m)` / `#2070=..` | `[]` / `[]` / `[]` | `[]` / `[]` / `[]` | `confirm`/`message`/hmi (hmi.js) |
+
+Honest-degrade is BUILT-IN: V4.1/DM500 return `[]` for HMI + probe-status → the atom emits nothing (a comment where useful, the homing precedent). Forms grey via caps (probeStatusCheck:false, hmi:false).
+
+### THE LEDGER — per op, what leaks and its migration status
+- **rotaryCenter / rotaryClock — ~DONE (atoms).** mkRM=readmachine, mkSWO=setworkoffset, PR=probe, CK=probecheck. RESIDUE: the single probe-fail `A('#1505','1','Probe failed')` (rotaryCenterWizard:170, rotaryClockWizard:133) — HMI leak. wcsArg (#578 / Gnn-53) rides the setWorkOffset atom → folds. → E5 = tiny.
+- **alignment — ~DONE (atoms).** RM/PR/CK/RD/CF/MSG all atoms; #50-54 are GENERIC scratch math (ATAN/ABS/delta) — portable, dialect-independent, NOT a leak. RESIDUE: the Expert-HMI display-var copies `A('#1510','#52')`/`#1511`/`#1512` + the MSG referencing them (alignmentWizard:161-164) — verify whether already inside a caps.hmi GUARD; if not, gate/degrade. → E4 = small (finer per-line audit).
+- **corner — NOT migrated (literals).** WCS base-compute `#71=#578,#72=[#71-1],#70=[805+[#72*5]]` (cornerWizard:246) + INDIRECT writes `#[#70]=#102`/`#[#73]=#101` (:195/:198) + sync `#[#74]=#883` (:337); HMI `mkA('#1505',...)` (:253/:344/:349); status via literal map `#1920/#1925` (:23-25) used at :191/:263. → E1 (the gated pilot).
+- **edge — NOT migrated (literals).** WCS `#71=#578..#70=[805+[#72*5]]` (edgeWizard:56) + `WCS_BASE` literal table (:21); HMI `#1505` (:64/:96/:97) + `mkIF('#1505','==','0',2)` cancel; status/read literal map (:18-19). → E2 (inherits corner).
+- **middle — NOT migrated (literals).** WCS INDIRECT-with-OFFSET `#[#70+2]=#57` (middleWizard:198) + sync `#74=[#70+slave],#[#74]=#883` (:238); HMI `#1505` (:186/:187/:247/:248); status/read literal map (:28-30). → E3 (inherits corner + the offset write + sync).
+- **probeBlocks.js** — shared VARS map (:21-23) + confirmBlock (:119, literal `#1505`). Shared helper; fold into whichever increment consumes it.
+
+### THE ONE FORK TO RULE ON — the #70-temp INDIRECT WCS write (corner/edge/middle)
+The inline `setWorkOffset` atom (Expert `#[805+[#578-1]*5+ax]=v`) CANNOT reproduce the corner/edge/middle Expert golden byte-for-byte — they use the base-into-#70 INDIRECT form (`#70=[805+[#72*5]]` once, then `#[#70]=v`). (This is exactly why `wcsZeroAtCurrent` is a dedicated atom — dialect line 34.) rotary uses the INLINE form and has no legacy golden, so it migrated freely. Rule-of-three FIRES (corner+edge+middle = 3). Options:
+- **A (preserve Expert bytes — honors "no Expert change, ever"):** add a dedicated seam/atom pair — `wcsBaseInto(destVar)` (Expert = the #71/#72/#70 compute, V4.1/DM500 = `[]`) + an INDIRECT `wcsWriteIndirect(baseVar,off,value)` (Expert `#[#70+off]=v`, V4.1/DM500 `G90 G92 axis v`). New machinery, but the shipped Expert bytes are untouched. **RECOMMEND (matches the stated constraint + the wcsZeroAtCurrent precedent).**
+- **B (unify on setWorkOffset — one-source win):** restructure corner/edge/middle to the INLINE `setworkoffset` atom (identical to rotary), one WCS-write mechanism across the whole family, zero new machinery, folds for free. COST: CHANGES Expert bytes (equivalent WCS result, different sequence) → a one-time Expert golden REBASELINE — which the "no Expert change, ever" rule forbids as literally stated. Only if the advisor relaxes it.
+Sieve: G3(one-source)+G4(dumb format) favor B; the residue is the advisor's own Expert-immutability constraint → their call. I lean A unless you bless a verified-equivalent Expert rebaseline.
+
+### RULING on the comm-twin design consideration (advisor asked)
+YES — the F1 mechanism IS the twin-per-dialect fix: emit-time atoms + programModel passing dialectOpts already fold rotary/alignment AND their twins per-post. Converting corner/edge/middle literals → atoms fixes stack AND twin together. FOR COMM: the SAME cure applies — convert comm's build-time-baked dialect RAW lines (dwell, hmiInput #2070, status-bar #1503) to atoms (dwell/hmiInput/message) so the comm twin folds per-post; that closes the t604 gated finding (DM500 dwell P500→P0.5) + statusDwell in one stroke. NOTE it's a comm-side sibling increment, not literally inside the probe family.
+- **statusDwell (communicationWizard.js:81)** — the F3 sibling: route the raw `G4 P<ms>` through `dialect.dwell(ms/1000)` (or the dwell atom). Small; do it with the comm-twin sibling or standalone.
+
+### SECONDARY finding (flag, likely out of F1 scope)
+Wizard `generate()` calls `emitMapped(xxxStack(params)).text` with NO profileId → **Expert-default** (cornerWizard:363, middleWizard:255, all wizards except wcsWizard:34 which threads `{dialect}`). So the wizard's own PREVIEW shows Expert even on V4.1/DM500 (the real inserted program is fine — programModel re-emits per-post). If the advisor wants preview parity, thread dialectOpts into generate() like wcsWizard does. Not required to close the leak.
+
+### SWEEP/VERIFY discipline for E1+ (per the dispatch)
+Each increment: convert one op, add V4.1+DM500 emit assertions (numeric per-post truth, NOT golden==golden), Expert byte-identity ABSOLUTE (the existing Expert golden must not move a byte — verify each atom's Expert form == the current literal before/after). Safety: a probe MISS must surface on V4.1/DM500 (honest degrade, no silent continue) — audit the fail-branch per op during its increment.
