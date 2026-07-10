@@ -24,6 +24,15 @@ export const readMachineBlock = {
     emit: (p, dx, dy, dialect) => dialect.readMachine(p.axis || 'Z', p.var || '#57'),
 };
 
+export const probeGuardBlock = {
+    // The G31 stop-mode / limit-protection preamble (#1905=0 / #1915=<v>) some probe wizards set before G31. PROFILE-AWARE:
+    // Expert's G31 consumes it → dialect.probeGuard emits the two assigns (byte-identical to the old raw ones); a post whose
+    // probe form doesn't consume them (V4.1's L#682 G31 / DM500's move-until-input → no dialect.probeGuard) folds to [].
+    type: 'probeguard', label: 'Probe Guard', kind: 'leaf', category: 'Probing',
+    defaults: { stopVar: '', limitVar: '', limitVal: '' }, fields: ['stopVar', 'limitVar', 'limitVal'],
+    emit: (p, dx, dy, dialect) => (dialect && typeof dialect.probeGuard === 'function' ? dialect.probeGuard(p) : []),
+};
+
 export const toolOffsetBlock = {
     type: 'tooloffset', label: 'Tool Offset', kind: 'leaf', category: 'Coordinates',
     defaults: { tool: '#1300', value: '#102' }, fields: ['tool', 'value'],

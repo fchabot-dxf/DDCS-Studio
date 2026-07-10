@@ -8436,3 +8436,27 @@ base↔write are coupled (fold the base but not the write → `#[#70+0]` referen
 
 ### RECOMMENDATION (one line)
 All 3 are small, natural extensions of the proven pattern: a spaced-confirm seam (idiom 1), a probeSurface stop/limit fold (idiom 2), a `direct` mode on wcsWriteIndirect (idiom 3). All three ALSO serve E3 middle. Awaiting your ruling on the 3 before I build edge (+ E3 middle then inherits them).
+
+---
+## 2026-07-09 (t616) — F1/E2 edge: COMPLETE (Expert byte-identical). 3 ruled seams built; corner manual-arm closed.
+
+Advisor ruled all 3 novel idioms as recommended. Edge converted as ONE unit (the entanglement rule). Expert byte-diff ZERO.
+
+### The 3 new mechanisms (all also serve E3 middle)
+1. **hmiconfirm atom** (hmi.js) — the SPACED confirm gate (prompt + ESC). Expert = `#1505=1 ( note )` + `IF #1505==0 GOTO<cancel>` (byte-identical to the old assign+ifgoto, via dialect.hmiLine + dialect.ifGoto); off-HMI folds BOTH to a plain comment with NO ESC IF (so an unset #1505 can't mis-branch). Distinct from `confirm` (no-space form).
+2. **probeguard atom** (measure.js) + Expert **probeGuard** seam — the G31 stop/limit preamble (#1905=0 / #1915=<v>). Expert emits the two assigns (byte-identical); posts whose probe form doesn't consume them (V4.1 L#682 G31, DM500 move-until-input → no dialect.probeGuard) fold to []. Wired into probeSurface (stopVar/limitVar → the probeguard atom).
+3. **wcsWriteIndirect `direct` mode** — Expert `#[#70+offset]=value` (the direct nested form; edge/middle) vs corner's `#[#70]`/#73-temp. wcswrite atom gained a `direct` param.
+
+### Shared-seam wiring (touches corner + middle — both re-verified byte-identical)
+- probeSurface: stop/limit assigns → the probeguard atom (edge + middle both fold off-Expert automatically; Expert unchanged).
+- safeTraverseStack MANUAL: the prompt+ESC (assign+ifgoto) → the hmiconfirm atom — this CLOSES corner's manual-travel ESC arm (the E1 gap) AND sets up middle's reposition, both byte-identical on Expert.
+
+### edgeWizard rewire + orphan cleanup
+base → mkWcsBase (wcsbaseinto); confirm → mkConfirm (hmiconfirm); trigger → rawAxis on probeSurface; WCS write → mkWcsWrite{direct:true}; toast/error → HMI (hmiline). Removed the orphaned WCS_BASE const + wcsBaseOf/mkA/mkIF/mkC helpers (my rewire orphaned them).
+
+### VERIFY
+- Expert byte-IDENTICAL (captured before, diffed after): the full edge active-X emit matches — confirm+ESC `#1505=1 ( ... )`+`IF #1505==0 GOTO2`, stop/limit `#1905=0`/`#1915=2`, base #70, trigger `#50=[#1925+#6]`, direct write `#[#70+0]=#50`, toast/error. edge + corner + middle + probe-surface + dialect-decode = 151 byte-identical (every combo + twins; corner's manual arm + middle's stop/limit re-verified through the shared seams).
+- V4.1/DM500: ZERO Expert registers — confirm → comment (NO ESC IF), NO #1905/#1915, base gone, trigger #1500/#864, WCS `G90 G92 X#50`, toast/error → comments. corner-post-fold.spec.js extended with edge's per-post numeric truth + negatives (no #1505/#190x/#191x/#70/#805/#1925). Full suite 921 pass.
+
+### E2 COMPLETE — E3 middle now inherits ALL of it
+middle shares the SAME probeSurface (stop/limit + trigger), safeTraverseStack (manual reposition), the #70 WCS idiom (incl. #[#70+2] direct), and #1505 prompts → the seams are all in place; E3 is the middle rewire + its per-post sweep.

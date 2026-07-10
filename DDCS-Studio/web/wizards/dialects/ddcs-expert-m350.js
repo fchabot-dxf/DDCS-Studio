@@ -26,6 +26,10 @@ export const dialect = {
     probeTrigVar: (axis) => `#${1925 + AX[axis]}`,   // the trigger register per axis (for an inline read, e.g. radius-comp) — #1925/#1926/#1927
     // #57=#882   (SAVE_WCS_XY_AUTO.nc:16). machine-DRO block #880+axis
     readMachine: (axis, varName) => [`${varName}=#${880 + AX[axis]}`],
+    // probeGuard({stopVar, limitVar, limitVal}) — the G31 stop-mode / limit-protection preamble (#1905=0 stop, #1915=<v> limit
+    // protect; 3D PROBE macros). Expert's G31 consumes them; posts whose probe form doesn't (V4.1's L#682 G31, DM500's
+    // move-until-input) have NO probeGuard → the probeguard atom folds to []. Byte-identical to the old raw stop/limit assigns.
+    probeGuard: (p = {}) => { const o = []; if (p.stopVar) o.push(`${p.stopVar}=0 ( Stop mode: decelerate )`); if (p.limitVar) o.push(`${p.limitVar}=${p.limitVal ?? ''} ( Limit protect )`); return o; },
     // G53 Z#99   (snippets.nc:4). NO G0 prefix; ref MUST be a #var on M350 (a literal fails)
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],
     // #[805+[idx-1]*5+ax]=value   (SAVE_WCS_XY_AUTO.nc:21-26). base 805, stride 5; X=base,Y=+1,Z=+2,A=+3
@@ -40,9 +44,11 @@ export const dialect = {
     // form (SAVE_WCS_XY_AUTO.nc:21-26). offset 0 → the base itself `#[#70]=v`; offset>0 → compute the address into addrVar
     // (#73/#74) then `#[addrVar]=v`. Notes are paren-stripped like the assign/comp lines. This is the byte-exact partner of
     // wcsBaseInto — setWorkOffset's INLINE form can't reproduce it (same reason wcsZeroAtCurrent is dedicated; probe twins depend on it).
-    wcsWriteIndirect: ({ offset, addrVar, value, note, addrNote }) => {
+    wcsWriteIndirect: ({ offset, addrVar, value, note, addrNote, direct }) => {
         const n = (s) => String(s ?? '').replace(/[()]/g, '').trim();
         const wr = (tgt, v, nt) => (n(nt) ? `${tgt}=${v} ( ${n(nt)} )` : `${tgt}=${v}`);
+        // DIRECT mode (edge/middle): write the nested address inline `#[#70+off]=v` (no #73 temp) — a distinct dump idiom.
+        if (direct) return [wr(`#[#70+${Number(offset) || 0}]`, value, note)];
         if (!Number(offset)) return [wr('#[#70]', value, note)];
         return [wr(addrVar, `[#70+${offset}]`, addrNote), wr(`#[${addrVar}]`, value, note)];
     },

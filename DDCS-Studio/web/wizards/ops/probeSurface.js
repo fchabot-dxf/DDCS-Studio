@@ -29,8 +29,9 @@ export function probeSurfaceStack(p = {}) {
     const port = p.port || '#5', level = p.level ?? 0, failGoto = p.failGoto ?? 1;
 
     if (p.comment) push('comment', { text: p.comment });
-    if (p.stopVar) push('assign', { var: p.stopVar, value: '0', note: 'Stop mode: decelerate' });
-    if (p.limitVar) push('assign', { var: p.limitVar, value: String(p.limitVal ?? ''), note: 'Limit protect' });
+    // G31 stop-mode / limit-protection preamble via the profile-aware probeguard atom: Expert emits #1905=0/#1915=<v>
+    // (byte-identical), posts whose probe form doesn't consume them (V4.1/DM500) fold to [].
+    if (p.stopVar || p.limitVar) push('probeguard', { stopVar: p.stopVar || '', limitVar: p.limitVar || '', limitVal: p.limitVal ?? '' });
 
     push('probe', { axis, to: p.probeVar, feed: p.feedFast, port, level });   // fast find
     push('probecheck', { axis, goto: failGoto });
@@ -92,14 +93,14 @@ export function safeTraverseStack(p = {}) {
     // Emits middle's proven reposition() shape verbatim; leaves the three auto arms below byte-identical for every
     // existing caller. See the @param p.approach note for the seq/in-axis-ONLY constraint + who owns the REPOSITION: prefix.
     if (p.approach === 'manual') {
-        const promptVar = p.promptVar || '#1505';
         const promptVal = p.promptVal ?? '1';
         const promptNote = p.promptNote ?? 'Press Enter when repositioned';
         const failGoto = p.failGoto ?? 2;
         if (p.lift) push('move', { mode: 'rapid', z: p.lift });
         if (p.comment) push('comment', { text: p.comment });
-        push('assign', { var: promptVar, value: String(promptVal), note: promptNote });
-        push('ifgoto', { lhs: promptVar, op: '==', rhs: '0', goto: failGoto });
+        // the operator jog-and-wait gate via the profile-aware hmiconfirm atom: Expert = `#1505=1 ( note )` + `IF #1505==0
+        // GOTO<fail>` (byte-identical to the old assign+ifgoto); off-HMI both fold to a comment (no ESC → no mis-branch).
+        push('hmiconfirm', { value: String(promptVal), note: promptNote, cancel: failGoto });
         if (p.drop) push('move', { mode: 'rapid', z: p.drop });
         push('distmode', { dist: 'inc' });
         return S;

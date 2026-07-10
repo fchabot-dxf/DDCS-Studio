@@ -77,3 +77,44 @@ test('WCS WRITE folds per post — Expert #[#70]/#73 indirect (byte-identical), 
     expect(line(t['ddcs-v41'], /G92 Z\[/)).toContain('G90 G92 Z[#1502-#6]');
     expect(line(t['ddcs-v3-dm500'], /G92 Z\[/)).toContain('G90 G92 Z[#866-#6]');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EDGE (E2) — inherits corner's seams + the 3 ruled additions: the spaced-confirm gate (prompt+ESC), the G31 stop/limit
+// probeguard fold, and the DIRECT-nested WCS write #[#70+off]. Expert byte-identical; V4.1/DM500 zero Expert registers.
+async function emitEdge(page, params) {
+    return page.evaluate(async (params) => {
+        const { edgeStack } = await import('/wizards/edgeWizard.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { getDialect } = await import('/wizards/dialects/index.js');
+        const out = {};
+        for (const id of ['ddcs-expert-m350', 'ddcs-v41', 'ddcs-v3-dm500']) out[id] = emitMapped(edgeStack(params), { dialect: getDialect(id) }).text;
+        return out;
+    }, params);
+}
+
+test('EDGE folds per post — Expert byte-identical (confirm+ESC, stop/limit, direct WCS, #1925); V4.1/DM500 G92, no Expert registers', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const t = await emitEdge(page, { axis: 'X', dir: 'pos' });
+    const E = t['ddcs-expert-m350'];
+    // Expert: the exact spaced confirm gate (prompt + ESC IF), stop/limit guard, direct WCS write, trigger read
+    expect(line(E, /Press Enter to probe/)).toBe('#1505=1 ( Press Enter to probe X pos - ESC=cancel )');
+    expect(line(E, /^IF #1505==0/)).toBe('IF #1505==0 GOTO2');
+    expect(line(E, /Stop mode/)).toBe('#1905=0 ( Stop mode: decelerate )');
+    expect(line(E, /Limit protect/)).toBe('#1915=2 ( Limit protect )');
+    expect(line(E, /^#50=\[/)).toBe('#50=[#1925+#6] ( Edge = trigger +/- stylus radius )');
+    expect(line(E, /Set Active WCS X to edge/)).toBe('#[#70+0]=#50 ( Set Active WCS X to edge )');
+    // V4.1 / DM500: G92 with the per-post trigger; the confirm folds to a comment with NO ESC IF; NO stop/limit/#70/#805/#1505
+    for (const id of ['ddcs-v41', 'ddcs-v3-dm500']) {
+        expect(line(t[id], /Press Enter to probe/), `${id} prompt → comment`).toBe('( Press Enter to probe X pos - ESC=cancel )');
+        expect(t[id], `${id} no ESC IF (can't mis-branch on unset #1505)`).not.toMatch(/IF #1505/);
+        expect(t[id], `${id} no #1505 write`).not.toMatch(/#1505=/);
+        expect(t[id], `${id} no G31 stop/limit registers`).not.toMatch(/#190[0-9]|#191[0-9]/);
+        expect(t[id], `${id} no #70/#805 WCS-table math`).not.toMatch(/#70|#\[805/);
+        expect(t[id], `${id} no #1925 trigger literal`).not.toMatch(/#1925/);
+        expect(line(t[id], /G92 X#50/), `${id} WCS write → G92`).toContain('G90 G92 X#50');
+    }
+    // the trigger read uses each post's OWN register
+    expect(line(t['ddcs-v41'], /^#50=\[/)).toContain('#50=[#1500+#6]');
+    expect(line(t['ddcs-v3-dm500'], /^#50=\[/)).toContain('#50=[#864+#6]');
+});

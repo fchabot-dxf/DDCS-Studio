@@ -30,6 +30,26 @@ export const hmilineBlock = {
     },
 };
 
+export const hmiConfirmBlock = {
+    // A spaced CONFIRM gate (the probe wizards' start / reposition prompt): the operator sets #1505 to continue, ESC sets it
+    // to 0 → skip to <cancel>. PROFILE-AWARE: Expert = the spaced `#1505=<v> ( <note> )` (byte-identical to the old assign)
+    // PLUS `IF #1505==0 GOTO<cancel>`; a post with NO scripted HMI (dialect.hmiLine absent → V4.1/DM500) folds BOTH lines to
+    // a plain comment (the instruction survives) with NO ESC IF — so the macro can't mis-branch on an unset #1505. Distinct
+    // from `confirm` (that uses the no-space hmiPrompt form); this matches the probe wizards' exact SPACED bytes incl. the IF.
+    type: 'hmiconfirm', label: 'HMI Confirm', kind: 'leaf', category: 'Control',
+    defaults: { value: '1', note: '', cancel: 2 }, fields: ['value', 'note', 'cancel'],
+    emit: (p, dx, dy, dialect) => {
+        const value = (p.value === '' || p.value == null) ? '1' : String(p.value);
+        const note = clean(p.note);
+        const cancel = Math.max(0, Math.round(num(p.cancel, 2)));
+        if (dialect && typeof dialect.hmiLine === 'function') {
+            const cv = dialect.hmiCancelVar || '#1505';
+            return [...dialect.hmiLine(value, note), ...dialect.ifGoto(cv, '==', '0', cancel)];
+        }
+        return note ? [`( ${note} )`] : [];   // no scripted HMI → the instruction as a comment, NO ESC (can't mis-branch)
+    },
+};
+
 export const confirmBlock = {
     type: 'confirm', label: 'Confirm', kind: 'leaf', category: 'Control',
     defaults: { msg: 'Press Enter to continue', cancel: 2 }, fields: ['msg', 'cancel'],

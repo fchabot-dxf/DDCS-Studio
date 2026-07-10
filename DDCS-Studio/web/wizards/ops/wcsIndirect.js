@@ -23,8 +23,8 @@ export const wcsBaseIntoBlock = {
 
 export const wcsWriteBlock = {
     type: 'wcswrite', label: 'WCS Write', kind: 'leaf', category: 'Coordinates',
-    defaults: { axis: 'X', wcs: '#578', offset: 0, addrVar: '', addrNote: '', value: '', note: '', rawAxis: '', radius: '#6', compDir: '-', offComment: '' },
-    fields: ['axis', 'wcs', 'offset', 'addrVar', 'addrNote', 'value', 'note', 'rawAxis', 'radius', 'compDir', 'offComment'],
+    defaults: { axis: 'X', wcs: '#578', offset: 0, addrVar: '', addrNote: '', value: '', note: '', rawAxis: '', radius: '#6', compDir: '-', offComment: '', direct: false },
+    fields: ['axis', 'wcs', 'offset', 'addrVar', 'addrNote', 'value', 'note', 'rawAxis', 'radius', 'compDir', 'offComment', 'direct'],
     emit: (p, dx, dy, dialect) => {
         // resolve the value: a radius-comped TRIGGER (rawAxis, per post) or the given literal
         let value = p.value;
@@ -36,7 +36,7 @@ export const wcsWriteBlock = {
         // Expert (register-write idiom): the byte-identical indirect form
         if (dialect && typeof dialect.wcsWriteIndirect === 'function') {
             if (value == null) return degrade('no probe-trigger readback on this controller');
-            return dialect.wcsWriteIndirect({ offset: num(p.offset, 0), addrVar: p.addrVar, value, note: p.note, addrNote: p.addrNote });
+            return dialect.wcsWriteIndirect({ offset: num(p.offset, 0), addrVar: p.addrVar, value, note: p.note, addrNote: p.addrNote, direct: !!p.direct });
         }
         // Non-Expert: an Expert-only value with no cross-post equivalent (the #883 sync) → honest comment, no G92 guess
         if (p.offComment) return [`( ${p.offComment} )`];
