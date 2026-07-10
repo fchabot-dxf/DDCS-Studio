@@ -22,6 +22,7 @@ import { tncProgram } from '../wizards/atcModel.js';   // INC-B2: the ONE shared
 import { renderCloudLogin } from './cloudAccount.js';
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
+import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 — no-LAN machine-truth: drop the controller's dump folder → derive geometry → the review modal
 import { declaredHomeEdgeSide } from '../engine/limitSwitches.js';   // t628 — the DECLARED home switch drives the seek direction (one source); the Homing section shows the derived end read-only
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
@@ -975,6 +976,7 @@ function buildSettingsOverlay() {
                         <div class="settings-row" style="margin-top:12px;">
                             <button class="toolbar-btn settings-io" id="set_profile_export">⬇ Export</button>
                             <button class="toolbar-btn settings-io" id="set_profile_import">⬆ Import</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_import_dump" title="No LAN link? Copy the controller's disk to a USB stick and drop the whole folder here — Studio reads its setting / eng / coord files and derives the machine geometry + WCS (read-only), then you review before applying.">📁 Import from dump</button>
                             <button class="toolbar-btn settings-io" id="set_profile_cloud_save">☁ Save to cloud</button>
                             <button class="toolbar-btn settings-io" id="set_profile_cloud_load">☁ Sync cloud</button>
                         </div>
@@ -2160,23 +2162,29 @@ function wireSettingsOverlay(ov) {
         const n = _importCands.filter((c) => c.checked).length;
         applyBtn.disabled = !n; applyBtn.textContent = n ? `Apply ${n}` : 'Apply';
     }
-    async function openImportModal() {
+    // scanOverride = a pre-computed scan (t666: from a dropped dump folder) → skip the network scanController.
+    async function openImportModal(scanOverride) {
         buildImportModal();
         const m = document.getElementById('import-modal');
         const body = m.querySelector('#import-body');
         _importCands = [];
-        body.innerHTML = '<div class="im-empty">Reading the controller…</div>';
+        body.innerHTML = '<div class="im-empty">' + (scanOverride ? 'Reading the dump…' : 'Reading the controller…') + '</div>';
         m.querySelector('#import-apply').disabled = true;
         m.classList.add('active');
         let scan;
-        try { scan = await scanController(); } catch (e) { scan = { connected: false, candidates: [], reason: 'no-gateway' }; }
+        if (scanOverride) scan = scanOverride;
+        else { try { scan = await scanController(); } catch (e) { scan = { connected: false, candidates: [], reason: 'no-gateway' }; } }
         if (!scan.connected) {
             // Distinguish WHY (the modal is now z-index 13100, so this message is actually visible — see the #import-modal z fix):
             //   no-controller = the bridge answered but the machine didn't; no-gateway (default) = the bridge itself is unreachable.
             const msg = scan.reason === 'no-controller'
-                ? 'The gateway is running, but the controller didn’t respond — check the machine is powered on and connected. Or Import a saved profile instead.'
-                : 'Gateway not reachable — is the bridge / desktop app running? Or Import a saved profile instead.';
-            body.innerHTML = '<div class="im-empty">' + msg + '</div>';
+                ? 'The gateway is running, but the controller didn’t respond — check the machine is powered on and connected.'
+                : 'Gateway not reachable — is the bridge / desktop app running?';
+            // t666 — no LAN? Offer the dump-folder import right here (the natural no-controller moment): copy the disk to USB, drop the folder.
+            body.innerHTML = '<div class="im-empty">' + msg + '<br><br>No LAN link (e.g. a DM500)? Copy the controller’s disk to a USB stick and import the folder — Studio derives the machine truth read-only.<br><br>'
+                + '<button class="toolbar-btn settings-io" id="import-fromdump">📁 Import from a dump folder</button></div>';
+            const fd = m.querySelector('#import-fromdump');
+            if (fd) fd.onclick = () => openDumpImport();
             return;
         }
         _importController = scan.controller || null;
@@ -2191,6 +2199,75 @@ function wireSettingsOverlay(ov) {
             catch (e) { body.innerHTML = '<div class="im-empty">Apply failed: ' + (e && e.message ? e.message : e) + '</div>'; }
         };
     }
+
+    // ── t666 — DUMP-FOLDER IMPORT (no LAN). Recognize the dropped setting/eng/coord files (data/dumpImport, the JS port
+    // of the gateway mapper) → build the SAME review candidates → the SAME modal + applyCandidates. Zero gateway. ──
+    const AXLB = [['x', 'X'], ['y', 'Y'], ['z', 'Z']];
+    function dumpToScan(rec) {
+        const cands = [], notes = [];
+        const prof = CONTROLLER_PROFILES[rec.controllerId] || {};
+        notes.push({ group: 'Dump files', label: 'Recognized', value: rec.recognized.map((r) => r.name + ' (' + r.role + ')').join(', ') || 'none',
+            kind: 'note', detail: rec.recognized.map((r) => ({ label: r.name, raw: r.role, derived: '' })).concat(rec.unrecognized.map((n) => ({ label: n, raw: 'not a setting/eng/coord file', derived: '—' }))) });
+        if (rec.note) notes.push({ group: 'Dump files', label: 'Note', value: rec.note, kind: 'note' });
+        const geo = rec.geometry;
+        if (geo && rec.grounded) {
+            const tv = geo.travel, hd = geo.homeDir || {}, he = geo.homeEdge || {}, hec = geo.homeEdgeConflict || {}, sl = geo.softLimits || {};
+            const signed = (a) => (hd[a] || (tv[a] < 0 ? -1 : 1)) * Math.abs(tv[a] || 0);
+            const declared = AXLB.filter(([a]) => tv[a] != null && tv[a] > 0);
+            if (declared.length) {
+                const edgeLabel = (a) => he[a] ? ((he[a] === 'max' ? 'MAX-home' : 'min-home') + (hec[a] ? ' ⚠dir-bit differs' : '')) : '';
+                const detail = [];
+                declared.forEach(([a, L]) => { detail.push({ label: `${L} envelope`, raw: `soft-limits min ${sl[a + 'Min'] ?? '—'} · max ${sl[a + 'Max'] ?? '—'}`, derived: `travel ${signed(a) > 0 ? '+' : ''}${signed(a)} mm` }); if (he[a]) detail.push({ label: `${L} home edge`, raw: `dir ${hd[a] > 0 ? '+1' : (hd[a] < 0 ? '−1' : '0')}`, derived: `home ${edgeLabel(a)}` }); });
+                cands.push({ group: 'Machine envelope', label: 'Travel + home switches', value: declared.map(([a, L]) => `${L} ${signed(a) > 0 ? '+' : ''}${signed(a)}`).join(' · '), changed: true, kind: 'travel', data: { travel: tv, homeDir: hd, homeEdge: he, homeEdgeConflict: hec }, detail });
+            }
+            if (geo.softLimitEnabled === false) notes.push({ group: 'Machine envelope', label: 'Soft limits DISABLED on the controller', value: 'the travel values are the declared config, not enforced (enable them on the controller)', kind: 'note' });
+            const hf = geo.homingFeeds;
+            if (hf && hf.speed) {
+                const seek = Math.round(hf.speed.x || hf.speed.y || hf.speed.z || 0), slow = Math.round(hf.precision || 0);
+                if (seek > 0) cands.push({ group: 'Homing', label: 'Homing feeds', value: `Seek ${seek} · Slow ${slow} mm/min`, changed: true, kind: 'homingFeeds', data: { speed: hf.speed, precision: hf.precision }, detail: AXLB.filter(([a]) => hf.speed[a] != null).map(([a, L]) => ({ label: `${L} seek`, raw: `${hf.speed[a]} mm/min`, derived: `${Math.round(hf.speed[a])}` })).concat([{ label: 'precision (slow)', raw: `${hf.precision ?? '—'}`, derived: `${slow}` }]) });
+            }
+        } else if (geo && !rec.grounded) {
+            const gi = geo._indices || {};
+            const rows = AXLB.map(([a, L]) => ({ label: `${L} soft-limit`, raw: `eng #${(gi.softNeg || {})[a] ?? '?'} / #${(gi.softPos || {})[a] ?? '?'}`, derived: 'value N/A' }));
+            notes.push({ group: 'Machine envelope', label: 'Named from the eng — values N/A', value: 'the field NAMES resolved from the eng, but the controller setting layout is not yet grounded (nothing is applied — refine on a real dump)', kind: 'note', detail: rows });
+        }
+        if (rec.wcs && rec.wcs.table) {
+            const wa = rec.wcs.active || 1;
+            const ftable = ['g54', 'g55', 'g56', 'g57', 'g58', 'g59'].map((k) => { const r = rec.wcs.table[k] || [0, 0, 0]; return { x: +r[0] || 0, y: +r[1] || 0, z: +r[2] || 0 }; });
+            if (ftable.some((r) => r.x || r.y || r.z)) {
+                const ar = ftable[wa - 1] || { x: 0, y: 0, z: 0 };
+                cands.push({ group: 'WCS table (G54–G59)', label: `G${53 + wa} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table: ftable, active: wa }, detail: ftable.map((r, i) => ({ label: `G${54 + i}${i === wa - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === wa - 1 ? '← active' : '' })) });
+            }
+        }
+        return { connected: true, controller: prof.id ? { id: prof.id, name: prof.name } : { id: rec.controllerId, name: rec.controllerId }, candidates: cands.concat(notes) };
+    }
+    async function readDumpFiles(files) {
+        const out = [];
+        for (const f of files) {
+            const role = classifyFile(f.name);
+            if (!role) { out.push({ name: f.name }); continue; }   // listed as unrecognized; not read
+            try { if (role === 'eng') out.push({ name: f.name, text: await f.text() }); else out.push({ name: f.name, buffer: await f.arrayBuffer() }); }
+            catch (e) { out.push({ name: f.name }); }
+        }
+        return out;
+    }
+    async function openDumpImport(fileList) {
+        const run = async (files) => {
+            const list = [...(files || [])];
+            if (!list.length) return;
+            const rec = recognizeDump(await readDumpFiles(list));
+            if (!rec.controllerId) { alert('No recognizable controller files (a “setting”, “eng”, or “coord1” file) in that folder. Copy the whole controller disk and try again.'); return; }
+            await openImportModal(dumpToScan(rec));
+        };
+        if (fileList) { await run(fileList); return; }
+        const input = document.createElement('input');
+        input.type = 'file'; input.multiple = true;
+        try { input.webkitdirectory = true; } catch (e) { /* older browsers → multi-file pick */ }
+        input.addEventListener('change', () => run(input.files));
+        input.click();
+    }
+    window.ddcsOpenDumpImport = openDumpImport;   // so the Gateway tab's no-LAN path can offer it too
+    if (q('set_profile_import_dump')) q('set_profile_import_dump').addEventListener('click', () => openDumpImport());
 
     // --- Tool library: a sparse list of the tools you own. Length offset → #[base + num − 1].
     //     The tab shows a summary; the modal is the editor; the Mill wizards + magazine pick from it. ---
