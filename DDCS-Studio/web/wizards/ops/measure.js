@@ -45,7 +45,7 @@ export const probeCheckBlock = {
             const rhs = p.dir === '-' ? `[${s}+${p.seek}+${eps}]` : `[${s}+${p.seek}-${eps}]`;
             return dialect.ifGoto(dro, op, rhs, goto);                       // (2) DRO-compare (reached full travel = miss)
         }
-        return ['( no probe-miss check on this post - verify contact )'];   // (3) honest degrade
+        return ['( no probe-miss check on this controller - verify contact )'];   // (3) honest degrade
     },
 };
 

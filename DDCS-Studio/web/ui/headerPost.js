@@ -88,7 +88,7 @@ export function initHeaderPost() {
 
     // Build the quick-actions popover: Program (file ops) · Post-processor (dialect) · Theme. The dialect
     // and theme rows carry a ✓ on the active one; the chevron's tooltip names the active post.
-    let postSubOpen = false;    // Post-processor + Theme are collapsible submenus (start collapsed)
+    let postSubOpen = false;    // Generate-for + Theme are collapsible submenus (start collapsed)
     let themeSubOpen = false;
 
     const fillMenu = () => {
@@ -122,7 +122,7 @@ export function initHeaderPost() {
             + '<span class="hq-caret" aria-hidden="true">▸</span></button>'
             + `<div class="hdr-quick-subitems" data-subitems="${key}"${open ? '' : ' hidden'}>${body}</div>`;
 
-        const postSub = sub('post', 'Post-processor', activeName, postSubOpen,
+        const postSub = sub('post', 'Generate for', activeName, postSubOpen,
             postRow('auto', autoLabel, false) + listPosts().map((p) => postRow(p.id, p.name, !p.verified)).join(''));
         // Theme picker is no longer collapsed — the chips are compact, so show them directly under a heading.
         const themeSection = '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
@@ -151,8 +151,8 @@ export function initHeaderPost() {
             + themeSection
             + '<div class="hdr-quick-sep"></div>' + checklistRow + settingsRow + rateRow;
 
-        btn.title = `Quick actions — open / save / load / export, post-processor (${activeName}), theme. Click to open.`;
-        btn.setAttribute('aria-label', `Quick actions (post-processor: ${activeName})`);
+        btn.title = `Quick actions — open / save / load / export, generate for controller (${activeName}), theme. Click to open.`;
+        btn.setAttribute('aria-label', `Quick actions (generate for controller: ${activeName})`);
     };
 
     const onDocClick = (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); };

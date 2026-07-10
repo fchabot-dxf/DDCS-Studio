@@ -25,7 +25,8 @@ function curControllerId() { try { return (getActiveProfile() || {}).id || DEFAU
 function curUserVars() { const d = db(); return d && d.getAll ? d.getAll().filter((v) => !v.isSys) : []; }
 
 /** The library (migrating on first access: wrap the current implicit state as ONE UNNAMED profile — byte-preserving,
- *  settings = the live getSettings() as-is; the user names it). */
+ *  settings = the live getSettings() as-is; the user names it).
+ *  @returns {{activeId:string, profiles:Array<{id:string,name:string,controllerId:string,settings:object,userVars:Array}>}} */
 export function getLibrary() {
     let lib = readLib();
     if (!lib) {
@@ -36,10 +37,13 @@ export function getLibrary() {
     return lib;
 }
 
+/** @returns {Array<{id:string,name:string,controllerId:string}>} the profiles (metadata only, no settings blob). */
 export function listProfiles() { return getLibrary().profiles.map((p) => ({ id: p.id, name: p.name, controllerId: p.controllerId })); }
+/** @returns {string} the active profile's id. */
 export function activeProfileId() { return getLibrary().activeId; }
+/** @returns {{id:string,name:string,controllerId:string,settings:object,userVars:Array}} the active profile (full record). */
 export function activeProfile() { const lib = getLibrary(); return lib.profiles.find((p) => p.id === lib.activeId) || lib.profiles[0]; }
-/** Does this profile (default = active) still need a name? (Profiles are only ever user-named.) */
+/** Does this profile (default = active) still need a name? (Profiles are only ever user-named.) @returns {boolean} */
 export function needsName(id) { const lib = getLibrary(); const p = lib.profiles.find((x) => x.id === (id || lib.activeId)); return !!(p && !String(p.name || '').trim()); }
 
 // snapshot the LIVE state into the active slot (the active's settings ARE the live copy → keep the slot fresh before a swap)
@@ -47,10 +51,13 @@ function snapshotActive(lib) {
     const p = lib.profiles.find((x) => x.id === lib.activeId);
     if (p) { p.settings = deep(getSettings()); p.userVars = curUserVars(); p.controllerId = curControllerId(); }
 }
+/** Re-snapshot the LIVE getSettings() into the active slot (keeps the persisted copy current). @returns {void} */
 export function saveActiveSnapshot() { const lib = getLibrary(); snapshotActive(lib); writeLib(lib); }
 
+/** Rename a profile (trimmed). @returns {string} the stored name (''+ if the id is unknown). */
 export function renameProfile(id, name) { const lib = getLibrary(); const p = lib.profiles.find((x) => x.id === id); if (p) { p.name = String(name || '').trim(); writeLib(lib); } return p ? p.name : ''; }
 
+/** Delete a profile (never the last; switches to the first if the active one is removed). @returns {boolean} did-delete. */
 export function deleteProfile(id) {
     const lib = getLibrary();
     if (lib.profiles.length <= 1) return false;   // never delete the last profile
@@ -62,7 +69,8 @@ export function deleteProfile(id) {
 }
 
 /** FULL-SWAP switch: snapshot the outgoing active (preserve its edits), then load the target's settings/vars/controller
- *  ENTIRELY (replaceSettings = a true swap, never a merge). */
+ *  ENTIRELY (replaceSettings = a true swap, never a merge).
+ *  @returns {object|null} the target profile record (null if the id is unknown; the current active if force is false and id is already active). */
 export function switchProfile(id, force) {
     const lib = getLibrary();
     if (!force && id === lib.activeId) return activeProfile();
@@ -78,7 +86,8 @@ export function switchProfile(id, force) {
 }
 
 /** NEW profile: 'dup' = a true copy of the current active (settings + vars, same controller); 'baseline' = a fresh
- *  config on a controller baseline (default settings). Only ever user-named. Makes the new profile active. */
+ *  config on a controller baseline (default settings). Only ever user-named. Makes the new profile active.
+ *  @returns {string} the NEW profile's id (a STRING — not a record; read it directly, never `.id`). */
 export function createProfile({ from = 'dup', controllerId, name } = {}) {
     const lib = getLibrary(); snapshotActive(lib);
     const id = uid();
@@ -92,7 +101,8 @@ export function createProfile({ from = 'dup', controllerId, name } = {}) {
 }
 
 /** Set the active profile's CONTROLLER property (switching controller = changing THIS profile's controller). Reuses the
- *  existing controller-switch flow (setActiveProfile + refresh); the pull/import still lands into the active profile. */
+ *  existing controller-switch flow (setActiveProfile + refresh); the pull/import still lands into the active profile.
+ *  @returns {void} */
 export function setActiveControllerId(controllerId) {
     const lib = getLibrary(); const p = lib.profiles.find((x) => x.id === lib.activeId);
     if (p) { p.controllerId = controllerId; writeLib(lib); }
@@ -101,7 +111,9 @@ export function setActiveControllerId(controllerId) {
     window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
 }
 
-/** Import a profile bundle (data/profileStore buildProfile shape) as a NEW named library profile, then switch to it. */
+/** Import a profile bundle (data/profileStore buildProfile shape) as a NEW named library profile, then switch to it.
+ *  This is the LANDING path for both file Import and cloud Load (the name IS the library entry's name).
+ *  @returns {string|null} the new profile's id (null if the bundle isn't an object). */
 export function importAsProfile(bundle, name) {
     if (!bundle || typeof bundle !== 'object') return null;
     const lib = getLibrary(); snapshotActive(lib);

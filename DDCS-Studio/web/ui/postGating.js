@@ -23,7 +23,7 @@ const CAP_WHY = {
     atc: 'no pneumatic tool-changer model on this controller — the drawbar/pusher/pocket dance is DDCS-Expert only',
     hmi: 'no in-program operator prompts on this controller',
     vars: 'no #variables on this controller',
-    wcsSync: 'dual-gantry slave sync is an M350 register write (#883/#884); no equivalent on this post',
+    wcsSync: 'dual-gantry slave sync is an M350 register write (#883/#884); no equivalent on this controller',
 };
 
 export function applyPostGating() {
@@ -61,7 +61,7 @@ export function applyPostGating() {
             o.disabled = !ok;
             o.title = ok ? '' : (o.value === '0'
                 ? `${post.name}: auto-WCS needs the controller active-WCS variable; pick a fixed WCS`
-                : `${post.name}: G92 zeroes the active WCS; this post can't target a specific register`);
+                : `${post.name}: G92 zeroes the active WCS; this controller can't target a specific register`);
         }
         const noneOk = ![...wsys.options].some((o) => !o.disabled);   // G92 posts: no option applies → the whole picker is inert
         wsys.disabled = noneOk;
@@ -87,7 +87,7 @@ export function applyPostGating() {
         });
         if (!ok) {
             if (elm.dataset.capTitle === undefined) elm.dataset.capTitle = elm.title || '';
-            elm.title = `${post.name}: not supported — ${CAP_WHY[cap] || 'unavailable on this post'}`;
+            elm.title = `${post.name}: not supported — ${CAP_WHY[cap] || 'unavailable on this controller'}`;
         } else if (elm.dataset.capTitle !== undefined) {
             elm.title = elm.dataset.capTitle; delete elm.dataset.capTitle;
         }

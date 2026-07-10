@@ -621,7 +621,7 @@ function renderHomingGui() {
     const expert = homingPostIsExpert();
     const list = homingConfiguredAxes();
     const tag = document.getElementById('set_homing_tag');
-    if (tag) tag.textContent = expert ? '' : 'Active post is unverified for homing — verify the emitted G-code on your controller.';
+    if (tag) tag.textContent = expert ? '' : 'This controller is unverified for homing — verify the emitted G-code on your controller.';
     if (document.getElementById('set_homing_simul')) document.getElementById('set_homing_simul').checked = h.philosophy === 'simultaneous';
 
     const ordered = [...list].sort((p, q) => ((cfg[p] || {}).order || HOMING_AX_IDX[p] + 1) - ((cfg[q] || {}).order || HOMING_AX_IDX[q] + 1));
@@ -964,14 +964,14 @@ function buildSettingsOverlay() {
                             <button class="toolbar-btn settings-io" id="set_profile_export">⬇ Export</button>
                             <button class="toolbar-btn settings-io" id="set_profile_import">⬆ Import</button>
                             <button class="toolbar-btn settings-io" id="set_profile_cloud_save">☁ Save to cloud</button>
-                            <button class="toolbar-btn settings-io" id="set_profile_cloud_load">☁ Load from cloud</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_cloud_load">☁ Sync cloud</button>
                         </div>
-                        <div class="settings-hint">Export the active profile as one JSON (the name rides with it). Import lands it as a new named profile. <b>Save/Load to cloud</b> keeps named profiles in your Google Drive (Settings → Cloud).</div>
+                        <div class="settings-hint">Export the active profile as one JSON (the name rides with it). Import lands it as a new named profile. <b>Save to cloud</b> pushes the active profile under its name; <b>Sync cloud</b> lists your cloud profiles in the library above (☁ rows) — Load pulls one onto this device. Cloud storage is your own Google Drive (Settings → Cloud).</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">CONTROLLER</div>
                         <div class="settings-row" style="align-items:center;">
-                            <select id="set_profile" title="The working controller — this profile's dialect/post, envelope, WCS and boot macro are all generated for it. Change it to retarget this profile." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
+                            <select id="set_profile" title="The working controller — this profile's G-code dialect, envelope, WCS and boot macro are all generated for it. Change it to retarget this profile." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
                             <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins + WCS) from the bridged controller. Offline controllers: use Import profile.">↧ Pull from controller</button>
                         </div>
                         <div class="settings-hint" id="set_controller_hint">The controller this profile targets — dialect, envelope, WCS and the boot macro are all generated for it. Changing it retargets THIS profile (to generate for another controller temporarily, duplicate the profile instead).</div>
@@ -1628,7 +1628,7 @@ function wireSettingsOverlay(ov) {
         show('set_head_plasma', t === 'plasma');
         show('set_head_laser', t === 'laser');
     }
-    // Post processor picker — which controller's G-code the Blocks view emits (live).
+    // Controller codegen-target picker — which controller's G-code the Blocks view emits (live).
     const postSel = q('set_post');
     function fillPostOptions() {
         if (!postSel) return;
@@ -1643,7 +1643,7 @@ function wireSettingsOverlay(ov) {
         const hint = q('set_post_hint'); if (!hint) return;
         const id = getActivePostId();
         if (id === 'auto') { hint.textContent = 'Following the controller (' + getDialect(getActiveProfile().id).name + '). Override to generate for another controller.'; hint.style.color = ''; }
-        else if (!isPostVerified(id)) { hint.textContent = '⚠ Unverified post — dump-derived, simulator/reference only. Not validated on hardware.'; hint.style.color = '#e0a020'; }
+        else if (!isPostVerified(id)) { hint.textContent = '⚠ Unverified controller — dump-derived, simulator/reference only. Not validated on hardware.'; hint.style.color = '#e0a020'; }
         else { hint.textContent = 'Generating for ' + getDialect(id).name + ' (verified).'; hint.style.color = ''; }
     }
     if (postSel) {
@@ -1692,7 +1692,11 @@ function wireSettingsOverlay(ov) {
         });
 
     // ── t658 — the NAMED-PROFILE LIBRARY UI (profile-first). window.ddcsProfileLib is loaded in app.js. ──
+    // t660 (E2) — ONE unified library: local profiles + cloud profiles render as ONE list, rows tagged
+    // local / cloud / both. cloudProfiles is a cached snapshot of the Drive list (refreshed by syncCloud, best-effort).
     const profLib = () => window.ddcsProfileLib || null;
+    let cloudProfiles = [];
+    const normName = (s) => String(s || '').trim().toLowerCase();
     function renderProfileLibrary() {
         const L = profLib(); if (!L) return;
         const active = L.activeProfile() || {};
@@ -1703,13 +1707,48 @@ function wireSettingsOverlay(ov) {
         if (nameHint) { nameHint.textContent = unnamed ? '⚠ Name your machine config to save it as a profile (it works as-is; type a name above — a suggestion is prefilled).' : ''; nameHint.style.color = unnamed ? 'var(--warn,#d1902b)' : ''; }
         const listEl = q('set_profile_list');
         if (listEl) {
-            listEl.innerHTML = L.listProfiles().map((p) => {
+            const cloudByName = new Map(cloudProfiles.filter((c) => c.name).map((c) => [normName(c.name), c]));
+            const matchedCloud = new Set();
+            // local rows (● active / ○); tagged 'both' (☁ synced) when a cloud copy shares the name, else 'local'
+            const localRows = L.listProfiles().map((p) => {
                 const on = p.id === active.id, ctrl = (CONTROLLER_PROFILES[p.controllerId] || {}).name || p.controllerId;
-                return '<button class="toolbar-btn settings-io prof-row" data-pid="' + p.id + '" style="text-align:left; padding:6px 10px; ' + (on ? 'border-color:var(--accent); font-weight:700;' : '') + '">' + (on ? '● ' : '○ ') + (p.name ? p.name : '(unnamed)') + '  <span style="opacity:.6; font-weight:400;">· ' + ctrl + '</span></button>';
-            }).join('');
-            listEl.querySelectorAll('.prof-row').forEach((b) => b.addEventListener('click', () => { if (b.dataset.pid === active.id) return; L.switchProfile(b.dataset.pid); afterProfileChange(); }));
+                const cl = p.name ? cloudByName.get(normName(p.name)) : null; if (cl) matchedCloud.add(cl.id);
+                const tag = cl ? '<span style="opacity:.7; font-size:11px;">☁ synced</span>' : '<span style="opacity:.4; font-size:11px;">on this device</span>';
+                return '<div class="prof-row" data-pid="' + p.id + '" role="button" tabindex="0" style="display:flex; align-items:center; gap:8px; text-align:left; padding:6px 10px; border:1px solid var(--border); border-radius:4px; cursor:pointer; ' + (on ? 'border-color:var(--accent);' : '') + '">'
+                    + '<span style="flex:1; ' + (on ? 'font-weight:700;' : '') + '">' + (on ? '● ' : '○ ') + (p.name ? p.name : '(unnamed)') + ' <span style="opacity:.6; font-weight:400;">· ' + ctrl + '</span></span>' + tag + '</div>';
+            });
+            // cloud-only rows (no local with the same name): download onto this device, or delete the cloud copy
+            const cloudRows = cloudProfiles.filter((c) => !matchedCloud.has(c.id)).map((c) => {
+                const d = c.savedAt ? new Date(c.savedAt).toLocaleDateString() : '';
+                return '<div class="prof-row prof-cloud" style="display:flex; align-items:center; gap:8px; padding:6px 10px; border:1px dashed var(--border); border-radius:4px;">'
+                    + '<span style="flex:1; opacity:.85;">☁ ' + c.name + (d ? ' <span style="opacity:.5; font-size:11px;">· ' + d + '</span>' : '') + '</span>'
+                    + '<span style="opacity:.6; font-size:11px;">in cloud</span>'
+                    + '<button class="toolbar-btn settings-io" data-cload="' + c.id + '" title="Download as a named profile on this device">⬇ Load</button>'
+                    + '<button class="op-btn" data-cdel="' + c.id + '" title="Delete this cloud copy">✕</button></div>';
+            });
+            listEl.innerHTML = localRows.join('') + cloudRows.join('');
+            listEl.querySelectorAll('.prof-row[data-pid]').forEach((el) => el.addEventListener('click', () => { if (el.dataset.pid === active.id) return; L.switchProfile(el.dataset.pid); afterProfileChange(); }));
+            listEl.querySelectorAll('[data-cload]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); loadCloudRow(b.dataset.cload); }));
+            listEl.querySelectorAll('[data-cdel]').forEach((b) => b.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (!confirm('Delete this cloud profile? (Only the cloud copy — nothing on this device changes.)')) return;
+                try { await window.ddcsDeleteCloudProfile(b.dataset.cdel); syncCloud(); }
+                catch (err) { alert('Delete failed: ' + (err && err.message ? err.message : err)); }
+            }));
         }
         const delBtn = q('set_profile_delete'); if (delBtn) delBtn.disabled = L.listProfiles().length <= 1;
+    }
+    // Refresh the cached cloud list (best-effort; returns [] fast when not signed in — no Drive call), then re-render.
+    async function syncCloud() {
+        try { cloudProfiles = (window.ddcsListCloudProfiles ? (await window.ddcsListCloudProfiles()) : []) || []; }
+        catch (e) { cloudProfiles = []; }
+        renderProfileLibrary();
+    }
+    async function loadCloudRow(fileId) {
+        if (!window.ddcsLoadCloudProfile) return;
+        if (!confirm('Load this cloud profile onto this device? It lands as a new named profile and becomes active.')) return;
+        try { await window.ddcsLoadCloudProfile(fileId); afterProfileChange(); syncCloud(); }
+        catch (e) { alert('Load failed: ' + (e && e.message ? e.message : e)); }
     }
     function afterProfileChange() { fillProfileOptions(); fillPostOptions(); fill(); applyHardwareTabs(); renderProfileLibrary(); }
     // profiles are ONLY ever USER-NAMED (t658 amend): New + Duplicate always prompt; an empty name cancels (no auto-names).
@@ -1718,7 +1757,34 @@ function wireSettingsOverlay(ov) {
     if (q('set_profile_delete')) q('set_profile_delete').addEventListener('click', () => { const L = profLib(); if (!L) return; const a = L.activeProfile(); if (L.listProfiles().length <= 1) { alert('The last profile can\'t be deleted.'); return; } if (!confirm('Delete the profile “' + (a.name || 'unnamed') + '”? This can\'t be undone.')) return; L.deleteProfile(a.id); afterProfileChange(); });
     if (q('set_profile_new_dup')) q('set_profile_new_dup').addEventListener('click', () => { const L = profLib(); if (!L) return; const name = promptName('Name the duplicate profile:'); if (name == null) return; L.createProfile({ from: 'dup', name }); afterProfileChange(); });
     if (q('set_profile_new_base')) q('set_profile_new_base').addEventListener('click', () => { const L = profLib(); if (!L) return; const name = promptName('Name the new profile:'); if (name == null) return; L.createProfile({ from: 'baseline', controllerId: getActiveProfile().id, name }); afterProfileChange(); });
+    // Cloud (E2) — the SAME named-profile concept, viewed in the unified library above. "Save to cloud" pushes the
+    // ACTIVE profile under ITS name (the name IS the cloud name; no silent overwrite — a same-name copy asks first).
+    // "Sync cloud" refreshes the ☁ rows in the library above, where each offers Load / delete. (Wired here so it shares
+    // the cloudProfiles / syncCloud state with renderProfileLibrary — one source of the cloud snapshot.)
+    const cloudSaveBtn = q('set_profile_cloud_save');
+    if (cloudSaveBtn) cloudSaveBtn.addEventListener('click', async () => {
+        if (!window.ddcsSaveProfileToCloud) return;
+        const L = profLib(); const ap = L && L.activeProfile();
+        const name = ((ap && ap.name) || '').trim();
+        if (!name) { alert('Name this profile first (at the top of the panel) — the cloud copy uses the profile name.'); const nEl = q('set_profile_name'); if (nEl) nEl.focus(); return; }
+        let existing = null;
+        try { const list = (window.ddcsListCloudProfiles ? (await window.ddcsListCloudProfiles()) : []) || []; existing = list.find((c) => normName(c.name) === normName(name)); }
+        catch (e) { alert('Could not reach your cloud: ' + (e && e.message ? e.message : e)); return; }
+        if (existing && !confirm('A cloud profile named “' + name + '” already exists — overwrite it?')) return;
+        const orig = cloudSaveBtn.textContent; cloudSaveBtn.disabled = true; cloudSaveBtn.textContent = 'Saving…';
+        try { const n = await window.ddcsSaveProfileToCloud(name); await syncCloud(); alert('Saved “' + n + '” to your cloud.'); }
+        catch (e) { alert('Cloud save failed: ' + (e && e.message ? e.message : e)); }
+        finally { cloudSaveBtn.disabled = false; cloudSaveBtn.textContent = orig; }
+    });
+    const cloudSyncBtn = q('set_profile_cloud_load');
+    if (cloudSyncBtn) cloudSyncBtn.addEventListener('click', async () => {
+        const orig = cloudSyncBtn.textContent; cloudSyncBtn.disabled = true; cloudSyncBtn.textContent = 'Syncing…';
+        await syncCloud();
+        cloudSyncBtn.disabled = false; cloudSyncBtn.textContent = orig;
+        if (!cloudProfiles.length) alert('No cloud profiles found. Sign in (Settings → Cloud), then use “Save to cloud” to push this profile.');
+    });
     renderProfileLibrary();
+    try { syncCloud(); } catch (e) { /* not signed in / no cloud — the library still shows local rows */ }
     window.addEventListener('ddcs:settings-changed', () => { try { renderProfileLibrary(); } catch (e) { /* */ } });
         // When a gateway answers (same-origin in the gateway-served/exe face, or via the ?api= dev
         // override), fetch the controller's own profile and offer it in the list (shown as
@@ -2473,64 +2539,10 @@ function wireSettingsOverlay(ov) {
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
-    // Profile import/export (JSON = settings + user variables)
+    // Profile import/export (JSON = settings + user variables). Cloud Save/Sync are wired up in the profile-library
+    // section above (they share the cloudProfiles / syncCloud state — one source of the cloud snapshot).
     q('set_profile_export').addEventListener('click', () => { if (window.ddcsExportProfile) window.ddcsExportProfile(); });
     q('set_profile_import').addEventListener('click', () => { if (window.ddcsImportProfile) window.ddcsImportProfile(); });
-
-    // Cloud profile save/load — named profiles in the user's own Google Drive (Settings → Cloud). Remote-sim leg.
-    const cloudSave = q('set_profile_cloud_save');
-    if (cloudSave) cloudSave.addEventListener('click', async () => {
-        if (!window.ddcsSaveProfileToCloud) return;
-        let def = ''; try { def = getActiveProfile().name || ''; } catch (e) { /* */ }
-        const name = window.prompt('Save this profile to your cloud as:', def || 'My machine');
-        if (!name) return;
-        const orig = cloudSave.textContent; cloudSave.disabled = true; cloudSave.textContent = 'Saving…';
-        try { const n = await window.ddcsSaveProfileToCloud(name); alert('Saved “' + n + '” to your cloud.'); }
-        catch (e) { alert('Cloud save failed: ' + (e && e.message ? e.message : e)); }
-        finally { cloudSave.disabled = false; cloudSave.textContent = orig; }
-    });
-    const cloudLoad = q('set_profile_cloud_load');
-    if (cloudLoad) cloudLoad.addEventListener('click', () => openCloudProfilePicker());
-
-    async function openCloudProfilePicker() {
-        let items = [];
-        try { items = (await window.ddcsListCloudProfiles()) || []; }
-        catch (e) { alert('Could not reach your cloud: ' + (e && e.message ? e.message : e)); return; }
-        if (!items.length) { alert('No cloud profiles yet — sign in (Settings → Cloud) and use “Save to cloud”.'); return; }
-        let m = document.getElementById('cloudprof-modal');
-        if (!m) {
-            m = document.createElement('div'); m.id = 'cloudprof-modal';
-            m.innerHTML = '<style>'
-                + '#cloudprof-modal { position:fixed; inset:0; z-index:13100; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.5); }'   /* 13100: opens from within Settings — above the 12000 overlay (was 1000, buried) */
-                + '#cloudprof-modal .cp-panel { background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:var(--radius,6px); width:min(460px,94vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.5); }'
-                + '#cloudprof-modal .cp-head { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); font-weight:700; }'
-                + '#cloudprof-modal .cp-head button { background:transparent; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; }'
-                + '#cloudprof-modal .cp-body { overflow:auto; padding:6px 12px 12px; }'
-                + '#cloudprof-modal .cp-row { display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px solid var(--border); }'
-                + '#cloudprof-modal .cp-name { flex:1; font-weight:600; } #cloudprof-modal .cp-date { font-size:11px; color:var(--text-dim); }'
-                + '</style><div class="cp-panel"><div class="cp-head"><span>☁ Load profile from cloud</span><button data-cp="x">✕</button></div><div class="cp-body" id="cloudprof-body"></div></div>';
-            document.body.appendChild(m);
-            m.addEventListener('mousedown', (e) => { if (e.target === m || (e.target.dataset && e.target.dataset.cp === 'x')) m.remove(); });
-        }
-        const body = m.querySelector('#cloudprof-body');
-        body.innerHTML = items.map((it) => {
-            const d = it.savedAt ? new Date(it.savedAt).toLocaleString() : '';
-            return '<div class="cp-row"><span class="cp-name">' + it.name + '</span><span class="cp-date">' + d + '</span>'
-                + '<button class="toolbar-btn settings-io" data-load="' + it.id + '">Load</button>'
-                + '<button class="op-btn" data-del="' + it.id + '" title="Delete">✕</button></div>';
-        }).join('');
-        body.querySelectorAll('[data-load]').forEach((b) => b.addEventListener('click', async () => {
-            if (!confirm('Load this profile? It replaces your current settings + variables.')) return;
-            b.disabled = true; b.textContent = 'Loading…';
-            try { await window.ddcsLoadCloudProfile(b.dataset.load); m.remove(); fill(); applyHardwareTabs(); alert('Profile loaded.'); }
-            catch (e) { alert('Load failed: ' + (e && e.message ? e.message : e)); b.disabled = false; b.textContent = 'Load'; }
-        }));
-        body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
-            if (!confirm('Delete this cloud profile?')) return;
-            try { await window.ddcsDeleteCloudProfile(b.dataset.del); openCloudProfilePicker(); }
-            catch (e) { alert('Delete failed: ' + (e && e.message ? e.message : e)); }
-        }));
-    }
 
     // ATC: generate a T.nc tool-change macro from the magazine table (client-side; review before running).
     const genTnc = q('atc_gen_tnc');

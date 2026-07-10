@@ -156,11 +156,17 @@ export async function listCloudProfiles() {
         .map((e) => ({ id: e.id, name: e.name.slice(0, -CLOUD_EXT.length), savedAt: e.savedAt }));
 }
 
-/** Load + apply a cloud profile by Drive file id. */
+/** Load a cloud profile by Drive file id → LAND it as a NEW named library profile (E2: the cloud name IS the library
+ *  entry's name — the same importAsProfile path as file Import). Falls back to applyProfile (merge) if the library
+ *  isn't loaded. Keeps the Drive plumbing (driveRead) unchanged. */
 export async function loadCloudProfile(fileId) {
     if (!cloudConnected()) throw new Error('Not signed in to cloud.');
     const obj = await driveRead(fileId);
-    applyProfile(obj);
+    if (window.ddcsProfileLib && window.ddcsProfileLib.importAsProfile) {
+        window.ddcsProfileLib.importAsProfile(obj, obj.name || obj.controllerName || 'Cloud profile');
+    } else {
+        applyProfile(obj);
+    }
     return obj;
 }
 
