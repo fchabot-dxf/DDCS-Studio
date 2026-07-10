@@ -34,8 +34,10 @@ export const dialect = {
     readMachine: (axis, varName) => [`${varName}=#${864 + AX[axis]}`],  // DRO X#864/Y#865/Z#866/A#867
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],      // G53 gated by config #395; dump safe-Z is M98 P101 — TO CONFIRM
     // DM500 macros zero with G92 (defprobe.nc:21) — value is a WORK coord (plate thickness), NOT a machine coord
-    // like Expert's register write. Cross-profile value semantics unresolved → VERIFY on hardware.
-    setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}   ( set datum - VERIFY on hardware )`],
+    // like Expert's register write. t644 (F4 datum fix): `value` is the MACHINE coord that should become work-0 (what Expert
+    // writes to its offset register); G92 takes a WORK value for the CURRENT position, so emit `[#dro - value]` (the offset
+    // lands = value → the touched face reads work-0; the live DRO #dro=#864+ax cancels out). Grounded in defprobe.nc's G92-at-contact.
+    setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}[#${864 + AX[axis]}-${value}]`],
     // WCS ZERO-AT-CURRENT (t479) — TRANSCRIBED from DM500's OWN dump form: set the current position as datum via G92,
     // GROUNDED in defprobe.nc (`G90 G92 X#2000/2+#2001` &c. — the datum-set is G92). For a NO-PROBE zero-at-current the
     // offset is 0 → `G90 G92 <axes>0`. NOT #804 (that register is DECLARED but NO dump WRITES it — register-name ≠
@@ -73,7 +75,10 @@ export const dialect = {
         if ((m = line.match(/^IF (.+?)(EQ|NE|LT|GT|LE|GE)(.+?) GOTO(\d+)$/))) return { type: 'ifgoto', params: { lhs: m[1], op: OPI[m[2]], rhs: m[3], goto: +m[4] } };
         if ((m = line.match(/^GOTO(\d+)$/))) return { type: 'goto', params: { n: +m[1] } };
         if ((m = line.match(/^N(\d+)$/))) return { type: 'label', params: { n: +m[1] } };
-        if ((m = line.match(/^G90 G92 ([XYZA])(.+)$/))) return { type: 'setworkoffset', params: { wcs: '#578', axis: m[1], value: m[2] } };
+        if ((m = line.match(/^G90 G92 ([XYZA])(.+)$/))) {
+            const wr = m[2].match(new RegExp('^\\[#' + (864 + AX[m[1]]) + '-(.+)\\]$'));   // t644 — strip the [#dro-value] datum wrapper so value round-trips
+            return { type: 'setworkoffset', params: { wcs: '#578', axis: m[1], value: wr ? wr[1] : m[2] } };
+        }
         if ((m = line.match(/^(#\d+)=#(\d+)$/))) { const ax = +m[2] - 864; if (ax >= 0 && ax <= 3) return { type: 'proberead', params: { axis: AXR[ax], var: m[1] } }; }
         return null;
     },

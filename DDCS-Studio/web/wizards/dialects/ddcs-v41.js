@@ -31,7 +31,10 @@ export const dialect = {
     machineMove: (axis, ref) => [`G0 G53 ${axis}${ref}`],   // CONFIRMED live: probe-fix.nc "G0G53Z#102" (G0 + G53)
     // CONFIRMED live (probe-vertex.nc): zero at the probed point with G90 G92 <axis><WORK value> — a work coord,
     // NOT a machine coord like Expert's register write. ("zero here" macros zeroz/zeroxy write #1506-1509 directly.)
-    setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}${value}`],
+    // t644 (F4 datum fix) — `value` is the MACHINE coord that should become work-0 (Expert writes it to the offset register).
+    // G92 takes a WORK value for the CURRENT position, so emit `[#dro - value]`: the offset lands = value (machine coord of the
+    // origin) → the touched face reads work-0, regardless of where the tool sits (the live DRO #dro cancels out). #dro = #1500+ax.
+    setWorkOffset: (wcsExpr, axis, value) => [`G90 G92 ${axis}[#${1500 + AX[axis]}-${value}]`],
     // WCS ZERO-AT-CURRENT (t477) — write the active WORK registers to 0 (PERSISTENT), GROUNDED in V4.1's OWN macros:
     // zeroxy.nc = `#1506=0 #1507=0`, zeroall.nc adds `#1508=0 #1509=0` (X/Y/Z/A = #1506+off). NOT G92 (that's a temporary
     // offset). ACTIVE-WCS-ONLY: #1506-1509 are the active work registers, no per-WCS index (activeWcs is null) → the WCS
@@ -67,7 +70,10 @@ export const dialect = {
         if ((m = line.match(/^IF (.+?)(==|!=|<=|>=|<|>)(.+?)GOTO(\d+)$/))) return { type: 'ifgoto', params: { lhs: m[1], op: m[2], rhs: m[3], goto: +m[4] } };
         if ((m = line.match(/^GOTO(\d+)$/))) return { type: 'goto', params: { n: +m[1] } };
         if ((m = line.match(/^N(\d+)$/))) return { type: 'label', params: { n: +m[1] } };
-        if ((m = line.match(/^G90 G92 ([XYZA])(.+)$/))) return { type: 'setworkoffset', params: { wcs: '#578', axis: m[1], value: m[2] } };
+        if ((m = line.match(/^G90 G92 ([XYZA])(.+)$/))) {
+            const wr = m[2].match(new RegExp('^\\[#' + (1500 + AX[m[1]]) + '-(.+)\\]$'));   // t644 — strip the [#dro-value] datum wrapper so value round-trips
+            return { type: 'setworkoffset', params: { wcs: '#578', axis: m[1], value: wr ? wr[1] : m[2] } };
+        }
         if ((m = line.match(/^(#\d+)=#(\d+)$/))) { const ax = +m[2] - 1500; if (ax >= 0 && ax <= 3) return { type: 'proberead', params: { axis: AXR[ax], var: m[1] } }; }
         return null;
     },

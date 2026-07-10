@@ -64,18 +64,20 @@ test('WCS WRITE folds per post — Expert #[#70]/#73 indirect (byte-identical), 
     // fixed-WCS base is the literal register
     const g55 = (await emitCorner(page, { corner: 'FL', wcs: 'G55' }))['ddcs-expert-m350'];
     expect(line(g55, /^#70=810/)).toBe('#70=810 ( Base WCS address )');
-    // V4.1 / DM500: G92 datum with the PER-POST trigger for Z; NO #70/#805/#[ table machinery; sync → honest comment
+    // V4.1 / DM500: G92 datum. t644 (F4) — the value is a MACHINE coord (the face) so G92 emits `[#dro - value]` (the datum
+    // DATUM correctness is verified in wcs-datum.spec; here we assert the FORM uses each post's DRO reg). NO #70/#805/table.
+    const droX = { 'ddcs-v41': '#1500', 'ddcs-v3-dm500': '#864' }, droY = { 'ddcs-v41': '#1501', 'ddcs-v3-dm500': '#865' }, droZ = { 'ddcs-v41': '#1502', 'ddcs-v3-dm500': '#866' };
     for (const id of ['ddcs-v41', 'ddcs-v3-dm500']) {
-        expect(line(t[id], /G92 X#102/), `${id} X → G92`).toContain('G90 G92 X#102');
-        expect(line(t[id], /G92 Y#101/), `${id} Y → G92`).toContain('G90 G92 Y#101');
+        expect(line(t[id], /G92 X\[/), `${id} X → G92 [dro-face]`).toContain(`G90 G92 X[${droX[id]}-#102]`);
+        expect(line(t[id], /G92 Y\[/), `${id} Y → G92 [dro-face]`).toContain(`G90 G92 Y[${droY[id]}-#101]`);
         expect(t[id], `${id} has no #805 table math`).not.toMatch(/#\[805/);
         expect(t[id], `${id} has no #70 base register`).not.toMatch(/#70/);
         expect(t[id], `${id} makes no EXECUTABLE #883 slave-DRO read (the honest-degrade comment may name it)`).not.toMatch(/=#883/);
         expect(line(t[id], /slave-DRO/), `${id} sync degrades honestly`).toContain('no #883 slave-DRO equivalent');
     }
-    // the Z datum uses each post's OWN trigger register (V4.1 #1502, DM500 #866)
-    expect(line(t['ddcs-v41'], /G92 Z\[/)).toContain('G90 G92 Z[#1502-#6]');
-    expect(line(t['ddcs-v3-dm500'], /G92 Z\[/)).toContain('G90 G92 Z[#866-#6]');
+    // the Z datum uses each post's OWN trigger register (V4.1 #1502, DM500 #866), wrapped in the [dro - value] datum form
+    expect(line(t['ddcs-v41'], /G92 Z\[/)).toContain('G90 G92 Z[#1502-[#1502-#6]]');
+    expect(line(t['ddcs-v3-dm500'], /G92 Z\[/)).toContain('G90 G92 Z[#866-[#866-#6]]');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,7 +114,8 @@ test('EDGE folds per post — Expert byte-identical (confirm+ESC, stop/limit, di
         expect(t[id], `${id} no G31 stop/limit registers`).not.toMatch(/#190[0-9]|#191[0-9]/);
         expect(t[id], `${id} no #70/#805 WCS-table math`).not.toMatch(/#70|#\[805/);
         expect(t[id], `${id} no #1925 trigger literal`).not.toMatch(/#1925/);
-        expect(line(t[id], /G92 X#50/), `${id} WCS write → G92`).toContain('G90 G92 X#50');
+        const droX = { 'ddcs-v41': '#1500', 'ddcs-v3-dm500': '#864' };   // t644 — G92 datum form [dro-face]
+        expect(line(t[id], /G92 X\[/), `${id} WCS write → G92 [dro-face]`).toContain(`G90 G92 X[${droX[id]}-#50]`);
     }
     // the trigger read uses each post's OWN register
     expect(line(t['ddcs-v41'], /^#50=\[/)).toContain('#50=[#1500+#6]');
@@ -155,8 +158,9 @@ test('MIDDLE folds per post — Expert byte-identical (bare base, direct writes,
         expect(t[id], `${id} no #70/#805 table math`).not.toMatch(/#70|#\[805/);
         expect(t[id], `${id} no G31 stop/limit`).not.toMatch(/#190[0-9]|#191[0-9]/);
         expect(t[id], `${id} no executable #883`).not.toMatch(/=#883/);
-        expect(line(t[id], /G92 Z#57/), `${id} Z → G92`).toContain('G90 G92 Z#57');
-        expect(line(t[id], /G92 X#53/), `${id} X → G92`).toContain('G90 G92 X#53');
+        const droZ = { 'ddcs-v41': '#1502', 'ddcs-v3-dm500': '#866' }, droX = { 'ddcs-v41': '#1500', 'ddcs-v3-dm500': '#864' };   // t644 — G92 datum form [dro-face]
+        expect(line(t[id], /G92 Z\[/), `${id} Z → G92 [dro-face]`).toContain(`G90 G92 Z[${droZ[id]}-#57]`);
+        expect(line(t[id], /G92 X\[/), `${id} X → G92 [dro-face]`).toContain(`G90 G92 X[${droX[id]}-#53]`);
         expect(line(t[id], /slave-DRO/), `${id} sync → honest comment`).toContain('no #883 slave-DRO equivalent');
     }
 });

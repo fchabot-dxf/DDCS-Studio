@@ -61,8 +61,13 @@ export const ATC_DIALECT = {
 };
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, initialPos = null, continuous = false, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000 } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, initialPos = null, continuous = false, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000, wcsBase = null, wcsStride = 5 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
+        // t644 — probe-datum tracking (for the datum-correctness check): _datumOrigin[axis] = the MACHINE coord where work-0
+        // lands after a WCS write. Set by G92 (any post) and by a write to the WCS-table register range (wcsBase/wcsStride,
+        // the register-write posts like Expert). The touched face reads work-0 ⟺ _datumOrigin[axis] == the face's machine coord.
+        this._wcsBase = Number.isFinite(wcsBase) ? wcsBase : null;
+        this._wcsStride = Number.isFinite(wcsStride) && wcsStride > 0 ? wcsStride : 5;
         // Time-true playback: moves take distance/feedrate (rapids at rapidRate),
         // divided by simSpeed (1 = real time). Slow probes crawl, rapids zip.
         this.simSpeed = Number.isFinite(simSpeed) && simSpeed > 0 ? simSpeed : 1;
@@ -269,6 +274,7 @@ export class GcodeExecutionEngine {
         this._waitPin = null;
         this._move = null;     // in-flight timed move (interpolated at the programmed feedrate)
         this._probeArmed = false;   // DM500 move-until-input: M101 arms, the next G01 is a probe, M102 disarms
+        this._datumOrigin = {};     // t644 — machine coord of work-0 per axis after a WCS write (G92 / register); the datum check
         this._traceSink = null;   // when non-null (trace()), moves snap + push a segment here instead of animating
         this._pass = 0;           // manual-REPOSITION pass index (mirrors gcodeParser): each reposition starts a new pass
         this._maxPass = 0;        // highest pass reached → stats.passes = _maxPass + 1
@@ -990,6 +996,19 @@ export class GcodeExecutionEngine {
             this.feedVal = wm.F;
         }
 
+        // t644 — G92 sets the WORK offset so the CURRENT machine position reads the given work value; it does NOT move.
+        // Record the datum origin (machine coord of work-0 per axis) so the probe-datum check can verify the touched face
+        // reads work-0. (Without this, G92 fell into the move handler below and drew a spurious jump.)
+        if (gcodes.includes(92)) {
+            const O = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
+            const cur = { x: (O.x || 0) + this.pos.x, y: (O.y || 0) + this.pos.y, z: (O.z || 0) + this.pos.z };
+            for (const [k, f] of [['X', 'x'], ['Y', 'y'], ['Z', 'z']]) {
+                if (wm[k] != null && Number.isFinite(wm[k])) this._datumOrigin[f] = cur[f] - wm[k] * this.unitScale;
+            }
+            this.ip += 1;
+            return false;
+        }
+
         const hasAxis = wm.X != null || wm.Y != null || wm.Z != null;
         const hasArcArg = wm.I != null || wm.J != null || wm.K != null || wm.R != null;
         if (!hasAxis && !hasArcArg) {
@@ -1295,7 +1314,15 @@ export class GcodeExecutionEngine {
 
         const value = this._evaluateExpression(rhs);
         if (idx != null && Number.isFinite(idx) && value != null) {
-            this.vars.set(Math.round(idx), value);
+            const i = Math.round(idx);
+            this.vars.set(i, value);
+            // t644 — a write to the active WCS-table register range (wcsBase + k*stride + axis, bounded to ≤9 WCS so it can't
+            // catch unrelated high registers like #1505/#1925) sets the datum: on register-write posts (Expert #805+) that
+            // register HOLDS the machine coord of work-0. G92 posts set _datumOrigin in the move dispatch instead.
+            if (this._wcsBase != null && i >= this._wcsBase && i < this._wcsBase + 9 * this._wcsStride) {
+                const ax = (i - this._wcsBase) % this._wcsStride;
+                if (ax >= 0 && ax <= 3) this._datumOrigin[['x', 'y', 'z', 'a'][ax]] = value;
+            }
         }
     }
 
