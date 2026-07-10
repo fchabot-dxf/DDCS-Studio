@@ -296,23 +296,30 @@ function applyCapGating(T, dialect) {
 
 /** O-word well-formedness for flow:'oword' posts (LinuxCNC / grblHAL). There, ifGoto→`o<n> if [neg]`,
  *  label→`o<n> endif`, and goto/probecheck fold to nothing (G38.2 ALARMs on no-contact, so the status-skip is
- *  moot). A folded probecheck leaves its target label's `o<n> endif` with no matching `o<n> if` (orphan) → the
- *  structured flow won't parse. This drops any o<n> if/endif whose number lacks BOTH halves, so the o-words are
- *  balanced and render cleanly. The fail-branch guard degrades gracefully (the controller alarms instead).
- *  GOTO posts (Expert/V4.1/DM500) are untouched. */
+ *  moot). A folded ifGoto/goto leaves its target label's `o<n> endif` with no matching `o<n> if` (orphan) → the
+ *  structured flow won't parse. This drops the orphans so the o-words are balanced and render cleanly.
+ *  STACK-based (t646): each `o<n> endif` closes the nearest still-open `o<n> if`; an endif with no open if of its
+ *  number is the orphan (dropped), and an if never closed is dropped too. Unlike the old Set-membership test, this
+ *  stays correct when the SAME number is reused by a real pair AND a folded orphan (e.g. comm's cancel label — t632 —
+ *  colliding with a probe wizard's o9): a real pair FOLLOWED by a same-number orphan keeps the pair, drops the orphan.
+ *  The fail-branch guard degrades gracefully (the controller alarms instead). GOTO posts (Expert/V4.1/DM500) untouched. */
 function balanceOwords(T, dialect) {
     if (getCaps(dialect.id).flow !== 'oword') return;
-    const ifs = new Set(), endifs = new Set();
-    for (const t of T) {
-        const s = (t.line || '').trim();
-        let m = s.match(/^o(\d+)\s+if\b/); if (m) ifs.add(m[1]);
-        m = s.match(/^o(\d+)\s+endif$/);   if (m) endifs.add(m[1]);
+    const open = [];         // stack of {n, i} for each currently-unclosed `o<n> if`
+    const drop = new Set();  // T indices to remove
+    for (let i = 0; i < T.length; i++) {
+        const s = (T[i].line || '').trim();
+        let m = s.match(/^o(\d+)\s+if\b/);
+        if (m) { open.push({ n: m[1], i }); continue; }
+        m = s.match(/^o(\d+)\s+endif$/);
+        if (!m) continue;
+        let k = -1;
+        for (let j = open.length - 1; j >= 0; j--) if (open[j].n === m[1]) { k = j; break; }   // nearest open if of the same number
+        if (k >= 0) open.splice(k, 1);   // matched pair — keep both
+        else drop.add(i);                // orphan endif — no open if of this number
     }
-    const valid = new Set([...ifs].filter((n) => endifs.has(n)));   // keep only numbers with BOTH an if and an endif
-    for (let i = T.length - 1; i >= 0; i--) {
-        const m = (T[i].line || '').trim().match(/^o(\d+)\s+(if|endif)\b/);
-        if (m && !valid.has(m[1])) T.splice(i, 1);                 // drop the orphan o-word line (+ its map entry)
-    }
+    for (const { i } of open) drop.add(i);   // an `o<n> if` never closed — drop it too
+    for (let i = T.length - 1; i >= 0; i--) if (drop.has(i)) T.splice(i, 1);   // remove orphans (line + its map entry)
 }
 
 /** Back-compat string projection (callers that only need the text). */

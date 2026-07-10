@@ -55,7 +55,8 @@ export function atcTestDataStack(params = ATC_TEST_DEFAULTS) {
         type: 'user_root', params: {},
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d' } },
-            { type: 'sim', params: { rotary: false, machine: true, magazine: true, toolMachine: true } },
+            { type: 'sim', params: { rotary: false, magazine: true, toolMachine: true } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
+
             { type: 'param_group', params: { group: 'ATC Test' }, children: [] },
         ],
         children: exec,

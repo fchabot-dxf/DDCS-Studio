@@ -20,6 +20,7 @@ import { makeZip, downloadBytes } from '../data/zip.js';
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 import { homingStack, homingRunParams } from '../wizards/homingWizard.js';   // homingRunParams = the ONE contract shape (t626) so sysstart generate matches the wizard emit (was passing the raw object → empty stub)
 import { emitMapped } from '../blocks/blockEmitter.js';
+import { activeDialectOpts } from '../wizards/previewEmit.js';   // t646 — thread the ACTIVE post into the sysstart emit like the previews (t634); homingStack already refuses non-Expert, this keeps the atom emit per-post too
 
 let _wired = false;
 
@@ -672,7 +673,7 @@ export function initMacrosApp() {
             }
             
             // sysstart.nc
-            let syscode = emitMapped(homingStack(homingRunParams(getSettings()))).text || '';   // t626 — the contract shape → the REAL homing sequence
+            let syscode = emitMapped(homingStack(homingRunParams(getSettings())), activeDialectOpts()).text || '';   // t626 — the contract shape → the REAL homing sequence; t646 — per-active-post emit
             const custom = String(getSettings().sysstartCustomGcode || '').trim();
             if (custom) syscode += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
             syscode += '\nM30\n';
@@ -767,7 +768,7 @@ export function initMacrosApp() {
         q('sysstart_gen').addEventListener('click', () => {
             const out = q('sysstart_out');
             if (!out) return;
-            let code = emitMapped(homingStack(homingRunParams(getSettings()))).text || '';   // t626 — the contract shape (enabled axes, ordered) → the REAL homing sequence, not the empty stub
+            let code = emitMapped(homingStack(homingRunParams(getSettings())), activeDialectOpts()).text || '';   // t626 — the contract shape (enabled axes, ordered) → the REAL homing sequence, not the empty stub; t646 — per-active-post emit
             const custom = String(q('sysstart_custom_gcode').value || '').trim();
             if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
             code += '\nM30\n';
@@ -778,7 +779,7 @@ export function initMacrosApp() {
 
     if (q('sysstart_push')) {
         q('sysstart_push').addEventListener('click', async () => {
-            let code = emitMapped(homingStack(homingRunParams(getSettings()))).text || '';   // t626 — the contract shape (enabled axes, ordered) → the REAL homing sequence, not the empty stub
+            let code = emitMapped(homingStack(homingRunParams(getSettings())), activeDialectOpts()).text || '';   // t626 — the contract shape (enabled axes, ordered) → the REAL homing sequence, not the empty stub; t646 — per-active-post emit
             const custom = String(q('sysstart_custom_gcode').value || '').trim();
             if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom + '\n';
             code += '\nM30\n';

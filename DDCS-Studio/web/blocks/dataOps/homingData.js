@@ -56,7 +56,8 @@ export function homingDataStack(params = HOMING_DEFAULTS) {
         type: 'user_root', params: {},
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d+2d' } },
-            { type: 'sim', params: { rotary: false, machine: true, magazine: false, toolMachine: true } },
+            { type: 'sim', params: { rotary: false, magazine: false, toolMachine: true } },   // t646 — machine implied by toolMachine (opSimContext: tmf ⟹ forceMachine); no dead machine key
+
             { type: 'param_group', params: { group: 'Homing' }, children: [] },
         ],
         children: exec,

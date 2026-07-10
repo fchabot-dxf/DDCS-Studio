@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-// These tests drive the Middle wizard's SVG schematic in the hidden #middleVizContainer; under full-suite parallel
-// load the path metrics (getTotalLength → stroke-dashoffset) can race and read 0. They pass deterministically in
-// isolation, so allow retries for load contention — the assertions are unchanged.
+// These tests drive the Middle wizard's SVG schematic in the hidden #middleVizContainer. The 'stroke-dashoffset toggles'
+// test (t646) is now DETERMINISTIC — it stops the autoplay animator, kills the CSS transition, and reads the steady state
+// synchronously, so it no longer races on getTotalLength/mid-transition frames. Retries remain for the other tests here,
+// which drive the REAL autoplay animator and can still be load-sensitive under full-suite parallel contention.
 test.describe.configure({ retries: 2 });
 
 test.describe('MiddleViz utilities & animator', () => {
@@ -139,15 +140,26 @@ test.describe('MiddleViz utilities & animator', () => {
       return;
     }
 
-    // Ensure hidden initial state (not 0). parseFloat: browsers serialize as "123px"/"0px".
-    await page.locator(probeSel).evaluate(el => el.classList.remove('path-draw'));
-    const before = await page.locator(probeSel).evaluate(el => getComputedStyle(el).getPropertyValue('stroke-dashoffset'));
-    expect(parseFloat(before)).not.toBe(0);
-
-    // Toggle draw and assert computed style becomes 0
-    await page.locator(probeSel).evaluate(el => el.classList.add('path-draw'));
-    const after = await page.locator(probeSel).evaluate(el => getComputedStyle(el).getPropertyValue('stroke-dashoffset'));
-    expect(parseFloat(after)).toBe(0);
+    // t646 — DETERMINISTIC steady-state read (was flaky: the looping autoplay animator concurrently mutated this
+    // element's inline stroke-dashoffset, and the CSS 1s dashoffset TRANSITION meant an immediate getComputedStyle
+    // read caught a MID-TRANSITION value, not the target). Fix: stop the animator, kill the transition, set a known
+    // hidden state (dashoffset = path length), and toggle .path-draw + read both computed values SYNCHRONOUSLY in one
+    // evaluate so no autoplay callback can slip in. This tests the pure CSS-class behaviour: .path-draw → 0 !important;
+    // without it → the (non-zero) path-length offset. Geometry-race-proof too (len is clamped ≥ 1 if getTotalLength=0).
+    const res = await page.locator(probeSel).evaluate((el) => {
+        try { window.__middleAnimator && window.__middleAnimator.stop(); } catch (e) {}
+        el.style.transition = 'none';                                                   // no 1s animation → instant, steady-state reads
+        const len = Math.max(1, Math.ceil(el.getTotalLength ? el.getTotalLength() : 0) + 1);
+        el.style.strokeDasharray = String(len);
+        el.classList.remove('path-draw');                                               // hidden: inline dashoffset = path length
+        el.style.strokeDashoffset = String(len);
+        const before = getComputedStyle(el).getPropertyValue('stroke-dashoffset');
+        el.classList.add('path-draw');                                                  // drawn: .path-draw forces 0 !important (beats inline len)
+        const after = getComputedStyle(el).getPropertyValue('stroke-dashoffset');
+        return { before, after };
+    });
+    expect(parseFloat(res.before), 'hidden: dashoffset = path length (non-zero)').not.toBe(0);
+    expect(parseFloat(res.after), 'drawn: .path-draw forces dashoffset to 0').toBe(0);
   });
 
   test('jog/traverse uses dashoffset reveal (no compound dasharray)', async ({ page }) => {
