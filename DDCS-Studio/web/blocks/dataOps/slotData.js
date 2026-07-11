@@ -121,7 +121,7 @@ export function slotDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'panel', params: { panel: 'form3d' } },   // t702 preview sweep — drill/bore parity: the shared 3D panel (play/carve + its own 2D toolpath-from-above toggle + draggable start), not the near-empty form2d layout
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             {
                 type: 'param_group',
@@ -131,5 +131,5 @@ export function slotDataDef() {
         ],
         children: exec,
     }];
-    return userOpFromStack('slot_data', 'Slot (data)', stack, SLOT_BINDINGS, 'form2d', null, 'mill_datawiz');
+    return userOpFromStack('slot_data', 'Slot (data)', stack, SLOT_BINDINGS, 'form3d', null, 'mill_datawiz');
 }

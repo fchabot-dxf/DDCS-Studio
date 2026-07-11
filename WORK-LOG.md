@@ -9527,3 +9527,44 @@ npx wrangler deploy
 No secrets change (AE_TOKEN/DASH_KEY already set). No client redeploy needed — `submitRating` already targets `/rate`. Verify: `curl -X POST <url>/rate -d '{"stars":5,"comment":"hi"}'` -> 204, then `npx wrangler d1 execute ddcs_ratings --remote --command "SELECT * FROM ratings"`.
 
 ### STAGED (mine only): analytics/src/index.js, analytics/wrangler.toml, analytics/migrations/0001_ratings.sql, analytics/test/worker.test.mjs
+
+---
+
+## t702 — RIDER (rollups dev-split) + THE PREVIEW SWEEP (slot/contour/text twins → the 3D panel)
+
+Two parts: (A) the advisor-RULED rider on t700 (rollups split dev, not drop); (B) the dispatched preview sweep. EOL note: appended CRLF to match WORK-LOG's line endings (the t700 nit — no full-file EOL rewrite this turn).
+
+### (A) RIDER — rollups SPLIT dev (analytics/, the ruled fork on t700)
+The advisor ruled the t700 fork: the forever-record must answer BOTH "how are users?" AND "how much was me?" — so `rollups` now carries a `devCount` column, not a dropped/merged total.
+- **migrations/0001_ratings.sql**: `rollups (date, event, count, devCount DEFAULT 0, PRIMARY KEY(date,event))`. count = TOTAL (all traffic); devCount = the dev portion (blob9='1'); real users = count − devCount.
+- **src/index.js rollupYesterday**: the AE query now `GROUP BY blob1, blob9` (one query, only proven constructs) → fold (event,dev) rows into `{count total, devCount}` per event → INSERT the 4-tuple. Idempotency unchanged (DELETE the day + re-INSERT in one batch).
+- **test/worker.test.mjs**: the D1 mock's rollups INSERT records devCount; AE stub rows carry `dev`; the cron tests assert count=total AND devCount=dev-split, and idempotency holds for BOTH (visit stays 10/dev 2 after two runs). Run: `node analytics/test/worker.test.mjs` → **✓ 43 assertions / 9 tests / 0 fail**.
+- Runbook (t700) unchanged — the migration file is edited in place (nothing deployed yet, so no 0002 needed).
+
+### (B) PREVIEW SWEEP — slot/contour/text twins got the standard 3D panel
+AUDIT (via a read-only recon agent; twin → has3D/has2D/handles → verdict). Every twin opens through the generic `userOpView`; the preview is decided by the declared `def.panel` (panelTypes.js): `form3d`/`form3d+2d` route to `preview3D` → the shared `createPreviewPanel` (3D stock+toolpath, play/material-carve, its OWN 2D toolpath-from-above toggle + a draggable start). `form2d` routes to `renderLayout2D` ONLY (no 3D, no engine) — and with no `role`/`group` bindings the FeatureCanvas paints just the stock rect.
+
+FULL AUDIT — the ONLY laggards were three mill twins ported emit-first as `form2d`; every other twin was already fine:
+- **REFERENCE**: drill, bore (`form3d`) · surfacing (`form3d`).
+- **reference-class (already fine)**: pocket, corner, middle, edge, alignment, rotary_center, rotary_clock, homing (`form3d+2d`); atc_length/check/warmup/change/test/table (`form3d`, machine-frame/param-write).
+- **special (by design, correctly)**: comm (`commscreen`), wcs (`form` — register-write, no motion), io_step (`form` — form-only).
+- **LAGGARDS (fixed this turn)**: **slot, contour, text** — were `form2d` → "no 3D, near-empty 2D".
+
+FIX (the minimal one the audit + dispatch converge on — "standard-panel wiring", drill/bore as the reference): flip each twin `form2d` → `form3d` in BOTH spots (the `panel` uiChild param + the `userOpFromStack(...)` 5th arg):
+- blocks/dataOps/slotData.js (:124 + :134)
+- blocks/dataOps/contourData.js (:86 + :92)
+- blocks/dataOps/textData.js (:130 + :140)
+This is a DECLARATION change (the panel type), no engine growth. It gives drill-parity: 3D + play/carve + the panel's own 2D toolpath (the REAL traced segments — so contour's 4 shapes render correctly because the panel traces the actual G-code, not a role-derived boundary) + a draggable start marker.
+
+FORK NOTE (not taken — flagged): going to `form3d+2d` would ADD the FeatureCanvas drag-layout with per-FEATURE placement handles (slot A/B/width, contour size), but that needs `role`/`group` bindings AND, for contour's multi-shape, the generic layoutSpecFromOp picks its draw-branch by which roles are present → it would mis-draw circle/polygon as a rect. So form3d (the reference standard, exactly what the dispatch scoped: "TEXT needs only the standard-panel wiring") is the right call; per-feature 2D handles are a clean follow-up IF wanted (declare roles + teach layoutSpecFromOp to respect the shape param). TEXT: panel-only, per the dispatch — its glyph/atom work stays the later text arc (untouched).
+
+VERIFY (real symptom, tests/preview-sweep-702.spec.js, 6/6 green @retries=0):
+- per twin: `_activePanel` is set (only preview3D sets it — a form2d op never would) → the shared 3D panel MOUNTED;
+- getSegments() non-empty AND the toolpath bbox spans the op extent (slot >20, contour >20, text >5 mm — the stock box is NOT in segs, so this is the ACTUAL toolpath, not the stock rect);
+- a start marker exists (getPassStarts());
+- Play (.pp-run) → the lazy engine is created + reaches running → the sim PLAYS.
+- BY EYE: scratchpad/preview-sweep-{slot,contour,text}-after.png — slot shows "Slot (data) · 22 lines" with the A→B channel on the stock (6 cuts · 8 rapids); contour shows "Contour (data) · 31 lines" with the 80×60 rect profile cut (15 cuts). Both = the drill/bore reference look (was: no 3D + stock-only 2D).
+- REGRESSION: slot-as-data / text-as-data / contour-data-emit byte-diff ZERO (panel is a uiChild, NOT an exec child → emit unchanged); contour-in-place, panel-types, custom-op-form2d-drag, drill/bore-as-data all green. The `form2d` mechanism itself is untouched (only these 3 twins moved off it).
+- FULL SUITE @retries=0 workers=4: **1013 passed, 2 skipped, 3 failed** — the 3 are the KNOWN chronic contention flakes (header-profile-menu, homing-declared-home, op-params-complete), each RE-RUN IN ISOLATION → GREEN (2/2, 3/3, 1/1). Unrelated to this turn (they touch neither dataOps twins nor analytics). (One transient: a stale `node_modules/.cache/playwright` gave a spurious "No tests found" on the first isolation run — cleared the cache per [[playwright-stale-cache-testuse-error]], then all three passed.)
+
+### FILES (this turn): analytics/src/index.js, analytics/migrations/0001_ratings.sql, analytics/test/worker.test.mjs (rider) · web/blocks/dataOps/{slotData,contourData,textData}.js, tests/preview-sweep-702.spec.js (sweep)

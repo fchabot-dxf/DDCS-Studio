@@ -83,11 +83,11 @@ export function contourDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'panel', params: { panel: 'form3d' } },   // t702 preview sweep — drill/bore parity: the shared 3D panel (play/carve + its own 2D toolpath-from-above toggle + draggable start), not the near-empty form2d layout
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Contour' }, children: [] },
         ],
         children: exec,
     }];
-    return userOpFromStack('contour_data', 'Contour (data)', stack, CONTOUR_BINDINGS, 'form2d', null, 'mill_datawiz');
+    return userOpFromStack('contour_data', 'Contour (data)', stack, CONTOUR_BINDINGS, 'form3d', null, 'mill_datawiz');
 }

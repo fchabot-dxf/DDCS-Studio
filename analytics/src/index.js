@@ -146,22 +146,33 @@ async function handleRate(request, env) {
 async function rollupYesterday(env) {
   if (!env.RATINGS || !env.AE_TOKEN || !env.ACCOUNT_ID) return { ok: false, reason: 'unconfigured' };
   const date = yesterdayUTC();
-  // SUM(_sample_interval) reconstructs the true count from AE's adaptive sampling (double1 is per-row weight-neutral).
-  const sql = `SELECT blob1 AS event, SUM(_sample_interval) AS count
+  // SUM(_sample_interval) reconstructs the true count from AE's adaptive sampling. GROUP BY blob1, blob9
+  // splits each event by the dev flag (blob9='1') in ONE query using only proven constructs — so we can
+  // store BOTH the total and the dev portion (real users = count - devCount) without a second round-trip.
+  const sql = `SELECT blob1 AS event, blob9 AS dev, SUM(_sample_interval) AS count
                FROM ddcs_events
                WHERE toDate(timestamp) = toDate('${date}')
-               GROUP BY blob1`;
+               GROUP BY blob1, blob9`;
   let rows;
   try { rows = await aeQuery(env, sql); } catch (e) { return { ok: false, reason: String(e && e.message || e) }; }
 
-  const stmts = [env.RATINGS.prepare('DELETE FROM rollups WHERE date = ?').bind(date)];
+  // fold (event, dev) rows → one {count total, devCount} per event.
+  const agg = new Map();
   for (const r of rows) {
     const ev = clip(r.event, 40) || '(none)';
-    const count = Math.round(Number(r.count) || 0);
-    stmts.push(env.RATINGS.prepare('INSERT INTO rollups (date, event, count) VALUES (?,?,?)').bind(date, ev, count));
+    const c = Math.round(Number(r.count) || 0);
+    const cur = agg.get(ev) || { count: 0, devCount: 0 };
+    cur.count += c;
+    if (String(r.dev) === '1') cur.devCount += c;
+    agg.set(ev, cur);
+  }
+
+  const stmts = [env.RATINGS.prepare('DELETE FROM rollups WHERE date = ?').bind(date)];
+  for (const [ev, v] of agg) {
+    stmts.push(env.RATINGS.prepare('INSERT INTO rollups (date, event, count, devCount) VALUES (?,?,?,?)').bind(date, ev, v.count, v.devCount));
   }
   try { await env.RATINGS.batch(stmts); } catch (e) { return { ok: false, reason: String(e && e.message || e) }; }
-  return { ok: true, date, events: rows.length };
+  return { ok: true, date, events: agg.size };
 }
 
 // Yesterday's date (UTC, YYYY-MM-DD). Isolated so the local test can stub the clock.

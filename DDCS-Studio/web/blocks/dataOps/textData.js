@@ -127,7 +127,7 @@ export function textDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'panel', params: { panel: 'form3d' } },   // t702 preview sweep — standard-panel wiring (drill/bore parity: 3D play/carve + the panel's own 2D toolpath toggle + draggable start); glyph/atom work stays the later text arc
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             {
                 type: 'param_group',
@@ -137,5 +137,5 @@ export function textDataDef() {
         ],
         children: exec,
     }];
-    return userOpFromStack('text_data', 'Text (data)', stack, TEXT_BINDINGS, 'form2d', null, 'mill_datawiz');
+    return userOpFromStack('text_data', 'Text (data)', stack, TEXT_BINDINGS, 'form3d', null, 'mill_datawiz');
 }
