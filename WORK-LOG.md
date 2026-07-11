@@ -9653,3 +9653,64 @@ UNWRAP the bar surface to a 2D grid; the cell value is REMAINING RADIUS (mirrors
 - Live remesh: SAME 45ms batch throttle + 8ms→end-state degrade; radial-vert update = same cost as the planar Z-update. Memory = 2×Float32Array(nu·nθ) = planar's h+hc order.
 
 ### VERIFY (this turn) — a design gate: no runtime change. Grounding is code-cited (file:line above); NO files touched, suite untouched.
+
+---
+
+## t706 — THE TEXT ARC stage 1: THE TEXT ATOM — DESIGN GATE (ground + design, NO CODE) — passed for ruling
+
+GATE per the dispatch. Grounded by reading the text stack (strokeFont/textGeometry/fillText/textWizard) + a recon pass (2D preview + Blockly + rotation). NO code. The good news: most of the atom EXISTS — stage 1 is PORT (built-in → twin) + ENRICH (rotation, {SN}, honesty), not build-from-scratch.
+
+### (1) AUDIT — the current text stack (grounded, file:line)
+- **The atom = `filltext`** (ops/fillText.js, kind:'fill'). Carries text/font/height/width/slant/spacing/align/x/y/strokeWidth/toolDia/stepoverPct/z/feed/plunge/clearance. `lines(p,z)` EMITS the pocket-fill engraving (scanlineFill(textContours) → fillLevelMoves; pure G0/G1, dialect-agnostic). `extent(p)` DECLARES the footprint (== textBBox → placement liveExtent).
+- **Glyph geometry = ONE source** (textGeometry.js): `layoutText(params)` → `{strokes: placed centreline polylines [x,y] in work coords, bbox, scale, height, lineW}` (handles multi-line via `\n`, align, width, slant, spacing, pos x/y); `textContours(params)` → the inflated ribbons the fill scans. BOTH the emit and the preview read layoutText → they can't diverge.
+- **Font source = strokeFont.js `FONTS` seam** (getFont/registerFont): a HAND-AUTHORED single-stroke centreline font 'single-stroke' — uppercase A–Z, 0–9, punctuation (- _ . , : / # + = * ( ) ! ?), centrelines on a 0..7 grid, `w`=advance. LICENSE-CLEAN (the project's own data). Registry seam already supports long-tail fonts as pure data.
+- **Twin** (blocks/dataOps/textData.js): binds all params; panel now `form3d` (t702). NO role/group bindings.
+- **Built-in `textView.js` ALREADY draws real letters + full handles** (buildTextSpec → layoutText → per-edge `kind:'line'` items + pos/height/width/slant handles + placement pickers). BUT this lives ONLY in the built-in view.
+- **The TWIN gets NONE of that**: `mode==='3d'` calls only preview3D → the shared 3D (traces+carves the engraving) + the panel's own parsed-gcode 2D toggle. `layoutSpecFromOp` (the FeatureCanvas 2D) has NO text/glyph branch at all → the twin's 2D shows the raster toolpath, not vector letters, and nothing is draggable.
+- **Blockly**: `filltext` round-trip is COMPLETE — a real palette block (Transforms, fields auto-derived from `fillTextBlock.fields`), emits via lines(), block↔stack bidirectional; G-code→op reverse-sync is carried at the `text` OP marker (opSchema.js SCHEMA.text / FIELD_BIND.text), NOT a filltext-level marker (by design — op params are the source, G-code is a one-way projection).
+- **Rotation = ABSENT** everywhere (fillText/layoutText/textBBox/textData/placement). `slant` is a baseline SHEAR, not a rotation. BUT a ready-made `rotate` atom EXISTS (ops/rotate.js: angle/pivotX/pivotY, bakes via rotateProgram, no G68) + `makeRotate` — the emit machinery to rotate about a pivot is already declared, just unwired from text.
+
+### (2) THE DECLARED TEXT ATOM — design
+Keep `filltext` as THE atom (it is already the one-source declarer+emitter+footprint + it round-trips; renaming churns the twin/tests/schema). Stage-1 enrichments:
+
+- **ROTATION** — add `rotation` (deg, about the anchor x,y) to `layoutText` (rotate each placed [x,y] about (x,y), right after the slant-skew). Because layoutText is THE one source feeding BOTH emit (→ textContours → fill) AND the previews (strokes), rotating THERE means emit + 2D + 3D + carve + footprint all follow automatically — same pattern as the existing `slant`. (FORK 1: this vs wrapping the op in the existing `rotate` atom.)
+- **DECLARED preview geometry → the twin's 2D** — the twin must draw the real letters + a pos + rotation handle, at parity with the built-in view. The atom declares its glyph geometry; the twin's 2D renders whatever the atom declares (declare-not-infer). (FORK 2: a generic `def.previewGeometry(params)→{paths,handles}` atom hook vs a text-specific branch in layoutSpecFromOp.) Proposed twin 2D:
+```
+    ┌───────────── 2D layout (FeatureCanvas) ─────────────┐
+    │        ╱▔▔╲  ╱▔╲                                     │   • real letters = layoutText.strokes as
+    │       │ D  ││ D │  C  S   ← real vector glyphs       │     paths[]{pts,cls:'fc-path'} (one <path>/polyline)
+    │        ╲__╱  ╲_╱                                     │   • ✛ pos handle  → x/y  (drag = move the label)
+    │            ✛pos          ↻rot                        │   • ↻ rotation handle → the new `rotation` param
+    │   ▁▁▁▁▁▁▁▁▁▁▁▁ stock ▁▁▁▁▁▁▁▁▁▁▁▁▁▁                  │   • honest width = max(strokeWidth, toolDia)  (§6)
+    └──────────────────────────────────────────────────────┘
+```
+- **multi-line** — already works via `\n` in the text field (layoutText splits + linePitch=H*1.6). Stage 1: surface it (a multi-line textarea) + expose `lineSpacing` (FORK 5: hardcode vs param).
+- **panel** → `form3d+2d` (supersedes t702's form3d): the twin gets BOTH the 3D engraving trace/carve AND the real-letter FeatureCanvas 2D + handles.
+
+### (3) THE BLOCKLY STORY — mostly FREE
+`filltext` is already a palette block that emits + block-round-trips; the `text` op marker (opSchema.js) carries the G-code→op re-import. Stage 1 = additive: the new fields (`rotation`, maybe `lineSpacing`) auto-surface as block inputs (block fields derive from `fillTextBlock.fields`) — just add them to `fields` + `defaults`, and add `rotation` to `FIELD_BIND.text` so the marker round-trips it. No new block, no new codec. Standing round-trip rule: satisfied by extension.
+
+### (4) THE STROKE-FONT SOURCE — reuse the existing DATA font
+strokeFont.js `FONTS` is already the license-clean, embedded-as-data single-stroke source (A–Z, 0–9, punctuation; the registry takes long-tail fonts as pure data). Stage 1 REUSES it. Coverage GAP: no lowercase (input is upper-cased) — a cheap DATA add later (extend the G map), not a stage-1 blocker. (FORK 6: add lowercase now vs defer.) No third-party font needed — the Hershey route is unnecessary (we already have a clean hand-authored one).
+
+### (5) {SN} STAYS OUT of stage 1 — but the field TOLERATES it literally
+The text field must store `{SN}` VERBATIM (no parse/substitution in stage 1 — stage 2 owns the dynamic on-controller serial). Today `{` `}` aren't in the font → they render as spaces → "{SN}" shows as " SN " (tolerated, but ugly). FORK 4: (a) ADD `{` `}` glyphs (cheap data) so stage 1 renders the literal token "{SN}"; (b) render a placeholder box labelled SN; (c) leave as spaces. RECOMMEND (a): add the brace glyphs so the token shows literally, store the raw string, and DO NOT substitute — stage 2 slots in cleanly (the declaration already holds the token).
+
+### (6) STROKE-WIDTH vs TOOL-DIA — the honesty note
+`strokeWidth` = the intended visual ribbon (how fat the letter looks); `toolDia` = the real cutter Ø that fills it. If `toolDia ≥ strokeWidth`, the tool CAN'T cut thinner than itself → the actual engraved letter is `toolDia` wide (a single centreline pass), NOT `strokeWidth`. HONESTY: the preview must draw the ACTUAL engraved width = `max(strokeWidth, toolDia)` (not the wished-for strokeWidth), and note when the tool forces it wider. This is the verify-real-symptom rule applied to the preview — show what actually cuts.
+
+### FORKS (for the ruling)
+1. **Rotation home** — (a) add `rotation` to layoutText (ONE source feeds emit+preview; consistent w/ `slant`) vs (b) wrap the op in the existing `rotate` atom (reuse a declared atom, but the preview must then read the rotated toolpath = a 2nd source). RECOMMEND (a) — one-source, both surfaces follow; note (b) exists.
+2. **Preview-geometry seam** — (a) a GENERIC `def.previewGeometry(params)→{paths,handles}` atom hook (declare-not-infer; text is its 1st user; any future geometry-op reuses it) vs (b) a text-specific branch in layoutSpecFromOp (cheap, matches the existing edge/rotary/corner special-branches, but couples the generic 2D to text). RECOMMEND (a) — the atom owns its preview geometry (north-star); it's a small seam (a method lookup), and it's the [[declared-seam-before-the-declaring-gui]] pattern. (b) is the rule-of-three fallback if the advisor wants minimal now.
+3. **Panel** — `form3d+2d` (3D engraving + real-letter 2D + handles). CONFIRM.
+4. **{SN} stage-1 render** — RECOMMEND add `{`/`}` glyphs → literal "{SN}", store raw, NO substitution.
+5. **lineSpacing** — RECOMMEND a param (cheap declaration) over the hardcoded H*1.6.
+6. **lowercase** — RECOMMEND defer (cheap data add later); stage 1 stays uppercase (existing).
+7. **Atom identity** — RECOMMEND keep `filltext` (enrich, don't rename — it already round-trips + is byte-proven).
+
+### SCOPE (stage 1) — NOT in this stage
+- {SN} dynamic substitution (stage 2 — on-controller serial machinery). Stage 1 only TOLERATES the literal token.
+- Lowercase / extra glyph coverage (cheap data, later).
+- True-outline (multi-stroke/contour) fonts — stage 1 stays single-stroke centreline (the fill model).
+
+### VERIFY (this turn) — a design gate: no runtime change. Grounding is code-cited; NO files touched, suite untouched. I build EXACTLY the ruling next turn.
