@@ -9375,3 +9375,18 @@ Removed the inline name field, the amber "(unnamed)/name your config" hint, the 
 
 ### GATED — (b2) the header quick-menu Profile section
 The "Generate for" section (headerPost.js:126 `sub('post', 'Generate for', …)`) → a PROFILE section: line 1 read-only current profile+controller; 2-3 recents (recentProfileIds(), one-click switchProfile); [Profiles…] [Save as…] [Pull from controller]; NO dialect switching. A distinct surface reusing openProfileModal + recentProfileIds — clean as its own turn.
+
+---
+
+## t690 — (b2) THE HEADER PROFILE SECTION (replaces the quick-menu "Generate for")
+
+The header quick-menu's collapsible "Generate for" (dialect) submenu → a PROFILE section (headerPost.js). NO dialect/controller switching in the menu at all — that authority stays on the Settings controller dropdown (with its per-post warning triangles); one override surface beats two.
+- **Line 1 READ-ONLY**: `<b>current profile</b> · controller` (a `.hdr-quick-cur` div, NOT a `.hdr-quick-item` so the menu's click router ignores it — else it fell through to `setActivePostId(undefined)`).
+- **RECENTS**: up to 3 (recentProfileIds(), minus the active), each a one-click FULL-SWAP (ProfLib.switchProfile + pushRecentProfile + settings-changed).
+- **Doors**: [🗂 Profiles…] → openProfileModal('browse'); [＋ Save as…] → openProfileModal('save'); [↧ Pull from controller] → openSettings(profile panel) + click #set_profile_pull (the existing review-modal flow, unchanged).
+- The quick-menu button tooltip/aria now names the PROFILE (not "generate for controller"). Guarded the now-dead data-post branch (`if (!it.dataset.post) return`).
+
+### VERIFY (real-symptom)
+- header-profile-menu.spec.js (NEW): the menu shows a Profile head + current (Rig B · Expert) + 1 recent (Rig A) + the 3 doors; **NO data-post items, no "Generate for"**. A recent one-click FULL-SWAPS the envelope 320→700; Profiles… opens `.profile-modal`; Save as… opens a dlgPrompt; Pull opens the review modal (`#import-close`). Both green.
+- header-responsive.spec.js updated: the old "one active post checked" assertion → "no data-post items + the Profile door present + one theme". editor-chrome (file actions) unaffected.
+- Screenshot scratchpad/header-profile-menu.png — the PROFILE section under PROGRAM, above THEME; current bold + a ↔ recent + Profiles…/Save as…/Pull; no dialect list. (Also shows the b3 "Insert gcode" label.)

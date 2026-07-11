@@ -69,10 +69,12 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… row present').toBe(1);
   // t598 — the always-available Rate / Feedback utility entry (alongside Settings / checklist).
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="rate"]').count(), 'Rate / Feedback row present').toBe(1);
-  // Exactly one active post and one active theme are checked.
-  const postChecked = await page.locator('#hdrPostMenu .hdr-quick-item[data-post][aria-checked="true"]').count();
+  // t688 b2 — the dialect (Generate-for) list is GONE from the menu; it now has a PROFILE section instead. One active theme.
+  const dialectItems = await page.locator('#hdrPostMenu .hdr-quick-item[data-post]').count();
+  const profileDoors = await page.locator('#hdrPostMenu [data-profact="browse"]').count();
   const themeChecked = await page.locator('#hdrPostMenu .hq-theme-chip[data-theme][aria-checked="true"]').count();
-  expect(postChecked, 'one active post checked').toBe(1);
+  expect(dialectItems, 'no dialect switching in the menu (moved to Settings)').toBe(0);
+  expect(profileDoors, 'the Profile section (Profiles… door) is present').toBe(1);
   expect(themeChecked, 'one active theme checked').toBe(1);
 
   // Escape closes it.

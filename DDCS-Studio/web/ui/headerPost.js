@@ -13,9 +13,11 @@
  * G-code, a ⚠ next to the selector explains the mismatch. Cutting programs (no #vars) switch cleanly.
  */
 import { listPosts, getActivePostId, setActivePostId, getDialect, resolveActivePost, getCaps } from '../wizards/dialects/index.js';
-import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { getActiveProfile, CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { validate, summarize } from '../shared/js/validate/validate.js';
 import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare alert)
+import { openProfileModal, recentProfileIds, pushRecentProfile } from './profileModal.js';   // t688 b2 — the header PROFILE section
+import * as ProfLib from '../data/profileLibrary.js';
 import { THEMES } from './themes.js';
 import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
 
@@ -123,8 +125,22 @@ export function initHeaderPost() {
             + '<span class="hq-caret" aria-hidden="true">▸</span></button>'
             + `<div class="hdr-quick-subitems" data-subitems="${key}"${open ? '' : ' hidden'}>${body}</div>`;
 
-        const postSub = sub('post', 'Generate for', activeName, postSubOpen,
-            postRow('auto', autoLabel, false) + listPosts().map((p) => postRow(p.id, p.name, !p.verified)).join(''));
+        // t688 b2 — the PROFILE section REPLACES "Generate for". Read-only current profile + controller, up to 3 recents
+        // (one-click full-swap), and the modal doors. NO dialect/controller switching here — that stays on the Settings
+        // controller dropdown (with its per-post warning triangles). One override surface beats two.
+        const ap = ProfLib.activeProfile() || {};
+        const apCtrl = (CONTROLLER_PROFILES[ap.controllerId] || {}).name || ap.controllerId || '';
+        const recents = recentProfileIds().filter((id) => id !== ProfLib.activeProfileId()).slice(0, 3);
+        const recentRows = recents.map((id) => {
+            const p = ProfLib.listProfiles().find((x) => x.id === id); if (!p) return '';
+            const c = (CONTROLLER_PROFILES[p.controllerId] || {}).name || p.controllerId || '';
+            return `<button type="button" role="menuitem" class="hdr-quick-item" data-profswitch="${esc(id)}" title="Switch to this profile (full-swap)"><span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">↔ ${esc(p.name || '(unnamed)')}<span class="hq-cur"> · ${esc(c)}</span></span></button>`;
+        }).join('');
+        const profAct = (act, label) => `<button type="button" role="menuitem" class="hdr-quick-item" data-profact="${act}"><span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">${label}</span></button>`;
+        const profileSection = '<div class="hdr-quick-head">Profile</div>'
+            + `<div class="hdr-quick-cur" style="display:flex; align-items:center; gap:8px; padding:5px 12px; font-size:13px; opacity:.92; cursor:default;"><span class="hdr-quick-lbl"><b>${esc(ap.name || '(unnamed configuration)')}</b><span class="hq-cur"> · ${esc(apCtrl)}</span></span></div>`
+            + recentRows
+            + profAct('browse', '🗂 Profiles…') + profAct('saveas', '＋ Save as…') + profAct('pull', '↧ Pull from controller');
         // Theme picker is no longer collapsed — the chips are compact, so show them directly under a heading.
         const themeSection = '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
             + `<div class="hdr-quick-subitems" data-subitems="theme">${THEMES.map(themeRow).join('')}</div>`;
@@ -148,12 +164,12 @@ export function initHeaderPost() {
             + HQ_ACTIONS.map(actionRow).join('')
             + '<div class="hdr-quick-sep"></div>'
             + actionRow(HQ_STANDALONE)
-            + '<div class="hdr-quick-sep"></div>' + postSub
+            + '<div class="hdr-quick-sep"></div>' + profileSection
             + themeSection
             + '<div class="hdr-quick-sep"></div>' + checklistRow + settingsRow + rateRow;
 
-        btn.title = `Quick actions — open / save / load / export, generate for controller (${activeName}), theme. Click to open.`;
-        btn.setAttribute('aria-label', `Quick actions (generate for controller: ${activeName})`);
+        btn.title = `Quick actions — open / save / load / export, profile (${ap.name || 'unnamed'} · ${apCtrl}), theme. Click to open.`;
+        btn.setAttribute('aria-label', `Quick actions (profile: ${ap.name || 'unnamed'} · ${apCtrl})`);
     };
 
     const onDocClick = (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); };
@@ -268,7 +284,16 @@ export function initHeaderPost() {
         if (it.dataset.theme) { setQuickTheme(it.dataset.theme); fillMenu(); return; }   // chips stay open; just refresh the active ring
         closeMenu();
         if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
-
+        // t688 b2 — PROFILE section: a recent switches (full-swap); the doors open the modal / the pull flow.
+        if (it.dataset.profswitch) { ProfLib.switchProfile(it.dataset.profswitch); pushRecentProfile(it.dataset.profswitch); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); return; }
+        if (it.dataset.profact) {
+            const a = it.dataset.profact;
+            if (a === 'browse') openProfileModal('browse');
+            else if (a === 'saveas') openProfileModal('save');
+            else if (a === 'pull') { if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' }); setTimeout(() => { const b = document.getElementById('set_profile_pull'); if (b) b.click(); }, 60); }
+            return;
+        }
+        if (!it.dataset.post) return;   // (dialect switching removed from the menu — no data-post items remain)
         setActivePostId(it.dataset.post);                           // persist the active post (override or 'auto')
 
         // Automatically sync the variable DB to the active post's family
