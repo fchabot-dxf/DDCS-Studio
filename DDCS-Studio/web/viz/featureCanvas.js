@@ -145,6 +145,7 @@ export class FeatureCanvas {
             }
         });
         const end = (e) => {
+            const act = this.active;
             let id;
             if (this.active) { id = this.active.id; this.active = null; }
             else if (this.pan) { this.pan = null; }
@@ -153,7 +154,18 @@ export class FeatureCanvas {
             const hadSnap = !!this._snap; this._snap = null;
             try { this.svg.releasePointerCapture(e.pointerId); } catch (_) {}
             if (id != null && this.spec && this.spec.onDragEnd) this.spec.onDragEnd(id);
-            if (hadSnap && this.spec) this._draw(this.spec, this._vw, this._vh);   // clear the snap ring
+            // t732 — REFIT-ON-DROP so the canvas ACCOMMODATES a marker dragged to the edge. A free (noSnap) sim-start marker
+            // is held at the 80px gutter by _followHandle during the drag; with the frozen viewBox and no refit it would PIN
+            // there — the next drag can't leave the fitted view, so it goes nowhere (the user's felt symptom). If it landed in
+            // the gutter, refit (roomy) to include ALL markers + a generous margin so it sits well inside and the next drag
+            // continues; make the roomy view STICK (_userAdjusted) so a field-change re-fit doesn't snap it back to the gutter.
+            if (act && act.noSnap && this.spec && this._handleInGutter(id)) {
+                this._userAdjusted = true;
+                this._tf = this._fit(this.spec, this._vw, this._vh, true);
+                this._draw(this.spec, this._vw, this._vh);
+            } else if (hadSnap && this.spec) {
+                this._draw(this.spec, this._vw, this._vh);   // clear the snap ring
+            }
         };
         svg.addEventListener('pointerup', end);
         svg.addEventListener('pointercancel', end);
@@ -200,8 +212,10 @@ export class FeatureCanvas {
         this._draw(spec, VW, VH);
     }
 
-    /** Fit the union of stock + items + handles + origin into the viewport with a margin. */
-    _fit(spec, VW, VH) {
+    /** Fit the union of stock + items + handles + origin into the viewport with a margin. `roomy` (t732 — a refit-on-drop
+     *  after a marker landed in the edge gutter) leaves a GENEROUS margin so the marker sits well inside and the next drag
+     *  has room to move (else it re-pins against the frozen viewBox). */
+    _fit(spec, VW, VH, roomy) {
         let x0 = 0, y0 = 0, x1 = 0, y1 = 0, any = false;
         const acc = (x, y) => {
             if (!isFinite(x) || !isFinite(y)) return;
@@ -229,7 +243,7 @@ export class FeatureCanvas {
         let w = x1 - x0, h = y1 - y0;
         if (!(w > 1)) { x0 -= 50; x1 += 50; w = x1 - x0; }
         if (!(h > 1)) { y0 -= 50; y1 += 50; h = y1 - y0; }
-        const scale = Math.min(VW / w, VH / h) * 0.82;
+        const scale = Math.min(VW / w, VH / h) * (roomy ? 0.55 : 0.82);   // roomy → a wider margin so a just-dropped edge marker sits well inside
         return { scale, cxw: (x0 + x1) / 2, cyw: (y0 + y1) / 2, cx: VW / 2, cy: VH / 2 };
     }
 
@@ -252,6 +266,16 @@ export class FeatureCanvas {
         t.cxw += dx / t.scale;   // shift the world-centre so the handle moves back toward the interior
         t.cyw -= dy / t.scale;   // Y flips (screen-down = world-up)
         return true;
+    }
+    /** t732 — did the handle `id` land within the edge gutter (the ≤ margin px band where _followHandle holds it)? Drives
+     *  the refit-on-drop: a marker stranded here can't be dragged further until the view accommodates it. */
+    _handleInGutter(id, margin = 80) {
+        const t = this._tf; if (!t || !(this._vw > 0) || !(this._vh > 0)) return false;
+        const h = (this.spec.handles || []).find((x) => String(x.id) === String(id));
+        if (!h || !isFinite(h.x) || !isFinite(h.y)) return false;
+        const p = this._placement || { x: 0, y: 0 };
+        const s = this._S(h.x + (p.x || 0), h.y + (p.y || 0));
+        return s.x < margin || s.x > this._vw - margin || s.y < margin || s.y > this._vh - margin;
     }
     /** World→screen WITH the toolpath placement applied. Pattern items/handles ride the placement (they're authored
      *  in the build frame); the stock + its attach markers do NOT (they're already in part coords). */
