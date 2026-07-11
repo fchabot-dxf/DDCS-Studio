@@ -692,12 +692,18 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 
 /* Project VFS — Open/manage DRAWER (left sidebar, Fusion-style; top set in JS to the header height). */
 .proj-drawer {
-    position: fixed; left: 0; bottom: 0; top: 52px; width: 320px; max-width: 85vw; z-index: 1500;
+    position: fixed; left: 0; bottom: 0; top: 52px; width: var(--proj-drawer-w, 320px); max-width: 85vw; z-index: 1500;
     display: flex; flex-direction: column;
     background: var(--panel, #1d2530); border-right: 1px solid var(--border, rgba(255,255,255,.15));
     box-shadow: 4px 0 24px rgba(0,0,0,.4);
 }
 .proj-drawer[hidden] { display: none; }
+/* t696 c — drag the right edge to resize; the width persists (ddcs_proj_drawer_w). */
+.proj-resize {
+    position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: ew-resize; z-index: 2;
+    background: transparent;
+}
+.proj-resize:hover, .proj-resize.dragging { background: linear-gradient(90deg, transparent, var(--accent, #4a90e2)); opacity: .5; }
 .proj-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .proj-title { font-weight: 600; }
 .proj-vol { font-weight: 400; font-size: 12px; }

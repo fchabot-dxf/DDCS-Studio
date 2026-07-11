@@ -381,6 +381,7 @@ function loadSettings() {
                 autostartBody: typeof p.autostartBody === 'string' ? p.autostartBody : undefined,   // undefined = never seeded → the panel migrates it on first open
                 autostartHandEdited: !!p.autostartHandEdited,
                 autostartProfileId: typeof p.autostartProfileId === 'string' ? p.autostartProfileId : undefined,   // t656 amend 1 — the profile the body was built for (mismatch note)
+                autostartGenSig: typeof p.autostartGenSig === 'string' ? p.autostartGenSig : undefined,   // t696 a — the generator-input fingerprint (staleness note); rides the profile like the body
             });
             seedGantryFromHoming(merged.motors, p.homing);   // t648 — a pulled dual-gantry dump seeds the slave axes role (one source)
             if (!merged.toolsSeeded && (!Array.isArray(merged.atc.tools) || merged.atc.tools.length === 0)) {

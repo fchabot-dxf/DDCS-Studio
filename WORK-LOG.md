@@ -9440,3 +9440,18 @@ Added `[data-theme] button.primary, [data-theme] .toolbar-btn.primary { backgrou
 ### VERIFY (the advisor's acceptance)
 - NEW tests/modal-primary-accent.spec.js (a KEEPER regression guard): across studio / normal / futuristic — the GENERATOR INSERT's computed background ≠ CANCEL's; the DIALOG OK ≠ Cancel; the TOOL-LIBRARY Done ≠ Add. Both tests green.
 - BY EYE (stated): scratchpad/gen-footer-futuristic.png — INSERT is BRIGHT CYAN (the futuristic accent), unmistakably different from the dark neutral CANCEL (the user's exact complaint, fixed); gen-footer-studio.png — INSERT keeps studio's blue gradient. Matrix also: dialog-accent-{theme}.png, toollib-{theme}.png, stock-modal-{studio,futuristic}.png.
+
+---
+
+## t696 — THE SMALLS TURN: (a) autostart staleness fingerprint · (c) projects-drawer resize handle · (b4) Presets affordance
+
+Three independent smalls, all landed + verified (tests/smalls-696.spec.js, 3/3).
+
+### (a) Autostart staleness FINGERPRINT (macrosApp.js + settingsPanel.js)
+`autostartGenSig()` = a djb2 hash of the generator INPUTS (JSON of `homingRunParams(settings)` + the additional-G-code field). `storeAutostartBody` records it alongside the body; the whitelist (settingsPanel:381) carries `autostartGenSig` so it rides the profile + survives reload. `updateSysstartEditNote` gains a STALENESS branch (after the controller-mismatch check, before hand-edit): a clean body whose stored sig ≠ the current sig → "⚠ The homing profile changed since this was generated — Regenerate" (amber `--warn` token). A `ddcs:settings-changed` listener live-refreshes the note. Legacy bodies with no stored sig → treated in-sync (no false alarm). VERIFY: regenerate → in-sync; disable an axis + settings-changed → the note appears; regenerate → gone; reload → the sig persists.
+
+### (c) Projects drawer RESIZE HANDLE (projectModal.js + styles.css)
+`.proj-drawer` width → `var(--proj-drawer-w, 320px)`; a `.proj-resize` grip on the right edge (ew-resize, accent hover). Drag sets the var from clientX, clamped `[240, min(85vw, 640)]`; mouseup persists to `ddcs_proj_drawer_w`; buildDrawer restores it. VERIFY: drag widens > 80px, persists to localStorage, and the width survives a reload.
+
+### (b4) Presets affordance (index.html + wizardTemplates.js)
+The wizard-header `📑` mystery icon → a LABELED "📑 Presets" button (bordered, padded — not a bare emoji); title reworded. The popover: "Presets — {op}", "+ Save current as preset…", + a terse distinguishing line: "A preset saves this op's values to reuse; 'Save as custom wizard' is different — it makes a new bar button." Same capability (save/load named per-op value-sets, local+cloud). VERIFY: the labeled button opens the popover; the copy reads "Presets"/"preset" + names the custom-wizard distinction.

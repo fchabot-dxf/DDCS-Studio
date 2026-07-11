@@ -575,8 +575,15 @@ export function initMacrosApp() {
     }
     const curProfileId = () => (getActiveProfile() || {}).id || 'ddcs-expert-m350';
     const curProfileName = () => (getActiveProfile() || {}).name || 'DDCS Expert M350';
-    // Record the body + WHICH profile it was built for (t656 amend 1: the selected controller drives everything).
-    function storeAutostartBody(body, handEdited) { getSettings().autostartBody = body; getSettings().autostartHandEdited = !!handEdited; getSettings().autostartProfileId = curProfileId(); saveSettings(); }
+    // t696 a — a FINGERPRINT of the generator INPUTS (the homingRunParams contract + the additional-G-code field). Stored
+    // with the body so the editor can flag a SILENT staleness: a homing-config change (e.g. a dual-Y enable, a feed) that
+    // the old note (controller-mismatch only) missed. djb2 over the JSON — small + drift-exact.
+    function autostartGenSig() {
+        try { const s = JSON.stringify(homingRunParams(getSettings())) + ' ' + String(getSettings().sysstartCustomGcode || ''); let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return String(h >>> 0); }
+        catch (e) { return ''; }
+    }
+    // Record the body + WHICH profile it was built for (t656 amend 1) + the generator-input fingerprint (t696 a).
+    function storeAutostartBody(body, handEdited) { getSettings().autostartBody = body; getSettings().autostartHandEdited = !!handEdited; getSettings().autostartProfileId = curProfileId(); getSettings().autostartGenSig = autostartGenSig(); saveSettings(); }
     function updateSysstartEditNote() {
         const n = q('sysstart_editnote'); if (!n) return;
         const genFor = getSettings().autostartProfileId, cur = curProfileId();
@@ -585,11 +592,22 @@ export function initMacrosApp() {
             n.style.color = 'var(--warn, #d1902b)';
             return;
         }
+        // t696 a — STALENESS: the generator inputs (homing config + additional G-code) drifted since this body was built,
+        // but the controller is unchanged. Flag it (a clean body only — a hand-edit shows its own note; Regenerate picks up
+        // the drift either way). Legacy bodies without a stored sig are treated as in-sync (no false alarm).
+        const storedSig = getSettings().autostartGenSig;
+        if (!getSettings().autostartHandEdited && storedSig && storedSig !== autostartGenSig()) {
+            n.innerHTML = '⚠ The homing profile changed since this was generated — <b>Regenerate</b> to rebuild the boot macro.';
+            n.style.color = 'var(--warn, #d1902b)';
+            return;
+        }
         n.style.color = '';
         n.textContent = getSettings().autostartHandEdited
             ? '✎ Hand-edited since the last regenerate — Regenerate will ask before overwriting.'
             : 'In sync with the homing profile — Regenerate rebuilds it; edit to customize (your edits stick).';
     }
+    // t696 a — a homing-config change (dispatched by Settings) live-refreshes the staleness note (no-op when the panel is closed).
+    window.addEventListener('ddcs:settings-changed', () => { try { updateSysstartEditNote(); } catch (_) { /* */ } });
     if (q('sysstart_body')) {
         // MIGRATE: first open with no stored body → seed it via one regenerate (for the SELECTED profile) so it's never empty.
         if (getSettings().autostartBody == null) storeAutostartBody(buildAutostartBody(), false);

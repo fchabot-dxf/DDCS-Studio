@@ -78,9 +78,10 @@ export function openTemplatesPopover(wm, anchor) {
     const pop = document.createElement('div');
     pop.className = 'wiz-tpl-pop';
     pop.innerHTML =
-        `<div class="wt-head">Templates — ${esc(label)}</div>` +
-        `<button class="wt-save" type="button">+ Save current as template…</button>` +
-        `<div class="wt-list">Loading…</div>`;
+        `<div class="wt-head">Presets — ${esc(label)}</div>` +
+        `<button class="wt-save" type="button">+ Save current as preset…</button>` +
+        `<div class="wt-list">Loading…</div>` +
+        `<div class="wt-note" style="font-size:10.5px; opacity:.6; margin-top:6px; line-height:1.4;">A preset saves this op's values to reuse; “Save as custom wizard” is different — it makes a new bar button.</div>`;
     document.body.appendChild(pop);
     _pop = pop;
 
