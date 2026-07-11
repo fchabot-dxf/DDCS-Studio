@@ -93,8 +93,7 @@ test('E3 DRIVE: Align opens IN-PLACE — non-empty form + the 3D sim renders the
         await page.click('#wiz_user .wiz-viz3d .pp-mtoggle');
         await page.waitForTimeout(200);
     }
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/alignment_e3_inplace.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_e3_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('E3 IN-PLACE FORM: ' + form.fieldCount + ' fields → ' + form.params.join(', ') + ' | ' + JSON.stringify({ twoD, nStarts: form.nStarts }));
     expect(form.fieldCount, 'the in-place form is NOT empty').toBeGreaterThan(6);
     expect(form.hasCheckAxis && form.hasProbeDir && form.hasSafeZ && form.hasTolerance, 'the checkAxis/probeDir/safeZ/tolerance knobs render').toBe(true);

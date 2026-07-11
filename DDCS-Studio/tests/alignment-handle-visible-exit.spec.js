@@ -65,7 +65,7 @@ test('a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (
         return { startX: starts[0] ? starts[0].x : null, markerMeshX: (m0 && m0.position) ? m0.position.x : null, stockX: ((window.ddcsGetSettings() || {}).stock || {}).x };
     });
 
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/alignment_exit_repro.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_exit_repro.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('3D SIM: ' + JSON.stringify(threeD));
     console.log('DURING drag: ' + JSON.stringify(during) + ' ax=' + axDuring);
     console.log('AFTER up: ' + JSON.stringify(after) + ' | param ax=' + rec);

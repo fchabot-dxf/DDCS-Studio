@@ -73,7 +73,7 @@ test('E2 real-symptom: the twin renders its multi-pass markers on the preview (f
         const methodVal = (document.querySelector('#wiz_user_form [data-param="method"]') || {}).value;
         return { nStarts: starts.length, hasViz: !!canvas, methodVal };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/rotary_center_simstarts.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/rotary_center_simstarts.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     expect(r.methodVal, 'the form is on the FIT method').toBe('fit');
     expect(r.nStarts, 'FIT declares 3 per-pass starts (the 3-point circle solve)').toBe(3);
     expect(r.hasViz, 'the rotary machine-frame preview renders').toBe(true);

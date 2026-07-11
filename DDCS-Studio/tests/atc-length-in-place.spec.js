@@ -77,7 +77,7 @@ test('DRIVE: ATC Tool Length opens IN-PLACE with a NON-EMPTY form + the 3D machi
         const canvas = document.querySelector('#wiz_user canvas');   // the form3d machine preview
         return { fieldCount: params.length, params, hasViz: !!canvas };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_length_inplace.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_length_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     expect(r.fieldCount, 'the in-place form renders its knobs (maxDist/retract/feeds/port/blockHeight/safeZ)').toBeGreaterThan(4);
     expect(r.params.includes('blockHeight'), 'the Setter Block Height knob renders').toBe(true);
     expect(r.hasViz, 'the 3D machine-frame sim renders (form3d + forceMachine)').toBe(true);

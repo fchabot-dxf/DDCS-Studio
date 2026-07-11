@@ -44,7 +44,7 @@ test('DRIVE THE APP: Pocket opens IN-PLACE with a NON-EMPTY form (shape/strategy
             vizEls: canvas ? 1 : 0,
         };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/pocket_inplace.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/pocket_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('POCKET IN-PLACE FORM: ' + form.fieldCount + ' fields → ' + form.params.join(', '));
     expect(form.fieldCount, 'the in-place form is NOT empty — the twin renders its knobs').toBeGreaterThan(8);
     expect(form.hasShape, 'the shape knob renders').toBe(true);

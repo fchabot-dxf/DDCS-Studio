@@ -34,7 +34,7 @@ test('WCS form gates auto/WCS-number/sync per post (M350 all on; rs274 fixed onl
     const rs274 = await gateFor('rs274ngc');   // rs274 last → the screenshot shows partial gating (auto+sync greyed, fixed G54 live) + the G10 preview
     await page.evaluate(() => { const x = document.getElementById('w_x'); if (x) { x.checked = true; x.dispatchEvent(new Event('change', { bubbles: true })); } });   // refresh the preview under the active post
     await page.waitForTimeout(150);
-    await page.locator('#wiz_wcs').screenshot({ path: 'scratchpad/wcs_gating.png' });
+    { const _b = await page.locator('#wiz_wcs').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/wcs_gating.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // restore the default post ('auto') + M350 gating for other specs
     await page.evaluate(async () => { const { setActivePostId } = await import('/wizards/dialects/index.js'); const { applyPostGating } = await import('/ui/postGating.js'); setActivePostId('auto'); applyPostGating(); });
     console.log('WCS GATING: M350=' + JSON.stringify(m350) + ' rs274=' + JSON.stringify(rs274) + ' v41=' + JSON.stringify(v41) + ' dm500=' + JSON.stringify(dm500));

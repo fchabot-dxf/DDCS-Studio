@@ -97,8 +97,7 @@ test('E5 DRIVE: Centreline opens IN-PLACE — non-empty form + the 3D sim render
         await page.click('#wiz_user .wiz-viz3d .pp-mtoggle');   // back to 3D
         await page.waitForTimeout(200);
     }
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/rotary_center_e5_inplace.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/rotary_center_e5_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // (6) FIT → the advanced label surfaces
     const fitAdvanced = await page.evaluate(() => {
         const sel = document.querySelector('#wiz_user_form [data-param="method"]');

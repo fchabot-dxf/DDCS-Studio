@@ -54,5 +54,5 @@ test('the alignment Layout has 2 draggable handles: A drag → the ax/ay anchor 
     expect(spanAfter, `B drag → the span field changed (${spanBefore} → ${spanAfter})`).not.toBe(spanBefore);
     expect(spanAfter, 'B drag grew the span (dragged toward the far X edge)').toBeGreaterThan(spanBefore);
     expect(Number.isFinite(recSpan) && recSpan === spanAfter, 'the recorded span == the field (one source)').toBe(true);
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/alignment_fork1_handles.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_fork1_handles.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
 });

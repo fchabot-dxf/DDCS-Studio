@@ -16,6 +16,7 @@ import { axisSpan, declaredHomeEdgeSide } from '../../engine/limitSwitches.js'; 
 import { partZeroShift } from '../../viz/sceneFrame.js';   // t586 PREVIEW-PARITY E2c — THE ONE frame source: the layout stock rides part-zero (the stock PIN) exactly like the 3D, no local WCS math
 import { BLOCKS } from './index.js';   // t708 — the block-def registry (type → def), to resolve an atom's DECLARED previewGeometry
 import { builderOf } from '../../blocks/opBuilders.js';   // t708 — build the op's stack to find its geometry atom + its live params
+import { getUserPreviewGeometry } from '../../blocks/userOps.js';   // t712 — a twin's DECLARED preview-geometry hook (slot/contour per-feature handles)
 
 // t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
 // settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
@@ -115,6 +116,11 @@ function _flattenStack(blocks, out = []) {
 }
 function _previewGeometryOf(def, params) {
     try {
+        // TWIN-LEVEL hook first (slot/contour): the twin declares previewGeometry over its OWN param names — sidesteps the
+        // atom-field↔twin-param rename (slot ax↔x0) + contour's cross-atom position (shape on filltext, origin on placement).
+        const tw = def && def.opType && getUserPreviewGeometry(def.opType);
+        if (tw) { const g = tw(params); if (g && (Array.isArray(g.paths) || Array.isArray(g.handles))) return g; }
+        // ELSE atom-level hook (text): the geometry atom declares it (params == atom keys); build the stack to reach it.
         const bo = def && def.opType && builderOf(def.opType);
         const atoms = _flattenStack(bo ? bo(params) : (def && def.template) || []);
         const a = atoms.find((b) => b && b.type && BLOCKS[b.type] && typeof BLOCKS[b.type].previewGeometry === 'function');

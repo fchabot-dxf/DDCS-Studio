@@ -44,9 +44,9 @@ test('(3) I/O-step Input: Result-var + Timeout are HIDDEN on a DDCS post, SHOWN 
         });
     };
     const expert = await visOn('ddcs-expert-m350');
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/io_step_input_expert.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/io_step_input_expert.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     const rs274 = await visOn('rs274ngc');
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/io_step_input_rs274.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/io_step_input_rs274.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // emit unchanged (visibility only) — the hidden fields still read their values
     const emit = await page.evaluate(async () => {
         const { ioStepStackResolved } = await import('/wizards/ioStepWizard.js');

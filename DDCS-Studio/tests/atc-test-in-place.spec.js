@@ -54,8 +54,7 @@ test('DRIVE: ATC Test opens IN-PLACE — both modes render their fields + the em
         const canvas = document.querySelector('#wiz_user canvas');
         return { params: [...new Set(params)], code, hasViz: !!canvas };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_test_inplace_drawbar.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_test_inplace_drawbar.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // switch to POCKETS mode via the segmented widget → the emit unrolls the 3 taught pockets
     await page.click('.seg-control[data-param="mode"] button[data-value="pockets"]');
     await page.waitForTimeout(500);
@@ -64,8 +63,7 @@ test('DRIVE: ATC Test opens IN-PLACE — both modes render their fields + the em
         const canvas = document.querySelector('#wiz_user canvas');
         return { code, hasViz: !!canvas };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_test_inplace_pockets.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_test_inplace_pockets.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // the form fields ARE the def params (mode + drawbar + pockets)
     for (const p of ['mode', 'cycles', 'dwellMs', 'first', 'count', 'zClear', 'descend']) {
         expect(drawbar.params.includes(p), `the in-place form renders the "${p}" knob (a def param)`).toBe(true);

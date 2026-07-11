@@ -32,6 +32,14 @@ export function getUserStatusHint(opType) { return USER_STATUS_HINT.get(opType) 
 const USER_SIM_GCODE = new Map();
 export function setUserSimGcode(opType, fn) { if (typeof fn === 'function') USER_SIM_GCODE.set(opType, fn); else USER_SIM_GCODE.delete(opType); }
 export function getUserSimGcode(opType) { return USER_SIM_GCODE.get(opType) || null; }
+// t712 — the DECLARED preview-geometry registry (a LIVE fn per op, re-attached from the seed like statusHint). `(resolved
+// twin params) → { paths:[{pts,cls}], handles:[canvasWidget decls] }`: a twin declares the REAL vector geometry + drag
+// handles its 2D layout should render — slot's A/B/width, contour's shape size/pos PER KIND — keyed by its OWN param names
+// (so it sidesteps the atom-field↔twin-param rename + contour's cross-atom position, which the atom-level hook can't). The
+// generic layoutSpecFromOp renders whatever it declares (declare-not-infer, the same seam text's atom-level hook rides).
+const USER_PREVIEW_GEOMETRY = new Map();
+export function setUserPreviewGeometry(opType, fn) { if (typeof fn === 'function') USER_PREVIEW_GEOMETRY.set(opType, fn); else USER_PREVIEW_GEOMETRY.delete(opType); }
+export function getUserPreviewGeometry(opType) { return USER_PREVIEW_GEOMETRY.get(opType) || null; }
 import { deriveBindings } from './dataOps/deriveBindings.js';   // re-derive binding indices BY IDENTITY after prune (guarded templates shift per state)
 
 const STORE_KEY = 'ddcs_user_ops';
@@ -534,6 +542,7 @@ export function registerUserOp(def) {
     setUserDeriveGuards(def.opType, def.deriveGuards);   // t469 — a DECLARED derive-guards hook (pocket _tooSmall from geometry); a LIVE fn (re-attached from the seed), injected before prune
     setUserStatusHint(def.opType, def.statusHint);   // t554 — a DECLARED in-place status HINT (homing's unset-travel warning); a LIVE fn (re-attached from the seed, like the others)
     setUserSimGcode(def.opType, def.simGcode);   // t566 — a DECLARED sim-gcode override (the ATC change choreography); a LIVE fn (re-attached from the seed, like the others)
+    setUserPreviewGeometry(def.opType, def.previewGeometry);   // t712 — a DECLARED preview-geometry hook (slot/contour per-feature 2D handles); a LIVE fn (re-attached from the seed, like the others)
     return def;
 }
 

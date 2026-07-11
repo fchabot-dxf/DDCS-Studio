@@ -109,7 +109,7 @@ test('the twin marker DRAG (2D→3D flow): the drag moves A and the 3D trace FOL
     // not origin. (The trace head vs marker A differ only by the probe APPROACH offset — alignment geometry, not the bug.)
     expect(r.minO, 'twin after a real DRAG (2D→3D): NO trace vertex at the origin (the fix holds)').toBeGreaterThan(10);
     expect(fromOrigin(r.head), 'the TRACE head is near the fence (off-origin) after the drag').toBeGreaterThan(10);
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/alignment_fresh_seat.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_fresh_seat.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
 });
 
 test('NEGATIVE CONTROL: homing (machine-frame) trace head still coincides with its seated tool — unchanged', async ({ page }) => {

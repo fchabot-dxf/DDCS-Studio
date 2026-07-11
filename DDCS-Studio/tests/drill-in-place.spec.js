@@ -77,7 +77,7 @@ test('DRIVE THE APP: Drill opens IN-PLACE with a NON-EMPTY form (the emit-only t
             vizEls: canvas ? 1 : 0,
         };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/drill_inplace.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/drill_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     expect(form.fieldCount, 'the in-place form is NOT empty — the emit-only twin renders its knobs').toBeGreaterThan(5);
     expect(form.hasPattern, 'the pattern knob renders').toBe(true);
     expect(form.hasDepth, 'the depth knob renders').toBe(true);

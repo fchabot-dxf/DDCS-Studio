@@ -16,6 +16,8 @@
  */
 import { contourStack } from '../../wizards/contourWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { regionDesc } from '../../wizards/ops/region.js';      // t712 — the true boundary ring (polygon/ellipse) for the 2D preview
+import { contourRegion } from '../../wizards/ops/contour.js';  // t712 — the OFFSET toolpath (tool-centre) so the 2D matches the cut
 
 /** Author defaults — match contourStack's num() fallbacks + the built-in Contour form defaults. Geometry is local-0-based
  *  (originX/originY ride the placement). All 4 shape dims present; the contourfill atom picks w×h vs dia+sides by shape. */
@@ -74,6 +76,40 @@ export const CONTOUR_BINDINGS = CONTOUR_EXEC_BINDINGS.map((b) => ({ ...b, blockI
 
 export const CONTOUR_DATA_OPTYPE = 'user_contour_data';
 
+const _n = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+/** The region params for the current shape (mirrors the built-in contourView.regionParams): rect/ellipse = corner/centre
+ *  + size, circle/polygon = centre + Ø. Origin owned by the placement (originX/originY) — the pos handle writes those. */
+function _regionParams(p) {
+    const ox = _n(p.originX, 0), oy = _n(p.originY, 0);
+    if (p.shape === 'circle') return { shape: 'circle', x: ox, y: oy, w: _n(p.dia, 50) };
+    if (p.shape === 'polygon') return { shape: 'polygon', x: ox, y: oy, w: _n(p.dia, 50), sides: _n(p.sides, 6) };
+    if (p.shape === 'ellipse') return { shape: 'ellipse', x: ox, y: oy, w: _n(p.w, 80), h: _n(p.h, 60) };
+    return { shape: 'rect', x: ox, y: oy, w: _n(p.w, 80), h: _n(p.h, 60) };
+}
+/** t712 — DECLARED preview geometry (twin-level, own param names). The MULTISHAPE is solved by DECLARATION, not by
+ *  layoutSpecFromOp guessing: the twin KNOWS p.shape, so it returns the right boundary + size-handle FOR THAT KIND. The
+ *  boundary ring + the OFFSET toolpath (what's cut) come from the SAME kernels the emit uses → the 2D can't diverge from
+ *  the G-code. Handles write the TWIN params (originX/originY pos; w/h or dia size). Preview-side → emit unaffected. */
+export function contourPreviewGeometry(p) {
+    const ox = _n(p.originX, 0), oy = _n(p.originY, 0), shape = p.shape || 'rect';
+    const rp = _regionParams(p);
+    const brg = regionDesc(rp);
+    const paths = [], handles = [{ type: 'point', id: 'ct_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos' }];
+    // the BOUNDARY you type (a closed guide ring, straight from the region kernel — correct for every shape)
+    for (const ring of (brg.contour || [])) { if (ring && ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-guide' }); }
+    // the OFFSET toolpath (tool-centre) — the SAME contourRegion the emit folds, so 2D == cut
+    try { const rg = contourRegion({ region: brg, side: p.side || 'outside', tool: _n(p.toolDia, 6) }); for (const ring of (rg.contour || [])) { if (ring && ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-path' }); } } catch (_) { /* degenerate size → skip the offset ring */ }
+    // the SIZE handle, PER KIND (declared, not sniffed): circle/polygon → radial Ø; rect/ellipse → rect W×H (ellipse = half-extent)
+    if (shape === 'circle' || shape === 'polygon') {
+        handles.push({ type: 'radial', id: 'ct_size', field: 'dia', cx: ox, cy: oy, r: _n(p.dia, 50) / 2, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+    } else if (shape === 'ellipse') {
+        handles.push({ type: 'rect', id: 'ct_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: _n(p.w, 80) / 2, ey: _n(p.h, 60) / 2, sx: 0.5, sy: 0.5, minw: 1, minh: 1, label: 'W×H' });
+    } else {
+        handles.push({ type: 'rect', id: 'ct_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: _n(p.w, 80), ey: _n(p.h, 60), sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' });
+    }
+    return { paths, handles };
+}
+
 /** Build the contour-as-data def — a fresh { opType, label, template, bindings } ready for registerUserOp. The template is
  *  contourStack(CONTOUR_DEFAULTS) (== BUILDERS(defaults), the canonical valid-by-construction stack); the hand-authored
  *  BINDINGS map is the independent artifact, proven byte-identical + binding-wiring by tests/contour-data-emit.spec.js. */
@@ -83,11 +119,13 @@ export function contourDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d' } },   // t702 preview sweep — drill/bore parity: the shared 3D panel (play/carve + its own 2D toolpath-from-above toggle + draggable start), not the near-empty form2d layout
+            { type: 'panel', params: { panel: 'form3d+2d' } },   // t712 — the 3D toolpath/carve AND the FeatureCanvas 2D with the real shape boundary + offset toolpath + pos/size handles (previewGeometry)
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Contour' }, children: [] },
         ],
         children: exec,
     }];
-    return userOpFromStack('contour_data', 'Contour (data)', stack, CONTOUR_BINDINGS, 'form3d', null, 'mill_datawiz');
+    const def = userOpFromStack('contour_data', 'Contour (data)', stack, CONTOUR_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    def.previewGeometry = contourPreviewGeometry;   // t712 — per-feature 2D handles (pos + shape size per kind) via the declared hook
+    return def;
 }

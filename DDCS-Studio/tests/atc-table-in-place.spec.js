@@ -46,7 +46,7 @@ test('DRIVE: Tool Table opens IN-PLACE — the two include toggles + the Edit-ta
         const code = (document.getElementById('wiz_user_code') || {}).textContent || '';
         return { params, hasEditBtn: !!(editBtn && editBtn.textContent.includes('Edit')), code, hasViz: !!document.querySelector('#wiz_user canvas') };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_table_inplace.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_table_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     expect(r.params.includes('includeLengths'), 'the "Write tool lengths" toggle renders').toBe(true);
     expect(r.params.includes('includePockets'), 'the "Write pocket positions" toggle renders').toBe(true);
     expect(r.hasEditBtn, 'the "Edit table…" action button renders (no second table editor)').toBe(true);

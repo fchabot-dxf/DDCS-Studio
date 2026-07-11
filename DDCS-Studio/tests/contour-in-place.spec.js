@@ -47,8 +47,7 @@ test('E1 DRIVE: Contour opens IN-PLACE with a NON-EMPTY, correct form + the 2D l
             hasViz: !!canvas,
         };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/contour_e1_inplace.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/contour_e1_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('E1 IN-PLACE FORM: ' + form.fieldCount + ' fields → ' + form.params.join(', ') + ' | viz=' + form.hasViz);
     expect(form.fieldCount, 'the in-place form is NOT empty (the drill-flat-form lesson)').toBeGreaterThan(8);
     expect(form.hasShape && form.hasSide && form.hasW && form.hasTool && form.hasDepth, 'the shape/side/width/tool/depth knobs render').toBe(true);

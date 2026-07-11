@@ -21,7 +21,7 @@ test('the Edge field shows High/Low on a DDCS post and all 4 on RS274; emit unch
             const onBtn = seg ? (seg.querySelector('.seg-btn.seg-on') || {}).textContent : null;
             return { btns, onBtn: onBtn ? onBtn.trim() : null };
         });
-        if (shotName) await page.locator('#wiz_user').screenshot({ path: shotName });
+        if (shotName) { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: shotName, clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
         return res;
     };
 

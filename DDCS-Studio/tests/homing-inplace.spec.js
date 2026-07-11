@@ -10,7 +10,7 @@ test.use({ viewport: { width: 1300, height: 950 } });
 
 async function openHomingInPlace(page, z) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });   // t712 — boot gate, own budget
     await page.evaluate((z) => {
         const s = window.ddcsGetSettings();
         s.machine = { x: 600, y: 400, z, show: false, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } };   // show OFF — the box must still force
@@ -29,7 +29,7 @@ async function openHomingInPlace(page, z) {
 
 test('the Homing slot opensAs the twin: opens in-place (plain title, twin hidden), the run ticks + a G31 code preview', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram);
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram, null, { timeout: 15000 });   // t712 — boot gate, own budget
     const wired = await page.evaluate(async () => {
         const WL = await import('/blocks/wizardLibrary.js');
         const { listUserOps } = await import('/blocks/userOps.js');
@@ -50,7 +50,7 @@ test('the Homing slot opensAs the twin: opens in-place (plain title, twin hidden
     expect(form.ticks.length, 'the run-form shows per-axis run ticks').toBeGreaterThanOrEqual(3);
     expect(form.hasG31, 'the code preview shows the REAL G31 emit').toBe(true);
     expect(form.isProxy, 'NOT a proxy — the real emit').toBe(false);
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/homing_inplace_form.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_inplace_form.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
 });
 
 for (const z of [500, -120]) {
@@ -71,6 +71,6 @@ for (const z of [500, -120]) {
         const endZ = await page.evaluate(() => +window.ddcsStudio.wizardManager._activePanel.engine.pos.z.toFixed(1));
         const topBackoff = z > 0 ? z - 5 : -5;
         expect(Math.abs(endZ - topBackoff) < 2, `the played tool homes to the top-backoff (~${topBackoff}), got ${endZ}`).toBe(true);
-        if (z === 500) await page.locator('#wiz_user').screenshot({ path: 'scratchpad/homing_inplace_running.png' });
+        if (z === 500) { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_inplace_running.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     });
 }

@@ -41,7 +41,7 @@ test('DRIVE: Bore opens IN-PLACE with a NON-EMPTY, correct form + the 3D renders
             hasViz: !!canvas,
         };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/bore_inplace.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/bore_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('BORE IN-PLACE FORM: ' + form.fieldCount + ' fields → ' + form.params.join(', ') + ' | viz=' + form.hasViz);
     expect(form.fieldCount, 'the in-place form is NOT empty').toBeGreaterThan(8);
     expect(form.hasHoleDia && form.hasToolDia && form.hasPitch && form.hasDepth && form.hasPattern, 'the bore knobs (holeDia/toolDia/pitch/depth/pattern) render').toBe(true);

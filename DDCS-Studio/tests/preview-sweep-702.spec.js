@@ -80,7 +80,7 @@ for (const { opType, name, minSpan } of [
         // toolpath must have a meaningful bounding span in at least one axis.
         expect(Math.max(st.bboxW, st.bboxH), `${name}: the toolpath spans the op extent`).toBeGreaterThan(minSpan);
         expect(st.starts, `${name}: a draggable start/placement marker exists`).toBeGreaterThan(0);
-        await page.locator('#wiz_user').screenshot({ path: `scratchpad/preview-sweep-${name}-after.png` });
+        { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: `scratchpad/preview-sweep-${name}-after.png`, clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     });
 
     test(`${name} twin: the 3D preview PLAYS (engine runs)`, async ({ page }) => {

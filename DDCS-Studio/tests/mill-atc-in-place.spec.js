@@ -66,7 +66,7 @@ for (const c of CFG) {
             const viz = document.querySelector('#wiz_user canvas, #wiz_user svg');   // 3D WebGL canvas OR 2D SVG
             return { fieldCount: params.length, params, hasViz: !!viz };
         });
-        await page.locator('#wiz_user').screenshot({ path: `scratchpad/inplace_${c.id}.png` });
+        { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: `scratchpad/inplace_${c.id}.png`, clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
         expect(r.fieldCount, `${c.id}: the in-place form is NON-EMPTY (the emit-only twin renders its knobs)`).toBeGreaterThan(0);
         expect(r.hasViz, `${c.id}: the sim/preview pane renders`).toBe(true);
         console.log(`IN-PLACE ${c.id}: ${r.fieldCount} fields → ${r.params.join(', ')}`);

@@ -67,7 +67,7 @@ test('DRIVE the real Middle probe in-place (Pocket + Probe-Z-First) → the 3D p
         const floorWorld = (viz._pocketFloors && viz._pocketFloors[0]) ? viz._pocketFloors[0].floorZ : null;
         return { minProbeZ: Number.isFinite(minZ) ? minZ : null, floorWorld };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/zfirst_probe_floor.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/zfirst_probe_floor.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('Z-FIRST WIZARD DRIVE: ' + JSON.stringify({ set, touch }));
     expect(set.hasFt && set.hasZf, 'the Middle form has Feature + Probe-Z-First controls').toBe(true);
 });

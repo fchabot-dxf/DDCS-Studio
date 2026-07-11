@@ -132,7 +132,7 @@ test('DRIVE THE APP: the rotary Centreline twin opens IN-PLACE with the 2D layou
         const datum = document.querySelector('#wiz_user .fc-rotary-datum');
         return { hasAxis: !!axis, hasDatum: !!datum };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/rotary_center_glyph.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/rotary_center_glyph.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('ROTARY CENTER 2D DRIVE: ' + JSON.stringify(glyph));
     expect(glyph.hasAxis, 'the rotary bar centreline glyph renders in the real 2D layout pane').toBe(true);
     expect(glyph.hasDatum, 'the rotary datum dot renders in the real 2D layout pane').toBe(true);

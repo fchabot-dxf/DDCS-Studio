@@ -51,8 +51,7 @@ test('a REAL drag past the stock edge writes a fraction >1, bounded by the machi
         const s = opSimStarts('user_alignment_data', getLastOp().params, window.ddcsGetSettings().stock) || [];
         return s[0] ? { x: s[0].x, y: s[0].y } : null;
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/alignment_handle_outside_stock.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_handle_outside_stock.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('dragged-past-stock: ax=' + (rec && rec.ax) + ' markA.x=' + (markA && markA.x) + ' (stock 200, envelope 220)');
     expect(rec && rec.type).toBe('user_alignment_data');
     expect(rec.ax, 'the drag wrote a fraction >1 — the handle EXITED the stock (past the 200mm edge)').toBeGreaterThan(1);

@@ -46,7 +46,7 @@ test('an unset axis travel shows the in-place unset-travel HINT (the t540 behavi
     const status = await page.evaluate(() => { const el = document.getElementById('userVizStatus'); return el ? el.textContent : ''; });
     expect(status.toLowerCase(), 'the panel status shows the unset-travel hint for Z').toContain('set z');
     expect(status.toLowerCase()).toContain('travel');
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/homing_inplace_unset_hint.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_inplace_unset_hint.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
 });
 
 test('the completed in-place homing: form + 3D + the 2D MACHINE layout (envelope + home + Start) — screenshot', async ({ page }) => {
@@ -62,7 +62,7 @@ test('the completed in-place homing: form + 3D + the 2D MACHINE layout (envelope
     await page.evaluate(() => { const host = document.getElementById('userViz3dContainer').parentElement.querySelector('.wiz-viz3d'); const run = host.querySelector('.pp-run'); if (run) run.click(); const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.engine) p.engine.simSpeed = 60; });
     await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine && !p.engine.running; }, null, { timeout: 25000 });
     await page.waitForTimeout(200);
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/homing_inplace_complete.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_inplace_complete.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // the 2D is the machine frame (a HOME glyph text is present in the layout SVG)
     const hasHome = await page.evaluate(() => /HOME/.test((document.querySelector('#userVizContainer') || {}).textContent || '') || [...document.querySelectorAll('#userVizContainer text')].some((t) => /HOME/.test(t.textContent)));
     expect(hasHome, 'the 2D machine layout shows the HOME glyph label').toBe(true);

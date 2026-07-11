@@ -82,8 +82,7 @@ test('② diagAim: the in-place Middle shows the ② handle for boss+probe-both+
       untouched21: (twin.split('\n').find((l) => /^#21=/.test(l)) || ''),
     };
   });
-  await page.locator('#wiz_user').screenshot({ path: 'scratchpad/middle_diagaim_preview.png' });
-
+  { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/middle_diagaim_preview.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
   expect(r.hasAim, 'the ② diagonal-aim handle appears in the 2D canvas for boss + probe-both + trans-axis auto').toBe(true);
   expect(r.aimLabel, 'the handle is labelled ②').toBe('②');
   expect(r.liveAim, 'the ② handle renders in the LIVE 2D canvas (the configured in-place Middle form)').toBe(true);

@@ -60,7 +60,7 @@ for (const checkAxis of ['X', 'Y']) for (const probeDir of ['pos', 'neg']) {
         }
         // 3) marker B == the route's B (the +15 offset is GONE — B rides A's approach line)
         expect(Math.hypot(r.routeB.x - r.markerB.x, r.routeB.y - r.markerB.y), `marker B (${JSON.stringify(r.markerB)}) == route B (${JSON.stringify(r.routeB)})`).toBeLessThan(0.6);
-        await page.locator('#wiz_user').screenshot({ path: `scratchpad/alignment_combo_${checkAxis}${probeDir}.png` });
+        { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: `scratchpad/alignment_combo_${checkAxis}${probeDir}.png`, clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
         console.log(`${checkAxis}/${probeDir}: markers outside ✓, ${r.legs.length} legs at face ${F.face} ✓, markerB==routeB ✓`);
     });
 }

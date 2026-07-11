@@ -56,13 +56,11 @@ test('DRIVE: Tool Change opens IN-PLACE — the per-method field gating matches 
 
     // m6 (default): callMacro hidden (not auto), z hidden (not manual), orient hidden (not firmware); zClear/fixedT NOT greyed
     const m6 = { callMacro: await rowShown('callMacro'), z: await rowShown('z'), orient: await rowShown('orient'), zClearGated: await gated('zClear'), fixedTGated: await gated('fixedT'), code: await code(), hasViz: await page.evaluate(() => !!document.querySelector('#wiz_user canvas')) };
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_change_inplace_m6.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_change_inplace_m6.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // manual: z shown, zClear shown+not-greyed, callMacro hidden, orient hidden
     await setMethod('manual');
     const manual = { z: await rowShown('z'), zClearGated: await gated('zClear'), callMacro: await rowShown('callMacro'), code: await code() };
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_change_inplace_manual.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_change_inplace_manual.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // generic + callMacro (default true): callMacro shown, zClear GREYED (auto), fixedT NOT greyed (callMacro on)
     await setMethod('generic');
     const generic = { callMacro: await rowShown('callMacro'), zClearGated: await gated('zClear'), fixedTGated: await gated('fixedT'), code: await code() };
@@ -70,8 +68,7 @@ test('DRIVE: Tool Change opens IN-PLACE — the per-method field gating matches 
     await page.evaluate(() => { const c = document.querySelector('#wiz_user_form [data-param="callMacro"]'); c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); });
     await page.waitForTimeout(300);
     const genericInline = { fixedTGated: await gated('fixedT'), code: await code() };
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_change_inplace_generic.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_change_inplace_generic.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // m6 assertions
     expect(m6.callMacro, 'm6: callMacro hidden (only automatic methods)').toBe(false);
     expect(m6.z, 'm6: Park Z hidden (manual only)').toBe(false);

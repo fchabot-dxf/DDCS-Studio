@@ -36,8 +36,7 @@ test('typing the A→B span moves handle B (one source: field ↔ marker) + the 
     expect(Number.isFinite(b30) && Number.isFinite(b90), 'marker B resolves for both spans').toBe(true);
     expect(b90 - b30, 'typing span 30→90 moves marker B +60mm along X (the field drives the marker)').toBeCloseTo(60, 0);
 
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/alignment_span_handles_form.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_span_handles_form.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // the AUTO emit: probe A IN PLACE (no travel/Confirm) + the relative span jog (#73) to B
     const emit = await page.evaluate(async () => {
         const { alignmentStack } = await import('/wizards/alignmentWizard.js');

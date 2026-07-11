@@ -74,7 +74,7 @@ test('DRIVE: ATC Tool Check opens IN-PLACE with a NON-EMPTY form (incl. toleranc
         const canvas = document.querySelector('#wiz_user canvas');
         return { fieldCount: params.length, params, hasViz: !!canvas };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/atc_check_inplace.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/atc_check_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     expect(r.fieldCount, 'the in-place form renders its 8 knobs').toBeGreaterThan(5);
     expect(r.params.includes('tolerance'), 'the Tolerance knob renders (the check-specific param)').toBe(true);
     expect(r.hasViz, 'the 3D machine-frame sim renders').toBe(true);

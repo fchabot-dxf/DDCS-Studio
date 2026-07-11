@@ -131,7 +131,7 @@ test('DRIVE THE APP: the draggable point renders on featureCanvas + the fx/fy fi
             svgEls: svg ? svg.querySelectorAll('*').length : 0, handles,
         };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/pointpick_pilot.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/pointpick_pilot.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     expect(live.hasPx, 'the fx/fy fields (px/py) render in the form').toBe(true);
     expect(live.hasPy).toBe(true);
     expect(live.pxVal, 'px seeds the authored default').toBe('40');

@@ -51,8 +51,7 @@ test('E3 DRIVE: Comm opens IN-PLACE — the comm fields render + the DDCS-screen
         };
     });
 
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/comm_e3_inplace.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/comm_e3_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('E3 IN-PLACE FORM: ' + form.fieldCount + ' fields → ' + form.params.join(', ') + ' | ' + JSON.stringify({ previewHasDialog: form.previewHasDialog, legacyModalHidden: form.legacyModalHidden }));
     expect(form.fieldCount, 'the in-place form is NOT empty').toBeGreaterThan(3);
     expect(form.hasType && form.hasMsg && form.hasPopupMode, 'the type / msg / popupMode comm knobs render').toBe(true);

@@ -86,6 +86,6 @@ test('E2 screenshot: the middle preview renders the per-pass markers', async ({ 
     window.ddcsStudio.wizardManager.update();
   });
   await page.waitForTimeout(600);   // let the 3D preview rebuild + the markers place
-  await page.locator('#wiz_middle').screenshot({ path: 'scratchpad/middle_e2_preview.png' });
+  { const _b = await page.locator('#wiz_middle').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/middle_e2_preview.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
   await expect(page.locator('#wiz_middle'), 'the middle wizard preview is visible').toBeVisible();
 });

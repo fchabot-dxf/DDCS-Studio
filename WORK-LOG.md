@@ -9778,3 +9778,63 @@ Diagnosed each flake (2 recon passes + a config read), fixed the true signal per
 - REFINEMENT caught mid-proof: a FIRST 2× attempt had run-1 green but run-2 fail at blocks-mobile L99 — a SECOND race in the same test (the resize-strip drag). Root: my initial overlap-wait settled the drawer EARLY (as soon as it covered the hit-test point), but the .25s slide was still animating, so the resize-strip (which rides the drawer top) was still MOVING when grabbed → the drag missed. Fixed by waiting for the drawer to FULLY SETTLE: covering-the-point AND two consecutive equal `top` reads (the covering gate rules out a start false-positive). Also made the resize height-check await the real grow, not a fixed sleep. Re-verified: blocks-mobile alone at repeat-each=4/w=4 green; the set repeat-each=3 green; the 2× full suite green (above).
 
 ### FILES: tests/op-params-complete.spec.js (decompose) · tests/header-profile-menu.spec.js · tests/blocks-mobile-drawers.spec.js · tests/hand-built-form.spec.js · tests/homing-declared-home.spec.js · tests/homing-io-ui-cleanup.spec.js · tests/homing-preview-machine-frame.spec.js · + 8 more homing/io specs (systemic clip conversion: homing-declared-direction, homing-drive, homing-g31-output, homing-preview-package, homing-preview-plays-real-emit, homing-simple-emit, homing-start-marker, homing-start-marker-frame, io-home-backfill)
+
+---
+
+## t712 — (1) PREVIEW-CONFIG AUDIT (scout, deliverable) + (2) SLOT/CONTOUR per-feature 2D handles (build)
+
+### PART 1 — THE PREVIEW-CONFIG AUDIT (no consolidation code; the advisor rules the consolidation next turn)
+Two recon passes (built-in views + twin/shared surfaces). **HEADLINE (both agree):** NO surface does its own FRAME, PANEL, or CARVE — every toolpath surface routes through the ONE createPreviewPanel (→ sceneFrame.partZeroShift/wcsOffsetAt + the ONE simConfig() + auto-carve on hasCut). So the frame/config/carve have NOT diverged. **100% of the divergence is the START/SEAT/INTENT arguments** — built-in views set intent IMPERATIVELY (`previewSeatAtStart/previewMachine/previewToolMachineFrame/previewRotaryFixture(true)`) while the data-twins set the SAME intent DECLARATIVELY (opSimContext / def.sim). Two parallel encodings of one fact = the alignment-seat-bug CLASS.
+
+**SURFACE MAP** (surface | panel | frame | simConfig | START/SEAT source | carve | divergence):
+| Surface | panel | frame | simConfig | START / SEAT | carve | diverge |
+|---|---|---|---|---|---|---|
+| Twin `form3d+2d` (userOpView) | createPreviewPanel + FeatureCanvas | sceneFrame | the one | opSimStarts + DECLARED opSimContext (applySimIntent) | on | **REFERENCE** (fully declared) |
+| Twin `form3d` | createPreviewPanel | sceneFrame | the one | START passed `null,null` → opSimStarts SKIPPED; seat declared | on | skips per-pass markers (latent) |
+| Twin `form2d` | none (renderLayout2D only) | sceneFrame(2D) | none | opSimStarts fallback in layoutSpecFromOp | OFF | no 3D/engine/carve (static) |
+| Twin `commscreen` | none (HTML mock) | — | — | — | off | by design |
+| **Editor preview** (gcodePreviewTab) | createPreviewPanel | sceneFrame | the one | opSimStarts program-wide; **NO opSimContext intent applied** | on | **HIGH** — no seat/machine/rig/magazine |
+| **Blocks preview** (blocksApp) | createPreviewPanel | sceneFrame | the one | **legacy WIZARDS[t].inferStart** (no hints); only setRotaryFixture | on | **HIGH** — wrong start source + under-applies intent |
+| Stock-modal | own GcodeViz3D (setStock only) | local/origin | none | none | off | LOW (private frame, by design) |
+| Built-in cutting views (drill/slot/pocket/contour/surfacing/text) | createPreviewPanel + FeatureCanvas | sceneFrame | the one | no start/seat (absolute) | on | NONE |
+| Built-in probe (edge/middle/rotary_center) | createPreviewPanel | sceneFrame | the one | inferStart(s)→opSimStarts | off | edge: start in wizard not registry (minor) |
+| **rotaryClockView** | createPreviewPanel | sceneFrame | the one | **inferStart ONLY (omits inferStarts)** | off | **HIGH** — drops the B (span) pass marker |
+| **alignmentView** | createPreviewPanel | sceneFrame | the one | inferStart(s) + **hard-coded previewSeatAtStart(true)** | off | **HIGH** — the EXEMPLAR seat bug (declared twice) |
+| homingView | createPreviewPanel | sceneFrame | the one | mid-envelope start + hand-rolled previewMachine+previewToolMachineFrame | on | consistent w/ twin (but double-declared) |
+| atc views (length/check/warmup/change/table/test) | createPreviewPanel | sceneFrame | the one | previewMachine(±magazine/±toolMachine) | off | **MED** — change/table/test omit previewToolMachineFrame (wrong tool frame); warmup omits magazine |
+
+**RANKED DIVERGENCES:**
+1. **Editor preview applies NO opSimContext intent** (gcodePreviewTab never calls setForceMachine/ToolMachineFrame/SeatAtStart/RotaryFixture/Magazine) — **HIGH**, widest (whole-program surface): homing rides the part-frame (the watched plunge), alignment draws from origin, rotary shows no rig, ATC no envelope/magazine.
+2. **Blocks preview under-applies intent + wrong start** (blocksApp uses legacy WIZARDS[t].inferStart, no getStartHints; applies only setRotaryFixture) — **HIGH**: ATC/homing/alignment render with wrong frame + a DIFFERENT start than the editor for the same program.
+3. **Alignment seat declared TWICE** (alignmentView:78 hard-codes previewSeatAtStart(true); opSimContext('alignment').seatAtStart===false — the seat lives ONLY on the twin via def.sim{seatStart}) — **HIGH** (the exemplar; latent re-regression of the t674 origin-draw bug the instant the view is migrated to read the registry).
+4. **rotaryClockView drops the B pass marker** (rotaryClockView:60 passes inferStart only, omits inferStarts; opSimStarts('rotary_clock') declares 2 passes; the twin declares 2 A/B handles) — **HIGH**: the built-in shows/animates ONE start, the twin TWO. The closest live sibling of the alignment bug.
+5. **ATC change/table/test render the tool in the WRONG frame** (previewMachine but NOT previewToolMachineFrame; the twins declare toolMachine:true → seat + machine-frame tool) — **MED**: with a stock shown, the built-in draws the tool stock-floor-shifted (the t497 plunge class).
+6. **programSimContext is a LOSSY union** (opSimContext:75-83 returns only {showRotaryRig, forceMachine, showMagazine} — DROPS toolMachineFrame + seatAtStart) — **MED**, the STRUCTURAL blocker: even a willing editor/Blocks caller can't get seat/machine-frame from the declared multi-op seam.
+7. **applySimIntent honors only toolMachineFrame, never plain forceMachine** (userOpView:285-300) — **MED**: a forceMachine-only twin (atc_length/check/warmup) doesn't force the envelope in-place, while its built-in view does. The inverse drift.
+8. **Twin `form3d` skips declared per-pass starts** (userOpView:373 `null,null`) — **MED** latent: a multi-pass op on the default panel shows no ①②③④.
+9. atc_warmup view shows no magazine (twin declares magazine:true) — **LOW** (cosmetic).
+10. Stock-modal private frame; carve is 3D-panel-only — **LOW** (both by construction).
+
+**CONSOLIDATION RECOMMENDATION (ranked by risk/value — the advisor rules):** the ROOT is that intent is DUAL-SOURCED (imperative view calls vs declared opSimContext). Single-source it:
+- **R-A (do first — contained, kills the named bug class): single-source opSimContext for the built-in TYPES.** Put `alignment`+the probe/ATC built-in strings into opSimContext's static seat/machineFrame/magazine sets, and migrate alignmentView + rotaryClockView + the ATC views to READ `opSimContext(type)` (via preview3D + a shared applyIntent) instead of hard-coding `preview*(true)`. This kills divergences #3 (alignment seat), #4 (rotary_clock B marker — feed opSimStarts), #5 (ATC tool frame), #9 (warmup magazine) in ONE declared table both sides read. Medium reach, high value, low broad-risk. Aligns with declare-never-infer + one-source.
+- **R-B (do with R-A — small, structural): fix programSimContext to carry ALL flags (toolMachineFrame + seatAtStart), and applySimIntent to honor plain forceMachine.** Unblocks R-C; fixes #6, #7.
+- **R-C (do after R-A/B — highest reach): the editor + Blocks previews apply opSimContext(type) intent per program op + use opSimStarts (Blocks: retire the legacy inferStart).** Fixes #1, #2, #8. Broadest surface (whole-program) → do it once the declared table (R-A) is the single source, applying per-op-in-program.
+- **R-D (no action): stock-modal + carve-2D are by design.**
+RECOMMEND ruling **R-A + R-B this next turn** (contained, retires the whole seat-bug class + the ATC/rotary divergences by single-sourcing the declared table), THEN **R-C** (the whole-program editor/Blocks intent) as a follow-up.
+
+### PART 2 — SLOT + CONTOUR per-feature 2D handles (build, via the previewGeometry hook)
+Extended the t708 previewGeometry seam to a TWIN-LEVEL hook (a new `def.previewGeometry` registry — setUserPreviewGeometry/getUserPreviewGeometry in userOps, wired by registerUserOp like statusHint/simStartsProvider). `_previewGeometryOf` (panelTypes) checks the twin registry FIRST, else the atom scan (text stays atom-level). WHY twin-level for slot/contour: the twin RENAMES the atom fields (slot ax↔x0) and contour's POSITION lives in a different atom (placeonstock offX/offY) than its SHAPE (contourfill w/h/dia) — the atom-level hook can't express either; a twin-level hook reads the twin's OWN params directly, no remap, no cross-atom problem.
+- **slotData.slotPreviewGeometry(p)**: the centreline (fc-path) + both edges (fc-guide) + A/B POINT handles (write ax/ay, bx/by) + a width projLength handle. panel form3d → **form3d+2d**.
+- **contourData.contourPreviewGeometry(p)**: the MULTISHAPE solved by DECLARATION — the twin KNOWS `p.shape`, so it returns the right boundary + size-handle FOR THAT KIND (circle/polygon → radial Ø; rect/ellipse → rect W×H) + a pos handle (originX/originY). The boundary ring + the OFFSET toolpath come from the SAME kernels the emit folds (regionDesc + contourRegion) → the 2D can't diverge from the cut. panel form3d → **form3d+2d**. This is the "solve multishape through declared geometry, not layoutSpecFromOp guessing" the t702 fork flagged.
+- Handles are PREVIEW-SIDE → emit byte-identical (slot-as-data + contour-data-emit ZERO-diff, unchanged).
+
+VERIFY (real-symptom, tests/preview-handles-712.spec.js 3/3):
+- slot: the 2D draws the slot geometry (≥3 paths) + A/B (move) + width handles; dragging A wrote ax/ay (0,0 → 37.6,−33). Screenshot preview-handles-slot.png shows A/B/width labelled handles on the real slot.
+- contour rect: boundary + offset toolpath drawn; pos + size handles; dragging pos wrote originX/originY.
+- contour multishape: rect→circle re-declared a real sampled circle ring (>8 pts, not a 4-pt rect) + kept a pos + Ø handle. Screenshot preview-handles-contour-circle.png shows the two concentric rings (boundary + tool-offset) + the 3D circular cut.
+- REGRESSION: text's ATOM-level hook still fires (text-atom-708 4/4); panel-types/contour-in-place/corner/custom-op/pocket/drill/group-canvas/slot-canvas/contour-canvas 20/20; no import cycle (boot green); slot-as-data + contour-data-emit byte-identical.
+
+### FILES: web/blocks/userOps.js (previewGeometry registry) · web/wizards/ops/panelTypes.js (twin-hook first in _previewGeometryOf) · web/blocks/dataOps/slotData.js · web/blocks/dataOps/contourData.js · tests/preview-handles-712.spec.js (new).
+
+### t712 ADDENDUM — a t710-sibling flake surfaced by the full run + the Mode A fix completed
+The full-suite run surfaced ONE failure: homing-inplace:57 (a homing-TWIN play-to-emit test NOT in the t710 set). It passes 3/3 in isolation → a CONTENTION flake of the SAME class as t710, NOT a t712 regression (homing has no previewGeometry; my change is null for it). ROOT: the t710 Mode A fix converted only `locator('#wiz_homing').screenshot`, but the TWIN previews screenshot `#wiz_user` (the GENERIC twin container — which ALSO holds the idle 3D viz → rAF-starved actionability). Completed it SYSTEMICALLY: converted all 53 `locator('#wiz_user').screenshot` (+ #wiz_middle/#wiz_wcs) across 44 specs to boundingBox()+page.screenshot({clip}), and gave homing-inplace 2 boot gates the 15s budget. VERIFY: homing-inplace + homing-inplace-e3 at repeat-each=4/w=4 = 24/24; the FULL suite re-run = 1027 passed / 0 failed / 2 skipped. All non-asserted scratchpad diagnostics → identical image, just no rAF-starvation stall.

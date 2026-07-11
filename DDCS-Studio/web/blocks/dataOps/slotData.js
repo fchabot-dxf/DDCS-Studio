@@ -114,6 +114,30 @@ export const SLOT_BINDINGS = SLOT_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: 
 
 export const SLOT_DATA_OPTYPE = 'user_slot_data';
 
+const _n = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+
+/** t712 — DECLARED preview geometry (twin-level, own param names): the slot centreline + both edges as paths, plus the
+ *  A/B endpoint POINT handles + a width projLength handle. Mirrors the built-in slotView.buildSlotSpec, but the handles
+ *  write the TWIN params (ax/ay/bx/by/width) directly — no atom-key remap. Handles are preview-side → emit unaffected. */
+export function slotPreviewGeometry(p) {
+    const ax = _n(p.ax, 0), ay = _n(p.ay, 0), bx = _n(p.bx, 60), by = _n(p.by, 0);
+    const tool = _n(p.toolDia, 6), W = Math.max(tool, _n(p.width, tool));
+    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len, mx = (ax + bx) / 2, my = (ay + by) / 2, hw = W / 2;
+    const line = (x1, y1, x2, y2, cls) => ({ pts: [{ x: x1, y: y1 }, { x: x2, y: y2 }], cls: cls || 'fc-guide' });
+    const paths = [
+        line(ax, ay, bx, by, 'fc-path'),                                              // centreline (the tool path)
+        line(ax + nx * hw, ay + ny * hw, bx + nx * hw, by + ny * hw),                 // +edge
+        line(ax - nx * hw, ay - ny * hw, bx - nx * hw, by - ny * hw),                 // −edge
+    ];
+    const handles = [
+        { type: 'point', id: 'sl_a', fx: 'ax', fy: 'ay', x: ax, y: ay, label: 'A' },
+        { type: 'point', id: 'sl_b', fx: 'bx', fy: 'by', x: bx, y: by, label: 'B' },
+        { type: 'projLength', id: 'sl_w', field: 'width', cx: mx, cy: my, nx, ny, off: hw, scale: 2, min: tool, label: 'width' },
+    ];
+    return { paths, handles };
+}
+
 /** Build the slot-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. */
 export function slotDataDef() {
     const exec = slotStack(SLOT_DEFAULTS);
@@ -121,7 +145,7 @@ export function slotDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d' } },   // t702 preview sweep — drill/bore parity: the shared 3D panel (play/carve + its own 2D toolpath-from-above toggle + draggable start), not the near-empty form2d layout
+            { type: 'panel', params: { panel: 'form3d+2d' } },   // t712 — the 3D engraving trace/carve AND the FeatureCanvas 2D with real slot geometry + A/B/width handles (previewGeometry)
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             {
                 type: 'param_group',
@@ -131,5 +155,7 @@ export function slotDataDef() {
         ],
         children: exec,
     }];
-    return userOpFromStack('slot_data', 'Slot (data)', stack, SLOT_BINDINGS, 'form3d', null, 'mill_datawiz');
+    const def = userOpFromStack('slot_data', 'Slot (data)', stack, SLOT_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    def.previewGeometry = slotPreviewGeometry;   // t712 — per-feature 2D handles (A/B endpoints + width) via the declared hook
+    return def;
 }

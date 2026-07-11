@@ -55,7 +55,7 @@ test('DRIVE: WCS opens IN-PLACE with a non-empty form (the WCS system + axes ren
         const params = [...f.querySelectorAll('[data-param]')].map((e) => e.getAttribute('data-param'));
         return { count: params.length, params, hasSys: params.includes('sys'), hasX: params.includes('axisX'), hasSync: params.includes('sync') };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/wcs_inplace.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/wcs_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('WCS FORM: ' + form.count + ' → ' + form.params.join(','));
     expect(form.count, 'the in-place form is non-empty').toBeGreaterThan(3);
     expect(form.hasSys, 'the WCS System field renders').toBe(true);

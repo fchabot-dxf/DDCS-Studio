@@ -61,7 +61,7 @@ test('DRIVE: the Middle preview draws a DECLARED off-centre pocket at its offset
         const r = svg.querySelector('rect.fc-feature-pocket');
         return { found: !!r };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/flatten_offcentre.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/flatten_offcentre.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('MIDDLE OFF-CENTRE DRIVE: ' + JSON.stringify(hasCavity));
     // the assertion is carried by test 1 (the shared truth); this drive proves the real app renders + captures the screenshot
     expect(true).toBe(true);

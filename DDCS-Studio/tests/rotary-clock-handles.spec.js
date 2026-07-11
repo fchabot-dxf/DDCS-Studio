@@ -54,8 +54,7 @@ test('2 draggable handles (A + B); dragging B sets the #6 span; typing #6 drives
     expect(Math.abs((afterDrag.bY - afterDrag.aY) - Number(afterDrag.span)), 'marker B = marker A + span (B tracks A + #6)').toBeLessThan(0.5);
     expect(Math.abs(Number(afterDrag.emit6) - Number(afterDrag.span)), 'the emitted #6 == the dragged span (the drag wrote the field)').toBeLessThan(0.001);
 
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/rotary_clock_2handles.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/rotary_clock_2handles.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // TYPING #6 still drives marker B (the field is the same one source) — set span=15, B moves to A + 15
     await page.evaluate(() => { const f = document.querySelector('#wiz_user_form [data-param="span"]'); f.value = '15'; f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true })); });
     await page.waitForTimeout(250);

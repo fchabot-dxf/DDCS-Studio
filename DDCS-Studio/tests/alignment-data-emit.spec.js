@@ -129,7 +129,7 @@ test('E2 real-symptom: the twin renders the BOX + the 2 fence starts on the prev
             fieldCount: params.length, hasCheckAxis: params.includes('checkAxis'), hasProbeDir: params.includes('probeDir'), hasSafeZ: params.includes('safeZ'), hasTolerance: params.includes('tolerance'),
         };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/alignment_e2_sim.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_e2_sim.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     expect(r.nStarts, 'the alignment declares 2 sim-starts (A + B along the fence)').toBe(2);
     expect(r.hasViz, 'the machine-frame preview renders').toBe(true);
     expect(r.stockShape, 'the sim shows a rectangular BOX (a fence probe — no round bar)').toBe('box');

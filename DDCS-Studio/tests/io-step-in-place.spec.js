@@ -51,8 +51,7 @@ test('E2 DRIVE (Expert): the mode picker + per-mode fields render; the declared-
         const opts = sel ? Array.from(sel.options).map((o) => o.textContent) : [];
         return { hasPicker: !!sel, opts, hasState: !!document.querySelector('#wiz_user_form [data-param="state"]'), inputGated: (document.querySelector('#wiz_user_form [data-param="mode"] [data-value="input"]') || {}).getAttribute ? document.querySelector('#wiz_user_form [data-param="mode"] [data-value="input"]').getAttribute('data-op-gated') : null, outPinVisible: vis('pin'), waitPinVisible: vis('waitPin'), secVisible: vis('sec') };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/io_step_output.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/io_step_output.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // switch to INPUT mode
     await page.click('#wiz_user_form [data-param="mode"] [data-value="input"]');
     await page.waitForTimeout(400);
@@ -60,14 +59,12 @@ test('E2 DRIVE (Expert): the mode picker + per-mode fields render; the declared-
         const sel = document.querySelector('#wiz_user_form [data-param="inputRef"]');
         return { hasPicker: !!sel, opts: sel ? Array.from(sel.options).map((o) => o.textContent) : [], hasEdge: !!document.querySelector('#wiz_user_form [data-param="mode2"]'), hasTimeout: !!document.querySelector('#wiz_user_form [data-param="timeout"]') };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/io_step_input.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/io_step_input.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // switch to DWELL mode
     await page.click('#wiz_user_form [data-param="mode"] [data-value="dwell"]');
     await page.waitForTimeout(400);
     const dwellMode = await page.evaluate(() => ({ hasSec: !!document.querySelector('#wiz_user_form [data-param="sec"]') }));
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/io_step_dwell.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/io_step_dwell.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     const all = await params();
     console.log('IO-STEP IN-PLACE params: ' + all.join(', '));
     console.log('output: ' + JSON.stringify(outputMode) + ' | input: ' + JSON.stringify(inputMode) + ' | dwell: ' + JSON.stringify(dwellMode));
@@ -94,7 +91,7 @@ test('E2 DRIVE (non-Expert): the INPUT mode greys (data-op-gated) on a V4.1 post
         const btn = document.querySelector('#wiz_user_form [data-param="mode"] [data-value="input"]');
         return btn ? { opGated: btn.getAttribute('data-op-gated'), disabled: btn.disabled, tip: btn.title } : null;
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/io_step_input_gated_v41.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/io_step_input_gated_v41.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     await page.evaluate(async () => { const { setActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js'); setActiveProfile('ddcs-expert-m350'); });
     console.log('non-Expert Input gate: ' + JSON.stringify(gated));
     expect(gated && gated.opGated, 'the Input segment is data-op-gated ON on a non-Expert post').toBe('on');

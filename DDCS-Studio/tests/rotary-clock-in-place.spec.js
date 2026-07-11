@@ -95,8 +95,7 @@ test('E3 DRIVE: Clock A0 opens IN-PLACE — non-empty form + the 3D sim renders 
         await page.click('#wiz_user .wiz-viz3d .pp-mtoggle');
         await page.waitForTimeout(200);
     }
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/rotary_clock_e3_inplace.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/rotary_clock_e3_inplace.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('E3 IN-PLACE FORM: ' + form.fieldCount + ' fields → ' + form.params.join(', ') + ' | ' + JSON.stringify({ twoD }));
     expect(form.fieldCount, 'the in-place form is NOT empty').toBeGreaterThan(8);
     expect(form.hasAction && form.hasReference && form.hasSpan && form.hasSafeZ, 'the action/reference/#6 span/safeZ knobs render').toBe(true);

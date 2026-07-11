@@ -51,6 +51,6 @@ test('the played trace STARTS at handle A (not origin) — the drawn path begins
     expect(Math.hypot(r.first.x - r.A.x, r.first.y - r.A.y), `the played trace STARTS at handle A (A=${JSON.stringify(r.A)}, first=${JSON.stringify(r.first)})`).toBeLessThan(5);
     // and NO segment endpoint sits at the origin (the stray {0,0} probe is gone)
     expect(r.minOrigin, 'no segment endpoint sits at the machine origin {0,0} anymore').toBeGreaterThan(10);
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/alignment_starts_at_a.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_starts_at_a.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     console.log('ALIGNMENT trace starts at A=' + JSON.stringify(r.A) + ' first=' + JSON.stringify(r.first) + ' minOrigin=' + r.minOrigin.toFixed(1));
 });

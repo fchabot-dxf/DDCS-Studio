@@ -137,8 +137,7 @@ test('DRIVE THE APP: a formfield-authored op RENDERS its fields in the live form
     expect(form.hasDist, 'the authored "dist" field renders in the live form (renderOpForm reads the derived bindings)').toBe(true);
     expect(form.hasRetract, 'the authored "retract" field renders').toBe(true);
     expect(form.distVal, 'the field seeds the authored default').toBe('30');
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/formfield_pilot_form.png' });
-
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/formfield_pilot_form.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     // Class-B render guard (blockly skill): the formfield block actually DRAWS in the Blocks workspace (not a phantom model)
     await page.evaluate(() => window.showApp('blocks'));
     await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0, { timeout: 8000 });

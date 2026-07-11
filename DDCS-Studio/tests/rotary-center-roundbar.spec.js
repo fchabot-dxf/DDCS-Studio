@@ -78,7 +78,7 @@ test('E3 real-symptom: the twin opens on a BOX stock but the sim RENDERS a round
         const canvas = document.querySelector('#wiz_user canvas');
         return { globalShape: g.shape, globalY: g.y, hasViz: !!canvas };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/rotary_center_roundbar.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/rotary_center_roundbar.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     expect(r.globalShape, 'opening the twin does NOT mutate the global stock to a cylinder (the hack is gone)').toBe('box');
     expect(r.globalY, 'the global stock cross dim is untouched').toBe(100);
     expect(r.hasViz, 'the 3D preview renders (the round bar from #57)').toBe(true);

@@ -51,7 +51,7 @@ test('text twin: real letters in the 2D + pos & rotation handles', async ({ page
     expect(st.fcPaths, 'the "TEXT" default draws real letter paths (previewGeometry), not just a stock rect').toBeGreaterThan(3);
     expect(st.moveHandles, 'a draggable pos (move) handle').toBeGreaterThan(0);
     expect(st.handles, 'pos + rotation handles present').toBeGreaterThanOrEqual(2);
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/text-atom-2d.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/text-atom-2d.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
 });
 
 test('rotation end-to-end: the 3D engraving trace rotates with the label angle', async ({ page }) => {
@@ -65,7 +65,7 @@ test('rotation end-to-end: the 3D engraving trace rotates with the label angle',
     await page.waitForTimeout(300);
     const b = (await readState(page)).bbox;
     expect(b.h, 'rotation 90: the traced toolpath is now taller than wide (it rotated)').toBeGreaterThan(b.w);
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/text-atom-rot90.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/text-atom-rot90.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
 });
 
 test('a literal {SN} renders as brace glyphs (not spaces) — stage 2 owns substitution', async ({ page }) => {

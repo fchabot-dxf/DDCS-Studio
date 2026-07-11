@@ -78,7 +78,7 @@ test('E2 real-symptom: the twin renders the BOX + the 4th-axis RIG + the single 
             rigBuilt: !!viz._rotaryFixture, rigChildOfPart: !!viz._rotaryFixture && viz._rotaryFixture.parent === viz._partGroup,
         };
     });
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/rotary_clock_e2_sim.png' });
+    { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/rotary_clock_e2_sim.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
     expect(r.nStarts, 'the clock declares TWO sim-starts (A + B, both draggable)').toBe(2);
     expect(r.hasViz, 'the rotary machine-frame preview renders').toBe(true);
     expect(r.stockShape, 'the clock sim shows a rectangular BOX (a flat, not a round bar → no def.simStock)').toBe('box');
