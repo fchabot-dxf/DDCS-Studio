@@ -11,7 +11,7 @@ test.use({ viewport: { width: 1300, height: 950 } });
 
 async function homingRenderedZ(page, stockShown) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     await page.evaluate((stockShown) => {
         const s = window.ddcsGetSettings();
         s.machine = { x: 600, y: -600, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } };
@@ -65,7 +65,7 @@ test('REAL APP: with the STOCK HIDDEN, the rendered homing tool is still at the 
 
 test('a CUTTING op (drill) leaves the tool on the stock-placed part frame (machine-frame flag OFF — unchanged)', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     await page.evaluate(() => {
         const s = window.ddcsGetSettings();
         s.machine = { x: 600, y: -600, z: -120, show: true };
@@ -81,7 +81,7 @@ test('a CUTTING op (drill) leaves the tool on the stock-placed part frame (machi
 
 test('DRIVE THE APP: the homing tool renders AT THE TOP with a stock shown — screenshot', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     await page.evaluate(() => {
         const s = window.ddcsGetSettings();
         s.machine = { x: 600, y: -600, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } };
@@ -98,5 +98,5 @@ test('DRIVE THE APP: the homing tool renders AT THE TOP with a stock shown — s
     await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine && !p.engine.running; }, null, { timeout: 20000 });
     const w = await page.evaluate(() => { const p = window.ddcsStudio.wizardManager._activePanel; p.viz._animTool.updateWorldMatrix(true, false); return +p.viz._animTool.getWorldPosition(new (p.viz.THREE.Vector3)()).z.toFixed(1); });
     expect(w >= -8, `the homing tool rests at the TOP (worldZ=${w}) with a stock shown, not the -100 bottom`).toBe(true);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_tool_at_top_with_stock.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_tool_at_top_with_stock.png', clip: _b }); }   // t710 clip capture (rAF-starved actionability dodge)
 });

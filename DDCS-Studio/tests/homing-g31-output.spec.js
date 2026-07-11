@@ -90,7 +90,7 @@ test('REAL APP: with a STOCK SHOWN, the G31 homing preview tool seeks to the swi
     // occupies mid-Z (was pinned near the top). The t497 "no plunge" property is that the RENDERED tool TRACKS engine.pos.z
     // (machine frame): assert wMin matches the engine's min, so a stock-floor plunge (w≈-100 while engine≈-60..-5) fails.
     expect(Math.abs(wMin - ezMin) < 3, `the rendered tool TRACKS engine.pos.z (worldZ min=${wMin}, engine min=${ezMin}) — no stock-floor plunge`).toBe(true);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_g31_tool_at_switch.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_g31_tool_at_switch.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 // A PLAYED G31 seek toward home, with NO stock (the homing context), stops AT the home switch = the machine envelope

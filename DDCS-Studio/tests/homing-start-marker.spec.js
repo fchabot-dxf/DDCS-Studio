@@ -41,7 +41,7 @@ test('(a) the Start marker seeds MID-ENVELOPE (machine center)', async ({ page }
     expect(Math.round(p.start.x), 'Start X = envelope mid (600/2)').toBe(300);
     expect(Math.round(p.start.y), 'Start Y = envelope mid (400/2)').toBe(200);
     expect(Math.round(p.start.z), 'Start Z = envelope mid (500/2)').toBe(250);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_start_midenvelope.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_start_midenvelope.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 test('(b) the played tool STARTS at the Start and homes UP to the top switch', async ({ page }) => {
@@ -62,7 +62,7 @@ test('(b) the played tool STARTS at the Start and homes UP to the top switch', a
     expect(r.startZ, 'the run STARTS at the mid-envelope Start (Z≈250), not the top (500)').toBeLessThan(300);
     expect(end, 'the tool HOMES to the top switch (~495), backed off from 500').toBeGreaterThan(480);
     expect(end, 'the tool ends at the top, not overshooting').toBeLessThanOrEqual(505);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_start_homed.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_start_homed.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 test('(c) dragging the Start makes the NEXT run travel from the NEW Start', async ({ page }) => {

@@ -8,7 +8,7 @@ test.use({ viewport: { width: 1300, height: 950 } });
 
 test('(1) homing run-row chips show switch-seek / set-zero — NO stale "native", even with a saved method:native', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     await page.evaluate(() => {
         const s = window.ddcsGetSettings();
         s.machine = { x: 600, y: 600, z: 500, show: true };
@@ -22,7 +22,7 @@ test('(1) homing run-row chips show switch-seek / set-zero — NO stale "native"
         const lbl = cb.closest('label'); const span = lbl && lbl.querySelector('span');
         return { axis: cb.getAttribute('data-axis'), text: span ? span.textContent.trim() : null };
     }));
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_no_stale_native.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_no_stale_native.png', clip: _b }); }   // t710 clip capture
     console.log('HOMING chips: ' + JSON.stringify(chips));
     const z = chips.find((c) => c.axis === 'z'), a = chips.find((c) => c.axis === 'a');
     expect(z && z.text, 'a LINEAR axis (saved native) shows the wizard method: switch-seek').toBe('switch-seek');
@@ -32,7 +32,7 @@ test('(1) homing run-row chips show switch-seek / set-zero — NO stale "native"
 
 test('(3) I/O-step Input: Result-var + Timeout are HIDDEN on a DDCS post, SHOWN on RS274 (dialect-aware); emit unchanged', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     const visOn = async (post) => {
         await page.evaluate(async (p) => { const { setActivePostId } = await import('/wizards/dialects/index.js'); setActivePostId(p); }, post);
         await page.evaluate(() => window.openWiz('user_io_step', 'input'));
@@ -67,7 +67,7 @@ test('(3) I/O-step Input: Result-var + Timeout are HIDDEN on a DDCS post, SHOWN 
 
 test('(amendment 1) the homing preview draws NO switch-device meshes', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     await page.evaluate(() => { const s = window.ddcsGetSettings(); s.machine = { x: 600, y: 600, z: 500, show: true }; s.limits = { zMaxHome: true, xMinHome: true, yMinHome: true }; });
     await page.evaluate(() => window.openWiz('homing'));
     await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
@@ -78,7 +78,7 @@ test('(amendment 1) the homing preview draws NO switch-device meshes', async ({ 
         if (!viz) return null;
         return { hasLimitGroup: !!viz._limitGroup, nDevices: viz._limitDevices ? Object.keys(viz._limitDevices).length : 0, getLimitSwitchIsFn: typeof viz.getLimitSwitch === 'function' };
     });
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_no_device_meshes.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_no_device_meshes.png', clip: _b }); }   // t710 clip capture
     console.log('DEVICE MESHES: ' + JSON.stringify(dev));
     expect(dev && dev.hasLimitGroup, 'NO switch-device mesh group in the homing preview').toBe(false);
     expect(dev && dev.nDevices, 'NO switch device meshes').toBe(0);
@@ -86,7 +86,7 @@ test('(amendment 1) the homing preview draws NO switch-device meshes', async ({ 
 
 test('(amendment 2) EVERY homing door routes through the SIMPLE G31 — no M98/O501, for a saved method:native config', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    await page.waitForFunction(() => window.ddcsGetBlockProgram, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     const r = await page.evaluate(async () => {
         const { homingStack } = await import('/wizards/homingWizard.js');
         const { builderOf } = await import('/blocks/opBuilders.js');

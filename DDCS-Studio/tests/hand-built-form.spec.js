@@ -20,7 +20,7 @@ test('a hand-built bare stack with an exposed knob → FORM [LIVE] shows + write
   page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack && window.ddcsGetBlockProgram && window.__blkws !== undefined || true);
-  await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack && window.ddcsGetBlockProgram, null, { timeout: 15000 });   // t710 — boot-readiness gate (window.showApp is late); own budget, not the 5s actionTimeout cap
 
   // a BARE hand-built stack (no op wrapper) whose first move's X is an exposed knob (a param pill named px).
   await openBlocksWith(page, [
@@ -66,7 +66,7 @@ test('a hand-built bare stack with an exposed knob → FORM [LIVE] shows + write
 test('a hand-built stack with NO exposed knobs → FORM [LIVE] stays hidden (no false-positive)', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => window.showApp && window.ddcsLoadBlockStack && window.ddcsGetBlockProgram, null, { timeout: 15000 });   // t710 — boot-readiness gate (window.showApp is late); own budget, not the 5s actionTimeout cap
 
   await openBlocksWith(page, [
     { type: 'move', params: { x: 10, y: 20, z: -2, mode: 'rapid' } },

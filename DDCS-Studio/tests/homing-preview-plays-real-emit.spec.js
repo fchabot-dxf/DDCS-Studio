@@ -82,5 +82,5 @@ test('the preview line-HIGHLIGHTS real emitted G31 lines during play (+ screensh
         return active && /G31/.test(active.textContent) ? active.textContent.trim() : false;
     }, null, { timeout: 15000 }).then((h) => h.jsonValue());
     expect(found, 'a real emitted G31 line is highlighted as it executes in the preview').toMatch(/G31/);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_preview_highlights_g31.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_preview_highlights_g31.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });

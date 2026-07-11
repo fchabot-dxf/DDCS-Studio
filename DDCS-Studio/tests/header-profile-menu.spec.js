@@ -10,7 +10,11 @@ const openMenu = async (page) => { await page.click('#hdrPostBtn'); await page.w
 
 test('the header menu shows the PROFILE section (current + recents + doors), NOT the dialect list', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsProfileLib && window.ddcsGetSettings && document.getElementById('hdrPostBtn'));
+    // t710 FLAKE FIX (real race): #hdrPostBtn is static HTML but its click handler is wired ~5 dynamic-imports later by
+    // initHeaderPost()→fillMenu(), which populates #hdrPostMenu (the `.hdr-quick-head` header) right before attaching the
+    // handler. Awaiting the POPULATED menu ⇔ the button is wired → openMenu's click can't land on a dead button. Explicit
+    // 15s budget: this signal arrives later in boot than ddcsProfileLib, so it must not inherit the 5s actionTimeout cap.
+    await page.waitForFunction(() => window.ddcsProfileLib && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
     // two profiles: Rig A (x=700), Rig B (active, x=320); Rig A seeded as a recent
     await page.evaluate(() => {
         localStorage.removeItem('ddcs_profile_library');
@@ -49,7 +53,11 @@ test('the header menu shows the PROFILE section (current + recents + doors), NOT
 
 test('a recent row full-swaps; Profiles… / Save as… open the modal; Pull opens the pull flow', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsProfileLib && window.ddcsGetSettings && document.getElementById('hdrPostBtn'));
+    // t710 FLAKE FIX (real race): #hdrPostBtn is static HTML but its click handler is wired ~5 dynamic-imports later by
+    // initHeaderPost()→fillMenu(), which populates #hdrPostMenu (the `.hdr-quick-head` header) right before attaching the
+    // handler. Awaiting the POPULATED menu ⇔ the button is wired → openMenu's click can't land on a dead button. Explicit
+    // 15s budget: this signal arrives later in boot than ddcsProfileLib, so it must not inherit the 5s actionTimeout cap.
+    await page.waitForFunction(() => window.ddcsProfileLib && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
     await page.evaluate(() => {
         localStorage.removeItem('ddcs_profile_library');
         const L = window.ddcsProfileLib;

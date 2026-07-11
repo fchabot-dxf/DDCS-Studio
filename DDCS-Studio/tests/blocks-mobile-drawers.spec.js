@@ -7,7 +7,9 @@ test.use({ viewport: { width: 390, height: 800 } });
 
 test('mobile: palette collapses (canvas reclaims width), preview + palette drawers toggle', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+  // t710 — window.showApp is set LATE in boot (gatewayStatus, IIFE step 5). A boot-readiness gate is a distinct concern
+  // from an action; give it its own 15s budget so 4-worker cold-boot contention can't trip the 5s actionTimeout cap.
+  await page.waitForFunction(() => window.ddcsStudio && window.showApp, null, { timeout: 15000 });
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
   await page.waitForSelector('#wiz_drill', { state: 'visible' });
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
@@ -70,7 +72,24 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
 
   // with BOTH palette + preview open, the preview must COVER the palette at their overlap (bottom-left)
   await page.click('#blkDrawerHandle');
-  await page.waitForTimeout(300);
+  // t710 FLAKE FIX (real transition race): `.right` slides up over a 250ms CSS transform transition. The old
+  // waitForTimeout(300) sampled mid-slide under contention. Await the drawer FULLY SETTLED — two consecutive equal
+  // `top` reads = the transition finished (a partial "reached the hit-test point" wait was NOT enough: the strip sits
+  // at the drawer top, so the resize-drag below grabbed a still-MOVING strip and missed → run-2 flake). Settling makes
+  // BOTH the overlap hit-test AND the resize-strip drag valid.
+  await page.evaluate(() => { window.__drawerTop = -1; });
+  await page.waitForFunction(() => {
+    const el = document.querySelector('#blocks-app .right');
+    if (!el || !el.classList.contains('open')) return false;
+    const top = Math.round(el.getBoundingClientRect().top);
+    if (top > window.innerHeight - 80) return false;   // still early in the slide — not yet covering the hit-test point
+    // …AND stopped moving: two consecutive equal reads. The covering gate above rules out a START false-positive (the
+    // closed top is > innerHeight−80), so the settle check only fires on the final approach — valid for BOTH the overlap
+    // hit-test AND the resize-strip drag (the strip rides the drawer top, which must stop before we grab it).
+    const settled = window.__drawerTop === top;
+    window.__drawerTop = top;
+    return settled;
+  }, null, { timeout: 15000 });
   const overlap = await page.evaluate(() => {
     const el = document.elementFromPoint(60, window.innerHeight - 80);
     return { inPreview: !!(el && el.closest('.right')), inToolbox: !!(el && el.closest('.blocklyToolbox')) };
@@ -85,7 +104,8 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   await page.mouse.down();
   await page.mouse.move(strip.x + strip.width / 2, 150, { steps: 8 });   // drag toward the top → taller
   await page.mouse.up();
-  await page.waitForTimeout(150);
+  // t710 — await the REAL resize result (the drawer grew) rather than a fixed 150ms sleep; the assertion below is the authority.
+  await page.waitForFunction((b) => document.querySelector('#blocks-app .right').getBoundingClientRect().height > b + 30, before, { timeout: 5000 }).catch(() => {});
   const after = await page.evaluate(() => document.querySelector('#blocks-app .right').getBoundingClientRect().height);
   expect(after, `drawer resized taller (${before} → ${after})`).toBeGreaterThan(before + 30);
 

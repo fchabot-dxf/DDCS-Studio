@@ -90,5 +90,5 @@ test('DRIVE THE APP: with a STALE dir=-, machine.z=-120 still homes Z UP to the 
     await page.waitForFunction(() => { const p = window.ddcsStudio.wizardManager._activePanel; return p && p.engine && !p.engine.running; }, null, { timeout: 20000 });
     const endZ = await page.evaluate(() => +window.ddcsStudio.wizardManager._activePanel.engine.pos.z.toFixed(1));
     expect(endZ, 'even with a stale dir=-, the PLAYED real emit homes Z to the TOP (~-5), not the -120 plunge (-115)').toBeGreaterThan(-8);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_declared_dir_top.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_declared_dir_top.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });

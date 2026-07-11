@@ -76,7 +76,7 @@ test('REAL APP (the human config): an existing config reloads → z_max Home bac
     await page.evaluate(() => window.openWiz('homing'));
     await page.waitForSelector('#wiz_homing', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(600);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_backfill_top.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_backfill_top.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
     console.log('LOADED (existing config): ' + JSON.stringify(loaded));
     expect(loaded.zMaxHome, 'on load the existing config got its z_max home backfilled (declared)').toBe(true);
     expect(loaded.flag, 'the one-time backfill flag persisted').toBeTruthy();

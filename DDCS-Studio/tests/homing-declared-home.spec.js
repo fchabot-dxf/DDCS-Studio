@@ -12,7 +12,7 @@ test.use({ viewport: { width: 1300, height: 950 } });
 // ── DETERMINISTIC: the home TARGET + emit direction are the declared TOP (z_max = hi) for BOTH signs. ──
 test('axisHomeMotion + the emitted G31 target the DECLARED home edge (z_max = TOP), sign-agnostic', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio);
+    await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     const r = await page.evaluate(async () => {
         const { axisHomeMotion, declaredHomeEdgeSide } = await import('/engine/limitSwitches.js');
         const { homingStack } = await import('/wizards/homingWizard.js');
@@ -46,7 +46,7 @@ test('axisHomeMotion + the emitted G31 target the DECLARED home edge (z_max = TO
 // ── REAL APP, BOTH SIGNS: the sim tool homes UP to the declared top switch and settles there (no plunge). ──
 async function homeSettle(page, z, shot) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });   // t710 — boot-readiness gate, own budget (not the 5s actionTimeout cap)
     await page.evaluate((z) => {
         const s = window.ddcsGetSettings();
         s.machine = { x: 600, y: -600, z, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } };
@@ -71,7 +71,8 @@ async function homeSettle(page, z, shot) {
         let w = null; try { p.viz._animTool.updateWorldMatrix(true, false); w = +p.viz._animTool.getWorldPosition(new (p.viz.THREE.Vector3)()).z.toFixed(1); } catch (e) {}
         return { engineZ: +p.engine.pos.z.toFixed(1), worldZ: w };
     });
-    if (shot) await page.locator('#wiz_homing').screenshot({ path: shot });
+    // t710 — clip capture (page.screenshot forces a composite) dodges locator.screenshot's rAF-starved "wait for stable" on the idle 3D viz
+    if (shot) { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: shot, clip: _b }); }
     return r;
 }
 

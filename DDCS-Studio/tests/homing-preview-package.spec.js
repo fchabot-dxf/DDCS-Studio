@@ -39,7 +39,7 @@ test('(2) the envelope BOX draws in the homing pin even with settings.machine.sh
     expect(r.show, 'settings.machine.show is OFF (the box is NOT drawn for ordinary part-frame views)').toBe(false);
     expect(r.forced, 'the homing pin FORCED the machine box').toBe(true);
     expect(r.machineBox, 'the envelope box IS drawn despite show OFF (homing is machine-frame)').toBe(true);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_box_forced_showoff.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_box_forced_showoff.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 test('(3) an UNSET axis travel surfaces a visible hint + the sim SKIPS that axis (no fictional span)', async ({ page }) => {
@@ -64,5 +64,5 @@ test('(3) an UNSET axis travel surfaces a visible hint + the sim SKIPS that axis
     expect(r.code, 'Z homing is skipped in the emit (unset envelope), with a visible SET-TRAVEL comment').toMatch(/SET Z TRAVEL/i);
     expect(r.code, 'no fabricated Z seek move for the unset axis').not.toMatch(/G31 Z/);
     expect(r.code, 'X still homes (configured envelope)').toMatch(/G31 X/);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_unset_travel_hint.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_unset_travel_hint.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });

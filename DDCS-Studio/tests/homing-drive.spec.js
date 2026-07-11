@@ -27,7 +27,7 @@ test('the homing sim drives every axis to the machine-0 home end (NOT the far/si
         const oldFar = { x: M.x, y: M.y, z: M.z };   // x -300 (left) · z -120 (down) — the plunge
         return { xSeek: seek('x'), ySeek: seek('y'), zSeek: seek('z'), oldFar, zHomeSide: axisSpan(M.z).homeSide, xHomeSide: axisSpan(M.x).homeSide };
     }, machine);
-    await page.locator('#wiz_homing').screenshot({ path: 'scratchpad/homing_at_home.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/homing_at_home.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
     console.log('HOMING: symptom(old far end)=' + JSON.stringify(r.oldFar) + ' → fix(seek)= X:' + r.xSeek + ' Y:' + r.ySeek + ' Z:' + r.zSeek);
 
     // SYMPTOM (before): the OLD signed-travel home end drove DOWN (z -120) + LEFT (x -300) — the far end, away from home.

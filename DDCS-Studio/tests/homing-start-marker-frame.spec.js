@@ -42,7 +42,7 @@ test('the 3D start marker renders at its MACHINE coordinate (no WCS double-shift
     expect(r.worldY, `3D marker world Y (${r.worldY}) == the machine-coord Start Y (${r.startY}) — no WCS double-shift`).toBeCloseTo(r.startY, 1);
     // and it stays INSIDE the envelope [machine.y, 0] = [-776, 0]
     expect(r.worldY <= 0 && r.worldY >= r.machY, `marker world Y (${r.worldY}) inside the envelope [${r.machY}, 0]`).toBe(true);
-    await page.locator('#wiz_homing').screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/homing-start-marker.png' });
+    { const _b = await page.locator('#wiz_homing').boundingBox(); if (_b) await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/homing-start-marker.png', clip: _b }); }   // t710 clip capture (rAF-starvation dodge)
 });
 
 test('2D machine-frame op: the Start marker sits INSIDE the drawn envelope; a work-shifted envelope would exclude it', async ({ page }) => {
