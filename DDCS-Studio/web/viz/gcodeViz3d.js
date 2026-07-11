@@ -259,10 +259,10 @@ export class GcodeViz3D {
         const c = document.createElement('canvas');
         c.width = c.height = 128;
         const ctx = c.getContext('2d');
-        ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 18; ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ffffff'; ctx.lineWidth = 16; ctx.lineJoin = 'round';
         ctx.beginPath();
-        if (emits) { ctx.fillRect(20, 20, 88, 88); }   // AUTO = filled SQUARE ■
-        else { ctx.arc(64, 64, 46, 0, Math.PI * 2); ctx.fill(); }   // MANUAL / Start = filled CIRCLE ●
+        if (emits) { ctx.fillRect(20, 20, 88, 88); }   // AUTO / emitting = FILLED SQUARE ■ (a drag writes a macro var)
+        else { ctx.arc(64, 64, 42, 0, Math.PI * 2); ctx.stroke(); }   // t722 P2a — MANUAL / Start = a HOLLOW RING ○ (the comment always promised it; it fills solid no longer) — a jog PREVIEW, never emitted
         return (this[key] = new this.THREE.CanvasTexture(c));
     }
 
@@ -356,12 +356,14 @@ export class GcodeViz3D {
             const glyph = this.spindleMarkers[p].children[0];
             if (!glyph || !glyph.material) continue;
             const sel = p === this.selectedStart;
-            glyph.material.opacity = sel ? 1 : 0.45;
             const src = (this._startSources && this._startSources[p]) || 'auto';
             // t293 — ONE glyph language: AUTO reposition (machine drives there) = a CYAN SQUARE ■; MANUAL jog / the operator
-            // Start = an AMBER CIRCLE ●. Shape + colour agree (matches the 2D toolpath + the Layout). Pass-0 is ALWAYS the
+            // Start = an AMBER ring ○. Shape + colour agree (matches the 2D toolpath + the Layout). Pass-0 is ALWAYS the
             // operator's first jog (the Start) → manual; every later pass follows its reposition SOURCE.
             const manual = p === 0 || src === 'manual';
+            // t722 P2a — the sim-only manual JOG glyph (the hollow ring) is a PREVIEW → always semi-transparent (ghostly); the
+            // emitting AUTO square reads more solid (a real programmed reposition). Selection boosts both.
+            glyph.material.opacity = manual ? (sel ? 0.8 : 0.42) : (sel ? 1 : 0.5);
             glyph.material.color.setHex(manual ? 0xffb300 : 0x22d3ee);
             const tex = this._startGlyphTex(!manual);
             if (glyph.material.map !== tex) { glyph.material.map = tex; glyph.material.needsUpdate = true; }

@@ -22,6 +22,7 @@
  */
 import { slotStack } from '../../wizards/slotWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy)
 
 /** Author defaults — match slotStack's num() fallbacks. width default == toolDia (a slot is ≥ tool wide). pattern:'single'
  *  (bare leaf, no array) + optIn:true (slot is an opt-in/absolute placement op — the seed must carry it). */
@@ -31,41 +32,6 @@ export const SLOT_DEFAULTS = {
     feed: 600, plunge: 150, clearance: 5, wcs: 'active',
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
-
-const WCS_OPTIONS = [
-    ['Active', 'active'],
-    ['G54', 'G54'],
-    ['G55', 'G55'],
-    ['G56', 'G56'],
-    ['G57', 'G57'],
-    ['G58', 'G58'],
-    ['G59', 'G59'],
-];
-
-const XY_DATUM_OPTIONS = [
-    ['Follow stock datum', ''],
-    ['Front Left', 'nn'],
-    ['Front Center', 'cn'],
-    ['Front Right', 'pn'],
-    ['Center Left', 'nc'],
-    ['Center', 'cc'],
-    ['Center Right', 'pc'],
-    ['Back Left', 'np'],
-    ['Back Center', 'cp'],
-    ['Back Right', 'pp'],
-];
-
-const STOCK_DATUM_OPTIONS = [
-    ['Front Left / Top', 'nnp'],
-    ['Front Center / Top', 'cnp'],
-    ['Front Right / Top', 'pnp'],
-    ['Center Left / Top', 'ncp'],
-    ['Center / Top', 'ccp'],
-    ['Center Right / Top', 'pcp'],
-    ['Back Left / Top', 'npp'],
-    ['Back Center / Top', 'cpp'],
-    ['Back Right / Top', 'ppp'],
-];
 
 // Pre-order flatten of the bare-leaf single-slot template [progstart, wcs, placeonstock{ slot }, progend]:
 //   0 progstart · 1 wcs · 2 placeonstock · 3 slot · 4 progend

@@ -21,6 +21,7 @@
  */
 import { textStack } from '../../wizards/textWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy)
 
 /** Author defaults — match textStack's num() fallbacks. optIn:true (text is an opt-in/absolute placement op — the seed
  *  must carry it). font 'single-stroke' = the built-in; stepdown defaults to depth (engraving is usually one pass). */
@@ -30,31 +31,6 @@ export const TEXT_DEFAULTS = {
     strokeWidth: 2.5, toolDia: 1.5, stepoverPct: 50, depth: 0.4, stepdown: 0.4, feed: 400, plunge: 120, clearance: 4,
     originX: 0, originY: 0, offZ: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0,
 };
-
-const XY_DATUM_OPTIONS = [
-    ['Follow stock datum', ''],
-    ['Front Left', 'nn'],
-    ['Front Center', 'cn'],
-    ['Front Right', 'pn'],
-    ['Center Left', 'nc'],
-    ['Center', 'cc'],
-    ['Center Right', 'pc'],
-    ['Back Left', 'np'],
-    ['Back Center', 'cp'],
-    ['Back Right', 'pp'],
-];
-
-const STOCK_DATUM_OPTIONS = [
-    ['Front Left / Top', 'nnp'],
-    ['Front Center / Top', 'cnp'],
-    ['Front Right / Top', 'pnp'],
-    ['Center Left / Top', 'ncp'],
-    ['Center / Top', 'ccp'],
-    ['Center Right / Top', 'pcp'],
-    ['Back Left / Top', 'npp'],
-    ['Back Center / Top', 'cpp'],
-    ['Back Right / Top', 'ppp'],
-];
 
 const ALIGN_OPTIONS = [
     ['Left', 'left'],

@@ -73,9 +73,9 @@ const POCKET_BINDING_SPECS = [
     // geometry (fan-out to both leaves)
     { param: 'shape', type: 'enum', key: 'shape', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.shape, widget: 'dropdown', widgetConfig: { options: SHAPE_OPTIONS }, label: 'Shape', section: G },
     { param: 'shape', type: 'enum', key: 'shape', match: { type: 'pocketwall' }, optional: true },
-    ...leafPair('w', 'w', 'number', { default: POCKET_DEFAULTS.w, label: 'Width', section: G }),
-    ...leafPair('h', 'h', 'number', { default: POCKET_DEFAULTS.h, label: 'Height', section: G }),
-    ...leafPair('dia', 'dia', 'number', { default: POCKET_DEFAULTS.dia, label: 'Diameter', section: G }),
+    ...leafPair('w', 'w', 'number', { default: POCKET_DEFAULTS.w, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Width', section: G }),   // t722 P2a — per-shape visibility
+    ...leafPair('h', 'h', 'number', { default: POCKET_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: G }),
+    ...leafPair('dia', 'dia', 'number', { default: POCKET_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: G }),
     ...leafPair('sides', 'sides', 'number', { default: POCKET_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: G }),
     ...leafPair('toolDia', 'toolDia', 'number', { default: POCKET_DEFAULTS.toolDia, label: 'Tool Ø', section: T }),
     ...leafPair('wallOffset', 'wallOffset', 'number', { default: POCKET_DEFAULTS.wallOffset, label: 'Wall Offset ±', section: T }),

@@ -18,6 +18,7 @@ import { contourStack } from '../../wizards/contourWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { regionDesc } from '../../wizards/ops/region.js';      // t712 — the true boundary ring (polygon/ellipse) for the 2D preview
 import { contourRegion } from '../../wizards/ops/contour.js';  // t712 — the OFFSET toolpath (tool-centre) so the 2D matches the cut
+import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy)
 
 /** Author defaults — match contourStack's num() fallbacks + the built-in Contour form defaults. Geometry is local-0-based
  *  (originX/originY ride the placement). All 4 shape dims present; the contourfill atom picks w×h vs dia+sides by shape. */
@@ -27,18 +28,8 @@ export const CONTOUR_DEFAULTS = {
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
 
-const WCS_OPTIONS = [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']];
 const SHAPE_OPTIONS = [['Rectangle', 'rect'], ['Circle', 'circle'], ['Polygon', 'polygon'], ['Ellipse', 'ellipse']];
 const SIDE_OPTIONS = [['Outside', 'outside'], ['Inside', 'inside'], ['On (finish)', 'on']];
-const XY_DATUM_OPTIONS = [
-    ['Follow stock datum', ''], ['Front Left', 'nn'], ['Front Center', 'cn'], ['Front Right', 'pn'],
-    ['Center Left', 'nc'], ['Center', 'cc'], ['Center Right', 'pc'], ['Back Left', 'np'], ['Back Center', 'cp'], ['Back Right', 'pp'],
-];
-const STOCK_DATUM_OPTIONS = [
-    ['Front Left / Top', 'nnp'], ['Front Center / Top', 'cnp'], ['Front Right / Top', 'pnp'],
-    ['Center Left / Top', 'ncp'], ['Center / Top', 'ccp'], ['Center Right / Top', 'pcp'],
-    ['Back Left / Top', 'npp'], ['Back Center / Top', 'cpp'], ['Back Right / Top', 'ppp'],
-];
 
 // Pre-order flatten of contourStack's [progstart, wcs, placeonstock{ stepdown{ contourfill } }, progend]:
 //   0 progstart · 1 wcs · 2 placeonstock · 3 stepdown · 4 contourfill · 5 progend
@@ -62,9 +53,9 @@ const CONTOUR_EXEC_BINDINGS = [
     // geometry + cut (block 4, the contourfill leaf). shape picks which dims matter; the 4 dims all bind, emit uses the right pair.
     { param: 'shape', blockIndex: 4, key: 'shape', type: 'enum', default: CONTOUR_DEFAULTS.shape, widget: 'dropdown', widgetConfig: { options: SHAPE_OPTIONS }, label: 'Shape', section: 'GEOMETRY' },
     { param: 'side', blockIndex: 4, key: 'side', type: 'enum', default: CONTOUR_DEFAULTS.side, widget: 'dropdown', widgetConfig: { options: SIDE_OPTIONS }, label: 'Side', help: 'Outside/Inside offset the cut by the tool radius so the FINISHED edge matches the size you type; On traces the boundary itself.', section: 'GEOMETRY' },
-    { param: 'w', blockIndex: 4, key: 'w', type: 'number', default: CONTOUR_DEFAULTS.w, when: { param: 'shape', is: 'rect' }, label: 'Width', section: 'GEOMETRY' },
-    { param: 'h', blockIndex: 4, key: 'h', type: 'number', default: CONTOUR_DEFAULTS.h, when: { param: 'shape', is: 'rect' }, label: 'Height', section: 'GEOMETRY' },
-    { param: 'dia', blockIndex: 4, key: 'dia', type: 'number', default: CONTOUR_DEFAULTS.dia, when: { param: 'shape', is: 'circle' }, label: 'Diameter', section: 'GEOMETRY' },
+    { param: 'w', blockIndex: 4, key: 'w', type: 'number', default: CONTOUR_DEFAULTS.w, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Width', section: 'GEOMETRY' },   // t722 P2a — W/H for rect AND ellipse
+    { param: 'h', blockIndex: 4, key: 'h', type: 'number', default: CONTOUR_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: 'GEOMETRY' },
+    { param: 'dia', blockIndex: 4, key: 'dia', type: 'number', default: CONTOUR_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: 'GEOMETRY' },   // t722 P2a — Ø for circle AND polygon
     { param: 'sides', blockIndex: 4, key: 'sides', type: 'number', default: CONTOUR_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: 'GEOMETRY' },
     { param: 'toolDia', blockIndex: 4, key: 'tool', type: 'number', default: CONTOUR_DEFAULTS.toolDia, label: 'Tool Ø', section: 'TOOL & CUT' },
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: CONTOUR_DEFAULTS.feed, label: 'Feed', section: 'TOOL & CUT' },

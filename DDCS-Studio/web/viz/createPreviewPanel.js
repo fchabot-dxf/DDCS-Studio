@@ -110,7 +110,7 @@ const PANEL_HTML = `
     <table class="pp-dro-tbl"><thead><tr><th></th><th>Work</th><th>Mach</th></tr></thead><tbody></tbody></table>
   </div>
   <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan</div>
-  <div class="pp-carve-note" style="display:none" title="Material-removal preview: flat endmills and ball-nose tools are modelled from the tool type; a vee/chamfer is shown flat for now; an unset tool carves at Ø6."></div>
+  <div class="pp-carve-note" style="display:none" title="Material-removal preview: flat endmills and ball-nose tools are modelled from the tool type; a vee/chamfer is shown flat for now; with no tool picked, an op carves at its typed Ø (Ø6 default)."></div>
 `;
 
 // SLICE 2 (WCS VISIBLE): classify an executing line as a WCS call or a spindle/start call, from the RAW text only
@@ -636,7 +636,12 @@ export function createPreviewPanel(container, opts = {}) {
                         const show = carveEnabled() && !!(parsed.stats && parsed.stats.feed > 0);   // only when there's material to remove
                         const tp = tl && tl.type;
                         const tipName = _carveTip === 'ball' ? 'ball-nose' : (['vbit', 'chamfer', 'engraver'].includes(tp) ? tp + ' (as flat)' : 'flat endmill');
-                        note.textContent = show ? ('Material view · ' + tipName + (tl && tl._default ? ' · assuming Ø6 (no tool set)' : '')) : '';
+                        // t722 P2a (2)+(4) — HONEST wording (no cognition verbs) + the op's TYPED Ø: an unset tool states the
+                        // default fact; an op-value tool discloses only the tip-shape unknown (the Ø is the typed op value).
+                        const dia = Math.round((Number(tl && tl.dia) || 6) * 10) / 10;
+                        const disc = (tl && tl._default) ? (' Ø' + dia + ' (default — no tool set)')
+                            : ((tl && tl._opValue) ? (' Ø' + dia + ' — op value, no tool picked') : (' Ø' + dia));
+                        note.textContent = show ? ('Material view · ' + tipName + disc) : '';
                         note.style.display = show ? '' : 'none';
                     }
                 }

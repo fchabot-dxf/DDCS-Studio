@@ -223,6 +223,11 @@ export const userOpView = {
         // placementParams) so a stock-attaching op places on the REAL stock, not the origin. Only UNSET fields; recorded +
         // emitted with the resolved stock (matches the built-in's placeOnStock snapshot). No-attach ops are byte-identical.
         try { Object.assign(params, resolvePlacementStock(params, (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null)); } catch (_) { /* no settings stock */ }
+        // t722 P2a (4) — the op's DECLARED tool for the sim body + carve radius + the honest note: the TYPED toolDia (present
+        // on every mill twin). `_opValue` flags it as the op's value (no tool-table tool picked) so the note owns up to only the
+        // tip-shape unknown, not the diameter. null when the op has no toolDia (probe/text) → simTool's T#/honest-6 fallback.
+        const _opToolDia = Number(params.toolDia);
+        const _opTool = (_opToolDia > 0) ? { type: 'endmill', dia: _opToolDia, _opValue: true } : null;
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
         const fhost = el('wiz_user_form');
@@ -303,7 +308,7 @@ export const userOpView = {
             // re-renders, so a spotted wall HOLDS in the 3D marker (computePassStarts reads host.__pinnedStarts). Empty spots → null → the pure-auto chain, byte-identical.
             const _phost = viz3dIn('userViz3dContainer');   // the SAME one-level-up derivation the panel + the drag path use (a two-level querySelector can match the OTHER pane's .wiz-viz3d in form3d+2d)
             if (_phost) _phost.__pinnedStarts = pinnedStartsFor(_def, params, _layoutSpots);
-            mgr.preview3D(previewGcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock);
+            mgr.preview3D(previewGcode, 'userViz3dContainer', (starts && starts[0]) || null, (Array.isArray(starts) && starts.length) ? starts : null, _simStock, _opTool);
             applySimIntent('userViz3dContainer');   // t578 — seat the machine-frame/seat intent BEFORE the layout overlay reads the trace, so the fresh-open route connects Start→seeks→HOME (the drag's own re-feed already had the intent set)
             const c = el('userVizContainer');
             if (c) {
@@ -366,7 +371,7 @@ export const userOpView = {
             // so a multi-pass op shows its ①②③④ markers here as well as in form3d+2d (they were only wired in the 3d2d branch).
             let starts3d = null;
             try { const stk = _simStock || (window.ddcsGetSettings && window.ddcsGetSettings().stock); starts3d = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
-            const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, 'userVizContainer', (starts3d && starts3d[0]) || null, (Array.isArray(starts3d) && starts3d.length) ? starts3d : null, _simStock);
+            const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, 'userVizContainer', (starts3d && starts3d[0]) || null, (Array.isArray(starts3d) && starts3d.length) ? starts3d : null, _simStock, _opTool);
         } else if (pt.mode === '2d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
             const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params);
