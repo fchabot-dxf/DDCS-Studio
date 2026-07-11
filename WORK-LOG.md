@@ -9983,3 +9983,22 @@ Six-part polish pass. P1 passed + V10.144 released; both P1 rulings ratified.
 **VERIFY:** wizard-polish-722 (3 tests, green): drill per-pattern + contour per-shape visibility follow LIVE; the note discloses the TYPED Ø + honest wording (no cognition verb). Audit 0 BAD; the form-integrity guard (form-kernel-720 e) stays green (hidden fields still carry options). Emit BYTE-IDENTICAL — all changes are form/preview (a `when` hides the ROW; the field still reads + emits its default → the as-data goldens stay green). Screenshots: p2a-note-glyph-largestock.png (note top-center + Ø12 op value + populated dropdowns + rect W/H), p2a-glyph-smallstock.png (drill grid Columns/Rows/pitch labeled + Ø6 default). FULL SUITE: 1053 passed, 2 skipped, 0 failed at retries=0.
 
 **Files:** web/blocks/dataOps/{drill,bore}Data.js (per-pattern when + labels) · {contour,pocket}Data.js (per-shape when) · {contour,slot,text}Data.js (consolidate to wizardOptions) · web/viz/gcodeViz3d.js (hollow ring + transparency) · web/wizardManager.js (getTool provider + preview3D tool param) · web/wizards/views/userOpView.js (op tool) · web/viz/createPreviewPanel.js (note label + title) · web/styles.css (note top-center) · tests/wizard-polish-722.spec.js (new). NEXT (per queue): P2b mill-start promotion (emit change, own turn), then E1.6 carve fidelity, then Transform. PASS BACK.
+
+---
+
+## Turn 724 (worker) — P2b MILL START PROMOTION — GATE (design proposal, surfacing forks before building)
+
+The dispatch delegates the SHAPE to me ("your grounding call") but says "surface any fork BEFORE building" — and this marker churned the user across several rounds, so I gate the design before touching the emit.
+
+**GROUNDED:** the mill emit opens `G0 Z<clr> (clearance)` → `G0 X<cutEntry> Y<cutEntry>` → plunge/cut. The mill twins have NO opSimStarts (null) — their sim-only ○ is the panel's computed pass-0 (= the cut entry). Post-process folds (place/rotate) emit children then transform the emitted LINES (kind:'place'/'rotate' in blockEmitter).
+
+**PROPOSED SHAPE (a declared stack atom, Blocks-round-trippable):**
+- A new `entry` FOLD atom (kind:'entry') wrapping the program body, params `entryX`/`entryY` (OPTIONAL, default UNSET '').
+- EMIT: emit children (placed) → find the first `G0 X.. Y..` (the cut entry) → IF entryX/entryY are SET and differ from the cut entry beyond ε (0.001mm): INSERT `G0 X<entryX> Y<entryY>` at the clearance Z (the opening rapid already set it) immediately BEFORE the first cut move → ELSE pass-through UNCHANGED. Default (unset) OR within-ε ⇒ BYTE-IDENTICAL (goldens untouched).
+- MARKER: the 7 mill twins declare a NEW `def.entryPoint = {x:'entryX', y:'entryY'}` → the emitting SQUARE glyph renders at the cut entry (unset) or (entryX,entryY) (set); dragging writes entryX/entryY (absolute placed coords); this REMOVES the sim-only ○ (userOpView takes the entry-marker path, not the SIM_ID ○). Probe/homing/ATC keep their ○ (no entryPoint). Blocks round-trips entryX/entryY (stack params + fields + marker reload agree).
+
+**FORKS (my recommendation in [brackets]):**
+- **F1 — how the emit gets the cut entry:** [A1: the `entry` fold PARSES the first `G0 X Y` from the placed emit — consistent with the existing place/rotate text-folds, localized, no per-geometry change] · A2: every geometry atom DECLARES its entry point (like `extent`) and the fold reads it (no parse, but touches ~6 geometry atoms).
+- **F2 — the marker binding:** [B1: a NEW absolute entry-point marker declaration (writes entryX/entryY placed coords)] · B2: reuse simStartParams (fraction-based world/stock) — awkward for an absolute placed XY.
+
+**ASK:** confirm the SEMANTIC + F1/F2 (or adjust), then I build + verify: default emit byte-identical per twin (goldens green); drag the square → the emitted approach G0 routes through the declared XY (assert line values); ○ gone from mill twins + present on corner/homing (negative control); Blocks editable entry fields + reverse-sync; t716 translate + t718 parity + glyph rules stay green; suite retries=0. HELD pending advisor synthesis.
