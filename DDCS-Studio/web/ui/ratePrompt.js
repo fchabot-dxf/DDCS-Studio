@@ -9,6 +9,8 @@
  * the analytics Worker URL is configured).
  */
 
+import { submitRating } from './analytics.js';   // t698 — POST stars+comment to the Worker /rate (D1 + AE)
+
 // The ONE declared trigger config — thresholds + cooldowns, readable + tweakable in one place.
 export const RATE_TRIGGER = { minSessions: 2, minInserts: 5, cooldownLaterDays: 14, oncePerVersion: true };
 
@@ -73,11 +75,16 @@ export function openRate(source) {
     track('rate_clicked');
     removeToast();
 }
-/** Send feedback by email — the no-GitHub path. A mailto pre-addressed to the maintainer, subject + version-prefilled body. */
-export function sendFeedback() {
+/** The mailto for the "send by email" path — pre-fills the stars + comment (the offline / no-Worker fallback). */
+function mailtoHref(stars, comment) {
     const subject = encodeURIComponent('DDCS Studio feedback');
-    const body = encodeURIComponent('\n\n\n— — —\nDDCS Studio ' + (appVersion() ? 'V' + appVersion() : '(version unknown)'));
-    try { window.location.href = `mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`; } catch (_) { /* no mail client — the anchor href is the fallback */ }
+    const starLine = stars ? '★'.repeat(stars) + '☆'.repeat(5 - stars) + ` (${stars}/5)\n\n` : '';
+    const body = encodeURIComponent(starLine + (comment ? comment + '\n' : '') + '\n— — —\nDDCS Studio ' + (appVersion() ? 'V' + appVersion() : '(version unknown)'));
+    return `mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`;
+}
+/** Send feedback by email — the no-GitHub / offline path. A mailto pre-addressed to the maintainer, stars + comment prefilled. */
+export function sendFeedback(stars, comment) {
+    try { window.location.href = mailtoHref(stars, comment); } catch (_) { /* no mail client — the anchor href is the fallback */ }
     const s = loadState(); s.state = 'done'; saveState(s);
     track('rate_feedback');
     removeToast();
@@ -91,17 +98,46 @@ function never() {
     track('rate_never'); removeToast();
 }
 
+/** Submit the rating form → POST to the Worker (stars 1–5 + optional comment), record done, thank, close. */
+function submitForm(bar) {
+    const stars = +bar.dataset.stars || 0;
+    if (stars < 1) { bar.querySelector('.rate-stars').classList.add('rate-shake'); setTimeout(() => bar.querySelector('.rate-stars').classList.remove('rate-shake'), 400); return; }
+    const comment = String((bar.querySelector('.rate-comment') || {}).value || '').slice(0, 500);
+    submitRating({ stars, comment });   // fire-and-forget to the Worker (D1+AE); the offline path is "send by email"
+    const s = loadState(); s.state = 'done'; saveState(s);
+    track('rate_feedback');
+    bar.innerHTML = '<div class="rate-head" style="margin:0;">🙏 Thanks for the feedback!</div>';
+    setTimeout(removeToast, 1600);
+}
+
 export function showRateToast() {
     if (document.querySelector('.ddcs-rate-toast')) return;
     const bar = document.createElement('div');
     bar.className = 'ddcs-rate-toast';
-    bar.innerHTML = '<span class="rate-msg">Enjoying DDCS Studio? </span>'
-        + `<a class="rate-btn rate-go" href="${REPO_URL}" target="_blank" rel="noopener">⭐ Rate on GitHub</a>`
-        + `<a class="rate-btn rate-feedback" href="mailto:${FEEDBACK_EMAIL}">✉ Send feedback</a>`
+    bar.dataset.stars = '0';
+    // in-app-dialog styling (var tokens) — a small non-modal card. 5 stars (1–5) + an optional ≤500-char comment → Send.
+    bar.innerHTML =
+        '<div class="rate-head">Enjoying DDCS Studio?</div>'
+        + '<div class="rate-stars" role="radiogroup" aria-label="Rating">'
+        + [1, 2, 3, 4, 5].map((i) => `<button type="button" class="rate-star" data-v="${i}" role="radio" aria-checked="false" aria-label="${i} star${i > 1 ? 's' : ''}" title="${i}/5">★</button>`).join('')
+        + '</div>'
+        + '<textarea class="rate-comment" rows="2" maxlength="500" placeholder="Anything you\'d like to say? (optional)"></textarea>'
+        + '<div class="rate-actions">'
         + '<button class="rate-btn rate-later" type="button">Later</button>'
-        + '<button class="rate-btn rate-never" type="button">Never</button>';
-    bar.querySelector('.rate-go').addEventListener('click', (e) => { e.preventDefault(); openRate('toast'); });
-    bar.querySelector('.rate-feedback').addEventListener('click', (e) => { e.preventDefault(); sendFeedback(); });
+        + '<button class="rate-btn rate-never" type="button">Never</button>'
+        + '<span style="flex:1"></span>'
+        + '<button class="rate-btn rate-submit primary" type="button">Send</button>'
+        + '</div>'
+        + '<div class="rate-alt">'
+        + `<a class="rate-email" href="${mailtoHref(0, '')}">or send by email</a>`
+        + `<a class="rate-github" href="${REPO_URL}" target="_blank" rel="noopener" title="Star the project on GitHub">⭐ star the project</a>`
+        + '</div>';
+    // stars: click sets 1–5, fills up to the chosen one
+    const paint = () => { const v = +bar.dataset.stars; bar.querySelectorAll('.rate-star').forEach((b) => { const on = +b.dataset.v <= v; b.classList.toggle('on', on); b.setAttribute('aria-checked', String(+b.dataset.v === v)); }); };
+    bar.querySelectorAll('.rate-star').forEach((b) => b.addEventListener('click', () => { bar.dataset.stars = b.dataset.v; paint(); }));
+    bar.querySelector('.rate-submit').addEventListener('click', () => submitForm(bar));
+    bar.querySelector('.rate-email').addEventListener('click', (e) => { e.preventDefault(); sendFeedback(+bar.dataset.stars || 0, (bar.querySelector('.rate-comment') || {}).value || ''); });
+    bar.querySelector('.rate-github').addEventListener('click', () => openRate('toast'));   // let the link navigate; also record done
     bar.querySelector('.rate-later').addEventListener('click', later);
     bar.querySelector('.rate-never').addEventListener('click', never);
     document.body.appendChild(bar);
@@ -125,5 +161,5 @@ export function initRatePrompt() {
     // the header ⋮ menu "⭐ Rate / Feedback" entry (unprompted path) — shows the toast so the user picks EITHER destination
     // (GitHub star OR email feedback). Distinct from the auto-prompt (this never records shownForVersion — it's on demand).
     window.ddcsOpenRate = () => showRateToast();
-    window.__ddcsRate = { shouldShowRate, RATE_TRIGGER, loadState, bumpSession, bumpInsert, onInsertComplete, openRate, sendFeedback };   // test hook
+    window.__ddcsRate = { shouldShowRate, RATE_TRIGGER, loadState, bumpSession, bumpInsert, onInsertComplete, openRate, sendFeedback, mailtoHref, submitRating };   // test hook
 }

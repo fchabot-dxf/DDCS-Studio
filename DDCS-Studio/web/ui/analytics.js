@@ -94,6 +94,27 @@ export function track(event, name = '') {
 
 if (typeof window !== 'undefined') window.ddcsTrack = track;
 
+/** t698 — the /rate endpoint = the analytics base + '/rate' (the Worker persists stars+comment to D1 + mirrors to AE). */
+function rateEndpoint() {
+  const u = (typeof window !== 'undefined' && window.DDCS_ANALYTICS_URL) || ENDPOINT;
+  if (!u || u.includes('REPLACE-ME')) return null;
+  return u.replace(/\/e\/?$/, '') + '/rate';
+}
+/** Submit a rating (stars 1–5 + optional ≤500-char comment) to the Worker. Same off()/no-track guards as track (a webdriver
+ *  test opts in via __ddcsForceTrack + a mocked endpoint). Fire-and-forget with a resolved status so the toast can react. */
+export function submitRating({ stars, comment } = {}) {
+  const s = Math.max(1, Math.min(5, parseInt(stars, 10) || 0));
+  const c = String(comment == null ? '' : comment).slice(0, 500);
+  const url = rateEndpoint();
+  if (!url || off()) return Promise.resolve({ ok: false, skipped: true });
+  const payload = JSON.stringify({ stars: s, comment: c, id: anonId(), app: isExe() ? 'exe' : 'web', version: version(), os: (navigator.platform || navigator.userAgent || '').slice(0, 32) });
+  try {
+    return fetch(url, { method: 'POST', body: payload, headers: { 'content-type': 'text/plain' }, keepalive: true })
+      .then((r) => ({ ok: !!(r && r.ok) })).catch(() => ({ ok: false }));
+  } catch (_) { return Promise.resolve({ ok: false }); }
+}
+if (typeof window !== 'undefined') window.ddcsSubmitRating = submitRating;
+
 // "?dev=1" marks THIS browser as the developer's own (persisted) AND registers your current network, so
 // other devices on the same wifi count as you too; "?dev=0" undoes both. You only need it once per network.
 // (A tagged browser also re-registers the network on every visit below, so it self-heals if your IP changes.)

@@ -9455,3 +9455,21 @@ Three independent smalls, all landed + verified (tests/smalls-696.spec.js, 3/3).
 
 ### (b4) Presets affordance (index.html + wizardTemplates.js)
 The wizard-header `📑` mystery icon → a LABELED "📑 Presets" button (bordered, padded — not a bare emoji); title reworded. The popover: "Presets — {op}", "+ Save current as preset…", + a terse distinguishing line: "A preset saves this op's values to reuse; 'Save as custom wizard' is different — it makes a new bar button." Same capability (save/load named per-op value-sets, local+cloud). VERIFY: the labeled button opens the popover; the copy reads "Presets"/"preset" + names the custom-wizard distinction.
+
+---
+
+## t698 — RATINGS + RETENTION: (1) THE RATE FORM done + verified; GATING (2)/(3)/(4) the Worker/D1/cron (concrete plan below)
+
+Delivered the client-facing (1) — the highest-value, self-contained, mock-verifiable piece. Gating the analytics/ Worker back-end given the session's depth + that it's a distinct, shared, deploy-gated concern.
+
+### (1) THE RATE FORM (ratePrompt.js + analytics.js + styles.css) — DONE
+The dismissible toast regained a FORM (in-app-dialog styling, tokens): a `.rate-head` + **5 clickable stars** (1–5, fill-to-selected, aria radiogroup) + an optional **≤500-char comment** textarea + a **Send** (`.rate-submit.primary` → the b6 theme-accent) + a footer: **"or send by email"** (the mailto path) · **"⭐ star the project"** (GitHub demoted to a small link). Later/Never + the trigger/cooldown/never gate UNCHANGED.
+- **submit** → `submitRating({stars, comment})` (new, analytics.js): POSTs `{stars, comment, id(anon), app, version, os}` to `<analytics-base>/rate`, reusing the SAME `off()`/no-track guards (webdriver + doNotTrack + ddcs_no_analytics; a test opts in via `__ddcsForceTrack`). Validated 1–5 (no stars → shake, no POST); comment capped 500. Fire-and-forget with a resolved status; a "🙏 Thanks" then auto-close.
+- **email/offline** → `mailtoHref(stars, comment)` pre-fills `★★★★☆ (4/5)` + the comment + version in the body.
+- VERIFY (rate-prompt.spec.js, 12/12): the form shows 5 stars + email + star-the-project + Later/Never; Send POSTs `{stars:4, comment, version, app}` to a MOCKED `/rate` (asserted via waitForRequest); no-stars → no POST (validation); the mailto carries the stars+comment; the header-menu path + "done"/never/cooldown all still green. Screenshots scratchpad/rate-form-{studio,normal,futuristic}.png (Send = the theme accent; gold filled stars).
+
+### GATED — (2)/(3)/(4) the analytics/ Worker (I mapped it: src/index.js routes /e→AE (env.EVENTS.writeDataPoint) + /dash; wrangler.toml has the AE dataset + DEV_IPS KV + ACCOUNT_ID)
+- **(2) /rate → D1 + AE**: add a `if (url.pathname === '/rate')` branch — parse+validate (stars 1–5, comment ≤500), `env.RATINGS.prepare('INSERT INTO ratings …').bind(ts, stars, comment, version, app, os, anonId).run()` (D1 permanent) + `env.EVENTS.writeDataPoint({blobs:['rating'], doubles:[stars], indexes:[version]})` (AE mirror for trends). A `migrations/0001_ratings.sql` (schema ts/stars/comment/version/app/os/anonId) + wrangler.toml `[[d1_databases]] binding="RATINGS"`.
+- **(3) cron rollup**: a `scheduled(event, env)` handler → AE SQL (aeQuery, already present) for yesterday grouped by event → upsert into a D1 `rollups {date, event, count}` (raw AE 90d, rollup forever). wrangler.toml `[triggers] crons = ["30 2 * * *"]`.
+- **(4) local unit tests, NO deploy**: vitest + `@cloudflare/vitest-pool-workers` (miniflare D1) if available, else a hand harness; assert /rate validates + writes both stores + the cron aggregates a synthetic day. The pending USER deploy now carries the (2nd-agent) read-reducer + these ratings + rollups — flag it, do NOT `wrangler deploy`.
+NOTE: analytics/ is shared with the 2nd agent (concurrent-analytics-agent-and-git) → the Worker turn must stage only its own files + rebase carefully.

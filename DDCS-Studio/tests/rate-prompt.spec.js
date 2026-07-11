@@ -52,8 +52,9 @@ test('a successful insert AFTER the threshold shows the toast; Later hides + per
     await page.waitForSelector('.ddcs-rate-toast', { timeout: 4000 });
     const t = await page.locator('.ddcs-rate-toast').innerText();
     expect(t).toContain('Enjoying DDCS Studio');
-    expect(t).toContain('Rate on GitHub');
-    expect(t).toContain('Send feedback');   // t598 amendment — the no-GitHub path
+    expect(await page.locator('.ddcs-rate-toast .rate-star').count(), '5 stars (the form, t698)').toBe(5);
+    expect(t).toMatch(/send by email/i);       // t698 — the mailto path (was "Send feedback")
+    expect(t).toMatch(/star the project/i);    // t698 — GitHub demoted to a small footer link
     expect(t).toContain('Later');
     expect(t).toContain('Never');
     // Later → hides + persists a +14d cooldown
@@ -130,10 +131,10 @@ test('the header ⋮ menu Rate/Feedback entry shows the toast with BOTH destinat
     await page.waitForSelector('#hdrPostMenu .hdr-quick-item[data-act="rate"]');
     await page.click('#hdrPostMenu .hdr-quick-item[data-act="rate"]');
     await page.waitForSelector('.ddcs-rate-toast');
-    const go = await page.getAttribute('.ddcs-rate-toast .rate-go', 'href');
-    const fb = await page.getAttribute('.ddcs-rate-toast .rate-feedback', 'href');
-    expect(go, 'Rate → the GitHub repo').toContain('github.com/fchabot-dxf/DDCS-Studio');
-    expect(fb, 'Send feedback → a mailto to the maintainer').toMatch(/^mailto:dansemur@gmail\.com/);
+    const go = await page.getAttribute('.ddcs-rate-toast .rate-github', 'href');
+    const fb = await page.getAttribute('.ddcs-rate-toast .rate-email', 'href');
+    expect(go, 'the footer star-the-project link → the GitHub repo').toContain('github.com/fchabot-dxf/DDCS-Studio');
+    expect(fb, 'send by email → a mailto to the maintainer').toMatch(/^mailto:dansemur@gmail\.com/);
 });
 
 test('Send feedback records "done" + fires the rate_feedback analytics event', async ({ page }) => {
@@ -145,4 +146,38 @@ test('Send feedback records "done" + fires the rate_feedback analytics event', a
     });
     expect(r.state, 'feedback counts as engaged → done (stops the auto-prompt)').toBe('done');
     expect(r.ev, 'the analytics event fires').toContain('rate_feedback');
+});
+
+test('the RATE FORM (t698): pick stars + comment → Send POSTs {stars,comment,version,app} to /rate; the email path carries them', async ({ page }) => {
+    await boot(page, { sessionCount: 2, successfulInserts: 5, lastSessionDay: TODAY() });
+    await page.route('**/rate', (route) => route.fulfill({ status: 200, body: 'ok' }));
+    await page.evaluate(() => { window.__ddcsForceTrack = true; window.__ddcsNoTrack = false; window.DDCS_ANALYTICS_URL = 'https://mock.test/e'; });
+    await page.evaluate(() => window.ddcsOpenRate());
+    await page.waitForSelector('.ddcs-rate-toast .rate-star');
+    await page.click('.ddcs-rate-toast .rate-star[data-v="4"]');
+    await page.fill('.ddcs-rate-toast .rate-comment', 'love the wizards');
+    const [req] = await Promise.all([
+        page.waitForRequest((r) => /\/rate$/.test(r.url()) && r.method() === 'POST', { timeout: 5000 }),
+        page.click('.ddcs-rate-toast .rate-submit'),
+    ]);
+    const body = JSON.parse(req.postData());
+    expect(body.stars, 'the POST carries the star rating').toBe(4);
+    expect(body.comment, 'the POST carries the comment').toBe('love the wizards');
+    expect(typeof body.version === 'string' && (body.app === 'web' || body.app === 'exe'), 'the POST carries version + app').toBe(true);
+    // the email/offline path pre-fills the same
+    const href = decodeURIComponent(await page.evaluate(() => window.__ddcsRate.mailtoHref(4, 'love the wizards')));
+    expect(href, 'the mailto carries the stars + comment').toMatch(/4\/5[\s\S]*love the wizards/);
+});
+
+test('the RATE FORM: Send with NO stars does not submit (validated 1–5)', async ({ page }) => {
+    await boot(page, { sessionCount: 2, successfulInserts: 5, lastSessionDay: TODAY() });
+    let posted = false;
+    await page.route('**/rate', (route) => { posted = true; route.fulfill({ status: 200, body: 'ok' }); });
+    await page.evaluate(() => { window.__ddcsForceTrack = true; window.DDCS_ANALYTICS_URL = 'https://mock.test/e'; });
+    await page.evaluate(() => window.ddcsOpenRate());
+    await page.waitForSelector('.ddcs-rate-toast .rate-submit');
+    await page.click('.ddcs-rate-toast .rate-submit');   // no stars picked
+    await page.waitForTimeout(400);
+    expect(posted, 'no POST without a star rating').toBe(false);
+    await expect(page.locator('.ddcs-rate-toast'), 'the form stays open to pick a star').toHaveCount(1);
 });
