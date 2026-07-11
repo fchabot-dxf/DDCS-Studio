@@ -10072,3 +10072,24 @@ t730's world-unclamp was real (V10.148) but the advisor's repro STILL saturated 
 
 **VERIFY:** emit BYTE-IDENTICAL (the refit is view-only; it recomputes _tf/_draw, never a field or param). FULL SUITE: 1064 passed, 2 skipped, 0 failed at retries=0 (the 2 new canvas-refit specs green; no regressions across the drag-heavy layout tests).
 **Files:** web/viz/featureCanvas.js (refit-on-drop: _fit `roomy` flag + _handleInGutter + the end-handler branch) · tests/alignment-canvas-refit-732.spec.js (NEW). NEXT (per queue): TRANSFORM declared + chip (the commissioned turn). PASS BACK.
+
+---
+
+## Turn 734 (worker) — TRANSFORM BECOMES DECLARED: GATE on the declaration SHAPE (a new-block-kind decision before the large build)
+
+Grounded the whole feature (Explore map). Most of the "declared transform" machinery already EXISTS: the ⟳ Transform modal already PREFERS a declared atom (makeRotate wraps the stack) and only bakes (rotateProgram text-rewrite) as a fallback for raw G-code / hand-edited text; the emit fold (blockEmitter kind:'rotate') applies the rotation at generation and 0° → returns the children UNTOUCHED (so ✕-clear byte-identity is already free); a rotate block round-trips through Blocks for FREE (generic fields path); save/load serializes the whole stack (in-stack declarations round-trip for free). So the gaps are: reliable declaring, the CHIP (new), and the declaration SHAPE.
+
+**THE FORK (worth a gate — a new block kind + it changes the whole build):** how to store the declared program-level rotation.
+
+- **A) REUSE the makeRotate WRAPPER (today's path):** nest the whole program in ONE `rotate` C-block — `program = [ rotate{angle,px,py, children:[...all ops...]} ]`. PRO: exists today (emit fold + round-trip + byte-identical), ZERO new schema. CON: it NESTS the entire program inside a container (a giant Rotate wrapper in Blocks); re-applying NESTS again (rotate{rotate{…}}) → awkward for "ONE active rotation" + the chip + ✕; not a FLAT "program-level" declaration.
+
+- **B) an entry-style SIBLING declaration (RECOMMENDED):** a flat childless marker `xform{angle,pivotX,pivotY}` at the top of the stack, emitting NOTHING itself, applied ONCE program-wide by a new `applyProgramTransform(T, blocks)` post-pass in emitMapped — `program = [ xform{angle,px,py}, ...all ops... ]`. This is the EXACT shape the mill ENTRY marker already uses (kind:'entry' → emits nothing, applied once via applyEntryWaypoint in the emit choke point). PRO: matches the spec's "program-LEVEL {angle,pivotX,pivotY}" + the entry precedent; ONE FLAT declaration → clean chip (show/edit/✕); stack stays flat; round-trips + saves for free (generic fields path, in-stack). CON: a NEW block kind (`xform`) + a new emitMapped post-pass; COEXISTS with the legacy makeRotate wrapper (old saved programs keep emitting via the kind:'rotate' fold — no migration, just coexistence).
+
+**RECOMMEND B** — the spec says "program-LEVEL", the entry marker is the established precedent, and the chip's "one active rotation, ✕ clears" semantics need one flat declaration (A's nesting-on-reapply fights that).
+
+**Sub-decisions (recommendations):**
+1. LEGACY: keep the makeRotate wrapper emit fold so old programs still emit; NEW rotations write the sibling xform; baked-text rotations stay baked (per the ruling's MIGRATION HONESTY). → coexist, no migration.
+2. .nc ROUND-TRIP: .mjson saves the stack (free). Should the xform also survive .nc export/import (a `( @DDCS )` marker)? → yes if the marker slot is cheap, else .mjson-only for v1.
+3. POSITION (move) tab: it ALREADY declares (makePlace optIn shift, round-trips) — less broken than rotate. → give it the SAME sibling treatment (fold {dx,dy,dz} into the one xform, OR a parallel xshift) for symmetry, or report it's already clean. Recommend: unify rotate now; do the position symmetry in the same turn if cheap.
+
+GATE: PASS BACK the fork + recommendation (B + the 3 sub-decisions). Await the synthesis, then build exactly that. No code changed this turn (a design gate).
