@@ -70,6 +70,12 @@ export const alignmentView = {
         // Two starts (point A + point B) spread along the fence so both probes are placed at distinct points.
         const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
         ctx.preview3D(gcode, 'alignmentVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
+        // t674/t676 — alignment is a SEATED in-place fence probe: the drawn trace + the sim must begin at marker A, not the
+        // origin (its final G53/absolute park otherwise flips stats.absolute → the trace anchors to {0,0}). The DATA twin
+        // declares this via def.sim{seatStart}; the built-in view must apply the SAME seat intent, else openWiz('alignment')
+        // draws from origin (the exact user symptom). previewSeatAtStart is idempotent + drives both the trace anchor
+        // (v._seatAtStart) and the engine seat (initialPos). Applied every render so a view switch / re-trace stays seated.
+        if (ctx.previewSeatAtStart) ctx.previewSeatAtStart('alignmentVizContainer', true);
 
         const probeAxis = params.checkAxis === 'X' ? 'Y' : 'X';
         const status = el('alignmentVizStatus');
