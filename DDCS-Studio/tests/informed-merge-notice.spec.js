@@ -57,7 +57,9 @@ test('showBlockEditNotice renders the residue and still resolves the 3-way choic
   const r = await page.evaluate(async () => {
     const { showBlockEditNotice } = await import('/ui/blockEditNotice.js');
     const p = showBlockEditNotice('Surfacing', { injected: ['G4 P500 (DWELL_MARKER)'], overrides: [{ from: 'F800', to: 'F1200' }] });
-    await new Promise((r) => setTimeout(r, 50));
+    // t728 r2 — REAL readiness (not a fixed 50ms sleep): wait for the notice element to actually render, else a slow
+    // (contended) render misses the 50ms window and the query returns null → the flake. Condition-gated, capped so it can't hang.
+    await new Promise((res) => { let n = 0; const t = setInterval(() => { if (document.querySelector('.block-edit-notice') || ++n > 400) { clearInterval(t); res(); } }, 10); });
     const ov = document.querySelector('.block-edit-notice');
     const shownInjected = ov.textContent.includes('DWELL_MARKER');
     const shownOverride = ov.textContent.includes('F800') && ov.textContent.includes('F1200');

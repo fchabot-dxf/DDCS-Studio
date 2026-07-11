@@ -305,6 +305,17 @@ export const userOpView = {
             if (viz3dBox) viz3dBox.style.display = '';
             let starts = null;
             try { const stk = _simStock || (window.ddcsGetSettings && window.ddcsGetSettings().stock); starts = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
+            // t728 r1 — a mill twin with a declared entry point feeds the 3D an EMITTING start at the entry (cut entry when
+            // unset, else entryX/entryY — the SAME position + the ONE firstRapidXY source as the 2D square), so the 3D glyph
+            // is the emitting SQUARE too (setStartEmits reads emits:true), unifying the 2D/3D marker language.
+            if (!starts && _def && _def.entryPoint) {
+                const epb = _def.entryPoint;
+                const exEl = fhost && fhost.querySelector(`[data-param="${epb.x}"]`), eyEl = fhost && fhost.querySelector(`[data-param="${epb.y}"]`);
+                const exV = (exEl && exEl.value !== '') ? Number(exEl.value) : NaN, eyV = (eyEl && eyEl.value !== '') ? Number(eyEl.value) : NaN;
+                const _cut = firstRapidXY(previewGcode);
+                const ep = (Number.isFinite(exV) && Number.isFinite(eyV)) ? { x: exV, y: eyV } : (_cut ? { x: _cut.x, y: _cut.y } : null);
+                if (ep) starts = [{ x: ep.x, y: ep.y, z: 0, emits: true }];   // emits:true → the 3D emitting SQUARE (not the sim-only ○)
+            }
             // t301 MARKER PARITY (Seam A feed) — refresh the datum-PINNED wall worlds from the live spot store BEFORE the panel
             // re-renders, so a spotted wall HOLDS in the 3D marker (computePassStarts reads host.__pinnedStarts). Empty spots → null → the pure-auto chain, byte-identical.
             const _phost = viz3dIn('userViz3dContainer');   // the SAME one-level-up derivation the panel + the drag path use (a two-level querySelector can match the OTHER pane's .wiz-viz3d in form3d+2d)
