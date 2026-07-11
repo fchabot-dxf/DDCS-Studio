@@ -9352,3 +9352,26 @@ The first full-suite run after the sweep failed 22 (979 passed). Root causes + f
 3. **Native-dialog-coupled tests** — tests used `page.on('dialog', d => d.accept())` or stubbed `window.confirm/prompt`; the in-app modal fires neither. Added **tests/_appDialog.js** (`autoAppDialog(page, {accept, prompt})` — a MutationObserver that auto-responds to `.app-dialog`: PROMPTS always submit the given value, CONFIRM/NOTICE honour `accept`; records messages for `appDialogLog`). Migrated autostart-stored-macro (dialog-COUNT assertions → `appDialogLog().length`), homing-sysstart-real, profile-library (prompt value), wizard-manager (×2), wizard-templates (the "Nothing to save" NOTICE now read from the log). All green.
 
 LESSON: an app-wide seam change (native→in-app dialogs) cascades into the tests coupled to the old seam. `node --check` every swept file (a lazy-loaded module's syntax error hides from a boot test); prefer a callback guard over forcing a whole handler async when the common path is sync + a test reads synchronously.
+
+---
+
+## t688 — (b) THE PROFILE BROWSER MODAL + Settings section collapse (GATING (b2) the header — a distinct surface)
+
+Built the profile browser (b); gating the header profile section (b2) as the next focused turn given the depth of this session.
+
+### NEW web/ui/profileModal.js — the browser (project-browser pattern, over the EXISTING library)
+`openProfileModal('browse'|'save')`. UI-only over data/profileLibrary.js + the cloud store — the full-swap semantics + the library API are UNCHANGED.
+- **browse**: a 13100-tier modal (its OWN class `profile-modal`, NOT `app-dialog`; dialogs bumped to z-20000 so a confirm/prompt from inside the modal sits ABOVE it) with a [Done] footer. Local rows (● active / ○, `☁ synced` when a cloud copy shares the name) each offer Load (switchProfile full-swap) / Export (⤓ the stored entry → .json) / Delete (dlgConfirm); cloud-only rows offer download / delete. Footer: [Import file] (importAsProfile), [☁ Save to cloud] (the active profile → ddcsSaveProfileToCloud, same-name asks), [☁ Sync], [Done].
+- **save (the ONLY naming moment)**: dlgPrompt the name → an UNNAMED active (or its own name) is RENAMED in place (no orphan unnamed profile); a NAMED active under a NEW name DUPLICATES the current config as that profile (createProfile switches to it); a same-name existing profile asks to overwrite (dlgConfirm) → replace. Duplicate = save-as from current.
+- **RECENTS**: a switch or a save pushes the id onto ddcs_profile_recents (localStorage, capped, live-filtered) — `recentProfileIds()` exported for the header (b2).
+
+### Settings PROFILE section COLLAPSED (settingsPanel.js)
+Removed the inline name field, the amber "(unnamed)/name your config" hint, the inline list, ＋New/⧉Duplicate, ⬇Export/⬆Import, ☁Save/☁Sync. Now: a read-only CURRENT line (`profile · controller`) + **[＋ Save as profile…] [🗂 Profiles…] [📁 Import from dump]**. `renderProfileLibrary` shrank to just the current-label setter; `setProfileChangeHook(afterProfileChange)` lets the modal refresh the live UI. Removed two UNGUARDED handlers (`set_profile_export`/`import`) that would crash settings-open now their elements are gone (the guarded ones no-op harmlessly).
+
+### VERIFY (real-symptom)
+- profile-library REAL-APP rewritten: the collapsed structure (current + Save-as + Profiles… + Import-from-dump, NO inline name/list/dup); **save-as NAMES + lands** (active.name); a 2nd save-as duplicates; the **browse modal lists 2**; **Load FULL-SWAPS** the envelope 320→700; **Done closes**; the CONTROLLER dropdown still persists. Green.
+- profile-cloud-library rewritten to the modal: local+cloud+synced rows; Save-to-cloud pushes the active name; the same-name overwrite confirm CANCEL → no push. Green. dialog-helper still green.
+- Screenshot scratchpad/profile-modal.png (the project-browser look: rows + Load/⤓/🗑, footer Import/Save-to-cloud/Sync/Done).
+
+### GATED — (b2) the header quick-menu Profile section
+The "Generate for" section (headerPost.js:126 `sub('post', 'Generate for', …)`) → a PROFILE section: line 1 read-only current profile+controller; 2-3 recents (recentProfileIds(), one-click switchProfile); [Profiles…] [Save as…] [Pull from controller]; NO dialect switching. A distinct surface reusing openProfileModal + recentProfileIds — clean as its own turn.

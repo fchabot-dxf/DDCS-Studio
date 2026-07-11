@@ -54,58 +54,54 @@ test('the switch FULL-SWAPS envelope + WCS + autostart both ways — no bleed (t
     expect(r.count).toBe(2);
 });
 
-test('REAL APP: the profile-first Controller panel — name, new dup, switch swaps the envelope, override banner; screenshots', async ({ page }) => {
+test('REAL APP (t684 b): the collapsed PROFILE section + the browser modal — save-as names + lands, load full-swaps', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings && window.ddcsProfileLib);
     await page.evaluate(() => { localStorage.removeItem('ddcs_profile_library'); const s = window.ddcsGetSettings(); s.machine = { x: 700, y: 500, z: 300, show: true }; });
     await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
-    await page.waitForSelector('#set_tab_profile #set_profile_name', { timeout: 8000 });
-    // profile-first structure (the amended labels): section 1 PROFILE (name + list + New/Duplicate + Export), section 2
-    // CONTROLLER (ONE dropdown). NO post-override banner/advanced (dropped). The migrated profile is UNNAMED → a prompt.
-    const struct = await page.evaluate(() => {
-        const sec = [...document.querySelectorAll('#set_tab_profile .settings-section-title')].map((e) => e.textContent);
-        return {
-            nameField: !!document.getElementById('set_profile_name'),
-            controllerDropdown: !!document.getElementById('set_profile'),
-            list: !!document.getElementById('set_profile_list'),
-            newDup: !!document.getElementById('set_profile_new_dup') && !!document.getElementById('set_profile_new_base'),
-            noBanner: !document.getElementById('set_post_override_banner') && !document.getElementById('set_post_advanced') && !document.getElementById('set_post'),
-            sections: sec,
-            unnamedHint: (document.getElementById('set_profile_name_hint') || {}).textContent || '',
-        };
-    });
-    expect(struct.nameField && struct.controllerDropdown && struct.list && struct.newDup, 'profile-first panel structure').toBe(true);
-    expect(struct.noBanner, 'the post-override banner + advanced link + post dropdown are dropped (amend 2)').toBe(true);
-    expect(struct.sections, 'sections renamed: PROFILE + CONTROLLER (no POST PROCESSOR)').toContain('PROFILE');
-    expect(struct.sections, 'the CONTROLLER section (was POST PROCESSOR)').toContain('CONTROLLER');
+    await page.waitForSelector('#set_tab_profile #set_profile_saveas', { timeout: 8000 });
+    // COLLAPSED structure: a read-only current line + [Save as…] [Profiles…] [Import from dump]. NO inline name/list/new-dup/amber hint.
+    const struct = await page.evaluate(() => ({
+        current: !!document.getElementById('set_profile_current'),
+        saveas: !!document.getElementById('set_profile_saveas'),
+        browse: !!document.getElementById('set_profile_browse'),
+        dump: !!document.getElementById('set_profile_import_dump'),
+        controllerDropdown: !!document.getElementById('set_profile'),
+        goneName: !document.getElementById('set_profile_name') && !document.getElementById('set_profile_list') && !document.getElementById('set_profile_new_dup') && !document.getElementById('set_profile_name_hint'),
+        sections: [...document.querySelectorAll('#set_tab_profile .settings-section-title')].map((e) => e.textContent),
+    }));
+    expect(struct.current && struct.saveas && struct.browse && struct.dump, 'collapsed section: current line + Save-as + Profiles… + Import-from-dump').toBe(true);
+    expect(struct.goneName, 'the inline name field / list / duplicate / amber hint are GONE (moved to the modal)').toBe(true);
+    expect(struct.controllerDropdown, 'the CONTROLLER dropdown stays').toBe(true);
+    expect(struct.sections.join(' '), 'PROFILE + CONTROLLER, no POST PROCESSOR').toMatch(/PROFILE/);
     expect(struct.sections.join(' '), 'POST PROCESSOR is gone').not.toMatch(/POST PROCESSOR/);
-    expect(struct.unnamedHint, 'the migrated profile prompts to be named (non-blocking-persistent)').toMatch(/Name your machine config/i);
 
-    // name the migrated (unnamed) profile
-    await page.fill('#set_profile_name', 'My V4.1 rig');
-    await page.dispatchEvent('#set_profile_name', 'change');
-    // create a 2nd profile (duplicate current) — accept the name prompt (profiles are only ever user-named)
+    // SAVE-AS names the current config (x=700 = "My V4.1 rig") — the ONLY naming moment (dlgPrompt)
+    await autoAppDialog(page, { accept: true, prompt: 'My V4.1 rig' });
+    await page.click('#set_profile_saveas');
+    await page.waitForTimeout(200);
+    expect(await page.evaluate(() => window.ddcsProfileLib.activeProfile().name), 'save-as named the current profile').toBe('My V4.1 rig');
+    // SAVE-AS again (still x=700) → "Second rig" duplicates the current + becomes active; THEN mutate x on Second rig
     await autoAppDialog(page, { accept: true, prompt: 'Second rig' });
-    await page.click('#set_profile_new_dup');
-    await page.waitForTimeout(150);
+    await page.click('#set_profile_saveas');
+    await page.waitForTimeout(200);
     await page.evaluate(() => { window.ddcsGetSettings().machine.x = 320; window.ddcsProfileLib.saveActiveSnapshot(); });
-    const rowCount = await page.evaluate(() => document.querySelectorAll('#set_profile_list .prof-row').length);
-    expect(rowCount, 'two profiles in the list').toBe(2);
-    // switch back to the first via the list → the envelope swaps to 700
-    await page.evaluate(() => { const rows = [...document.querySelectorAll('#set_profile_list .prof-row')]; const first = rows.find((r) => /My V4.1 rig/.test(r.textContent)); first.click(); });
+    // BROWSE modal → two rows; loading "My V4.1 rig" FULL-SWAPS the envelope back to 700
+    await page.click('#set_profile_browse');
+    await page.waitForSelector('.profile-modal');
+    expect(await page.locator('.profile-modal .prof-row').count(), 'two profiles in the modal list').toBe(2);
+    await page.evaluate(() => { const r = [...document.querySelectorAll('.profile-modal .prof-row')].find((x) => /My V4.1 rig/.test(x.textContent)); r.querySelector('[data-load]').click(); });
     await page.waitForTimeout(150);
-    const env1 = await page.evaluate(() => window.ddcsGetSettings().machine.x);
-    expect(env1, 'switching to the first profile swaps the envelope back to 700').toBe(700);
-    await page.locator('#set_tab_profile').screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/profile-first-panel.png' });
+    expect(await page.evaluate(() => window.ddcsGetSettings().machine.x), 'loading the first profile full-swaps the envelope back to 700').toBe(700);
+    await page.locator('.profile-modal > div').first().screenshot({ path: 'scratchpad/profile-modal.png' });
+    // DONE closes
+    await page.click('.profile-modal [data-pa="done"]');
+    await expect(page.locator('.profile-modal')).toHaveCount(0);
 
-    // the CONTROLLER dropdown is the single authoritative control: changing it retargets THIS profile + persists (reload → stuck)
+    // the CONTROLLER dropdown still retargets THIS profile + persists
     await page.selectOption('#set_profile', 'ddcs-v41').catch(() => {});
     await page.waitForTimeout(100);
-    const persisted = await page.evaluate(() => {
-        const lib = JSON.parse(localStorage.getItem('ddcs_profile_library'));
-        const active = lib.profiles.find((p) => p.id === lib.activeId);
-        return active.controllerId;
-    });
+    const persisted = await page.evaluate(() => { const lib = JSON.parse(localStorage.getItem('ddcs_profile_library')); return lib.profiles.find((p) => p.id === lib.activeId).controllerId; });
     expect(persisted, 'changing the CONTROLLER dropdown persists into the active profile').toBe('ddcs-v41');
 });
 

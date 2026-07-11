@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { autoAppDialog } from './_appDialog.js';   // t684 b/d — the profile modal + in-app dialogs
 
 /**
  * CLOUD LIBRARY UNIFICATION (t660, E2). Save-to-cloud / Load-from-cloud are views over the SAME named-profile concept:
@@ -139,12 +140,13 @@ test('the unified library renders local + cloud + both rows; Save pushes the act
         window.ddcsSaveProfileToCloud = async (n) => { window.__savedName = n; return n; };
     });
     await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
-    await page.waitForSelector('#set_tab_profile #set_profile_list');
-    await page.click('#set_profile_cloud_load');   // "Sync cloud" → merge cloud rows into the one list
+    await page.waitForSelector('#set_profile_browse');
+    await page.click('#set_profile_browse');   // the PROFILE BROWSER MODAL auto-syncs the cloud on open
+    await page.waitForSelector('.profile-modal .prof-row');
     await page.waitForTimeout(200);
 
     const rows = await page.evaluate(() => {
-        const list = document.getElementById('set_profile_list');
+        const list = document.querySelector('.profile-modal [data-plist]');
         return {
             localCount: list.querySelectorAll('.prof-row[data-pid]').length,
             cloudOnlyLoadable: !!list.querySelector('[data-cload="c2"]'),      // 'Cloud only' → a Load button
@@ -155,20 +157,21 @@ test('the unified library renders local + cloud + both rows; Save pushes the act
     });
     expect(rows.localCount, 'two local rows (Shared rig + Local only)').toBe(2);
     expect(rows.cloudOnlyLoadable, 'the cloud-only profile shows an inline Load button').toBe(true);
-    expect(rows.sharedIsNotACloudRow, 'a cloud name that exists locally is one "both" row, not duplicated').toBe(true);
+    expect(rows.sharedIsNotACloudRow, 'a cloud name that exists locally is one "synced" row, not duplicated').toBe(true);
     expect(rows.synced, 'the matched local carries a ☁ synced tag').toBe(true);
     expect(rows.text, 'the cloud-only profile is visible in the one list').toContain('Cloud only');
 
-    // Save-to-cloud pushes the ACTIVE profile under ITS name (no name prompt). Active = 'Local only' (not on cloud) → saves.
-    await page.click('#set_profile_cloud_save');
+    // Save-to-cloud pushes the ACTIVE profile under ITS name. Active = 'Local only' (not on cloud) → saves; dismiss the "saved" notice.
+    await autoAppDialog(page, { accept: true });
+    await page.click('.profile-modal [data-pa="cloudsave"]');
     await page.waitForTimeout(200);
     expect(await page.evaluate(() => window.__savedName), 'Save pushes the active profile under its own name').toBe('Local only');
 
     // switch active to 'Shared rig' (name IS on cloud) → Save must ASK before overwriting; cancel → no push (no silent overwrite)
-    await page.evaluate(() => { window.__savedName = null; const r = [...document.querySelectorAll('#set_profile_list .prof-row[data-pid]')].find((x) => /Shared rig/.test(x.textContent)); r.click(); });
+    await page.evaluate(() => { window.__savedName = null; const r = [...document.querySelectorAll('.profile-modal .prof-row[data-pid]')].find((x) => /Shared rig/.test(x.textContent)); r.querySelector('[data-load]').click(); });
     await page.waitForTimeout(150);
-    page.once('dialog', (d) => d.dismiss());   // the overwrite confirm → cancel
-    await page.click('#set_profile_cloud_save');
+    await autoAppDialog(page, { accept: false });   // the overwrite confirm → Cancel
+    await page.click('.profile-modal [data-pa="cloudsave"]');
     await page.waitForTimeout(200);
     expect(await page.evaluate(() => window.__savedName), 'cancelling the overwrite confirm does NOT push — no silent overwrite').toBeNull();
 });

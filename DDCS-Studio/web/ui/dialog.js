@@ -24,7 +24,7 @@ function openDialog(kind, message, opts = {}) {
         ov.className = 'app-dialog';
         ov.setAttribute('role', 'dialog');
         ov.setAttribute('aria-modal', 'true');
-        ov.style.cssText = 'position:fixed; inset:0; z-index:10095; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:16px;';
+        ov.style.cssText = 'position:fixed; inset:0; z-index:20000; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:16px;';   // above every modal (incl. the 13100 profile modal) — a confirm from within a modal must sit on top
 
         const panel = document.createElement('div');
         panel.style.cssText = 'width:min(440px,94vw); max-height:88vh; overflow:auto; background:var(--panel,#161b22); color:var(--text-main,#e6ecf2); border:1px solid var(--border,#2a313b); border-radius:10px; padding:16px 18px; box-shadow:0 14px 40px rgba(0,0,0,.6);';

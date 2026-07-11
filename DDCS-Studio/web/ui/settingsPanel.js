@@ -26,6 +26,7 @@ import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 �
 import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
+import { openProfileModal, setProfileChangeHook } from './profileModal.js';   // t684 b — the profile browser (save-as / browse)
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
 // --- Tool library ----------------------------------------------------------
@@ -988,24 +989,14 @@ function buildSettingsOverlay() {
                     <div class="settings-section">
                         <div class="settings-section-title">PROFILE</div>
                         <div class="settings-row" style="align-items:center;">
-                            <input type="text" id="set_profile_name" placeholder="Name this machine config…" title="This profile's name (rename freely)" style="flex:1; min-width:160px; background:var(--bg); color:var(--text-main); border:1px solid var(--border); border-radius:4px; font-size:14px; font-weight:600; padding:5px 8px;">
-                            <button class="toolbar-btn settings-io" id="set_profile_delete" title="Delete this profile (the last profile can't be deleted)">🗑 Delete</button>
+                            <span id="set_profile_current" style="flex:1; font-weight:600; font-size:14px;"></span>
                         </div>
-                        <div class="settings-hint" id="set_profile_name_hint" style="margin-top:4px;"></div>
-                        <div id="set_profile_list" style="display:flex; flex-direction:column; gap:4px; margin-top:10px;"></div>
                         <div class="settings-row" style="margin-top:8px;">
-                            <button class="toolbar-btn settings-io" id="set_profile_new_base">＋ New profile</button>
-                            <button class="toolbar-btn settings-io" id="set_profile_new_dup">⧉ Duplicate current</button>
-                        </div>
-                        <div class="settings-hint">Named saved states — several for the same controller (different tables / fixtures) is fine. Switching swaps EVERYTHING: envelope, WCS, boot macro, variables.</div>
-                        <div class="settings-row" style="margin-top:12px;">
-                            <button class="toolbar-btn settings-io" id="set_profile_export">⬇ Export</button>
-                            <button class="toolbar-btn settings-io" id="set_profile_import">⬆ Import</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_saveas" title="Save the current configuration as a named profile">＋ Save as profile…</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_browse" title="Browse, load, delete, export or sync your profiles">🗂 Profiles…</button>
                             <button class="toolbar-btn settings-io" id="set_profile_import_dump" title="No LAN link? Copy the controller's disk to a USB stick and drop the whole folder here — Studio reads its setting / eng / coord files and derives the machine geometry + WCS (read-only), then you review before applying.">📁 Import from dump</button>
-                            <button class="toolbar-btn settings-io" id="set_profile_cloud_save">☁ Save to cloud</button>
-                            <button class="toolbar-btn settings-io" id="set_profile_cloud_load">☁ Sync cloud</button>
                         </div>
-                        <div class="settings-hint">Export the active profile as one JSON (the name rides with it). Import lands it as a new named profile. <b>Save to cloud</b> pushes the active profile under its name; <b>Sync cloud</b> lists your cloud profiles in the library above (☁ rows) — Load pulls one onto this device. Cloud storage is your own Google Drive (Settings → Cloud).</div>
+                        <div class="settings-hint">A named profile is one saved machine config — switching one swaps EVERYTHING (envelope, WCS, boot macro, variables). <b>Profiles…</b> opens the browser to load / delete / export / sync the cloud.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">CONTROLLER</div>
@@ -1736,46 +1727,13 @@ function wireSettingsOverlay(ov) {
     const profLib = () => window.ddcsProfileLib || null;
     let cloudProfiles = [];
     const normName = (s) => String(s || '').trim().toLowerCase();
+    // The Settings PROFILE section is now a read-only current line + [Save as…] [Profiles…] (the browse/list/cloud UI
+    // moved to the profile modal, t684 b). This refreshes the current-profile label.
     function renderProfileLibrary() {
         const L = profLib(); if (!L) return;
         const active = L.activeProfile() || {};
-        const unnamed = L.needsName();   // profiles are only ever user-named; the migrated config prompts (non-blocking-but-persistent) until named
-        const nameEl = q('set_profile_name');
-        if (nameEl) { if (document.activeElement !== nameEl) nameEl.value = active.name || ''; nameEl.placeholder = unnamed ? ('e.g. ' + getActiveProfile().name + ' — name this config…') : 'Name this machine config…'; }
-        const nameHint = q('set_profile_name_hint');
-        if (nameHint) { nameHint.textContent = unnamed ? '⚠ Name your machine config to save it as a profile (it works as-is; type a name above — a suggestion is prefilled).' : ''; nameHint.style.color = unnamed ? 'var(--warn,#d1902b)' : ''; }
-        const listEl = q('set_profile_list');
-        if (listEl) {
-            const cloudByName = new Map(cloudProfiles.filter((c) => c.name).map((c) => [normName(c.name), c]));
-            const matchedCloud = new Set();
-            // local rows (● active / ○); tagged 'both' (☁ synced) when a cloud copy shares the name, else 'local'
-            const localRows = L.listProfiles().map((p) => {
-                const on = p.id === active.id, ctrl = (CONTROLLER_PROFILES[p.controllerId] || {}).name || p.controllerId;
-                const cl = p.name ? cloudByName.get(normName(p.name)) : null; if (cl) matchedCloud.add(cl.id);
-                const tag = cl ? '<span style="opacity:.7; font-size:11px;">☁ synced</span>' : '<span style="opacity:.4; font-size:11px;">on this device</span>';
-                return '<div class="prof-row" data-pid="' + p.id + '" role="button" tabindex="0" style="display:flex; align-items:center; gap:8px; text-align:left; padding:6px 10px; border:1px solid var(--border); border-radius:4px; cursor:pointer; ' + (on ? 'border-color:var(--accent);' : '') + '">'
-                    + '<span style="flex:1; ' + (on ? 'font-weight:700;' : '') + '">' + (on ? '● ' : '○ ') + (p.name ? p.name : '(unnamed)') + ' <span style="opacity:.6; font-weight:400;">· ' + ctrl + '</span></span>' + tag + '</div>';
-            });
-            // cloud-only rows (no local with the same name): download onto this device, or delete the cloud copy
-            const cloudRows = cloudProfiles.filter((c) => !matchedCloud.has(c.id)).map((c) => {
-                const d = c.savedAt ? new Date(c.savedAt).toLocaleDateString() : '';
-                return '<div class="prof-row prof-cloud" style="display:flex; align-items:center; gap:8px; padding:6px 10px; border:1px dashed var(--border); border-radius:4px;">'
-                    + '<span style="flex:1; opacity:.85;">☁ ' + c.name + (d ? ' <span style="opacity:.5; font-size:11px;">· ' + d + '</span>' : '') + '</span>'
-                    + '<span style="opacity:.6; font-size:11px;">in cloud</span>'
-                    + '<button class="toolbar-btn settings-io" data-cload="' + c.id + '" title="Download as a named profile on this device">⬇ Load</button>'
-                    + '<button class="op-btn" data-cdel="' + c.id + '" title="Delete this cloud copy">✕</button></div>';
-            });
-            listEl.innerHTML = localRows.join('') + cloudRows.join('');
-            listEl.querySelectorAll('.prof-row[data-pid]').forEach((el) => el.addEventListener('click', () => { if (el.dataset.pid === active.id) return; L.switchProfile(el.dataset.pid); afterProfileChange(); }));
-            listEl.querySelectorAll('[data-cload]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); loadCloudRow(b.dataset.cload); }));
-            listEl.querySelectorAll('[data-cdel]').forEach((b) => b.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                if (!(await dlgConfirm('Delete this cloud profile? (Only the cloud copy — nothing on this device changes.)', { danger: true, okLabel: 'Delete' }))) return;
-                try { await window.ddcsDeleteCloudProfile(b.dataset.cdel); syncCloud(); }
-                catch (err) { dlgNotice('Delete failed: ' + (err && err.message ? err.message : err)); }
-            }));
-        }
-        const delBtn = q('set_profile_delete'); if (delBtn) delBtn.disabled = L.listProfiles().length <= 1;
+        const cur = q('set_profile_current');
+        if (cur) { const ctrl = (CONTROLLER_PROFILES[active.controllerId] || {}).name || active.controllerId || ''; cur.textContent = (active.name ? active.name : '(unnamed configuration)') + (ctrl ? '  ·  ' + ctrl : ''); }
     }
     // Refresh the cached cloud list (best-effort; returns [] fast when not signed in — no Drive call), then re-render.
     async function syncCloud() {
@@ -1790,6 +1748,10 @@ function wireSettingsOverlay(ov) {
         catch (e) { dlgNotice('Load failed: ' + (e && e.message ? e.message : e)); }
     }
     function afterProfileChange() { fillProfileOptions(); fillPostOptions(); fill(); applyHardwareTabs(); renderProfileLibrary(); }
+    // t684 b — the PROFILE section is buttons only; the browser modal does load/delete/export/cloud and calls back here.
+    setProfileChangeHook(afterProfileChange);
+    if (q('set_profile_saveas')) q('set_profile_saveas').addEventListener('click', () => openProfileModal('save'));
+    if (q('set_profile_browse')) q('set_profile_browse').addEventListener('click', () => openProfileModal('browse'));
     // profiles are ONLY ever USER-NAMED (t658 amend): New + Duplicate always prompt; an empty name cancels (no auto-names).
     const promptName = async (msg, def) => { const n = await dlgPrompt(msg, def || ''); if (n == null) return null; const t = String(n).trim(); return t || null; };
     if (q('set_profile_name')) q('set_profile_name').addEventListener('change', (e) => { const L = profLib(); if (!L) return; L.renameProfile(L.activeProfileId(), e.target.value); renderProfileLibrary(); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); });
@@ -2653,10 +2615,7 @@ function wireSettingsOverlay(ov) {
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
-    // Profile import/export (JSON = settings + user variables). Cloud Save/Sync are wired up in the profile-library
-    // section above (they share the cloudProfiles / syncCloud state — one source of the cloud snapshot).
-    q('set_profile_export').addEventListener('click', () => { if (window.ddcsExportProfile) window.ddcsExportProfile(); });
-    q('set_profile_import').addEventListener('click', () => { if (window.ddcsImportProfile) window.ddcsImportProfile(); });
+    // Profile import/export + cloud save/sync moved to the PROFILE BROWSER MODAL (t684 b — profileModal.js).
 
     // ATC: generate a T.nc tool-change macro from the magazine table (client-side; review before running).
     const genTnc = q('atc_gen_tnc');
