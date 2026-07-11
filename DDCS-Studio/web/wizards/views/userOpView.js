@@ -17,9 +17,8 @@ import { activeDialectOpts } from '../previewEmit.js';   // t634 — the data-op
 import { flattenBlocks, getUserStatusHint, getUserSimGcode } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography)
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
-import { opSimContext } from '../../viz/opSimContext.js';   // t421 E5 — the DECLARED preview intent (rotary rig, …) so an in-place rotary twin shows its 4th-axis rig (generic mirror of the built-in view + the Blocks tab)
 import { CommunicationWizard } from '../communicationWizard.js';   // t518 — the Comm twin's 'commscreen' panel renders this wizard's DDCS-screen mock (pure fn of params)
-import { magazinePockets } from './atcViews.js';   // t560 — a DECLARED magazine intent (sim{magazine:true}) renders the ATC magazine tiles in-place (generic mirror of atc_change/atc_table)
+import { applyPreviewIntent } from './atcViews.js';   // t714 — the ONE declared-intent apply (opSimContext → preview*), shared with the built-in views so twin + built-in agree by construction
 const _commWizard = new CommunicationWizard();
 import { createToolpath2d } from '../../viz/toolpath2d.js';   // t309 — the 2D-animation overlay under the Layout SVG (path + red head, driven by the shared engine)
 import { whenOk } from '../../blocks/whenGuard.js';   // ③ — gate `when`-conditioned form rows (e.g. corner's start #21/#22) from the live params
@@ -282,22 +281,10 @@ export const userOpView = {
         // so a FRESH open feeds the overlay the SAME seated machine-frame route a drag does (the reported 'on open it's not
         // connecting the start and probe, only after first drag' = the intent used to land AFTER renderLayoutWithSim). Idempotent
         // (the panel setters early-return when unchanged), so the plain-3D tail call below is a harmless no-op for 3d2d.
-        const applySimIntent = (rigCont) => {
-            if (!rigCont) return;
-            try {
-                const ctx = opSimContext(_def.opType);
-                mgr.previewRotaryFixture(rigCont, !!ctx.showRotaryRig);
-                if (ctx.toolMachineFrame) {
-                    if (mgr.previewMachine) mgr.previewMachine(rigCont, true);
-                    if (mgr.previewToolMachineFrame) mgr.previewToolMachineFrame(rigCont, true);
-                }
-                if (mgr.previewSeatAtStart) mgr.previewSeatAtStart(rigCont, !!ctx.seatAtStart);
-                if (ctx.showMagazine && mgr.previewMagazine) {
-                    const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
-                    mgr.previewMagazine(rigCont, magazinePockets(s.atc || {}));
-                }
-            } catch (_) { /* op declares no rig/machine intent → harmless no-ops */ }
-        };
+        // t714 — the twin path now uses the SAME applyPreviewIntent the built-in views call → one apply, one declaration
+        // (opSimContext(_def.opType)). This also lands R-B #7 (it honors plain forceMachine, not only toolMachineFrame — so a
+        // forceMachine-only twin, e.g. atc_length/check/warmup, forces the envelope in-place too). Idempotent.
+        const applySimIntent = (rigCont) => applyPreviewIntent(mgr, rigCont, _def.opType);
         // t518 — the Comm 'commscreen' preview host is a sibling in #userVizContainer; drop any stale one at the top of EVERY
         // render so it never leaks into another op's 3D/2D pane (self-cleaning; the commscreen branch re-creates it fresh).
         { const c0 = el('userVizContainer'); const h0 = c0 && c0.querySelector('.comm-screen-host'); if (h0 && pt.mode !== 'commscreen') h0.remove(); }
@@ -370,7 +357,11 @@ export const userOpView = {
             }
         } else if (pt.mode === '3d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
-            const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, 'userVizContainer', null, null, _simStock);
+            // t714 (R-B #8) — feed the DECLARED per-pass sim-starts (opSimStarts) in the default form3d panel too, not null,null,
+            // so a multi-pass op shows its ①②③④ markers here as well as in form3d+2d (they were only wired in the 3d2d branch).
+            let starts3d = null;
+            try { const stk = _simStock || (window.ddcsGetSettings && window.ddcsGetSettings().stock); starts3d = opSimStarts(_def.opType, params, stk); } catch (_) { /* op declares no sim-starts */ }
+            const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, 'userVizContainer', (starts3d && starts3d[0]) || null, (Array.isArray(starts3d) && starts3d.length) ? starts3d : null, _simStock);
         } else if (pt.mode === '2d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
             const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params);

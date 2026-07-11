@@ -4,6 +4,7 @@ import { safeZFrameValue } from '../../ui/safeZFrameToggle.js';   // SPATIAL-MOD
 import { RotaryCenterWizard } from '../rotaryCenterWizard.js';
 import { cylinderOf, rotaryAxisOf } from '../../engine/probeGeometry.js';
 import { applySettings } from '../../ui/settingsPanel.js';
+import { applyPreviewIntent } from './atcViews.js';   // t714 — the ONE declared-intent apply (rig + envelope), single-sourced with the twin
 
 const wizard = new RotaryCenterWizard();
 
@@ -111,7 +112,7 @@ export const rotaryCenterView = {
         // Per-pass start hints: the FIT method repositions twice → 3 starts (top + ±Y flanks) so the 3 probes hit
         // DISTINCT points and the circle solves; the KNOWN method is a single pass (one start).
         ctx.preview3D(gcode, 'rotaryCenterVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
-        ctx.previewRotaryFixture('rotaryCenterVizContainer', true);   // op-specific: show the 4th-axis rig
+        applyPreviewIntent(ctx, 'rotaryCenterVizContainer', 'rotary_center');   // t714 — rig + envelope, single-sourced with the twin
 
         const status = el('rotaryCenterVizStatus');
         if (status) status.textContent = `Rotary centre: ${method} | Z0 ${params.datum} | ${params.wcs}`;

@@ -71,7 +71,7 @@ export function alignmentDataStack(params = ALIGNMENT_DEFAULTS) {
         params: {},
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d+2d' } },
-            { type: 'sim', params: { rotary: false, machine: true, magazine: false, seatStart: true } },   // t570 — seat the trace/engine start at marker A (AUTO probes A in place) so the drawn path begins at A, not origin; a drag re-seats + re-runs
+            { type: 'sim', params: { rotary: false, machine: false, magazine: false, seatStart: true } },   // t570 — SEAT the trace/engine start at marker A (AUTO probes A in place) so the drawn path begins at A, not origin; a drag re-seats + re-runs. t714 — machine:false (part-frame probe; the SEAT is the intent, not forceMachine — machine:true was latent-dead)
             { type: 'param_group', params: { group: 'Alignment' }, children: [] },
         ],
         children: exec,

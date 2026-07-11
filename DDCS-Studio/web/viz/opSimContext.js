@@ -16,19 +16,28 @@
  * geometry too; today's consumers only need the flags.
  */
 
+// t714 (R-A) — the ONE DECLARED table for the BUILT-IN op types, mirroring EXACTLY what each op's data-twin declares in
+// its `def.sim` block (userOps resolveSimMeta: rotary→rig, machine→forceMachine, magazine→showMagazine, toolMachine→tmf,
+// seatStart→seat). The built-in VIEWS now READ opSimContext(type) instead of hard-coding preview*(true), so the built-in
+// and the twin get the SAME intent BY CONSTRUCTION — retiring the imperative-vs-declared drift (the alignment-seat class).
 // 4th-axis fixture (chuck + tailstock): the rotary probe ops frame a bar/part on the A-axis.
 const ROTARY_RIG = new Set(['rotary_clock', 'rotary_center']);
-// Pin to the MACHINE frame so the envelope always draws: ATC tool changes are inherently G53 (even when a given
-// trace — auto-change with no tool, warmup/drawbar with no motion, the table-write macro — doesn't reach a G53).
-// NOTE: a machine-frame-TOOL op (toolMachineFrame — homing, atc_test/change/table) is NOT listed here: it IMPLIES
-// forceMachine (a machine-frame tool op always draws the envelope), derived below (t590 E3 — one intent, not three flags).
-const FORCE_MACHINE = new Set(['atc_length', 'atc_check', 'atc_warmup', 'atc_change', 'atc_test', 'atc_table']);
-// Render the tool in RAW machine coords + ignore the workpiece for collision: homing (a switch-seek). This is THE declared
-// "machine-frame op" intent — it IMPLIES forceMachine (draw the envelope) AND seatAtStart (seat the initial position), so an
-// op declares it ONCE instead of three coupled flags. (The ATC twins declare toolMachine via their own sim block → USER_INTENT.)
-const MACHINE_FRAME_TOOL = new Set(['homing']);
-// Carries an ATC magazine (pockets + tool stubs on the envelope): the ops that actually move tools to/from pockets.
-const WITH_MAGAZINE = new Set(['atc_change', 'atc_table']);
+// Pin to the MACHINE frame so the envelope always draws (forceMachine ONLY — not the machine-frame-TOOL ops below, which
+// derive forceMachine from tmf). ONLY the ATC no-tool-move ops are machine-frame here. The PROBE ops (corner/edge/middle/
+// alignment/rotary) are PART-frame — they probe the datum-placed stock; their twins' old sim{machine:true} was declared-but-
+// DEAD (the pre-t714 applySimIntent ignored plain forceMachine), and t714's R-B #7 (which honors it) would wrongly force the
+// envelope on them — so those twin declarations were corrected to machine:false + they are NOT listed here.
+const FORCE_MACHINE = new Set(['atc_length', 'atc_check', 'atc_warmup']);
+// Render the tool in RAW machine coords + ignore the workpiece for collision (a G53 machine-frame tool op). This is THE
+// declared "machine-frame op" intent — it IMPLIES forceMachine (draw the envelope) AND seatAtStart (seat the initial
+// position), so an op declares it ONCE instead of three coupled flags. Mirrors the twins' sim{toolMachine:true}.
+const MACHINE_FRAME_TOOL = new Set(['homing', 'atc_change', 'atc_test', 'atc_table']);
+// Carries an ATC magazine (pockets + tool stubs on the envelope): the ops that actually move tools to/from pockets, plus
+// warmup (its twin declares magazine:true — the rack tiles). Mirrors the twins' sim{magazine:true}.
+const WITH_MAGAZINE = new Set(['atc_change', 'atc_table', 'atc_test', 'atc_warmup']);
+// SEAT the trace/engine initial position at the Start (marker A) WITHOUT the machine-frame tool render — an in-place probe
+// on the part frame whose drawn path must begin at A, not origin (alignment; the twin declares sim{seatStart:true}, t570).
+const SEAT_AT_START = new Set(['alignment']);
 
 // Custom ops (user_*) DECLARE their full preview intent — NOTHING is inferred from their motion. userOps registers
 // whatever `def.sim` declares (the same way the panel block declares panel type). The axis letter doesn't carry
@@ -63,7 +72,7 @@ export function opSimContext(opType) {
         forceMachine: tmf || (u ? !!u.forceMachine : FORCE_MACHINE.has(opType)),   // machine-frame tool ⟹ force the envelope
         showMagazine: u ? !!u.showMagazine : WITH_MAGAZINE.has(opType),
         toolMachineFrame: tmf,
-        seatAtStart: tmf || (u ? !!u.seatAtStart : false),   // machine-frame tool ⟹ seat at the Start (alignment opts in without tmf)
+        seatAtStart: tmf || SEAT_AT_START.has(opType) || (u ? !!u.seatAtStart : false),   // machine-frame tool ⟹ seat; alignment seats WITHOUT tmf
     };
 }
 
@@ -79,6 +88,8 @@ export function programSimContext(opTypes) {
             showRotaryRig: acc.showRotaryRig || c.showRotaryRig,
             forceMachine: acc.forceMachine || c.forceMachine,
             showMagazine: acc.showMagazine || c.showMagazine,
+            toolMachineFrame: acc.toolMachineFrame || c.toolMachineFrame,   // t714 (R-B #6) — keep the full intent in the union so a whole-program consumer (editor/Blocks) can seat + machine-frame the tool
+            seatAtStart: acc.seatAtStart || c.seatAtStart,
         };
-    }, { showRotaryRig: false, forceMachine: false, showMagazine: false });
+    }, { showRotaryRig: false, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false });
 }

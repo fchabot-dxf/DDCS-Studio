@@ -9838,3 +9838,42 @@ VERIFY (real-symptom, tests/preview-handles-712.spec.js 3/3):
 
 ### t712 ADDENDUM — a t710-sibling flake surfaced by the full run + the Mode A fix completed
 The full-suite run surfaced ONE failure: homing-inplace:57 (a homing-TWIN play-to-emit test NOT in the t710 set). It passes 3/3 in isolation → a CONTENTION flake of the SAME class as t710, NOT a t712 regression (homing has no previewGeometry; my change is null for it). ROOT: the t710 Mode A fix converted only `locator('#wiz_homing').screenshot`, but the TWIN previews screenshot `#wiz_user` (the GENERIC twin container — which ALSO holds the idle 3D viz → rAF-starved actionability). Completed it SYSTEMICALLY: converted all 53 `locator('#wiz_user').screenshot` (+ #wiz_middle/#wiz_wcs) across 44 specs to boundingBox()+page.screenshot({clip}), and gave homing-inplace 2 boot gates the 15s budget. VERIFY: homing-inplace + homing-inplace-e3 at repeat-each=4/w=4 = 24/24; the FULL suite re-run = 1027 passed / 0 failed / 2 skipped. All non-asserted scratchpad diagnostics → identical image, just no rAF-starvation stall.
+
+---
+
+## t714 — CONSOLIDATION R-A + R-B: single-source opSimContext; retire the alignment-seat-bug CLASS
+
+Implemented the ruled R-A + R-B. The audit's headline was: 100% of preview divergence = imperative built-in intent vs declared twin intent. This turn makes opSimContext the ONE declaration BOTH read, and routes BOTH through ONE apply — so built-in view and twin agree BY CONSTRUCTION.
+
+### THE SEAM: applyPreviewIntent (new, wizards/views/atcViews.js — co-located with magazinePockets, imports opSimContext)
+`applyPreviewIntent(mgr, containerId, opType)` reads `opSimContext(opType)` and applies it via the manager's preview* methods (rotaryFixture / machine / toolMachineFrame / seatAtStart / magazine). THE ONE apply that BOTH the built-in views AND the twin (userOpView) call — retiring the two-parallel-paths drift. Cycle-safe (atcViews → opSimContext, a pure leaf).
+
+### R-A — opSimContext mirrors each twin's def.sim, and the views READ it (no more imperative preview*)
+- **opSimContext.js table** now MIRRORS exactly what each op's twin declares in `def.sim` (resolveSimMeta: rotary→rig, machine→forceMachine, magazine→showMagazine, toolMachine→tmf, seatStart→seat):
+  - FORCE_MACHINE = {atc_length, atc_check, atc_warmup} ONLY (the true machine ops); −atc_change/test/table (→ tmf). The PROBE ops are NOT here — see the dead-forceMachine correction below.
+  - MACHINE_FRAME_TOOL += atc_change, atc_test, atc_table (twins: toolMachine:true).
+  - WITH_MAGAZINE += atc_test, atc_warmup (twins: magazine:true).
+  - NEW SEAT_AT_START = {alignment} → opSimContext('alignment').seatAtStart = true (the DECLARED truth; the exemplar #3).
+- **Migrated the built-in VIEWS to READ opSimContext(type) via applyPreviewIntent** (no imperative preview*(true) left — grep-guarded):
+  - alignmentView (#3): the hard-coded previewSeatAtStart(true) → applyPreviewIntent('alignment') (seat + forceMachine, single-sourced with the twin).
+  - rotaryClockView (#4): now passes BOTH declared pass markers (wizard.inferStarts = opSimStarts('rotary_clock'), the SAME source the twin reads — fixes the dropped B marker) + applyPreviewIntent('rotary_clock').
+  - rotaryCenterView: previewRotaryFixture(true) → applyPreviewIntent('rotary_center').
+  - atcViews ×6 (length/check/warmup/change/table/test) (#5/#9): previewMachine/previewMagazine → applyPreviewIntent(type) — so change/table/test get toolMachineFrame (right tool frame) + warmup gets its magazine.
+
+### R-B — the reducers keep/honor the full intent
+- **programSimContext** (#6) now KEEPS toolMachineFrame + seatAtStart in the union (was dropping them) — so a whole-program consumer (editor/Blocks, R-C next turn) can seat + machine-frame the tool.
+- **userOpView.applySimIntent** (#7) → delegates to applyPreviewIntent, which honors PLAIN forceMachine (not only toolMachineFrame) — so a forceMachine-only twin (atc_length/check/warmup, and now alignment/rotary) forces the envelope in-place too. (Removed the now-dead opSimContext import.)
+- **userOpView form3d branch** (#8): feeds the DECLARED opSimStarts (was `null,null`) so a multi-pass op shows its ①②③④ markers in the default panel too, not only in form3d+2d.
+
+### VERIFY (the bug-class acceptance)
+- **tests/preview-intent-single-source-714.spec.js** (NEW): for EVERY migrated op, `opSimContext(builtinType)` ≡ `opSimContext(twinType)` — the built-in and the twin declare the SAME intent, so the two OPEN paths can't diverge (the by-construction proof). Spot-checks: alignment.seatAtStart=true (#3), atc_change.toolMachineFrame=true (#5), atc_warmup.showMagazine=true (#9). GREEN.
+- **GREP GUARD**: NO imperative previewMachine/ToolMachineFrame/SeatAtStart/RotaryFixture/Magazine intent calls remain in the migrated views (all go through applyPreviewIntent). CLEAN.
+- **op-sim-context.spec.js**: updated to the NEW single-sourced contract (the table now mirrors the twins) + added alignment/atc_test/atc_check/atc_warmup rows + the 5-key programSimContext union. GREEN.
+- REAL-SYMPTOM (existing twin specs, all green in the acceptance batch): alignment-fresh-seat (seat at A, the negative-control homing head still coincident), alignment-in-place, rotary-clock-in-place (BOX + 4-jaw rig + the start), rotary-clock-sim-starts, rotary-center-in-place (round bar + rig), atc-change-in-place, mill-atc-in-place, homing-inplace — 28/28.
+- EMIT BYTE-IDENTICAL: all changes are PREVIEW-SIDE (opSimContext + applyPreviewIntent + view intent + the panel start arg) — no emit path touched; the *-data-emit / *-as-data goldens pass unchanged.
+- DEAD-forceMachine PROBE CORRECTION (the #7 fix's necessary consequence — surfaced by the full run via corner, treated as real): the first audit itself flagged that `forceMachine:true` on the PROBE ops (corner/edge/middle/alignment/rotary) was "declared-but-DEAD, harmless" — the pre-t714 applySimIntent IGNORED plain forceMachine, so these probes always rendered PART-frame (their shipped behavior). R-B #7 (honor plain forceMachine) makes those dead declarations LIVE — CORRECT for the ATC machine ops (#7's target), but WRONG for a PART-frame probe. corner has NO seat, so it broke visibly (corner-datum-probe-anchor: the probe landed ~128 = one stock-diagonal off); edge/middle/alignment/rotary are seated/rigged so they'd only gain a spurious envelope. FIX (honest intent, one-source): corrected ALL those twin sim blocks to machine:false (corner/edge/middle/alignment[keep seatStart]/rotary_clock[keep rotary]/rotary_center[keep rotary]) + REMOVED them from opSimContext FORCE_MACHINE. So ONLY true machine ops (ATC + homing) force the envelope; the probes stay PART-frame (shipped behavior preserved). All preview-side → emit byte-identical (corner/edge/middle/alignment/rotary data-emit ZERO-diff).
+- FULL SUITE @retries=0 workers=4: **1028 passed, 2 skipped, 0 failed** (deterministic run). The corrected end state is fully green.
+
+### NOT this turn: R-C (editor + Blocks whole-program intent, #1/#2) — next turn, on this fixed foundation (programSimContext now carries the full intent).
+
+### FILES: web/viz/opSimContext.js · web/wizards/views/atcViews.js (applyPreviewIntent + 6 migrations) · web/wizards/views/{alignmentView,rotaryClockView,rotaryCenterView,userOpView}.js · web/blocks/dataOps/{corner,edge,middle,alignment,rotaryClock,rotaryCenter}Data.js (the latent-dead forceMachine → machine:false) · tests/op-sim-context.spec.js · tests/preview-intent-single-source-714.spec.js (new)

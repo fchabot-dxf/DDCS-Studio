@@ -3,6 +3,7 @@ import { el, UIUtils } from '../../ui/uiUtils.js';
 import { safeZFrameValue } from '../../ui/safeZFrameToggle.js';   // SPATIAL-MODEL 1c: shared safe-Z frame read
 import { RotaryClockWizard } from '../rotaryClockWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
+import { applyPreviewIntent } from './atcViews.js';   // t714 — the ONE declared-intent apply (rig + envelope), single-sourced with the twin
 
 const wizard = new RotaryClockWizard();
 
@@ -57,8 +58,10 @@ export const rotaryClockView = {
         const gcode = wizard.generate(params);
         el('wiz_rotary_clock_code').innerHTML = UIUtils.formatGCode(gcode);
         const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
-        ctx.preview3D(gcode, 'rotaryClockVizContainer', wizard.inferStart(params, stock));
-        ctx.previewRotaryFixture('rotaryClockVizContainer', true);   // op-specific: show the 4th-axis rig
+        // t714 (R-A #4) — pass BOTH declared pass markers (A + the span B, from wizard.inferStarts = opSimStarts('rotary_clock'),
+        // the SAME source the twin reads) so the built-in shows/animates both touch points, not just A (the dropped-B-marker bug).
+        ctx.preview3D(gcode, 'rotaryClockVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
+        applyPreviewIntent(ctx, 'rotaryClockVizContainer', 'rotary_clock');   // t714 — rig + envelope, single-sourced
 
         const status = el('rotaryClockVizStatus');
         if (status) status.textContent = `Rotary clock: ${action} | ref ${params.reference} | ${params.wcs}`;

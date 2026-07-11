@@ -8,6 +8,7 @@ import { AtcLengthWizard } from '../atcLengthWizard.js';
 import { AtcWarmupWizard } from '../atcWarmupWizard.js';
 import { AtcChangeWizard, atcChoreography, firmwareStationSeed } from '../atcChangeWizard.js';
 import { atcCombo } from '../atcModel.js';
+import { opSimContext } from '../../viz/opSimContext.js';   // t714 (R-A) — the ONE declared per-type intent; applyPreviewIntent reads it so built-in views + twins agree
 import { motionToSimGcode, interpCtxFromAtc } from '../atcInterpreter.js';
 import { traceToolpath } from '../../engine/trace.js';
 import { AtcTestWizard } from '../atcTestWizard.js';
@@ -80,6 +81,28 @@ export function magazinePockets(a, theta) {
         });
     }
     return mag.map((p, i) => ({ x: p.x, y: p.y, z: p.z, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p) }));
+}
+
+/**
+ * t714 (R-A/R-B) — apply an op's DECLARED opSimContext(opType) preview intent to a container, via the manager's preview*
+ * methods. THE ONE apply that BOTH the built-in views AND the twin (userOpView) call, so the built-in and the twin get the
+ * SAME frame / seat / rig / magazine BY CONSTRUCTION — retiring the imperative-vs-declared drift (the alignment-seat class).
+ * Idempotent (the panel setters early-return when unchanged). Call AFTER preview3D (the panel/viz must exist).
+ *   forceMachine → envelope · toolMachineFrame → raw-machine-coords tool · seatAtStart → seat at the Start · rig · magazine.
+ */
+export function applyPreviewIntent(mgr, containerId, opType) {
+    if (!mgr || !containerId) return;
+    try {
+        const ctx = opSimContext(opType);
+        if (mgr.previewRotaryFixture) mgr.previewRotaryFixture(containerId, !!ctx.showRotaryRig);
+        if (ctx.forceMachine && mgr.previewMachine) mgr.previewMachine(containerId, true);            // R-B #7 — honor plain forceMachine, not only tmf
+        if (ctx.toolMachineFrame && mgr.previewToolMachineFrame) mgr.previewToolMachineFrame(containerId, true);
+        if (mgr.previewSeatAtStart) mgr.previewSeatAtStart(containerId, !!ctx.seatAtStart);
+        if (ctx.showMagazine && mgr.previewMagazine) {
+            const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+            mgr.previewMagazine(containerId, magazinePockets(s.atc || {}));
+        }
+    } catch (_) { /* op declares no rig/machine/seat/magazine intent → harmless no-ops */ }
 }
 
 /**
@@ -223,7 +246,7 @@ export const atcLengthView = {
         el('wiz_atc_length_code').innerHTML = UIUtils.formatGCode(gcode);
         const setter = (p.setterW > 0 && p.setterH > 0) ? p : null;
         if (mgr) mgr.preview3D(gcode, 'atcLengthViz');
-        if (mgr) mgr.previewMachine('atcLengthViz', true);   // ATC = machine-frame: always show the envelope
+        if (mgr) applyPreviewIntent(mgr, 'atcLengthViz', 'atc_length');   // t714 — the DECLARED intent (envelope), single-sourced with the twin
         if (mgr && mgr.previewToolSetter) mgr.previewToolSetter('atcLengthViz', setter);   // the fixed touch-off block at its configured machine position
         setStatus('atcLengthVizStatus', 'Z touch on the tool setter · ▶ traces the fast approach, slow touch + retract');
     },
@@ -257,7 +280,7 @@ export const atcCheckView = {
         el('wiz_atc_check_code').innerHTML = UIUtils.formatGCode(gcode);
         const setter = (p.setterW > 0 && p.setterH > 0) ? p : null;
         if (mgr) mgr.preview3D(gcode, 'atcCheckViz');
-        if (mgr) mgr.previewMachine('atcCheckViz', true);   // ATC = machine-frame: always show the envelope
+        if (mgr) applyPreviewIntent(mgr, 'atcCheckViz', 'atc_check');   // t714 — single-sourced with the twin
         if (mgr && mgr.previewToolSetter) mgr.previewToolSetter('atcCheckViz', setter);   // the fixed touch-off block at its configured machine position
         setStatus('atcCheckVizStatus', 'Z re-tap on the setter · ▶ traces the probe; aborts if broken / wrong length');
     },
@@ -280,7 +303,7 @@ export const atcWarmupView = {
         const gcode = warmupWizard.generate(params);
         el('wiz_atc_warmup_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcWarmupViz');
-        if (mgr) mgr.previewMachine('atcWarmupViz', true);   // ATC = machine-frame: always show the envelope
+        if (mgr) applyPreviewIntent(mgr, 'atcWarmupViz', 'atc_warmup');   // t714 — envelope + magazine (the twin declares magazine:true), single-sourced (fixes the missing rack)
         setStatus('atcWarmupVizStatus', 'Spindle warm-up · no toolpath — ▶ steps the RPM / dwell stages');
     },
 };
@@ -382,8 +405,7 @@ export const atcChangeView = {
         const interpret = !!(cmb && cmb.motion && (cmb.motion.candidate || ['firmware', 'generic', 'disk'].includes(cmb.method)));
         const simGcode = interpret ? motionToSimGcode(cmb, interpCtxFromAtc(s.atc, magazinePockets(s.atc || {}), { outputs: s.outputs, inputs: s.inputs })) : gcode;
         if (mgr) mgr.preview3D(simGcode, 'atcChangeViz');
-        if (mgr) mgr.previewMachine('atcChangeViz', true);   // ATC = machine-frame: always show the envelope
-        if (mgr) mgr.previewMagazine('atcChangeViz', magazinePockets(s.atc || {}));   // pockets + tools in 3D on the envelope
+        if (mgr) applyPreviewIntent(mgr, 'atcChangeViz', 'atc_change');   // t714 — envelope + tool-machine-frame + magazine, single-sourced (fixes the wrong tool frame)
         // I4: a FORK/DOCK grip (magnet — RapidChange) renders the forks the tool plunges into at each dock; else clear.
         if (mgr && mgr.previewForkDock) mgr.previewForkDock('atcChangeViz', (interpret && cmb.grip && cmb.grip.device === 'fork') ? magazinePockets(s.atc || {}).map((p) => ({ x: p.x, y: p.y, z: p.z })) : null);
         // P-C.1a: the op's DECLARED choreography (ATC_CHOREOGRAPHY, keyed on the method) drives the sim visual. FIRMWARE
@@ -451,7 +473,7 @@ export const atcTestView = {
         const gcode = testWizard.generate(params);
         el('wiz_atc_test_code').innerHTML = UIUtils.formatGCode(gcode);
         if (mgr) mgr.preview3D(gcode, 'atcTestViz');
-        if (mgr) mgr.previewMachine('atcTestViz', true);   // ATC = machine-frame: always show the envelope
+        if (mgr) applyPreviewIntent(mgr, 'atcTestViz', 'atc_test');   // t714 — envelope + tool-machine-frame + magazine, single-sourced
         setStatus('atcTestVizStatus', mode === 'pockets'
             ? 'Pocket dry-run · visits each magazine pocket (Settings → Tool table) at clearance Z'
             : 'Drawbar cycle · no toolpath — ▶ steps the release / lock sequence');
@@ -481,8 +503,7 @@ export const atcTableView = {
         // the real preview (pockets + tools).
         const mag = (Array.isArray(a.magazine) ? a.magazine : []).filter((p) => p && (p.x !== '' || p.y !== '' || p.z !== ''));
         if (mgr) mgr.preview3D('G90', 'atcTableViz');
-        if (mgr) mgr.previewMachine('atcTableViz', true);   // ATC = machine-frame: always show the envelope
-        if (mgr) mgr.previewMagazine('atcTableViz', magazinePockets(a));   // pockets + tools in 3D on the envelope
+        if (mgr) applyPreviewIntent(mgr, 'atcTableViz', 'atc_table');   // t714 — envelope + tool-machine-frame + magazine, single-sourced
         // Tool-profile rack strip: each magazine tool drawn at its real shape (type/Ø) + length — review the rack.
         const rack = el('atcTableTools');
         if (rack) rack.innerHTML = magazineRackHtml(a);

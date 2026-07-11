@@ -69,7 +69,7 @@ export function rotaryClockDataStack(params = ROTARY_CLOCK_DEFAULTS) {
         params: {},
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d+2d' } },
-            { type: 'sim', params: { rotary: true, machine: true, magazine: false } },
+            { type: 'sim', params: { rotary: true, machine: false, magazine: false } },   // t714 — the 4th-axis RIG frames the bar (rotary:true); no forceMachine envelope (machine:true was latent-dead)
             { type: 'param_group', params: { group: 'Rotary Clock' }, children: [] },
         ],
         children: exec,

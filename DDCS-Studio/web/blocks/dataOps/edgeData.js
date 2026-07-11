@@ -72,7 +72,7 @@ export function edgeDataStack(params = EDGE_DEFAULTS) {
         params: {},
         uiChildren: [
             { type: 'panel', params: { panel: 'form3d+2d' } },
-            { type: 'sim', params: { rotary: false, machine: true, magazine: false } },
+            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },   // t714 — edge is a PART-frame probe (no forceMachine); machine:true was latent-dead (see cornerData/opSimContext)
             { type: 'param_group', params: { group: 'Edge' }, children: [] },
         ],
         children: exec,
