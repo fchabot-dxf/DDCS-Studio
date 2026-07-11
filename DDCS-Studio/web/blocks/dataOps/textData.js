@@ -26,7 +26,7 @@ import { userOpFromStack } from '../userOps.js';
  *  must carry it). font 'single-stroke' = the built-in; stepdown defaults to depth (engraving is usually one pass). */
 export const TEXT_DEFAULTS = {
     optIn: true,
-    text: 'TEXT', font: 'single-stroke', height: 12, width: 1, slant: 0, spacing: 1.2, align: 'left', x: 0, y: 0,
+    text: 'TEXT', font: 'single-stroke', height: 12, width: 1, slant: 0, rotation: 0, spacing: 1.2, lineSpacing: 1.6, align: 'left', x: 0, y: 0,
     strokeWidth: 2.5, toolDia: 1.5, stepoverPct: 50, depth: 0.4, stepdown: 0.4, feed: 400, plunge: 120, clearance: 4,
     originX: 0, originY: 0, offZ: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0,
 };
@@ -100,7 +100,9 @@ const TEXT_EXEC_BINDINGS = [
     { param: 'height', blockIndex: 5, key: 'height', type: 'number', default: TEXT_DEFAULTS.height },
     { param: 'width', blockIndex: 5, key: 'width', type: 'number', default: TEXT_DEFAULTS.width },
     { param: 'slant', blockIndex: 5, key: 'slant', type: 'number', default: TEXT_DEFAULTS.slant },
+    { param: 'rotation', blockIndex: 5, key: 'rotation', type: 'number', default: TEXT_DEFAULTS.rotation },   // t708 — the label angle (deg, about the anchor); the ↻ preview handle writes it
     { param: 'spacing', blockIndex: 5, key: 'spacing', type: 'number', default: TEXT_DEFAULTS.spacing },
+    { param: 'lineSpacing', blockIndex: 5, key: 'lineSpacing', type: 'number', default: TEXT_DEFAULTS.lineSpacing },   // t708 — multi-line pitch = height × this
     {
         param: 'align', blockIndex: 5, key: 'align', type: 'enum', default: TEXT_DEFAULTS.align,
         widget: 'dropdown', widgetConfig: { options: ALIGN_OPTIONS },
@@ -127,7 +129,7 @@ export function textDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d' } },   // t702 preview sweep — standard-panel wiring (drill/bore parity: 3D play/carve + the panel's own 2D toolpath toggle + draggable start); glyph/atom work stays the later text arc
+            { type: 'panel', params: { panel: 'form3d+2d' } },   // t708 text arc — the 3D engraving trace/carve AND the FeatureCanvas 2D real-letter layout (via filltext.previewGeometry: real letters + pos/rotation handles)
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             {
                 type: 'param_group',
@@ -137,5 +139,14 @@ export function textDataDef() {
         ],
         children: exec,
     }];
-    return userOpFromStack('text_data', 'Text (data)', stack, TEXT_BINDINGS, 'form3d', null, 'mill_datawiz');
+    const def = userOpFromStack('text_data', 'Text (data)', stack, TEXT_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    // t708 — WIDTH-HONESTY note (the DECLARED status-hint seam: registerUserOp wires def.statusHint → getUserStatusHint):
+    // a tool wider than the intended stroke can't cut thinner than itself, so the ACTUAL engraved letter width =
+    // max(strokeWidth, toolDia). Surface it in the in-place status when the tool forces it wider than the stroke.
+    def.statusHint = (p) => {
+        const n = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+        const sw = n(p.strokeWidth, 2.5), td = n(p.toolDia, 1.5);
+        return td > sw ? ` · ⚠ engraved width ${td}mm (Ø${td} tool wider than the ${sw}mm stroke)` : '';
+    };
+    return def;
 }

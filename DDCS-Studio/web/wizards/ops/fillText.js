@@ -6,16 +6,16 @@
  */
 import { num } from './util.js';
 import { scanlineFill, fillLevelMoves } from '../clearing.js';
-import { textContours } from '../textGeometry.js';
+import { textContours, layoutText } from '../textGeometry.js';
 import { pointsBBox } from './placement.js';
 
 export const fillTextBlock = {
     type: 'filltext', label: 'Fill Text', kind: 'fill', category: 'Transforms',
     defaults: {
-        text: 'TEXT', font: 'single-stroke', height: 12, width: 1, slant: 0, spacing: 1.2, align: 'left', x: 0, y: 0,
+        text: 'TEXT', font: 'single-stroke', height: 12, width: 1, slant: 0, rotation: 0, spacing: 1.2, lineSpacing: 1.6, align: 'left', x: 0, y: 0,
         strokeWidth: 2.5, toolDia: 1.5, stepoverPct: 50, z: 'z', feed: 400, plunge: 120, clearance: 4,
     },
-    fields: ['text', 'font', 'height', 'width', 'slant', 'spacing', 'align', 'x', 'y', 'strokeWidth', 'toolDia', 'stepoverPct', 'z', 'feed', 'plunge', 'clearance'],
+    fields: ['text', 'font', 'height', 'width', 'slant', 'rotation', 'spacing', 'lineSpacing', 'align', 'x', 'y', 'strokeWidth', 'toolDia', 'stepoverPct', 'z', 'feed', 'plunge', 'clearance'],
     lines: (p, z) => {
         const tool = Math.max(0.1, num(p.toolDia, 1.5));
         const so = Math.max(0.15, tool * num(p.stepoverPct, 50) / 100);
@@ -27,4 +27,21 @@ export const fillTextBlock = {
     // placement bbox from LIVE params (one source of truth) — makes stock-attach track the text instead of a frozen
     // snapshot. (textContours is the same geometry the fill scans, so the footprint can never diverge from the toolpath.)
     extent: (p) => { const pts = textContours(p).flat(); return pts.length ? pointsBBox(pts) : null; },
+
+    // DECLARED PREVIEW GEOMETRY (the general seam, t708): an atom declares the vector geometry + drag handles its
+    // twin's 2D layout should render — declare-not-infer, so the preview never re-derives letters from the toolpath.
+    // text is the first consumer; per-feature handles for other ops ride this same hook later. Returns FeatureCanvas
+    // `paths` (the real letter centrelines) + canvasWidget handle DECLS keyed by the op's PARAM names (x/y/rotation),
+    // so a drag routes through the twin's form field → update → re-render (the writer round-trip).
+    previewGeometry: (p) => {
+        const lay = layoutText(p);
+        const paths = lay.strokes.map((poly) => ({ pts: poly.map(([x, y]) => ({ x, y })), cls: 'fc-path' }));
+        const ox = num(p.x, 0), oy = num(p.y, 0), rot = num(p.rotation, 0);
+        const r = Math.max(4, lay.lineW || 10);   // the ↻ handle rides the rotated baseline end (grab it to swing the label)
+        const handles = [
+            { type: 'point', id: 'txt_pos', fx: 'x', fy: 'y', x: ox, y: oy, label: 'pos' },
+            { type: 'radial', id: 'txt_rot', fieldA: 'rotation', cx: ox, cy: oy, r, a: rot * Math.PI / 180, label: '↻' },
+        ];
+        return { paths, handles };
+    },
 };

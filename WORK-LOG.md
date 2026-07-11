@@ -9714,3 +9714,39 @@ The text field must store `{SN}` VERBATIM (no parse/substitution in stage 1 — 
 - True-outline (multi-stroke/contour) fonts — stage 1 stays single-stroke centreline (the fill model).
 
 ### VERIFY (this turn) — a design gate: no runtime change. Grounding is code-cited; NO files touched, suite untouched. I build EXACTLY the ruling next turn.
+
+---
+
+## t708 — THE TEXT ARC stage 1 BUILD: text twin → built-in parity + rotation (all 7 forks ruled as recommended)
+
+Built the ruled stage 1: the text twin reaches BUILT-IN PARITY (real letters in the 2D + pos/rotation handles), rotation end-to-end via layoutText (the one source), the generic `def.previewGeometry` seam, {SN} literal braces, lineSpacing, the width-honesty note, Blockly additive. All verified real-symptom + suite.
+
+### (1) ROTATION — one source (textGeometry.layoutText)
+`rotation` (deg, about the anchor x,y) is applied to the PLACED points in `layoutText`, right after the slant-skew. Because layoutText is THE source feeding emit (→ textContours → fill) AND every preview (strokes), emit + 2D + 3D + carve + footprint rotate TOGETHER. `rotation=0` → the rotate() is the identity → byte-identical (goldens stay zero-diff). Also added `lineSpacing` (multi-line pitch = height × lineSpacing, default 1.6 → byte-identical). Threaded through fillText (defaults+fields), textWizard.textStack, textData (bindings + defaults).
+
+### (2) THE GENERIC def.previewGeometry SEAM (panelTypes.js) — declare-not-infer, text is the first consumer
+- An atom's block-def MAY declare `previewGeometry(atomParams) → { paths:[{pts,cls}], handles:[canvasWidget decls] }`. `layoutSpecFromOp` builds the op's stack (`builderOf`), finds the first atom whose `BLOCKS[type].previewGeometry` exists (`_previewGeometryOf`), and merges: paths → the spec's `paths` (FeatureCanvas draws `<path>`); handle decls → `decls` (built through the SAME `_writeParam` setFields → the writer round-trip). Null for every other op today (only filltext declares it) → those twins UNCHANGED (verified: contour-in-place/corner/custom-op/panel-types/group-canvas all green). This is the seam the per-feature-2D-handles follow-up rides later.
+- `fillTextBlock.previewGeometry` returns the real letter centrelines (lay.strokes → paths) + a `point` pos handle (x/y) + a `radial` (angle-only, no rScale = pure rotate) rotation handle (fieldA:'rotation'). No new gesture needed — the existing `radial` IS the rotation handle. Handle field names = the op's PARAM names (x/y/rotation), which for the text twin == the form data-params → the drag writes the form field → update → re-render.
+- Twin panel → `form3d+2d` (was form3d, t702): the 3D engraving trace/carve AND the FeatureCanvas real-letter 2D + handles.
+
+### (3) BLOCKLY — additive (no new block/codec)
+`filltext` already round-trips (palette block + emit + block↔stack + the `text` op-marker codec). Adding `rotation`/`lineSpacing` to `fillTextBlock.fields` auto-surfaces them as block inputs; added `rotation`/`lineSpacing` to `SCHEMA.text` (the `( @DDCS )` marker codec) + `FIELD_BIND.text` so the op-marker round-trips them (protocol-validator green).
+
+### (4) FONT — reused the existing FONTS data font (no third-party). (6) braces so {SN} renders literal.
+Added `{`/`}` glyphs to strokeFont.js (centreline polylines on the 0..7 grid) so a literal `{SN}`/`{DATE}` token RENDERS as text in stage 1. The text field stores the token VERBATIM — NO parse/substitution here (stage 2 owns the dynamic on-controller serial).
+
+### (5)/(6) WIDTH-HONESTY note (the DECLARED status-hint seam)
+`def.statusHint` (registerUserOp wires it → getUserStatusHint): when `toolDia > strokeWidth` the in-place status shows "⚠ engraved width {toolDia}mm (tool wider than the {strokeWidth}mm stroke)" — a tool can't cut thinner than itself, so the ACTUAL letter width = max(strokeWidth, toolDia). (Gotcha caught: a bare `setUserStatusHint()` call is CLOBBERED by registerUserOp's `setUserStatusHint(opType, def.statusHint=undefined)` at registration — the declared seam is `def.statusHint`, not a side-call.)
+
+### VERIFY (real-symptom, tests/text-atom-708.spec.js 4/4 @retries=0)
+- the twin opens with REAL letter paths in the 2D (fc-path > 3, not a stock rect) + a pos (move) handle + a rotation handle (≥2 fc-handle);
+- rotation: `text='TEST'`, rotation 0 → the traced toolpath bbox is WIDER than tall; rotation 90 → TALLER than wide (the 3D engraving trace rotated); screenshots scratchpad/text-atom-{2d,rot90}.png (rot90 shows "TEST" drawn VERTICALLY + the 3D trace updated);
+- `{SN}` → more glyph strokes than bare `SN` (the braces are real glyphs, not spaces);
+- width note appears when strokeWidth(1) < toolDia(3).
+- REGRESSION: text-as-data byte-identical (data==textStack across the sweep; updated its hardcoded bindingCount 25→27 + REF_BINDINGS +rotation/+lineSpacing — 2 legit new bindings) + protocol-validator (marker round-trip) green; contour-in-place/corner/custom-op-canvas-handles/custom-op-form2d-drag/panel-types/group-canvas/wizard-manager/gui-panel-block/text-glow-cap/alignment-handles 18/18 (the previewGeometry seam is null-safe for every non-text op).
+
+- FULL SUITE @retries=0 workers=4: **1016 passed, 2 skipped, 4 failed** — all 4 RE-RUN IN ISOLATION → GREEN (homing-declared-home 3/3, op-params-complete 1/1, homing-io-ui-cleanup 5/5, homing-preview-machine-frame 4/4). Heavy homing/machine-frame renders (~27s each) that flake under 4-worker contention; unrelated to this turn (the previewGeometry seam is null for every non-text op → homing's layout is byte-unchanged). op-params-complete + homing-declared-home are the established chronic set; the two homing-preview specs joined it this run under contention.
+
+### FILES: web/wizards/{textGeometry,textWizard,strokeFont}.js, web/wizards/ops/{fillText,panelTypes}.js, web/blocks/dataOps/textData.js, web/blocks/opSchema.js, tests/text-atom-708.spec.js (new), tests/text-as-data.spec.js (count+REF update)
+
+### STAGE 2 (queued by advisor): the dynamic {SN}/{DATE} glyph-dispatch grounding.

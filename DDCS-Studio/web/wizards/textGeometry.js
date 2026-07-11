@@ -25,7 +25,13 @@ export function layoutText(params) {
     const align = params.align || 'left';
     const ox = num(params.x, 0), oy = num(params.y, 0);
     const lines = text.split('\n');
-    const linePitch = H * 1.6;
+    const linePitch = H * num(params.lineSpacing, 1.6);   // line pitch = height × lineSpacing (default 1.6 → byte-identical)
+    // ROTATION (deg, about the anchor x,y) — applied to the PLACED points, so it lives in the ONE source (layoutText)
+    // that feeds BOTH the emit (via textContours) AND every preview: emit + 2D + 3D + carve + footprint rotate together.
+    // rotation=0 → the rotate() is the identity → byte-identical to the pre-rotation layout (goldens stay zero-diff).
+    const rot = num(params.rotation, 0) * Math.PI / 180;
+    const cosR = Math.cos(rot), sinR = Math.sin(rot);
+    const rotate = rot ? ([px, py]) => { const dx = px - ox, dy = py - oy; return [ox + dx * cosR - dy * sinR, oy + dx * sinR + dy * cosR]; } : (pt) => pt;
 
     const strokes = [];
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, maxLw = 0;
@@ -41,8 +47,9 @@ export function layoutText(params) {
         for (const ch of ln) {
             const g = glyph(ch);
             for (const stroke of g.s) {
-                // width-stretch x, then slant-skew x by glyph height (about the baseline) — both in glyph units, then scale
-                const placed = stroke.map(([x, y]) => [cx + (x * width + y * tanSlant) * scale, baseY + y * scale]);
+                // width-stretch x, then slant-skew x by glyph height (about the baseline) — both in glyph units, then scale,
+                // then rotate the placed point about the anchor (the label angle). Emit + previews all read this.
+                const placed = stroke.map(([x, y]) => rotate([cx + (x * width + y * tanSlant) * scale, baseY + y * scale]));
                 strokes.push(placed);
                 for (const [px, py] of placed) acc(px, py);
             }

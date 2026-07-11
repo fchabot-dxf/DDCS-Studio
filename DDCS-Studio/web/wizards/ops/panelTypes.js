@@ -14,6 +14,8 @@ import { datumXY, getWorkpiece, workpieceBackdrop } from '../../engine/workpiece
 import { opSimContext } from '../../viz/opSimContext.js';   // t554 — the DECLARED machine-frame-layout intent (homing's sim{toolMachine:true})
 import { axisSpan, declaredHomeEdgeSide } from '../../engine/limitSwitches.js';   // t554 — the machine envelope span + the declared <edge>Home for the layout's HOME glyph
 import { partZeroShift } from '../../viz/sceneFrame.js';   // t586 PREVIEW-PARITY E2c — THE ONE frame source: the layout stock rides part-zero (the stock PIN) exactly like the 3D, no local WCS math
+import { BLOCKS } from './index.js';   // t708 — the block-def registry (type → def), to resolve an atom's DECLARED previewGeometry
+import { builderOf } from '../../blocks/opBuilders.js';   // t708 — build the op's stack to find its geometry atom + its live params
 
 // t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
 // settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
@@ -103,6 +105,25 @@ export function pinnedStartsFor(def, params, spots) {
     return Object.keys(out).length ? out : null;
 }
 
+// t708 — DECLARED preview geometry (the GENERAL seam). Build the op's stack, find the first atom whose block-def
+// declares previewGeometry(atomParams) → { paths:[{pts,cls}], handles:[canvasWidget decls] }, and return it. The atom
+// DECLARES its vector geometry + drag handles (declare-not-infer); the twin's 2D renders whatever it declares. text is
+// the first consumer (real letters + pos/rotation handles); per-feature handles for other ops ride this same hook later.
+function _flattenStack(blocks, out = []) {
+    for (const b of (blocks || [])) { if (!b) continue; out.push(b); if (b.uiChildren) _flattenStack(b.uiChildren, out); if (b.children) _flattenStack(b.children, out); }
+    return out;
+}
+function _previewGeometryOf(def, params) {
+    try {
+        const bo = def && def.opType && builderOf(def.opType);
+        const atoms = _flattenStack(bo ? bo(params) : (def && def.template) || []);
+        const a = atoms.find((b) => b && b.type && BLOCKS[b.type] && typeof BLOCKS[b.type].previewGeometry === 'function');
+        if (!a) return null;
+        const g = BLOCKS[a.type].previewGeometry(a.params || params);
+        return (g && (Array.isArray(g.paths) || Array.isArray(g.handles))) ? g : null;
+    } catch (_) { return null; }
+}
+
 export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers) {
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
@@ -138,6 +159,12 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     const groups = {};
     for (const b of (def.bindings || [])) { if (b.group) (groups[b.group] = groups[b.group] || []).push(b); }
     const items = [], decls = [];
+    // t708 — DECLARED preview geometry (the general seam): an atom may declare real vector geometry + handles. Its handle
+    // decls join `decls` (so they build through the SAME setFields writer round-trip below); its paths join a `paths` array
+    // returned in the spec (FeatureCanvas draws paths as <path>). text's filltext is the first consumer (real letters + ↻/pos).
+    const _pgeo = _previewGeometryOf(def, params);
+    const previewPaths = (_pgeo && Array.isArray(_pgeo.paths)) ? _pgeo.paths : null;
+    if (_pgeo && Array.isArray(_pgeo.handles)) for (const h of _pgeo.handles) decls.push(h);
     // t385 (human) — DRAW the workpiece INSIDE cavities (the pocket) in the 2D layout from the DECLARED workpiece
     // (getWorkpiece → the stock-modal-defined pos+size), so a Middle probe SHOWS the pocket it finds — matching the 3D
     // render + the probe-stop (ONE source, no hardcoded inset). Only inside cavities draw; an outer boss/solid has none →
@@ -380,7 +407,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
             if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });
             else if (spotOnDrag) spotOnDrag(id, world);
         };
-        return { stock: stockOut, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, ...machSpread, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: [...handles, ...markerHandles], onDrag: onDragMarkers, origin, paths: previewPaths, ...machSpread, ...cornerPick, ...edgePick };
     }
     // t73 — the SIM-ONLY first-start marker also shows on the Layout canvas (a SECOND renderer of createPreviewPanel's
     // userStarts pass-0, never emitted): a hollow ◇ for spatial reference alongside the emitting reposition handles. It is
@@ -411,9 +438,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
                 } else if (spotOnDrag) spotOnDrag(id, world);
             }
             : spotOnDrag;
-        return { stock: stockOut, items, handles: allHandles, onDrag: wrappedOnDrag, origin, ...machSpread, ...cornerPick, ...edgePick };
+        return { stock: stockOut, items, handles: allHandles, onDrag: wrappedOnDrag, origin, paths: previewPaths, ...machSpread, ...cornerPick, ...edgePick };
     }
-    return { stock: stockOut, items, handles, onDrag: spotOnDrag, origin, ...machSpread, ...cornerPick, ...edgePick };
+    return { stock: stockOut, items, handles, onDrag: spotOnDrag, origin, paths: previewPaths, ...machSpread, ...cornerPick, ...edgePick };
 }
 
 // One shared FeatureCanvas for the custom panel's 2D mode (lazy).

@@ -76,6 +76,8 @@ test('text-as-data: byte-identical G-code to textStack across a param sweep + bi
       { param: 'height', blockIndex: 5, key: 'height' },
       { param: 'width', blockIndex: 5, key: 'width' },
       { param: 'slant', blockIndex: 5, key: 'slant' },
+      { param: 'rotation', blockIndex: 5, key: 'rotation' },       // t708
+      { param: 'lineSpacing', blockIndex: 5, key: 'lineSpacing' }, // t708
       { param: 'spacing', blockIndex: 5, key: 'spacing' },
       { param: 'align', blockIndex: 5, key: 'align' },
       { param: 'x', blockIndex: 5, key: 'x' },
@@ -113,7 +115,7 @@ test('text-as-data: byte-identical G-code to textStack across a param sweep + bi
   expect(r.resolves, 'text-as-data resolves via builderOf').toBe(true);
   expect(r.independentPath, 'data builder is NOT textStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
-  expect(r.bindingCount, 'all bindable text params are bound (incl. font/width/slant)').toBe(25);
+  expect(r.bindingCount, 'all bindable text params are bound (incl. font/width/slant/rotation/lineSpacing)').toBe(27);   // t708 +rotation +lineSpacing
   expect(r.wiringFails, 'every binding routes to the same socket textStack uses').toEqual([]);
   if (!r.main.pass) console.log('FIRST DIFF @', JSON.stringify(r.main.firstDiff && r.main.firstDiff.params) + '\n--- textStack ---\n' + (r.main.firstDiff && r.main.firstDiff.a) + '\n--- data def ---\n' + (r.main.firstDiff && r.main.firstDiff.b));
   expect(r.main.count, 'the sweep is substantial').toBeGreaterThan(13);
