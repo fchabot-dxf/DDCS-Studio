@@ -12,8 +12,8 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 test('opEditSummary returns the block-only residue an injection adds (real diff, wizard closed)', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.openWiz && window.updateWiz && window.insertWiz && window.closeWiz
-    && window.ddcsGetBlockProgram && window.ddcsLoadBlockStack);
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager && window.openWiz && window.updateWiz && window.insertWiz && window.closeWiz
+    && window.ddcsGetBlockProgram && window.ddcsLoadBlockStack);   // t746 — REAL readiness (the app + wizardManager booted), not just the function globals: under -workers contention openWiz/insertWiz ran before the wizard system was ready → no op inserted → opId null
 
   const opId = await page.evaluate(async () => {
     window.ddcsLoadBlockStack([]);

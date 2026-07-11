@@ -10191,3 +10191,25 @@ Advisor dispatched Phase 2 as 4 parts. I delivered the FOLD (parts 1-3) — a co
 
 **VERIFY:** FULL SUITE: 1075 passed, 1 CONTENTION FLAKE (homing-sysstart-real — a timing-sensitive real-symptom drive, passes 2/2 ISOLATED, UNRELATED to these visibility changes: homing, not preview), 2 skipped at retries=0; total 1078 matches --list (no dropped tests — the false-green guard).
 **Files:** viz/toolpath2d.js (registry-aware paint + envelope-everywhere + __t2disp) · viz/featureCanvas.js (registry-aware stock/envelope) · viz/createPreviewPanel.js (drop the 3 anchor gates + applyPreviewSettings fold) · ui/settingsPanel.js (remove the 4 checkboxes + handlers) · ui/visibilityModal.js (theme tokens) · tests/preview-visibility-phase2-744.spec.js (NEW). NEXT: PART 4 the position chip (the declared 12th element). PASS BACK (surfacing the poschip).
+
+---
+
+## Turn 746 (worker) — THE POSITION CHIP (visibility element #12) + the homing-sysstart-real flake root-cause (t710)
+
+The micro-turn: the poschip (as I scoped it in the Phase-2 pass-back) + the no-flake-category rider.
+
+**THE POSITION CHIP (the declared 12th element `poschip`, displayPrefs):** during play a small readout RIDES THE TOOL HEAD in BOTH renderers, showing the live WORK coords from the SAME source as the DRO (onPositionChange → viz.setToolPosition / t2.setToolPosition / updateDro all get the SAME `pos`, so the chip is DRO-equal BY CONSTRUCTION, not a second computation).
+- 2D (toolpath2d): drawPosChip draws a label near the drawPath head (which already rides the live toolPos) with `X … Y …`; exposes canvas.__t2chip (coords + screen pos) for tests.
+- 3D (gcodeViz3d): _posChip = a Sprite (sizeAttenuation:false → constant screen size) riding _animTool's WORLD pos (lifted clear of the cut), its canvas texture redrawn with the coords each move; exposes viz._posChip + _posChipVal.
+- MOTION-GATED: a chipGate (2D) / _posChipGate (3D) = 1 while moving, ramping to 0 over ~1s after the last move (700ms hold + 350ms fade); a fade rAF (started on stop / setAnimate(false)) keeps repainting through the fade then hides. Toggle + alpha from the ONE registry (applyDisplay); prefs persist (localStorage).
+
+**VERIFY (tests/poschip-746.spec.js, 3 green):** (1) 3D — during play the chip is VISIBLE, carries finite WORK coords, is DRO-EQUAL (|chip.x − DRO Work X| < 0.01, same Y), RIDES the head (the sprite's world XY within 2mm of _animTool's), the modal row TOGGLES it (hide → invisible), and it FADES on stop (invisible ~1s after ▶ stops). (2) 2D — the chip drew during play with X/Y text, DRO-equal. (3) the poschip pref (visible:false, alpha:0.4) SURVIVES a reload. Robust play control: explicit ▶ click + a poll during the play window (no autoLoop-gap flakiness). Screenshot scratchpad/poschip_3d_746.png (the chip riding the head reading X 10.0 Y 10.0 = the DRO Work). The Phase-1 test's element-count assert updated 11 → 12. Emit BYTE-IDENTICAL (view-only).
+
+**RIDER — homing-sysstart-real flake ROOT-CAUSED (t710, no waits-as-fix):** the failing test (`sysstart REGENERATE`) had TWO fixed `waitForTimeout(200)` — the classic waits-as-fix. THE MECHANISM: (a) after showMacrosPanel('macros_panel_sysstart'), the 200ms sleep raced the panel RENDER — under −workers=4 contention the panel/#sysstart_regen button wasn't attached yet, so the subsequent `#sysstart_regen` click no-opped; (b) after the click, the 200ms sleep raced the REGEN writing #sysstart_body — a starved CPU hadn't finished, so the read got an EMPTY body → the G31/M30 asserts failed. FIX (real readiness signals): (a) waitForSelector('#sysstart_regen', attached) — the panel + button rendered; (b) waitForFunction(#sysstart_body has /M30/) — the regen actually wrote the body. Verified 8/8 under −workers=4 −repeat-each=4 (the exact failing condition). By the t710 doctrine this WAS a real spec timing race, not an environment blip.
+
+
+
+**RIDER 2 — informed-merge-notice flake (a 2ND real timing race surfaced in this full run, same doctrine):** test 1 (opEditSummary) waited only for the function globals (window.openWiz etc.), NOT the app: under contention openWiz/insertWiz ran before window.ddcsStudio.wizardManager was ready → no op inserted → opId null → the asserts failed. FIX: wait for window.ddcsStudio && .wizardManager (the app + wizard system booted) — verified 8/8 under -workers=4 -repeat-each=4. (Both flakes this turn root-caused + fixed per the no-flake-category doctrine.)
+
+**VERIFY:** FULL SUITE: 1079 passed, 2 skipped, 0 failed at retries=0 (a CLEAN run — total 1081 matches --list; BOTH root-caused flakes held in the full run — no flake category remains).
+**Files:** viz/displayPrefs.js (the 12th element) · viz/toolpath2d.js (drawPosChip + motion-gate + __t2chip) · viz/gcodeViz3d.js (_posChip sprite + _updatePosChip/_posChipFade + applyDisplay toggle + setAnimate fade hook) · tests/poschip-746.spec.js (NEW) · tests/preview-visibility-740.spec.js (11→12 count) · tests/homing-sysstart-real.spec.js + tests/informed-merge-notice.spec.js (the two t710 flake fixes). NEXT (per queue): header never-clips + the wider chevron. PASS BACK.

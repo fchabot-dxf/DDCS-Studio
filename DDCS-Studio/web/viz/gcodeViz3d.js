@@ -560,6 +560,7 @@ export class GcodeViz3D {
         show(this.grid, vis('grid')); base(this.grid, alp('grid'));
         for (const ax of [this._axisLineX, this._axisLineY, this._axisLineZ, this._originGizmo]) { show(ax, vis('axes')); base(ax, alp('axes')); }
         for (const mk of (this.spindleMarkers || [])) show(mk, vis('markers'));
+        if (this._posChip) { if (!vis('poschip')) this._posChip.visible = false; else if (this._posChip.visible) this._posChip.material.opacity = alp('poschip') * this._posChipGate(); }   // t746 — the readout toggle/alpha
         this.render();
     }
 
@@ -577,6 +578,7 @@ export class GcodeViz3D {
             if (this._animRaf) cancelAnimationFrame(this._animRaf);
             this._animRaf = null;
             this._applyPartRotation(0, 0); // return the part to rest when the play stops
+            if (this._posChip && this._posChip.visible && !this._posChipRaf) this._posChipFade();   // t746 — fade the position readout ~1s after stop
             this.render();
         }
     }
@@ -638,7 +640,52 @@ export class GcodeViz3D {
             if (!this._trailOn) this._dimRoute(true);
             this._updateTrailTip(this._animTool.position);
         }
+        this._updatePosChip(pos);   // t746 — the position readout rides the head with these WORK coords (the SAME source as the DRO)
         this.render();
+    }
+
+    /** t746 — THE POSITION READOUT (poschip): a fixed-screen-size sprite riding the tool head with the live WORK coords (the
+     *  SAME onPositionChange pos the DRO shows → DRO-equal). Motion-gated (fades ~1s after stop). Toggle + alpha from the ONE
+     *  registry. A sprite (sizeAttenuation:false → constant screen size), added to the scene, placed at the tool's WORLD pos. */
+    _ensurePosChip() {
+        if (this._posChip) return;
+        const THREE = this.THREE;
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 72;
+        const tex = new THREE.CanvasTexture(cv);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: false }));
+        sp.renderOrder = 40; sp.visible = false; sp.scale.set(0.17, 0.048, 1);   // ~constant screen size
+        this._posChip = sp; this._posChipCv = cv; this._posChipTex = tex;
+        this.scene.add(sp);
+    }
+    _drawPosChipTex(x, y) {
+        const cv = this._posChipCv, c = cv.getContext('2d');
+        c.clearRect(0, 0, cv.width, cv.height);
+        c.fillStyle = 'rgba(10,14,20,0.85)'; c.fillRect(0, 0, cv.width, cv.height);
+        c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 3; c.strokeRect(1.5, 1.5, cv.width - 3, cv.height - 3);
+        c.fillStyle = '#dfe8f2'; c.font = 'bold 30px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
+        c.fillText('X ' + x.toFixed(3), 14, 22); c.fillText('Y ' + y.toFixed(3), 14, 52);
+        this._posChipTex.needsUpdate = true;
+    }
+    _updatePosChip(pos) {
+        if (!displayOf('poschip').visible) { if (this._posChip) this._posChip.visible = false; return; }
+        this._ensurePosChip();
+        this._posChipVal = { x: Number(pos.x) || 0, y: Number(pos.y) || 0 };
+        this._posChipMoveMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y);
+        const t = this._animTool;
+        if (t) { t.updateWorldMatrix(true, false); const w = t.getWorldPosition(new this.THREE.Vector3()); this._posChip.position.set(w.x, w.y, w.z + 24); }   // ride the head, lifted clear of the cut
+        this._posChip.material.opacity = displayOf('poschip').alpha;
+        this._posChip.visible = true;
+        if (!this._posChipRaf) this._posChipFade();
+    }
+    _posChipGate() { const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now(); return Math.max(0, Math.min(1, 1 - (now - (this._posChipMoveMs || 0) - 700) / 350)); }   // 1 while moving → 0 ~1s after stop
+    _posChipFade() {
+        if (!this._posChip) { this._posChipRaf = 0; return; }
+        const g = this._posChipGate();
+        if (this._animOn) { this._posChipRaf = requestAnimationFrame(() => this._posChipFade()); return; }   // still playing → the tick refreshes it
+        this._posChip.material.opacity = displayOf('poschip').alpha * g;
+        if (g > 0.02) { this.render(); this._posChipRaf = requestAnimationFrame(() => this._posChipFade()); }
+        else { this._posChip.visible = false; this._posChipRaf = 0; this.render(); }
     }
 
     /** t497 — render the live tool in the MACHINE frame (raw machine coords), ignoring the stock-floor part-frame shift.

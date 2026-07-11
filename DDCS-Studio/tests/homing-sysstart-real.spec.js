@@ -59,10 +59,10 @@ test('the Macros → sysstart REGENERATE rebuilds the real homing sequence into 
     await page.evaluate(() => window.showApp('macros'));
     await page.waitForFunction(() => window.showMacrosPanel, null, { timeout: 8000 });
     await page.evaluate(() => window.showMacrosPanel('macros_panel_sysstart'));
-    await page.waitForTimeout(200);
+    await page.waitForSelector('#sysstart_regen', { state: 'attached', timeout: 8000 });   // t746 — REAL readiness (the panel + Regenerate button rendered), not a 200ms sleep that lost the race under -workers contention
     await autoAppDialog(page, { accept: true });   // any clobber-confirm → accept (a fresh seed isn't hand-edited, so usually none)
     await page.click('#sysstart_regen');
-    await page.waitForTimeout(200);
+    await page.waitForFunction(() => { const b = document.getElementById('sysstart_body'); return b && /M30/.test(b.value); }, null, { timeout: 8000 });   // t746 — wait for the REGEN to actually write the body (was a 200ms sleep → empty body under contention)
     const out = await page.evaluate(() => (document.getElementById('sysstart_body') || {}).value || '');
     expect(out, 'the regenerated body carries the real G31 homing sequence, not the stub').toMatch(/G31 Z\S+ F600/);
     expect(out).toMatch(/G31 X\S+ F800/);

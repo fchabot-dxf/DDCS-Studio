@@ -38,7 +38,7 @@ test('the modal opens on the editor + a mill twin + a probe twin; toggle + alpha
     await page.locator('.pp-vis').first().click();
     await page.waitForSelector('.vis-modal-pop', { timeout: 4000 });
     const nRows = await page.locator('.vis-modal-pop .vis-row').count();
-    expect(nRows, 'the modal lists all 11 declared elements').toBe(11);
+    expect(nRows, 'the modal lists all 12 declared elements (incl. the position chip)').toBe(12);
 
     // baseline: stock + cut + tool visible in the 3D
     const before = await page.evaluate(() => { const v = window.__gpPanel.viz; return { stock: !!(v.stockMesh && v.stockMesh.visible), stockOp: v.stockMesh && v.stockMesh.material.opacity, cut: !!(v.lineGroups.feed && v.lineGroups.feed.visible), tool: !!(v._animParts && v._animParts.tool && v._animParts.tool.visible) }; });

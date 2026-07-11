@@ -24,6 +24,7 @@ export const DISPLAY_ELEMENTS = [
     { id: 'grid',     label: 'Grid',             alpha: 1 },
     { id: 'axes',     label: 'Axes',             alpha: 0.7 },
     { id: 'markers',  label: 'Markers',          alpha: 1 },
+    { id: 'poschip',  label: 'Position readout', alpha: 0.9 },   // t746 — the chip riding the tool head during play (live WORK coords, DRO-equal, motion-gated)
 ];
 
 const KEY = 'ddcs_display';

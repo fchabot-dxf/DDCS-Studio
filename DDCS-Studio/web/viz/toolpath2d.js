@@ -65,6 +65,9 @@ export function createToolpath2d(canvas, opts = {}) {
     const pulses = [];          // t319/INC-6 — active on-touch pulses [{x,y,pass,axis,slow,prog,speed,flashes,last}]; drawn as the HONEST top-view projection (Z=circle, X/Y wall=line)
     let pulseRaf = null;
     const nowMs = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+    let chipPos = null, chipMs = 0, chipRaf = 0;   // t746 — the position readout (poschip): last WORK pos + when it moved (motion-gate) + the fade rAF
+    const CHIP_HOLD = 700, CHIP_FADE = 350;        // full for ~0.7s after the last move, then fade over ~0.35s (≈ the 1s stop-fade)
+    const chipGate = () => Math.max(0, Math.min(1, 1 - (nowMs() - chipMs - CHIP_HOLD) / CHIP_FADE));   // 1 while moving → 0 ~1s after stop
 
     const W = () => canvas.clientWidth, H = () => canvas.clientHeight;
     const tx = (x) => view.ox + x * view.scale;
@@ -166,7 +169,7 @@ export function createToolpath2d(canvas, opts = {}) {
         const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
         if (!view) return;
         canvas.__t2view = view;   // expose the world→screen transform (debug + tests): sx=ox+x*scale, sy=oy-y*scale
-        if (overlay) { drawPath(ctx, anim.playing ? Math.floor(anim.k) : null); drawPulses(ctx); return; }   // t309/t319 — overlay = path + head + touch pulses; the SVG under-lays the grid/stock/handles
+        if (overlay) { drawPath(ctx, anim.playing ? Math.floor(anim.k) : null); drawPulses(ctx); drawPosChip(ctx); return; }   // t309/t319 — overlay = path + head + touch pulses (+ t746 the poschip); the SVG under-lays the grid/stock/handles
         const foot = footprint(), step = stepFor(foot);
         // t744 — every 2D element reads the ONE visibility registry (visible + composed alpha), same source as the 3D.
         const dv = (id) => displayOf(id).visible, da = (id) => displayOf(id).alpha, wa = (rgba, a) => rgba.replace(/,\s*([0-9.]+)\)$/, (m, v) => ',' + (parseFloat(v) * a).toFixed(3) + ')');
@@ -181,6 +184,7 @@ export function createToolpath2d(canvas, opts = {}) {
         if (dv('axes')) drawOriginAxes(ctx, foot);
         drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
         drawPulses(ctx);   // t319 — the on-touch pulses over the path
+        drawPosChip(ctx);   // t746 — the position readout riding the head
         drawLabels(ctx, foot, step, w, h);
         if (starts.length && dv('markers')) drawStartHandles(ctx);
         canvas.__t2starts = starts.map((s, i) => ({ i, sx: sptx(s.x), sy: spty(s.y), x: s.x, y: s.y, source: startSources[i] || 'auto', emits: !!startEmits[i] }));   // debug + tests: the drawn per-pass start handles + colour source + SHAPE (emits)
@@ -287,6 +291,21 @@ export function createToolpath2d(canvas, opts = {}) {
         ctx.fillStyle = hexCss(HEAD.color); ctx.beginPath(); ctx.arc(hx, hy, HEAD.r, 0, Math.PI * 2); ctx.fill();   // t317 — RED moving probe tip (the ruby, matching the 3D) from the ONE palette
         canvas.__t2head = { sx: hx, sy: hy, live: !!toolPos };   // debug + tests: the drawn head (screen px)
     }
+    // t746 — THE POSITION READOUT (poschip): a small chip riding the head with the live WORK coords (the SAME onPositionChange
+    // source as the DRO). Motion-gated (fades ~1s after stop via chipGate), toggle + alpha from the ONE registry.
+    function drawPosChip(ctx) {
+        const d = displayOf('poschip'), g = chipGate() * d.alpha;
+        if (!chipPos || !d.visible || g <= 0.02) { canvas.__t2chip = null; return; }
+        const hx = ptx(chipPos.x, chipPos.pass), hy = pty(chipPos.y, chipPos.pass);
+        const text = 'X ' + chipPos.x.toFixed(3) + '  Y ' + chipPos.y.toFixed(3);
+        ctx.save(); ctx.globalAlpha = g; ctx.font = 'bold 11px monospace';
+        const bw = ctx.measureText(text).width + 12, bh = 18, bx = hx + 12, by = hy - bh - 8;   // offset up-right, off the cut
+        ctx.fillStyle = 'rgba(10,14,20,0.82)'; ctx.fillRect(bx, by, bw, bh);
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+        ctx.fillStyle = '#dfe8f2'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(text, bx + 6, by + bh / 2);
+        ctx.restore();
+        canvas.__t2chip = { hx, hy, bx, by, x: chipPos.x, y: chipPos.y, text, alpha: +g.toFixed(3) };   // debug + tests: the drawn chip + its WORK coords (DRO-equal)
+    }
     function drawLabels(ctx, foot, step, w, h) {   // sparse coord labels along the bottom (X) + left (Y) frame
         if (!(step > 0)) return;
         ctx.save(); ctx.font = '10px sans-serif';
@@ -341,11 +360,12 @@ export function createToolpath2d(canvas, opts = {}) {
     function setStartEmits(arr) { startEmits = Array.isArray(arr) ? arr.slice() : []; if (view) paint(); }   // per-pass marker SHAPE: emitting (a drag edits the program) = filled ◆, sim-only = hollow ◇
     function setPassEnds(arr) { passEnds = Array.isArray(arr) ? arr : null; if (view) paint(); }   // t107 — per-pass RUNTIME world-ENDs (from the trace): an anchorsAtPrev pass anchors its route at passEnds[p-1] + relocates its marker to end+cross
     function setAnchor(v) { anchorToStart = !!v; if (view) paint(); }   // mirror the 3D's _anchorToStart: anchored → path emanates from the start, not the stock pin
-    function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0, pass: p.pass } : null; if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D); pass → per-pass anchor (INC4)
+    function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0, pass: p.pass } : null; if (p) { chipPos = { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, pass: p.pass }; chipMs = nowMs(); } if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D) + the poschip's WORK coords (the SAME onPositionChange source as the DRO); pass → per-pass anchor (INC4)
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
 
     // ---- play / progress ----
-    function stop() { if (anim.playing) { anim.playing = false; if (anim.raf) cancelAnimationFrame(anim.raf); anim.raf = null; } toolPos = null; redraw(); }   // clear the live head when the sim stops
+    function stop() { if (anim.playing) { anim.playing = false; if (anim.raf) cancelAnimationFrame(anim.raf); anim.raf = null; } toolPos = null; redraw(); if (chipPos && chipGate() > 0 && !chipRaf) chipFadeLoop(); }   // clear the live head when the sim stops; the poschip fades over ~1s
+    function chipFadeLoop() { if (view) paint(); if (!anim.playing && chipPos && chipGate() > 0) { chipRaf = requestAnimationFrame(chipFadeLoop); } else { chipRaf = 0; chipPos = null; if (view) paint(); } }   // t746 — after stop, keep repainting while the chip fades, then drop it
     function loop() { if (!anim.playing) return; anim.k += 1.2; if (anim.k >= segs.length) anim.k = 0; paint(); anim.raf = requestAnimationFrame(loop); }
     function play() { if (anim.playing || !segs.length) return; anim.playing = true; anim.k = 0; loop(); }
     function toggle() { if (anim.playing) { stop(); return false; } play(); return anim.playing; }
