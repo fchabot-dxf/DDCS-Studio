@@ -19,6 +19,7 @@ import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare 
 import { openProfileModal, recentProfileIds, pushRecentProfile } from './profileModal.js';   // t688 b2 — the header PROFILE section
 import * as ProfLib from '../data/profileLibrary.js';
 import { THEMES } from './themes.js';
+import { getAccount, renderCloudLogin } from './cloudAccount.js';   // t742 — the header ACCOUNT row consumes the ONE shared cloud-account API (no second connect impl)
 import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
 
 // Quick-menu glyphs (24×24 stroke grid) — mirror the dock toolbar icons so the menu reads consistently.
@@ -79,6 +80,26 @@ function setQuickTheme(name) {
     } catch (_) { document.body.setAttribute('data-theme', name); }
 }
 
+// t742 — the header ACCOUNT row's tap: open a small modal hosting the SHARED renderCloudLogin (the ONE cloud-connect UI
+// Settings + the Projects drawer use — no duplicated connect logic; it self-refreshes on ddcs:cloud-account + routes
+// desktop/pywebview to the loopback flow inside cloudAccount.connect). Theme-token styled so it's legible on every theme.
+function openCloudModal() {
+    const ov = document.createElement('div');
+    ov.className = 'cloud-account-ov';
+    ov.style.cssText = 'position:fixed; inset:0; z-index:10060; background:rgba(0,0,0,0.45); display:flex; align-items:flex-start; justify-content:center;';
+    const box = document.createElement('div');
+    box.style.cssText = 'margin-top:12vh; min-width:min(340px,92vw); max-width:92vw; background:var(--panel,#161b22); color:var(--text,#e6edf5); border:1px solid var(--border,rgba(255,255,255,0.14)); border-radius:10px; padding:16px 18px; box-shadow:0 12px 40px rgba(0,0,0,0.5);';
+    box.innerHTML = '<div style="font-weight:700; margin-bottom:10px">Cloud account</div><div class="cloud-mount"></div>'
+        + '<div style="text-align:right; margin-top:14px"><button type="button" class="primary cloud-done" style="padding:5px 18px; font-size:13px">Done</button></div>';
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    renderCloudLogin(box.querySelector('.cloud-mount'));   // the shared component (connect / connected+disconnect / auto-refresh)
+    const close = () => ov.remove();
+    box.querySelector('.cloud-done').addEventListener('click', close);
+    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+    document.addEventListener('keydown', function onEsc(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); } });
+}
+
 export function initHeaderPost() {
     const btn = document.getElementById('hdrPostBtn');
     const menu = document.getElementById('hdrPostMenu');
@@ -137,8 +158,14 @@ export function initHeaderPost() {
             return `<button type="button" role="menuitem" class="hdr-quick-item" data-profswitch="${esc(id)}" title="Switch to this profile (full-swap)"><span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">↔ ${esc(p.name || '(unnamed)')}<span class="hq-cur"> · ${esc(c)}</span></span></button>`;
         }).join('');
         const profAct = (act, label) => `<button type="button" role="menuitem" class="hdr-quick-item" data-profact="${act}"><span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">${label}</span></button>`;
-        const profileSection = '<div class="hdr-quick-head">Profile</div>'
+        // t742 — the ACCOUNT row: cloud connection state at a glance (invisible on mobile before this). Reads the ONE shared
+        // cloudAccount API; tap opens the SAME connect flow (renderCloudLogin) Settings + the Projects drawer use.
+        const acc = getAccount();
+        const accTxt = acc.connected ? ('☁ ' + esc(acc.email || acc.name || 'Connected')) : '☁ Cloud: not connected · Connect';
+        const accountRow = `<button type="button" role="menuitem" class="hdr-quick-item" data-cloud="1" title="${acc.connected ? 'Cloud account — tap to manage or disconnect' : 'Connect your cloud account to sync projects to your own Drive'}"><span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">${accTxt}</span></button>`;
+        const profileSection = '<div class="hdr-quick-head">Profile &amp; account</div>'
             + `<div class="hdr-quick-cur" style="display:flex; align-items:center; gap:8px; padding:5px 12px; font-size:13px; opacity:.92; cursor:default;"><span class="hdr-quick-lbl"><b>${esc(ap.name || '(unnamed configuration)')}</b><span class="hq-cur"> · ${esc(apCtrl)}</span></span></div>`
+            + accountRow
             + recentRows
             + profAct('browse', '🗂 Profiles…') + profAct('saveas', '＋ Save as…') + profAct('pull', '↧ Pull from controller');
         // Theme picker is no longer collapsed — the chips are compact, so show them directly under a heading.
@@ -283,6 +310,7 @@ export function initHeaderPost() {
 
         if (it.dataset.theme) { setQuickTheme(it.dataset.theme); fillMenu(); return; }   // chips stay open; just refresh the active ring
         closeMenu();
+        if (it.dataset.cloud) { openCloudModal(); return; }   // t742 — the account row → the shared cloud-connect flow
         if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
         // t688 b2 — PROFILE section: a recent switches (full-swap); the doors open the modal / the pull flow.
         if (it.dataset.profswitch) { ProfLib.switchProfile(it.dataset.profswitch); pushRecentProfile(it.dataset.profswitch); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); return; }
