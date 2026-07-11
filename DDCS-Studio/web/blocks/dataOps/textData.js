@@ -21,6 +21,8 @@
  */
 import { textStack } from '../../wizards/textWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
+import { entryBindingsFor } from './deriveBindings.js';   // t726 P2b - entryX/entryY by identity (into def.bindings, not the exported EXEC bindings)
 import { XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy)
 
 /** Author defaults — match textStack's num() fallbacks. optIn:true (text is an opt-in/absolute placement op — the seed
@@ -113,9 +115,9 @@ export function textDataDef() {
                 children: [],
             },
         ],
-        children: exec,
+        children: appendEntry(exec),   // t726 P2b - the entry marker appended (emits nothing; no body-index shift)
     }];
-    const def = userOpFromStack('text_data', 'Text (data)', stack, TEXT_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    const def = userOpFromStack('text_data', 'Text (data)', stack, [...TEXT_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     // t708 — WIDTH-HONESTY note (the DECLARED status-hint seam: registerUserOp wires def.statusHint → getUserStatusHint):
     // a tool wider than the intended stroke can't cut thinner than itself, so the ACTUAL engraved letter width =
     // max(strokeWidth, toolDia). Surface it in the in-place status when the tool forces it wider than the stroke.
@@ -124,5 +126,6 @@ export function textDataDef() {
         const sw = n(p.strokeWidth, 2.5), td = n(p.toolDia, 1.5);
         return td > sw ? ` · ⚠ engraved width ${td}mm (Ø${td} tool wider than the ${sw}mm stroke)` : '';
     };
+    def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     return def;
 }

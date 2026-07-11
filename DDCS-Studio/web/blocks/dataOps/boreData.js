@@ -16,6 +16,8 @@
  */
 import { drillStack } from '../../wizards/drillWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
+import { entryBindingsFor } from './deriveBindings.js';   // t726 P2b - entryX/entryY by identity (into def.bindings, not the exported EXEC bindings)
 import { drillPatternGeometry } from './drillData.js';   // t716 — the SHARED drill/bore pattern previewGeometry (bore adds the Ø handle)
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, DRILL_PATTERN_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options
 
@@ -93,9 +95,10 @@ export function boreDataDef() {
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Bore' }, children: [] },
         ],
-        children: exec,
+        children: appendEntry(exec),   // t726 P2b - the entry marker appended (emits nothing; no body-index shift)
     }];
-    const def = userOpFromStack('bore_data', 'Bore (data)', stack, BORE_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    const def = userOpFromStack('bore_data', 'Bore (data)', stack, [...BORE_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = (p) => drillPatternGeometry(p, true);   // t716 — bore pattern + pos + pattern handles + a draggable Ø (holeDia)
+    def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     return def;
 }

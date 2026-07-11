@@ -291,9 +291,11 @@ export class FeatureCanvas {
         // t87 — the SIM-ONLY marker IS draggable (writes userStarts, sim-only — "sim only means it doesn't emit, but we still
         // drag it to simulate a user start"). It only YIELDS the hit to an EMITTING handle when they DEGENERATELY COINCIDE
         // (e.g. an explicit 0 offset); normally (post-t76 anchor-offset fix) they're separated, so the sim marker grabs cleanly.
-        if (best && best.simOnly) {
+        // t726 P2b — the mill ENTRY marker YIELDS to a coincident feature handle too (like the sim-only ○ did): its default
+        // sits at the cut entry, which for drill/bore IS the pos handle — so a drag there grabs the FEATURE, not the entry.
+        if (best && (best.simOnly || best.yieldCoincident)) {
             const coincTol = 6 / this._tf.scale;
-            const em = (this.spec.handles || []).find((h) => !h.simOnly && Math.hypot(h.x - best.x, h.y - best.y) < coincTol);
+            const em = (this.spec.handles || []).find((h) => !h.simOnly && !h.yieldCoincident && Math.hypot(h.x - best.x, h.y - best.y) < coincTol);
             if (em) return em;
         }
         return best;

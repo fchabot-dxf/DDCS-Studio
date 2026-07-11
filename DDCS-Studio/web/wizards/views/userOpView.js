@@ -17,6 +17,7 @@ import { activeDialectOpts } from '../previewEmit.js';   // t634 — the data-op
 import { flattenBlocks, getUserStatusHint, getUserSimGcode } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography)
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { resolvePlacementStock } from '../ops/placement.js';   // t720 P1 (d) — fill a twin's UNSET stockW/H from the settings stock so cc-attach places on the real stock
+import { firstRapidXY } from '../ops/entry.js';   // t726 P2b — the ONE cut-entry source (the entry marker sits here when unset, shared with the emit)
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
 import { CommunicationWizard } from '../communicationWizard.js';   // t518 — the Comm twin's 'commscreen' panel renders this wizard's DDCS-screen mock (pure fn of params)
 import { applyPreviewIntent } from './atcViews.js';   // t714 — the ONE declared-intent apply (opSimContext → preview*), shared with the built-in views so twin + built-in agree by construction
@@ -351,14 +352,34 @@ export const userOpView = {
                             return false;
                         });
                     }
+                    // t726 P2b — THE MILL ENTRY POINT: a twin that declares def.entryPoint drops the sim-only jog ○ and gets an
+                    // emitting-square marker instead. It sits at the DECLARED (entryX,entryY) when set, else at the cut's OWN entry
+                    // (firstRapidXY of THIS emit — the ONE shared source), and a drag WRITES entryX/entryY (the placement-absolute
+                    // coords the emit routes the opening rapid through). Rendered via the simMarkers path (a square, not the ○).
+                    const epb = _def && _def.entryPoint;
+                    let entryMarkers = null;
+                    if (epb) {
+                        const exEl = fhost && fhost.querySelector(`[data-param="${epb.x}"]`);
+                        const eyEl = fhost && fhost.querySelector(`[data-param="${epb.y}"]`);
+                        const exV = (exEl && exEl.value !== '') ? Number(exEl.value) : NaN;
+                        const eyV = (eyEl && eyEl.value !== '') ? Number(eyEl.value) : NaN;
+                        const cut = firstRapidXY(previewGcode);
+                        const pos = (Number.isFinite(exV) && Number.isFinite(eyV)) ? { x: exV, y: eyV } : (cut ? { x: cut.x, y: cut.y } : null);
+                        if (pos) entryMarkers = [{ pos, label: 'entry', yieldCoincident: true, onDrag: (world) => {
+                            const w3 = (n) => String(Math.round(n * 1000) / 1000);
+                            if (exEl) { exEl.value = w3(world.x); exEl.dispatchEvent(new Event('input', { bubbles: true })); }
+                            if (eyEl) { eyEl.value = w3(world.y); eyEl.dispatchEvent(new Event('input', { bubbles: true })); }
+                            mgr.update();
+                        } }];
+                    }
                     const simMarkers = (spb && Array.isArray(starts))
                         ? spb.map((_m, i) => (starts[i] && Number.isFinite(+starts[i].x)) ? {
                             pos: starts[i], label: String.fromCharCode(65 + i),   // A, B, …
                             onDrag: (world) => { if (writeSimStartFrac(_def, i, world, stkNow, starts)) mgr.update(); },
                         } : null).filter(Boolean)
-                        : null;
-                    const simStart = (spb || !(panel && pos0 && typeof panel.onStartDrag === 'function'))
-                        ? (pos0 && !spb ? { pos: pos0 } : null)
+                        : entryMarkers;
+                    const simStart = (spb || epb || !(panel && pos0 && typeof panel.onStartDrag === 'function'))
+                        ? ((pos0 && !spb && !epb) ? { pos: pos0 } : null)
                         : { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } };
                     const fc = renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps, simMarkers);   // t301 Seam C + t508 simMarkers (declared marker→param handles)
                     wireAnimOverlay(c, fc, panel, ps, passEnds, sources);   // t309 — the 2D-animation overlay under the SVG (created once, fed the shared trace each render; driven by the panel's engine via onToolPos)

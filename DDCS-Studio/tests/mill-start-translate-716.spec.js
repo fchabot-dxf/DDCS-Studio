@@ -18,7 +18,7 @@ async function openTwin(page, opType) {
 }
 const val = (page, name) => page.evaluate((n) => { const f = document.querySelector(`#wiz_user_form [data-param="${n}"]`); return f ? Number(f.value) : null; }, name);
 async function dragMove(page, index, dx, dy) {
-    const b = await page.locator('#wiz_user .fc-handle-move').nth(index).boundingBox();
+    const b = await page.locator('#wiz_user .fc-handle-move:not([data-hid="__simstart0"])').nth(index).boundingBox();
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     await page.mouse.down();
     await page.mouse.move(b.x + b.width / 2 + dx, b.y + b.height / 2 + dy, { steps: 6 });
@@ -57,7 +57,7 @@ test('slot: the anchor TRANSLATES (length + width + angle frozen); dragging B le
     expect(Math.abs(a1.ang - a0.ang), 'the slot ANGLE is frozen on translate (45° stays 45°)').toBeLessThan(0.02);
     expect(await val(page, 'width'), 'the slot WIDTH is frozen on translate').toBe(w0);
     // independence: drag B (the LAST move handle: translate=0, A=1, B=2) → A stays put
-    const nMove = await page.locator('#wiz_user .fc-handle-move').count();
+    const nMove = await page.locator('#wiz_user .fc-handle-move:not([data-hid="__simstart0"])').count();
     const ax2 = await val(page, 'ax'), ay2 = await val(page, 'ay');
     await dragMove(page, nMove - 1, 40, -30);
     expect(await val(page, 'bx') !== a1.bx || await val(page, 'by') !== a1.by, 'dragging B moved B').toBeTruthy();

@@ -22,6 +22,7 @@
 import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox } from '../../wizards/pocketWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor, mergeBindingsByParam } from './deriveBindings.js';
+import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b — the declared mill entry point (entryX/entryY bind via POCKET_BINDING_SPECS)
 import { pruneGuards } from '../whenGuard.js';
 import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true boundary ring (polygon/ellipse) for the 2D preview
 
@@ -94,6 +95,10 @@ const POCKET_BINDING_SPECS = [
     { param: 'clearance', type: 'number', key: 'clearance', match: { type: 'pocketfill' }, optional: true },
     { param: 'clearance', type: 'number', key: 'clearance', match: { type: 'pocketwall' }, optional: true },
     { param: 'clearance', type: 'number', key: 'clearance', match: { type: 'drill' }, optional: true },
+    // t726 P2b — the entry-point declaration. IN the bindingSpecs (not entryBindingsFor) so it RE-DERIVES over the PRUNED
+    // stack each instantiate (pocket's entry index shifts with strategy/tooSmall — a static superset index would miss).
+    { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
+    { param: 'entryY', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '' },
 ];
 
 /** The strategy fork is a STRUCTURAL driver (guard key), no block socket — declared as a bindingless (blockIndex-free)
@@ -144,7 +149,7 @@ function pocketDataStack(defaults) {
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Pocket' }, children: [] },
         ],
-        children: pocketStack(defaults, { superset: true }),
+        children: appendEntry(pocketStack(defaults, { superset: true })),   // t726 P2b — the entry marker appended (emits nothing)
     }];
 }
 
@@ -158,7 +163,7 @@ export const POCKET_BINDINGS = mergeBindingsByParam(deriveBindingsFor(canonicalP
  *  structural strategy toggle + the derive-guards hook (_tooSmall) + postInstantiate (the derived drill centre). */
 export function pocketDataDef() {
     const def = userOpFromStack('pocket_data', 'Pocket (data)', pocketDataStack(POCKET_DEFAULTS),
-        [...POCKET_BINDINGS, ...POCKET_STRUCT_BINDINGS], 'form3d+2d');
+        [...POCKET_BINDINGS, ...POCKET_STRUCT_BINDINGS], 'form3d+2d');   // t726 P2b — entryX/entryY are in POCKET_BINDINGS (via the specs, re-derived by bindingSpecs)
     def.bindingSpecs = POCKET_BINDING_SPECS;                       // re-derive value sockets BY IDENTITY over the PRUNED stack each build
     def.deriveGuards = (p) => ({ _tooSmall: pocketTooSmall(p || {}) });   // GEOMETRY-DERIVED guard key, injected before prune
     def.postInstantiate = (stack, resolved) => {                  // rewrite the DERIVED sockets the frozen superset baked at DEFAULT geometry
@@ -172,5 +177,6 @@ export function pocketDataDef() {
         return stack;
     };
     def.previewGeometry = pocketPreviewGeometry;   // t716 — per-feature 2D handles (shape boundary + pos/size per kind) via the declared hook
+    def.entryPoint = ENTRY_POINT;   // t726 P2b — the emitting-square entry marker (replaces the sim-only ○)
     return def;
 }

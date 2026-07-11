@@ -21,6 +21,7 @@
  * correctness, not motion safety (lint comes next — see MULTI-OP-STACKING.md).
  */
 import { BLOCKS, evalExpr, depthLevels } from '../wizards/ops/index.js';
+import { firstRapidXY } from '../wizards/ops/entry.js';   // t726 P2b — THE ONE cut-entry source for the entry fold (shared with the marker)
 import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { placeShiftFromParams } from '../wizards/ops/placement.js';
@@ -226,6 +227,10 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 rotate)
     }
 
+    if (def.kind === 'entry') return [];       // ENTRY POINT (t726 P2b): a childless MARKER — emits nothing here. The waypoint
+                                               // is applied ONCE over the whole program in emitMapped (applyEntryWaypoint), so the
+                                               // marker sits as a sibling (no body-index shift → the goldens' positional bindings hold).
+
     if (def.kind === 'container') {            // STAMP child(ren) at each point (skip 1-based indices in p.skip)
         const pts = def.points(p);
         const skip = new Set(String(p.skip || '').split(/[ ,]+/).map((s) => parseInt(s, 10)).filter((n) => n > 0));
@@ -269,11 +274,35 @@ export function emitMapped(blocks, settings = {}) {
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
     const T = [];
     (blocks || []).forEach((b) => { T.push(...emit(b, 0, 0, [], scope, dialect)); });
+    applyEntryWaypoint(T, blocks);        // t726 P2b — the DECLARED mill entry point: route the opening rapid through it (no-op unless it moves the cut entry)
     applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
     applyCapGating(T, dialect);           // comment out lines the active post can't run (honest per-line gating)
     balanceOwords(T, dialect);            // oword posts: drop orphan o<n> if/endif so structured flow is well-formed
     const lines = T.map((t) => t.line);
     return { text: lines.join('\n'), lines, map: T.map((t) => t.src) };
+}
+
+/** t726 P2b — find the DECLARED entry-point marker anywhere in the stack (a childless `entry` block). */
+function findEntryBlock(blocks) {
+    for (const b of (blocks || [])) {
+        if (!b) continue;
+        if (b.type === 'entry') return b;
+        const u = b.uiChildren && findEntryBlock(b.uiChildren); if (u) return u;
+        const c = b.children && findEntryBlock(b.children); if (c) return c;
+    }
+    return null;
+}
+
+/** t726 P2b — THE MILL ENTRY POINT: if the op declares an entry marker with entryX/entryY set, and they differ from the
+ *  program's OWN cut entry (firstRapidXY — the one shared source) beyond ε, insert ONE `G0 X Y` at clearance before the
+ *  first cut move. UNSET / within-ε → no change (the emitted text is byte-identical). No entry marker → no-op (probe/etc). */
+function applyEntryWaypoint(T, blocks) {
+    const e = findEntryBlock(blocks); if (!e || !e.params) return;
+    const ex = num(e.params.entryX, NaN), ey = num(e.params.entryY, NaN);
+    if (!Number.isFinite(ex) || !Number.isFinite(ey)) return;   // unset → the cut owns its entry
+    const cut = firstRapidXY(T.map((t) => t.line).join('\n'));
+    if (!cut || (Math.abs(ex - cut.x) < 1e-3 && Math.abs(ey - cut.y) < 1e-3)) return;   // within ε → byte-identical
+    T.splice(cut.index, 0, { line: `G0 X${r3(ex)} Y${r3(ey)}   ( entry )`, src: e.id ? [e.id] : null });   // one waypoint at clearance, before the cut
 }
 
 /** Feedrate is modal in G-code: once set it sticks until changed. The kernels emit F on every cutting line

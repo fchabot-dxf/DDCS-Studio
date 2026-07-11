@@ -431,7 +431,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     if (Array.isArray(simMarkers) && simMarkers.length) {
         // t532 — noSnap: a sim-start probe point is a FREE position (anywhere in reach), NOT a feature to seat on the stock —
         // so it must NOT snap to stock corners/edges (the snap CAUGHT it at the perimeter → "can't exit the stock", the human's bug).
-        const markerHandles = simMarkers.map((m, i) => ({ id: '__simstart' + i, x: +m.pos.x, y: +m.pos.y, kind: 'move', noSnap: true, label: m.label || String(i + 1), color: '#39c0d8' }));
+        const markerHandles = simMarkers.map((m, i) => ({ id: '__simstart' + i, x: +m.pos.x, y: +m.pos.y, kind: 'move', noSnap: true, label: m.label || String(i + 1), color: '#39c0d8', yieldCoincident: !!m.yieldCoincident }));   // t726 P2b — the entry marker yields to a coincident feature handle
         const onDragMarkers = (id, world) => {
             const mi = markerHandles.findIndex((h) => h.id === id);
             if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });

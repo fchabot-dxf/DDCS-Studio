@@ -95,6 +95,16 @@ export function deriveBindingsFor(stack, specs) {
     return deriveBindings(flattenBlocks(stack), specs);
 }
 
+/** t726 P2b — the entryX/entryY bindings for a mill twin, derived BY IDENTITY (match the appended `entry` marker) so its
+ *  flat index is found by type — no fixed offset, works whether the twin has 5 or 6 body blocks. These go into def.bindings
+ *  (NOT the exported EXEC bindings the as-data goldens iterate), so the wiring goldens stay untouched. */
+export function entryBindingsFor(stack) {
+    return deriveBindingsFor(stack, [
+        { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
+        { param: 'entryY', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '' },
+    ]);
+}
+
 /** t720 P1 (a) — collapse duplicate-param bindings into ONE per param, MERGING their declarations so a widget/label
  *  can never be lost to ordering. The FIRST row's identity (blockIndex/key/default/socketHeld) wins (it targets the live
  *  socket); a later duplicate only FILLS a presentational field the first row LACKS (widget/widgetConfig/label/help/

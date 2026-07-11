@@ -27,6 +27,8 @@
  */
 import { surfacingStack } from '../../wizards/surfacingWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
+import { entryBindingsFor } from './deriveBindings.js';   // t726 P2b - entryX/entryY by identity (into def.bindings, not the exported EXEC bindings)
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, SURFACING_STRATEGY_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options (were undeclared → empty dropdowns)
 
 /** Author defaults — match surfacingStack's own num() fallbacks (+ flat stepover/strategy) so the seeded template == the
@@ -103,9 +105,10 @@ export function surfacingDataDef() {
                 children: [],
             },
         ],
-        children: exec,
+        children: appendEntry(exec),   // t726 P2b - the entry marker appended (emits nothing; no body-index shift)
     }];
-    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, SURFACING_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, [...SURFACING_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = surfacingPreviewGeometry;   // t716 — per-feature 2D handles (region extent) via the declared hook
+    def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     return def;
 }

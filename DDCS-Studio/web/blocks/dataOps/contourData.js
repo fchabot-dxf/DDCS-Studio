@@ -16,6 +16,8 @@
  */
 import { contourStack } from '../../wizards/contourWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
+import { entryBindingsFor } from './deriveBindings.js';   // t726 P2b - entryX/entryY by identity (into def.bindings, not the exported EXEC bindings)
 import { regionDesc } from '../../wizards/ops/region.js';      // t712 — the true boundary ring (polygon/ellipse) for the 2D preview
 import { contourRegion } from '../../wizards/ops/contour.js';  // t712 — the OFFSET toolpath (tool-centre) so the 2D matches the cut
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy)
@@ -120,9 +122,10 @@ export function contourDataDef() {
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Contour' }, children: [] },
         ],
-        children: exec,
+        children: appendEntry(exec),   // t726 P2b - the entry marker appended (emits nothing; no body-index shift)
     }];
-    const def = userOpFromStack('contour_data', 'Contour (data)', stack, CONTOUR_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    const def = userOpFromStack('contour_data', 'Contour (data)', stack, [...CONTOUR_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = contourPreviewGeometry;   // t712 — per-feature 2D handles (pos + shape size per kind) via the declared hook
+    def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     return def;
 }
