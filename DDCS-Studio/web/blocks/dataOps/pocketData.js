@@ -23,6 +23,7 @@ import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox } from '../.
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';
+import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true boundary ring (polygon/ellipse) for the 2D preview
 
 /** Author defaults — match pocketStack's num() fallbacks AND the built-in Pocket form defaults (index.html p_*). */
 export const POCKET_DEFAULTS = {
@@ -103,6 +104,32 @@ const POCKET_STRUCT_BINDINGS = [
 
 export const POCKET_DATA_OPTYPE = 'user_pocket_data';
 
+const _pn = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+const _circlePath = (cx, cy, r) => { const pts = []; for (let i = 0; i <= 48; i++) { const a = 2 * Math.PI * i / 48; pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }); } return { pts, cls: 'fc-guide' }; };
+/** t716 — DECLARED preview geometry (twin-level): the pocket boundary (the finished-wall outline) PER SHAPE KIND — the
+ *  multishape solved by declaration (the twin knows p.shape) — + a pos handle (originX/originY) + a size handle per kind
+ *  (circle/polygon → radial Ø; rect/ellipse → rect W×H). Mirrors the built-in pocketView.buildPocketSpec. Preview-side → emit unaffected. */
+export function pocketPreviewGeometry(p) {
+    const ox = _pn(p.originX, 0), oy = _pn(p.originY, 0), shape = p.shape || 'rect';
+    const paths = [], handles = [{ type: 'point', id: 'pk_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos' }];
+    if (shape === 'circle') {
+        const R = _pn(p.dia, 50) / 2;
+        paths.push(_circlePath(ox, oy, R));
+        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: R, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+    } else if (shape === 'polygon') {
+        try { const ring = (regionDesc({ shape: 'polygon', x: ox, y: oy, w: _pn(p.dia, 50), sides: _pn(p.sides, 6) }).contour || [])[0] || []; if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-guide' }); } catch (_) { /* degenerate */ }
+        handles.push({ type: 'radial', id: 'pk_size', field: 'dia', cx: ox, cy: oy, r: _pn(p.dia, 50) / 2, a: 0, rScale: 2, minR: 1, label: 'Ø' });
+    } else if (shape === 'ellipse') {
+        try { const ring = (regionDesc({ shape: 'ellipse', x: ox, y: oy, w: _pn(p.w, 80), h: _pn(p.h, 60) }).contour || [])[0] || []; if (ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-guide' }); } catch (_) { /* degenerate */ }
+        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: _pn(p.w, 80) / 2, ey: _pn(p.h, 60) / 2, sx: 0.5, sy: 0.5, minw: 1, minh: 1, label: 'W×H' });
+    } else {
+        const w = _pn(p.w, 80), h = _pn(p.h, 60);
+        paths.push({ pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], cls: 'fc-path' });
+        handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' });
+    }
+    return { paths, handles };
+}
+
 /** The wrapped superset template: pocketStack(DEFAULTS, {superset:true}) under the user_root/panel/sim/param_group prefix. */
 function pocketDataStack(defaults) {
     return [{
@@ -141,5 +168,6 @@ export function pocketDataDef() {
         }
         return stack;
     };
+    def.previewGeometry = pocketPreviewGeometry;   // t716 — per-feature 2D handles (shape boundary + pos/size per kind) via the declared hook
     return def;
 }

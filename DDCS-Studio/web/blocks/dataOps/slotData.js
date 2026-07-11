@@ -131,6 +131,9 @@ export function slotPreviewGeometry(p) {
         line(ax - nx * hw, ay - ny * hw, bx - nx * hw, by - ny * hw),                 // −edge
     ];
     const handles = [
+        // t716 — the TRANSLATE anchor (the whole slot shifts, length + angle unchanged): moves A+B by the drag delta. Slot
+        // has no single position param (A/B are absolute), so this is the anchor the origin-based ops get from their pos handle.
+        { type: 'translate', id: 'sl_anchor', cx: mx, cy: my, xs: [['ax', ax], ['bx', bx]], ys: [['ay', ay], ['by', by]], label: '✛' },
         { type: 'point', id: 'sl_a', fx: 'ax', fy: 'ay', x: ax, y: ay, label: 'A' },
         { type: 'point', id: 'sl_b', fx: 'bx', fy: 'by', x: bx, y: by, label: 'B' },
         { type: 'projLength', id: 'sl_w', field: 'width', cx: mx, cy: my, nx, ny, off: hw, scale: 2, min: tool, label: 'width' },

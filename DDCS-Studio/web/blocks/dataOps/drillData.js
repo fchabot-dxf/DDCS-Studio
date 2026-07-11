@@ -37,7 +37,7 @@
  *     sweep (it also covers the unbound method/clearance sockets staying put).
  * Stage 6 authors the template independently too (then the builder can be deleted); that's the self-host step, not this one.
  */
-import { drillStack } from '../../wizards/drillWizard.js';
+import { drillStack, patternPoints } from '../../wizards/drillWizard.js';
 import { userOpFromStack } from '../userOps.js';
 
 /** The author defaults — match drillStack's own num() fallbacks so the seeded template == the true default stack. */
@@ -97,6 +97,34 @@ export const DRILL_BINDINGS = DRILL_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex
 
 export const DRILL_DATA_OPTYPE = 'user_drill_data';
 
+const _dn = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+const _holeRing = (cx, cy, r) => { const pts = []; for (let i = 0; i <= 12; i++) { const a = 2 * Math.PI * i / 12; pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }); } return { pts, cls: 'fc-guide' }; };
+/** t716 — DECLARED preview geometry for the DRILL/BORE pattern family: the hole positions (patternPoints) drawn as rings +
+ *  a pos handle (originX/originY) + the pattern SIZE handle PER KIND (grid dx/dy · circle Ø/angle · line pitch/angle · rect
+ *  W/H). Bore (boreDia=true) ALSO gets a draggable hole-DIAMETER handle (holeDia). Mirrors drillView.buildDrillSpec; handles
+ *  write the TWIN params directly (preview-side → emit unaffected). SHARED by drillData + boreData (bore imports it). */
+export function drillPatternGeometry(p, boreDia) {
+    const pattern = p.pattern || 'grid';
+    const ox = _dn(p.originX, 0), oy = _dn(p.originY, 0);
+    const holeR = boreDia ? Math.max(0.5, _dn(p.holeDia, 12) / 2) : 3;   // bore = the real bore Ø; drill = a small display dot
+    const pts = patternPoints({ ...p, cx: ox, cy: oy, x0: ox, y0: oy }) || [];   // patternPoints reads cx/cy or x0/y0 per pattern
+    const paths = pts.map((pt) => _holeRing(pt.x, pt.y, holeR));
+    const handles = [{ type: 'point', id: 'dr_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos' }];
+    if (pattern === 'circle') {
+        handles.push({ type: 'radial', id: 'dr_ring', field: 'dia', fieldA: 'startAngle', cx: ox, cy: oy, r: _dn(p.dia, 50) / 2, a: _dn(p.startAngle, 0) * Math.PI / 180, rScale: 2, minR: 0, label: 'Ø' });
+    } else if (pattern === 'grid') {
+        const cols = Math.max(1, Math.round(_dn(p.cols, 3))), rows = Math.max(1, Math.round(_dn(p.rows, 2))), dx = _dn(p.dx, 20), dy = _dn(p.dy, 20);
+        handles.push({ type: 'rect', id: 'dr_grid', field: 'dx', fieldH: 'dy', ax: ox, ay: oy, ex: (cols - 1) * dx, ey: (rows - 1) * dy, sx: cols - 1, sy: rows - 1, label: 'pitch' });   // signed pitch (no min)
+    } else if (pattern === 'rect') {
+        handles.push({ type: 'rect', id: 'dr_rect', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: _dn(p.w, 100), ey: _dn(p.h, 80), sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' });
+    } else if (pattern === 'line') {
+        const n = Math.max(1, Math.round(_dn(p.count, 3))), s = _dn(p.spacing, 20);
+        handles.push({ type: 'radial', id: 'dr_line', field: 'spacing', fieldA: 'angle', cx: ox, cy: oy, r: (n - 1) * s, a: _dn(p.angle, 0) * Math.PI / 180, rScale: n > 1 ? 1 / (n - 1) : null, minR: 0, label: 'pitch' });
+    }
+    if (boreDia) handles.push({ type: 'radial', id: 'dr_dia', field: 'holeDia', cx: (pts[0] && pts[0].x) || ox, cy: (pts[0] && pts[0].y) || oy, r: holeR, a: 0, rScale: 2, minR: 0.5, label: 'Ø' });
+    return { paths, handles };
+}
+
 /** Build the drill-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. The template
  *  is drillStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
 export function drillDataDef() {
@@ -105,7 +133,7 @@ export function drillDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d' } },
+            { type: 'panel', params: { panel: 'form3d+2d' } },   // t716 — the FeatureCanvas 2D with the hole pattern + pos + pattern-size handles (previewGeometry)
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             {
                 type: 'param_group',
@@ -115,5 +143,7 @@ export function drillDataDef() {
         ],
         children: exec,
     }];
-    return userOpFromStack('drill_data', 'Drill (data)', stack, DRILL_BINDINGS, 'form3d', null, 'mill_datawiz');
+    const def = userOpFromStack('drill_data', 'Drill (data)', stack, DRILL_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    def.previewGeometry = (p) => drillPatternGeometry(p, false);   // t716 — hole pattern + pos + pattern handles (diameter DISPLAY)
+    return def;
 }

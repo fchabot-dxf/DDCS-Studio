@@ -16,6 +16,7 @@
  */
 import { drillStack } from '../../wizards/drillWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { drillPatternGeometry } from './drillData.js';   // t716 — the SHARED drill/bore pattern previewGeometry (bore adds the Ø handle)
 
 /** Author defaults — match drillStack's num() fallbacks so the seeded template == the true default stack. method='helical'
  *  → drillStack builds the `bore` leaf. The pattern/placement half is identical to DRILL_DEFAULTS. */
@@ -86,11 +87,13 @@ export function boreDataDef() {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form3d' } },
+            { type: 'panel', params: { panel: 'form3d+2d' } },   // t716 — the FeatureCanvas 2D with the bore pattern + pos + pattern-size + Ø handles (previewGeometry)
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Bore' }, children: [] },
         ],
         children: exec,
     }];
-    return userOpFromStack('bore_data', 'Bore (data)', stack, BORE_BINDINGS, 'form3d', null, 'mill_datawiz');
+    const def = userOpFromStack('bore_data', 'Bore (data)', stack, BORE_BINDINGS, 'form3d+2d', null, 'mill_datawiz');
+    def.previewGeometry = (p) => drillPatternGeometry(p, true);   // t716 — bore pattern + pos + pattern handles + a draggable Ø (holeDia)
+    return def;
 }

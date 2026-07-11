@@ -9877,3 +9877,30 @@ Implemented the ruled R-A + R-B. The audit's headline was: 100% of preview diver
 ### NOT this turn: R-C (editor + Blocks whole-program intent, #1/#2) — next turn, on this fixed foundation (programSimContext now carries the full intent).
 
 ### FILES: web/viz/opSimContext.js · web/wizards/views/atcViews.js (applyPreviewIntent + 6 migrations) · web/wizards/views/{alignmentView,rotaryClockView,rotaryCenterView,userOpView}.js · web/blocks/dataOps/{corner,edge,middle,alignment,rotaryClock,rotaryCenter}Data.js (the latent-dead forceMachine → machine:false) · tests/op-sim-context.spec.js · tests/preview-intent-single-source-714.spec.js (new)
+
+---
+
+## Turn 716 (worker) — THE MILL LAYOUT COMPLETENESS PASS + the START-MARKER TRANSLATE RULE
+
+**Dispatch:** every mill twin gets per-feature 2D layout handles via previewGeometry (each declared feature dimension = a draggable handle that writes its param); the pocket layout FRAMING bug fixed (user screenshot: path clipped at the canvas corner, NO stock outline, Start disconnected); PLUS the START-MARKER TRANSLATE RULE across ALL mill twins — the start/anchor TRANSLATES the whole setup (shape params frozen), the feature handles reshape INDEPENDENTLY.
+
+**WHAT SHIPPED (4 new previewGeometry twins + 1 new gesture + the translate rule):**
+
+- **drill + bore** (drillData.js `drillPatternGeometry(p, boreDia)` — SHARED, bore imports it): the hole positions (patternPoints) drawn as rings + a pos handle (originX/originY) + the pattern-SIZE handle PER KIND (grid dx/dy signed via rect sx=cols-1/sy=rows-1 · circle Ø/startAngle via radial · line pitch/angle via radial 1/(n-1) · rect W/H). Bore ALSO gets a draggable hole-Ø handle (holeDia radial); drill shows a small display dot (diameter is a DISPLAY there). Panel form3d→form3d+2d.
+- **pocket** (pocketData.js `pocketPreviewGeometry` — multishape mirror of contour, per kind: circle→radial Ø · polygon→regionDesc ring+radial · ellipse→regionDesc ring+rect · rect→rect path+rect). Adding this is what FIXED the framing bug: pocket had NO previewGeometry, so FeatureCanvas._fit never unioned the feature → the path clipped at the corner with no stock outline. With the pocket now in spec.paths, _fit unions stock+feature+start(+15% margin) → framed. CONFIRMED visually (scratchpad/mill-layout-pocket.png): stock outline present, pocket clearing passes fully drawn, Start connected, WxH handle draggable.
+- **surfacing** (surfacingData.js `surfacingPreviewGeometry`): the region rect path + a pos handle + a W×H rect handle. Panel form3d→form3d+2d.
+
+**THE TRANSLATE RULE — the design decision (declared, not hand-rolled per twin):**
+- Origin-based ops (contour/surfacing/pocket/drill/bore/text) TRANSLATE via their existing pos `point` handle — it writes originX/originY (drill/bore: the placement offset, block-2 offX/offY) or x/y (text), which shifts the whole placed feature while every shape param stays frozen. No new code needed there.
+- Slot has NO single position param (ax/ay/bx/by are absolute), so a pos handle can't express "shift the whole slot". Rather than hand-roll it, I DECLARED a reusable **`translate` gesture** in canvasWidgets.js (`xs`/`ys` = [[field,value],...]; on drag each field += cursor−centroid) and added a translate anchor (id sl_anchor, ✛) as the FIRST handle in slotPreviewGeometry. Dragging it moves A+B by the same delta → length + angle + width all frozen. This is the anchor the origin-based ops get for free from their pos handle.
+- drill/bore preview mirrors the built-in drillView EXACTLY (drillView.js:160 passes x0:originX,y0:originY to patternPoints; its pos handle writes d_originX/d_originY) — so the twin preview is NOT divergent from the real view; verified by reading drillView.
+
+**FLAGGED (not done — would be a bigger change): the sim-only Start ○ is NOT re-plumbed to translate.** The createPreviewPanel operator-start marker (○, writes userStarts[0]) stays the operator JOG. The TRANSLATE anchor is the previewGeometry pos/translate handle (writes params). Making the sim ○ ITSELF translate the setup would need a markerDragWriter per twin — flag for the advisor if that's wanted; the current split (jog ○ vs param anchor) seemed the honest one.
+
+**VERIFY (the real symptom — drag gestures, not a proxy):**
+- tests/mill-start-translate-716.spec.js (NEW, 7 passed): per twin, drag the anchor (first .fc-handle-move) → the position param MOVES and every SHAPE param is asserted FROZEN — slot: hypot(len)+atan2(angle)+width frozen (a 5in slot at 45° stays 5in/45°); contour/surfacing/pocket: w/h frozen; drill/bore: dx/dy/cols/rows(/holeDia) frozen; text: rotation/height/width frozen. PLUS slot independence: drag B → A.x/A.y asserted unmoved.
+- tests/mill-layout-716.spec.js (NEW, 4 passed): each twin draws the feature (paths>=1) + pos+size handles (>=2, a move handle), and dragging the size handle writes its param.
+- Emit BYTE-IDENTICAL — all changes are preview-side (previewGeometry + the panel form3d→form3d+2d UI switch); the {template,bindings} are untouched, and the as-data equivalence specs (drill/bore/pocket/surfacing-as-data) stay green.
+- **FULL SUITE: 1039 passed, 2 skipped, 0 failed at retries=0** (deterministic; exit 0).
+
+**Files:** web/blocks/dataOps/{drill,bore,pocket,surfacing,slot}Data.js · web/viz/canvasWidgets.js (the `translate` gesture) · tests/mill-layout-716.spec.js · tests/mill-start-translate-716.spec.js. NEXT (per dispatch queue): R-C (editor+Blocks whole-program intent), then the visibility modal, then text stage 2. PASS BACK.

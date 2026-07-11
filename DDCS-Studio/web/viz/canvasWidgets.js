@@ -108,6 +108,14 @@ export const CANVAS_GESTURES = {
             };
         },
     },
+    // t716 — TRANSLATE ANCHOR: move a SET of x-fields + y-fields by the drag DELTA, so the whole feature SHIFTS while its
+    // SHAPE is unchanged (a 5in slot at 45° stays 5in/45°). `xs`/`ys` = [[field, currentValue], …] (the coord params to
+    // translate); the handle sits at the current centroid (cx,cy); on drag each field += (cursor − centroid). Used where a
+    // feature has NO single position param to write (slot's absolute A/B) — the pos `point` handle covers the origin-based ops.
+    translate: {
+        place: (d) => ({ x: d.cx, y: d.cy, kind: 'move', label: d.label }),
+        drag: (d, w) => { const dx = w.x - d.cx, dy = w.y - d.cy, m = {}; (d.xs || []).forEach(([f, v]) => { m[f] = v + dx; }); (d.ys || []).forEach(([f, v]) => { m[f] = v + dy; }); return m; },
+    },
 };
 
 /** Declarations → { handles, onDrag, onEdit } for a FeatureCanvas spec. `setFields(map)` writes the op's form fields
