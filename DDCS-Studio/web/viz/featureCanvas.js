@@ -22,6 +22,8 @@
 const SVGNS = 'http://www.w3.org/2000/svg';
 const r3 = (n) => Math.round(n * 1000) / 1000;
 
+import { displayOf } from './displayPrefs.js';   // t744 — the ONE declared preview-visibility registry ({visible,alpha}), shared with the 3D + toolpath2d
+
 function svgEl(tag, attrs) {
     const e = document.createElementNS(SVGNS, tag);
     if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -361,7 +363,7 @@ export class FeatureCanvas {
         }
 
         // --- stock (datum-positioned: its datum corner sits at part-zero, the origin) ---------------------
-        if (spec.stock && spec.stock.w > 0 && spec.stock.h > 0) {
+        if (spec.stock && spec.stock.w > 0 && spec.stock.h > 0 && displayOf('stock').visible) {   // t744 — the ONE visibility registry
             const sox = spec.stock.ox || 0, soy = spec.stock.oy || 0;
             const o = this._S(sox, soy + spec.stock.h);
             items.appendChild(svgEl('rect', {
@@ -372,9 +374,9 @@ export class FeatureCanvas {
 
         // --- origin: the MACHINE frame (envelope + home + edge labels, machine-coherent — matches the 3D sim's
         //     convention, one source) when spec.machine is set; else the part-zero crosshair (stock/wizard layout). ----
-        if (spec.machine) {
+        if (spec.machine && displayOf('envelope').visible) {   // t744 — the envelope element gates the Layout's machine frame too
             this._drawMachineFrame(spec.machine);
-        } else {
+        } else if (!spec.machine) {
             // the part-zero crosshair sits at spec.origin (world) when set — so the stock modal's datum moves it to the
             // selected corner, matching the 3D — else at the min-XY corner (the default for wizard layouts).
             const ow = spec.origin || { x: 0, y: 0 };

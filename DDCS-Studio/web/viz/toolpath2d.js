@@ -16,6 +16,7 @@ import { traceToolpath } from '../engine/trace.js';
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE draws from the RUNTIME END of the previous pass (t107 machine-faithful, via passEnds), else the static previous START (t94), not its own net-endpoint marker
 import { stockPinOffset } from './sceneFrame.js';   // t584 PREVIEW-PARITY E2b — the stock's WCS pin from THE ONE declared frame source (shared with the 3D's partZeroShift), so the 2D pin can't drift from the 3D/engine
 import { PATH_TYPES, PATH_STATE, HEAD, TOUCH_PULSE, pulsePx, hexCss } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette (type × state) + the touch-pulse token, shared with the 3D + the legend (t331 — feedRgb gradient removed)
+import { displayOf } from './displayPrefs.js';   // t744 — the ONE declared preview-visibility registry ({visible,alpha} per element), shared with the 3D
 
 // Colours + progress states are the ONE declared source in viz/pathStyle.js (t317) — rapid=yellow(dashed),
 // retract=green, probe=blue(slow=light blue, dotted), feed=a blue→teal gradient by DEPTH (Z) which also surfaces the
@@ -107,7 +108,7 @@ export function createToolpath2d(canvas, opts = {}) {
     // ---- scene geometry (program/work frame; part-zero at 0,0) ----
     function envelopeRect() {
         const m = machine;
-        if (!m || !m.show || !m.x || !m.y || !m.z) return null;
+        if (!m || !m.x || !m.y || !m.z) return null;   // t744 — ENVELOPE EVERYWHERE: a DECLARED envelope (valid x/y/z) qualifies; visibility is the registry's `envelope` element (paint gates on it), not settings.machine.show
         // t652 — a machine-frame op draws the envelope in RAW machine coords (home at 0), matching its machine-coord Start +
         // route (and the 3D). A WORK-frame op shifts the envelope by −workOrigin so the WCS-pinned setup sits correctly inside it.
         const wo = machineFrame ? {} : (m.workOrigin || {}), wx = wo.x || 0, wy = wo.y || 0;
@@ -167,21 +168,24 @@ export function createToolpath2d(canvas, opts = {}) {
         canvas.__t2view = view;   // expose the world→screen transform (debug + tests): sx=ox+x*scale, sy=oy-y*scale
         if (overlay) { drawPath(ctx, anim.playing ? Math.floor(anim.k) : null); drawPulses(ctx); return; }   // t309/t319 — overlay = path + head + touch pulses; the SVG under-lays the grid/stock/handles
         const foot = footprint(), step = stepFor(foot);
-        drawGrid(ctx, foot, step);
-        const env = envelopeRect(); if (env) drawRect(ctx, env, 'rgba(108,122,140,0.55)', null);
+        // t744 — every 2D element reads the ONE visibility registry (visible + composed alpha), same source as the 3D.
+        const dv = (id) => displayOf(id).visible, da = (id) => displayOf(id).alpha, wa = (rgba, a) => rgba.replace(/,\s*([0-9.]+)\)$/, (m, v) => ',' + (parseFloat(v) * a).toFixed(3) + ')');
+        if (dv('grid')) drawGrid(ctx, foot, step);
+        const env = envelopeRect(); if (env && dv('envelope')) drawRect(ctx, env, wa('rgba(108,122,140,0.55)', da('envelope') / 0.4), null);   // the 3D box default alpha is 0.4 → scale the 2D literal by the registry alpha relative to it
         const st = stockRect();
-        if (st) {
-            const isPk = st.shape === 'pocket';
-            drawRect(ctx, st, isPk ? 'rgba(134,182,255,0.65)' : 'rgba(166,215,124,0.65)', isPk ? 'rgba(106,143,190,0.10)' : 'rgba(143,174,106,0.10)');
+        if (st && dv('stock')) {
+            const isPk = st.shape === 'pocket', sa = da('stock') / 0.72;   // scale the 2D stock literals by the registry alpha relative to the 3D default 0.72
+            drawRect(ctx, st, wa(isPk ? 'rgba(134,182,255,0.65)' : 'rgba(166,215,124,0.65)', sa), wa(isPk ? 'rgba(106,143,190,0.10)' : 'rgba(143,174,106,0.10)', sa));
             if (isPk) drawPocketCavity(ctx, st);   // #15: the inner cavity so a pocket READS as a pocket (mirrors the 3D square-donut)
         }
-        drawOriginAxes(ctx, foot);
+        if (dv('axes')) drawOriginAxes(ctx, foot);
         drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
         drawPulses(ctx);   // t319 — the on-touch pulses over the path
         drawLabels(ctx, foot, step, w, h);
-        if (starts.length) drawStartHandles(ctx);
+        if (starts.length && dv('markers')) drawStartHandles(ctx);
         canvas.__t2starts = starts.map((s, i) => ({ i, sx: sptx(s.x), sy: spty(s.y), x: s.x, y: s.y, source: startSources[i] || 'auto', emits: !!startEmits[i] }));   // debug + tests: the drawn per-pass start handles + colour source + SHAPE (emits)
-        { const e = envelopeRect(); canvas.__t2env = e ? { minX: e.minX, minY: e.minY, maxX: e.maxX, maxY: e.maxY } : null; }   // t652 — debug + tests: the drawn envelope's MACHINE bounds (the marker's machine coord must fall inside)
+        { const e = dv('envelope') ? envelopeRect() : null; canvas.__t2env = e ? { minX: e.minX, minY: e.minY, maxX: e.maxX, maxY: e.maxY } : null; }   // t652/t744 — the DRAWN envelope's MACHINE bounds (null when the registry hides it) — the marker's machine coord must fall inside
+        canvas.__t2disp = { stock: dv('stock'), envelope: dv('envelope'), grid: dv('grid'), axes: dv('axes'), markers: dv('markers'), cut: dv('cut'), rapid: dv('rapid'), probe: dv('probe'), envAlpha: da('envelope'), stockAlpha: da('stock') };   // t744 — debug + tests: what the registry drew (value asserts for the 2D toggles/alphas)
         canvas.__t2cursor = cursor;   // debug + tests
         if (cursor) { if (cursor.snapped) drawSnap(ctx, cursor); drawReadout(ctx, cursor, w, h); }
     }
@@ -236,10 +240,12 @@ export function createToolpath2d(canvas, opts = {}) {
         ctx.restore();
     }
     function strokeSegs(ctx, from, to, alpha, width, zMin, zRange, maxPF) {
-        ctx.globalAlpha = alpha;
         const isSlowProbe = (s) => (s.type === 'probe' || s.probe) && (s.feed || 0) > 0 && (s.feed || 0) < maxPF;   // t319 — the WHITE slow re-probe
+        const elOf = (t) => t === 'probe' ? 'probe' : (t === 'rapid' || t === 'retract' || t === 'jog') ? 'rapid' : 'cut';   // t744 — path type → the registry element (cut · rapid family · probe)
         const drawSeg = (s) => {
-            const t = typeOf(s);
+            const t = typeOf(s), el = elOf(t), d = displayOf(el);
+            if (!d.visible) return;   // t744 — the registry hides this path type live
+            ctx.globalAlpha = alpha * d.alpha;   // compose the registry alpha onto the progress-state alpha
             // MOTION-TYPE colouring (matches the 3D): a rapid is a rapid → the one-source rapid YELLOW, whether single-axis
             // (dogleg leg) or 2-axis (diagonal traverse) — it IS a G0 positioning move (human t328). The ONLY source-special
             // case is the MANUAL 2-axis jog, which arcs UP ('rainbow') in its own amber jog colour. Markers still carry the
@@ -414,8 +420,9 @@ export function createToolpath2d(canvas, opts = {}) {
     canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
     canvas.addEventListener('mouseleave', () => { cursor = null; if (!anim.playing) paint(); });
 
+    const applyDisplay = () => { if (view) paint(); };   // t744 — the registry changed → re-paint (paint reads displayOf per element)
     return {
-        setGcode, setSegments, setMachine, setStock, setMachineFrame, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, setViewTransform, pulse, redraw, fit, play, stop, toggle, seek,
+        setGcode, setSegments, setMachine, setStock, setMachineFrame, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, setViewTransform, pulse, redraw, fit, play, stop, toggle, seek, applyDisplay,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

@@ -34,8 +34,8 @@ export function openVisibilityModal(anchor) {
     pop.className = 'vis-modal-pop';
     pop.setAttribute('role', 'dialog');
     pop.style.cssText = 'position:fixed; left:50%; top:10%; transform:translateX(-50%); z-index:10050;'
-        + 'background:rgba(20,22,28,0.98); border:1px solid rgba(255,255,255,0.14); border-radius:8px;'
-        + 'padding:12px 14px; min-width:260px; max-height:82vh; overflow-y:auto; box-shadow:0 10px 34px rgba(0,0,0,0.55);'
+        + 'background:var(--panel,#161b22); border:1px solid var(--border,rgba(255,255,255,0.14)); border-radius:8px;'   // t744 — THEME TOKENS (was a hardcoded dark bg → dark labels on light/classic themes)
+        + 'padding:12px 14px; min-width:260px; max-height:82vh; overflow-y:auto; box-shadow:0 10px 34px rgba(0,0,0,0.45);'
         + 'font-size:13px; color:var(--text,#e6edf5);';
     pop.innerHTML = `<div class="vis-head" style="font-weight:700; margin-bottom:8px; opacity:.9">Show in preview</div>`
         + `<div class="vis-rows">${rowsHtml()}</div>`

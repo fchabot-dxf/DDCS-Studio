@@ -306,10 +306,10 @@ export function createPreviewPanel(container, opts = {}) {
         if (!viz) return;
         const damp = Number.isFinite(pv.followDamp) ? pv.followDamp : 50;        // 0 = snappy … 100 = very damped
         if (viz.setFollowLerp) viz.setFollowLerp(0.32 - (damp / 100) * 0.30);
-        if (viz.setShowRapids) viz.setShowRapids(pv.showRapids !== false);
+        // t744 — rapid visibility + which assembly parts show FOLDED into the ONE visibility registry (displayPrefs → viz.applyDisplay);
+        // the settings.preview.showRapids / .parts switches are gone. gridStep (spacing, not visibility) + head (body sizes) stay here.
         if (viz.setGridStep) viz.setGridStep(pv.gridStep);   // Preview → grid spacing (mm; 0/'' = auto)
         if (viz.setHead) viz.setHead(pv.head);               // Preview → spindle/collet body sizes (sim-only, match the real machine)
-        if (viz.setPartVisible && pv.parts) viz.setPartVisible(pv.parts);   // Preview → which assembly pieces show
     }
     const nearest2d = (pos) => {
         let bi = 0, bd = Infinity;
@@ -580,7 +580,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (t2.setStartEmits) t2.setStartEmits(passStarts.map((s) => !!s.emits));   // sim-marker-distinguish (t69): the SHAPE axis (emitting=solid vs sim-only=hollow), orthogonal to the auto/manual COLOUR
         if (t2.setPassEnds) t2.setPassEnds(passEnds);        // t107 — an anchorsAtPrev pass anchors its route + relocates its marker to the previous pass's runtime END (machine-faithful)
         t2.setAnchor(curAnchor);                              // 2D mirrors the 3D anchor: anchored → path emanates from the start, not the stock pin
-        t2.setMachine(curAnchor ? null : machineForViz());   // anchored (probe) → LOCAL scene (no envelope), like the 3D's setMachine(null)
+        t2.setMachine(machineForViz());   // t744 — ENVELOPE EVERYWHERE (2D): draw the declared box regardless of anchor (the modal's `envelope` element gates it; paint reads displayOf)
         if (mode === '3d') {
             const v = ensureViz();
             if (v) {
@@ -717,7 +717,7 @@ export function createPreviewPanel(container, opts = {}) {
             if (v) { if (v.renderer) v.renderer.domElement.style.display = ''; v.setActive(true); }
         }
         if (active) setGcode();
-        if (mode === '2d') { t2.setMachine(curAnchor ? null : machineForViz()); t2.setStock(stockForViz()); t2.fit(); }   // frame the full scene on toggle (anchored → local, like the 3D)
+        if (mode === '2d') { t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.fit(); }   // t744 — envelope everywhere (2D): pass the declared machine regardless of anchor
         syncJog();
     }
     // The I/O button toggles the FLOATING virtual-I/O panel (mounts in <body>, draggable). It OVERLAYS the
@@ -847,7 +847,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
     // Stock (or other settings) changed — e.g. the Stock modal — update the workpiece box + re-trace (probe clamp).
-    window.addEventListener('ddcs:settings-changed', () => { renderStock(); updateStockGlow(); const m = (viz && viz._anchorToStart) ? null : machineForViz(); if (viz) viz.setMachine(m); t2.setMachine(m); applyPreviewSettings(); if (active) setGcode(); });
+    window.addEventListener('ddcs:settings-changed', () => { renderStock(); updateStockGlow(); const m = machineForViz(); if (viz) viz.setMachine(m); t2.setMachine(m); applyPreviewSettings(); if (active) setGcode(); });   // t744 — envelope everywhere: the declared machine regardless of anchor (the registry gates the box in both viz.setMachine + t2.paint)
 
     function setActive(on) {
         active = !!on;

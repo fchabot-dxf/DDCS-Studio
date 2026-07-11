@@ -924,7 +924,7 @@ function buildSettingsOverlay() {
                         <div class="settings-field">Default play speed
                             <select id="set_pv_speed"><option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
                         </div>
-                        <label class="settings-check"><input type="checkbox" id="set_pv_rapids"> Show rapid moves (yellow) in the 3D view</label>
+                        <div class="settings-hint" style="margin:6px 0">Show / hide preview elements (stock, rapids, tool, machine envelope, …) + their opacity are now in the <b>👁 visibility</b> button on every preview toolbar.</div>
                         <div class="settings-field" style="margin-top:10px">Grid spacing
                             <select id="set_pv_gridstep" title="Floor-grid line spacing. The grid is linked to the machine envelope; Auto picks a tidy step for its size.">
                                 <option value="0">Auto</option>
@@ -957,12 +957,8 @@ function buildSettingsOverlay() {
                             <input type="number" id="set_pv_collet_dia" class="dim-edit" min="1" step="1" title="Collet diameter (mm)">
                             <input type="number" id="set_pv_collet_len" class="dim-edit" min="1" step="1" title="Collet length (mm)">
                         </div>
-                        <div style="margin-top:2px">Show:
-                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_spindle"> Spindle</label>
-                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_collet"> Collet</label>
-                            <label class="settings-check" style="display:inline-flex"><input type="checkbox" id="set_pv_show_tool"> Tool</label>
-                        </div>
                     </div>
+                    <!-- t744 — Spindle/Collet/Tool SHOW toggles folded into the 👁 visibility modal (tool/head elements) -->
                     <div class="settings-section">
                         <div class="settings-section-title">3D PROBE (SIM VIEW)</div>
                         <div class="settings-hint">Edit a dimension right on the diagram — the probe redraws to match. Visual only (never changes the G-code); the probing radius comes from the <b>Stylus radius</b> field above (3D Probe defaults). These are the touch-probe body sizes so the sim matches your real probe.</div>
@@ -1163,7 +1159,7 @@ function buildSettingsOverlay() {
                                 <label class="mach-travel-row"><span class="mach-ax" style="color:#5a8fe0;">Z</span><input type="number" id="set_mach_z" class="dim-edit mach-col-field" step="1" title="Z travel (mm) — sign sets the home direction"></label>
                             </div>
                         </div>
-                        <label class="settings-check"><input type="checkbox" id="set_mach_show"> Show machine envelope in 3D</label>
+                        <!-- t744 — Show-machine-envelope folded into the 👁 visibility modal (the envelope element, everywhere + default-on). Soft limits stay below (a real machine bound, not a display toggle). -->
                         <label class="settings-check" title="Soft limits (#655). On = the controller bounds travel to this envelope, so the box closes. Off = no software bound — the box opens, unbounded in the travel direction (still pinned at home). Studio never writes #655 to the controller; this mirrors the machine's own setting (pull it)."><input type="checkbox" id="set_mach_softlimit"> Enable soft limits (#655) — closes the envelope</label>
                     </div>
                     <div class="settings-section" id="set_homing_section">
@@ -1533,7 +1529,6 @@ function wireSettingsOverlay(ov) {
         const pv = s.preview || (s.preview = { ...SETTINGS_DEFAULTS.preview });
         if (q('set_pv_view')) q('set_pv_view').value = pv.defaultView || '3d';
         if (q('set_pv_speed')) q('set_pv_speed').value = String(pv.defaultSpeed || 1);
-        if (q('set_pv_rapids')) q('set_pv_rapids').checked = pv.showRapids !== false;
         if (q('set_pv_gridstep')) q('set_pv_gridstep').value = String(pv.gridStep || 0);
         if (q('set_pv_follow_default')) q('set_pv_follow_default').checked = pv.followDefault !== false;
         if (q('set_pv_autoloop')) q('set_pv_autoloop').checked = pv.autoLoop !== false;
@@ -1544,9 +1539,6 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_spindle_len')) q('set_pv_spindle_len').value = pvh.spindleLen;
         if (q('set_pv_collet_dia')) q('set_pv_collet_dia').value = pvh.colletDia;
         if (q('set_pv_collet_len')) q('set_pv_collet_len').value = pvh.colletLen;
-        if (q('set_pv_show_spindle')) q('set_pv_show_spindle').checked = pvp.spindle !== false;
-        if (q('set_pv_show_collet')) q('set_pv_show_collet').checked = pvp.collet !== false;
-        if (q('set_pv_show_tool')) q('set_pv_show_tool').checked = pvp.tool !== false;
         renderHeadGui();
         const pvpr = pv.probe || (pv.probe = { ...SETTINGS_DEFAULTS.preview.probe });
         if (q('set_pv_probe_body_dia')) q('set_pv_probe_body_dia').value = pvpr.bodyDia;
@@ -1578,7 +1570,6 @@ function wireSettingsOverlay(ov) {
         q('set_mach_z').value = s.machine.z;
         renderMachineGui();
         renderWcsTable(q('set_mach_wcs_table'), s.machine);
-        q('set_mach_show').checked = !!s.machine.show;
         if (q('set_mach_softlimit')) q('set_mach_softlimit').checked = !!s.machine.softLimits;
         renderAxesGui();   // t648 — the vertical per-axis role list (was static A/B role+around selects)
 
@@ -2433,7 +2424,6 @@ function wireSettingsOverlay(ov) {
         const pv = s.preview || (s.preview = { ...SETTINGS_DEFAULTS.preview });
         if (q('set_pv_view')) pv.defaultView = q('set_pv_view').value;
         if (q('set_pv_speed')) pv.defaultSpeed = num(q('set_pv_speed').value, 1);
-        if (q('set_pv_rapids')) pv.showRapids = q('set_pv_rapids').checked;
         if (q('set_pv_gridstep')) pv.gridStep = num(q('set_pv_gridstep').value, 0);
         if (q('set_pv_follow_default')) pv.followDefault = q('set_pv_follow_default').checked;
         if (q('set_pv_autoloop')) pv.autoLoop = q('set_pv_autoloop').checked;
@@ -2443,9 +2433,6 @@ function wireSettingsOverlay(ov) {
         if (q('set_pv_spindle_len')) pvh.spindleLen = num(q('set_pv_spindle_len').value, 200);
         if (q('set_pv_collet_dia')) pvh.colletDia = num(q('set_pv_collet_dia').value, 20);
         if (q('set_pv_collet_len')) pvh.colletLen = num(q('set_pv_collet_len').value, 30);
-        if (q('set_pv_show_spindle')) pvp.spindle = q('set_pv_show_spindle').checked;
-        if (q('set_pv_show_collet')) pvp.collet = q('set_pv_show_collet').checked;
-        if (q('set_pv_show_tool')) pvp.tool = q('set_pv_show_tool').checked;
         const pvpr = pv.probe || (pv.probe = { ...SETTINGS_DEFAULTS.preview.probe });
         if (q('set_pv_probe_body_dia')) pvpr.bodyDia = num(q('set_pv_probe_body_dia').value, 40);
         if (q('set_pv_probe_body_len')) pvpr.bodyLen = num(q('set_pv_probe_body_len').value, 20);
@@ -2473,7 +2460,6 @@ function wireSettingsOverlay(ov) {
         s.machine.y = num(q('set_mach_y').value, s.machine.y);
         s.machine.z = num(q('set_mach_z').value, s.machine.z);
         // ox/oy/oz removed; workOrigin is derived from the WCS table (renderWcsTable persists it on edit/pull).
-        s.machine.show = q('set_mach_show').checked;
         if (q('set_mach_softlimit')) s.machine.softLimits = q('set_mach_softlimit').checked;
 
         s.probes.probePin = num(q('set_probe_pin').value, s.probes.probePin);
