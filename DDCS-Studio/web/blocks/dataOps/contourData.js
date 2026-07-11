@@ -77,6 +77,8 @@ export const CONTOUR_BINDINGS = CONTOUR_EXEC_BINDINGS.map((b) => ({ ...b, blockI
 export const CONTOUR_DATA_OPTYPE = 'user_contour_data';
 
 const _n = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+// t718 — bbox over a set of {pts} paths (the origin-inclusive toolpath extent, for the layout placement-parity shift).
+const _pbb = (ps) => { let b = null; for (const p of (ps || [])) for (const q of (p.pts || [])) { if (!b) b = { minX: q.x, maxX: q.x, minY: q.y, maxY: q.y }; else { if (q.x < b.minX) b.minX = q.x; if (q.x > b.maxX) b.maxX = q.x; if (q.y < b.minY) b.minY = q.y; if (q.y > b.maxY) b.maxY = q.y; } } return b; };
 /** The region params for the current shape (mirrors the built-in contourView.regionParams): rect/ellipse = corner/centre
  *  + size, circle/polygon = centre + Ø. Origin owned by the placement (originX/originY) — the pos handle writes those. */
 function _regionParams(p) {
@@ -107,7 +109,11 @@ export function contourPreviewGeometry(p) {
     } else {
         handles.push({ type: 'rect', id: 'ct_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: _n(p.w, 80), ey: _n(p.h, 60), sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' });
     }
-    return { paths, handles };
+    // t718 — the origin-inclusive OFFSET-toolpath bbox (the drawn fc-path): the twin's contourfill geometry is FROZEN at 0
+    // (originX rides the placement offX, unlike the built-in wizard), so the layout consumer places against THIS drawn-frame
+    // bbox (not the emit's 0-relative liveExtent) → the offset ring coincides with the traced toolpath.
+    const bbox = _pbb(paths.filter((q) => q.cls === 'fc-path')) || _pbb(paths);
+    return { paths, handles, bbox };
 }
 
 /** Build the contour-as-data def — a fresh { opType, label, template, bindings } ready for registerUserOp. The template is

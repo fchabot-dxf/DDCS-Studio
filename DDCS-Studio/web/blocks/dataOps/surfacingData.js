@@ -81,7 +81,9 @@ export function surfacingPreviewGeometry(p) {
         { type: 'point', id: 'sf_pos', fx: 'originX', fy: 'originY', x: ox, y: oy, label: 'pos' },
         { type: 'rect', id: 'sf_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' },
     ];
-    return { paths, handles };
+    // t718 — the origin-inclusive region bbox: the twin's surfacing geometry emits 0-relative (origin rides the placement
+    // offX), so the layout consumer places against THIS drawn-frame bbox → the region coincides with the raster trace.
+    return { paths, handles, bbox: { minX: ox, maxX: ox + w, minY: oy, maxY: oy + h } };
 }
 
 /** Build the surfacing-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. The template

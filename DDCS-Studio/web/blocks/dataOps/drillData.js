@@ -38,6 +38,7 @@
  * Stage 6 authors the template independently too (then the builder can be deleted); that's the self-host step, not this one.
  */
 import { drillStack, patternPoints } from '../../wizards/drillWizard.js';
+import { pointsBBox } from '../../wizards/ops/placement.js';   // t718 — the hole-CENTRES bbox for the placement-parity shift
 import { userOpFromStack } from '../userOps.js';
 
 /** The author defaults — match drillStack's own num() fallbacks so the seeded template == the true default stack. */
@@ -122,7 +123,10 @@ export function drillPatternGeometry(p, boreDia) {
         handles.push({ type: 'radial', id: 'dr_line', field: 'spacing', fieldA: 'angle', cx: ox, cy: oy, r: (n - 1) * s, a: _dn(p.angle, 0) * Math.PI / 180, rScale: n > 1 ? 1 / (n - 1) : null, minR: 0, label: 'pitch' });
     }
     if (boreDia) handles.push({ type: 'radial', id: 'dr_dia', field: 'holeDia', cx: (pts[0] && pts[0].x) || ox, cy: (pts[0] && pts[0].y) || oy, r: holeR, a: 0, rScale: 2, minR: 0.5, label: 'Ø' });
-    return { paths, handles };
+    // t718 — the origin-inclusive hole-CENTRES bbox (NOT the rings, which inflate by holeR): the drill emit's pattern
+    // is 0-relative (array x0/y0 default 0, origin rides the placement offX), so the layout consumer resolves the shift
+    // against THIS drawn-frame bbox (placeShiftOfStack bboxOverride) — landing the drawn pattern where the trace lands.
+    return { paths, handles, bbox: pointsBBox(pts) };
 }
 
 /** Build the drill-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. The template

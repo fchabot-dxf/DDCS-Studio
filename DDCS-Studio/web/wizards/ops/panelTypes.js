@@ -17,6 +17,7 @@ import { partZeroShift } from '../../viz/sceneFrame.js';   // t586 PREVIEW-PARIT
 import { BLOCKS } from './index.js';   // t708 — the block-def registry (type → def), to resolve an atom's DECLARED previewGeometry
 import { builderOf } from '../../blocks/opBuilders.js';   // t708 — build the op's stack to find its geometry atom + its live params
 import { getUserPreviewGeometry } from '../../blocks/userOps.js';   // t712 — a twin's DECLARED preview-geometry hook (slot/contour per-feature handles)
+import { placeShiftOfStack } from '../../blocks/blockEmitter.js';   // t718 LAYOUT PLACEMENT PARITY — the op's DECLARED placement shift (== the emit's), to draw previewGeometry PLACED
 
 // t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
 // settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
@@ -169,8 +170,23 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // decls join `decls` (so they build through the SAME setFields writer round-trip below); its paths join a `paths` array
     // returned in the spec (FeatureCanvas draws paths as <path>). text's filltext is the first consumer (real letters + ↻/pos).
     const _pgeo = _previewGeometryOf(def, params);
-    const previewPaths = (_pgeo && Array.isArray(_pgeo.paths)) ? _pgeo.paths : null;
-    if (_pgeo && Array.isArray(_pgeo.handles)) for (const h of _pgeo.handles) decls.push(h);
+    // t718 LAYOUT PLACEMENT PARITY — the previewGeometry is DUMB raw-param math (drawn at originX); PLACE it onto the stock
+    // with the SAME shift the emit bakes (placeShiftOfStack → placeShiftFromParams) so the drawn rings/handles COINCIDE with
+    // the traced toolpath (which is the placed emit). We BAKE the shift into the previewGeometry paths + handle RENDER positions
+    // and INVERSE-map their drag world (world − shift → raw param) — NOT via spec.placement, so the already-placed sim Start ○
+    // (drawn from the placed sim) is untouched. A twin whose preview frame differs from its emit geometry frame (drill/bore:
+    // pattern emits 0-relative but draws at originX) declares its own origin-inclusive toolpath bbox (_pgeo.bbox) so the shift
+    // lands the DRAWN feature; others fall through to the emit's liveExtent (identical result). Probe ops (no place block) → {0,0}.
+    let _pShift = { x: 0, y: 0 };
+    const _pgIds = new Set();
+    if (_pgeo) {
+        if (Array.isArray(_pgeo.handles)) for (const h of _pgeo.handles) { decls.push(h); if (h && h.id != null) _pgIds.add(h.id); }
+        try { const _bo = builderOf(def.opType); if (_bo) { const s = placeShiftOfStack(_bo(params), _pgeo.bbox || null); _pShift = { x: s.x || 0, y: s.y || 0 }; } } catch (_) { /* no place block / unbuildable → no shift */ }
+    }
+    const _placed = _pShift.x || _pShift.y;
+    const previewPaths = (_pgeo && Array.isArray(_pgeo.paths))
+        ? (_placed ? _pgeo.paths.map((pth) => ({ ...pth, pts: (pth.pts || []).map((q) => ({ x: q.x + _pShift.x, y: q.y + _pShift.y })) })) : _pgeo.paths)
+        : null;
     // t385 (human) — DRAW the workpiece INSIDE cavities (the pocket) in the 2D layout from the DECLARED workpiece
     // (getWorkpiece → the stock-modal-defined pos+size), so a Middle probe SHOWS the pocket it finds — matching the 3D
     // render + the probe-stop (ONE source, no hardcoded inset). Only inside cavities draw; an outer boss/solid has none →
@@ -313,7 +329,15 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
     // math (corner/radius) lives in the registry; here `setFields` just routes each {param: value} to its form field.
     const setFields = (m) => { for (const k in m) _writeParam(k, m[k]); };
-    const { handles, onDrag } = buildCanvasWidgets(decls, setFields);
+    const { handles, onDrag: _rawOnDrag } = buildCanvasWidgets(decls, setFields);
+    // t718 LAYOUT PLACEMENT PARITY — PLACE the previewGeometry handles: bake the shift into their RENDER position and
+    // INVERSE-map their drag world (world − shift → the raw param), keyed by the previewGeometry handle ids. Role/probe
+    // handles + the sim Start are untouched (the shift is 0 for probe ops anyway). Size/delta fields pass through — the
+    // gesture math reads the un-shifted world, so a pos handle writes world−shift while W/H/Ø/dx/dy are pure translation.
+    if (_placed && _pgIds.size) for (const h of handles) if (_pgIds.has(h.id)) { h.x += _pShift.x; h.y += _pShift.y; }
+    const onDrag = (_placed && _pgIds.size)
+        ? (id, world) => _rawOnDrag(id, _pgIds.has(id) ? { x: world.x - _pShift.x, y: world.y - _pShift.y } : world)
+        : _rawOnDrag;
     // t120 — Option A independence: wrap the emitting-handle drag. On dragging ANY relTo handle, CAPTURE (freeze) every OTHER
     // relTo group's spot at its CURRENT displayed world (no jump), then SET the dragged group's spot to the drop world — all
     // datum-relative to cornerXY. The re-render then derives each group's G91 increment off the current planned anchor, so

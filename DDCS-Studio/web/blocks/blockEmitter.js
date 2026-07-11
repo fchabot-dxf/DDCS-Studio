@@ -94,6 +94,32 @@ function liveExtent(blocks, scope) {
     return null;
 }
 
+/** t718 LAYOUT PLACEMENT PARITY — the (x,y,z) placement shift an op's stack BAKES into its emit, exposed so the 2D
+ *  layout can draw a twin's previewGeometry PLACED (coincident with the traced toolpath). It walks to the first
+ *  kind:'place' block and returns the SAME placeShiftFromParams the place fold uses (line ~188) — NOT re-derived math.
+ *  `bboxOverride` (when given) replaces the wrapped geometry's liveExtent: a twin whose previewGeometry is drawn in a
+ *  DIFFERENT frame than its emit geometry (drill/bore — the pattern emits 0-relative at x0/y0 but the preview draws it
+ *  at originX) passes its OWN origin-inclusive toolpath bbox, so the shift lands the drawn feature's datum corner where
+ *  the emit lands it. Ops with origin-inclusive geometry (contour/pocket/…) pass nothing → liveExtent (identical result).
+ *  Returns {x:0,y:0,z:0} for an op with no placement (probe ops) so the caller is safe to always call it. */
+export function placeShiftOfStack(blocks, bboxOverride = null) {
+    const scope = Object.create(null);
+    let place = null;
+    const walk = (bs) => {
+        for (const b of (bs || [])) {
+            if (!b) continue;
+            const d = BLOCKS[b.type];
+            if (d && d.kind === 'place') { place = b; return true; }
+            if (b.uiChildren && walk(b.uiChildren)) return true;
+            if (b.children && walk(b.children)) return true;
+        }
+        return false;
+    };
+    walk(blocks);
+    if (!place) return { x: 0, y: 0, z: 0 };
+    return placeShiftFromParams(resolveParams(place.params, scope), bboxOverride || liveExtent(place.children, scope));
+}
+
 /** Recursive fold → tagged lines. `anc` = ancestry of block ids; `scope` = the variable environment. */
 function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dialect = DEFAULT_DIALECT) {
     const def = BLOCKS[block.type];

@@ -106,6 +106,8 @@ export const POCKET_DATA_OPTYPE = 'user_pocket_data';
 
 const _pn = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
 const _circlePath = (cx, cy, r) => { const pts = []; for (let i = 0; i <= 48; i++) { const a = 2 * Math.PI * i / 48; pts.push({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }); } return { pts, cls: 'fc-guide' }; };
+// t718 — bbox over a set of {pts} paths (the origin-inclusive boundary extent, for the layout placement-parity shift).
+const _pbb = (ps) => { let b = null; for (const p of (ps || [])) for (const q of (p.pts || [])) { if (!b) b = { minX: q.x, maxX: q.x, minY: q.y, maxY: q.y }; else { if (q.x < b.minX) b.minX = q.x; if (q.x > b.maxX) b.maxX = q.x; if (q.y < b.minY) b.minY = q.y; if (q.y > b.maxY) b.maxY = q.y; } } return b; };
 /** t716 — DECLARED preview geometry (twin-level): the pocket boundary (the finished-wall outline) PER SHAPE KIND — the
  *  multishape solved by declaration (the twin knows p.shape) — + a pos handle (originX/originY) + a size handle per kind
  *  (circle/polygon → radial Ø; rect/ellipse → rect W×H). Mirrors the built-in pocketView.buildPocketSpec. Preview-side → emit unaffected. */
@@ -127,7 +129,9 @@ export function pocketPreviewGeometry(p) {
         paths.push({ pts: [{ x: ox, y: oy }, { x: ox + w, y: oy }, { x: ox + w, y: oy + h }, { x: ox, y: oy + h }, { x: ox, y: oy }], cls: 'fc-path' });
         handles.push({ type: 'rect', id: 'pk_size', field: 'w', fieldH: 'h', ax: ox, ay: oy, ex: w, ey: h, sx: 1, sy: 1, minw: 1, minh: 1, label: 'W×H' });
     }
-    return { paths, handles };
+    // t718 — the origin-inclusive boundary bbox: the twin's pocket geometry emits 0-relative (origin rides the placement
+    // offX), so the layout consumer places against THIS drawn-frame bbox → the pocket frames the traced clearing passes.
+    return { paths, handles, bbox: _pbb(paths) };
 }
 
 /** The wrapped superset template: pocketStack(DEFAULTS, {superset:true}) under the user_root/panel/sim/param_group prefix. */

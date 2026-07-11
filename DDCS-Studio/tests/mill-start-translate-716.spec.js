@@ -63,5 +63,6 @@ test('slot: the anchor TRANSLATES (length + width + angle frozen); dragging B le
     expect(await val(page, 'bx') !== a1.bx || await val(page, 'by') !== a1.by, 'dragging B moved B').toBeTruthy();
     expect(await val(page, 'ax'), 'dragging B left A.x unmoved (independent)').toBe(ax2);
     expect(await val(page, 'ay'), 'dragging B left A.y unmoved (independent)').toBe(ay2);
-    await page.locator('#wiz_user').screenshot({ path: 'scratchpad/mill-slot-translate.png' });
+    const _bb = await page.locator('#wiz_user').boundingBox();   // t710 convention: boundingBox+clip (idle-3D locator.screenshot stalls)
+    if (_bb) await page.screenshot({ path: 'scratchpad/mill-slot-translate.png', clip: _bb });
 });

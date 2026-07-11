@@ -49,6 +49,7 @@ for (const { op, name, sizeParams } of [
         await dragHandle(page, sizeSel, 40, 35);
         const a1 = await paramVal(page, pa), b1 = await paramVal(page, pb);
         expect(a1 !== a0 || b1 !== b0, `${name}: dragging the size handle wrote ${pa}/${pb} (${a0},${b0} → ${a1},${b1})`).toBeTruthy();
-        await page.locator('#wiz_user').screenshot({ path: `scratchpad/mill-layout-${name}.png` });
+        const _bb = await page.locator('#wiz_user').boundingBox();   // t710 convention: boundingBox+clip (idle-3D locator.screenshot stalls)
+        if (_bb) await page.screenshot({ path: `scratchpad/mill-layout-${name}.png`, clip: _bb });
     });
 }
