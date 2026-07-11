@@ -25,10 +25,12 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 test('a REAL drag past the stock edge writes a fraction >1, bounded by the machine envelope; the marker follows', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
-    // stock 200×120; a TIGHT envelope 220×220 (workOrigin 0) → the max reach is 220mm → the max ax fraction = 220/200 = 1.10
+    // stock 200×120; a TIGHT envelope 220×220 with a DECLARED WCS placement (a real table row seats part-zero at machine 0 →
+    // workOrigin 0) → the max reach is 220mm → the max ax fraction = 220/200 = 1.10. t730 — the clamp only binds with a
+    // DECLARED placement (a WCS table row); the shipped-default `table:null` is a placeholder and leaves the drag unbounded.
     await page.evaluate(async () => {
         const SP = await import('/ui/settingsPanel.js');
-        SP.applySettings({ stock: { x: 200, y: 120, z: 30, shape: 'box', show: true }, machine: { x: 220, y: 220, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 } } });
+        SP.applySettings({ stock: { x: 200, y: 120, z: 30, shape: 'box', show: true }, machine: { x: 220, y: 220, z: -120, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: [{ x: 0, y: 0, z: 0 }] } } });
     });
     await page.evaluate(() => window.openWiz('user_alignment_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });

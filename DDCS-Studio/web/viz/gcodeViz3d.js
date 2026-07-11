@@ -1269,29 +1269,59 @@ export class GcodeViz3D {
         if (this._carveMesh) this._partGroup.add(this._carveMesh);
     }
 
-    /** Flat tiles + TRUE vertical wall quads (doubled rim/floor verts) from the CRISP floor hc[] — a straight pocket wall
-     *  renders vertical, not a one-cell ramp (t682). Walls at the cell boundary near the analytic edge; flat-shaded. Records
-     *  `_carveMaxWall` (the tallest vertical face) for the assert. Not in-place-remeshable (topology varies) → rebuilt whole. */
+    /** Trimmed flat tiles + TRUE VERTICAL wall curtains that follow the ANALYTIC CONTOUR — a MARCHING-TRIANGLES trace of the
+     *  floor iso-contour (t730). The crisp floor hc[] gives the discrete Z levels; the AA field h[] carries the sub-cell edge
+     *  (coverage 0.5 ⇒ the analytic edge sits at the half-depth iso, and the round tool cap curves that iso at ~toolR near an
+     *  internal corner). So each 2-level cell splits along the interpolated contour: floor tile at the low level, top tile at
+     *  the high level, and a vertical curtain (rim+floor share XY) between them — diagonals render STRAIGHT, internal corners
+     *  ARC at ~toolR, straight runs stay crisp. Records `_carveMaxWall` (tallest curtain) for the assert. Rebuilt whole. */
     _buildCrispCarveMesh(c, color) {
         const THREE = this.THREE;
         const nx = c.nx, ny = c.ny, dx = c.dx, dy = c.dy, X = c.X, Y = c.Y, Z = c.Z, ox = -X / 2, oy = -Y / 2, topZ = Z / 2, botZ = -Z / 2;
-        const zAt = (i, j) => c.hc[c.idx(i, j)] + topZ;   // the CRISP floor (clean single step, no AA lip)
+        const hcAt = (i, j) => c.hc[c.idx(i, j)], hAt = (i, j) => c.h[c.idx(i, j)];   // crisp level (discrete) + AA height (sub-cell edge)
+        const vx = (i) => i * dx + ox, vy = (j) => j * dy + oy;                       // grid VERTEX world XY (dx=X/(nx-1))
         const verts = [], idx = [];
-        const quad = (ax, ay, az, bx, by, bz, cx, cy, cz, ex, ey, ez) => { const b0 = verts.length / 3; verts.push(ax, ay, az, bx, by, bz, cx, cy, cz, ex, ey, ez); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
-        const xL = (i) => Math.max(ox, i * dx + ox - dx / 2), xR = (i) => Math.min(ox + X, i * dx + ox + dx / 2);
-        const yB = (j) => Math.max(oy, j * dy + oy - dy / 2), yT = (j) => Math.min(oy + Y, j * dy + oy + dy / 2);
-        for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const z = zAt(i, j); quad(xL(i), yB(j), z, xR(i), yB(j), z, xR(i), yT(j), z, xL(i), yT(j), z); }   // flat top tiles
-        const EPS = 1e-4; let maxWall = 0;
-        for (let j = 0; j < ny; j++) for (let i = 0; i < nx - 1; i++) { const za = zAt(i, j), zb = zAt(i + 1, j), d = Math.abs(za - zb); if (d <= EPS) continue; if (d > maxWall) maxWall = d; const xw = i * dx + ox + dx / 2; quad(xw, yB(j), za, xw, yT(j), za, xw, yT(j), zb, xw, yB(j), zb); }   // walls ↔ x-neighbours
-        for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx; i++) { const za = zAt(i, j), zb = zAt(i, j + 1), d = Math.abs(za - zb); if (d <= EPS) continue; if (d > maxWall) maxWall = d; const yw = j * dy + oy + dy / 2; quad(xL(i), yw, za, xR(i), yw, za, xR(i), yw, zb, xL(i), yw, zb); }   // walls ↕ y-neighbours
-        for (let i = 0; i < nx; i++) { const zf = zAt(i, 0); quad(xL(i), oy, zf, xR(i), oy, zf, xR(i), oy, botZ, xL(i), oy, botZ); const zk = zAt(i, ny - 1); quad(xL(i), oy + Y, zk, xR(i), oy + Y, zk, xR(i), oy + Y, botZ, xL(i), oy + Y, botZ); }   // front/back skirt
-        for (let j = 0; j < ny; j++) { const zl = zAt(0, j); quad(ox, yB(j), zl, ox, yT(j), zl, ox, yT(j), botZ, ox, yB(j), botZ); const zr = zAt(nx - 1, j); quad(ox + X, yB(j), zr, ox + X, yT(j), zr, ox + X, yT(j), botZ, ox + X, yB(j), botZ); }   // left/right skirt
-        quad(ox, oy, botZ, ox + X, oy, botZ, ox + X, oy + Y, botZ, ox, oy + Y, botZ);   // bottom
+        const pushTri = (ax, ay, az, bx, by, bz, cx, cy, cz) => { const b0 = verts.length / 3; verts.push(ax, ay, az, bx, by, bz, cx, cy, cz); idx.push(b0, b0 + 1, b0 + 2); };
+        const flatTri = (p, q, r, z) => pushTri(p.x, p.y, z, q.x, q.y, z, r.x, r.y, z);
+        const flatQuad = (p, q, r, s, z) => { flatTri(p, q, r, z); flatTri(p, r, s, z); };
+        let maxWall = 0;
+        const curtain = (p, q, zHi, zLo) => { const d = zHi - zLo; if (d > maxWall) maxWall = d; const b0 = verts.length / 3; verts.push(p.x, p.y, zHi, q.x, q.y, zHi, q.x, q.y, zLo, p.x, p.y, zLo); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };   // VERTICAL (rim+floor share XY)
+        // the contour crossing on edge P→Q: the analytic edge sits at the AA half-depth iso (coverage 0.5), interpolated on
+        // h[]. Symmetric in P,Q → the crossing on a SHARED edge matches from both cells (a continuous, seamless contour).
+        const cross = (P, Q) => { const iso = (P.hc + Q.hc) / 2, den = Q.h - P.h; let t = Math.abs(den) < 1e-9 ? 0.5 : (iso - P.h) / den; t = t < 0 ? 0 : t > 1 ? 1 : t; return { x: P.x + t * (Q.x - P.x), y: P.y + t * (Q.y - P.y) }; };
+        let junctions = 0;
+        // Marching TRIANGLES on the 4-corner cell (2 tris, shared NW-SE diagonal): 3 cases per tri, NO saddle ambiguity.
+        const procTri = (A, B, C) => {
+            const la = A.hc, lb = B.hc, lc = C.hc;
+            if (la === lb && lb === lc) { flatTri(A, B, C, la + topZ); return; }              // 1 level → flat tile, no wall
+            const hiL = Math.max(la, lb, lc), loL = Math.min(la, lb, lc), midL = la + lb + lc - hiL - loL;
+            if (midL !== hiL && midL !== loL) { flatTri(A, B, C, hiL + topZ); junctions++; return; }   // 3 distinct levels (rare triple-point) → flat at shallowest
+            const zHi = hiL + topZ, zLo = loL + topZ, isLo = (P) => P.hc === loL;
+            const los = [A, B, C].filter(isLo), his = [A, B, C].filter((P) => !isLo(P));
+            if (los.length === 1) {   // one cut corner: a floor triangle + a top quad, curtain between
+                const a = los[0], b = his[0], d = his[1], pab = cross(a, b), pad = cross(a, d);
+                flatTri(a, pab, pad, zLo); flatQuad(pab, b, d, pad, zHi); curtain(pab, pad, zHi, zLo);
+            } else {                  // two cut corners: a top triangle + a floor quad, curtain between
+                const cc = his[0], a = los[0], b = los[1], pca = cross(cc, a), pcb = cross(cc, b);
+                flatTri(cc, pca, pcb, zHi); flatQuad(pca, a, b, pcb, zLo); curtain(pca, pcb, zHi, zLo);
+            }
+        };
+        for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+            const SW = { x: vx(i), y: vy(j), hc: hcAt(i, j), h: hAt(i, j) }, SE = { x: vx(i + 1), y: vy(j), hc: hcAt(i + 1, j), h: hAt(i + 1, j) };
+            const NW = { x: vx(i), y: vy(j + 1), hc: hcAt(i, j + 1), h: hAt(i, j + 1) }, NE = { x: vx(i + 1), y: vy(j + 1), hc: hcAt(i + 1, j + 1), h: hAt(i + 1, j + 1) };
+            procTri(SW, NW, SE); procTri(SE, NW, NE);   // shared NW-SE diagonal → matched crossings across the split
+        }
+        // perimeter skirt (vertical, vertex-based) + bottom — the stock boundary, unchanged from the box outline
+        const zc = (i, j) => hcAt(i, j) + topZ;
+        const skirt = (i0, j0, i1, j1) => { const b0 = verts.length / 3; verts.push(vx(i0), vy(j0), zc(i0, j0), vx(i1), vy(j1), zc(i1, j1), vx(i1), vy(j1), botZ, vx(i0), vy(j0), botZ); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
+        for (let i = 0; i < nx - 1; i++) { skirt(i, 0, i + 1, 0); skirt(i, ny - 1, i + 1, ny - 1); }
+        for (let j = 0; j < ny - 1; j++) { skirt(0, j, 0, j + 1); skirt(nx - 1, j, nx - 1, j + 1); }
+        flatQuad({ x: ox, y: oy }, { x: ox + X, y: oy }, { x: ox + X, y: oy + Y }, { x: ox, y: oy + Y }, botZ);   // bottom
         const g = new THREE.BufferGeometry();
         g.setIndex(idx);
         g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
         g.computeVertexNormals();
-        this._carveMaxWall = maxWall; this._carveSkirtTop = null; this._carveNtop = 0; this._carveTriCount = idx.length / 3;
+        this._carveMaxWall = maxWall; this._carveSkirtTop = null; this._carveNtop = 0; this._carveTriCount = idx.length / 3; this._carveTriJunctions = junctions;
         const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.85, depthWrite: true, side: THREE.DoubleSide, flatShading: true });   // flat-shade → crisp rims, no smeared normals
         return new THREE.Mesh(g, mat);
     }

@@ -95,13 +95,20 @@ let _simStartFracs = {};
 
 /** The machine ENVELOPE reach in the WCS/stock frame (the stock corner sits at the WCS origin): a WCS coord `w` maps to
  *  machine `workOrigin + w`, reachable while `0 ≤ workOrigin + w ≤ span` → `w ∈ [-workOrigin, span - workOrigin]`. Null if
- *  no envelope is configured (then the drag is unbounded — the stock is never the bound). */
+ *  the stock's PLACEMENT in the machine is not DECLARED (then the drag is unbounded — the stock is never the bound).
+ *  t730 — the reach is meaningful ONLY when a real WCS table row backs `workOrigin` (that row IS where the stock's part-zero
+ *  sits in the machine). The SHIPPED default (`wcs.table === null` → `workOrigin {0,0,0}`) is a PLACEHOLDER, not a
+ *  declaration: reading it as "the stock's datum corner is jammed at the travel minimum" wrongly pins any marker that
+ *  legitimately sits in front of / left of the stock (an alignment fence at −Y seats A at y<0 by design). Undeclared
+ *  placement → null → markers position ANYWHERE; envelope bounds at most, and only once a placement is declared. */
 function machineReachXY() {
     try {
         const m = (window.ddcsGetSettings && window.ddcsGetSettings().machine) || null;
         if (!m) return null;
         const spanX = Math.abs(Number(m.x) || 0), spanY = Math.abs(Number(m.y) || 0);
         if (!(spanX > 0) || !(spanY > 0)) return null;
+        const declared = m.wcs && Array.isArray(m.wcs.table) && m.wcs.table.length > 0;   // a real WCS row backs workOrigin
+        if (!declared) return null;   // placement unknown → don't clamp (the default workOrigin 0 is a placeholder, not "at travel-0")
         const wo = m.workOrigin || {}, woX = Number(wo.x) || 0, woY = Number(wo.y) || 0;
         return { xMin: -woX, xMax: spanX - woX, yMin: -woY, yMax: spanY - woY };
     } catch (_) { return null; }
