@@ -9296,3 +9296,26 @@ The dispatch said "the tool table gains tip: flat|ball". But the tool table ALRE
 
 ### t682 FINAL suite status (E1.5 crisp walls + adaptive cap + ballnose)
 Full suite (--workers=4): **996 passed, 2 skipped, 2 failed**. The 2 (blocks-mobile-drawers, op-params-complete) PASS in isolation (--workers=1, 2/2) → environmental contention flakes on the active machine (op-params-complete opens ~40 wizards → times out only under full-suite load; blocks-mobile is a screenshot flake), NOT regressions. Byte-identity holds (flat carve is byte-identical; carve is viz-only). Committing.
+
+---
+
+## t684 — UX BUNDLE: landed the 2 small independent items; GATING the rest (each is turn-sized)
+
+The dispatched "bundle" (NEXT-SESSION item (a)–(e2)) is ~12 sub-items; on inspection MOST are individually turn-sized features, not small tweaks. Per the batch rule ("land the small ones, gate what explodes"), I landed the two genuinely-trivial/small independent items and am gating the large multi-file sweeps for focused re-dispatch (quality > cramming).
+
+### LANDED this turn
+- **(b3)** header quick-menu "Insert file" → **"Insert gcode"** (headerPost.js HQ_ACTIONS). Trivial. No test referenced the old label.
+- **(d2)** the 3D START MARKER was fixed ~constant-screen size (~too big on a small stock, per the user's Bore shot). Now **SCENE-RELATIVE**: `glyphWorld = clamp(2.5, stockDiagonal·0.045, 60)`, group scaled `/9` (the glyph sprite is 9 world-units at scale 1). Small stock → small marker, large → proportional. gcodeViz3d `_scaleMarkers`. Verified: app boots clean; 12 start-marker/preview specs green (homing-start-marker, preview-2d-start-handle, per-pass-starts-2d, corner-marker-independence + the header quickmenu spec).
+
+### GATED (recommend re-dispatch as focused turns — my size read)
+- **(a)** autostart staleness FINGERPRINT — MEDIUM. Hash the homingRunParams-relevant settings + the additional-G-code field, store with the boot body, show a "homing profile changed — Regenerate" note on drift. Self-contained but needs the sysstart-generation seam mapped.
+- **(b)+(b2)** Profile section → buttons + PROFILE BROWSER MODAL + header quick-menu Profile section — LARGE. A new 13100-tier modal (project-browser pattern, local+cloud rows, save-as = the only naming, load=full-swap) + the header "Generate for" → Profile section. This is a feature, not a tweak.
+- **(b4)** wizard "templates" icon → labeled PRESETS affordance — MEDIUM; the preset feature wasn't locatable by a quick grep in web/wizards → needs discovery first.
+- **(b5)** the app-wide MODAL RULE sweep ([Done]/OK+Cancel, X-never-only-exit, the WORK-LOG modal list) — LARGE (every modal audited + a per-theme screenshot set).
+- **(b6)** PRIMARY-button theme-accent (token-driven, per-skin) — MEDIUM (needs the primary-vs-neutral class seam + per-theme screenshots).
+- **(c)** Projects drawer RESIZE HANDLE (drag + persisted width) — MEDIUM.
+- **(d)** ONE in-app dialog helper replacing ALL browser confirm/prompt/alert + the grep-guard + the sweep — LARGE (app-wide call-site sweep).
+- **(e)** SLOT/CONTOUR/TEXT preview sweep to the standard panel — LARGE (multi-twin).
+- **(e2)** the TEXT atom (dynamic on-controller {SN}, glyph subs) — HUGE and its OWN spec says "GATE the atom design back for ruling before building" + "GROUND FIRST the persistent-var range + clock registers". Design-gate, not a build.
+
+Recommend the advisor re-dispatch (a),(b6),(c) next (medium, independent), then the large sweeps (b/b2, b5, d, e) one per turn, and (e2) as a design-ground-then-ruling turn.

@@ -404,8 +404,12 @@ export class GcodeViz3D {
         const worldPerPxAt = (pos) => ortho
             ? (this.camera.top - this.camera.bottom) / H
             : (2 * this.camera.position.distanceTo(pos) * tanHalf) / H;
-        const targetPx = this._gizmoPx || 90, base = 26; // base = the arrow length at scale 1
-        for (const m of this.spindleMarkers) m.scale.setScalar(Math.max(1e-4, (targetPx * worldPerPxAt(m.position)) / base));
+        // START MARKER — SCENE-RELATIVE, not constant-screen (t684 d2): a small fraction of the stock diagonal, clamped, so
+        // it never dwarfs a small stock nor vanishes on a big one. The glyph sprite is 9 world-units at group scale 1.
+        const st = this._stock || {};
+        const diag = Math.hypot(Number(st.x) || 0, Number(st.y) || 0, Number(st.z) || 0) || 100;
+        const glyphWorld = Math.min(60, Math.max(2.5, diag * 0.045));
+        for (const m of this.spindleMarkers) m.scale.setScalar(glyphWorld / 9);
         // Work-origin gizmo: constant on-screen size. Group crosshair is ±1mm at scale 1, so scale it so the cross
         // spans ~36px; the label sprite (a group child) is counter-scaled so the "WCS" text stays a fixed px width
         // (canvas is 2:1) instead of compounding with the group scale.
