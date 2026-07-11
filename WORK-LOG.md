@@ -9159,3 +9159,45 @@ web/wizards/views/alignmentView.js: after preview3D, `if (ctx.previewSeatAtStart
 ### VERIFY (extended — the miss was under-testing; now BOTH ops × BOTH flows)
 tests/alignment-fresh-seat.spec.js (REWRITTEN, 6, reads the ACTUAL p.viz — polyline vertices + _animTool + spindleMarkers[0]): for EACH of ['alignment' (built-in), 'user_alignment_data' (twin)] × (A) 3D-INITIAL open AND (B) DEFAULT-view open → setView('3d') [the advisor's exact repro, preview.default3D=false] → the 3D TRACE head == A, NO trace vertex at origin, and (3D-initial) the SIM never seats/animates at origin (sampled across auto-play). PLUS: the twin real 2D-handle DRAG → to 3D → NO origin vertex (the fix holds after a drag; head follows A in the fence axis — the Y differs only by the probe approach). Homing (machine-frame) negative control: trace head coincides with its seated tool. 2× repeat = 12/12. EMIT BYTE-IDENTICAL (alignment-data-emit green — previewSeatAtStart is a viz call, not the emit path). Regression: 50 alignment/homing/corner specs green. Screenshot scratchpad/alignment_fresh_seat.png.
 Files: wizards/views/alignmentView.js, tests/alignment-fresh-seat.spec.js (rewritten).
+
+## 2026-07-10 (t678) — MATERIAL REMOVAL E0: GROUNDED DESIGN (gate — NO CODE; advisor rules, then E1)
+The ratified heightmap-2.5D design (live+end-state, everywhere, visual-only, probe-never-carves off declared classes, recesses pre-seed). Grounded the 6 seams; the module shape + forks + perf risks are below for the ruling.
+
+### GROUNDING (file:line seams)
+1. POSITION STREAM + MOVE CLASS. Recorded segment (engine `_traceSink`, GcodeExecutionEngine.js:1177): `{x1,y1,z1, x2,y2,z2, rapid, probe, type:'rapid'|'feed'|'probe', feed, pass, line}` — consecutive within a pass. Live stream = `engine.onPositionChange({x,y,z,pass})` (_advanceMove:529 / _finishMove:583), subscribed at createPreviewPanel.js:381. The viz reads `parsed.segments` → world `_animSegs` (gcodeViz3d.setSegments:754, _rebuild offset :866). MOVE CLASS is DECLARED from the G-word (G0→rapid, G1→feed, G31→probe; G53→forced rapid), attached per-segment, IDENTICAL across engine/gcodeParser/GcodeSimulator → reliable in BOTH editor + wizard contexts. Probe-never-carves key = `s.probe===true || s.type==='probe'`.
+2. HEADLESS FAST END-STATE. `engine.trace(text)` (:355) / `traceToolpath(text, opts)` (engine/trace.js:22) — SYNCHRONOUS, no-rAF, follows IF/GOTO/WHILE, auto-satisfies probes, linearizes arcs, returns ALL segments in execution order + stats. "The ONE toolpath source for every preview." → the end-state carve iterates result.segments ONCE.
+3. TOOL Ø. `simTool(code, parsed)` (createPreviewPanel.js:415): host `getTool` (the wizard's op tool) → program `T#` in `atc.tools[].dia` → probe-if-path-has-probes → **default 6mm endmill**. #1430 is LENGTH only (NOT Ø). Tool = {type, dia}; E1 = flat endmill.
+4. STOCK MESH + PRE-SEED. Stock box in setStock (gcodeViz3d.js:1189), MeshLambertMaterial translucent (:1162), opacity per sim-mode (_stockOpacity: probe 0.16 / mill 0.72, :521). Frame = stock-local, top at z=0 (probeGeometry.js), in `_partGroup` (top-Z=_stockTopZ pg-local z/2, XY [0..x]×[0..y], placed by pg.position + partZeroShift → inherits datum/WCS/rotary). PRE-SEED source = `_pocketFloors=[{x,y,depth,floorZ}]` (:1244) + feature model `{shape,side,pos(physical stock-local),size,depth}` from projectWorkpiece (workpiece.js:90).
+5. WHERE IT PLUGS. `createPreviewPanel.js` = the ONE shared component (editor gcodePreviewTab.js:83 + ALL wizards wizardManager.js:491 + Blocks + Macros). Carve seams: ensureViz/setStock (:292), setSegments (:582), play loop onPositionChange (:381). Re-mesh = in-place `pos.setXYZ + needsUpdate` throttled on the `_animTick` rAF (gcodeViz3d.js:648/655), `render()` on demand.
+6. PROBE-NEVER-CARVES = the declared class (§1) — reliable both contexts. CONFIRMED.
+
+### THE MODULE SHAPE (engine/stockRemoval.js) — a CARTESIAN heightmap behind a CarveMap seam
+```
+interface CarveMap {              // the rotary(E2)/voxel(later) seam — parameterizes the map DOMAIN, not cartesian-assumed
+  seed(stock, pocketFloors)       // cells: top=0 (stock-local); pre-carve each recess footprint → -depth (min)
+  carveSegment(prev, pos, toolR, cls)   // cls!=='feed' → return; else lower cells under the swept CAPSULE
+  heights() / mesh()              // the displaced grid (top surface + SKIRT) → replaces stockMesh/edges
+}
+carveSegment: for each cell whose XY dist to seg[prev.xy→pos.xy] ≤ toolR: tipZ = interp pos.z at the cell's projection;
+  cell.z = min(cell.z, tipZ)   // FLAT endmill: bottom=tipZ; ABOVE-top (tipZ>0) no-ops since cell.z≤0 → rapids/clearance safe by construction
+Two drivers, ONE carve fn (deterministic → live converges to end-state):
+  END-STATE (instant): traceToolpath → seed → carveSegment×all → one mesh (on open + every edit)
+  LIVE (play): onPositionChange → carveSegment(prev→pos) → re-mesh THROTTLED per rAF
+```
+
+### FORKS — for the advisor's RULING
+- FORK A (grid resolution / perf budget): RECOMMEND a fixed MAX cell count (e.g. 200×200) with cellSize=stock/N → BOUNDED perf; a big stock degrades resolution (honest). Alt: fixed cell SIZE = consistent resolution but UNBOUNDED cells (perf risk). YOUR CALL: the cap value.
+- FORK B (tool geometry v1): RECOMMEND FLAT endmill only (cell.z=tipZ); approximate ball/vee as flat (visual-only, floor slightly optimistic) with a note. Real tool profiles = later. YOUR CALL: flat-approx-all vs skip-non-flat.
+- FORK C (solidity / the "less-transparent" rider): RECOMMEND the heightmap REPLACES the box = top surface + a SKIRT (perimeter walls to the bottom + a bottom quad) so it reads SOLID; material at a higher opacity (~0.85) + depthWrite:true. The recesses are subsumed by the pre-seed (no separate recess geometry). Alt: keep the box + overlay a carved top (double geometry). YOUR CALL + the opacity value.
+- FORK D (pre-seed shapes): RECOMMEND rasterize the declared feature footprints (rect pockets via _pocketFloors + round bores) into the initial map. E1 = rect + round.
+- FORK E (tool Ø unknown): simTool ALWAYS resolves a default (6mm) → RECOMMEND carve-with-default (visual-only, consistent). Alt: skip-if-truly-unknown (but there's always a default).
+- FORK F (re-mesh throttle / degrade): RECOMMEND carve every segment (cheap: capsule over footprint cells only), re-mesh (update Z attr, skip normals / flat-shade) at rAF cadence; honest degrade (end-state-only, no live) if a big program lags. YOUR CALL: the degrade trigger.
+- FORK G (state locus): RECOMMEND per-PANEL CarveMap (each createPreviewPanel/viz owns its map) — "everywhere" = the SHARED CODE (all panels inherit), not shared state. Dispose with the panel.
+
+### PERF RISKS (flagged)
+- Big program (10k+ segs) × end-state: each seg = a thin capsule over a few-hundred footprint cells → a few M ops → sub-100ms. OK. Cap protects.
+- Live re-mesh: N×N Z-attr update per frame — update Z only, flat-shade (skip normal recompute) → cheap; throttle to rAF.
+- Wizard previews (small/frequent): end-state fast path on open (one carve+mesh); live carve only during play; small stock scales cells down.
+- Memory: one grid + heights array per panel; dispose on close (like stockMesh). Multiple wizard panels = multiple grids (bounded by the cap).
+
+### GATES (decision sieve): declare-not-infer ✓ (probe class declared), one-source ✓ (the shared panel + traceToolpath), valid-by-construction ✓ (carve = pure fn of the segment stream + seed; above-top no-ops by construction). The RESIDUE = your calls: the cell-count cap / perf budget (A/F), flat-only-v1 (B), replace-vs-overlay + opacity (C), the degrade trigger (F). NO code written — awaiting the ruling.
