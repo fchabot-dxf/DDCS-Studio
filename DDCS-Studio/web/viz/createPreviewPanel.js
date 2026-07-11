@@ -22,6 +22,8 @@ import { LEGEND_ROWS } from './pathStyle.js';   // t317 — the ONE declared pat
 import { traceToolpath } from '../engine/trace.js';
 import { carveTipForToolType } from '../engine/stockRemoval.js';   // t682 — the carve tip PROFILE from the tool `type` (ball-nose etc.), one source
 import { wcsOffsetAt } from './sceneFrame.js';   // t588 PREVIEW-PARITY E2d — THE ONE WCS table read (the DRO Mach + the engine G53 + the 2D frame all read it; no local lookup)
+import { toggleVisibilityModal } from '../ui/visibilityModal.js';   // t738 — the preview-visibility modal (opens from the toolbar 👁)
+import { onDisplayChange } from './displayPrefs.js';   // t738 — re-apply the visibility registry to THIS panel on any modal change
 import { GcodeExecutionEngine } from '../engine/index.js';
 import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
@@ -96,6 +98,7 @@ const PANEL_HTML = `
   <div class="viz3d-controls">
     <button class="pp-mtoggle viz3d-2dtoggle" type="button" title="Toggle 2D / 3D view">3D</button>
     <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)" aria-label="Stock">📦</button>
+    <button class="pp-vis" type="button" title="Show / hide preview elements (stock, toolpath, tool, envelope, …) + their opacity" aria-label="Preview visibility">👁</button>
     <button class="pp-speed" type="button" title="Simulation speed — tap to cycle 1× 2× 5× 10×" aria-label="Simulation speed">1×</button>
     <button class="pp-run" type="button" title="Run the program · while running, click to stop and reset to the start">${ICON_PLAY}</button>
     <button class="pp-step" type="button" title="Execute one line at a time (pauses a running program)">${ICON_STEP}</button>
@@ -602,7 +605,7 @@ export function createPreviewPanel(container, opts = {}) {
                 // frame — datum-aware stock + the envelope. The op's coordinate nature decides it, not the host.
                 if (anchor !== lastAnchor) {
                     v.setStock(previewStock());
-                    v.setMachine(anchor ? null : machineForViz());     // probe → no envelope; mill → per settings
+                    v.setMachine(machineForViz());     // t738 — ENVELOPE EVERYWHERE: draw the declared box regardless of the anchor (the box + the G53 start-anchor are SEPARABLE — the start-anchor stock frame above stays as-is); the modal's `envelope` element gates it inside setMachine
                     lastAnchor = anchor;                               // (the 2D's anchor/machine are set above, for both views)
                 }
                 // Place EVERY pass's start marker before setSegments so each anchored (probe) pass offsets to its own
@@ -645,6 +648,7 @@ export function createPreviewPanel(container, opts = {}) {
                         note.style.display = show ? '' : 'none';
                     }
                 }
+                if (v.applyDisplay) v.applyDisplay();   // t738 — apply the ONE declared visibility registry across every element (after all the rebuilds)
             }
         }
         const s = parsed.stats || {};
@@ -797,6 +801,9 @@ export function createPreviewPanel(container, opts = {}) {
         if (key !== lastStockKey) { lastStockKey = key; fitted = false; }
     }
     q('.pp-stock').addEventListener('click', (e) => toggleStockEditor(e.currentTarget));
+    { const vb = q('.pp-vis'); if (vb) vb.addEventListener('click', (e) => toggleVisibilityModal(e.currentTarget)); }
+    // t738 — re-apply the ONE visibility registry to THIS panel whenever the modal changes an element (live, every mounted panel)
+    onDisplayChange(() => { if (viz && viz.applyDisplay) viz.applyDisplay(); if (t2 && t2.applyDisplay) t2.applyDisplay(); });
     // Stock has no Settings tab, so its "needs setup" signal lives HERE: glow the Stock button while stock is still
     // the shipped default (mirrors the checklist's stockSet detector via window.ddcsStockNeedsSetup).
     const updateStockGlow = () => { const b = q('.pp-stock'); if (b) b.classList.toggle('needs-setup', !!(window.ddcsStockNeedsSetup && window.ddcsStockNeedsSetup())); };

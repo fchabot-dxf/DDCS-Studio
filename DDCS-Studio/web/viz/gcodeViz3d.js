@@ -23,6 +23,7 @@ import { HeightmapCarve } from '../engine/stockRemoval.js';   // t680 — MATERI
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
 import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
 import { PATH_TYPES, PATH_STATE, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend (t331 — FEED_LOW/HIGH gradient removed)
+import { displayOf } from './displayPrefs.js';   // t738 — the ONE declared preview-visibility registry ({visible,alpha} per element)
 
 export class GcodeViz3D {
     constructor(container) {
@@ -525,8 +526,42 @@ export class GcodeViz3D {
     // Machine HEAD dims { spindleDia, spindleLen, colletDia, colletLen } (mm) — pulled from settings by the preview.
     setHead(head) { this._head = head || null; if (this._animTool) this._buildAnimTool(); }
     // Per-op SIM MODE: 'mill' → solid shaded stock; 'probe' → translucent so the probe/feature shows through.
-    _stockOpacity() { return this._simMode === 'probe' ? 0.16 : 0.72; }
+    // t738 — stock opacity COMPOSES the registry alpha (BASE) with the probe-mode scale: probe dims the stock to ~0.16
+    // of the old 0.72 so the probe path reads through it. Default registry stock alpha 0.72 → 0.72 / 0.16 unchanged.
+    _stockOpacity() { return displayOf('stock').alpha * (this._simMode === 'probe' ? (0.16 / 0.72) : 1); }
     setSimMode(mode) { if (mode === this._simMode) return; this._simMode = mode; if (this.stockMesh && this.stockMesh.material) { this.stockMesh.material.opacity = this._stockOpacity(); this.render(); } }
+
+    /** t738 — apply the ONE declared visibility registry (displayPrefs) across every 3D element: `.visible` per element +
+     *  the BASE opacity (the probe-mode / play scales in _stockOpacity + _dimRoute multiply this base). Called after every
+     *  rebuild (setGcode) and LIVE on a modal change. Colours stay in pathStyle; this owns visible + alpha. */
+    applyDisplay() {
+        const vis = (id) => displayOf(id).visible, alp = (id) => displayOf(id).alpha;
+        const base = (o, a) => { if (o && o.material) { o.material.transparent = true; o.material.opacity = a; if (o.material.__op0 != null) o.material.__op0 = a; } };   // store the base so _dimRoute composes
+        const show = (o, on) => { if (o) o.visible = on; };
+        // stock box (+ edges) — hidden anyway while the carve grid stands in for it; opacity via _stockOpacity (probe scale)
+        show(this.stockMesh, vis('stock') && !this._carveMesh); if (this.stockMesh) base(this.stockMesh, this._stockOpacity());
+        show(this.stockEdges, vis('stock') && !this._carveMesh);
+        show(this._carveMesh, vis('carve')); if (this._carveMesh) base(this._carveMesh, alp('carve'));
+        // toolpath line groups — cut=feed · rapid=rapid+retract+jog (travel family) · probe=probe+probeSlow
+        const lg = this.lineGroups || {};
+        show(lg.feed, vis('cut')); base(lg.feed, alp('cut'));
+        show(lg.rapid, vis('rapid')); base(lg.rapid, alp('rapid'));
+        show(lg.retract, vis('rapid')); show(lg.jog, vis('rapid'));
+        show(lg.probe, vis('probe')); base(lg.probe, alp('probe'));
+        show(lg.probeSlow, vis('probe')); base(lg.probeSlow, alp('probe'));
+        // tool + head (spindle/collet) — the moving cutter assembly parts
+        const ap = this._animParts || {};
+        show(ap.tool, vis('tool')); base(ap.tool, alp('tool')); show(ap.ruby, vis('tool'));
+        show(ap.spindle, vis('head')); base(ap.spindle, alp('head')); show(ap.collet, vis('head')); base(ap.collet, alp('head'));
+        // machine envelope — the box is CREATED by setMachine gated on this registry; toggle/alpha live here
+        if (this.machineBox) { this.machineBox.visible = vis('envelope'); base(this.machineBox, alp('envelope')); }
+        else if (vis('envelope') && this._machine) this.setMachine(this._machine);   // OFF→ON needs a (re)create
+        // grid · axes · markers
+        show(this.grid, vis('grid')); base(this.grid, alp('grid'));
+        for (const ax of [this._axisLineX, this._axisLineY, this._axisLineZ, this._originGizmo]) { show(ax, vis('axes')); base(ax, alp('axes')); }
+        for (const mk of (this.spindleMarkers || [])) show(mk, vis('markers'));
+        this.render();
+    }
 
     // Toggle a tool dot that travels the whole path in execution order, feed-true (real program time)
     setAnimate(on) {
@@ -555,7 +590,7 @@ export class GcodeViz3D {
             const o = this.lineGroups[k]; if (!o) continue;
             if (on) {
                 if (o.material.__op0 == null) o.material.__op0 = o.material.opacity != null ? o.material.opacity : 1;
-                o.material.transparent = true; o.material.opacity = PATH_STATE.future.alpha;   // t313/t317 — untraveled guide alpha = the ONE palette's future state (0.8), SHARED with the 2D future so a human mod hits both; the bold _trailLine still carries the traveled emphasis
+                o.material.transparent = true; o.material.opacity = (o.material.__op0 != null ? o.material.__op0 : 1) * PATH_STATE.future.alpha;   // t313/t317/t738 — untraveled guide = the registry BASE (__op0) × the ONE palette's future state (0.8): the play dim COMPOSES onto the display alpha, not an absolute 0.8 that would drop it
             } else if (o.material.__op0 != null) {
                 o.material.opacity = o.material.__op0; o.material.transparent = o.material.__op0 < 1;
             }
@@ -1594,13 +1629,16 @@ export class GcodeViz3D {
         if (this.machineBox) { this.scene.remove(this.machineBox); this.machineBox.geometry.dispose(); this.machineBox.material.dispose(); this.machineBox = null; }
         if (this.machineAxes) { this.scene.remove(this.machineAxes); if (this.machineAxes.geometry) this.machineAxes.geometry.dispose(); if (this.machineAxes.material) this.machineAxes.material.dispose(); this.machineAxes = null; }
         const sx = machine ? machine.x : 0, sy = machine ? machine.y : 0, sz = machine ? machine.z : 0;
-        // t540 — a MACHINE-FRAME op (homing / forceMachine ATC) FORCES the envelope box regardless of settings.machine.show:
-        // its motion IS machine-frame, so the box is its reference. The `show` toggle only governs ordinary part-frame views.
-        if (machine && (machine.show || this._forceMachineBox) && sx && sy && sz) {
+        // t738 — ENVELOPE EVERYWHERE: the DECLARED machine box (valid sx/sy/sz) draws whenever the visibility registry says
+        // so (default-ON), a faint backdrop in EVERY preview — NOT gated on settings.machine.show any more (that toggle folds
+        // into the modal's `envelope` element, Phase 2). A machine-frame op (homing / forceMachine ATC) still FORCES it. No
+        // declared envelope (sx/sy/sz falsy) → nothing drawn. The `anchor ? null` suppression is dropped at the panel (the box
+        // and the G53 start-anchor are separable — the anchor handling stays as-is).
+        if (machine && (displayOf('envelope').visible || this._forceMachineBox) && sx && sy && sz) {
             const src = new THREE.BoxGeometry(Math.abs(sx), Math.abs(sy), Math.abs(sz));   // |travel| — the sign is just the home direction
             const eg = new THREE.EdgesGeometry(src);
             src.dispose();
-            const box = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x6c7a8c, transparent: true, opacity: 0.4 }));
+            const box = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x6c7a8c, transparent: true, opacity: displayOf('envelope').alpha }));
             const sh = this.partFrame.shift;   // part-zero offset (the stock's WCS) — home shows when it's separate
             // Envelope spans machine 0..travel (signed) in MACHINE coords — home stays at scene 0 (fixed); the PART
             // frame shifts to the stock's WCS instead, so the envelope never moves when the WCS changes.

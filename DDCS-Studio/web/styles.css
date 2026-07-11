@@ -649,6 +649,12 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .editor-container .xform-badge-x { padding: 4px 8px; border-left: 1px solid color-mix(in srgb, #f0b429 50%, #000); font-weight: 800; }
 .editor-container .xform-badge-label:hover { filter: brightness(1.06); }
 .editor-container .xform-badge-x:hover { background: #ffd264; }
+/* t738 — the PREVIEW VISIBILITY modal rows: a visible toggle + label on the left, an opacity slider on the right. */
+.vis-modal-pop .vis-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 3px 0; }
+.vis-modal-pop .vis-tog { display: flex; align-items: center; gap: 7px; cursor: pointer; white-space: nowrap; color: var(--text, #e6edf5); }
+.vis-modal-pop .vis-head { color: var(--text, #e6edf5); }
+.vis-modal-pop .vis-tog input { cursor: pointer; }
+.vis-modal-pop .vis-alpha { width: 96px; cursor: pointer; accent-color: var(--accent, #0ea5e9); }
 /* Mobile portrait: the 3D preview is a bottom sheet (height --viz3d-size). Push the Transform button UP so it
    rides just above the open drawer (and follows its resize) instead of hiding under it. (The keyboard case is
    already handled — keyboard-active pins the editor to a top strip, carrying the button with it.) */
