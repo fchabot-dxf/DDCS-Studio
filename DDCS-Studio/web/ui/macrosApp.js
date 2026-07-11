@@ -24,6 +24,7 @@ import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 import { homingStack, homingRunParams } from '../wizards/homingWizard.js';   // homingRunParams = the ONE contract shape (t626) so sysstart generate matches the wizard emit (was passing the raw object → empty stub)
 import { emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../wizards/previewEmit.js';   // t646 — thread the ACTIVE post into the sysstart emit like the previews (t634); homingStack already refuses non-Expert, this keeps the atom emit per-post too
+import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 
 let _wired = false;
 
@@ -216,24 +217,24 @@ export function initMacrosApp() {
     function validFileName(raw, cid, exclude) {
         let n = String(raw == null ? '' : raw).trim();
         if (!n) return null;
-        if (/[\\/]/.test(n)) { alert('File names can’t contain slashes.'); return null; }
+        if (/[\\/]/.test(n)) { dlgNotice('File names can’t contain slashes.'); return null; }
         if (!/\.(nc|rc)$/i.test(n)) n += '.nc';   // DDCS macro convention
-        if (flattenFiles(cid).some((e) => e.path.toLowerCase() === n.toLowerCase())) { alert('“' + n + '” is a built-in controller file — pick another name.'); return null; }
-        if (userFilesArr().some((f) => f.path.toLowerCase() === n.toLowerCase() && f.path.toLowerCase() !== String(exclude || '').toLowerCase())) { alert('You already have a file named “' + n + '”.'); return null; }
+        if (flattenFiles(cid).some((e) => e.path.toLowerCase() === n.toLowerCase())) { dlgNotice('“' + n + '” is a built-in controller file — pick another name.'); return null; }
+        if (userFilesArr().some((f) => f.path.toLowerCase() === n.toLowerCase() && f.path.toLowerCase() !== String(exclude || '').toLowerCase())) { dlgNotice('You already have a file named “' + n + '”.'); return null; }
         return n;
     }
-    function addUserFile() {
+    async function addUserFile() {
         const cid = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
-        const name = validFileName(window.prompt('New file name (e.g. myprobe.nc):', ''), cid);
+        const name = validFileName(await dlgPrompt('New file name (e.g. myprobe.nc):', ''), cid);
         if (!name) return;
         userFilesArr().push({ path: name, title: name, sub: 'Your file' });
         (getSettings().workspace || (getSettings().workspace = {}))[name] = '';
         saveSettings();
         renderFileTree(name);   // rebuild + open the new file
     }
-    function renameUserFile(path) {
+    async function renameUserFile(path) {
         const cid = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
-        const name = validFileName(window.prompt('Rename file:', path), cid, path);
+        const name = validFileName(await dlgPrompt('Rename file:', path), cid, path);
         if (!name || name === path) return;
         const f = userFilesArr().find((x) => x.path === path); if (f) { f.path = name; f.title = name; }
         const ws = getSettings().workspace || (getSettings().workspace = {});
@@ -241,8 +242,8 @@ export function initMacrosApp() {
         saveSettings();
         renderFileTree(name);
     }
-    function deleteUserFile(path) {
-        if (!confirm('Delete “' + path + '”? It’s removed from this profile.')) return;
+    async function deleteUserFile(path) {
+        if (!await dlgConfirm('Delete “' + path + '”? It’s removed from this profile.')) return;
         const arr = userFilesArr(); const i = arr.findIndex((x) => x.path === path); if (i >= 0) arr.splice(i, 1);
         if (getSettings().workspace) delete getSettings().workspace[path];
         saveSettings();
@@ -323,21 +324,21 @@ export function initMacrosApp() {
         setNote();
         ta.addEventListener('input', () => { (getSettings().workspace || (getSettings().workspace = {}))[path] = ta.value; saveSettings(); setNote(); });
         const send = panel.querySelector('#macfile_send');
-        if (send) send.addEventListener('click', () => {
+        if (send) send.addEventListener('click', async () => {
             const content = ta.value;
             if (isExport) { UIUtils.downloadFile(path, content); return; }
-            if (!confirm('Push “' + path + '” to the controller? This overwrites the file on the machine.')) return;
+            if (!await dlgConfirm('Push “' + path + '” to the controller? This overwrites the file on the machine.')) return;
             const orig = send.textContent; send.disabled = true; send.textContent = 'Pushing…';
             makeClient().writeSysfile(path, content, 'write')
-                .then((r) => { alert(r && r.ok ? ('Pushed “' + path + '”.' + (r.backup ? ' (backup: ' + r.backup + ')' : '')) : ('Push failed: ' + ((r && r.error) || 'no controller'))); })
-                .catch((e) => alert('Push failed: ' + (e && e.message ? e.message : e)))
+                .then((r) => { dlgNotice(r && r.ok ? ('Pushed “' + path + '”.' + (r.backup ? ' (backup: ' + r.backup + ')' : '')) : ('Push failed: ' + ((r && r.error) || 'no controller'))); })
+                .catch((e) => dlgNotice('Push failed: ' + (e && e.message ? e.message : e)))
                 .finally(() => { send.disabled = false; send.textContent = orig; });
         });
         const rename = panel.querySelector('#macfile_rename'); if (rename) rename.addEventListener('click', () => renameUserFile(path));
         const del = panel.querySelector('#macfile_delete'); if (del) del.addEventListener('click', () => deleteUserFile(path));
         const revert = panel.querySelector('#macfile_revert');
-        if (revert) revert.addEventListener('click', () => {
-            if (!confirm('Discard your edits to “' + path + '” and restore the default baseline?')) return;
+        if (revert) revert.addEventListener('click', async () => {
+            if (!await dlgConfirm('Discard your edits to “' + path + '” and restore the default baseline?')) return;
             if (getSettings().workspace) delete getSettings().workspace[path];
             saveSettings();
             openFileEditor(path);   // refresh: now unedited → shows the seed again
@@ -373,28 +374,28 @@ export function initMacrosApp() {
         if (t.kind === 'kbutton') { const k = Math.min(7, Math.max(1, parseInt(t.key, 10) || 1)); return `( save as key-${k}.nc on SYSDISK — K${k} button )\n${body}${hasEnd ? '' : '\nM30'}\n`; }
         return `( save as ${(name || 'macro').replace(/[^\w-]+/g, '_')}.nc )\n${body}${hasEnd ? '' : '\nM30'}\n`;
     }
-    const insertToEditor = (txt) => { const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager; if (em && typeof em.insert === 'function') em.insert(txt); else alert('Editor not available.'); };
+    const insertToEditor = (txt) => { const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager; if (em && typeof em.insert === 'function') em.insert(txt); else dlgNotice('Editor not available.'); };
     const findKbtn = (k) => macrosArr().find((m) => (m.trigger || {}).kind === 'kbutton' && (m.trigger || {}).key === k);
     const ensureKbtn = (k) => { let m = findKbtn(k); if (!m) { m = { name: '', trigger: { kind: 'kbutton', key: k }, body: '' }; macrosArr().push(m); } return m; };
     async function pushMcode(m) {
         const n = parseInt((m.trigger || {}).code, 10) || 0; const oNum = 'O' + (10000 + n);
-        if (!confirm(`Merge M${n} (${oNum}) into the controller's macro library (slib-m.nc)?\n\nThe existing slib-m.nc is backed up first (slib-m.nc.bak). You must REBOOT the controller afterward for it to load.`)) return;
+        if (!await dlgConfirm(`Merge M${n} (${oNum}) into the controller's macro library (slib-m.nc)?\n\nThe existing slib-m.nc is backed up first (slib-m.nc.bak). You must REBOOT the controller afterward for it to load.`)) return;
         try {
             const cur = await makeClient().readSysfile('slib-m.nc');
-            if (!cur || cur.ok === false) { alert('Could not read slib-m.nc — needs the gateway/desktop app + a connected controller.' + (cur && cur.error ? '\n(' + cur.error + ')' : '')); return; }
-            if (new RegExp('(^|\\s)' + oNum + '(\\s|$)').test(cur.content || '')) { alert(`${oNum} is already in slib-m.nc — remove it on the controller first so it isn't duplicated, then push again.`); return; }
+            if (!cur || cur.ok === false) { dlgNotice('Could not read slib-m.nc — needs the gateway/desktop app + a connected controller.' + (cur && cur.error ? '\n(' + cur.error + ')' : '')); return; }
+            if (new RegExp('(^|\\s)' + oNum + '(\\s|$)').test(cur.content || '')) { dlgNotice(`${oNum} is already in slib-m.nc — remove it on the controller first so it isn't duplicated, then push again.`); return; }
             const res = await makeClient().writeSysfile('slib-m.nc', '\n' + macroFileText(m), 'append');
-            if (res && res.ok) alert(`Merged ${oNum} (M${n}) into slib-m.nc${res.backup ? ' — backup ' + res.backup : ''}.\n\nReboot the controller to load it; then M${n} is callable from a program.`);
-            else alert('Push failed: ' + ((res && res.error) || 'unknown'));
-        } catch (err) { alert('Push failed: ' + (err && err.message ? err.message : err)); }
+            if (res && res.ok) dlgNotice(`Merged ${oNum} (M${n}) into slib-m.nc${res.backup ? ' — backup ' + res.backup : ''}.\n\nReboot the controller to load it; then M${n} is callable from a program.`);
+            else dlgNotice('Push failed: ' + ((res && res.error) || 'unknown'));
+        } catch (err) { dlgNotice('Push failed: ' + (err && err.message ? err.message : err)); }
     }
     async function pushKbutton(k, m) {
-        if (!confirm(`Write key-${k}.nc to the controller (the K${k} button)?\n\nThe existing key-${k}.nc is backed up first (key-${k}.nc.bak).`)) return;
+        if (!await dlgConfirm(`Write key-${k}.nc to the controller (the K${k} button)?\n\nThe existing key-${k}.nc is backed up first (key-${k}.nc.bak).`)) return;
         try {
             const res = await makeClient().writeSysfile('key-' + k + '.nc', macroFileText(m), 'write');
-            if (res && res.ok) alert(`Wrote key-${k}.nc${res.backup ? ' — backup ' + res.backup : ''}.\nPress K${k} to run it (reboot if the controller doesn't pick it up).`);
-            else alert('Push failed: ' + ((res && res.error) || 'needs the gateway/desktop app + a connected controller'));
-        } catch (err) { alert('Push failed: ' + (err && err.message ? err.message : err)); }
+            if (res && res.ok) dlgNotice(`Wrote key-${k}.nc${res.backup ? ' — backup ' + res.backup : ''}.\nPress K${k} to run it (reboot if the controller doesn't pick it up).`);
+            else dlgNotice('Push failed: ' + ((res && res.error) || 'needs the gateway/desktop app + a connected controller'));
+        } catch (err) { dlgNotice('Push failed: ' + (err && err.message ? err.message : err)); }
     }
     function renderMcodes() {
         const host = q('mcodes_list'); if (!host) return;
@@ -450,13 +451,13 @@ export function initMacrosApp() {
             else if (f === 'num') { m.trigger = m.trigger || { kind: 'mcode' }; m.trigger.kind = 'mcode'; m.trigger.code = parseInt(e.target.value, 10) || 0; const s = c.querySelector('.mc-o'); if (s) s.textContent = '→ O' + (10000 + m.trigger.code); }
             saveSettings();
         });
-        mch.addEventListener('click', (e) => {
+        mch.addEventListener('click', async (e) => {
             const c = e.target.closest('.macro-card'); if (!c) return; const i = +c.dataset.i; const a = e.target.dataset.act;
             const m = macrosArr()[i];
             if (a === 'del') { 
                 const code = (m.trigger || {}).code != null ? parseInt(m.trigger.code, 10) : null;
                 if (FOUNDATIONAL_M_CODES.includes(code)) {
-                    if (!confirm(`M${code} is a foundational system M-code. Deleting it may break basic controller functionality (like spindle or coolant).\n\nAre you absolutely sure you want to delete it?`)) return;
+                    if (!await dlgConfirm(`M${code} is a foundational system M-code. Deleting it may break basic controller functionality (like spindle or coolant).\n\nAre you absolutely sure you want to delete it?`)) return;
                 }
                 macrosArr().splice(i, 1); 
                 saveSettings(); 
@@ -469,7 +470,7 @@ export function initMacrosApp() {
             }
             else if (a === 'restore') {
                 const code = (m.trigger || {}).code != null ? parseInt(m.trigger.code, 10) : null;
-                if (!confirm(`This will overwrite your current M${code} macro with the factory default for your active controller.\n\nAre you sure you want to revert to the original code?`)) return;
+                if (!await dlgConfirm(`This will overwrite your current M${code} macro with the factory default for your active controller.\n\nAre you sure you want to revert to the original code?`)) return;
                 
                 const profileId = (getActiveProfile() || {}).id || 'ddcs-expert-m350';
                 const factory = FACTORY_MACROS[profileId] || [];
@@ -481,7 +482,7 @@ export function initMacrosApp() {
                     saveSettings();
                     renderMcodes();
                 } else {
-                    alert('Could not find the factory default code for this macro.');
+                    dlgNotice('Could not find the factory default code for this macro.');
                 }
             }
             else if (a === 'gen') insertToEditor(macroFileText(macrosArr()[i]));
@@ -494,8 +495,8 @@ export function initMacrosApp() {
         kbh.addEventListener('click', (e) => {
             const r = e.target.closest('.kbtn-row'); if (!r) return; const k = +r.dataset.k; const a = e.target.dataset.act;
             if (a === 'ked') { ensureKbtn(k).body = editorText().trim(); saveSettings(); renderKbuttons(); }
-            else if (a === 'kgen') { const m = findKbtn(k); if (!m || !String(m.body).trim()) { alert('K' + k + ' is empty.'); return; } insertToEditor(macroFileText(m)); }
-            else if (a === 'kpush') { const m = findKbtn(k); if (!m || !String(m.body).trim()) { alert('K' + k + ' is empty.'); return; } pushKbutton(k, m); }
+            else if (a === 'kgen') { const m = findKbtn(k); if (!m || !String(m.body).trim()) { dlgNotice('K' + k + ' is empty.'); return; } insertToEditor(macroFileText(m)); }
+            else if (a === 'kpush') { const m = findKbtn(k); if (!m || !String(m.body).trim()) { dlgNotice('K' + k + ' is empty.'); return; } pushKbutton(k, m); }
             else if (a === 'kclr') { const i = macrosArr().findIndex((x) => (x.trigger || {}).kind === 'kbutton' && (x.trigger || {}).key === k); if (i >= 0) macrosArr().splice(i, 1); saveSettings(); renderKbuttons(); }
         });
     }
@@ -541,8 +542,8 @@ export function initMacrosApp() {
         saveSettings();
     });
     
-    if (q('mac_tnc_unlock')) q('mac_tnc_unlock').addEventListener('click', () => {
-        if (!confirm('T.nc executes on every tool change. Errors here can cause crashes.\n\nAre you sure you want to unlock it?')) return;
+    if (q('mac_tnc_unlock')) q('mac_tnc_unlock').addEventListener('click', async () => {
+        if (!await dlgConfirm('T.nc executes on every tool change. Errors here can cause crashes.\n\nAre you sure you want to unlock it?')) return;
         getSettings().systemHooks = getSettings().systemHooks || {};
         getSettings().systemHooks.T_unlocked = true;
         saveSettings();
@@ -899,8 +900,8 @@ export function initMacrosApp() {
                 
                 q('macros_sync_modal').style.display = 'none';
                 q('macros_sync_modal').style.display = 'none';
-                if (failCount === 0) alert(`Successfully deployed ${successCount} file(s) to the controller.\n\nNote: For slib-m.nc changes, you must reboot the controller to load the new M-codes.`);
-                else alert(`Deployed ${successCount} file(s), but ${failCount} failed. Ensure the controller is connected.`);
+                if (failCount === 0) dlgNotice(`Successfully deployed ${successCount} file(s) to the controller.\n\nNote: For slib-m.nc changes, you must reboot the controller to load the new M-codes.`);
+                else dlgNotice(`Deployed ${successCount} file(s), but ${failCount} failed. Ensure the controller is connected.`);
             } else if (syncMode === 'push_warning') {
                 // User chose to bypass the warning
                 getSettings().macrosSynced = true; // Mark as synced so we don't warn again
@@ -911,9 +912,9 @@ export function initMacrosApp() {
     }
 
     if (q('sysstart_regen')) {
-        q('sysstart_regen').addEventListener('click', () => {
+        q('sysstart_regen').addEventListener('click', async () => {
             // t656 — no silent clobber: a hand-edited body is confirmed before a fresh rebuild overwrites it.
-            if (getSettings().autostartHandEdited && !confirm('Regenerate will OVERWRITE the boot macro you hand-edited with a fresh build from the homing profile + the additional G-code.\n\nOverwrite your edits?')) return;
+            if (getSettings().autostartHandEdited && !await dlgConfirm('Regenerate will OVERWRITE the boot macro you hand-edited with a fresh build from the homing profile + the additional G-code.\n\nOverwrite your edits?')) return;
             const body = buildAutostartBody();
             storeAutostartBody(body, false);   // t656 amend 1 — records the SELECTED profile the body was built for
             const t = q('sysstart_body'); if (t) t.value = body;
@@ -925,12 +926,12 @@ export function initMacrosApp() {
         q('sysstart_push').addEventListener('click', async () => {
             const code = String(getSettings().autostartBody || '');   // t656 — send EXACTLY the STORED body (the editor IS the source of truth), not a re-emit
             const filename = (homingPostIsExpert() || isV41) ? 'advstart.nc' : 'sysstart.nc';
-            if (!confirm(`Write ${filename} to the controller?\n\nThe existing ${filename} will be backed up.`)) return;
+            if (!await dlgConfirm(`Write ${filename} to the controller?\n\nThe existing ${filename} will be backed up.`)) return;
             try {
                 const res = await makeClient().writeSysfile(filename, code, 'write');
-                if (res && res.ok) alert(`Wrote ${filename}${res.backup ? ' — backup ' + res.backup : ''}.`);
-                else alert('Push failed: ' + ((res && res.error) || 'needs the gateway/desktop app + a connected controller'));
-            } catch (err) { alert('Push failed: ' + (err && err.message ? err.message : err)); }
+                if (res && res.ok) dlgNotice(`Wrote ${filename}${res.backup ? ' — backup ' + res.backup : ''}.`);
+                else dlgNotice('Push failed: ' + ((res && res.error) || 'needs the gateway/desktop app + a connected controller'));
+            } catch (err) { dlgNotice('Push failed: ' + (err && err.message ? err.message : err)); }
         });
     }
 
@@ -1026,7 +1027,13 @@ function homingPostIsExpert() {
         slot.bodyDirty = false;
     }
     // A structural edit rebuilds the macro. If the body was hand-edited since the last build, confirm first.
-    function regenGuard(slot) { return !slot.bodyDirty || confirm('Rebuild the macro from the ops?\nYour manual edits to the macro body will be discarded.'); }
+    // Guard a from-ops rebuild behind the clobber-confirm, but ONLY async when there's a hand-edit to clobber — a clean
+    // slot proceeds SYNCHRONOUSLY (so the cam handlers stay sync + the op edit lands immediately). callback style.
+    function regenGuard(slot, proceed) {
+        if (!slot.bodyDirty) { proceed(); return; }
+        dlgConfirm('Rebuild the macro from the ops?\nYour manual edits to the macro body will be discarded.', { danger: true, okLabel: 'Rebuild' })
+            .then((ok) => { if (ok) proceed(); else renderCamBuilder(); });
+    }
     // Re-allocate a slot's form params (#11xx) to free ones around `otherUsed`, rewriting each field's read-line
     // mirror (#26xx) to match. For duplicating a LEGACY/hand-built slot (no op manifest to regenerate from) so the
     // copy doesn't collide with the original. Anchored to each field's `var=#mirror` at line start — calcs untouched.
@@ -1137,11 +1144,11 @@ function homingPostIsExpert() {
                 ctx.drawImage(img, (W - iw * sc) / 2, (H - ih * sc) / 2, iw * sc, ih * sc);
                 URL.revokeObjectURL(blobUrl);
                 try { slot.icon = { name: svgName + '.bmp', data: bmpDataUrl(W, H, ctx.getImageData(0, 0, W, H).data), w: W, h: H, source: 'svg:' + svgName }; saveCamPack(); renderCamBuilder(); }
-                catch (e) { alert('Could not read the rendered icon: ' + (e && e.message ? e.message : e)); }
+                catch (e) { dlgNotice('Could not read the rendered icon: ' + (e && e.message ? e.message : e)); }
             };
-            img.onerror = () => { URL.revokeObjectURL(blobUrl); alert('Could not render ' + svgName + '.svg'); };
+            img.onerror = () => { URL.revokeObjectURL(blobUrl); dlgNotice('Could not render ' + svgName + '.svg'); };
             img.src = blobUrl;
-        } catch (e) { alert('Palette icon failed: ' + (e && e.message ? e.message : e)); }
+        } catch (e) { dlgNotice('Palette icon failed: ' + (e && e.message ? e.message : e)); }
     }
     // Simulate a slot: run its macro through the shared preview panel with the #2600 mirrors SEEDED from each
     // field's default (mirror = #param + 1500). Lets the pack author verify the toolpath before publishing —
@@ -1197,7 +1204,7 @@ function homingPostIsExpert() {
         });
         camHost.addEventListener('click', (e) => {
             const card = e.target.closest('.cam-slot'); if (!card) return; const si = +card.dataset.si; const slot = _camPack.slots[si]; if (!slot) return; const a = e.target.dataset.act;
-            if (a === 'addf') { slot.fields = slot.fields || []; const idx = slotPack.nextParam(slotPack.usedParams(_camPack)); if (idx == null) { alert('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
+            if (a === 'addf') { slot.fields = slot.fields || []; const idx = slotPack.nextParam(slotPack.usedParams(_camPack)); if (idx == null) { dlgNotice('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
             else if (a === 'delf') { slot.fields.splice(+e.target.closest('tr').dataset.fi, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'edit') { openIconEditor(slot.icon || null, (bmp, model) => { slot.icon = { name: (slot.name || 'cam' + slot.slot) + '.bmp', data: bmp, w: 360, h: 180, layers: model.layers }; saveCamPack(); renderCamBuilder(); }); }
@@ -1225,22 +1232,17 @@ function homingPostIsExpert() {
                 saveCamPack(); renderCamBuilder();
             }
             else if (a === 'delop') {
-                if (!regenGuard(slot)) { renderCamBuilder(); return; }
-                slot.ops.splice(+e.target.dataset.oi, 1);
-                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+                const oi = +e.target.dataset.oi;
+                regenGuard(slot, () => { slot.ops.splice(oi, 1); buildSlotFromOps(slot); saveCamPack(); renderCamBuilder(); });
             }
             else if (a === 'opup' || a === 'opdown') {
                 const oi = +e.target.dataset.oi, ni = a === 'opup' ? oi - 1 : oi + 1;
                 if (!slot.ops || ni < 0 || ni >= slot.ops.length) return;
-                if (!regenGuard(slot)) { renderCamBuilder(); return; }
-                const tmp = slot.ops[oi]; slot.ops[oi] = slot.ops[ni]; slot.ops[ni] = tmp;   // values travel with the op
-                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+                regenGuard(slot, () => { const tmp = slot.ops[oi]; slot.ops[oi] = slot.ops[ni]; slot.ops[ni] = tmp; buildSlotFromOps(slot); saveCamPack(); renderCamBuilder(); });   // values travel with the op
             }
             else if (a === 'dupop') {
-                if (!slot.ops) return; const src = slot.ops[+e.target.dataset.oi]; if (!src) return;
-                if (!regenGuard(slot)) { renderCamBuilder(); return; }
-                slot.ops.splice(+e.target.dataset.oi + 1, 0, JSON.parse(JSON.stringify(src)));   // deep copy incl. tuned values
-                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+                if (!slot.ops) return; const oi = +e.target.dataset.oi; const src = slot.ops[oi]; if (!src) return;
+                regenGuard(slot, () => { slot.ops.splice(oi + 1, 0, JSON.parse(JSON.stringify(src))); buildSlotFromOps(slot); saveCamPack(); renderCamBuilder(); });   // deep copy incl. tuned values
             }
             else if (a === 'dupslot') {
                 const clone = JSON.parse(JSON.stringify(slot)); delete clone.bodyDirty;
@@ -1277,13 +1279,9 @@ function homingPostIsExpert() {
             const card = t.closest('.cam-slot'); if (!card) return; const slot = _camPack.slots[+card.dataset.si]; if (!slot || !slot.ops) return;
             const op = slot.ops[+t.dataset.oi]; if (!op) return;
             if (t.classList.contains('cam-op-type')) {
-                if (!regenGuard(slot)) { renderCamBuilder(); return; }
-                op.type = t.value; op.variant = defaultVariant(t.value);   // reset the variant to the new type's default
-                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+                regenGuard(slot, () => { op.type = t.value; op.variant = defaultVariant(t.value); buildSlotFromOps(slot); saveCamPack(); renderCamBuilder(); });   // reset the variant to the new type's default
             } else if (t.classList.contains('cam-op-var')) {
-                if (!regenGuard(slot)) { renderCamBuilder(); return; }
-                op.variant = t.value;
-                buildSlotFromOps(slot); saveCamPack(); renderCamBuilder();
+                regenGuard(slot, () => { op.variant = t.value; buildSlotFromOps(slot); saveCamPack(); renderCamBuilder(); });
             }
         });
     }
@@ -1306,10 +1304,10 @@ function homingPostIsExpert() {
         '', 'Spindle: the cutting slots run M3/M5 themselves. If your CAM workflow starts the spindle',
         'separately, delete the M3/G04/M5 lines from the macro (they are plain editable lines).'].join('\n') + '\n';
     const _camExport = q('cam_export_pack');
-    if (_camExport) _camExport.addEventListener('click', () => {
-        if (!_camPack.slots.length) { alert('No slots to export — add a slot first.'); return; }
+    if (_camExport) _camExport.addEventListener('click', async () => {
+        if (!_camPack.slots.length) { dlgNotice('No slots to export — add a slot first.'); return; }
         const v = slotPack.validatePack(_camPack);
-        if (!v.ok && !confirm('This pack has problems:\n\n' + v.errors.join('\n') + '\n\nExport anyway?')) return;
+        if (!v.ok && !await dlgConfirm('This pack has problems:\n\n' + v.errors.join('\n') + '\n\nExport anyway?')) return;
         const files = [], eng = [];
         _camPack.slots.forEach((slot) => {
             files.push({ name: `CAM/macro_cam${slot.slot}.nc`, data: slotPack.slotMacro(slot) });
@@ -1325,7 +1323,7 @@ function homingPostIsExpert() {
     // Safe eng merge: paste the controller's CURRENT eng → append this pack's params, flag collisions, download.
     const _camMerge = q('cam_merge_eng');
     if (_camMerge) _camMerge.addEventListener('click', () => {
-        if (!_camPack.slots.length) { alert('No slots to merge — add a slot first.'); return; }
+        if (!_camPack.slots.length) { dlgNotice('No slots to merge — add a slot first.'); return; }
         const additions = _camPack.slots.map((s) => slotPack.slotEng(s)).join('\n') + '\n';
         const overlay = document.createElement('div');
         overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
@@ -1343,7 +1341,7 @@ function homingPostIsExpert() {
         overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
         overlay.querySelector('[data-mgo]').addEventListener('click', () => {
             const eng = overlay.querySelector('[data-eng]').value;
-            if (!eng.trim()) { alert('Paste the controller eng first.'); return; }
+            if (!eng.trim()) { dlgNotice('Paste the controller eng first.'); return; }
             const m = slotPack.mergeEng(eng, additions);
             const msgs = [];
             if (m.paramCollisions.length) msgs.push('⚠ #param collisions (already defined in the eng): ' + m.paramCollisions.map((n) => '#' + n).join(', ') + ' — reallocate these fields in the builder before installing.');

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { autoAppDialog } from './_appDialog.js';   // t684 d — in-app dialog
 
 /**
  * SYSSTART GENERATE NOW HOMES (t626). The Macros → sysstart Generate/Push used to call homingStack(settings.homing) — the
@@ -59,7 +60,7 @@ test('the Macros → sysstart REGENERATE rebuilds the real homing sequence into 
     await page.waitForFunction(() => window.showMacrosPanel, null, { timeout: 8000 });
     await page.evaluate(() => window.showMacrosPanel('macros_panel_sysstart'));
     await page.waitForTimeout(200);
-    page.on('dialog', (d) => d.accept());   // any clobber-confirm → accept (a fresh seed isn't hand-edited, so usually none)
+    await autoAppDialog(page, { accept: true });   // any clobber-confirm → accept (a fresh seed isn't hand-edited, so usually none)
     await page.click('#sysstart_regen');
     await page.waitForTimeout(200);
     const out = await page.evaluate(() => (document.getElementById('sysstart_body') || {}).value || '');

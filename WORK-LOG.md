@@ -9319,3 +9319,36 @@ The dispatched "bundle" (NEXT-SESSION item (a)–(e2)) is ~12 sub-items; on insp
 - **(e2)** the TEXT atom (dynamic on-controller {SN}, glyph subs) — HUGE and its OWN spec says "GATE the atom design back for ruling before building" + "GROUND FIRST the persistent-var range + clock registers". Design-gate, not a build.
 
 Recommend the advisor re-dispatch (a),(b6),(c) next (medium, independent), then the large sweeps (b/b2, b5, d, e) one per turn, and (e2) as a design-ground-then-ruling turn.
+
+---
+
+## t686 — (d) THE IN-APP DIALOG HELPER + app-wide confirm/prompt/alert sweep + grep-guard (the profile-modal dependency)
+
+Replaced ALL of the browser's blocking window.confirm/prompt/alert under web/ui + web/wizards with ONE declared promise-based, theme-aware helper.
+
+### The helper — web/ui/dialog.js (generalises blockEditNotice)
+- `dlgConfirm(msg, opts) → Promise<boolean>` (OK/Cancel; Enter=OK, Esc/backdrop=Cancel).
+- `dlgPrompt(msg, default, opts) → Promise<string|null>` (input; OK returns text, Cancel/Esc → null).
+- `dlgNotice(msg, opts) → Promise<void>` (a single dismiss; alert).
+- opts: title, okLabel, cancelLabel, **danger** (red primary for destructive), placeholder, multiline. A fixed backdrop + themed panel (CSS vars: --panel/--text-main/--border/--accent/--danger with fallbacks → legible on every skin). message via textContent (safe + preserves \n via pre-wrap). Focus the input (prompt) or OK. Enter submits (Ctrl/Cmd-Enter for a multiline prompt); Esc/backdrop cancels.
+
+### The sweep (~95 call sites → 0 bare)
+- 60 **alert** → `dlgNotice` (mostly drop-in, fire-and-forget) via a reviewable node pass (+ the per-file import, correct relative path).
+- ~35 **confirm/prompt** → `await dlgConfirm/dlgPrompt`, making each enclosing handler/function `async`. KEY: `!confirm(X)` → `!await dlgConfirm(X)` parses as `!(await …)` (await is unary, binds tighter than `!`/`&&`/`?:`) → no paren-matching needed; only the async-ness of the enclosing fn matters. Ripples handled: settingsPanel `promptName` helper (async → its 2 callers await + their handlers async); macrosApp `regenGuard` (async → its 5 callers await + the cam-builder click handler async), plus addUserFile/renameUserFile/deleteUserFile + 6 click handlers made async; projectModal 9 sites (all already-async contexts); cloudAccount `connect` (async). Destructive asks got `danger` + a verb okLabel (Delete/Remove/Overwrite).
+- Files swept: macrosApp (43), projectModal (18), settingsPanel (15), wizardManagerPanel (5), wizardTemplates (4), cloudAccount (4), iconEditor (2), gateway/views/files (1), headerPost (1).
+
+### The grep-guard — tests/dialog-grep-guard.spec.js (allowlist NONE)
+Strips comments + strings, then fails on any `(?<![.\w])(confirm|prompt|alert)\s*\(` under web/ui + web/wizards. (Comment-stripping avoids false positives: "…prompt (…" in prose, the `hmiPrompt` dialect method.) Currently GREEN → 0 offenders.
+
+### VERIFY
+- dialog-helper.spec.js: the app BOOTS CLEAN after the sweep (an orphan `await` would be a module syntax error — caught by pageerror; none) + behaviour: confirm OK→true / Cancel→false / Esc→false; prompt type+Enter→text / Esc→null; notice dismiss→closes. Grep-guard green.
+- Per-theme screenshots: scratchpad/dialog-{studio,normal,futuristic}.png — legible on light (studio) + dark (futuristic), danger primary red, neutral Cancel.
+- Full suite running (covers this + the t684 b3/d2 landed items — V10.131 held on it).
+
+### t686 (d) — the test cascade (the sweep changed the dialog seam, so ~20 tests needed updating)
+The first full-suite run after the sweep failed 22 (979 passed). Root causes + fixes:
+1. **A missed async** — the macrosApp cam-builder `change` handler kept an `await regenGuard` but wasn't made async → a MODULE syntax error that only fired when the Macros app lazy-loads (the boot-clean test didn't open it). That broke EVERY macros-app test (cam-slot-sim, controller-file-tree, macros-tabs, homing-config-machine-tab). Fixed: `node --check` on all swept files (now a habit) caught it; made the handler async. Then those tests went green from the syntax fix alone.
+2. **regenGuard async-timing** — cam-slot-sim edits dispatch a change then read the result SYNCHRONOUSLY; making the handler async moved the mutation to a microtask → the read raced. Refactored `regenGuard(slot, proceed)` to CALLBACK style: a clean slot (`!bodyDirty`) proceeds SYNCHRONOUSLY (no dialog), only a hand-edited slot goes async (dlgConfirm.then). The cam handlers reverted to sync → the 5 cam-slot-sim tests pass unchanged. (Nice side effect: the common path never touches a promise.)
+3. **Native-dialog-coupled tests** — tests used `page.on('dialog', d => d.accept())` or stubbed `window.confirm/prompt`; the in-app modal fires neither. Added **tests/_appDialog.js** (`autoAppDialog(page, {accept, prompt})` — a MutationObserver that auto-responds to `.app-dialog`: PROMPTS always submit the given value, CONFIRM/NOTICE honour `accept`; records messages for `appDialogLog`). Migrated autostart-stored-macro (dialog-COUNT assertions → `appDialogLog().length`), homing-sysstart-real, profile-library (prompt value), wizard-manager (×2), wizard-templates (the "Nothing to save" NOTICE now read from the log). All green.
+
+LESSON: an app-wide seam change (native→in-app dialogs) cascades into the tests coupled to the old seam. `node --check` every swept file (a lazy-loaded module's syntax error hides from a boot test); prefer a callback guard over forcing a whole handler async when the common path is sync + a test reads synchronously.

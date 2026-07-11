@@ -17,6 +17,7 @@ import {
     createGroup, deleteGroup, SECTIONS,
 } from '../blocks/wizardLibrary.js';
 import { ICON_REGISTRY, entryIconHtml } from './wizIcons.js';
+import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 // Authoring custom ops lives in Blocks → Dev mode (the one authoring path); this panel only DESIGNS the bar.
 
 const SECTION_LABEL = { left: 'LEFT', center: 'CENTRE', right: 'RIGHT' };
@@ -125,9 +126,9 @@ function importWizardFile(onDone) {
         r.onload = (e) => {
             try {
                 const def = importWizard(e.target.result || '');
-                if (!def) { alert('That isn’t a valid .wizard file.'); return; }
+                if (!def) { dlgNotice('That isn’t a valid .wizard file.'); return; }
                 onDone();
-            } catch (err) { alert('Import failed: ' + (err && err.message || err)); }
+            } catch (err) { dlgNotice('Import failed: ' + (err && err.message || err)); }
         };
         r.readAsText(f);
     };
@@ -169,8 +170,8 @@ export function renderWizardLibrary(container) {
     const actions = document.createElement('div');
     actions.className = 'settings-row'; actions.style.marginTop = '8px';
     actions.appendChild(mkBtn('⬆ Import .wizard', () => importWizardFile(apply), { title: 'Load a shared .wizard file into your library' }));
-    actions.appendChild(mkBtn('↺ Reset to factory', () => {
-        if (confirm('Reset the whole bar layout (sections, dropdowns, names, visibility, order, icons) to factory defaults?\nYour custom .wizard ops are kept.')) { resetLayout(); apply(); }
+    actions.appendChild(mkBtn('↺ Reset to factory', async () => {
+        if (await dlgConfirm('Reset the whole bar layout (sections, dropdowns, names, visibility, order, icons) to factory defaults?\nYour custom .wizard ops are kept.', { danger: true, okLabel: 'Reset' })) { resetLayout(); apply(); }
     }, { title: 'Discard all bar customisation (keeps your custom ops)' }));
     head.appendChild(actions);
     container.appendChild(head);
@@ -218,8 +219,8 @@ export function renderWizardLibrary(container) {
             gh.appendChild(mkArrow('▲', gi === 0, () => { moveGroupInSection(groups, gi, -1); apply(); }, 'Move dropdown up'));
             gh.appendChild(mkArrow('▼', gi === groups.length - 1, () => { moveGroupInSection(groups, gi, +1); apply(); }, 'Move dropdown down'));
             if (group.custom) {
-                gh.appendChild(mkBtn('🗑 Delete', () => {
-                    if (confirm(`Delete the “${group.label}” dropdown? Its wizards return to their default dropdowns.`)) { deleteGroup(group.id); apply(); }
+                gh.appendChild(mkBtn('🗑 Delete', async () => {
+                    if (await dlgConfirm(`Delete the “${group.label}” dropdown? Its wizards return to their default dropdowns.`, { danger: true, okLabel: 'Delete' })) { deleteGroup(group.id); apply(); }
                 }, { danger: true, title: 'Delete this dropdown (its wizards revert to their defaults)' }));
             }
             grpEl.appendChild(gh);
@@ -304,8 +305,8 @@ function renderRow(entry, group, ei, allGroups, apply) {
         row.appendChild(mkBtn('✎ Edit', () => { if (window.ddcsEditWizardDef) { window.ddcsEditWizardDef(entry.type); if (window.closeSettings) window.closeSettings(); } },
             { title: 'Re-author this wizard — opens its blocks (knobs + all) in Dev mode to tweak and re-save' }));
         row.appendChild(mkBtn('Export', () => exportEntry(entry), { title: 'Save this op as a shareable .wizard file' }));
-        row.appendChild(mkBtn('Delete', () => {
-            if (confirm(`Delete the custom wizard “${entry.label}”? This removes it from your library.`)) { deleteWizard(entry.type); apply(); }
+        row.appendChild(mkBtn('Delete', async () => {
+            if (await dlgConfirm(`Delete the custom wizard “${entry.label}”? This removes it from your library.`, { danger: true, okLabel: 'Delete' })) { deleteWizard(entry.type); apply(); }
         }, { danger: true, title: 'Remove this custom op' }));
     }
     return row;

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { autoAppDialog } from './_appDialog.js';   // t684 d — the in-app dialog replaced native confirm/prompt/alert
 
 /**
  * The Settings "Wizard library manager" — a section tree that designs the bar. Drives the real overlay:
@@ -26,9 +27,9 @@ const libState = (page) => page.evaluate(async () => {
 });
 
 test('Wizard library manager: every control flows live to the bar', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());            // confirm() → proceed; alert() → dismiss
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openSettings && window.ddcsRefreshWizardBar);
+  await autoAppDialog(page, { accept: true });   // confirm → proceed; notice → dismiss
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 
   // open Settings → General → Wizards
@@ -94,9 +95,9 @@ test('Wizard library manager: every control flows live to the bar', async ({ pag
 });
 
 test('Wizard library manager: the section tree — create dropdown, move a wizard in, delete', async ({ page }) => {
-  page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openSettings && window.ddcsRefreshWizardBar);
+  await autoAppDialog(page, { accept: true });
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
   await page.evaluate(() => window.openSettings());
   await page.click('.settings-main-tab[data-group="general"]');

@@ -25,6 +25,7 @@ import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 — no-LAN machine-truth: drop the controller's dump folder → derive geometry → the review modal
 import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
+import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
 // --- Tool library ----------------------------------------------------------
@@ -1769,9 +1770,9 @@ function wireSettingsOverlay(ov) {
             listEl.querySelectorAll('[data-cload]').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); loadCloudRow(b.dataset.cload); }));
             listEl.querySelectorAll('[data-cdel]').forEach((b) => b.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                if (!confirm('Delete this cloud profile? (Only the cloud copy — nothing on this device changes.)')) return;
+                if (!(await dlgConfirm('Delete this cloud profile? (Only the cloud copy — nothing on this device changes.)', { danger: true, okLabel: 'Delete' }))) return;
                 try { await window.ddcsDeleteCloudProfile(b.dataset.cdel); syncCloud(); }
-                catch (err) { alert('Delete failed: ' + (err && err.message ? err.message : err)); }
+                catch (err) { dlgNotice('Delete failed: ' + (err && err.message ? err.message : err)); }
             }));
         }
         const delBtn = q('set_profile_delete'); if (delBtn) delBtn.disabled = L.listProfiles().length <= 1;
@@ -1784,17 +1785,17 @@ function wireSettingsOverlay(ov) {
     }
     async function loadCloudRow(fileId) {
         if (!window.ddcsLoadCloudProfile) return;
-        if (!confirm('Load this cloud profile onto this device? It lands as a new named profile and becomes active.')) return;
+        if (!(await dlgConfirm('Load this cloud profile onto this device? It lands as a new named profile and becomes active.', { okLabel: 'Load' }))) return;
         try { await window.ddcsLoadCloudProfile(fileId); afterProfileChange(); syncCloud(); }
-        catch (e) { alert('Load failed: ' + (e && e.message ? e.message : e)); }
+        catch (e) { dlgNotice('Load failed: ' + (e && e.message ? e.message : e)); }
     }
     function afterProfileChange() { fillProfileOptions(); fillPostOptions(); fill(); applyHardwareTabs(); renderProfileLibrary(); }
     // profiles are ONLY ever USER-NAMED (t658 amend): New + Duplicate always prompt; an empty name cancels (no auto-names).
-    const promptName = (msg, def) => { const n = window.prompt(msg, def || ''); if (n == null) return null; const t = String(n).trim(); return t || null; };
+    const promptName = async (msg, def) => { const n = await dlgPrompt(msg, def || ''); if (n == null) return null; const t = String(n).trim(); return t || null; };
     if (q('set_profile_name')) q('set_profile_name').addEventListener('change', (e) => { const L = profLib(); if (!L) return; L.renameProfile(L.activeProfileId(), e.target.value); renderProfileLibrary(); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); });
-    if (q('set_profile_delete')) q('set_profile_delete').addEventListener('click', () => { const L = profLib(); if (!L) return; const a = L.activeProfile(); if (L.listProfiles().length <= 1) { alert('The last profile can\'t be deleted.'); return; } if (!confirm('Delete the profile “' + (a.name || 'unnamed') + '”? This can\'t be undone.')) return; L.deleteProfile(a.id); afterProfileChange(); });
-    if (q('set_profile_new_dup')) q('set_profile_new_dup').addEventListener('click', () => { const L = profLib(); if (!L) return; const name = promptName('Name the duplicate profile:'); if (name == null) return; L.createProfile({ from: 'dup', name }); afterProfileChange(); });
-    if (q('set_profile_new_base')) q('set_profile_new_base').addEventListener('click', () => { const L = profLib(); if (!L) return; const name = promptName('Name the new profile:'); if (name == null) return; L.createProfile({ from: 'baseline', controllerId: getActiveProfile().id, name }); afterProfileChange(); });
+    if (q('set_profile_delete')) q('set_profile_delete').addEventListener('click', async () => { const L = profLib(); if (!L) return; const a = L.activeProfile(); if (L.listProfiles().length <= 1) { dlgNotice('The last profile can\'t be deleted.'); return; } if (!(await dlgConfirm('Delete the profile “' + (a.name || 'unnamed') + '”? This can\'t be undone.', { danger: true, okLabel: 'Delete' }))) return; L.deleteProfile(a.id); afterProfileChange(); });
+    if (q('set_profile_new_dup')) q('set_profile_new_dup').addEventListener('click', async () => { const L = profLib(); if (!L) return; const name = await promptName('Name the duplicate profile:'); if (name == null) return; L.createProfile({ from: 'dup', name }); afterProfileChange(); });
+    if (q('set_profile_new_base')) q('set_profile_new_base').addEventListener('click', async () => { const L = profLib(); if (!L) return; const name = await promptName('Name the new profile:'); if (name == null) return; L.createProfile({ from: 'baseline', controllerId: getActiveProfile().id, name }); afterProfileChange(); });
     // Cloud (E2) — the SAME named-profile concept, viewed in the unified library above. "Save to cloud" pushes the
     // ACTIVE profile under ITS name (the name IS the cloud name; no silent overwrite — a same-name copy asks first).
     // "Sync cloud" refreshes the ☁ rows in the library above, where each offers Load / delete. (Wired here so it shares
@@ -1804,14 +1805,14 @@ function wireSettingsOverlay(ov) {
         if (!window.ddcsSaveProfileToCloud) return;
         const L = profLib(); const ap = L && L.activeProfile();
         const name = ((ap && ap.name) || '').trim();
-        if (!name) { alert('Name this profile first (at the top of the panel) — the cloud copy uses the profile name.'); const nEl = q('set_profile_name'); if (nEl) nEl.focus(); return; }
+        if (!name) { dlgNotice('Name this profile first (at the top of the panel) — the cloud copy uses the profile name.'); const nEl = q('set_profile_name'); if (nEl) nEl.focus(); return; }
         let existing = null;
         try { const list = (window.ddcsListCloudProfiles ? (await window.ddcsListCloudProfiles()) : []) || []; existing = list.find((c) => normName(c.name) === normName(name)); }
-        catch (e) { alert('Could not reach your cloud: ' + (e && e.message ? e.message : e)); return; }
-        if (existing && !confirm('A cloud profile named “' + name + '” already exists — overwrite it?')) return;
+        catch (e) { dlgNotice('Could not reach your cloud: ' + (e && e.message ? e.message : e)); return; }
+        if (existing && !(await dlgConfirm('A cloud profile named “' + name + '” already exists — overwrite it?', { okLabel: 'Overwrite' }))) return;
         const orig = cloudSaveBtn.textContent; cloudSaveBtn.disabled = true; cloudSaveBtn.textContent = 'Saving…';
-        try { const n = await window.ddcsSaveProfileToCloud(name); await syncCloud(); alert('Saved “' + n + '” to your cloud.'); }
-        catch (e) { alert('Cloud save failed: ' + (e && e.message ? e.message : e)); }
+        try { const n = await window.ddcsSaveProfileToCloud(name); await syncCloud(); dlgNotice('Saved “' + n + '” to your cloud.'); }
+        catch (e) { dlgNotice('Cloud save failed: ' + (e && e.message ? e.message : e)); }
         finally { cloudSaveBtn.disabled = false; cloudSaveBtn.textContent = orig; }
     });
     const cloudSyncBtn = q('set_profile_cloud_load');
@@ -1819,7 +1820,7 @@ function wireSettingsOverlay(ov) {
         const orig = cloudSyncBtn.textContent; cloudSyncBtn.disabled = true; cloudSyncBtn.textContent = 'Syncing…';
         await syncCloud();
         cloudSyncBtn.disabled = false; cloudSyncBtn.textContent = orig;
-        if (!cloudProfiles.length) alert('No cloud profiles found. Sign in (Settings → Cloud), then use “Save to cloud” to push this profile.');
+        if (!cloudProfiles.length) dlgNotice('No cloud profiles found. Sign in (Settings → Cloud), then use “Save to cloud” to push this profile.');
     });
     renderProfileLibrary();
     try { syncCloud(); } catch (e) { /* not signed in / no cloud — the library still shows local rows */ }
@@ -2280,7 +2281,7 @@ function wireSettingsOverlay(ov) {
             const list = [...(files || [])];
             if (!list.length) return;
             const rec = recognizeDump(await readDumpFiles(list));
-            if (!rec.controllerId) { alert('No recognizable controller files (a “setting”, “eng”, or “coord1” file) in that folder. Copy the whole controller disk and try again.'); return; }
+            if (!rec.controllerId) { dlgNotice('No recognizable controller files (a “setting”, “eng”, or “coord1” file) in that folder. Copy the whole controller disk and try again.'); return; }
             await openImportModal(dumpToScan(rec));
         };
         if (fileList) { await run(fileList); return; }
@@ -2314,7 +2315,7 @@ function wireSettingsOverlay(ov) {
                 if (v === '' || v == null || !Number.isFinite(Number(v)) || !Number.isFinite(n)) return;
                 lines.push('#' + (base + n - 1) + '=' + Number(v) + ' ( T' + n + (t.name ? ' ' + t.name : '') + ' length )');
             });
-            if (!lines.length) { alert('No tool lengths set in the library.'); return; }
+            if (!lines.length) { dlgNotice('No tool lengths set in the library.'); return; }
             const code = '( Tool table )\n' + lines.join('\n') + '\n';
             const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager;
             if (em && typeof em.insert === 'function') em.insert(code);
@@ -2757,8 +2758,8 @@ function wireSettingsOverlay(ov) {
     if (_atcAddBtn) _atcAddBtn.addEventListener('click', () => addSubsystem('atc'));
     // Remove a subsystem: hide its tab + strip the I/O rows it owns (group-tagged). The tool table/magazine data
     // is left intact (it lives under atc.*), so re-adding restores everything.
-    function removeSubsystem(kind) {
-        if (!window.confirm('Remove the ' + kind.toUpperCase() + ' subsystem and its I/O rows? (Your magazine + tool table are kept.)')) return;
+    async function removeSubsystem(kind) {
+        if (!(await dlgConfirm('Remove the ' + kind.toUpperCase() + ' subsystem and its I/O rows? (Your magazine + tool table are kept.)', { danger: true, okLabel: 'Remove' }))) return;
         _ddcsSettings.hardwareTabs = _ddcsSettings.hardwareTabs || {};
         _ddcsSettings.hardwareTabs[kind] = false;
         const outs = getOutputs(), ins = getInputs();

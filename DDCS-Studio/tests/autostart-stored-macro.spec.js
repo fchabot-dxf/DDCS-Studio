@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { autoAppDialog, appDialogLog } from './_appDialog.js';   // t684 d — in-app dialog
 
 /**
  * AUTOSTART = A STORED MACRO + SIMPLE EDITOR (t656, user design). The Macros → sysstart panel is now a plain editable
@@ -68,12 +69,12 @@ test('Regenerate rebuilds body == homingStack emit + the additional-G-code suffi
         return code;
     });
     // NO hand-edit yet (fresh seed) → Regenerate proceeds without a confirm
-    let dialogs = 0; page.on('dialog', (d) => { dialogs++; d.accept(); });
+    await autoAppDialog(page, { accept: true });   // records + accepts any dialog that appears
     await page.click('#sysstart_regen');
     await page.waitForTimeout(150);
     const body1 = await page.evaluate(() => document.getElementById('sysstart_body').value);
     expect(body1, 'Regenerate == homingStack emit + the additional-G-code suffix (byte-equal)').toBe(expected);
-    expect(dialogs, 'no clobber-confirm when the body was not hand-edited').toBe(0);
+    expect((await appDialogLog(page)).length, 'no clobber-confirm when the body was not hand-edited').toBe(0);
     // a human caught a DOUBLE M30: the body must end with EXACTLY ONE M30, and the additional G-code runs BEFORE it
     expect((body1.match(/^M30$/gm) || []).length, 'exactly one M30 (no double-end)').toBe(1);
     expect(body1.indexOf('G54'), 'the additional G-code appears BEFORE the M30').toBeLessThan(body1.lastIndexOf('M30'));
@@ -82,7 +83,7 @@ test('Regenerate rebuilds body == homingStack emit + the additional-G-code suffi
     await page.evaluate(() => { const t = document.getElementById('sysstart_body'); t.value = '( keep me )'; t.dispatchEvent(new Event('input', { bubbles: true })); });
     await page.click('#sysstart_regen');
     await page.waitForTimeout(150);
-    expect(dialogs, 'a hand-edited body prompts a confirm before Regenerate overwrites it').toBe(1);
+    expect((await appDialogLog(page)).length, 'a hand-edited body prompts a confirm before Regenerate overwrites it').toBe(1);
     const body2 = await page.evaluate(() => document.getElementById('sysstart_body').value);
     expect(body2, 'confirm accepted → the body is rebuilt (the hand edit is gone)').toBe(expected);
 });
@@ -110,7 +111,7 @@ test('t656 amend1/2: the SELECTED controller drives the body — the chip shows 
     await page.locator('#macros-app').screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/macros-ctrl-chip-mismatch.png' });
 
     // Regenerate under V4.1 → the body is V4.1 (the honest refusal, NO Expert-only registers), recorded for V4.1, note clears
-    page.on('dialog', (d) => d.accept());
+    await autoAppDialog(page, { accept: true });
     await page.click('#sysstart_regen');
     await page.waitForTimeout(150);
     const regen = await page.evaluate(() => ({ body: document.getElementById('sysstart_body').value, prof: window.ddcsGetSettings().autostartProfileId, note: (document.getElementById('sysstart_editnote') || {}).textContent }));
@@ -138,7 +139,7 @@ test('Push sends EXACTLY the stored body (payload assertion)', async ({ page }) 
     // store a distinctive body, then Push
     await page.evaluate(() => { const t = document.getElementById('sysstart_body'); t.value = '( PUSH PAYLOAD 4242 )\nG31 Z-500 F600\nM30\n'; t.dispatchEvent(new Event('input', { bubbles: true })); });
     const stored = await page.evaluate(() => window.ddcsGetSettings().autostartBody);
-    page.on('dialog', (d) => d.accept());   // the "write to controller?" confirm
+    await autoAppDialog(page, { accept: true });   // the "write to controller?" confirm
     await page.click('#sysstart_push');
     await page.waitForTimeout(300);
     expect(pushed, 'the push sent a payload').toBeTruthy();

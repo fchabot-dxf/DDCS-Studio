@@ -15,6 +15,7 @@
 import { listPosts, getActivePostId, setActivePostId, getDialect, resolveActivePost, getCaps } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { validate, summarize } from '../shared/js/validate/validate.js';
+import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare alert)
 import { THEMES } from './themes.js';
 import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
 
@@ -52,7 +53,7 @@ function runQuickAction(act) {
     switch (act) {
         case 'open':   document.getElementById('projOpenBtn')?.click(); break;
         case 'save':   document.getElementById('projSaveBtn')?.click(); break;
-        case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : alert('Open an op in the Blocks tab first, then save it as a wizard.'); break;
+        case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : dlgNotice('Open an op in the Blocks tab first, then save it as a wizard.'); break;
         case 'load':   window.loadGcodeFile?.(); break;
         case 'insert': window.insertGcodeFile?.(); break;
         case 'clear':  window.clearCode?.(); break;

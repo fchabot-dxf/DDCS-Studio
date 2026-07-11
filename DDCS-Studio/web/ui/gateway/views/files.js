@@ -1,5 +1,6 @@
 // files.js — the CNCDISK explorer: list the controller's files, view G-code (preview-block), delete (safe).
 import { el, toast } from "../util.js";
+import { dlgConfirm, dlgPrompt, dlgNotice } from '../../dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 
 export default {
   id: "files",
@@ -32,7 +33,7 @@ export default {
   },
 
   async del(ctx, name) {
-    if (!confirm(`Delete ${name} from the controller?`)) return;
+    if (!(await dlgConfirm(`Delete ${name} from the controller?`, { danger: true, okLabel: 'Delete' }))) return;
     try {
       const r = await ctx.client.deleteFile(name);
       r.ok ? toast("Deleted " + name) : toast("Delete refused: " + r.error, true);

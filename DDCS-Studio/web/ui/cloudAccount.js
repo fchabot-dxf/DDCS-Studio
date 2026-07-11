@@ -9,6 +9,7 @@
  */
 import { getProvider, providerLabel, providerIcon, clientId, setClientId, redirectUri, AVAILABLE_PROVIDER_IDS } from './cloud/providers.js';
 import { makeChallenge, makeState, buildAuthUrl, exchangeCode } from './cloud/pkce.js';
+import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 
 const TOK = 'ddcs_cloud_token', PROV = 'ddcs_cloud_provider', EMAIL = 'ddcs_cloud_email', REFRESH = 'ddcs_cloud_refresh', NAME = 'ddcs_cloud_name';
 
@@ -37,14 +38,14 @@ async function captureGoogleIdentity() {
 
 /** Connect a provider (BYO). Uses the shipped public client ID; falls back to a one-time paste if none is set
  *  (dev/self-host). Google uses GIS (its token model); Dropbox/OneDrive use the PKCE popup. */
-export function connect(provider = 'google') {
+export async function connect(provider = 'google') {
     const p = getProvider(provider);
     if (!p) return;
     // Desktop (exe/webview): Google's popup can't open + Google blocks embedded webviews, so route Google
     // sign-in through the gateway's loopback flow (its client id lives in gateway config, not providers.js).
     if (provider === 'google' && window.pywebview && window.pywebview.api) { connectGoogleDesktop(); return; }
     if (!clientId(provider)) {
-        const v = window.prompt(
+        const v = await dlgPrompt(
             `Connect ${p.label} — your OWN account (no server, no secret).\n\n`
             + `No client ID is configured. Register a PUBLIC / SPA OAuth app for ${p.label}`
             + (provider === 'google' ? ' (Authorized JavaScript origin = ' + location.origin + ')' : `, redirect URI:\n   ${redirectUri()}`)
@@ -66,7 +67,7 @@ async function connectGoogleFlow() {
         window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));   // show "Connected" now
         captureGoogleIdentity();                                       // fill in name + email when it resolves
     } catch (e) {
-        if (String(e && e.message) !== 'sign-in cancelled') window.alert('Google sign-in failed: ' + (e && e.message));
+        if (String(e && e.message) !== 'sign-in cancelled') dlgNotice('Google sign-in failed: ' + (e && e.message));
     }
 }
 
@@ -75,9 +76,9 @@ async function connectGoogleFlow() {
 async function connectGoogleDesktop() {
     let r;
     try { r = await (await fetch('/oauth/google/start')).json(); }
-    catch (e) { window.alert('Could not reach the gateway to start Google sign-in.'); return; }
+    catch (e) { dlgNotice('Could not reach the gateway to start Google sign-in.'); return; }
     if (!r.ok) {
-        window.alert('Google sign-in unavailable: ' + (r.error || 'set a Google Desktop client id in the gateway Setup.'));
+        dlgNotice('Google sign-in unavailable: ' + (r.error || 'set a Google Desktop client id in the gateway Setup.'));
         return;
     }
     // Consent is now open in the system browser; poll the gateway until it has exchanged a token (3 min cap).

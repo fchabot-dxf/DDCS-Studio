@@ -9,6 +9,7 @@
 import { getAdapter } from './cloud/cloudVolume.js';
 import { getAccount } from './cloudAccount.js';
 import { getLastOp } from '../blocks/opRecord.js';
+import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 
 const LKEY = (op) => `ddcs_tpl_${op}`;
 const CLOUD_FILE = (op) => `ddcs-templates-${op}.mjson`;
@@ -91,12 +92,12 @@ export function openTemplatesPopover(wm, anchor) {
         try { wm.update(); } catch (_) { /* keep the recorded op fresh */ }
         const last = getLastOp();
         const params = last && last.type === op ? last.params : null;   // recordOp stores { type, params } (not opType)
-        if (!params) { alert('Nothing to save yet — adjust the wizard first.'); return; }
-        const name = (window.prompt('Template name:') || '').trim();
+        if (!params) { dlgNotice('Nothing to save yet — adjust the wizard first.'); return; }
+        const name = (await dlgPrompt('Template name:', '', { title: 'Save preset' }) || '').trim();
         if (!name) return;
         let where = 'local';
-        if (cloudConnected()) where = window.confirm('Save to your connected cloud?\n\nOK = Cloud  ·  Cancel = Local') ? 'cloud' : 'local';
-        try { await saveTemplate(op, name, params, where); } catch (e) { alert('Save failed: ' + (e && e.message || e)); }
+        if (cloudConnected()) where = await dlgConfirm('Save to your connected cloud?\n\nOK = Cloud  ·  Cancel = Local', { okLabel: 'Cloud', cancelLabel: 'Local' }) ? 'cloud' : 'local';
+        try { await saveTemplate(op, name, params, where); } catch (e) { dlgNotice('Save failed: ' + (e && e.message || e)); }
         renderList();
     });
 

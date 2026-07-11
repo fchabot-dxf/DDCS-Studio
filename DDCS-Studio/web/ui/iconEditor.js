@@ -6,6 +6,7 @@
  */
 import { bmpDataUrl } from '../data/bmp.js';
 import { stageSvg, startGesture, applyGesture } from './shapeStage.js';   // shared drawing core (also used by the region editor)
+import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 
 const W = 360, H = 180, ZOOM = 2;
 // Tile source SVG(s) under web/assets/svg/. tileset.svg is the purpose-built CAM-icon library; add more
@@ -260,9 +261,9 @@ export function openIconEditor(initial, onSave) {
             const c = document.createElement('canvas'); c.width = W; c.height = H;
             const ctx = c.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H);
             try { const url = bmpDataUrl(W, H, ctx.getImageData(0, 0, W, H).data); m.remove(); onSave(url, { layers }); }
-            catch (err) { alert('Export failed: ' + (err && err.message ? err.message : err)); }
+            catch (err) { dlgNotice('Export failed: ' + (err && err.message ? err.message : err)); }
         };
-        img.onerror = () => alert('Could not rasterize the icon (an SVG tile failed to load).');
+        img.onerror = () => dlgNotice('Could not rasterize the icon (an SVG tile failed to load).');
         img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     }
 

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { autoAppDialog, appDialogLog } from './_appDialog.js';   // t684 d — in-app dialog
 
 // #4: per-op wizard templates. Local store round-trips, and the header 📑 popover lists templates and loads one
 // into the form. (Save UI uses prompt()/confirm() — local vs cloud when connected — so we seed via the store API.)
@@ -48,13 +49,8 @@ test('the popover "Save current as template" actually saves the open wizard (reg
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
   await page.waitForSelector('#wiz_drill', { state: 'visible' });
 
-  // stub the dialogs: name via prompt, capture any alert (the bug fired "Nothing to save…")
-  await page.evaluate(() => {
-    window.__alerts = [];
-    window.alert = (m) => window.__alerts.push(String(m));
-    window.prompt = () => 'FromPopover';
-    window.confirm = () => false;   // local
-  });
+  // in-app dialogs: name via prompt ('FromPopover'), confirm → Cancel = local. Any "Nothing to save…" notice is recorded.
+  await autoAppDialog(page, { accept: false, prompt: 'FromPopover' });
 
   await page.click('.wiz-templates');
   await page.waitForSelector('.wiz-tpl-pop .wt-save');
@@ -64,9 +60,10 @@ test('the popover "Save current as template" actually saves the open wizard (reg
   const r = await page.evaluate(async () => {
     const T = await import('/ui/wizardTemplates.js');
     const list = await T.listTemplates('drill');
-    return { saved: list.some((t) => t.name === 'FromPopover'), alerts: window.__alerts };
+    return { saved: list.some((t) => t.name === 'FromPopover') };
   });
-  expect(r.alerts.join(' '), 'no "nothing to save" alert').not.toContain('Nothing to save');
+  const notices = (await appDialogLog(page)).join(' ');
+  expect(notices, 'no "nothing to save" notice').not.toContain('Nothing to save');
   expect(r.saved, 'the open wizard was saved as a template from the popover').toBeTruthy();
 
   await page.evaluate(async () => { const T = await import('/ui/wizardTemplates.js'); await T.deleteTemplate('drill', 'FromPopover', 'local'); });

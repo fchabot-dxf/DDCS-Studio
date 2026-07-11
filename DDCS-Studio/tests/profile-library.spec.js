@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { autoAppDialog } from './_appDialog.js';   // t684 d — in-app dialog
 
 /**
  * PROFILES FIRST-CLASS (t658). A named PROFILE bundles {name, controllerId, settings, userVars}; the CONTROLLER is a
@@ -84,7 +85,7 @@ test('REAL APP: the profile-first Controller panel — name, new dup, switch swa
     await page.fill('#set_profile_name', 'My V4.1 rig');
     await page.dispatchEvent('#set_profile_name', 'change');
     // create a 2nd profile (duplicate current) — accept the name prompt (profiles are only ever user-named)
-    page.once('dialog', (d) => d.accept('Second rig'));
+    await autoAppDialog(page, { accept: true, prompt: 'Second rig' });
     await page.click('#set_profile_new_dup');
     await page.waitForTimeout(150);
     await page.evaluate(() => { window.ddcsGetSettings().machine.x = 320; window.ddcsProfileLib.saveActiveSnapshot(); });

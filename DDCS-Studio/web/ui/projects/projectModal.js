@@ -13,6 +13,7 @@ import { PROVIDER_IDS, providerLabel, providerIcon } from '../cloud/providers.js
 import * as gdrive from '../cloud/googleDrive.js';   // Google adapter (others plug in via the same shape)
 import { pickFolder } from '../cloud/googlePicker.js';
 import { googleApiKey, setGoogleApiKey } from '../cloud/providers.js';
+import { dlgConfirm, dlgPrompt, dlgNotice } from '../dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 
 const sanitize = (s) => (String(s || '').trim().replace(/[^A-Za-z0-9 _.-]+/g, '_').replace(/^\.+/, '') || 'untitled');
 
@@ -135,23 +136,23 @@ async function onDrawerClick(e) {
         if (act === 'close') return closeDrawer();
         if (act === 'cd') { cwd = path; return renderDrawer(); }
         if (act === 'open') { const obj = await store.readProject(path); if (obj) { loadProject(obj); closeDrawer(); } return; }
-        if (act === 'mkdir') { const name = window.prompt('New folder name:'); if (name) { await store.mkdir(store.joinPath(cwd, sanitize(name))); renderDrawer(); } return; }
+        if (act === 'mkdir') { const name = await dlgPrompt('New folder name:'); if (name) { await store.mkdir(store.joinPath(cwd, sanitize(name))); renderDrawer(); } return; }
         if (act === 'import') { importInput.click(); return; }
         if (act === 'rename') {
             const cur = store.baseName(path);
-            const name = window.prompt('Rename to:', cur);
+            const name = await dlgPrompt('Rename to:', cur);
             if (name && sanitize(name) !== cur) { await store.rename(path, store.joinPath(store.parentOf(path), sanitize(name))); renderDrawer(); }
             return;
         }
-        if (act === 'del') { if (window.confirm('Delete "' + store.baseName(path) + '"?')) { await store.remove(path); renderDrawer(); } return; }
-    } catch (err) { window.alert(act + ' failed: ' + err.message); }
+        if (act === 'del') { if (await dlgConfirm('Delete "' + store.baseName(path) + '"?')) { await store.remove(path); renderDrawer(); } return; }
+    } catch (err) { dlgNotice(act + ' failed: ' + err.message); }
 }
 
 function onImportFile(e) {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
     const r = new FileReader();
-    r.onload = () => { try { openMacroText(String(r.result)); closeDrawer(); } catch (err) { window.alert('Not a valid .mjson macro: ' + err.message); } };
+    r.onload = () => { try { openMacroText(String(r.result)); closeDrawer(); } catch (err) { dlgNotice('Not a valid .mjson macro: ' + err.message); } };
     r.readAsText(f);
     importInput.value = '';
 }
@@ -189,7 +190,7 @@ async function renderCloud() {
         mkBtn('📂 Choose folder', async () => {
             try {
                 if (!googleApiKey()) {
-                    const k = window.prompt('One-time setup: paste your Google API key (Cloud console → APIs & Services → Credentials → "Create credentials" → API key) and enable the "Google Picker API". Stored locally in this browser.');
+                    const k = await dlgPrompt('One-time setup: paste your Google API key (Cloud console → APIs & Services → Credentials → "Create credentials" → API key) and enable the "Google Picker API". Stored locally in this browser.');
                     if (!k || !k.trim()) return;
                     setGoogleApiKey(k.trim());
                 }
@@ -200,16 +201,16 @@ async function renderCloud() {
             } catch (e) {
                 const m = String(e && e.message);
                 if (m === 'cancelled') return;
-                if (m === 'no-api-key') { window.alert('A Google API key is needed for the folder picker (see the prompt).'); return; }
-                window.alert(cloudErrMsg(e));
+                if (m === 'no-api-key') { dlgNotice('A Google API key is needed for the folder picker (see the prompt).'); return; }
+                dlgNotice(cloudErrMsg(e));
             }
         }, 'op-btn'),
-        mkBtn('+ Folder', async () => { const n = window.prompt('New folder name:'); if (!n) return; try { await gdrive.mkdir(sanitize(n), cur.id); renderCloud(); } catch (e) { window.alert(cloudErrMsg(e)); } }),
+        mkBtn('+ Folder', async () => { const n = await dlgPrompt('New folder name:'); if (!n) return; try { await gdrive.mkdir(sanitize(n), cur.id); renderCloud(); } catch (e) { dlgNotice(cloudErrMsg(e)); } }),
         mkBtn('⤓ Save here', async () => {
             const st = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-            if (!st.length) { window.alert('Nothing to save — build a program first.'); return; }
-            const n = window.prompt('Save project as:', 'macro'); if (!n) return;
-            try { await gdrive.write(sanitize(n) + '.mjson', serializeProject(sanitize(n)), cur.id); renderCloud(); } catch (e) { window.alert(cloudErrMsg(e)); }
+            if (!st.length) { dlgNotice('Nothing to save — build a program first.'); return; }
+            const n = await dlgPrompt('Save project as:', 'macro'); if (!n) return;
+            try { await gdrive.write(sanitize(n) + '.mjson', serializeProject(sanitize(n)), cur.id); renderCloud(); } catch (e) { dlgNotice(cloudErrMsg(e)); }
         }),
     );
     bar.append(crumb, acts);
@@ -225,12 +226,12 @@ async function renderCloud() {
         name.textContent = (it.type === 'folder' ? '📁 ' : '📄 ') + it.name;
         name.addEventListener('click', it.type === 'folder'
             ? () => { cloudStack.push({ id: it.id, name: it.name }); renderCloud(); }
-            : async () => { try { loadProject(await gdrive.read(it.id)); closeDrawer(); } catch (e) { window.alert(cloudErrMsg(e)); } });
+            : async () => { try { loadProject(await gdrive.read(it.id)); closeDrawer(); } catch (e) { dlgNotice(cloudErrMsg(e)); } });
         const meta = document.createElement('span'); meta.className = 'proj-meta muted'; meta.textContent = it.savedAt ? it.savedAt.slice(0, 16).replace('T', ' ') : '';
         const ra = document.createElement('span'); ra.className = 'proj-rowacts';
         ra.append(
-            mkBtn('✎', async () => { const c = it.name.replace(/\.mjson$/, ''); const n = window.prompt('Rename to:', c); if (!n || sanitize(n) === c) return; try { await gdrive.rename(it.id, it.type === 'folder' ? sanitize(n) : sanitize(n) + '.mjson'); renderCloud(); } catch (e) { window.alert(cloudErrMsg(e)); } }),
-            mkBtn('🗑', async () => { if (!window.confirm('Delete "' + it.name + '"?')) return; try { await gdrive.del(it.id); renderCloud(); } catch (e) { window.alert(cloudErrMsg(e)); } }, 'danger'),
+            mkBtn('✎', async () => { const c = it.name.replace(/\.mjson$/, ''); const n = await dlgPrompt('Rename to:', c); if (!n || sanitize(n) === c) return; try { await gdrive.rename(it.id, it.type === 'folder' ? sanitize(n) : sanitize(n) + '.mjson'); renderCloud(); } catch (e) { dlgNotice(cloudErrMsg(e)); } }),
+            mkBtn('🗑', async () => { if (!await dlgConfirm('Delete "' + it.name + '"?')) return; try { await gdrive.del(it.id); renderCloud(); } catch (e) { dlgNotice(cloudErrMsg(e)); } }, 'danger'),
         );
         row.append(name, meta, ra); listc.append(row);
     }
@@ -259,7 +260,7 @@ let saveOv = null, treeEl = null, nameInput = null, saveDest = '';
 
 export async function openSaveModal() {
     const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-    if (!stack.length) { window.alert('Nothing to save — build a program first.'); return; }
+    if (!stack.length) { dlgNotice('Nothing to save — build a program first.'); return; }
     if (!saveOv) buildSaveModal();
     saveDest = cwd || '';                         // default to the drawer's current folder
     nameInput.value = 'macro';
@@ -322,7 +323,7 @@ async function onSaveClick(e) {
         if (act === 'cancel') return closeSave();
         if (act === 'pick') { saveDest = t.dataset.folder || ''; return highlightTree(); }
         if (act === 'mkdir') {
-            const name = window.prompt('New folder under "' + (saveDest || 'root') + '":');
+            const name = await dlgPrompt('New folder under "' + (saveDest || 'root') + '":');
             if (!name) return;
             const np = store.joinPath(saveDest, sanitize(name));
             await store.mkdir(np); saveDest = np; await renderTree();
@@ -336,5 +337,5 @@ async function onSaveClick(e) {
             return;
         }
         if (act === 'exportfile') { downloadMacro(name); closeSave(); return; }
-    } catch (err) { window.alert('Save failed: ' + err.message); }
+    } catch (err) { dlgNotice('Save failed: ' + err.message); }
 }

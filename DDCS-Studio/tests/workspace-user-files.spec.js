@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { autoAppDialog } from './_appDialog.js';   // t684 d — in-app dialog
 
 /**
  * WORKSPACE E3 — USER FILE ORGANIZATION (t664). The user can ADD / RENAME / DELETE their own files in the Macros tab;
@@ -27,7 +28,7 @@ test('add → edit → reload persists (under My files, push present) → rename
     await setController(page, 'ddcs-v41');
     await page.waitForFunction(() => document.getElementById('mac_add_file'));
     // ADD a file (prompt) → the editor opens for it
-    page.once('dialog', (d) => d.accept('myprobe.nc'));
+    await autoAppDialog(page, { accept: true, prompt: 'myprobe.nc' });
     await page.click('#mac_add_file');
     await page.waitForFunction(() => document.getElementById('macfile_body'));
     // EDIT it
@@ -47,7 +48,7 @@ test('add → edit → reload persists (under My files, push present) → rename
     expect(after.rename && after.del, 'a user file offers Rename + Delete').toBe(true);
 
     // RENAME → the body carries; the old name is gone
-    page.once('dialog', (d) => d.accept('renamed.nc'));
+    await autoAppDialog(page, { accept: true, prompt: 'renamed.nc' });
     await page.click('#macfile_rename');
     await page.waitForFunction(() => [...document.querySelectorAll('#macros_tree .settings-tab')].some((b) => b.dataset.file === 'renamed.nc'));
     expect(await myFiles(page), 'renamed').toEqual(['renamed.nc']);
@@ -57,7 +58,7 @@ test('add → edit → reload persists (under My files, push present) → rename
     // DELETE → gone from the profile
     await clickTreeFile(page, 'renamed.nc');
     await page.waitForFunction(() => document.getElementById('macfile_delete'));
-    page.once('dialog', (d) => d.accept());   // confirm
+    await autoAppDialog(page, { accept: true });
     await page.click('#macfile_delete');
     await page.waitForFunction(() => ![...document.querySelectorAll('#macros_tree .settings-tab')].some((b) => b.dataset.file === 'renamed.nc'));
     expect(await page.evaluate(() => window.ddcsGetSettings().workspaceFiles.length), 'deleted from the profile').toBe(0);
