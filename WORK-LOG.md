@@ -9473,3 +9473,57 @@ The dismissible toast regained a FORM (in-app-dialog styling, tokens): a `.rate-
 - **(3) cron rollup**: a `scheduled(event, env)` handler → AE SQL (aeQuery, already present) for yesterday grouped by event → upsert into a D1 `rollups {date, event, count}` (raw AE 90d, rollup forever). wrangler.toml `[triggers] crons = ["30 2 * * *"]`.
 - **(4) local unit tests, NO deploy**: vitest + `@cloudflare/vitest-pool-workers` (miniflare D1) if available, else a hand harness; assert /rate validates + writes both stores + the cron aggregates a synthetic day. The pending USER deploy now carries the (2nd-agent) read-reducer + these ratings + rollups — flag it, do NOT `wrangler deploy`.
 NOTE: analytics/ is shared with the 2nd agent (concurrent-analytics-agent-and-git) → the Worker turn must stage only its own files + rebase carefully.
+
+---
+
+## t700 — THE ANALYTICS WORKER BACK-END: /rate → D1+AE · nightly rollup cron · local tests (NO deploy)
+
+Implemented the gated (2)/(3)/(4) from t698. Worker-only — NO client change (analytics.js `submitRating` already POSTs `{stars,comment,id,app,version,os}` text/plain to `<base>/rate`; the new handler accepts exactly that shape). All in analytics/ (shared with the 2nd agent — staged ONLY my 4 files, listed below).
+
+### (2) POST /rate → D1 (permanent) + AE (trend mirror)  [src/index.js]
+- New route `if (url.pathname === '/rate') return handleRate(request, env)` (before the ingest path), + a `handleRate()`:
+  - **validate**: `stars = Math.round(Number(b.stars))`, reject unless finite && 1..5 → **400**. Bad JSON → **400**. comment: strip control chars `/[ -]/g → ' '`, trim, cap 500. app/version/os/id clipped.
+  - **D1**: `env.RATINGS.prepare('INSERT INTO ratings (ts,stars,comment,version,app,os,anon_id) VALUES (?,?,?,?,?,?,?)').bind(...).run()` — wrapped in try/catch so a store hiccup **never fails the client** (204 still returns; the AE mirror still fires).
+  - **AE mirror**: `env.EVENTS.writeDataPoint({blobs:['rating', comment≤96, '', app, version, os, '','','0'], doubles:[stars], indexes:[anon||version||'rating']})` — shaped like an event so /dash can chart it (blob1='rating', **double1=stars** → `AVG(double1)` = mean rating).
+  - `ts = Date.now()` (server time — dropped an earlier client-`date`-header read; never trust a client timestamp).
+  - Returns **204** fast (OPTIONS→204, non-POST→405).
+
+### (3) scheduled() nightly rollup → D1 `rollups` (idempotent)  [src/index.js]
+- `async scheduled(event, env, ctx) { ctx.waitUntil(rollupYesterday(env)); }` on the default export.
+- `rollupYesterday(env)`: guards on RATINGS+AE_TOKEN+ACCOUNT_ID; `date = yesterdayUTC()`; reuses the existing `aeQuery()` with `SELECT blob1 AS event, SUM(_sample_interval) AS count FROM ddcs_events WHERE toDate(timestamp)=toDate('<date>') GROUP BY blob1` (SAME `SUM(_sample_interval)` count convention the dashboard uses, lines 229-235).
+- **IDEMPOTENT**: one `batch([ DELETE FROM rollups WHERE date=?, INSERT..., INSERT... ])` — a re-run (cron retry / manual) REPLACES the day's totals, never accumulates. PRIMARY KEY (date,event) also enforces uniqueness.
+- ⚑ FORK for the advisor (one-liner, non-blocking): the rollup aggregates ALL traffic incl. dev (blob9='1'); the live /dash filters dev out by default. If the historical rollup should be real-users-only, add `AND blob9 != '1'` to the SQL. Kept literal ("by-event counts") for now.
+
+### wrangler.toml  [analytics/wrangler.toml]
+- `[[d1_databases]] binding="RATINGS" database_name="ddcs_ratings" database_id="REPLACE-WITH-D1-ID"` (+ inline setup comment).
+- `[triggers] crons = ["30 2 * * *"]` (02:30 UTC — folds yesterday).
+
+### migrations/0001_ratings.sql  [new]
+- `ratings(id PK AUTOINCREMENT, ts, stars, comment, version, app, os, anon_id)` + `ix_ratings_ts`.
+- `rollups(date, event, count, PRIMARY KEY(date,event))`.
+
+### (4) LOCAL tests — NO miniflare install, NO deploy  [analytics/test/worker.test.mjs]
+- A hand harness (Node 24 global Request/Response/fetch) invoking the REAL `worker.fetch`/`worker.scheduled` against a stub env whose **D1 mock APPLIES the SQL to an in-memory store** — so idempotency asserts the stored VALUE (assert-the-value-not-the-change), not just "a write happened".
+- Run: `node analytics/test/worker.test.mjs` → **✓ 39 assertions, 9 tests, 0 fail**:
+  - rate valid → 204 + 1 D1 row (stars/comment/app/version/anon/ts all correct) + 1 AE row (blob1='rating', double1=4).
+  - control chars → spaces+trim; comment capped 500.
+  - stars 0/6/'abc'/null → 400 + NO D1 + NO AE. Bad JSON → 400.
+  - no-RATINGS-binding → still 204 + AE still mirrors (client never blocked).
+  - cron: 3 event types → 3 rollup rows w/ correct counts + YYYY-MM-DD date.
+  - cron **idempotent**: two runs → still 2 rows, visit stays 10 (not 20).
+  - cron unconfigured (no token) → no AE query, no rows.
+
+### ▶ USER DEPLOY RUNBOOK (pending — I did NOT deploy; analytics/ is user-owned + shared)
+This one deploy now carries THREE changes: the 2nd-agent **read-reducer**, plus my **ratings** + **rollups**. From `analytics/`:
+```
+# 1. create the D1 database (prints a database_id)
+npx wrangler d1 create ddcs_ratings
+# 2. paste that id into wrangler.toml -> [[d1_databases]] database_id = "..."
+# 3. create the tables in the REMOTE db
+npx wrangler d1 execute ddcs_ratings --remote --file=migrations/0001_ratings.sql
+# 4. deploy (registers /rate + the 02:30 UTC cron trigger + the D1 binding)
+npx wrangler deploy
+```
+No secrets change (AE_TOKEN/DASH_KEY already set). No client redeploy needed — `submitRating` already targets `/rate`. Verify: `curl -X POST <url>/rate -d '{"stars":5,"comment":"hi"}'` -> 204, then `npx wrangler d1 execute ddcs_ratings --remote --command "SELECT * FROM ratings"`.
+
+### STAGED (mine only): analytics/src/index.js, analytics/wrangler.toml, analytics/migrations/0001_ratings.sql, analytics/test/worker.test.mjs

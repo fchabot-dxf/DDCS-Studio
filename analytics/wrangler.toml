@@ -29,3 +29,16 @@ dataset = "ddcs_events"
 [[kv_namespaces]]
 binding = "DEV_IPS"
 id = "d787c20a031b44478bb893de94a27da0"
+
+# Permanent store (D1/SQLite) for star ratings + nightly usage rollups. Bound as env.RATINGS.
+# ONE-TIME SETUP (prints the database_id — paste it below, then deploy):
+#   npx wrangler d1 create ddcs_ratings
+#   npx wrangler d1 execute ddcs_ratings --remote --file=migrations/0001_ratings.sql
+[[d1_databases]]
+binding = "RATINGS"
+database_name = "ddcs_ratings"
+database_id = "REPLACE-WITH-D1-ID"   # ← from `wrangler d1 create ddcs_ratings`
+
+# Nightly rollup cron — 02:30 UTC folds YESTERDAY's raw AE events into D1 `rollups` (scheduled() in src/index.js).
+[triggers]
+crons = ["30 2 * * *"]

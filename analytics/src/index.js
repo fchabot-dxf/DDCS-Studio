@@ -30,6 +30,7 @@ export default {
     // Private dashboard (secret-link gated). Handles GET (render) AND POST (dev-IP management),
     // so the ingest path below only ever sees real event POSTs.
     if (url.pathname === '/dash') return handleDash(request, env);
+    if (url.pathname === '/rate') return handleRate(request, env);   // t700 — 5-star + comment → D1 (permanent) + AE (trends)
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     if (request.method !== 'POST') return new Response('ddcs-analytics', { status: 200, headers: CORS });
@@ -88,7 +89,85 @@ export default {
     }
     return new Response(null, { status: 204, headers: CORS });
   },
+
+  // t700 — nightly rollup: fold YESTERDAY's raw AE events into D1 `rollups` (date,event,count) so the
+  // dashboard can read cheap pre-aggregated totals + keep long-term history past AE's retention window.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(rollupYesterday(env));
+  },
 };
+
+// ── Ratings + rollups (D1) ────────────────────────────────────────────────────────────────────────
+// POST /rate  { stars:1..5, comment?, id?, app?, version?, os? }  (text/plain, same as the ingest beacon)
+//   → validate, INSERT one row into D1 `ratings` (permanent), AND mirror to AE (blob1="rating",
+//     double1=stars) so the dashboard can chart the trend next to the usage events. 204 fast, never blocks.
+
+async function handleRate(request, env) {
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+  if (request.method !== 'POST') return new Response('rate', { status: 405, headers: CORS });
+
+  let b = {};
+  try { b = JSON.parse(await request.text()); } catch { return new Response('bad json', { status: 400, headers: CORS }); }
+
+  const stars = Math.round(Number(b.stars));
+  if (!Number.isFinite(stars) || stars < 1 || stars > 5) {
+    return new Response('stars must be an integer 1..5', { status: 400, headers: CORS });
+  }
+  // strip control chars (incl. newlines beyond a space) then cap at 500 — the store never sees raw control bytes.
+  const comment = clip(String(b.comment == null ? '' : b.comment).replace(/[\u0000-\u001f\u007f]/g, ' ').trim(), 500);
+  const app = clip(b.app, 8) || 'web';
+  const version = clip(b.version, 24);
+  const os = clip(b.os, 32);
+  const anon = clip(b.id, 64);
+  const ts = Date.now();   // server-received time (never trust a client-supplied timestamp)
+
+  // Permanent store (D1). A store hiccup must NOT fail the client — the AE mirror still captures the trend.
+  if (env.RATINGS) {
+    try {
+      await env.RATINGS
+        .prepare('INSERT INTO ratings (ts, stars, comment, version, app, os, anon_id) VALUES (?,?,?,?,?,?,?)')
+        .bind(ts, stars, comment, version, app, os, anon)
+        .run();
+    } catch { /* swallow — never block the client on a D1 write */ }
+  }
+  // Trend mirror (AE) — one row shaped like an event so /dash can query it alongside the usage stream.
+  if (env.EVENTS) {
+    env.EVENTS.writeDataPoint({
+      blobs: ['rating', clip(comment, 96), '', app, version, os, '', '', '0'],
+      doubles: [stars],                       // double1 = the star value (AVG over these = the mean rating)
+      indexes: [anon || version || 'rating'],
+    });
+  }
+  return new Response(null, { status: 204, headers: CORS });
+}
+
+// Fold YESTERDAY (UTC) into D1 `rollups`. IDEMPOTENT: delete the day's rows then re-insert, inside one batch —
+// a re-run (cron retry, manual trigger) REPLACES the day's totals, never accumulates them.
+async function rollupYesterday(env) {
+  if (!env.RATINGS || !env.AE_TOKEN || !env.ACCOUNT_ID) return { ok: false, reason: 'unconfigured' };
+  const date = yesterdayUTC();
+  // SUM(_sample_interval) reconstructs the true count from AE's adaptive sampling (double1 is per-row weight-neutral).
+  const sql = `SELECT blob1 AS event, SUM(_sample_interval) AS count
+               FROM ddcs_events
+               WHERE toDate(timestamp) = toDate('${date}')
+               GROUP BY blob1`;
+  let rows;
+  try { rows = await aeQuery(env, sql); } catch (e) { return { ok: false, reason: String(e && e.message || e) }; }
+
+  const stmts = [env.RATINGS.prepare('DELETE FROM rollups WHERE date = ?').bind(date)];
+  for (const r of rows) {
+    const ev = clip(r.event, 40) || '(none)';
+    const count = Math.round(Number(r.count) || 0);
+    stmts.push(env.RATINGS.prepare('INSERT INTO rollups (date, event, count) VALUES (?,?,?)').bind(date, ev, count));
+  }
+  try { await env.RATINGS.batch(stmts); } catch (e) { return { ok: false, reason: String(e && e.message || e) }; }
+  return { ok: true, date, events: rows.length };
+}
+
+// Yesterday's date (UTC, YYYY-MM-DD). Isolated so the local test can stub the clock.
+function yesterdayUTC() {
+  return new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+}
 
 // ── Private dashboard ─────────────────────────────────────────────────────────────────────────────
 // GET  /dash?key=<DASH_KEY>[&days=30][&dev=1]  → charts.
