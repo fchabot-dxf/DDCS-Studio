@@ -109,7 +109,7 @@ async function openConnectModal(provider) {
         + `<div class="cloud-modal-status">Opening ${p.label} sign-in…</div>`
         + `<div class="hint">A secure ${p.label} window opens — approve access and it returns here automatically. Your token stays in this browser; nothing is sent to a server.</div>`
         + '</div>'
-        + '<div class="cloud-modal-foot"><button class="op-btn" data-cm="retry">Open sign-in</button><span style="flex:1"></span><button class="op-btn" data-cm="cancel">Cancel</button></div>'
+        + '<div class="cloud-modal-foot"><button class="op-btn primary" data-cm="retry">Open sign-in</button><span style="flex:1"></span><button class="op-btn" data-cm="cancel">Cancel</button></div>'
         + '</div>';
     document.body.appendChild(ov);
     const statusEl = ov.querySelector('.cloud-modal-status');

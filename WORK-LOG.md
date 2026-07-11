@@ -9422,3 +9422,21 @@ Given the depth of this session I delivered the inventory (the advisor-requested
 
 ### GATED (recommend a focused follow-up, inventory above = the map)
 The two USER-NAMED screenshot targets — the **wizard/generator footer** (Insert should be accent vs neutral Cancel; the user's original complaint) and the **tool-table modal from a wizard** — plus the remaining audit (cloudAccount / ioTable / userOpForm / wizardManagerPanel / macros CAM+pack modals) and the full per-theme screenshot matrix. These need each modal's footer located + the [Done]/OK-Cancel rule + `.primary` applied; a careful pass best done with fresh budget so "consistency" is actually consistent, not half-swept.
+
+---
+
+## t694 — (b6) STRENGTHEN .primary (the real fix) + tool-table Done + finish the audit (advisor located my surfaces)
+
+The advisor's KEY finding: the Generator's INSERT ALREADY had `.primary`, yet in the user's dark theme it looked identical to CANCEL. ROOT CAUSE: bare `button.primary` (specificity 0,1,1) TIED each theme's own generic `button`/`.toolbar-btn` skin and lost by source order → no distinct background. So the fix wasn't per-button — it was the `.primary` TREATMENT itself.
+
+### THE FIX (one place, every .primary at once) — styles.css
+Added `[data-theme] button.primary, [data-theme] .toolbar-btn.primary { background: var(--accent) !important; color:#fff !important; border-color: var(--accent) !important; text-shadow; font-weight:600 }`. The ancestor-qualified selector (0,2,1) + `!important` forces a FILLED accent over any theme's button skin. Studio's fancier gradient is preserved by marking ITS rule `!important` too (same specificity, later source order → studio wins for studio). So: studio = its blue gradient; every other theme = a filled `--accent`. Both OBVIOUSLY distinct from the neutral CANCEL.
+
+### Named surfaces (advisor-located)
+- **GENERATOR** (index.html wiz-foot): INSERT already `.primary` → now reads accent. Transactional (INSERT/CANCEL) → correct as-is (no [Done]).
+- **TOOL-TABLE modal** (#toollib-modal): already had a Done footer (b5 ✓) — added `.primary` to it (b6). Pick-mode deferred per the ruling (not built).
+- **cloudAccount** connect modal: "Open sign-in" → `.primary`. ioTable = an inline Settings table (no footer modal); wizardManagerPanel line 56 = a small icon-picker popover (not a footer modal) — neither is a modal-rule case.
+
+### VERIFY (the advisor's acceptance)
+- NEW tests/modal-primary-accent.spec.js (a KEEPER regression guard): across studio / normal / futuristic — the GENERATOR INSERT's computed background ≠ CANCEL's; the DIALOG OK ≠ Cancel; the TOOL-LIBRARY Done ≠ Add. Both tests green.
+- BY EYE (stated): scratchpad/gen-footer-futuristic.png — INSERT is BRIGHT CYAN (the futuristic accent), unmistakably different from the dark neutral CANCEL (the user's exact complaint, fixed); gen-footer-studio.png — INSERT keeps studio's blue gradient. Matrix also: dialog-accent-{theme}.png, toollib-{theme}.png, stock-modal-{studio,futuristic}.png.

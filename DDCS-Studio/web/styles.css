@@ -1906,6 +1906,20 @@ button.primary:hover {
     opacity: 0.9;
 }
 
+/* t694 b6 — the PRIMARY action must read as ACCENT in EVERY theme. The bare `button.primary` (0,1,1) TIED a theme's own
+   generic `button`/`.toolbar-btn` rule and lost by source order, so in the user's dark theme the Generator's INSERT looked
+   identical to Cancel. A FILLED --accent (not a border tint) forced here with !important so it beats any theme's button
+   skin — one place, every .primary modal button at once. Themes that want a fancier primary (studio's gradient below) mark
+   THEIR rule !important too, so by source-order the later (theme-specific) one wins for that theme. */
+[data-theme] button.primary,
+[data-theme] .toolbar-btn.primary {
+    background: var(--accent) !important;
+    color: #fff !important;
+    border-color: var(--accent) !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+    font-weight: 600;
+}
+
 /* ============================================
    WIZARDS (Structure)
    ============================================ */
@@ -2571,11 +2585,12 @@ Middle (handle) {
 }
 [data-theme="studio"] .toolbar-btn.axis-blue,
 [data-theme="studio"] button.primary,
+[data-theme="studio"] .toolbar-btn.primary,
 [data-theme="studio"] button.blue {
-    color: #fff;
+    color: #fff !important;
     background:
         linear-gradient(180deg, #4f93ff, #1668ff 60%, #0c47c2) padding-box,
-        linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box;
+        linear-gradient(to bottom right, #8fbcff, #4f93ff 35%, #0a3a9e 65%, #062a72) border-box !important;
     text-shadow: 0 1px 1px rgba(0,0,0,0.4);
 }
 

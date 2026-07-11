@@ -2363,7 +2363,7 @@ function wireSettingsOverlay(ov) {
                 <div class="tl-foot">
                     <button class="toolbar-btn settings-io" id="toollib-add">＋ Add tool</button>
                     <span class="tl-hint">Tool # → length offset #[base + #−1]. Feeds in mm/min. The Mill wizards' Tool ▾ and the ATC magazine read this list.</span>
-                    <button class="toolbar-btn settings-io" id="toollib-done">Done</button>
+                    <button class="toolbar-btn settings-io primary" id="toollib-done">Done</button>
                 </div>
             </div>`;
         document.body.appendChild(m);
