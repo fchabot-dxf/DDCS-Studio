@@ -821,8 +821,11 @@ export class GcodeViz3D {
             // animated tool (which rides engine.pos, seeded at the Start via initialPos). A Start drag re-traces (new deltas)
             // + repositions the route here. Cutting ops (toolMachineFrame off) keep the normal part-frame off (unchanged).
             const machTool = !!this._toolMachineFrame;
+            // t674 — a SEATED op (alignment) anchors its DRAWN route to the Start even when a final absolute/G53 park sets
+            // stats.absolute (which turns _anchorToStart OFF). Without this the whole trace drew from the origin while the
+            // animation (engine.pos, seeded at the Start) sat correctly at A. _seatAtStart makes the trace match the seat.
             const rawOff = machTool ? (this.starts[p] || { x: 0, y: 0, z: 0 })
-                : (this._anchorToStart ? (passAnchorFor(this.starts, this._passEnds, p) || mk) : { x: 0, y: 0, z: 0 });
+                : ((this._anchorToStart || this._seatAtStart) ? (passAnchorFor(this.starts, this._passEnds, p) || mk) : { x: 0, y: 0, z: 0 });
             const dOff = this._probeXYOff();   // t363 — map the whole route onto the datum-placed stock (physical − datum)
             const sh = machTool ? this.partFrame.shift : { x: 0, y: 0, z: 0 };   // t540 — homing route sits at raw machine coords (like the tool), not the stock-floor-shifted part frame
             const off = { x: rawOff.x - dOff.x - sh.x, y: rawOff.y - dOff.y - sh.y, z: rawOff.z - sh.z };

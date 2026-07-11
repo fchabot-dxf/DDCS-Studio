@@ -552,6 +552,13 @@ export function createPreviewPanel(container, opts = {}) {
                 // envelope — tool changes are G53 even when this particular trace didn't reach one.
                 const anchor = curAnchor;
                 v._anchorToStart = anchor;
+                // t674 — a SEATED op (alignment) anchors its DRAWN trace to the Start too: the animation already rides
+                // engine.pos (seeded at the Start via initialPos), but the drawn route ignores the seat, so a final
+                // absolute / G53 park (stats.absolute → _anchorToStart OFF) drew the whole path from the origin. Give the
+                // trace the same seat the play uses (gcodeViz3d reads _seatAtStart). NOT added to the animation's `o` — the
+                // seat is already in engine.pos there (adding it would double-count). Machine-frame ops (homing) are the
+                // machTool branch — untouched (negative control).
+                v._seatAtStart = seatAtStart;
                 // ONE flag drives the whole frame: an incremental / operator-relative op (a probe) is LOCAL —
                 // stock top-at-0 AND no machine envelope; an absolute / WCS op (mill, WCS setup) shows the MACHINE
                 // frame — datum-aware stock + the envelope. The op's coordinate nature decides it, not the host.
@@ -841,7 +848,11 @@ export function createPreviewPanel(container, opts = {}) {
         on = !!on;
         if (on === seatAtStart) return;
         seatAtStart = on;
-        if (active) setGcode();   // re-trace so the route re-seats at the Start (a no-op render otherwise)
+        // t674 — re-trace so the DRAWN route re-seats (via v._seatAtStart) AND re-seed the RUNNING play: the declared seat
+        // intent is applied AFTER the on-open auto-play (preview3D → setActive → autoStartOnOpen ran while seatAtStart was
+        // still false → engine seeded pos=0). scheduleLiveRestart bails on unchanged G-code, so the running animation stays
+        // at origin until a drag. Force a restart so the sim seats at the Start on FRESH OPEN with zero interaction.
+        if (active) { setGcode(); if (engine && engine.running) { stopPlay(); play(); } }
     }
 
     // Arm the ATC tool-swap + device animation for this op. A 'push' (firmware) or 'pick-place' (generic/disk)
