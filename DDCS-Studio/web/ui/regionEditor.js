@@ -84,7 +84,7 @@ export function openRegionEditor(initial, onSave) {
                 <div class="re-grp"><h4>Regions</h4><div class="re-list" id="re_list"></div></div>
             </div>
         </div>
-        <div class="re-foot"><button class="toolbar-btn settings-io" data-re="cancel">Cancel</button><button class="toolbar-btn settings-io" data-re="save">Save region pick</button></div>
+        <div class="re-foot"><button class="toolbar-btn settings-io" data-re="cancel">Cancel</button><button class="toolbar-btn settings-io primary" data-re="save">Save region pick</button></div>
     </div>`;
     document.body.appendChild(m);
     const $ = (id) => m.querySelector('#' + id);

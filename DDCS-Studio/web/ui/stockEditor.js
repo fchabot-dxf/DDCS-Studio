@@ -146,6 +146,9 @@ export function openStockEditor(anchor, opts) {
             </div>
           </div>
         </div>
+        <div class="se-foot" style="display:flex; justify-content:flex-end; margin-top:12px; padding-top:10px; border-top:1px solid #2a3340;">
+            <button id="se_done" type="button" class="primary" style="padding:5px 18px; font-size:13px;" title="Close — your stock edits are already applied live">Done</button>
+        </div>
     `;
     document.body.appendChild(pop);
     _pop = pop;
@@ -410,6 +413,7 @@ export function openStockEditor(anchor, opts) {
     });
 
     q('se_close').addEventListener('click', closeAndReturn);
+    if (q('se_done')) q('se_done').addEventListener('click', closeAndReturn);   // t692 b5 — [Done] footer: X is never the only exit (edits already apply live)
     const backBtn = q('se_back'); if (backBtn) backBtn.addEventListener('click', closeAndReturn);   // "‹ origin" → walk back
     // keep pointer events on the popover from reaching the 3D orbit handler
     pop.addEventListener('pointerdown', (e) => e.stopPropagation());

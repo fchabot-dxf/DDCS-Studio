@@ -150,7 +150,7 @@ export function openIconEditor(initial, onSave) {
                 <div class="ie-grp"><h4>Layers (top = front)</h4><div class="ie-layers" id="ie_layers"></div></div>
             </div>
         </div>
-        <div class="ie-foot"><button class="toolbar-btn settings-io" data-ie="cancel">Cancel</button><button class="toolbar-btn settings-io" data-ie="save">Save icon</button></div>
+        <div class="ie-foot"><button class="toolbar-btn settings-io" data-ie="cancel">Cancel</button><button class="toolbar-btn settings-io primary" data-ie="save">Save icon</button></div>
     </div>`;
     document.body.appendChild(m);
     const $ = (id) => m.querySelector('#' + id);

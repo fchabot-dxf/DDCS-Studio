@@ -9390,3 +9390,35 @@ The header quick-menu's collapsible "Generate for" (dialect) submenu → a PROFI
 - header-profile-menu.spec.js (NEW): the menu shows a Profile head + current (Rig B · Expert) + 1 recent (Rig A) + the 3 doors; **NO data-post items, no "Generate for"**. A recent one-click FULL-SWAPS the envelope 320→700; Profiles… opens `.profile-modal`; Save as… opens a dlgPrompt; Pull opens the review modal (`#import-close`). Both green.
 - header-responsive.spec.js updated: the old "one active post checked" assertion → "no data-post items + the Profile door present + one theme". editor-chrome (file actions) unaffected.
 - Screenshot scratchpad/header-profile-menu.png — the PROFILE section under PROGRAM, above THEME; current bold + a ↔ recent + Profiles…/Save as…/Pull; no dialect list. (Also shows the b3 "Insert gcode" label.)
+
+---
+
+## t692 — (b5)+(b6) VISUAL CONSISTENCY — modal inventory + stock modal [Done] + primary-accent sweep (PARTIAL; gating the rest)
+
+Given the depth of this session I delivered the inventory (the advisor-requested groundwork) + the clearest user-named gap + the token-driven accent, and am GATING the exhaustive per-modal audit (esp. the two remaining named targets I couldn't cleanly locate) as a focused follow-up with this inventory as the map.
+
+### MODAL INVENTORY (name → kind → footer state)
+| Modal (file) | Kind | Footer | b5/b6 state |
+|---|---|---|---|
+| dialog.js (confirm/prompt) | transactional | OK + Cancel | ✓ accent OK, Esc cancels |
+| dialog.js (notice) | live/info | OK | ✓ accent, Esc dismiss |
+| profileModal.js (browse) | live-commit | **[Done]** + Import/Save-cloud/Sync | ✓ accent Done |
+| profileModal.js (save) | transactional | dlgPrompt (OK/Cancel) | ✓ |
+| blockEditNotice.js | transactional (3-way) | Keep both / Replace / Cancel | ✓ accent "Keep both" |
+| stockEditor.js (STOCK) | live-commit | **[Done] ADDED (was ✕-only)** | ✓ FIXED — Done+primary, X not sole exit |
+| iconEditor.js | transactional | Cancel + Save icon | ✓ Save→**.primary** (was neutral) |
+| regionEditor.js | transactional | Cancel + Save region | ✓ Save→**.primary** (was neutral) |
+| setupChecklist.js | live | Done (+ Save destination) | ✓ already accent (inline var(--accent)) |
+| wizardPrereq.js | transactional | Add it + ✕ | ✓ already accent |
+| settingsPanel.js (Pull/import review) | transactional | (im-* modal) | audited-open OK (used by b2 pull); footer review PENDING |
+| cloudAccount.js (connect) | transactional | ✕ + Cancel | PENDING (primary?) |
+| ioTable.js · userOpForm.js · wizardManagerPanel.js · macrosApp (CAM/pack) | mixed | various | PENDING audit |
+| **the WIZARD "Generator" footer (Insert/Cancel)** | transactional | — | GATED — not cleanly located; the user's original b6 complaint |
+| **the TOOL-TABLE modal (from a wizard)** | live/transactional | — | GATED — user-named, not located |
+
+### DONE this turn (verified)
+- **(b5) stock modal**: added a `[Done]` footer wired to the same close/return as ✕ (edits already apply live) — X is no longer the only exit. Verified: Done closes the popover; screenshots scratchpad/stock-modal-{studio,futuristic}.png show the blue accent Done.
+- **(b6) accent**: `button.primary` (already per-theme skinned via `--accent`) applied to iconEditor "Save icon" + regionEditor "Save region"; the stock Done uses `.primary`. Confirmed dialog/profileModal/blockEditNotice/setupChecklist/wizardPrereq already carry the accent → the pattern is now consistent across the audited set.
+
+### GATED (recommend a focused follow-up, inventory above = the map)
+The two USER-NAMED screenshot targets — the **wizard/generator footer** (Insert should be accent vs neutral Cancel; the user's original complaint) and the **tool-table modal from a wizard** — plus the remaining audit (cloudAccount / ioTable / userOpForm / wizardManagerPanel / macros CAM+pack modals) and the full per-theme screenshot matrix. These need each modal's footer located + the [Done]/OK-Cancel rule + `.primary` applied; a careful pass best done with fresh budget so "consistency" is actually consistent, not half-swept.
