@@ -64,6 +64,53 @@ test('LIVE: play progressively removes material (monotone loss t0 → t-end), th
     expect(monotone, `live material loss is monotone (samples=${JSON.stringify(samples.map((s) => +s.toFixed(2)))})`).toBe(true);
 });
 
+test('CRISP WALLS (t682): a pocket end-state builds TRUE vertical wall faces (rim+floor share XY at depth), not a ramp', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.setGcodeView);
+    await setup(page, false);   // no auto-play → the settled CRISP end-state
+    // a rectangular pocket floor at Z=−8 (a Ø10 tool rasters it out), leaving vertical walls at the pocket boundary
+    const prog = 'G90\nG0 X30 Y20 Z5\nG1 Z-8 F300\nX70\nY30\nX30\nY40\nX70\nY50\nX30\nY60\nX70\nG0 Z5\nM30\n';
+    await page.evaluate((g) => { const e = document.getElementById('editor'); if (e) e.value = g; if (window.setGcodeView) window.setGcodeView('3d'); }, prog);
+    await page.waitForTimeout(400);
+    await page.evaluate((g) => { const p = window.__gpPanel; if (p) { p.setGcode(g); if (p.viz && p.viz.setTool) p.viz.setTool({ type: 'endmill', dia: 10 }); } }, prog);
+    await page.waitForTimeout(400);
+    const r = await page.evaluate(() => {
+        const v = window.__gpPanel.viz; const g = v._carveMesh && v._carveMesh.geometry; if (!g) return null;
+        const p = g.attributes.position; const cols = new Map();
+        for (let i = 0; i < p.count; i++) { const kx = Math.round(p.getX(i) * 4) / 4, ky = Math.round(p.getY(i) * 4) / 4, z = p.getZ(i); const key = kx + ',' + ky; const e = cols.get(key) || { min: 1e9, max: -1e9 }; e.min = Math.min(e.min, z); e.max = Math.max(e.max, z); cols.set(key, e); }
+        // a pocket-wall column: rim + floor share XY spanning ~the pocket depth (8), NOT the full stock height (20 = perimeter skirt)
+        let pocketWalls = 0; for (const e of cols.values()) { const d = e.max - e.min; if (d > 6 && d < 14) pocketWalls++; }
+        return { mode: v._carveMeshMode, maxWall: v._carveMaxWall, tri: v._carveTriCount, pocketWalls };
+    });
+    expect(r, 'the editor built a crisp end-state carve').not.toBeNull();
+    expect(r.mode, 'the settled end-state uses the CRISP (vertical-wall) mesh').toBe('crisp');
+    expect(r.maxWall, 'a vertical wall spans ~the pocket depth (8mm), not a sub-cell ramp').toBeGreaterThan(6);
+    expect(r.pocketWalls, 'the mesh has vertical wall columns (rim+floor at the same XY spanning the pocket depth)').toBeGreaterThan(0);
+});
+
+test('BALL-NOSE (t682): a ball-nose tool (T3) NAMES the tip in the panel note + carves the spherical profile (one source: tool type)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.setGcodeView);
+    await setup(page, false);
+    // T3 is the default 6mm ball-nose; a facing cut with it → the note should name "ball-nose", and the carve is spherical
+    const prog = 'G90\nT3\nG0 X20 Y40 Z5\nG1 Z-4 F300\nX80\nG0 Z5\nM30\n';
+    await page.evaluate((g) => { const e = document.getElementById('editor'); if (e) e.value = g; if (window.setGcodeView) window.setGcodeView('3d'); }, prog);
+    await page.waitForTimeout(400);
+    await page.evaluate((g) => { window.__gpPanel.setGcode(g); }, prog);
+    await page.waitForTimeout(400);
+    const r = await page.evaluate(() => {
+        const n = document.querySelector('.viz3d-drawer .pp-carve-note') || document.querySelector('.pp-carve-note');
+        const c = window.__gpPanel.viz && window.__gpPanel.viz._carve;
+        // spherical: the pass centre is deeper than a point 2mm off the axis (a flat tool would be equal)
+        const centre = c ? c.heightAt(50, 40) : 0, off = c ? c.heightAt(50, 42.5) : 0;
+        return { note: n && n.textContent, centre, off, has: !!c };
+    });
+    expect(r.has, 'the ball program built a carve').toBe(true);
+    expect(r.note, 'the panel note names the ball-nose tip in use').toContain('ball-nose');
+    expect(r.centre, 'the ball pass centre cuts to the tip depth (~−4)').toBeLessThan(-3);
+    expect(r.off - r.centre, 'the ball flank is SHALLOWER off-axis than at the centre (spherical, not flat)').toBeGreaterThan(0.1);
+});
+
 test('EVERYWHERE: a WIZARD preview inherits the carve (a surfacing wizard removes material) + solid-look screenshot', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);

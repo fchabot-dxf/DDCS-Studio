@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { HeightmapCarve, CARVE_MAX_CELLS } from '../web/engine/stockRemoval.js';
+import { HeightmapCarve, CARVE_MAX_CELLS, CARVE_MAX_CELLS_LARGE } from '../web/engine/stockRemoval.js';
 
 /**
  * MATERIAL REMOVAL E1 — the CarveMap core, headless (the ratified assert-the-VALUE bar). A heightmap carve: 'feed' (cut)
@@ -78,10 +78,54 @@ test('ANTI-ALIAS: a drilled hole reads ROUND — mirror-symmetric footprint with
     for (const [dx, dy] of [[3, 0], [0, 3]]) { const h = m.heightAt(50 + dx, 40 + dy); expect(h, 'edge is partially cut').toBeLessThan(-0.2); expect(h, 'edge not full depth').toBeGreaterThan(-9.8); }
 });
 
-test('the CAP + min-cell clamp (A): big stock → 256/axis; tiny stock → coarse (never absurd-dense); floor clamp', () => {
-    const big = new HeightmapCarve({ x: 2000, y: 3000, z: 40 }, []);
-    expect(big.nx, 'X cells capped at 256').toBe(CARVE_MAX_CELLS);
-    expect(big.ny, 'Y cells capped at 256').toBe(CARVE_MAX_CELLS);
+test('BALL tip (t682): tip=flat is BYTE-IDENTICAL to the default carve; a ball tool carves a DIFFERENT (spherical) map', () => {
+    const A = { x: 20, y: 40, z: -5 }, B = { x: 80, y: 40, z: -5 };
+    const flat = new HeightmapCarve(STOCK, []); flat.carveSegment(A, B, 3, 'feed', 'flat');
+    const dflt = new HeightmapCarve(STOCK, []); dflt.carveSegment(A, B, 3, 'feed');   // tip omitted → default flat
+    let identical = true; for (let k = 0; k < flat.h.length; k++) if (flat.h[k] !== dflt.h[k]) identical = false;
+    expect(identical, 'tip=flat == the pre-tip default carve (byte-identical map — flat behaviour unchanged)').toBe(true);
+    const ball = new HeightmapCarve(STOCK, []); ball.carveSegment(A, B, 3, 'feed', 'ball');
+    expect(flat.heightAt(50, 40), 'a FLAT groove floor is −5 across the width').toBeCloseTo(-5, 2);
+    expect(ball.heightAt(50, 40), 'a BALL groove centre reaches −5 (the tip)').toBeCloseTo(-5, 1);
+    expect(ball.heightAt(50, 42), 'a BALL groove 2mm off-axis is SHALLOWER than −5 (spherical rise)').toBeGreaterThan(-4.9);
+    let differs = false; for (let k = 0; k < ball.h.length; k++) if (Math.abs(ball.h[k] - flat.h[k]) > 0.05) differs = true;
+    expect(differs, 'the ball profile carves a different map than flat').toBe(true);
+});
+
+test('BALL scallops (t682): parallel ball passes leave periodic ridges ≈ r − √(r² − (stepover/2)²)', () => {
+    const r = 3, stepover = 3;   // Ø6 ball, 3mm stepover
+    const m = new HeightmapCarve(STOCK, []);
+    for (const y of [37, 40, 43, 46]) m.carveSegment({ x: 20, y, z: -5 }, { x: 80, y, z: -5 }, r, 'feed', 'ball');   // parallel passes along X
+    const centreZ = m.heightAt(50, 43);          // on a pass axis → deepest (~−5)
+    const ridgeZ = m.heightAt(50, 41.5);         // between passes 40 & 43 (stepover/2 = 1.5 from each) → the scallop peak
+    const ridge = ridgeZ - centreZ;
+    const expected = r - Math.sqrt(r * r - (stepover / 2) * (stepover / 2));   // ≈ 0.40mm
+    expect(centreZ, 'a ball pass centre reaches the tip depth −5').toBeCloseTo(-5, 1);
+    expect(ridge, 'a SCALLOP ridge stands between the passes (material not fully cleared)').toBeGreaterThan(0.15);
+    expect(Math.abs(ridge - expected), 'the scallop height matches r − √(r²−(s/2)²) at cell precision').toBeLessThan(0.12);
+});
+
+test('CRISP floor hc[] (t682): a pocket wall is a CLEAN single step (0 → −depth), no AA lip — feeds the vertical-wall mesh', () => {
+    const m = new HeightmapCarve(STOCK, []);
+    for (let y = 30; y <= 50; y += 1) m.carveSegment({ x: 20, y, z: -6 }, { x: 80, y, z: -6 }, 5, 'feed');   // a −6 pocket band
+    const hcAt = (x, y) => m.hc[m.idx(Math.round(x / m.dx), Math.round(y / m.dy))];
+    expect(hcAt(50, 40), 'pocket interior floor is crisp −6').toBeCloseTo(-6, 3);
+    expect(hcAt(50, 22), 'outside the pocket is full stock (0)').toBe(0);
+    // the CRISP layer has NO intermediate lip value along the wall — every cell is either 0 or −6 (unlike the AA h[])
+    let clean = true; for (let y = 18; y <= 40; y += m.dy) { const v = hcAt(50, y); if (v < -0.05 && v > -5.95) clean = false; }
+    expect(clean, 'hc has no mid-plateau (a single clean wall, so the mesh wall is one vertical face)').toBe(true);
+    // the AA layer h[] DOES carry a lip (that is what made the smooth mesh ramp) — proves the two layers differ by design
+    let hHasLip = false; for (let y = 18; y <= 40; y += m.dy) { const v = m.h[m.idx(Math.round(50 / m.dx), Math.round(y / m.dy))]; if (v < -0.05 && v > -5.95) hHasLip = true; }
+    expect(hHasLip, 'the AA h[] keeps its fractional lip (smooth mesh); hc[] is the crisp one').toBe(true);
+});
+
+test('the ADAPTIVE CAP + min-cell clamp (A/t682): sheet stock → 512/axis; mid stock → 256; tiny → coarse; floor clamp', () => {
+    const sheet = new HeightmapCarve({ x: 2000, y: 3000, z: 40 }, []);
+    expect(sheet.nx, 'a sheet-scale stock (>500mm) caps at 512/axis (adaptive)').toBe(CARVE_MAX_CELLS_LARGE);
+    expect(sheet.ny, 'Y also 512').toBe(CARVE_MAX_CELLS_LARGE);
+    const mid = new HeightmapCarve({ x: 400, y: 300, z: 30 }, []);   // ≤ 500mm → the default 256 cap
+    expect(mid.nx, 'a ≤500mm stock keeps the 256 cap').toBe(CARVE_MAX_CELLS);
+    expect(sheet.dx, 'a 2000mm side at the 512 cap → ~3.9mm cells (≤ ~2mm on a ≤1m sheet, honest degrade)').toBeLessThan(4.5);
     const tiny = new HeightmapCarve({ x: 1, y: 1, z: 5 }, []);
     expect(tiny.dx, 'tiny stock stays ≥ ~0.2mm cells (never absurd-dense)').toBeGreaterThanOrEqual(0.2);
     // can't cut below the stock bottom (floor clamp)

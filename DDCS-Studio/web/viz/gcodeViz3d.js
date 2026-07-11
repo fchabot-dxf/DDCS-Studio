@@ -1238,24 +1238,60 @@ export class GcodeViz3D {
 
     _disposeCarve() {
         if (this._carveMesh) { this._partGroup && this._partGroup.remove(this._carveMesh); this._carveMesh.geometry.dispose(); this._carveMesh.material.dispose(); this._carveMesh = null; }
-        this._carve = null; this._carveSkirtTop = null; this._carveNtop = 0;
+        this._carve = null; this._carveSkirtTop = null; this._carveNtop = 0; this._carveMeshMode = null;
     }
 
-    /** Seed the carve map from the stock + its DECLARED recesses, build the displaced grid+skirt, and HIDE the box. */
+    /** Seed the carve map from the stock + its DECLARED recesses, build the SMOOTH grid (the live default), and HIDE the box. */
     _buildCarve(stock, cavities) {
-        const THREE = this.THREE;
         this._disposeCarve();
         const feats = (() => { try { return projectWorkpiece(stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
-        const c = this._carve = new HeightmapCarve(stock, feats);
+        this._carve = new HeightmapCarve(stock, feats);
         // hide the translucent box + edges — the grid IS the stock now
         if (this.stockMesh) this.stockMesh.visible = false;
         if (this.stockEdges) this.stockEdges.visible = false;
-        this._carveMesh = this._buildCarveMesh(c, (cavities && cavities.length) ? 0x6a8fbe : 0x8fae6a);
+        this._carveColor = (cavities && cavities.length) ? 0x6a8fbe : 0x8fae6a;
+        this._rebuildCarveMesh('smooth');   // live default; the settled END-STATE swaps to 'crisp' (vertical walls)
+    }
+
+    /** (Re)build the carve mesh in the given mode: 'smooth' (interpolated grid, in-place-remeshable — LIVE) or 'crisp'
+     *  (flat tiles + TRUE vertical wall faces — the settled END-STATE, t682). Disposes the previous mesh. */
+    _rebuildCarveMesh(mode) {
+        const c = this._carve; if (!c) return;
+        if (this._carveMesh) { this._partGroup.remove(this._carveMesh); this._carveMesh.geometry.dispose(); this._carveMesh.material.dispose(); this._carveMesh = null; }
+        this._carveMeshMode = mode;
+        this._carveMesh = (mode === 'crisp') ? this._buildCrispCarveMesh(c, this._carveColor) : this._buildSmoothCarveMesh(c, this._carveColor);
         if (this._carveMesh) this._partGroup.add(this._carveMesh);
     }
 
-    /** Build the grid geometry (top surface + skirt walls + bottom) in pg-local (centred like the box). */
-    _buildCarveMesh(c, color) {
+    /** Flat tiles + TRUE vertical wall quads (doubled rim/floor verts) from the CRISP floor hc[] — a straight pocket wall
+     *  renders vertical, not a one-cell ramp (t682). Walls at the cell boundary near the analytic edge; flat-shaded. Records
+     *  `_carveMaxWall` (the tallest vertical face) for the assert. Not in-place-remeshable (topology varies) → rebuilt whole. */
+    _buildCrispCarveMesh(c, color) {
+        const THREE = this.THREE;
+        const nx = c.nx, ny = c.ny, dx = c.dx, dy = c.dy, X = c.X, Y = c.Y, Z = c.Z, ox = -X / 2, oy = -Y / 2, topZ = Z / 2, botZ = -Z / 2;
+        const zAt = (i, j) => c.hc[c.idx(i, j)] + topZ;   // the CRISP floor (clean single step, no AA lip)
+        const verts = [], idx = [];
+        const quad = (ax, ay, az, bx, by, bz, cx, cy, cz, ex, ey, ez) => { const b0 = verts.length / 3; verts.push(ax, ay, az, bx, by, bz, cx, cy, cz, ex, ey, ez); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
+        const xL = (i) => Math.max(ox, i * dx + ox - dx / 2), xR = (i) => Math.min(ox + X, i * dx + ox + dx / 2);
+        const yB = (j) => Math.max(oy, j * dy + oy - dy / 2), yT = (j) => Math.min(oy + Y, j * dy + oy + dy / 2);
+        for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const z = zAt(i, j); quad(xL(i), yB(j), z, xR(i), yB(j), z, xR(i), yT(j), z, xL(i), yT(j), z); }   // flat top tiles
+        const EPS = 1e-4; let maxWall = 0;
+        for (let j = 0; j < ny; j++) for (let i = 0; i < nx - 1; i++) { const za = zAt(i, j), zb = zAt(i + 1, j), d = Math.abs(za - zb); if (d <= EPS) continue; if (d > maxWall) maxWall = d; const xw = i * dx + ox + dx / 2; quad(xw, yB(j), za, xw, yT(j), za, xw, yT(j), zb, xw, yB(j), zb); }   // walls ↔ x-neighbours
+        for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx; i++) { const za = zAt(i, j), zb = zAt(i, j + 1), d = Math.abs(za - zb); if (d <= EPS) continue; if (d > maxWall) maxWall = d; const yw = j * dy + oy + dy / 2; quad(xL(i), yw, za, xR(i), yw, za, xR(i), yw, zb, xL(i), yw, zb); }   // walls ↕ y-neighbours
+        for (let i = 0; i < nx; i++) { const zf = zAt(i, 0); quad(xL(i), oy, zf, xR(i), oy, zf, xR(i), oy, botZ, xL(i), oy, botZ); const zk = zAt(i, ny - 1); quad(xL(i), oy + Y, zk, xR(i), oy + Y, zk, xR(i), oy + Y, botZ, xL(i), oy + Y, botZ); }   // front/back skirt
+        for (let j = 0; j < ny; j++) { const zl = zAt(0, j); quad(ox, yB(j), zl, ox, yT(j), zl, ox, yT(j), botZ, ox, yB(j), botZ); const zr = zAt(nx - 1, j); quad(ox + X, yB(j), zr, ox + X, yT(j), zr, ox + X, yT(j), botZ, ox + X, yB(j), botZ); }   // left/right skirt
+        quad(ox, oy, botZ, ox + X, oy, botZ, ox + X, oy + Y, botZ, ox, oy + Y, botZ);   // bottom
+        const g = new THREE.BufferGeometry();
+        g.setIndex(idx);
+        g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        g.computeVertexNormals();
+        this._carveMaxWall = maxWall; this._carveSkirtTop = null; this._carveNtop = 0; this._carveTriCount = idx.length / 3;
+        const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.85, depthWrite: true, side: THREE.DoubleSide, flatShading: true });   // flat-shade → crisp rims, no smeared normals
+        return new THREE.Mesh(g, mat);
+    }
+
+    /** Build the SMOOTH grid geometry (interpolated top surface + skirt walls + bottom) in pg-local — the LIVE mesh (fast in-place Z remesh). */
+    _buildSmoothCarveMesh(c, color) {
         const THREE = this.THREE;
         const nx = c.nx, ny = c.ny, dx = c.dx, dy = c.dy, X = c.X, Y = c.Y, Z = c.Z, ox = -X / 2, oy = -Y / 2, topZ = Z / 2, botZ = -Z / 2;
         const zAt = (k) => c.h[k] + topZ;
@@ -1287,37 +1323,40 @@ export class GcodeViz3D {
     /** Map a G-code/part-frame point to STOCK-LOCAL (top=0): part-zero sits at the datum point of the stock. */
     _toStockLocal(x, y, z) { const D = this._datumFrac(this._stock || {}), Z = (this._carve && this._carve.Z) || 0; return { x: (x || 0) + D[0], y: (y || 0) + D[1], z: (z || 0) + (D[2] - Z) }; }
 
-    /** Carve one G-code/part-frame segment (live or end-state). toolR = tool radius mm. Marks the grid dirty. */
-    carveSeg(seg, toolR) {
+    /** Carve one G-code/part-frame segment (live or end-state). toolR = tool radius mm; tip = flat|ball profile. Marks dirty. */
+    carveSeg(seg, toolR, tip) {
         if (!this._carve || !seg) return;
         const cls = seg.type || (seg.probe ? 'probe' : seg.rapid ? 'rapid' : 'feed');
-        this._carve.carveSegment(this._toStockLocal(seg.x1, seg.y1, seg.z1), this._toStockLocal(seg.x2, seg.y2, seg.z2), toolR, cls);
+        this._carve.carveSegment(this._toStockLocal(seg.x1, seg.y1, seg.z1), this._toStockLocal(seg.x2, seg.y2, seg.z2), toolR, cls, tip || 'flat');
     }
 
     /** Carve a per-frame swept sub-step from the live engine (prev→pos, G-code/part coords), cut class only. */
-    carveStep(prev, pos, toolR) { if (!this._carve || !prev || !pos) return; this._carve.carveSegment(this._toStockLocal(prev.x, prev.y, prev.z), this._toStockLocal(pos.x, pos.y, pos.z), toolR, 'feed'); }
+    carveStep(prev, pos, toolR, tip) { if (!this._carve || !prev || !pos) return; this._carve.carveSegment(this._toStockLocal(prev.x, prev.y, prev.z), this._toStockLocal(pos.x, pos.y, pos.z), toolR, 'feed', tip || 'flat'); }
 
-    /** Reseed the carve to PRISTINE (full stock + declared recesses) + re-mesh — the live progressive carve starts here. */
+    /** Reseed the carve to PRISTINE (full stock + declared recesses) + the SMOOTH mesh — the live progressive carve starts here. */
     carveReseed() {
         if (!this._carve || !this._stock) return;
         const feats = (() => { try { return projectWorkpiece(this._stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
         this._carve.reseed(this._stock, feats);
-        this._remeshCarve();
+        if (this._carveMeshMode !== 'smooth') this._rebuildCarveMesh('smooth'); else this._remeshCarve();
     }
     carveDirty() { return !!(this._carve && this._carve.dirty); }
 
-    /** Instant END-STATE: reseed + carve ALL segments once + one re-mesh (no rAF). segs = parsed.segments. */
-    carveEndState(segs, toolR) {
+    /** Instant settled END-STATE: reseed + carve ALL segments once + build the CRISP vertical-wall mesh. segs = parsed.segments; tip = flat|ball. */
+    carveEndState(segs, toolR, tip) {
         if (!this._carve || !this._stock) return;
         const feats = (() => { try { return projectWorkpiece(this._stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
         this._carve.reseed(this._stock, feats);
-        for (const s of (segs || [])) this.carveSeg(s, toolR);
-        this._remeshCarve();
+        for (const s of (segs || [])) this.carveSeg(s, toolR, tip);
+        this._rebuildCarveMesh('crisp'); this.render();
     }
 
-    /** Update the grid mesh Z in-place from the carve heights (throttled by the caller). Returns the ms cost (degrade watch). */
+    /** Settle the LIVE carve into the CRISP vertical-wall mesh (playback stopped) — no reseed, just re-mesh the final heights (t682). */
+    carveFinalize() { if (!this._carve) return; this._rebuildCarveMesh('crisp'); this.render(); }
+
+    /** Update the SMOOTH grid mesh Z in-place from the carve heights (throttled; LIVE only). Returns the ms cost (degrade watch). */
     _remeshCarve() {
-        const c = this._carve, mesh = this._carveMesh; if (!c || !mesh) return 0;
+        const c = this._carve, mesh = this._carveMesh; if (!c || !mesh || this._carveMeshMode !== 'smooth') return 0;
         const now = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => 0;
         const t0 = now();
         const pos = mesh.geometry.attributes.position, topZ = c.Z / 2;

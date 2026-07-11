@@ -20,6 +20,7 @@ import { GcodeViz3D } from './gcodeViz3d.js';
 import { createToolpath2d } from './toolpath2d.js';
 import { LEGEND_ROWS } from './pathStyle.js';   // t317 — the ONE declared path-visual palette (the legend reads it, can't drift from the renderers)
 import { traceToolpath } from '../engine/trace.js';
+import { carveTipForToolType } from '../engine/stockRemoval.js';   // t682 — the carve tip PROFILE from the tool `type` (ball-nose etc.), one source
 import { wcsOffsetAt } from './sceneFrame.js';   // t588 PREVIEW-PARITY E2d — THE ONE WCS table read (the DRO Mach + the engine G53 + the 2D frame all read it; no local lookup)
 import { GcodeExecutionEngine } from '../engine/index.js';
 import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
@@ -109,7 +110,7 @@ const PANEL_HTML = `
     <table class="pp-dro-tbl"><thead><tr><th></th><th>Work</th><th>Mach</th></tr></thead><tbody></tbody></table>
   </div>
   <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan</div>
-  <div class="pp-carve-note" style="display:none" title="Material-removal preview (v1): every tool is approximated as a FLAT endmill (ball / vee shown flat); an unset tool carves at Ø6."></div>
+  <div class="pp-carve-note" style="display:none" title="Material-removal preview: flat endmills and ball-nose tools are modelled from the tool type; a vee/chamfer is shown flat for now; an unset tool carves at Ø6."></div>
 `;
 
 // SLICE 2 (WCS VISIBLE): classify an executing line as a WCS call or a spindle/start call, from the RAW text only
@@ -206,7 +207,7 @@ export function createPreviewPanel(container, opts = {}) {
     // t680 — MATERIAL REMOVAL (E1): the static END-STATE (on setGcode) + the LIVE progressive carve (during play), throttled
     // with an honest degrade (F). ON by default; a preview.carve=false toggle turns it off. Per-panel (G) — the viz owns the map.
     const carveEnabled = () => previewPrefs().carve !== false;
-    let _carveTR = 3, _carvePrev = null, _carveDirty = false, _carveLastRemesh = 0, _carveHeavySince = 0, _carveDegraded = false, _carveSegs = [], _carveRaf = 0;
+    let _carveTR = 3, _carveTip = 'flat', _carvePrev = null, _carveDirty = false, _carveLastRemesh = 0, _carveHeavySince = 0, _carveDegraded = false, _carveSegs = [], _carveRaf = 0;
     // The END-STATE carve (build the grid mesh + carve every segment + re-mesh) is DEFERRED to the next frame so it never
     // blocks setGcode / a drag / a wizard open. A panel that closes before the frame (a transient wizard, e.g. the params
     // sweep opening 40 wizards in a tight loop) cancels it via setActive(false) → the carve costs nothing there. The LIVE
@@ -221,7 +222,7 @@ export function createPreviewPanel(container, opts = {}) {
             _carveRaf = 0;
             if (!active || !v.setCarve) return;   // deactivated/closed before the frame → skip
             v.setCarve(true);
-            if (!(engine && engine.running)) v.carveEndState(_carveSegs, _carveTR);
+            if (!(engine && engine.running)) v.carveEndState(_carveSegs, _carveTR, _carveTip);
         };
         _carveRaf = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame(run) : (run(), 0);
     }
@@ -415,7 +416,7 @@ export function createPreviewPanel(container, opts = {}) {
             },
             onPositionChange: (pos) => { lastPass = pos.pass || 0; if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } if (toolPosSubs.length) { const k = segs.length ? nearest2d(pos) : 0; for (const cb of toolPosSubs) cb(pos, k); }
                 // t680 — LIVE progressive carve: remove material along the swept sub-step (feed class handled inside carveStep), re-mesh throttled.
-                if (viz && viz.carveStep && carveEnabled() && !_carveDegraded) { if (_carvePrev) viz.carveStep(_carvePrev, pos, _carveTR); _carvePrev = pos; if (viz.carveDirty && viz.carveDirty()) _carveDirty = true; carveRemeshThrottled(); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
+                if (viz && viz.carveStep && carveEnabled() && !_carveDegraded) { if (_carvePrev) viz.carveStep(_carvePrev, pos, _carveTR, _carveTip); _carvePrev = pos; if (viz.carveDirty && viz.carveDirty()) _carveDirty = true; carveRemeshThrottled(); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
             onStatus: ({ message }) => setStatus(message),
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
@@ -624,14 +625,18 @@ export function createPreviewPanel(container, opts = {}) {
                 // (carve every segment once). During play the live progressive carve drives it instead. Tool Ø from simTool (E).
                 if (v.setCarve) {
                     const tl = simTool(code, parsed); _carveTR = (Number(tl && tl.dia) || 6) / 2;
+                    _carveTip = carveTipForToolType(tl && tl.type);   // ball-nose → spherical carve (one source: the tool `type`)
                     _carveSegs = (parsed && parsed.segments) || [];   // remembered for the LIVE→end-state degrade jump (F)
                     const hasCut = !!(parsed.stats && parsed.stats.feed > 0);   // material removal only for CUTTING programs; probe/rapid → the plain box
                     scheduleEndStateCarve(v, hasCut);   // DEFERRED (perf): never block setGcode; a transient/probe wizard costs ~nothing
-                    // honest note (rulings B/E): own up to the flat-endmill approximation, and to the Ø6 assumption when no tool is set
+                    // honest note (rulings B/E + t682): NAME the tip in use — ball-nose is modelled; flat is exact; a vee/chamfer
+                    // is still rendered flat (approx). Plus the Ø6 assumption when no tool is set.
                     const note = q('.pp-carve-note');
                     if (note) {
                         const show = carveEnabled() && !!(parsed.stats && parsed.stats.feed > 0);   // only when there's material to remove
-                        note.textContent = show ? (tl && tl._default ? 'Material view · flat-endmill approx · assuming Ø6 (no tool set)' : 'Material view · flat-endmill approx') : '';
+                        const tp = tl && tl.type;
+                        const tipName = _carveTip === 'ball' ? 'ball-nose' : (['vbit', 'chamfer', 'engraver'].includes(tp) ? tp + ' (as flat)' : 'flat endmill');
+                        note.textContent = show ? ('Material view · ' + tipName + (tl && tl._default ? ' · assuming Ø6 (no tool set)' : '')) : '';
                         note.style.display = show ? '' : 'none';
                     }
                 }
@@ -752,8 +757,8 @@ export function createPreviewPanel(container, opts = {}) {
         if (viz) viz.setAnimate(false);
         if (typeof opts.onLine === 'function') opts.onLine(null);
         for (const cb of toolPosSubs) cb(null, 0);   // t309 — tell the Layout overlay the sim stopped (clears its red head, redraws the static path)
-        // t680 — the run finished/stopped: a final re-mesh so the END-STATE shows even if the last throttle tick was skipped (or degraded)
-        if (viz && viz._remeshCarve && carveEnabled() && viz.carveDirty && viz.carveDirty()) viz._remeshCarve();
+        // t680/t682 — the run finished/stopped: settle the live carve into the CRISP vertical-wall END-STATE mesh (no-op if no carve)
+        if (viz && viz.carveFinalize && carveEnabled()) viz.carveFinalize();
         updateRunBtn();
     }
     // #18: dragging/declaring the start re-runs the sim animation from the NEW start (not just the static re-trace), so

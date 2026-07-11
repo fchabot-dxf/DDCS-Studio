@@ -13,9 +13,19 @@
  * (tipZ > 0 is never < h ≤ 0). Deterministic: the same segment stream + seed → the same map (live converges to end-state).
  */
 
-export const CARVE_MAX_CELLS = 256;   // per axis (A)
+export const CARVE_MAX_CELLS = 256;         // per axis (A) — the default cap
+export const CARVE_MAX_CELLS_LARGE = 512;   // per axis for a SHEET-scale stock (adaptive cap, advisor t682) → keeps ≤~2mm facets
+export const CARVE_LARGE_STOCK = 500;       // mm — a stock whose largest side exceeds this uses the 512 cap
 export const CARVE_MIN_CELL = 0.2;    // mm — the finest cell (A): tiny stock stays sane
 export const CARVE_DEFAULT_DIA = 6;   // mm — the honest default endmill Ø (E)
+
+/** The carve tip PROFILE derived from the tool-table `type` — ONE source (the table already declares the tool shape;
+ *  no separate `tip` field to drift). ballnose → 'ball'; vbit/chamfer/engraver → 'vee' (reserved, renders flat until the
+ *  vee profile is built); everything else → 'flat'. (t682 ballnose amendment.) */
+export function carveTipForToolType(type) {
+    if (type === 'ballnose') return 'ball';
+    return 'flat';   // 'vbit' | 'chamfer' | 'engraver' → 'vee' when that profile lands
+}
 
 export class HeightmapCarve {
     constructor(stock, features) { this.reseed(stock || {}, features || []); }
@@ -25,15 +35,18 @@ export class HeightmapCarve {
         const X = Math.max(0.001, Number(stock.x) || 0);
         const Y = Math.max(0.001, Number(stock.y) || 0);
         const Z = Math.max(0, Number(stock.z) || 0);
-        // cells/axis: at least 2 (a quad), at most CARVE_MAX_CELLS, and never finer than CARVE_MIN_CELL.
-        this.nx = Math.max(2, Math.min(CARVE_MAX_CELLS, Math.floor(X / CARVE_MIN_CELL) + 1));
-        this.ny = Math.max(2, Math.min(CARVE_MAX_CELLS, Math.floor(Y / CARVE_MIN_CELL) + 1));
+        // cells/axis: at least 2 (a quad), at most the cap, and never finer than CARVE_MIN_CELL. The cap is ADAPTIVE — a
+        // sheet-scale stock (largest side > 500mm) gets 512/axis so its facets stay ≤~2mm; small stock keeps 256 (t682).
+        const cap = Math.max(X, Y) > CARVE_LARGE_STOCK ? CARVE_MAX_CELLS_LARGE : CARVE_MAX_CELLS;
+        this.nx = Math.max(2, Math.min(cap, Math.floor(X / CARVE_MIN_CELL) + 1));
+        this.ny = Math.max(2, Math.min(cap, Math.floor(Y / CARVE_MIN_CELL) + 1));
         this.dx = X / (this.nx - 1);
         this.dy = Y / (this.ny - 1);
         this.X = X; this.Y = Y; this.Z = Z;
         this.top = 0;          // stock-local top
         this.bottom = -Z;      // stock-local bottom (clamp floor — can't cut below the stock)
-        this.h = new Float32Array(this.nx * this.ny);   // remaining top per cell; 0 = full stock
+        this.h = new Float32Array(this.nx * this.ny);    // remaining top per cell (AA-blended, for the SMOOTH mesh + depth reads); 0 = full stock
+        this.hc = new Float32Array(this.nx * this.ny);   // CRISP floor per cell (coverage ≥ ½ snap, for the vertical-wall mesh) — one clean step, no AA lip
         for (const f of (features || [])) this._preCarveFeature(f);
         this.seedSnapshot = this.h.slice();   // the untouched-by-cutting baseline (probe-carves-nothing assert)
         this.dirty = true;
@@ -60,8 +73,16 @@ export class HeightmapCarve {
             const p = this.cellXY(i, j);
             const inside = round ? (((p.x - cx) * (p.x - cx)) / (hx * hx) + ((p.y - cy) * (p.y - cy)) / (hy * hy) <= 1)
                 : (Math.abs(p.x - cx) <= hx && Math.abs(p.y - cy) <= hy);
-            if (inside) { const k = this.idx(i, j); if (floorZ < this.h[k]) this.h[k] = floorZ; }
+            if (inside) { const k = this.idx(i, j); if (floorZ < this.h[k]) this.h[k] = floorZ; if (floorZ < this.hc[k]) this.hc[k] = floorZ; }   // a declared recess is crisp → both layers
         }
+    }
+
+    /** Height of the tool's cutting surface above its lowest tip point, at horizontal distance d from the axis (0 at the tip).
+     *  FLAT → 0 (a plane bottom). BALL → the spherical bottom r − √(r²−d²) (deepest under the axis, rising to the edge).
+     *  Shaped so 'vee' (d·tan(halfAngle)) can slot in later — NOT built. (t682 ballnose amendment.) */
+    _tipOffset(d, r, tip) {
+        if (tip === 'ball') { const rr = r * r - d * d; return rr > 0 ? r - Math.sqrt(rr) : r; }
+        return 0;
     }
 
     /** Squared XY distance from a point to the segment A→B, plus the clamped projection param t (for the tip-Z interp). */
@@ -83,7 +104,7 @@ export class HeightmapCarve {
      * Returns true if any cell changed.
      * @param {{x,y,z}} prev  @param {{x,y,z}} pos  @param {number} toolR tool radius (mm)  @param {string} cls segment class
      */
-    carveSegment(prev, pos, toolR, cls) {
+    carveSegment(prev, pos, toolR, cls, tip = 'flat') {
         if (cls !== 'feed') return false;   // probe / rapid never carve
         const r = toolR > 0 ? toolR : CARVE_DEFAULT_DIA / 2;
         const ax = Number(prev.x) || 0, ay = Number(prev.y) || 0, az = Number(prev.z) || 0;
@@ -94,31 +115,36 @@ export class HeightmapCarve {
         const cell = Math.max(this.dx, this.dy), half = cell / 2, band = r + half;   // AA ramp is one cell wide, centred on the edge
         const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - band) / this.dx)), i1 = Math.min(this.nx - 1, Math.ceil((Math.max(ax, bx) + band) / this.dx));
         const j0 = Math.max(0, Math.floor((Math.min(ay, by) - band) / this.dy)), j1 = Math.min(this.ny - 1, Math.ceil((Math.max(ay, by) + band) / this.dy));
-        const bandR2 = band * band;
+        const bandR2 = band * band, flat = tip !== 'ball' && tip !== 'vee';   // flat → the profile offset is 0 → BYTE-IDENTICAL to the pre-tip carve
         let changed = false;
         for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
             const cx = i * this.dx, cy = j * this.dy;
             const pc = this._segDist2(cx, cy, ax, ay, dxv, dyv, len2);
             if (pc.d2 > bandR2) continue;      // the whole cell is clear of the tool (past the AA band)
+            const d = pc.d2 <= 0 ? 0 : Math.sqrt(pc.d2);
             // COVERAGE: a distance ramp across the tool edge — c=1 fully inside, 0.5 at the edge, 0 a half-cell past it.
-            const c = pc.d2 <= 0 ? 1 : Math.min(1, Math.max(0, 0.5 + (r - Math.sqrt(pc.d2)) / cell));
+            const c = pc.d2 <= 0 ? 1 : Math.min(1, Math.max(0, 0.5 + (r - d) / cell));
             if (c <= 0) continue;
-            // FLAT endmill: the floor is the tip Z at the CLOSEST approach (constant-Z pass → flat floor by construction).
+            // tip Z at the cell's CLOSEST approach, then the tool-TIP PROFILE: flat = the tip (a plane floor); ball = the
+            // spherical bottom rising toward the edge → scallops between stepover passes emerge naturally (t682).
             let tipZ = (len2 < 1e-9) ? Math.min(az, bz) : az + pc.t * (bz - az);
-            if (tipZ < this.bottom) tipZ = this.bottom;   // can't cut below the stock
+            let cutZ = flat ? tipZ : tipZ + this._tipOffset(d, r, tip);
+            if (cutZ < this.bottom) cutZ = this.bottom;   // can't cut below the stock
             const k = this.idx(i, j), h0 = this.h[k];
-            const targetZ = h0 + c * (tipZ - h0);   // c=1 → tipZ exactly; c<1 → a partial lowering (bounded in [tipZ,h0] → never over-cuts)
+            const targetZ = h0 + c * (cutZ - h0);   // c=1 → cutZ exactly; c<1 → a partial lowering (bounded in [cutZ,h0] → never over-cuts)
             if (targetZ < h0) { this.h[k] = targetZ; changed = true; }
+            // CRISP floor (for the vertical-wall mesh): a cell counts as fully cut once the tool covers ≥ half of it.
+            if (c >= 0.5 && cutZ < this.hc[k]) this.hc[k] = cutZ;
         }
         if (changed) this.dirty = true;
         return changed;
     }
 
-    /** Carve a whole segment stream (the end-state fast path). segs = [{x1,y1,z1,x2,y2,z2,type}], toolR + a class map. */
-    carveAll(segs, toolR) {
+    /** Carve a whole segment stream (the end-state fast path). segs = [{x1,y1,z1,x2,y2,z2,type}], toolR, tip profile. */
+    carveAll(segs, toolR, tip = 'flat') {
         for (const s of (segs || [])) {
             const cls = s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
-            this.carveSegment({ x: s.x1, y: s.y1, z: s.z1 }, { x: s.x2, y: s.y2, z: s.z2 }, toolR, cls);
+            this.carveSegment({ x: s.x1, y: s.y1, z: s.z1 }, { x: s.x2, y: s.y2, z: s.z2 }, toolR, cls, tip);
         }
         return this.dirty;
     }

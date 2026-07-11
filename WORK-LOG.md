@@ -9255,3 +9255,44 @@ A full-suite run flagged failures in perf-sensitive flows (op-params-complete op
 
 ### t680 FINAL suite status
 Full suite (--workers=4, the stable count — the default over-parallelizes this active machine and mass-times-out): **990 passed, 2 skipped, 3 failed**. The 3 (blocks-mobile-drawers, homing-start-marker (b), homing-sysstart-real) ALL PASS in isolation (--workers=1, 7/7) → environmental contention flakes on the actively-used machine, NOT regressions and unrelated to the carve (homing has no cuts → feed-gated → no carve at all). Same category as the pre-existing declared-flaky middle-animator (self-configures retries:2 for full-suite contention). Byte-identity + preview regression subset re-verified green in isolation (44/44 + 14 + 39). E1 code is complete and correct; committing.
+
+---
+
+## t682 — MATERIAL REMOVAL **E1.5** CRISP WALLS + adaptive cap (advisor dispatch on the user's soft-wall screenshot)
+
+The E1 mesh interpolated ONE continuous sheet, so a vertical cut wall rendered as a ramp ~one cell wide (soft), regardless of the analytic carve. Fixed the MESHER + the cap.
+
+### Adaptive cap (advisor ruling on amendment pt3)
+`reseed` now picks the cap by stock size: `Math.max(X,Y) > 500mm → 512/axis, else 256`. A sheet-scale stock keeps facets ≤~2mm (a 1m side → ~2mm cells); small stock stays 256 (wizard previews never pay). Constants: CARVE_MAX_CELLS_LARGE=512, CARVE_LARGE_STOCK=500.
+
+### Crisp vertical walls — a HYBRID mesh + a CRISP floor layer
+- **hc[] (crisp floor)** — a second Float32Array alongside h[] (the AA-blended). During carve, a cell snaps to the floor once the tool covers ≥ ½ of it (`c >= 0.5 → hc = min(hc, tipZ)`). So hc is a CLEAN single step (0 → −depth, no AA lip) while h[] keeps the fractional lip for the smooth mesh + depth reads. Pre-seed recesses set both.
+- **Two mesh modes**: SMOOTH (the interpolated grid, in-place-Z remeshable — used LIVE for cheap per-frame carve) and CRISP (`_buildCrispCarveMesh`: flat top TILES + TRUE vertical wall quads — doubled rim/floor verts at each cell boundary where hc steps — used for the settled END-STATE). `_rebuildCarveMesh(mode)` swaps them.
+- **Wiring**: `carveReseed` (play start) → smooth; live `_remeshCarve` → in-place Z (smooth only, guarded); `carveEndState` (static setGcode) → crisp; new `carveFinalize` (stopPlay) → settle the live carve into crisp. So during PLAYBACK you get the cheap smooth progressive carve; when it SETTLES you get crisp vertical walls.
+- Walls flat-shaded (no smeared rim normals). Placed at the cell boundary near the analytic edge (hc's ≥½ snap ≈ the true edge to within the cell; with the adaptive cap ≤~2mm). HONEST limitation: sub-cell wall nudging (the exact fractional line) is NOT done — the ≥½ snap + fine adaptive cap makes it ≤~1–2mm, a large visible win over the soft ramp. Flag if the advisor wants true sub-cell.
+
+### PERF (256² cap grid, a real cleared pocket + a −12 hole, ~19 feed segs)
+Crisp mesh: tri = **139142** (vs the smooth grid ~130050 → **+~7%**, the sparse wall quads); VERTS are 4× (tiles don't share corners) but tris barely move. Build = **18–20ms** ONE-SHOT (end-state only, deferred off the interaction path). Live playback keeps the cheap smooth in-place remesh → the degrade path unchanged. maxWall = 12 (the 12mm hole → a full 12mm vertical face).
+
+### VERIFY
+- 8 core (added: CRISP floor hc[] clean-step assert; adaptive cap 512/256) + 5 app (added: CRISP WALLS — mesh mode crisp, `_carveMaxWall` > 6 ≈ pocket depth, and a geometry scan finds vertical wall columns rim+floor sharing XY spanning the pocket depth, NOT the full stock height). All green.
+- Perf-sensitive regression set (op-params-complete, editor-sim-disc, corner-marker-independence, corner-start-datum-drag) → 12 passed (the crisp build is end-state/deferred/feed-gated → no re-regression).
+- Visual: scratchpad/crisp-walls.png — vertical-walled channels, crisp, solid look held.
+
+### t682 AMENDMENT — BALL-NOSE (user: "don't forget we also use ballnose")
+The carve modelled only the tool RADIUS (a flat plane bottom). Added a tool-TIP PROFILE.
+
+### ⚠ DECISION (flagged for the advisor): tip DERIVED from `type`, not a new `tip` field
+The dispatch said "the tool table gains tip: flat|ball". But the tool table ALREADY declares the shape: `TOOL_TYPES` (settingsPanel.js:35) includes `endmill/ballnose/vbit/chamfer/...`, and the default T3 is `type:'ballnose'`. A separate `tip` field would DUPLICATE that (two fields for one fact → drift; violates one-source, decision-sieve gate 3). So I DERIVE the profile from `type` via `carveTipForToolType(type)` (ballnose→ball; vbit/chamfer/engraver→vee reserved; else→flat). This meets every verify point (ball carve, round-trips — `type` already persists + edits via the tool dropdown, hint names the tip) with NO redundant field. If you specifically want an explicit per-tool `tip` OVERRIDE (a flat tool forced to render ball, etc.), say so and I'll add it as an override on top of the type-derived default. I judged the redundant field the wrong default and eliminated it (only-present-legitimate-options).
+
+### Implementation
+- **stockRemoval.js**: `carveTipForToolType(type)` (exported, one-source map). `_tipOffset(d, r, tip)` — height of the cutting surface above the tip at radial distance d: FLAT→0, BALL→`r − √(r²−d²)` (spherical bottom, deepest under the axis). Shaped so VEE (`d·tan θ`) slots in later — NOT built. `carveSegment(...tip='flat')` applies `cutZ = tipZ + _tipOffset(d,r,tip)` to BOTH h[] (AA) and hc[] (crisp). FLAT path is byte-identical (offset 0). `carveAll(...tip)`.
+- **gcodeViz3d.js**: `carveSeg/carveStep/carveEndState` thread `tip`.
+- **createPreviewPanel.js**: `_carveTip = carveTipForToolType(simTool().type)`; threaded to carveEndState + the live carveStep. The panel NOTE names the tip in use ("ball-nose" / "flat endmill" / "vbit (as flat)"); the tooltip updated (ball-nose now MODELLED, not approximated).
+
+### VERIFY
+- Ball SCALLOPS (core): parallel ball passes leave periodic ridges; the ridge height matches `r − √(r²−(s/2)²)` at cell precision (measured 0.353 vs 0.402 expected — within the ~0.31mm cell). FLAT byte-identical to the default carve (map ==); ball carves a demonstrably different (spherical) map. `carveTipForToolType` maps ballnose→ball, endmill/vbit→flat.
+- App: a T3 ball-nose program NAMES "ball-nose" in the note AND the carve is spherical (centre deeper than the flank). 12 core + 6 app green. Perf-sensitive set (op-params/editor-sim-disc/corner) 7 passed. Visual: scratchpad/ball-scallops.png (scalloped raster).
+
+### t682 FINAL suite status (E1.5 crisp walls + adaptive cap + ballnose)
+Full suite (--workers=4): **996 passed, 2 skipped, 2 failed**. The 2 (blocks-mobile-drawers, op-params-complete) PASS in isolation (--workers=1, 2/2) → environmental contention flakes on the active machine (op-params-complete opens ~40 wizards → times out only under full-suite load; blocks-mobile is a screenshot flake), NOT regressions. Byte-identity holds (flat carve is byte-identical; carve is viz-only). Committing.
