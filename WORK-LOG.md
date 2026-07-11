@@ -9568,3 +9568,88 @@ VERIFY (real symptom, tests/preview-sweep-702.spec.js, 6/6 green @retries=0):
 - FULL SUITE @retries=0 workers=4: **1013 passed, 2 skipped, 3 failed** — the 3 are the KNOWN chronic contention flakes (header-profile-menu, homing-declared-home, op-params-complete), each RE-RUN IN ISOLATION → GREEN (2/2, 3/3, 1/1). Unrelated to this turn (they touch neither dataOps twins nor analytics). (One transient: a stale `node_modules/.cache/playwright` gave a spurious "No tests found" on the first isolation run — cleared the cache per [[playwright-stale-cache-testuse-error]], then all three passed.)
 
 ### FILES (this turn): analytics/src/index.js, analytics/migrations/0001_ratings.sql, analytics/test/worker.test.mjs (rider) · web/blocks/dataOps/{slotData,contourData,textData}.js, tests/preview-sweep-702.spec.js (sweep)
+
+---
+
+## t704 — E2 ROTARY CARVE: DESIGN GATE (GROUND + DESIGN, NO CODE) — passed back for ruling
+
+GATE per the dispatch. Grounded via two recon passes (rotary rendering + A-axis path) + reading the carve seam (engine/stockRemoval.js) and the viz mesh builders. NO code written. Design + forks + perf below; the BIG finding first.
+
+### ⚠ HEADLINE: the carve is the LAST link of a 3-link chain — the first two DON'T EXIST
+```
+  (i)  a wrap / rotary-MILL wizard emits  G1 … A … F     ← DOES NOT EXIST (rotary is PROBE/INDEX-only)
+   └→ (ii) the ENGINE consumes A: setAxis('A','a') → pos.a → seg.a1/a2 → onPositionChange.a   ← DOES NOT EXIST
+        └→ (iii) CylindricalCarve maps (u=axis, θ=wrap, ρ=radius)   ← THE PIECE THIS DISPATCH DESIGNS
+             └→ (iv) a displaced-cylinder mesh (the render)
+```
+GROUNDED (recon, file:line):
+- **Engine DROPS A.** GcodeExecutionEngine `setAxis` reads only X/Y/Z (:1027-40) — an `A` word in G0/G1 is silently ignored; `pos={x,y,z}` (no a); traced segments are x/y/z-only (:1177-84); `onPositionChange` never emits `pos.a`. The viz's per-endpoint `a1/a2` interpolation (gcodeViz3d :685, :801-889) EXISTS but is fed 0 → **the part is pinned to angle 0 during any program playback** (only the manual A-jog spins it).
+- **No cutting op emits A.** rotaryCenter (probe), rotaryClock (probe + ONE `G0 A#58` index rapid) are the only rotary ops. The MOVE atom CAN emit `A` with mode:'cut' (ops/move.js:21) but nothing calls it that way. No wrap/rotary-mill cutting wizard exists.
+- **Carve is gated OFF for cylinder** (gcodeViz3d :1227 `if (this._carveOn && stock.shape !== 'cylinder') this._buildCarve(...)`).
+So a CylindricalCarve built today is INERT in the real app — nothing feeds it a1/a2. This is the crux of FORK 1.
+
+### (1) How rotary renders today
+- Part spins: `_applyPartRotation(a,b)` (:707) rotates `_partGroup` about the declared Cartesian axis (`rax.a||'x'` → **X default**) by `a` DEGREES. The stock/rig/carve are children → they inherit the spin + the datum/WCS placement (pg.position).
+- Round bar: `stock.shape==='cylinder'`; radius = `stock.diameter/2` (declared) else `min(cross)/2` (`barRadius`, probeGeometry.js); length = the stock dim along the axis (`stock.x` for X); centred at (X/2, Y/2, −Z/2); a CylinderGeometry rotated to lie along X. Canonical geometry `cylinderOf(stock, axis)` → {axis,u,v,cu,cv,r,lo,hi}. Rig (3-jaw chuck + tailstock) via `_rotaryRigSpec` {axis,r,L,jaws}.
+- Rotary datum: rotaryCenter writes Y0/Z0 = the bar CENTRELINE. So part-frame Z≈0 at the axis (needed for the cut-radius frame — FORK 3).
+
+### (2) THE MAP — a cylindrical heightmap `CylindricalCarve` (a 2nd impl behind the SAME CarveMap seam)
+UNWRAP the bar surface to a 2D grid; the cell value is REMAINING RADIUS (mirrors the planar h[] = remaining height):
+```
+   bar (along X), spinning about X            UNWRAPPED map ρ(u,θ)  (what CylindricalCarve holds)
+        tool ↓ (fixed, at top)                θ=2π ┌───────────────────────────┐
+     ╭───────●───────╮   ← top generatrix          │ · · · · · · · · · · · · · │  cell = REMAINING RADIUS ρ
+    ╱        ┊        ╲     = the contact line   θ  │ · · · ▓▓▓▓▓ · · · · · · · │  (start R; a cut LOWERS it;
+   │    axis ⊙ ─────────→ X (u = axis pos)          │ · · · ▓▓▓▓▓ · · · · · · · │   floor ρ=0 = cut to centre)
+    ╲                 ╱                          θ=0 └───────────────────────────┘
+     ╰───────────────╯                               u=0 ····· axis position u ····· u=L
+```
+- **Grid:** `u ∈ [0,L]` (axial) × `θ ∈ [0,2π)` (wrap). Two Float32Array like planar: `rho[]` (smooth, AA) + `rhoc[]` (crisp radius, for the wall mesh). Same method surface as HeightmapCarve: `reseed / carveSegment / carveAll / heightAt / isPristine`.
+- **CONTACT MODEL (top generatrix) + the map from a linear XYZ+A segment.** The tool is fixed above; the bar spins by A. The tool tip at part-Z `z_tip` cuts the surface point CURRENTLY at the top → that material point's wrap-angle is `θ = θ₀ − A` (A from the segment; θ₀ = the material angle at top when A=0). So **the segment's `a` value directly indexes the angular cell** — no inference. Per swept sub-step (sub-sample the segment as the planar carve does):
+    - axial cell:  `u = x`   (tool X = position along the bar axis)
+    - angular cell: `θ = θ₀ − a`   (a interpolated along the segment: a1→a2)
+    - cut radius:  `ρ_cut = |axis − tip|` in the Y–Z cross-section = `|Z_c − z_tip|` for a centreline tool
+    - lower `rho(u,θ) → ρ_cut` over the tool FOOTPRINT: `Δu = ±r` (axial), `Δθ = ±r/ρ` (tangential ARC = tool-radius/current-radius).
+  Tool tip PROFILE reused RADIALLY: `_tipOffset(d,r,tip)` added to ρ_cut (flat=0, ball=spherical) — scallops between angular/axial passes emerge as they do planar.
+- **Honest approximations (state them):**
+    (a) point/short-arc contact at the top generatrix — a real endmill contacts a curved arc ±r/R rad; v1 spreads the cut over Δθ=r/ρ, exact enough for tip-depth.
+    (b) CENTRELINE tool only (tool in the Y=Y_c plane) — a Y-offset tool really contacts at θ=A+asin(y/ρ) and a shallower radius; v1 IGNORES Y-offset. NAMED degrade.
+    (c) RADIAL tip-penetration only — the tip's distance-to-axis is the cut; side-milling the cylinder wall (flute-side engagement) is NOT modelled. NAMED.
+
+### (3) THE MESH — a displaced cylinder (mirror of the planar displaced grid)
+- Vert at (u_i, θ_j) = axis point + `rho·(radial dir)`: `(x=u_i, y=Y_c+ρ·cosθ_j, z=Z_c+ρ·sinθ_j)`. Smooth mesh (live, in-place radial-remesh) + crisp mesh (settled).
+- **The ONE structural difference vs planar: θ WRAPS (periodic).** The grid closes the seam — connect `j=nθ−1` back to `j=0` (planar leaves its edges open). End-caps = discs at u=0 / u=L (the bar ends), the "skirt/bottom" analog; a through-cut (ρ→0) collapses to the axis.
+- **Crisp rim/floor doubling works the SAME, just RADIAL:** a crisp step in ρ between neighbour cells → a radial wall quad (doubled verts at the cell boundary, ρ_a→ρ_b), exactly the planar `_buildCrispCarveMesh` treatment rotated into (u,θ,ρ). The "floor" is the axis for a through-cut.
+
+### (4) WHERE IT PLUGS — the same CarveMap seam
+- `_buildCarve(stock)`: pick `new CylindricalCarve(stock)` + the cylinder mesh builders WHEN `stock.shape==='cylinder'` && a rotary axis is declared; else the planar `HeightmapCarve`. Open the `:1227` gate (today it EXCLUDES cylinder).
+- `CylindricalCarve` mirrors HeightmapCarve's method surface, so `carveStep / carveSeg / carveEndState / carveReseed / _remeshCarve` are unchanged EXCEPT they pass `a` through: `carveSeg` reads `seg.a1/a2`; `carveStep` reads `pos.a`. ← requires link (ii) (engine A). Tool tips (flat/ball) apply radially (reused `_tipOffset`).
+
+### (5) SCOPE — what v1 does NOT model (name the degrades)
+- Side-milling the cylinder WALL (only radial tip-penetration).
+- Non-centreline (Y-offset) tools (contact assumed on the centreline/top generatrix).
+- B-axis / 5-axis (A only).
+- Vee/tapered tools radially (flat/ball only, mirrors planar's reserved 'vee').
+- BOX stock with A-indexing (indexed prism) — v1 is round-bar-only; box+A stays planar (ignores A).
+- **AND the prerequisites**: no engine A-consumption + no G1+A cutting wizard → the carve is inert without links (i)+(ii).
+
+### FORKS (for the ruling)
+**FORK 1 — E2 SCOPE this cycle (THE ruling). The carve is dormant without links (i)+(ii):**
+- **A) Carve+seam only, dormant** — build CylindricalCarve + cylinder mesh + open the gate; test with SYNTHETIC a1/a2 segments. Proves the seam extensible + keeps the E0/E1 promise, but does NOTHING in the real app (no A cutting input). ~E1 planar-carve sized.
+- **B) + engine A-consumption** — also teach the engine setAxis('A','a')→pos.a→seg.a1/a2→onPositionChange.a. Lights up the EXISTING viz a1/a2 spin plumbing (the part visibly rotates during ANY A program) AND feeds the carve. Touches MOTION semantics (regression surface — verify every existing x/y/z program is byte-identical with a=0). Still no cutting wizard.
+- **C) full vertical slice** — A-consumption + a minimal wrap/rotary-MILL cutting wizard (emits G1+A) + the carve. End-to-end, but the cutting wizard is its own design (a real feature).
+- **D) DEFER (record this design)** — the CarveMap seam is ALREADY proven extensible (stockRemoval.js header declares it; this design confirms the map/mesh/plug fit cleanly). Building a dormant carve now is speculative MACHINERY (CLAUDE.md #2 — "an engine for an unused case"). Record the design; build when a rotary-mill wizard is real.
+- **RECOMMEND (decision sieve): D, escalating to C when a rotary-mill wizard is scheduled.** Rationale: the DESIGN is a cheap declaration (record it — done, this doc); the CODE (A/B) is an engine with no consumer, exactly the speculative machinery #2 rejects. If the advisor already has a rotary-mill wizard planned, go C (carve LAST, after A-consumption + the wizard). A/B build a dormant engine — only worth it if the advisor explicitly wants the seam PROVEN by synthetic-segment tests now (legitimate but speculative). The advisor rules — they may know a rotary-mill wizard is imminent.
+
+**FORK 2 — angular resolution:** fixed nθ (e.g. 256) vs ARC-length-clamped (nθ so arc 2πR/nθ ≥ CARVE_MIN_CELL 0.2mm, capped 256/512). RECOMMEND arc-clamped (consistent with the planar min-cell ruling; a small-Ø bar uses fewer angular cells).
+
+**FORK 3 — the cut-radius frame:** ρ_cut = |bar-axis − tip| in the Y–Z cross-section. Depends on the rotary DATUM (rotaryCenter writes Z0 at the CENTRELINE → part-Z≈0 at the axis → ρ_cut≈|z_tip|). RECOMMEND: read the declared rotary centreline (Y_c,Z_c) from cylinderOf/the datum, not a hardcode.
+
+**FORK 4 — activation gate:** cylinder + rotary-axis-declared (round-bar-only v1); box+A is a later case. RECOMMEND round-bar-only.
+
+### PERF BUDGET (no new risk vs planar)
+- Grid `nu × nθ`, same 256/512 adaptive cap; axial min-cell 0.2mm; angular ARC min 0.2mm (FORK 2). e.g. R=25mm → 2π·25/0.2≈785 → capped 256 (1.4°, arc 0.6mm); R=5mm → 157 cells.
+- Verts `nu·nθ` (same order as planar nx·ny ≤ 256²≈65k); triangle budget same; wrap-seam closing adds `nu` quads (negligible).
+- Live remesh: SAME 45ms batch throttle + 8ms→end-state degrade; radial-vert update = same cost as the planar Z-update. Memory = 2×Float32Array(nu·nθ) = planar's h+hc order.
+
+### VERIFY (this turn) — a design gate: no runtime change. Grounding is code-cited (file:line above); NO files touched, suite untouched.
