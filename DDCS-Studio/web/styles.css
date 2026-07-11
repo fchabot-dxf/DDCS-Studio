@@ -4220,6 +4220,15 @@ svg [id$="_wcs"] { display: none; }
     z-index: 100;
 }
 .viz3d-hint { display: none; } /* was a long central line that overlapped the legend + controls */
+/* Material-removal honest note (t680) — a small caption owning up to the flat-endmill / Ø6 approximation.
+   Bottom-centre so it clears the status bar (top-left), legend, jog pendant (bottom-left) and controls (bottom-right). */
+.pp-carve-note {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    font-family: monospace; font-size: 10px; color: #cbb98a;
+    background: rgba(0, 0, 0, 0.5); padding: 2px 8px; border-radius: 3px;
+    z-index: 4; white-space: nowrap; pointer-events: none; max-width: calc(100% - 120px);
+    overflow: hidden; text-overflow: ellipsis;
+}
 .viz3d-controls {
     position: absolute; bottom: 6px; right: 8px; z-index: 6;
     display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end;

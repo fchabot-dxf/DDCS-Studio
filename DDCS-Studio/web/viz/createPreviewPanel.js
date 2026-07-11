@@ -109,6 +109,7 @@ const PANEL_HTML = `
     <table class="pp-dro-tbl"><thead><tr><th></th><th>Work</th><th>Mach</th></tr></thead><tbody></tbody></table>
   </div>
   <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan</div>
+  <div class="pp-carve-note" style="display:none" title="Material-removal preview (v1): every tool is approximated as a FLAT endmill (ball / vee shown flat); an unset tool carves at Ø6."></div>
 `;
 
 // SLICE 2 (WCS VISIBLE): classify an executing line as a WCS call or a spindle/start call, from the RAW text only
@@ -202,6 +203,40 @@ export function createPreviewPanel(container, opts = {}) {
     let lastPass = 0;        // the live tool's current pass index (from onPositionChange) — the pulse rides the SAME per-pass anchored frame as the head
     let lastRunCode = null, loopOn = false, loopTimer = null, autoStarted = false, liveTimer = null;
     let lastAbsolute = false;   // t580 PREVIEW-PARITY E1 — the last trace's absolute-ness (mill G90/G53), so play() picks the SAME mill part-Z work origin the drawn route did (simConfig)
+    // t680 — MATERIAL REMOVAL (E1): the static END-STATE (on setGcode) + the LIVE progressive carve (during play), throttled
+    // with an honest degrade (F). ON by default; a preview.carve=false toggle turns it off. Per-panel (G) — the viz owns the map.
+    const carveEnabled = () => previewPrefs().carve !== false;
+    let _carveTR = 3, _carvePrev = null, _carveDirty = false, _carveLastRemesh = 0, _carveHeavySince = 0, _carveDegraded = false, _carveSegs = [], _carveRaf = 0;
+    // The END-STATE carve (build the grid mesh + carve every segment + re-mesh) is DEFERRED to the next frame so it never
+    // blocks setGcode / a drag / a wizard open. A panel that closes before the frame (a transient wizard, e.g. the params
+    // sweep opening 40 wizards in a tight loop) cancels it via setActive(false) → the carve costs nothing there. The LIVE
+    // per-frame carve during play is separate (onPositionChange, already rAF-throttled).
+    function scheduleEndStateCarve(v, hasCut) {
+        if (_carveRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(_carveRaf);
+        _carveRaf = 0;
+        // No cuts (probe / rapid-only) or carve off → show the plain stock box, build NOTHING (setCarve(false) no-ops if it
+        // was never on). This is the big win: probe wizards (corner/alignment/middle) never pay the carve-mesh cost.
+        if (!carveEnabled() || !hasCut) { if (v.setCarve) v.setCarve(false); return; }
+        const run = () => {
+            _carveRaf = 0;
+            if (!active || !v.setCarve) return;   // deactivated/closed before the frame → skip
+            v.setCarve(true);
+            if (!(engine && engine.running)) v.carveEndState(_carveSegs, _carveTR);
+        };
+        _carveRaf = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame(run) : (run(), 0);
+    }
+    function carveRemeshThrottled() {
+        if (!_carveDirty || !viz || !viz._remeshCarve) return;
+        const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+        if (now - _carveLastRemesh < 45) return;   // carve EVERY tick; re-mesh batched (~22fps) — the ruling's rAF throttle
+        _carveLastRemesh = now; _carveDirty = false;
+        const cost = viz._remeshCarve();
+        // DEGRADE (F): re-mesh cost > 8ms sustained ~1s → stop the live re-mesh and JUMP to the full end-state (a manual toggle overrides)
+        if (cost > 8) { if (!_carveHeavySince) _carveHeavySince = now; else if (!_carveDegraded && now - _carveHeavySince > 1000) {
+            _carveDegraded = true; setStatus('Live carve paused (heavy program) — showing the end-state');
+            if (viz.carveEndState) viz.carveEndState(_carveSegs, _carveTR);   // fall back to end-state-only NOW, not a frozen partial
+        } } else _carveHeavySince = 0;
+    }
 
     // DRO — a dual numeric readout mirroring the DDCS controller: Work (the tool's program position) + Mach. Work comes
     // straight from onPositionChange; Mach = Work + the ACTIVE WCS offset. `activeWcsOffset()` is the SINGLE swap-point:
@@ -378,7 +413,9 @@ export function createPreviewPanel(container, opts = {}) {
                     if (c) { const r = engine.vars.get(6); if (Number.isFinite(r)) viz.nudgeSurface(c.axis, r * c.sign); }
                 }
             },
-            onPositionChange: (pos) => { lastPass = pos.pass || 0; if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } if (toolPosSubs.length) { const k = segs.length ? nearest2d(pos) : 0; for (const cb of toolPosSubs) cb(pos, k); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
+            onPositionChange: (pos) => { lastPass = pos.pass || 0; if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } if (toolPosSubs.length) { const k = segs.length ? nearest2d(pos) : 0; for (const cb of toolPosSubs) cb(pos, k); }
+                // t680 — LIVE progressive carve: remove material along the swept sub-step (feed class handled inside carveStep), re-mesh throttled.
+                if (viz && viz.carveStep && carveEnabled() && !_carveDegraded) { if (_carvePrev) viz.carveStep(_carvePrev, pos, _carveTR); _carvePrev = pos; if (viz.carveDirty && viz.carveDirty()) _carveDirty = true; carveRemeshThrottled(); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
             onStatus: ({ message }) => setStatus(message),
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
@@ -423,7 +460,7 @@ export function createPreviewPanel(container, opts = {}) {
             if (t) return withProbe({ type: t.type || 'endmill', dia: Number(t.dia) || 6, length: Number(t.length) || undefined });
         }
         if ((parsed && parsed.stats && parsed.stats.probe) > 0) return withProbe({ type: 'probe', dia: 6 });
-        return { type: 'endmill', dia: 6 };
+        return { type: 'endmill', dia: 6, _default: true };   // no host tool / no T# / not a probe → the honest 6mm default (E); flagged so the carve note can own up to the assumption
     }
     // THE one declared source of the per-pass starts (inc2): the precedence userStarts > pass-0 start > registry hint
     // (getStartHints) > prev. Pure (reads the closures); BOTH feeds — the trace and the engine — call it so they never
@@ -583,6 +620,21 @@ export function createPreviewPanel(container, opts = {}) {
                 if (v.setSimTool) v.setSimTool(simTool(code, parsed));   // per-op tool from the tool table (see simTool)
                 if (v.setSimMode) v.setSimMode(((parsed.stats && parsed.stats.probe) > 0) ? 'probe' : 'mill');   // probe = translucent stock, mill = solid
                 if (startSeated() && v.setToolPosition) v.setToolPosition(getStartPos() || { x: 0, y: 0, z: 0 });   // t540 homing / t570 alignment — seat the PRE-PLAY tool at the draggable Start, coherent with the Start-anchored route (play() re-seats it too)
+                // t680 — MATERIAL REMOVAL: (un)swap the box for the displaced grid, and when NOT playing show the instant END-STATE
+                // (carve every segment once). During play the live progressive carve drives it instead. Tool Ø from simTool (E).
+                if (v.setCarve) {
+                    const tl = simTool(code, parsed); _carveTR = (Number(tl && tl.dia) || 6) / 2;
+                    _carveSegs = (parsed && parsed.segments) || [];   // remembered for the LIVE→end-state degrade jump (F)
+                    const hasCut = !!(parsed.stats && parsed.stats.feed > 0);   // material removal only for CUTTING programs; probe/rapid → the plain box
+                    scheduleEndStateCarve(v, hasCut);   // DEFERRED (perf): never block setGcode; a transient/probe wizard costs ~nothing
+                    // honest note (rulings B/E): own up to the flat-endmill approximation, and to the Ø6 assumption when no tool is set
+                    const note = q('.pp-carve-note');
+                    if (note) {
+                        const show = carveEnabled() && !!(parsed.stats && parsed.stats.feed > 0);   // only when there's material to remove
+                        note.textContent = show ? (tl && tl._default ? 'Material view · flat-endmill approx · assuming Ø6 (no tool set)' : 'Material view · flat-endmill approx') : '';
+                        note.style.display = show ? '' : 'none';
+                    }
+                }
             }
         }
         const s = parsed.stats || {};
@@ -686,6 +738,8 @@ export function createPreviewPanel(container, opts = {}) {
         // engine's first onPositionChange (a seek-to-home is a no-move → wouldn't fire it, leaving the tool at the shifted
         // build spot). The engine then drives it from here.
         if (viz && startSeated() && viz.setToolPosition) viz.setToolPosition(getStartPos() || { x: 0, y: 0, z: 0 });
+        // t680 — the LIVE progressive carve starts from PRISTINE stock (recesses seeded) and removes material as the tool moves.
+        if (viz && viz.carveReseed && carveEnabled() && !_carveDegraded) { viz.carveReseed(); _carvePrev = null; _carveDirty = false; }
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
         updateRunBtn();
@@ -698,6 +752,8 @@ export function createPreviewPanel(container, opts = {}) {
         if (viz) viz.setAnimate(false);
         if (typeof opts.onLine === 'function') opts.onLine(null);
         for (const cb of toolPosSubs) cb(null, 0);   // t309 — tell the Layout overlay the sim stopped (clears its red head, redraws the static path)
+        // t680 — the run finished/stopped: a final re-mesh so the END-STATE shows even if the last throttle tick was skipped (or degraded)
+        if (viz && viz._remeshCarve && carveEnabled() && viz.carveDirty && viz.carveDirty()) viz._remeshCarve();
         updateRunBtn();
     }
     // #18: dragging/declaring the start re-runs the sim animation from the NEW start (not just the static re-trace), so
@@ -778,7 +834,7 @@ export function createPreviewPanel(container, opts = {}) {
 
     function setActive(on) {
         active = !!on;
-        if (!active) { stopPlay(); autoStarted = false; if (viz) viz.setActive(false); if (deviceIoListener) { window.removeEventListener('io_change', deviceIoListener); deviceIoListener = null; } if (limitIoListener) { window.removeEventListener('io_change', limitIoListener); limitIoListener = null; } return; }   // t181/H4 tidy: drop the ATC + limit-switch io_change listeners when the preview deactivates (re-armed via setAtcSwap / setLimitSwitches on next update)
+        if (!active) { if (_carveRaf && typeof cancelAnimationFrame === 'function') { cancelAnimationFrame(_carveRaf); _carveRaf = 0; } stopPlay(); autoStarted = false; if (viz) viz.setActive(false); if (deviceIoListener) { window.removeEventListener('io_change', deviceIoListener); deviceIoListener = null; } if (limitIoListener) { window.removeEventListener('io_change', limitIoListener); limitIoListener = null; } return; }   // t181/H4 tidy: drop the ATC + limit-switch io_change listeners when the preview deactivates (re-armed via setAtcSwap / setLimitSwitches on next update)
         if (mode === '3d') { const v = ensureViz(); if (v) v.setActive(true); }
         else if (mode === '2d' && cv2d) cv2d.style.display = '';   // 2D default: ensure the canvas is visible
         setGcode();

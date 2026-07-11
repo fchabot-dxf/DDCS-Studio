@@ -19,6 +19,7 @@ import { getRotaryAxes } from '../ui/settingsPanel.js';
 import { stockProbeStop, barRadius } from '../engine/probeGeometry.js';
 import { switchTypeOf } from '../engine/switchTypes.js';   // t512 — the DECLARED switch-type render glyph ('sensor-face' vs 'plunger'), so optical/hall draw non-contact (not the hardcoded 'proximity' string)
 import { projectWorkpiece } from '../engine/workpiece.js';   // render declared features[] at their PHYSICAL pos on the datum-placed stock (Face 2; byte-identical to the legacy 25% inset for a derived pocket)
+import { HeightmapCarve } from '../engine/stockRemoval.js';   // t680 — MATERIAL REMOVAL E1: the heightmap carve map (behind a CarveMap seam)
 import { passAnchorFor } from '../engine/passAnchor.js';   // t94/t107 — an AUTO reposition pass's ROUTE (+ its probe-collision Aw/Bw) draws from the RUNTIME END of the previous pass (t107 machine-faithful, via _passEnds), else the static previous START (t94), not its own net-endpoint marker
 import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the Layout ALSO reads, so the 3D ruby + the Layout handle can't diverge
 import { PATH_TYPES, PATH_STATE, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend (t331 — FEED_LOW/HIGH gradient removed)
@@ -1216,6 +1217,10 @@ export class GcodeViz3D {
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
             this.stockEdges = edges; pg.add(edges);
+            // t680 — MATERIAL REMOVAL: when carving is ON (a box/pocket stock, not a rotary cylinder), the DISPLACED
+            // HEIGHTMAP GRID replaces the translucent box (the recesses are subsumed by the pre-seed). Built here as a
+            // child of pg so it inherits the same datum / WCS / rotary placement as the box.
+            if (this._carveOn && stock.shape !== 'cylinder') this._buildCarve(stock, cavities);
             // The table the stock rests on is the GRID floor (a fixed machine-frame surface — see _layoutGrid), not a
             // per-stock bed. So nothing extra to draw here.
         }
@@ -1226,6 +1231,103 @@ export class GcodeViz3D {
         // AFTER the A-jog re-apply → inherits the spin + the datum/WCS placement). Only when the rig is on (setStock's no-render
         // contract for the stock modal — _showRotaryFixture is false there — stays intact).
         if (this._showRotaryFixture) this.setRotaryRig(this._rotaryRigSpec());
+    }
+
+    // ── t680 — MATERIAL REMOVAL (E1). The heightmap carve: a displaced grid + skirt replaces the box, live + end-state. ──
+    setCarve(on) { on = !!on; if (on === !!this._carveOn) return; this._carveOn = on; if (!on) this._disposeCarve(); if (this._stock) this.setStock(this._stock); }   // rebuild → (un)swaps the box for the grid
+
+    _disposeCarve() {
+        if (this._carveMesh) { this._partGroup && this._partGroup.remove(this._carveMesh); this._carveMesh.geometry.dispose(); this._carveMesh.material.dispose(); this._carveMesh = null; }
+        this._carve = null; this._carveSkirtTop = null; this._carveNtop = 0;
+    }
+
+    /** Seed the carve map from the stock + its DECLARED recesses, build the displaced grid+skirt, and HIDE the box. */
+    _buildCarve(stock, cavities) {
+        const THREE = this.THREE;
+        this._disposeCarve();
+        const feats = (() => { try { return projectWorkpiece(stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
+        const c = this._carve = new HeightmapCarve(stock, feats);
+        // hide the translucent box + edges — the grid IS the stock now
+        if (this.stockMesh) this.stockMesh.visible = false;
+        if (this.stockEdges) this.stockEdges.visible = false;
+        this._carveMesh = this._buildCarveMesh(c, (cavities && cavities.length) ? 0x6a8fbe : 0x8fae6a);
+        if (this._carveMesh) this._partGroup.add(this._carveMesh);
+    }
+
+    /** Build the grid geometry (top surface + skirt walls + bottom) in pg-local (centred like the box). */
+    _buildCarveMesh(c, color) {
+        const THREE = this.THREE;
+        const nx = c.nx, ny = c.ny, dx = c.dx, dy = c.dy, X = c.X, Y = c.Y, Z = c.Z, ox = -X / 2, oy = -Y / 2, topZ = Z / 2, botZ = -Z / 2;
+        const zAt = (k) => c.h[k] + topZ;
+        const verts = [], idx = [], skirtTop = [];
+        for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) verts.push(i * dx + ox, j * dy + oy, zAt(c.idx(i, j)));
+        for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) { const a = j * nx + i, b = a + 1, d = a + nx, e = d + 1; idx.push(a, d, b, b, d, e); }
+        const wall = (cells, flip) => { for (let t = 0; t < cells.length - 1; t++) {
+            const c0 = cells[t], c1 = cells[t + 1], k0 = c.idx(c0.i, c0.j), k1 = c.idx(c1.i, c1.j);
+            const x0 = c0.i * dx + ox, y0 = c0.j * dy + oy, x1 = c1.i * dx + ox, y1 = c1.j * dy + oy, base = verts.length / 3;
+            verts.push(x0, y0, zAt(k0), x1, y1, zAt(k1), x0, y0, botZ, x1, y1, botZ);
+            skirtTop.push({ vi: base, k: k0 }, { vi: base + 1, k: k1 });
+            if (flip) idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2); else idx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+        } };
+        const bot = [], top = [], left = [], right = [];
+        for (let i = 0; i < nx; i++) { bot.push({ i, j: 0 }); top.push({ i, j: ny - 1 }); }
+        for (let j = 0; j < ny; j++) { left.push({ i: 0, j }); right.push({ i: nx - 1, j }); }
+        wall(bot, true); wall(top, false); wall(left, false); wall(right, true);
+        const bb = verts.length / 3; verts.push(ox, oy, botZ, X + ox, oy, botZ, ox, Y + oy, botZ, X + ox, Y + oy, botZ);
+        idx.push(bb, bb + 2, bb + 1, bb + 1, bb + 2, bb + 3);
+        const g = new THREE.BufferGeometry();
+        g.setIndex(idx);
+        g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+        g.computeVertexNormals();
+        this._carveSkirtTop = skirtTop; this._carveNtop = nx * ny;
+        const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.85, depthWrite: true, side: THREE.DoubleSide });   // (C) denser, not a brick
+        return new THREE.Mesh(g, mat);
+    }
+
+    /** Map a G-code/part-frame point to STOCK-LOCAL (top=0): part-zero sits at the datum point of the stock. */
+    _toStockLocal(x, y, z) { const D = this._datumFrac(this._stock || {}), Z = (this._carve && this._carve.Z) || 0; return { x: (x || 0) + D[0], y: (y || 0) + D[1], z: (z || 0) + (D[2] - Z) }; }
+
+    /** Carve one G-code/part-frame segment (live or end-state). toolR = tool radius mm. Marks the grid dirty. */
+    carveSeg(seg, toolR) {
+        if (!this._carve || !seg) return;
+        const cls = seg.type || (seg.probe ? 'probe' : seg.rapid ? 'rapid' : 'feed');
+        this._carve.carveSegment(this._toStockLocal(seg.x1, seg.y1, seg.z1), this._toStockLocal(seg.x2, seg.y2, seg.z2), toolR, cls);
+    }
+
+    /** Carve a per-frame swept sub-step from the live engine (prev→pos, G-code/part coords), cut class only. */
+    carveStep(prev, pos, toolR) { if (!this._carve || !prev || !pos) return; this._carve.carveSegment(this._toStockLocal(prev.x, prev.y, prev.z), this._toStockLocal(pos.x, pos.y, pos.z), toolR, 'feed'); }
+
+    /** Reseed the carve to PRISTINE (full stock + declared recesses) + re-mesh — the live progressive carve starts here. */
+    carveReseed() {
+        if (!this._carve || !this._stock) return;
+        const feats = (() => { try { return projectWorkpiece(this._stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
+        this._carve.reseed(this._stock, feats);
+        this._remeshCarve();
+    }
+    carveDirty() { return !!(this._carve && this._carve.dirty); }
+
+    /** Instant END-STATE: reseed + carve ALL segments once + one re-mesh (no rAF). segs = parsed.segments. */
+    carveEndState(segs, toolR) {
+        if (!this._carve || !this._stock) return;
+        const feats = (() => { try { return projectWorkpiece(this._stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
+        this._carve.reseed(this._stock, feats);
+        for (const s of (segs || [])) this.carveSeg(s, toolR);
+        this._remeshCarve();
+    }
+
+    /** Update the grid mesh Z in-place from the carve heights (throttled by the caller). Returns the ms cost (degrade watch). */
+    _remeshCarve() {
+        const c = this._carve, mesh = this._carveMesh; if (!c || !mesh) return 0;
+        const now = (typeof performance !== 'undefined' && performance.now) ? () => performance.now() : () => 0;
+        const t0 = now();
+        const pos = mesh.geometry.attributes.position, topZ = c.Z / 2;
+        for (let k = 0; k < this._carveNtop; k++) pos.setZ(k, c.h[k] + topZ);
+        for (const st of (this._carveSkirtTop || [])) pos.setZ(st.vi, c.h[st.k] + topZ);
+        pos.needsUpdate = true;
+        mesh.geometry.computeVertexNormals();
+        c.dirty = false;
+        this.render();
+        return now() - t0;
     }
 
     /** Build ONE clean MANIFOLD surface for a stock with declared pocket cuts (the Fusion extrusion-cut model): the boundary
