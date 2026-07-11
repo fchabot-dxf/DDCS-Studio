@@ -40,6 +40,7 @@
 import { drillStack, patternPoints } from '../../wizards/drillWizard.js';
 import { pointsBBox } from '../../wizards/ops/placement.js';   // t718 — the hole-CENTRES bbox for the placement-parity shift
 import { userOpFromStack } from '../userOps.js';
+import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, DRILL_PATTERN_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options (were undeclared → empty dropdowns)
 
 /** The author defaults — match drillStack's own num() fallbacks so the seeded template == the true default stack. */
 export const DRILL_DEFAULTS = {
@@ -58,11 +59,11 @@ export const DRILL_DEFAULTS = {
 //  snapshot on block 2 is NO LONGER a frontier — the place fold recomputes it LIVE from the array's params, so
 //  placement is fully bindable now; only the 4 bbox-snapshot keys (bminX..) stay vestigial/ignored.)
 const DRILL_EXEC_BINDINGS = [
-    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: DRILL_DEFAULTS.wcs },
+    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: DRILL_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS } },
     // placement scalars (block 2, placeonstock) — now correct because the bbox tracks the pattern live (array.extent)
-    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: DRILL_DEFAULTS.stockAttach },
-    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: DRILL_DEFAULTS.pathDatum },
-    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: DRILL_DEFAULTS.stockDatum },
+    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: DRILL_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: DRILL_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: DRILL_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
     { param: 'stockW', blockIndex: 2, key: 'stockW', type: 'number', default: DRILL_DEFAULTS.stockW },
     { param: 'stockH', blockIndex: 2, key: 'stockH', type: 'number', default: DRILL_DEFAULTS.stockH },
     { param: 'stockZ', blockIndex: 2, key: 'stockZ', type: 'number', default: DRILL_DEFAULTS.stockZ },
@@ -70,7 +71,7 @@ const DRILL_EXEC_BINDINGS = [
     { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: DRILL_DEFAULTS.originY },
     { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: DRILL_DEFAULTS.offZ },
     // pattern + geometry (block 3, the `array` container — patternPoints reads these scalars at emit)
-    { param: 'pattern', blockIndex: 3, key: 'pattern', type: 'enum', default: DRILL_DEFAULTS.pattern },
+    { param: 'pattern', blockIndex: 3, key: 'pattern', type: 'enum', default: DRILL_DEFAULTS.pattern, widget: 'dropdown', widgetConfig: { options: DRILL_PATTERN_OPTIONS } },
     { param: 'x0', blockIndex: 3, key: 'x0', type: 'number', default: DRILL_DEFAULTS.x0 },
     { param: 'y0', blockIndex: 3, key: 'y0', type: 'number', default: DRILL_DEFAULTS.y0 },
     { param: 'cols', blockIndex: 3, key: 'cols', type: 'number', default: DRILL_DEFAULTS.cols },

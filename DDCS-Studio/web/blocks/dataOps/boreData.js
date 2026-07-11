@@ -17,6 +17,7 @@
 import { drillStack } from '../../wizards/drillWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { drillPatternGeometry } from './drillData.js';   // t716 — the SHARED drill/bore pattern previewGeometry (bore adds the Ø handle)
+import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, DRILL_PATTERN_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options
 
 /** Author defaults — match drillStack's num() fallbacks so the seeded template == the true default stack. method='helical'
  *  → drillStack builds the `bore` leaf. The pattern/placement half is identical to DRILL_DEFAULTS. */
@@ -29,7 +30,6 @@ export const BORE_DEFAULTS = {
 };
 
 const RAMP_OPTIONS = [['Ring-step (G3 circle)', 'step'], ['Helix (linearized)', 'helix']];
-const WCS_OPTIONS = [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']];
 
 // Flatten (pre-order) of drillStack's [progstart, wcs, placeonstock{array{bore}}, progend]:
 //   0 progstart · 1 wcs · 2 placeonstock · 3 array · 4 bore · 5 progend
@@ -38,9 +38,9 @@ const WCS_OPTIONS = [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56
 const BORE_EXEC_BINDINGS = [
     { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: BORE_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS } },
     // placement scalars (block 2, placeonstock)
-    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: BORE_DEFAULTS.stockAttach },
-    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: BORE_DEFAULTS.pathDatum },
-    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: BORE_DEFAULTS.stockDatum },
+    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: BORE_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: BORE_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: BORE_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
     { param: 'stockW', blockIndex: 2, key: 'stockW', type: 'number', default: BORE_DEFAULTS.stockW },
     { param: 'stockH', blockIndex: 2, key: 'stockH', type: 'number', default: BORE_DEFAULTS.stockH },
     { param: 'stockZ', blockIndex: 2, key: 'stockZ', type: 'number', default: BORE_DEFAULTS.stockZ },
@@ -48,7 +48,7 @@ const BORE_EXEC_BINDINGS = [
     { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: BORE_DEFAULTS.originY },
     { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: BORE_DEFAULTS.offZ },
     // pattern + geometry (block 3, the `array` container — patternPoints reads these scalars at emit)
-    { param: 'pattern', blockIndex: 3, key: 'pattern', type: 'enum', default: BORE_DEFAULTS.pattern },
+    { param: 'pattern', blockIndex: 3, key: 'pattern', type: 'enum', default: BORE_DEFAULTS.pattern, widget: 'dropdown', widgetConfig: { options: DRILL_PATTERN_OPTIONS } },
     { param: 'x0', blockIndex: 3, key: 'x0', type: 'number', default: BORE_DEFAULTS.x0 },
     { param: 'y0', blockIndex: 3, key: 'y0', type: 'number', default: BORE_DEFAULTS.y0 },
     { param: 'cols', blockIndex: 3, key: 'cols', type: 'number', default: BORE_DEFAULTS.cols },

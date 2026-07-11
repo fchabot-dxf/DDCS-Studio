@@ -130,10 +130,23 @@ function sliderWidget(host, b) {
 
 function dropdownWidget(host, b) {
     host.style.cssText = ROW_CSS;
+    const options = (b.widgetConfig && b.widgetConfig.options) || [];
+    // t720 P1 (b) — a dropdown with ZERO options is a DECLARATION BUG (a missing widgetConfig.options), NOT a valid empty
+    // state. Render a LOUD read-only fallback (flagged red, shows the value) + a dev-mode console error — never a silent
+    // empty select that looks like a working control. The form-integrity spec (P3) + the fixed sources keep this dormant.
+    if (options.length === 0) {
+        if (typeof console !== 'undefined' && console.error) console.error(`formWidgets: enum "${b.param}" has no options (widgetConfig.options missing) — read-only fallback`);
+        const ro = document.createElement('input');
+        ro.type = 'text'; ro.readOnly = true; ro.value = String(b.default ?? '');
+        ro.dataset.param = b.param; ro.title = `⚠ ${b.param}: no options declared`;
+        ro.style.cssText = CTRL_CSS + ' min-width:120px; opacity:0.65; border-color:#c0392b;';
+        host.append(labelSpan(b), ro);
+        return { read: () => ({ [b.param]: b.default }) };
+    }
     const sel = document.createElement('select');
     sel.style.cssText = CTRL_CSS + ' min-width:120px;';
     sel.dataset.param = b.param;   // t112 — targetable by [data-param] (parity with numeric fields) so a canvas picker (corner-selector) can set it + dispatch change
-    for (const o of ((b.widgetConfig && b.widgetConfig.options) || [])) {
+    for (const o of options) {
         const val = Array.isArray(o) ? o[1] : o, lab = Array.isArray(o) ? o[0] : o;
         const op = document.createElement('option');
         op.value = String(val); op.textContent = String(lab);

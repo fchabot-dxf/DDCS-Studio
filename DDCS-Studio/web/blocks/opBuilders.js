@@ -54,6 +54,9 @@ export function builderOf(opType) { return BUILDERS[opType] || USER_BUILDERS[opT
 
 /** Install a USER op's builder into the user layer (the wizard-maker calls this — see blocks/userOps.js). */
 export function registerUserBuilder(opType, fn) { USER_BUILDERS[opType] = fn; }
+/** t720 P1 (e) — enumerate the registered user-layer op types (the built-in data-op twins + any authored ops), so the
+ *  form-integrity guard can sweep EVERY twin dynamically (a new twin is covered the moment it registers). */
+export function userBuilderTypes() { return Object.keys(USER_BUILDERS); }
 /** Remove a USER op's builder from the user layer. */
 export function unregisterUserBuilder(opType) { delete USER_BUILDERS[opType]; }
 

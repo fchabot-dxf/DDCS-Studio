@@ -99,6 +99,20 @@ export function placementSpec(params, bbox, prefix) {
     };
 }
 
+/** t720 P1 (d) — RESOLVE a twin op's placement stock from the SETTINGS stock. The built-in views always inject the stock
+ *  dims via placementParams (they have no stock fields); a data-op twin BINDS stockW/stockH/stockZ as params that DEFAULT
+ *  0, so with a non-default stockAttach the emit computes attachX = (FRAC-FRAC)*0 = 0 → the feature lands at the ORIGIN
+ *  instead of the real stock corner/centre. This returns the fields to MERGE so an UNSET (0) stock dim follows the settings
+ *  stock — a TYPED value is respected; only ops that HAVE the field are touched. A no-attach op's shift is stock-independent
+ *  (attachX=0 regardless), so the default emit stays byte-identical — only a stock-attaching op now uses the real stock. */
+export function resolvePlacementStock(params = {}, stock = null) {
+    if (!stock) return {};
+    const out = {};
+    const fill = (pk, sk) => { if ((pk in params) && !(Number(params[pk]) > 0) && Number(stock[sk]) > 0) out[pk] = Number(stock[sk]); };
+    fill('stockW', 'x'); fill('stockH', 'y'); fill('stockZ', 'z');
+    return out;
+}
+
 /** WCS pin offset for a stock in work coords: how far the stock's datum corner is from the program origin
  *  when the stock is pinned to a WCS (G54–G59) rather than program zero.
  *  Returns {x:0, y:0} when no pin is active, no table row exists, or machine data is absent. */

@@ -27,6 +27,7 @@
  */
 import { surfacingStack } from '../../wizards/surfacingWizard.js';
 import { userOpFromStack } from '../userOps.js';
+import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, SURFACING_STRATEGY_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options (were undeclared → empty dropdowns)
 
 /** Author defaults — match surfacingStack's own num() fallbacks (+ flat stepover/strategy) so the seeded template == the
  *  true default stack. stepover 7.2 == the default tool·% (Ø12 · 60%); strategy 'parallel' == the form's default 'raster'. */
@@ -42,13 +43,13 @@ export const SURFACING_DEFAULTS = {
 // (clearance is deliberately NOT bound — frontier #3 fan-out to progstart + the surfacefill leaf. surfacefill's
 //  shape/x/y/z/direction stay at their constants: shape='rect', x=y=0 [local], z='z', direction='bothways'.)
 const SURFACING_EXEC_BINDINGS = [
-    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs },
+    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS } },
     // placement scalars (block 2, placeonstock) — origin owned by the placement now (region is local-0-based)
     { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: SURFACING_DEFAULTS.originX },
     { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: SURFACING_DEFAULTS.originY },
-    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: SURFACING_DEFAULTS.stockAttach },
-    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: SURFACING_DEFAULTS.pathDatum },
-    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: SURFACING_DEFAULTS.stockDatum },
+    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: SURFACING_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: SURFACING_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: SURFACING_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
     { param: 'stockW', blockIndex: 2, key: 'stockW', type: 'number', default: SURFACING_DEFAULTS.stockW },
     { param: 'stockH', blockIndex: 2, key: 'stockH', type: 'number', default: SURFACING_DEFAULTS.stockH },
     { param: 'stockZ', blockIndex: 2, key: 'stockZ', type: 'number', default: SURFACING_DEFAULTS.stockZ },
@@ -60,7 +61,7 @@ const SURFACING_EXEC_BINDINGS = [
     { param: 'w', blockIndex: 4, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w },
     { param: 'h', blockIndex: 4, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h },
     { param: 'stepover', blockIndex: 4, key: 'stepover', type: 'number', default: SURFACING_DEFAULTS.stepover },
-    { param: 'strategy', blockIndex: 4, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy },
+    { param: 'strategy', blockIndex: 4, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed },
     { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge },
 ];

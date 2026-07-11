@@ -16,6 +16,7 @@ import { emitMapped } from '../../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../previewEmit.js';   // t634 — the data-op preview folds per the ACTIVE post (== insert), not Expert-default
 import { flattenBlocks, getUserStatusHint, getUserSimGcode } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography)
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
+import { resolvePlacementStock } from '../ops/placement.js';   // t720 P1 (d) — fill a twin's UNSET stockW/H from the settings stock so cc-attach places on the real stock
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
 import { CommunicationWizard } from '../communicationWizard.js';   // t518 — the Comm twin's 'commscreen' panel renders this wizard's DDCS-screen mock (pure fn of params)
 import { applyPreviewIntent } from './atcViews.js';   // t714 — the ONE declared-intent apply (opSimContext → preview*), shared with the built-in views so twin + built-in agree by construction
@@ -218,6 +219,10 @@ export const userOpView = {
         const params = {};
         for (const read of _readers) { try { Object.assign(params, read()); } catch (_) { /* skip a broken widget */ } }
         Object.assign(params, _simStartFracs);   // t508 — the dragged sim-start FRACTIONS (the declared marker→param source) → recorded + read by opSimStarts + the emit
+        // t720 P1 (d) — a twin's stock fields default 0; fill them from the SETTINGS stock (like the built-in views inject via
+        // placementParams) so a stock-attaching op places on the REAL stock, not the origin. Only UNSET fields; recorded +
+        // emitted with the resolved stock (matches the built-in's placeOnStock snapshot). No-attach ops are byte-identical.
+        try { Object.assign(params, resolvePlacementStock(params, (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null)); } catch (_) { /* no settings stock */ }
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
         const fhost = el('wiz_user_form');

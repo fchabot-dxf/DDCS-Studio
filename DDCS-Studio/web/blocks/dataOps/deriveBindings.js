@@ -71,6 +71,12 @@ export function deriveBindings(flatStack, specs) {
         if (s.default === undefined) b.socketHeld = true;
         if (s.label) b.label = s.label;
         if (s.help) b.help = s.help;      // DECLARED HELP SLOT (1a) — carry the optional field tooltip through derivation
+        // t720 P1 (a) — CARRY the widget declaration through the derive: a spec's `widget`/`widgetConfig` (e.g. an enum's
+        // dropdown options) was silently DROPPED here, so a derived enum rendered an option-less (empty) select. The form
+        // needs them to render a populated control. (This was pocket's wcs/attach/datum/shape empty-dropdown root cause.)
+        if (s.widget) b.widget = s.widget;
+        if (s.widgetConfig) b.widgetConfig = s.widgetConfig;
+        if (s.units) b.units = s.units;
         if (s.section) b.section = s.section;
         if (s.group) b.group = s.group;   // canvas-layout grouping (layoutSpecFromOp reads b.group)
         if (s.role) b.role = s.role;      // canvas-layout role (x/y/w/h/… — the draggable handle it drives)
@@ -87,4 +93,19 @@ export function deriveBindings(flatStack, specs) {
 /** Convenience: flatten the wrapped stack, then derive. */
 export function deriveBindingsFor(stack, specs) {
     return deriveBindings(flattenBlocks(stack), specs);
+}
+
+/** t720 P1 (a) — collapse duplicate-param bindings into ONE per param, MERGING their declarations so a widget/label
+ *  can never be lost to ordering. The FIRST row's identity (blockIndex/key/default/socketHeld) wins (it targets the live
+ *  socket); a later duplicate only FILLS a presentational field the first row LACKS (widget/widgetConfig/label/help/
+ *  section/units). Replaces the old keep-first `dedupeByParam` (which dropped a widget declared on a non-first duplicate —
+ *  the "bore-wcs-populates-while-drill-doesn't" ordering luck). Insertion order is preserved (Map). */
+export function mergeBindingsByParam(bindings) {
+    const byParam = new Map();
+    for (const b of (bindings || [])) {
+        const prev = byParam.get(b.param);
+        if (!prev) { byParam.set(b.param, { ...b }); continue; }
+        for (const k of ['widget', 'widgetConfig', 'label', 'help', 'section', 'units']) if (prev[k] === undefined && b[k] !== undefined) prev[k] = b[k];
+    }
+    return [...byParam.values()];
 }

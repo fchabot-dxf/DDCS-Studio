@@ -21,7 +21,7 @@
  */
 import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox } from '../../wizards/pocketWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
-import { deriveBindingsFor } from './deriveBindings.js';
+import { deriveBindingsFor, mergeBindingsByParam } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';
 import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true boundary ring (polygon/ellipse) for the 2D preview
 
@@ -152,8 +152,7 @@ function pocketDataStack(defaults) {
 // then DEDUPED by param (fan-out yields N specs per param; the form wants ONE — keep the first, which carries the label).
 const CANONICAL_BIND = { ...POCKET_DEFAULTS, strategy: 'raster', _tooSmall: false };
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(pocketDataStack(POCKET_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
-function dedupeByParam(bindings) { const seen = new Set(); return bindings.filter((b) => (seen.has(b.param) ? false : (seen.add(b.param), true))); }
-export const POCKET_BINDINGS = dedupeByParam(deriveBindingsFor(canonicalPrunedStack(), POCKET_BINDING_SPECS));
+export const POCKET_BINDINGS = mergeBindingsByParam(deriveBindingsFor(canonicalPrunedStack(), POCKET_BINDING_SPECS));
 
 /** Build the pocket-as-data def — the superset-twin pattern (corner/middle): bindingSpecs (emit re-derivation) + a
  *  structural strategy toggle + the derive-guards hook (_tooSmall) + postInstantiate (the derived drill centre). */
