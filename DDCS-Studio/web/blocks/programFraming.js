@@ -44,6 +44,15 @@ export function makeRotate(params = {}, children) {
     return b;
 }
 
+/** t736 — the DECLARED program-level ROTATION: a flat childless `xform` sibling carrying {angle,pivotX,pivotY}. Emits
+ *  nothing itself; blockEmitter.applyProgramTransform applies it ONCE over the whole program at generation. Sits at the
+ *  TOP of the stack (a program declaration). See ops/transform.js. */
+export function makeXform(params = {}) {
+    const b = newBlock('xform');
+    b.params = { angle: num(params.angle, 0), pivotX: num(params.pivotX, 0), pivotY: num(params.pivotY, 0) };
+    return b;
+}
+
 /** Program End from wizard params: the configured end-of-program routine. */
 export function makeEnd(params = {}) {
     const ep = params.endProgram || {};

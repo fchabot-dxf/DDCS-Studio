@@ -8,6 +8,10 @@
  * The editor text is transparent over the #editor-highlight overlay, so the .op-hover class shows behind it.
  */
 import { showOpMenu, showGroupMenu, hideOpMenu } from './opContextMenu.js';
+import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
+import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
+
+const r3 = (n) => { const v = Math.round(n * 1000) / 1000; return Object.is(v, -0) ? 0 : v; };
 
 export function initEditorOpHover() {
     const editor = document.getElementById('editor');
@@ -17,6 +21,35 @@ export function initEditorOpHover() {
     const chip = document.createElement('button');
     chip.id = 'op-edit-chip'; chip.className = 'op-edit-chip'; chip.type = 'button'; chip.hidden = true;
     editor.parentElement.appendChild(chip);
+
+    // t736 — the PROGRAM ROTATION badge: a program-level pill beside the ⟳ Transform button showing the DECLARED xform
+    // rotation ("⟳ 6.98°"). Click the label = reopen Transform prefilled; the ✕ = clear the declaration to 0 (the emit's
+    // 0° fold makes that BYTE-IDENTICAL). Program-level (NOT on an op pill — the rotation is program-wide). Updated on
+    // every program change (onChange) — apply / clear / a Blocks edit of angle/pivot all refresh it.
+    const badge = document.createElement('div');
+    badge.id = 'xform-badge'; badge.className = 'xform-badge'; badge.hidden = true;
+    const badgeLabel = document.createElement('button');
+    badgeLabel.type = 'button'; badgeLabel.className = 'xform-badge-label';
+    badgeLabel.addEventListener('click', () => { if (typeof window.ddcsAlignRotate === 'function') window.ddcsAlignRotate(); });
+    const badgeX = document.createElement('button');
+    badgeX.type = 'button'; badgeX.className = 'xform-badge-x'; badgeX.textContent = '✕'; badgeX.title = 'Clear the program rotation (back to 0°)';
+    badgeX.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const stack = (typeof window.ddcsGetBlockProgram === 'function' && window.ddcsGetBlockProgram()) || [];
+        const rest = stack.filter((b) => !(b && b.type === 'xform'));   // drop the declaration → the emit is byte-identical to pre-rotation
+        if (typeof window.ddcsLoadBlockStack === 'function') window.ddcsLoadBlockStack(rest);
+    });
+    badge.appendChild(badgeLabel); badge.appendChild(badgeX);
+    editor.parentElement.appendChild(badge);
+    const updateBadge = () => {
+        const rot = (typeof window.ddcsGetBlockProgram === 'function') ? programRotation(window.ddcsGetBlockProgram() || []) : { angle: 0, pivotX: 0, pivotY: 0 };
+        if (!rot.angle) { badge.hidden = true; return; }
+        badgeLabel.textContent = '⟳ ' + r3(rot.angle) + '°';
+        badgeLabel.title = `Program rotated ${r3(rot.angle)}° about (${r3(rot.pivotX)}, ${r3(rot.pivotY)}) — click to adjust`;
+        badge.hidden = false;
+    };
+    onChange(() => updateBadge());
+    updateBadge();
 
     let hoverOpId = null;
     const lineHeight = () => {

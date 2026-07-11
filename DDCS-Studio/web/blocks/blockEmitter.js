@@ -26,6 +26,7 @@ import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.
 import { num, r3 } from '../wizards/ops/util.js';
 import { placeShiftFromParams } from '../wizards/ops/placement.js';
 import { translateProgram, rotateProgram } from '../data/rotateProgram.js';
+import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program-level rotation ({angle,pivotX,pivotY})
 
 let _seq = 0;
 /** Fresh block record from a registry type, seeded with that primitive's defaults. */
@@ -227,6 +228,8 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 rotate)
     }
 
+    if (def.kind === 'xform') return [];       // PROGRAM ROTATION (t736): a childless DECLARATION — emits nothing here; it's
+                                               // applied ONCE over the whole program in emitMapped (applyProgramTransform).
     if (def.kind === 'entry') return [];       // ENTRY POINT (t726 P2b): a childless MARKER — emits nothing here. The waypoint
                                                // is applied ONCE over the whole program in emitMapped (applyEntryWaypoint), so the
                                                // marker sits as a sibling (no body-index shift → the goldens' positional bindings hold).
@@ -275,6 +278,7 @@ export function emitMapped(blocks, settings = {}) {
     const T = [];
     (blocks || []).forEach((b) => { T.push(...emit(b, 0, 0, [], scope, dialect)); });
     applyEntryWaypoint(T, blocks);        // t726 P2b — the DECLARED mill entry point: route the opening rapid through it (no-op unless it moves the cut entry)
+    applyProgramTransform(T, blocks);     // t736 — the DECLARED program rotation: rotate the whole emitted program about the pivot (AFTER the entry so that move rotates too; 0°/none → byte-identical)
     applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
     applyCapGating(T, dialect);           // comment out lines the active post can't run (honest per-line gating)
     balanceOwords(T, dialect);            // oword posts: drop orphan o<n> if/endif so structured flow is well-formed
@@ -303,6 +307,16 @@ function applyEntryWaypoint(T, blocks) {
     const cut = firstRapidXY(T.map((t) => t.line).join('\n'));
     if (!cut || (Math.abs(ex - cut.x) < 1e-3 && Math.abs(ey - cut.y) < 1e-3)) return;   // within ε → byte-identical
     T.splice(cut.index, 0, { line: `G0 X${r3(ex)} Y${r3(ey)}   ( entry )`, src: e.id ? [e.id] : null });   // one waypoint at clearance, before the cut
+}
+
+/** t736 — THE DECLARED PROGRAM ROTATION: a flat `xform` sibling declares {angle,pivotX,pivotY}; rotate EVERY emitted
+ *  absolute XY move + arc I/J about the pivot ONCE over the whole program (data/rotateProgram). 0° / no xform → untouched
+ *  (byte-identical). Keeps each line's provenance (1:1 rotate). Runs AFTER the entry waypoint so that move rotates too. */
+function applyProgramTransform(T, blocks) {
+    const { angle, pivotX, pivotY } = programRotation(blocks);
+    if (!angle) return;   // 0° / none → the emit is byte-identical to the un-rotated program
+    const rotated = rotateProgram(T.map((t) => t.line).join('\n'), angle, pivotX, pivotY).text.split('\n');
+    for (let i = 0; i < T.length && i < rotated.length; i++) T[i].line = rotated[i];
 }
 
 /** Feedrate is modal in G-code: once set it sticks until changed. The kernels emit F on every cutting line

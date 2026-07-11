@@ -7,7 +7,8 @@ import { resetVirtualIO, setVirtualOutput, getVirtualInput } from '../engine/vir
 import { rotateProgram, translateProgram } from '../data/rotateProgram.js';
 import { parseGcode } from '../gcodeParser.js';
 import { FeatureCanvas } from '../viz/featureCanvas.js';
-import { makeRotate, makePlace } from '../blocks/programFraming.js';
+import { makePlace, makeXform } from '../blocks/programFraming.js';
+import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
 import { openHomingSetup } from './settingsPanel.js';
 import { openStockEditor } from './stockEditor.js';
 
@@ -198,7 +199,13 @@ export function setupGlobalFunctions(app) {
             let bx0 = 0, by0 = 0, bx1 = 0, by1 = 0, any = false;
             segs.forEach((s) => { [[s.x1, s.y1], [s.x2, s.y2]].forEach(([x, y]) => { if (!any) { bx0 = bx1 = x; by0 = by1 = y; any = true; } else { bx0 = Math.min(bx0, x); by0 = Math.min(by0, y); bx1 = Math.max(bx1, x); by1 = Math.max(by1, y); } }); });
             const handleR = Math.max(any ? Math.hypot(bx1 - bx0, by1 - by0) * 0.5 : 0, 12);
-            const st = { ang: 0, px: 0, py: 0 };
+            // t736 — PREFILL from the DECLARED program rotation (the chip's "reopen prefilled"): the editor geometry is
+            // ALREADY rotated by it, so UN-ROTATE the runs back to the base program and seat st at the current rotation. The
+            // preview shows the ABSOLUTE rotation (base rotated by st.ang) and apply REPLACES the declaration (not compose).
+            const cur = (window.ddcsGetBlockProgram) ? programRotation(window.ddcsGetBlockProgram() || []) : { angle: 0, pivotX: 0, pivotY: 0 };
+            const unrot = (pts) => { const t = -cur.angle * Math.PI / 180, c = Math.cos(t), s = Math.sin(t); return pts.map((p) => ({ x: cur.pivotX + (p.x - cur.pivotX) * c - (p.y - cur.pivotY) * s, y: cur.pivotY + (p.x - cur.pivotX) * s + (p.y - cur.pivotY) * c })); };
+            const baseAll = cur.angle ? allRuns.map(unrot) : allRuns, baseFeed = cur.angle ? feedRuns.map(unrot) : feedRuns, baseRapid = cur.angle ? rapidRuns.map(unrot) : rapidRuns;
+            const st = { ang: cur.angle, px: cur.pivotX, py: cur.pivotY };
             const rotRun = (run) => { const t = st.ang * Math.PI / 180, c = Math.cos(t), s = Math.sin(t); return run.map((p) => ({ x: st.px + (p.x - st.px) * c - (p.y - st.py) * s, y: st.py + (p.x - st.px) * s + (p.y - st.py) * c })); };
             const canvasEl = pane.querySelector('[data-canvas]');
             const angI = pane.querySelector('[data-ang]'), pxI = pane.querySelector('[data-px]'), pyI = pane.querySelector('[data-py]');
@@ -206,9 +213,9 @@ export function setupGlobalFunctions(app) {
             const buildSpec = () => {
                 const t = st.ang * Math.PI / 180;
                 const paths = [];
-                allRuns.forEach((r) => paths.push({ pts: r, cls: 'fc-path-ghost' }));      // original (before)
-                feedRuns.forEach((r) => paths.push({ pts: rotRun(r), cls: 'fc-path' }));    // rotated cut moves
-                rapidRuns.forEach((r) => paths.push({ pts: rotRun(r), cls: 'fc-path-rapid' }));
+                baseAll.forEach((r) => paths.push({ pts: r, cls: 'fc-path-ghost' }));      // the base (un-rotated) program — before
+                baseFeed.forEach((r) => paths.push({ pts: rotRun(r), cls: 'fc-path' }));    // rotated cut moves (absolute st.ang)
+                baseRapid.forEach((r) => paths.push({ pts: rotRun(r), cls: 'fc-path-rapid' }));
                 return {
                     items: [{ kind: 'circle', cx: st.px, cy: st.py, r: handleR }],          // rotation ring (dashed guide)
                     paths,
@@ -225,6 +232,7 @@ export function setupGlobalFunctions(app) {
             };
             const syncInputs = () => { angI.value = r3(st.ang); pxI.value = r3(st.px); pyI.value = r3(st.py); };
             const redraw = () => fc.render(canvasEl, buildSpec());
+            syncInputs();   // t736 — show the prefilled current rotation (the chip's "reopen prefilled")
             angI.addEventListener('input', () => { st.ang = parseFloat(angI.value) || 0; redraw(); });
             pxI.addEventListener('input', () => { st.px = parseFloat(pxI.value) || 0; redraw(); });
             pyI.addEventListener('input', () => { st.py = parseFloat(pyI.value) || 0; redraw(); });
@@ -240,21 +248,23 @@ export function setupGlobalFunctions(app) {
                 o.style.color = '#fd0';
             });
             pane.querySelector('[data-rgo]').addEventListener('click', () => {
-                if (!st.ang) { pane.querySelector('[data-rout]').textContent = 'Set a non-zero angle (drag the handle or type one).'; return; }
                 const o = pane.querySelector('[data-rout]');
-                // Preferred ATOM path: wrap the block program in a Rotate atom — non-lossy, reversible, round-trips in
-                // the Blocks tab. The preview rotated the CURRENTLY shown geometry, so we always nest a fresh wrapper
-                // (two alignments compose, and preview == result). Only when the editor still matches the live
-                // projection (else the stack is stale and re-emitting would clobber a hand-edit).
+                if (!st.ang && !cur.angle) { o.textContent = 'Set a non-zero angle (drag the handle or type one).'; return; }
+                // DECLARED path (t736): write a FLAT program-level xform{angle,pivotX,pivotY} at the TOP of the stack — the
+                // EMITTER applies it at generation (ops untouched); it round-trips through Blocks + save/load and drives the
+                // rotation BADGE. st is the ABSOLUTE angle (prefilled from the current), so apply REPLACES the one declaration
+                // (never composes/nests); st.ang 0 → drop it (BYTE-IDENTICAL). Only when the editor matches the projection.
                 const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
                 const proj = (window.ddcsGetBlockGcode && window.ddcsGetBlockGcode()) || '';
                 if (stack.length && proj.trim() && proj === ed.value && window.ddcsLoadBlockStack) {
-                    window.ddcsLoadBlockStack([makeRotate({ angle: st.ang, pivotX: st.px, pivotY: st.py }, stack)]);
-                    window.ddcsTrack?.('feature', 'align-rotate-atom');
-                    close();   // done — the editor + preview now show the rotated result; the Rotate atom is in Blocks
+                    const rest = stack.filter((b) => !(b && b.type === 'xform'));   // drop the old declaration (replace, not compose)
+                    window.ddcsLoadBlockStack(st.ang ? [makeXform({ angle: st.ang, pivotX: st.px, pivotY: st.py }), ...rest] : rest);
+                    window.ddcsTrack?.('feature', st.ang ? 'align-rotate-xform' : 'align-rotate-clear');
+                    close();   // done — the editor + preview show the rotated result; the xform declaration + badge are live
                     return;
                 }
-                // Fallback: in-place text rewrite (raw G-code with no block program, or a not-yet-reconciled edit). Lossy.
+                // Fallback: in-place text rewrite (raw G-code with no block program to declare into). Lossy.
+                if (!st.ang) { o.textContent = 'Set a non-zero angle (drag the handle or type one).'; return; }
                 const r = rotateProgram(ed.value, st.ang, st.px, st.py);
                 ed.value = r.text;
                 ed.dispatchEvent(new Event('input', { bubbles: true }));   // refresh highlight + preview

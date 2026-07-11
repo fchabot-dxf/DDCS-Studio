@@ -633,6 +633,22 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 }
 .editor-container .op-edit-chip:hover { filter: brightness(1.1); box-shadow: 0 2px 13px rgba(0,0,0,.48), 0 0 0 4px color-mix(in srgb, var(--accent, #0ea5e9) 42%, transparent); }
 .editor-container .op-edit-chip:disabled { background: var(--panel, #334); color: var(--text-dim, #9aa); cursor: default; box-shadow: none; border-color: transparent; }
+/* t736 — the PROGRAM ROTATION badge: a program-level pill beside the ⟳ Transform button. Amber = the ⟳ rotation theme;
+   a label (click = reopen Transform prefilled) + a ✕ (clear the declaration to 0°, byte-identical). */
+.editor-container .xform-badge {
+    position: absolute; left: 8px; bottom: 38px; z-index: 12;
+    display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,.42), 0 0 0 3px color-mix(in srgb, #f0b429 30%, transparent);
+    border: 1px solid color-mix(in srgb, #f0b429 60%, #ffffff);
+}
+.editor-container .xform-badge[hidden] { display: none; }
+.editor-container .xform-badge-label, .editor-container .xform-badge-x {
+    font: 700 11px/1 inherit; padding: 4px 10px; cursor: pointer; border: 0;
+    background: #f0b429; color: #1a1200; text-shadow: 0 1px 1px rgba(255,255,255,.25); white-space: nowrap;
+}
+.editor-container .xform-badge-x { padding: 4px 8px; border-left: 1px solid color-mix(in srgb, #f0b429 50%, #000); font-weight: 800; }
+.editor-container .xform-badge-label:hover { filter: brightness(1.06); }
+.editor-container .xform-badge-x:hover { background: #ffd264; }
 /* Mobile portrait: the 3D preview is a bottom sheet (height --viz3d-size). Push the Transform button UP so it
    rides just above the open drawer (and follows its resize) instead of hiding under it. (The keyboard case is
    already handled — keyboard-active pins the editor to a top strip, carrying the button with it.) */
