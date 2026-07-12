@@ -23,7 +23,8 @@
 import { slotStack } from '../../wizards/slotWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
-import { entryBindingsFor } from './deriveBindings.js';   // t726 P2b - entryX/entryY by identity (into def.bindings, not the exported EXEC bindings)
+import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
+import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy)
 
 /** Author defaults — match slotStack's num() fallbacks. width default == toolDia (a slot is ≥ tool wide). pattern:'single'
@@ -124,9 +125,9 @@ export function slotDataDef() {
                 children: [],
             },
         ],
-        children: appendEntry(exec),   // t726 P2b - the entry marker appended (emits nothing; no body-index shift)
+        children: appendToolSel(appendEntry(exec)),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
     }];
-    const def = userOpFromStack('slot_data', 'Slot (data)', stack, [...SLOT_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
+    const def = userOpFromStack('slot_data', 'Slot (data)', stack, [...toolBindingsFor(stack), ...SLOT_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = slotPreviewGeometry;   // t712 — per-feature 2D handles (A/B endpoints + width) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     return def;

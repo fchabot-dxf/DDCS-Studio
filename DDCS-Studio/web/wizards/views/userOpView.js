@@ -18,6 +18,7 @@ import { flattenBlocks, getUserStatusHint, getUserSimGcode } from '../../blocks/
 import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
 import { resolvePlacementStock } from '../ops/placement.js';   // t720 P1 (d) — fill a twin's UNSET stockW/H from the settings stock so cc-attach places on the real stock
 import { firstRapidXY } from '../ops/entry.js';   // t726 P2b — the ONE cut-entry source (the entry marker sits here when unset, shared with the emit)
+import { getTool } from '../toolPicker.js';   // t768 P1a — resolve the DECLARED tool (toolNum → the library row's real type+Ø) so the sim renders the actual cutter
 import { opSimStarts, getUserSimStock } from '../../viz/opSimStarts.js';   // form3d+2d: the DECLARED per-pass sim-start markers + the per-op sim-stock (rotary round bar) feed the 3D preview
 import { CommunicationWizard } from '../communicationWizard.js';   // t518 — the Comm twin's 'commscreen' panel renders this wizard's DDCS-screen mock (pure fn of params)
 import { applyPreviewIntent } from './atcViews.js';   // t714 — the ONE declared-intent apply (opSimContext → preview*), shared with the built-in views so twin + built-in agree by construction
@@ -235,7 +236,16 @@ export const userOpView = {
         // on every mill twin). `_opValue` flags it as the op's value (no tool-table tool picked) so the note owns up to only the
         // tip-shape unknown, not the diameter. null when the op has no toolDia (probe/text) → simTool's T#/honest-6 fallback.
         const _opToolDia = Number(params.toolDia);
-        const _opTool = (_opToolDia > 0) ? { type: 'endmill', dia: _opToolDia, _opValue: true } : null;
+        // t768 P1a — resolve the DECLARED tool: a picked toolNum → the library row → the sim renders the REAL cutter (a
+        // ballnose visibly round-nosed, the true Ø, the name). The tip SHAPE + Ø come from the ONE source (the table), never
+        // a COPY on the op. No toolNum/table tool → the honest fallback: the typed Ø as a flat endmill, `_opValue`-flagged so
+        // the note owns only the tip-shape unknown (not the diameter). null when the op has no tool at all (probe).
+        let _opTool = null;
+        const _tbl = (params.toolNum !== '' && params.toolNum != null) ? getTool(params.toolNum) : null;
+        const _tdia = _tbl ? Number(_tbl.dia) : NaN;
+        const _dia = (_tdia > 0) ? _tdia : ((_opToolDia > 0) ? _opToolDia : NaN);
+        if (_tbl && Number.isFinite(_dia)) _opTool = { type: _tbl.type || 'endmill', dia: _dia, name: _tbl.name };
+        else if (_opToolDia > 0) _opTool = { type: 'endmill', dia: _opToolDia, _opValue: true };
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
         const fhost = el('wiz_user_form');

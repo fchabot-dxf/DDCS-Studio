@@ -17,6 +17,7 @@ import { workpieceFeatureItems } from '../engine/workpiece.js';
 import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inline source dot the built-in forms use, on sourceField bindings
 import { getOutputs, getInputs } from './settingsPanel.js';   // t522 — the declared-I/O picker lists settings.outputs/inputs BY NAME (live)
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
+import { getToolLibrary, getTool } from '../wizards/toolPicker.js';   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
 
 // t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
 // widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
@@ -178,6 +179,46 @@ function declaredIoWidget(host, b) {
     }
     host.append(labelSpan(b), sel);
     return { read: () => ({ [b.param]: sel.value }) };
+}
+
+// t768 P1a — the TOOL PICKER: a LIVE dropdown of the tool library (settings.atc.tools — T# · name · Ø) bound to the op's
+// declared tool NUMBER (identity). Value = the T# ('' = no tool → the op's typed Ø owns the cut, the honest no-table
+// fallback). On pick it AUTO-FILLS the sibling Ø / feed / plunge / rpm form fields from the table row (one source: the
+// table you fill FROM), so the emit's cut-math and the sim agree; the user can still edit them after. The tip SHAPE is
+// NEVER copied onto the op — the sim/carve resolve it from the table via toolNum (no drift). Reflows on settings-changed.
+// (Phase 1b enriches each row with a tip glyph + a trailing ⚙ opening the tool-table modal.)
+function toolPickWidget(host, b) {
+    host.style.cssText = ROW_CSS;
+    const sel = document.createElement('select');
+    sel.style.cssText = CTRL_CSS + ' min-width:170px;';
+    sel.dataset.param = b.param;
+    const fill = () => {
+        const keep = sel.value || String(b.default ?? '');
+        sel.innerHTML = '';
+        const mk = (val, lab) => { const o = document.createElement('option'); o.value = String(val); o.textContent = lab; sel.appendChild(o); };
+        mk('', 'No tool (use typed Ø)');
+        let lib = [];
+        try { lib = getToolLibrary(); } catch (_) { /* no settings yet */ }
+        lib.forEach((t) => mk(t.num, t.label));
+        sel.value = keep;
+        if (String(sel.value) !== String(keep)) sel.value = '';   // the kept T# was deleted from the library → fall back to no-tool
+    };
+    fill();
+    // AUTO-FILL on pick: write the table row's Ø / feeds into the sibling form fields (only ones that exist), then dispatch
+    // input so update() re-reads (parity with the built-in views' toolPicker → setFields). Never runs headless (emit/instantiate).
+    sel.addEventListener('change', () => {
+        const tool = sel.value === '' ? null : getTool(sel.value);
+        if (!tool) return;
+        const form = host.parentElement;   // renderOpForm mounts every row under one container → siblings are queryable here
+        if (!form) return;
+        const put = (key, param) => { const el = form.querySelector(`[data-param="${param}"]`); if (el && tool[key] !== '' && tool[key] != null) el.value = tool[key]; };
+        put('dia', 'toolDia'); put('feed', 'feed'); put('plunge', 'plunge'); put('rpm', 'rpm');
+    });
+    // LIVE: re-fill when the tool library changes (a tool added/edited in Settings). Detach when the row leaves the DOM.
+    const onSettings = () => { if (!sel.isConnected) { if (typeof window !== 'undefined') window.removeEventListener('ddcs:settings-changed', onSettings); return; } fill(); };
+    if (typeof window !== 'undefined') window.addEventListener('ddcs:settings-changed', onSettings);
+    host.append(labelSpan(b), sel);
+    return { read: () => ({ [b.param]: sel.value === '' ? '' : numOr(sel.value, '') }) };
 }
 
 // t323 — SEGMENTED control: a small enum (2-3 values) as a compact [ Auto | Manual ] toggle, both states VISIBLE (the
@@ -505,6 +546,7 @@ export const FORM_WIDGETS = {
     text: textWidget,
     action: actionWidget,
     'declared-io': declaredIoWidget,
+    toolpick: toolPickWidget,
     'corner-grid': cornerGridWidget,
     'region-pick': regionPickWidget,
     'coord-list': coordListWidget,

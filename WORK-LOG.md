@@ -10530,3 +10530,26 @@ FORK F - which ops get the Tool row: a shared toolBindingsFor(stack) (identity-d
 MARKER BLOAT: under A-DERIVE the mill markers grow by exactly +1 key (toolNum) — dia stays the existing toolDia; tip/name/feeds are derived, never stored. (A-DUPLICATE would add ~3.) Another point for DERIVE.
 
 NOT built this turn (design gate). NO source touched. VERIFY: n/a (grounding). Files: WORK-LOG only. PASS BACK the design + the 6 forks (A-F) — A/B/C/F sieve-decided with a recommend, D+E are the named residues for the human. Once ruled, the build is: toolNum field + composite toolpick widget + toolBindingsFor + userOpView.js:238 unforce + toolFieldMap type + applyToolChanges post-pass + (E) optional modal extraction.
+
+## 2026-07-12 (t768) — TOOL SELECTION Phase 1a: DECLARE the tool + the SIM reflects it (foundation, releasable)
+
+Built Phase 1a of the ruled tool-selection feature (advisor confirmed A/B/C/D/E/F). Phasing (advisor's "widget+modal vs emit arms are separable"): 1a = the DECLARATION + the sim renders the real cutter (this turn); 1b = the rich picker UI + the pickable/edit context modal; 2 = the machine-mode emit arms + applyToolChanges. Each releasable.
+
+THE FOUNDATION (proved once, all mill twins inherit — the corner-pilot rule):
+- NEW ATOM: wizards/ops/toolsel.js — a childless `toolsel` MARKER carrying the declared tool NUMBER, mirroring entry.js: it EMITS NOTHING (blockEmitter.js kind==='toolsel' -> []) and is APPENDED after the body (appendToolSel), so the body's flat indices don't shift -> the as-data goldens' positional bindings hold. Registered in ops/index.js. Phase 2 will scan this marker for the change-on-difference prefix.
+- SHARED BINDING: deriveBindings.js TOOL_BINDING_SPECS + toolBindingsFor(stack) — binds toolNum BY IDENTITY (match { type:'toolsel' }), like entryBindingsFor. ONE spec, injected into all 7 mill twins (drill/bore/slot/surfacing/contour/text via [...toolBindingsFor(stack), ...] into def.bindings; pocket via ...TOOL_BINDING_SPECS in POCKET_BINDING_SPECS). Goes into def.bindings, NOT the exported EXEC bindings -> the wiring goldens are untouched.
+- THE WIDGET: formWidgets.js toolPickWidget ('toolpick') — a LIVE dropdown of settings.atc.tools (T# . name . Ø), value = the tool NUMBER ('' = no tool). On pick it AUTO-FILLS the sibling Ø/feed/plunge/rpm form fields from the table row (one source: the table you fill FROM; the user can still edit after) and reflows on ddcs:settings-changed. read() returns only { toolNum }. The tip SHAPE is NEVER copied onto the op. (Phase 1b enriches the rows with a tip glyph + a trailing gear.)
+- KILLED THE HARDCODE: userOpView.js:238 no longer forces type:'endmill'. It now resolves params.toolNum -> getTool(toolNum) -> the sim tool { type, dia, name } (the REAL cutter: a ballnose renders round-nosed, the true Ø). No tool/table -> the honest fallback: the typed Ø as a flat endmill (_opValue-flagged so the note owns only the tip unknown). null when the op has no tool (probe).
+
+WHY DERIVE, NOT DUPLICATE (the ruled crux): the op declares only the tool IDENTITY (toolNum). dia/tip DERIVE from the table (the ONE source) at sim/carve. The tip is never stored on the op (no drift — the stockRemoval.js:22 intent), so the mill marker grows by exactly +1 key (toolNum). A free-typed toolDia is the no-table fallback.
+
+VERIFIED (real symptom, tests/tool-select-768.spec.js — 4 tests, workers-clean):
+1. all 7 twins expose a toolNum toolpick binding; a declared toolNum is BYTE-IDENTICAL for emit (the marker emits nothing) + survives the op-marker round-trip.
+2. a picked ballnose resolves to a ROUND profile (toolHalfProfile tip reaches the axis, curved arc) vs a flat endmill (full-radius flat tip) — the exact chain the sim renders.
+3. REAL DRIVE: open the Drill twin, pick a ballnose T7 in the picker -> the sim cutter IS a ballnose at the table Ø (8mm) — viz._simTool.type==='ballnose', dia===8.
+4. no tool declared + a free-typed Ø on the Slot twin -> the sim cutter is a flat endmill at that Ø (the no-table fallback works).
+FULL SUITE: 1113 passed + 2 skipped = 1115 (== --list), 0 failed, workers=3 (false-green guard satisfied). The existing text/mill emit goldens + the 7 as-data byte-identity goldens stay GREEN (the marker is inert; only def.bindings + the sim tool resolution changed).
+
+Files: NEW web/wizards/ops/toolsel.js + tests/tool-select-768.spec.js; web/wizards/ops/index.js, web/blocks/blockEmitter.js, web/blocks/dataOps/deriveBindings.js, web/ui/formWidgets.js, web/wizards/views/userOpView.js, + the 7 twins (drillData/boreData/slotData/surfacingData/contourData/textData/pocketData).
+
+NEXT (Phase 1b): the rich toolpick rows (tip glyph) + the pickable/edit context modal (extract the settingsPanel tool-lib closure). Then Phase 2: the machine tool-change MODE declaration (ATC/manual/none) + applyToolChanges post-pass (scan the toolsel markers, track the loaded tool, inject the arm on difference) + all 3 arms per post. RELEASABLE NOW as "declare your tool, see the real cutter." PASS BACK.

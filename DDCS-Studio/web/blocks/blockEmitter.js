@@ -234,6 +234,9 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     if (def.kind === 'entry') return [];       // ENTRY POINT (t726 P2b): a childless MARKER — emits nothing here. The waypoint
                                                // is applied ONCE over the whole program in emitMapped (applyEntryWaypoint), so the
                                                // marker sits as a sibling (no body-index shift → the goldens' positional bindings hold).
+    if (def.kind === 'toolsel') return [];     // TOOL SELECTION (t768 P1a): a childless MARKER recording the op's declared tool
+                                               // number — emits nothing here (drives the sim cutter; Phase 2 scans it for the
+                                               // change-on-difference prefix). Sibling after the body → positional bindings hold.
 
     if (def.kind === 'container') {            // STAMP child(ren) at each point (skip 1-based indices in p.skip)
         const pts = def.points(p);

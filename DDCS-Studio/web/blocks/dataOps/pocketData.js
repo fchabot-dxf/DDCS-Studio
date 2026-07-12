@@ -21,8 +21,9 @@
  */
 import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox } from '../../wizards/pocketWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
-import { deriveBindingsFor, mergeBindingsByParam } from './deriveBindings.js';
+import { deriveBindingsFor, mergeBindingsByParam, TOOL_BINDING_SPECS } from './deriveBindings.js';
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b — the declared mill entry point (entryX/entryY bind via POCKET_BINDING_SPECS)
+import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a — the declared tool-selection marker (toolNum binds via POCKET_BINDING_SPECS)
 import { pruneGuards } from '../whenGuard.js';
 import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true boundary ring (polygon/ellipse) for the 2D preview
 
@@ -99,6 +100,8 @@ const POCKET_BINDING_SPECS = [
     // stack each instantiate (pocket's entry index shifts with strategy/tooSmall — a static superset index would miss).
     { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
     { param: 'entryY', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '' },
+    // t768 P1a — the tool-selection declaration. IN the bindingSpecs (re-derived over the pruned stack each instantiate).
+    ...TOOL_BINDING_SPECS,
 ];
 
 /** The strategy fork is a STRUCTURAL driver (guard key), no block socket — declared as a bindingless (blockIndex-free)
@@ -149,7 +152,7 @@ function pocketDataStack(defaults) {
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Pocket' }, children: [] },
         ],
-        children: appendEntry(pocketStack(defaults, { superset: true })),   // t726 P2b — the entry marker appended (emits nothing)
+        children: appendToolSel(appendEntry(pocketStack(defaults, { superset: true }))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing)
     }];
 }
 

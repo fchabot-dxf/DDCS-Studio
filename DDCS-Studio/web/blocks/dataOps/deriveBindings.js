@@ -105,6 +105,23 @@ export function entryBindingsFor(stack) {
     ]);
 }
 
+/** t768 P1a — the TOOL-SELECTION spec: bind the op's declared tool NUMBER by IDENTITY (match the appended `toolsel`
+ *  marker). ONE shared spec so every mill twin (+ any composed wizard carrying the marker) inherits the same tool picker,
+ *  sim cutter, and (Phase 2) change emit — the corner-pilot "prove once, inherit" rule. The tool's diameter + tip SHAPE
+ *  derive from the library at sim/carve (one source, no COPY on the op); a free-typed toolDia is the no-table fallback. */
+export const TOOL_BINDING_SPECS = [
+    {
+        param: 'toolNum', type: 'number', key: 'toolNum', match: { type: 'toolsel' }, default: '',
+        widget: 'toolpick', label: 'Tool',
+        help: 'Pick a tool from the library (Settings -> Tool table). Its diameter + tip shape drive the sim and carve; the typed cutter Ø is the fallback when no tool is picked.',
+    },
+];
+
+/** The toolNum binding for a mill twin (goes into def.bindings, like entryBindingsFor — not the exported EXEC bindings). */
+export function toolBindingsFor(stack) {
+    return deriveBindingsFor(stack, TOOL_BINDING_SPECS);
+}
+
 /** t720 P1 (a) — collapse duplicate-param bindings into ONE per param, MERGING their declarations so a widget/label
  *  can never be lost to ordering. The FIRST row's identity (blockIndex/key/default/socketHeld) wins (it targets the live
  *  socket); a later duplicate only FILLS a presentational field the first row LACKS (widget/widgetConfig/label/help/
