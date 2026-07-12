@@ -10951,3 +10951,77 @@ SUITE: 1161 passed + 2 skipped, 0 failed (workers=2) (workers=2 — P5 touches t
 Files: web/ui/formWidgets.js (FIELD_HELP fill + HELP_EXEMPT + helpFor readonlyHint fallback + row.title/data-help in addRow), web/blocks/dataOps/{drill,bore,pocket,slot,surfacing,text}Data.js (per-twin help), tests/field-help-798.spec.js (NEW). Commit: 8985d4e.
 
 FORM-HONESTY PROGRESS: P1 stock spill + P2 honest labels (V.4) · P3 preset row (V.5) · P4 deep-links (V.6) · P5 field help (this). REMAINING: Batch 4 = P6 clearing cluster + P7 shadow forms.
+
+## 2026-07-12 (t800) — FORM-HONESTY Batch 4 (the CAMPAIGN CLOSER): P6 clearing cluster + P7 shadow forms + tap residue
+
+The advisor dispatched Batch 4 — P6 + P7 + the tap one-liner — to close the form-honesty campaign. Commit 91f399c.
+
+### P6 — THE CLEARING CLUSTER (+ direction surfaced for the first time)
+
+KERNEL GROUNDING FIRST (the advisor asked for it — label honestly per what the kernel DOES, not the framing). The pocket
+toolpath kernel is `wizards/ops/stepover.js fillStrategy` (via pocketfill.js). What `direction` ACTUALLY does:
+- **bothways** → `fillLevelMoves` — boustrophedon zig-zag, links passes back-and-forth (fastest). The default.
+- **oneway** → `onewayMoves(reverse=false)` — climb: every pass cut the same way, LIFT + rapid back between rows.
+- **otherway** → `onewayMoves(reverse=true)` — conventional (same, reversed).
+- CRUCIAL: direction is read ONLY on the scanline/raster path. `strategy==='concentric'` on a **circle/rect** uses the analytic
+  `concentricCircle`/`concentricRect` and IGNORES direction (fixed ring dir). (polygon/ellipse concentric falls through to
+  scanline, so direction applies there.) → the advisor's "ring direction for concentric" is NOT what the kernel does.
+
+HONEST SURFACING (only-present-legitimate-options): `direction` is a real pocketfill atom field (fields already listed it;
+the builder HARD-CODED 'bothways' at pocketWizard.js:102). I surfaced it as a RASTER pass-direction:
+- Builder pass-through: `direction: params.direction || 'bothways'` (built-in passes none → unchanged → byte-identity holds).
+- `DIRECTION_OPTIONS` = [Zig-zag (both ways)=bothways, One-way climb=oneway, One-way conventional=otherway] — labelled per the kernel.
+- A `direction` binding (match pocketfill, key direction) → the twin reads/writes the atom directly; round-trips.
+- GATED `when strategy is raster` — the only path the kernel scans. (No whenAny/OR in the when-DSL to ALSO catch
+  spiral+polygon/ellipse; there bothways is the safe default, and hiding an INERT control on the spiral+circle/rect default
+  is the honest call. Documented in the DIRECTION_OPTIONS comment.)
+
+THE CLUSTER ORDER (shape → size → CLEARING(strategy/direction/stepover) → feeds): renderOpForm renders in binding-array
+order + `group` clustering (no section headers). `strategy` is the STRUCTURAL prune driver (spiral→concentric+nowall /
+raster→parallel+wall) so it stays a bindingless STRUCT binding (appended last, would trail at the form's end). Fix: give
+all three `group:'clearing'` + SPLICE strategy in just before the first derived clearing binding (pocketDataDef) so the
+toggle LEADS its gated dependents. direction + stepoverPct moved up to right after `sides`; toolDia/wallOffset now follow the cluster.
+
+BLOCKLY: no change needed — bridge.js:54 ALREADY declares `direction: ['bothways','oneway','otherway']` (SELECTS map), so
+the pocketfill block renders a populated dropdown that round-trips (valid-by-construction).
+
+### P7 — SHADOW FORMS (grounded by a read-only audit agent; findings listed)
+
+AUDIT VERDICT: **there is no live shadow form.** The built-in wizard forms and the twin form are sibling `.wiz-body` panels
+inside `#wizard`; `WizardManager.open()` (wizardManager.js) sets `display:none` on all + the one shown to `display:block`.
+`display:none` already drops a panel from render + tab order + hit-testing. Audit findings:
+- Q1 mounting: built-in `#wiz_<type>` present-but-`display:none` while the shared `#wiz_user` twin panel fronts (never concurrent).
+- Q2 ghost reads: NONE — `activeView()` only ever reads the visible view; built-in specs open the built-in DIRECTLY, twin specs open `#wiz_user`. Nothing depends on the ghost being live.
+- Q3 interactable: hide = inline `display:none` (no overlay/visibility trick) → hidden controls already non-focusable.
+
+CHANGE (declare the invariant, belt-and-suspenders): in the same open() hide/show loop, ALSO set `elem.inert = true` on each
+hidden panel + `inert = false` on the fronting one — makes "no hidden-but-interactable control behind the twin" an EXPLICIT
+declared invariant instead of a display:none side-effect. GUARD (clearing-cluster-800): with a twin open, exactly one
+`.wiz-body` is shown and no hidden one has an interactable control; the fronting form is not inert.
+
+### TAP — the P1 residue (advisor ruled: extends to tap verbatim)
+
+The P5 sweep found the tap twin still spilling its stock block (stockDatum/stockW/stockH/stockZ) onto the form —
+bore/contour/drill got `formHidden` in P1, tap was the 8th mill twin and was missed. One-liner: `formHidden: true` on the four
+tap stock bindings (form-only; stays in the stack + Blocks + round-trip; emit byte-identical — tap-twin-778 golden still green).
+The canonical P1 guard (stock-spill-792) TWINS list now sweeps `user_tap_data` (the assert extends).
+
+### VERIFY (clearing-cluster-800.spec.js, 5/5 + extended P1 guard)
+
+- P6.1 form order shape→size→CLEARING(strategy/direction/stepover)→feeds (asserted on the real DOM data-param order).
+- P6.2 direction HONORED end-to-end: raster oneway ≠ bothways (more G0 Z lift-returns), otherway distinct, twin(oneway) BYTE-IDENTICAL to pocketStack(oneway), and spiral+rect IGNORES direction (the kernel truth the honest gate reflects).
+- P6.3 round-trips params + Blocks (the pocketfill atom carries direction=oneway; the bridge renders the 3-value dropdown).
+- P7 shadow-forms guard green; tap spill gone (stock-spill-792 now includes tap).
+
+BYTE-IDENTITY intact: pocket-data-emit (96 cases, 0 diffs) + tap-twin-778 green — the default emit is unchanged; only a
+user-set direction=oneway/otherway (a NEW capability) changes the G-code.
+
+SUITE: 1165 passed + 2 skipped, 0 failed (workers=2, retries=0) (workers=2 — P6 touches the shared pocketWizard builder + pocketDataDef; P7 touches the shared
+wizardManager.open; verified no regression).
+
+Files: web/wizards/pocketWizard.js (direction pass-through), web/blocks/dataOps/pocketData.js (DIRECTION_OPTIONS + direction
+binding + cluster splice + strategy group), web/wizardManager.js (inert on hidden panels), web/blocks/dataOps/tapData.js
+(4× formHidden), tests/clearing-cluster-800.spec.js (NEW), tests/stock-spill-792.spec.js (tap added). Commit 91f399c.
+
+FORM-HONESTY CAMPAIGN COMPLETE: P1 stock spill + P2 honest labels (V.4) · P3 preset row (V.5) · P4 deep-links (V.6) ·
+P5 field help (V.7) · P6 clearing cluster + P7 shadow forms + tap residue (this). The 7 pieces are landed.
