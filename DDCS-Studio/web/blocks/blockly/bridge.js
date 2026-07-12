@@ -255,7 +255,7 @@ const makeOpDef = (type, label, msgAdd = '', argsAdd = []) => ({
     message2: '%1',
     args2: [ { type: 'input_statement', name: 'GCODE' } ],
     message3: 'SIM %1',
-    args3: [ { type: 'input_dummy' } ],
+    args3: [ { type: 'input_dummy', name: 'SIM_LBL' } ],   // t788 — named so the empty-SIM adaptive hide can drop the label row too
     message4: '%1',
     args4: [ { type: 'input_statement', name: 'SIM' } ],
     previousStatement: null, nextStatement: null,

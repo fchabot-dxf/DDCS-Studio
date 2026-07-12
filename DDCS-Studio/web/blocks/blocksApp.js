@@ -40,11 +40,23 @@ function findModelById(stack, id) {
 // non-runnable lines — see the G-code panel), so we DON'T grey the whole op (that would overstate a partial
 // gate); just attach a native ⚠ comment naming the missing caps. The op stays in the stack (kept record);
 // re-evaluated on every render, so switching post updates it in place.
+// t788 rider — the op block's SIM mouth is redundant for MOST ops (the sim declarations live in the user-op
+// Presentation section now); show it ONLY when it actually holds a declared sim override, else hide the socket AND its
+// "SIM" label row. setVisible (NOT removeInput) keeps the connection, so workspaceToStack still reads any child →
+// round-trip + emit/sim byte-identical. Adaptive: re-run on every load + structural change (a sim block plugged/pulled).
+function syncSimSocket(b) {
+    const sim = b.getInput && b.getInput('SIM'); if (!sim) return;
+    const has = !!(sim.connection && sim.connection.targetBlock());
+    if (sim.isVisible && sim.isVisible() === has) return;   // already in the right state
+    try { sim.setVisible(has); const lbl = b.getInput('SIM_LBL'); if (lbl) lbl.setVisible(has); if (b.rendered && b.render) b.render(); } catch (_) { /* older Blockly */ }
+}
+
 function applyOpGating(ws) {
     const post = resolveActivePost(getActiveProfile().id), caps = getCaps(post.id);
     const dl = { id: post.id, name: post.name, caps };   // dialect-shaped for an atom's gate() predicate
     const has = (r) => (r === 'flow' ? caps.flow !== 'none' : caps[r] !== false);
     for (const b of ws.getAllBlocks(false)) {
+        if (b.type === 'op' || (typeof b.type === 'string' && b.type.endsWith('_op'))) syncSimSocket(b);   // hide the empty SIM mouth
         if (b.type === 'op') {                              // op CONTAINER: per-line caps gate → ⚠ (don't grey the whole op)
             let meta = {}; try { meta = JSON.parse(b.data || '{}'); } catch (_) { /* keep {} */ }
             const unmet = (meta.requires || []).filter((r) => !has(r));
@@ -325,17 +337,24 @@ async function buildWorkspace() {
   };
 
   // Render the right pane (code panel + preview + selection) from a projection { text, lines, map }.
-  function renderViews(p) {
+  // t788 — split into the PROMPT half (code panel · selection · overlays · live form — cheap/moderate, and read
+  // synchronously by glow / the form writeback) and the HEAVY half (the 2D/3D preview: toolpath re-trace + 3D route
+  // rebuild + stock carve). On a block edit the prompt half runs inline (the edit reflects at once) and the heavy half
+  // DEFERS to quiescence (see reproject). A full render (load / resize) runs both, in the original order.
+  function renderViewsPrompt(p) {
     renderCode(p.lines, p.map);
+    applySelection();
+    repaintOverlays();   // re-apply transient hover (.warm) + value-token (.thot) overlays onto the rebuilt spans
+    renderLiveForm();    // the wizard's form as a LIVE view of the blocks (only while editing a custom op)
+  }
+  function renderViewsPreview(p) {
     panel.setGcode(p.text);
     // t756 (R-C) — the Blocks tab renders the WHOLE program, so apply the full UNION render-intent via the ONE seam
     // (rotary rig · machine frame · machine-frame tool · seat-at-start) — IDENTICAL to the editor preview by
     // construction (both call applyProgramIntent with their program's op types; the wizard derives the same per op).
     applyProgramIntent(panel, getStack().filter((b) => b && b.type === 'op').map((b) => b.opType));
-    applySelection();
-    repaintOverlays();   // re-apply transient hover (.warm) + value-token (.thot) overlays onto the rebuilt spans
-    renderLiveForm();    // the wizard's form as a LIVE view of the blocks (only while editing a custom op)
   }
+  function renderViews(p) { renderCode(p.lines, p.map); renderViewsPreview(p); applySelection(); repaintOverlays(); renderLiveForm(); }
 
   // Live FORM view — the wizard's form as a TWO-WAY view of the blocks (only while editing a custom op).
   //  · block→form: derive the bindings (deriveAuthoredDef) on every render. Same structure → sync values into the
@@ -387,10 +406,37 @@ async function buildWorkspace() {
   })();
 
   // User edited the WORKSPACE → push to the shared model (which re-projects the editor) → refresh the pane.
-  function reproject() {
-    setStack(workspaceToStack(ws), 'blockly');
-    renderViews(getProjection());
+  // t788 — the RULED TRIGGER SPLIT (pipeline-level; every heavy op, not a pocket special-case). One field edit used to
+  // run a FULL synchronous re-emit (a pocket ≈ 199 lines + 7 post-passes) → toolpath re-trace → 3D route rebuild →
+  // stock carve, PER change event, freezing the Blocks tab on heavy ops (user t783). Now the edit's PROMPT half runs
+  // inline — the model re-emit + code panel + selection + live form — so the edit REFLECTS at once (glow / form
+  // writeback read the fresh model synchronously), and only the HEAVY consumer (the 2D/3D preview: trace · carve ·
+  // route) DEFERS to quiescence via a leading-edge-free throttle: at most one preview render per RECOMPUTE_MS window,
+  // so a typed commit's preview follows within ~300ms and a continuous gesture (spinner drag / rapid commits) tracks
+  // live at the window cadence instead of freezing per event. Emit is byte-identical after settle — only WHEN the
+  // heavy preview runs changed, never WHAT is emitted. (Instrumented for the acceptance spec.)
+  const RECOMPUTE_MS = 300;
+  let _previewTimer = null, _previewCount = 0, _previewMs = 0, _modelMs = 0, _lastEditAt = 0, _lastPreviewAt = 0, _editsSincePreview = 0;
+  function previewNow() {
+    const t0 = performance.now();
+    renderViewsPreview(getProjection());                   // the heavy half: trace + 3D route + (rAF-deferred) carve
+    _previewMs = performance.now() - t0; _lastPreviewAt = performance.now(); _previewCount++; _editsSincePreview = 0;
   }
+  function schedulePreview() {                              // coalesce a burst; defer the heavy render off the edit
+    _editsSincePreview++;
+    if (_previewTimer) return;                              // within the current window → coalesce (one render serves the burst)
+    _previewTimer = setTimeout(() => { _previewTimer = null; previewNow(); }, RECOMPUTE_MS);
+  }
+  function reproject() {
+    const t0 = performance.now();
+    setStack(workspaceToStack(ws), 'blockly');             // model + emit + editor text — SYNC (glow / form writeback read it)
+    renderViewsPrompt(getProjection());                    // code panel + selection + live form — SYNC (the edit reflects now)
+    _modelMs = performance.now() - t0; _lastEditAt = performance.now();
+    schedulePreview();                                     // the heavy 2D/3D preview — DEFERRED to ~RECOMPUTE_MS of quiescence
+  }
+  // Instrumented timestamps for the acceptance spec + a manual flush (tests assert the settled preview without waiting).
+  window.__ddcsEditPerf = () => ({ previewCount: _previewCount, previewMs: Math.round(_previewMs), modelMs: Math.round(_modelMs), lastEditAt: Math.round(_lastEditAt), lastPreviewAt: Math.round(_lastPreviewAt), pending: !!_previewTimer, editsSincePreview: _editsSincePreview, windowMs: RECOMPUTE_MS });
+  window.__ddcsPreviewFlush = () => { if (_previewTimer) { clearTimeout(_previewTimer); _previewTimer = null; } previewNow(); };
 
   // The model changed ELSEWHERE (Studio editor edit / wizard seed / post-processor change) → render it into the
   // workspace (muted so the rebuild doesn't echo back through the change listener), reframe, refresh the pane.
