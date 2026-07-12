@@ -87,6 +87,9 @@ test('text-as-data: byte-identical G-code to textStack across a param sweep + bi
       { param: 'stepoverPct', blockIndex: 5, key: 'stepoverPct' },
       { param: 'feed', blockIndex: 5, key: 'feed' },
       { param: 'plunge', blockIndex: 5, key: 'plunge' },
+      { param: 'snSlot', blockIndex: 5, key: 'snSlot' },         // t764 — the {SN} dynamic-serial fields
+      { param: 'snWidth', blockIndex: 5, key: 'snWidth' },
+      { param: 'snIncrement', blockIndex: 5, key: 'snIncrement' },
     ];
     const refOf = (param) => REF_BINDINGS.find((x) => x.param === param);
     for (const b of TEXT_BINDINGS) {
@@ -115,7 +118,7 @@ test('text-as-data: byte-identical G-code to textStack across a param sweep + bi
   expect(r.resolves, 'text-as-data resolves via builderOf').toBe(true);
   expect(r.independentPath, 'data builder is NOT textStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
-  expect(r.bindingCount, 'all bindable text params are bound (incl. font/width/slant/rotation/lineSpacing)').toBe(27);   // t708 +rotation +lineSpacing
+  expect(r.bindingCount, 'all bindable text params are bound (incl. font/width/slant/rotation/lineSpacing + t764 snSlot/snWidth/snIncrement)').toBe(30);   // t708 +rotation +lineSpacing; t764 +3 serial fields
   expect(r.wiringFails, 'every binding routes to the same socket textStack uses').toEqual([]);
   if (!r.main.pass) console.log('FIRST DIFF @', JSON.stringify(r.main.firstDiff && r.main.firstDiff.params) + '\n--- textStack ---\n' + (r.main.firstDiff && r.main.firstDiff.a) + '\n--- data def ---\n' + (r.main.firstDiff && r.main.firstDiff.b));
   expect(r.main.count, 'the sweep is substantial').toBeGreaterThan(13);

@@ -51,6 +51,10 @@ export function textStack(params = {}) {
         x: num(params.x, 0), y: num(params.y, 0), strokeWidth: num(params.strokeWidth, 2.5),
         toolDia: tool, stepoverPct: num(params.stepoverPct, 50),
         z: 'z', feed: num(params.feed, 400), plunge: num(params.plunge, 120), clearance: clr,
+        // t764 — {SN} dynamic-serial fields: inert unless the text carries the token, but must reach the filltext leaf
+        // (the emit source) so the wizard's serial #var / digits / increment route through the real path.
+        snSlot: num(params.snSlot, 490), snWidth: num(params.snWidth, 6), snIncrement: num(params.snIncrement, 1),
+        dateStamp: params.dateStamp || '',
     };
     const sd = newBlock('stepdown');
     sd.params = { ...sd.params, to: depth, by: stepdown };

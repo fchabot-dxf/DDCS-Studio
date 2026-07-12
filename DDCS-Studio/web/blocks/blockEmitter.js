@@ -27,6 +27,7 @@ import { num, r3 } from '../wizards/ops/util.js';
 import { placeShiftFromParams } from '../wizards/ops/placement.js';
 import { translateProgram, rotateProgram } from '../data/rotateProgram.js';
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program-level rotation ({angle,pivotX,pivotY})
+import { serialBump, serialInline, glyphLibrary } from '../wizards/serialEngrave.js';   // t764 — {SN} dynamic serial: bump + per-digit dispatch + the shared glyph library
 
 let _seq = 0;
 /** Fresh block record from a registry type, seeded with that primitive's defaults. */
@@ -279,6 +280,7 @@ export function emitMapped(blocks, settings = {}) {
     (blocks || []).forEach((b) => { T.push(...emit(b, 0, 0, [], scope, dialect)); });
     applyEntryWaypoint(T, blocks);        // t726 P2b — the DECLARED mill entry point: route the opening rapid through it (no-op unless it moves the cut entry)
     applyProgramTransform(T, blocks);     // t736 — the DECLARED program rotation: rotate the whole emitted program about the pivot (AFTER the entry so that move rotates too; 0°/none → byte-identical)
+    applySerialLibrary(T, dialect);       // t764 — expand {SN} markers → the bump (top) + the per-digit dispatch + the glyph library (once per distinct height, after the program end). NO {SN} marker → byte-identical.
     applyModalFeed(T);                    // F is modal — drop it where it just repeats the current feed
     applyCapGating(T, dialect);           // comment out lines the active post can't run (honest per-line gating)
     balanceOwords(T, dialect);            // oword posts: drop orphan o<n> if/endif so structured flow is well-formed
@@ -317,6 +319,50 @@ function applyProgramTransform(T, blocks) {
     if (!angle) return;   // 0° / none → the emit is byte-identical to the un-rotated program
     const rotated = rotateProgram(T.map((t) => t.line).join('\n'), angle, pivotX, pivotY).text.split('\n');
     for (let i = 0; i < T.length && i < rotated.length; i++) T[i].line = rotated[i];
+}
+
+/** t764 — parse a self-describing `( @SN … )` marker (fillText emits one per {SN} placement per fill level). */
+function parseSnMarker(line) {
+    if (!line || !/\(\s*@SN\b/.test(line)) return null;
+    const g = (k) => { const m = line.match(new RegExp('\\b' + k + '=(-?[0-9.]+)')); return m ? Number(m[1]) : null; };
+    return { slot: g('slot'), count: g('count'), inc: g('inc'), x: g('x'), y: g('y'), h: g('h'), w: g('w'), depth: g('depth'), feed: g('feed'), plunge: g('plunge'), clr: g('clr') };
+}
+
+/** t764 — expand the {SN} markers into the DYNAMIC serial macro at PROGRAM scope: the counter bump ONCE at the top, the
+ *  per-digit dispatch inline at each placement, and the glyph library ONCE per DISTINCT height (after the program end).
+ *  Dedups a placement across fill levels (keeps the deepest → one engraving at full depth). NO {SN} marker → byte-identical.
+ *  Non-DDCS posts (no persistent uservar) DEGRADE: the marker is dropped with an honest note — no dynamic serial. */
+function applySerialLibrary(T, dialect) {
+    const marks = [];
+    T.forEach((t, i) => { const m = parseSnMarker(t.line); if (m && m.slot != null) marks.push({ ...m, i }); });
+    if (!marks.length) return;
+    // Which posts run the macro (persistent #vars · WHILE · IF/GOTO · M98 subs)? The DDCS uservar controllers only
+    // (Expert / V4.1 / DM500 — t758); grbl / centroid / rs274 use a different macro dialect → DEGRADE honestly.
+    const supports = !dialect || String(dialect.id || '').startsWith('ddcs-');
+    if (!supports) {
+        const body = T.map((t) => parseSnMarker(t.line) ? { line: '( {SN}: dynamic serial needs a DDCS Expert/V4.1/DM500 controller — this post has no persistent-var macro; type a fixed serial instead )', src: t.src } : t);
+        T.splice(0, T.length, ...body);
+        return;
+    }
+    // dedup by placement (slot,x,y) → keep the DEEPEST depth (one engraving at full depth); a distinct (h,w) → a distinct set.
+    const kept = new Map();
+    for (const m of marks) { const k = `${m.slot}|${m.x}|${m.y}`; const c = kept.get(k); if (!c || m.depth > c.depth) kept.set(k, m); }
+    const sets = new Map(); let si = 0;
+    for (const m of kept.values()) { const sk = `${m.h}|${m.w}`; if (!sets.has(sk)) sets.set(sk, si++); }
+    const slots = new Map(); for (const m of kept.values()) if (!slots.has(m.slot)) slots.set(m.slot, m.inc);
+    // rebuild T: bump(s) at top · body (kept marker → the inline, duplicates dropped) · the glyph libraries after the end
+    const bump = [...slots].flatMap(([slot, inc]) => serialBump(slot, inc)).map((l) => ({ line: l, src: null }));
+    const body = [];
+    T.forEach((t, i) => {
+        const m = parseSnMarker(t.line);
+        if (!m) { body.push(t); return; }
+        const keptM = kept.get(`${m.slot}|${m.x}|${m.y}`);
+        if (keptM && keptM.i === i) for (const l of serialInline(m.slot, m.count, m.x, m.y, sets.get(`${m.h}|${m.w}`))) body.push({ line: l, src: t.src });
+        // else: a duplicate (shallower-level) marker for the same placement → drop it
+    });
+    const lib = [];
+    for (const [sk, setIndex] of sets) { const m = [...kept.values()].find((x) => `${x.h}|${x.w}` === sk); lib.push(...glyphLibrary(setIndex, m.h, m.w, { feed: m.feed, plunge: m.plunge, clearance: m.clr, depth: m.depth }).map((l) => ({ line: l, src: null }))); }
+    T.splice(0, T.length, ...bump, ...body, ...lib);
 }
 
 /** Feedrate is modal in G-code: once set it sticks until changed. The kernels emit F on every cutting line

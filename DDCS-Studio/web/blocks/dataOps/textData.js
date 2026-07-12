@@ -32,6 +32,7 @@ export const TEXT_DEFAULTS = {
     text: 'TEXT', font: 'single-stroke', height: 12, width: 1, slant: 0, rotation: 0, spacing: 1.2, lineSpacing: 1.6, align: 'left', x: 0, y: 0,
     strokeWidth: 2.5, toolDia: 1.5, stepoverPct: 50, depth: 0.4, stepdown: 0.4, feed: 400, plunge: 120, clearance: 4,
     originX: 0, originY: 0, offZ: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0,
+    snSlot: 490, snWidth: 6, snIncrement: 1,   // t764 — {SN} dynamic serial (inert unless the text carries the token)
 };
 
 const ALIGN_OPTIONS = [
@@ -70,7 +71,7 @@ const TEXT_EXEC_BINDINGS = [
     { param: 'depth', blockIndex: 4, key: 'to', type: 'number', default: TEXT_DEFAULTS.depth },
     { param: 'stepdown', blockIndex: 4, key: 'by', type: 'number', default: TEXT_DEFAULTS.stepdown },
     // glyph geometry + cut (block 5, the filltext leaf)
-    { param: 'text', blockIndex: 5, key: 'text', type: 'string', default: TEXT_DEFAULTS.text },
+    { param: 'text', blockIndex: 5, key: 'text', type: 'string', default: TEXT_DEFAULTS.text, label: 'Text', help: 'The engraved text. Two tokens: {SN} = a running serial number that increments on the controller each run (persistent #var — set the digits/increment below); {DATE} = the date you insert it, stamped statically (no controller has a live clock). Type any prefix/suffix around them, e.g. PART-{SN}.' },
     {
         param: 'font', blockIndex: 5, key: 'font', type: 'enum', default: TEXT_DEFAULTS.font,
         widget: 'dropdown', widgetConfig: { options: FONT_OPTIONS },
@@ -92,6 +93,13 @@ const TEXT_EXEC_BINDINGS = [
     { param: 'stepoverPct', blockIndex: 5, key: 'stepoverPct', type: 'number', default: TEXT_DEFAULTS.stepoverPct },
     { param: 'feed', blockIndex: 5, key: 'feed', type: 'number', default: TEXT_DEFAULTS.feed },
     { param: 'plunge', blockIndex: 5, key: 'plunge', type: 'number', default: TEXT_DEFAULTS.plunge },
+    // t764 — DYNAMIC SERIAL {SN} fields (a text carrying the {SN} token engraves a persistent, per-run-bumping serial on
+    // the controller). Inert unless the text uses {SN}. The START value is NOT a field — it drives an "Initialize counter"
+    // action (never emitted, else it'd reset every run). Prefix/suffix = just type static text around {SN}. {DATE} = the
+    // insert-time stamp (no controller has a macro-readable clock).
+    { param: 'snSlot', blockIndex: 5, key: 'snSlot', type: 'number', default: TEXT_DEFAULTS.snSlot, label: 'Serial #var', help: 'The controller uservar holding the running serial — it persists across runs. 100-549. Avoid slots your own macros use: the park macros use #470-471, tool-change #472-473.' },
+    { param: 'snWidth', blockIndex: 5, key: 'snWidth', type: 'number', default: TEXT_DEFAULTS.snWidth, label: 'Serial digits', help: 'Digit count, zero-padded — e.g. 6 → 000042.' },
+    { param: 'snIncrement', blockIndex: 5, key: 'snIncrement', type: 'number', default: TEXT_DEFAULTS.snIncrement, label: 'Serial increment', help: 'How much the serial advances each run (usually 1).' },
 ];
 
 // Wrapped-template indexes (user_root + param_group precede execution children).

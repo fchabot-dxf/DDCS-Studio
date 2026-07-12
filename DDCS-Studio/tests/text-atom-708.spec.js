@@ -68,15 +68,17 @@ test('rotation end-to-end: the 3D engraving trace rotates with the label angle',
     { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/text-atom-rot90.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
 });
 
-test('a literal {SN} renders as brace glyphs (not spaces) — stage 2 owns substitution', async ({ page }) => {
+test('a {SN} token renders as its reserved serial PLACEHOLDER digits (t764 stage-2 substitution — no longer literal braces)', async ({ page }) => {
     await openText(page);
     await setParam(page, 'text', 'SN');
     await page.waitForTimeout(200);
-    const noBrace = (await readState(page)).fcPaths;
-    await setParam(page, 'text', '{SN}');
+    const bare = (await readState(page)).fcPaths;
+    await setParam(page, 'text', 'SN{SN}');
     await page.waitForTimeout(200);
-    const withBrace = (await readState(page)).fcPaths;
-    expect(withBrace, 'the { and } add real glyph strokes over bare "SN" (braces are glyphs, not spaces)').toBeGreaterThan(noBrace);
+    const withSN = (await readState(page)).fcPaths;
+    // t764 — {SN} is no longer engraved as literal { } glyphs; it reserves a dynamic-serial region shown in the 2D
+    // layout as N placeholder digit glyphs (the runtime number is engraved on the controller).
+    expect(withSN, 'the {SN} token adds its placeholder serial digits over bare "SN"').toBeGreaterThan(bare);
 });
 
 test('width-honesty: the note shows when the tool is wider than the stroke', async ({ page }) => {

@@ -13,6 +13,7 @@ import { isMarker, parseMarker } from '../blocks/opSchema.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 import { applyProgramIntent } from '../viz/opSimContext.js';   // t756 — the WHOLE-PROGRAM declared render intent (seat / machine-frame / rig)
 import { onChange } from '../blocks/programModel.js';          // t756 — re-apply the intent when the program's ops change
+import { simUserVarStore } from '../engine/simUserVars.js';    // t764 — the persistent sim uservar store (a {SN} serial bumps across Plays)
 
 // Per-pass sim-start HINTS for the editor's program — the SAME federated registry the wizards use (opSimStarts). So the
 // editor sims a multi-pass probe (a boss-both) with the 2nd-axis beginning at ② — IDENTICAL to the wizard's preview —
@@ -52,8 +53,11 @@ function gpStartHints() {
 
 // Seed controller parameter vars from Settings so "read from controller" macros (F#632 P#1078 L#1080 … —
 // PROBE-CONFIG-SOURCE.md) resolve as a controller whose parameter page matches the Settings panel.
+// t764 — REUSE the PERSISTENT sim-uservar store (models the controller's non-volatile uservar file) so a {SN} serial
+// counter bumped by one Play survives into the next Play (two Plays → different serials). The config vars below are
+// re-seeded fresh into it each run; the user vars (#100-549, incl. the serial slot) persist.
 function gpSeededVarStore() {
-    const m = new Map();
+    const m = simUserVarStore();
     const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
     const p = (cfg && cfg.probes) || {};
     const a = (cfg && cfg.atc) || {};

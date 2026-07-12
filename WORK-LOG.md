@@ -10436,3 +10436,26 @@ Built + PROVED the serial-engrave emit core (wizards/serialEngrave.js) on the t7
 6. Blockly round-trip for the new fields; byte-golden for a static-only text op (no {SN}/{DATE} → unchanged emit); the library-once + 2-token + dedupe program-level tests.
 
 **Files:** wizards/serialEngrave.js (NEW, the emit core) · tests/serial-engrave-762.spec.js (NEW). App untouched (emit module unused until 2b wires it). PASS BACK (2a core proven; 2b integration next).
+
+## 2026-07-12 (t764) — Text Stage 2, phase 2b: THE WIRING ({SN} dynamic serial goes user-facing)
+
+Wired the t762 serial emit core (serialEngrave.js) into the real text op, end-to-end. The {SN} dynamic serial now flows: wizard field -> textStack -> emit -> sim cross-run bump, and DEGRADES honestly off-DDCS.
+
+**THE BLOCKER I FOUND + FIXED (textWizard.js): textStack never carried the serial fields to the filltext leaf.** The text-as-data wiring test (the last full-suite red) caught it: refSock.snSlot stayed at the fillText DEFAULT (490), never the sentinel 4242 -> the wiring assertion failed. Root cause was not the test -- textStack built its filltext block WITHOUT snSlot/snWidth/snIncrement/dateStamp, so the wizard's serial fields did NOT route through the real emit path AT ALL. The serial-wired-764 tests passed only by COINCIDENCE (their snSlot:490 == the default; snWidth:4 silently fell back to 6). Fix: textStack's ft.params now sets snSlot/snWidth/snIncrement (num-guarded) + dateStamp. This is REQUIRED for the feature to honour its own fields, and it is byte-inert for static text (no {SN}/{DATE} token -> no marker), so the goldens hold.
+
+**THE PIPELINE (all committed this turn):**
+1. textGeometry.layoutText: resolveDate({DATE}->insert stamp) + segmentsOf splits on {SN}; each {SN} records a placement {x,y,count,height,width,pitch} + serialPreview placeholders. Byte-identical for token-free text (one static segment -> the identical char loop).
+2. fillText.lines: static fill + snMarker `( @SN slot= count= inc= x= y= h= w= depth= feed= plunge= clr= )` per placement. previewGeometry shows the placeholders; extent handles pure-{SN}.
+3. blockEmitter.applySerialLibrary (post-pass after applyProgramTransform): parses @SN markers; serialBump ONCE at program top; body markers -> serialInline; glyphLibrary ONCE per DISTINCT height after M30 (dedup by placement, keep deepest depth). Non-DDCS dialect -> markers replaced with an honest degrade note (no broken macro).
+4. simUserVars.js (NEW): a module-level persistent Map so the uservar range survives across sim Plays; gcodePreviewTab.gpSeededVarStore reads it -> two panel Plays bump the serial (100->101->102).
+5. Fields (textData.js): snSlot (#490, help lists park #470-471 / tool-change #472-473, range 100-549), snWidth (digits, zero-padded), snIncrement; + the `text` field gained label/help documenting {SN} and {DATE} so a user can DISCOVER the tokens (a user-facing release must announce them). All three fields bound (blockIndex 5) + Blockly round-trip (bindingCount 30).
+
+**VERIFIED (real symptom, not just green):** serial-wired-764 (6 tests) -- two consecutive sim Plays engrave DIFFERENT serials at correct depth; the glyph library emits ONCE with two {SN} tokens and a distinct height gets its own O620 set; grbl degrades to the note; V4.1 keeps the macro (#100-499); {DATE} is a static stamp. text-as-data byte-golden + wiring GREEN. text-atom-708 updated. **Full suite: 1109 passed + 2 skipped = 1111 (== --list count), 0 failed, exit 0, workers=3** (false-green guard satisfied).
+
+**Files (mine only, staged LF): tests/text-as-data.spec.js, tests/text-atom-708.spec.js, tests/serial-wired-764.spec.js (NEW), web/wizards/textGeometry.js, web/wizards/textWizard.js, web/wizards/ops/fillText.js, web/blocks/blockEmitter.js, web/blocks/dataOps/textData.js, web/ui/gcodePreviewTab.js, web/engine/simUserVars.js (NEW).** Left untouched (not mine): the .png snapshots, .vscode/*, code-workspace, NEXT-SESSION.md, scratchpad, TAPPING-CAPABILITY.md, snippets.js.
+
+**FORK SURFACED (Initialize-counter -- the ONE piece not built).** The counter WORKS today without it: it starts from whatever #490 holds (0 -> first run engraves 1) and continues. An "Initialize counter to N" convenience needs a REAL-CONTROLLER-init decision, which is a genuine fork (never emitted into the engraving program either way):
+  A. MANUAL on the controller -- the user sets #490=N on the DDCS variable screen. Zero emit, honest, and the starting serial is the user's value to own ([[dont-declare-away-user-responsibility]]). RECOMMEND.
+  B. A separate ONE-SHOT init program (`#490 = N` / M30) Studio hands over to run ONCE -- convenient but generates code (mild tension with the ruled "no using Studio to make new code").
+  C. Gateway write of the #var when connected -- cleanest UX, needs live-connection + var-write support.
+The SIM seam (setSimUserVar) already exists for whichever wins, to make the PREVIEW start at N. The declared action seam is ready too (widget:'action' + a dispatch case in formWidgets.js, like homing's 'Homing Setup...'). I did NOT pick silently. ADVISOR RULES the real-controller path; then it's a small add (an action binding + one dispatch case + the sim seed). PASS BACK -- the {SN} feature is wired, green, and releasable now; Initialize-to-N is the one ruled follow-on.

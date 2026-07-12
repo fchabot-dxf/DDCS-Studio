@@ -7,16 +7,29 @@
  * ribbon never covers the glyph centre) and overlapping pieces fill solid under the non-zero-winding scanline.
  */
 import { getFont, FONT_CAP_HEIGHT } from './strokeFont.js';
+import { digitPitch } from './serialEngrave.js';   // t764 — {SN} reserves monospace digit slots (same pitch the emit engraves at)
 
 export { FONT_CAP_HEIGHT };
 
 function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Number(v); }
 
+// t764 — resolve the {DATE} token to its declared insert-time STATIC stamp (no macro-readable clock on the controllers,
+// t758): a stored p.dateStamp (frozen at insert), else today (the wizard freezes + shows the honest note). Uppercased —
+// the single-stroke font is caps-only. {SN} stays a token (handled per-segment below) — it engraves dynamically.
+function resolveDate(text, params) {
+    if (text.indexOf('{DATE}') < 0) return text;
+    const s = (params.dateStamp && String(params.dateStamp)) || _todayStamp();
+    return text.replace(/\{DATE\}/g, s.toUpperCase());
+}
+function _todayStamp() { try { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; } catch (_) { return ''; } }
+// Split a line into [{static text} | {kind:'sn'}] segments on the {SN} token (case-insensitive).
+function segmentsOf(line) { return line.split(/(\{SN\})/i).filter((s) => s !== '').map((s) => /^\{SN\}$/i.test(s) ? { sn: true } : { text: s }); }
+
 /** Lay the string out → placed centreline polylines (work coords) + the text bounding box. */
 export function layoutText(params) {
     const font = getFont(params.font);            // FONT SEAM: select by name (default = built-in single-stroke)
     const glyph = font.glyph;
-    const text = (params.text == null ? 'TEXT' : String(params.text));
+    const text = resolveDate((params.text == null ? 'TEXT' : String(params.text)), params);   // t764 — {DATE} → insert-stamp
     const H = Math.max(1, num(params.height, 12));
     const scale = H / font.capHeight;
     const width = Math.max(0.1, num(params.width, 1));               // horizontal scale: <1 condensed, >1 extended
@@ -33,32 +46,53 @@ export function layoutText(params) {
     const cosR = Math.cos(rot), sinR = Math.sin(rot);
     const rotate = rot ? ([px, py]) => { const dx = px - ox, dy = py - oy; return [ox + dx * cosR - dy * sinR, oy + dx * sinR + dy * cosR]; } : (pt) => pt;
 
-    const strokes = [];
+    // t764 — {SN} reserves `snWidth` MONOSPACE digit slots (the same pitch the emit engraves at), records a placement
+    // for the emit macro, and lays PLACEHOLDER '0's for the preview. No {SN} → segmentsOf returns one static segment →
+    // the char loop is IDENTICAL to before (existing text goldens stay byte-zero-diff).
+    const snWidth = Math.max(1, Math.round(num(params.snWidth, 6)));
+    const snPitch = digitPitch(H, width, params.font);
+    const strokes = [], serials = [], serialPreview = [];
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, maxLw = 0;
     const acc = (px, py) => { if (px < x0) x0 = px; if (py < y0) y0 = py; if (px > x1) x1 = px; if (py > y1) y1 = py; };
 
     lines.forEach((ln, li) => {
-        let lw = 0;
-        for (const ch of ln) lw += glyph(ch).w * width * scale + tracking;
-        if (ln.length) lw -= tracking;
+        const segs = segmentsOf(ln);
+        let lw = 0, cells = 0;
+        for (const seg of segs) {
+            if (seg.sn) { lw += snWidth * snPitch + tracking; cells++; }
+            else for (const ch of seg.text) { lw += glyph(ch).w * width * scale + tracking; cells++; }
+        }
+        if (cells) lw -= tracking;
         if (lw > maxLw) maxLw = lw;   // widest line's advance (baseline span) — the width/slant handle anchors
         const baseY = oy - li * linePitch;
         let cx = align === 'center' ? ox - lw / 2 : align === 'right' ? ox - lw : ox;
-        for (const ch of ln) {
-            const g = glyph(ch);
-            for (const stroke of g.s) {
-                // width-stretch x, then slant-skew x by glyph height (about the baseline) — both in glyph units, then scale,
-                // then rotate the placed point about the anchor (the label angle). Emit + previews all read this.
-                const placed = stroke.map(([x, y]) => rotate([cx + (x * width + y * tanSlant) * scale, baseY + y * scale]));
-                strokes.push(placed);
-                for (const [px, py] of placed) acc(px, py);
+        for (const seg of segs) {
+            if (seg.sn) {
+                const [sx, sy] = rotate([cx, baseY]);
+                serials.push({ x: sx, y: sy, count: snWidth, height: H, width, pitch: snPitch });
+                let px = cx;   // preview placeholders: '0' × count at the monospace pitch (shows the serial's width/place)
+                for (let d = 0; d < snWidth; d++) {
+                    for (const stroke of glyph('0').s) { const placed = stroke.map(([x, y]) => rotate([px + x * width * scale, baseY + y * scale])); serialPreview.push(placed); for (const [ppx, ppy] of placed) acc(ppx, ppy); }
+                    px += snPitch;
+                }
+                cx += snWidth * snPitch + tracking;
+            } else {
+                for (const ch of seg.text) {
+                    const g = glyph(ch);
+                    for (const stroke of g.s) {
+                        // width-stretch x, then slant-skew x by glyph height (about the baseline), scale, then rotate about the anchor.
+                        const placed = stroke.map(([x, y]) => rotate([cx + (x * width + y * tanSlant) * scale, baseY + y * scale]));
+                        strokes.push(placed);
+                        for (const [px, py] of placed) acc(px, py);
+                    }
+                    cx += g.w * width * scale + tracking;
+                }
             }
-            cx += g.w * width * scale + tracking;
         }
     });
 
     if (!isFinite(x0)) { x0 = x1 = ox; y0 = y1 = oy; }
-    return { strokes, bbox: { x0, y0, x1, y1 }, scale, height: H, lineW: maxLw };
+    return { strokes, bbox: { x0, y0, x1, y1 }, scale, height: H, lineW: maxLw, serials, serialPreview };
 }
 
 const ccw = (pts) => {
