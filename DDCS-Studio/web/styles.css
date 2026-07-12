@@ -4455,8 +4455,15 @@ svg [id$="_wcs"] { display: none; }
 .pp-dro-tbl th, .pp-dro-tbl td { padding: 0 4px; }
 .pp-dro-tbl thead th { font-weight: 600; color: #7f93a6; font-size: 8px; text-align: right; }
 .pp-dro-tbl tbody th { color: #9fc4e6; text-align: left; font-weight: 700; }   /* axis letter */
+/* t780 (user) — DECLARED coordinate-frame colors: WORK vs MACHINE. One token pair, consumed by the DRO columns +
+   the position chip (which speaks WORK) + anything else that states a frame; themes may override the tokens. */
+:root { --coord-work: #6fd3ff; --coord-mach: #d8a35a; }
 .pp-dro-w, .pp-dro-m { text-align: right; font-variant-numeric: tabular-nums; min-width: 50px; }
-.pp-dro-m { color: #8fa8bf; }   /* Mach a touch dimmer than Work */
+.pp-dro-w { color: var(--coord-work); }
+.pp-dro-tbl thead th:nth-child(2) { color: var(--coord-work); }
+.pp-dro-tbl thead th:nth-child(3) { color: var(--coord-mach); }
+
+.pp-dro-m { color: var(--coord-mach); }   /* the MACHINE frame color (declared token) */
 @keyframes ddcs-dro-flash {
     0% { color: #fff; text-shadow: 0 0 6px rgba(255, 224, 138, 0.95); }
     100% { color: inherit; text-shadow: none; }

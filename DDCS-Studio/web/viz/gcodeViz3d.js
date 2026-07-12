@@ -650,34 +650,42 @@ export class GcodeViz3D {
     _ensurePosChip() {
         if (this._posChip) return;
         const THREE = this.THREE;
-        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 108;   // t779 — 3 lines (X/Y/Z)
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 104;
         const tex = new THREE.CanvasTexture(cv);
-        // t779 — ALWAYS ON TOP: depthTest:false + depthWrite:false + a very high renderOrder (the start-glyph treatment)
-        // so the spindle body can never hide it. SIDE OFFSET (screen-space) via the sprite center: the chip sits BESIDE
-        // the head (never inside the spindle) at any zoom, because a constant-screen-size sprite's center is a screen offset.
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }));
-        sp.renderOrder = 999; sp.visible = false; sp.scale.set(0.17, 0.072, 1);   // ~constant screen size (taller for 3 lines)
-        sp.center.set(-0.12, 0.5);   // anchor to the LEFT of the sprite → the chip extends to the RIGHT of the head, gapped
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }));   // depthWrite:false — never dirty the depth buffer (worker's graft)
+        // t780 (user) — ALWAYS-ON-TOP: renderOrder above every scene object incl. the spindle/collet meshes, and a
+        // SCREEN-SPACE offset via sprite.center; the chip renders BELOW the target position (and a touch right) so the
+        // tip/target stays unobscured at any zoom (a constant-screen-size sprite's center is a screen offset).
+        sp.renderOrder = 999; sp.visible = false; sp.scale.set(0.17, 0.069, 1);   // ~constant screen size (3 lines)
+        sp.center.set(-0.08, 1.45);
         this._posChip = sp; this._posChipCv = cv; this._posChipTex = tex;
         this.scene.add(sp);
     }
-    _drawPosChipTex(x, y, z) {
+    _drawPosChipTex(x, y, z, wcs, frame) {
         const cv = this._posChipCv, c = cv.getContext('2d');
         c.clearRect(0, 0, cv.width, cv.height);
         c.fillStyle = 'rgba(10,14,20,0.85)'; c.fillRect(0, 0, cv.width, cv.height);
         c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 3; c.strokeRect(1.5, 1.5, cv.width - 3, cv.height - 3);
-        c.fillStyle = '#dfe8f2'; c.font = 'bold 28px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
-        c.fillText('X ' + x.toFixed(3), 14, 20); c.fillText('Y ' + y.toFixed(3), 14, 54); c.fillText('Z ' + z.toFixed(3), 14, 88);
+        // t780 (user) — the chip wears its FRAME's declared token: work cyan, machine amber (same pair as the DRO columns)
+        const tok = frame === 'mach' ? '--coord-mach' : '--coord-work';
+        let wc = frame === 'mach' ? '#d8a35a' : '#6fd3ff';
+        try { wc = (getComputedStyle(document.documentElement).getPropertyValue(tok) || wc).trim() || wc; } catch (_) { /* headless */ }
+        c.fillStyle = wc; c.font = 'bold 30px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
+        c.fillText('X ' + x.toFixed(3), 14, 22); c.fillText('Y ' + y.toFixed(3), 14, 52); c.fillText('Z ' + z.toFixed(3), 14, 82);   // t780 (user) — the Z line (DRO-equal work Z)
+        if (wcs) { c.globalAlpha = 0.75; c.font = 'bold 22px monospace'; c.textAlign = 'right'; c.fillText(wcs, cv.width - 12, 22); c.globalAlpha = 1; }   // t780 (user) — the chip STATES its frame (the active WCS)
         this._posChipTex.needsUpdate = true;
     }
     _updatePosChip(pos) {
         if (!displayOf('poschip').visible) { if (this._posChip) this._posChip.visible = false; return; }
         this._ensurePosChip();
-        this._posChipVal = { x: Number(pos.x) || 0, y: Number(pos.y) || 0, z: Number(pos.z) || 0 };   // t779 — WORK z (DRO-equal)
+        const mach = pos.frame === 'mach' && pos.mach;   // t780 (user) — machine-semantic motion leads with the MACHINE frame
+        this._posChipVal = mach
+            ? { x: Number(mach.x) || 0, y: Number(mach.y) || 0, z: Number(mach.z) || 0, wcs: 'Mach', frame: 'mach' }
+            : { x: Number(pos.x) || 0, y: Number(pos.y) || 0, z: Number(pos.z) || 0, wcs: pos.wcs || '', frame: 'work' };
         this._posChipMoveMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y, this._posChipVal.z);
+        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y, this._posChipVal.z, this._posChipVal.wcs, this._posChipVal.frame);
         const t = this._animTool;
-        if (t) { t.updateWorldMatrix(true, false); const w = t.getWorldPosition(new this.THREE.Vector3()); this._posChip.position.set(w.x, w.y, w.z + 24); }   // ride the head, lifted clear of the cut (the side offset keeps it clear of the body)
+        if (t) { t.updateWorldMatrix(true, false); const w = t.getWorldPosition(new this.THREE.Vector3()); this._posChip.position.set(w.x, w.y, w.z); }   // anchor AT the tip; the sprite renders below it (screen-space center offset)
         this._posChip.material.opacity = displayOf('poschip').alpha;
         this._posChip.visible = true;
         if (!this._posChipRaf) this._posChipFade();
@@ -1195,22 +1203,34 @@ export class GcodeViz3D {
         return b;
     }
 
-    // Frame the WORK by default (t779): the fit union reads the CONTENT — toolpath + stock (+ markers, via the data bounds)
-    // — and EXCLUDES the machine envelope, which is drawn as context but never drives the camera. On a big declared table
-    // the stock/toolpath used to shrink to a speck; now the default open frames them tight, the envelope visible around.
-    // includeEnvelope=true (the fit control's 2nd press / cycle) unions the envelope so fit-to-envelope stays reachable.
-    fitAll(includeEnvelope = false) {
+    // Frame the WORK by default (t779/t780): the fit union reads the CONTENT — toolpath + stock (+ markers via the data
+    // bounds) — and EXCLUDES the machine envelope, which is drawn as context but never drives the camera. On a big
+    // declared table the stock/toolpath used to shrink to a speck. wide=true (dbl-click cycle) unions the envelope.
+    fitAll(wide = false) {
         let b = null;
         const m = this._machine, useMch = m && m.show && m.x && m.y && m.z;
         const sh = this.partFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };   // part-frame offset (+WCS in machine view, else 0)
         const d = this._dataBounds;
-        if (d) b = this._growBounds(b, d.minX + sh.x, d.minY + sh.y, d.minZ + sh.z, d.maxX + sh.x, d.maxY + sh.y, d.maxZ + sh.z);
-        const s = this._stock;
-        if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, sh.x, sh.y, sh.z - s.z, sh.x + s.x, sh.y + s.y, sh.z);
-        // The envelope joins the fit ONLY when explicitly requested, OR when there is no work content to frame (fall back).
-        if (useMch && (includeEnvelope || !b)) {
+        const s = this._stock, hasStock = !!(s && s.show && s.x > 0 && s.y > 0 && s.z > 0);
+        if (d) {
+            // t780 (user) — a safe-Z/G53 retract to the MACHINE TOP stretches the data bounds into a tall thin column
+            // (z→+775 on an −800 machine) and blows the "work" framing. With a stock to anchor the work, clamp the fit's
+            // Z contribution to the work region (stock top + a clearance margin scaled to the XY span); the retract line
+            // still DRAWS — it just no longer drives the camera. No stock → nothing to anchor, keep the full bounds.
+            const zCap = hasStock ? sh.z + 0.35 * Math.max(d.maxX - d.minX, d.maxY - d.minY, 50) : Infinity;
+            b = this._growBounds(b, d.minX + sh.x, d.minY + sh.y, d.minZ + sh.z, d.maxX + sh.x, d.maxY + sh.y, Math.min(d.maxZ + sh.z, zCap));
+        }
+        if (hasStock) b = this._growBounds(b, sh.x, sh.y, sh.z - s.z, sh.x + s.x, sh.y + s.y, sh.z);
+        // t780 (user) — THE WORK DRIVES THE DEFAULT FIT: on a big declared machine the envelope framing shrank the
+        // stock/toolpath to a speck, so the envelope stays DRAWN as context but joins the fit ONLY when asked (wide —
+        // dbl-click cycles it) or when there is nothing else to frame. Machine ops (homing/ATC) span the envelope with
+        // their own data bounds, so their framing is unchanged by construction.
+        const wantWide = !!(useMch && (wide || !b));
+        if (wantWide) {
+            // envelope corners in MACHINE coords (home at scene 0; the part rides +workOrigin)
             b = this._growBounds(b, Math.min(0, m.x), Math.min(0, m.y), Math.min(0, m.z), Math.max(0, m.x), Math.max(0, m.y), Math.max(0, m.z));
         }
+        this._fitWide = wantWide;
         if (b) this.fit(b);
         this.render();
     }
@@ -2158,6 +2178,8 @@ export class GcodeViz3D {
             window.removeEventListener('pointerup', onUp);
             window.removeEventListener('pointercancel', onUp);
         };
+        // t780 (user) — dbl-click cycles the fit: WORK (stock+toolpath, the default) ↔ WIDE (the machine envelope).
+        el.addEventListener('dblclick', (e) => { e.preventDefault(); this.fitAll(!this._fitWide); });
         el.addEventListener('pointerdown', (e) => {
             e.preventDefault();
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2207,7 +2229,6 @@ export class GcodeViz3D {
         el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); }); // no middle-click autoscroll
         // t779 — the fit CONTROL: double-click cycles the framing WORK ↔ ENVELOPE (the default frames the work; a 2nd
         // press reaches the full machine envelope). A natural, discoverable reframe gesture (there is no fit toolbar button).
-        el.addEventListener('dblclick', (e) => { e.preventDefault(); this._fitCycle = !this._fitCycle; this.fitAll(this._fitCycle); });
         // Hover feedback: highlight the ViewCube face or the axis handle under the cursor
         el.addEventListener('pointermove', (e) => {
             if (mode) return;

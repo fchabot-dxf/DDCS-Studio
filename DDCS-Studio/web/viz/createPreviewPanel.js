@@ -112,7 +112,7 @@ const PANEL_HTML = `
     <div class="pp-dro-wcs" title="Active work-coordinate system">G54</div>
     <table class="pp-dro-tbl"><thead><tr><th></th><th>Work</th><th>Mach</th></tr></thead><tbody></tbody></table>
   </div>
-  <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan</div>
+  <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan · dbl-click fit work/machine</div>
   <div class="pp-carve-note" style="display:none" title="Material-removal preview: flat endmills and ball-nose tools are modelled from the tool type; a vee/chamfer is shown flat for now; with no tool picked, an op carves at its typed Ø (Ø6 default)."></div>
 `;
 
@@ -417,7 +417,20 @@ export function createPreviewPanel(container, opts = {}) {
                     if (c) { const r = engine.vars.get(6); if (Number.isFinite(r)) viz.nudgeSurface(c.axis, r * c.sign); }
                 }
             },
-            onPositionChange: (pos) => { lastPass = pos.pass || 0; if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } if (toolPosSubs.length) { const k = segs.length ? nearest2d(pos) : 0; for (const cb of toolPosSubs) cb(pos, k); }
+            onPositionChange: (pos) => { lastPass = pos.pass || 0;
+                // t780 (user) — the chip LEADS WITH THE MEANINGFUL FRAME: machine for machine-semantic motion
+                // (a declared machine-frame op — ATC/homing — or a PROBE segment: the probe is REWRITING the WCS,
+                // so quoting work coords mid-probe quotes the frame being replaced), work+WCS otherwise. The mach
+                // values use the DRO's OWN activeWcsOffset (one source — the chip can never disagree with the DRO).
+                const kSeg = segs.length ? nearest2d(pos) : 0;
+                const sg = segs[kSeg];
+                const probeSeg = pos.probing != null ? !!(pos.probing || pos.g53) : !!(sg && (sg.probe || /probe/i.test(sg.type || '')));   // t780 (user) — the ENGINE's own move semantics win (probe OR G53 = machine-frame motion); the traced segment is the fallback
+                const machineOp = !!(viz && (viz._toolMachineFrame || viz._forceMachineBox));
+                const off = activeWcsOffset();
+                pos.frame = (machineOp || probeSeg) ? 'mach' : 'work';
+                pos.mach = { x: (+pos.x || 0) + (+off.x || 0), y: (+pos.y || 0) + (+off.y || 0), z: (+pos.z || 0) + (+off.z || 0) };
+                pos.wcs = (droWcsEl && droWcsEl.textContent) || '';
+                if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(kSeg); t2.setToolPosition(pos); } if (toolPosSubs.length) { for (const cb of toolPosSubs) cb(pos, kSeg); }
                 // t680 — LIVE progressive carve: remove material along the swept sub-step (feed class handled inside carveStep), re-mesh throttled.
                 if (viz && viz.carveStep && carveEnabled() && !_carveDegraded) { if (_carvePrev) viz.carveStep(_carvePrev, pos, _carveTR, _carveTip); _carvePrev = pos; if (viz.carveDirty && viz.carveDirty()) _carveDirty = true; carveRemeshThrottled(); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
             onStatus: ({ message }) => setStatus(message),
