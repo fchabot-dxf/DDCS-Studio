@@ -7,6 +7,12 @@ import { dwellBlock } from '../wizards/ops/dwell.js';
 import { getLibrary } from '../blocks/wizardLibrary.js';
 import { entryIconHtml } from './wizIcons.js';
 
+// t748 — the DECLARED app-header yield order: the SEQUENCE of what sheds when the nav row runs out of width, as
+// data in ONE place (not hand-rolled if-branches). _fitAppHeader adds these classes one at a time, in order, until
+// the header stops overflowing — so the nav TOP is never clipped and the most labels possible are kept. The CSS for
+// each class lives beside the .app-header rules in styles.css. Order = priority of sacrifice (least-valuable first).
+const HEADER_YIELD = ['hy-logo', 'is-compact', 'hy-tabscale', 'is-mini', 'is-tiny'];
+
 // Header toolbar icons — inline line-art SVG (not emoji) so they render identically on every OS,
 // inherit the theme via currentColor, stay crisp at any size, and give each button an icon to
 // collapse to on narrow screens. Drawn in the spirit of each tool: bubble, wrench, flame, target,
@@ -626,6 +632,7 @@ export class CommandDeck {
             this._headerFitInit = true;
             const fit = () => requestAnimationFrame(() => { this._fitHeader(); this._fitAppHeader(); });
             window.addEventListener('resize', fit);
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);   // t748 — re-fit once webfonts settle (fallback metrics are narrower), so a cold load can't leave the nav overflowing
             if (window.MutationObserver) {
                 const mo = new MutationObserver(fit);
                 mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -750,19 +757,17 @@ export class CommandDeck {
     }
 
     // Top app-header: staged so the right-edge icons never overflow the window. Stage 1 drops the
-    // op-button labels (.is-compact); stage 2 drops inactive tab labels + version (.is-mini);
-    // stage 3 drops ALL tab labels + shrinks logo (.is-tiny).
-    // Measured each call (load + resize + theme change) — no fixed breakpoints.
+    // Applies the DECLARED yield order (HEADER_YIELD) one step at a time until the nav row fits — no fixed
+    // breakpoints, it adapts to theme / font / width. Measured each call (load + resize + theme change).
     _fitAppHeader() {
         const h = document.querySelector('.app-header');
         if (!h) return;
-        h.classList.remove('is-compact', 'is-mini', 'is-tiny');
-        // Strict (no tolerance): the app-header has no internal scroll, so ANY overflow is page
-        // overflow. Collapse on the first pixel over so the right-edge icons never leave the window.
-        if (h.scrollWidth > h.clientWidth) {
-            h.classList.add('is-compact');
-            if (h.scrollWidth > h.clientWidth) h.classList.add('is-mini');
-            if (h.scrollWidth > h.clientWidth) h.classList.add('is-tiny');
+        h.classList.remove(...HEADER_YIELD);
+        // Strict (no tolerance): the app-header has no internal scroll, so ANY overflow is page overflow.
+        // Shed one declared step per iteration; stop the instant it fits so we keep the most labels possible.
+        for (const step of HEADER_YIELD) {
+            if (h.scrollWidth <= h.clientWidth) break;
+            h.classList.add(step);
         }
     }
 

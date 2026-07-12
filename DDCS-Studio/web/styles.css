@@ -185,7 +185,8 @@ html, body { overflow-x: clip; }
 
 /* Header — themed via --hdr-* tokens set per [data-theme] (see THEME sections) */
 .app-header {
-    height: 54px;
+    min-height: 54px;   /* t748 — CONTENT-DRIVEN, not a fixed height: the nav row GROWS with its content (larger OS/min
+                           font, text-only zoom) so the tab tops can never clip. At the resting font this is exactly 54px. */
     padding: 0 15px 0 0;
     display: flex;
     align-items: stretch;
@@ -226,7 +227,7 @@ html, body { overflow-x: clip; }
 
 /* App-switcher tabs (STUDIO / GATEWAY) — visual stubs, no navigation yet.
    The :hover/:active resets shield them from the per-theme global `button` skins. */
-.hdr-tabs { display: flex; align-items: stretch; margin-left: 16px; align-self: flex-end; height: 44px; }   /* bottom-aligned: a bit of space above the tab tops, feet still meet the bar below */
+.hdr-tabs { display: flex; align-items: stretch; margin-left: 16px; align-self: flex-end; min-height: 44px; }   /* t748 — min-height (content-driven): the bottom-aligned band GROWS if the tab content is taller; feet still meet the bar below. Resting height is 44px. */
 /* Custom app icons so STUDIO / GATEWAY can collapse to icon-only when the header is tight */
 .hdr-tabs .tab .app-ico { display: inline-flex; flex: 0 0 auto; }
 .hdr-tabs .tab .app-ico svg { width: 17px; height: 17px; display: block; }
@@ -250,7 +251,7 @@ html, body { overflow-x: clip; }
     align-items: center;
     padding: 6px 16px;
     min-height: 0;
-    font-size: 12.5px;
+    font-size: clamp(11px, 1.1vw, 12.5px);   /* t748 — tab labels scale a step under width pressure (12.5px at ≥1137px CSS = desktop-identical, floor 11px) */
     font-weight: 700;
     letter-spacing: 1.5px;
     font-family: inherit;
@@ -508,14 +509,22 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
    `button` skin so the chevron stays flat, not a beveled pill. */
 .hdr-quick { position: relative; display: inline-flex; align-items: center; }
 .app-header button.hdr-quick-btn {
+    position: relative;   /* t748 — anchors the ≥44px hit-area expander (::before) */
     display: inline-flex; align-items: center; justify-content: center;
-    width: 20px; height: 20px; min-height: 0; padding: 0;
+    width: 28px; height: 30px; min-height: 0; padding: 0;   /* t748 — visually wider than the old 20px pill (phone tightens it back below) */
     border: 1px solid transparent; border-radius: var(--radius, 6px);
     background: transparent; color: var(--text-main, #e6edf3);
     cursor: pointer; opacity: .7; transition: opacity .12s ease, background .12s ease, border-color .12s ease;
     box-shadow: none; text-shadow: none;
 }
-.app-header button.hdr-quick-btn svg { width: 13px; height: 13px; transition: transform .15s ease; }
+/* t748 — a REAL touch target: a transparent ≥44px hit-area expander that overflows the visible chevron
+   WITHOUT costing header layout width (absolute → out of flow). Guarantees the WCAG 44px minimum on
+   mobile + desktop; the visible button stays discreet and token-styled (hover/expanded rules below). */
+.app-header button.hdr-quick-btn::before {
+    content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 48px; height: 48px; border-radius: inherit;   /* >44 so the hittable span clears the 44px minimum after edge-exclusive rounding */
+}
+.app-header button.hdr-quick-btn svg { width: 15px; height: 15px; transition: transform .15s ease; }
 .app-header button.hdr-quick-btn:hover { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); border-color: var(--border, rgba(255,255,255,.18)); }
 .app-header button.hdr-quick-btn[aria-expanded="true"] { opacity: 1; background: var(--panel2, rgba(255,255,255,.10)); }
 .app-header button.hdr-quick-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
@@ -4515,9 +4524,21 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 /* Header op-buttons: never wrap labels to 2 lines; collapse to icon-only when narrow */
 .app-header { flex-wrap: nowrap; }
 .op-btn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
-/* AUTOMATIC fit (_fitAppHeader): measured on load + every resize so the right-edge icons NEVER
-   overflow the window. Stage 1 (.is-compact) drops the op-button labels; stage 2 (.is-mini) drops
-   the STUDIO/GATEWAY labels + version. No fixed breakpoints — it adapts to theme / font / width. */
+/* AUTOMATIC fit (_fitAppHeader): the DECLARED yield order (HEADER_YIELD in commandDeck.js) is applied one step at a
+   time until the nav row stops overflowing — no fixed breakpoints, it adapts to theme / font / width. The order:
+     (a) .hy-logo     — the logo drops its "CNC MACRO STUDIO" subtitle + shrinks  (yields FIRST)
+     (b) .is-compact  — the right-side op-button labels drop
+     (c) .hy-tabscale — the tab labels scale a step tighter
+     (d) .is-mini     — inactive tabs collapse to icon-only (active tab keeps its label) + version drops
+     (e) .is-tiny     — ALL tabs icon-only + the logo mark shrinks further
+   Each step is inert data until the loop adds its class; the yield SEQUENCE lives in one place (the array). */
+/* (a) logo yields first: crop the "CNC MACRO STUDIO" subtitle (bottom ~22% of the 0 0 132 34 viewBox) + shrink the
+   mark, freeing horizontal width. The crop leaves the wordmark; the shorter box de-clutters the tight header. */
+.app-header.hy-logo .logo { height: 30px; clip-path: inset(0 0 27% 0); }
+.app-header.hy-logo .brand { gap: 8px; }
+/* (c) tab labels scale a step: tighter tracking + a touch smaller frees width before we drop to icons */
+.app-header.hy-tabscale .hdr-tabs .tab { letter-spacing: .5px; padding-left: 12px; padding-right: 12px; }
+.app-header.hy-tabscale .hdr-tabs .tab .app-tx { font-size: 11px; }
 .app-header.is-compact .op-btn .op-label { display: none; }
 .app-header.is-compact .op-btn { gap: 0; }
 .app-header.is-compact .hdr-controls { gap: 6px; }
@@ -4530,6 +4551,7 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-tiny .hdr-tabs .tab { padding: 0 10px; }
 .app-header.is-tiny .brand { padding: 0 4px; gap: 4px; }
 .app-header.is-tiny .logo { height: 24px; }
+.app-header.is-tiny button.hdr-quick-btn { width: 20px; }   /* t748 — reclaim phone px: the visible chevron tightens, its ≥44px ::before hit area is unchanged */
 /* Header Undo/Redo: slim icon buttons that match the header chrome */
 .hdr-controls .hdr-undo {
     font-size: 15px; padding: 2px 6px; line-height: 1; border: none; border-radius: 4px;
