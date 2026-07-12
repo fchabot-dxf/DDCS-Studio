@@ -10693,3 +10693,15 @@ FULL SUITE: 1136 passed + 2 skipped = 1138 (== --list), 0 failed, workers=3. Add
 Files: web/data/dumpImport.js (mapSpindle + recognizeDump), bridge/bridge-app/fairy/ops.py (_map_spindle_to_profile + 2 call sites), web/ui/settingsPanel.js (spindleCandidate + 2 pushes + the apply branch), tests/dump-import-golden.spec.js (+spindle golden), tests/dump-import-ui.spec.js (+spindle review/apply), bridge/bridge-app/tests/test_pull_geometry.py (+2 spindle tests).
 
 THE SPINDLE STORY IS COMPLETE (1a declaration · 1b pull-seed). NEXT (per the dispatch): the small queue — long-press dup/delete -> the .nc program-marker slot -> form-section collapse. PASS BACK.
+
+## 2026-07-12 (t780 RIDER) — PREVIEW: poschip occlusion + Z line + default fit frames the WORK (user t779, mid-task amend)
+
+Folded the advisor's mid-task PREVIEW RIDER into this turn (disjoint viz files from the pull-seed). Three fixes to the 3D preview (gcodeViz3d.js):
+
+(1) POSCHIP ALWAYS-ON-TOP (user screenshot: the chip vanished behind the spindle at X5/Y-795): the position-readout sprite now draws depthTest:false + depthWrite:false + renderOrder 999 (the start-glyph treatment), AND a SCREEN-SPACE SIDE OFFSET via the sprite center (center.x = -0.12) so the chip sits BESIDE the head, never inside the spindle body, at any zoom (a constant-screen-size sprite's center IS a screen offset).
+(2) THE Z LINE: the chip read X/Y only; it now reads X/Y/Z (the DRO-equal WORK z, from the same onPositionChange pos that has pos.z — one source). The canvas grew to 108px (3 lines) + the sprite scale to match.
+(3) DEFAULT FIT FRAMES THE WORK, NOT THE ENVELOPE: fitAll() now unions only the CONTENT (toolpath + stock) and EXCLUDES the machine envelope (still drawn as context, never camera-driving) — so a big declared table (the user's ~3.8 m) no longer shrinks the stock to a speck; the default open frames the work tight, the envelope visible around. Envelope is added back only when there is no content to frame (fallback) or when explicitly requested. fitAll(true) reaches the full envelope; a DOUBLE-CLICK on the 3D canvas cycles WORK <-> ENVELOPE (there was no fit toolbar button — a natural, discoverable reframe gesture is the fit control).
+
+VERIFIED (tests/poschip-fit-779.spec.js — 2 tests): the poschip reads X/Y/Z all equal to the head pos (DRO-equal), depthTest off + depthWrite off + renderOrder > 100 (always on top), the sprite center is offset from centre (screen-space side offset), the canvas holds 3 lines; the default fit on a 3.8 m machine + a 100x80 stock frames the work far tighter than the envelope fit (work radius < 0.4x the envelope radius), and fitAll(true)/double-click reaches the big envelope. FULL SUITE: 1138 passed + 2 skipped = 1140 (== --list), 0 failed, workers=2. Additive viz-only — no emit path touched.
+
+Files: web/viz/gcodeViz3d.js (poschip always-on-top + side offset + Z line; fitAll work-vs-envelope + the dblclick cycle), tests/poschip-fit-779.spec.js (NEW).

@@ -650,30 +650,34 @@ export class GcodeViz3D {
     _ensurePosChip() {
         if (this._posChip) return;
         const THREE = this.THREE;
-        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 72;
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 108;   // t779 — 3 lines (X/Y/Z)
         const tex = new THREE.CanvasTexture(cv);
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: false }));
-        sp.renderOrder = 40; sp.visible = false; sp.scale.set(0.17, 0.048, 1);   // ~constant screen size
+        // t779 — ALWAYS ON TOP: depthTest:false + depthWrite:false + a very high renderOrder (the start-glyph treatment)
+        // so the spindle body can never hide it. SIDE OFFSET (screen-space) via the sprite center: the chip sits BESIDE
+        // the head (never inside the spindle) at any zoom, because a constant-screen-size sprite's center is a screen offset.
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false }));
+        sp.renderOrder = 999; sp.visible = false; sp.scale.set(0.17, 0.072, 1);   // ~constant screen size (taller for 3 lines)
+        sp.center.set(-0.12, 0.5);   // anchor to the LEFT of the sprite → the chip extends to the RIGHT of the head, gapped
         this._posChip = sp; this._posChipCv = cv; this._posChipTex = tex;
         this.scene.add(sp);
     }
-    _drawPosChipTex(x, y) {
+    _drawPosChipTex(x, y, z) {
         const cv = this._posChipCv, c = cv.getContext('2d');
         c.clearRect(0, 0, cv.width, cv.height);
         c.fillStyle = 'rgba(10,14,20,0.85)'; c.fillRect(0, 0, cv.width, cv.height);
         c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 3; c.strokeRect(1.5, 1.5, cv.width - 3, cv.height - 3);
-        c.fillStyle = '#dfe8f2'; c.font = 'bold 30px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
-        c.fillText('X ' + x.toFixed(3), 14, 22); c.fillText('Y ' + y.toFixed(3), 14, 52);
+        c.fillStyle = '#dfe8f2'; c.font = 'bold 28px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
+        c.fillText('X ' + x.toFixed(3), 14, 20); c.fillText('Y ' + y.toFixed(3), 14, 54); c.fillText('Z ' + z.toFixed(3), 14, 88);
         this._posChipTex.needsUpdate = true;
     }
     _updatePosChip(pos) {
         if (!displayOf('poschip').visible) { if (this._posChip) this._posChip.visible = false; return; }
         this._ensurePosChip();
-        this._posChipVal = { x: Number(pos.x) || 0, y: Number(pos.y) || 0 };
+        this._posChipVal = { x: Number(pos.x) || 0, y: Number(pos.y) || 0, z: Number(pos.z) || 0 };   // t779 — WORK z (DRO-equal)
         this._posChipMoveMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y);
+        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y, this._posChipVal.z);
         const t = this._animTool;
-        if (t) { t.updateWorldMatrix(true, false); const w = t.getWorldPosition(new this.THREE.Vector3()); this._posChip.position.set(w.x, w.y, w.z + 24); }   // ride the head, lifted clear of the cut
+        if (t) { t.updateWorldMatrix(true, false); const w = t.getWorldPosition(new this.THREE.Vector3()); this._posChip.position.set(w.x, w.y, w.z + 24); }   // ride the head, lifted clear of the cut (the side offset keeps it clear of the body)
         this._posChip.material.opacity = displayOf('poschip').alpha;
         this._posChip.visible = true;
         if (!this._posChipRaf) this._posChipFade();
@@ -1106,9 +1110,12 @@ export class GcodeViz3D {
             L.yp.position.set(gCx, gCy + gHalfY + off, gFloor); L.yn.position.set(gCx, gCy - gHalfY - off, gFloor);
         }
         // Axis lines mark PART-ZERO — part-local (they ride the part frame, which offsets them to +workOrigin in
-        // machine view): X red along y=0, Y green along x=0, over the part footprint at the part floor.
-        if (this._axisLineX) { const px = this._axisLineX.geometry.attributes.position; px.setXYZ(0, -pHalfX, 0, pFloor); px.setXYZ(1, pHalfX, 0, pFloor); px.needsUpdate = true; }
-        if (this._axisLineY) { const py = this._axisLineY.geometry.attributes.position; py.setXYZ(0, 0, -pHalfY, pFloor); py.setXYZ(1, 0, pHalfY, pFloor); py.needsUpdate = true; }
+        // machine view): X red along y=0, Y green along x=0, over the part footprint at the part floor. When the envelope
+        // is shown they span the ENVELOPE half (like the Z line) — NOT the camera-fit bounds, which now frame only the work
+        // (t779). Otherwise they span the part footprint (pHalfX/pHalfY).
+        const axHalfX = useMch ? gHalfX : pHalfX, axHalfY = useMch ? gHalfY : pHalfY;
+        if (this._axisLineX) { const px = this._axisLineX.geometry.attributes.position; px.setXYZ(0, -axHalfX, 0, pFloor); px.setXYZ(1, axHalfX, 0, pFloor); px.needsUpdate = true; }
+        if (this._axisLineY) { const py = this._axisLineY.geometry.attributes.position; py.setXYZ(0, 0, -axHalfY, pFloor); py.setXYZ(1, 0, axHalfY, pFloor); py.needsUpdate = true; }
         // Z line: spans the ENVELOPE Z extent (its own travel) when the envelope is shown — so it matches the X/Y
         // lines and doesn't overshoot the real travel. Otherwise it rides the part frame: from the part floor up the
         // Z extent (sz), with a small min so a flat part still shows a stub. Min is tied to the Z extent, NOT the XY
@@ -1188,8 +1195,11 @@ export class GcodeViz3D {
         return b;
     }
 
-    // Frame the union of toolpath + stock + machine envelope (whichever are present)
-    fitAll() {
+    // Frame the WORK by default (t779): the fit union reads the CONTENT — toolpath + stock (+ markers, via the data bounds)
+    // — and EXCLUDES the machine envelope, which is drawn as context but never drives the camera. On a big declared table
+    // the stock/toolpath used to shrink to a speck; now the default open frames them tight, the envelope visible around.
+    // includeEnvelope=true (the fit control's 2nd press / cycle) unions the envelope so fit-to-envelope stays reachable.
+    fitAll(includeEnvelope = false) {
         let b = null;
         const m = this._machine, useMch = m && m.show && m.x && m.y && m.z;
         const sh = this.partFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };   // part-frame offset (+WCS in machine view, else 0)
@@ -1197,8 +1207,8 @@ export class GcodeViz3D {
         if (d) b = this._growBounds(b, d.minX + sh.x, d.minY + sh.y, d.minZ + sh.z, d.maxX + sh.x, d.maxY + sh.y, d.maxZ + sh.z);
         const s = this._stock;
         if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, sh.x, sh.y, sh.z - s.z, sh.x + s.x, sh.y + s.y, sh.z);
-        if (useMch) {
-            // envelope corners in MACHINE coords (home at scene 0; the part rides +workOrigin)
+        // The envelope joins the fit ONLY when explicitly requested, OR when there is no work content to frame (fall back).
+        if (useMch && (includeEnvelope || !b)) {
             b = this._growBounds(b, Math.min(0, m.x), Math.min(0, m.y), Math.min(0, m.z), Math.max(0, m.x), Math.max(0, m.y), Math.max(0, m.z));
         }
         if (b) this.fit(b);
@@ -2195,6 +2205,9 @@ export class GcodeViz3D {
         el.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false }); // no page scroll on touch-drag
         el.addEventListener('contextmenu', (e) => e.preventDefault());
         el.addEventListener('mousedown', (e) => { if (e.button === 1) e.preventDefault(); }); // no middle-click autoscroll
+        // t779 — the fit CONTROL: double-click cycles the framing WORK ↔ ENVELOPE (the default frames the work; a 2nd
+        // press reaches the full machine envelope). A natural, discoverable reframe gesture (there is no fit toolbar button).
+        el.addEventListener('dblclick', (e) => { e.preventDefault(); this._fitCycle = !this._fitCycle; this.fitAll(this._fitCycle); });
         // Hover feedback: highlight the ViewCube face or the axis handle under the cursor
         el.addEventListener('pointermove', (e) => {
             if (mode) return;
