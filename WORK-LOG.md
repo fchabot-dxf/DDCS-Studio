@@ -10390,3 +10390,25 @@ Grounded the DDCS dumps (bridge/controllers/) for dynamic-on-controller {SN}/{DA
 7. Blockly round-trip + reverse-sync for the {SN}/{DATE} tokens ([[wire-blockly-roundtrip-new-features]]) — in scope for the build turn.
 
 PASS THE DESIGN BACK for ruling. NO BUILD until ruled. (Grounding files: bridge/controllers/expert-m350/… ; scratchpad/text-stage2-design.md.)
+
+---
+
+## Turn 760 (worker) — TEXT STAGE 2, phase 1: the SIM-ENGINE M98 SUBPROGRAM foundation (landed + tested) + scope phasing
+
+Started the ruled text-stage-2 build. Grounding the ACCEPTANCE ("the sim's persistent-var store proves the bump + glyph dispatch end-to-end across two runs") surfaced that it needs TWO core-engine capabilities the gate design didn't cover: (1) the sim must EXECUTE general M98 subprogram calls (the digit-glyph library O600-609 is called via M98) — the engine only special-cased M98 P501 (homing), "other subs unhandled"; (2) a CROSS-RUN persistent var store (the #490 counter must survive run→run). On top of that: the emit (token parse + glyph library + dispatch), the wizard fields, Blockly round-trip, and the tests. That is a large, high-blast-radius, SAFETY-CRITICAL (real engraving G-code) build. So I landed + verified the PIVOTAL, riskiest, self-contained piece this turn — the engine M98 capability — and phase the rest on top, to keep the core-engine change and the safety-critical emit each reviewable rather than sprawling.
+
+**LANDED (engine/GcodeExecutionEngine.js) — general M98 subprogram execution:**
+- `_matchSubs()` (called from loadProgram) indexes every `O####` header → program index (`this.subs`).
+- `_executeStep`: a bare `O####` line is a no-op label (skip); `M98 P####` — ONLY when `subs.has(P)` (a sub DEFINED in this program) — pushes the return address (`this._callStack`) and jumps to the header; `M99` POPS the return address when the call stack is non-empty, else (empty) it stays a program end (UNCHANGED). Firmware slib subs (P501 homing, P502 probe) are NOT in `subs` → they fall through to their existing special handlers, untouched.
+- Generically useful beyond text: any CAM macro with its own subs now runs in the sim ("the sim runs full DDCS macros").
+
+**VERIFY (tests/engine-subprogram-760.spec.js, 3 green):** M98 P600 calls O600 and M99 RETURNS to the caller (trace path 0,0 -> 50,50[sub] -> 10,10[return]); NESTED M98 (a sub calls a sub) threads through both levels; a bare M99 with NO pending call is STILL a program end (the post-M99 line never runs) — the unchanged-semantics guard. Regression batch 16 green (homing M98 P501, sysstart M99, ATC O10102, cam-probing, preview-dialect-parity, whole-program-intent). FULL SUITE: exit 0, 1101 passed / 2 skipped / 0 failed at retries=0 workers=3 — total 1103 == --list.
+
+**PHASE 2 (next turn, on this foundation — the design is locked, all confirmed-ops-only):**
+1. EMIT (a new module): parse {SN}/{DATE} in the text; STATIC segments -> the existing filltext strokes; {SN} -> the glyph-dispatch macro; {DATE} -> a Studio insert-time STATIC stamp (no readable clock, per t758 grounding). Glyph library O600-609 = strokeFont '0'-'9' at the token height, drawn INCREMENTAL (G91) from the cursor (avoids the UNCONFIRMED bracket-expr coords / computed-P / G52 — uses only G0/G1/G90/G91 + literal deltas + var-coord positioning G0 X#150, all confirmed). Digit extraction = the SUBTRACTIVE-remainder loop (no INT/floor needed — confirmed ops; the sim has FIX but the real controller's is unconfirmed). Dispatch = an IF-ladder (M98 P60d). Counter bump `#<slot>=#<slot>+<inc>` once at program top. Shared library emitted ONCE per program, deduped by DISTINCT token height.
+2. SIM cross-run persistence: a uservar-range (#100-#549) persistent store seeded into each sim run + written back (models the real uservar file), so the counter bumps across two runs.
+3. WIZARD fields (textData.js/textWizard): SN slot (default #490, guarded 100-549, help lists park #470-471 etc.), width (6), zero-pad (on), increment (1); the START value drives a one-time "Initialize counter" push action (NOT emitted, else it'd reset every run); prefix/suffix via typed static text (help says so); the {DATE} = insert-stamp note.
+4. Blockly round-trip for the new fields.
+5. TESTS: the two-run bumping serial in the sim (uses this M98 foundation + the persistent store); byte-golden for a static-only text op (unchanged); the shared library emits ONCE with 2 tokens; distinct-height dedupe; Blockly round-trip.
+
+**Files:** engine/GcodeExecutionEngine.js (M98/M99/O subprogram execution) · tests/engine-subprogram-760.spec.js (NEW). Emit untouched (engine-sim-side only; no op/builder code). PASS BACK (phase 1 foundation; phase 2 continues).

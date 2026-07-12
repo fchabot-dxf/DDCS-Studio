@@ -267,6 +267,8 @@ export class GcodeExecutionEngine {
         this.plane = 17;
         this.program = [];
         this.labels = new Map();
+        this.subs = this.subs || new Map();   // t760 — O#### subprogram header → program index (built at load; kept across resetState)
+        this._callStack = [];                 // t760 — M98 return addresses (M99 pops); empty ⇒ M99 is a program end
         this.ip = 0;
         this.currentLineIndex = null;
         this.running = false;
@@ -299,6 +301,21 @@ export class GcodeExecutionEngine {
         this.labels = labels;
         this.totalLines = totalLines;
         this._matchLoops();
+        this._matchSubs();
+    }
+
+    /**
+     * t760 — index every `O####` subprogram HEADER (program index) so a general `M98 P####` can jump to it and `M99`
+     * return (a call stack). ONLY subs defined in THIS program are indexed (the emitted digit-glyph library O600-609,
+     * or a CAM slot's own subs) — firmware slib subs (P501/P502) are NOT here, so they still hit their special handlers.
+     */
+    _matchSubs() {
+        this.subs = new Map();
+        for (let i = 0; i < this.program.length; i++) {
+            const line = this.program[i] && this.program[i].stripped;
+            const m = line && line.match(/^O0*(\d+)\b/i);
+            if (m) this.subs.set(Number(m[1]), i);
+        }
     }
 
     /**
@@ -697,6 +714,9 @@ export class GcodeExecutionEngine {
             return false;
         }
 
+        // t760 — a bare `O####` subprogram HEADER is a label/no-op: the body follows and is reached only via M98.
+        if (/^O\d+\b/i.test(line)) { this.ip += 1; return false; }
+
         // WHILE <cond> DOn — pre-matched to its ENDn at load. Enter the body if the condition holds,
         // otherwise jump past the matching END. (Unmatched WHILE: just enter, the cap guards runaways.)
         if (step.whileN != null) {
@@ -771,6 +791,21 @@ export class GcodeExecutionEngine {
                 return false;
             }
             this.ip += 1;
+            return false;
+        }
+
+        // t760 — general M98 P#### subprogram CALL, but ONLY for subs DEFINED in this program (the digit-glyph library
+        // O600-609, a CAM slot's subs). Firmware slib subs (P501 homing / P502 probe) aren't in `subs`, so they fall
+        // through to their existing special handlers below. Push the return address, jump to the O#### header.
+        const m98 = line.match(/^M98\s*P0*(\d+)/i);
+        if (m98 && this.subs && this.subs.has(Number(m98[1]))) {
+            this._callStack.push(this.ip + 1);
+            this.ip = this.subs.get(Number(m98[1]));
+            return false;
+        }
+        // t760 — M99 RETURNS from a subprogram call (pop the return address). With no call on the stack it is a program end.
+        if (/^M99\b/i.test(line) && this._callStack && this._callStack.length) {
+            this.ip = this._callStack.pop();
             return false;
         }
 
