@@ -2041,8 +2041,10 @@ button.primary:hover {
    Desktop: flex-grow within the definite-height column. Order-INDEPENDENT — keyed by data-viz-pane, not DOM position.
    A COLLAPSED pane's flex:0 0 auto !important (below) wins, so the surviving pane still FILLS — the ratio only bites
    with both open (exactly the "inert while collapsed" rule). */
-.wiz-2pane .wiz-visual .viz-split > [data-viz-pane="preview3d"] { flex-grow: var(--pane-ratio, 0.5); }
-.wiz-2pane .wiz-visual .viz-split > [data-viz-pane="layout2d"]  { flex-grow: calc(1 - var(--pane-ratio, 0.5)); }
+/* ×100: the grows must be PROPORTIONAL (50:50 → even, 68:32 → the ratio) yet each ≥1 in absolute terms, so when the
+   OTHER pane collapses the survivor (grow ≥15) still FILLS — a sub-1 grow-sum only distributes part of the free space. */
+.wiz-2pane .wiz-visual .viz-split > [data-viz-pane="preview3d"] { flex-grow: calc(var(--pane-ratio, 0.5) * 100); }
+.wiz-2pane .wiz-visual .viz-split > [data-viz-pane="layout2d"]  { flex-grow: calc((1 - var(--pane-ratio, 0.5)) * 100); }
 
 /* THE SPLITTER — a slim grabbable horizontal divider between the two panes; shown only when BOTH are open+visible
    (data-split-on). ≥44px effective grab via the ::before overlay; touch-native (pointer events + touch-action:none). */
