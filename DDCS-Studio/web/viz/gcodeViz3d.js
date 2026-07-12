@@ -667,7 +667,9 @@ export class GcodeViz3D {
         c.clearRect(0, 0, cv.width, cv.height);
         c.fillStyle = 'rgba(10,14,20,0.85)'; c.fillRect(0, 0, cv.width, cv.height);
         c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 3; c.strokeRect(1.5, 1.5, cv.width - 3, cv.height - 3);
-        c.fillStyle = '#dfe8f2'; c.font = 'bold 30px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
+        let wc = '#6fd3ff';   // t780 (user) — the chip speaks WORK coords, so it wears the declared work-frame token
+        try { wc = (getComputedStyle(document.documentElement).getPropertyValue('--coord-work') || wc).trim() || wc; } catch (_) { /* headless */ }
+        c.fillStyle = wc; c.font = 'bold 30px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
         c.fillText('X ' + x.toFixed(3), 14, 22); c.fillText('Y ' + y.toFixed(3), 14, 52); c.fillText('Z ' + z.toFixed(3), 14, 82);   // t780 (user) — the Z line (DRO-equal work Z)
         this._posChipTex.needsUpdate = true;
     }
