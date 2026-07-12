@@ -93,3 +93,22 @@ export function programSimContext(opTypes) {
         };
     }, { showRotaryRig: false, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false });
 }
+
+/**
+ * t756 (R-C) — THE ONE seam that applies a WHOLE-PROGRAM declared intent to a preview PANEL (the shared
+ * createPreviewPanel return). Both the EDITOR preview and the BLOCKS preview call this with their program's op types,
+ * so editor == Blocks == wizard BY CONSTRUCTION (they all resolve from opSimContext / programSimContext; the wizard
+ * single-op views use the mgr-based applyPreviewIntent, same source). Retires the imperative per-flag preview calls
+ * (the Blocks tab's setRotaryFixture-only, the editor's nothing) → one declared apply. The panel setters early-return
+ * when unchanged, so this is idempotent + re-entrancy-safe to call on every render.
+ */
+export function applyProgramIntent(panel, opTypes) {
+    if (!panel) return;
+    const ctx = programSimContext(opTypes);
+    try {
+        if (panel.setRotaryFixture) panel.setRotaryFixture(!!ctx.showRotaryRig);          // 4th-axis rig if ANY op is rotary
+        if (panel.setForceMachine) panel.setForceMachine(!!ctx.forceMachine);            // envelope/machine frame (ATC/homing)
+        if (panel.setToolMachineFrame) panel.setToolMachineFrame(!!ctx.toolMachineFrame);  // raw-machine-coords tool (G53)
+        if (panel.setSeatAtStart) panel.setSeatAtStart(!!ctx.seatAtStart);               // seat the initial pos at the Start (alignment)
+    } catch (_) { /* a panel may lack a setter — harmless */ }
+}

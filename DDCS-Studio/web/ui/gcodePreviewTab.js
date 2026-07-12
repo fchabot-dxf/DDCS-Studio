@@ -11,6 +11,8 @@
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 import { isMarker, parseMarker } from '../blocks/opSchema.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
+import { applyProgramIntent } from '../viz/opSimContext.js';   // t756 — the WHOLE-PROGRAM declared render intent (seat / machine-frame / rig)
+import { onChange } from '../blocks/programModel.js';          // t756 — re-apply the intent when the program's ops change
 
 // Per-pass sim-start HINTS for the editor's program — the SAME federated registry the wizards use (opSimStarts). So the
 // editor sims a multi-pass probe (a boss-both) with the 2nd-axis beginning at ② — IDENTICAL to the wizard's preview —
@@ -66,6 +68,12 @@ function gpSeededVarStore() {
     return m;
 }
 
+// t756 (R-C) — the EDITOR preview consumes the WHOLE-PROGRAM declared intent (opSimContext), so a program with an
+// alignment op seats at the Start, a machine op (ATC/homing) draws the machine frame, a rotary program shows the rig
+// — the SAME truths the wizard/Blocks previews honor, via the ONE applyProgramIntent seam (no imperative preview* here).
+const editorOpTypes = () => (window.ddcsGetBlockProgram ? (window.ddcsGetBlockProgram() || []) : []).filter((b) => b && b.type === 'op' && b.opType).map((b) => b.opType);
+const applyEditorIntent = () => { if (gpPanel) applyProgramIntent(gpPanel, editorOpTypes()); };
+
 let gpPanel = null;
 let gpView = 'editor';   // drawer open ('3d') vs closed ('editor')
 
@@ -120,7 +128,7 @@ export function setGcodeView(view) {
     }
     if (!is3d) { if (gpPanel) gpPanel.setActive(false); return; }   // closed → pause/stop the panel
     const panel = ensurePanel();
-    if (panel) panel.setActive(true);                               // open → mount/activate + render the editor program
+    if (panel) { panel.setActive(true); applyEditorIntent(); }      // open → mount/activate + render the editor program, applying the whole-program intent
 }
 
 function gpInit() {
@@ -157,6 +165,8 @@ function gpInit() {
 
     // Live update while the drawer is open (the panel debounces its own renders internally).
     if (els.editor) els.editor.addEventListener('input', () => { if (gpView === '3d' && gpPanel) gpPanel.setGcode(els.editor.value); });
+    // t756 — the program's OPS changed (insert / edit / load) → re-apply the whole-program render intent (seat / frame / rig).
+    onChange(() => { if (gpView === '3d') applyEditorIntent(); });
 
     // Click / move the caret in the editor → place the tool in the preview at that line (when not playing).
     if (els.editor) {

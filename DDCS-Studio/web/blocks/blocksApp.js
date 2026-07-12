@@ -21,19 +21,13 @@ import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curat
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
-import { programSimContext } from '../viz/opSimContext.js';          // declared op-type → preview render-intent (rotary rig, …)
+import { applyProgramIntent } from '../viz/opSimContext.js';          // t756 — the WHOLE-PROGRAM declared render-intent seam (seat / machine-frame / rig), shared with the editor preview
+import { opSimStarts } from '../viz/opSimStarts.js';                  // t756 — the DECLARED per-op start source (retires the legacy inferStart)
 import { getCaps, resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
-import { getLastOp } from './opRecord.js';
-import { CornerWizard } from '../wizards/cornerWizard.js';
-import { EdgeWizard } from '../wizards/edgeWizard.js';
-import { MiddleWizard } from '../wizards/middleWizard.js';
-import { CircularWizard } from '../wizards/circularWizard.js';
-
-const WIZARDS = {
-    corner: new CornerWizard(), edge: new EdgeWizard(),
-    middle: new MiddleWizard(), circular: new CircularWizard()
-};
+// t756 (R-C) — the legacy WIZARDS[type].inferStart start-source is retired: the Blocks preview now reads the DECLARED
+// opSimStarts (blkStartHints below), the same source as the editor + wizard previews. The CornerWizard/… imports that
+// only fed inferStart are gone with it.
 
 // Find a model record by block id in the shared stack (records: { id, params, children }) — used to map a hovered
 // Blockly leaf back to its param keys for value-token highlighting.
@@ -140,18 +134,26 @@ async function buildWorkspace() {
   const host = document.createElement('div'); host.className = 'blk-bk-host';
   wsHost.append(topbar, host);
   const out = document.getElementById('blk-gcode');
+  // t756 (R-C) — per-pass sim-start HINTS from the DECLARED source (opSimStarts), read off the whole block program —
+  // the SAME registry the editor + wizard previews use, so the Blocks preview seats each pass identically. Retires the
+  // legacy WIZARDS[type].inferStart start-source (the imperative per-wizard guess).
+  const blkStartHints = () => {
+    const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
+    const hints = [];
+    for (const b of (getStack() || [])) {
+      if (!b || b.type !== 'op' || !b.opType) continue;
+      const h = opSimStarts(b.opType, b.params || {}, stock);
+      if (Array.isArray(h) && h.length) hints.push(...h);
+    }
+    return hints.length ? hints : null;
+  };
   // THE shared preview panel — identical to Studio main + the wizards (same code + UI); fed the projected program.
   const blkPanelHost = document.getElementById('blk-preview-panel');
   const panel = createPreviewPanel(blkPanelHost, {
     getGcode: () => getProjection().text,
-    getStart: () => {
-      const op = getLastOp();
-      if (op && WIZARDS[op.type] && WIZARDS[op.type].inferStart) {
-        const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
-        return WIZARDS[op.type].inferStart(op.params, stock);
-      }
-      return null;
-    },
+    // The DECLARED start source (opSimStarts) — pass 0 begins at the inferred start, matching the editor + wizard.
+    getStart: () => (blkStartHints() || [])[0] || null,
+    getStartHints: blkStartHints,
     // Route the sim's EXECUTING line to the projected G-code view: glow the emitting line (+ a fading comet-tail),
     // mirroring the read-only editor panel — so watching a run in the Blocks tab lights the very code the blocks emit.
     onLine: (i) => setExecLine(i),
@@ -326,10 +328,10 @@ async function buildWorkspace() {
   function renderViews(p) {
     renderCode(p.lines, p.map);
     panel.setGcode(p.text);
-    // Sim intent: the Blocks tab renders the WHOLE program, so apply the UNION render-intent — e.g. the 4th-axis
-    // rotary rig appears when ANY op is rotary (the per-op wizard previews derive the same flag from opSimContext).
-    const sim = programSimContext(getStack().filter((b) => b && b.type === 'op').map((b) => b.opType));
-    panel.setRotaryFixture(sim.showRotaryRig);
+    // t756 (R-C) — the Blocks tab renders the WHOLE program, so apply the full UNION render-intent via the ONE seam
+    // (rotary rig · machine frame · machine-frame tool · seat-at-start) — IDENTICAL to the editor preview by
+    // construction (both call applyProgramIntent with their program's op types; the wizard derives the same per op).
+    applyProgramIntent(panel, getStack().filter((b) => b && b.type === 'op').map((b) => b.opType));
     applySelection();
     repaintOverlays();   // re-apply transient hover (.warm) + value-token (.thot) overlays onto the rebuilt spans
     renderLiveForm();    // the wizard's form as a LIVE view of the blocks (only while editing a custom op)
