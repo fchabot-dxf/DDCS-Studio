@@ -10789,3 +10789,36 @@ SCOPE DECISION (flagged): I delivered the diet on the clear end-state cases (rea
 SUITE: 1146 passed + 2 skipped = 1148 (== --list), 0 failed (workers=2). No assert weakened (the 4 cranked specs assert identical end-states; the cycle assert gained the 20× step). Riders A+B NOT in this turn (advisor's worktree).
 
 Files: web/viz/createPreviewPanel.js (20× tier), tests/preview-controls.spec.js (cycle), tests/dro.spec.js + dro-position + probe-wcs + probe-cue-refine (sim 20×). Commit: fb5b69b.
+
+## 2026-07-12 (t788) — BLOCKS EDIT LAG on heavy ops (ruled trigger split) + the empty-SIM-socket rider
+
+USER t783 (live): "if i load a pocket op, then switch to blocks, i have a hard time editing the block in the stack." GROUND FIRST (advisor), then fix at the pipeline level with the ruled trigger split. Commit 825bf76.
+
+GROUNDING (mapped by an Explore agent + instrumented, not guessed):
+- ONE field edit fired a FULLY SYNCHRONOUS chain, PER change event, with NO coalescing (the only async step was the rAF stock-carve): the change listener (blocksApp.js:557) → `reproject()` (:390) → `setStack`→`emitMapped` (a pocket ≈ 199 lines + 7 post-passes, HEAVY) → `renderViews` → `panel.setGcode` → `traceToolpath` (HEAVY, sometimes ×2) + 3D `viz.setSegments` (HEAVY) + `scheduleEndStateCarve` (rAF). A spinner drag / rapid commits ran the whole thing per event → the freeze.
+- The SIM socket lives on `op`/`*_op` blocks (bridge.js:260); `user_root` data-twins use PRESENTATION/EXECUTION mouths (no SIM socket). An op record `{type:'op',opType:'pocket'}` loads as a `pocket_op` block WITH a SIM socket. workspaceToStack reads it via `getInput('SIM').targetBlock()` (stackBridge.js:83) — so hiding via setVisible (NOT removeInput) preserves round-trip.
+- Glow-safety: the EDIT localizer (`opGlow._localizeEdit`) uses real from→to deltas (no sentinel); only the HOVER localizer (`_localizeValue`) uses the 987654.321 sentinel, and it is already guarded (try/catch on the emit + a line-count-mismatch bail). So the runaway-sentinel hazard is NOT on the edit path → my change can't implicate it.
+
+THE FIX — the ruled trigger split at the pipeline level (every heavy op, NOT a pocket special-case):
+- Split `renderViews` into `renderViewsPrompt` (code panel + selection + overlays + live form — cheap/moderate; glow + form-writeback read it) and `renderViewsPreview` (the HEAVY 2D/3D preview: trace + route + carve). A full render (load / resize) still runs both, in order.
+- `reproject()` (fired on a block edit) now runs the PROMPT half INLINE — `setStack` (model re-emit + editor text) + `renderViewsPrompt` — so the edit REFLECTS at once and glow / form-writeback see the fresh model synchronously; then it SCHEDULES the heavy preview via a leading-edge-free ~300ms THROTTLE (`schedulePreview`): at most one preview render per window, coalescing a burst. A typed commit's preview follows within ~300ms of quiescence; a continuous gesture tracks live at the window cadence instead of freezing per event.
+- Emit is BYTE-IDENTICAL after settle — only WHEN the heavy preview runs changed, never WHAT is emitted (the model/emit stays synchronous + current).
+- INSTRUMENTED: `window.__ddcsEditPerf()` exposes modelMs / previewMs / previewCount / pending / editsSincePreview; `window.__ddcsPreviewFlush()` forces the settled render for deterministic asserts.
+
+MEASURED (blocks-edit-lag-788.spec.js, 4/4):
+- a single edit's PROMPT half (re-emit + code + form) = modelMs < 100ms → the edit reflects at once.
+- a 12-edit burst → burstSyncMs < 120ms (no per-event freeze) + previewCount does NOT advance synchronously (deferred, pending=true, 12 edits coalesced) → settles to ONE preview render (not 12).
+- emit byte-identical after settle (the settled program == a direct emit of the same workspace state).
+- ⚠ HEADLESS CAVEAT: the isolated one-render cost measured ~11ms headless — but that UNDERSTATES the real machine cost (headless has no visible-WebGL 3D draw / carve mesh, the user's actual lag). The FIX is correct regardless of the absolute ms: it COALESCES a burst to one render + moves it OFF the edit. The coalescing + deferral is what's proven; the absolute per-render number is headless-understated.
+
+CONDITIONAL FALLBACK (ruled): NO manual Recalculate button / stale badge — the ruled condition (a quiescent recompute > ~1s on real programs) is not met (measured ~11ms; even a heavy machine render is well under 1s for a pocket, and it's coalesced + deferred so the user is never blocked). Left it OUT per the rule; if a future op's quiescent render genuinely exceeds ~1s, the honest form is the explicit stale badge (never a silently-outdated preview).
+
+RIDER (user t783, same tab): the op block's SIM mouth is redundant for MOST ops (sim declarations live in the user-op Presentation section) → hide the socket AND its "SIM" label row when EMPTY, adaptively in `applyOpGating` (runs after every load). `setVisible(false)` (not removeInput) keeps the connection so an op WITH a declared sim override stays visible + `workspaceToStack` still reads it → round-trip + emit/sim byte-identical. Named the label dummy `SIM_LBL` (bridge.js) so the whole row hides. Verified: `pocket_op` empty → SIM + label hidden; an op with simChildren → visible + round-trips (simChildren length preserved).
+
+NO EXISTING TEST MODIFIED: the model-sync design means the 2 tests that first broke under a coarse whole-reproject debounce (hand-built-form form-writeback readback · op-declared-edits glow ranges — both read the model right after an edit) pass UNCHANGED once the model half stayed synchronous. 35 op-block/SIM/round-trip tests green.
+
+⚑ 3 INHERITED FAILURES (NOT the blocks change — the advisor's date-version release; fixed test-only, commit 2b5b133): the first full-suite run of 825bf76 was 1147 passed + 2 skipped + 3 FAILED — update-check · web-version-nudge · stale-page-banner. Root cause: date-based versioning (4642f0b / a211f78) baked the version as 2026.07.12.1, but each test simulated a "newer" release as 99.x — and 99 < 2026, so isNewer CORRECTLY reports 99.x as OLDER → the banner never fires → timeout. The APP LOGIC IS CORRECT (the direct isNewer semver asserts still pass); only the fixtures were stale for the new format. Bumped the simulated version to 9999.x (always newer than any YYYY date). My blocks change added ZERO failures. FLAG for the advisor: these are your version domain — I fixed the stale fixtures to restore green; review if you want a different date-format fixture.
+
+SUITE: 1150 passed + 2 skipped = 1152 (== --list), 0 failed (workers=2, re-run after the fixture fix). View/pipeline-timing + one block-def attr (SIM_LBL name) — emit byte-identical.
+
+Files: web/blocks/blocksApp.js (renderViews split + the throttle + instrumentation + syncSimSocket in applyOpGating), web/blocks/blockly/bridge.js (SIM_LBL name), tests/blocks-edit-lag-788.spec.js (NEW). Commits: 825bf76 (the fix), 2b5b133 (the inherited version-fixture repair).
