@@ -10876,3 +10876,27 @@ SUITE: 1154 passed + 2 skipped = 1156 (== 1155 + 1 new), 0 failed (workers=2 —
 Files: web/ui/formWidgets.js (renderOpForm formHidden filter), web/blocks/dataOps/deriveBindings.js (carry formHidden + link), 7× *Data.js (formHidden flags), web/ui/headerPost.js (label), web/styles.css (chevron border), tests/stock-spill-792.spec.js (NEW). Commits: b3093c4 (P1), 695bda8 (P2).
 
 NOTE (env hazard mid-turn): `taskkill node.exe` to clear a stray detached full-suite run also took the dev server — Playwright's webServer config (`npx http-server ./web -p 3211`) auto-restarts it on the next run, so no manual restart needed. Lesson banked: don't blanket-kill node; target the PID.
+
+## 2026-07-12 (t794) — FORM-HONESTY Batch 2, sub-phased: 2a = P3 preset row (done); 2b = P4 deep-links (grounded, queued)
+
+The advisor's Batch 2 = P3 + P4. P4 (deep-links) is a substantial multi-part feature; I SUB-PHASED — 2a = P3 (complete + releasable), 2b = P4 (grounded below, next). Per "each batch releasable, pass back per batch".
+
+### P3 — THE PRESET ROW MOVES INTO THE FORM (adaptive) — commit 6612f17
+Presets leave the wizard header (one mis-tap from the ✕; the header is window chrome) for a slim row at the TOP of every wizard form:
+- 0 saved presets → a subtle `★ Save preset` link (no dead dropdown); ≥1 → `Preset: [pick ▾] [★ Save]` (the stock-modal template-row pattern).
+- `mountPresetRow(wm, wizElem)` (wizardTemplates.js) inserts the row as the first child of the active wizard's `.wiz-controls`, called from the SHARED wizardManager.open hook (every wizard inherits, idempotent). Keyed by `wm._activeType`.
+- REUSES the existing per-op machinery VERBATIM: `[pick ▾]` loads (wm._seedForm + update); `[★ Save]` opens the existing `openTemplatesPopover` (save + list + DELETE — nothing lost), re-anchored to the row, given a new `onChange` callback so the row re-renders its adaptive state after a save/delete.
+- The header `.wiz-templates` span (index.html) + its click wiring + the drag-ignore entry are REMOVED.
+- preset-row-794.spec.js: adaptive 0 vs ≥1 states + the header button gone; smalls-696 (b4) updated to the form-row affordance. Screenshot: "PRESET [Load… ▾] [★ Save]" at the form top, bordered, legible.
+
+### P4 — FIELD DEEP-LINKS (Batch 2b — GROUNDED, ready to build next)
+The `link` slot is already carried through deriveBindings + mergeBindingsByParam (done in P1, forward-decl). The build:
+1. renderOpForm renders a row-end gear ⚙ when a binding has `link: {kind:'settings', group, panel}` | `{kind:'modal', id}`; click → `pushReturn(label, reopenWizard)` (navReturn.js:24, the return-glow) then navigate.
+2. The settings deep-link seam EXISTS: `_settingsNavTo(group, panelId)` (settingsPanel.js:2760 — the Homing ⚙ precedent). The WCS TABLE lives in Settings → Machine (group likely 'hardware'; GROUND the exact panelId at build). The visibility footer 'More preview settings…' → `_settingsNavTo(<group>, 'preview'/the preview panel)`.
+3. Declare `link` (→ WCS table) on the shared `wcs` binding so EVERY twin + the stock modal's "Sits at WCS" inherits it (GROUND: is the wcs binding one shared spec or per-twin? — it's `param: 'wcs'` in each *Data.js + wcsData.js; if per-twin, a shared WCS_LINK constant referenced by each keeps it one-source).
+4. The 👁 visibility modal footer gains the 'More preview settings…' link (beside Reset/Done) → Settings → Preview.
+Acceptance (from the entry): the wcs row's ⚙ opens Settings scrolled to the WCS table over the wizard + returns with the glow; a stock-modal Sits-at-WCS ⚙ same; every twin inherits (spot-check 3); grep — no per-wizard link code (declared data only).
+
+SUITE: 1153 passed + 2 skipped, + 2 test-only failures (retired-header-button selectors) fixed test-only (commit 46-) = 1155 pass + 2 skip effective, 0 product failures (workers=2 — P3 touches the shared wizardManager.open; verified across every wizard open).
+
+Files (P3): web/ui/wizardTemplates.js (mountPresetRow + onChange), web/wizardManager.js (mount call + import + retire wiring), web/index.html (retire the header span), web/styles.css (preset-row CSS), tests/preset-row-794.spec.js (NEW), tests/smalls-696.spec.js (updated). Commit: 6612f17.
