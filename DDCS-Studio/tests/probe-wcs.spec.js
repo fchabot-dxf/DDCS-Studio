@@ -14,7 +14,8 @@ async function setup(page, program) {
   await page.goto(BASE);
   await page.waitForFunction(() => !!window.ioPanel && typeof window.ddcsGetSettings === 'function' && typeof window.setGcodeView === 'function');
   await page.locator('#editor').fill(program);
-  await page.evaluate(() => { window.ddcsGetSettings().preview.autoLoop = false; });
+  // SUITE DIET (t786): sim at 20× — all asserts read the END STATE (WCS/datum written) after 'complete', never during motion.
+  await page.evaluate(() => { window.ddcsGetSettings().preview.autoLoop = false; window.ddcsGetSettings().preview.defaultSpeed = 20; });
   await page.evaluate(() => window.setGcodeView('3d'));
   await page.waitForSelector(RUN, { state: 'attached', timeout: 8000 });
 }

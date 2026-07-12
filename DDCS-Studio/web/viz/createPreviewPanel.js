@@ -99,7 +99,7 @@ const PANEL_HTML = `
     <button class="pp-mtoggle viz3d-2dtoggle" type="button" title="Toggle 2D / 3D view">3D</button>
     <button class="pp-stock" type="button" title="Stock — set the workpiece (dimensions, shape, show, templates)" aria-label="Stock">📦</button>
     <button class="pp-vis" type="button" title="Show / hide preview elements (stock, toolpath, tool, envelope, …) + their opacity" aria-label="Preview visibility">👁</button>
-    <button class="pp-speed" type="button" title="Simulation speed — tap to cycle 1× 2× 5× 10×" aria-label="Simulation speed">1×</button>
+    <button class="pp-speed" type="button" title="Simulation speed — tap to cycle 1× 2× 5× 10× 20×" aria-label="Simulation speed">1×</button>
     <button class="pp-run" type="button" title="Run the program · while running, click to stop and reset to the start">${ICON_PLAY}</button>
     <button class="pp-step" type="button" title="Execute one line at a time (pauses a running program)">${ICON_STEP}</button>
     <button class="pp-loop" type="button" title="Loop: restart the program when it completes" aria-label="Loop">${ICON_LOOP}</button>
@@ -295,7 +295,7 @@ export function createPreviewPanel(container, opts = {}) {
         statusEl.classList.toggle('has-error', !!isError);
         const cp = q('.pp-copy'); if (cp) cp.classList.toggle('visible', !!(text && text.length));
     };
-    const SPEEDS = [1, 2, 5, 10];
+    const SPEEDS = [1, 2, 5, 10, 20];   // 20× tier (t786) — a fast fly-through for long programs; app-wide (users get it too)
     let speedIx = Math.max(0, SPEEDS.indexOf(Number(previewPrefs().defaultSpeed) || 2));   // STICKY: defaults to 2×, restores the user's last pick
     const simSpeed = () => SPEEDS[speedIx] || 1;
     if (q('.pp-speed')) q('.pp-speed').textContent = simSpeed() + '×';   // reflect the (sticky) speed on load, not the hardcoded 1×
@@ -832,7 +832,7 @@ export function createPreviewPanel(container, opts = {}) {
     });
     q('.pp-step').addEventListener('click', () => { const eng = ensureEngine(); if (viz && !eng.running) viz.setAnimate(false); eng.step(get('getGcode') || ''); updateRunBtn(); });
     q('.pp-loop').addEventListener('click', () => { loopOn = !loopOn; q('.pp-loop').classList.toggle('on', loopOn); if (!loopOn && loopTimer) { clearTimeout(loopTimer); loopTimer = null; } });
-    q('.pp-speed').addEventListener('click', () => {   // cycle 1× → 2× → 5× → 10× → 1×
+    q('.pp-speed').addEventListener('click', () => {   // cycle 1× → 2× → 5× → 10× → 20× → 1×
         speedIx = (speedIx + 1) % SPEEDS.length;
         q('.pp-speed').textContent = SPEEDS[speedIx] + '×';
         if (engine) engine.simSpeed = simSpeed();

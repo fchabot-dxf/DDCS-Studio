@@ -14,7 +14,9 @@ async function setup(page, program) {
   await page.goto(BASE);
   await page.waitForFunction(() => !!window.ioPanel && typeof window.ddcsGetSettings === 'function' && typeof window.setGcodeView === 'function');
   await page.locator('#editor').fill(program);
-  await page.evaluate(() => { window.ddcsGetSettings().preview.autoLoop = false; });
+  // SUITE DIET (t786): run the sim at 20× — every DRO test asserts only the END STATE (final Work/Mach after the program
+  // completes), never samples DURING motion, so a fast fly-through is safe and identical. (16.2s → 15.1s isolated.)
+  await page.evaluate(() => { window.ddcsGetSettings().preview.autoLoop = false; window.ddcsGetSettings().preview.defaultSpeed = 20; });
   await page.evaluate(() => window.setGcodeView('3d'));
   await page.waitForSelector(RUN, { state: 'attached', timeout: 8000 });
 }

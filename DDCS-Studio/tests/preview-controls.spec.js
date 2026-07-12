@@ -54,13 +54,13 @@ test('preview: single 2D/3D toggle, one Stock, always-visible compact controls',
   expect(twoD.w, '2D canvas has a real size').toBeGreaterThan(10);
   expect(twoD.drawn, '2D toolpath actually drew pixels').toBeGreaterThan(0);
 
-  // speed is a cycling button (1× → 2× → 5× → 10× → 1×), not a dropdown
+  // speed is a cycling button (1× → 2× → 5× → 10× → 20× → 1×), not a dropdown — 20× is the t786 fast tier
   const sp = await page.evaluate(() => {
     const s = [...document.querySelectorAll('.preview-panel')].find((x) => x.querySelector('.pp-speed')).querySelector('.pp-speed');
     const seq = [s.textContent.trim()];
-    for (let i = 0; i < 4; i++) { s.click(); seq.push(s.textContent.trim()); }
+    for (let i = 0; i < 5; i++) { s.click(); seq.push(s.textContent.trim()); }
     return { tag: s.tagName, seq };
   });
   expect(sp.tag, 'speed is a button, not a select').toBe('BUTTON');
-  expect(sp.seq, 'defaults to 2× and cycles 2×→5×→10×→1×→2×').toEqual(['2×', '5×', '10×', '1×', '2×']);
+  expect(sp.seq, 'defaults to 2× and cycles 2×→5×→10×→20×→1×→2×').toEqual(['2×', '5×', '10×', '20×', '1×', '2×']);
 });
