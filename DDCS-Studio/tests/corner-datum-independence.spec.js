@@ -57,8 +57,12 @@ test('corner-pick circles stay on the physical corners at any datum; the crossha
   // CENTRE datum — crosshair at the block centre; circles still physical
   const cc = await inspect('ccp', 'FR');
   for (const c of ['FL', 'FR', 'BL', 'BR']) expect({ x: cc.circles[c].x, y: cc.circles[c].y }).toEqual(cc.phys[c]);
-  expect(cc.cross.x, 'centre datum → crosshair x at mid-width').toBe(Math.round((cc.phys.FL.x + cc.phys.FR.x) / 2));
-  expect(cc.cross.y, 'centre datum → crosshair y at mid-height').toBe(Math.round((cc.phys.BL.y + cc.phys.FL.y) / 2));
+  // ±1px: the crosshair renders from the centre datum in mm (round(centreFrac·W)), while this re-derives the midpoint
+  // from the ALREADY-rounded corner-circle px — the two agree to a pixel-rounding boundary. (At a CORNER datum the
+  // crosshair shares the circle's source, so lines 48/54 stay exact; only this re-derived midpoint needs the tolerance.)
+  // The t784 side-chevron strip narrowed the 2D canvas by 44px, tipping the rounding here; the property is unchanged.
+  expect(Math.abs(cc.cross.x - Math.round((cc.phys.FL.x + cc.phys.FR.x) / 2)), 'centre datum → crosshair x at mid-width (±1px rounding)').toBeLessThanOrEqual(1);
+  expect(Math.abs(cc.cross.y - Math.round((cc.phys.BL.y + cc.phys.FL.y) / 2)), 'centre datum → crosshair y at mid-height (±1px rounding)').toBeLessThanOrEqual(1);
 
   // EMIT byte-identical across datums — the corner probe emit never reads the stock datum
   const emitAt = (datum) => page.evaluate(async (d) => {

@@ -48,7 +48,9 @@ test.describe('collapse gives the form the space (mobile) — the surviving pane
     const visBefore = await visualH(page, 'contour');
 
     await strip(page, 'contour', 'preview3d').click();
-    await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').getAttribute('data-collapsed') === '1', null, { timeout: 3000 });
+    // wait for the collapse ANIMATION to actually finish (attribute flips instantly, height settles up to ~350ms) —
+    // under workers=2 load a bare attribute-wait measured mid-animation (~184px). Mirror the height-settle guard.
+    await page.waitForFunction(() => { const el = document.querySelector('#wiz_contour [data-viz-pane="preview3d"]'); return el.getAttribute('data-collapsed') === '1' && el.getBoundingClientRect().height < 60; }, null, { timeout: 3000 });
     const h3Collapsed = (await p3.boundingBox()).height;
     expect(h3Collapsed, 'collapsed the 3D pane is just its strip').toBeLessThan(60);
     expect(h3Expanded - h3Collapsed, 'collapsing frees the 3D height').toBeGreaterThan(100);
