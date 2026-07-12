@@ -297,7 +297,7 @@ export function createToolpath2d(canvas, opts = {}) {
         const d = displayOf('poschip'), g = chipGate() * d.alpha;
         if (!chipPos || !d.visible || g <= 0.02) { canvas.__t2chip = null; return; }
         const hx = ptx(chipPos.x, chipPos.pass), hy = pty(chipPos.y, chipPos.pass);
-        const text = 'X ' + chipPos.x.toFixed(3) + '  Y ' + chipPos.y.toFixed(3) + '  Z ' + (chipPos.z || 0).toFixed(3);   // t780 (user) — the Z line (DRO-equal)
+        const text = (chipPos.wcs ? chipPos.wcs + '  ' : '') + 'X ' + chipPos.x.toFixed(3) + '  Y ' + chipPos.y.toFixed(3) + '  Z ' + (chipPos.z || 0).toFixed(3);   // t780 (user) — the frame label + the Z line (DRO-equal)
         ctx.save(); ctx.globalAlpha = g; ctx.font = 'bold 11px monospace';
         const bw = ctx.measureText(text).width + 12, bh = 18, bx = hx + 12, by = hy - bh - 8;   // offset up-right, off the cut
         ctx.fillStyle = 'rgba(10,14,20,0.82)'; ctx.fillRect(bx, by, bw, bh);
@@ -362,7 +362,7 @@ export function createToolpath2d(canvas, opts = {}) {
     function setStartEmits(arr) { startEmits = Array.isArray(arr) ? arr.slice() : []; if (view) paint(); }   // per-pass marker SHAPE: emitting (a drag edits the program) = filled ◆, sim-only = hollow ◇
     function setPassEnds(arr) { passEnds = Array.isArray(arr) ? arr : null; if (view) paint(); }   // t107 — per-pass RUNTIME world-ENDs (from the trace): an anchorsAtPrev pass anchors its route at passEnds[p-1] + relocates its marker to end+cross
     function setAnchor(v) { anchorToStart = !!v; if (view) paint(); }   // mirror the 3D's _anchorToStart: anchored → path emanates from the start, not the stock pin
-    function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0, pass: p.pass } : null; if (p) { chipPos = { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, pass: p.pass }; chipMs = nowMs(); } if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D) + the poschip's WORK coords (the SAME onPositionChange source as the DRO); pass → per-pass anchor (INC4)
+    function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0, pass: p.pass } : null; if (p) { chipPos = { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, pass: p.pass, wcs: p.wcs || '' }; chipMs = nowMs(); } if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D) + the poschip's WORK coords (the SAME onPositionChange source as the DRO); pass → per-pass anchor (INC4)
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
 
     // ---- play / progress ----

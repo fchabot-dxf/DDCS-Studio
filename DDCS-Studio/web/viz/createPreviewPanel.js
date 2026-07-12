@@ -417,7 +417,7 @@ export function createPreviewPanel(container, opts = {}) {
                     if (c) { const r = engine.vars.get(6); if (Number.isFinite(r)) viz.nudgeSurface(c.axis, r * c.sign); }
                 }
             },
-            onPositionChange: (pos) => { lastPass = pos.pass || 0; if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } if (toolPosSubs.length) { const k = segs.length ? nearest2d(pos) : 0; for (const cb of toolPosSubs) cb(pos, k); }
+            onPositionChange: (pos) => { lastPass = pos.pass || 0; pos.wcs = (droWcsEl && droWcsEl.textContent) || '';   /* t780 (user) — the chip STATES its frame: the active-WCS label rides the position (one source: the DRO header) */ if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(nearest2d(pos)); t2.setToolPosition(pos); } if (toolPosSubs.length) { const k = segs.length ? nearest2d(pos) : 0; for (const cb of toolPosSubs) cb(pos, k); }
                 // t680 — LIVE progressive carve: remove material along the swept sub-step (feed class handled inside carveStep), re-mesh throttled.
                 if (viz && viz.carveStep && carveEnabled() && !_carveDegraded) { if (_carvePrev) viz.carveStep(_carvePrev, pos, _carveTR, _carveTip); _carvePrev = pos; if (viz.carveDirty && viz.carveDirty()) _carveDirty = true; carveRemeshThrottled(); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
             onStatus: ({ message }) => setStatus(message),

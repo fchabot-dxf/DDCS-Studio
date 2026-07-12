@@ -662,7 +662,7 @@ export class GcodeViz3D {
         this._posChip = sp; this._posChipCv = cv; this._posChipTex = tex;
         this.scene.add(sp);
     }
-    _drawPosChipTex(x, y, z) {
+    _drawPosChipTex(x, y, z, wcs) {
         const cv = this._posChipCv, c = cv.getContext('2d');
         c.clearRect(0, 0, cv.width, cv.height);
         c.fillStyle = 'rgba(10,14,20,0.85)'; c.fillRect(0, 0, cv.width, cv.height);
@@ -671,14 +671,15 @@ export class GcodeViz3D {
         try { wc = (getComputedStyle(document.documentElement).getPropertyValue('--coord-work') || wc).trim() || wc; } catch (_) { /* headless */ }
         c.fillStyle = wc; c.font = 'bold 30px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
         c.fillText('X ' + x.toFixed(3), 14, 22); c.fillText('Y ' + y.toFixed(3), 14, 52); c.fillText('Z ' + z.toFixed(3), 14, 82);   // t780 (user) — the Z line (DRO-equal work Z)
+        if (wcs) { c.globalAlpha = 0.75; c.font = 'bold 22px monospace'; c.textAlign = 'right'; c.fillText(wcs, cv.width - 12, 22); c.globalAlpha = 1; }   // t780 (user) — the chip STATES its frame (the active WCS)
         this._posChipTex.needsUpdate = true;
     }
     _updatePosChip(pos) {
         if (!displayOf('poschip').visible) { if (this._posChip) this._posChip.visible = false; return; }
         this._ensurePosChip();
-        this._posChipVal = { x: Number(pos.x) || 0, y: Number(pos.y) || 0, z: Number(pos.z) || 0 };
+        this._posChipVal = { x: Number(pos.x) || 0, y: Number(pos.y) || 0, z: Number(pos.z) || 0, wcs: pos.wcs || '' };
         this._posChipMoveMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y, this._posChipVal.z);
+        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y, this._posChipVal.z, this._posChipVal.wcs);
         const t = this._animTool;
         if (t) { t.updateWorldMatrix(true, false); const w = t.getWorldPosition(new this.THREE.Vector3()); this._posChip.position.set(w.x, w.y, w.z + 24); }   // ride the head, lifted clear of the cut
         this._posChip.material.opacity = displayOf('poschip').alpha;
