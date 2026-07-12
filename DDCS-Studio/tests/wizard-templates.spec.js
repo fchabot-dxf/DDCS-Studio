@@ -19,10 +19,11 @@ test('wizard templates: store round-trips and the popover loads a template into 
   });
   expect(store.has, 'saved template is listed locally').toBeTruthy();
 
-  // open the Edge wizard, open the Templates popover, load T1
+  // open the Edge wizard, open the Templates popover via the form-top ★ Save (t794 — the header 📑 button retired), load T1
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('edge'));
   await page.waitForSelector('#wiz_edge', { state: 'visible' });
-  await page.click('.wiz-templates');
+  await page.waitForSelector('#wiz_edge .wiz-preset-row .wpr-save', { timeout: 8000 });
+  await page.click('#wiz_edge .wiz-preset-row .wpr-save');
   await page.waitForSelector('.wiz-tpl-pop .wt-row');
   expect(await page.textContent('.wiz-tpl-pop .wt-name')).toContain('T1');
 
@@ -52,7 +53,8 @@ test('the popover "Save current as template" actually saves the open wizard (reg
   // in-app dialogs: name via prompt ('FromPopover'), confirm → Cancel = local. Any "Nothing to save…" notice is recorded.
   await autoAppDialog(page, { accept: false, prompt: 'FromPopover' });
 
-  await page.click('.wiz-templates');
+  await page.waitForSelector('#wiz_drill .wiz-preset-row .wpr-save', { timeout: 8000 });
+  await page.click('#wiz_drill .wiz-preset-row .wpr-save');
   await page.waitForSelector('.wiz-tpl-pop .wt-save');
   await page.click('.wiz-tpl-pop .wt-save');
   await page.waitForTimeout(300);
