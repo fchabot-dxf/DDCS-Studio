@@ -107,7 +107,11 @@ test('the twin marker DRAG (2D→3D flow): the drag moves A and the 3D trace FOL
     // the FIX (no origin) must HOLD after a real drag in the 2D→3D flow — the exact seat is drag-position-dependent, so
     // assert the invariant the bug violated: NO trace vertex at the machine origin, and the trace head is near the fence (A),
     // not origin. (The trace head vs marker A differ only by the probe APPROACH offset — alignment geometry, not the bug.)
-    expect(r.minO, 'twin after a real DRAG (2D→3D): NO trace vertex at the origin (the fix holds)').toBeGreaterThan(10);
+    // >5, not >10: the fresh-seat BUG collapses a trace vertex ONTO the machine origin (minO≈0), so >5 still catches it
+    // decisively. The t784 side-chevron strip narrowed the 2D canvas ~44px → the fixed 70px drag now lands A a few mm
+    // further along the fence (larger px→world scale), so the nearest legit vertex sits ~9.6mm out (was >10). The
+    // invariant asserted is unchanged: no vertex AT the origin.
+    expect(r.minO, 'twin after a real DRAG (2D→3D): NO trace vertex at the origin (the fix holds)').toBeGreaterThan(5);
     expect(fromOrigin(r.head), 'the TRACE head is near the fence (off-origin) after the drag').toBeGreaterThan(10);
     { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_fresh_seat.png', clip: _b }); }   // t712 clip capture (rAF-starvation dodge)
 });
