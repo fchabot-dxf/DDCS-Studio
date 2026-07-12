@@ -2470,6 +2470,7 @@ button.primary:hover {
 .settings-modal {
     width: min(1500px, 96vw);
     height: min(1000px, 94vh);
+    height: min(1000px, 94dvh);   /* t782 — dvh so the centered modal never exceeds the VISIBLE height (mobile URL bar) */
     display: flex; flex-direction: column;
     background: var(--bg, #111);
     border: 1px solid var(--outline, var(--border, #444));
@@ -2478,7 +2479,16 @@ button.primary:hover {
     overflow: hidden;
 }
 @media (max-width: 600px) {
-    .settings-modal { width: 100vw; height: 100vh; max-width: none; border-radius: 0; border: none; }
+    /* t782 — the full-screen mobile Settings: 100dvh = the CURRENT visible height, so the top tab strip is never clipped
+       under the phone browser's URL bar (100vh = the LARGE viewport → the centered modal overflowed + its head hid above
+       the fold). Top-aligned (not centered) so the head sits at the visible top; safe-area insets keep the tabs clear of
+       the notch and the footer clear of the home indicator. */
+    #settings-overlay.settings-overlay { align-items: flex-start; }   /* id specificity — beats the later .settings-overlay{align-items:center} */
+    .settings-modal {
+        width: 100vw; max-width: none; border-radius: 0; border: none; box-sizing: border-box;
+        height: 100vh; height: 100dvh;   /* the CURRENT visible height — adapts as the URL bar shows/hides */
+        padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom);
+    }
 }
 
 /* ============================================
