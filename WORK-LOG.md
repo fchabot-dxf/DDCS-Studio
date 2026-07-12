@@ -10624,3 +10624,25 @@ Screenshot scratchpad/spindle-decl.png (the SPINDLE section, the hint, the two c
 Files: web/ui/settingsPanel.js + tests/spindle-declaration-774.spec.js (NEW).
 
 NEXT — two separable pieces (advisor sequences): (1b) the PULL-seed (twinned decode of #188/#189/#79/#80 -> settings.spindle.interface/mappingAxis, review-then-apply, golden re-pin); (2) THE TAPPING DATA-TWIN (thread preset table metric+imperial+custom; the pitch-locked feed F derived + shown read-only; the floating-holder cycle M3/dwell/G1-to-depth/M4/G1-out/M5 dialect-portable; the RIGID G84 variant grey-gated on spindle.tapCapable AND Expert; low-RPM default, no peck v1; the standard twin bar). The declaration is READY for the tapping gate. PASS BACK.
+
+## 2026-07-12 (t776) — TAPPING Phase 2a: the emit core (preset table + pitch-locked feed + the floating-holder cycle)
+
+Built the TAPPING emit core — the novel/risky half (the cycle, the feed math, the presets). Phased the wizard: 2a = the tested emit foundation (this turn); 2b = the data-twin (form + thread-preset picker + derived-F display + reversible/rigid gates + preview + round-trip + registration + tool tie-in).
+
+WHAT LANDED:
+- THE THREAD PRESET TABLE (wizards/threads.js): THREAD_PRESETS — metric coarse (M3-M16) + fine (M8/M10/M12) + imperial UNC (#10-24 .. 1/2-13) + UNF (1/4-28, 3/8-24). Each carries the mm LEAD (imperial = 25.4/TPI baked in), so the feed derivation is UNIFORM. threadPreset(name) + tapFeed(rpm, pitch).
+- THE PITCH-LOCKED FEED (uniform, both unit systems): F (mm/min) = RPM * pitch(mm). Metric M6x1.0 @400 -> F400; imperial 1/4-20 @400 -> lead 1.27 -> F508. The feed is DERIVED IN THE ATOM (never a stored param) -> valid-by-construction, the shown feed can't drift from the emit.
+- THE TAP ATOM (wizards/ops/tap.js, registered in ops/index.js): a leaf `tap` block. FLOATING-HOLDER cycle (every DDCS post): rapid to XY at clearance, M3 S<low> + a stabilize dwell (dialect.dwell -> P units per post), G1 to depth at the locked F, M4 (reverse), G1 out at the same F, M5. RIGID (G84-style, opt-in): G84 Z R F + G80 + a VERIFY note (the exact surface is unverified on hardware per TAPPING-CAPABILITY.md). extent = a point (placement-portable like drill).
+- THE TAP STACK (wizards/tapWizard.js): tapStack -> [progstart(tap rpm), wcs, placeOnStock{ tap }, progend]. optIn:true = absolute x/y placement (the text twin's precedent) so the hole stays where the user put it. The frame spins at the LOW tap rpm (a router default would spin dangerously into the thread).
+
+BUG CAUGHT (the applyModalFeed poison): my cycle comment `( ... F400 locked ... )` contained " F400", which applyModalFeed's ` F<digits>` regex matched -> it set modalF=400 and then STRIPPED the real F400 off the G1-to-depth line as "redundant." Reworded the comment ("feed 400 mm/min") so the modal-feed tracker only sees real feed words. (A good reminder: comments must not contain a space-F-digits token.)
+
+VERIFIED (real symptom, tests/tapping-776.spec.js — 3 tests):
+1. the feed derivation: M6x1.0 @400 -> F400; 1/4-20 lead = 1.27 -> F508 (the advisor cycle-math goldens).
+2. the floating-holder cycle emits M3 -> dwell -> G1-to-depth at the locked F -> M4 -> feed out (F modal) -> M5, in order; the imperial op emits F508 to depth.
+3. the RIGID variant emits G84 Z + G80 + the VERIFY note, and does NOT use the floating-holder G1-F move.
+FULL SUITE: 1130 passed + 2 skipped = 1132 (== --list), 0 failed, workers=3. Additive — a new atom + a new emit path; no existing golden touched.
+
+Files: web/wizards/threads.js (NEW), web/wizards/ops/tap.js (NEW), web/wizards/tapWizard.js (NEW), web/wizards/ops/index.js (register tapBlock), tests/tapping-776.spec.js (NEW).
+
+NEXT (Phase 2b, the data-twin — the user-facing wizard): tapData.js mirroring drillData (def + bindings: x/y/depth/rpm/pitch/dwell/clearance/rigid + placement + wcs) + toolBindingsFor (the tap-tool picker + the tool-change tie-in, free) + entryBindingsFor; a thread-preset picker widget (fills pitch, mirror toolpick); the derived-F shown read-only (statusHint) + a reversible-warn (grey with why when spindle.reversible is false); the RIGID toggle grey-gated on spindle.tapCapable AND the Expert post; previewGeometry (position + thread-O); registration (opensAs, mill_datawiz); Blockly round-trip + form-integrity/audit. The emit core is the proven foundation it wraps. PASS BACK.
