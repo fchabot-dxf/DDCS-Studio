@@ -10921,3 +10921,33 @@ SUITE: 1159 passed + 2 skipped, 0 failed (workers=2 — P4 appends the gear via 
 Files: web/ui/formWidgets.js (FIELD_LINKS + openFieldLink + linkGear + the gear in renderOpForm), web/ui/stockEditor.js (Sits-at-WCS ⚙), web/ui/visibilityModal.js (footer link), web/styles.css (gear CSS), tests/field-deeplink-796.spec.js (NEW). Commit: 697029a.
 
 FORM-HONESTY PROGRESS: P1 stock spill + P2 honest labels (V.4) · P3 preset row (V.5) · P4 deep-links (this). REMAINING: Batch 3 = P5 field help (whole-row hover + the ~162-text content sweep + help-coverage guard) alone; Batch 4 = P6 clearing cluster + P7 shadow forms.
+
+## 2026-07-12 (t798) — FORM-HONESTY Batch 3: P5 FIELD HELP
+
+The advisor dispatched Batch 3 = P5 (whole-row hover + the content sweep + a help-coverage guard). Commit 8985d4e.
+
+P5.1 WHOLE-ROW HOVER (done + verified): the help title moved from the label to the ROW HOST in addRow — `if (help) { row.title = help; row.dataset.help = '1'; }`. Now hovering the INPUT or the widget (not just the label) shows the help, because the row CONTAINS them all. The `data-help` marker is what the coverage guard reads (precise: a widget's own title does NOT count as help).
+
+P5.2 THE CONTENT SWEEP — one-source first, per-twin second, ported BY MEANING (not blind copy):
+- **FIELD_HELP** (formWidgets.js) = the shared param→help map; `helpFor(b) = b.help || FIELD_HELP[b.param] || b.readonlyHint || null`. Filled the shared/mill params (wcs, originX/Y, offZ, feed, plunge, clearance, toolDia, depth, stepdown, stepoverPct, shape, sides, pattern, pathDatum, stockAttach, entryX/Y) PLUS the gap params the 24-twin guard surfaced: the ATC warm-up stages (rpm1/time1/rpm2/time2), stock geometry (stockDatum/stockW/stockH/stockZ), tap (rigid), set-WCS (axisX/Y/Z, sync, slave), corner (travelDist).
+- **Per-twin help** (the *Data.js binding specs, carried through deriveBindings' `help` whitelist): drill (dia/skip/peck), bore (dia/skip/holeDia/pitch), pocket (strategy + wallOffset via the leafPair `extra`), slot (width), surfacing (w/h/stepover/strategy), text (height/strokeWidth/width/slant/spacing/font/rotation/lineSpacing).
+- **readonlyHint AS help**: a readonly canvas-set field (e.g. middle's `diagPrimary`, "Set by dragging the ② handle on the 2D canvas") now uses its readonlyHint as the help — the hint IS the declared explanation. helpFor's 3rd fallback; readonlyHint already flows through derive (deriveBindings.js:87) and already titles the input (formWidgets.js:73).
+
+MEANING-FIT — 5 spot-reads (the dispatch's "by meaning, not blind copy"):
+1. **sync** — ported VERBATIM from the built-in `m_sync_a` title: "Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis." The wcs twin's `sync` bool IS that toggle. ✓
+2. **slave** — ported VERBATIM from `m_slave`: "WCS offset index for slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4])." Same enum. ✓
+3. **feed** — NOT blind-copied: the built-in probe forms title `feed_fast`/`feed_slow` as "Fast/Slow probe feedrate #3/#4" — a DIFFERENT param. The mill twins' `feed` is the cutting feed, so authored "Cutting feed rate (mm/min) for the lateral moves." (by meaning, not the probe title). ✓
+4. **rigid** — built-in label "Rigid tap (G84)"; help "Rigid tapping (G84 — spindle synchronised to Z). Off = floating/tension-compression tap holder." (G84 = rigid; explains the off-state). ✓
+5. **stepoverPct** — "Spacing between parallel passes as a % of tool Ø (40% = a 2.4mm step on a Ø6 tool)." matches the surfacing/pocket stepover semantic. ✓
+
+P5.3 THE COVERAGE GUARD (tests/field-help-798.spec.js): enumerates every `user_*` twin (24), opens each, and asserts every visible `[data-param]` has a helped row (`closest('[data-help]')`) OR its param is in the declared HELP_EXEMPT. First run flagged 5 twins' gaps (atc_warmup, tap, wcs, corner, middle) — the twins outside the mill sweep — which drove the FIELD_HELP additions + the readonlyHint fallback above. Now GREEN: full coverage across all 24. HELP_EXEMPT gained the positional canvas-handle fields (cross1_x/cross1_y/startX/startY — role x/y dX/dY offsets, self-documenting via the 2D layout + label, same category as the already-exempt x/y/ax/ay).
+
+TOUCH LIMITATION (noted honestly): tooltips are HOVER-only. On touch there is no hover, so the help is not reachable by finger yet — the long-press-to-reveal path is a SEPARATE queued item, not this turn (the dispatch said so explicitly).
+
+FLAG for the advisor — a P1 residue found while sweeping: the **tap** twin's stock fields (stockDatum/stockW/stockH/stockZ) are NOT `formHidden`, so tap still spills the stock block onto its form (bore/contour/drill got formHidden in P1). I gave them declared help so P5 coverage is honest, but did NOT change tap's field visibility (that's a P1 behavior change — the advisor should decide whether P1's stock-spill sweep should include tap). Not expanded here (one task per wake).
+
+SUITE: 1161 passed + 2 skipped, 0 failed (workers=2) (workers=2 — P5 touches the shared renderOpForm + helpFor + deriveBindings; verified no twin-form regression). View-only (a row title + a data attribute; no emit path).
+
+Files: web/ui/formWidgets.js (FIELD_HELP fill + HELP_EXEMPT + helpFor readonlyHint fallback + row.title/data-help in addRow), web/blocks/dataOps/{drill,bore,pocket,slot,surfacing,text}Data.js (per-twin help), tests/field-help-798.spec.js (NEW). Commit: 8985d4e.
+
+FORM-HONESTY PROGRESS: P1 stock spill + P2 honest labels (V.4) · P3 preset row (V.5) · P4 deep-links (V.6) · P5 field help (this). REMAINING: Batch 4 = P6 clearing cluster + P7 shadow forms.
