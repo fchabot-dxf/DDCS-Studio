@@ -512,9 +512,9 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
     position: relative;   /* t748 — anchors the ≥44px hit-area expander (::before) */
     display: inline-flex; align-items: center; justify-content: center;
     width: 28px; height: 30px; min-height: 0; padding: 0;   /* t748 — visually wider than the old 20px pill (phone tightens it back below) */
-    border: 1px solid transparent; border-radius: var(--radius, 6px);
+    border: 1px solid var(--border, rgba(255,255,255,.22)); border-radius: var(--radius, 6px);   /* t792 — a VISIBLE theme-aware border so the chevron reads as a button, not a bare icon */
     background: transparent; color: var(--text-main, #e6edf3);
-    cursor: pointer; opacity: .7; transition: opacity .12s ease, background .12s ease, border-color .12s ease;
+    cursor: pointer; opacity: .82; transition: opacity .12s ease, background .12s ease, border-color .12s ease;
     box-shadow: none; text-shadow: none;
 }
 /* t748 — a REAL touch target: a transparent ≥44px hit-area expander that overflows the visible chevron

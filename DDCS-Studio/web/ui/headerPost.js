@@ -41,7 +41,7 @@ const HQ_ACTIONS = [
     { act: 'open',   label: 'Open project' },
     { act: 'save',   label: 'Save project' },
     { act: 'wizard', label: 'Save as custom wizard' },   // register the current op's stack as a bar button (+ its form)
-    { act: 'load',   label: 'Load file' },
+    { act: 'load',   label: 'Load gcode (replace)' },
     { act: 'insert', label: 'Insert gcode' },
     // Copy moved to a floating button in the editor (ui: #editor-copy-btn). Clear stays here as the phone access
     // point (the header Clear shortcut is desktop-only); on desktop it's a fallback to the header trash button.
