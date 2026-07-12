@@ -2296,6 +2296,10 @@ function wireSettingsOverlay(ov) {
         const n = parseInt(num, 10);
         return Number.isFinite(n) ? '#' + (base + n - 1) : '#—';
     }
+    // t768 P1b — CONTEXT-AWARE mode: null = edit-only (opened from Settings, exactly as before); { onPick } = PICK mode
+    // (opened from a wizard's ⚙). In pick mode each row grows a "Use" affordance (+ row double-click) that selects the tool
+    // INTO the wizard binding + closes. Editing/adding stays available in pick mode so add-then-use has no dead end.
+    let _toolLibPick = null;
     function renderToolLibRows() {
         const body = document.getElementById('toollib-rows');
         if (!body) return;
@@ -2317,7 +2321,7 @@ function wireSettingsOverlay(ov) {
                 '<td class="tl-prof" data-prof="' + i + '">' + toolProfileSvg(t, { w: 26, h: 40 }) + '</td>' +
                 cell(i, 'dia', t.dia) + cell(i, 'flutes', t.flutes, '1') + cell(i, 'length', t.length, '0.001') +
                 cell(i, 'rpm', t.rpm, '1') + cell(i, 'feed', t.feed, '1') + cell(i, 'plunge', t.plunge, '1') +
-                '<td><button class="tl-del" data-del="' + i + '" title="Remove tool">✕</button></td>' +
+                '<td class="tl-actcell"><button class="tl-use" data-usenum="' + (t.num === '' || t.num == null ? '' : t.num) + '" title="Use this tool in the wizard">Use</button><button class="tl-del" data-del="' + i + '" title="Remove tool">✕</button></td>' +
                 '</tr>';
         });
         body.innerHTML = html;
@@ -2349,6 +2353,11 @@ function wireSettingsOverlay(ov) {
                 #toollib-modal td:nth-child(7) input, #toollib-modal td:nth-child(8) input, #toollib-modal td:nth-child(9) input { width: 70px; }
                 #toollib-modal .tl-del { width: auto; background: transparent; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 2px 6px; }
                 #toollib-modal .tl-del:hover { color: #d66; }
+                /* t768 P1b — the PICK affordance: a primary-accent "Use" button, shown ONLY in pick mode (wizard ⚙); hidden in edit-only (Settings). */
+                #toollib-modal .tl-use { display: none; background: var(--accent); color: #fff; border: none; border-radius: 4px; padding: 3px 11px; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; margin-right: 6px; }
+                #toollib-modal .tl-use:hover { filter: brightness(1.08); }
+                #toollib-modal.tl-pickmode .tl-use { display: inline-block; }
+                #toollib-modal.tl-pickmode .tl-body tbody tr:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
                 #toollib-modal .tl-foot { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
                 #toollib-modal .tl-hint { font-size: 11px; color: var(--text-dim); }
             </style>
@@ -2369,7 +2378,8 @@ function wireSettingsOverlay(ov) {
                 </div>
             </div>`;
         document.body.appendChild(m);
-        const close = () => m.classList.remove('active');
+        const close = () => { m.classList.remove('active'); m.classList.remove('tl-pickmode'); _toolLibPick = null; };   // t768 P1b — any close (X/Done/backdrop) clears pick mode
+        const pick = (num) => { const n = parseInt(num, 10); if (Number.isFinite(n) && _toolLibPick && _toolLibPick.onPick) { const cb = _toolLibPick.onPick; close(); cb(n); } };   // t768 P1b — select INTO the wizard + close (close first so it clears before the wizard re-renders)
         m.querySelector('#toollib-close').addEventListener('click', close);
         m.querySelector('#toollib-done').addEventListener('click', close);
         m.addEventListener('mousedown', (e) => { if (e.target === m) close(); });   // click backdrop
@@ -2395,6 +2405,8 @@ function wireSettingsOverlay(ov) {
             renderLibSummary();
         });
         m.addEventListener('click', (e) => {
+            const useNum = e.target && e.target.dataset ? e.target.dataset.usenum : null;   // t768 P1b — a "Use" button → select into the wizard
+            if (useNum != null) { pick(useNum); return; }
             if (e.target.id === 'toollib-add') {
                 const a = _ddcsSettings.atc; a.tools = a.tools || [];
                 a.tools.push(normalizeTool({}, nextToolNum(a.tools)));
@@ -2408,15 +2420,29 @@ function wireSettingsOverlay(ov) {
                 saveSettings(); renderToolLibRows(); renderLibSummary();
             }
         });
-    }
-    const _atcLibrary = q('set_atc_library');
-    if (_atcLibrary) {
-        _atcLibrary.addEventListener('click', () => {
-            buildToolLibModal();
-            renderToolLibRows();
-            document.getElementById('toollib-modal').classList.add('active');
+        // t768 P1b — in PICK mode, double-clicking a row (anywhere but its inputs) selects that tool.
+        m.addEventListener('dblclick', (e) => {
+            if (!_toolLibPick) return;
+            const row = e.target.closest && e.target.closest('tr');
+            const useBtn = row && row.querySelector('.tl-use');
+            if (useBtn) pick(useBtn.dataset.usenum);
         });
     }
+    // t768 P1b — the ONE opener, context-aware. No opts (or no onPick) = EDIT-ONLY (opened from Settings, exactly as before);
+    // { onPick } = PICK mode (opened from a wizard's ⚙). ONE modal, one source — the wizard and Settings share it.
+    function doOpenToolLib(opts) {
+        _toolLibPick = (opts && typeof opts.onPick === 'function') ? { onPick: opts.onPick } : null;
+        buildToolLibModal();
+        renderToolLibRows();
+        const el = document.getElementById('toollib-modal');
+        el.classList.toggle('tl-pickmode', !!_toolLibPick);
+        const title = el.querySelector('.tl-head span'); if (title) title.textContent = _toolLibPick ? '🛠 Pick a tool' : '🛠 Tool library';
+        el.classList.add('active');
+    }
+    _toolLibOpener = doOpenToolLib;                 // expose to the module-level openToolLibrary() (the wizard ⚙ entry)
+    window.ddcsOpenToolLibrary = doOpenToolLib;     // also a window seam (parity with window.openSettings etc.)
+    const _atcLibrary = q('set_atc_library');
+    if (_atcLibrary) _atcLibrary.addEventListener('click', () => doOpenToolLib());   // Settings entry = edit-only (no onPick)
 
     const closeOv = () => {
         saveSettings();
@@ -2819,6 +2845,15 @@ export function openHomingSetup() {
  *  Registers a return so Settings shows the return-glow and closing it drops back to the wizard mounted behind it. */
 export function openAtcSetup() {
     openSettings({ group: 'hardware', panel: 'set_tab_atc', returnToken: pushReturn('Wizard', () => {}) });
+}
+/** t768 P1b — the tool-library opener (wired inside wireSettingsOverlay, which runs once via buildSettingsOverlay). */
+let _toolLibOpener = null;
+/** Open the tool-table modal from anywhere (a wizard's ⚙). Ensures the settings overlay is built once (which wires the
+ *  modal), then opens it PICK mode when opts.onPick is given (Use/double-click selects into the wizard + closes), else
+ *  edit-only. The wizard picker inherits this; Settings' own entry opens it edit-only. ONE modal, one source. */
+export function openToolLibrary(opts) {
+    buildSettingsOverlay();
+    if (typeof _toolLibOpener === 'function') _toolLibOpener(opts);
 }
 export function closeSettings() {
     const ov = document.getElementById('settings-overlay');

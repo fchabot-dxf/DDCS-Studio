@@ -7,13 +7,20 @@
  */
 import { libraryTools } from '../ui/settingsPanel.js';
 
+/** A compact unicode TIP GLYPH per tool type — for the picker rows (the tool-table modal shows the full SVG silhouette).
+ *  t768 P1b — the "tip glyph" of the ruled row read T# · name · Ø · tip. */
+export function tipGlyph(type) {
+    return ({ endmill: '▭', ballnose: '◗', drill: '▽', vbit: '◣', chamfer: '◣', engraver: '◣', spotdrill: '▽', face: '▬', tap: '≣', reamer: '▯' })[type] || '·';
+}
+
 /** Library tools, each labelled for a dropdown. Keyed by tool number (T-word).
  *  Returns [{ num, name, type, dia, flutes, length, rpm, feed, plunge, label }]. */
 export function getToolLibrary() {
     const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
     return libraryTools(s.atc || {}).map((t) => {
         const dia = (t.dia !== '' && t.dia != null) ? ('Ø' + t.dia) : '';
-        const label = 'T' + t.num + (t.name ? ' · ' + t.name : '') + (dia ? ' (' + dia + ')' : '');
+        // t768 P1b — the full row read: T# · name · Ø · tip glyph.
+        const label = 'T' + t.num + (t.name ? ' · ' + t.name : '') + (dia ? ' (' + dia + ')' : '') + ' · ' + tipGlyph(t.type);
         return { ...t, label };
     });
 }

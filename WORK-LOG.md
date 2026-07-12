@@ -10553,3 +10553,25 @@ FULL SUITE: 1113 passed + 2 skipped = 1115 (== --list), 0 failed, workers=3 (fal
 Files: NEW web/wizards/ops/toolsel.js + tests/tool-select-768.spec.js; web/wizards/ops/index.js, web/blocks/blockEmitter.js, web/blocks/dataOps/deriveBindings.js, web/ui/formWidgets.js, web/wizards/views/userOpView.js, + the 7 twins (drillData/boreData/slotData/surfacingData/contourData/textData/pocketData).
 
 NEXT (Phase 1b): the rich toolpick rows (tip glyph) + the pickable/edit context modal (extract the settingsPanel tool-lib closure). Then Phase 2: the machine tool-change MODE declaration (ATC/manual/none) + applyToolChanges post-pass (scan the toolsel markers, track the loaded tool, inject the arm on difference) + all 3 arms per post. RELEASABLE NOW as "declare your tool, see the real cutter." PASS BACK.
+
+## 2026-07-12 (t770) — TOOL SELECTION Phase 1b: the rich picker + the context-aware modal (releasable)
+
+Built Phase 1b (advisor confirmed the phasing). The everyday picker got the full row read + a ⚙ that opens the tool-table modal CONTEXT-AWARE (pickable from a wizard, edit-only from Settings) — ONE modal, one source, the settingsPanel closure exposed rather than duplicated.
+
+WHAT LANDED:
+- RICH ROWS (one source): toolPicker.js getToolLibrary() label is now "T# . name . (Øn) . <tip glyph>"; a new tipGlyph(type) maps each tool type to a compact unicode glyph (ballnose ◗, endmill ▭, drill ▽, vbit/chamfer/engraver ◣, ...). The dropdown rows show it automatically (the label is the one source the built-in <select> + the twin picker both read). The MODAL keeps the full SVG silhouette (toolProfileSvg) for the deeper view.
+- THE ⚙ (composite widget, one binding): formWidgets.js toolPickWidget appends a gear beside the select (grouped in a right-flex span so the label stays left). Click -> openToolLibrary({ onPick }) with a callback that fill()s (to pick up a just-added tool), sets the select + dispatches change (-> the Ø/feeds auto-fill + the sim update). Still read() -> { toolNum } only, so any composed wizard carrying the tool marker inherits the picker + the gear (proven-once-inherit).
+- CONTEXT-AWARE MODAL (settingsPanel.js, the closure EXPOSED not duplicated): a module-level `openToolLibrary(opts)` export ensures the settings overlay is built once (buildSettingsOverlay is idempotent -> wires the modal + the opener), then opens it. No onPick = EDIT-ONLY (the Settings entry, set_atc_library, routes here unchanged); { onPick } = PICK mode. Pick mode adds a primary-accent "Use" button per row (CSS-shown only under .tl-pickmode) + row double-click; both call pick(num) which closes THEN fires onPick (so the modal clears before the wizard re-renders). Editing/adding stays live in pick mode -> ADD a tool, fill it, USE it, one visit, no dead end. The head title flips to "Pick a tool". Standing modal rules already satisfied (in-app, [Done] primary footer, theme tokens, X = Done).
+- The opener is also on window.ddcsOpenToolLibrary (parity with window.openSettings); the widget uses the module export (resolves before Settings is ever opened).
+
+VERIFIED (real symptom, tests/tool-picker-1b-768.spec.js — 5 tests, all green):
+1. the dropdown rows read T# . name . Ø . tip glyph (◗ for the ballnose asserted).
+2. REAL DRIVE: open the Slot twin, click the ⚙ -> the modal opens in PICK mode with a visible Use; clicking Use for T5 sets the binding to 5 + CLOSES the modal.
+3. openToolLibrary() from Settings (no onPick) -> the SAME modal is edit-only: no pickmode, no Use affordance.
+4. add-then-use: ⚙ -> +Add -> fill the new tool's Ø -> Use it -> the just-added tool is selected in the wizard + the modal closes (one visit).
+5. composability: toolBindingsFor on a MINIMAL custom (non-twin) stack carrying the toolsel marker yields the same toolNum/toolpick binding (any composed wizard inherits it).
+Phase 1a's 4 tests stay green (the gear + wrapper didn't disturb the sim resolution). FULL SUITE: 1118 passed + 2 skipped = 1120 (== --list), 0 failed, workers=3. Byte-identical emit + all goldens hold (1b touched only the picker label + the widget DOM + the modal — no emit path).
+
+Files: web/wizards/toolPicker.js, web/ui/formWidgets.js, web/ui/settingsPanel.js, + tests/tool-picker-1b-768.spec.js (NEW).
+
+NEXT (Phase 2): the machine tool-change MODE declaration (ATC/manual/none) + the applyToolChanges emitMapped post-pass (scan the toolsel markers, track the loaded tool across a multi-op program, inject the arm ONLY on difference: ATC -> atcChangeStack; manual-attended -> the confirm/M0 prompt; none -> an honest comment) + all 3 arms asserted per post + the loaded-state question (does op 1 arm, or match a declared loaded tool?). RELEASABLE NOW as the rich pickable tool library. PASS BACK.

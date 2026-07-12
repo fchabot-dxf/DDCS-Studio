@@ -15,7 +15,7 @@ import { buildRegions, paintRegions, regionValueFromEvent, regionLabel } from '.
 import { FeatureCanvas } from '../viz/featureCanvas.js';
 import { workpieceFeatureItems } from '../engine/workpiece.js';
 import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inline source dot the built-in forms use, on sourceField bindings
-import { getOutputs, getInputs } from './settingsPanel.js';   // t522 — the declared-I/O picker lists settings.outputs/inputs BY NAME (live)
+import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';   // t522 declared-I/O picker; t768 P1b the tool-library modal opener (pickable from a wizard)
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
 import { getToolLibrary, getTool } from '../wizards/toolPicker.js';   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
 
@@ -217,7 +217,19 @@ function toolPickWidget(host, b) {
     // LIVE: re-fill when the tool library changes (a tool added/edited in Settings). Detach when the row leaves the DOM.
     const onSettings = () => { if (!sel.isConnected) { if (typeof window !== 'undefined') window.removeEventListener('ddcs:settings-changed', onSettings); return; } fill(); };
     if (typeof window !== 'undefined') window.addEventListener('ddcs:settings-changed', onSettings);
-    host.append(labelSpan(b), sel);
+    // t768 P1b — the ⚙ at the row's end opens the tool-table modal PICKABLE from a wizard (add-then-use has no dead end):
+    // Use/double-click there selects the tool INTO this binding + closes. ONE composite widget, one binding — a custom
+    // wizard carrying the tool atom inherits the picker + the gear. (From Settings the SAME modal opens edit-only.)
+    const gear = document.createElement('button');
+    gear.type = 'button'; gear.textContent = '⚙'; gear.title = 'Open the tool library — add or edit tools, then Use one';
+    gear.style.cssText = 'margin-left:6px; padding:4px 9px; background:var(--panel,#232833); color:inherit; border:1px solid var(--border,#2a3340); border-radius:6px; cursor:pointer; flex:0 0 auto;';
+    gear.addEventListener('click', () => {
+        openToolLibrary({ onPick: (num) => { fill(); sel.value = String(num); sel.dispatchEvent(new Event('change', { bubbles: true })); } });
+    });
+    const right = document.createElement('span');
+    right.style.cssText = 'display:inline-flex; align-items:center;';
+    right.append(sel, gear);
+    host.append(labelSpan(b), right);
     return { read: () => ({ [b.param]: sel.value === '' ? '' : numOr(sel.value, '') }) };
 }
 
