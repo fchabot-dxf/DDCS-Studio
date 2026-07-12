@@ -1,8 +1,14 @@
 /**
- * ui/paneAccordion.js — THE ONE accordion engine (t752). Every wizard pane (the preview visual · the code preview) is
- * made individually collapsible from the SHARED host — one implementation, every wizard inherits (called from
- * wizardManager.open, like frameWizardSections). Collapsed state is app-wide per pane KIND (panePrefs), so folding the
- * preview in one wizard opens every wizard folded.
+ * ui/paneAccordion.js — THE ONE accordion engine (t752 · per-pane split t784). Every wizard viz pane — the 3D verify,
+ * the 2D layout, the code preview — is made individually collapsible from the SHARED host: one implementation, every
+ * wizard inherits (called from wizardManager.open). Each pane DECLARES its kind in the HTML (`data-viz-pane`); the
+ * engine enhances the declared panes (not the whole .wiz-visual), so the 3D and the 2D fold INDEPENDENTLY. Collapsed
+ * state is app-wide per pane KIND (panePrefs), so folding the 3D in one wizard opens every wizard with the 3D folded.
+ *
+ * The affordance is a slim SIDE-CHEVRON strip (a vertical bar on the pane's left, ≥44px touch target, both platforms —
+ * one collapse language). The REFLOW is a platform split, driven purely by CSS: desktop the surviving pane FILLS the
+ * freed space (definite-height flex column); mobile the surviving pane KEEPS its size and the freed space goes to the
+ * FORM below (content-sized stack). This engine only drives the measured-height collapse + the data-reveal/-dir keys.
  *
  * THE MOTION IS DECLARED PER THEME, not hand-rolled here: each theme sets a drawer-motion token block in styles.css —
  *   --drawer-dur (capped ≤350ms so personality never costs responsiveness) · --drawer-ease (timing function) ·
@@ -78,8 +84,9 @@ function applyState(pane, collapsed, animate) {
     }
 }
 
-// Enhance one pane element: inject a title bar + wrap the content in a collapsible body (idempotent), apply the
-// persisted state (snapped), and wire the bar to toggle + persist. `kind` is a panePrefs id; `title` is the bar label.
+// Enhance one pane element: inject the slim side-chevron strip + wrap the content in a collapsible body (idempotent),
+// apply the persisted state (snapped), and wire the strip to toggle + persist. `kind` is a panePrefs id; `title` labels
+// the strip. The bar is the SAME element as t752 (a <button>.wiz-pane-bar) — CSS turns it into a vertical side strip.
 function enhancePane(pane, kind, title) {
     if (!pane || pane.querySelector(':scope > .wiz-pane-bar')) { return; }   // already enhanced
     const body = document.createElement('div');
@@ -88,6 +95,7 @@ function enhancePane(pane, kind, title) {
     const bar = document.createElement('button');
     bar.type = 'button'; bar.className = 'wiz-pane-bar';
     bar.setAttribute('aria-expanded', 'true');
+    bar.setAttribute('aria-label', `Collapse the ${title} pane`);           // the strip label is tiny/vertical → a11y name
     bar.innerHTML = `${CHEVRON}<span class="wiz-pane-label">${title}</span>`;
     pane.appendChild(bar);
     pane.appendChild(body);
@@ -101,12 +109,16 @@ function enhancePane(pane, kind, title) {
 }
 
 let _wired = false;
-/** Make every collapsible pane in `root` (a wizard panel) individually foldable. Idempotent — safe every open. */
+/** Make every collapsible pane in `root` (a wizard panel) individually foldable. Idempotent — safe every open.
+ *  Each viz pane DECLARES its kind via `data-viz-pane` (the 2D layout · the 3D verify); the code preview is 'code'. */
 export function makePanesCollapsible(root) {
     if (!root) return;
-    const visual = root.querySelector('.wiz-visual');
-    if (visual) enhancePane(visual, 'preview', LABEL.preview || 'Preview');
-    // The G-code preview block (inside the form) — a second, independent pane kind.
+    // The declared viz panes — 2D layout + 3D verify fold INDEPENDENTLY (t784), each on its own side-chevron strip.
+    root.querySelectorAll('.wiz-visual [data-viz-pane]').forEach((pane) => {
+        const kind = pane.dataset.vizPane;
+        if (kind) enhancePane(pane, kind, LABEL[kind] || kind);
+    });
+    // The G-code preview block (inside the form) — a separate, independent pane kind.
     root.querySelectorAll('.preview-block').forEach((pb) => enhancePane(pb, 'code', LABEL.code || 'G-code'));
 
     // Live cross-wizard sync: folding a kind in one open wizard re-applies (snapped) to every mounted pane of that kind.

@@ -2,69 +2,140 @@ import { test, expect } from '@playwright/test';
 
 /**
  * t752 — COLLAPSIBLE WIZARD PANES + per-theme motion tokens + the header undo/redo yield rider.
- *  - Every wizard's preview pane (and the code pane) gets a collapsible title bar on the SHARED host (one impl, every
- *    wizard inherits). Collapsed state is app-wide per pane KIND (panePrefs, localStorage ddcs_panes), default expanded.
+ * t784 — SPLIT the atomic .wiz-visual collapse into INDIVIDUAL panes: the 2D layout and the 3D verify fold
+ *   independently, each via a slim SIDE-CHEVRON strip (≥44px touch, both platforms; the t752 top title bars retire).
+ *   PLATFORM-SPLIT reflow: desktop the surviving pane FILLS the freed space; mobile the surviving pane KEEPS its size
+ *   and the freed space goes to the FORM below. State is app-wide per pane KIND (panePrefs, localStorage ddcs_panes).
  *  - The motion is DECLARED per theme (--drawer-* tokens); ONE engine reads them; reduced-motion ⇒ instant; ≤350ms cap.
  *  - RIDER: the header undo/redo stay REACHABLE at 360px (the hy-controls yield step).
  *  - View-only: emit is byte-identical whether a pane is collapsed or not.
+ *
+ * NOTE (t784 assert changes — strength KEPT, target moved): the t752 asserts that targeted the whole `.wiz-visual`
+ * single bar/collapse now target the INDIVIDUAL `[data-viz-pane="preview3d"|"layout2d"]` panes and their side strips.
+ * Every original property (shrink-to-bar, app-wide-per-kind, survives-reload, motion tokens, reduced-motion, emit
+ * byte-identity) is still asserted — plus the new per-platform reflow + the ≥44px strip.
  */
 
 const openWiz = async (page, type) => {
   await page.evaluate((t) => window.openWiz(t), type);
   await page.waitForSelector(`#wiz_${type}`, { state: 'visible', timeout: 8000 }).catch(() => {});
-  await page.waitForFunction((t) => { const w = document.getElementById(`wiz_${t}`); const v = w && w.querySelector('.wiz-visual'); return v && v.querySelector(':scope > .wiz-pane-bar'); }, type, { timeout: 8000 });
+  await page.waitForFunction((t) => {
+    const w = document.getElementById(`wiz_${t}`);
+    return w && w.querySelector('.wiz-visual [data-viz-pane] > .wiz-pane-bar');
+  }, type, { timeout: 8000 });
 };
-const visual = (page, type) => page.locator(`#wiz_${type} .wiz-visual`);
+const pane = (page, type, kind) => page.locator(`#wiz_${type} [data-viz-pane="${kind}"]`);
+const strip = (page, type, kind) => page.locator(`#wiz_${type} [data-viz-pane="${kind}"] > .wiz-pane-bar`);
+const bodyH = (page, type, kind) => page.evaluate(([t, k]) => {
+  const b = document.querySelector(`#wiz_${t} [data-viz-pane="${k}"] > .wiz-pane-body`);
+  return b ? Math.round(b.getBoundingClientRect().height) : -1;
+}, [type, kind]);
+const visualH = (page, type) => page.evaluate((t) => Math.round(document.querySelector(`#wiz_${t} .wiz-visual`).getBoundingClientRect().height), type);
 
-test.describe('collapse gives the form the space (mobile)', () => {
+test.describe('collapse gives the form the space (mobile) — the surviving pane keeps its size', () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test('collapsing the preview shrinks its pane to the bar (asserted heights); the bar toggles it', async ({ page }) => {
+  test('collapsing the 3D shrinks ITS pane to the strip; the 2D keeps its size + the form gains the space', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
     await openWiz(page, 'contour');
 
-    const v = visual(page, 'contour');
-    const hExpanded = (await v.boundingBox()).height;
-    expect(hExpanded, 'the preview pane is tall when expanded').toBeGreaterThan(250);
+    const p3 = pane(page, 'contour', 'preview3d');
+    const h3Expanded = (await p3.boundingBox()).height;
+    expect(h3Expanded, 'the 3D pane is tall when expanded').toBeGreaterThan(150);
+    const twoDbefore = await bodyH(page, 'contour', 'layout2d');
+    const visBefore = await visualH(page, 'contour');
 
-    await page.locator('#wiz_contour .wiz-visual > .wiz-pane-bar').click();
-    await page.waitForFunction(() => { const el = document.querySelector('#wiz_contour .wiz-visual'); return el.getAttribute('data-collapsed') === '1' && el.getBoundingClientRect().height < 60; }, null, { timeout: 3000 });
-    const hCollapsed = (await v.boundingBox()).height;
-    expect(hCollapsed, 'collapsed the pane is just its bar').toBeLessThan(60);
-    expect(hExpanded - hCollapsed, 'collapsing frees the preview height for the form').toBeGreaterThan(200);
+    await strip(page, 'contour', 'preview3d').click();
+    await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').getAttribute('data-collapsed') === '1', null, { timeout: 3000 });
+    const h3Collapsed = (await p3.boundingBox()).height;
+    expect(h3Collapsed, 'collapsed the 3D pane is just its strip').toBeLessThan(60);
+    expect(h3Expanded - h3Collapsed, 'collapsing frees the 3D height').toBeGreaterThan(100);
 
-    // the bar toggles back (wait for the expand ANIMATION to actually restore the height, not just the attribute)
-    await page.locator('#wiz_contour .wiz-visual > .wiz-pane-bar').click();
-    await page.waitForFunction(() => { const el = document.querySelector('#wiz_contour .wiz-visual'); return el.getAttribute('data-collapsed') === '0' && el.getBoundingClientRect().height > 250; }, null, { timeout: 3000 });
-    expect((await v.boundingBox()).height, 'expands back to full').toBeGreaterThan(250);
+    // the OTHER pane keeps its size (mobile: fixed height, not grown), and the visual total shrinks → form gains
+    const twoDafter = await bodyH(page, 'contour', 'layout2d');
+    expect(Math.abs(twoDafter - twoDbefore), 'the 2D pane KEEPS its size (does not grow)').toBeLessThan(8);
+    expect(await visualH(page, 'contour'), 'the visual shrinks so the form below reclaims the space').toBeLessThan(visBefore - 100);
+
+    // the strip toggles it back (wait for the expand animation to actually restore the height)
+    await strip(page, 'contour', 'preview3d').click();
+    await page.waitForFunction(() => { const el = document.querySelector('#wiz_contour [data-viz-pane="preview3d"]'); return el.getAttribute('data-collapsed') === '0' && el.getBoundingClientRect().height > 150; }, null, { timeout: 3000 });
+    expect((await p3.boundingBox()).height, 'expands back to full').toBeGreaterThan(150);
   });
 
-  test('the collapsed state is app-wide per pane kind — 3 wizards inherit it + it survives a reload', async ({ page }) => {
+  test('the side strips are a ≥44px touch target on BOTH panes', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
+    await openWiz(page, 'contour');
+    for (const kind of ['layout2d', 'preview3d']) {
+      const b = await strip(page, 'contour', kind).boundingBox();
+      expect(b.width, `${kind} strip width ≥44px`).toBeGreaterThanOrEqual(44);
+      expect(b.height, `${kind} strip height ≥44px`).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test('the collapsed state is app-wide per pane KIND — 3 wizards inherit the folded 3D + it survives a reload', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
 
     await openWiz(page, 'contour');
-    await page.locator('#wiz_contour .wiz-visual > .wiz-pane-bar').click();
-    await page.waitForFunction(() => document.querySelector('#wiz_contour .wiz-visual').getAttribute('data-collapsed') === '1');
+    await strip(page, 'contour', 'preview3d').click();
+    await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').getAttribute('data-collapsed') === '1');
     await page.evaluate(() => window.closeWiz && window.closeWiz());
 
-    // two OTHER wizards open already collapsed (the pref is per-kind, app-wide)
+    // two OTHER wizards open already with the 3D collapsed (the pref is per-kind, app-wide)
     for (const t of ['drill', 'surfacing']) {
       await openWiz(page, t);
-      expect(await visual(page, t).getAttribute('data-collapsed'), `${t} inherits the collapsed preview`).toBe('1');
+      expect(await pane(page, t, 'preview3d').getAttribute('data-collapsed'), `${t} inherits the collapsed 3D`).toBe('1');
+      expect(await pane(page, t, 'layout2d').getAttribute('data-collapsed'), `${t}'s 2D is independent (still expanded)`).toBe('0');
       await page.evaluate(() => window.closeWiz && window.closeWiz());
     }
 
-    // survives a reload (persisted to localStorage, not the profile)
+    // survives a reload (persisted to localStorage per KIND, not the profile)
     const stored = await page.evaluate(() => localStorage.getItem('ddcs_panes'));
-    expect(stored, 'collapsed state is in the app-wide ddcs_panes store').toContain('preview');
+    expect(stored, 'collapsed state is in the app-wide ddcs_panes store, keyed by the 3D kind').toContain('preview3d');
     await page.reload();
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
     await openWiz(page, 'contour');
-    expect(await visual(page, 'contour').getAttribute('data-collapsed'), 'the collapse survived reload').toBe('1');
+    expect(await pane(page, 'contour', 'preview3d').getAttribute('data-collapsed'), 'the 3D collapse survived reload').toBe('1');
+    await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
+  });
+});
+
+test.describe('desktop reflow — the surviving pane FILLS the freed space', () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test('collapse the 3D → the 2D expands to fill; collapse the 2D → the 3D fills (both ways)', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
+    await openWiz(page, 'contour');
+
+    const h2Both = (await pane(page, 'contour', 'layout2d').boundingBox()).height;
+    const h3Both = (await pane(page, 'contour', 'preview3d').boundingBox()).height;
+
+    // collapse the 3D → the 2D fills the freed column
+    await strip(page, 'contour', 'preview3d').click();
+    await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').getAttribute('data-collapsed') === '1', null, { timeout: 3000 });
+    await page.waitForTimeout(400);
+    const h2Filled = (await pane(page, 'contour', 'layout2d').boundingBox()).height;
+    const h3Strip = (await pane(page, 'contour', 'preview3d').boundingBox()).height;
+    expect(h2Filled, 'the 2D grew to fill the freed 3D space').toBeGreaterThan(h2Both + 100);
+    expect(h3Strip, 'the collapsed 3D is just its strip').toBeLessThan(60);
+
+    // expand 3D, then collapse the 2D → the 3D fills (symmetric)
+    await strip(page, 'contour', 'preview3d').click();
+    await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').getAttribute('data-collapsed') === '0', null, { timeout: 3000 });
+    await strip(page, 'contour', 'layout2d').click();
+    await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="layout2d"]').getAttribute('data-collapsed') === '1', null, { timeout: 3000 });
+    await page.waitForTimeout(400);
+    const h3Filled = (await pane(page, 'contour', 'preview3d').boundingBox()).height;
+    const h2Strip = (await pane(page, 'contour', 'layout2d').boundingBox()).height;
+    expect(h3Filled, 'the 3D grew to fill the freed 2D space').toBeGreaterThan(h3Both + 100);
+    expect(h2Strip, 'the collapsed 2D is just its strip').toBeLessThan(60);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
   });
 });
@@ -98,12 +169,12 @@ test.describe('motion tokens + reduced-motion', () => {
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
     await openWiz(page, 'contour');
-    await page.locator('#wiz_contour .wiz-visual > .wiz-pane-bar').click();
-    // under reduced-motion the engine sets the effective duration to 0ms
-    const durEff = await page.evaluate(() => document.querySelector('#wiz_contour .wiz-visual').style.getPropertyValue('--drawer-dur-eff'));
+    await strip(page, 'contour', 'preview3d').click();
+    // under reduced-motion the engine sets the effective duration to 0ms (on the toggled pane)
+    const durEff = await page.evaluate(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').style.getPropertyValue('--drawer-dur-eff'));
     expect(durEff, 'reduced-motion ⇒ instant (0ms)').toBe('0ms');
     // and it still actually collapsed (functionally works)
-    expect(await visual(page, 'contour').getAttribute('data-collapsed')).toBe('1');
+    expect(await pane(page, 'contour', 'preview3d').getAttribute('data-collapsed')).toBe('1');
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
   });
 });
@@ -127,7 +198,7 @@ test.describe('header rider + emit', () => {
     expect(r.foldStep, 'the hy-controls yield step engaged').toBe(true);
   });
 
-  test('emit is BYTE-IDENTICAL whether the preview pane is collapsed or not (view-only)', async ({ page }) => {
+  test('emit is BYTE-IDENTICAL whether a pane is collapsed or not (view-only)', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.ddcsGetBlockProgram);
@@ -135,8 +206,8 @@ test.describe('header rider + emit', () => {
     await openWiz(page, 'contour');
     const read = () => page.evaluate(() => { const pre = document.querySelector('#wiz_contour_code'); return pre ? pre.textContent : ''; });
     const expanded = await read();
-    await page.locator('#wiz_contour .wiz-visual > .wiz-pane-bar').click();
-    await page.waitForFunction(() => document.querySelector('#wiz_contour .wiz-visual').getAttribute('data-collapsed') === '1');
+    await strip(page, 'contour', 'preview3d').click();
+    await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').getAttribute('data-collapsed') === '1');
     const collapsed = await read();
     expect(collapsed, 'collapsing a pane does not change the emitted G-code').toBe(expanded);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });

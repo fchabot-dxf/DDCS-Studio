@@ -2045,7 +2045,7 @@ button.primary:hover {
        0 and the position:absolute canvas (no in-flow height) overflows onto the form. Fix: size every
        visual element to its content (flex:0 0 auto) with a definite viz height, and let normal block
        flow stack visual-then-form. */
-    .wiz-box.two-pane { width: min(96vw, 560px); height: auto; }
+    .wiz-box.two-pane { width: min(96vw, 608px); height: auto; }   /* +48px so the side-chevron strips don't cramp the preview (t784) */
     .two-pane .wiz-body { overflow-y: auto; }
     .wiz-2pane { flex-direction: column; height: auto; }
     /* !important beats the splitter's inline order (controls:1 / visual:3) so the preview stacks on TOP and can
@@ -2054,66 +2054,70 @@ button.primary:hover {
     .wiz-2pane > .wiz-visual { order: 1 !important; flex: 0 0 auto; min-height: 0; }     /* visuals on top, content-sized */
     .wiz-2pane > .wiz-splitter { display: none; }
     .wiz-2pane > .wiz-visual > .viz-container { flex: 0 0 auto; min-height: 0; }
-    .wiz-2pane .wiz-visual .wiz-viz3d { flex: 0 0 auto; height: 240px !important; min-height: 240px; }
-    .wiz-2pane .wiz-visual .viz-split { flex-direction: row; }               /* drill: 2D | 3D side-by-side */
-    .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 1 1 0; min-height: 240px; }
+    /* t784 — STACK the 2D + 3D panes (was side-by-side): each keeps a fixed preview height, so collapsing one frees
+       ITS height to the FORM below while the surviving pane keeps its size. */
+    .wiz-2pane .wiz-visual .viz-split { flex-direction: column; }
+    .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 0 0 auto; min-height: 0; }
+    .wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body { height: 200px; }   /* each stacked preview keeps a fixed size */
+    .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
     /* Lock the preview at the top: it stays pinned while the form scrolls under it (single-column view). */
     .wiz-2pane > .wiz-visual {
         position: sticky; top: 0; z-index: 3;
         background: var(--panel); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
-    /* Collapsed preview on mobile: the pane shrinks to just its bar so the form gets the screen (t752). */
-    .wiz-2pane > .wiz-visual[data-collapsed="1"] { box-shadow: none; }
 }
 
 /* ============================================================================================================
-   t752 — COLLAPSIBLE WIZARD PANES (paneAccordion engine). Every preview / code pane gets a title bar; the body
-   collapses to give the form the space. ONE mechanism (measured-height collapse + the reveal keyed off data-reveal);
-   the PERSONALITY is the per-theme --drawer-* token block below. --drawer-{dur,ease}-eff are set by the engine
-   (duration capped ≤350ms; 0ms under reduced-motion / on snap). ============================================ */
-.wiz-visual[data-pane-kind], .preview-block[data-pane-kind] {
-    display: flex; flex-direction: column;
+   t752 · t784 — COLLAPSIBLE WIZARD PANES (paneAccordion engine). Each DECLARED viz pane (data-viz-pane: the 2D
+   layout · the 3D verify) and the code preview folds INDEPENDENTLY via a slim SIDE-CHEVRON strip (a vertical bar on
+   the pane's left, ≥44px touch, both platforms — the t752 top title bars are retired: one collapse language). ONE
+   mechanism (measured-height body collapse + the reveal keyed off data-reveal); the PERSONALITY is the per-theme
+   --drawer-* token block below. --drawer-{dur,ease}-eff are set by the engine (≤350ms; 0ms reduced-motion). ======= */
+/* NB the `.wiz-visual` scope raises specificity to (0,2,0) so this beats the plain `.viz-container` rules later in the
+   file (flex-direction:column · padding) — WITHOUT it the strip renders as a top bar again. */
+.wiz-visual [data-viz-pane], .preview-block[data-pane-kind] {
+    display: flex; flex-direction: row; align-items: stretch;
+    padding: 0; overflow: hidden;
     border-radius: var(--drawer-corner-expanded, 6px);
-    transition: border-radius var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease), flex-basis var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease);
+    transition: border-radius var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
+                flex-basis var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease);
 }
 [data-collapsed="1"][data-pane-kind] { border-radius: var(--drawer-corner-collapsed, 6px); }
-/* Collapsed: the pane sizes to its bar (the body clips to 0 below) so the sibling form reclaims the space. */
-.wiz-visual[data-collapsed="1"] { flex: 0 0 auto !important; height: auto !important; min-height: 0 !important; }
+/* Collapsed: the pane content-sizes to its strip (the body clips to 0), freeing the space — the SIBLING pane grows
+   (desktop, definite-height column) or the FORM below reclaims it (mobile, content stack). */
+[data-viz-pane][data-collapsed="1"] { flex: 0 0 auto !important; min-height: 0 !important; }
 
+/* THE SLIM SIDE-CHEVRON STRIP — the whole collapse affordance; a vertical bar on the pane's left, ≥44px touch target
+   on BOTH platforms, token-styled. Chevron + a vertical kind label (2D / 3D / G-code). */
 .wiz-pane-bar {
-    display: flex; align-items: center; gap: 6px; width: 100%; flex: 0 0 auto;
-    padding: 5px 9px; border: none; background: transparent; cursor: pointer; text-align: left;
-    font-family: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+    flex: 0 0 44px; align-self: stretch; min-height: 44px;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px;
+    padding: 10px 0; border: none; cursor: pointer;
+    background: color-mix(in srgb, var(--bg) 55%, transparent);
     color: var(--hdr-dim, var(--text-dim));
-    border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+    font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    border-radius: inherit; border-top-right-radius: 0; border-bottom-right-radius: 0;
     transition: color .12s ease, background .12s ease;
 }
-.wiz-pane-bar:hover { color: var(--text-main); background: color-mix(in srgb, var(--bg) 40%, transparent); }
+.wiz-pane-bar:hover { color: var(--text-main); background: color-mix(in srgb, var(--bg) 78%, transparent); }
 .wiz-pane-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.wiz-pane-chev { flex: 0 0 auto; transition: transform var(--drawer-dur-eff, 180ms) var(--drawer-ease-eff, ease); }
-[data-collapsed="1"] > .wiz-pane-bar .wiz-pane-chev { transform: rotate(-90deg); }
-.wiz-pane-label { flex: 1 1 auto; }
-/* The bar IS the pane title now — hide the original inner "VISUALIZATION" section-label to avoid a double heading. */
-.wiz-visual[data-pane-kind] > .wiz-pane-body > .section-label { display: none; }
+.wiz-pane-chev { flex: 0 0 auto; transform: rotate(90deg); transition: transform var(--drawer-dur-eff, 180ms) var(--drawer-ease-eff, ease); }   /* expanded → points ‹ toward the rail (fold me) */
+[data-collapsed="1"] > .wiz-pane-bar .wiz-pane-chev { transform: rotate(-90deg); }   /* collapsed → points › outward (open me) */
+.wiz-pane-label { flex: 0 0 auto; writing-mode: vertical-rl; text-orientation: mixed; letter-spacing: .12em; }
+/* The strip IS the pane heading now — hide the original inner "VISUALIZATION" section-label to avoid a double heading. */
+[data-viz-pane] > .wiz-pane-body > .section-label { display: none; }
 
-/* The collapsible body. On desktop it carries the flex-grow chain (fills the tall pane → the viz sizes correctly);
-   on mobile it is content-sized. Height is driven inline by the engine for a measured transition. */
-.wiz-visual > .wiz-pane-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
-/* RE-ESTABLISH the flex-grow chain through the wrapper: the original rules (.wiz-2pane > .wiz-visual > .viz-*) target
-   DIRECT children of .wiz-visual, but the body now sits between — so the viz would lose its fill (the featureCanvas
-   sizes wrong). Mirror those rules one level deeper so the preview/2D canvas size EXACTLY as before. */
-.wiz-2pane > .wiz-visual > .wiz-pane-body > .viz-container,
-.wiz-2pane > .wiz-visual > .wiz-pane-body > .viz-split { flex: 1 1 auto; min-height: 0; }
-@media (max-width: 860px) {
-    .wiz-2pane > .wiz-visual > .wiz-pane-body > .viz-container { flex: 0 0 auto; min-height: 0; }
-}
+/* The collapsible body carries the pane content; its HEIGHT animates (measured) so the pane row collapses to the strip.
+   Desktop: it stretches to fill the pane (the flex chain sizes the canvas). Mobile: a fixed height (set in @860px). */
+[data-viz-pane] > .wiz-pane-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px 12px; }
+.preview-block[data-pane-kind] > .wiz-pane-body { padding: 8px 10px; }
 .wiz-pane-body {
     overflow: hidden;
     transition: height var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
                 opacity var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
                 transform var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
                 clip-path var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease);
-    transform-origin: top center;
+    transform-origin: top left;
 }
 /* REVEAL personalities — applied only while collapsed; the height collapse always runs underneath (gives the space). */
 [data-collapsed="1"][data-reveal="fade"]   > .wiz-pane-body { opacity: 0; }
@@ -2155,7 +2159,7 @@ button.primary:hover {
     --drawer-corner-expanded: 8px; --drawer-corner-collapsed: 8px;
 }
 @media (prefers-reduced-motion: reduce) {
-    .wiz-pane-body, .wiz-pane-chev, .wiz-visual[data-pane-kind], .preview-block[data-pane-kind] { transition: none !important; }
+    .wiz-pane-body, .wiz-pane-chev, [data-viz-pane], .preview-block[data-pane-kind] { transition: none !important; }
 }
 
 /* --- HEADER (Flush Fit) --- */
