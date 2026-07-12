@@ -1,7 +1,8 @@
 /**
- * ui/panePrefs.js — THE declared COLLAPSIBLE-PANE registry (t752). A small {id,label} list of wizard pane KINDS (the
- * preview visual · the code preview). Whether a kind is collapsed is remembered APP-WIDE per kind — collapse the
- * preview in ONE wizard and every wizard opens with it collapsed — exactly like the theme / display prefs: a DISPLAY
+ * ui/panePrefs.js — THE declared COLLAPSIBLE-PANE registry (t752 · split per-pane t784). A small {id,label} list of
+ * wizard pane KINDS (the 2D layout · the 3D verify · the code preview — the 2D and 3D fold INDEPENDENTLY). Whether a
+ * kind is collapsed is remembered APP-WIDE per kind — collapse the 3D in ONE wizard and every wizard opens with the 3D
+ * collapsed — exactly like the theme / display prefs: a DISPLAY
  * preference persisted in localStorage, NEVER the machine profile (a stored program / pulled config must not carry
  * which panes you like folded). The accordion engine (paneAccordion.js) owns the MOTION (per-theme tokens); this owns
  * only the collapsed STATE. Default for every kind = expanded.
@@ -10,8 +11,9 @@
 /** The declared pane kinds — id · human label. A wizard pane tags itself with one of these ids; the collapsed state
  *  is keyed by the id, so it is shared across every wizard that has that kind of pane. */
 export const PANE_KINDS = [
-    { id: 'preview', label: 'Preview' },   // the .wiz-visual 3D / 2D pane — the one that eats the screen on mobile
-    { id: 'code',    label: 'G-code' },    // the .preview-block G-code preview
+    { id: 'preview3d', label: '3D' },      // the 3D verify pane — folds INDEPENDENTLY of the 2D (t784)
+    { id: 'layout2d',  label: '2D' },      // the 2D layout pane — folds independently of the 3D
+    { id: 'code',      label: 'G-code' },  // the .preview-block G-code preview
 ];
 
 const KEY = 'ddcs_panes';

@@ -197,11 +197,15 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <!-- Visualization container -->
-                <div class="viz-container">
-                    <div id="middleVizStatus" class="viz-status"></div>
-                    <!-- Feature-canvas ②-aim editor: drag the per-pass start markers ①②③④ (sim-only declared starts, two-way synced). -->
-                    <div id="middleLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
-                    <div id="middleVizContainer" class="viz-canvas"></div>
+                <div class="viz-split">
+                    <div class="viz-container" data-viz-pane="layout2d">
+                        <div id="middleVizStatus" class="viz-status"></div>
+                        <!-- Feature-canvas ②-aim editor: drag the per-pass start markers ①②③④ (sim-only declared starts, two-way synced). -->
+                        <div id="middleLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container" data-viz-pane="preview3d">
+                        <div id="middleVizContainer" class="viz-canvas"></div>
+                    </div>
                 </div>
 
                 <!-- Viz Legend -->
@@ -382,7 +386,7 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
-                <div class="viz-container">
+                <div class="viz-container" data-viz-pane="preview3d">
                     <div id="rotaryCenterVizStatus" class="viz-status"></div>
                     <div id="rotaryCenterVizContainer" class="viz-canvas"></div>
                 </div>
@@ -474,7 +478,7 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
-                <div class="viz-container">
+                <div class="viz-container" data-viz-pane="preview3d">
                     <div id="rotaryClockVizStatus" class="viz-status"></div>
                     <div id="rotaryClockVizContainer" class="viz-canvas"></div>
                 </div>
@@ -558,11 +562,15 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <!-- Visualization container -->
-                <div class="viz-container">
-                    <div id="edgeVizStatus" class="viz-status"></div>
-                    <!-- Feature-canvas probe-VECTOR editor: drag the arrow → axis/dir/dist (two-way synced with the form). -->
-                    <div id="edgeLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
-                    <div id="probeVizContainer" class="viz-canvas"><svg id="probeViz" width="100%" height="160" viewBox="0 0 400 140" xmlns="http://www.w3.org/2000/svg"></svg></div>
+                <div class="viz-split">
+                    <div class="viz-container" data-viz-pane="layout2d">
+                        <div id="edgeVizStatus" class="viz-status"></div>
+                        <!-- Feature-canvas probe-VECTOR editor: drag the arrow → axis/dir/dist (two-way synced with the form). -->
+                        <div id="edgeLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
+                    </div>
+                    <div class="viz-container" data-viz-pane="preview3d">
+                        <div id="probeVizContainer" class="viz-canvas"><svg id="probeViz" width="100%" height="160" viewBox="0 0 400 140" xmlns="http://www.w3.org/2000/svg"></svg></div>
+                    </div>
                 </div>
 
                 <!-- Viz Legend -->
@@ -671,11 +679,11 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="layout2d">
                         <div id="drillLayoutStatus" class="viz-status">LAYOUT</div>
                         <div id="drillLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
                     </div>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="drillVizStatus" class="viz-status"></div>
                         <div id="drillVizContainer" class="viz-canvas"></div>
                     </div>
@@ -780,11 +788,11 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container" id="userViz3dBox" style="display:none">
+                    <div class="viz-container" id="userViz3dBox" data-viz-pane="preview3d" style="display:none">
                         <div id="userViz3dStatus" class="viz-status"></div>
                         <div id="userViz3dContainer" class="viz-canvas"></div>
                     </div>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="layout2d">
                         <div id="userVizStatus" class="viz-status"></div>
                         <div id="userVizContainer" class="viz-canvas"></div>
                     </div>
@@ -807,11 +815,11 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="layout2d">
                         <div id="pocketLayoutStatus" class="viz-status">LAYOUT</div>
                         <div id="pocketLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
                     </div>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="pocketVizStatus" class="viz-status"></div>
                         <div id="pocketVizContainer" class="viz-canvas"></div>
                     </div>
@@ -890,11 +898,11 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="layout2d">
                         <div id="contourLayoutStatus" class="viz-status">LAYOUT</div>
                         <div id="contourLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
                     </div>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="contourVizStatus" class="viz-status"></div>
                         <div id="contourVizContainer" class="viz-canvas"></div>
                     </div>
@@ -968,11 +976,11 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="layout2d">
                         <div id="slotLayoutStatus" class="viz-status">LAYOUT</div>
                         <div id="slotLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
                     </div>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="slotVizStatus" class="viz-status"></div>
                         <div id="slotVizContainer" class="viz-canvas"></div>
                     </div>
@@ -1071,11 +1079,11 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="layout2d">
                         <div id="surfacingLayoutStatus" class="viz-status">LAYOUT</div>
                         <div id="surfacingLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
                     </div>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="surfacingVizStatus" class="viz-status"></div>
                         <div id="surfacingVizContainer" class="viz-canvas"></div>
                     </div>
@@ -1139,11 +1147,11 @@
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
                 <div class="viz-split">
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="layout2d">
                         <div id="textLayoutStatus" class="viz-status">LAYOUT</div>
                         <div id="textLayoutCanvas" class="viz-canvas" style="min-height:220px"></div>
                     </div>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="textVizStatus" class="viz-status"></div>
                         <div id="textVizContainer" class="viz-canvas"></div>
                     </div>
@@ -1207,7 +1215,7 @@
                 <span class="section-label">VISUALIZATION</span>
 
                 <!-- Viz placeholder -->
-                <div class="viz-container">
+                <div class="viz-container" data-viz-pane="preview3d">
                     <div id="alignmentVizStatus" class="viz-status"></div>
                     <div id="alignmentVizContainer" class="viz-canvas">
                         <!-- Alignment viz — SVG to be added in a future pass -->
@@ -1310,7 +1318,7 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                     <span class="section-label">VISUALIZATION</span>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="atcLengthVizStatus" class="viz-status"></div>
                         <div id="atcLengthViz" class="viz-canvas"></div>
                     </div>
@@ -1331,7 +1339,7 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                     <span class="section-label">VISUALIZATION</span>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="atcCheckVizStatus" class="viz-status"></div>
                         <div id="atcCheckViz" class="viz-canvas"></div>
                     </div>
@@ -1357,7 +1365,7 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                     <span class="section-label">VISUALIZATION</span>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="atcWarmupVizStatus" class="viz-status"></div>
                         <div id="atcWarmupViz" class="viz-canvas"></div>
                     </div>
@@ -1383,7 +1391,7 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                     <span class="section-label">MAGAZINE PREVIEW</span>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="atcTableVizStatus" class="viz-status"></div>
                         <div id="atcTableViz" class="viz-canvas"></div>
                     </div>
@@ -1412,7 +1420,7 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                     <span class="section-label">MAGAZINE &amp; TOOL CHANGE</span>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="atcChangeVizStatus" class="viz-status"></div>
                         <div id="atcChangeViz" class="viz-canvas"></div>
                     </div>
@@ -1476,7 +1484,7 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                     <span class="section-label">VISUALIZATION</span>
-                    <div class="viz-container">
+                    <div class="viz-container" data-viz-pane="preview3d">
                         <div id="atcTestVizStatus" class="viz-status"></div>
                         <div id="atcTestViz" class="viz-canvas"></div>
                     </div>
@@ -1680,7 +1688,7 @@
               <div class="wiz-2pane">
                 <div class="wiz-visual">
                 <span class="section-label">VISUALIZATION</span>
-                <div class="viz-container">
+                <div class="viz-container" data-viz-pane="preview3d">
                     <div id="homingVizStatus" class="viz-status"></div>
                     <div id="homingVizContainer" class="viz-canvas"></div>
                 </div>
