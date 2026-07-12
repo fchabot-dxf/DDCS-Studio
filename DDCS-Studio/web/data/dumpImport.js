@@ -168,6 +168,35 @@ export function mapByNameGeometry(params, engText, grounded = true) {
     };
 }
 
+// ── SPINDLE (t780 1b) — the DECLARED spindle interface + mapping axis, BY NAME from the eng, decoded through EACH eng's
+// OWN enums (V4.1 #188 Analog|PUL/DIR + #189 X/Y/Z/A · Expert #79 Analog|Plu/dir|Multi-speed + #80 X..5th — never
+// cross-applied). Seeds ONLY interface + mappingAxis (readable machine truth); tapCapable/reversible stay USER attestations.
+const SPINDLE_ENG = { iface: 'spindle\\s+interface\\s+type', mapAxis: 'spindle\\s+mapping\\s+axis' };
+/** Normalize an eng interface label → the Studio value ('analog' | 'pul-dir-axis'). PUL/DIR (or Plu/dir) = axis-driven. */
+function normSpindleIface(label) { return /pul|dir/i.test(label) ? 'pul-dir-axis' : 'analog'; }
+/** Normalize an eng mapping-axis label → 'X'|'Y'|'Z'|'A'|'' (4th → A; 5th/unknown → none, Studio has no B axis). */
+function normSpindleAxis(label) { const m = /^\s*([XYZA])\b/i.exec(String(label)); if (m) return m[1].toUpperCase(); if (/4th/i.test(label)) return 'A'; return ''; }
+/** Decode { interface, mappingAxis } (+ raw/label/idx provenance for the review) from params+eng. null if no eng / not found. */
+export function mapSpindle(params, engText) {
+    if (!engText) return null;
+    const eng = parseEng(engText);
+    const keys = Object.keys(eng).map(Number).sort((a, b) => a - b);
+    const find = (pat) => { const rx = new RegExp(pat, 'i'); for (const i of keys) { if (rx.test(eng[i].name)) return i; } return null; };
+    const ifIdx = find(SPINDLE_ENG.iface), axIdx = find(SPINDLE_ENG.mapAxis);
+    if (ifIdx == null && axIdx == null) return null;
+    const readEnum = (idx) => {
+        if (idx == null || idx < 0 || idx >= (params ? params.length : 0)) return { raw: null, label: '' };
+        const raw = Math.trunc(Number(params[idx]) || 0);
+        return { raw, label: (eng[idx] && eng[idx].enums && eng[idx].enums[raw]) || '' };
+    };
+    const iff = readEnum(ifIdx), axx = readEnum(axIdx);
+    return {
+        interface: normSpindleIface(iff.label), interfaceLabel: iff.label, interfaceRaw: iff.raw,
+        mappingAxis: normSpindleAxis(axx.label), mappingAxisLabel: axx.label, mappingAxisRaw: axx.raw,
+        _idx: { interface: ifIdx, mappingAxis: axIdx },
+    };
+}
+
 const V41_ACTIVE_WCS = 16, V41_COORD_STRIDE = 6;
 /** V4.1 WCS from coord1 (54×f64, block 1 = G54, stride 6). activeEnum = setting #16. Ports _map_wcs_to_profile_v41. */
 export function mapCoordWcs(coord1, activeEnum) {
@@ -207,12 +236,14 @@ export function recognizeDump(files) {
     // Identify the controller: prefer the setting size; else the eng shape (has soft-limit names) → treat as by-name.
     let controllerId = settingParams ? controllerFromParamCount(settingParams.length) : null;
     if (!controllerId && engText) controllerId = 'ddcs-v3-dm500';   // eng-only drop (no setting) — by-name, values N/A
-    let geometry = null, wcs = null, grounded = false, note = '';
+    let geometry = null, wcs = null, spindle = null, grounded = false, note = '';
     if (controllerId === 'ddcs-expert-m350' && settingParams) {
         geometry = mapExpertGeometry(settingParams); wcs = mapExpertWcs(settingParams); grounded = true;
+        spindle = mapSpindle(settingParams, engText);   // t780 — the Expert eng NAMES #79/#80 with its own enums
     } else if (controllerId === 'ddcs-v41' && settingParams) {
         geometry = engText ? mapByNameGeometry(settingParams, engText, true) : null; grounded = !!engText;
         wcs = coordParams ? mapCoordWcs(coordParams, settingParams[V41_ACTIVE_WCS]) : null;
+        spindle = mapSpindle(settingParams, engText);   // t780 — V4.1 #188/#189 by name
         if (!engText) note = 'Drop the eng file too — V4.1 geometry is derived from it by name.';
     } else if (controllerId === 'ddcs-v3-dm500') {
         // DM500 setting layout is ungrounded → NAMES resolve by-name, VALUES stay N/A (honest; refine on a real dump).
@@ -220,5 +251,5 @@ export function recognizeDump(files) {
         grounded = false;
         note = 'DM500 geometry is named from the eng, but its setting layout is not yet grounded — values show N/A until a real dump confirms them.';
     }
-    return { controllerId, recognized, unrecognized, geometry, wcs, grounded, note };
+    return { controllerId, recognized, unrecognized, geometry, wcs, spindle, grounded, note };
 }

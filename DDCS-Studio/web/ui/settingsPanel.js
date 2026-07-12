@@ -2048,6 +2048,7 @@ function wireSettingsOverlay(ov) {
             const gdetail = gslaves.map((s) => ({ label: `${s.ax.toUpperCase()} axis`, raw: 'gantry slave', derived: `follows ${String(s.follows).toUpperCase()}` }));
             notes.push({ group: 'Gantry', label: 'Dual-axis gantry', value: gslaves.map((s) => `${s.ax.toUpperCase()} → ${String(s.follows).toUpperCase()}`).join(' · '), kind: 'note', detail: gdetail });
         } else notes.push({ group: 'Gantry', label: 'No gantry slave declared', value: 'single motor per axis (from Axes)', kind: 'note' });
+        const spc = spindleCandidate(hwProfile && hwProfile.spindle); if (spc) cands.push(spc);   // t780 — the pulled spindle interface + mapping axis
         // reason (only meaningful when !connected): no-gateway = the bridge never answered; no-controller = bridge up, machine didn't respond.
         return { connected, candidates: cands.concat(notes), controller: (hwProfile && hwProfile.id) ? { id: hwProfile.id, name: hwProfile.name } : null, reason: connected ? null : (gatewayReached ? 'no-controller' : 'no-gateway') };
     }
@@ -2091,6 +2092,14 @@ function wireSettingsOverlay(ov) {
                 if (s > 0) ax.seekFeed = s;
                 if (prec > 0) ax.slowFeed = prec;
             }
+        }
+        // t780 1b — the pulled SPINDLE interface + mapping axis → settings.spindle. Writes ONLY those two readable fields;
+        // NEVER tapCapable/reversible (the user's own attestations of the physical wiring — never auto-seeded).
+        const spc = checked.find((c) => c.kind === 'spindle');
+        if (spc) {
+            const sp = _ddcsSettings.spindle || (_ddcsSettings.spindle = {});
+            if (spc.data.interface) sp.interface = spc.data.interface;
+            if (spc.data.mappingAxis != null) sp.mappingAxis = spc.data.mappingAxis;
         }
         saveSettings(); fill();
         const mt = ov.querySelector('#atc_magazine'); if (mt) renderMagazineTable(mt, _ddcsSettings.atc, atcOnChange);
@@ -2230,6 +2239,18 @@ function wireSettingsOverlay(ov) {
         };
     }
 
+    // t780 1b — the SPINDLE review candidate (raw → derived detail rows), shared by the LAN pull + the dump import. Seeds
+    // ONLY interface + mappingAxis (readable machine truth); tapCapable/reversible are NEVER pulled (user attestations).
+    function spindleCandidate(sp) {
+        if (!sp) return null;
+        const idx = sp._idx || {}; const detail = [];
+        if (sp.interfaceRaw != null) detail.push({ label: 'Interface', raw: `eng #${idx.interface ?? '?'} = ${sp.interfaceRaw} (${sp.interfaceLabel || '—'})`, derived: sp.interface });
+        if (sp.mappingAxisRaw != null) detail.push({ label: 'Mapping axis', raw: `eng #${idx.mappingAxis ?? '?'} = ${sp.mappingAxisRaw} (${sp.mappingAxisLabel || '—'})`, derived: sp.mappingAxis || '— none' });
+        if (!detail.length) return null;
+        const val = `${sp.interface === 'pul-dir-axis' ? 'PUL/DIR (axis-driven)' : 'Analog (VFD)'}${sp.mappingAxis ? ' · axis ' + sp.mappingAxis : ''}`;
+        return { group: 'Spindle', label: 'Interface + mapping axis', value: val, changed: true, kind: 'spindle', data: { interface: sp.interface, mappingAxis: sp.mappingAxis }, detail };
+    }
+
     // ── t666 — DUMP-FOLDER IMPORT (no LAN). Recognize the dropped setting/eng/coord files (data/dumpImport, the JS port
     // of the gateway mapper) → build the SAME review candidates → the SAME modal + applyCandidates. Zero gateway. ──
     const AXLB = [['x', 'X'], ['y', 'Y'], ['z', 'Z']];
@@ -2269,6 +2290,7 @@ function wireSettingsOverlay(ov) {
                 cands.push({ group: 'WCS table (G54–G59)', label: `G${53 + wa} active`, value: `X${ar.x} Y${ar.y} Z${ar.z}`, changed: false, kind: 'wcs', data: { table: ftable, active: wa }, detail: ftable.map((r, i) => ({ label: `G${54 + i}${i === wa - 1 ? ' (active)' : ''}`, raw: `X${r.x} Y${r.y} Z${r.z}`, derived: i === wa - 1 ? '← active' : '' })) });
             }
         }
+        const spc = spindleCandidate(rec.spindle); if (spc) cands.push(spc);   // t780 — the pulled spindle interface + mapping axis
         return { connected: true, controller: prof.id ? { id: prof.id, name: prof.name } : { id: rec.controllerId, name: rec.controllerId }, candidates: cands.concat(notes) };
     }
     async function readDumpFiles(files) {

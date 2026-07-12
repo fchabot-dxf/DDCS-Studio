@@ -10672,3 +10672,24 @@ Plus a real drive: openWiz('user_tap_data') renders the form (thread picker + rp
 Files: web/blocks/dataOps/tapData.js (NEW), tests/tap-twin-778.spec.js (NEW); web/wizards/tapWizard.js (header no-spindle refinement), web/wizards/ops/tap.js (rigid Expert-gate), web/ui/formWidgets.js (threadpick), web/wizards/views/userOpView.js (_rigidOk gate fact), web/app.js + web/blocks/wizardLibrary.js (registration + Mill menu entry).
 
 THE TAPPING FEATURE IS COMPLETE (2a emit core · 2b data-twin). NEXT (per the backlog, advisor sequences): the 1b spindle pull-seed (the queued convenience), or the next dispatch. PASS BACK — this releases as the TAPPING feature.
+
+## 2026-07-12 (t780) — SPINDLE PULL-SEED (1b): the twinned by-name decode (finishes the spindle story)
+
+Built the spindle pull-seed — the queued 1b convenience. A Pull / dump-import now SEEDS settings.spindle.interface + .mappingAxis from the controller's eng, BY NAME, decoded through EACH eng's own enums, on BOTH surfaces with the cross-language golden. tapCapable/reversible are NEVER seeded (user attestations).
+
+THE TWINNED DECODE (identical output both sides — verified):
+- JS (dumpImport.js): mapSpindle(params, engText) — finds "spindle interface type" + "spindle mapping axis" BY NAME, reads params[idx], decodes the value through eng[idx].enums, normalizes (interface: /pul|dir/ -> 'pul-dir-axis' else 'analog'; axis: leading X/Y/Z/A, 4th -> A, 5th/unknown -> none). Returns {interface, mappingAxis, +raw/label/_idx provenance} or null. recognizeDump attaches `spindle` for Expert + V4.1.
+- Python (ops.py): _map_spindle_to_profile + _norm_spindle_iface/_axis + _SPINDLE_ENG — the EXACT mirror; called from BOTH _map_geometry paths (Expert via self._read_eng(); V4.1 shares the already-read eng). Emits prof["spindle"].
+- DECODED VALUES (both fixtures, JS==Python): V4.1 #188 Analog(0) / #189 "A axis"(3) -> {analog, A}; Expert #79 Analog(0) / #80 "4th-axis"(3) -> {analog, A}. The DIFFERENT eng labels ("A axis" vs "4th-axis") both normalize to A via each eng's OWN enums — NEVER cross-applied. DM500 has no spindle-axis surface -> null (honest N/A).
+
+THE REVIEW-APPLY (settingsPanel.js): a shared spindleCandidate(sp) builds the review row (Spindle · Interface + mapping axis) with raw->derived DETAIL rows (eng #188 = 0 (Analog) -> analog; #189 = 3 (A axis) -> A), pushed by BOTH scanController (LAN, hwProfile.spindle) + dumpToScan (dump, rec.spindle). The applyCandidates spindle branch writes ONLY settings.spindle.interface + .mappingAxis — NEVER tapCapable/reversible (the user's physical-wiring attestations).
+
+VERIFIED (real symptom):
+- CROSS-LANGUAGE GOLDEN dump-import-golden.spec.js (+1 test): V4.1 + Expert spindle decoded to {analog, A} with each eng's OWN label (A axis vs 4th-axis) + the _idx provenance (188/189 vs 79/80); DM500 null. 5 JS golden tests pass.
+- BRIDGE PYTHON test_pull_geometry.py (+2 tests): the SAME values pinned in Python (test_spindle_interface_and_mapping_axis_by_name asserts idx 188/189 + 79/80, label 'A axis' + '4th-axis', never tapCapable/reversible; test_spindle_dm500_na). 11 Python tests OK.
+- REVIEW-APPLY dump-import-ui.spec.js (extended the V4.1 drive): the review body shows the Spindle rows (Analog); Apply writes spindle.interface='analog' + mappingAxis='A' AND leaves the user's pre-set tapCapable=true UNTOUCHED.
+FULL SUITE: 1136 passed + 2 skipped = 1138 (== --list), 0 failed, workers=3. Additive — no existing golden/decode value changed.
+
+Files: web/data/dumpImport.js (mapSpindle + recognizeDump), bridge/bridge-app/fairy/ops.py (_map_spindle_to_profile + 2 call sites), web/ui/settingsPanel.js (spindleCandidate + 2 pushes + the apply branch), tests/dump-import-golden.spec.js (+spindle golden), tests/dump-import-ui.spec.js (+spindle review/apply), bridge/bridge-app/tests/test_pull_geometry.py (+2 spindle tests).
+
+THE SPINDLE STORY IS COMPLETE (1a declaration · 1b pull-seed). NEXT (per the dispatch): the small queue — long-press dup/delete -> the .nc program-marker slot -> form-section collapse. PASS BACK.

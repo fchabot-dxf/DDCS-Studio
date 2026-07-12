@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { join } from 'path';
-import { readF64, parseEng, byNameIndices, controllerFromParamCount, mapExpertGeometry, mapExpertWcs, mapByNameGeometry, mapCoordWcs } from '../web/data/dumpImport.js';
+import { readF64, parseEng, byNameIndices, controllerFromParamCount, mapExpertGeometry, mapExpertWcs, mapByNameGeometry, mapCoordWcs, mapSpindle } from '../web/data/dumpImport.js';
 
 /**
  * CROSS-LANGUAGE GOLDEN (t666). The Studio JS dump mapper (data/dumpImport.js) must reproduce the EXACT values the
@@ -13,6 +13,7 @@ const repo = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', 'bri
 const bytes = (p) => readFileSync(join(repo, p));
 const text = (p) => readFileSync(join(repo, p), 'utf8');
 const EXPERT_SETTING = 'expert-m350/assets/capture/20260610T163337Z/SYSDISK/setting';
+const EXPERT_ENG = 'expert-m350/assets/capture/20260610T163337Z/SYSDISK/eng';
 const V41_SETTING = 'v4.1/assets/setting';
 const V41_ENG = 'v4.1/assets/firmware/ddcs v4.1/ddcsv4(2025-04-04)/ddcsv4(2025-04-04)/ddcsv4/eng';
 const V41_COORD1 = 'v4.1/assets/system-backup/current/coord1';
@@ -95,4 +96,24 @@ test('DM500 — the eng NAMES the geometry (by-name), but the setting layout is 
     expect(g.softLimits.xMin).toBeNull();
     expect(g.homingFeeds).toBeNull();
     expect(g._indices.softNeg).toEqual({ x: 375, y: 376, z: 377 });   // structure known, values not
+});
+
+test('SPINDLE (t780) — interface + mapping axis BY NAME through EACH eng own enums (V4.1 #188/#189 · Expert #79/#80); DM500 N/A', () => {
+    // V4.1 — #188 "Spindle interface type" = Analog(0); #189 "Spindle mapping axis" = A axis(3)
+    const sp41 = mapSpindle(readF64(bytes(V41_SETTING)), text(V41_ENG));
+    expect(sp41.interface).toBe('analog');
+    expect(sp41.interfaceRaw).toBe(0);
+    expect(sp41.mappingAxis).toBe('A');
+    expect(sp41.mappingAxisRaw).toBe(3);
+    expect(sp41.mappingAxisLabel).toBe('A axis');           // V4.1's OWN enum label
+    expect(sp41._idx).toEqual({ interface: 188, mappingAxis: 189 });
+    // Expert — #79 Analog(0); #80 "4th-axis"(3) → normalized to A via its OWN enum (a DIFFERENT label, never cross-applied)
+    const spX = mapSpindle(readF64(bytes(EXPERT_SETTING)), text(EXPERT_ENG));
+    expect(spX.interface).toBe('analog');
+    expect(spX.mappingAxis).toBe('A');
+    expect(spX.mappingAxisRaw).toBe(3);
+    expect(spX.mappingAxisLabel).toBe('4th-axis');          // Expert's OWN enum
+    expect(spX._idx).toEqual({ interface: 79, mappingAxis: 80 });
+    // DM500 — no PUL/DIR interface or spindle-axis mapping in the eng → honest N/A
+    expect(mapSpindle(readF64(bytes(DM500_SETTING)), text(DM500_ENG)), 'DM500 has no spindle-axis surface').toBeNull();
 });

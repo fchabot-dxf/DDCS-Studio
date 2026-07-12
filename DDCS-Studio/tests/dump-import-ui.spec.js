@@ -29,6 +29,8 @@ const dropDump = (page, entries) => page.evaluate(async (ents) => {
 
 test('drop a V4.1 dump → review modal derives the envelope + WCS by name; Apply writes settings (no gateway)', async ({ page }) => {
     await openControllerPanel(page);
+    // t780 — the user has attested tapCapable; the pull must NEVER overwrite it (only interface/mappingAxis are seeded).
+    await page.evaluate(() => { const s = window.ddcsGetSettings(); s.spindle = s.spindle || {}; s.spindle.tapCapable = true; });
     await dropDump(page, [
         { name: 'setting', b64: b64('v4.1/assets/setting') },
         { name: 'eng', text: txt('v4.1/assets/firmware/ddcs v4.1/ddcsv4(2025-04-04)/ddcsv4(2025-04-04)/ddcsv4/eng') },
@@ -42,16 +44,22 @@ test('drop a V4.1 dump → review modal derives the envelope + WCS by name; Appl
     expect(body, 'the envelope derived from the soft-limits (by name)').toContain('3830');
     expect(body, 'the WCS G54 derived from coord1').toContain('-300.29');
     expect(body, 'the review names the controller').toMatch(/V4\.1/i);
+    expect(body, 'the spindle interface + mapping-axis rows appear (raw → derived)').toMatch(/Spindle|Interface \+ mapping/i);
+    expect(body, 'the spindle interface is decoded (Analog VFD)').toMatch(/Analog/);
     // tick everything + Apply
     await page.evaluate(() => document.querySelectorAll('#import-body input[type=checkbox]').forEach((c) => { if (!c.checked) c.click(); }));
     await page.click('#import-apply');
     await page.waitForSelector('#import-modal.active', { state: 'detached', timeout: 8000 }).catch(() => {});
     const applied = await page.evaluate(() => {
         const s = window.ddcsGetSettings();
-        return { g54: (((s.machine.wcs || {}).table || [])[0]) || null, mx: s.machine.x };
+        return { g54: (((s.machine.wcs || {}).table || [])[0]) || null, mx: s.machine.x, spindle: s.spindle };
     });
     expect(applied.g54, 'Apply wrote the G54 offsets into settings.machine.wcs').toEqual({ x: -300.29, y: -116.06, z: 1547.268 });
     expect(Math.abs(applied.mx), 'Apply wrote the X envelope (3830) into settings.machine').toBe(3830);
+    // t780 — the spindle interface + mapping axis are seeded; the user's tapCapable attestation is UNTOUCHED.
+    expect(applied.spindle.interface, 'Apply wrote spindle.interface (analog)').toBe('analog');
+    expect(applied.spindle.mappingAxis, 'Apply wrote spindle.mappingAxis (A)').toBe('A');
+    expect(applied.spindle.tapCapable, 'the pull NEVER overwrites the user-owned tapCapable attestation').toBe(true);
 });
 
 test('drop a DM500 dump → honest "named from the eng, values N/A" (its setting layout is ungrounded)', async ({ page }) => {

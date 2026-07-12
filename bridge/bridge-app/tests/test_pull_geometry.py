@@ -146,6 +146,45 @@ def test_v41_wcs_none_when_coord1_unreadable():
     assert "wcs" not in prof or prof["wcs"] is None, prof
 
 
+# ── SPINDLE by-name (t780 1b). The DECLARED interface + mapping axis, decoded through EACH eng's OWN enums (V4.1 #188/#189
+# · Expert #79/#80 — never cross-applied). Matches the JS golden (DDCS-Studio/tests/dump-import-golden.spec.js). Seeds
+# ONLY interface/mappingAxis (readable machine truth) — never tapCapable/reversible (user attestations).
+_V41_ENG = os.path.normpath(os.path.join(_HERE, "..", "..", "controllers", "v4.1", "assets", "firmware",
+                                         "ddcs v4.1", "ddcsv4(2025-04-04)", "ddcsv4(2025-04-04)", "ddcsv4", "eng"))
+_EXPERT_ENG = os.path.normpath(os.path.join(_HERE, "..", "..", "controllers", "expert-m350",
+                                            "assets", "capture", "20260610T163337Z", "SYSDISK", "eng"))
+_DM500_SETTING = os.path.normpath(os.path.join(_HERE, "..", "..", "controllers", "dm500", "setting"))
+_DM500_ENG = os.path.normpath(os.path.join(_HERE, "..", "..", "controllers", "dm500", "install", "eng"))
+
+
+def _spindle(setting, eng, npar):
+    params = list(struct.unpack("<%dd" % npar, open(setting, "rb").read()[:npar * 8]))
+    eng_text = open(eng, "r", encoding="utf-8", errors="replace").read()
+    prof = {}
+    Ops(None, None)._map_spindle_to_profile(params, prof, eng_text)
+    return prof.get("spindle")
+
+
+def test_spindle_interface_and_mapping_axis_by_name():
+    """V4.1 #188 Analog(0) / #189 A axis(3); Expert #79 Analog(0) / #80 4th-axis(3) → both normalize to analog / A via
+    each eng's OWN enums (different labels, same normalized value). Seeds ONLY interface/mappingAxis."""
+    sp41 = _spindle(_V41_CAPTURE, _V41_ENG, 1500)
+    assert sp41["interface"] == "analog" and sp41["interfaceRaw"] == 0, sp41
+    assert sp41["mappingAxis"] == "A" and sp41["mappingAxisRaw"] == 3, sp41
+    assert sp41["mappingAxisLabel"] == "A axis", sp41                       # V4.1's OWN enum
+    assert sp41["_idx"] == {"interface": 188, "mappingAxis": 189}, sp41
+    spX = _spindle(_CAPTURE, _EXPERT_ENG, 1000)
+    assert spX["interface"] == "analog" and spX["mappingAxis"] == "A", spX
+    assert spX["mappingAxisLabel"] == "4th-axis", spX                      # Expert's OWN enum, NOT cross-applied
+    assert spX["_idx"] == {"interface": 79, "mappingAxis": 80}, spX
+    assert "tapCapable" not in sp41 and "reversible" not in sp41, sp41     # never the user attestations
+
+
+def test_spindle_dm500_na():
+    """DM500 has no PUL/DIR interface or spindle-axis mapping in its eng → no spindle payload (honest N/A)."""
+    assert _spindle(_DM500_SETTING, _DM500_ENG, 21250) is None
+
+
 if __name__ == "__main__":
     for name, fn in sorted((n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)):
         fn()

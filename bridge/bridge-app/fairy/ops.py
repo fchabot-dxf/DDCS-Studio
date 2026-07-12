@@ -314,7 +314,9 @@ class Ops:
             if params is not None:
                 prof["source"] = "controller"
                 prof["paramCount"] = len(params)
-                self._map_geometry_to_profile_v41(params, prof, self._read_eng() or "")   # eng = the MEANING (by name), setting = the VALUES
+                _eng = self._read_eng() or ""
+                self._map_geometry_to_profile_v41(params, prof, _eng)   # eng = the MEANING (by name), setting = the VALUES
+                self._map_spindle_to_profile(params, prof, _eng)        # t780 — V4.1 #188 interface + #189 mapping axis
                 self._map_wcs_to_profile_v41(params, prof, self._read_coord1())            # WCS table from the SYSDISK coord1 file (t654)
             return prof
         # Expert M350, or unknown → default to the Expert baseline + live-setting refinement (as before).
@@ -325,6 +327,7 @@ class Ops:
             prof["paramCount"] = len(params)
             self._map_setting_to_profile(params, prof)
             self._map_geometry_to_profile(params, prof)
+            self._map_spindle_to_profile(params, prof, self._read_eng() or "")   # t780 — Expert #79 interface + #80 mapping axis
             prof["validation"] = self.validate_profile(params)   # reuse the read; UI shows match/warnings
         return prof
 
@@ -562,6 +565,54 @@ class Ops:
         for role in ("softNeg", "softPos", "homeDir", "seek", "slow"):
             idx[role] = {ax: find(self._ENG_NAME[role].format(AX=ax.upper())) for ax in ("x", "y", "z")}
         return idx
+
+    # ── SPINDLE (t780 1b) — the DECLARED spindle interface + mapping axis, BY NAME from the eng, decoded through EACH
+    # eng's OWN enums (V4.1 #188/#189 · Expert #79/#80 — never cross-applied). Seeds ONLY interface + mappingAxis
+    # (readable machine truth); tapCapable/reversible stay USER attestations (never seeded). The JS twin (dumpImport.js
+    # mapSpindle) reproduces this EXACTLY — the cross-language golden pins both.
+    _SPINDLE_ENG = {"iface": r"spindle\s+interface\s+type", "mapAxis": r"spindle\s+mapping\s+axis"}
+
+    @staticmethod
+    def _norm_spindle_iface(label):
+        return "pul-dir-axis" if re.search(r"pul|dir", label or "", re.I) else "analog"
+
+    @staticmethod
+    def _norm_spindle_axis(label):
+        m = re.match(r"\s*([XYZA])\b", label or "", re.I)
+        if m:
+            return m.group(1).upper()
+        return "A" if re.search(r"4th", label or "", re.I) else ""
+
+    def _map_spindle_to_profile(self, params, prof, eng_text):
+        """Emit `spindle` = {interface, mappingAxis} (+ raw/label/idx provenance) BY NAME through the eng's own enums.
+        Read-only; never raises; leaves prof untouched if the eng has neither field."""
+        eng = self._parse_eng(eng_text or "")
+        if not eng:
+            return
+        def find(pat):
+            rx = re.compile(pat, re.I)
+            for i in sorted(eng):
+                if rx.search(eng[i]["name"]):
+                    return i
+            return None
+        if_idx, ax_idx = find(self._SPINDLE_ENG["iface"]), find(self._SPINDLE_ENG["mapAxis"])
+        if if_idx is None and ax_idx is None:
+            return
+        def read_enum(idx):
+            if idx is None or idx < 0 or idx >= len(params):
+                return (None, "")
+            try:
+                raw = int(params[idx])
+            except (ValueError, TypeError):
+                raw = 0
+            return (raw, eng[idx]["enums"].get(raw, ""))
+        if_raw, if_lbl = read_enum(if_idx)
+        ax_raw, ax_lbl = read_enum(ax_idx)
+        prof["spindle"] = {
+            "interface": self._norm_spindle_iface(if_lbl), "interfaceLabel": if_lbl, "interfaceRaw": if_raw,
+            "mappingAxis": self._norm_spindle_axis(ax_lbl), "mappingAxisLabel": ax_lbl, "mappingAxisRaw": ax_raw,
+            "_idx": {"interface": if_idx, "mappingAxis": ax_idx},
+        }
 
     def _map_geometry_to_profile_v41(self, params, prof, eng_text):
         """V4.1 geometry DERIVED BY NAME from the eng (the MEANING) + the live/captured `setting` (the VALUES). The eng
