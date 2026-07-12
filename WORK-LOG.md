@@ -10855,3 +10855,24 @@ FLEXBOX GOTCHA caught by the full suite (commit 7e9b2c9): the t784 desktop reflo
 SUITE: 1153 passed + 2 skipped = 1155 (== 1152 + 3 new), 0 failed (workers=2, re-run after the fill-fix). View-only (CSS + a splitter div + a display pref) — no emit path touched.
 
 Files: web/ui/panePrefs.js (the ratio pref), web/ui/paneAccordion.js (the splitter engine), web/styles.css (ratio flex/heights + splitter styling + the ×100 fill-fix), tests/pane-splitter-790.spec.js (NEW). Commits: 3994b0f (the splitter), 7e9b2c9 (the flexbox fill-fix).
+
+## 2026-07-12 (t792) — THE FORM-HONESTY TURN (phased). Batch 1: P1 stock spill + P2 honest labels
+
+The advisor dispatched a 7-piece form-honesty turn, "phase it as you see fit, each phase releasable, pass back per phase". My phasing: **P1 stock spill → P2 honest labels → P3 preset row → P4 deep-links → P5 field help → P6 clearing cluster → P7 shadow forms.** This batch = P1 + P2 (both surface/form-honesty, byte-identical/view-only, coherent). P3-P7 DEFERRED to the next dispatch(es).
+
+### P1 — THE STOCK SPILL LEAVES THE WIZARD FORMS (commit b3093c4)
+A program runs on ONE setup with ONE stock; the per-op stockW/stockH/stockZ/stockDatum fields were a data-model artifact, not a placement choice. They leave every mill/layout twin's FORM via a DECLARED `formHidden` flag on the binding — renderOpForm skips the form field, but the binding stays in the STACK + Blocks + round-trip (the escape hatch). The two REAL placement choices (Path Datum + Attach to Stock) remain.
+- GROUNDED: the twin form renders `_def.bindings` (userOpView:191) which are DERIVED (`mergeBindingsByParam(deriveBindingsFor(specs))`), and deriveBindings only carried a whitelist (help/widget/…) — so a flag on the spec was dropped. Fix: carry `formHidden` (+ `link`, forward-decl for P4) through both deriveBindings + mergeBindingsByParam's fill list.
+- BYTE-IDENTICAL: the fields defaulted to follow-the-stock (resolvePlacementStock fills unset from settings), so the emit is unchanged → the as-data goldens stay green. Verified: pocket + contour emit goldens + blocks round-trip.
+- 28 flags (7 twins × 4 fields) via a scripted regex on `param: 'stockX',`.
+- stock-spill-792.spec.js: the 4 fields GONE from all 7 twins (pocket/contour/drill/bore/surfacing/slot/text), Path Datum + Attach REMAIN.
+
+### P2 — HONEST LABELS (commit 695bda8)
+- 'Load file' → 'Load gcode (replace)' (headerPost.js) — it opens a .nc from disk and REPLACES the editor (vs 'Insert gcode' = insert at cursor); the label now says which. No test referenced the old label.
+- The header quick-menu chevron (.hdr-quick-btn) gets a VISIBLE theme-aware border (was `1px solid transparent`, invisible until hover; opacity .7→.82) so it reads as a button, not a bare icon. Screenshot (normal/studio/organic): the ⌄ after the version chip is now a discoverable bordered button.
+
+SUITE: 1154 passed + 2 skipped = 1156 (== 1155 + 1 new), 0 failed (workers=2 — covers the SHARED renderOpForm/deriveBindings changes across every twin). P1 byte-identical (emit untouched); P2 view-only.
+
+Files: web/ui/formWidgets.js (renderOpForm formHidden filter), web/blocks/dataOps/deriveBindings.js (carry formHidden + link), 7× *Data.js (formHidden flags), web/ui/headerPost.js (label), web/styles.css (chevron border), tests/stock-spill-792.spec.js (NEW). Commits: b3093c4 (P1), 695bda8 (P2).
+
+NOTE (env hazard mid-turn): `taskkill node.exe` to clear a stray detached full-suite run also took the dev server — Playwright's webServer config (`npx http-server ./web -p 3211`) auto-restarts it on the next run, so no manual restart needed. Lesson banked: don't blanket-kill node; target the PID.
