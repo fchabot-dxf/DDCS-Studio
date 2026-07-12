@@ -2090,7 +2090,8 @@ button.primary:hover {
 /* THE SLIM SIDE-CHEVRON STRIP — the whole collapse affordance; a vertical bar on the pane's left, ≥44px touch target
    on BOTH platforms, token-styled. Chevron + a vertical kind label (2D / 3D / G-code). */
 .wiz-pane-bar {
-    flex: 0 0 44px; align-self: stretch; min-height: 44px;
+    flex: 0 0 28px; align-self: stretch; min-height: 44px;   /* t785 (user) — slimmer strip; the hit area extends into the outer gutter via ::before */
+    position: relative;
     display: flex; align-items: center; justify-content: center;   /* chevron ONLY — no text label */
     padding: 0; border: none; cursor: pointer;
     background: color-mix(in srgb, var(--bg) 55%, transparent);
@@ -2098,6 +2099,7 @@ button.primary:hover {
     border-radius: inherit; border-top-right-radius: 0; border-bottom-right-radius: 0;
     transition: color .12s ease, background .12s ease;
 }
+.wiz-pane-bar::before { content: ''; position: absolute; top: 0; bottom: 0; left: -16px; width: 16px; }   /* t785 — 28+16 = 44px effective touch, extended AWAY from the canvas (the gutter side) so edge drags are never stolen */
 .wiz-pane-bar:hover { color: var(--text-main); background: color-mix(in srgb, var(--bg) 78%, transparent); }
 .wiz-pane-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .wiz-pane-chev { flex: 0 0 auto; transform: rotate(90deg); transition: transform var(--drawer-dur-eff, 180ms) var(--drawer-ease-eff, ease); }   /* expanded → points ‹ toward the rail (fold me) */

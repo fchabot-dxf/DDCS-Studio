@@ -85,7 +85,7 @@ test.describe('collapse gives the form the space (mobile) — the surviving pane
           band: Math.round(cv.top - bdy.top),
         };
       }, kind);
-      expect(r.w, `${kind} strip ≥44px wide (touch target)`).toBeGreaterThanOrEqual(44);
+      expect(r.w + 16, `${kind} strip ≥44px EFFECTIVE touch (28px visible + the 16px ::before gutter extension — t785, user: narrower strip)`).toBeGreaterThanOrEqual(44);
       expect(r.h, `${kind} strip ≥44px tall when expanded (touch target)`).toBeGreaterThanOrEqual(44);
       expect(r.text, `${kind} strip has NO visible text label (chevron only)`).toBe('');
       // no reserved band: the body has no top padding + the status chip OVERLAYS (absolute), so the canvas fills.
