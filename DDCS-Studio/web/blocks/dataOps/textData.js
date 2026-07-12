@@ -62,12 +62,12 @@ const TEXT_EXEC_BINDINGS = [
         widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS },
     },
     {
-        param: 'stockDatum', blockIndex: 3, key: 'stockDatum', type: 'enum', default: TEXT_DEFAULTS.stockDatum,
+        param: 'stockDatum', formHidden: true, blockIndex: 3, key: 'stockDatum', type: 'enum', default: TEXT_DEFAULTS.stockDatum,
         widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS },
     },
-    { param: 'stockW', blockIndex: 3, key: 'stockW', type: 'number', default: TEXT_DEFAULTS.stockW },
-    { param: 'stockH', blockIndex: 3, key: 'stockH', type: 'number', default: TEXT_DEFAULTS.stockH },
-    { param: 'stockZ', blockIndex: 3, key: 'stockZ', type: 'number', default: TEXT_DEFAULTS.stockZ },
+    { param: 'stockW', formHidden: true, blockIndex: 3, key: 'stockW', type: 'number', default: TEXT_DEFAULTS.stockW },
+    { param: 'stockH', formHidden: true, blockIndex: 3, key: 'stockH', type: 'number', default: TEXT_DEFAULTS.stockH },
+    { param: 'stockZ', formHidden: true, blockIndex: 3, key: 'stockZ', type: 'number', default: TEXT_DEFAULTS.stockZ },
     // depth pass (block 4, stepdown)
     { param: 'depth', blockIndex: 4, key: 'to', type: 'number', default: TEXT_DEFAULTS.depth },
     { param: 'stepdown', blockIndex: 4, key: 'by', type: 'number', default: TEXT_DEFAULTS.stepdown },

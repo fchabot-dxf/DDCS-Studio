@@ -85,6 +85,8 @@ export function deriveBindings(flatStack, specs) {
         if (s.anchor) b.anchor = s.anchor;   // composable GUI (PILOT 2) — a DECLARED layout anchor {kind, frame}; layoutSpecFromOp switches on anchor.kind
         if (s.readonly) b.readonly = true;   // t389 — a DRAG-DRIVEN socket: the form field DISPLAYS it (readonly), the canvas handle is the sole editor
         if (s.readonlyHint) b.readonlyHint = s.readonlyHint;
+        if (s.formHidden) b.formHidden = true;   // t792 — declared OUT of the form (stays in stack + Blocks); the stock spill
+        if (s.link) b.link = s.link;             // t792 — declared deep-link slot {kind, …} → the row-end gear (carry through derive)
         out.push(b);
     }
     return out;
@@ -132,7 +134,7 @@ export function mergeBindingsByParam(bindings) {
     for (const b of (bindings || [])) {
         const prev = byParam.get(b.param);
         if (!prev) { byParam.set(b.param, { ...b }); continue; }
-        for (const k of ['widget', 'widgetConfig', 'label', 'help', 'section', 'units']) if (prev[k] === undefined && b[k] !== undefined) prev[k] = b[k];
+        for (const k of ['widget', 'widgetConfig', 'label', 'help', 'section', 'units', 'formHidden', 'link']) if (prev[k] === undefined && b[k] !== undefined) prev[k] = b[k];
     }
     return [...byParam.values()];
 }

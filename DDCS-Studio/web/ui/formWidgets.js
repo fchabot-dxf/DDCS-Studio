@@ -623,6 +623,10 @@ export function renderFormWidget(host, unit) {
 export function renderOpForm(host, bindings) {
     const readers = [], units = [], byGroup = {};
     for (const b of (bindings || [])) {
+        // t792 — a binding may DECLARE itself out of the form (`formHidden`): it stays in the stack + Blocks + round-trip
+        // (the escape hatch), but no form field renders. The stock spill uses it — stockW/H/Z/stockDatum resolve from the
+        // GLOBAL stock, so the per-op form field was a data-model artifact, not a real placement choice.
+        if (b && b.formHidden) continue;
         if (b.group) { if (!byGroup[b.group]) { byGroup[b.group] = []; units.push(byGroup[b.group]); } byGroup[b.group].push(b); }
         else units.push([b]);
     }

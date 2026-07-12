@@ -56,12 +56,12 @@ const SLOT_EXEC_BINDINGS = [
         widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS },
     },
     {
-        param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: SLOT_DEFAULTS.stockDatum,
+        param: 'stockDatum', formHidden: true, blockIndex: 2, key: 'stockDatum', type: 'enum', default: SLOT_DEFAULTS.stockDatum,
         widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS },
     },
-    { param: 'stockW', blockIndex: 2, key: 'stockW', type: 'number', default: SLOT_DEFAULTS.stockW },
-    { param: 'stockH', blockIndex: 2, key: 'stockH', type: 'number', default: SLOT_DEFAULTS.stockH },
-    { param: 'stockZ', blockIndex: 2, key: 'stockZ', type: 'number', default: SLOT_DEFAULTS.stockZ },
+    { param: 'stockW', formHidden: true, blockIndex: 2, key: 'stockW', type: 'number', default: SLOT_DEFAULTS.stockW },
+    { param: 'stockH', formHidden: true, blockIndex: 2, key: 'stockH', type: 'number', default: SLOT_DEFAULTS.stockH },
+    { param: 'stockZ', formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: SLOT_DEFAULTS.stockZ },
     { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: SLOT_DEFAULTS.offZ },
     // geometry + cut (block 3, the slot leaf). Wizard names ax/ay/bx/by/toolDia → leaf keys x0/y0/x1/y1/tool.
     { param: 'ax', blockIndex: 3, key: 'x0', type: 'number', default: SLOT_DEFAULTS.ax },
