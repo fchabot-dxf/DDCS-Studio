@@ -10459,3 +10459,74 @@ Wired the t762 serial emit core (serialEngrave.js) into the real text op, end-to
   B. A separate ONE-SHOT init program (`#490 = N` / M30) Studio hands over to run ONCE -- convenient but generates code (mild tension with the ruled "no using Studio to make new code").
   C. Gateway write of the #var when connected -- cleanest UX, needs live-connection + var-write support.
 The SIM seam (setSimUserVar) already exists for whichever wins, to make the PREVIEW start at N. The declared action seam is ready too (widget:'action' + a dispatch case in formWidgets.js, like homing's 'Homing Setup...'). I did NOT pick silently. ADVISOR RULES the real-controller path; then it's a small add (an action binding + one dispatch case + the sim seed). PASS BACK -- the {SN} feature is wired, green, and releasable now; Initialize-to-N is the one ruled follow-on.
+
+## 2026-07-12 (t766) — DESIGN GATE (grounding, NO build): MILL-WIZARD TOOL SELECTION + SWAP
+
+Grounded the 5 seams (5 parallel Explore sweeps) for the t682 tool-selection design. The design is largely user-ruled (NEXT-SESSION line 9); grounding CONFIRMS the pieces mostly EXIST and surfaces ONE architectural reframe + a triaged fork list. Passing back for ruling before build.
+
+### THE CENTRAL FINDING (reframes the literal t682 wording "grow the atom to {tool, dia, tip}")
+
+The tool TABLE is ALREADY the full one-source declaration, and sim+carve ALREADY consume it:
+- settings.atc.tools[] records = {num, name, TYPE, dia, flutes, length, rpm, feed, plunge} (settingsPanel.js:51 normalizeTool; TOOL_TYPES enum settingsPanel.js:37 = endmill/drill/ballnose/chamfer/vbit/... — TYPE is the tip). NOT ATC-specific; present for manual machines too. Persisted in ddcs_studio_settings.
+- The SIM cutter is tip-aware: toolHalfProfile(tool) reads type+dia (ball hemisphere / vee cone / flat) — viz/toolProfile.js:21; fed by setSimTool.
+- The CARVE is tip-aware: carveTipForToolType (ballnose->ball else flat; vee reserved) + _tipOffset spherical bottom — engine/stockRemoval.js:25,83. The code EXPLICITLY has NO separate tip field, derived from the table type "so [it] can't drift" (stockRemoval.js:22).
+- The STARVATION is a single hardcode: userOpView.js:238 builds _opTool={type:'endmill', dia:_opToolDia} from the numeric toolDia leaf — TYPE FORCED to endmill — and it WINS over the T# table lookup (createPreviewPanel.js simTool precedence). So every mill op renders/carves a flat endmill regardless of the real tool. Also toolPicker.js:43 toolFieldMap copies dia/feed/plunge/rpm but DROPS type.
+
+So the mill ops today carry a numeric toolDia (a cut-math diameter, DISJOINT from any tool identity), while the machine tool atom (wizards/ops/tool.js:4, field n -> "T{n} M6") carries only the T# and no dia/tip. Neither owns {tool,dia,tip}; the TABLE does.
+
+=> THE FORK THIS FORCES (Fork A, the crux): DERIVE vs DUPLICATE.
+  A-DERIVE (recommend): the op/atom declares the tool IDENTITY (a T# = which table row). dia/tip/name/feeds DERIVE from the table when a T# resolves (ONE SOURCE = the table); a FREE-TYPED dia stays the NO-TABLE FALLBACK. The only code change to light up sim/carve is to stop forcing type:'endmill' at userOpView.js:238 (let the T#-resolved table tool + its real type flow) + extend toolFieldMap to also carry type. This is declare-never-infer (identity declared, properties one-sourced) + literally what t682 sub-ruling (1) says ("dia/tip auto-fill = one source; free-typed dia = the no-table fallback").
+  A-DUPLICATE: the atom carries literal {tool, dia, tip} authoritative values (the literal wording). This COPIES the table onto the atom -> drift (the exact anti-pattern stockRemoval.js:22 avoided) + grows every mill marker by ~3 keys.
+  SIEVE: Gate 2 (declare-never-infer) + Gate 3 (one-source) DECIDE -> A-DERIVE. Flagging because it reinterprets the literal "{tool,dia,tip}" as "{toolNum} + table-derived {dia,tip} + free-typed fallback." HUMAN confirms the reinterpretation.
+
+### THE 5 SEAMS (grounded, file:line)
+
+1. TOOL TABLE + CONTEXT MODAL. Source = settings.atc.tools[] (above). The tool-table modal (#toollib-modal, settingsPanel.js:2325 buildToolLibModal) is EDIT-ONLY, autosave-on-input, footer +Add/Done, and an UN-EXPORTED closure inside settingsPanel (the biggest structural fork to make it wizard-pickable). Today's wizard pick is the plain toolPicker.js <select> (drops type). Browse-vs-pick precedents disagree: profileModal(mode string), projectModal(two fns + highlight-then-commit saveDest), openStockEditor/openAtcSetup(opts+returnToken "back to <origin>").
+
+2. TOOL ATOM + SIM/CARVE. (above) — tip already flows end-to-end; only userOpView.js:238 hardcode + toolFieldMap drop block it. vee is reserved-not-built (vbit renders flat with an "(as flat)" note).
+
+3. EMIT PREFIX + TRACKING. atcChangeStack(params) returns a dialect-NEUTRAL atom stack; arms in ARM_BUILDERS {m6, manual, macroCall, firmware, inlineTnc} (atcChangeWizard.js:210). manualStack (:54) IS the manual arm already: park + MSG('Swap tool by hand...') + PAUSE()(M00). confirmBlock (wizards/ops/hmi.js:54) type 'confirm' {msg,...,pauseOnDegrade} folds to "( msg )"+M0 on no-HMI posts = exactly "Load T3 - 6mm ballnose"+blocking M0. Dialect rendering is deferred to emitMapped (arms are neutral; machinemove renders G53 per-post; cap:'atc' folds on non-ATC). CROSS-OP state: a shared scope is threaded across all ops (blockEmitter.js:279) and applyModalFeed (:373) is the whole-program post-pass precedent (tracks modalF, folds redundant F). NO current-tool tracker exists (greenfield). toolBlock emits T{n} M6 unconditionally. Machine MODE has NO single source: caps.atc (per-post firmware: Expert true / V4.1+DM500 false) + settings.hardwareTabs.atc (per-machine bool, default false) + settings.atc{grip,motion,layout,magazine}; the arm is chosen PER-OP today (resolveMethod reads params.method), NOT per-machine; there is NO explicit "none/unattended" state.
+
+4. formWidgets WIDGET. FORM_WIDGETS registry (formWidgets.js:499). A COMPOSITE 'toolpick' (rich dropdown rows [T# . name . dia . tip glyph] + a trailing gear in the SAME row) is fully expressible in ONE binding — numberWidget/coordListWidget already mount a control+buttons under one binding; the gear needs NO param (read() returns just the tool number {n}, like dropdownWidget:159). Must read settings.atc.tools LIVE (like declared-io / segmented's optionsBy) + reflow on ddcs:settings-changed. Gear dispatch reuses actionWidget's b.action switch (add a 'toolTableEdit' arm -> openAtcSetup) or inline-imports it. Binding auto-surfaces as a form widget from def.bindings (renderOpForm) with no per-field registration.
+
+5. TWIN / ROUND-TRIP. markerLine (opSchema.js:217) serializes EVERY param key (no allow-list) + parseMarker is symmetric -> a new op param AUTO-round-trips with NO schema edit; a twin's marker/validate schema is derived from def.bindings (userOps.js:523). Blockly: twins are generic op containers, params ride one data JSON blob (stackBridge) -> a new tool PARAM needs no stackBridge code (a new atom SOCKET would need the block def to declare the field). The shared-binding-injection PRECEDENT = entryBindingsFor(stack) (deriveBindings.js:101, derives by IDENTITY matching an appended marker block) + appendEntry(exec) (entry.js:36, appends a marker that EMITS NOTHING, AFTER the body so WRAP_PREFIX_COUNT=4 positional bindings don't shift). A toolBindingsFor(stack) clones this into all 6 positional twins (drill/bore/slot/surfacing/text/contour) + pocket's POCKET_BINDING_SPECS.
+
+### PROPOSED ARCHITECTURE (if the sieve recommendations hold)
+
+  DECLARE (op param)         ONE SOURCE (table)              CONSUMERS (already wired)
+  +--------------+           +-----------------------+      +-----------------------+
+  | toolNum (T#) |--resolve->| settings.atc.tools[T#]|----->| sim  toolHalfProfile  |
+  |  (+ free dia |           |  {type, dia, name,    |      | carve carveTipForType |
+  |   fallback if|           |   length, feeds}      |      | emit  T# + change stack|
+  |   no table)  |           +-----------------------+      +-----------------------+
+  +--------------+            (no {dia,tip} COPY on the atom -> nothing to drift)
+
+  FORM ROW (composite 'toolpick' widget, one binding):
+  +---------------------------------------------------------+
+  | Tool  [ T3 . 6mm ballnose . dia6 . )  v ]         [gear]|   gear -> the (extracted) tool-table modal, PICK-mode
+  +---------------------------------------------------------+   dropdown rows: T# . name . dia . tip-glyph; live from settings.atc.tools
+
+  EMIT (a NEW emitMapped post-pass applyToolChanges, mirroring applyEntryWaypoint/applySerialLibrary + entry's append-marker):
+    walk ops in program order, track the currently-loaded T#; before an op whose toolNum DIFFERS, INJECT atcChangeStack(arm) where
+      arm = machine ATC declared -> the ATC change stack (firmware/m6/macro per settings.atc)
+          | manual-attended       -> confirm{msg:'Load T3 - 6mm ballnose', pauseOnDegrade:true}  (M0-blocking)
+          | none/unattended       -> an honest comment only
+    (append-marker keeps every positional binding intact -> goldens/entry unaffected; the change G-code is injected at emit, not in the stack body.)
+
+### THE FORK LIST FOR RULING (sieve-triaged; deciding gate cited, or residue named)
+
+FORK A - DERIVE vs DUPLICATE the tool properties. DECIDED by Gate 2+3 -> DERIVE (toolNum identity + table one-source + free-typed fallback). HUMAN: confirm the reinterpretation of the literal "{tool,dia,tip}".
+
+FORK B - emit-prefix injection: append-marker + a new applyToolChanges post-pass (mirrors entry + my t764 applySerialLibrary) vs prepend a real emitting block. DECIDED by Gate 4 (don't shift positional bindings; large blast) -> append-marker + post-pass. (This also subsumes the "post-pass vs scope-thread tracking" sub-fork: the post-pass IS the tracker.)
+
+FORK C - the widget: a COMPOSITE 'toolpick' (dropdown+gear one widget) vs two bindings (dropdown + a separate _setup action). Value/GUI (Gate 8) + the t682 UI ruling ("gear at the row's end", "ONE visible door") -> RECOMMEND composite. (Both are buildable; residue = the exact glue, minor.)
+
+FORK D (RESIDUE - human) - the "manual-attended (M0 prompt) vs none (comment)" arm is UNENCODED today (only ATC-on vs ATC-off exists). This is a DECLARE gap: add a machine-level tool-change MODE = { automatic(ATC) | manual-attended | none/unattended }, settings-carried like hardwareTabs.atc, PULL-seeded where knowable. QUESTION for the human: do you even want the silent-comment "none" arm, or is manual-attended M0 always right for a non-ATC machine (a hobby CNC operator is present)? If M0-always, the declaration collapses to the existing ATC-on/off boolean and Fork D disappears.
+
+FORK E (RESIDUE - cost/timing) - the pickable modal. The everyday pick is the rich dropdown (no modal). The t682 ruling ALSO wants the gear modal to be PICKABLE from a wizard (double-click/Use -> select+close, "add-then-use has no dead end"). That requires EXTRACTING the edit-only closure (settingsPanel.js:2325) into a module openToolLibrary({mode:'pick'|'edit', onPick}) (the profileModal/projectModal precedent) + a pick-mode "Use" affordance + a return channel (resolve onPick(T#)). RECOMMEND the opts+returnToken shape (openStockEditor precedent). QUESTION: build the pickable modal NOW, or ship the rich dropdown + an EDIT-only gear first (gear opens today's modal via openAtcSetup) and add pick later? (The dropdown already covers the common pick; the modal-pick is the "add-a-new-tool-then-use-it-without-a-dead-end" convenience.)
+
+FORK F - which ops get the Tool row: a shared toolBindingsFor(stack) (identity-derived like entryBindingsFor, injected into all 6 positional twins + pocket's specs) vs new tool-change wizards only. Gate 3 (one-source) + t682 4d (composability: any wizard with the atom inherits it) + the corner-pilot "proven-once-inherit" -> RECOMMEND the shared helper. NOTE the two injection sites (6 positional twins take [...XXX_BINDINGS, ...toolBindingsFor(stack)]; pocket re-derives over POCKET_BINDING_SPECS) -> toolBindingsFor must be identity-derived to serve both. Also: reuse the EXISTING toolDia leaf as the no-table fallback dia (do NOT add a 2nd dia param -> validateUserOp rejects duplicate params, userOps.js:480); the NEW param is toolNum only.
+
+MARKER BLOAT: under A-DERIVE the mill markers grow by exactly +1 key (toolNum) — dia stays the existing toolDia; tip/name/feeds are derived, never stored. (A-DUPLICATE would add ~3.) Another point for DERIVE.
+
+NOT built this turn (design gate). NO source touched. VERIFY: n/a (grounding). Files: WORK-LOG only. PASS BACK the design + the 6 forks (A-F) — A/B/C/F sieve-decided with a recommend, D+E are the named residues for the human. Once ruled, the build is: toolNum field + composite toolpick widget + toolBindingsFor + userOpView.js:238 unforce + toolFieldMap type + applyToolChanges post-pass + (E) optional modal extraction.
