@@ -61,11 +61,11 @@ test('wizardLibrary: catalog + user ops + overrides + .wizard codec', async ({ p
 
   // default catalog
   expect(r.groups0).toEqual(['setup', 'probe', 'atc', 'mill']);
-  expect(r.mill0).toEqual(['drill', 'bore', 'pocket', 'contour', 'slot', 'surfacing', 'text']);
+  expect(r.mill0).toEqual(['drill', 'bore', 'pocket', 'contour', 'slot', 'surfacing', 'text', 'tap']);   // t778 — the new Tapping wizard
   // user op in custom
   expect(r.custom1).toEqual([{ id: 'user_lib_test', label: 'Lib Test', kind: 'user' }]);
   // overrides: pocket hidden + slot moved out of mill; drill renamed; group renamed; slot now in setup; hidden still visible with the flag
-  expect(r.mill2).toEqual(['drill', 'bore', 'contour', 'surfacing', 'text']);
+  expect(r.mill2).toEqual(['drill', 'bore', 'contour', 'surfacing', 'text', 'tap']);   // t778 — tap stays after pocket/slot are hidden/moved
   expect(r.millLabel2).toBe('Milling');
   expect(r.drillLabel2).toBe('My Drill');
   expect(r.setupHasSlot).toBe(true);
@@ -75,7 +75,7 @@ test('wizardLibrary: catalog + user ops + overrides + .wizard codec', async ({ p
   expect(r.parsed.label).toBe('Codec Test');
   expect(r.bad).toBe(null);
   // reset restores the shipped catalog but keeps the user op
-  expect(r.mill3).toEqual(['drill', 'bore', 'pocket', 'contour', 'slot', 'surfacing', 'text']);
+  expect(r.mill3).toEqual(['drill', 'bore', 'pocket', 'contour', 'slot', 'surfacing', 'text', 'tap']);   // t778 — reset restores the shipped catalog incl. tap
   expect(r.customStill).toBe(1);
 });
 

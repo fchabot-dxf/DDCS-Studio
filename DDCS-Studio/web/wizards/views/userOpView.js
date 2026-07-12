@@ -30,6 +30,7 @@ import { getActiveProfile } from '../../shared/js/profiles/controllerProfiles.js
 // t538 — the active post is RS274/grblHAL (o-word / M66)? Injected as the `_oword` gate param so a binding can hide a
 // dialect-specific field (e.g. the I/O-step Result-var/Timeout, which are M66-only and dead on a DDCS WHILE-poll).
 const activePostOword = () => { try { return getCaps(resolveActivePost(getActiveProfile().id).id).flow === 'oword'; } catch (_) { return false; } };
+const activePostId = () => { try { return resolveActivePost(getActiveProfile().id).id || ''; } catch (_) { return ''; } };   // t778 — for the tapping rigid gate (Expert-only)
 import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
 
 // t309 — THE 2D-ANIMATION OVERLAY: a path-only toolpath2d <canvas> UNDER the Layout SVG (behind, pointer-events:none via
@@ -249,7 +250,10 @@ export const userOpView = {
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
         const fhost = el('wiz_user_form');
-        const gp = { ...params, _oword: activePostOword() };   // t538 — the live params + a dialect gate flag (`_oword`)
+        // t538 — the live params + a dialect gate flag (`_oword`); t778 — `_rigidOk` for the tapping rigid gate: a DECLARED
+        // encoder/servo spindle (settings.spindle.tapCapable) AND the Expert post (the only dump-evidenced firmware).
+        const _spin = (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {};
+        const gp = { ...params, _oword: activePostOword(), _rigidOk: !!_spin.tapCapable && activePostId().startsWith('ddcs-expert') };
         if (fhost) fhost.querySelectorAll('[data-when], [data-when-all]').forEach((row) => {
             let ok;
             if (row.dataset.whenAll) {   // t522 — COMPOUND gate: AND of all conditions

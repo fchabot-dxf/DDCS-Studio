@@ -23,6 +23,7 @@ import { atcTestDataDef } from './blocks/dataOps/atcTestData.js';   // t556-t560
 import { atcChangeDataDef } from './blocks/dataOps/atcChangeData.js';   // t562-t566 ATC Change port — the "Tool Change (data)" twin: opened IN-PLACE from the built-in Tool Change slot (opensAs); 5-method _arm superset + M2 static-arm graft + inlineTnc live-view + per-method field gating + machine/magazine/choreography sim
 import { atcTableDataDef } from './blocks/dataOps/atcTableData.js';   // t568 ATC Table port (THE LAST WIZARD) — the "Tool Table (data)" twin: opened IN-PLACE from the built-in Tool Table slot (opensAs); include-toggle superset + live-view rows (unroll from Settings → Tool table)
 import { drillDataDef } from './blocks/dataOps/drillData.js';
+import { tapDataDef } from './blocks/dataOps/tapData.js';   // t778 — the Tapping data-twin (floating-holder + gated rigid)
 import { boreDataDef } from './blocks/dataOps/boreData.js';   // fan-out — the helical "Bore (data)" twin — opened IN-PLACE from the built-in Bore slot (opensAs); drillStack method='helical', byte-identical
 import { slotDataDef } from './blocks/dataOps/slotData.js';
 import { surfacingDataDef } from './blocks/dataOps/surfacingData.js';
@@ -165,6 +166,7 @@ class DDCSStudio {
             atcChangeDataDef(),   // t566 E2 — seed the Tool Change twin so its in-place Tool Change slot (opensAs) opens a registered op on boot (5-method _arm superset + M2 static-arm graft + inlineTnc live-view + per-method gating + choreography sim)
             atcTableDataDef(),   // t568 — seed the Tool Table twin (THE LAST WIZARD) so its in-place Tool Table slot (opensAs) opens a registered op on boot (include-toggle superset + live-view rows from Settings → Tool table)
             drillDataDef(),
+            tapDataDef(),   // t778 — the Tapping twin (NEW wizard, no built-in slot): floating-holder pitch-locked cycle + gated rigid; opens from its Mill menu entry
             boreDataDef(),   // fan-out — seed the Bore twin so its in-place Bore slot (opensAs) opens a registered op on boot
             slotDataDef(),
             surfacingDataDef(),

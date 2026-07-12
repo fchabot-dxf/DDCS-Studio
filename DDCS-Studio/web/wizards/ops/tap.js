@@ -16,7 +16,10 @@ export function tapCycle(pt, p, dialect) {
     const clr = num(p.clearance, 5), depth = num(p.depth, 10), rpm = Math.round(num(p.rpm, 400)), pitch = num(p.pitch, 1.0);
     const feed = r3(rpm * pitch);   // DERIVED: the pitch-locked feed (mm/min) = RPM × pitch(mm)
     const dwellLines = (dialect && dialect.dwell) ? dialect.dwell(num(p.dwell, 0.3)) : [`G4 P${num(p.dwell, 0.3)}`];
-    if (p.rigid) {
+    // RIGID only on the Expert post (the only dump-evidenced rigid-tapping firmware); any other post HONESTLY degrades to
+    // the floating-holder cycle (the tapCapable spindle attestation is enforced by the wizard's grey gate at set-time).
+    const rigidOk = !!p.rigid && !!dialect && String(dialect.id || '').startsWith('ddcs-expert');
+    if (rigidOk) {
         return [
             `( rigid tap ${pitch}mm pitch - G84-style; VERIFY the cycle + spindle-axis build on your controller )`,
             `G0 X${r3(pt.x)} Y${r3(pt.y)}`,

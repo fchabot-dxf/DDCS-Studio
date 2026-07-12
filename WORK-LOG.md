@@ -10646,3 +10646,29 @@ FULL SUITE: 1130 passed + 2 skipped = 1132 (== --list), 0 failed, workers=3. Add
 Files: web/wizards/threads.js (NEW), web/wizards/ops/tap.js (NEW), web/wizards/tapWizard.js (NEW), web/wizards/ops/index.js (register tapBlock), tests/tapping-776.spec.js (NEW).
 
 NEXT (Phase 2b, the data-twin — the user-facing wizard): tapData.js mirroring drillData (def + bindings: x/y/depth/rpm/pitch/dwell/clearance/rigid + placement + wcs) + toolBindingsFor (the tap-tool picker + the tool-change tie-in, free) + entryBindingsFor; a thread-preset picker widget (fills pitch, mirror toolpick); the derived-F shown read-only (statusHint) + a reversible-warn (grey with why when spindle.reversible is false); the RIGID toggle grey-gated on spindle.tapCapable AND the Expert post; previewGeometry (position + thread-O); registration (opensAs, mill_datawiz); Blockly round-trip + form-integrity/audit. The emit core is the proven foundation it wraps. PASS BACK.
+
+## 2026-07-12 (t778) — TAPPING Phase 2b: the data-twin (RELEASES the tapping feature)
+
+Built the user-facing tapping wizard around the t776 emit core — the 24th data-twin. Metric/imperial thread picker, derived read-only feed, the reversible/rigid gates, preview, menu, round-trip.
+
+WHAT LANDED:
+- tapData.js — the twin mirroring drillData. Bindings: x/y/depth/rpm/dwell + pitch (via threadpick) + rigid (gated) + placement (originX/Y/offZ/stockAttach/pathDatum/stockDatum/stockW/H/Z) + wcs. clearance is held at default (it fans out to progstart + the tap leaf — the drill frontier-#3 pattern). INHERITS toolBindingsFor (the tap-tool picker + the tool-change tie-in) + the entry marker.
+- STRUCTURAL FIX (2a refined): tapStack's header now emits NO spindle (progstart rpm 0) — the tap atom owns the whole M3/M4/M5 cycle. This SINGLE-SOURCES rpm to the tap leaf so one binding drives it (the 2a goldens still hold — the M3/feed/M4/M5 all come from the tap atom). Byte-equal twin==tapStack across the sweep.
+- THE THREAD PICKER (formWidgets.js threadpick): a preset dropdown (metric coarse/fine + imperial UNC/UNF + Custom) + a pitch number, BOTH driving the one `pitch` socket. Pick a preset -> fills the pitch; type a pitch -> flips to Custom (or the match). Round-trip is on pitch (exact); the name is cosmetic.
+- THE DERIVED FEED read-only (def.statusHint, live): ` · feed <F> mm/min (pitch-locked to <rpm> rpm)` where F = tapFeed(rpm, pitch). Recomputes every form update.
+- REVERSIBLE gating: when the DECLARED spindle.reversible is false, the statusHint appends the plain why (floating-holder tapping needs M4 to back out — declare it reversible). Live off settings.spindle.
+- RIGID gating (two layers): (UI) the rigid toggle grey-gates on `_rigidOk` = spindle.tapCapable AND the Expert post, injected into the form gate params (userOpView gp) with a tooltip why; (EMIT) the tap atom emits G84 ONLY on an Expert dialect, else HONESTLY DEGRADES rigid->floating (a non-Expert post can never emit a broken G84 even if rigid persists). The emitted G84 keeps the VERIFY-on-machine note.
+- previewGeometry: the tapped hole as a thread-O ring at (x,y) + a pos handle; placement-parity (0-relative, bbox = the hole point).
+- MENU: registered tapDataDef() in app.js (mill_datawiz group) + a first-class "🔩 Tap" entry in the Mill group (wizardLibrary; a NEW wizard with no built-in -> opensAs the twin directly). Verified: the entry appears + clicking opens the twin form.
+
+VERIFIED (real symptom, tests/tap-twin-778.spec.js — 5 tests + tapping-776 3 tests):
+1. the twin BYTE-EQUAL to tapStack across the sweep; pitch is a threadpick; the tool picker is inherited.
+2. the derived feed via statusHint: M6x1.0@400 -> feed 400 mm/min; 1/4-20@400 -> feed 508 mm/min.
+3. a non-reversible declared spindle warns (the plain why); reversible -> no warning.
+4. the rigid toggle is gated on _rigidOk; Expert+rigid -> G84; grbl+rigid -> NO G84 (floating degrade).
+5. the twin round-trips its params (pitch/rpm/depth/rigid) through the op marker.
+Plus a real drive: openWiz('user_tap_data') renders the form (thread picker + rpm + pitch) and the 🔩 Tap menu entry opens it. FULL SUITE: 1135 passed + 2 skipped = 1137 (== --list), 0 failed, workers=3 — the 24-twin form audit stays ZERO BAD; the mobile/form-integrity guards green; no existing golden touched (the twin is additive; the tapStack refinement kept the 2a goldens).
+
+Files: web/blocks/dataOps/tapData.js (NEW), tests/tap-twin-778.spec.js (NEW); web/wizards/tapWizard.js (header no-spindle refinement), web/wizards/ops/tap.js (rigid Expert-gate), web/ui/formWidgets.js (threadpick), web/wizards/views/userOpView.js (_rigidOk gate fact), web/app.js + web/blocks/wizardLibrary.js (registration + Mill menu entry).
+
+THE TAPPING FEATURE IS COMPLETE (2a emit core · 2b data-twin). NEXT (per the backlog, advisor sequences): the 1b spindle pull-seed (the queued convenience), or the next dispatch. PASS BACK — this releases as the TAPPING feature.

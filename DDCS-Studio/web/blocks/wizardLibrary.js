@@ -71,6 +71,7 @@ const BUILTINS = [
     { id: 'slot', type: 'slot', label: 'Slot', icon: '', group: 'mill', opensAs: 'user_slot_data' },
     { id: 'surfacing', type: 'surfacing', label: 'Surfacing', icon: '', group: 'mill', opensAs: 'user_surfacing_data' },
     { id: 'text', type: 'text', label: 'Text / engrave', icon: '✎', group: 'mill', opensAs: 'user_text_data' },
+    { id: 'tap', type: 'tap', label: 'Tap', icon: '🔩', group: 'mill', opensAs: 'user_tap_data' },   // t778 — a NEW wizard (no built-in): the entry opens the data-twin directly via opensAs (floating-holder + gated rigid)
 ];
 
 // ── customization layer (per-entry + per-group overrides) ────────────────────────────────────────────────────

@@ -18,6 +18,7 @@ import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inl
 import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';   // t522 declared-I/O picker; t768 P1b the tool-library modal opener (pickable from a wizard)
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
 import { getToolLibrary, getTool } from '../wizards/toolPicker.js';   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
+import { THREAD_PRESETS, threadPreset } from '../wizards/threads.js';   // t778 — the thread preset table for the tapping wizard's pitch picker
 
 // t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
 // widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
@@ -231,6 +232,38 @@ function toolPickWidget(host, b) {
     right.append(sel, gear);
     host.append(labelSpan(b), right);
     return { read: () => ({ [b.param]: sel.value === '' ? '' : numOr(sel.value, '') }) };
+}
+
+// t778 — the THREAD PICKER (tapping): a preset dropdown (metric coarse/fine · imperial UNC/UNF · Custom) + a pitch number,
+// both driving the ONE `pitch` socket (the mm lead that locks the feed). Picking a preset fills the pitch; typing a pitch
+// flips the dropdown to Custom (or the matching preset). Round-trip is on `pitch` (exact); the preset name is cosmetic.
+function threadPickWidget(host, b) {
+    host.style.cssText = ROW_CSS;
+    const sel = document.createElement('select');
+    sel.style.cssText = CTRL_CSS + ' min-width:150px;';
+    const num = document.createElement('input');
+    num.type = 'number'; num.step = '0.01'; num.min = '0';
+    num.style.cssText = CTRL_CSS + ' width:78px; margin-left:6px;';
+    num.dataset.param = b.param;   // the pitch value lives here (targetable + read from here)
+    const mk = (val, lab) => { const o = document.createElement('option'); o.value = String(val); o.textContent = lab; sel.appendChild(o); };
+    THREAD_PRESETS.forEach((t) => mk(t.name, t.name));
+    mk('__custom__', 'Custom…');
+    const r3p = (v) => Math.round(Number(v) * 1000) / 1000;
+    // reflect a pitch value → the matching preset name (first match), else Custom
+    const syncSel = () => { const p = r3p(num.value); const hit = THREAD_PRESETS.find((t) => r3p(t.pitch) === p); sel.value = hit ? hit.name : '__custom__'; };
+    num.value = (b.default != null && b.default !== '') ? b.default : '1';
+    syncSel();
+    sel.addEventListener('change', () => {
+        const preset = threadPreset(sel.value);
+        if (preset) { num.value = r3p(preset.pitch); num.dispatchEvent(new Event('input', { bubbles: true })); }
+        // Custom → leave the number for the user to type
+    });
+    num.addEventListener('input', syncSel);
+    const right = document.createElement('span');
+    right.style.cssText = 'display:inline-flex; align-items:center;';
+    right.append(sel, num);
+    host.append(labelSpan(b), right);
+    return { read: () => ({ [b.param]: numOr(num.value, b.default ?? 1) }) };
 }
 
 // t323 — SEGMENTED control: a small enum (2-3 values) as a compact [ Auto | Manual ] toggle, both states VISIBLE (the
@@ -559,6 +592,7 @@ export const FORM_WIDGETS = {
     action: actionWidget,
     'declared-io': declaredIoWidget,
     toolpick: toolPickWidget,
+    threadpick: threadPickWidget,
     'corner-grid': cornerGridWidget,
     'region-pick': regionPickWidget,
     'coord-list': coordListWidget,
