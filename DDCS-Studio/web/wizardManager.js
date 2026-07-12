@@ -17,7 +17,7 @@ import { toast } from './ui/gateway/util.js';   // the shared transient toast (r
 import { decorateProbeSrc } from './ui/probeSrcGlyph.js';     // controller-source chips on probe inputs
 import { mountSafeZFrameToggles } from './ui/safeZFrameToggle.js';   // SPATIAL-MODEL 1c: the shared safe-Z frame toggle (rel|mach)
 import { createPreviewPanel } from './viz/createPreviewPanel.js';   // THE shared preview (identical to Blocks/Studio), fed the wizard's op code
-import { openTemplatesPopover, closeTemplatesPopover } from './ui/wizardTemplates.js';   // per-op save/load templates (local + cloud)
+import { openTemplatesPopover, closeTemplatesPopover, mountPresetRow } from './ui/wizardTemplates.js';   // per-op save/load templates (local + cloud); t794 the form-top preset row
 import { frameWizardSections } from './ui/wizardSections.js';   // group each form's fields into framed categories
 import { makePanesCollapsible } from './ui/paneAccordion.js';   // t752 — individually collapsible preview/code panes (per-theme motion)
 import { needsPrereqPrompt } from './ui/wizardPrereq.js';   // just-in-time "add a probe / ATC" prompt for hardware-gated wizards
@@ -109,11 +109,9 @@ export class WizardManager {
         // Drag the whole generator by its header bar (but not the gear / close).
         const box = this.wizardElement.querySelector('.wiz-box');
         const head = box && box.querySelector('.wiz-head');
-        if (box && head) makeDraggable(box, head, { ignore: 'select, button, input, .wiz-gear, .wiz-close, .wiz-templates' });
+        if (box && head) makeDraggable(box, head, { ignore: 'select, button, input, .wiz-gear, .wiz-close' });
 
-        // Wizard header → Templates popover (save / load this op's parameter templates).
-        const tplBtn = this.wizardElement.querySelector('.wiz-templates');
-        if (tplBtn) tplBtn.addEventListener('click', (e) => { e.stopPropagation(); openTemplatesPopover(this, tplBtn); });
+        // t794 P3 — presets moved from the header 📑 button to the adaptive form-top row (mountPresetRow on open).
 
         // Settings (stock/probe/machine) changed — if a wizard is open, re-run its update() so the
         // preview + the inferred spindle start track the new values live (e.g. editing stock size via
@@ -265,6 +263,7 @@ export class WizardManager {
         if (wizElem) {
             wizElem.style.display = 'block';
             frameWizardSections(wizElem);   // group the form's fields into framed categories (idempotent)
+            mountPresetRow(this, wizElem);  // t794 P3 — the adaptive preset row at the form top (retires the header 📑 button)
             makePanesCollapsible(wizElem);  // t752 — collapsible preview/code panes (idempotent; state app-wide per kind)
             this._setupSplitter(wizElem);   // draggable form/preview divider (all two-pane wizards)
             // Variant entry: a view may declare identity-splitting variants (e.g. drill vs bore) that share one

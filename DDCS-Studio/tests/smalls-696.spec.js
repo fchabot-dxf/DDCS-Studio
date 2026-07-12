@@ -54,13 +54,16 @@ test('(c) PROJECTS DRAWER RESIZE HANDLE: drag sets a persisted, clamped width; s
     expect(Math.abs(w2 - w1), 'the resized width survives reload').toBeLessThan(6);
 });
 
-test('(b4) PRESETS affordance: a labeled button (not a bare emoji) opens the popover with terse copy', async ({ page }) => {
+test('(b4) PRESETS affordance: the form-top preset row (header button retired) opens the popover with terse copy', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
     await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
     await page.waitForSelector('#wiz_drill', { state: 'visible' });
-    expect(await page.evaluate(() => document.querySelector('.wiz-templates').textContent), 'a labeled Presets affordance, not a bare emoji').toMatch(/Presets/);
-    await page.click('.wiz-templates');
+    // t794 — Presets moved from the header to an adaptive form-top row; the header .wiz-templates is retired.
+    expect(await page.locator('.wiz-templates').count(), 'the header Presets button is retired').toBe(0);
+    await page.waitForSelector('#wiz_drill .wiz-preset-row .wpr-save', { timeout: 5000 });
+    expect(await page.evaluate(() => document.querySelector('#wiz_drill .wiz-preset-row .wpr-save').textContent), 'a labeled Save-preset affordance in the form row').toMatch(/preset|save/i);
+    await page.click('#wiz_drill .wiz-preset-row .wpr-save');
     await page.waitForSelector('.wiz-tpl-pop .wt-save', { timeout: 5000 });
     expect(await page.evaluate(() => document.querySelector('.wt-head').textContent), 'popover titled Presets').toMatch(/Presets/i);
     expect(await page.evaluate(() => document.querySelector('.wt-save').textContent), 'terse save copy').toMatch(/preset/i);

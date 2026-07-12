@@ -69,8 +69,38 @@ export function closeTemplatesPopover() {
     _pop = null;
 }
 
-/** Toggle the popover anchored to `anchor`, driven by the WizardManager `wm` (active op + seed/update). */
-export function openTemplatesPopover(wm, anchor) {
+// t794 P3 — the adaptive PRESET ROW at the top of every wizard form (retires the header 📑 button). 0 presets → a
+// subtle "★ Save preset" link; ≥1 → `Preset: [pick ▾] [★ Save]`. Reuses the save/list/delete machinery (the popover,
+// re-anchored to Save) — ONE language for named value-sets, the stock-modal template-row pattern. Idempotent per open.
+export async function mountPresetRow(wm, wizElem) {
+    const op = wm && wm._activeType; if (!op || !wizElem) return;
+    const controls = wizElem.querySelector('.wiz-controls'); if (!controls) return;
+    let row = controls.querySelector(':scope > .wiz-preset-row');
+    if (!row) { row = document.createElement('div'); row.className = 'wiz-preset-row'; controls.insertBefore(row, controls.firstChild); }
+    row.dataset.op = op;
+    let list = []; try { list = await listTemplates(op); } catch (_) { /* */ }
+    if (row.dataset.op !== op) return;   // a newer open superseded this async render
+    if (!list.length) {
+        row.innerHTML = '<button type="button" class="wpr-save wpr-link" title="Save the current values as a reusable preset">★ Save preset</button>';
+    } else {
+        row.innerHTML = '<span class="wpr-lbl">Preset</span>' +
+            '<select class="wpr-pick" title="Load a saved preset"><option value="">Load…</option>' +
+            list.map((t, i) => `<option value="${i}">${esc(t.name)}${t.where === 'cloud' ? ' ☁' : ''}</option>`).join('') + '</select>' +
+            '<button type="button" class="wpr-save" title="Save the current values / manage presets">★ Save</button>';
+        const pick = row.querySelector('.wpr-pick');
+        pick.addEventListener('change', () => {
+            const i = Number(pick.value);
+            if (pick.value !== '' && list[i]) { try { wm._seedForm(op, list[i].params); wm.update(); } catch (_) { /* */ } }
+            pick.value = '';
+        });
+    }
+    const saveBtn = row.querySelector('.wpr-save');
+    if (saveBtn) saveBtn.addEventListener('click', (e) => { e.stopPropagation(); openTemplatesPopover(wm, saveBtn, () => mountPresetRow(wm, wizElem)); });
+}
+
+/** Toggle the popover anchored to `anchor`, driven by the WizardManager `wm` (active op + seed/update). `onChange`
+ *  (t794) fires after a save/delete so a mounted preset row can re-render its adaptive state. */
+export function openTemplatesPopover(wm, anchor, onChange) {
     if (_pop) { closeTemplatesPopover(); return; }
     const op = wm && wm._activeType; if (!op || !anchor) return;
     const label = (typeof wm.opLabel === 'function' && wm.opLabel(op)) || op;
@@ -99,7 +129,7 @@ export function openTemplatesPopover(wm, anchor) {
         let where = 'local';
         if (cloudConnected()) where = await dlgConfirm('Save to your connected cloud?\n\nOK = Cloud  ·  Cancel = Local', { okLabel: 'Cloud', cancelLabel: 'Local' }) ? 'cloud' : 'local';
         try { await saveTemplate(op, name, params, where); } catch (e) { dlgNotice('Save failed: ' + (e && e.message || e)); }
-        renderList();
+        renderList(); try { onChange && onChange(); } catch (_) { /* */ }
     });
 
     async function renderList() {
@@ -120,7 +150,7 @@ export function openTemplatesPopover(wm, anchor) {
             row.querySelector('.wt-del').addEventListener('click', async (e) => {
                 e.stopPropagation();
                 try { await deleteTemplate(op, t.name, t.where); } catch (_) { /* */ }
-                renderList();
+                renderList(); try { onChange && onChange(); } catch (_) { /* */ }
             });
         });
     }
