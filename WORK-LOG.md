@@ -10764,3 +10764,28 @@ MID-TURN AMENDMENT (advisor relaying live-screenshot USER feedback on the panes 
 FULL SUITE: 1146 passed + 2 skipped = 1148 (== --list), 0 failed (workers=2, re-run after the amendment polish + the 2 test fixes). Emit untouched (byte-identical asserted). View/CSS/HTML + test-only.
 
 Files: web/index.html (28 data-viz-pane decls + middle/edge restructure), web/ui/panePrefs.js (PANE_KINDS split), web/ui/paneAccordion.js (enhance per-pane + chevron-only strip), web/styles.css (side-strip + platform reflow + widen + no-band overlay + slim collapse), tests/collapsible-panes-752.spec.js (updated + band/collapsed/label asserts), tests/corner-datum-independence.spec.js (±1px crosshair tolerance), tests/alignment-fresh-seat.spec.js (minO 10→5). Commits: ee73aa4 (substrate), 7ba5e2a (engine/CSS/test), 78f0d2b (2 test-only robustifications), e018567 (band/collapsed/label polish), 0ce43b5 (alignment minO tolerance).
+
+## 2026-07-12 (t786) — THE SUITE DIET: the 20× tier + end-state sims at 20× + the PROFILING FINDING
+
+Dispatched a 3-part turn (Suite Diet + 2 panes-polish riders); the USER scoped it to "just do the suite diet" and the advisor's amendment REMOVED riders A+B (advisor builds the chevron-width + smooth-uncollapse in an isolated worktree). So this turn = the diet ONLY.
+
+WHAT SHIPPED (commit fb5b69b):
+- PART 1 — the 20× speed tier (app-wide, users get it too): `SPEEDS = [1,2,5,10,20]` in createPreviewPanel.js + the button title + the cycle comment; preview-controls.spec.js cycle assert updated (2×→5×→10×→20×→1×→2×, a 5-step cycle now). A fast fly-through for long programs.
+- PART 2 — the 4 CLEAREST end-state sim specs run their sim at 20× (`preview.defaultSpeed = 20` in setup, each with a WHY comment): dro, dro-position, probe-wcs, probe-cue-refine. Every one asserts ONLY the final state after 'complete' (Work/Mach, WCS/datum, persistent axes) — never DURING motion — so a fast fly-through is byte-identical. All pass at 20×.
+
+BEFORE / AFTER (workers=2) — and a MEASUREMENT-INTEGRITY note:
+- BEFORE (baseline, current HEAD): 1397s (23.3 min). AFTER (diet): 1250s (20.8 min). Raw wall delta −147s.
+- ⚠ DO NOT attribute −147s to the diet. Full-suite wall at workers=2 swings ±100s+ run-to-run (machine load, the concurrent analytics agent, thermal) — 147s from 4 cranks that each save ~1s isolated is NOISE, not signal. The RELIABLE measure is the CONTROLLED per-file delta (same machine, isolated, back-to-back): dro 16.2s → 15.1s = −1.1s; the other three ~1–2s each. So the diet's TRUE impact ≈ ~5s across the 4 files (~0.4% wall). This variance is itself part of the finding: the sim-diet's effect is BELOW the wall-measurement noise floor.
+
+⚑ THE PROFILING FINDING (the point of the turn — verify-real-symptom): **the suite's cost is NOT sim motion.** Top specs by summed duration (baseline JSON):
+- corner-start-datum-drag 106.5s — pp-run=0 (NO sim). It is a 16-CONFIG geometry sweep (4 corners × 2 probeSeq × 2 probeZ), each re-opening the corner wizard + a 450ms settle. Inherent to coverage; geometry-sensitive (the gated pilot) → not safely cuttable.
+- mill-start-translate-716 60s · layout-placement-parity-718 56s · op-params-complete 51s · corner-atrest-parity 36s · blocks-live-form 35s — all pp-run=0 (drag/param/form, not sims).
+- The homing sim specs (8, ~220s) ALREADY crank simSpeed to 20–60 yet sit at 26–31s each — their cost is wizard-open + waits, not motion.
+- io-sim 28s / dro 16s are APP-LOAD bound: 5× `page.goto` + `waitForFunction(app ready)` ≈ ~3s each ≈ 15s of the file; the sim motion is sub-second (G0 rapids + a 0.8s auto-answer). Cranking dro's sim to 20× saved only 1.1s (proved empirically).
+- CONCLUSION: the sim-20× diet's CEILING is ~1–2% wall. The real cost is (a) per-test app-load — 1148× page.goto + app-wire wait, the single biggest lever, helps EVERY test; (b) the comprehensive param SWEEPS + wizard-open (the 106s corner sweep, mill, op-params); (c) scattered fixed `waitForTimeout` sleeps (replaceable with event waits). All three are STRUCTURAL (shared context / boot speed / sweep restructure) — advisor-level, not a unilateral worker sweep, and (b) touches the gated corner pilot.
+
+SCOPE DECISION (flagged): I delivered the diet on the clear end-state cases (real, safe, documented) rather than grinding the full ~23-file sim sweep, because the profiling PROVES the sweep's ceiling is ~1.5% and each crank carries per-test risk (a during-motion assertion I might misjudge — the anim specs probe-anim-*, sim-anim-refresh, passstarts, atc-*-swap, the io-sim Loop test genuinely sample DURING motion and must stay slow). RECOMMENDATION for the next diet turn: target the app-load lever (or the outlier sweeps) — that is where the real minutes are. Ask the advisor whether to (a) still sweep the remaining end-state sims (~seconds), or (b) redirect to the structural lever.
+
+SUITE: 1146 passed + 2 skipped = 1148 (== --list), 0 failed (workers=2). No assert weakened (the 4 cranked specs assert identical end-states; the cycle assert gained the 20× step). Riders A+B NOT in this turn (advisor's worktree).
+
+Files: web/viz/createPreviewPanel.js (20× tier), tests/preview-controls.spec.js (cycle), tests/dro.spec.js + dro-position + probe-wcs + probe-cue-refine (sim 20×). Commit: fb5b69b.
