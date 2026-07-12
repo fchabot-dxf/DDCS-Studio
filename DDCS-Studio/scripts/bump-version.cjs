@@ -17,16 +17,22 @@ if (!m) {
     console.error('bump-version: no `<span class="ver">V…</span>` chip found in web/index.html — aborting.');
     process.exit(1);
 }
-const parts = m[1].split('.').map(Number);
-parts[parts.length - 1] += 1;        // bump the last segment, e.g. V10.23 -> V10.24
-const v = parts.join('.');
+// t785 (user): DATE-BASED versions — V<YYYY>.<MM>.<DD>.<n>, n = the release counter within the day (resets daily).
+// Dot-only so the existing segment-wise numeric compare (updateCheck.parseV) needs NO change, and every date version
+// sorts after the legacy 10.x line (2026 > 10). The analytics decimal-sort scramble (10.169 < 10.97) dies with the scheme.
+const now = new Date();
+const Y = now.getFullYear(), M = String(now.getMonth() + 1).padStart(2, '0'), D = String(now.getDate()).padStart(2, '0');
+const prev = m[1].split('.');
+const sameDay = prev.length === 4 && prev[0] === String(Y) && prev[1] === M && prev[2] === D;
+const n = sameDay ? (parseInt(prev[3], 10) || 0) + 1 : 1;
+const v = `${Y}.${M}.${D}.${n}`;
 
 html = html.replace(/(class="ver">V)[0-9][0-9.]*(<)/, `$1${v}$2`);                          // the chip (release + update-banner source of truth)
 html = html.replace(/(<title>DDCS Studio V)[0-9][0-9.]*( - Modular<\/title>)/, `$1${v}$2`); // the window title
 fs.writeFileSync(htmlPath, html);
 
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-pkg.version = parts.length >= 3 ? v : v + '.0';   // package.json wants 3-part semver
+pkg.version = `${Y}.${parseInt(M, 10)}.${parseInt(D, 10)}`;   // package.json stays 3-part (date only; the daily counter lives in the chip)
 fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
 
 // The DECLARED live-version artifact for the web version-nudge (ui/updateCheck.js): a small, cache-bustable JSON

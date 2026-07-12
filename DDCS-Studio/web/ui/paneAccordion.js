@@ -41,6 +41,27 @@ function motionTokens() {
 
 // Apply the collapsed/expanded state to one enhanced pane, animating per the active theme's tokens (or instant under
 // reduced-motion / the initial paint). `animate=false` = snap (used on open + on a cross-wizard re-apply).
+// t785 (user: 'uncollapsing is done in two times') — during the height transition the 3D canvas only truly resized at
+// transitionend (the ResizeObserver fires on the container, whose layout settles late), so the expand read as TWO
+// motions: the box opening, then the render snapping. This rAF loop follows the animation, resizing any mounted
+// preview panel EACH frame until the transition ends — one continuous motion. Cheap: only runs during the ~200-300ms animation.
+function followPanelResize(body) {
+    const hosts = [...body.querySelectorAll('*')].filter((el) => el.__panel);
+    if (!hosts.length) return () => {};
+    let on = true;
+    const tick = () => {
+        if (!on) return;
+        for (const h of hosts) { try { const v = h.__panel && h.__panel.viz; if (v && v._resize) v._resize(); } catch (_) { /* mid-teardown */ } }
+        requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    return () => { on = false; };
+}
+
+function hostsResizeOnce(body) {
+    for (const el of body.querySelectorAll('*')) { if (el.__panel) { try { const v = el.__panel.viz; if (v && v._resize) v._resize(); } catch (_) { /* */ } } }
+}
+
 function applyState(pane, collapsed, animate) {
     const body = pane.querySelector(':scope > .wiz-pane-body');
     const bar = pane.querySelector(':scope > .wiz-pane-bar');
@@ -66,6 +87,9 @@ function applyState(pane, collapsed, animate) {
         body.style.overflow = 'hidden';
         body.style.height = full + 'px';
         void body.offsetHeight;                          // reflow so the next frame animates from full
+        const stopC = followPanelResize(body);
+        const doneC = (e) => { if (e.target === body && e.propertyName === 'height') { stopC(); body.removeEventListener('transitionend', doneC); } };
+        body.addEventListener('transitionend', doneC);
         requestAnimationFrame(() => { body.style.height = '0px'; });
     } else {
         // Measure the NATURAL expanded height: a collapsed flex-column body reports scrollHeight 0 (children shrink to
@@ -78,8 +102,9 @@ function applyState(pane, collapsed, animate) {
         body.style.overflow = 'hidden';
         void body.offsetHeight;
         body.style.transition = '';
+        const stopE = followPanelResize(body);
         requestAnimationFrame(() => { body.style.height = full + 'px'; });
-        const done = (e) => { if (e.target === body && e.propertyName === 'height') { body.style.height = ''; body.style.overflow = ''; body.removeEventListener('transitionend', done); } };
+        const done = (e) => { if (e.target === body && e.propertyName === 'height') { body.style.height = ''; body.style.overflow = ''; stopE(); const v = hostsResizeOnce(body); body.removeEventListener('transitionend', done); } };
         body.addEventListener('transitionend', done);
     }
 }
