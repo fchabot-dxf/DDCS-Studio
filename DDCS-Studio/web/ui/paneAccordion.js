@@ -17,7 +17,7 @@
  * keys the personality off) → N distinct personalities from pure data. prefers-reduced-motion ⇒ instant (rate-toast
  * precedent). View-only: no emit path is touched.
  */
-import { isPaneCollapsed, setPaneCollapsed, onPaneChange, PANE_KINDS } from './panePrefs.js';
+import { isPaneCollapsed, setPaneCollapsed, onPaneChange, PANE_KINDS, getPaneRatio, setPaneRatio, onRatioChange, RATIO_MIN, RATIO_MAX } from './panePrefs.js';
 
 const LABEL = Object.fromEntries(PANE_KINDS.map((k) => [k.id, k.label]));
 const DUR_CAP = 350;   // ms — the hard ceiling on any theme's drawer duration
@@ -134,6 +134,78 @@ function enhancePane(pane, kind, title) {
     });
 }
 
+// ── t790 — THE PANE SPLITTER. A grabbable horizontal divider between the 3D and 2D panes rebalances their share
+// continuously (the collapse chevrons are all-or-nothing; this is the ratio). The ratio (the 3D pane's fraction) is an
+// app-wide display pref (panePrefs) applied via `--pane-ratio` on :root → flex-grow on desktop, body heights on mobile
+// (CSS). The splitter is INERT/hidden while either pane is collapsed/hidden. WHILE DRAGGING the canvases resize live
+// via followPanelResize (the t785 one-motion-fold helper, reused). ──
+function applyPaneRatio(r) {
+    try { document.documentElement.style.setProperty('--pane-ratio', String(r == null ? getPaneRatio() : r)); } catch (_) { /* */ }
+}
+
+// The splitter only means something with BOTH panes open + visible → toggle its inertness off collapse / display state.
+function updateSplitOn(split) {
+    const panes = [...split.querySelectorAll(':scope > [data-viz-pane]')];
+    const ok = panes.length === 2 && panes.every((p) => p.offsetParent !== null && p.getAttribute('data-collapsed') !== '1');
+    split.dataset.splitOn = ok ? '1' : '0';
+}
+
+function addPaneSplitter(split) {
+    if (!split || split.querySelector(':scope > .viz-pane-splitter')) { if (split) updateSplitOn(split); return; }
+    const panes = [...split.querySelectorAll(':scope > [data-viz-pane]')];
+    if (panes.length !== 2) return;                                // a ratio only exists between two panes
+    const sp = document.createElement('div');
+    sp.className = 'viz-pane-splitter';
+    sp.setAttribute('role', 'separator'); sp.setAttribute('aria-orientation', 'horizontal');
+    sp.setAttribute('aria-label', 'Drag to rebalance the 3D and 2D previews'); sp.tabIndex = 0;
+    sp.innerHTML = '<span class="viz-pane-splitter-grip" aria-hidden="true"></span>';
+    panes[0].after(sp);                                            // sits BETWEEN the two panes
+
+    // the pointer Y → the 3D pane's fraction, order-independent (twin = 3D on top, built-in = 2D on top).
+    const ratioAt = (y) => {
+        const s = split.getBoundingClientRect();
+        if (s.height <= 0) return getPaneRatio();
+        const frac = (y - s.top) / s.height;                       // the TOP pane's share
+        const a = split.querySelector(':scope > [data-viz-pane="preview3d"]');
+        const b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
+        const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
+        return Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+    };
+    let dragging = false, stopFollow = null;
+    const onMove = (e) => { if (!dragging) return; e.preventDefault(); applyPaneRatio(ratioAt(e.clientY)); };   // live, unpersisted
+    const onUp = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        try { sp.releasePointerCapture(e.pointerId); } catch (_) { /* */ }
+        sp.removeEventListener('pointermove', onMove); sp.removeEventListener('pointerup', onUp); sp.removeEventListener('pointercancel', onUp);
+        if (stopFollow) { stopFollow(); stopFollow = null; }
+        split.classList.remove('is-dragging');
+        setPaneRatio(ratioAt(e.clientY));                          // persist + notify (final) → survives reload, app-wide
+    };
+    sp.addEventListener('pointerdown', (e) => {
+        if (split.dataset.splitOn !== '1') return;                 // inert while a pane is collapsed / hidden
+        dragging = true; e.preventDefault();
+        try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
+        split.classList.add('is-dragging');
+        stopFollow = followPanelResize(split);                     // reuse t785 — rAF-resize BOTH canvases live during the drag
+        sp.addEventListener('pointermove', onMove); sp.addEventListener('pointerup', onUp); sp.addEventListener('pointercancel', onUp);
+    });
+    // keyboard a11y — arrows nudge the ratio (the separator role invites it)
+    sp.addEventListener('keydown', (e) => {
+        if (split.dataset.splitOn !== '1') return;
+        const d = e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -0.05 : (e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 0.05 : 0);
+        if (!d) return;
+        e.preventDefault();
+        const a = split.querySelector(':scope > [data-viz-pane="preview3d"]'), b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
+        const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
+        setPaneRatio(getPaneRatio() + (threeDTop ? -d : d));       // ArrowDown grows the bottom pane, regardless of which it is
+        hostsResizeOnce(split);
+    });
+
+    updateSplitOn(split);
+    try { new MutationObserver(() => updateSplitOn(split)).observe(split, { attributes: true, attributeFilter: ['style', 'data-collapsed'], subtree: true, childList: true }); } catch (_) { /* */ }
+}
+
 let _wired = false;
 /** Make every collapsible pane in `root` (a wizard panel) individually foldable. Idempotent — safe every open.
  *  Each viz pane DECLARES its kind via `data-viz-pane` (the 2D layout · the 3D verify); the code preview is 'code'. */
@@ -146,10 +218,15 @@ export function makePanesCollapsible(root) {
     });
     // The G-code preview block (inside the form) — a separate, independent pane kind.
     root.querySelectorAll('.preview-block').forEach((pb) => enhancePane(pb, 'code', LABEL.code || 'G-code'));
+    // t790 — a drag-splitter between the two viz panes (idempotent); apply the persisted ratio.
+    root.querySelectorAll('.wiz-visual .viz-split').forEach((split) => addPaneSplitter(split));
+    applyPaneRatio();
 
     // Live cross-wizard sync: folding a kind in one open wizard re-applies (snapped) to every mounted pane of that kind.
     if (!_wired) {
         _wired = true;
+        applyPaneRatio();
+        onRatioChange((r) => applyPaneRatio(r));                   // a drag in one wizard rebalances every mounted pane live
         onPaneChange((id) => {
             document.querySelectorAll('.wiz-body [data-pane-kind]').forEach((pane) => {
                 const kind = pane.dataset.paneKind;
@@ -157,6 +234,7 @@ export function makePanesCollapsible(root) {
                 const want = isPaneCollapsed(kind);
                 if ((pane.getAttribute('data-collapsed') === '1') !== want) applyState(pane, want, false);
             });
+            document.querySelectorAll('.wiz-visual .viz-split').forEach((split) => updateSplitOn(split));   // collapse → splitter inert
         });
     }
 }

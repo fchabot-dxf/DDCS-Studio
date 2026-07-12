@@ -57,5 +57,36 @@ export function resetPanes() {
     for (const cb of _subs) { try { cb(null); } catch (_) { /* isolate */ } }
 }
 
+// ── The pane RATIO (t790) — how the 3D and 2D panes SHARE the visual space when both are open. A drag-splitter between
+// them rebalances it continuously (the collapse chevrons are all-or-nothing; the ratio is the in-between). Like the
+// collapse state it is an app-wide DISPLAY pref (localStorage, NOT the machine profile). Value = the 3D pane's FRACTION
+// (so it means the same thing on every wizard regardless of DOM order); clamped so neither pane can vanish. ──
+const RATIO_KEY = 'ddcs_pane_ratio';
+export const RATIO_MIN = 0.15, RATIO_MAX = 0.85, RATIO_DEFAULT = 0.5;
+let _ratio = null;
+const _ratioSubs = new Set();
+const clampRatio = (r) => Math.max(RATIO_MIN, Math.min(RATIO_MAX, Number(r)));
+
+/** The 3D pane's share of the visual [RATIO_MIN..RATIO_MAX] (default 0.5 = an even split). */
+export function getPaneRatio() {
+    if (_ratio == null) {
+        _ratio = RATIO_DEFAULT;
+        try { const raw = localStorage.getItem(RATIO_KEY); if (raw != null && Number.isFinite(Number(raw))) _ratio = clampRatio(raw); } catch (_) { /* defaults */ }
+    }
+    return _ratio;
+}
+
+/** Set the 3D pane's share; clamps, persists, notifies (every open wizard rebalances live). */
+export function setPaneRatio(r) {
+    const next = clampRatio(r);
+    if (next === _ratio) return;
+    _ratio = next;
+    try { localStorage.setItem(RATIO_KEY, String(next)); } catch (_) { /* private mode */ }
+    for (const cb of _ratioSubs) { try { cb(next); } catch (_) { /* isolate */ } }
+}
+
+/** Subscribe to ratio changes (a drag in one wizard rebalances every mounted pane). Returns an unsubscribe fn. */
+export function onRatioChange(cb) { _ratioSubs.add(cb); return () => _ratioSubs.delete(cb); }
+
 /** Subscribe to collapse changes (one wizard folds a kind → others re-apply live). Returns an unsubscribe fn. */
 export function onPaneChange(cb) { _subs.add(cb); return () => _subs.delete(cb); }

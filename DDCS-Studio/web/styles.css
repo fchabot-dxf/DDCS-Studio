@@ -2037,6 +2037,23 @@ button.primary:hover {
 /* drill: stack the 2D layout above the 3D in the tall pane; each fills half */
 .wiz-2pane .wiz-visual .viz-split { flex-direction: column; }
 .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 1 1 0; min-height: 160px; }
+/* t790 — the pane RATIO: the drag-splitter's --pane-ratio (the 3D pane's fraction, on :root) rebalances the two panes.
+   Desktop: flex-grow within the definite-height column. Order-INDEPENDENT — keyed by data-viz-pane, not DOM position.
+   A COLLAPSED pane's flex:0 0 auto !important (below) wins, so the surviving pane still FILLS — the ratio only bites
+   with both open (exactly the "inert while collapsed" rule). */
+.wiz-2pane .wiz-visual .viz-split > [data-viz-pane="preview3d"] { flex-grow: var(--pane-ratio, 0.5); }
+.wiz-2pane .wiz-visual .viz-split > [data-viz-pane="layout2d"]  { flex-grow: calc(1 - var(--pane-ratio, 0.5)); }
+
+/* THE SPLITTER — a slim grabbable horizontal divider between the two panes; shown only when BOTH are open+visible
+   (data-split-on). ≥44px effective grab via the ::before overlay; touch-native (pointer events + touch-action:none). */
+.viz-pane-splitter { display: none; flex: 0 0 8px; align-self: stretch; position: relative; z-index: 2;
+    align-items: center; justify-content: center; cursor: row-resize; touch-action: none; }
+.viz-split[data-split-on="1"] > .viz-pane-splitter { display: flex; }
+.viz-pane-splitter::before { content: ''; position: absolute; left: 0; right: 0; top: -18px; bottom: -18px; }   /* 8 + 2·18 = 44px effective grab */
+.viz-pane-splitter-grip { width: 46px; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--text-dim) 55%, transparent); transition: background .12s ease, width .12s ease; }
+.viz-pane-splitter:hover .viz-pane-splitter-grip, .viz-split.is-dragging > .viz-pane-splitter .viz-pane-splitter-grip { background: var(--accent); width: 60px; }
+.viz-pane-splitter:focus-visible { outline: none; }
+.viz-pane-splitter:focus-visible .viz-pane-splitter-grip { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
 
 @media (max-width: 860px) {
     /* Mobile: collapse to a single STACKED column. The desktop two-pane relies on a flex-grow chain
@@ -2059,6 +2076,9 @@ button.primary:hover {
     .wiz-2pane .wiz-visual .viz-split { flex-direction: column; }
     .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 0 0 auto; min-height: 0; }
     .wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body { height: 200px; }   /* each stacked preview keeps a fixed size */
+    /* t790 — the ratio splits the FIXED total (2×200) so the splitter works stacked AND collapsing still frees the form. */
+    .wiz-2pane .wiz-visual [data-viz-pane="preview3d"] > .wiz-pane-body { height: calc(400px * var(--pane-ratio, 0.5)); }
+    .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(400px * (1 - var(--pane-ratio, 0.5))); }
     .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
     /* Lock the preview at the top: it stays pinned while the form scrolls under it (single-column view). */
     .wiz-2pane > .wiz-visual {
