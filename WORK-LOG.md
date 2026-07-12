@@ -10337,3 +10337,56 @@ Sweep evidence: JS gates = mouseenter 3 (2 tooltips + 1 varlist tooltip), mouseo
 
 **VERIFY (tests/whole-program-intent-756.spec.js, 3 green):** (1) EDITOR — an alignment program → seat (viz._seatAtStart); homing → machine frame (_forceMachineBox + _toolMachineFrame); rotary_clock → rig (_showRotaryFixture); a plain pocket → NONE (the union is all-false). (2) BLOCKS preview EQUALS the editor for alignment / homing / rotary / pocket — the four intent flags AND the declared starts match (same opSimStarts source). (3) grep-guard: no `.inferStart(` call and no imperative `setRotaryFixture(` remains in the Blocks/editor preview paths, and BOTH use the ONE applyProgramIntent seam (fetched the served modules + regex-checked). Regression batch: blocks-rotary-rig + alignment-fresh-seat + alignment-sim-starts-at-a + homing-inplace + atc-change-in-place + preview-dialect-parity + preview-drag-writes-program + blocks-single-inject + blocks-live-form = 29 green. Emit BYTE-IDENTICAL (preview/sim-side only — no emit / op / builder code touched; the start source is SIM-only). FULL SUITE: exit 0, 1098 passed / 2 skipped / 0 failed at retries=0 workers=3 — total 1100 == --list.
 **Files:** viz/opSimContext.js (the applyProgramIntent seam) · ui/gcodePreviewTab.js (the editor consumes the intent on open + onChange) · blocks/blocksApp.js (the full union in renderViews + getStart via opSimStarts + orphan import cleanup) · tests/whole-program-intent-756.spec.js (NEW). NEXT (per queue, GATE-FIRST): text stage 2 — ground the Expert persistent-var range + clock registers, pass the design back before building. PASS BACK.
+
+---
+
+## Turn 758 (worker) — TEXT STAGE 2 GROUNDING + DESIGN (GATE — NO BUILD; pass back for ruling)
+
+Grounded the DDCS dumps (bridge/controllers/) for dynamic-on-controller {SN}/{DATE}, per the RULED mode (NEXT-SESSION e2: "dynamic-on-controller is the committed mode — the program lives on the controller and self-updates per execution"). NO code this turn.
+
+### 1. PERSISTENT #VAR (Expert M350) — GROUNDED
+- The `uservar` FILE range **#100–#549** (450 non-volatile f64 slots; slot = #var−100) is the persistent macro-var store. Evidence: expert-m350/FINDINGS.md:140-142 (range) + CAP/manifest.txt:186 (CNCDISK/uservar = 3601 B = 450×8+1).
+- #470-471 written by SYSDISK/save_park_position.nc ("FIXED - Uses safe variables #470-471"; #470=#880 X, #471=#881 Y); #472-473 by save_toolchange_position.nc. READ BACK in SEPARATE later-run macros key-2.nc / key-3.nc (IF [#470==0]*[#471==0] guards + delta math) → CROSS-RUN retention proven.
+- VOLATILE runtime regs (RHS sources / display, NOT persistent-intent): #880/#881 live machine X/Y · #1505/#1510/#1511 screen message+args · #2004/#2005 motion% · #130-137/#410-411 per-run math.
+- ⚠ HONESTY: cross-RUN retention is proven; a power-CYCLE (reboot) survival test is an OPEN unchecked item (v4.1/ETHERNET_TESTS.md:45). The uservar file is NAND non-volatile and flushed RAM↔file at run start/end (lazy snapshot, not live) — the park/tool-change design already presumes power-cycle survival, but the dump has no verbatim reboot-test confirmation. → RECOMMEND: proceed on the NAND-file basis; the wizard notes "the counter lives in controller memory; verify it survives a full power-cycle on your machine."
+
+### 2. CLOCK (Expert) — HONEST N/A
+- NO macro-readable clock/date/time register anywhere in the Expert dump (eng/cfg greps for zone/clock/date/#330-339 → none; the only time labels are durations/display-config: "IO filter time", "LOGO display time", file-sort=DATE, "RTCP Resolution"). The panel shows a wall clock but it is NOT exposed to macros.
+- → {DATE} = the HONEST FALLBACK: Studio stamps the INSERT-TIME date as STATIC engraving + the wizard SAYS "date = insert-time stamp (controller clock not macro-readable)". No dynamic date on Expert.
+
+### 3. ARITHMETIC / DISPATCH capability (Expert) — GROUNDED (enough; no INT needed)
+- Confirmed: `+ − * /` with `[brackets]` (#102 = 805 + [#100-1]*5 ; #31 = #30/#21) · indirect `#[#expr]` (#[#102], #[#103]=1) · var-coords (Z#4) · `IF [expr] THEN stmt` / `IF [expr] GOTO` + boolean `*` (key-2.nc). 
+- INT/floor/MOD NOT found → NOT REQUIRED: digit extraction uses a subtractive-remainder loop (compare+subtract), only confirmed ops. Computed `M98 P[600+#d]` is UNCONFIRMED → use the IF-ladder dispatch (confirmed); computed-P is an optional line-shrink to verify.
+
+### 4. O-WORDS free (Expert) — GROUNDED
+- Taken: 500-503, 9028-9199 (sparse), 10000-10307 (sparse), 20000 (slib-g/m/user). FREE: ALL of O1-O499 and O504-O8999. → digit glyphs at **O600-O609**, the digit-dispatcher at **O610** (clear of every system range).
+
+### 5. V4.1 + others
+- V4.1: persistent uservar **#100–#499** confirmed cross-run (FINDINGS.md:22, uservar=3200 B=400×f64). Clock params #331/#332 exist but are display-config only → NO macro-readable clock. So {SN} works on V4.1 (persistent var); {DATE} = the same insert-stamp fallback.
+- grbl / Mach3 / Mach4 / UCCNC / others: assess per-post; where no persistent var → {SN} degrades to a static insert-time number + the honest note. Static text always works everywhere.
+
+### THE DESIGN (glyph-dispatch, Expert primary)
+**Var map (Expert):** SN counter = a CONFIGURABLE uservar slot, default **#490** (in #100-549, clear of park #470-471 / tool-change #472-473; wizard field so a user avoids their own macros). Working scratch (overwritten each run, persistence irrelevant): #150 cursorX · #151 cursorY · #152 digit · #153 remainder.
+
+**Shared glyph library (emitted ONCE per program, ~135 lines):**
+- O600..O609 = the single-stroke glyphs '0'..'9' (from strokeFont.js, baked at the token's height at emit time), drawn INCREMENTALLY (G91) from the cursor so no per-stroke var math — each ≈ (strokes×2 + plunge/retract) ≈ 8-16 lines → 10 subs ≈ 120 lines. Ends: pen-up, restore G90, M99.
+- O610 = "engrave digit #152 at (#150,#151)": an IF-ladder `IF [#152 EQ d] M98 P60d` (10 lines) then advance #150 += digitPitch. ~15 lines, once.
+
+**{SN} inline (fixed N digits, default 6, MSB→LSB):**
+- program top (once): `#490 = #490 + 1`  (bump the persistent counter this execution)
+- at the {SN} anchor: `#153 = #490` (remainder); set cursor #150/#151 to the token origin; then per place P = 10^(N-1)..1:
+    subtractive extract: `#152=0 / N10 IF [#153 LT P] GOTO N20 / #153=#153-P / #152=#152+1 / GOTO N10 / N20` (~5 lines) then `M98 P610` (engrave+advance). 
+- ~cost per {SN}: 1 (bump) + N×(≈5 extract + 1 call) → N=6 ≈ 37 lines inline + the 135-line shared library (shared by every dynamic token). Leading zeros: default engrave them (fixed-width dispatch); a "blank-suppress" toggle is an option.
+
+**{DATE}:** Expert + V4.1 → insert-time STATIC stamp (no readable clock) + the wizard says so.
+
+### OPEN RULINGS (gate — before any build)
+1. POWER-CYCLE persistence: cross-run proven; reboot-survival unverified in the dump (NAND file). Ship on the NAND basis + a wizard note to verify on-machine? (I recommend yes — the whole park design relies on it.)
+2. SN slot #490: default + make it a wizard field (confirm no user-macro convention on it)? 
+3. Digit count N (default 6) + leading-zero mode (zero-pad default vs blank-suppress)?
+4. Glyph library per HEIGHT: one dynamic-token height per program (one O600-609 set), or per-distinct-height sub-sets (rule-of-three — start with one)?
+5. Line-cost acceptance: ~135 shared + ~37/{SN} — OK for "small + editable", or want the computed-P optimization verified first (cuts dispatch to ~1 line/digit)?
+6. {SN} format fields: start value, increment, zero-pad width, optional static prefix/suffix (e.g. "SN-000042")?
+7. Blockly round-trip + reverse-sync for the {SN}/{DATE} tokens ([[wire-blockly-roundtrip-new-features]]) — in scope for the build turn.
+
+PASS THE DESIGN BACK for ruling. NO BUILD until ruled. (Grounding files: bridge/controllers/expert-m350/… ; scratchpad/text-stage2-design.md.)
