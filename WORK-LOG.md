@@ -10575,3 +10575,31 @@ Phase 1a's 4 tests stay green (the gear + wrapper didn't disturb the sim resolut
 Files: web/wizards/toolPicker.js, web/ui/formWidgets.js, web/ui/settingsPanel.js, + tests/tool-picker-1b-768.spec.js (NEW).
 
 NEXT (Phase 2): the machine tool-change MODE declaration (ATC/manual/none) + the applyToolChanges emitMapped post-pass (scan the toolsel markers, track the loaded tool across a multi-op program, inject the arm ONLY on difference: ATC -> atcChangeStack; manual-attended -> the confirm/M0 prompt; none -> an honest comment) + all 3 arms asserted per post + the loaded-state question (does op 1 arm, or match a declared loaded tool?). RELEASABLE NOW as the rich pickable tool library. PASS BACK.
+
+## 2026-07-12 (t772) — TOOL SELECTION Phase 2: the machine-mode emit arms (COMPLETES the tool campaign)
+
+Built Phase 2 — the DECLARED tool change now EMITS. A mill op that declares a tool inserts the change arm before its cut, ONLY on a difference, per the machine's declared tool-change mode. Includes the Settings mode selector, so the tool campaign (declare → pick → sim → emit) is DONE.
+
+THE MACHINERY (blockEmitter.js):
+- The toolsel marker now EMITS `( @TOOL n )` when a tool is declared (kind==='toolsel' → the marker; unset → nothing → byte-identical). It stays APPENDED (binding-stable); its op is delimited by the emit loop, not the marker position.
+- emitMapped records each top-level op's [start,end) LINE RANGE as it emits (opRanges) — a ROBUST op boundary that needs no block ids (freshly-built ops have none; relying on ids/src[0] mis-grouped two ops into one — the first bug I hit + fixed with opRanges).
+- applyToolChanges(T, opRanges, dialect) runs FIRST in the post-pass chain: per op range, read its @TOOL marker → toolNum; track the modal `loaded` tool across the program (starts NULL → op-1 ALWAYS arms, per the ruling — Studio never guesses physical state); inject the arm ONLY when toolNum !== loaded; strip the marker always. An op with NO declared tool keeps `loaded` (no arm) — so a no-tool op between two tool ops doesn't steal the next op's change.
+- THE 3 ARMS (toolChangeArm): ATC → `( tool change -> T3 - 6mm ballnose )` + `T3 M6` (the installed T.nc runs the physical change + the runtime #1300 tool-in-spindle no-op — dialect-portable). MANUAL → the confirmBlock atom's dialect-aware emit ('Load T3 - 6mm ballnose': an HMI prompt on Expert (#1505), or `( Load … )` + M0 that BLOCKS off-HMI on V4.1/DM500). NONE → an honest comment ('no changer configured; pre-stage the tool'). The message dia/type/name are looked up LIVE from settings.atc.tools.
+
+THE MODE DECLARATION (settings.toolChange.mode, profile-carried): atc | manual | none, read LIVE at emit. DEFAULT DERIVES from the existing "has a tool changer" declaration (hardwareTabs.atc → atc, else manual — an operator swaps by hand). The Settings UI (settingsPanel.js): a "TOOL CHANGE" section (always-present Tool Table tab) with a Mode dropdown [Automatic (ATC) / Manual (prompt) / None (comment)], loaded to the current/derived mode, saved on change. So a machine largely inherits the right mode automatically; the dropdown adds the override + the 'none' opt-in.
+
+LOADED-STATE (as ruled): NO declared-loaded-tool field. `loaded` starts null → the first declared tool arms unconditionally; the runtime owns physical truth (the ATC macro's #1300 compare no-ops a redundant change; MANUAL's op-1 M0 is the operator confirming what's loaded; NONE comments). Studio-side we only skip a CONSECUTIVE SAME tool (zero emit for op-2).
+
+VERIFIED (real symptom, tests/tool-change-772.spec.js — 7 tests):
+1. a two-op SAME-tool program emits ONE arm (op-1) + ZERO for op-2; no @TOOL marker leaks.
+2. DIFFERING tools (T3 then T5) emit a change per difference, in order.
+3. MANUAL per post: Expert renders the #1505 HMI prompt naming the tool; V4.1 degrades to `( Load T3 )` + M0 (blocks off-HMI); manual never calls the ATC macro.
+4. NONE → the honest no-changer comment naming the tool; no macro, no prompt.
+5. a NO-tool op is byte-identical (no arm, no marker).
+6. the Settings mode selector offers all 3 modes, writes settings.toolChange.mode, and the emit FOLLOWS it (none → the comment) — verified via a real openSettings drive; screenshot scratchpad/toolchange-mode.png (the TOOL CHANGE section, the hint, the dropdown at the derived Manual default).
+7. the SIM PLAYS through an armed change (the T/M6 arm is a motion no-op; the drilling still traces).
+Updated tool-select-768 test 1 (the Phase-1a "toolNum inert for emit" assertion is now obsolete — toolNum ACTIVELY emits in Phase 2; the permanent invariant is a NO-tool op stays byte-identical, which it asserts). FULL SUITE: 1125 passed + 2 skipped = 1127 (== --list), 0 failed, workers=3. Every emit/as-data golden holds (no-tool programs untouched; applyToolChanges early-returns when no @TOOL marker exists). Blockly untouched (the post-pass works on the emitted lines only; toolNum round-trips via the block data path).
+
+Files: web/blocks/blockEmitter.js, web/ui/settingsPanel.js + tests/tool-change-772.spec.js (NEW); tests/tool-select-768.spec.js (obsolete Phase-1a assertion updated).
+
+TOOL CAMPAIGN COMPLETE (t768 P1a declare+sim · t770 P1b rich picker+modal · t772 P2 emit arms+mode). NEXT (per the dispatch): the TAPPING wizard + the spindle declaration (TAPPING-CAPABILITY.md; the tapping wants the tool atom's tip/type, now available). PASS BACK.

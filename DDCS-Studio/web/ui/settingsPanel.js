@@ -1357,6 +1357,15 @@ function buildSettingsOverlay() {
                         </div>
                         <div class="settings-hint">Tool-setter pin &amp; location live in the Input tab. The Tool Length wizard probes against the setter and writes the result to the tool table above.</div>
                     </div>
+                    <div class="settings-section" id="set_toolchange_section">
+                        <div class="settings-section-title">TOOL CHANGE</div>
+                        <div class="settings-hint">How a mill op changes tools when its picked tool differs from the one loaded. <b>Automatic</b> runs your ATC (a T# M6 call); <b>Manual</b> pauses with a "Load T#" prompt for a hand swap; <b>None</b> just leaves a comment (you pre-stage the tool, no mid-program stops). A mill op with no tool picked emits nothing. Studio arms the change once and only on a difference — the controller no-ops if that tool is already in the spindle.</div>
+                        <label>Mode<select id="set_toolchange_mode">
+                            <option value="atc">Automatic — run the ATC (T# M6)</option>
+                            <option value="manual">Manual — pause + "Load T#" prompt</option>
+                            <option value="none">None — comment only (pre-staged)</option>
+                        </select></label>
+                    </div>
                     <div class="settings-section" id="set_atc_add" style="display:none">
                         <div class="settings-section-title">TOOL CHANGER (ATC)</div>
                         <div class="settings-hint">Add an automatic tool changer to set up the magazine and generate the T.nc tool-change macro. This adds the drawbar (and, for a disk magazine, carousel-rotate / index) I/O to Output/Input.</div>
@@ -1566,6 +1575,8 @@ function wireSettingsOverlay(ov) {
             const lbl = q('set_pv_followdamp_val'); if (lbl) lbl.textContent = d + '%';
         }
         const ad = SETTINGS_DEFAULTS.atc, a = s.atc || (s.atc = {});
+        // t772 P2b — the tool-change mode; DEFAULT derives from the "has a changer" declaration (hardwareTabs.atc) when unset.
+        const _tcm = q('set_toolchange_mode'); if (_tcm) _tcm.value = (s.toolChange && s.toolChange.mode) || (s.hardwareTabs && s.hardwareTabs.atc ? 'atc' : 'manual');
         q('set_atc_blockheight').value = a.blockHeight ?? ad.blockHeight;
         q('set_atc_safez').value = a.safeZ ?? ad.safeZ;
         q('set_atc_maxdist').value = a.maxDist ?? ad.maxDist;
@@ -2738,6 +2749,9 @@ function wireSettingsOverlay(ov) {
     // "+ Add" lives inside each subsystem's own (always-present) tab now. (Head has no Add — it's the default.)
     const _atcAddBtn = q('set_atc_add_btn');
     if (_atcAddBtn) _atcAddBtn.addEventListener('click', () => addSubsystem('atc'));
+    // t772 P2b — the tool-change mode selector (settings.toolChange.mode; profile-carried). Save on change; the emit reads it live.
+    const _tcMode = q('set_toolchange_mode');
+    if (_tcMode) _tcMode.addEventListener('change', (e) => { _ddcsSettings.toolChange = _ddcsSettings.toolChange || {}; _ddcsSettings.toolChange.mode = e.target.value; saveSettings(); });
     // Remove a subsystem: hide its tab + strip the I/O rows it owns (group-tagged). The tool table/magazine data
     // is left intact (it lives under atc.*), so re-adding restores everything.
     async function removeSubsystem(kind) {

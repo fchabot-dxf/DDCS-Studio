@@ -234,9 +234,10 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     if (def.kind === 'entry') return [];       // ENTRY POINT (t726 P2b): a childless MARKER — emits nothing here. The waypoint
                                                // is applied ONCE over the whole program in emitMapped (applyEntryWaypoint), so the
                                                // marker sits as a sibling (no body-index shift → the goldens' positional bindings hold).
-    if (def.kind === 'toolsel') return [];     // TOOL SELECTION (t768 P1a): a childless MARKER recording the op's declared tool
-                                               // number — emits nothing here (drives the sim cutter; Phase 2 scans it for the
-                                               // change-on-difference prefix). Sibling after the body → positional bindings hold.
+    if (def.kind === 'toolsel') {              // TOOL SELECTION (t768): a childless MARKER recording the op's declared tool
+        const tn = num(p.toolNum, 0);          // number. t772 P2 — emit `( @TOOL n )` when a tool is declared; applyToolChanges
+        return tn > 0 ? [tag(`( @TOOL ${tn} )`, own)] : [];   // consumes it → the change arm on difference. Unset → nothing (byte-identical).
+    }
 
     if (def.kind === 'container') {            // STAMP child(ren) at each point (skip 1-based indices in p.skip)
         const pts = def.points(p);
@@ -280,7 +281,9 @@ export function emitMapped(blocks, settings = {}) {
     const dialect = settings.dialect || getDialect(settings.profileId);   // active controller profile → its G-code forms
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
     const T = [];
-    (blocks || []).forEach((b) => { T.push(...emit(b, 0, 0, [], scope, dialect)); });
+    const opRanges = [];                  // t772 P2 — each top-level block = one op; record its [start,end) line range as emitted
+    (blocks || []).forEach((b) => { const s = T.length; T.push(...emit(b, 0, 0, [], scope, dialect)); opRanges.push([s, T.length]); });
+    applyToolChanges(T, opRanges, dialect);   // t772 P2 — the DECLARED tool change: per op range, read its @TOOL marker, track the loaded tool, inject the arm (ATC/manual/none) ONLY on a difference. No tool declared → byte-identical.
     applyEntryWaypoint(T, blocks);        // t726 P2b — the DECLARED mill entry point: route the opening rapid through it (no-op unless it moves the cut entry)
     applyProgramTransform(T, blocks);     // t736 — the DECLARED program rotation: rotate the whole emitted program about the pivot (AFTER the entry so that move rotates too; 0°/none → byte-identical)
     applySerialLibrary(T, dialect);       // t764 — expand {SN} markers → the bump (top) + the per-digit dispatch + the glyph library (once per distinct height, after the program end). NO {SN} marker → byte-identical.
@@ -322,6 +325,67 @@ function applyProgramTransform(T, blocks) {
     if (!angle) return;   // 0° / none → the emit is byte-identical to the un-rotated program
     const rotated = rotateProgram(T.map((t) => t.line).join('\n'), angle, pivotX, pivotY).text.split('\n');
     for (let i = 0; i < T.length && i < rotated.length; i++) T[i].line = rotated[i];
+}
+
+/** t772 P2 — parse a `( @TOOL n )` marker (the toolsel block emits one per op that declares a tool). */
+function parseToolMarker(line) {
+    const m = String(line).match(/\(\s*@TOOL\s+(\d+)\s*\)/);
+    return m ? Number(m[1]) : null;
+}
+
+/** t772 P2 — the DECLARED per-machine tool-change MODE (settings, profile-carried): atc | manual | none. Read LIVE from
+ *  settings (like the ATC inline body). Default DERIVES from the existing "has a tool changer" declaration (hardwareTabs.atc)
+ *  → atc when a changer is configured, else manual (an operator swaps by hand). 'none' (pre-staged, no stops) is an opt-in. */
+function toolChangeMode() {
+    const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+    const m = s.toolChange && s.toolChange.mode;
+    if (m === 'atc' || m === 'manual' || m === 'none') return m;
+    return (s.hardwareTabs && s.hardwareTabs.atc) ? 'atc' : 'manual';
+}
+
+/** t772 P2 — the tool library row for the change MESSAGE (dia/type/name). Live from settings; null if not in the library. */
+function lookupTool(n) {
+    const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings()) || {};
+    const tools = (s.atc && s.atc.tools) || [];
+    return tools.find((t) => t && Number(t.num) === Number(n)) || null;
+}
+
+/** t772 P2 — the change ARM as LINES, by mode. ATC → `T# M6` (the installed T.nc handles the physical change + the runtime
+ *  #1300 tool-in-spindle no-op — Studio never guesses physical state). MANUAL → the confirmBlock prompt (dialect-aware: a
+ *  scripted HMI prompt, or `( Load … )` + M0 that BLOCKS off-HMI). NONE → an honest comment (pre-stage the tool). */
+function toolChangeArm(mode, n, dialect) {
+    const t = lookupTool(n);
+    const desc = t ? `T${n} - ${(t.dia != null && t.dia !== '') ? t.dia + 'mm ' : ''}${t.type || 'tool'}${t.name ? ' (' + t.name + ')' : ''}` : `T${n}`;
+    if (mode === 'atc') return [`( tool change -> ${desc} )`, `T${n} M6`];
+    if (mode === 'none') return [`( tool change: load ${desc} - no changer configured; pre-stage the tool before running )`];
+    const cf = BLOCKS['confirm'];   // MANUAL — reuse the confirm atom's dialect-aware emit (block-degrades to a message + M0)
+    return cf ? cf.emit({ msg: `Load ${desc}`, mode: 1, cancel: 2, pauseOnDegrade: true }, 0, 0, dialect) : [`( Load ${desc} )`, 'M0'];
+}
+
+/** t772 P2 — THE TOOL CHANGE PASS: each op (a top-level block, its line range from the emit loop) that declares a tool
+ *  carries a `( @TOOL n )` marker. Track the modal loaded tool across the program and inject the change arm at the op's START
+ *  ONLY on a DIFFERENCE (loaded starts null → the first declared tool ALWAYS arms; Studio never guesses physical state — a
+ *  consecutive SAME tool resolves Studio-side to zero emit, and the runtime no-ops a redundant change). An op with NO declared
+ *  tool keeps the loaded tool (no arm). The @TOOL marker is always consumed (never leaks). No tool anywhere → byte-identical. */
+function applyToolChanges(T, opRanges, dialect) {
+    if (!T.some((t) => parseToolMarker(t.line) != null)) return;   // no declared tool anywhere → byte-identical, no work
+    const mode = toolChangeMode();
+    const out = [];
+    let loaded = null, cursor = 0;
+    for (const [start, end] of opRanges) {
+        while (cursor < start) { out.push(T[cursor++]); }   // any lines before this op (none in practice — ranges tile T)
+        let toolNum = null; const body = [];
+        for (let k = start; k < end; k++) {
+            const n = parseToolMarker(T[k].line);
+            if (n != null) toolNum = n; else body.push(T[k]);   // read + strip the marker; keep the rest verbatim
+        }
+        if (toolNum != null && toolNum !== loaded) out.push(...toolChangeArm(mode, toolNum, dialect).map((line) => ({ line, src: null })));   // a change point → the arm before the op body
+        if (toolNum != null) loaded = toolNum;
+        out.push(...body);
+        cursor = end;
+    }
+    while (cursor < T.length) { out.push(T[cursor++]); }
+    T.splice(0, T.length, ...out);
 }
 
 /** t764 — parse a self-describing `( @SN … )` marker (fillText emits one per {SN} placement per fill level). */

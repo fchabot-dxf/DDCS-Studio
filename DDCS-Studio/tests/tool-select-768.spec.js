@@ -13,7 +13,7 @@ const TWINS = {
   contour: 'contourDataDef', text: 'textDataDef', pocket: 'pocketDataDef',
 };
 
-test('every mill twin declares a toolNum picker; the tool marker is INERT for emit (byte-identical)', async ({ page }) => {
+test('every mill twin declares a toolNum picker; a NO-TOOL op is byte-identical + toolNum round-trips', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const r = await page.evaluate(async (TWINS) => {
@@ -33,17 +33,15 @@ test('every mill twin declares a toolNum picker; the tool marker is INERT for em
       registerUserOp(def);
       const hasPick = (def.bindings || []).some((b) => b.param === 'toolNum' && b.widget === 'toolpick');
       const build = builderOf(def.opType);
-      const base = emitMapped(build({})).text;
-      const withTool = emitMapped(build({ toolNum: 3 })).text;   // a declared T# must NOT change the emitted G-code (Phase 1a)
+      const base = emitMapped(build({})).text;   // NO tool declared → no tool machinery at all (byte-identical; the goldens hold)
       const back = parseMarker(markerLine(def.opType, { toolNum: 5 }));   // the declared toolNum round-trips through the op marker
-      out[name] = { hasPick, inert: base === withTool, leak: /toolsel|@TOOL|@SN.*tool/i.test(base), rt: !!back && Number(back.params.toolNum) === 5 };
+      out[name] = { hasPick, leak: /toolsel|@TOOL|tool change|T\d+ M6|Load T/i.test(base), rt: !!back && Number(back.params.toolNum) === 5 };
     }
     return out;
   }, TWINS);
   for (const name of Object.keys(TWINS)) {
     expect(r[name].hasPick, `${name} exposes a toolNum toolpick binding`).toBe(true);
-    expect(r[name].inert, `${name}: a declared toolNum is inert for emit (byte-identical)`).toBe(true);
-    expect(r[name].leak, `${name}: the tool marker leaks nothing into the G-code`).toBe(false);
+    expect(r[name].leak, `${name}: a no-tool op emits NO tool-change machinery (byte-identical)`).toBe(false);
     expect(r[name].rt, `${name}: toolNum survives the marker round-trip`).toBe(true);
   }
 });
