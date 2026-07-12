@@ -658,17 +658,19 @@ export class GcodeViz3D {
         // offset via sprite.center so the chip sits BESIDE the spindle body, never inside it (center x < 0 shifts the
         // rendered quad right of its 3D anchor by |x|·width — screen-space, so it holds at any zoom).
         sp.renderOrder = 100; sp.visible = false; sp.scale.set(0.17, 0.069, 1);   // ~constant screen size (3 lines)
-        sp.center.set(-0.18, 0.5);
+        sp.center.set(-0.08, 1.45);   // t780 (user) — render BELOW the target position (and a touch right): the anchor sits above the quad's top-left, so the tip/target stays unobscured at any zoom
         this._posChip = sp; this._posChipCv = cv; this._posChipTex = tex;
         this.scene.add(sp);
     }
-    _drawPosChipTex(x, y, z, wcs) {
+    _drawPosChipTex(x, y, z, wcs, frame) {
         const cv = this._posChipCv, c = cv.getContext('2d');
         c.clearRect(0, 0, cv.width, cv.height);
         c.fillStyle = 'rgba(10,14,20,0.85)'; c.fillRect(0, 0, cv.width, cv.height);
         c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 3; c.strokeRect(1.5, 1.5, cv.width - 3, cv.height - 3);
-        let wc = '#6fd3ff';   // t780 (user) — the chip speaks WORK coords, so it wears the declared work-frame token
-        try { wc = (getComputedStyle(document.documentElement).getPropertyValue('--coord-work') || wc).trim() || wc; } catch (_) { /* headless */ }
+        // t780 (user) — the chip wears its FRAME's declared token: work cyan, machine amber (same pair as the DRO columns)
+        const tok = frame === 'mach' ? '--coord-mach' : '--coord-work';
+        let wc = frame === 'mach' ? '#d8a35a' : '#6fd3ff';
+        try { wc = (getComputedStyle(document.documentElement).getPropertyValue(tok) || wc).trim() || wc; } catch (_) { /* headless */ }
         c.fillStyle = wc; c.font = 'bold 30px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
         c.fillText('X ' + x.toFixed(3), 14, 22); c.fillText('Y ' + y.toFixed(3), 14, 52); c.fillText('Z ' + z.toFixed(3), 14, 82);   // t780 (user) — the Z line (DRO-equal work Z)
         if (wcs) { c.globalAlpha = 0.75; c.font = 'bold 22px monospace'; c.textAlign = 'right'; c.fillText(wcs, cv.width - 12, 22); c.globalAlpha = 1; }   // t780 (user) — the chip STATES its frame (the active WCS)
@@ -677,11 +679,14 @@ export class GcodeViz3D {
     _updatePosChip(pos) {
         if (!displayOf('poschip').visible) { if (this._posChip) this._posChip.visible = false; return; }
         this._ensurePosChip();
-        this._posChipVal = { x: Number(pos.x) || 0, y: Number(pos.y) || 0, z: Number(pos.z) || 0, wcs: pos.wcs || '' };
+        const mach = pos.frame === 'mach' && pos.mach;   // t780 (user) — machine-semantic motion leads with the MACHINE frame
+        this._posChipVal = mach
+            ? { x: Number(mach.x) || 0, y: Number(mach.y) || 0, z: Number(mach.z) || 0, wcs: 'Mach', frame: 'mach' }
+            : { x: Number(pos.x) || 0, y: Number(pos.y) || 0, z: Number(pos.z) || 0, wcs: pos.wcs || '', frame: 'work' };
         this._posChipMoveMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y, this._posChipVal.z, this._posChipVal.wcs);
+        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y, this._posChipVal.z, this._posChipVal.wcs, this._posChipVal.frame);
         const t = this._animTool;
-        if (t) { t.updateWorldMatrix(true, false); const w = t.getWorldPosition(new this.THREE.Vector3()); this._posChip.position.set(w.x, w.y, w.z + 24); }   // ride the head, lifted clear of the cut
+        if (t) { t.updateWorldMatrix(true, false); const w = t.getWorldPosition(new this.THREE.Vector3()); this._posChip.position.set(w.x, w.y, w.z); }   // anchor AT the tip; the sprite renders below it (screen-space center offset)
         this._posChip.material.opacity = displayOf('poschip').alpha;
         this._posChip.visible = true;
         if (!this._posChipRaf) this._posChipFade();

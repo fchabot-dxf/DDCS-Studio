@@ -296,14 +296,15 @@ export function createToolpath2d(canvas, opts = {}) {
     function drawPosChip(ctx) {
         const d = displayOf('poschip'), g = chipGate() * d.alpha;
         if (!chipPos || !d.visible || g <= 0.02) { canvas.__t2chip = null; return; }
-        const hx = ptx(chipPos.x, chipPos.pass), hy = pty(chipPos.y, chipPos.pass);
+        const hx = ptx(chipPos.frame === 'mach' ? chipPos.wx : chipPos.x, chipPos.pass), hy = pty(chipPos.frame === 'mach' ? chipPos.wy : chipPos.y, chipPos.pass);   // placement is scene(work)-frame; the TEXT may quote mach
         const text = (chipPos.wcs ? chipPos.wcs + '  ' : '') + 'X ' + chipPos.x.toFixed(3) + '  Y ' + chipPos.y.toFixed(3) + '  Z ' + (chipPos.z || 0).toFixed(3);   // t780 (user) — the frame label + the Z line (DRO-equal)
         ctx.save(); ctx.globalAlpha = g; ctx.font = 'bold 11px monospace';
-        const bw = ctx.measureText(text).width + 12, bh = 18, bx = hx + 12, by = hy - bh - 8;   // offset up-right, off the cut
+        const bw = ctx.measureText(text).width + 12, bh = 18, bx = hx + 12, by = hy - bh - 8;   // offset up-right, off the cut (user: the 2D placement is right as-is)
         ctx.fillStyle = 'rgba(10,14,20,0.82)'; ctx.fillRect(bx, by, bw, bh);
         ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
-        let wc = '#6fd3ff';   // t780 (user) — WORK-frame token (matches the DRO Work column)
-        try { wc = (getComputedStyle(document.documentElement).getPropertyValue('--coord-work') || wc).trim() || wc; } catch (_) { /* headless */ }
+        const tok = chipPos.frame === 'mach' ? '--coord-mach' : '--coord-work';   // t780 (user) — the chip wears its frame's token
+        let wc = chipPos.frame === 'mach' ? '#d8a35a' : '#6fd3ff';
+        try { wc = (getComputedStyle(document.documentElement).getPropertyValue(tok) || wc).trim() || wc; } catch (_) { /* headless */ }
         ctx.fillStyle = wc; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(text, bx + 6, by + bh / 2);
         ctx.restore();
         canvas.__t2chip = { hx, hy, bx, by, x: chipPos.x, y: chipPos.y, z: chipPos.z || 0, text, alpha: +g.toFixed(3) };   // debug + tests: the drawn chip + its WORK coords (DRO-equal)
@@ -362,7 +363,7 @@ export function createToolpath2d(canvas, opts = {}) {
     function setStartEmits(arr) { startEmits = Array.isArray(arr) ? arr.slice() : []; if (view) paint(); }   // per-pass marker SHAPE: emitting (a drag edits the program) = filled ◆, sim-only = hollow ◇
     function setPassEnds(arr) { passEnds = Array.isArray(arr) ? arr : null; if (view) paint(); }   // t107 — per-pass RUNTIME world-ENDs (from the trace): an anchorsAtPrev pass anchors its route at passEnds[p-1] + relocates its marker to end+cross
     function setAnchor(v) { anchorToStart = !!v; if (view) paint(); }   // mirror the 3D's _anchorToStart: anchored → path emanates from the start, not the stock pin
-    function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0, pass: p.pass } : null; if (p) { chipPos = { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, pass: p.pass, wcs: p.wcs || '' }; chipMs = nowMs(); } if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D) + the poschip's WORK coords (the SAME onPositionChange source as the DRO); pass → per-pass anchor (INC4)
+    function setToolPosition(p) { toolPos = p ? { x: +p.x || 0, y: +p.y || 0, pass: p.pass } : null; if (p) { const mc = p.frame === 'mach' && p.mach; chipPos = mc ? { x: +mc.x || 0, y: +mc.y || 0, z: +mc.z || 0, pass: p.pass, wcs: 'Mach', frame: 'mach', wx: +p.x || 0, wy: +p.y || 0 } : { x: +p.x || 0, y: +p.y || 0, z: +p.z || 0, pass: p.pass, wcs: p.wcs || '', frame: 'work' }; chipMs = nowMs(); } if (view && anim.playing) paint(); }   // live sim head (in sync with the 3D) + the poschip's WORK coords (the SAME onPositionChange source as the DRO); pass → per-pass anchor (INC4)
     function setGcode(text) { setSegments(traceToolpath(text).segments); }
 
     // ---- play / progress ----

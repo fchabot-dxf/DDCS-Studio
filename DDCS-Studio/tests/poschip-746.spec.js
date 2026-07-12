@@ -97,3 +97,19 @@ test('the poschip pref persists across a reload', async ({ page }) => {
     expect(p.alpha, 'poschip alpha pref survived reload').toBeCloseTo(0.4, 2);
     await page.evaluate(async () => { const m = await import('/viz/displayPrefs.js'); m.resetDisplay(); });
 });
+
+test('PROBE motion: the chip flips to the MACHINE frame (the probe is rewriting the WCS) and back', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.setGcodeView);
+    await page.evaluate(async () => { const m = await import('/viz/displayPrefs.js'); m.resetDisplay(); });
+    await seed(page, '3d');
+    // a probe program: the G31 seek dominates the play window
+    await page.evaluate(() => { const p = window.__gpPanel; p.setGcode(['G90', 'G0 X10 Y10 Z5', 'G31 Z-25 F60', 'G0 Z5', 'M30', ''].join('\n')); });
+    await play(page);
+    const s2 = await sampleDuringPlay(page, () => {
+        const v = window.__gpPanel.viz; if (!(v._posChip && v._posChip.visible && v._posChipVal)) return null;
+        return v._posChipVal.frame === 'mach' ? v._posChipVal : null;
+    });
+    expect(s2, 'a machine-frame chip sample was captured during the probe').not.toBeNull();
+    expect(s2.wcs, 'the chip is LABELED Mach during probe motion (G53 shares this conduit)').toBe('Mach');
+});

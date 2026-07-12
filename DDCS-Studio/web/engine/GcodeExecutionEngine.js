@@ -565,6 +565,7 @@ export class GcodeExecutionEngine {
                 p = { x: mv.from.x + (mv.to.x - mv.from.x) * t, y: mv.from.y + (mv.to.y - mv.from.y) * t, z: mv.from.z + (mv.to.z - mv.from.z) * t };
             }
             p.pass = this._pass;   // INC4: report the current REPOSITION pass so the live tool anchors to starts[_pass] (not always ①)
+            p.g53 = !!mv.g53; p.probing = !!mv.probe;   // t780 (user) — the MOVE's frame semantics ride the event (G53 = a machine-coord move; probe = rewriting the WCS)
             this.onPositionChange(p);
             this._updateLimitSwitches(p);   // H3 (t485) — trip home/limit switches LIVE as the axis travels toward the edge
         }
@@ -1231,7 +1232,7 @@ export class GcodeExecutionEngine {
                 const realMs = rate > 0 ? (d / rate) * 60000 : 0;
                 const speed = this.simSpeed > 0 ? this.simSpeed : 1;
                 if (realMs / speed > 50) {
-                    this._move = { from: { ...this.pos }, to: target, durMs: realMs, elapsed: 0, last: null, touchName };
+                    this._move = { from: { ...this.pos }, to: target, durMs: realMs, elapsed: 0, last: null, touchName, g53, probe: isProbe };   // t780 (user) — the position event states its frame semantics
                     const kind = isProbe ? 'G31 probe' : rapid ? 'G0 rapid' : 'G1 feed';
                     this._setStatus(`${kind} ${d.toFixed(1)} mm at F${rate} — ${(realMs / 1000).toFixed(1)} s${speed !== 1 ? ` @ ${speed}×` : ''}`, true);
                     this._nextDelayMs = 16;
@@ -1287,7 +1288,7 @@ export class GcodeExecutionEngine {
                 const realMs = rate > 0 ? (len / rate) * 60000 : 0;
                 const speed = this.simSpeed > 0 ? this.simSpeed : 1;
                 if (realMs / speed > 50) {
-                    this._move = { from: { ...pts[0] }, to: { ...pts[pts.length - 1] }, path: pts, durMs: realMs, elapsed: 0, last: null, touchName: null };
+                    this._move = { from: { ...pts[0] }, to: { ...pts[pts.length - 1] }, path: pts, durMs: realMs, elapsed: 0, last: null, touchName: null, g53: false, probe: false };
                     this._setStatus(`${effMotion === 2 ? 'G2 cw' : 'G3 ccw'} arc ${len.toFixed(1)} mm at F${rate} — ${(realMs / 1000).toFixed(1)} s${speed !== 1 ? ` @ ${speed}×` : ''}`, true);
                     this._nextDelayMs = 16;
                     this.ip += 1;
