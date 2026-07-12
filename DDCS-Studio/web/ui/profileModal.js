@@ -63,6 +63,14 @@ async function saveAsFlow() {
     if (!String(active.name || '').trim() || norm(active.name) === norm(nm)) { L.renameProfile(active.id, nm); L.saveActiveSnapshot(); pushRecentProfile(active.id); }
     else { const id = L.createProfile({ from: 'dup', name: nm }); if (id) pushRecentProfile(id); }
     _afterChange();
+    // t754 — cloud-default: the LOCAL save above always lands; when connected + the pref prefers cloud, ALSO push to
+    // cloud so the profile syncs across devices. A failed push keeps the local save + shows the note (never lost work).
+    let SP = null; try { SP = await import('./savePrefs.js'); } catch (_) { /* optional */ }
+    if (SP && SP.preferredSaveTarget() === 'cloud' && typeof window.ddcsSaveProfileToCloud === 'function') {
+        try { await window.ddcsSaveProfileToCloud(nm); dlgNotice(`Saved “${nm}” — synced to cloud.`); return; }
+        catch (_) { dlgNotice(SP.localFallbackNote('failed')); return; }
+    }
+    if (SP && SP.getDefaultSaveLocation() === 'cloud-when-connected' && !SP.cloudConnected()) { dlgNotice(SP.localFallbackNote('offline')); return; }
     dlgNotice(`Saved “${nm}”.`);
 }
 

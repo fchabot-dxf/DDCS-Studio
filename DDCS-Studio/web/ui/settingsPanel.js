@@ -1082,6 +1082,14 @@ function buildSettingsOverlay() {
                         <div class="settings-section-title">CLOUD STORAGE</div>
                         <div class="settings-hint">Sign in to save &amp; sync your projects to your own Google Drive — files go straight to your account, we never see them.</div>
                         <div id="set_cloud_mount" style="margin-top:8px"></div>
+                        <div class="settings-row" style="align-items:center; margin-top:12px;">
+                            <label class="label" for="set_save_location" style="flex:1">Default save location</label>
+                            <select id="set_save_location" title="Where a NEW project save or profile save-as lands first. The other option is always one click away in the save dialog; existing saves never move." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;">
+                                <option value="cloud-when-connected">Cloud when connected</option>
+                                <option value="always-local">Always local</option>
+                            </select>
+                        </div>
+                        <div class="settings-hint">New saves pre-target the cloud when you're signed in (local is one click away). Signed out or offline, they land locally with a quiet sync note — a save never fails.</div>
                     </div>
                 </div>
 
@@ -1501,6 +1509,8 @@ function wireSettingsOverlay(ov) {
     const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 
     renderCloudLogin(q('set_cloud_mount'));   // cloud account login (Network tab) — shared with the Project Manager drawer
+    // t754 — Default save location (cloud-when-connected | always-local): an APP pref (savePrefs), not the machine profile.
+    { const sel = q('set_save_location'); if (sel) import('./savePrefs.js').then((SP) => { sel.value = SP.getDefaultSaveLocation(); sel.addEventListener('change', () => SP.setDefaultSaveLocation(sel.value)); }); }
     renderMachineNet(q('set_machinenet_mount'));   // MACHINE NETWORK: live controller connection via the gateway
     renderLanAccess(q('set_lan_mount'));   // LAN ACCESS: shareable URL + QR for the exe-served Studio
 

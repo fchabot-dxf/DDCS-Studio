@@ -757,6 +757,14 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .proj-savepanel { width: min(440px, 92vw); max-height: 82vh; display: flex; flex-direction: column; background: var(--panel, #1d2530); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 48px rgba(0,0,0,.5); overflow: hidden; }
 .proj-savebody { padding: 14px 16px; overflow: auto; }
 .proj-savebody .label { display: block; margin: 0 0 4px; }
+/* t754 — the save TARGET toggle (Local | Cloud) + the quiet fallback note */
+.proj-save-target { display: flex; gap: 6px; margin: 10px 0 4px; }
+.proj-starget { flex: 1 1 0; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text-dim); font: inherit; font-weight: 600; cursor: pointer; transition: background .12s ease, color .12s ease, border-color .12s ease; }
+.proj-starget:hover:not(:disabled) { color: var(--text-main); background: color-mix(in srgb, var(--bg) 40%, transparent); }
+.proj-starget.on { color: #fff; background: var(--accent, #0ea5e9); border-color: var(--accent, #0ea5e9); }
+.proj-starget:disabled { opacity: .45; cursor: default; }
+.proj-save-note { margin: 6px 0 2px; font-size: 12px; color: var(--hdr-dim, var(--text-dim)); }
+.proj-save-note[hidden] { display: none; }
 .proj-treehead { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 6px; }
 .proj-tree { border: 1px solid var(--border); border-radius: 8px; max-height: 220px; overflow: auto; padding: 4px; }
 .proj-tree-row { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text-main); cursor: pointer; font: inherit; padding: 5px 6px; border-radius: 5px; }

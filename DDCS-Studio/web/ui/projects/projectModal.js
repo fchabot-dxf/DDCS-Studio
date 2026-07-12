@@ -14,6 +14,7 @@ import * as gdrive from '../cloud/googleDrive.js';   // Google adapter (others p
 import { pickFolder } from '../cloud/googlePicker.js';
 import { googleApiKey, setGoogleApiKey } from '../cloud/providers.js';
 import { dlgConfirm, dlgPrompt, dlgNotice } from '../dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
+import { preferredSaveTarget, getDefaultSaveLocation, cloudConnected, localFallbackNote } from '../savePrefs.js';   // t754 — cloud-default-when-connected
 
 const sanitize = (s) => (String(s || '').trim().replace(/[^A-Za-z0-9 _.-]+/g, '_').replace(/^\.+/, '') || 'untitled');
 
@@ -21,6 +22,7 @@ const sanitize = (s) => (String(s || '').trim().replace(/[^A-Za-z0-9 _.-]+/g, '_
 let drawer = null, listEl = null, crumbEl = null, footEl = null, importInput = null;
 let localWrap = null, cloudWrap = null, cloudMount = null;
 let cwd = '', vol = 'local';
+let saveTarget = 'local';   // t754 — the save modal's current target (local | cloud), defaulted from preferredSaveTarget()
 let cloudStack = [];   // cloud folder path [{ id, name }] — mirrors Local's cwd but by provider file IDs
 
 export function openOpenDrawer() {
@@ -284,10 +286,34 @@ export async function openSaveModal() {
     if (!stack.length) { dlgNotice('Nothing to save — build a program first.'); return; }
     if (!saveOv) buildSaveModal();
     saveDest = cwd || '';                         // default to the drawer's current folder
+    saveTarget = preferredSaveTarget();           // t754 — cloud when connected + the setting says so, else local
     nameInput.value = 'macro';
     saveOv.hidden = false;
     await renderTree();
+    updateSaveTargetUI();
     nameInput.focus(); nameInput.select();
+}
+
+// t754 — reflect the current save target: highlight the segment, show the folder tree only for Local, disable Cloud
+// when not signed in, and surface the quiet "saved locally — connect cloud to sync" note when cloud is preferred but
+// the save will land local (offline). Never blocks a save — the note is informational.
+function updateSaveTargetUI() {
+    if (!saveOv) return;
+    const connected = cloudConnected();
+    if (saveTarget === 'cloud' && !connected) saveTarget = 'local';   // can't target cloud while signed out
+    saveOv.querySelectorAll('.proj-starget').forEach((b) => {
+        const isCloud = b.dataset.starget === 'cloud';
+        b.classList.toggle('on', b.dataset.starget === saveTarget);
+        b.disabled = isCloud && !connected;
+        b.title = isCloud && !connected ? 'Sign in on the Cloud tab to save to your Google Drive' : '';
+    });
+    const folder = saveOv.querySelector('#projLocalFolder'); if (folder) folder.style.display = saveTarget === 'local' ? '' : 'none';
+    const note = saveOv.querySelector('#projSaveNote');
+    if (note) {
+        const offline = saveTarget === 'local' && getDefaultSaveLocation() === 'cloud-when-connected' && !connected;
+        if (offline) { note.textContent = localFallbackNote('offline'); note.hidden = false; }
+        else note.hidden = true;
+    }
 }
 function closeSave() { if (saveOv) saveOv.hidden = true; }
 
@@ -300,9 +326,17 @@ function buildSaveModal() {
         + '<div class="proj-head"><span class="proj-title">⤓ Save project</span><button class="op-btn" data-sact="cancel" title="Cancel">✕</button></div>'
         + '<div class="proj-savebody">'
         + '<label class="label">Name</label><input id="projSaveName" type="text" value="macro" style="width:100%"/>'
-        + '<div class="proj-treehead"><span class="label">Folder</span>'
-        + '<button class="op-btn" data-sact="mkdir" title="New folder under the selected one">+ New folder</button></div>'
-        + '<div class="proj-tree" id="projTree"></div>'
+        // t754 — WHERE the save lands: Cloud (when connected) or Local, defaulted from the app setting; the other is one click.
+        + '<div class="proj-save-target" id="projSaveTarget">'
+        +   '<button class="proj-starget" data-starget="local" type="button">💾 Local</button>'
+        +   '<button class="proj-starget" data-starget="cloud" type="button">☁ Cloud</button>'
+        + '</div>'
+        + '<div class="proj-save-note" id="projSaveNote" hidden></div>'
+        + '<div id="projLocalFolder">'
+        +   '<div class="proj-treehead"><span class="label">Folder</span>'
+        +   '<button class="op-btn" data-sact="mkdir" title="New folder under the selected one">+ New folder</button></div>'
+        +   '<div class="proj-tree" id="projTree"></div>'
+        + '</div>'
         + '</div>'
         + '<div class="proj-savefoot">'
         + '<button class="op-btn" data-sact="exportfile" title="Download as a .mjson file instead">Export file</button>'
@@ -337,6 +371,8 @@ function highlightTree() {
 }
 
 async function onSaveClick(e) {
+    const st = e.target.closest('[data-starget]');   // t754 — the Local / Cloud target toggle
+    if (st && !st.disabled) { saveTarget = st.dataset.starget; updateSaveTargetUI(); return; }
     const t = e.target.closest('[data-sact]');
     if (!t) { if (e.target === saveOv) closeSave(); return; }   // backdrop closes
     const act = t.dataset.sact;
@@ -352,9 +388,27 @@ async function onSaveClick(e) {
         }
         const name = sanitize(nameInput.value);
         if (act === 'save') {
-            await store.saveProject(store.joinPath(saveDest, name), serializeProject(name));
+            const data = serializeProject(name);
+            if (saveTarget === 'cloud') {
+                try {
+                    const root = await gdrive.ensureRoot();
+                    await gdrive.write(name + '.mjson', data, root);
+                    closeSave();
+                    dlgNotice('Saved to cloud — “' + name + '”.');
+                } catch (err) {
+                    // t754 — a cloud write that errors FALLS BACK to local + the note; the save always lands (no lost work).
+                    await store.saveProject(store.joinPath(saveDest, name), data);
+                    closeSave();
+                    if (drawer && !drawer.hidden) renderDrawer();
+                    dlgNotice(localFallbackNote('failed'));
+                }
+                return;
+            }
+            await store.saveProject(store.joinPath(saveDest, name), data);
             closeSave();
             if (drawer && !drawer.hidden) renderDrawer();
+            // Landed local while cloud was the preference (signed out) → the quiet sync note.
+            if (getDefaultSaveLocation() === 'cloud-when-connected' && !cloudConnected()) dlgNotice(localFallbackNote('offline'));
             return;
         }
         if (act === 'exportfile') { downloadMacro(name); closeSave(); return; }

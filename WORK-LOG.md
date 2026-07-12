@@ -10299,3 +10299,26 @@ Sweep evidence: JS gates = mouseenter 3 (2 tooltips + 1 varlist tooltip), mouseo
 
 **VERIFY (tests/collapsible-panes-752.spec.js, 6 green):** (1) at 390px collapsing the preview drops the pane 674→38px (asserted heights) + the bar toggles back; (2) the collapse is app-wide per kind — drill + surfacing open collapsed after folding contour, and it SURVIVES a reload (localStorage ddcs_panes, not the profile); (3) all 5 themes declare a DISTINCT drawer personality (token signatures unique) + each has a real reveal; (4) reduced-motion ⇒ the engine sets --drawer-dur-eff 0ms (instant) and still collapses; (5) undo/redo REACHABLE at 360px (the hy-controls step); (6) emit BYTE-IDENTICAL collapsed vs expanded (view-only). Regression batch: contour-canvas + canvas-widgets + drill-canvas + layout-parity + corner-datum-drag + preview-visibility + wizard-preview-parity + text/coord/group canvas = 19 green. Per-theme pane-bar screenshots scratchpad/panes/ (chrome legible on all 5). FULL SUITE: exit 0, 1091 passed / 2 skipped / 0 failed at retries=0 workers=3 — total 1093 == --list.
 **Files:** ui/panePrefs.js (NEW — pane-kind registry) · ui/paneAccordion.js (NEW — the engine) · wizardManager.js (wire makePanesCollapsible) · ui/commandDeck.js (HEADER_YIELD += hy-controls) · styles.css (collapse chrome + reveals + per-theme --drawer-* tokens + hy-controls + the flex-chain fix) · tests/collapsible-panes-752.spec.js (NEW) · tests/corner-datum-independence.spec.js (rounding-consistent phys). NEXT (per queue): cloud-default-when-connected. PASS BACK.
+
+---
+
+## Turn 754 (worker) — CLOUD-DEFAULT-WHEN-CONNECTED (a NEW save pre-targets cloud when signed in; never a failed save)
+
+**THE ONE DECLARED SETTING (ui/savePrefs.js):** `Default save location = 'cloud-when-connected' (default) | 'always-local'` — an APP pref (localStorage `ddcs_save_location`), NEVER the machine profile (a stored program / pulled config must not carry your save-location taste). It exposes the resolver `preferredSaveTarget()` → 'cloud' ONLY when the setting is cloud-when-connected AND getAccount().connected, else 'local'; plus `localFallbackNote(reason)` for the two quiet notes (offline / failed). ONE source; every save surface reads it.
+
+**THE DECISION (where a NEW save lands first — existing saves NEVER move):**
+```
+   pref=cloud-when-connected + CONNECTED   → pre-target CLOUD   (Local one click away)
+   pref=cloud-when-connected + SIGNED OUT  → LOCAL + "Saved locally — connect cloud to sync across devices."
+   pref=always-local                       → LOCAL always       (Cloud still one click away)
+   cloud write ERRORS                       → LOCAL fallback + "Cloud save failed — saved locally … your work is safe."
+```
+
+**PROJECT SAVE MODAL (ui/projects/projectModal.js):** a [💾 Local | ☁ Cloud] segmented toggle at the top of the dialog, defaulted from preferredSaveTarget() each open; the folder tree shows only for Local; Cloud is disabled (greyed, "sign in on the Cloud tab") when signed out; the quiet sync note shows when cloud is preferred but the save will land local. On Save → Cloud: gdrive.write(name.mjson, data, ensureRoot()); on ANY error it FALLS BACK to store.saveProject (local) + the failure note — the save ALWAYS lands (no lost work). On Save → Local: store.saveProject + (if cloud-preferred but signed out) the offline note. Screenshot scratchpad/save_cloud.png (connected → Cloud pre-selected, Local one click).
+
+**PROFILE SAVE-AS (ui/profileModal.js):** honors the same default — the LOCAL save-as always lands first (unchanged), THEN when connected + cloud-preferred it also pushes to cloud via window.ddcsSaveProfileToCloud(nm) (already the wired cloud-profile path); a failed push keeps the local save + the note. Additive + guarded — the profile save can never regress.
+
+**THE SETTING UI:** Settings → GENERAL → CLOUD STORAGE → "Default save location" select (an app pref beside the cloud account login, NOT the machine profile). Reads/writes savePrefs on change.
+
+**VERIFY (tests/cloud-default-754.spec.js, 4 green):** (1) CONNECTED + cloud pref → the dialog pre-targets Cloud (asserted), Local enabled one-click, no note; (2) DISCONNECTED → Local selected + the sync note (asserted) + Cloud disabled; (3) the setting FLIPS the default (always-local stays Local even connected; cloud-when-connected → Cloud when connected); (4) a cloud write that FAILS (page.route aborts every googleapis call → gdrive throws) FALLS BACK to a LOCAL save (asserted: the project lands in the local projectStore) + the "saved locally" note — NO LOST WORK. Regression batch: project-drawer-smoke + header-profile-menu + header-account-row = green. Emit UNTOUCHED (no emit/op code — save-target + a localStorage pref only). FULL SUITE: exit 0, 1095 passed / 2 skipped / 0 failed at retries=0 workers=3 — total 1097 == --list.
+**Files:** ui/savePrefs.js (NEW — the declared setting + resolver) · ui/projects/projectModal.js (the save-target toggle + cloud save + local fallback) · ui/profileModal.js (save-as honors the default) · ui/settingsPanel.js (the setting UI) · styles.css (the toggle + note chrome) · tests/cloud-default-754.spec.js (NEW). NEXT (per queue): R-C editor+Blocks intent. PASS BACK.
