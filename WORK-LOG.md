@@ -10263,3 +10263,39 @@ Sweep evidence: JS gates = mouseenter 3 (2 tooltips + 1 varlist tooltip), mouseo
 
 **VERIFY:** touch spec 2/2 + project-drawer-smoke + custom-op-chip (2) + group-chip green at workers=2. FULL SUITE: exit 0, 1085 passed / 2 skipped / 0 failed at retries=0 workers=4 — total 1087 == --list (workers=4, per the t748 contention finding — default 12 starves boot on this loaded box). Emit UNTOUCHED (view/trigger-only; no op/emit code changed).
 **Files:** web/ui/editorOpHover.js (extract updateChipForLine + the touch pointerup trigger) · web/ui/projects/projectModal.js (drawer resize mouse→pointer + touch-action) · tests/touch-reachability-750.spec.js (NEW guard). NEXT (per queue): collapsible panes with the theme motion tokens. PASS BACK.
+
+---
+
+## Turn 752 (worker) — COLLAPSIBLE WIZARD PANES + per-theme MOTION TOKENS + the header undo/redo yield rider
+
+**THE SHAPE (one implementation, every wizard inherits):** the wizard modal is static HTML (index.html) — each `#wiz_<type>.wiz-body > .wiz-2pane > .wiz-visual (preview) + .wiz-controls (form, with a .preview-block G-code pane)`. So the collapse is a DOM-enhancement pass (like frameWizardSections): wizardManager.open → makePanesCollapsible(wizElem) injects a title bar + wraps the content in a collapsible body, idempotently, for EVERY wizard.
+```
+  .wiz-visual                          .wiz-visual[data-collapsed=1]  (mobile: 674px → 38px, the form gets the screen)
+   ┌───────────────────────────┐        ┌───────────────────────────┐
+   │ ⌄ PREVIEW   (the bar)     │        │ › PREVIEW   (bar only)    │
+   ├───────────────────────────┤   ⇄    └───────────────────────────┘
+   │  [ 3D / 2D preview body ] │
+   └───────────────────────────┘
+```
+
+**PANE KINDS declared (ui/panePrefs.js — mirrors displayPrefs):** `preview` (the .wiz-visual 3D/2D) + `code` (the .preview-block G-code). Collapsed state is APP-WIDE PER KIND (collapse the preview in one wizard → every wizard opens folded), persisted to localStorage `ddcs_panes` — a DISPLAY pref like the theme, NEVER the profile. Default = expanded. onPaneChange fans out live to every open pane of that kind. SCOPE JUDGMENT: preview + code are the collapsible panes this turn; long-form-section collapse is deferred (the dispatch said "where sensible" — the previews are what eat the mobile screen; noted for a follow-up).
+
+**THE MOTION IS DECLARED PER THEME, ONE ENGINE READS IT (ui/paneAccordion.js):** each theme sets a `--drawer-*` token block in styles.css; the engine reads them (getComputedStyle on body, the established token-read pattern) and drives ONE mechanism — a measured-height collapse (the pane shrinks to its bar → the sibling form reclaims the space, the functional core) + a `data-reveal`/`data-dir` the CSS keys the personality off + a corner-radius morph. prefers-reduced-motion ⇒ instant (matchMedia, the keyFx/rate-toast precedent); duration CAPPED ≤350ms in the engine (DUR_CAP) so personality never costs responsiveness. Tokens: `--drawer-dur · --drawer-ease · --drawer-reveal (slide|roll|fade|wipe|unfold) · --drawer-dir · --drawer-corner-{expanded,collapsed}`.
+
+**5 DISTINCT PERSONALITIES (my taste; asserted distinct):**
+| theme | reveal | dur | ease | corners | feel |
+|---|---|---|---|---|---|
+| studio | slide | 150ms | stiff (.4,0,.6,1) | 0→0 (square) | machined nameplate: fast, stiff, square |
+| normal | slide | 200ms | ease-out (.2,.8,.2,1) | 5→5 | clean flat: a gentle slide |
+| futuristic | wipe | 240ms | overshoot (.34,1.4,.64,1) | 0→0 (square) | neon tech: a fast clip-wipe with a spring |
+| organic | unfold | 320ms | soft (.34,1.2,.64,1) | 14→22 (round-morph) | humanist: a slow fold + fade, corners bloom |
+| steampunk | roll | 300ms | mechanical (.5,0,.2,1) | 8→8 | shutter: a firm scaleY roll-up |
+
+**RIDER (audit gap b — header undo/redo scroll-off ≤360px): FOLDED INTO HEADER_YIELD.** Added a 6th declared step `hy-controls` (last, tightest tier): tightens the undo/redo controls + tab padding + logo so they stay REACHABLE (on-screen) at 360px instead of scrolling off — chose keep-visible-and-tight over docking-to-menu (undo/redo stay one-tap). Verified: at 360px ovf=0 + undo/redo on-screen + hy-controls engaged; 390px unchanged (fits without it). Below ~360 (320/300, sub-phone) still overflows — a hard physical floor, below any real device; the acceptance target (360) passes.
+
+**A REGRESSION I introduced + fixed (surgical):** wrapping .wiz-visual's content in `.wiz-pane-body` BROKE the original `.wiz-2pane > .wiz-visual > .viz-container/.viz-split { flex:1 1 auto }` rules (DIRECT-child combinator — the body now sits between), so the featureCanvas lost its fill → the contour CIRCLE radial-drag stopped changing ct_dia (rect worked, circle didn't — the tell). FIX: re-established the flex-grow one level deeper (`.wiz-visual > .wiz-pane-body > .viz-container/.viz-split`), desktop + mobile. contour-canvas + 18 other canvas/layout/viz specs green after.
+
+**A 2ND regression + fix — CORNER-DATUM-INDEPENDENCE (t359 release-blocker) rounding, HONEST DISCLOSURE:** the collapse bar unavoidably takes ~1px, shrinking the corner-pick canvas container 315→314px; that tipped a TEST-ONLY rounding artifact — the test computed the physical corner as round(rect.x)+round(rect.width) (rounding the parts SEPARATELY) while the circle centre is round(cx); round(a)+round(b) != round(a+b) at a .5 boundary → a spurious 1px miss. featureCanvas is PROVABLY CORRECT here (it emits circle.cx == rect.x_float+rect.width_float as EQUAL floats, _S linear). FIX (test-side, NOT a weakening): round each CORNER (the sum rx+rw) ONCE — matching how the circle rounds — so it's exact-to-the-pixel AND stable at any container size. I DID touch the advisor's release-blocker test; flagging it explicitly — the assertion strength is unchanged (still pixel-exact circle-on-corner + datum-independence), only the self-inconsistent double-rounding is removed. If the advisor prefers the source-side crisp-integer-rect-edge fix instead, easy to swap.
+
+**VERIFY (tests/collapsible-panes-752.spec.js, 6 green):** (1) at 390px collapsing the preview drops the pane 674→38px (asserted heights) + the bar toggles back; (2) the collapse is app-wide per kind — drill + surfacing open collapsed after folding contour, and it SURVIVES a reload (localStorage ddcs_panes, not the profile); (3) all 5 themes declare a DISTINCT drawer personality (token signatures unique) + each has a real reveal; (4) reduced-motion ⇒ the engine sets --drawer-dur-eff 0ms (instant) and still collapses; (5) undo/redo REACHABLE at 360px (the hy-controls step); (6) emit BYTE-IDENTICAL collapsed vs expanded (view-only). Regression batch: contour-canvas + canvas-widgets + drill-canvas + layout-parity + corner-datum-drag + preview-visibility + wizard-preview-parity + text/coord/group canvas = 19 green. Per-theme pane-bar screenshots scratchpad/panes/ (chrome legible on all 5). FULL SUITE: exit 0, 1091 passed / 2 skipped / 0 failed at retries=0 workers=3 — total 1093 == --list.
+**Files:** ui/panePrefs.js (NEW — pane-kind registry) · ui/paneAccordion.js (NEW — the engine) · wizardManager.js (wire makePanesCollapsible) · ui/commandDeck.js (HEADER_YIELD += hy-controls) · styles.css (collapse chrome + reveals + per-theme --drawer-* tokens + hy-controls + the flex-chain fix) · tests/collapsible-panes-752.spec.js (NEW) · tests/corner-datum-independence.spec.js (rounding-consistent phys). NEXT (per queue): cloud-default-when-connected. PASS BACK.

@@ -2054,6 +2054,100 @@ button.primary:hover {
         position: sticky; top: 0; z-index: 3;
         background: var(--panel); box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
     }
+    /* Collapsed preview on mobile: the pane shrinks to just its bar so the form gets the screen (t752). */
+    .wiz-2pane > .wiz-visual[data-collapsed="1"] { box-shadow: none; }
+}
+
+/* ============================================================================================================
+   t752 — COLLAPSIBLE WIZARD PANES (paneAccordion engine). Every preview / code pane gets a title bar; the body
+   collapses to give the form the space. ONE mechanism (measured-height collapse + the reveal keyed off data-reveal);
+   the PERSONALITY is the per-theme --drawer-* token block below. --drawer-{dur,ease}-eff are set by the engine
+   (duration capped ≤350ms; 0ms under reduced-motion / on snap). ============================================ */
+.wiz-visual[data-pane-kind], .preview-block[data-pane-kind] {
+    display: flex; flex-direction: column;
+    border-radius: var(--drawer-corner-expanded, 6px);
+    transition: border-radius var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease), flex-basis var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease);
+}
+[data-collapsed="1"][data-pane-kind] { border-radius: var(--drawer-corner-collapsed, 6px); }
+/* Collapsed: the pane sizes to its bar (the body clips to 0 below) so the sibling form reclaims the space. */
+.wiz-visual[data-collapsed="1"] { flex: 0 0 auto !important; height: auto !important; min-height: 0 !important; }
+
+.wiz-pane-bar {
+    display: flex; align-items: center; gap: 6px; width: 100%; flex: 0 0 auto;
+    padding: 5px 9px; border: none; background: transparent; cursor: pointer; text-align: left;
+    font-family: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--hdr-dim, var(--text-dim));
+    border-radius: inherit; border-bottom-left-radius: 0; border-bottom-right-radius: 0;
+    transition: color .12s ease, background .12s ease;
+}
+.wiz-pane-bar:hover { color: var(--text-main); background: color-mix(in srgb, var(--bg) 40%, transparent); }
+.wiz-pane-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.wiz-pane-chev { flex: 0 0 auto; transition: transform var(--drawer-dur-eff, 180ms) var(--drawer-ease-eff, ease); }
+[data-collapsed="1"] > .wiz-pane-bar .wiz-pane-chev { transform: rotate(-90deg); }
+.wiz-pane-label { flex: 1 1 auto; }
+/* The bar IS the pane title now — hide the original inner "VISUALIZATION" section-label to avoid a double heading. */
+.wiz-visual[data-pane-kind] > .wiz-pane-body > .section-label { display: none; }
+
+/* The collapsible body. On desktop it carries the flex-grow chain (fills the tall pane → the viz sizes correctly);
+   on mobile it is content-sized. Height is driven inline by the engine for a measured transition. */
+.wiz-visual > .wiz-pane-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+/* RE-ESTABLISH the flex-grow chain through the wrapper: the original rules (.wiz-2pane > .wiz-visual > .viz-*) target
+   DIRECT children of .wiz-visual, but the body now sits between — so the viz would lose its fill (the featureCanvas
+   sizes wrong). Mirror those rules one level deeper so the preview/2D canvas size EXACTLY as before. */
+.wiz-2pane > .wiz-visual > .wiz-pane-body > .viz-container,
+.wiz-2pane > .wiz-visual > .wiz-pane-body > .viz-split { flex: 1 1 auto; min-height: 0; }
+@media (max-width: 860px) {
+    .wiz-2pane > .wiz-visual > .wiz-pane-body > .viz-container { flex: 0 0 auto; min-height: 0; }
+}
+.wiz-pane-body {
+    overflow: hidden;
+    transition: height var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
+                opacity var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
+                transform var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
+                clip-path var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease);
+    transform-origin: top center;
+}
+/* REVEAL personalities — applied only while collapsed; the height collapse always runs underneath (gives the space). */
+[data-collapsed="1"][data-reveal="fade"]   > .wiz-pane-body { opacity: 0; }
+[data-collapsed="1"][data-reveal="roll"]   > .wiz-pane-body { transform: scaleY(.5); opacity: .25; }
+[data-collapsed="1"][data-reveal="wipe"]   > .wiz-pane-body { clip-path: inset(0 0 100% 0); }
+[data-collapsed="1"][data-reveal="unfold"] > .wiz-pane-body { transform: perspective(700px) rotateX(-88deg); opacity: .35; }
+[data-collapsed="1"][data-reveal="slide"][data-dir="left"]  > .wiz-pane-body { transform: translateX(-10%); opacity: .4; }
+[data-collapsed="1"][data-reveal="slide"][data-dir="right"] > .wiz-pane-body { transform: translateX(10%); opacity: .4; }
+
+/* ---- The DECLARED per-theme drawer-motion personalities (the engine reads these; distinct per theme) ---- */
+:root {
+    --drawer-dur: 200ms; --drawer-ease: cubic-bezier(.2,.8,.2,1);
+    --drawer-reveal: slide; --drawer-dir: up;
+    --drawer-corner-expanded: 6px; --drawer-corner-collapsed: 6px;
+}
+[data-theme="studio"] {      /* machined nameplate — stiff, fast, SQUARE, a crisp near-linear slide */
+    --drawer-dur: 150ms; --drawer-ease: cubic-bezier(.4,0,.6,1);
+    --drawer-reveal: slide; --drawer-dir: up;
+    --drawer-corner-expanded: 0px; --drawer-corner-collapsed: 0px;
+}
+[data-theme="normal"] {      /* clean flat — a gentle ease-out slide, small radius */
+    --drawer-dur: 200ms; --drawer-ease: cubic-bezier(.2,.8,.2,1);
+    --drawer-reveal: slide; --drawer-dir: up;
+    --drawer-corner-expanded: 5px; --drawer-corner-collapsed: 5px;
+}
+[data-theme="futuristic"] {  /* neon tech — a fast WIPE with a slight overshoot, sharp square corners */
+    --drawer-dur: 240ms; --drawer-ease: cubic-bezier(.34,1.4,.64,1);
+    --drawer-reveal: wipe; --drawer-dir: up;
+    --drawer-corner-expanded: 0px; --drawer-corner-collapsed: 0px;
+}
+[data-theme="organic"] {     /* humanist soft — a slow UNFOLD/fade, a big rounded radius morph */
+    --drawer-dur: 320ms; --drawer-ease: cubic-bezier(.34,1.2,.64,1);
+    --drawer-reveal: unfold; --drawer-dir: up;
+    --drawer-corner-expanded: 14px; --drawer-corner-collapsed: 22px;
+}
+[data-theme="steampunk"] {   /* mechanical shutter — a firm ROLL up, medium radius */
+    --drawer-dur: 300ms; --drawer-ease: cubic-bezier(.5,0,.2,1);
+    --drawer-reveal: roll; --drawer-dir: up;
+    --drawer-corner-expanded: 8px; --drawer-corner-collapsed: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+    .wiz-pane-body, .wiz-pane-chev, .wiz-visual[data-pane-kind], .preview-block[data-pane-kind] { transition: none !important; }
 }
 
 /* --- HEADER (Flush Fit) --- */
@@ -4552,6 +4646,13 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 .app-header.is-tiny .brand { padding: 0 4px; gap: 4px; }
 .app-header.is-tiny .logo { height: 24px; }
 .app-header.is-tiny button.hdr-quick-btn { width: 20px; }   /* t748 — reclaim phone px: the visible chevron tightens, its ≥44px ::before hit area is unchanged */
+/* Stage 6 (.hy-controls): the tightest tier — keep undo/redo REACHABLE (t752, audit gap b) by tightening the controls
+   + tab padding so they never scroll off-screen, instead of docking them away. Reached only when is-tiny still overflows. */
+.app-header.hy-controls .hdr-controls { gap: 1px; }
+.app-header.hy-controls .hdr-controls .hdr-undo { padding: 2px 3px; font-size: 13px; }
+.app-header.hy-controls .hdr-tabs .tab { padding: 0 6px; }
+.app-header.hy-controls .brand { padding: 0 2px; }
+.app-header.hy-controls .logo { height: 22px; }
 /* Header Undo/Redo: slim icon buttons that match the header chrome */
 .hdr-controls .hdr-undo {
     font-size: 15px; padding: 2px 6px; line-height: 1; border: none; border-radius: 4px;

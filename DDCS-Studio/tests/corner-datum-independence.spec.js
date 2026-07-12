@@ -30,8 +30,11 @@ test('corner-pick circles stay on the physical corners at any datum; the crossha
       const circles = {};
       svg.querySelectorAll('.fc-corner-pick').forEach((c) => { circles[c.getAttribute('data-corner')] = { x: Math.round(+c.getAttribute('cx')), y: Math.round(+c.getAttribute('cy')), cur: c.classList.contains('fc-corner-pick-cur') }; });
       const sr = svg.querySelector('.fc-stock');
-      const R = { x: Math.round(+sr.getAttribute('x')), y: Math.round(+sr.getAttribute('y')), w: Math.round(+sr.getAttribute('width')), h: Math.round(+sr.getAttribute('height')) };
-      const phys = { FL: { x: R.x, y: R.y + R.h }, FR: { x: R.x + R.w, y: R.y + R.h }, BL: { x: R.x, y: R.y }, BR: { x: R.x + R.w, y: R.y } };   // screen: world min-XY = bottom-left
+      // Round each CORNER (the sum) once — matching how the circle centre is rounded (round(cx)). Rounding x and width
+      // SEPARATELY then adding (round(a)+round(b)) split by 1px whenever the fit lands a corner on a .5 boundary — a
+      // test-rounding artifact, not a real offset (featureCanvas emits circle.cx == rect.x+rect.width as equal floats).
+      const rx = +sr.getAttribute('x'), ry = +sr.getAttribute('y'), rw = +sr.getAttribute('width'), rh = +sr.getAttribute('height');
+      const phys = { FL: { x: Math.round(rx), y: Math.round(ry + rh) }, FR: { x: Math.round(rx + rw), y: Math.round(ry + rh) }, BL: { x: Math.round(rx), y: Math.round(ry) }, BR: { x: Math.round(rx + rw), y: Math.round(ry) } };   // screen: world min-XY = bottom-left
       const ax = svg.querySelector('.fc-axis-x');
       const cross = { x: Math.round((+ax.getAttribute('x1') + +ax.getAttribute('x2')) / 2), y: Math.round(+ax.getAttribute('y1')) };
       return { circles, phys, cross };

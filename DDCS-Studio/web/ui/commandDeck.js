@@ -11,7 +11,7 @@ import { entryIconHtml } from './wizIcons.js';
 // data in ONE place (not hand-rolled if-branches). _fitAppHeader adds these classes one at a time, in order, until
 // the header stops overflowing — so the nav TOP is never clipped and the most labels possible are kept. The CSS for
 // each class lives beside the .app-header rules in styles.css. Order = priority of sacrifice (least-valuable first).
-const HEADER_YIELD = ['hy-logo', 'is-compact', 'hy-tabscale', 'is-mini', 'is-tiny'];
+const HEADER_YIELD = ['hy-logo', 'is-compact', 'hy-tabscale', 'is-mini', 'is-tiny', 'hy-controls'];   // t752 — hy-controls is the last step: tighten the undo/redo controls + tab padding so they stay REACHABLE (on-screen) at the tightest widths instead of scrolling off
 
 // Header toolbar icons — inline line-art SVG (not emoji) so they render identically on every OS,
 // inherit the theme via currentColor, stay crisp at any size, and give each button an icon to
