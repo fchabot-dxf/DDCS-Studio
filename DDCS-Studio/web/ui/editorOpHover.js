@@ -119,9 +119,8 @@ export function initEditorOpHover() {
         glowEdited();
     }).catch(() => { /* detector optional */ });
 
-    editor.addEventListener('mousemove', (e) => {
+    const updateChipForLine = (line) => {
         if (typeof window.ddcsOpAtLine !== 'function') return;
-        const line = lineAtY(e.clientY);
         const op = window.ddcsOpAtLine(line);
         if (!op) {
             // AUTO (advisor-gated): a PURE hand-built stack (whole program = one loose run, no real ops) auto-shows an
@@ -164,7 +163,12 @@ export function initEditorOpHover() {
         chip.dataset.opId = op.id;
         chip.dataset.autoRun = '';                  // a real op chip, not the auto-run chip
         chip.hidden = false;
-    });
+    };
+    editor.addEventListener('mousemove', (e) => updateChipForLine(lineAtY(e.clientY)));
+    // t750 — TOUCH reachability: touch devices have no hover, so a TAP on an op's lines reveals the SAME chip through
+    // the SAME code path (updateChipForLine). Tap the chip to edit; tapping a non-op line dismisses it. Gated to
+    // pointerType 'touch' so desktop stays hover-only (a mouse click to place the caret must not pop the chip).
+    editor.addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') updateChipForLine(lineAtY(e.clientY)); });
     // Keep the chip visible when the pointer moves onto it; hide otherwise.
     editor.addEventListener('mouseleave', () => setTimeout(() => { if (!chip.matches(':hover')) hide(); }, 60));
     chip.addEventListener('click', async () => {

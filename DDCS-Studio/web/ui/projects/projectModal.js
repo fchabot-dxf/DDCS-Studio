@@ -54,11 +54,12 @@ function startDrawerResize(e) {
     const grip = e.currentTarget; grip.classList.add('dragging');
     const move = (ev) => { if (drawer) drawer.style.setProperty('--proj-drawer-w', clampDrawerW(ev.clientX) + 'px'); };
     const up = () => {
-        document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up);
+        document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
         grip.classList.remove('dragging');
         try { localStorage.setItem('ddcs_proj_drawer_w', parseInt(drawer.style.getPropertyValue('--proj-drawer-w'), 10) || 320); } catch (_) { /* */ }
     };
-    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+    // t750 — POINTER events (not mouse) so the drawer resizes on touch too (a continuous drag never synthesizes mouse events)
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
 }
 
 function buildDrawer() {
@@ -87,7 +88,8 @@ function buildDrawer() {
     // t696 c — a drag handle on the right edge sets a persisted width (ddcs_proj_drawer_w), clamped sane.
     try { const w = parseInt(localStorage.getItem('ddcs_proj_drawer_w'), 10); if (w > 0) drawer.style.setProperty('--proj-drawer-w', clampDrawerW(w) + 'px'); } catch (_) { /* */ }
     const grip = document.createElement('div'); grip.className = 'proj-resize'; grip.title = 'Drag to resize';
-    grip.addEventListener('mousedown', startDrawerResize);
+    grip.style.touchAction = 'none';   // t750 — let a touch-drag on the grip resize (not scroll the page)
+    grip.addEventListener('pointerdown', startDrawerResize);
     drawer.appendChild(grip);
     document.body.appendChild(drawer);
     localWrap = drawer.querySelector('#projLocal');
