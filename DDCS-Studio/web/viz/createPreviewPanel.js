@@ -112,7 +112,7 @@ const PANEL_HTML = `
     <div class="pp-dro-wcs" title="Active work-coordinate system">G54</div>
     <table class="pp-dro-tbl"><thead><tr><th></th><th>Work</th><th>Mach</th></tr></thead><tbody></tbody></table>
   </div>
-  <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan</div>
+  <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan · dbl-click fit work/machine</div>
   <div class="pp-carve-note" style="display:none" title="Material-removal preview: flat endmills and ball-nose tools are modelled from the tool type; a vee/chamfer is shown flat for now; with no tool picked, an op carves at its typed Ø (Ø6 default)."></div>
 `;
 

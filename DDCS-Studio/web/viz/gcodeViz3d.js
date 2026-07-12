@@ -650,28 +650,33 @@ export class GcodeViz3D {
     _ensurePosChip() {
         if (this._posChip) return;
         const THREE = this.THREE;
-        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 72;
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 104;
         const tex = new THREE.CanvasTexture(cv);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: false }));
-        sp.renderOrder = 40; sp.visible = false; sp.scale.set(0.17, 0.048, 1);   // ~constant screen size
+        // t780 (user) — ALWAYS-ON-TOP: renderOrder above every scene object incl. the spindle/collet meshes (whose
+        // depthWrite would otherwise paint over a lower-order sprite in the transparent pass), and a SCREEN-SPACE side
+        // offset via sprite.center so the chip sits BESIDE the spindle body, never inside it (center x < 0 shifts the
+        // rendered quad right of its 3D anchor by |x|·width — screen-space, so it holds at any zoom).
+        sp.renderOrder = 100; sp.visible = false; sp.scale.set(0.17, 0.069, 1);   // ~constant screen size (3 lines)
+        sp.center.set(-0.18, 0.5);
         this._posChip = sp; this._posChipCv = cv; this._posChipTex = tex;
         this.scene.add(sp);
     }
-    _drawPosChipTex(x, y) {
+    _drawPosChipTex(x, y, z) {
         const cv = this._posChipCv, c = cv.getContext('2d');
         c.clearRect(0, 0, cv.width, cv.height);
         c.fillStyle = 'rgba(10,14,20,0.85)'; c.fillRect(0, 0, cv.width, cv.height);
         c.strokeStyle = 'rgba(255,255,255,0.22)'; c.lineWidth = 3; c.strokeRect(1.5, 1.5, cv.width - 3, cv.height - 3);
         c.fillStyle = '#dfe8f2'; c.font = 'bold 30px monospace'; c.textBaseline = 'middle'; c.textAlign = 'left';
-        c.fillText('X ' + x.toFixed(3), 14, 22); c.fillText('Y ' + y.toFixed(3), 14, 52);
+        c.fillText('X ' + x.toFixed(3), 14, 22); c.fillText('Y ' + y.toFixed(3), 14, 52); c.fillText('Z ' + z.toFixed(3), 14, 82);   // t780 (user) — the Z line (DRO-equal work Z)
         this._posChipTex.needsUpdate = true;
     }
     _updatePosChip(pos) {
         if (!displayOf('poschip').visible) { if (this._posChip) this._posChip.visible = false; return; }
         this._ensurePosChip();
-        this._posChipVal = { x: Number(pos.x) || 0, y: Number(pos.y) || 0 };
+        this._posChipVal = { x: Number(pos.x) || 0, y: Number(pos.y) || 0, z: Number(pos.z) || 0 };
         this._posChipMoveMs = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y);
+        this._drawPosChipTex(this._posChipVal.x, this._posChipVal.y, this._posChipVal.z);
         const t = this._animTool;
         if (t) { t.updateWorldMatrix(true, false); const w = t.getWorldPosition(new this.THREE.Vector3()); this._posChip.position.set(w.x, w.y, w.z + 24); }   // ride the head, lifted clear of the cut
         this._posChip.material.opacity = displayOf('poschip').alpha;
@@ -1189,18 +1194,31 @@ export class GcodeViz3D {
     }
 
     // Frame the union of toolpath + stock + machine envelope (whichever are present)
-    fitAll() {
+    fitAll(wide = false) {
         let b = null;
         const m = this._machine, useMch = m && m.show && m.x && m.y && m.z;
         const sh = this.partFrame ? this.partFrame.shift : { x: 0, y: 0, z: 0 };   // part-frame offset (+WCS in machine view, else 0)
         const d = this._dataBounds;
-        if (d) b = this._growBounds(b, d.minX + sh.x, d.minY + sh.y, d.minZ + sh.z, d.maxX + sh.x, d.maxY + sh.y, d.maxZ + sh.z);
-        const s = this._stock;
-        if (s && s.show && s.x > 0 && s.y > 0 && s.z > 0) b = this._growBounds(b, sh.x, sh.y, sh.z - s.z, sh.x + s.x, sh.y + s.y, sh.z);
-        if (useMch) {
+        const s = this._stock, hasStock = !!(s && s.show && s.x > 0 && s.y > 0 && s.z > 0);
+        if (d) {
+            // t780 (user) — a safe-Z/G53 retract to the MACHINE TOP stretches the data bounds into a tall thin column
+            // (z→+775 on an −800 machine) and blows the "work" framing. With a stock to anchor the work, clamp the fit's
+            // Z contribution to the work region (stock top + a clearance margin scaled to the XY span); the retract line
+            // still DRAWS — it just no longer drives the camera. No stock → nothing to anchor, keep the full bounds.
+            const zCap = hasStock ? sh.z + 0.35 * Math.max(d.maxX - d.minX, d.maxY - d.minY, 50) : Infinity;
+            b = this._growBounds(b, d.minX + sh.x, d.minY + sh.y, d.minZ + sh.z, d.maxX + sh.x, d.maxY + sh.y, Math.min(d.maxZ + sh.z, zCap));
+        }
+        if (hasStock) b = this._growBounds(b, sh.x, sh.y, sh.z - s.z, sh.x + s.x, sh.y + s.y, sh.z);
+        // t780 (user) — THE WORK DRIVES THE DEFAULT FIT: on a big declared machine the envelope framing shrank the
+        // stock/toolpath to a speck, so the envelope stays DRAWN as context but joins the fit ONLY when asked (wide —
+        // dbl-click cycles it) or when there is nothing else to frame. Machine ops (homing/ATC) span the envelope with
+        // their own data bounds, so their framing is unchanged by construction.
+        const wantWide = !!(useMch && (wide || !b));
+        if (wantWide) {
             // envelope corners in MACHINE coords (home at scene 0; the part rides +workOrigin)
             b = this._growBounds(b, Math.min(0, m.x), Math.min(0, m.y), Math.min(0, m.z), Math.max(0, m.x), Math.max(0, m.y), Math.max(0, m.z));
         }
+        this._fitWide = wantWide;
         if (b) this.fit(b);
         this.render();
     }
@@ -2148,6 +2166,8 @@ export class GcodeViz3D {
             window.removeEventListener('pointerup', onUp);
             window.removeEventListener('pointercancel', onUp);
         };
+        // t780 (user) — dbl-click cycles the fit: WORK (stock+toolpath, the default) ↔ WIDE (the machine envelope).
+        el.addEventListener('dblclick', (e) => { e.preventDefault(); this.fitAll(!this._fitWide); });
         el.addEventListener('pointerdown', (e) => {
             e.preventDefault();
             pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });

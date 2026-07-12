@@ -297,14 +297,14 @@ export function createToolpath2d(canvas, opts = {}) {
         const d = displayOf('poschip'), g = chipGate() * d.alpha;
         if (!chipPos || !d.visible || g <= 0.02) { canvas.__t2chip = null; return; }
         const hx = ptx(chipPos.x, chipPos.pass), hy = pty(chipPos.y, chipPos.pass);
-        const text = 'X ' + chipPos.x.toFixed(3) + '  Y ' + chipPos.y.toFixed(3);
+        const text = 'X ' + chipPos.x.toFixed(3) + '  Y ' + chipPos.y.toFixed(3) + '  Z ' + (chipPos.z || 0).toFixed(3);   // t780 (user) — the Z line (DRO-equal)
         ctx.save(); ctx.globalAlpha = g; ctx.font = 'bold 11px monospace';
         const bw = ctx.measureText(text).width + 12, bh = 18, bx = hx + 12, by = hy - bh - 8;   // offset up-right, off the cut
         ctx.fillStyle = 'rgba(10,14,20,0.82)'; ctx.fillRect(bx, by, bw, bh);
         ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
         ctx.fillStyle = '#dfe8f2'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(text, bx + 6, by + bh / 2);
         ctx.restore();
-        canvas.__t2chip = { hx, hy, bx, by, x: chipPos.x, y: chipPos.y, text, alpha: +g.toFixed(3) };   // debug + tests: the drawn chip + its WORK coords (DRO-equal)
+        canvas.__t2chip = { hx, hy, bx, by, x: chipPos.x, y: chipPos.y, z: chipPos.z || 0, text, alpha: +g.toFixed(3) };   // debug + tests: the drawn chip + its WORK coords (DRO-equal)
     }
     function drawLabels(ctx, foot, step, w, h) {   // sparse coord labels along the bottom (X) + left (Y) frame
         if (!(step > 0)) return;

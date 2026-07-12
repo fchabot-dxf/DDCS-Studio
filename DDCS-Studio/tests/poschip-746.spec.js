@@ -41,13 +41,15 @@ test('3D: the chip rides the head during play with DRO-equal WORK coords; the mo
         const v = window.__gpPanel.viz; if (!(v._posChip && v._posChip.visible && v._posChipVal)) return null;
         const V3 = v.THREE.Vector3; const cw = v._posChip.getWorldPosition(new V3()); const t = v._animTool; t.updateWorldMatrix(true, false); const tw = t.getWorldPosition(new V3());
         const dro = [...document.querySelectorAll('.pp-dro-w')].map((e) => parseFloat(e.textContent));
-        return { val: v._posChipVal, chipXY: { x: cw.x, y: cw.y }, toolXY: { x: tw.x, y: tw.y }, dro };
+        return { val: v._posChipVal, chipXY: { x: cw.x, y: cw.y }, toolXY: { x: tw.x, y: tw.y }, dro, onTop: v._posChip.renderOrder >= 100 && v._posChip.center.x < 0 };
     });
     expect(s, 'the 3D chip was visible during play').not.toBeNull();
     expect(Number.isFinite(s.val.x) && Number.isFinite(s.val.y), 'the chip carries finite WORK coords').toBe(true);
     // DRO-EQUAL: the chip's WORK coords == the DRO Work cells (the same onPositionChange source)
     expect(Math.abs(s.val.x - s.dro[0]), 'chip X == DRO Work X').toBeLessThan(0.01);
     expect(Math.abs(s.val.y - s.dro[1]), 'chip Y == DRO Work Y').toBeLessThan(0.01);
+    expect(Math.abs((s.val.z || 0) - s.dro[2]), 'chip Z == DRO Work Z (t780 - the Z line)').toBeLessThan(0.01);
+    expect(s.onTop, 'the chip draws ALWAYS-ON-TOP with a side offset (t780 - renderOrder 100 + center.x < 0, never hidden by the spindle)').toBe(true);
     // RIDES the head: the sprite sits at the tool's world XY (offset only in Z)
     expect(Math.hypot(s.chipXY.x - s.toolXY.x, s.chipXY.y - s.toolXY.y), 'the chip rides the tool head (XY)').toBeLessThan(2);
 
@@ -78,6 +80,7 @@ test('2D: the chip rides the head with DRO-equal coords', async ({ page }) => {
     expect(s.chip.text, 'the 2D chip shows X/Y coords').toContain('X ');
     expect(Math.abs(s.chip.x - s.dro[0]), '2D chip X == DRO Work X').toBeLessThan(0.01);
     expect(Math.abs(s.chip.y - s.dro[1]), '2D chip Y == DRO Work Y').toBeLessThan(0.01);
+    expect(s.chip.text, 'the 2D chip shows the Z line (t780)').toContain('Z ');
 });
 
 test('the poschip pref persists across a reload', async ({ page }) => {
