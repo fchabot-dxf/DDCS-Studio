@@ -132,7 +132,10 @@ export const SETTINGS_DEFAULTS = {
     // Spindle / VFD — Studio-side authoring defaults. The DDCS controller owns the live spindle
     // params (PWM/analog, max RPM #582); these seed generated M3/M4 + S words, spin-up/down dwell,
     // and the warm-up wizard target. Always shown on the Head tab (a spindle/router is the default head).
-    spindle: { maxRpm: 24000, defaultRpm: 18000, dir: 'cw', spinUp: 3, spinDown: 3 },
+    // t774 P1a — the DECLARED spindle machine-truth (Machine tab): interface (analog VFD vs a PUL/DIR axis-driven servo),
+    // which axis drives it, whether it can reverse (floating-holder tapping), whether it is rigid-tap capable (an
+    // encoder/servo spindle the user attests is wired), and the RPM range. A controller Pull can seed interface/mappingAxis.
+    spindle: { maxRpm: 24000, defaultRpm: 18000, dir: 'cw', spinUp: 3, spinDown: 3, interface: 'analog', mappingAxis: '', reversible: true, tapCapable: false, minRpm: 0 },
     // End-of-program routine — the safe footer appended to generated programs. DDCS note: G53
     // machine-coord moves are verified; G28 is NOT configured, so retract/park use G53. Global
     // default; per-wizard overrides can layer on top later.
@@ -1185,6 +1188,26 @@ function buildSettingsOverlay() {
                         <div class="settings-hint">X/Y/Z are linear. Set A/B to <b>Rotary</b> (the 3D sim spins the part on those axes' moves) or <b>Gantry slave</b> (a twin-motor axis that mirrors a master — homed with the master, never independently). One machine config covers 3-axis, rotary, and dual-gantry jobs.</div>
                         <div id="set_axes_list"></div>
                     </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title">SPINDLE</div>
+                        <div class="settings-hint">Declare your spindle so wizards emit the right code. <b>Reverse</b> (M4) enables floating-holder tapping. <b>Rigid-tap capable</b> means an encoder/servo spindle driven as an axis — you must confirm it is wired (Studio can't verify hardware). A Pull from the controller can seed the interface + mapping axis. Max RPM is on the Spindle/VFD tab.</div>
+                        <div class="settings-grid">
+                            <label>Interface<select id="set_spin_interface">
+                                <option value="analog">Analog (VFD / router)</option>
+                                <option value="pul-dir-axis">PUL/DIR (axis-driven servo)</option>
+                            </select></label>
+                            <label>Mapping axis<select id="set_spin_mapaxis">
+                                <option value="">— none</option>
+                                <option value="X">X</option>
+                                <option value="Y">Y</option>
+                                <option value="Z">Z</option>
+                                <option value="A">A</option>
+                            </select></label>
+                            <label>Min RPM<input type="number" id="set_spin_minrpm" step="1" min="0"></label>
+                        </div>
+                        <label class="settings-check"><input type="checkbox" id="set_spin_reversible"> Spindle can reverse (M4) — floating-holder tapping</label>
+                        <label class="settings-check"><input type="checkbox" id="set_spin_tapcapable"> Rigid-tap capable — encoder/servo spindle, wired (you attest)</label>
+                    </div>
                 </div>
 
                 <!-- HARDWARE: WCS (work-coordinate offsets) -->
@@ -1635,6 +1658,13 @@ function wireSettingsOverlay(ov) {
             q('set_spin_dir').value = sp.dir || spd.dir;
             q('set_spin_up').value = sp.spinUp ?? spd.spinUp;
             q('set_spin_down').value = sp.spinDown ?? spd.spinDown;
+        }
+        if (q('set_spin_interface')) {   // t774 P1a — the Machine-tab spindle declaration (always present)
+            q('set_spin_interface').value = sp.interface || spd.interface;
+            q('set_spin_mapaxis').value = sp.mappingAxis || spd.mappingAxis;
+            q('set_spin_minrpm').value = sp.minRpm ?? spd.minRpm;
+            q('set_spin_reversible').checked = sp.reversible !== false;   // default true
+            q('set_spin_tapcapable').checked = !!sp.tapCapable;
         }
         if (q('set_head_type')) { q('set_head_type').value = (s.head && s.head.type) || 'spindle'; applyHeadType(); }
         const ep = s.endProgram || (s.endProgram = {}), epd = SETTINGS_DEFAULTS.endProgram;
@@ -2549,6 +2579,13 @@ function wireSettingsOverlay(ov) {
             sp.dir = q('set_spin_dir').value || sp.dir;
             sp.spinUp = num(q('set_spin_up').value, sp.spinUp);
             sp.spinDown = num(q('set_spin_down').value, sp.spinDown);
+        }
+        if (q('set_spin_interface')) {   // t774 P1a — the Machine-tab spindle declaration
+            sp.interface = q('set_spin_interface').value || sp.interface;
+            sp.mappingAxis = q('set_spin_mapaxis').value;
+            sp.minRpm = num(q('set_spin_minrpm').value, sp.minRpm);
+            sp.reversible = q('set_spin_reversible').checked;
+            sp.tapCapable = q('set_spin_tapcapable').checked;
         }
         if (q('set_head_type')) { s.head = s.head || {}; s.head.type = q('set_head_type').value || 'spindle'; applyHeadType(); }
         const ep = s.endProgram || (s.endProgram = {});

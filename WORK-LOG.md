@@ -10603,3 +10603,24 @@ Updated tool-select-768 test 1 (the Phase-1a "toolNum inert for emit" assertion 
 Files: web/blocks/blockEmitter.js, web/ui/settingsPanel.js + tests/tool-change-772.spec.js (NEW); tests/tool-select-768.spec.js (obsolete Phase-1a assertion updated).
 
 TOOL CAMPAIGN COMPLETE (t768 P1a declare+sim · t770 P1b rich picker+modal · t772 P2 emit arms+mode). NEXT (per the dispatch): the TAPPING wizard + the spindle declaration (TAPPING-CAPABILITY.md; the tapping wants the tool atom's tip/type, now available). PASS BACK.
+
+## 2026-07-12 (t774) — SPINDLE DECLARATION Phase 1a: the declared spindle block (the tapping prerequisite)
+
+Built the SPINDLE DECLARATION — the prerequisite the advisor asked for first. Grounded (2 Explore sweeps): settings.spindle ALREADY EXISTS (a VFD-authoring object at settingsPanel.js:135) — I EXTENDED it, no new subtree. Phased: 1a = the declaration + Machine-tab UI (this turn — what the tapping wizard's rigid gate actually reads); 1b = the PULL-seed (a separable, TWINNED convenience).
+
+WHAT LANDED (settingsPanel.js):
+- settings.spindle gains {interface: 'analog'|'pul-dir-axis', mappingAxis: '', reversible: true, tapCapable: false, minRpm: 0} alongside the existing {maxRpm, defaultRpm, dir, spinUp, spinDown}.
+- A "SPINDLE" section on the Machine tab (set_tab_machine, after AXES): Interface (Analog VFD vs a PUL/DIR axis-driven servo), Mapping axis (X/Y/Z/A), Min RPM, a "reverse (M4)" checkbox (floating-holder tapping) + a "Rigid-tap capable — encoder/servo spindle, wired (you attest)" checkbox. Wired via the standard load (fill) + save (onInput) sites; the generic input listener auto-saves, so no bespoke wiring.
+- PROFILE-CARRIED for free: settings.spindle is already in loadSettings (default-spread), applySettings ({...D.spindle,...S.spindle,...incoming.spindle}), and buildProfile (whole-object export) — the new keys backfill from SETTINGS_DEFAULTS.spindle with zero extra plumbing.
+- USER-OWNED (dont-declare-away-user-responsibility): tapCapable + reversible are checkboxes the user attests; the PULL will only ever seed interface/mappingAxis (readable machine truth), NEVER tapCapable/encoderWired (the wiring is the user's to confirm). maxRpm reused (already on the Spindle/VFD tab) — NOT duplicated on the Machine tab (two inputs on the shared onInput handler would fight over s.spindle.maxRpm; the tapping wizard reads maxRpm from the one key regardless).
+
+WHY DERIVE THE PULL-SEED AS 1b (not this turn): grounding shows the eng->settings decode is a BY-NAME TWIN — Python (ops.py, LAN pull) + JS (dumpImport.js, no-LAN dump import), both feeding one review-then-apply modal, re-pinned by a cross-language golden. Seeding interface/mappingAxis from V4.1 #188/#189 (Analog|PUL-DIR / X-Y-Z-A) + Expert #79/#80 (a DIFFERENT slot set with Analog|PUL-DIR|Multi-speed / X-Y-Z-4th-5th — must decode through each eng's OWN enums, not hardcode) is a small-but-coordinated ~5-place change touching the bridge Python. It is a CONVENIENCE (pre-fill) — NOT a gate prerequisite: the tapping wizard's rigid gate reads tapCapable (user-owned) + the post (Expert), both available now. So the DECLARATION unblocks the tapping wizard; the pull-seed can land before or after it.
+
+VERIFIED (real symptom, tests/spindle-declaration-774.spec.js — 2 tests):
+1. the Machine-tab SPINDLE section renders all fields; setting them writes settings.spindle (interface=pul-dir-axis, mappingAxis=Z, minRpm=400, reversible=false, tapCapable=true) — a real openSettings drive.
+2. a legacy profile with only spindle.maxRpm backfills the new fields (interface->analog, tapCapable->false, reversible->true, mappingAxis->'', minRpm->0) via applySettings + keeps the incoming maxRpm — profile-carry + defaults confirmed.
+Screenshot scratchpad/spindle-decl.png (the SPINDLE section, the hint, the two checkboxes at their defaults). FULL SUITE: 1127 passed + 2 skipped = 1129 (== --list), 0 failed, workers=3. Purely additive — no emit path touched, all goldens hold.
+
+Files: web/ui/settingsPanel.js + tests/spindle-declaration-774.spec.js (NEW).
+
+NEXT — two separable pieces (advisor sequences): (1b) the PULL-seed (twinned decode of #188/#189/#79/#80 -> settings.spindle.interface/mappingAxis, review-then-apply, golden re-pin); (2) THE TAPPING DATA-TWIN (thread preset table metric+imperial+custom; the pitch-locked feed F derived + shown read-only; the floating-holder cycle M3/dwell/G1-to-depth/M4/G1-out/M5 dialect-portable; the RIGID G84 variant grey-gated on spindle.tapCapable AND Expert; low-RPM default, no peck v1; the standard twin bar). The declaration is READY for the tapping gate. PASS BACK.
