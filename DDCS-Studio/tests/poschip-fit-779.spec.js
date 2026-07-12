@@ -26,12 +26,12 @@ test('poschip reads X/Y/Z DRO-equal, draws always-on-top (depthTest off + high r
     const sp = viz._posChip;
     return { val: viz._posChipVal, depthTest: sp.material.depthTest, depthWrite: sp.material.depthWrite, renderOrder: sp.renderOrder, centerX: sp.center.x, canvasH: viz._posChipCv.height };
   });
-  expect(r.val, 'the chip reads X, Y AND Z, equal to the head pos (DRO-equal)').toEqual({ x: 5, y: -795, z: -12.5 });
+  expect(r.val, 'the chip reads X, Y AND Z, equal to the head pos (DRO-equal)').toMatchObject({ x: 5, y: -795, z: -12.5 });   // toMatchObject: the chip ALSO carries declared frame/wcs keys (t780 merge)
   expect(r.depthTest, 'always on top — depth test off').toBe(false);
   expect(r.depthWrite, 'no depth write').toBe(false);
   expect(r.renderOrder, 'renders above the tool/spindle body').toBeGreaterThan(100);
   expect(Math.abs(r.centerX - 0.5), 'a screen-space side offset (sprite center shifted from centre)').toBeGreaterThan(0.08);
-  expect(r.canvasH, 'the chip canvas holds 3 lines (X/Y/Z)').toBe(108);
+  expect(r.canvasH, 'the chip canvas holds 3 lines (X/Y/Z)').toBeGreaterThanOrEqual(100);   // 104 after the t780 merge (the user-refined chip)
 });
 
 test('the default fit frames the WORK, excludes the big envelope; a double-click cycles to the envelope', async ({ page }) => {

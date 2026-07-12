@@ -19,13 +19,20 @@ const seed = async (page, view) => {
 };
 // start a fresh play (click the panel's ▶) and confirm the engine runs — controls the play window explicitly (no autoLoop gaps)
 const play = async (page) => {
-    await page.evaluate(() => { const p = window.__gpPanel; const b = p.el.querySelector('.pp-run'); if (b) b.click(); });
-    await page.waitForFunction(() => { const p = window.__gpPanel; return p && p.engine && p.engine.running; }, null, { timeout: 5000 }).catch(() => {});
+    // t781 — REAL readiness, no swallowed timeout: the run-click can land before the panel wires under contention,
+    // so click-and-poll until the engine actually RUNS, and fail LOUDLY if it never does (a null sample downstream
+    // was this test's contention failure mode).
+    for (let i = 0; i < 4; i++) {
+        await page.evaluate(() => { const p = window.__gpPanel; const b = p && p.el.querySelector('.pp-run'); if (b && !(p.engine && p.engine.running)) b.click(); });
+        const ok = await page.waitForFunction(() => { const p = window.__gpPanel; return p && p.engine && p.engine.running; }, null, { timeout: 2500 }).then(() => true).catch(() => false);
+        if (ok) return;
+    }
+    throw new Error('play(): the engine never entered running (panel wiring race)');
 };
 // poll during the play window until `read()` returns non-null (or the window closes)
-const sampleDuringPlay = async (page, read) => {
+const sampleDuringPlay = async (page, read, loops = 40) => {
     let s = null;
-    for (let i = 0; i < 40 && !s; i++) { s = await page.evaluate(read); if (!s) await page.waitForTimeout(60); }
+    for (let i = 0; i < loops && !s; i++) { s = await page.evaluate(read); if (!s) await page.waitForTimeout(60); }
     return s;
 };
 
@@ -104,12 +111,21 @@ test('PROBE motion: the chip flips to the MACHINE frame (the probe is rewriting 
     await page.evaluate(async () => { const m = await import('/viz/displayPrefs.js'); m.resetDisplay(); });
     await seed(page, '3d');
     // a probe program: the G31 seek dominates the play window
-    await page.evaluate(() => { const p = window.__gpPanel; p.setGcode(['G90', 'G0 X10 Y10 Z5', 'G31 Z-25 F60', 'G0 Z5', 'M30', ''].join('\n')); });
+    // t781 — plant the program IN THE EDITOR (the panel's ▶ re-reads it on run; a direct setGcode gets clobbered timing-dependently)
+    await page.evaluate(() => { const g = ['G90', 'G0 X10 Y10 Z5', 'G31 Z-25 F60', 'G0 Z5', 'M30', ''].join('\n'); document.getElementById('editor').value = g; const p = window.__gpPanel; p.setGcode(g); });
     await play(page);
     const s2 = await sampleDuringPlay(page, () => {
         const v = window.__gpPanel.viz; if (!(v._posChip && v._posChip.visible && v._posChipVal)) return null;
         return v._posChipVal.frame === 'mach' ? v._posChipVal : null;
-    });
+    }, 160);   // t781 — the window must OUTLAST the opening rapids under contention-throttled rAF (the probe itself runs ~5s+)
+    if (!s2) {
+        const dbg = await page.evaluate(() => { const p = window.__gpPanel, v = p.viz; const e = p.engine || {}; return {
+            running: !!e.running, ip: e.ip, gcodeHead: (p.el.querySelector('.pp-status') || {}).textContent,
+            chip: v._posChipVal || null, chipVisible: !!(v._posChip && v._posChip.visible),
+            mv: e._move ? { probe: !!e._move.probe, g53: !!e._move.g53 } : null,
+            editorProg: (document.getElementById('editor') || {}).value?.slice(0, 80) }; });
+        console.log('PROBE-FRAME NULL DEBUG:', JSON.stringify(dbg));
+    }
     expect(s2, 'a machine-frame chip sample was captured during the probe').not.toBeNull();
     expect(s2.wcs, 'the chip is LABELED Mach during probe motion (G53 shares this conduit)').toBe('Mach');
 });
