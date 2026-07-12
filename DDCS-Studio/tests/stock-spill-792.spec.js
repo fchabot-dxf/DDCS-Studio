@@ -9,7 +9,8 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-const TWINS = ['user_pocket_data', 'user_contour_data', 'user_drill_data', 'user_bore_data', 'user_surfacing_data', 'user_slot_data', 'user_text_data'];
+// t800 — tap ADDED: the P5 help sweep found the tap twin still spilling its stock block; the P1 assert now extends to it (the 8th twin).
+const TWINS = ['user_pocket_data', 'user_contour_data', 'user_drill_data', 'user_bore_data', 'user_surfacing_data', 'user_slot_data', 'user_text_data', 'user_tap_data'];
 
 test('the four stock fields are GONE from every mill twin form; Path Datum + Attach remain', async ({ page }) => {
   page.on('dialog', (d) => d.accept());

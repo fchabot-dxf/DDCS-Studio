@@ -30,13 +30,18 @@ import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true
 /** Author defaults — match pocketStack's num() fallbacks AND the built-in Pocket form defaults (index.html p_*). */
 export const POCKET_DEFAULTS = {
     shape: 'rect', w: 80, h: 60, dia: 50, sides: 6, toolDia: 6, wallOffset: 0, stepoverPct: 40,
-    strategy: 'spiral', depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, wcs: 'active',
+    strategy: 'spiral', direction: 'bothways', depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, wcs: 'active',
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
 
 const WCS_OPTIONS = [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']];
 const SHAPE_OPTIONS = [['Rectangle', 'rect'], ['Circle', 'circle'], ['Polygon', 'polygon'], ['Ellipse', 'ellipse']];
 const STRATEGY_OPTIONS = [['Spiral (concentric)', 'spiral'], ['Raster (parallel + wall)', 'raster']];
+// t800 P6 — DIRECTION: the RASTER scan pattern, labelled per what the kernel (stepover.js fillStrategy) ACTUALLY does.
+// bothways = boustrophedon zig-zag (links passes); oneway = climb (lift + rapid back each pass); otherway = conventional
+// (same, reversed). Only the raster/scanline path reads it — concentric rings on a circle/rect ignore it (fixed dir), so
+// the binding is gated `when strategy is raster` (no whenAny/OR to also catch spiral+polygon/ellipse; bothways is the safe default there).
+const DIRECTION_OPTIONS = [['Zig-zag (both ways)', 'bothways'], ['One-way climb', 'oneway'], ['One-way conventional', 'otherway']];
 const XY_DATUM_OPTIONS = [
     ['Follow stock datum', ''], ['Front Left', 'nn'], ['Front Center', 'cn'], ['Front Right', 'pn'],
     ['Center Left', 'nc'], ['Center', 'cc'], ['Center Right', 'pc'], ['Back Left', 'np'], ['Back Center', 'cp'], ['Back Right', 'pp'],
@@ -79,9 +84,12 @@ const POCKET_BINDING_SPECS = [
     ...leafPair('h', 'h', 'number', { default: POCKET_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: G }),
     ...leafPair('dia', 'dia', 'number', { default: POCKET_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: G }),
     ...leafPair('sides', 'sides', 'number', { default: POCKET_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: G }),
+    // t800 P6 — the CLEARING cluster (strategy → direction → stepover) lands together right after shape/size (strategy, the
+    // structural driver, is spliced in ahead of these in pocketDataDef). direction gates to raster — the only path the kernel scans.
+    { param: 'direction', type: 'enum', key: 'direction', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.direction, widget: 'dropdown', widgetConfig: { options: DIRECTION_OPTIONS }, label: 'Direction', section: T, group: 'clearing', when: { param: 'strategy', is: 'raster' }, help: 'Raster scan pattern: Zig-zag links passes back-and-forth (fastest); One-way lifts and rapids back before each pass for a consistent climb (or conventional) cut. Applies to the raster passes — concentric rings keep their fixed direction.' },
+    { param: 'stepoverPct', type: 'number', key: 'stepoverPct', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.stepoverPct, label: 'Stepover %', section: T, group: 'clearing' },
     ...leafPair('toolDia', 'toolDia', 'number', { default: POCKET_DEFAULTS.toolDia, label: 'Tool Ø', section: T }),
     ...leafPair('wallOffset', 'wallOffset', 'number', { default: POCKET_DEFAULTS.wallOffset, label: 'Wall Offset ±', section: T, help: 'Signed wall offset (mm): + cuts OVERSIZE (walls out), − cuts UNDERSIZE / leaves stock. 0 = the exact typed size.' }),
-    { param: 'stepoverPct', type: 'number', key: 'stepoverPct', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.stepoverPct, label: 'Stepover %', section: T },
     ...leafPair('feed', 'feed', 'number', { default: POCKET_DEFAULTS.feed, label: 'Feed', section: T }),
     // depth pass (stepdown, clearing arm) + the drill arm (tooSmall) carry the SAME params at different keys
     { param: 'depth', type: 'number', key: 'to', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.depth, label: 'Depth', section: T },
@@ -107,7 +115,7 @@ const POCKET_BINDING_SPECS = [
 /** The strategy fork is a STRUCTURAL driver (guard key), no block socket — declared as a bindingless (blockIndex-free)
  *  binding so withGuardDefaults fills it before prune + the form renders it. tooSmall is NOT here (it's the derive-hook). */
 const POCKET_STRUCT_BINDINGS = [
-    { param: 'strategy', help: "Clearing pattern: Concentric = offset rings inward; Raster = parallel zig-zag then a wall-finish pass.", type: 'enum', default: POCKET_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: STRATEGY_OPTIONS }, label: 'Strategy', section: T },
+    { param: 'strategy', help: "Clearing pattern: Spiral = concentric offset rings inward (no wall pass); Raster = parallel zig-zag passes then a wall-finish pass.", type: 'enum', default: POCKET_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: STRATEGY_OPTIONS }, label: 'Strategy', section: T, group: 'clearing' },   // t800 P6 — group:'clearing' + spliced ahead of direction/stepover so it LEADS the cluster
 ];
 
 export const POCKET_DATA_OPTYPE = 'user_pocket_data';
@@ -165,8 +173,15 @@ export const POCKET_BINDINGS = mergeBindingsByParam(deriveBindingsFor(canonicalP
 /** Build the pocket-as-data def — the superset-twin pattern (corner/middle): bindingSpecs (emit re-derivation) + a
  *  structural strategy toggle + the derive-guards hook (_tooSmall) + postInstantiate (the derived drill centre). */
 export function pocketDataDef() {
+    // t800 P6 — the CLEARING cluster reads strategy → direction → stepover. strategy is the structural driver (appended
+    // separately, so it would otherwise trail at the form's end); splice it in just before the first derived clearing
+    // binding (direction) so the toggle LEADS its gated dependents, right after shape/size.
+    const clAt = POCKET_BINDINGS.findIndex((b) => b.group === 'clearing');
+    const orderedBindings = clAt < 0
+        ? [...POCKET_BINDINGS, ...POCKET_STRUCT_BINDINGS]
+        : [...POCKET_BINDINGS.slice(0, clAt), ...POCKET_STRUCT_BINDINGS, ...POCKET_BINDINGS.slice(clAt)];
     const def = userOpFromStack('pocket_data', 'Pocket (data)', pocketDataStack(POCKET_DEFAULTS),
-        [...POCKET_BINDINGS, ...POCKET_STRUCT_BINDINGS], 'form3d+2d');   // t726 P2b — entryX/entryY are in POCKET_BINDINGS (via the specs, re-derived by bindingSpecs)
+        orderedBindings, 'form3d+2d');   // t726 P2b — entryX/entryY are in POCKET_BINDINGS (via the specs, re-derived by bindingSpecs)
     def.bindingSpecs = POCKET_BINDING_SPECS;                       // re-derive value sockets BY IDENTITY over the PRUNED stack each build
     def.deriveGuards = (p) => ({ _tooSmall: pocketTooSmall(p || {}) });   // GEOMETRY-DERIVED guard key, injected before prune
     def.postInstantiate = (stack, resolved) => {                  // rewrite the DERIVED sockets the frozen superset baked at DEFAULT geometry

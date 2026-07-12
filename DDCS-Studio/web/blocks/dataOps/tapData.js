@@ -29,10 +29,11 @@ const TAP_EXEC_BINDINGS = [
     // placement scalars (block 2, placeonstock)
     { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: TAP_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
     { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: TAP_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'stockDatum', blockIndex: 2, key: 'stockDatum', type: 'enum', default: TAP_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
-    { param: 'stockW', blockIndex: 2, key: 'stockW', type: 'number', default: TAP_DEFAULTS.stockW },
-    { param: 'stockH', blockIndex: 2, key: 'stockH', type: 'number', default: TAP_DEFAULTS.stockH },
-    { param: 'stockZ', blockIndex: 2, key: 'stockZ', type: 'number', default: TAP_DEFAULTS.stockZ },
+    // t800 P1-residue — the stock block resolves from the GLOBAL stock (the stock modal), not per-op fields; formHidden like bore/contour/drill (the P5 sweep found tap still spilling them onto the form). Stays in the stack + Blocks + round-trip.
+    { param: 'stockDatum', formHidden: true, blockIndex: 2, key: 'stockDatum', type: 'enum', default: TAP_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
+    { param: 'stockW', formHidden: true, blockIndex: 2, key: 'stockW', type: 'number', default: TAP_DEFAULTS.stockW },
+    { param: 'stockH', formHidden: true, blockIndex: 2, key: 'stockH', type: 'number', default: TAP_DEFAULTS.stockH },
+    { param: 'stockZ', formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: TAP_DEFAULTS.stockZ },
     { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: TAP_DEFAULTS.originX },
     { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: TAP_DEFAULTS.originY },
     { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: TAP_DEFAULTS.offZ },

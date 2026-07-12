@@ -251,17 +251,21 @@ export class WizardManager {
         this.wizardElement.style.display = 'flex';
         this.wizardElement.classList.add('active');
 
-        // Hide all wizard panels (incl. the shared custom-op panel)
+        // Hide all wizard panels (incl. the shared custom-op panel). t800 P7 — also DECLARE each hidden panel `inert`:
+        // display:none already drops it from render + tab order, but inert makes "no hidden-but-interactable control ghosts
+        // behind the fronting form" an explicit invariant (belt-and-suspenders; the shadow-forms guard asserts it).
         this.views.forEach((v) => {
             const elem = el(v.panelId);
-            if (elem) elem.style.display = 'none';
+            if (elem) { elem.style.display = 'none'; elem.inert = true; }
         });
-        { const u = el('wiz_user'); if (u) u.style.display = 'none'; }
+        { const u = el('wiz_user'); if (u) { u.style.display = 'none'; u.inert = true; } }
 
         // Show requested wizard (every user_* op shares the one #wiz_user panel)
         const wizElem = el(view === userOpView ? 'wiz_user' : 'wiz_' + type);
         if (wizElem) {
             wizElem.style.display = 'block';
+            wizElem.inert = false;   // t800 P7 — the fronting form is the ONLY interactable wizard panel
+
             frameWizardSections(wizElem);   // group the form's fields into framed categories (idempotent)
             mountPresetRow(this, wizElem);  // t794 P3 — the adaptive preset row at the form top (retires the header 📑 button)
             makePanesCollapsible(wizElem);  // t752 — collapsible preview/code panes (idempotent; state app-wide per kind)
