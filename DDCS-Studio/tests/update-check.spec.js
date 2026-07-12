@@ -31,7 +31,7 @@ test('update banner: silent on web, version compare correct, shows in (simulated
     const real = window.fetch;
     window.fetch = async (url, opts) => {
       const s = String(url);
-      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v99.0', html_url: 'https://example/rel', assets: [{ name: 'DDCS-Studio.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
+      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'DDCS-Studio.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
       if (s.includes('/commits')) return { ok: true, json: async () => ([{ commit: { message: 'feat: shiny new thing\n\nbody' } }, { commit: { message: 'fix: a bug' } }]) };
       return real(url, opts);
     };
@@ -43,7 +43,7 @@ test('update banner: silent on web, version compare correct, shows in (simulated
     const b = document.querySelector('.ddcs-update-bar');
     return { text: b.textContent, href: b.querySelector('a.upd-btn').getAttribute('href') };
   });
-  expect(bar.text).toContain('v99.0');
+  expect(bar.text).toContain('v9999.0');
   expect(bar.href).toBe('https://example/DDCS-Studio.exe');
 
   await page.click('.ddcs-update-bar .upd-what');
@@ -52,7 +52,7 @@ test('update banner: silent on web, version compare correct, shows in (simulated
 
   // dismiss persists for that version
   await page.click('.ddcs-update-bar .upd-x');
-  expect(await page.evaluate(() => localStorage.getItem('ddcs_update_dismissed'))).toBe('v99.0');
+  expect(await page.evaluate(() => localStorage.getItem('ddcs_update_dismissed'))).toBe('v9999.0');
   await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => !!document.querySelector('.ddcs-update-bar')), 'dismissed version does not re-nag').toBeFalsy();

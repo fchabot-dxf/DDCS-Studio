@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
 // The exe is harmless: its relative fetch hits the bundled copy (== baked) → the "equal" case below (no toast).
 
 test('web version-nudge: toasts a reload nudge when a NEWER version is live', async ({ page }) => {
-  await page.route('**/version.json', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ v: '99.9' }) }));
+  await page.route('**/version.json', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ v: '9999.9' }) }));
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.__ddcsUpd);
   const text = await page.evaluate(async () => {
@@ -15,7 +15,7 @@ test('web version-nudge: toasts a reload nudge when a NEWER version is live', as
     const t = document.querySelector('.toast');
     return t ? t.textContent : null;
   });
-  expect(text, 'the nudge names the live version').toContain('99.9');
+  expect(text, 'the nudge names the live version').toContain('9999.9');
   expect(text, 'and prompts a reload').toContain('reload');
 });
 

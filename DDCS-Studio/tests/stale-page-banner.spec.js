@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
  * equal case. Runs on localhost:3211 = the dev server (isDevServer() true).
  */
 test('stale-page banner FIRES when the served build stamp is NEWER than the loaded chip', async ({ page }) => {
-  await page.route('**/version.json', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ v: '99.9' }) }));
+  await page.route('**/version.json', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ v: '9999.9' }) }));
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.__ddcsUpd);
   const res = await page.evaluate(async () => {
@@ -20,7 +20,7 @@ test('stale-page banner FIRES when the served build stamp is NEWER than the load
   expect(res.isDev, 'localhost:3211 is the dev server').toBe(true);
   expect(res.shown, 'checkStalePage returned true (banner shown)').toBe(true);
   expect(res.text, 'the banner names the stale state + the server version').toContain('stale page');
-  expect(res.text, 'and shows the newer server stamp').toContain('99.9');
+  expect(res.text, 'and shows the newer server stamp').toContain('9999.9');
   expect(res.hasReload, 'the banner has a Reload button').toBe(true);
 });
 
