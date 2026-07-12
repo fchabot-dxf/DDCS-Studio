@@ -10900,3 +10900,24 @@ Acceptance (from the entry): the wcs row's ⚙ opens Settings scrolled to the WC
 SUITE: 1153 passed + 2 skipped, + 2 test-only failures (retired-header-button selectors) fixed test-only (commit 46-) = 1155 pass + 2 skip effective, 0 product failures (workers=2 — P3 touches the shared wizardManager.open; verified across every wizard open).
 
 Files (P3): web/ui/wizardTemplates.js (mountPresetRow + onChange), web/wizardManager.js (mount call + import + retire wiring), web/index.html (retire the header span), web/styles.css (preset-row CSS), tests/preset-row-794.spec.js (NEW), tests/smalls-696.spec.js (updated). Commit: 6612f17.
+
+## 2026-07-12 (t796) — FORM-HONESTY Batch 2b: P4 FIELD DEEP-LINKS
+
+The advisor dispatched Batch 2b = P4 exactly per my grounding. Commit 697029a.
+
+THE MECHANISM (the Homing-⚙ precedent, reused): a binding declares where its truth LIVES; renderOpForm shows a row-end ⚙ that opens it OVER the wizard with the return-glow. The slot is pure DATA — grep-clean of per-wizard link code.
+- `openFieldLink(link)` (formWidgets): `{kind:'settings', group, panel, scrollTo?, label?}` → `openSettings({group, panel, returnToken: pushReturn(label, ()=>{})})` (settingsPanel.js:2915 pattern); `{kind:'modal', open()}` → open(). `linkGear(link)` builds the ⚙ button.
+- `renderOpForm` appends the gear when a binding has `link` OR the per-param default `FIELD_LINKS[param]`.
+
+THE DECLARATIONS:
+- **wcs → the WCS table (ONE source):** `FIELD_LINKS = { wcs: WCS_LINK }` where `WCS_LINK = {kind:'settings', group:'controller', panel:'set_tab_wcs'}`. So the wcs PARAM links to the WCS table on EVERY form that renders it — every twin inherits with NO per-twin declaration (the wcs binding is per-twin, but the LINK is one map). Spot-checked contour/pocket/corner/middle.
+- **the stock modal's "Sits at WCS":** got the SAME ⚙ directly (stockEditor.js — a `#se_wcs_link` button → `openFieldLink({...WCS_LINK, returnLabel:'Stock'})`). The link follows the WCS field wherever it renders.
+- **the 👁 visibility modal footer:** gained "More preview settings…" (beside Reset/Done) → `openFieldLink({kind:'settings', group:'general', panel:'set_tab_preview', returnLabel:'Preview'})` — the deeper prefs (default 2D/3D, follow-cam, sim probe dims, speed) one tap away.
+
+VERIFIED (field-deeplink-796.spec.js, 4/4): the wcs gear opens Settings scrolled to the WCS table OVER the wizard (still open behind) + an active return token (the glow); EVERY twin inherits the gear (spot-check 3); the stock modal's ⚙ → WCS table; the visibility footer → Settings Preview. Grep guard: NO `openFieldLink`/`WCS_LINK`/`link:` in any dataOps/view — the slot is data + 2 modal-level wirings only. Screenshot: the ⚙ sits discreet at the wcs row's right edge.
+
+SUITE: 1159 passed + 2 skipped, 0 failed (workers=2 — P4 appends the gear via the shared renderOpForm; verified no twin-form regression). View-only (a row-end button + a display-nav; no emit path).
+
+Files: web/ui/formWidgets.js (FIELD_LINKS + openFieldLink + linkGear + the gear in renderOpForm), web/ui/stockEditor.js (Sits-at-WCS ⚙), web/ui/visibilityModal.js (footer link), web/styles.css (gear CSS), tests/field-deeplink-796.spec.js (NEW). Commit: 697029a.
+
+FORM-HONESTY PROGRESS: P1 stock spill + P2 honest labels (V.4) · P3 preset row (V.5) · P4 deep-links (this). REMAINING: Batch 3 = P5 field help (whole-row hover + the ~162-text content sweep + help-coverage guard) alone; Batch 4 = P6 clearing cluster + P7 shadow forms.
