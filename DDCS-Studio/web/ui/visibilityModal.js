@@ -39,8 +39,10 @@ export function openVisibilityModal(anchor) {
         + 'font-size:13px; color:var(--text,#e6edf5);';
     pop.innerHTML = `<div class="vis-head" style="font-weight:700; margin-bottom:8px; opacity:.9">Show in preview</div>`
         + `<div class="vis-rows">${rowsHtml()}</div>`
-        + `<div class="vis-foot" style="display:flex; justify-content:space-between; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,0.1)">`
-        + `<button type="button" data-reset class="toolbar-btn settings-io" style="font-size:12px">Reset</button>`
+        + `<div class="vis-foot" style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,0.1)">`
+        + `<div style="display:flex; gap:10px; align-items:center;">`
+        + `<a href="#" data-morepreview style="font-size:11.5px; color:var(--accent,#0ea5e9); opacity:.9; text-decoration:none;" title="Deeper preview prefs — default 2D/3D, follow-cam, sim probe dims, speed…">More preview settings…</a>`
+        + `<button type="button" data-reset class="toolbar-btn settings-io" style="font-size:12px">Reset</button></div>`
         + `<button type="button" data-done class="primary" style="padding:5px 18px; font-size:13px">Done</button></div>`;
     document.body.appendChild(pop);
 
@@ -51,6 +53,11 @@ export function openVisibilityModal(anchor) {
     });
     pop.querySelector('[data-reset]').addEventListener('click', () => { resetDisplay(); pop.querySelector('.vis-rows').innerHTML = rowsHtml(); wireRows(pop); });
     pop.querySelector('[data-done]').addEventListener('click', closeVisibilityModal);
+    // t796 P4 — the deeper preview prefs (default view, follow-cam, sim probe dims, speed…) are one tap away in Settings.
+    pop.querySelector('[data-morepreview]').addEventListener('click', (e) => {
+        e.preventDefault(); closeVisibilityModal();
+        import('./formWidgets.js').then((m) => m.openFieldLink({ kind: 'settings', group: 'general', panel: 'set_tab_preview', label: 'Preview settings', returnLabel: 'Preview' })).catch(() => {});
+    });
     document.addEventListener('keydown', _onKey);
     _pop = pop;
 }

@@ -2239,6 +2239,13 @@ button.primary:hover {
 .wiz-preset-row .wpr-link { border: none; background: transparent; color: var(--text-dim, #9aa); opacity: .85; padding: 3px 2px; }
 .wiz-preset-row .wpr-link:hover { color: var(--accent, #0ea5e9); opacity: 1; }
 
+/* t796 P4 — the row-end deep-link gear (a field whose truth lives in Settings / a modal). Absolute top-right so it never
+   disrupts the label-above-input row layout; discreet until hover. */
+.has-field-link { position: relative; }
+.field-link-gear { position: absolute; top: 0; right: 0; z-index: 1; padding: 1px 3px; border: none; background: transparent; color: var(--text-dim, #9aa); cursor: pointer; font-size: 12px; line-height: 1.2; opacity: .55; transition: opacity .12s ease, color .12s ease; }
+.field-link-gear:hover { opacity: 1; color: var(--accent, #0ea5e9); }
+.field-link-gear:focus-visible { outline: 2px solid var(--accent, #0ea5e9); outline-offset: 1px; border-radius: 3px; opacity: 1; }
+
 /* Templates popover (save / load this op's parameter sets) — now anchored under the form-top ★ Save (t794). */
 .wiz-tpl-pop {
     position: fixed; z-index: 13000; width: 240px; max-height: 60vh; overflow: auto;

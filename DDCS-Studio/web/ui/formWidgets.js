@@ -620,6 +620,35 @@ export function renderFormWidget(host, unit) {
 
 /** Render a whole op's BINDINGS into host as one row per unit (single binding, or a group sharing a multi-param
  *  widget). Returns the readers [() → {param: value}]. Shared by the modal (userOpForm) and the panel view. */
+// t796 P4 — DECLARED FIELD DEEP-LINKS. A binding declares where its truth LIVES (or inherits a per-PARAM default below);
+// renderOpForm shows a row-end gear that opens it OVER the wizard with the return-glow (the Homing-⚙ precedent). The slot
+// is pure DATA — no per-wizard link code. `link: { kind:'settings', group, panel, scrollTo?, label? }  |  { kind:'modal', open() }`
+export const WCS_LINK = { kind: 'settings', group: 'controller', panel: 'set_tab_wcs', label: 'the WCS table' };
+// ONE source: the wcs PARAM links to the WCS table wherever it renders — every twin inherits, no per-twin declaration.
+export const FIELD_LINKS = { wcs: WCS_LINK };
+export function fieldLinkFor(b) { return (b && b.link) || (b && FIELD_LINKS[b.param]) || null; }
+
+/** Open a declared field-link OVER the current surface, with a return to it (the glow). Reused by the stock modal + tests. */
+export function openFieldLink(link) {
+    if (!link) return;
+    if (link.kind === 'settings') {
+        Promise.all([import('./settingsPanel.js'), import('./navReturn.js')]).then(([SP, NR]) => {
+            if (SP.openSettings) SP.openSettings({ group: link.group, panel: link.panel, scrollTo: link.scrollTo, returnToken: NR.pushReturn(link.returnLabel || 'Wizard', () => {}) });
+        }).catch(() => {});
+    } else if (link.kind === 'modal' && typeof link.open === 'function') { try { link.open(); } catch (_) { /* */ } }
+}
+
+/** A row-end gear that deep-links to where a field's truth lives. Returns null if the binding declares no link. */
+export function linkGear(link) {
+    if (!link) return null;
+    const g = document.createElement('button');
+    g.type = 'button'; g.className = 'field-link-gear'; g.textContent = '⚙';
+    g.title = `Open ${link.label || 'settings'} — over the wizard, returns here`;
+    g.setAttribute('aria-label', g.title);
+    g.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openFieldLink(link); });
+    return g;
+}
+
 export function renderOpForm(host, bindings) {
     const readers = [], units = [], byGroup = {};
     for (const b of (bindings || [])) {
@@ -646,6 +675,8 @@ export function renderOpForm(host, bindings) {
         if (w && w.gate) row.dataset.gate = JSON.stringify(w.gate);
         try { readers.push(renderFormWidget(row, spec).read); }
         catch (e) { console.warn('widget render failed for', label, e); }
+        const gear = linkGear(fieldLinkFor(w));   // t796 P4 — the row-end deep-link gear (declared `link` / FIELD_LINKS)
+        if (gear) { row.classList.add('has-field-link'); row.appendChild(gear); }
         host.appendChild(row);
     };
     for (const unit of units) {

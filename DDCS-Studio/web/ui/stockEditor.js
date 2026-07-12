@@ -8,6 +8,7 @@
  * Pick a template, tweak dims/shape/show, and save/delete your own templates here.
  */
 import { getSettings, applySettings, STOCK_TEMPLATES } from './settingsPanel.js';
+import { openFieldLink, WCS_LINK } from './formWidgets.js';   // t796 P4 — the shared field deep-link (the "Sits at WCS" ⚙ → the WCS table)
 import { makeDraggable } from './uiUtils.js';
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 import { popReturn, dropReturn, activeReturn } from './navReturn.js';   // central back-navigation: the ✕ returns to wherever we came from
@@ -123,8 +124,8 @@ export function openStockEditor(anchor, opts) {
                     <div id="se_datum_pick" class="se-datum-pick" title="Click the box point of the stock that is your part-zero / program origin"></div>
                     <span id="se_datum_name" style="font-size:10px; color:#9fb4cc; text-align:center;"></span>
                 </label>
-                <label class="col">Sits at WCS
-                    <select id="se_pin" title="Where this stock sits in the machine: the program zero, or pinned to a WCS offset from the table (Settings → Hardware → WCS). This is the stock's WCS — the op runs from its datum.">
+                <label class="col">Sits at WCS <button type="button" id="se_wcs_link" class="field-link-gear" style="position:static; margin-left:3px; vertical-align:middle;" title="Open the WCS table — over this modal, returns here">⚙</button>
+                    <select id="se_pin" title="Where this stock sits in the machine: the program zero, or pinned to a WCS offset from the table (the ⚙ opens the WCS table). This is the stock's WCS — the op runs from its datum.">
                         <option value="origin">Program zero</option>
                         <option value="g54">G54</option><option value="g55">G55</option><option value="g56">G56</option>
                         <option value="g57">G57</option><option value="g58">G58</option><option value="g59">G59</option>
@@ -354,6 +355,8 @@ export function openStockEditor(anchor, opts) {
         q(id).addEventListener('input', commit);
         q(id).addEventListener('change', commit);
     });
+    // t796 P4 — the "Sits at WCS" ⚙ deep-links to the WCS table (the SAME affordance the twin wcs fields carry), over this modal.
+    { const wl = q('se_wcs_link'); if (wl) wl.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openFieldLink({ ...WCS_LINK, returnLabel: 'Stock' }); }); }
     // Datum: an XY top-view cell sets [X][Y] (keeps the current height); a Z button sets the height (keeps XY).
     if (datumPick) datumPick.addEventListener('click', (e) => {
         const cur = getDatum();
