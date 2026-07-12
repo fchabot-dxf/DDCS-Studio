@@ -10822,3 +10822,36 @@ NO EXISTING TEST MODIFIED: the model-sync design means the 2 tests that first br
 SUITE: 1150 passed + 2 skipped = 1152 (== --list), 0 failed (workers=2, re-run after the fixture fix). View/pipeline-timing + one block-def attr (SIM_LBL name) — emit byte-identical.
 
 Files: web/blocks/blocksApp.js (renderViews split + the throttle + instrumentation + syncSimSocket in applyOpGating), web/blocks/blockly/bridge.js (SIM_LBL name), tests/blocks-edit-lag-788.spec.js (NEW). Commits: 825bf76 (the fix), 2b5b133 (the inherited version-fixture repair).
+
+## 2026-07-12 (t790) — THE PANE SPLITTER: a drag-divider between the 3D and 2D preview panes
+
+USER t787 (enthusiastic): a grabbable divider between the two preview panes to REBALANCE their share continuously (the collapse chevrons are all-or-nothing; the splitter is the ratio in between). Built on my t784 pane system + the advisor's t785 followPanelResize. Commit 3994b0f.
+
+GROUNDING (reused, not duplicated):
+- The pane layout (t784): `.viz-split` (flex column, desktop + mobile) > two `.viz-container[data-viz-pane]` panes. Desktop = flex:1 1 0 (50/50 in the definite-height column); mobile = fixed 200px bodies (content-sized so collapse frees the form). DOM order VARIES: twins render 3D-on-top (#userViz3dBox first), built-ins render 2D-on-top (LayoutCanvas first) — so the ratio must be order-INDEPENDENT.
+- `followPanelResize(body)` (paneAccordion.js:48, the t785 one-motion-fold helper): finds `__panel` hosts + rAF-resizes their `viz._resize()` each frame, returns a stop fn — REUSED verbatim for the live canvas resize during the splitter drag.
+- The projects-drawer resize precedent (blocksApp.js:709/759, `--blk-pv-*` + localStorage): pointerdown→move→up, a CSS var, live refresh, persist — the exact shape, turned horizontal.
+
+THE RATIO (panePrefs family — the dispatch's home): getPaneRatio/setPaneRatio/onRatioChange + RATIO_MIN/MAX (localStorage `ddcs_pane_ratio`, the 3D pane's FRACTION [0.15..0.85], default 0.5 = even). An app-wide DISPLAY pref (like the collapse state / the 👁 registry), NOT the machine profile. Value = the 3D fraction (not "the top pane") so it means the SAME thing on every wizard regardless of DOM order.
+
+APPLICATION (CSS, --pane-ratio on :root → inherited by every pane):
+- DESKTOP: `.viz-split > [data-viz-pane="preview3d"] { flex-grow: var(--pane-ratio) }` + `layout2d { flex-grow: calc(1 - …) }` within the definite-height column. A COLLAPSED pane's flex:0 0 auto !important (t784) WINS → the surviving pane still fills → the ratio only bites with both open (= the "inert while collapsed" rule, for free).
+- MOBILE: the ratio splits the FIXED total (2×200): `[preview3d] > .wiz-pane-body { height: calc(400px * var(--pane-ratio)) }` + layout2d the complement → the total stays ~400 so collapsing one still frees its height to the form (t784 reflow preserved).
+
+THE SPLITTER (paneAccordion.addPaneSplitter, inserted between the two panes in makePanesCollapsible):
+- Pointer-events, touch-native (touch-action:none + setPointerCapture + pointercancel), ≥44px EFFECTIVE grab (a ::before overlay extends the slim 8px visual bar to 44px), keyboard arrows nudge the ratio (role=separator). cursor row-resize; the grip highlights + widens on hover/drag.
+- ratioAt(y) maps the pointer Y → the 3D fraction ORDER-AWARE (3D-on-top → frac; 3D-on-bottom → 1-frac), clamped — so dragging always feels right on both twin + built-in layouts.
+- LIVE: pointermove sets --pane-ratio on :root directly (unpersisted) + followPanelResize rAF-resizes BOTH canvases each frame → the panes rebalance continuously with NO post-drag snap; pointerup calls setPaneRatio (the single persist + app-wide notify).
+- INERT/hidden while either pane is collapsed or display:none (data-split-on, driven by updateSplitOn on: open · onPaneChange · a MutationObserver on the split's style/data-collapsed/childList — catches the twin's conditional #userViz3dBox toggle).
+
+VERIFIED (pane-splitter-790.spec.js, 3/3 + a screenshot at ratio 0.68):
+- desktop: the splitter shows between both panes, ≥44px effective grab; a real pointer-drag moves the ratio LIVE during the drag (asserted the ratio changed BEFORE mouseup — no post-drag snap) == the settled ratio; the 3D pane height rebalanced; persisted to ddcs_pane_ratio + SURVIVED reload.
+- desktop: collapsing the 3D → data-split-on=0 + the splitter display:none (inert).
+- mobile 390px: touch-drag rebalances the stacked bodies, the fixed total (~400) preserved (collapse still frees the form).
+- Screenshot: at 0.68 the 3D pane (bottom, on contour) fills ~2/3, the 2D ~1/3, the grip between; each pane keeps its side-chevron.
+
+FLEXBOX GOTCHA caught by the full suite (commit 7e9b2c9): the t784 desktop reflow (collapse 3D → the 2D FILLS) failed — a fractional `flex-grow: 0.5` on the LONE surviving pane sums to <1, and flexbox then distributes only THAT fraction of the free space, so the 2D grew to ~half, not full. Fix: multiply both grows ×100 (`calc(var(--pane-ratio) * 100)` / `calc((1 - …) * 100)`) — proportional (same ratio) but each ≥15 in absolute terms, so a lone survivor's grow ≥1 → it fills. collapsible-panes-752 (8) + pane-splitter-790 (3) both green after.
+
+SUITE: 1153 passed + 2 skipped = 1155 (== 1152 + 3 new), 0 failed (workers=2, re-run after the fill-fix). View-only (CSS + a splitter div + a display pref) — no emit path touched.
+
+Files: web/ui/panePrefs.js (the ratio pref), web/ui/paneAccordion.js (the splitter engine), web/styles.css (ratio flex/heights + splitter styling + the ×100 fill-fix), tests/pane-splitter-790.spec.js (NEW). Commits: 3994b0f (the splitter), 7e9b2c9 (the flexbox fill-fix).
