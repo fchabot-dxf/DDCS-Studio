@@ -74,22 +74,22 @@ const TEXT_EXEC_BINDINGS = [
     // glyph geometry + cut (block 5, the filltext leaf)
     { param: 'text', blockIndex: 5, key: 'text', type: 'string', default: TEXT_DEFAULTS.text, label: 'Text', help: 'The engraved text. Two tokens: {SN} = a running serial number that increments on the controller each run (persistent #var — set the digits/increment below); {DATE} = the date you insert it, stamped statically (no controller has a live clock). Type any prefix/suffix around them, e.g. PART-{SN}.' },
     {
-        param: 'font', blockIndex: 5, key: 'font', type: 'enum', default: TEXT_DEFAULTS.font,
+        param: 'font', help: "Letter font — single-stroke engraving fill; more fonts drop in when registered.", blockIndex: 5, key: 'font', type: 'enum', default: TEXT_DEFAULTS.font,
         widget: 'dropdown', widgetConfig: { options: FONT_OPTIONS },
     },
-    { param: 'height', blockIndex: 5, key: 'height', type: 'number', default: TEXT_DEFAULTS.height },
-    { param: 'width', blockIndex: 5, key: 'width', type: 'number', default: TEXT_DEFAULTS.width },
-    { param: 'slant', blockIndex: 5, key: 'slant', type: 'number', default: TEXT_DEFAULTS.slant },
-    { param: 'rotation', blockIndex: 5, key: 'rotation', type: 'number', default: TEXT_DEFAULTS.rotation },   // t708 — the label angle (deg, about the anchor); the ↻ preview handle writes it
-    { param: 'spacing', blockIndex: 5, key: 'spacing', type: 'number', default: TEXT_DEFAULTS.spacing },
-    { param: 'lineSpacing', blockIndex: 5, key: 'lineSpacing', type: 'number', default: TEXT_DEFAULTS.lineSpacing },   // t708 — multi-line pitch = height × this
+    { param: 'height', help: "Cap height (mm).", blockIndex: 5, key: 'height', type: 'number', default: TEXT_DEFAULTS.height },
+    { param: 'width', help: "Horizontal scale: 1 = normal, <1 condensed, >1 extended.", blockIndex: 5, key: 'width', type: 'number', default: TEXT_DEFAULTS.width },
+    { param: 'slant', help: "Oblique / italic skew in degrees (0 = upright; positive leans right).", blockIndex: 5, key: 'slant', type: 'number', default: TEXT_DEFAULTS.slant },
+    { param: 'rotation', help: "Label rotation in degrees about its anchor (0 = level).", blockIndex: 5, key: 'rotation', type: 'number', default: TEXT_DEFAULTS.rotation },   // t708 — the label angle (deg, about the anchor); the ↻ preview handle writes it
+    { param: 'spacing', help: "Extra gap between letters (mm).", blockIndex: 5, key: 'spacing', type: 'number', default: TEXT_DEFAULTS.spacing },
+    { param: 'lineSpacing', help: "Line pitch for multi-line text = cap height × this.", blockIndex: 5, key: 'lineSpacing', type: 'number', default: TEXT_DEFAULTS.lineSpacing },   // t708 — multi-line pitch = height × this
     {
         param: 'align', blockIndex: 5, key: 'align', type: 'enum', default: TEXT_DEFAULTS.align,
         widget: 'dropdown', widgetConfig: { options: ALIGN_OPTIONS },
     },
     { param: 'x', blockIndex: 5, key: 'x', type: 'number', default: TEXT_DEFAULTS.x },
     { param: 'y', blockIndex: 5, key: 'y', type: 'number', default: TEXT_DEFAULTS.y },
-    { param: 'strokeWidth', blockIndex: 5, key: 'strokeWidth', type: 'number', default: TEXT_DEFAULTS.strokeWidth },
+    { param: 'strokeWidth', help: "Letter boldness (mm). Use ≥ the tool Ø so the fill is clean.", blockIndex: 5, key: 'strokeWidth', type: 'number', default: TEXT_DEFAULTS.strokeWidth },
     { param: 'toolDia', blockIndex: 5, key: 'toolDia', type: 'number', default: TEXT_DEFAULTS.toolDia },
     { param: 'stepoverPct', blockIndex: 5, key: 'stepoverPct', type: 'number', default: TEXT_DEFAULTS.stepoverPct },
     { param: 'feed', blockIndex: 5, key: 'feed', type: 'number', default: TEXT_DEFAULTS.feed },

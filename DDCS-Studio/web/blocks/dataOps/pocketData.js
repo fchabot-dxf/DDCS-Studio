@@ -80,7 +80,7 @@ const POCKET_BINDING_SPECS = [
     ...leafPair('dia', 'dia', 'number', { default: POCKET_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: G }),
     ...leafPair('sides', 'sides', 'number', { default: POCKET_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: G }),
     ...leafPair('toolDia', 'toolDia', 'number', { default: POCKET_DEFAULTS.toolDia, label: 'Tool Ø', section: T }),
-    ...leafPair('wallOffset', 'wallOffset', 'number', { default: POCKET_DEFAULTS.wallOffset, label: 'Wall Offset ±', section: T }),
+    ...leafPair('wallOffset', 'wallOffset', 'number', { default: POCKET_DEFAULTS.wallOffset, label: 'Wall Offset ±', section: T, help: 'Signed wall offset (mm): + cuts OVERSIZE (walls out), − cuts UNDERSIZE / leaves stock. 0 = the exact typed size.' }),
     { param: 'stepoverPct', type: 'number', key: 'stepoverPct', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.stepoverPct, label: 'Stepover %', section: T },
     ...leafPair('feed', 'feed', 'number', { default: POCKET_DEFAULTS.feed, label: 'Feed', section: T }),
     // depth pass (stepdown, clearing arm) + the drill arm (tooSmall) carry the SAME params at different keys
@@ -107,7 +107,7 @@ const POCKET_BINDING_SPECS = [
 /** The strategy fork is a STRUCTURAL driver (guard key), no block socket — declared as a bindingless (blockIndex-free)
  *  binding so withGuardDefaults fills it before prune + the form renders it. tooSmall is NOT here (it's the derive-hook). */
 const POCKET_STRUCT_BINDINGS = [
-    { param: 'strategy', type: 'enum', default: POCKET_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: STRATEGY_OPTIONS }, label: 'Strategy', section: T },
+    { param: 'strategy', help: "Clearing pattern: Concentric = offset rings inward; Raster = parallel zig-zag then a wall-finish pass.", type: 'enum', default: POCKET_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: STRATEGY_OPTIONS }, label: 'Strategy', section: T },
 ];
 
 export const POCKET_DATA_OPTYPE = 'user_pocket_data';

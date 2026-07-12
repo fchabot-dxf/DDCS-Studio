@@ -68,7 +68,7 @@ const SLOT_EXEC_BINDINGS = [
     { param: 'ay', blockIndex: 3, key: 'y0', type: 'number', default: SLOT_DEFAULTS.ay },
     { param: 'bx', blockIndex: 3, key: 'x1', type: 'number', default: SLOT_DEFAULTS.bx },
     { param: 'by', blockIndex: 3, key: 'y1', type: 'number', default: SLOT_DEFAULTS.by },
-    { param: 'width', blockIndex: 3, key: 'width', type: 'number', default: SLOT_DEFAULTS.width },
+    { param: 'width', help: "Finished slot width (≥ tool Ø). Equal to the tool = a single pass.", blockIndex: 3, key: 'width', type: 'number', default: SLOT_DEFAULTS.width },
     { param: 'toolDia', blockIndex: 3, key: 'tool', type: 'number', default: SLOT_DEFAULTS.toolDia },
     { param: 'stepoverPct', blockIndex: 3, key: 'stepoverPct', type: 'number', default: SLOT_DEFAULTS.stepoverPct },
     { param: 'depth', blockIndex: 3, key: 'depth', type: 'number', default: SLOT_DEFAULTS.depth },

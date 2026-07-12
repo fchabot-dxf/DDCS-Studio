@@ -649,6 +649,57 @@ export function linkGear(link) {
     return g;
 }
 
+// t798 P5 — DECLARED FIELD HELP. A binding's `help` is the field tooltip; params that recur across twins with the SAME
+// meaning declare it ONCE here (a binding's explicit `help` always wins). The help title now goes on the WHOLE ROW
+// (label + input + widget answer to hover), not just the label. Filled by the content sweep (ported from the built-in
+// forms' ~162 title texts BY MEANING). EXCEPT: pure-structural params in HELP_EXEMPT need no help (the coverage guard allows them).
+export const FIELD_HELP = {
+    wcs: 'Run in the Active WCS (whatever G54–G59 is selected on the controller) or force a specific one. Positions are in the chosen frame.',
+    originX: 'Signed X offset of the path from the stock-attach corner (drag the square handle in the 2D layout).',
+    originY: 'Signed Y offset of the path from the stock-attach corner (drag the square handle in the 2D layout).',
+    offZ: 'Signed Z offset of the whole path (shifts every Z move; 0 = the part-zero plane).',
+    feed: 'Cutting feed rate (mm/min) for the lateral moves.',
+    plunge: 'Z plunge feed rate (mm/min) — usually slower than the cutting feed.',
+    clearance: 'Safe Z the tool rapids to above the part between moves (mm above the part-zero plane).',
+    toolDia: 'Cutting-tool diameter (mm). Auto-filled when you pick a tool from the library; type it when running off-table.',
+    depth: 'Total depth of material cut below the top of the stock (mm).',
+    stepdown: 'Z step-down per pass (mm).',
+    stepoverPct: 'Spacing between parallel passes as a % of tool Ø (40% = a 2.4 mm step on a Ø6 tool).',
+    shape: 'Outline: rectangle, circle, regular polygon, or ellipse.',
+    sides: 'Number of sides for a regular polygon (≥ 3).',
+    pattern: 'Hole layout: grid, bolt circle, rectangle border, or line.',
+    pathDatum: 'Which corner/point of the path anchors to the stock (the PATH ANCHOR picker). Empty = follow the stock-attach corner.',
+    stockAttach: 'Stock corner the path attaches to (the markers on the stock). Empty = the stock datum.',
+    entryX: "X of the tool's lead-in / entry point. Blank = start at the path's natural start.",
+    entryY: "Y of the tool's lead-in / entry point. Blank = start at the path's natural start.",
+    // ATC spindle warm-up stages (two-stage ramp before the first cut).
+    rpm1: 'Spindle RPM for warm-up stage 1 (the gentle ramp — usually ~half the working speed).',
+    time1: 'Dwell time (s) the spindle holds at the stage-1 RPM before ramping up.',
+    rpm2: 'Spindle RPM for warm-up stage 2 (near/at the working speed).',
+    time2: 'Dwell time (s) the spindle holds at the stage-2 RPM.',
+    // Stock geometry (shown on twins that still carry the stock block on the form).
+    stockDatum: 'Which corner/point of the stock block the op measures from (the stock datum).',
+    stockW: 'Stock block width (mm) along X.',
+    stockH: 'Stock block height (mm) along Y.',
+    stockZ: 'Stock block thickness (mm) along Z (top of stock to the table).',
+    // Tapping.
+    rigid: 'Rigid tapping (G84 — spindle synchronised to Z). Off = floating/tension-compression tap holder.',
+    // Set-WCS toggles + dual-gantry.
+    axisX: 'Zero the X axis of the active WCS at the current machine position.',
+    axisY: 'Zero the Y axis of the active WCS at the current machine position.',
+    axisZ: 'Zero the Z axis of the active WCS at the current machine position (usually after a Z probe).',
+    sync: 'Dual gantry only — writes A machine position to WCS slave offset. Disable if A is a rotary axis.',
+    slave: 'WCS offset index for slave axis. A=offset 3 (#[#70+3]), B=offset 4 (#[#70+4]).',
+    // Corner probe.
+    travelDist: 'How far the tool repositions between the two walls of the corner before the second touch (mm).',
+};
+// Pure-structural / self-evident params (the built-in forms gave them no title either) — the coverage guard allows these
+// to render without help. A twin that DOES declare help for one still shows it (explicit help always wins in helpFor).
+// Positional coordinate fields (role x/y, canvas-dragged handles) are self-documenting via the 2D layout + their label — exempt like x/y/ax/ay.
+export const HELP_EXEMPT = new Set(['cols', 'rows', 'dx', 'dy', 'nx', 'ny', 'count', 'spacing', 'angle', 'startAngle', 'x0', 'y0', 'x', 'y', 'ax', 'ay', 'bx', 'by', 'w', 'h', 'dia', 'align', 'cross1_x', 'cross1_y', 'startX', 'startY']);
+// A readonly canvas-set field (e.g. a drag-handle target) uses its readonlyHint as the help — the hint IS the declared explanation.
+export function helpFor(b) { return (b && b.help) || (b && FIELD_HELP[b.param]) || (b && b.readonlyHint) || null; }
+
 export function renderOpForm(host, bindings) {
     const readers = [], units = [], byGroup = {};
     for (const b of (bindings || [])) {
@@ -673,6 +724,8 @@ export function renderOpForm(host, bindings) {
         // t566 — a `gate`-conditioned binding GREYS (not hides) its field when the condition holds, with a `tip` (the ATC
         // change gating: zClear greyed for auto, fixedT greyed for auto+inline). `{param,in|is|not,tip}` or `{all:[…],tip}`.
         if (w && w.gate) row.dataset.gate = JSON.stringify(w.gate);
+        const help = helpFor(w);   // t798 P5 — the help title on the WHOLE ROW (hovering the input/widget, not just the label, shows it)
+        if (help) { row.title = help; row.dataset.help = '1'; }   // data-help marks a helped row for the coverage guard
         try { readers.push(renderFormWidget(row, spec).read); }
         catch (e) { console.warn('widget render failed for', label, e); }
         const gear = linkGear(fieldLinkFor(w));   // t796 P4 — the row-end deep-link gear (declared `link` / FIELD_LINKS)

@@ -61,10 +61,10 @@ const SURFACING_EXEC_BINDINGS = [
     { param: 'depth', blockIndex: 3, key: 'to', type: 'number', default: SURFACING_DEFAULTS.depth },
     { param: 'stepdown', blockIndex: 3, key: 'by', type: 'number', default: SURFACING_DEFAULTS.stepdown },
     // geometry + cut (block 4, the surfacefill leaf)
-    { param: 'w', blockIndex: 4, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w },
-    { param: 'h', blockIndex: 4, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h },
-    { param: 'stepover', blockIndex: 4, key: 'stepover', type: 'number', default: SURFACING_DEFAULTS.stepover },
-    { param: 'strategy', blockIndex: 4, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
+    { param: 'w', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", blockIndex: 4, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w },
+    { param: 'h', help: "Height of the faced area (Y).", blockIndex: 4, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h },
+    { param: 'stepover', help: "Distance between parallel passes (mm). Smaller = finer finish, slower.", blockIndex: 4, key: 'stepover', type: 'number', default: SURFACING_DEFAULTS.stepover },
+    { param: 'strategy', help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", blockIndex: 4, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed },
     { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge },
 ];
