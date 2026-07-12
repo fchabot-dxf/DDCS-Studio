@@ -10412,3 +10412,27 @@ Started the ruled text-stage-2 build. Grounding the ACCEPTANCE ("the sim's persi
 5. TESTS: the two-run bumping serial in the sim (uses this M98 foundation + the persistent store); byte-golden for a static-only text op (unchanged); the shared library emits ONCE with 2 tokens; distinct-height dedupe; Blockly round-trip.
 
 **Files:** engine/GcodeExecutionEngine.js (M98/M99/O subprogram execution) · tests/engine-subprogram-760.spec.js (NEW). Emit untouched (engine-sim-side only; no op/builder code). PASS BACK (phase 1 foundation; phase 2 continues).
+
+---
+
+## Turn 762 (worker) — TEXT STAGE 2 phase 2a: the DYNAMIC {SN} emit CORE, proven end-to-end in the sim
+
+Built + PROVED the serial-engrave emit core (wizards/serialEngrave.js) on the t760 M98 engine foundation — the acceptance's technical heart (a persistent counter bumps + digit glyphs dispatch, two runs engrave different serials). The wizard/layout/Blockly INTEGRATION is phase 2b (below) — kept separate so the safety-critical G-code stays correct + reviewable.
+
+**wizards/serialEngrave.js (confirmed-ops-only, per t758 grounding):**
+- `serialBump(slot, inc)` — `#slot = #slot + inc` once at program start (this execution).
+- `serialInline(slot, count, cx, cy, setIndex)` — seed the cursor + a remainder from the counter; per digit (MSB→LSB) a SUBTRACTIVE WHILE loop (`WHILE [#rem >= place] DO1 … END1`, NO INT/floor needed, no labels) yields the digit, then `M98 P(base+10)` (the set's dispatcher draws it + advances the cursor).
+- `glyphLibrary(setIndex, height, width, cut)` — O(base..base+9) draw digits 0-9 INCREMENTAL (G91) from the pen (one depth pass, pen returns to baseline-left net-zero), O(base+10) is the dispatcher (pen→cursor AT CLEARANCE Z, an IF-GOTO ladder `IF [#digit == d] GOTO L_d` to the glyph, then advance by the monospace pitch). base = 600 + setIndex*20 → distinct O-block + label block per distinct height (the dedupe). Glyphs baked from strokeFont at emit time.
+- KEY debug wins: (1) DDCS labels must be on their OWN line — `N6005 M98 P605` fails the executor's `^M98` match; `N6005` + `M98 P605` on separate lines works. (2) the incremental glyph plunges clr→-depth, so the dispatcher MUST position Z=+clearance first (else it plunged clr+depth = 4.4mm deep — a real cut error, caught by the depth assert).
+
+**VERIFY (tests/serial-engrave-762.spec.js, 3 green — uses the REAL t760 M98 engine + a shared persistent store):** (1) TWO consecutive runs engrave DIFFERENT serials — the shared uservar store bumps #490 41→42→43, the feed strokes DIFFER (42 vs 43), and it engraves at the configured depth (minZ = -0.4, NOT the clearance-deep bug); (2) the glyph library is ONE set per height (O600-610) and a distinct height gets a distinct set (O620-630) — dedupe-ready, an inline for set 1 calls O630; (3) zero-padded fixed width lays out all 6 digits (leading zeros included) at the monospace pitch. serialEngrave.js is a STANDALONE module (only the test imports it) → the app is UNTOUCHED, no regression surface. FULL SUITE: exit 0, 1104 passed / 2 skipped / 0 failed at retries=0 workers=3 — total 1106 == --list (app untouched — the module is standalone).
+
+**PHASE 2b (next turn — wire the proven core into the text op + the UI):**
+1. layoutText (textGeometry.js): tokenize {SN}/{DATE} — {DATE} → the insert-time STATIC stamp string (static glyphs); {SN} → reserve `width` monospace slots + record a placement {cursorX, cursorY, count, height, setIndex}; return the static strokes + the serial placements.
+2. fillText.lines: emit the static fill (excluding {SN} regions) + `serialInline(...)` at each placement (positioned to the layout cursor).
+3. blockEmitter post-pass (like applyProgramTransform): emit `serialBump` at program top (once) + `glyphLibrary` per DISTINCT height AFTER the program end (once) — the library-once + height-dedupe at program scope.
+4. SIM cross-run persistence: gpSeededVarStore returns a module-level persistent Map for the uservar range (re-seed probe-config each run, leave the serial slots to persist) → two panel Plays bump the serial.
+5. WIZARD fields (textData.js): SN slot (default #490, guarded 100-549, help lists park #470-471 etc.), width (6), zero-pad (on), increment (1); the START value drives a one-time "Initialize counter" action (NOT emitted); prefix/suffix via typed static text (help); {DATE}=insert-stamp note (plain).
+6. Blockly round-trip for the new fields; byte-golden for a static-only text op (no {SN}/{DATE} → unchanged emit); the library-once + 2-token + dedupe program-level tests.
+
+**Files:** wizards/serialEngrave.js (NEW, the emit core) · tests/serial-engrave-762.spec.js (NEW). App untouched (emit module unused until 2b wires it). PASS BACK (2a core proven; 2b integration next).
