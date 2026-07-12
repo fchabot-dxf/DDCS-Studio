@@ -50,9 +50,9 @@ test.describe('collapse gives the form the space (mobile) — the surviving pane
     await strip(page, 'contour', 'preview3d').click();
     // wait for the collapse ANIMATION to actually finish (attribute flips instantly, height settles up to ~350ms) —
     // under workers=2 load a bare attribute-wait measured mid-animation (~184px). Mirror the height-settle guard.
-    await page.waitForFunction(() => { const el = document.querySelector('#wiz_contour [data-viz-pane="preview3d"]'); return el.getAttribute('data-collapsed') === '1' && el.getBoundingClientRect().height < 60; }, null, { timeout: 3000 });
+    await page.waitForFunction(() => { const el = document.querySelector('#wiz_contour [data-viz-pane="preview3d"]'); return el.getAttribute('data-collapsed') === '1' && el.getBoundingClientRect().height < 40; }, null, { timeout: 3000 });
     const h3Collapsed = (await p3.boundingBox()).height;
-    expect(h3Collapsed, 'collapsed the 3D pane is just its strip').toBeLessThan(60);
+    expect(h3Collapsed, 'collapsed the 3D pane folds to a SLIM bar (just the chevron, ≤~28px)').toBeLessThanOrEqual(28);
     expect(h3Expanded - h3Collapsed, 'collapsing frees the 3D height').toBeGreaterThan(100);
 
     // the OTHER pane keeps its size (mobile: fixed height, not grown), and the visual total shrinks → form gains
@@ -66,15 +66,32 @@ test.describe('collapse gives the form the space (mobile) — the surviving pane
     expect((await p3.boundingBox()).height, 'expands back to full').toBeGreaterThan(150);
   });
 
-  test('the side strips are a ≥44px touch target on BOTH panes', async ({ page }) => {
+  test('the strips are chevron-ONLY (no text label), ≥44px touch, and leave NO empty band above either canvas', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
     await openWiz(page, 'contour');
     for (const kind of ['layout2d', 'preview3d']) {
-      const b = await strip(page, 'contour', kind).boundingBox();
-      expect(b.width, `${kind} strip width ≥44px`).toBeGreaterThanOrEqual(44);
-      expect(b.height, `${kind} strip height ≥44px`).toBeGreaterThanOrEqual(44);
+      const r = await page.evaluate((k) => {
+        const p = document.querySelector(`#wiz_contour [data-viz-pane="${k}"]`);
+        const bar = p.querySelector(':scope > .wiz-pane-bar');
+        const body = p.querySelector(':scope > .wiz-pane-body');
+        const canvas = body.querySelector('.viz-canvas');
+        const status = body.querySelector(':scope > .viz-status');
+        const bb = bar.getBoundingClientRect(), bdy = body.getBoundingClientRect(), cv = canvas.getBoundingClientRect();
+        return {
+          w: Math.round(bb.width), h: Math.round(bb.height), text: bar.textContent.trim(),
+          padTop: getComputedStyle(body).paddingTop, statusPos: status ? getComputedStyle(status).position : 'none',
+          band: Math.round(cv.top - bdy.top),
+        };
+      }, kind);
+      expect(r.w, `${kind} strip ≥44px wide (touch target)`).toBeGreaterThanOrEqual(44);
+      expect(r.h, `${kind} strip ≥44px tall when expanded (touch target)`).toBeGreaterThanOrEqual(44);
+      expect(r.text, `${kind} strip has NO visible text label (chevron only)`).toBe('');
+      // no reserved band: the body has no top padding + the status chip OVERLAYS (absolute), so the canvas fills.
+      expect(r.padTop, `${kind} body has no top-padding band`).toBe('0px');
+      expect(r.statusPos, `${kind} status chip overlays (absolute), not a reserved row`).toBe('absolute');
+      if (kind === 'layout2d') expect(r.band, 'the 2D canvas top ≈ the pane body top (no empty band above)').toBeLessThanOrEqual(2);
     }
   });
 
@@ -126,7 +143,7 @@ test.describe('desktop reflow — the surviving pane FILLS the freed space', () 
     const h2Filled = (await pane(page, 'contour', 'layout2d').boundingBox()).height;
     const h3Strip = (await pane(page, 'contour', 'preview3d').boundingBox()).height;
     expect(h2Filled, 'the 2D grew to fill the freed 3D space').toBeGreaterThan(h2Both + 100);
-    expect(h3Strip, 'the collapsed 3D is just its strip').toBeLessThan(60);
+    expect(h3Strip, 'the collapsed 3D folds to a slim bar (≤~28px)').toBeLessThanOrEqual(28);
 
     // expand 3D, then collapse the 2D → the 3D fills (symmetric)
     await strip(page, 'contour', 'preview3d').click();
@@ -137,7 +154,7 @@ test.describe('desktop reflow — the surviving pane FILLS the freed space', () 
     const h3Filled = (await pane(page, 'contour', 'preview3d').boundingBox()).height;
     const h2Strip = (await pane(page, 'contour', 'layout2d').boundingBox()).height;
     expect(h3Filled, 'the 3D grew to fill the freed 2D space').toBeGreaterThan(h3Both + 100);
-    expect(h2Strip, 'the collapsed 2D is just its strip').toBeLessThan(60);
+    expect(h2Strip, 'the collapsed 2D folds to a slim bar (≤~28px)').toBeLessThanOrEqual(28);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.resetPanes(); });
   });
 });

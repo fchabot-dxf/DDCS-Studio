@@ -95,8 +95,9 @@ function enhancePane(pane, kind, title) {
     const bar = document.createElement('button');
     bar.type = 'button'; bar.className = 'wiz-pane-bar';
     bar.setAttribute('aria-expanded', 'true');
-    bar.setAttribute('aria-label', `Collapse the ${title} pane`);           // the strip label is tiny/vertical → a11y name
-    bar.innerHTML = `${CHEVRON}<span class="wiz-pane-label">${title}</span>`;
+    bar.setAttribute('aria-label', `Collapse the ${title} pane`);           // NO visible label — the chevron is the whole strip
+    bar.title = `${title} pane`;                                            // the identity lives in the tooltip, not a band
+    bar.innerHTML = CHEVRON;
     pane.appendChild(bar);
     pane.appendChild(body);
     pane.dataset.paneKind = kind;

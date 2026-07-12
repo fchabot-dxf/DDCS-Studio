@@ -2091,11 +2091,10 @@ button.primary:hover {
    on BOTH platforms, token-styled. Chevron + a vertical kind label (2D / 3D / G-code). */
 .wiz-pane-bar {
     flex: 0 0 44px; align-self: stretch; min-height: 44px;
-    display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 8px;
-    padding: 10px 0; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;   /* chevron ONLY — no text label */
+    padding: 0; border: none; cursor: pointer;
     background: color-mix(in srgb, var(--bg) 55%, transparent);
     color: var(--hdr-dim, var(--text-dim));
-    font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
     border-radius: inherit; border-top-right-radius: 0; border-bottom-right-radius: 0;
     transition: color .12s ease, background .12s ease;
 }
@@ -2103,14 +2102,21 @@ button.primary:hover {
 .wiz-pane-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .wiz-pane-chev { flex: 0 0 auto; transform: rotate(90deg); transition: transform var(--drawer-dur-eff, 180ms) var(--drawer-ease-eff, ease); }   /* expanded → points ‹ toward the rail (fold me) */
 [data-collapsed="1"] > .wiz-pane-bar .wiz-pane-chev { transform: rotate(-90deg); }   /* collapsed → points › outward (open me) */
-.wiz-pane-label { flex: 0 0 auto; writing-mode: vertical-rl; text-orientation: mixed; letter-spacing: .12em; }
-/* The strip IS the pane heading now — hide the original inner "VISUALIZATION" section-label to avoid a double heading. */
-[data-viz-pane] > .wiz-pane-body > .section-label { display: none; }
+/* COLLAPSED — the strip drops to a fixed slim height so the whole pane folds to a SLIM bar (just the chevron), not a
+   tall empty frame. The 44px width stays so the height-collapse animation slides smoothly (no width snap). A fixed
+   height (not padding) keeps the folded bar ≤~26px even under the 3px inset viz-container border. */
+[data-collapsed="1"] > .wiz-pane-bar { min-height: 0; height: 18px; padding: 0; }
 
-/* The collapsible body carries the pane content; its HEIGHT animates (measured) so the pane row collapses to the strip.
-   Desktop: it stretches to fill the pane (the flex chain sizes the canvas). Mobile: a fixed height (set in @860px). */
-[data-viz-pane] > .wiz-pane-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px 12px; }
-.preview-block[data-pane-kind] > .wiz-pane-body { padding: 8px 10px; }
+/* The body carries the pane content, the CANVAS FILLING it (padding:0 — no reserved band). The status chip (title /
+   '· N lines') OVERLAYS the canvas top-left corner instead of owning a row (advisor/user note: kill the dead space). */
+[data-viz-pane] > .wiz-pane-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: 0; position: relative; }
+[data-viz-pane] > .wiz-pane-body > .viz-status {
+    position: absolute; top: 4px; left: 4px; right: auto; width: auto; max-width: calc(100% - 8px); margin: 0;
+    z-index: 3; pointer-events: none;
+}
+[data-viz-pane] > .wiz-pane-body > .viz-status:empty { display: none; }   /* an empty chip must not leave a stray box */
+[data-viz-pane] > .wiz-pane-body > .section-label { display: none; }
+.preview-block[data-pane-kind] > .wiz-pane-body { padding: 6px 8px; }
 .wiz-pane-body {
     overflow: hidden;
     transition: height var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
