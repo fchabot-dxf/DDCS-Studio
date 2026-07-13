@@ -2558,3 +2558,75 @@ Files: web/ui/selectLoad.js (NEW — the shared model), web/styles.css (.sl-* ru
 [Load], Active badge, retire per-row Load), web/blocks/dataOps/pocketData.js (RIDER — Ramp Angle label),
 tests/select-load-805.spec.js (NEW), tests/profile-library.spec.js + tests/profile-cloud-library.spec.js (migrated).
 Commit 611eb1c.
+
+## 2026-07-12 (t808) — STEPPER RUNAWAY: ground then fix (held-stepper debounce + write-back loop-guard)
+
+The advisor dispatched the stepper-runaway fix (user t805 "sometimes the input fields will get stuck when i use the
+stepper, and will increase uncontrollably"): GROUND FIRST, then fix at the PIPELINE RULE. Commit 31536e5.
+
+### GROUNDING — instrumented, all three form hosts (the loop named itself)
+
+I instrumented the form: a capture-phase log of every input/change (isTrusted + dispatch-site stack + value), a patched
+`EventTarget.dispatchEvent` to catch every SYNTHETIC input on a `[data-param]` field, and an element-identity check.
+
+- **Wizard host (userOpView) — discrete stepper input is CLEAN.** One 'input' (a stepper click; the steppers have NO
+  hold-repeat of their own) → exactly ONE recompute, ZERO synthetic write-backs, no cascade, no value walk (10 inputs →
+  +10 exactly), the field element preserved, and ZERO input events after the last one. No self-sustaining loop from a
+  discrete event.
+- **THE LOOP NAMED (fc-handle drag instrumentation).** `update()` re-renders the heavy 2D featureCanvas + 3D preview
+  SYNCHRONOUSLY on EVERY 'input', and that re-render REPLACES the interactive element: the grabbed `.fc-handle` reported
+  `isConnected === false` from the FIRST drag frame onward (2 synthetic write-backs per move → 2 full re-renders per
+  move). The drag only survives because the SVG root keeps pointer-capture. So a recompute REBUILDS the element that owns
+  the active gesture, synchronously, per event — exactly the dispatch's suspect (1). The wizard host had NO debounce
+  (unlike Blocks, which already coalesces to RECOMPUTE_MS=300 and skips the active element in value-sync).
+- **Blocks host** already skips the focused field in value-sync and rebuilds only on a `formSig` STRUCTURE change (not a
+  plain number step) — the safer host. **Settings** fields recompute on 'change' (commit), not per-'input'.
+- **HONEST HARNESS LIMIT.** Playwright/headless Chromium does NOT drive the native number-spinner's hold auto-repeat, nor
+  ArrowUp key auto-repeat — both yield ONE increment. So the EXACT native-spinner runaway (which needs the auto-repeat
+  the real browser provides) is not directly reproducible in the suite. I reproduced the underlying PIPELINE defect (the
+  per-input synchronous heavy re-render that replaces the active element) via the handle drag, and the guard asserts the
+  FIX's invariants (the ruled acceptance) via a simulated focused-field burst.
+
+Mechanism (why the native spinner "gets stuck + climbs"): holding it auto-repeats 'input' at the OS rate; each fired a
+FULL synchronous re-render (pocket ≈ 199-line emit + featureCanvas + 3D), choking the main thread so the spinner's
+pointer-release was missed and the value ran away while the element under it was rebuilt each frame.
+
+### THE FIX — at the pipeline rule (both suspects)
+
+- **(a) HELD-STEPPER DEBOUNCE (userOpView).** A FOCUSED form field emitting 'input' (a held spinner / live typing = a
+  CONTINUOUS gesture) now throttles the heavy recompute: a LEADING-EDGE throttle (RECOMPUTE_MS=200) fires the first edit
+  instantly, coalesces rapid repeats to one update per window, and lands a trailing update. A COMMIT ('change'/blur) OR a
+  NON-focused synthetic input (a canvas picker / a handle write-back — `document.activeElement` is not the field) runs
+  INLINE. So a held stepper can never fire a full synchronous re-render per increment (no main-thread choke, no missed
+  release, no per-frame element rebuild under the pointer); programmatic updates, canvas-drag re-feeds (which call
+  `mgr.update()` directly), and the tests are unchanged. This EXTENDS the Blocks edit-lag discipline (typed commits
+  inline, gestures debounced) to held steppers, per the ruled trigger split.
+- **(b) WRITE-BACK LOOP-GUARD (panelTypes `_writeParam`).** The canvas-handle write-back now dispatches 'input' ONLY when
+  the value actually CHANGES (mirrors `setParam`'s `s.value !== val` guard for the enum pickers). An unchanged write-back
+  — a jittery drag frame or any render-time re-derive that lands the same number — emits nothing, so it can never
+  re-trigger update() → re-render → write-back (the round-trip that walks/sticks the value); a synthetic event that lands
+  the same value short-circuits the chain.
+
+### VERIFY (stepper-runaway-808.spec.js, 3/3) + the instrumented repro (documented above)
+
+- A HELD-STEPPER burst on a FOCUSED field stops EXACTLY where released (value == start + N, no walk), fires ZERO input
+  events after release (no self-sustaining loop), and the focused element is NEVER rebuilt/detached (anti-orphan) — the
+  ruled acceptance, asserted without a native spinner (headless can't drive its auto-repeat).
+- The heavy recompute COALESCES for a focused-field burst (12 inputs → ≤ 4 recomputes) — the throttle is active.
+- A NON-focused synthetic input (canvas picker / handle write-back) still updates INLINE — no throttle regression.
+- Targeted regressions green (11/11): preview-drag-writes-program (handle drags → inline update), pocket-data-emit +
+  depth-entry-804 (byte-goldens untouched — no emit change), handles-independent, alignment-fork1-handles.
+
+Real symptom driven: the actual pocket wizard at localhost:3211, instrumented; the loop named from the live re-render.
+
+Note (scope, logged for the advisor): the fix targets the STEPPER (the reported bug). The DRAG-orphan I surfaced (the
+featureCanvas replacing the grabbed handle mid-drag) currently survives via SVG pointer-capture and is NOT the reported
+symptom — noted as a related follow-up (the same debounce-on-active-gesture rule would cover it if a canvas-drag flag is
+threaded). Design call: throttle on `document.activeElement` being a form field (a held native spinner focuses its input)
+— the cleanest signal that separates a held stepper (throttle) from a canvas drag / picker / programmatic update (inline).
+
+SUITE: 1183 passed, 2 skipped, 0 failed, 0 flaky (workers=2, retries=0, 20.4m) (workers=2 — the fix is scoped to the userOpView focused-field recompute + the one write-back guard;
+no emit path touched → byte goldens unaffected; verified).
+
+Files: web/wizards/views/userOpView.js (held-stepper debounce — the throttle + the focused-field listener), web/wizards/
+ops/panelTypes.js (_writeParam equality loop-guard), tests/stepper-runaway-808.spec.js (NEW guard). Commit 31536e5.
