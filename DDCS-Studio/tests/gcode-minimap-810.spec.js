@@ -110,6 +110,27 @@ test.describe('desktop', () => {
     expect(Math.abs(s.top - (s.idx / s.n) * s.H), 'the marker sits at the executing line (idx/n·H) during real playback').toBeLessThan(3);
   });
 
+  test('t812 riders: the strip is inset clear of the pull-tab, and hugs the TEXT pane in split view', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && document.querySelector('.gcode-minimap') && window.setGcodeView);
+    // (1) drawer CLOSED: the strip does not overlap the 3D-drawer pull-tab
+    const closed = await page.evaluate(() => {
+      const s = document.querySelector('.gcode-minimap').getBoundingClientRect();
+      const tab = document.querySelector('.viz3d-handle').getBoundingClientRect();
+      return { overlaps: !(s.left >= tab.right || s.right <= tab.left), insetFromRight: window.innerWidth - s.right };
+    });
+    expect(closed.overlaps, 'the strip never overlaps the pull-tab (rider 1)').toBe(false);
+    expect(closed.insetFromRight, 'the strip is inset from the window edge by the tab gutter').toBeGreaterThan(10);
+    // (2) SPLIT view: the strip hugs the TEXT pane's right edge (left of the 3D pane), not the window edge
+    await page.evaluate(() => window.setGcodeView('3d'));
+    await page.waitForTimeout(300);
+    const split = await page.evaluate(() => {
+      const s = document.querySelector('.gcode-minimap').getBoundingClientRect();
+      return { insetFromRight: window.innerWidth - s.right };
+    });
+    expect(split.insetFromRight, 'in split view the strip sits well left of the window edge (over the text pane, not the 3D pane)').toBeGreaterThan(closed.insetFromRight + 100);
+  });
+
   test('the TOGGLE persists across reload (panePrefs ddcs_minimap)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && document.querySelector('.gm-toggle'));

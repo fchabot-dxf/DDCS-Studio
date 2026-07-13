@@ -53,6 +53,16 @@ export function makeXform(params = {}) {
     return b;
 }
 
+/** t812 — a PROGRAM-LEVEL entry waypoint as a flat childless `entry` sibling carrying {entryX,entryY}. Emits nothing
+ *  itself; blockEmitter.applyEntryWaypoint inserts the opening G0 X Y ( entry ) before the first cut. Mirror of makeXform
+ *  — used to RECONSTRUCT a program-level entry from its .nc marker (a nested per-op entry rides its own op marker). */
+export function makeEntry(params = {}) {
+    const b = newBlock('entry');
+    const ex = parseFloat(params.entryX), ey = parseFloat(params.entryY);
+    b.params = { entryX: Number.isFinite(ex) ? ex : '', entryY: Number.isFinite(ey) ? ey : '' };
+    return b;
+}
+
 /** Program End from wizard params: the configured end-of-program routine. */
 export function makeEnd(params = {}) {
     const ep = params.endProgram || {};

@@ -3454,10 +3454,17 @@ body #editor.editor-layer {
 }
 
 /* t810 — the editor MINIMAP strip (right edge). When ON, the text layers inset their RIGHT padding so no line hides
-   under the strip; the strip itself is an absolute full-height child of .editor-container, below the 3D drawer. */
-.editor-container.has-minimap .editor-layer { padding-right: calc(var(--gm-w, 62px) + 6px); }
+   under the strip; the strip itself is an absolute full-height child of .editor-container, below the 3D drawer.
+   t812 riders: the strip is INSET by the 3D-drawer pull-tab width (--gm-tab, 30px) so the tab never occludes it; and
+   in SPLIT view (the 3D drawer open) it hugs the TEXT pane's right edge (right = the drawer width + the tab inset),
+   never the window edge over the 3D pane. `:has()` is already used for the editor (the Transform-button rule). */
+/* --gm-right = the strip's distance from the container's RIGHT edge: the pull-tab inset alone (drawer closed), or the
+   drawer width + the tab inset (drawer OPEN → hug the text pane). One var drives the strip, its padding, and the toggle. */
+.editor-container { --gm-tab: 30px; --gm-right: var(--gm-tab); }
+.editor-container:has(.viz3d-drawer.open) { --gm-right: calc(var(--viz3d-size, 50%) + var(--gm-tab)); }
+.editor-container.has-minimap .editor-layer { padding-right: calc(var(--gm-right) + var(--gm-w, 62px) + 6px); }
 .gcode-minimap {
-    position: absolute; top: 0; right: 0; bottom: 0; width: var(--gm-w, 62px); z-index: 4;
+    position: absolute; top: 0; right: var(--gm-right); bottom: 0; width: var(--gm-w, 62px); z-index: 4;
     background: color-mix(in srgb, var(--panel, #111) 55%, transparent);
     border-left: 1px solid var(--border, #333); cursor: pointer; overflow: hidden; touch-action: none;
 }
@@ -3476,7 +3483,7 @@ body #editor.editor-layer {
 }
 .gcode-minimap .gm-exec[hidden] { display: none; }
 .gm-toggle {
-    position: absolute; top: 4px; right: 4px; z-index: 6; width: 22px; height: 22px; padding: 0;
+    position: absolute; top: 4px; right: calc(var(--gm-right, 30px) + 4px); z-index: 7; width: 22px; height: 22px; padding: 0;
     border: 1px solid var(--border, #333); border-radius: 5px; background: var(--panel, #1a1a1a); color: var(--text-dim, #889);
     font-size: 13px; line-height: 1; cursor: pointer; opacity: .55;
 }
@@ -3485,7 +3492,8 @@ body #editor.editor-layer {
 /* phone widths: the minimap goes OFF (the text needs the full width); the toggle stays reachable at the corner */
 @media (max-width: 600px) {
     .gcode-minimap { display: none !important; }
-    .editor-container.has-minimap .editor-layer { padding-right: 20px; }
+    .editor-container.has-minimap .editor-layer { padding-right: 20px !important; }
+    .gm-toggle { right: 4px; }
 }
 
 .editor-layer {
