@@ -29,6 +29,12 @@ export const dialect = {
     missScratch: '#190',
     readMachine: (axis, varName) => [`${varName}=#${1500 + AX[axis]}`], // DRO X#1500/Y#1501/Z#1502/A#1503 (safez.nc)
     machineMove: (axis, ref) => [`G0 G53 ${axis}${ref}`],   // CONFIRMED live: probe-fix.nc "G0G53Z#102" (G0 + G53)
+    // safeRetract (t822) — machine-frame safe-height retract. V4.1 has NO Studio boot macro that seeds a register
+    // (advstart is the honest UNVERIFIED stub) → BAKE the declared margin as a literal, staged in a free var (#190,
+    // the verified-free missScratch; post-miss its compare value is stale) to match the CONFIRMED `G0 G53 Z#var` form.
+    safeRetract: function ({ margin = -5 } = {}) {
+        return ['( Safe-Z retract - machine frame )', `#190=${margin} ( safe-Z margin - machine frame )`, ...this.machineMove('Z', '#190')];
+    },
     // CONFIRMED live (probe-vertex.nc): zero at the probed point with G90 G92 <axis><WORK value> — a work coord,
     // NOT a machine coord like Expert's register write. ("zero here" macros zeroz/zeroxy write #1506-1509 directly.)
     // t644 (F4 datum fix) — `value` is the MACHINE coord that should become work-0 (Expert writes it to the offset register).

@@ -13,7 +13,7 @@ import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
-import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
+import { safeZParkBlock, safeZFrameOf, safeRetractNode } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive (+ t822 machine-frame safe-height retract)
 import { opSimStarts } from '../viz/opSimStarts.js';   // E2 — the shared single-start registry (BUILT_IN.rotary_clock) the built-in + twin both read
 
 /** The interpolated SUMMARY texts (the 2 header comments + the 2 action-arm comments + the final message) — extracted to ONE
@@ -135,7 +135,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
     DM('abs');
     MSG(_hdr.msg);
     GO(2);
-    LB(1); DM('inc'); MV('Z', '#17'); DM('abs'); HMI('1', 'Probe failed - no contact');
+    LB(1); S.push(safeRetractNode()); HMI('1', 'Probe failed - no contact');   // t822 — machine-frame G53 retract (was G91/G0 Z#17/G90 — incremental crash vector)
     LB(2); END();
     return S;
 }

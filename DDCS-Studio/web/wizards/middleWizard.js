@@ -22,7 +22,7 @@ import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';   // the shared probe + travel primitives (middle composes them — t131 inc1, ① auto/manual travel)
-import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
+import { safeZParkBlock, safeZFrameOf, safeRetractNode } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive (+ t822 machine-frame safe-height retract)
 import { opSimStarts } from '../viz/opSimStarts.js';
 
 const AX = {
@@ -253,7 +253,7 @@ export function middleStack(params = {}, opts = {}) {
 
     // ── Footer + error handler ── the bare #1505 success/fail codes via hmiline (Expert #1505=<v>; off-HMI nothing, no text).
     S.push(mkDM('abs'), mkHMI('-5000', ''), mkGO(2));
-    S.push(mkLB(1), mkDM('inc'), mkMV('Z', '#17'), mkDM('abs'), mkHMI('1', ''), mkLB(2), mkEND());
+    S.push(mkLB(1), safeRetractNode(), mkHMI('1', ''), mkLB(2), mkEND());   // t822 — machine-frame G53 retract (was mkDM inc/mkMV Z#17/mkDM abs — incremental crash vector)
     return S;
 }
 

@@ -17,6 +17,7 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';
+import { safeRetractNode } from './ops/safeZframe.js';   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix)
 import { num } from './ops/util.js';
 import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
@@ -208,6 +209,8 @@ export function cornerStack(params = {}, opts = {}) {
         // Z-TRUST (Option B): the per-wall lift-to-safe-Z is #17 (=safeZ+scanDepth) when probeZ ON (unchanged), but #19 (=safeZ
         // ONLY) when probeZ OFF — scanDepth is meaningless without a measured surface, so the off-path travels at the DECLARED
         // safe Z. Forked via zPairR so the twin's superset carries both arms (byte-identical ON). Pairs with the reposition drop.
+        // t824 amendment (per-wall lift → machine-frame) is HELD at a gate: a G53 here breaks the sim preview's runtime-END
+        // anchoring (corner-draw-anchor) — same conflict middle/rotary flag; advisor to rule the approach (see WORK-LOG t824).
         out.push(mkMV(ax, retractVar), ...zPairR([mkMV('Z', '#17')], [mkMV('Z', '#19')]));
         return out;
     };
@@ -352,7 +355,7 @@ export function cornerStack(params = {}, opts = {}) {
     GO(2);
     C('=== ERROR HANDLER ===');
     LB(1);
-    DM('inc'); MV('Z', '#17'); DM('abs');
+    S.push(safeRetractNode());   // t822 — machine-frame G53 retract (was G91/G0 Z#17/G90 — incremental from an UNKNOWN Z after a miss → compounded into the top switch)
     HMI('1', 'ERROR: Probe failed to trigger');
     LB(2); END();
     return S;

@@ -32,6 +32,19 @@ export const dialect = {
     probeGuard: (p = {}) => { const o = []; if (p.stopVar) o.push(`${p.stopVar}=0 ( Stop mode: decelerate )`); if (p.limitVar) o.push(`${p.limitVar}=${p.limitVal ?? ''} ( Limit protect )`); return o; },
     // G53 Z#99   (snippets.nc:4). NO G0 prefix; ref MUST be a #var on M350 (a literal fails)
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],
+    // safeRetract (t822) — the SYSTEM safe-height retract to the machine-frame margin. G53 needs a #var on M350, so
+    // read the boot-seeded persistent register #520 (data/varMap.js RESERVED; sysstart.nc seeds it from the setting).
+    // INLINE UNSET-GUARD (defense-in-depth): a controller value wins if set (negative); else seed the declared margin —
+    // NEVER `G53 Z0` (= the top switch). A `function` (not arrow) so `this` is the dialect (reuses ifGoto/label/machineMove).
+    safeRetract: function ({ margin = -5, label = 91 } = {}) {
+        return [
+            '( Safe-Z retract - machine frame )',
+            ...this.ifGoto('#520', '<', '0', label),   // IF #520<0 GOTO<L>  — margin already set, skip the seed
+            `#520=${margin} ( safe-Z margin - controller value wins if set )`,
+            ...this.label(label),                      // N<L>
+            ...this.machineMove('Z', '#520'),          // G53 Z#520
+        ];
+    },
     // #[805+[idx-1]*5+ax]=value   (SAVE_WCS_XY_AUTO.nc:21-26). base 805, stride 5; X=base,Y=+1,Z=+2,A=+3
     setWorkOffset: (wcsExpr, axis, value) => [`#[805+[${wcsExpr}-1]*5+${AX[axis]}]=${value}`],
     // wcsBaseInto(wcs) — the WCS-table BASE-address compute into #70, the dump-grounded INDIRECT idiom shared by the probe

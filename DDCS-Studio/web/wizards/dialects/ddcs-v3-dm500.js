@@ -33,6 +33,14 @@ export const dialect = {
     missScratch: '#190',
     readMachine: (axis, varName) => [`${varName}=#${864 + AX[axis]}`],  // DRO X#864/Y#865/Z#866/A#867
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],      // G53 gated by config #395; dump safe-Z is M98 P101 — TO CONFIRM
+    // safeRetract (t822) — CONSERVATIVE degrade. Direct G53 is NOT dump-grounded on DM500 (no factory macro LINE emits
+    // G53; machine frame is reached only via M98 P100/P101 subprograms, and #395 is a setting NAME not usage). So DEGRADE
+    // to an ABSOLUTE WORK-FRAME clearance (G90 G0 Z<safe-Z>) — an absolute move KILLS the compounding crash vector even
+    // without G53 — plus an honest comment. DM500-direct-G53-confirm is on the user-gated list (do NOT ride M98 P101: a
+    // factory park may move XY, and a mid-program behavior change is worse than an honest work-frame retract).
+    safeRetract: function ({ workClear = '#17' } = {}) {
+        return ['( Safe-Z retract - machine G53 not grounded on DM500; absolute work-frame clearance )', this.distMode('abs'), `G0 Z${workClear}`];
+    },
     // DM500 macros zero with G92 (defprobe.nc:21) — value is a WORK coord (plate thickness), NOT a machine coord
     // like Expert's register write. t644 (F4 datum fix): `value` is the MACHINE coord that should become work-0 (what Expert
     // writes to its offset register); G92 takes a WORK value for the CURRENT position, so emit `[#dro - value]` (the offset

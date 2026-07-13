@@ -84,7 +84,7 @@ export const SETTINGS_DEFAULTS = {
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
     // Travel x/y/z are SIGNED (sign = home direction). workOrigin = the active WCS offset (machine coords of
     // part-zero), kept in sync from wcs.table[active-1]. wcs = the G54–G59 table pulled from the controller.
-    machine: { x: 300, y: 300, z: -120, show: true, softLimits: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },   // Z is negative: homes at the TOP (machine 0) and travels down into the work — the router/mill norm
+    machine: { x: 300, y: 300, z: -120, show: true, softLimits: true, safeZMargin: 5, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },   // Z is negative: homes at the TOP (machine 0) and travels down into the work — the router/mill norm. safeZMargin (t822) = mm below home the error-handler retract falls to via G53 (USER-OWNED); home Z0 = top, so 5 → machine Z -5
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
     probes:  {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)
@@ -572,6 +572,7 @@ function commitMachine() {
     s.machine.y = _gvs('set_mach_y', s.machine.y || 300);
     s.machine.z = _gvs('set_mach_z', s.machine.z || -120);   // negative default — Z homes at top, travels down
     const sl = document.getElementById('set_mach_softlimit'); if (sl) s.machine.softLimits = sl.checked;
+    const szm = document.getElementById('set_safez_margin'); if (szm) s.machine.safeZMargin = Math.abs(_gvs('set_safez_margin', s.machine.safeZMargin != null ? s.machine.safeZMargin : 5));   // t822 — USER-OWNED machine-frame safe-Z margin (mm below home)
     saveSettings();
 }
 
@@ -1172,6 +1173,8 @@ function buildSettingsOverlay() {
                         </div>
                         <!-- t744 — Show-machine-envelope folded into the 👁 visibility modal (the envelope element, everywhere + default-on). Soft limits stay below (a real machine bound, not a display toggle). -->
                         <label class="settings-check" title="Soft limits (#655). On = the controller bounds travel to this envelope, so the box closes. Off = no software bound — the box opens, unbounded in the travel direction (still pinned at home). Studio never writes #655 to the controller; this mirrors the machine's own setting (pull it)."><input type="checkbox" id="set_mach_softlimit"> Enable soft limits (#655) — closes the envelope</label>
+                        <!-- t822 — the DECLARED machine-frame safe-Z margin. The error-handler retract (on a probe miss) drops to this height in MACHINE coords via G53, so it never compounds into the top switch. YOUR value (headroom below home). -->
+                        <label class="mach-travel-row" style="margin-top:8px;" title="Safe-Z margin (mm below machine home). On a probe fault the tool retracts to G53 Z −(this) — a fixed machine height, immune to where the tool sits — instead of an incremental lift that can slam the top switch. Home Z0 = the top, so 5 → machine Z −5. Seeded to the controller register #520 by the sysstart boot macro (Expert)."><span class="mach-ax" style="color:#d8a35a;">⤒</span><input type="number" id="set_safez_margin" class="dim-edit mach-col-field" step="1" min="0" title="Safe-Z margin — mm below machine home"><span style="font-size:11px; opacity:.7;">Safe-Z margin (mm below home)</span></label>
                     </div>
                     <div class="settings-section" id="set_homing_section">
                         <div class="settings-section-title">HOMING</div>
@@ -1612,6 +1615,7 @@ function wireSettingsOverlay(ov) {
         q('set_mach_x').value = s.machine.x;
         q('set_mach_y').value = s.machine.y;
         q('set_mach_z').value = s.machine.z;
+        if (q('set_safez_margin')) q('set_safez_margin').value = s.machine.safeZMargin != null ? s.machine.safeZMargin : 5;   // t822 — machine-frame safe-Z margin
         renderMachineGui();
         renderWcsTable(q('set_mach_wcs_table'), s.machine);
         if (q('set_mach_softlimit')) q('set_mach_softlimit').checked = !!s.machine.softLimits;
@@ -2560,6 +2564,7 @@ function wireSettingsOverlay(ov) {
         s.machine.z = num(q('set_mach_z').value, s.machine.z);
         // ox/oy/oz removed; workOrigin is derived from the WCS table (renderWcsTable persists it on edit/pull).
         if (q('set_mach_softlimit')) s.machine.softLimits = q('set_mach_softlimit').checked;
+        if (q('set_safez_margin')) s.machine.safeZMargin = Math.abs(num(q('set_safez_margin').value, s.machine.safeZMargin != null ? s.machine.safeZMargin : 5));   // t822 — machine-frame safe-Z margin (mm below home)
 
         s.probes.probePin = num(q('set_probe_pin').value, s.probes.probePin);
         s.probes.probeLevel = num(q('set_probe_level').value, s.probes.probeLevel);
@@ -2772,6 +2777,7 @@ function wireSettingsOverlay(ov) {
     ['set_pv_probe_body_dia', 'set_pv_probe_body_len', 'set_pv_probe_stylus_len', 'set_pv_probe_ball_dia'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderProbeGui); el.addEventListener('change', commitProbeDims); } });
     // Machine envelope GUI: typing redraws the iso box (origin follows the signs); on commit persist so the 3D updates.
     ['set_mach_x', 'set_mach_y', 'set_mach_z'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderMachineGui); el.addEventListener('change', commitMachine); } });
+    { const el = q('set_safez_margin'); if (el) el.addEventListener('change', commitMachine); }   // t822 — commit the safe-Z margin live (no envelope redraw needed)
     { const el = q('set_mach_softlimit'); if (el) el.addEventListener('change', () => { commitMachine(); renderMachineGui(); }); }   // soft-limit toggle redraws the box closed/open
     // HOMING section (t624, moved here from Macros → sysstart) — the simultaneous flag + the safe-default reset (the per-axis
     // row inputs + ▲▼ are wired inside renderHomingGui on each render).

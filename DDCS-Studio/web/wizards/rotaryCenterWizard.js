@@ -14,7 +14,7 @@ import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (rotary composes it — t129 inc1)
-import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // the shared safe-Z FRAME primitive (SPATIAL-MODEL inc1)
+import { safeZParkBlock, safeZFrameOf, safeRetractNode } from './ops/safeZframe.js';   // the shared safe-Z FRAME primitive (SPATIAL-MODEL inc1) + t822 machine-frame safe-height retract
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 
@@ -169,7 +169,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
     DM('abs');
     MSG('Centreline Y#54 Z#56 - R#55');
     GO(2);
-    LB(1); DM('inc'); MV('Z', '#17'); DM('abs'); HMI('1', 'Probe failed - no contact');
+    LB(1); S.push(safeRetractNode()); HMI('1', 'Probe failed - no contact');   // t822 — machine-frame G53 retract (was G91/G0 Z#17/G90 — incremental crash vector)
     LB(2); END();
     return S;
 }

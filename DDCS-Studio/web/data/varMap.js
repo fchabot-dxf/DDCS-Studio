@@ -34,6 +34,14 @@ export const RANGES = {
 export const FORM = { min: 1100, max: 1499 };   // CAM form params (a sub-pool of camsetting)
 export const WCS = { min: 805, max: 834 };       // G54..G59 offset table (base 805, stride 5)
 
+/** RESERVED persistent uservar slots — a Studio meaning is pinned to the # so nothing else allocates it. Grounded CLEAN
+ *  in the M350 dump (macro-free; a FINDINGS persistence test that touched a slot only PROVES it is a live persistent cell). */
+export const RESERVED = {
+    520: 'safe-Z margin (t822) — machine-frame retract height as a NEGATIVE machine Z (below home). sysstart.nc seeds it '
+        + 'from settings.machine.safeZMargin; the error-handler retract reads G53 Z#520 with an inline unset-guard. '
+        + 'Neighbours in use: park #470-471, tool-change #472-473, SN #490, tool-change working #500/#510 — #520 is clear.',
+};
+
 /** Which class a macro var # belongs to. */
 export function classify(n) {
     n = Number(n);
