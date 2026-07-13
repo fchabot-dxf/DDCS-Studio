@@ -2881,3 +2881,60 @@ dirty rect is real), assert median splice <= median smooth * 1.3 + 2ms headroom 
 immune to a sub-ms coin flip. The geometry eps guard is unchanged. Ran the spec 3x (9/9, stable) + the carve cluster
 (24/24) before pass-back. Commit 3167aee. WHY noted in the test comment: two noisy singles compared strictly = a suite
 time bomb.
+
+## 2026-07-13 (t820) — BUNDLED SMALL TURN: (1) op-block empty SIM socket · (2) form-section collapse
+
+The advisor dispatched a bundle. Commit 511a164.
+
+### (1) THE OP BLOCK'S EMPTY SIM SOCKET — already done by t788 (verified + tested)
+
+GROUND (the dispatch said "who reads it — getUserSimGcode; else just hide-empty"): the adaptive hide ALREADY shipped as
+t788 — `syncSimSocket` (blocksApp, from `applyOpGating` on every load) hides the SIM mouth AND its "SIM" label when no
+child is plugged in, via `setVisible` (NOT removeInput → the connection + round-trip survive). Two DISTINCT sim concepts:
+`simChildren` (authored blocks in the SIM mouth — what syncSimSocket tests) vs `def.simGcode`/`getUserSimGcode` (a declared
+preview-gcode OVERRIDE function — only the ATC change). I checked keying the socket on `getUserSimGcode` instead — but that
+registry is NOT populated for the ATC opTypes in this build (`getUserSimGcode('atc_change_data')` / `'atc_change'` both
+null, `listUserOps` carry no `simGcode`), so a getUserSimGcode branch would be DEAD CODE. Since the ATC change's override
+is a FUNCTION (applied at preview, socket-independent), it still shows + round-trips regardless of the empty mouth —
+hiding it (t788) is correct. So the sanctioned "just hide-empty" IS the shipped behavior. I reverted my dormant
+getUserSimGcode experiment (kept only a clarified comment: the t788 comment claimed "a declared sim override" but the code
+tests a connected child — now it says so, and notes the ATC override is a function).
+
+Deliverable: the missing GUARD (sim-socket-hide-820.spec.js, 2/2) — a pocket (empty SIM) hides the socket AND its "SIM"
+label; an op holding a SIM child keeps it visible; the hide is setVisible-not-removeInput → simChildren survive the
+round-trip + the emit is byte-identical.
+
+### (2) FORM-SECTION COLLAPSE on long twin forms
+
+`renderOpForm` ignored the binding `section` field (rows were flat siblings). Now: bucket units by their declared
+`section`; ONLY a LONG form (> SECTION_THRESHOLD=8 rows AND ≥ 2 sections) renders the fold chrome ("where sensible" — a
+short form stays plain, ZERO change); each section gets a tappable HEADER (the title + a chevron, ≥44px touch) and its
+rows go INTO a `.wiz-pane-body` (folded ≠ removed — still in the DOM). NO per-wizard code: the shared renderer inherits it
+across all three hosts (twin form, Blocks pane, custom-op modal).
+
+- MOTION: REUSE the paneAccordion engine — I exported `applyState`; it sets `--drawer-dur-eff`/`--drawer-ease-eff` +
+  `data-collapsed`/`-reveal`/`-dir` on the `.form-sec`, so the EXISTING generic `.wiz-pane-body` transition + the reveal
+  personalities (per theme) drive the fold. No duplicate engine; prefers-reduced-motion → instant (inherited).
+- STATE: a new panePrefs per-kind boolean (`isSectionCollapsed`/`setSectionCollapsed`/`onSectionChange`, key
+  `ddcs_form_sections`) — app-wide per section title, default expanded, localStorage (never the machine profile).
+- CSS: `.form-sec > .form-sec-hdr` (2 classes) out-specifies the theme `[data-theme] button` pill so the 44px target holds
+  in every theme; the chevron rotates off `[data-collapsed]`.
+
+### VERIFY (form-section-collapse-820.spec.js 4/4 + sim-socket 2/2 + guards 7/7 + emit 9/9)
+
+- A LONG form (pocket) renders 2 collapsible sections (GEOMETRY 11 rows + TOOL & CUT 14), default expanded, header ≥44px;
+  folding TOOL & CUT persists (localStorage `ddcs_form_sections`) and SURVIVES a reload (reopen → still folded); the folded
+  section's fields REMAIN in the DOM (folded ≠ removed).
+- A SHORT form (wcs, 6 rows) renders NO collapse chrome; spot-check 3 twins (pocket sectionizes, wcs plain, surfacing OK).
+- All 5 themes: the section header renders as a ≥44px tappable bar (screenshots).
+- The form-integrity guard (form-kernel-720) + help-coverage (field-help-798) + help-slot stay green (folded rows still
+  found). Emit/params UNTOUCHED: pocket-data-emit 96 cases 0 diffs, depth-entry-804, atc-change-in-place green.
+
+Real symptom driven: the actual twin forms at localhost:3211; a screenshot shows the GEOMETRY / TOOL & CUT headers folding.
+
+SUITE: 1206 passed, 2 skipped, 0 failed, 0 flaky (workers=2, retries=0, 20.9m) (workers=2 — the section collapse is confined to renderOpForm's LONG-form path (short forms unchanged)
++ a new pref + a reused motion engine; the SIM change is a comment only; no emit path touched → byte goldens unaffected).
+
+Files: web/ui/formWidgets.js (renderOpForm sectionize + threshold), web/ui/panePrefs.js (section-collapse pref),
+web/ui/paneAccordion.js (export applyState), web/styles.css (.form-sec chrome), web/blocks/blocksApp.js (t788 comment
+clarify), tests/sim-socket-hide-820.spec.js (NEW), tests/form-section-collapse-820.spec.js (NEW). Commit 511a164.
