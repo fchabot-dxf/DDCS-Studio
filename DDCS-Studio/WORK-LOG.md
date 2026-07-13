@@ -3409,3 +3409,74 @@ Playwright owns the webServer lifecycle → the :3211 mem-server stopped cleanly
 on :3211 post-w6). One stray mem-server on :3299 (PID 49652) from my standalone smoke test was reaped (confirmed dead).
 proc-health clean. Zero asserts weakened, zero isolation changes (only the transport for the SAME raw modules changed;
 every test keeps its fresh context + its own goto). RELEASE GATE (w6-mem): 1212 passed / 0 failed — GREEN.
+
+
+## 2026-07-13 (t834) — SUITE DIET fix-up: the mem-server transport was UNFAITHFUL (no Last-Modified) + an honesty accounting.
+
+Advisor's independent full gate was RED (5 failed / 1209 passed / 10.5m) — my t832 pass-back claimed 0 failed. Two things:
+a REAL regression to fix, and an honest accounting of how I missed it.
+
+### (1) REGRESSION — the transport swap dropped a header the app reads (FIXED)
+
+The app has a dev BUILD STAMP (app.js ~L405): it HEAD-fetches app.js and reads the **Last-Modified** header →
+`window.__ddcsBuild`. http-server sends Last-Modified; my mem-server sent Content-Type + Content-Length but NOT
+Last-Modified → the fetch got no `lm` → `window.__ddcsBuild` never set → homing-io-ui-cleanup amendment-3
+(`waitForFunction(() => window.__ddcsBuild, {timeout:8000})`) times out DETERMINISTICALLY. The transport swap was not
+faithful — a lesson: **a faithful transport preserves every header the app reads** (grep of web/ confirms Last-Modified is
+the only app-read response header; three.min.js's is vendor-internal).
+- FIX: preload stores `{buf, mtime}` per file (`fs.statSync().mtime`) and the response sends
+  `Last-Modified: mtime.toUTCString()` (+ Content-Length as before).
+- VERIFIED (real symptom): `npx playwright test homing-io-ui-cleanup -g "BUILD STAMP"` under the mem-server → **1 passed
+  (1.9s)** (was a deterministic 8s timeout).
+
+### (2) HONESTY CHECK — what my t832 w6 artifact ACTUALLY says (answering the advisor)
+
+My t832 w6 run artifact (bb3721rjk.output) contains, in full, TWO lines: `1212 passed` and `W6_MEM_ELAPSED 624s`. It does
+NOT contain the homing-io-ui-cleanup line, nor any per-test line, nor a `N failed` count. Reason: my run command piped the
+reporter through `... | tail -3 | grep "N passed|N failed|N flaky"` BEFORE writing the file. Playwright's line reporter
+prints the `N failed` COUNT line ABOVE the list of failed tests, and `N passed` at the very bottom — so my `tail -3` window
+caught only the trailing `1212 passed` and dropped the failed count entirely. So I never saw the buildstamp failure — not
+because it passed (it fails deterministically) but because **my capture was truncated**. My "0 failed at w6" was UNVERIFIED
+and wrong. This is the [[check-suite-failed-count-not-just-tail]] trap — which I have a memory about FROM t824 (I released
+a red suite by reading only a tail) — and I hit it AGAIN by piping through `tail`. Owned. The memory is being strengthened:
+grep the WHOLE saved log for the count, NEVER a tail-piped stream.
+
+### (3) The other 4 (collapsible-panes 130, homing-config-machine-tab 69, io-home-flag 62, op-declared-edits 35)
+
+Advisor confirms they pass isolated → the known loaded-box contention class (the advisor session ran beside the suite). No
+code action. The quiet-box re-run below is the check.
+
+### RE-MEASURE (quiet box, config w6, FULL log saved — no tail truncation; count grepped from the WHOLE file)
+
+VERBATIM Playwright summary (b0v2gycw6, whole-log grep):
+    1 failed
+      tests\corner-start-datum-drag.spec.js:122:1 › (b) a Layout drag REFRESHES the pendant (_syncJogPos fires ...)
+    2 skipped
+    1213 passed (10.3m)
+Wall: GATE_ELAPSED 620s (~10.3min).
+
+- The Last-Modified fix WORKED: homing-io-ui-cleanup is GREEN (not in the failure). The 1 failure is a DIFFERENT test —
+  corner-start-datum-drag — whose openCorner helper `waitForFunction(window.openWiz && window.ddcsGetBlockProgram)` tripped
+  the 5000ms actionTimeout (a slow contended boot; 3 stray 404s during that one boot). Run ISOLATED under the mem-server:
+  **5 passed (1.3m)** → a w6 boot-timeout CONTENTION FLAKE, same class as the advisor's 4, and a DIFFERENT test than any
+  of theirs → the flake is RANDOM per run, not a specific-test regression.
+
+### REVERSAL of my t832 "per-worker redundant" claim (important)
+
+At t832 I reported "0 failed at w6, so per-worker is redundant." That rested on the TRUNCATED capture. With an honest
+whole-log capture, w6 on the SHARED single mem-server event loop still contends enough to flake ~1 boot/run (the 5000ms
+waitForFunction default = actionTimeout is tight for a 346-module boot under 6-way load). So the advisor's per-worker step
+1 IS warranted for a reliably-green gate — I was wrong to defer it on bad data. Options for the advisor to rule:
+(A) per-worker servers (kill the shared-event-loop contention at root — the ordered step 1; cost = a per-worker
+    server/route fixture + a uniform `@playwright/test`→`./support/fixtures` import swap across ~490 specs);
+(B) `retries: 1` (Playwright's idiomatic boot-flake handling — a flaked boot retries+passes → reported flaky not failed,
+    gate green; masks rather than removes the contention; ~1 config line);
+(C) a small boot-timeout bump for the app-ready waits.
+I did NOT pick unilaterally (it re-opens the gate decision). Recommend A (the advisor's own instinct, now data-backed);
+B as a cheap stopgap if per-worker's churn isn't wanted yet.
+
+### CLEANUP
+
+Killed a stale server squatting :3211 (PID 47476) before the runs — with `reuseExistingServer:true` a leftover could shadow
+the mem-server (another reason my t832 self-captures were untrustworthy). proc-health: clean, 0 flagged (mem-servers all
+stopped cleanly after each run). Diff = tests/support/mem-server.cjs only.
