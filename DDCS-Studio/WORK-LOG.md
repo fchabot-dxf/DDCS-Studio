@@ -2938,3 +2938,138 @@ SUITE: 1206 passed, 2 skipped, 0 failed, 0 flaky (workers=2, retries=0, 20.9m) (
 Files: web/ui/formWidgets.js (renderOpForm sectionize + threshold), web/ui/panePrefs.js (section-collapse pref),
 web/ui/paneAccordion.js (export applyState), web/styles.css (.form-sec chrome), web/blocks/blocksApp.js (t788 comment
 clarify), tests/sim-socket-hide-820.spec.js (NEW), tests/form-section-collapse-820.spec.js (NEW). Commit 511a164.
+
+## 2026-07-13 (t822) — SAFE-Z RETRACT: GROUND-FIRST + design gate (no code; safety-critical, passing back the forks)
+
+The dispatch demanded GROUND FIRST for a safety-critical, ALL-POST, goldens-regenerating change (machine crash: an
+incremental G91 Z-up compounds into the Z top switch). Grounding done (thorough sweep). It surfaced real design decisions
++ per-post grounding gaps that must be ruled BEFORE regenerating goldens across every post + committing a controller
+register — so this turn is the grounding + the plan + the forks (a GATE per the worker rule; no emit changed, suite green
+from the last release).
+
+### THE SWEEP + CLASSIFICATION (the crux)
+
+SAFE-HEIGHT incremental retracts (the crash class — CONVERT to machine-frame G53):
+- EVERY ERROR-HANDLER retract, raw incremental, fires from an UNKNOWN Z after a failed trigger (the worst vector):
+  cornerWizard L355, middleWizard L256, rotaryCenterWizard L172, rotaryClockWizard L138 (all DM(inc); MV(Z,#17); DM(abs)).
+- cornerWizard L211 per-wall lift-to-safe-Z after each wall touch (probe retreat).
+- atcLengthWizard L91 / atcToolCheck L86,L93 safe-Z retract, currently WORK-absolute (#19), not machine.
+ALREADY machine-frame (correct, no change): atcChange/atcTest/homing (G53); middle/rotaryCenter/rotaryClock/alignment
+FINAL park via safeZParkBlock. IN-CUT (untouched — small symmetric hops / peck / step-over / cutting-op G0 Z<clr>):
+safeTraverse lift+equal-drop-back, reposition, probeSurface back-offs, drill peck, program.js clearance.
+
+### EXISTING INFRA (reuse, do not duplicate)
+
+ops/safeZframe.js  ALREADY gives relative|machine(G53) — rolled to middle/rotary*/alignment
+FINAL park, driven by ui/safeZFrameToggle.js (ADOPTING_FIELDS rc/rcl/al/m, NOT corner). CORNER is NOT on the frame (raw
+incremental L211/L355). The sim ALREADY parses G53 -> machine->part map + flips the poschip AMBER (engine 1059-1093;
+toolpath2d 305-306) -> the sim acceptance needs NO new work, just an assert.
+
+### PER-POST G53 (from the dumps) + the register
+
+Expert  (needs #var, no G0; snippets.nc seeds a TEMP #99=0 then G53 Z#99). V4.1  (firmware uses
+#1402 for safe-Z). grbl  (no vars). rs274/centroid literal-or-var. Persistent Expert uservar #100-#549
+(real; #481+ machine-proven writable) but NO slot is DEDICATED to safe-Z, and DM500 #100-#102 are CONFIG params not scratch
+(register name != macro usage). DM500 factory safe-Z is  (a SUBPROGRAM), direct G53 gated by config #395 -> direct
+ on DM500 is UNCONFIRMED.
+
+### SETTINGS SEAM
+
+settings.machine.z = -120 (home Z=0 top, envelope -120 bottom); settings.endProgram carries the G53 policy note. NO
+machine safe-Z margin field yet -> a new USER-OWNED settings.machine.safeZMargin (default 5 => G53 Z-5) follows the
+set_mach_z read/write pattern.
+
+### THE FORKS (advisor to rule before the goldens-regenerating build)
+
+FORK A - the Expert margin REGISTER + boot-macro: no dedicated slot exists. A1 = declare a persistent slot (e.g. #500) as
+the safe-Z-margin register; a boot macro seeds it from the setting (#500 = -margin); emit reads G53 Z#500. A2 = literal
+(ungrounded). Dispatch ruled register-where-grounded, so A1 for Expert - but the SLOT choice + the boot-macro home is a
+controller commitment I should confirm (which slot; does the boot macro already exist to extend, or is it net-new).
+FORK B - the UNSET-GUARD emit form: register 0/unset must fall to the baked default, never Z0. Options: (B1) emit-side
+DDCS IF  before  (per-retract or once); (B2) the boot macro owns init and the
+emit trusts it (+ a one-time seed guard). B1 is self-contained per program; confirm the DDCS IF syntax is safe in-line.
+FORK C - DM500: direct G53 unconfirmed (factory = M98 P101 subprogram, #395-gated). Options: call the M98 subprogram, a
+literal G53 if #395 permits, or degrade to the existing work-absolute safe-Z with a flagged note. Needs a ruling.
+FORK D - CLASSIFICATION confirm: is corner L211 per-wall lift SAFE-HEIGHT (convert) or IN-CUT (keep)? I classify it
+safe-height (probe retreat to clearance), and ALL error-handlers safe-height (convert), and the symmetric lift+drop-back
+inter-move traverses IN-CUT (keep). Confirm before the sweep regenerates corner-data-emit/corner-post-fold/corner-z-trust.
+
+PLAN once ruled: settings.machine.safeZMargin -> a shared safe-height atom (extend safeZParkBlock to read the margin +
+the per-post register/literal + the unset-guard) -> wire corner L211 + ALL error-handlers to it (pilot) -> all twins
+inherit -> per-post + unset-guard + sim-amber asserts -> regenerate ONLY the safe-height-class goldens, each diff
+justified. NO emit touched this turn.
+
+## 2026-07-13 (t822) — SAFE-Z RETRACT: GROUND-FIRST + design gate (CORRECTED — the prior append lost its ()-fragments to a bash substitution glitch; this is the authoritative entry)
+
+The dispatch demanded GROUND FIRST for a safety-critical, ALL-POST, goldens-regenerating change (machine crash: an
+incremental G91 Z-up compounds into the Z top switch). Grounding is done (a thorough emit sweep + a dump read). It
+surfaced real design decisions + per-post grounding gaps that must be RULED before regenerating goldens across every
+post + committing a controller register — so this turn is the grounding + the plan + the forks (a GATE per the worker
+rule; NO emit changed, suite green from the last release).
+
+### THE SWEEP + CLASSIFICATION (the crux)
+
+SAFE-HEIGHT incremental retracts = the crash class, CONVERT to machine-frame G53:
+- EVERY ERROR-HANDLER retract is raw incremental and fires from an UNKNOWN Z after a failed trigger (the worst vector):
+  cornerWizard L355, middleWizard L256, rotaryCenterWizard L172, rotaryClockWizard L138 -- each is the pattern
+  DM inc ; MV Z #17 ; DM abs.
+- cornerWizard L211 per-wall lift-to-safe-Z after each wall touch (probe retreat).
+- atcLengthWizard L91 / atcToolCheck L86,L93 safe-Z retract, currently WORK-absolute #19, not machine.
+ALREADY machine-frame (correct, untouched): atcChange / atcTest / homing use G53; middle / rotaryCenter / rotaryClock /
+alignment FINAL park already go through safeZParkBlock. IN-CUT (untouched -- small symmetric hops / peck / step-over /
+cutting-op work-clearance): safeTraverse lift+equal-drop-back, reposition, probeSurface back-offs, drill peck,
+program.js clearance. These are deterministic in the G90 work frame and do NOT compound.
+
+### EXISTING INFRA (reuse, do not duplicate)
+
+ops/safeZframe.js exports safeZParkBlock(frame, varRef): frame machine -> a machinemove atom (dialect G53), frame
+relative -> a plain move atom (byte-identical to today). It is ALREADY rolled to the FINAL park of middle / rotaryCenter
+/ rotaryClock / alignment, driven by ui/safeZFrameToggle.js (ADOPTING_FIELDS = rc / rcl / al / m -- NOT corner). CORNER
+is NOT on the frame (its L211 + L355 are raw incremental). The sim ALREADY parses G53 -> maps machine-to-part +
+flips the poschip AMBER (GcodeExecutionEngine.js 1059-1093; toolpath2d.js 305-306) -> the sim acceptance needs NO new
+render work, only an assert.
+
+### PER-POST G53 (verified in the dumps) + the register
+
+- Expert (ddcs-expert-m350): machineMove emits  G53 Z#var  -- needs a #var, no G0, no literal form. snippets.nc seeds a
+  TEMP #99=0 then does G53 Z#99.
+- V4.1 (ddcs-v41): machineMove emits  G0 G53 Z#var . Firmware uses #1402 for safe-Z, #1300-#1302 for the tool-change park.
+- DM500 (ddcs-v3-dm500): machineMove emits  G53 Z#var  but the FACTORY safe-Z is  M98 P101  (a subprogram), and direct
+  G53 is gated by config #395 -> a direct  G53 Z-margin  on DM500 is UNCONFIRMED (register name != macro usage).
+- grbl: machineMove emits  G53 G0 Z<literal>  -- grbl has NO #vars, so the margin can only be a baked literal.
+- rs274ngc / centroid: literal or #var both accepted.
+Persistent register: Expert uservar range #100-#549 is real; #481+ is machine-PROVEN writable (the verify/*.nc G53-var
+tests). But NO slot is DEDICATED to a machine safe-Z today, and on DM500 #100-#102 are CONFIG params (axis speeds), NOT
+free scratch -- so a margin register must be chosen PER POST, it does not map by number across posts.
+
+### SETTINGS SEAM
+
+settings.machine.z = -120 (home Z=0 at the TOP, envelope -120 at the bottom); settings.endProgram already carries the
+G53 retract/park policy note. There is NO machine safe-Z margin field yet. A new USER-OWNED settings.machine.safeZMargin
+(default 5 => G53 Z-5, i.e. 5mm below home) would follow the existing set_mach_z read/write pattern in settingsPanel.js.
+
+### THE FORKS (advisor to rule before the goldens-regenerating build)
+
+FORK A -- the Expert margin REGISTER + its boot init. No dedicated slot exists.
+  A1: declare a persistent slot (e.g. #500) as THE safe-Z-margin register; an init/boot macro seeds it from the setting
+      (set the reg = -margin); emit reads  G53 Z#reg .  A2: bake a literal (ungrounded -- editing the setting never
+      reaches the controller). Dispatch ruled register-where-grounded, so A1 for Expert -- but the SLOT choice AND the
+      boot-init HOME need confirming: does a Studio-written boot/startup macro already exist to extend, or is the init
+      net-new? (My grounding did not find a clear existing boot-macro seam Studio owns -- this is the key open gap.)
+FORK B -- the UNSET-GUARD emit form (register 0/unset must fall to the baked default, NEVER Z0 which rapids into the top
+  switch). B1: an emit-side DDCS conditional  IF [#reg EQ 0] THEN #reg = -default  immediately before  G53 Z#reg
+  (self-contained in every program; confirm the DDCS IF/assignment syntax is safe inline). B2: the boot macro owns init
+  and the emit trusts the register (relies on FORK A's boot seam existing). B1 is the safety net that stands alone.
+FORK C -- DM500. Direct G53 is unconfirmed (factory safe-Z = M98 P101 subprogram, #395-gated). Options: call the M98
+  subprogram, emit a literal G53 if #395 permits, or degrade to the existing work-absolute safe-Z with a flagged note.
+  Needs a ruling -- the dispatch said no post stays incremental, but DM500 direct-G53 is not dump-proven.
+FORK D -- CLASSIFICATION confirm. Is cornerWizard L211 (the per-wall lift-to-safe-Z) SAFE-HEIGHT (convert to G53) or
+  IN-CUT (keep relative)? I classify it SAFE-HEIGHT (a probe retreat to clearance -- the dispatch lists probe start/
+  retreat as safe-height), ALL error-handlers SAFE-HEIGHT (convert), and the symmetric lift+equal-drop-back inter-move
+  traverses IN-CUT (keep). Confirm before the sweep regenerates corner-data-emit / corner-post-fold / corner-z-trust.
+
+PLAN once ruled: declare settings.machine.safeZMargin (USER-OWNED) -> a shared safe-height atom that reads the margin +
+the per-post register-or-literal + the unset-guard (extend safeZframe.js, one source) -> wire corner L211 + ALL
+error-handlers to it (corner = the gated pilot) -> all data twins inherit in the same commit -> per-post fold +
+unset-guard + sim-amber asserts -> regenerate ONLY the safe-height-class goldens, each diff justified. NO emit touched
+this turn -- this is the GATE.
