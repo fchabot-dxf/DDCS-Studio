@@ -2870,3 +2870,14 @@ stop-crisp refactor is verified byte-identical; no emit path touched → the gol
 Files: web/engine/stockRemoval.js (retained dirty rect), web/viz/gcodeViz3d.js (_crispContext one-source + the byte-identical
 stop refactor + carveLiveCrisp/_liveCrispInit/Splice/Assemble + arc-for-live), web/viz/createPreviewPanel.js (throttle →
 crisp splice; feed the arc), tests/carve-live-crisp-816.spec.js (NEW). Commit 5bd8336.
+
+## 2026-07-13 (t818) — FIX-UP: median-of-N perf assert for carve-live-crisp-816 (advisor red, pre-release)
+
+The t816 perf assertion compared two SINGLE wall-clock samples (spliceMs vs smoothMs) with a strict <= — a knife-edge
+that flips on scheduler noise (the advisor MY-run saw spliceMs 34.2 vs smoothMs 34.0; the t710 flaky-is-banned doctrine).
+The GEOMETRY guard (sameLen + maxErr 0) passed — the feature is correct, the PERF assert was malformed. Fix (test-only):
+measure MEDIAN-OF-7 for BOTH the splice and the smooth remesh in the same page (each splice rep cuts NEW material so the
+dirty rect is real), assert median splice <= median smooth * 1.3 + 2ms headroom — still catches a real 2x regression,
+immune to a sub-ms coin flip. The geometry eps guard is unchanged. Ran the spec 3x (9/9, stable) + the carve cluster
+(24/24) before pass-back. Commit 3167aee. WHY noted in the test comment: two noisy singles compared strictly = a suite
+time bomb.
