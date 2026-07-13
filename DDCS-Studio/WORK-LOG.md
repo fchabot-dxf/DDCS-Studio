@@ -3744,3 +3744,59 @@ depth-entry-everywhere-842 test 6: (a) the SIM plays every mode per op — trace
 plunge/ramp/helix + contour x plunge/ramp → segments produced (the preview animates exactly this). (b) each TWIN FORM
 renders the Depth Entry cluster (screenshots at the two-pane wide viewport, VIEWED): surfacing shows Depth Entry=Helix +
 the when-gated Helix Ø (mm) + Helix Pitch (mm/rev) — units in parens, labels clean (t806). All 6 spec tests green.
+
+
+## 2026-07-13 (t844) — BACKLOG 4: TIME ESTIMATES (total + per-op) from the sim's own move+feed knowledge.
+
+GROUND-FIRST (2 agents): the engine ALREADY does time-true playback (`rate = rapid ? rapidRate : (feed>0?feed:600)`,
+`realMs = dist/rate*60000`), but the STATIC trace never totals it; rapidRate is hardcoded 6000 (not a setting) in every
+path; a SEPARATE estimator exists in shared/js/instrument/gcode-parse.js (the GATEWAY's, different defaults) — NOT used
+here (it would disagree with playback); the wizard preview computes NO per-program total (the advisor's "the panel already
+computes a duration" was OFF — flagged; I ADD it); the real G0-rate register IS grounded per profile (Expert #63, V4.1
+#103, DM500 #80).
+
+### BUILT — the estimate reads the ONE source (the engine trace + the SAME rate model as playback)
+
+- **engine/timeEstimate.js** (NEW): `estimateProgram(program, {rapidRate, toolChangeSec, wcsOffset})` → `{seconds, moveSec,
+  dwellSec, tcSec, perLine}`. `moveSeconds(seg, rapidRate)` = the IDENTICAL formula the engine playback uses (dist/rate,
+  the feed≤0→600 fallback). `secondsForLines(perLine, lines)` = the per-op split (sum the seconds on an op's source lines).
+  `fmtDuration` = honest rounding (no fake precision: s / min / h m). NO second parser — reads traceToolpath's segments.
+- **GcodeExecutionEngine.js**: the trace now accumulates `stats.dwellMs` (each G4 P, real ms) + `stats.toolChanges` (each
+  M6) — non-motion time that isn't in the segments — and exposes them in `_buildTraceResult`. The estimate adds them.
+- **settings.machine.rapidRate = 6000 + toolChangeSec = 15** (declared, honest defaults). Wired rapidRate → the playback
+  engine (createPreviewPanel ensureEngine) so the sim's per-move time and the estimate use the SAME rate → they agree.
+- **ui/timeChip.js** (NEW): an unobtrusive editor chip (top-centre) "≈ 14 min", live on programModel.onChange + editor
+  input (debounced) + settings-changed; caches the estimate so the op-hover chip reads it without re-tracing. Tooltip: the
+  cut/dwell/tool-change breakdown + "no acceleration modeled — a real job runs a little longer on dense code."
+- **editorOpHover.js**: the op-hover chip appends the per-op time ("✎ Pocket · ≈ 9 min") via secondsForLines.
+
+### HONESTY / ONE-SOURCE
+
+- The estimate is the SIM's model (the engine trace), the advisor's named source — NOT gcode-parse.js. FLAG: two time
+  models now exist (the gateway's instrument estimator + the sim's); unifying them is a follow-on (different defaults —
+  gcode-parse uses feed→1000, the engine feed→600; unifying would shift the gateway's beacon pacing, out of scope here).
+- accel/decel NOT modeled → the number says "≈" + the tooltip states the bias; rounded (no fake precision).
+
+### DEFERRED (flagged) — the pull-seed
+
+The G0-rate register is grounded (Expert #63 "G00 speed", V4.1 #103 "G0 Speed", DM500 #80). The advisor said "the pull
+seeds it when readable." I DECLARED settings.machine.rapidRate with the honest 6000 default (the acceptance's "assert the
+setting feeds it" is met) but did NOT wire the dump→rapidRate pull-seed this turn (a dumpImport by-name role + a pull-apply
+line, the softLimitsPulled precedent) — the turn was large and the pull-seed is not in the acceptance. A small next increment.
+
+### VERIFIED (real symptom) — time-estimate-844.spec.js (7)
+
+- EXACT math on a hand-computable program: rapid 60mm@6000=0.6s + feed 100mm@600=10s + G4 P500=0.5s + M6=15s → 26.1s (asserted).
+- RAPIDS use the declared rate (halve rapidRate → the rapid time doubles); settings.machine.rapidRate/toolChangeSec present.
+- The estimate == the SIM PLAYBACK MODEL (the engine per-move formula, independently recomputed from the trace, to 6 dp).
+- PER-OP split is a valid partition (never exceeds the total; the ops account for >99% of the move time — a tiny residual
+  is a program-level header rapid in no op).
+- CHIP renders + updates on edit + legible in both themes (screenshots viewed). Per-op HOVER chip shows "≈ …" (screenshot
+  viewed: the time chip "≈ 9 min" top-centre + "✎ Pocket · ≈ 9 min" on hover; the G04 P3000 dwell is included).
+
+### GATE (w4, full log — no tail truncation)
+
+VERBATIM: 1240 passed / 1 failed / 2 skipped (12.4m, 744s). The 1 failure — io-home-backfill (a homing screenshot) — is
+the KNOWN w4 CPU-contention class (t842 flaked the same); it passes ISOLATED (2 passed), is UNRELATED to time-estimates (no
+homing/io touched), the box ran loaded. My change: 7 new time tests green, no op-regression touched. Advisor re-runs on a
+quiet box for the release gate.
