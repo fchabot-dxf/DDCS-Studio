@@ -95,6 +95,25 @@ let _layoutSpots = {};    // { [groupId]: { dx, dy } } datum-relative; cleared p
 // surfaces. Seeded from the op's params on EDIT (setForm); cleared per fresh OPEN (onShow).
 let _simStartFracs = {};
 
+// t808 — HELD-STEPPER DEBOUNCE (stepper-runaway fix a). The number-field steppers have NO hold-repeat of their own; the
+// runaway was the recompute LOOP around them — while a form field is FOCUSED (a held/repeating spinner, or live typing,
+// is a CONTINUOUS gesture) each 'input' fired a FULL synchronous re-render (emit + 2D featureCanvas + 3D), which choked
+// the main thread so a native spinner's release was missed and the value ran away. Now a focused-field edit runs on a
+// LEADING-EDGE throttle: the first edit updates instantly, rapid repeats coalesce to one update per window, a trailing
+// update lands the final value. A COMMIT ('change'/blur) or a non-focused synthetic input (a canvas picker / a handle
+// write-back) runs INLINE — unchanged, so programmatic updates and the tests are unaffected. (Extends the Blocks
+// edit-lag discipline — typed commits inline, gestures debounced — to held steppers, per the ruled trigger split.)
+const RECOMPUTE_MS = 200;
+let _uTimer = null, _uPending = false;
+function _runUpdate() { _uTimer = null; if (_uPending) { _uPending = false; _throttledUpdate(); } }
+function _throttledUpdate() {
+    if (_uTimer) { _uPending = true; return; }   // inside the window → coalesce, fire once on the trailing edge
+    if (_mgr) _mgr.update();                       // leading edge → instant (a single click / first keystroke is not delayed)
+    _uTimer = setTimeout(_runUpdate, RECOMPUTE_MS);
+}
+function _inlineUpdate() { if (_uTimer) { clearTimeout(_uTimer); _uTimer = null; } _uPending = false; if (_mgr) _mgr.update(); }
+function _clearThrottle() { if (_uTimer) { clearTimeout(_uTimer); _uTimer = null; } _uPending = false; }
+
 /** The machine ENVELOPE reach in the WCS/stock frame (the stock corner sits at the WCS origin): a WCS coord `w` maps to
  *  machine `workOrigin + w`, reachable while `0 ≤ workOrigin + w ≤ span` → `w ∈ [-workOrigin, span - workOrigin]`. Null if
  *  the stock's PLACEMENT in the machine is not DECLARED (then the drag is unbounded — the stock is never the bound).
@@ -192,10 +211,17 @@ function render() {
     _readers = _def.bindings && _def.bindings.length
         ? renderOpForm(host, binds)
         : (host.appendChild(Object.assign(document.createElement('div'), { textContent: 'No parameters — inserts as-is.', style: 'opacity:.6;margin:8px 0;' })), []);
-    // one delegated listener: any widget input/change (incl. canvas pickers, which dispatch a bubbling input) re-runs update()
+    // one delegated listener: any widget input/change (incl. canvas pickers, which dispatch a bubbling input) re-runs update().
+    // t808 — a focused form field emitting 'input' (a held stepper / live typing = a continuous gesture) THROTTLES the heavy
+    // recompute (leading-edge, one per window + trailing); a COMMIT ('change'/blur) or a non-focused synthetic input (a canvas
+    // picker or a handle write-back — activeElement is not the field) runs INLINE (unchanged for tests + programmatic updates).
     if (_mgr && !host.dataset.wired) {
         host.dataset.wired = '1';
-        const u = () => _mgr && _mgr.update();
+        const u = (e) => {
+            const ae = (typeof document !== 'undefined') ? document.activeElement : null;
+            const gesture = e && e.type === 'input' && ae && host.contains(ae) && (ae.tagName === 'INPUT' || ae.tagName === 'SELECT');
+            if (gesture) _throttledUpdate(); else _inlineUpdate();
+        };
         host.addEventListener('input', u);
         host.addEventListener('change', u);
     }
@@ -219,7 +245,7 @@ export const userOpView = {
     // before onShow→render so the seeded default shows. A fresh open (no variant) is unaffected; opensAs entries pass none.
     applyVariant(variant) { if (variant != null && variant !== '' && _def && (_def.bindings || []).some((b) => b.param === 'mode')) _seed = { ...(_seed || {}), mode: variant }; },
 
-    onShow(mgr) { _mgr = mgr; _layoutSpots = {}; _simStartFracs = {}; applyPanel(); render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical); t508 clear the sim-start fractions too
+    onShow(mgr) { _mgr = mgr; _layoutSpots = {}; _simStartFracs = {}; _clearThrottle(); applyPanel(); render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical); t508 clear the sim-start fractions too; t808 drop any pending throttled update
 
     update(mgr) {
         _mgr = mgr;

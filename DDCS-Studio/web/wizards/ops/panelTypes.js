@@ -68,7 +68,16 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
 // over those — the form widget already drags them. (The selector targets the live custom-op form.)
 const _field = (name) => (typeof document !== 'undefined') ? document.querySelector('#wiz_user_form [data-param="' + (window.CSS ? CSS.escape(name) : name) + '"]') : null;
 const _writable = (name) => !!_field(name);
-function _writeParam(name, val) { const f = _field(name); if (f) { f.value = r3(val); f.dispatchEvent(new Event('input', { bubbles: true })); } }
+// t808 — LOOP-GUARD (stepper-runaway fix b): a handle write-back only dispatches when the value ACTUALLY changes. An
+// unchanged write (a jittery drag frame, or any render-time re-derive that lands the same number) must NOT fire a
+// synthetic 'input' — otherwise it re-triggers update() → re-render → write-back → … a self-sustaining round-trip that
+// walks/sticks the value. (Mirrors setParam's `s.value !== val` guard for the enum pickers.)
+function _writeParam(name, val) {
+    const f = _field(name); if (!f) return;
+    const next = r3(val);
+    if (String(f.value) === String(next)) return;   // unchanged → no dispatch (breaks the write-back→recompute→write-back chain)
+    f.value = next; f.dispatchEvent(new Event('input', { bubbles: true }));
+}
 
 // Derive a 2D FeatureCanvas spec from the op's xy / rect / circle-bound params — a top-down summary that mirrors what
 // the canvas pickers set (xy group → a point; rect group → a rectangle; circle group → a disc), drawn on the configured
