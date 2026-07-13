@@ -90,7 +90,9 @@ test('REAL APP (t684 b): the collapsed PROFILE section + the browser modal — s
     await page.click('#set_profile_browse');
     await page.waitForSelector('.profile-modal');
     expect(await page.locator('.profile-modal .prof-row').count(), 'two profiles in the modal list').toBe(2);
-    await page.evaluate(() => { const r = [...document.querySelectorAll('.profile-modal .prof-row')].find((x) => /My V4.1 rig/.test(x.textContent)); r.querySelector('[data-load]').click(); });
+    // t805 SELECT-THEN-LOAD: select the row, then the dedicated [Load] (no per-row Load button)
+    await page.evaluate(() => { const r = [...document.querySelectorAll('.profile-modal .prof-row')].find((x) => /My V4.1 rig/.test(x.textContent)); r.querySelector('.sl-name').click(); });
+    await page.click('.profile-modal [data-sl-primary]');
     await page.waitForTimeout(150);
     expect(await page.evaluate(() => window.ddcsGetSettings().machine.x), 'loading the first profile full-swaps the envelope back to 700').toBe(700);
     await page.locator('.profile-modal > div').first().screenshot({ path: 'scratchpad/profile-modal.png' });

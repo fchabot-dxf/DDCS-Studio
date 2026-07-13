@@ -751,6 +751,18 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .proj-rowacts { display: flex; gap: 3px; }
 .proj-foot { padding: 7px 14px; border-top: 1px solid var(--border); font-size: 11px; }
 
+/* SELECT-THEN-LOAD — the shared row-selection model (projects + profiles browsers; ui/selectLoad.js).
+   Selection uses a box-shadow ring so it never collides with a row's own inline/border styling. The ACTIVE
+   badge (.sl-active-badge) is a separate pill, visually distinct from the selection ring. */
+.sl-row { cursor: pointer; }
+.sl-row.sl-selected { box-shadow: 0 0 0 2px var(--accent, #0ea5e9) inset; background: color-mix(in srgb, var(--accent, #0ea5e9) 14%, transparent); border-radius: 6px; }
+.sl-name { flex: 1; text-align: left; color: var(--text-main); font: inherit; padding: 4px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sl-active-badge { font: 700 10px inherit; letter-spacing: .3px; text-transform: uppercase; color: var(--accent, #0ea5e9); border: 1px solid var(--accent, #0ea5e9); border-radius: 4px; padding: 1px 5px; }
+.sl-tag { font-size: 10px; opacity: .65; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+.sl-openbar { display: flex; justify-content: flex-end; padding: 8px 12px; border-top: 1px solid var(--border); }
+.sl-primary { padding: 6px 14px; font: 600 12px inherit; border-radius: 6px; cursor: pointer; border: 1px solid var(--accent, #0ea5e9); background: var(--accent, #0ea5e9); color: #fff; }
+.sl-primary:disabled { opacity: .4; cursor: default; }
+
 /* Project VFS — SAVE modal (centered) with the folder tree picker. */
 .proj-savemodal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; }
 .proj-savemodal[hidden] { display: none; }

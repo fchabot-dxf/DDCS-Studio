@@ -9,7 +9,8 @@
 import { serializeProject, loadProject, downloadMacro, openMacroText } from '../../blocks/programFile.js';
 import * as store from './projectStore.js';
 import { getAccount, connect } from '../cloudAccount.js';
-import { PROVIDER_IDS, providerLabel, providerIcon } from '../cloud/providers.js';
+import { AVAILABLE_PROVIDER_IDS, providerLabel, providerIcon } from '../cloud/providers.js';
+import { installSelectLoad, syncPrimary } from '../selectLoad.js';   // t805 — the shared select-then-load model
 import * as gdrive from '../cloud/googleDrive.js';   // Google adapter (others plug in via the same shape)
 import { pickFolder } from '../cloud/googlePicker.js';
 import { googleApiKey, setGoogleApiKey } from '../cloud/providers.js';
@@ -78,6 +79,7 @@ function buildDrawer() {
         + '<span class="proj-actions"><button class="op-btn" data-act="mkdir" title="New folder here">+ Folder</button>'
         + '<button class="op-btn" data-act="import" title="Import a .mjson file">Import</button></span></div>'
         + '<div class="proj-list" id="projList"></div>'
+        + '<div class="sl-openbar"><button class="sl-primary" data-sl-primary disabled title="Open the selected project">Open</button></div>'
         + '<div class="proj-foot muted" id="projFoot"></div>'
         + '</div>'
         + '<div id="projCloud" style="display:none">'
@@ -104,6 +106,16 @@ function buildDrawer() {
     importInput.addEventListener('change', onImportFile);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drawer && !drawer.hidden) closeDrawer(); });
     window.addEventListener('ddcs:cloud-account', () => { if (drawer && !drawer.hidden && vol === 'cloud') renderCloud(); });
+    // t805 — SELECT-THEN-LOAD: a project row selects; the dedicated [Open] (disabled until selected) or a
+    // double-click opens. Folders navigate on their own click (not sl-rows). Two roots = local vs cloud.
+    installSelectLoad(localWrap, async (path) => {
+        try { const obj = await store.readProject(path); if (obj) { loadProject(obj); closeDrawer(); } }
+        catch (err) { dlgNotice('open failed: ' + err.message); }
+    });
+    installSelectLoad(cloudMount, async (id) => {
+        try { loadProject(await gdrive.read(id)); closeDrawer(); }
+        catch (e) { dlgNotice(cloudErrMsg(e)); }
+    });
 }
 
 function mkCrumb(label, path) {
@@ -127,15 +139,21 @@ async function renderDrawer() {
     listEl.replaceChildren();
     if (!entries.length) listEl.innerHTML = '<div class="muted" style="padding:10px">empty — Save a project, or Import a .mjson file</div>';
     for (const en of entries) {
+        const isFolder = en.type === 'folder';
         const row = document.createElement('div');
-        row.className = 'proj-row';
-        const icon = en.type === 'folder' ? '📁' : '📄';
+        // A FOLDER navigates on click (its own button); a PROJECT is an sl-row — selected then opened via [Open]/dblclick.
+        row.className = isFolder ? 'proj-row' : 'proj-row sl-row';
+        if (!isFolder) row.dataset.slId = en.path;
+        const icon = isFolder ? '📁' : '📄';
         const meta = (en.type === 'project' && en.savedAt) ? en.savedAt.slice(0, 16).replace('T', ' ') : '';
-        const nameBtn = document.createElement('button');
-        nameBtn.className = 'proj-name';
-        nameBtn.dataset.act = en.type === 'folder' ? 'cd' : 'open';
-        nameBtn.dataset.path = en.path;
-        nameBtn.textContent = icon + ' ' + en.name;
+        let nameEl;
+        if (isFolder) {
+            nameEl = document.createElement('button');
+            nameEl.className = 'proj-name'; nameEl.dataset.act = 'cd'; nameEl.dataset.path = en.path;
+        } else {
+            nameEl = document.createElement('span'); nameEl.className = 'sl-name';
+        }
+        nameEl.textContent = icon + ' ' + en.name;
         const metaEl = document.createElement('span'); metaEl.className = 'proj-meta muted'; metaEl.textContent = meta;
         const acts = document.createElement('span'); acts.className = 'proj-rowacts';
         for (const [act, label, cls, title] of [['rename', '✎', '', 'Rename'], ['del', '🗑', 'danger', 'Delete']]) {
@@ -143,10 +161,11 @@ async function renderDrawer() {
             b.className = 'op-btn ' + cls; b.dataset.act = act; b.dataset.path = en.path; b.textContent = label; b.title = title;
             acts.appendChild(b);
         }
-        row.append(nameBtn, metaEl, acts);
+        row.append(nameEl, metaEl, acts);
         listEl.appendChild(row);
     }
     footEl.textContent = 'Local · IndexedDB' + (cwd ? ' · /' + cwd : '');
+    syncPrimary(localWrap);   // t805 — a fresh list carries no selection → disable [Open]
 }
 
 async function onDrawerClick(e) {
@@ -157,8 +176,7 @@ async function onDrawerClick(e) {
     const act = t.dataset.act, path = t.dataset.path || '';
     try {
         if (act === 'close') return closeDrawer();
-        if (act === 'cd') { cwd = path; return renderDrawer(); }
-        if (act === 'open') { const obj = await store.readProject(path); if (obj) { loadProject(obj); closeDrawer(); } return; }
+        if (act === 'cd') { cwd = path; return renderDrawer(); }   // folders navigate; projects open via select-then-load
         if (act === 'mkdir') { const name = await dlgPrompt('New folder name:'); if (name) { await store.mkdir(store.joinPath(cwd, sanitize(name))); renderDrawer(); } return; }
         if (act === 'import') { importInput.click(); return; }
         if (act === 'rename') {
@@ -239,17 +257,26 @@ async function renderCloud() {
     bar.append(crumb, acts);
 
     const listc = document.createElement('div'); listc.className = 'proj-list';
+    const openbar = document.createElement('div'); openbar.className = 'sl-openbar';
+    openbar.innerHTML = '<button class="sl-primary" data-sl-primary disabled title="Open the selected project">Open</button>';
     let items = [];
     try { items = await gdrive.list(cur.id); }
     catch (e) { listc.innerHTML = `<div class="muted" style="padding:10px">${cloudErrMsg(e)}</div>`; cloudMount.replaceChildren(bar, listc); return; }
     if (!items.length) listc.innerHTML = '<div class="muted" style="padding:10px">empty — Save a project or + Folder</div>';
     for (const it of items) {
-        const row = document.createElement('div'); row.className = 'proj-row';
-        const name = document.createElement('button'); name.className = 'proj-name';
-        name.textContent = (it.type === 'folder' ? '📁 ' : '📄 ') + it.name;
-        name.addEventListener('click', it.type === 'folder'
-            ? () => { cloudStack.push({ id: it.id, name: it.name }); renderCloud(); }
-            : async () => { try { loadProject(await gdrive.read(it.id)); closeDrawer(); } catch (e) { dlgNotice(cloudErrMsg(e)); } });
+        const isFolder = it.type === 'folder';
+        const row = document.createElement('div');
+        // A FOLDER navigates on click; a PROJECT is an sl-row — selected then opened via [Open]/dblclick (t805).
+        row.className = isFolder ? 'proj-row' : 'proj-row sl-row';
+        if (!isFolder) row.dataset.slId = it.id;
+        let name;
+        if (isFolder) {
+            name = document.createElement('button'); name.className = 'proj-name';
+            name.addEventListener('click', () => { cloudStack.push({ id: it.id, name: it.name }); renderCloud(); });
+        } else {
+            name = document.createElement('span'); name.className = 'sl-name';
+        }
+        name.textContent = (isFolder ? '📁 ' : '📄 ') + it.name;
         const meta = document.createElement('span'); meta.className = 'proj-meta muted'; meta.textContent = it.savedAt ? it.savedAt.slice(0, 16).replace('T', ' ') : '';
         const ra = document.createElement('span'); ra.className = 'proj-rowacts';
         ra.append(
@@ -258,7 +285,8 @@ async function renderCloud() {
         );
         row.append(name, meta, ra); listc.append(row);
     }
-    cloudMount.replaceChildren(bar, listc);
+    cloudMount.replaceChildren(bar, listc, openbar);
+    syncPrimary(cloudMount);   // t805 — fresh list (or a folder switch) carries no selection → disable [Open]
 }
 
 /** Disconnected Cloud tab: status + per-provider connect buttons (drawer-local; Settings uses renderCloudLogin). */
@@ -268,7 +296,8 @@ function renderCloudConnect() {
     status.textContent = 'Not connected — connect your own cloud to save projects there.';
     wrap.appendChild(status);
     const row = document.createElement('div'); row.className = 'cloud-providers';
-    for (const id of PROVIDER_IDS) {
+    // t805 — only OFFER providers that are actually wired (was PROVIDER_IDS → dead Dropbox/OneDrive connect buttons).
+    for (const id of AVAILABLE_PROVIDER_IDS) {
         const b = document.createElement('button'); b.className = 'op-btn cloud-connect';
         b.innerHTML = providerIcon(id) + '<span>Connect ' + providerLabel(id) + '</span>';
         b.addEventListener('click', () => connect(id));

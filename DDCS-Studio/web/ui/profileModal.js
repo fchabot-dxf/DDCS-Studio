@@ -12,6 +12,7 @@
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';
 import * as L from '../data/profileLibrary.js';
 import { CONTROLLER_PROFILES, getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { installSelectLoad, syncPrimary } from './selectLoad.js';   // t805 — the shared select-then-load model
 
 const RECENTS_KEY = 'ddcs_profile_recents';
 const norm = (s) => String(s || '').trim().toLowerCase();
@@ -94,7 +95,8 @@ async function browse() {
             <button type="button" data-pa="cloudsave" class="toolbar-btn settings-io" title="Save the CURRENT profile to your cloud (Google Drive)">☁ Save to cloud</button>
             <button type="button" data-pa="sync" class="toolbar-btn settings-io" title="Refresh the cloud profile list">☁ Sync</button>
             <span style="flex:1"></span>
-            <button type="button" data-pa="done" style="padding:6px 16px; font-size:12px; border-radius:5px; cursor:pointer; border:1px solid var(--accent,#2d7ff9); background:var(--accent,#2d7ff9); color:#fff;">Done</button>
+            <button type="button" data-sl-primary class="sl-primary" disabled title="Load the selected profile (full-swap)">Load</button>
+            <button type="button" data-pa="done" style="padding:6px 16px; font-size:12px; border-radius:5px; cursor:pointer; border:1px solid var(--border,#2a313b); background:transparent; color:var(--text-main,#e6ecf2);">Done</button>
         </div>`;
     ov.appendChild(panel);
     const importInput = document.createElement('input');
@@ -116,43 +118,51 @@ async function browse() {
         for (const p of L.listProfiles()) {
             const on = p.id === active.id;
             const cl = p.name ? cloudByName.get(norm(p.name)) : null; if (cl) matched.add(cl.id);
-            const tag = cl ? '☁ synced' : 'on this device';
-            rows.push(`<div class="prof-row" data-pid="${p.id}" style="display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid ${on ? 'var(--accent,#2d7ff9)' : 'var(--border,#2a313b)'}; border-radius:6px;">
-                <span style="flex:1; ${on ? 'font-weight:700;' : ''}">${on ? '● ' : '○ '}${esc(p.name || '(unnamed)')} <span style="opacity:.6; font-weight:400;">· ${esc(ctrlName(p.controllerId))}</span></span>
-                <span style="opacity:.5; font-size:11px;">${tag}</span>
-                ${on ? '' : `<button type="button" class="toolbar-btn settings-io" data-load="${p.id}" title="Switch to this profile (full-swap)">Load</button>`}
+            const tag = cl ? '☁ synced' : '💾 on this device';   // t805 — local/cloud unambiguous
+            // t805 — SELECT-THEN-LOAD: rows are sl-rows selected then loaded via the footer [Load]/dblclick (no per-row
+            // Load). The ACTIVE profile carries a distinct "Active" badge (not the selection ring).
+            rows.push(`<div class="prof-row sl-row" data-pid="${p.id}" data-sl-id="${p.id}" data-sl-kind="local"${on ? ' data-sl-active' : ''} style="display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid ${on ? 'var(--accent,#2d7ff9)' : 'var(--border,#2a313b)'}; border-radius:6px;">
+                <span class="sl-name" style="flex:1; ${on ? 'font-weight:700;' : ''}">${esc(p.name || '(unnamed)')} <span style="opacity:.6; font-weight:400;">· ${esc(ctrlName(p.controllerId))}</span></span>
+                ${on ? '<span class="sl-active-badge">Active</span>' : ''}
+                <span class="sl-tag">${tag}</span>
                 <button type="button" class="toolbar-btn settings-io" data-export="${p.id}" title="Export this profile to a .json file">⤓</button>
                 <button type="button" class="op-btn" data-del="${p.id}" title="Delete this profile">🗑</button>
             </div>`);
         }
         for (const c of _cloud.filter((c) => !matched.has(c.id))) {
             const d = c.savedAt ? new Date(c.savedAt).toLocaleDateString() : '';
-            rows.push(`<div class="prof-row" style="display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px dashed var(--border,#2a313b); border-radius:6px;">
-                <span style="flex:1; opacity:.85;">☁ ${esc(c.name)}${d ? ` <span style="opacity:.5; font-size:11px;">· ${d}</span>` : ''}</span>
-                <span style="opacity:.5; font-size:11px;">in cloud</span>
-                <button type="button" class="toolbar-btn settings-io" data-cload="${c.id}" title="Download as a profile on this device">⬇ Load</button>
+            rows.push(`<div class="prof-row sl-row" data-sl-id="${c.id}" data-sl-kind="cloud" style="display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px dashed var(--border,#2a313b); border-radius:6px;">
+                <span class="sl-name" style="flex:1; opacity:.85;">☁ ${esc(c.name)}${d ? ` <span style="opacity:.5; font-size:11px;">· ${d}</span>` : ''}</span>
+                <span class="sl-tag">☁ in cloud</span>
                 <button type="button" class="op-btn" data-cdel="${c.id}" title="Delete this cloud copy">✕</button>
             </div>`);
         }
         listEl.innerHTML = rows.join('') || '<div style="opacity:.6; padding:14px; text-align:center;">No profiles yet — Save as… to create one.</div>';
+        syncPrimary(panel);   // t805 — a fresh row list carries no selection → disable [Load]
     }
+
+    // t805 — SELECT-THEN-LOAD: a row selects; the footer [Load] (disabled until selected) or a double-click loads.
+    // Local → full-swap switchProfile; cloud → download-then-activate (asks first). One dedicated action, no per-row Load.
+    installSelectLoad(panel, async (id, row) => {
+        if (row.dataset.slKind === 'cloud') {
+            if (!window.ddcsLoadCloudProfile) return;
+            if (!(await dlgConfirm('Load this cloud profile onto this device? It lands as a named profile and becomes active.', { okLabel: 'Load' }))) return;
+            try { await window.ddcsLoadCloudProfile(id); _afterChange(); await refreshCloud(); render(); }
+            catch (err) { dlgNotice('Load failed: ' + (err && err.message ? err.message : err)); }
+        } else {
+            L.switchProfile(id); pushRecentProfile(id); _afterChange(); render();
+        }
+    });
 
     listEl.addEventListener('click', async (e) => {
         const t = e.target.closest('button'); if (!t) return;
-        if (t.dataset.load) { L.switchProfile(t.dataset.load); pushRecentProfile(t.dataset.load); _afterChange(); render(); }
-        else if (t.dataset.del) {
+        if (t.dataset.del) {
             const p = L.listProfiles().find((x) => x.id === t.dataset.del); if (!p) return;
             if (L.listProfiles().length <= 1) { dlgNotice('The last profile can’t be deleted.'); return; }
             if (!(await dlgConfirm(`Delete the profile “${p.name || 'unnamed'}”? This can’t be undone.`, { danger: true, okLabel: 'Delete' }))) return;
             L.deleteProfile(p.id); _afterChange(); render();
         }
         else if (t.dataset.export) { exportProfile(t.dataset.export); }
-        else if (t.dataset.cload) {
-            if (!window.ddcsLoadCloudProfile) return;
-            if (!(await dlgConfirm('Load this cloud profile onto this device? It lands as a named profile and becomes active.', { okLabel: 'Load' }))) return;
-            try { await window.ddcsLoadCloudProfile(t.dataset.cload); _afterChange(); await refreshCloud(); render(); }
-            catch (err) { dlgNotice('Load failed: ' + (err && err.message ? err.message : err)); }
-        }
         else if (t.dataset.cdel) {
             if (!(await dlgConfirm('Delete this cloud profile? (Only the cloud copy — nothing on this device changes.)', { danger: true, okLabel: 'Delete' }))) return;
             try { await window.ddcsDeleteCloudProfile(t.dataset.cdel); await refreshCloud(); render(); }

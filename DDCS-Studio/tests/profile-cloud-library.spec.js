@@ -149,14 +149,16 @@ test('the unified library renders local + cloud + both rows; Save pushes the act
         const list = document.querySelector('.profile-modal [data-plist]');
         return {
             localCount: list.querySelectorAll('.prof-row[data-pid]').length,
-            cloudOnlyLoadable: !!list.querySelector('[data-cload="c2"]'),      // 'Cloud only' → a Load button
-            sharedIsNotACloudRow: !list.querySelector('[data-cload="c1"]'),    // 'Shared rig' matched a local → NOT a cloud-only row
+            // t805 SELECT-THEN-LOAD: the cloud-only profile is a selectable sl-row (loaded via the dedicated [Load]),
+            // not a per-row Load button; a matched-local name collapses to ONE synced local row (no cloud-only row).
+            cloudOnlyRow: !!list.querySelector('.sl-row[data-sl-kind="cloud"][data-sl-id="c2"]'),
+            sharedIsNotACloudRow: !list.querySelector('.sl-row[data-sl-kind="cloud"][data-sl-id="c1"]'),
             synced: /☁ synced/.test(list.innerHTML),                           // the matched local shows the synced tag
             text: list.textContent,
         };
     });
     expect(rows.localCount, 'two local rows (Shared rig + Local only)').toBe(2);
-    expect(rows.cloudOnlyLoadable, 'the cloud-only profile shows an inline Load button').toBe(true);
+    expect(rows.cloudOnlyRow, 'the cloud-only profile is a selectable cloud row').toBe(true);
     expect(rows.sharedIsNotACloudRow, 'a cloud name that exists locally is one "synced" row, not duplicated').toBe(true);
     expect(rows.synced, 'the matched local carries a ☁ synced tag').toBe(true);
     expect(rows.text, 'the cloud-only profile is visible in the one list').toContain('Cloud only');
@@ -168,7 +170,9 @@ test('the unified library renders local + cloud + both rows; Save pushes the act
     expect(await page.evaluate(() => window.__savedName), 'Save pushes the active profile under its own name').toBe('Local only');
 
     // switch active to 'Shared rig' (name IS on cloud) → Save must ASK before overwriting; cancel → no push (no silent overwrite)
-    await page.evaluate(() => { window.__savedName = null; const r = [...document.querySelectorAll('.profile-modal .prof-row[data-pid]')].find((x) => /Shared rig/.test(x.textContent)); r.querySelector('[data-load]').click(); });
+    // t805 SELECT-THEN-LOAD: select the row, then the dedicated [Load]
+    await page.evaluate(() => { window.__savedName = null; const r = [...document.querySelectorAll('.profile-modal .prof-row[data-pid]')].find((x) => /Shared rig/.test(x.textContent)); r.querySelector('.sl-name').click(); });
+    await page.click('.profile-modal [data-sl-primary]');
     await page.waitForTimeout(150);
     await autoAppDialog(page, { accept: false });   // the overwrite confirm → Cancel
     await page.click('.profile-modal [data-pa="cloudsave"]');
