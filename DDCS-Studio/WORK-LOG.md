@@ -2408,3 +2408,63 @@ PASS BACK (no code — scout). Awaiting the [F1]/[F2]/[F3] calls, then E0.
 5. **emit BYTE-IDENTICAL** — twin == alignmentStack across a checkAxis/probeDir/frame/scalar sweep (incl safeZ #19 + tolerance).
 
 **FULL SUITE: 721 passed, 2 skipped, 0 failed.** Shared wizardLibrary.js + commandDeck.js + app.js touched → NO regression (the pinned wizard-bar routing updated + green; no other test read the alignment special opener). Files: web/blocks/wizardLibrary.js · web/ui/commandDeck.js (WIZ_SPECIAL_OPENER→{}) · web/app.js · tests/wizard-bar.spec.js (Align routing) · tests/alignment-in-place.spec.js (new). **🎯 THE PROBE FAN-OUT IS COMPLETE — all 6 probe wizards (Corner · Edge · Middle · Rotary Centreline · Rotary Clock · Alignment) are IN-PLACE data-op twins + verified, ready for the advisor's V10.90 release.** NEXT (per dispatch): the advisor surfaces the design-heavy set to the human. PASS BACK.
+
+## 2026-07-12 (t804) — DEPTH ENTRY OPTIONS (plunge / ramp / helix) on the pocket clearing
+
+The advisor dispatched a per-level depth-entry choice in the CLEARING cluster. Commit dc6e130.
+
+### GROUNDING
+
+The clearing kernels each do a straight PLUNGE (`G1 Z<z> F<plunge>`) as the first descent per StepDown level. The StepDown
+depth-loop (blockEmitter fold, kind:'depth') runs the fill once per level exposing scope `z` (the cut Z); the fill kernel
+plunges. The existing HELIX atom (helix.js `helixPoints`) descends at `pitch` mm/rev around (cx,cy) at `radius` — its native
+descent field is `pitch`. The 2D/3D toolpath is EMIT-DRIVEN (parses G0/G1 into segments — toolpath2d.js) → ramp/helix
+emitted as G1 moves render automatically, so "the sim plays all three" needs no separate sim work.
+
+### THE MECHANISM (self-contained, plunge byte-identical)
+
+- **levelEntry(mode, o)** (clearing.js) — the per-level descent, ENDING at (x0,y0,z) so the kernel proceeds unchanged:
+  - ramp → rapid to the previous cleared floor (prevZ = z + `by`), then a linear G1 descent TOWARD the region centre at
+    ≤ rampAngle°, then return to the start at z. Greys (ok:false + a `why`) when the run to centre is shorter than the
+    descent needs (drop / tan(angle)).
+  - helix → a linearized descending helix (helixPoints) of radius helixR (clamped to fit) at (cx,cy), pitch = mm/rev, then
+    a G1 to the start at z.
+- **entryOrPlunge(ctx, x0, y0, plungeLines)** — returns the entry lines when `ctx.entry` asks AND it fits; else the kernel's
+  EXACT `plungeLines` (so PLUNGE — the default — is byte-for-byte). A ramp that can't fit degrades to the plunge with a
+  `( why )` comment (the honest greyed-ramp case). Wired into all 5 pocket kernels' first plunge: concentricContour,
+  concentricCircle, concentricRect, fillLevelMoves (raster bothways), onewayMoves (raster oneway).
+- **fillStrategy** builds the entry ctx: prevZ (from the exposed StepDown `by`), the region centre, and a tool-clamped helix
+  radius (min(helixDia/2 || toolR, regionInradius(inset) − ε) — the "helix fits" clamp).
+- **The depth fold** (blockEmitter) now also exposes `child.by = by` so the fill descends exactly one level; the pocketfill
+  reads `by: 'by'` from scope. `entry`/`rampAngle`/`helixDia`/`helixPitch` are new pocketfill fields (default plunge → the
+  seed + goldens are unchanged); the builder passes them through (params.entry || 'plunge').
+
+### FORM + BLOCKLY
+
+The CLEARING cluster (t800) gained: **Depth Entry** (dropdown plunge/ramp/helix) + **Ramp Angle °** (when entry=ramp) +
+**Helix Ø** / **Helix Pitch (mm/rev)** (when entry=helix) — per-mode when-guards. Blockly: `entry` registered as a 3-value
+enum in bridge.js SELECTS (the number fields auto-render); round-trips (params + Blocks). Full help on each.
+
+### VERIFY (depth-entry-804.spec.js, 5/5)
+
+- PLUNGE default byte-identical (entry:plunge == no entry; the 96-case goldens guard the full sweep — E1 0 diffs, E0 0 goldenDiffs).
+- RAMP: every level's ramp slope ≤ tan(angle) (measured drop/dist from the emitted moves) + reaches the three cut levels.
+- HELIX: radius + tool ≤ the pocket inradius (fits) + Z descends ≈ pitch per revolution (measured over one 24-seg turn).
+- TWIN + FORM: user_pocket_data controls entry via the clearing-cluster binding (pocketfill.entry=ramp) + the Blockly 3-value dropdown.
+- GREYED RAMP: a dia-20 pocket at 1° can't fit the ramp → the emit degrades to plunge with `( ramp 1deg needs 114.58mm, first move 7mm -> plunge )` (the why), no ramp move survives.
+- Real symptom: the twin form renders the Depth Entry dropdown; selecting Ramp reveals the Ramp Angle field (when-gate).
+
+Design notes: the ramp descends toward the CENTRE (uniform + self-contained across all 5 kernels, no kernel-structural
+change) rather than consuming a kernel's first edge; a circle's concentric first move is an arc, so a uniform centre-ward
+ramp is the honest choice there too. Greying is an EMIT-level honest degrade (ramp→plunge + why) — the declarative gate DSL
+can't compute the geometry condition, and a machine-safe truthful plunge is the right call (G1/honest-degrade); no
+speculative form-grey machinery for the geometry case.
+
+SUITE: 1174 passed, 2 skipped, 0 failed, 0 flaky (workers=2, retries=0, 21.0m) (workers=2 — levelEntry/entryOrPlunge are shared by the clearing kernels [pocket/surfacing/slot via
+fillStrategy] + the depth fold change; entry defaults to plunge everywhere → the others are byte-identical; verified).
+
+Files: web/wizards/clearing.js (levelEntry + entryOrPlunge + wire 3 kernels), web/wizards/ops/stepover.js (fillStrategy ctx
++ onewayMoves wire), web/wizards/ops/contour.js (concentricContour wire), web/wizards/ops/pocketfill.js (entry fields),
+web/wizards/pocketWizard.js (builder pass-through), web/blocks/blockEmitter.js (fold exposes by),
+web/blocks/dataOps/pocketData.js (ENTRY_OPTIONS + 4 clearing-cluster bindings + defaults), web/blocks/blockly/bridge.js
+(entry enum), tests/depth-entry-804.spec.js (NEW). Commit dc6e130.
