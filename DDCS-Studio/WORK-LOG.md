@@ -2630,3 +2630,68 @@ no emit path touched → byte goldens unaffected; verified).
 
 Files: web/wizards/views/userOpView.js (held-stepper debounce — the throttle + the focused-field listener), web/wizards/
 ops/panelTypes.js (_writeParam equality loop-guard), tests/stepper-runaway-808.spec.js (NEW guard). Commit 31536e5.
+
+## 2026-07-12 (t810) — G-CODE MINIMAP (VS Code-style editor overview) + the throttle-on-close RIDER
+
+The advisor dispatched a VS Code-style minimap on the editor's right edge (user t805 "editor zoom … make it like vscode",
+emphasis "especially need to see the execution highlight"). Commit 2ad184c.
+
+### RIDER (t809) — clear the userOpView recompute throttle on CLOSE too
+
+t808 cleared the held-stepper throttle on onShow only; a pending trailing update could ghost-fire ~200ms after the modal
+closed. Added a symmetric **onHide** view hook: `wizardManager.close()` calls `activeView().onHide()`, and userOpView's
+`onHide()` runs `_clearThrottle()`. So a close drops any pending throttled recompute — nothing ghost-fires after close.
+
+### THE MINIMAP
+
+- **ONE SOURCE for the execution marker (the point).** The marker reads the SAME `editorManager.activeLineIndex` the
+  in-text highlight consumes — never a second tracker. I added a tiny subscription: `editorManager.onActiveLine(cb)`,
+  fired from `setActiveLine`/`clearActiveLine` in the SAME call that (un)marks the in-text `.active-line`. The minimap
+  subscribes and moves its marker in lockstep. So during real playback (engine → panel onLine → gcodePreviewTab bridge →
+  `setActiveLine`) both the text highlight and the map marker track the running line from the one index, by construction.
+- **The strip** (`web/ui/gcodeMinimap.js`): an absolute full-height child of `.editor-container` on the right.
+  - A `<canvas>` SILHOUETTE — each source line a thin row tinted by a DECLARED line classifier (comment / op-marker
+    header `( @DDCS…)` / rapid G0 / cut G1-G3 / probe G31 / M-code / other), width = the line's content length (the code
+    shape). Consecutive same-class lines form BANDS, so op regions read as coloured bands. Redrawn only on program /
+    theme / resize (not on scroll or exec — those move cheap DOM overlays). Colours resolve from the active theme tokens
+    (`--accent`, `--code-comment`, `--code-num`, `--text-dim`) each draw, re-tinting on a `body[data-theme]` change.
+  - A DOM VIEWPORT BOX — the visible slice `top=(scrollTop/scrollHeight)·H, height=(clientHeight/scrollHeight)·H`. A
+    pointerdown anywhere on the strip centres the viewport on the pointer (CLICK jumps); a pointer drag scrolls (touch-
+    native via pointer events + `touch-action:none` + pointer capture) — one handler serves click-jump AND drag-scroll.
+  - A DOM EXECUTION MARKER — a bright accent bar at `(idx/n)·H` with a CSS MIN height (3px) + glow, so it stays legible
+    on a huge program where a row is < 1px. Hidden when idle (activeLineIndex null).
+- **Toggle + persistence.** `getMinimapOn/setMinimapOn/onMinimapChange` added to the panePrefs family (key
+  `ddcs_minimap`, default ON — VS Code parity). A small `▤` toggle button at the editor's top-right corner flips it; the
+  strip shows/hides live and the state survives reload. Off at phone widths via CSS (`@media (max-width:600px)` — the
+  text keeps the full width); the text layers inset their right padding by the strip width only when ON.
+
+### VERIFY (gcode-minimap-810.spec.js, 7/7) + 13/13 regressions
+
+- Proportional render for a SMALL (12-line) AND a HUGE (5000-line) program; the marker stays ≥ 3px on the huge one; the
+  silhouette canvas is actually painted.
+- CLICK jumps + DRAG scrolls the editor (asserted via editor.scrollTop).
+- The marker tracks the executing line — 20× end-state (marker y == (idx/n)·H AND idx == editorManager.activeLineIndex
+  AND the same idx drives the in-text highlight — ONE source) + idle → marker hides.
+- REAL MOTION: actual engine playback (`setGcodeView('3d')` → run) fires the onLine seam → the marker sits at the
+  executing line (its y = idx/n·H by construction — it reads the same activeLineIndex, no second tracker).
+- The in-text execution highlight is UNCHANGED (my hook only ADDED a notify; `.active-line` still lands on the `.g-line`).
+- The toggle persists across reload (localStorage `ddcs_minimap`).
+- Phone width (390px): the strip is off. All five themes: the silhouette paints legibly (screenshots per theme).
+- Regressions 13/13: exec-line-trail, blocks-exec-glow, homing-preview-plays-real-emit (real playback + highlight),
+  editor-chrome/click-seek, wizard-templates (close path), stepper-runaway-808 (the onHide RIDER).
+
+Real symptom driven: the actual editor at localhost:3211 — a screenshot shows the op-marker BANDS, the viewport box, and
+the tinted rows; the marker verified from real engine playback.
+
+Design notes (logged): the 3D-drawer right-edge pull-tab overlaps the minimap's vertical centre (it sits above the strip)
+— a minor coexistence, the pull-tab stays clickable and the minimap works around it; a later nudge could inset the strip.
+The line classifier is minimap-local (declared) — the editor tints by token SPANS (formatGCode) with no per-line class,
+so a per-line classifier is the honest minimum; if a second consumer appears it graduates to a shared `classifyGLine`.
+
+SUITE: 1190 passed, 2 skipped, 0 failed, 0 flaky (workers=2, retries=0, 20.5m) (workers=2 — additive editor subscription + a new optional chrome module + the onHide hook; no emit
+path touched → byte goldens unaffected; verified).
+
+Files: web/ui/gcodeMinimap.js (NEW — the strip), web/ui/panePrefs.js (the ddcs_minimap pref), web/ui/editorManager.js
+(onActiveLine — the one-source subscription), web/wizardManager.js (onHide hook in close), web/wizards/views/userOpView.js
+(onHide → clear throttle, the RIDER), web/app.js (mount the minimap), web/styles.css (.gcode-minimap + phone media),
+tests/gcode-minimap-810.spec.js (NEW). Commit 2ad184c.
