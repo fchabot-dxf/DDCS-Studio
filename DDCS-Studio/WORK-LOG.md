@@ -3800,3 +3800,52 @@ VERBATIM: 1240 passed / 1 failed / 2 skipped (12.4m, 744s). The 1 failure — io
 the KNOWN w4 CPU-contention class (t842 flaked the same); it passes ISOLATED (2 passed), is UNRELATED to time-estimates (no
 homing/io touched), the box ran loaded. My change: 7 new time tests green, no op-regression touched. Advisor re-runs on a
 quiet box for the release gate.
+
+
+## 2026-07-13 (t846) — BACKLOG 5: DRILL PATTERNS (bolt circle / row / grid). GROUND-FIRST: the system was ALREADY built.
+
+The advisor said "extend, never fork" + "ground what the drill pattern field does today." It does a LOT already:
+- `patternPoints` (wizards/ops/array.js) computes circle / line / grid / rect XY; the `array` container stamps the single
+  hole at each point (ONE source — the emit iterates, the cycle body is unchanged).
+- The DRILL + BORE twins SHARE it (boreData mirrors drillData; `drillPatternGeometry` is imported by both). The pattern
+  field + ALL per-kind params are already bound + WHEN-GATED (grid cols/rows/dx/dy · circle dia/count/startAngle · line
+  count/spacing/angle · rect w/h/nx/ny), labelled + helped. DRILL_PATTERN_OPTIONS = Grid / Bolt circle / Rectangle / Line.
+- `drillPatternGeometry` already draws EVERY hole as a ring + a `dr_pos` DRAG-TRANSLATE handle + per-kind SIZE handles
+  (circle Ø/startAngle · grid pitch · line pitch/angle · bore hole-Ø) — the spatial-GUI rule, done.
+So BOLT CIRCLE = the `circle` pattern, ROW = `line`, GRID = `grid` — already first-class. This turn = ADD the one genuine
+gap (SINGLE) + VERIFY the whole feature numerically (which wasn't covered by a dedicated test).
+
+### BUILT (small — the engine existed)
+
+- **array.js**: a `single` pattern (one hole at the position) in patternPoints + fieldsFor (just the position, no params).
+- **wizardOptions.js**: DRILL_PATTERN_OPTIONS gains `Single hole` (+ `Line` relabelled `Row (line)` per the advisor's naming).
+  Values unchanged (single/grid/circle/line/rect) → existing patterns byte-identical.
+
+### FLAGS (for the advisor)
+
+- **The feature was ~built** — I verified + added SINGLE, did NOT rebuild (extend-not-fork honoured; the patterns, when-
+  gating, bore-sharing, layout, drag handles, drag-translate all pre-existed).
+- **The DEFAULT is `grid` (a 3×2 six-hole pattern), NOT `single`** — the advisor's "SINGLE stays the default = byte-
+  identical" premise is off (drillWizard: `params.pattern || 'grid'`). I added SINGLE as an OPTION and KEPT the grid
+  default so the existing drill/bore byte-goldens hold (verified: 10 regressions green). Changing the default to `single`
+  (arguably the sensible CAM default; the 6-hole default is a latent surprise) would REBASE the drill goldens + change
+  behaviour → the advisor's call, flagged not taken.
+- The twin form's pattern dropdown is a CUSTOM widget over a hidden `<select>` (my first live-switch test drove the hidden
+  select by mistake — corrected; the form re-render itself is fine, as t842's surfacing proved).
+
+### VERIFIED (real symptom) — drill-patterns-846.spec.js (9)
+
+- BOLT CIRCLE positions == hand-computed trig incl. startAngle (cx + R·cos(a0 + k·2π/n), 6 holes).
+- ROW (line) positions == hand-computed (count·spacing along the angle); GRID == the hand-computed corners.
+- SINGLE = exactly one hole AND byte-identical to a 1×1 grid at the same spot (the byte-golden).
+- The LAYOUT draws N holes (bolt circle 8, grid 12) + the `dr_pos` drag-translate handle + the per-kind size handle.
+- DRAG-TRANSLATE: every hole shifts by exactly the pos delta; the shape (relative positions) is untouched (handles-independence).
+- BORE shares the pattern (bore hole count == drill; bore adds the hole-Ø handle).
+- The TIME ESTIMATE grows with the hole count (the multiplied positions flow through for free — t844 consumes them).
+- FORM: the twin renders the pattern cluster (Pattern dropdown + Bolt circle offered + the params + the 2D holes/handles); screenshot viewed.
+- Regressions (10): drill/bore-as-data byte-identical + drill-canvas + drill-in-place + peck-drill + slot-array (the array `single` addition didn't touch the existing patterns).
+
+### GATE (w4, full log — no tail truncation)
+
+VERBATIM: 1250 passed / 0 failed / 2 skipped (12.2m, 733s). CLEAN — no failures (the box was quiet this run); +9 new
+drill-pattern tests, no regressions, no contention flake. Byte-identity held (single/grid/circle/line defaults unchanged).
