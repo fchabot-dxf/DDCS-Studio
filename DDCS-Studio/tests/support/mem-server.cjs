@@ -25,23 +25,29 @@ const MIME = {
 const mimeFor = (p) => MIME[path.extname(p).toLowerCase()] || 'application/octet-stream';
 
 // Preload web/ into a Map keyed by URL path ("/index.html", "/wizards/cornerWizard.js"). ONE fs walk, at start.
+// Store {buf, mtime}: mtime → the Last-Modified header, which the app's dev BUILD STAMP (app.js: window.__ddcsBuild)
+// HEAD-fetches to prove "what am I running". http-server sends it; dropping it made the transport UNFAITHFUL and failed
+// homing-io-ui-cleanup amendment-3 deterministically (t834). A faithful transport preserves every header the app reads.
 const ROOT = path.resolve(__dirname, '..', '..', 'web');
 const store = new Map();
 (function walk(dir) {
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, ent.name);
     if (ent.isDirectory()) walk(full);
-    else store.set('/' + path.relative(ROOT, full).split(path.sep).join('/'), fs.readFileSync(full));
+    else store.set('/' + path.relative(ROOT, full).split(path.sep).join('/'), { buf: fs.readFileSync(full), mtime: fs.statSync(full).mtime });
   }
 })(ROOT);
 
 const server = http.createServer((req, res) => {
   let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
   if (urlPath === '/' || urlPath.endsWith('/')) urlPath += 'index.html';
-  const body = store.get(urlPath);
-  if (!body) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('404 ' + urlPath); return; }
-  res.writeHead(200, { 'Content-Type': mimeFor(urlPath), 'Content-Length': body.length, 'Cache-Control': 'no-cache' });
-  res.end(req.method === 'HEAD' ? undefined : body);
+  const entry = store.get(urlPath);
+  if (!entry) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('404 ' + urlPath); return; }
+  res.writeHead(200, {
+    'Content-Type': mimeFor(urlPath), 'Content-Length': entry.buf.length,
+    'Last-Modified': entry.mtime.toUTCString(), 'Cache-Control': 'no-cache',
+  });
+  res.end(req.method === 'HEAD' ? undefined : entry.buf);
 });
 
 const port = parseInt(process.argv[2], 10) || 3211;
