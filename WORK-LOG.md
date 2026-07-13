@@ -11025,3 +11025,64 @@ binding + cluster splice + strategy group), web/wizardManager.js (inert on hidde
 
 FORM-HONESTY CAMPAIGN COMPLETE: P1 stock spill + P2 honest labels (V.4) · P3 preset row (V.5) · P4 deep-links (V.6) ·
 P5 field help (V.7) · P6 clearing cluster + P7 shadow forms + tap residue (this). The 7 pieces are landed.
+
+## 2026-07-12 (t802) — CONCENTRIC FOR ALL POCKET SHAPES (the user's octagon)
+
+The advisor dispatched concentric-for-all-shapes after closing the form-honesty campaign (V.8). Commit 421fada.
+
+### GROUNDING (assembly, not invention — the advisor's framing confirmed)
+
+The pocket clearing kernel is `stepover.js fillStrategy`. BEFORE: `concentric` had analytic kernels only for circle
+(concentricCircle, G3 arcs) + rect (concentricRect, inset rectangles); **polygon + ellipse SILENTLY fell through to the
+scanline (raster) fill** — a silent fallback that existed only because concentricRect-on-NaN-bounds HUNG on a centred shape
+(the code comment said so). The fix uses the EXISTING `offsetRegion` (contour.js), which already insets any shape correctly
+(polygon by the apothem: circumradius += d/cos(π/n) so `d` is a true PERPENDICULAR offset; ellipse rx±d, ry±d).
+
+DIA CONVENTION (the octagon "gap") — GROUNDED: preview + kernel BOTH call `regionDesc({shape:'polygon', w: dia, sides})`
+→ `r = dia/2` (circumradius). IDENTICAL. So there is NO dia mismatch — the "gap" the user saw was (a) the correct toolR
+inset between the drawn boundary and the (tool-centre) clearing, made worse by (b) the silent raster fallback and (c) the
+2D layout drawing ONLY the boundary, no passes. Fix at the ONE source was not needed (they already agree); the real fixes are the concentric emit + drawing the rings.
+
+### THE FIX
+
+- **`concentricRings(rg, step)`** (contour.js) — the ONE SOURCE: the sequence of inward offset ring contours (outermost
+  first), from the tool-inset boundary, inset by `step` each ring (regionInradius floor → it TERMINATES, no hang), until no
+  room remains. Both the emit and the 2D preview consume it → drawn rings == cut rings by construction.
+- **`concentricContour(rg, step, ctx)`** (contour.js) — traces those rings as G-code (plunge once, step inward ≤ one
+  stepover between rings like concentricRect, close each ring) + a centre finish for the core.
+- **fillStrategy** — `if (strategy==='concentric') return concentricContour(rg, step, ctx)` for polygon/ellipse (AFTER the
+  circle/rect analytic branches, which are UNTOUCHED → byte-identity).
+- **The 2D layout draws the rings** — pocketPreviewGeometry, when strategy is concentric, appends `concentricRings(pocketInsetRegion(p), stepoverMm(p))` as fc-guide paths (stepoverMm exported from pocketfill for the one-source spacing). The octagon now shows nested octagons filling to the centre (screenshot: scratchpad/octagon-concentric-rings.png — verified visually, ~9 rings + boundary, 268-line emit).
+
+### NO SILENT FALLBACK (honest-degrade rule)
+
+The one silent fallback (polygon/ellipse concentric → raster) is ELIMINATED — every shape × strategy now emits its DECLARED
+pattern (asserted per combo: concentric ≠ raster for all 4 shapes; circle concentric uses G3 arcs). After this fix NO
+shape×strategy combo is un-runnable, so nothing greys — I did NOT build a speculative greying UI for zero cases (rule-of-three;
+the honest-degrade rule is satisfied by making concentric truly run, not by hiding it). tooSmall (a SIZE issue, not
+shape×strategy) still drills — a separate pre-existing declared path, untouched. IF the advisor wants a specific combo greyed, that is a fork — flag on pass-back.
+
+### VERIFY (concentric-shapes-802.spec.js, 4/4)
+
+- KERNEL: octagon concentric emits inward offset RINGS — ring count ≈ inradius/stepover, outermost ring == the tool-inset boundary, ring spacing ≈ step/cos(π/8) (perpendicular step).
+- EMIT no-silent-fallback: all 4 shapes' concentric ≠ raster; circle uses G3 arcs.
+- P3+P4 LAYOUT + PERIMETER: the 2D preview draws EXACTLY the emit rings (one source); per-shape preview boundary == kernel true boundary (circle/polygon/ellipse); outermost drawn ring == the outermost cut pass == boundary apothem − toolR (± wallOffset).
+- BYTE-IDENTITY: twin == built-in pocketStack for concentric across all 4 shapes (0 diffs). pocket-data-emit (96-case sweep) + the golden still green — circle/rect kernels untouched.
+
+Screenshot (real symptom): the octagon 2D layout draws the concentric rings — scratchpad/octagon-concentric-rings.png.
+
+GOLDEN REGEN (surgical, scope-verified): the E0 flatten golden (tests/fixtures/pocket-golden.json) FROZE the old
+silent-raster-fallback output for polygon/ellipse concentric. The full-suite run flagged pocket-e0-superset (the ONLY reader
+of that fixture). I enumerated the diffs: EXACTLY 14 keys changed, ALL `polygon|spiral|*` / `ellipse|spiral|*` (the intended
+concentric cases) — ZERO rect/circle/raster changed (byte-identical, goldens untouched, as the acceptance requires). I
+regenerated ONLY those 14 `.emit` values from the current pocketStack (diff = 14 ins / 14 del, nothing else). This is NOT
+circular self-assertion: the concentric CORRECTNESS is independently guarded by concentric-shapes-802 (ring count ≈
+inradius/step, outermost == inset boundary, spacing == step/cos, preview == emit). The E0 gate (prune(superset)==concrete)
++ the flatten invariant still hold (both paths share the updated fillStrategy).
+
+SUITE: 1169 passed + 2 skipped, 0 failed (workers=2, retries=0) (workers=2 — the kernel change is shared by pocket/surfacing/slot via fillStrategy; verified no regression).
+
+Files: web/wizards/ops/contour.js (concentricRings + concentricContour + regionInradius), web/wizards/ops/stepover.js
+(fillStrategy dispatch + import), web/wizards/ops/pocketfill.js (export stepoverMm), web/blocks/dataOps/pocketData.js
+(preview draws the rings + imports), tests/fixtures/pocket-golden.json (14 polygon/ellipse concentric emits regenerated),
+tests/concentric-shapes-802.spec.js (NEW). Commit 421fada.
