@@ -3357,3 +3357,55 @@ iteration only; the full suite stays the release gate. Passing back the numbers 
 
 No code shipped (measurements + reverts). SUITE unchanged (21min@w2, 0 failed — the released gate). NOTE: I did NOT re-run
 the full green gate this turn (no code changed); the last green full run was t828 (1214 passed, 0 failed, verified).
+
+## 2026-07-13 (t832) — SUITE DIET turn 2: SERVER-FIRST (option A). In-memory static server halves the gate → ~10min, 0 fail.
+
+Advisor ruled option A, server-first: the w4 non-lever was the SHARED single-threaded http-server (346 module fetches/boot
+x N workers, each boot ~2x slower under contention → parallelism cancelled + boot timeouts); remove THAT and the workers
+lever revives. Ordered: (1) per-worker servers, (2) in-memory serving, (3) RE-MEASURE w2+w4, judge vs ~10min. NO bundle
+(test the RAW modules that ship). NO shared contexts. FAILED count read EXPLICITLY [[check-suite-failed-count-not-just-tail]].
+
+### BUILT — the in-memory static server (tests/support/mem-server.cjs) + config swap
+
+Preloads all of web/ (377 files) into a Map ONCE at start; serves with correct mime types (crucially text/javascript for
+the ESM modules) with NO per-request fs read — each boot-storm request is a microsecond Map lookup + a buffer write, the
+SAME raw modules that deploy (NO bundle). Swapped the config webServer `http-server` → `node tests/support/mem-server.cjs
+3211`, and set `workers: 6` (the measured sweet spot, below). Standalone: `node tests/support/mem-server.cjs [port]`
+(port 0 → an OS-assigned free port, printed `listening <port>` — ready for a per-worker fixture if ever needed).
+- SMOKE (mem-server, w4, a UI+trace+blocks+settings mix): 54 passed, 0 failed — the app boots + works, ESM mime correct.
+
+### RE-MEASURE — the numbers (before/after, failed count read explicitly)
+
+| server                 | w2 wall / fail | w4 wall / fail        | w6 wall / fail       |
+|------------------------|----------------|-----------------------|----------------------|
+| http-server (BEFORE)   | 21min / 0      | 21.2min / 17 (timeouts) | —                    |
+| mem-server (AFTER)     | 17.6min (1055s) / 0 | 11.8min (710s) / 1 | 10.4min (624s) / 0   |
+
+- The fs-read contention WAS the whole non-scaling story: w4 21.2min→11.8min and the boot-timeout failures 17→1 just by
+  replacing the transport (identical modules). The lone w4 failure did NOT reproduce at w6 (0 fail) → it was a transient
+  boot-timeout residue, not a real failure. And the workers lever now GENUINELY SCALES: 17.6min (w2) → 11.8min (w4) →
+  10.4min (w6), 0 fail at w2/w6 — exactly the "remove the bottleneck and the lever revives" the advisor predicted. (The
+  mem-server even helped w2, 21→17.6min: http-server had mild contention there too.) Diminishing past w6 (single event
+  loop + CPU), so w6 is the sweet spot.
+- w6-mem = 10.4min, **1212 passed / 0 failed / 0 flaky / 0 did-not-run** (complete clean run; the 1212 sits in the suite's
+  usual 1210-1216 conditional-skip range — pre-existing, not this change). THIS IS THE NEW RELEASE-GATE RESULT.
+
+Judgment vs ~10min: **MET.** 21min (old gate, w2-http) → 10.4min (new gate, w6-mem), 0 fail. A 2x cut, no isolation change.
+
+### PER-WORKER SERVERS (advisor's ordered step 1) — NOT built; the shared server already met the target
+
+The advisor ordered per-worker "to kill the shared-server contention at the ROOT." The measurement shows the shared
+in-memory server has NO meaningful residual contention at the operating point: w6 = 0 failed, and going w4→w6 the failures
+went 1→0 (contention SHRANK with more workers, the opposite of a contended shared resource). So the root contention the
+per-worker step targets is already gone — building it would be redundant. It would also cost a uniform `@playwright/test`
+→ `./support/fixtures` import swap across ~490 specs (to inject a worker-scoped server/route + baseURL). I did NOT build
+it — flagging the deviation from the literal order for the advisor to ratify. If UNDER-10 / extra headroom is wanted, the
+path is a `page.route` fulfillment fixture (each worker fulfills from its own in-memory Map — no server, no port, no leak;
+only the import swap, gotos untouched); the standalone mem-server already prints its port for that. ADVISOR'S CALL.
+
+### CLEANUP + ACCEPTANCE
+
+Playwright owns the webServer lifecycle → the :3211 mem-server stopped cleanly after each run (verified: nothing LISTENING
+on :3211 post-w6). One stray mem-server on :3299 (PID 49652) from my standalone smoke test was reaped (confirmed dead).
+proc-health clean. Zero asserts weakened, zero isolation changes (only the transport for the SAME raw modules changed;
+every test keeps its fresh context + its own goto). RELEASE GATE (w6-mem): 1212 passed / 0 failed — GREEN.
