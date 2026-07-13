@@ -35,8 +35,9 @@ export function pocketInsetRegion(p) {
     return offsetRegion(trueRegionFromFlat(p), -(r - num(p.wallOffset, 0)));
 }
 
-/** The absolute stepover (mm) from the % + tool — matching pocketWizard's `so` (max(0.2, tool·%/100)). */
-function stepoverMm(p) { return Math.max(0.2, Math.max(0.1, num(p.toolDia, 6)) * num(p.stepoverPct, 40) / 100); }
+/** The absolute stepover (mm) from the % + tool — matching pocketWizard's `so` (max(0.2, tool·%/100)). Exported (t802) so
+ *  the 2D preview draws its concentric rings at the SAME spacing the emit cuts. */
+export function stepoverMm(p) { return Math.max(0.2, Math.max(0.1, num(p.toolDia, 6)) * num(p.stepoverPct, 40) / 100); }
 
 export const pocketFillBlock = {
     type: 'pocketfill', label: 'Pocket Fill', kind: 'fill', category: 'Toolpaths',

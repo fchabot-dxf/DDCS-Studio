@@ -8,6 +8,7 @@
  */
 import { num, r3 } from './util.js';
 import { scanlineFill, fillLevelMoves, concentricRect, concentricCircle } from '../clearing.js';
+import { concentricContour } from './contour.js';   // t802 — concentric for polygon/ellipse (inward offset rings)
 import { coerceRegion, regionDesc } from './region.js';
 
 /** The region to clear: a plugged Region reporter (StepOver) OR, when none is plugged, built from the block's OWN flat
@@ -34,11 +35,12 @@ function onewayMoves(rows, ctx, reverse) {
 export function fillStrategy(p, z) {
     const rg = fillRegion(p), step = Math.max(0.1, num(p.stepover, 4));
     const ctx = { z, clr: num(p.clearance, 5), feed: num(p.feed, 600), plunge: num(p.plunge, 200) };
-    // Concentric rings have analytic kernels only for circle + rect; polygon/ellipse fall through to the scanline
-    // fill (contour-based, so it clears any shape). (concentricRect on NaN bounds from a centred shape never
-    // terminates — the cause of the hang on polygon/ellipse pockets.)
+    // Concentric rings: circle + rect keep their analytic kernels (byte-identity); polygon + ellipse now clear via
+    // concentricContour — inward OFFSET RINGS over the same offsetRegion the wall uses (t802: replaces the old silent
+    // raster FALLBACK, which existed only because concentricRect-on-NaN hung on a centred shape — concentricContour terminates).
     if (p.strategy === 'concentric' && rg.kind === 'circle') return concentricCircle(rg.cx, rg.cy, rg.r, step, ctx);
     if (p.strategy === 'concentric' && rg.kind === 'rect') return concentricRect(rg.x, rg.y, rg.x + rg.w, rg.y + rg.h, step, ctx);
+    if (p.strategy === 'concentric') return concentricContour(rg, step, ctx);   // polygon / ellipse
     const rows = scanlineFill(rg.contour, step);
     if (p.direction === 'oneway') return onewayMoves(rows, ctx, false);
     if (p.direction === 'otherway') return onewayMoves(rows, ctx, true);

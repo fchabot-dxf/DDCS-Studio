@@ -26,6 +26,8 @@ import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a — the declared tool-selection marker (toolNum binds via POCKET_BINDING_SPECS)
 import { pruneGuards } from '../whenGuard.js';
 import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true boundary ring (polygon/ellipse) for the 2D preview
+import { pocketInsetRegion, stepoverMm } from '../../wizards/ops/pocketfill.js';   // t802 — the tool-inset boundary + ring spacing (one source with the emit)
+import { concentricRings } from '../../wizards/ops/contour.js';   // t802 — the inward offset rings the concentric emit cuts (draw them in the 2D preview)
 
 /** Author defaults — match pocketStack's num() fallbacks AND the built-in Pocket form defaults (index.html p_*). */
 export const POCKET_DEFAULTS = {
@@ -147,7 +149,18 @@ export function pocketPreviewGeometry(p) {
     }
     // t718 — the origin-inclusive boundary bbox: the twin's pocket geometry emits 0-relative (origin rides the placement
     // offX), so the layout consumer places against THIS drawn-frame bbox → the pocket frames the traced clearing passes.
-    return { paths, handles, bbox: _pbb(paths) };
+    const bbox = _pbb(paths);   // the boundary bbox — computed BEFORE the inner rings (which are ⊂ the boundary anyway)
+    // t802 — CONCENTRIC strategy: draw the actual inward offset RINGS the emit cuts, from the SAME concentricRings source
+    // (over the tool-inset region) — so the 2D layout shows the octagon/ellipse clearing pattern, not just the boundary,
+    // and the drawn rings equal the cut rings by construction. (Raster keeps the boundary-only preview.)
+    if ((p.strategy || 'spiral') === 'spiral') {
+        try {
+            for (const ring of concentricRings(pocketInsetRegion(p), stepoverMm(p))) {
+                if (ring && ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-guide' });
+            }
+        } catch (_) { /* degenerate pocket (smaller than the tool) — no rings to draw */ }
+    }
+    return { paths, handles, bbox };
 }
 
 /** The wrapped superset template: pocketStack(DEFAULTS, {superset:true}) under the user_root/panel/sim/param_group prefix. */

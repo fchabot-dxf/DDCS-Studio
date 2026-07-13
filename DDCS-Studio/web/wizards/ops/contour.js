@@ -25,6 +25,55 @@ export function offsetRegion(rg, d) {
     return { kind: 'rect', x: x0, y: y0, w: x1 - x0, h: y1 - y0, contour: rectContour(x0, y0, x1, y1) };
 }
 
+/** t802 — the region's perpendicular HALF-EXTENT (inradius): how much room is left to inset another full ring.
+ *  polygon apothem = r·cos(π/n); ellipse = min(rx,ry); circle = r; rect = min(w,h)/2. */
+export function regionInradius(rg) {
+    if (rg.kind === 'ellipse') return Math.min(rg.rx, rg.ry);
+    if (rg.kind === 'polygon') return rg.r * Math.cos(Math.PI / rg.sides);
+    if (rg.kind === 'rect') return Math.min(rg.w, rg.h) / 2;
+    return rg.r;   // circle
+}
+
+/** t802 — CONCENTRIC clearing for ANY shape via inward OFFSET RINGS (polygon + ellipse; circle/rect keep their analytic
+ *  concentricCircle/concentricRect kernels for byte-identity). Start at the tool-inset boundary `rg`, trace it, inset by
+ *  `step` (a TRUE perpendicular offset — offsetRegion adjusts the polygon circumradius by step/cos(π/n)), repeat until the
+ *  region can't hold another ring, then a centre finish clears the core. ASSEMBLY over offsetRegion + a linked ring trace
+ *  (no per-ring retract — step inward like concentricRect) — no new geometry, and it TERMINATES (regionInradius floor),
+ *  unlike the old concentricRect-on-NaN hang that forced polygon/ellipse to silently raster. */
+/** t802 — the SEQUENCE of inward offset ring contours (outermost first) that clear `rg` with a `step` perpendicular
+ *  spacing. ONE SOURCE for BOTH the emit (concentricContour) and the 2D preview (pocketPreviewGeometry) so the drawn
+ *  rings equal the cut rings by construction — the perimeter-grounding rule. Each entry is a closed point-array. */
+export function concentricRings(rg, step) {
+    const s = Math.max(0.1, step), rings = [];
+    let region = rg, guard = 0;
+    while (guard++ < 100000) {
+        const ring = (region.contour || [])[0];
+        if (!ring || ring.length < 2) break;
+        rings.push(ring);
+        if (regionInradius(region) <= s) break;   // no room for another full ring inward
+        region = offsetRegion(region, -s);
+    }
+    return rings;
+}
+
+export function concentricContour(rg, step, ctx) {
+    const { z, clr, feed, plunge } = ctx;
+    const rings = concentricRings(rg, step);
+    if (!rings.length) return [];
+    const cx = rg.cx != null ? rg.cx : (rg.x + rg.w / 2), cy = rg.cy != null ? rg.cy : (rg.y + rg.h / 2);
+    const L = [];
+    let first = true;
+    for (const ring of rings) {
+        const p0 = ring[0];
+        if (first) { L.push(`G0 Z${r3(clr)}`, `G0 X${r3(p0.x)} Y${r3(p0.y)}`, `G1 Z${r3(z)} F${plunge}`); first = false; }
+        else L.push(`G1 X${r3(p0.x)} Y${r3(p0.y)} F${feed}`);   // step inward to the next ring (≤ one stepover)
+        for (let i = 1; i < ring.length; i++) L.push(`G1 X${r3(ring[i].x)} Y${r3(ring[i].y)} F${feed}`);
+        L.push(`G1 X${r3(p0.x)} Y${r3(p0.y)} F${feed}`);   // close the ring
+    }
+    L.push(`G1 X${r3(cx)} Y${r3(cy)} F${feed}`);   // centre finish — clear the remaining core (≤ one stepover, within tool reach)
+    return L;
+}
+
 /** Signed offset (tool-radius) for a side: outside = +r, inside = −r, on = 0. */
 export const sideOffset = (side, toolR) => (side === 'inside' ? -toolR : side === 'on' ? 0 : toolR);
 
