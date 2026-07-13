@@ -2468,3 +2468,93 @@ Files: web/wizards/clearing.js (levelEntry + entryOrPlunge + wire 3 kernels), we
 web/wizards/pocketWizard.js (builder pass-through), web/blocks/blockEmitter.js (fold exposes by),
 web/blocks/dataOps/pocketData.js (ENTRY_OPTIONS + 4 clearing-cluster bindings + defaults), web/blocks/blockly/bridge.js
 (entry enum), tests/depth-entry-804.spec.js (NEW). Commit dc6e130.
+
+## 2026-07-12 (t806) — DRIVE FLOW + SELECT-THEN-LOAD (cloud UX) + the Ramp-Angle degree RIDER
+
+The advisor dispatched the cloud-UX turn (user t799 "google drive auth is wonky, no real button to load a selection";
+"profiles are also confusing to select"; the ruled interaction model t803). Commit 611eb1c.
+
+### (a) THE WONKY STEP — traced + named concretely
+
+The connect FLOW itself works: `cloudAccount.connect('google')` → GIS token popup (`googleDrive.connectGoogle` →
+`initTokenClient().requestAccessToken()`) → the raw access token in localStorage `ddcs_cloud_token`; every surface
+re-renders on the `ddcs:cloud-account` event; a 401 silently re-mints (`silentRefresh`). What was actually WONKY:
+
+1. **Dead-end connect buttons (a real dead click).** The projects drawer's disconnected Cloud tab
+   (`projectModal.renderCloudConnect`) iterated **PROVIDER_IDS** (google, dropbox, onedrive) and drew a Connect button
+   for each — but only google is wired (`AVAILABLE_PROVIDER_IDS`; the OneDrive adapter returns null). So two of the three
+   connect buttons led nowhere. (Settings' own `renderCloudLogin` already used AVAILABLE — the two surfaces disagreed.)
+   FIX: `renderCloudConnect` now iterates `AVAILABLE_PROVIDER_IDS` → only Google is offered.
+
+2. **"No real button to load a selection" (the named user symptom).** After connect the Cloud tab DID keylessly list the
+   app's own drive.file projects (`gdrive.list`), but the ONLY way to open one was clicking its filename — which loaded
+   IMMEDIATELY, with no selected state and no dedicated button. Same in Local and in the profiles browser (there a per-row
+   Load, but no selection + no single dedicated action). FIX: the ruled SELECT-THEN-LOAD model below.
+
+3. **The Picker key gate looks mandatory but isn't.** "📂 Choose folder" (the Google Picker, the only way drive.file can
+   point at a PRE-EXISTING Drive folder) needs the browser API key (`ddcs_apikey_google`, empty until registered) →
+   prompts a paste. That is an UPGRADE, not a requirement — the keyless listing + [Open] already works with zero setup.
+   Kept as-is and DOCUMENTED as the key-gated upgrade (no key exists yet); the keyless list is the working default.
+
+### (b) KEYLESS LISTING + a real [Open] per browser (no Picker key)
+
+The Cloud tab keeps its keyless `gdrive.list(folder)` (drive.file — lists what the app created). The affordance is now a
+dedicated **[Open]** button (disabled until a project row is selected) + double-click; the Picker stays the documented
+key-gated upgrade.
+
+### (c) SELECT-THEN-LOAD — ONE declared model over all four surfaces
+
+The declare move: a shared `web/ui/selectLoad.js` (NOT four hand-rolls) that generalises the tool-library "Use"
+precedent (accent commit button + dblclick) with an explicit one-at-a-time SELECTED state + a disabled-until-selected
+primary button. A row opts in with `sl-row` + `data-sl-id`; the ACTIVE row adds `data-sl-active` (a distinct badge, NOT
+the selection ring). A single click SELECTS (accent box-shadow ring, one at a time); the dedicated `[data-sl-primary]`
+button OR a double-click COMMITS via `onLoad(id, row)`. Row-action buttons (rename/delete) never select; delegation lives
+on a STABLE root so rows + the button re-render freely; `syncPrimary(root)` after each render resets the disabled state.
+
+- **Projects (local + cloud):** each is a select-load root. FILES are `sl-row`s (name → a plain span, the whole row
+  selects); FOLDERS keep their navigate button (single click enters — a known affordance, not a dead click). A bottom
+  [Open] bar per tab. Local `onLoad` = readProject→loadProject; cloud `onLoad` = gdrive.read→loadProject. The now-orphaned
+  `data-act='open'` branch (only files emitted it) was removed.
+- **Profiles (one mixed list):** rows carry `data-sl-kind` local|cloud; the footer gained a dedicated **[Load]**; the
+  per-row Load buttons (local `data-load` + cloud-only `data-cload`) were RETIRED in favour of the one action (their
+  orphaned listener branches removed; delete/export/cdel kept). The ACTIVE profile shows a distinct "Active" pill
+  (`.sl-active-badge`) separate from the selection ring. Cloud load keeps its confirm. Tags (`.sl-tag`: 💾 on this device
+  / ☁ synced / ☁ in cloud) make local-vs-cloud unambiguous. Done stepped back to a secondary button so [Load] is the
+  clear primary.
+
+Design calls (faithful to the ruling, logged so they're auditable): FOLDERS navigate on single click / FILES select —
+this resolves the row-click-loads ambiguity without a dead click. Per-row Load in profiles was retired (a dedicated
+button + per-row buttons would be redundant/confusing) — this is MIGRATION of a retiring interaction, not a regression,
+so the two specs that drove `[data-load]`/`[data-cload]` were updated to select-then-[Load].
+
+### RIDER — the Ramp-Angle double degree (my t804 nit)
+
+`labelSpan` (formWidgets) renders the label text THEN appends a ` (units)` span. My t804 binding had BOTH `label:'Ramp
+Angle °'` AND `units:'°'` → "Ramp Angle ° (°)". Dropped the ° from the LABEL (units own the symbol) → renders
+"Ramp Angle (°)" (verified in the twin form: one degree sign). SWEEP: an exhaustive grep of every `label:`+`units:` pair
+across all of web/ (including widgetConfig.units) found this as the ONLY label repeating its unit ("Helix Ø (mm)" is fine
+— Ø is the diameter symbol, not the unit).
+
+### VERIFY (select-load-805.spec.js, 6/6 — mocked Drive)
+
+- Projects CLOUD (in-memory Drive, keyless list): [Open] disabled until a file is selected → enabled → loads; a folder
+  navigates on single click (crumb grows, not an sl-row); exactly one selected row at a time.
+- Projects CLOUD: double-click a file is the shortcut (loads without the button).
+- The WONKY fix: the disconnected Cloud tab offers exactly ONE connect button (Google) — no dead Dropbox/OneDrive.
+- Projects LOCAL: single click selects (not load), one at a time; the folder is a navigate button (not selectable).
+- Profiles: [Load] disabled until selected; the ACTIVE profile is badged distinct; select a non-active → [Load] → full-swap
+  makes it active; local/cloud tags present; after load the list re-renders → [Load] disabled again (no stale selection).
+- Profiles CLOUD row: selectable + loads via [Load] (download-then-activate, confirmed).
+- Migrated: profile-library + profile-cloud-library (retired per-row Load → select-then-[Load]); project-drawer-smoke +
+  cloud-default-754 unaffected. Ran the 5 together: 16/16.
+
+Real symptom driven (not a proxy): the actual drawer + profile modal at localhost:3211, a mocked network-level Drive.
+
+SUITE: 1180 passed, 2 skipped, 0 failed, 0 flaky (workers=2, retries=0, 20.6m) (workers=2 — the shared selectLoad module + both browsers + the one-line RIDER; profiles/projects
+verified end-to-end; no emit surface touched → the byte goldens are unaffected).
+
+Files: web/ui/selectLoad.js (NEW — the shared model), web/styles.css (.sl-* rules), web/ui/projects/projectModal.js
+(local+cloud select-then-load, folder-navigate, [Open], AVAILABLE_PROVIDER_IDS), web/ui/profileModal.js (select-then-load,
+[Load], Active badge, retire per-row Load), web/blocks/dataOps/pocketData.js (RIDER — Ramp Angle label),
+tests/select-load-805.spec.js (NEW), tests/profile-library.spec.js + tests/profile-cloud-library.spec.js (migrated).
+Commit 611eb1c.
