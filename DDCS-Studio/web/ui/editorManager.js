@@ -299,6 +299,14 @@ export class EditorManager {
         this._applyTrail();
     }
 
+    // PUBLIC jump-to-line (t838 pre-flight): scroll a 1-BASED source line into view + flash it (a violation row-click).
+    // Reuses the existing _scrollToLine (0-based) + flashLine glow — the "editor scroll exists" the feature relies on.
+    revealLine(line1Based) {
+        const idx = Math.max(0, (line1Based | 0) - 1);
+        this._scrollToLine(idx);
+        this.flashLine(idx, 'event');
+    }
+
     _scrollToLine(index) {
         if (!this.editor) return;
         const cs = getComputedStyle(this.editor);

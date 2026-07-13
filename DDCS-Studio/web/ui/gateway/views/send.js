@@ -3,6 +3,8 @@
 // progress tracking, then submitJob to the gateway queue. A WRITE op — the operator still presses Cycle Start.
 import { el, toast } from '../util.js';
 import { instrument, DEFAULTS } from '../../../shared/js/instrument/instrument.js';
+import { dlgConfirm } from '../../dialog.js';
+import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — pre-flight before the push
 
 const field = (labelText, control) => el('div', {}, el('span', { class: 'label' }, labelText), control);
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
@@ -66,6 +68,21 @@ export default {
       const name = (nameField.value || file.name || 'job.nc').trim();
       btn.disabled = true;
       try {
+        // t838 PRE-FLIGHT ENVELOPE CHECK — warn before pushing a program that would leave the machine travel. The machine
+        // is the USER's, so we ASK (an explicit confirm), never silently block. Fires only on RED (declared placement +
+        // a real breach); advisory (a checker error never blocks the send).
+        try {
+          const pre = checkEnvelope(file.text, (window.ddcsGetSettings && window.ddcsGetSettings()) || {});
+          if (pre.status === 'red') {
+            const top = pre.violations.slice(0, 4).map(v => `line ${v.line}: ${v.axis} by ${Math.round(v.overshoot * 10) / 10} mm`).join('\n');
+            const more = pre.violations.length > 4 ? `\n…and ${pre.violations.length - 4} more` : '';
+            const ok = await dlgConfirm(
+              `Pre-flight found ${pre.violations.length} move(s) that would leave the machine travel:\n\n${top}${more}\n\nSend to the controller anyway?`,
+              { title: 'Envelope violation', danger: true, okLabel: 'Send anyway', cancelLabel: 'Cancel' });
+            if (!ok) return;   // the finally block re-enables the button
+          }
+        } catch (_) { /* advisory — never block the send on a checker error */ }
+
         let nc = file.text, map;
         if (beacons.checked) {
           const res = instrument(file.text, {
