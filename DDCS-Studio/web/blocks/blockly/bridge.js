@@ -52,6 +52,7 @@ const SELECTS = {
     arc: ['ccw', 'cw'],                              // arc move direction (G3 / G2)
     end: ['M30', 'M2', 'M99'],                       // program end (M30 reset / M2 end / M99 subprogram return)
     direction: ['bothways', 'oneway', 'otherway'],   // fill / step-over scan direction
+    entry: ['plunge', 'ramp', 'helix'],              // t804 — pocket depth-entry (per-level descent)
     order: ['outside-in', 'inside-out'],             // concentric-fill ring order
     strategy: ['parallel', 'concentric'],            // step-over pass strategy
     // SIM-START (per-pass preview start, the simstart authoring block — B3). The Option-A vocabulary as dropdowns.

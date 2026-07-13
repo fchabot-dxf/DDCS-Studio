@@ -10,7 +10,7 @@
  * (offset) polygon contour.
  */
 import { num, r3 } from './util.js';
-import { contourLevel, circleContour, polygonContour, ellipseContour, rectContour } from '../clearing.js';
+import { contourLevel, circleContour, polygonContour, ellipseContour, rectContour, entryOrPlunge } from '../clearing.js';
 import { coerceRegion } from './region.js';
 
 /** Offset a region descriptor OUTWARD (+) / INWARD (−) by `d` (the signed tool-radius), rebuilding its contour.
@@ -65,7 +65,7 @@ export function concentricContour(rg, step, ctx) {
     let first = true;
     for (const ring of rings) {
         const p0 = ring[0];
-        if (first) { L.push(`G0 Z${r3(clr)}`, `G0 X${r3(p0.x)} Y${r3(p0.y)}`, `G1 Z${r3(z)} F${plunge}`); first = false; }
+        if (first) { L.push(...entryOrPlunge(ctx, p0.x, p0.y, [`G0 Z${r3(clr)}`, `G0 X${r3(p0.x)} Y${r3(p0.y)}`, `G1 Z${r3(z)} F${plunge}`])); first = false; }
         else L.push(`G1 X${r3(p0.x)} Y${r3(p0.y)} F${feed}`);   // step inward to the next ring (≤ one stepover)
         for (let i = 1; i < ring.length; i++) L.push(`G1 X${r3(ring[i].x)} Y${r3(ring[i].y)} F${feed}`);
         L.push(`G1 X${r3(p0.x)} Y${r3(p0.y)} F${feed}`);   // close the ring

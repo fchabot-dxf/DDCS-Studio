@@ -41,8 +41,11 @@ export function stepoverMm(p) { return Math.max(0.2, Math.max(0.1, num(p.toolDia
 
 export const pocketFillBlock = {
     type: 'pocketfill', label: 'Pocket Fill', kind: 'fill', category: 'Toolpaths',
-    defaults: { shape: 'rect', originX: 0, originY: 0, w: 80, h: 60, dia: 50, sides: 6, wallOffset: 0, toolDia: 6, stepoverPct: 40, strategy: 'concentric', direction: 'bothways', z: 'z', feed: 600, plunge: 150, clearance: 5 },
-    fields: ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'stepoverPct', 'strategy', 'direction', 'z', 'feed', 'plunge', 'clearance'],
+    // t804 — DEPTH ENTRY: `entry` (plunge|ramp|helix) is the per-level descent to the cut Z. plunge = straight (default,
+    // byte-identical); ramp = a linear descent at ≤ rampAngle°; helix = a descending helix at helixDia (pitch = mm/rev).
+    // `by` reads the enclosing StepDown's step (exposed in scope) so the entry descends exactly one level.
+    defaults: { shape: 'rect', originX: 0, originY: 0, w: 80, h: 60, dia: 50, sides: 6, wallOffset: 0, toolDia: 6, stepoverPct: 40, strategy: 'concentric', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, by: 'by', z: 'z', feed: 600, plunge: 150, clearance: 5 },
+    fields: ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'stepoverPct', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'by', 'z', 'feed', 'plunge', 'clearance'],
     // the enclosing StepDown fills scope `z`; fillStrategy reads the inset region + the flat cut params → the stepover passes.
     lines: (p, z) => fillStrategy({ ...p, region: pocketInsetRegion(p), stepover: stepoverMm(p) }, z),
     segments: (p) => fillSegments({ ...p, region: pocketInsetRegion(p), stepover: stepoverMm(p) }),

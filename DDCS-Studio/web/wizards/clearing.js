@@ -16,7 +16,51 @@
  *
  * Conventions match gcodeViz3d.js / featureCanvas.js: work coords X-right / Y-up, mm, feed mm/min.
  */
+import { helixPoints } from './ops/helix.js';   // t804 — the descending-helix atom, reused for the helix depth-entry (assembly)
+
 const r3 = (n) => Math.round(n * 1000) / 1000;
+
+/** t804 — DEPTH ENTRY: the per-level descent to the cut Z `z`, by mode. Returns { ok, lines?, why? }. When ok, the caller
+ *  kernel emits `lines` in place of its straight plunge; else it falls back to the plunge (byte-identical) — the honest
+ *  degrade. Every entry rapids to (x0,y0), drops to the previous cleared floor (prevZ), descends `drop = prevZ − z`, and
+ *  ENDS at (x0,y0,z) so the kernel proceeds unchanged. `plunge` is handled inline by the caller (not routed here).
+ *   ramp  — descend TOWARD the region centre (cx,cy) at ≤ rampAngle°, then return to the start at z. Greys (ok:false +
+ *           why) when the run to centre is shorter than the descent needs (drop / tan(angle)) — the greyed-ramp case.
+ *   helix — a linearized descending helix (helixPoints) of radius helixR (the caller clamps it to fit) at (cx,cy),
+ *           pitch = mm per rev, then a G1 to the start at z. */
+export function levelEntry(mode, o) {
+    const { x0, y0, cx, cy, z, prevZ, feed } = o, drop = prevZ - z;
+    if (!(drop > 1e-6)) return { ok: false };   // no descent this level → let the kernel plunge (defensive)
+    if (mode === 'ramp') {
+        const ang = Math.min(45, Math.max(0.5, num(o.rampAngle, 3))), run = drop / Math.tan(ang * Math.PI / 180);
+        const toC = Math.hypot(cx - x0, cy - y0);
+        if (!(toC >= run)) return { ok: false, why: `ramp ${r3(ang)}deg needs ${r3(run)}mm, first move ${r3(toC)}mm -> plunge` };
+        const t = run / toC, mx = x0 + t * (cx - x0), my = y0 + t * (cy - y0);
+        return { ok: true, lines: [`G0 X${r3(x0)} Y${r3(y0)}`, `G0 Z${r3(prevZ)}`, `G1 X${r3(mx)} Y${r3(my)} Z${r3(z)} F${feed}   ( ramp )`, `G1 X${r3(x0)} Y${r3(y0)} F${feed}`] };
+    }
+    if (mode === 'helix') {
+        const R = Math.max(0.2, num(o.helixR, 3)), pitch = Math.max(0.1, num(o.helixPitch, 1));
+        const pts = helixPoints({ cx, cy, radius: R, depth: drop, pitch, seg: 24 });   // p.z ∈ (0,−drop] → world prevZ+p.z ∈ [prevZ, z]
+        const L = [`G0 X${r3(cx + R)} Y${r3(cy)}`, `G0 Z${r3(prevZ)}`];
+        for (const p of pts) L.push(`G1 X${r3(p.x)} Y${r3(p.y)} Z${r3(prevZ + p.z)} F${feed}`);
+        L.push(`G1 X${r3(x0)} Y${r3(y0)} Z${r3(z)} F${feed}   ( helix )`);
+        return { ok: true, lines: L };
+    }
+    return { ok: false };
+}
+const num = (v, d) => { const n = Number(v); return isFinite(n) ? n : d; };
+
+/** t804 — a kernel's first descent at (x0,y0): the level-entry (ramp/helix) when `ctx.entry` asks for it AND it fits, else
+ *  the kernel's exact `plungeLines` (so PLUNGE — the default — stays byte-for-byte). A ramp that can't fit degrades to the
+ *  plunge with a `( why )` comment (the honest greyed-ramp case). ctx carries {entry, cx, cy, z, prevZ, rampAngle, helixR, helixPitch, feed}. */
+export function entryOrPlunge(ctx, x0, y0, plungeLines) {
+    if (ctx && ctx.entry && ctx.entry !== 'plunge') {
+        const e = levelEntry(ctx.entry, { x0, y0, cx: ctx.cx, cy: ctx.cy, z: ctx.z, prevZ: ctx.prevZ, rampAngle: ctx.rampAngle, helixR: ctx.helixR, helixPitch: ctx.helixPitch, feed: ctx.feed });
+        if (e && e.ok) return e.lines;
+        if (e && e.why) return [`( ${e.why} )`, ...plungeLines];
+    }
+    return plungeLines;
+}
 
 /** Region → contour(s). A contour is a closed ring of {x,y} (the close edge is implicit). */
 export function rectContour(x0, y0, x1, y1) {
@@ -98,7 +142,7 @@ export function fillLevelMoves(rows, ctx) {
         for (let si = 0; si < ordered.length; si++) {
             const [xlo, xhi] = ordered[si];
             const xs = dir > 0 ? xlo : xhi, xe = dir > 0 ? xhi : xlo;
-            if (!started) { L.push(`G0 X${r3(xs)} Y${r3(y)}`, `G1 Z${r3(z)} F${plunge}`); started = true; }
+            if (!started) { L.push(...entryOrPlunge(ctx, xs, y, [`G0 X${r3(xs)} Y${r3(y)}`, `G1 Z${r3(z)} F${plunge}`])); started = true; }
             else if (si > 0 || liftNext) { L.push(`G0 Z${r3(clr)}`, `G0 X${r3(xs)} Y${r3(y)}`, `G1 Z${r3(z)} F${plunge}`); }
             else { L.push(`G1 X${r3(xs)} Y${r3(y)} F${feed}`); }   // step to the next row through the cleared band
             L.push(`G1 X${r3(xe)} Y${r3(y)} F${feed}`);
@@ -131,7 +175,7 @@ export function concentricRect(x0, y0, x1, y1, step, ctx) {
     for (;;) {
         const ax = x0 + inset, ay = y0 + inset, bx = x1 - inset, by = y1 - inset;
         if (bx - ax < 1e-6 || by - ay < 1e-6) break;
-        if (first) { L.push(`G0 X${r3(ax)} Y${r3(ay)}`, `G1 Z${r3(z)} F${plunge}`); first = false; }
+        if (first) { L.push(...entryOrPlunge(ctx, ax, ay, [`G0 X${r3(ax)} Y${r3(ay)}`, `G1 Z${r3(z)} F${plunge}`])); first = false; }
         else L.push(`G1 X${r3(ax)} Y${r3(ay)} F${feed}`);   // diagonal step to the next ring's corner
         L.push(`G1 X${r3(bx)} Y${r3(ay)} F${feed}`, `G1 X${r3(bx)} Y${r3(by)} F${feed}`,
                `G1 X${r3(ax)} Y${r3(by)} F${feed}`, `G1 X${r3(ax)} Y${r3(ay)} F${feed}`);
@@ -148,7 +192,7 @@ export function concentricCircle(cx, cy, Rc, step, ctx) {
     let rad = Rc, first = true;
     while (rad > 1e-6) {
         const sx = cx + rad, sy = cy;
-        if (first) { L.push(`G0 X${r3(sx)} Y${r3(sy)}`, `G1 Z${r3(z)} F${plunge}`); first = false; }
+        if (first) { L.push(...entryOrPlunge(ctx, sx, sy, [`G0 X${r3(sx)} Y${r3(sy)}`, `G1 Z${r3(z)} F${plunge}`])); first = false; }
         else L.push(`G1 X${r3(sx)} Y${r3(sy)} F${feed}`);
         L.push(`G3 X${r3(sx)} Y${r3(sy)} I${r3(-rad)} J0 F${feed}`);   // full CCW circle
         rad -= step;

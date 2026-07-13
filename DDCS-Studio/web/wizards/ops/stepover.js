@@ -7,8 +7,8 @@
  * Pocket / Surfacing / Slot — the body is what to do on each pass (default: cut it). Wraps clearing.js kernels.
  */
 import { num, r3 } from './util.js';
-import { scanlineFill, fillLevelMoves, concentricRect, concentricCircle } from '../clearing.js';
-import { concentricContour } from './contour.js';   // t802 — concentric for polygon/ellipse (inward offset rings)
+import { scanlineFill, fillLevelMoves, concentricRect, concentricCircle, entryOrPlunge } from '../clearing.js';
+import { concentricContour, regionInradius } from './contour.js';   // t802 concentric polygon/ellipse; t804 regionInradius (helix clamp)
 import { coerceRegion, regionDesc } from './region.js';
 
 /** The region to clear: a plugged Region reporter (StepOver) OR, when none is plugged, built from the block's OWN flat
@@ -23,7 +23,7 @@ function onewayMoves(rows, ctx, reverse) {
     for (const row of rows) {
         for (const [xlo, xhi] of row.spans) {
             const xs = reverse ? xhi : xlo, xe = reverse ? xlo : xhi;
-            if (!started) { L.push(`G0 X${r3(xs)} Y${r3(row.y)}`, `G1 Z${r3(z)} F${plunge}`); started = true; }
+            if (!started) { L.push(...entryOrPlunge(ctx, xs, row.y, [`G0 X${r3(xs)} Y${r3(row.y)}`, `G1 Z${r3(z)} F${plunge}`])); started = true; }
             else L.push(`G0 Z${r3(clr)}`, `G0 X${r3(xs)} Y${r3(row.y)}`, `G1 Z${r3(z)} F${plunge}`);
             L.push(`G1 X${r3(xe)} Y${r3(row.y)} F${feed}`);
         }
@@ -35,6 +35,18 @@ function onewayMoves(rows, ctx, reverse) {
 export function fillStrategy(p, z) {
     const rg = fillRegion(p), step = Math.max(0.1, num(p.stepover, 4));
     const ctx = { z, clr: num(p.clearance, 5), feed: num(p.feed, 600), plunge: num(p.plunge, 200) };
+    // t804 — DEPTH ENTRY context: the per-level descent (ramp/helix) the kernels apply at their first plunge. prevZ = the
+    // previous cleared floor (this level's z + the StepDown step `by`); centre + a tool-clamped helix radius from the region.
+    ctx.entry = p.entry || 'plunge';
+    if (ctx.entry !== 'plunge') {
+        ctx.prevZ = z + num(p.by, Math.abs(z));   // by from the enclosing StepDown scope; standalone → the whole depth
+        ctx.cx = rg.cx != null ? rg.cx : (rg.x + rg.w / 2);
+        ctx.cy = rg.cy != null ? rg.cy : (rg.y + rg.h / 2);
+        ctx.rampAngle = num(p.rampAngle, 3);
+        const toolR = Math.max(0.1, num(p.toolDia, 6)) / 2, wantR = num(p.helixDia, 0) > 0 ? num(p.helixDia, 0) / 2 : toolR;
+        ctx.helixR = Math.max(0.2, Math.min(wantR, regionInradius(rg) - 0.01));   // clamp so the helix + tool stays inside the pocket
+        ctx.helixPitch = num(p.helixPitch, 1);
+    }
     // Concentric rings: circle + rect keep their analytic kernels (byte-identity); polygon + ellipse now clear via
     // concentricContour — inward OFFSET RINGS over the same offsetRegion the wall uses (t802: replaces the old silent
     // raster FALLBACK, which existed only because concentricRect-on-NaN hung on a centred shape — concentricContour terminates).

@@ -32,7 +32,7 @@ import { concentricRings } from '../../wizards/ops/contour.js';   // t802 — th
 /** Author defaults — match pocketStack's num() fallbacks AND the built-in Pocket form defaults (index.html p_*). */
 export const POCKET_DEFAULTS = {
     shape: 'rect', w: 80, h: 60, dia: 50, sides: 6, toolDia: 6, wallOffset: 0, stepoverPct: 40,
-    strategy: 'spiral', direction: 'bothways', depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, wcs: 'active',
+    strategy: 'spiral', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, wcs: 'active',
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
 
@@ -44,6 +44,9 @@ const STRATEGY_OPTIONS = [['Spiral (concentric)', 'spiral'], ['Raster (parallel 
 // (same, reversed). Only the raster/scanline path reads it — concentric rings on a circle/rect ignore it (fixed dir), so
 // the binding is gated `when strategy is raster` (no whenAny/OR to also catch spiral+polygon/ellipse; bothways is the safe default there).
 const DIRECTION_OPTIONS = [['Zig-zag (both ways)', 'bothways'], ['One-way climb', 'oneway'], ['One-way conventional', 'otherway']];
+// t804 — DEPTH ENTRY: the per-level descent. Plunge = straight down (default); Ramp = a linear descent at ≤ the angle
+// (greys → plunge when the pocket is too small); Helix = a descending helix (the existing helix atom), pitch = mm/rev.
+const ENTRY_OPTIONS = [['Plunge (straight)', 'plunge'], ['Ramp', 'ramp'], ['Helix', 'helix']];
 const XY_DATUM_OPTIONS = [
     ['Follow stock datum', ''], ['Front Left', 'nn'], ['Front Center', 'cn'], ['Front Right', 'pn'],
     ['Center Left', 'nc'], ['Center', 'cc'], ['Center Right', 'pc'], ['Back Left', 'np'], ['Back Center', 'cp'], ['Back Right', 'pp'],
@@ -90,6 +93,11 @@ const POCKET_BINDING_SPECS = [
     // structural driver, is spliced in ahead of these in pocketDataDef). direction gates to raster — the only path the kernel scans.
     { param: 'direction', type: 'enum', key: 'direction', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.direction, widget: 'dropdown', widgetConfig: { options: DIRECTION_OPTIONS }, label: 'Direction', section: T, group: 'clearing', when: { param: 'strategy', is: 'raster' }, help: 'Raster scan pattern: Zig-zag links passes back-and-forth (fastest); One-way lifts and rapids back before each pass for a consistent climb (or conventional) cut. Applies to the raster passes — concentric rings keep their fixed direction.' },
     { param: 'stepoverPct', type: 'number', key: 'stepoverPct', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.stepoverPct, label: 'Stepover %', section: T, group: 'clearing' },
+    // t804 — DEPTH ENTRY (in the clearing cluster): the per-level descent + its per-mode fields (when-gated).
+    { param: 'entry', type: 'enum', key: 'entry', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', section: T, group: 'clearing', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle (degrades to plunge, with the reason, on a pocket too small for it). Helix = a descending helix at the helix Ø, pitch mm per rev.' },
+    { param: 'rampAngle', type: 'number', key: 'rampAngle', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.rampAngle, label: 'Ramp Angle °', section: T, group: 'clearing', when: { param: 'entry', is: 'ramp' }, units: '°', help: 'Max descent angle of the ramp (degrees from horizontal). Shallower = gentler on the tool; too shallow needs a longer run than a small pocket has (then it degrades to a straight plunge).' },
+    { param: 'helixDia', type: 'number', key: 'helixDia', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.helixDia, label: 'Helix Ø', section: T, group: 'clearing', when: { param: 'entry', is: 'helix' }, units: 'mm', help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the pocket.' },
+    { param: 'helixPitch', type: 'number', key: 'helixPitch', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.helixPitch, label: 'Helix Pitch', section: T, group: 'clearing', when: { param: 'entry', is: 'helix' }, units: 'mm/rev', help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler entry, more revolutions.' },
     ...leafPair('toolDia', 'toolDia', 'number', { default: POCKET_DEFAULTS.toolDia, label: 'Tool Ø', section: T }),
     ...leafPair('wallOffset', 'wallOffset', 'number', { default: POCKET_DEFAULTS.wallOffset, label: 'Wall Offset ±', section: T, help: 'Signed wall offset (mm): + cuts OVERSIZE (walls out), − cuts UNDERSIZE / leaves stock. 0 = the exact typed size.' }),
     ...leafPair('feed', 'feed', 'number', { default: POCKET_DEFAULTS.feed, label: 'Feed', section: T }),

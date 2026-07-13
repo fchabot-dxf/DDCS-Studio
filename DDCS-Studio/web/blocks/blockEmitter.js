@@ -186,7 +186,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const to = ev(block.params.to, 5), by = ev(block.params.by, 1) || 1;
         const out = [];
         for (const L of depthLevels(to, by)) {
-            const child = Object.create(scope); child.z = -L;          // child scope: cut Z visible to the body, doesn't leak out
+            const child = Object.create(scope); child.z = -L; child.by = by;   // t804 — expose `by` too: the fill's depth-entry (ramp/helix) descends exactly one level
             out.push(tag(`( ${def.label} z=${r3(-L)} )`, own));
             (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
         }
