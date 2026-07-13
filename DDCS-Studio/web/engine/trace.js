@@ -25,6 +25,7 @@ export function traceToolpath(text, opts = {}) {
         stock: opts.stock || null,
         stockOffset: opts.start || null,
         wcsOffset: opts.wcsOffset || null,   // work origin in MACHINE coords → G53 moves draw in the part frame
+        g53ApproxZ: opts.g53ApproxZ != null ? opts.g53ApproxZ : null,   // t826 — undeclared placement: render machine-frame G53 Z retracts at this work-frame Z (margin above the work origin)
         initialPos: opts.initialPos || null,   // t540 — seed the tool's START position (homing: the draggable machine-frame Start)
         continuous: opts.continuous || false,   // t570 — an AUTO-traverse op (alignment) is ONE continuous path from the seat (no per-pass origin reset)
         createVarStore: opts.createVarStore || null,

@@ -103,7 +103,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
     CF('Position over the flat, near A0. Enter to probe - ESC=cancel', 2);
     DM('inc');
     C('Point A: probe down onto the flat'); ppZdown('#51');
-    MV('Z', '#17');                          // retract clear above the flat
+    S.push(safeRetractNode());               // t824/t826 — retract clear via the machine-frame margin (was G0 Z#17, an incremental lift that compounds into the top switch from a high start)
     MV('Y', '#6');                           // step across the flat by the span (+Y)
     C('Point B: probe down onto the flat'); ppZdown('#52');
     C('Tilt of the flat (degrees) = atan( dZ / span )');

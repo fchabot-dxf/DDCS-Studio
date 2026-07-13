@@ -61,7 +61,7 @@ export const ATC_DIALECT = {
 };
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, initialPos = null, continuous = false, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000, wcsBase = null, wcsStride = 5 } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, g53ApproxZ = null, initialPos = null, continuous = false, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000, wcsBase = null, wcsStride = 5 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
         // t644 — probe-datum tracking (for the datum-correctness check): _datumOrigin[axis] = the MACHINE coord where work-0
         // lands after a WCS write. Set by G92 (any post) and by a write to the WCS-table register range (wcsBase/wcsStride,
@@ -109,6 +109,7 @@ export class GcodeExecutionEngine {
         // Lets G53 machine-frame moves draw in the part/WCS frame the rest of the route uses:
         // part = machine - wcsOffset. Default = origin, so when unknown (no dump/profile) G53 is unchanged.
         this._wcsOffset = wcsOffset || { x: 0, y: 0, z: 0 };
+        this._g53ApproxZ = g53ApproxZ;   // t826 — undeclared placement: the work-frame Z to render machine-frame G53 Z retracts at (margin above the work origin); null = declared → the exact machine map
         this.syntaxValidator = typeof syntaxValidator === 'function' ? syntaxValidator : null;
         // Auto-answer: a virtual sensor satisfies any M31/M33 wait after autoAnswerMs,
         // even for pins the truth table doesn't know — so any user's macro completes
@@ -1067,7 +1068,11 @@ export class GcodeExecutionEngine {
                 bad = true;
                 return;
             }
-            target[field] = g53 ? value * this.unitScale - (this._wcsOffset[field] || 0)
+            // t826 — UNDECLARED placement (no WCS row backs the work origin): a machine-frame G53 Z retract has no true
+            // scene position, so instead of collapsing onto raw machine coords (a G53 Z-5 would draw BELOW a top-datum part),
+            // render it as the DECLARED safe-Z margin above the work origin — the honest approximation the user ruled good for
+            // probe previews (never machine 0). Declared placement (_g53ApproxZ null) keeps the exact machine->part map.
+            target[field] = g53 ? ((field === 'z' && this._g53ApproxZ != null) ? this._g53ApproxZ : value * this.unitScale - (this._wcsOffset[field] || 0))
                           : this.absolute ? value * this.unitScale
                           : this.pos[field] + value * this.unitScale;
         };
@@ -1081,10 +1086,13 @@ export class GcodeExecutionEngine {
             return false;
         }
 
-        // A move made in ABSOLUTE mode (G90) or G53 establishes a fixed position → the path no longer depends on the
-        // operator start. A purely-incremental (G91) program is start-relative. The preview uses this to decide
-        // whether moving the start drags the toolpath (probe macros) or not (mill). See gcodeViz3d _anchorToStart.
-        if (this.absolute || g53) this.stats.absolute = true;
+        // stats.absolute = "the PROGRAM's frame is fixed (G90 mill), so moving the operator start must NOT drag the path".
+        // It is driven by the DIST MODE (G90), NOT by a G53: a mid-program G53 is a LOCAL machine-frame excursion (a safe-Z
+        // retract between probe passes) inside an otherwise-incremental (G91) probe macro — it must NOT flip the whole program
+        // absolute, or the NEXT probe pass re-anchors to machine 0 (the old g53-move-breaks-preview-start-anchor collapse, t826).
+        // The G53 move still RENDERS in the machine frame via the wcsOffset map above; the preview models it as a local
+        // excursion while each probe pass stays anchored to its own start (passAnchor.js). See gcodeViz3d _anchorToStart.
+        if (this.absolute) this.stats.absolute = true;
 
         const isProbe = gcodes.includes(31) || this._probeArmed;   // G31, or a G01 inside a DM500 M101/M102 cycle
         // G53 (machine-coord positioning, e.g. the end "safe Z" park) is a RAPID, not a cut — but on DDCS it's

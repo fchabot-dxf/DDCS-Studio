@@ -86,10 +86,12 @@ export function rotaryCenterStack(params = {}, opts = {}) {
         raw: TRIG[axis], rawAxis: axis, result: resultVar, radius: '#6', compEnable: comp,   // rawAxis → trigger folds per post
     });
     const repositionR = (msg) => [
-        // Lift clear, operator jogs to the flank, then drop back the SAME amount — all INCREMENTAL (no G53).
-        // Keeping the fit start-anchored lets the preview fan the 3 passes out to their own markers; a G53 here
-        // would mark the whole trace absolute and the 3 probe paths would collapse onto the macro's machine coords.
-        mkMV('Z', '#17'), mkC(`REPOSITION: ${msg}`), mkCF('Press Enter when repositioned - ESC=cancel', 2), mkMV('Z', '[0-#17]'), mkDM('inc'),
+        // t824/t826 — the retreat-to-clear before the operator jogs was an incremental G0 Z#17 lift (compounds into the top
+        // switch from a high start). It now retracts to the DECLARED MACHINE MARGIN (safeRetractNode → G53, limit-proof); the
+        // sim preview MODELS this mid-program G53 (t826), so the 3 probe passes still fan out to their own start markers (each
+        // pass stays anchored — the G53 is a local excursion, not a whole-trace absolute flip). The jog + the −#17 drop-back
+        // (now descending from the margin) are unchanged.
+        safeRetractNode(), mkC(`REPOSITION: ${msg}`), mkCF('Press Enter when repositioned - ESC=cancel', 2), mkMV('Z', '[0-#17]'), mkDM('inc'),
     ];
 
     const _hdr = rotaryCenterHeaderComments(params);   // ONE format, shared with the twin's postInstantiate recompose

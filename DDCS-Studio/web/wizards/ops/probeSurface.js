@@ -17,6 +17,7 @@
  *         raw · rawAxis(opt-in: dialect trigger reg per post) · result · radius · compEnable(=true) · failGoto(=1) · comment · compNote · stopVar · limitVar · limitVal
  */
 import { newBlock } from '../../blocks/blockEmitter.js';
+import { safeRetractNode } from './safeZframe.js';   // t826 — opt-in machine-frame safe-height lift (safeTraverseStack machineLift)
 
 export function probeSurfaceStack(p = {}) {
     const S = [];
@@ -93,6 +94,10 @@ export function probeSurfaceStack(p = {}) {
 export function safeTraverseStack(p = {}) {
     const S = [];
     const push = (type, params) => { const b = newBlock(type); b.params = { ...params }; S.push(b); };
+    // t826 — the clearing LIFT before the traverse. Default = the incremental G0 Z<lift> (byte-identical to every existing
+    // caller). `machineLift` (opt-in) retracts to the DECLARED MACHINE MARGIN instead (limit-proof; the sim models the
+    // mid-program G53) — for a manual reposition whose auto lift could otherwise compound into the top switch from a high start.
+    const doLift = () => { if (!p.lift) return; if (p.machineLift) S.push(safeRetractNode()); else push('move', { mode: 'rapid', z: p.lift }); };
     const axis = p.axis || 'X';
     const second = p.second || 'Y';
     const alc = axis.toLowerCase(), slc = second.toLowerCase();
@@ -104,7 +109,7 @@ export function safeTraverseStack(p = {}) {
         const promptVal = p.promptVal ?? '1';
         const promptNote = p.promptNote ?? 'Press Enter when repositioned';
         const failGoto = p.failGoto ?? 2;
-        if (p.lift) push('move', { mode: 'rapid', z: p.lift });
+        doLift();
         if (p.comment) push('comment', { text: p.comment });
         // the operator jog-and-wait gate via the profile-aware hmiconfirm atom: Expert = `#1505=1 ( note )` + `IF #1505==0
         // GOTO<fail>` (byte-identical to the old assign+ifgoto); off-HMI both fold to a comment (no ESC → no mis-branch).
@@ -119,7 +124,7 @@ export function safeTraverseStack(p = {}) {
         push('assign', { var: '#22', value: String(p.diagPrimary), note: `Diag primary: the diagonal ${axis} target — #53 (re-centre, measured NOW) at rest, or ②.${axis} when the ② marker is placed` });
         const pmove = `[#22-${p.wall2Var}-${lastRetract}${p.dir1Plus ? '-'+p.radiusVar : '+'+p.radiusVar}]`;
         const smove = p.dir2Plus ? `[0-${p.diagTravel}]` : String(p.diagTravel); // travelOpp logic
-        if (p.lift) push('move', { mode: 'rapid', z: p.lift });
+        doLift();
         if (p.dogleg) {
             // SAFE DOG-LEG (mirrors mode:'seq' firstAxis): route AROUND the boss — travel the SECONDARY out FIRST (clears
             // the boss on that side), THEN re-centre the PRIMARY. A single diagonal (the else) could clip the boss corner.
@@ -133,7 +138,7 @@ export function safeTraverseStack(p = {}) {
         push('distmode', { dist: 'inc' });
     } else if (p.mode === 'seq') {
         if (p.comment) push('comment', { text: p.comment });
-        if (p.lift) push('move', { mode: 'rapid', z: p.lift });
+        doLift();
         // SAFE DOG-LEG (safety): when the caller DECLARES a firstAxis, split the 2D reposition into two SEQUENTIAL single-axis
         // rapids so the tool routes AROUND the outside corner instead of diagonally THROUGH the stock. The order is caller-
         // declared + geometry-aware: pass the SECOND wall's axis (sA). After probing wall-1 the tool sits OUTSIDE the stock
@@ -151,7 +156,7 @@ export function safeTraverseStack(p = {}) {
         }
         if (p.drop) push('move', { mode: 'rapid', z: p.drop });
     } else if (p.mode === 'in-axis') {
-        if (p.lift) push('move', { mode: 'rapid', z: p.lift });
+        doLift();
         push('move', { mode: 'rapid', [alc]: String(p.move) });
         if (p.drop) push('move', { mode: 'rapid', z: p.drop });
         if (p.comment) push('comment', { text: p.comment });

@@ -277,7 +277,25 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 // projected program's spacing depend on its shape (leaf programs had none, high-level had some) — so a round-trip
 // that flattened to leaves dropped them, an inconsistent "line jumps come and go". The program now emits with
 // uniform single-line spacing; op structure reads from the marker comments ("( Step Down z=… )", "( Array N @ … )").
+// t826 — the safe-Z retract's Expert unset-guard emits a forward-jump label (N<label>). A program can now hold SEVERAL
+// safe-Z retracts (per-wall retreats + the error handler), so give each a UNIQUE label in emit order (base 91, unused by any
+// wizard) — else duplicate N91s make the guard's GOTO ambiguous. Deterministic (walk order) → the twin + built-in match, and
+// this subsumes the cross-op accumulation case (offsetLabels no longer special-cases saferetract). Idempotent (re-run safe).
+function uniquifySafeRetractLabels(blocks) {
+    let n = 91;
+    const walk = (list) => {
+        for (const b of (list || [])) {
+            if (!b) continue;
+            if (b.type === 'saferetract') { b.params = { ...(b.params || {}), label: n++ }; }
+            if (b.children) walk(b.children);
+            if (b.uiChildren) walk(b.uiChildren);
+        }
+    };
+    walk(blocks);
+}
+
 export function emitMapped(blocks, settings = {}) {
+    uniquifySafeRetractLabels(blocks);   // t826 — unique safe-Z guard labels per program (base 91), before the fold
     const dialect = settings.dialect || getDialect(settings.profileId);   // active controller profile → its G-code forms
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
     const T = [];

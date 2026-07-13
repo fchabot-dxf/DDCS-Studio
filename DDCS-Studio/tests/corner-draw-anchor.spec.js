@@ -37,7 +37,11 @@ async function traceCorner(page, params) {
     const p = { ...CD.CORNER_DEFAULTS, ...params };
     const declared = def.simStartsProvider(p, stock).map((m) => ({ x: m.x, y: m.y, z: m.z || 0, source: m.source, anchorsAtPrev: !!m.anchorsAtPrev }));
     const gcode = emitMapped(build(p)).text;
-    const parsed = traceToolpath(gcode, { stock, start: declared[0], passStarts: declared });
+    // t826 — UNDECLARED placement (no WCS row): the per-wall retreat is now a machine-frame G53, which the preview renders as
+    // the declared safe-Z margin above the work origin (g53ApproxForViz in createPreviewPanel — margin, default 5). Feed the
+    // trace the SAME approximation so the anchoring is exercised faithfully (declared mode would pass a real wcsOffset instead).
+    const g53ApproxZ = Math.abs(Number((window.ddcsGetSettings().machine || {}).safeZMargin)) || 5;
+    const parsed = traceToolpath(gcode, { stock, start: declared[0], passStarts: declared, g53ApproxZ });
     const passEnds = parsed.passEnds || [];
     // WORLD segments, offset by the SAME passAnchorFor(passEnds) the viz/engine use (t107 — a flagged pass anchors at the
     // previous pass's RUNTIME END, mirroring gcodeViz3d off / toolpath2d passOff / the engine collision O).
@@ -65,8 +69,9 @@ test('(4) route reconnect: pass-1 dog-leg starts at the RUNTIME wall-1 END, wall
   expect([R1(m0.x), R1(m0.y)], 'declared marker0 ① = (7,-43) (start-based, unchanged)').toEqual([7, -43]);
   expect([R1(m1.x), R1(m1.y)], 'declared marker1 ② = (-43,7) (start-based, unchanged)').toEqual([-43, 7]);
   // passEnds[0] = the RUNTIME wall-1 end (independent geometry): X unmoved (7), Y = contact(-2) − retract(5) = -7 (+36
-  // ABOVE ①, the probe-distance the old start-based frame was short by), Z = start(-5) + safeZ lift(10) = 5.
-  expect([R1(e0.x), R1(e0.y), R1(e0.z)], 'passEnds[0] = wall-1 runtime end (7,-7,5), NOT the start marker (7,-43,-5)').toEqual([7, -7, 5]);
+  // ABOVE ①, the probe-distance the old start-based frame was short by). Z = the machine-frame G53 retract, rendered
+  // (undeclared) as the safe-Z margin(5) above the run's top work-Z(≈ the anchor -5) = 0 (t826 — was the incremental +5 lift).
+  expect([R1(e0.x), R1(e0.y), R1(e0.z)], 'passEnds[0] = wall-1 runtime end (7,-7,0): XY anchored, Z = the G53 margin-clearance').toEqual([7, -7, 0]);
   expect(e0.y, 'the runtime end sits ~a probe-distance above the jog start (machine-faithful, not the static start)').toBeGreaterThan(m0.y + 30);
   const pass1 = r.segs.filter((s) => s.pass === 1);
   const firstRapid = pass1.find((s) => s.t === 'rapid');
@@ -98,11 +103,13 @@ test('(1) engine-frame: the wall-2 probe trigger #1926 == the RELOCATED ②.y (f
     const p = { ...CD.CORNER_DEFAULTS };
     const declared = def.simStartsProvider(p, stock).map((m) => ({ x: m.x, y: m.y, z: m.z || 0, source: m.source, anchorsAtPrev: !!m.anchorsAtPrev }));
     const gcode = emitMapped(build(p)).text;
-    // independent re-derivation of the relocated ② from the trace's runtime end (a DIFFERENT path than the engine DRO)
-    const parsed = traceToolpath(gcode, { stock, start: declared[0], passStarts: declared });
+    // independent re-derivation of the relocated ② from the trace's runtime end (a DIFFERENT path than the engine DRO).
+    // t826 — feed the SAME undeclared G53 approximation the real preview uses (margin above the work; g53ApproxForViz).
+    const g53ApproxZ = Math.abs(Number((window.ddcsGetSettings().machine || {}).safeZMargin)) || 5;
+    const parsed = traceToolpath(gcode, { stock, start: declared[0], passStarts: declared, g53ApproxZ });
     const e0 = (parsed.passEnds || [])[0], m0 = declared[0], m1 = declared[1];
     const relY = e0.y + (m1.y - m0.y);   // relocated ②.y = passEnds[0].y + off.wall2.y
-    const eng = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: declared[0] });
+    const eng = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: declared[0], g53ApproxZ });
     eng._passStarts = declared;
     eng.trace(gcode);
     return { y1926: eng.vars.get(1926), x1925: eng.vars.get(1925), z1927: eng.vars.get(1927), relY, staticY: m1.y };
@@ -112,9 +119,10 @@ test('(1) engine-frame: the wall-2 probe trigger #1926 == the RELOCATED ②.y (f
   expect(R1(r.y1926), 'the sim wall-2 probe trigger Y == the RELOCATED ②.y (machine-faithful)').toBe(R1(r.relY));
   expect(R1(r.y1926), 'machine-faithful #1926 == 43').toBe(43);
   expect(R1(r.y1926), 'NOT the static (t94 start-based) ②.y = 7').not.toBe(R1(r.staticY));
-  // #1925 (contact X) contacts the X face at -tipR = -2 (reachable from the relocated ②), #1927 (probe height) = drop -5
+  // #1925 (contact X) contacts the X face at -tipR = -2 (reachable from the relocated ②), #1927 (probe height): the tool
+  // now descends from the machine-frame margin retract (rendered at the margin-clearance) then drops -#19 → -10 (t826; was -5).
   expect(R1(r.x1925), 'the wall-2 contact X = front-face 0 − tipR 2 = -2 (on-stock, reachable from the relocated ②)').toBe(-2);
-  expect(R1(r.z1927), 'the wall-2 probe fires at the jogged/drop height z = -scanDepth = -5, not above the stock').toBe(-5);
+  expect(R1(r.z1927), 'the wall-2 probe fires at the descend-from-margin height z = -10 (machine-frame retract then drop)').toBe(-10);
 });
 
 // (2) FALLBACK — the #1 all-ops-regression guard. drawAnchorFor with NO flag resolves to SELF (never undefined/NaN),

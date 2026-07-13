@@ -520,6 +520,16 @@ export function createPreviewPanel(container, opts = {}) {
         }
         return { x: wo.x || 0, y: wo.y || 0, z: wo.z || 0 };
     }
+    // t826 — UNDECLARED placement (no real WCS row backs the work origin): a machine-frame G53 Z retract has no true scene
+    // position, so render it as the DECLARED safe-Z margin ABOVE the work origin (Z=0, the probe datum) — the honest preview
+    // approximation the user ruled good (never machine 0). Declared (a WCS row) OR a machine-frame op → null = the exact map.
+    function g53ApproxForViz() {
+        if (machineFrameTool) return null;
+        const m = machineForViz();
+        const declared = m && m.wcs && Array.isArray(m.wcs.table) && m.wcs.table.length > 0;
+        if (declared) return null;
+        return Math.abs(Number(m && m.safeZMargin) || 5);   // mm above the work origin (approx: the run's top work-Z ≈ 0)
+    }
     function simConfig(absolute) {
         const st = getStartPos(), seat = startSeated(), stk = simStock();
         return {
@@ -529,6 +539,7 @@ export function createPreviewPanel(container, opts = {}) {
             continuous: seatAtStart,                           // t570 — an auto-traverse op is ONE continuous path (no per-pass origin reset)
             passStarts,                                        // per-pass starts (multi-point probe collision fires from each)
             wcsOffset: simWcsOffset(absolute, stk),
+            g53ApproxZ: g53ApproxForViz(),                     // t826 — undeclared: render machine-frame G53 Z retracts as a margin-clearance above the work
         };
     }
     // Apply the ONE config to the LIVE animation engine (the trace consumes it via traceToolpath opts).
@@ -540,6 +551,7 @@ export function createPreviewPanel(container, opts = {}) {
         eng._continuous = c.continuous;
         eng._passStarts = (c.passStarts && c.passStarts.length) ? c.passStarts : null;
         eng._wcsOffset = c.wcsOffset;
+        eng._g53ApproxZ = c.g53ApproxZ;   // t826 — undeclared: the live tool retracts to the same margin-clearance the route drew
     }
 
     function setGcode(text) {
@@ -580,7 +592,10 @@ export function createPreviewPanel(container, opts = {}) {
         lastPassEnds = passEnds;
         // ONE anchor flag for BOTH views (mirrors the 3D's v._anchorToStart): an op with no established absolute
         // position (an incremental probe) is start-relative → the path emanates from the operator START; an absolute
-        // (G90/G53 mill) op sits at its own coords. forceMachine (ATC) pins to the machine frame regardless.
+        // (G90 mill) op sits at its own coords. t826 — stats.absolute is driven by the DIST MODE (G90), NOT by a G53: a
+        // mid-program G53 safe-Z retract in an incremental probe is a LOCAL machine-frame excursion (it renders in the
+        // machine frame via the wcsOffset map + the undeclared g53ApproxZ), so the probe passes STAY start-anchored (each
+        // pass anchors to its own start via passAnchor.js) instead of collapsing to machine 0. forceMachine (ATC) pins regardless.
         curAnchor = !forceMachine && !(parsed.stats && parsed.stats.absolute);
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
         if (t2.setMachineFrame) t2.setMachineFrame(machineFrameTool);   // t652 — machine-frame op → the 2D draws in raw machine coords (Start + envelope), matching the 3D (robust vs lazy init)

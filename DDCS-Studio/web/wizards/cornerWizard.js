@@ -206,12 +206,13 @@ export function cornerStack(params = {}, opts = {}) {
         } else {
             out.push(...wcsFork((w, label) => [mkWcsWrite({ axis: 'Y', wcs: wcsArgOf(w), offset: 1, addrVar: '#73', addrNote: 'WCS Y Address', value: '#101', note: `Save to ${label} Y` })]));   // Expert `#73=[#70+1]`+`#[#73]=#101`; else `G90 G92 Y#101`
         }
-        // Z-TRUST (Option B): the per-wall lift-to-safe-Z is #17 (=safeZ+scanDepth) when probeZ ON (unchanged), but #19 (=safeZ
-        // ONLY) when probeZ OFF — scanDepth is meaningless without a measured surface, so the off-path travels at the DECLARED
-        // safe Z. Forked via zPairR so the twin's superset carries both arms (byte-identical ON). Pairs with the reposition drop.
-        // t824 amendment (per-wall lift → machine-frame) is HELD at a gate: a G53 here breaks the sim preview's runtime-END
-        // anchoring (corner-draw-anchor) — same conflict middle/rotary flag; advisor to rule the approach (see WORK-LOG t824).
-        out.push(mkMV(ax, retractVar), ...zPairR([mkMV('Z', '#17')], [mkMV('Z', '#19')]));
+        // t824 amendment (RULING D REVERSED — field evidence: the user probed the first wall then THIS lift walked into the Z
+        // limit) + t826 (preview now models a mid-program G53): the per-wall retreat was an INCREMENTAL Z#17/#19 that lands safeZ
+        // ABOVE a possibly-high start → compounds into the top switch. It now retracts to the DECLARED MACHINE MARGIN
+        // (safeRetractNode → G53, absolute, limit-proof) on every post. Both old zPairR arms (#17/#19) collapse to the same
+        // machine retract (probeZ-independent). The reposition below then DESCENDS from the margin (no longer the −#17 round-trip):
+        // slower + limit-proof, the ruled divergence from the factory macro. wall2's retract is the clean final position.
+        out.push(mkMV(ax, retractVar), safeRetractNode());
         return out;
     };
 

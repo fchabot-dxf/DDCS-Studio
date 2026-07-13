@@ -129,11 +129,12 @@ export function middleStack(params = {}, opts = {}) {
             raw: av.result, rawAxis: ax, result: resultVar, radius: '#6', compEnable: true,   // rawAxis → trigger folds per post
         });
     };
-    // Lift clear, the operator jogs to the next wall, then drop back the SAME amount — all INCREMENTAL (no G53), so the
-    // preview stays start-anchored and fans each pass out to its own marker. The "REPOSITION:" comment is what the parser
-    // counts as a new pass (gcodeParser.js). Delegated to the ONE shared travel primitive (safeTraverseStack, manual). RETURNS.
+    // t824/t826 — the retreat-to-clear before the operator jogs was an incremental G0 Z#17 lift (compounds into the top
+    // switch from a high start). It now retracts to the DECLARED MACHINE MARGIN (machineLift → safeRetractNode → G53,
+    // limit-proof); the sim preview MODELS this mid-program G53 (t826), so each pass stays anchored to its own start marker
+    // (the "REPOSITION:" comment still delimits the pass). The jog + the −#17 drop-back (now from the margin) are unchanged.
     const repositionR = (msg) => safeTraverseStack({
-        approach: 'manual', lift: '#17', drop: '[0-#17]',
+        approach: 'manual', lift: '#17', machineLift: true, drop: '[0-#17]',
         comment: `REPOSITION: ${msg || 'jog the probe to the next wall'}`,
     });
     // Boss, AUTO in-axis: clear over the feature to the far side, hands-free (the #19/#20 cross-over spans the feature). RETURNS.

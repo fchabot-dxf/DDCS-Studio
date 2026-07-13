@@ -28,13 +28,14 @@ test('safe-Z frame on the rotary final park: relative byte-identical, machine = 
     };
   });
   console.log('SAFEZFRAME ' + JSON.stringify(r));
-  // relative = today: the frame defaults to relative; only the rapid lift G0 Z#17, no machine move
+  // relative = today for the FINAL PARK: it defaults to relative (G0 Z#17). t824/t826 — the per-probe reposition lift + the
+  // error retract are now the machine-frame safe-Z margin (G53 Z#520, NOT G53 Z#17), so only the final park is a G0 Z#17 here.
   expect(r.defEqRel, 'the frame defaults to relative (default emit === explicit relative)').toBe(true);
-  expect(r.rel_g53, 'relative emits NO G53 (byte-identical to today)').toBe(0);
-  expect(r.rel_g0, 'relative keeps both retracts as the rapid lift G0 Z#17').toBe(2);
-  // machine = the new path: the FINAL park swaps to G53; the error retract stays relative (scope = final park only)
+  expect(r.rel_g53, 'relative final park emits NO G53 Z#17').toBe(0);
+  expect(r.rel_g0, 'relative: only the FINAL PARK is a G0 Z#17 lift (the reposition/error retracts are now G53 Z#520)').toBe(1);
+  // machine = the new path: the FINAL park swaps to G53 Z#17; the reposition/error retracts already moved to G53 Z#520 (t824/t826)
   expect(r.mac_g53, 'machine parks the final retract via G53 Z#17').toBe(1);
-  expect(r.mac_g0, 'the error-path retract stays relative (final-park scope only)').toBe(1);
+  expect(r.mac_g0, 'no G0 Z#17 left in machine mode (final park + reposition + error all machine-frame)').toBe(0);
   // round-trip: the frame survives the op marker
   expect(r.parsedFrame, 'safeZFrame round-trips through the op marker').toBe('machine');
 });

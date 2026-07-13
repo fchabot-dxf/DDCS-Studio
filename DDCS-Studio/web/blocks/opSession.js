@@ -413,22 +413,18 @@ const _walk = (arr, fn) => { for (const b of (arr || [])) { if (!b) continue; fn
 /** Highest label number anywhere in a stack (0 if none) — used to offset an appended snippet's labels. */
 function maxLabelNum(blocks) {
     let m = 0;
-    _walk(blocks, (b) => {
-        if (!b.params) return;
-        if (b.type === 'label') m = Math.max(m, Math.round(num(b.params.n, 0)));
-        else if (b.type === 'saferetract') m = Math.max(m, Math.round(num(b.params.label, 0)));   // t822 — the safe-Z unset-guard's forward-jump label (emitted as N<label> by the atom, not a label BLOCK)
-    });
+    _walk(blocks, (b) => { if (b.type === 'label' && b.params) m = Math.max(m, Math.round(num(b.params.n, 0))); });
     return m;
 }
 
-/** Shift every label / goto / ifgoto target in a stack by `off` (in place) so an appended snippet can't collide. */
+/** Shift every label / goto / ifgoto target in a stack by `off` (in place) so an appended snippet can't collide.
+ *  (The safe-Z retract's guard label is NOT renumbered here — emitMapped uniquifies saferetract labels per program, t826.) */
 function offsetLabels(blocks, off) {
     if (!off) return blocks;
     _walk(blocks, (b) => {
         if (!b.params) return;
         if (b.type === 'label' || b.type === 'goto') b.params.n = Math.round(num(b.params.n, 1)) + off;
         else if (b.type === 'ifgoto') b.params.goto = Math.round(num(b.params.goto, 1)) + off;
-        else if (b.type === 'saferetract') b.params.label = Math.round(num(b.params.label, 91)) + off;   // t822 — renumber the safe-Z guard label too, else two accumulated probe ops both emit N91
     });
     return blocks;
 }

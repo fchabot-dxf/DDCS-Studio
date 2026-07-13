@@ -34,23 +34,27 @@ async function emitAll(page) {
   });
 }
 
-/** slice the error-handler region: from the last 'Safe-Z retract' comment to the trailing M30. */
-function retractRegion(text) {
-  const i = text.indexOf('Safe-Z retract');
-  return i >= 0 ? text.slice(i, text.indexOf('M30', i) + 3) : '';
+/** slice ONE safe-Z retract's lines (a program can now hold several: per-wall retreats + the error handler). `which`
+ *  = 'first' (default) or 'last' (the error handler, nearest M30). A retract is at most ~6 lines (comment+guard+G53). */
+function retractRegion(text, which = 'first') {
+  const i = which === 'last' ? text.lastIndexOf('Safe-Z retract') : text.indexOf('Safe-Z retract');
+  return i >= 0 ? text.slice(i).split('\n').slice(0, 6).join('\n') : '';
 }
 
-test('the safe-height class retracts in the MACHINE frame (Expert G53 #520) — ZERO incremental G91 Z-ups survive', async ({ page }) => {
+test('the safe-height class retracts in the MACHINE frame (Expert G53 #520) — ZERO incremental per-wall Z-lifts survive', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetSettings);
   const em = await emitAll(page);
-  // all 4 wizards, Expert: the error-handler retract is the machine-frame register form, with NO incremental lift left.
+  // all 4 wizards, Expert: the safe-height class (per-wall retreats + the error handler) is the machine-frame register form.
+  // (The FINAL PARK is a SEPARATE, frame-toggleable mechanism — safeZParkBlock, relative default `G0 Z#17` — NOT the crash
+  //  class; corner-z-trust asserts corner's per-wall retreat converted specifically.)
   for (const w of Object.keys(STACKS)) {
-    const reg = retractRegion(em[w]['ddcs-expert-m350']);
-    expect(reg, `${w}: the error handler emits a machine-frame G53 retract`).toContain('G53 Z#520');
-    expect(reg, `${w}: the incremental crash vector G91 is GONE from the retract`).not.toContain('G91');
-    // the OLD hand-rolled incremental lift to the work-frame safe-Z var is gone
-    expect(reg, `${w}: no incremental G0 Z#17 lift in the retract`).not.toMatch(/G0 Z#17\b/);
+    const text = em[w]['ddcs-expert-m350'];
+    expect(text, `${w}: emits the machine-frame G53 retract`).toContain('G53 Z#520');
+    // the ERROR-HANDLER retract (the LAST safe-Z retract, at the miss branch near M30) is machine-frame with no incremental lift
+    const err = retractRegion(text, 'last');
+    expect(err, `${w}: the error-handler retract is machine-frame G53`).toContain('G53 Z#520');
+    expect(err, `${w}: no incremental G91 in the error-handler retract`).not.toContain('G91');
   }
 });
 
@@ -159,9 +163,16 @@ test('the SIM executes the machine-frame retract to the declared safe height (�
     const code = emitMapped([safeRetractNode()], { dialect: getDialect('ddcs-expert-m350') }).text;
     const trace = new GcodeExecutionEngine({ autoAnswer: true }).trace(code + '\nM30');
     const last = trace.segments[trace.segments.length - 1];
-    return { code, endZ: last ? last.z2 : null, absolute: trace.stats.absolute };
+    // the poschip frame decision (createPreviewPanel.onPositionChange): a move whose event carries g53 → the MACHINE frame
+    // (amber), work otherwise. Mirror the exact predicate so the amber-during-lift contract is guarded.
+    const chipFrame = (pos) => (pos.probing != null ? !!(pos.probing || pos.g53) : false) ? 'mach' : 'work';
+    return { code, endZ: last ? last.z2 : null, absolute: trace.stats.absolute,
+      liftFrame: chipFrame({ g53: true, probing: false }), cutFrame: chipFrame({ g53: false, probing: false }) };
   });
   expect(r.code, 'the isolated retract is the machine-frame register form').toContain('G53 Z#520');
-  expect(r.absolute, 'a G53 machine-frame move ran (the frame the poschip renders amber)').toBe(true);
+  expect(r.absolute, 'a G53 machine-frame move ran').toBe(true);
   expect(r.endZ, 'the sim retracts to the declared machine safe height (-5)').toBeCloseTo(-5, 1);
+  // the chip goes AMBER (machine frame) during the G53 lift, and stays cyan (work) for a normal move
+  expect(r.liftFrame, 'the poschip is AMBER (machine frame) during the G53 safe-Z lift').toBe('mach');
+  expect(r.cutFrame, 'the poschip stays CYAN (work frame) for a non-G53 move').toBe('work');
 });
