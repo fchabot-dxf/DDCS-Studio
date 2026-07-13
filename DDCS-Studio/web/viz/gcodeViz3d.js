@@ -1387,85 +1387,79 @@ export class GcodeViz3D {
      *  internal corner). So each 2-level cell splits along the interpolated contour: floor tile at the low level, top tile at
      *  the high level, and a vertical curtain (rim+floor share XY) between them — diagonals render STRAIGHT, internal corners
      *  ARC at ~toolR, straight runs stay crisp. Records `_carveMaxWall` (tallest curtain) for the assert. Rebuilt whole. */
-    _buildCrispCarveMesh(c, color) {
-        const THREE = this.THREE;
+    // t816 — the SHARED crisp marching, ONE SOURCE for the whole-mesh STOP build AND the live incremental splice. Returns
+    // `cellTris(i,j,out)` (appends quad-cell (i,j)'s contour triangles — NON-INDEXED floats — to `out`, returns
+    // {maxWall,junctions}) and `perimeterTris(out)` (the stock skirt + bottom). Reads c.h/c.hc + the t814 arc snap LIVE, so
+    // re-calling a cell after a carve picks up the new heights. The stop path and the sub-rect splice call the SAME cell fn
+    // → they cannot diverge (the mandated safety guard re-checks this).
+    _crispContext(c) {
         const nx = c.nx, ny = c.ny, dx = c.dx, dy = c.dy, X = c.X, Y = c.Y, Z = c.Z, ox = -X / 2, oy = -Y / 2, topZ = Z / 2, botZ = -Z / 2;
-        const hcAt = (i, j) => c.hc[c.idx(i, j)], hAt = (i, j) => c.h[c.idx(i, j)];   // crisp level (discrete) + AA height (sub-cell edge)
-        const vx = (i) => i * dx + ox, vy = (j) => j * dy + oy;                       // grid VERTEX world XY (dx=X/(nx-1))
-        const verts = [], idx = [];
-        const pushTri = (ax, ay, az, bx, by, bz, cx, cy, cz) => { const b0 = verts.length / 3; verts.push(ax, ay, az, bx, by, bz, cx, cy, cz); idx.push(b0, b0 + 1, b0 + 2); };
-        const flatTri = (p, q, r, z) => pushTri(p.x, p.y, z, q.x, q.y, z, r.x, r.y, z);
-        const flatQuad = (p, q, r, s, z) => { flatTri(p, q, r, z); flatTri(p, r, s, z); };
-        let maxWall = 0;
-        const curtain = (p, q, zHi, zLo) => { const d = zHi - zLo; if (d > maxWall) maxWall = d; const b0 = verts.length / 3; verts.push(p.x, p.y, zHi, q.x, q.y, zHi, q.x, q.y, zLo, p.x, p.y, zLo); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };   // VERTICAL (rim+floor share XY)
-        // t814 — ANALYTIC-ARC CORNERS: the marching crossing lands on a cell EDGE (a linear interp of h[]), so a corner arc
-        // chords through ~½-cell-off points → visible facets. But the coverage-½ iso IS the analytic tool-offset boundary, and
-        // at a corner that boundary is a true ARC of radius toolR about the TOOLPATH VERTEX. So SNAP the crossing onto that
-        // exact circle when its CLOSEST toolpath feature is a vertex (a corner) at ≈ toolR — round corners at zero grid cost
-        // (do not refine the grid). A straight wall's closest feature is a segment INTERIOR → left untouched (stays crisp).
+        const hcAt = (i, j) => c.hc[c.idx(i, j)], hAt = (i, j) => c.h[c.idx(i, j)];
+        const vx = (i) => i * dx + ox, vy = (j) => j * dy + oy;
         const arc = this._carveArc;
-        // the band around toolR within which a corner crossing is snapped: a near-tangent cell edge makes the linear-interp
-        // crossing wander up to a few cells off the true arc, so span a few cells (the closest-feature-is-a-vertex test — not
-        // TOL — is the real guard against snapping a straight wall, so a generous band is safe).
-        const TOL = Math.max(Math.max(dx, dy) * 3, (arc ? arc.r : 3) * 0.45);
+        const TOL = Math.max(Math.max(dx, dy) * 3, (arc ? arc.r : 3) * 0.45);   // t814 corner-snap band (closest-feature test is the real guard)
         const snapArc = (x, y) => {
             if (!arc || !arc.segs.length) return { x, y };
             const r = arc.r; let best = null;
             for (const s of arc.segs) {
-                if (x < s.minx - r - TOL || x > s.maxx + r + TOL || y < s.miny - r - TOL || y > s.maxy + r + TOL) continue;   // bbox early-out
+                if (x < s.minx - r - TOL || x > s.maxx + r + TOL || y < s.miny - r - TOL || y > s.maxy + r + TOL) continue;
                 const ex = s.bx - s.ax, ey = s.by - s.ay, L2 = ex * ex + ey * ey;
                 let t = L2 > 1e-12 ? ((x - s.ax) * ex + (y - s.ay) * ey) / L2 : 0;
-                let vx, vy, endpoint;
-                if (t <= 0) { vx = s.ax; vy = s.ay; endpoint = true; }
-                else if (t >= 1) { vx = s.bx; vy = s.by; endpoint = true; }
-                else { vx = s.ax + t * ex; vy = s.ay + t * ey; endpoint = false; }
-                const d = Math.hypot(x - vx, y - vy);
-                if (!best || d < best.d) best = { vx, vy, d, endpoint };
+                let px, py, endpoint;
+                if (t <= 0) { px = s.ax; py = s.ay; endpoint = true; }
+                else if (t >= 1) { px = s.bx; py = s.by; endpoint = true; }
+                else { px = s.ax + t * ex; py = s.ay + t * ey; endpoint = false; }
+                const d = Math.hypot(x - px, y - py);
+                if (!best || d < best.d) best = { vx: px, vy: py, d, endpoint };
             }
-            // snap ONLY when the closest feature is a VERTEX (a corner) sitting ~toolR away — the true fillet arc there
-            if (best && best.endpoint && best.d > 1e-6 && Math.abs(best.d - r) <= TOL) {
-                return { x: best.vx + r * (x - best.vx) / best.d, y: best.vy + r * (y - best.vy) / best.d };
-            }
+            if (best && best.endpoint && best.d > 1e-6 && Math.abs(best.d - r) <= TOL) return { x: best.vx + r * (x - best.vx) / best.d, y: best.vy + r * (y - best.vy) / best.d };
             return { x, y };
         };
-        // the contour crossing on edge P→Q: the analytic edge sits at the AA half-depth iso (coverage 0.5), interpolated on
-        // h[]. Symmetric in P,Q → the crossing on a SHARED edge matches from both cells (a continuous, seamless contour).
         const cross = (P, Q) => { const iso = (P.hc + Q.hc) / 2, den = Q.h - P.h; let t = Math.abs(den) < 1e-9 ? 0.5 : (iso - P.h) / den; t = t < 0 ? 0 : t > 1 ? 1 : t; return snapArc(P.x + t * (Q.x - P.x), P.y + t * (Q.y - P.y)); };
-        let junctions = 0;
-        // Marching TRIANGLES on the 4-corner cell (2 tris, shared NW-SE diagonal): 3 cases per tri, NO saddle ambiguity.
-        const procTri = (A, B, C) => {
-            const la = A.hc, lb = B.hc, lc = C.hc;
-            if (la === lb && lb === lc) { flatTri(A, B, C, la + topZ); return; }              // 1 level → flat tile, no wall
-            const hiL = Math.max(la, lb, lc), loL = Math.min(la, lb, lc), midL = la + lb + lc - hiL - loL;
-            if (midL !== hiL && midL !== loL) { flatTri(A, B, C, hiL + topZ); junctions++; return; }   // 3 distinct levels (rare triple-point) → flat at shallowest
-            const zHi = hiL + topZ, zLo = loL + topZ, isLo = (P) => P.hc === loL;
-            const los = [A, B, C].filter(isLo), his = [A, B, C].filter((P) => !isLo(P));
-            if (los.length === 1) {   // one cut corner: a floor triangle + a top quad, curtain between
-                const a = los[0], b = his[0], d = his[1], pab = cross(a, b), pad = cross(a, d);
-                flatTri(a, pab, pad, zLo); flatQuad(pab, b, d, pad, zHi); curtain(pab, pad, zHi, zLo);
-            } else {                  // two cut corners: a top triangle + a floor quad, curtain between
-                const cc = his[0], a = los[0], b = los[1], pca = cross(cc, a), pcb = cross(cc, b);
-                flatTri(cc, pca, pcb, zHi); flatQuad(pca, a, b, pcb, zLo); curtain(pca, pcb, zHi, zLo);
-            }
-        };
-        for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+        const cellTris = (i, j, out) => {
+            const emit = (ax, ay, az, bx, by, bz, cx, cy, cz) => out.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+            const flatTri = (p, q, r, z) => emit(p.x, p.y, z, q.x, q.y, z, r.x, r.y, z);
+            const flatQuad = (p, q, r, s, z) => { flatTri(p, q, r, z); flatTri(p, r, s, z); };
+            let maxWall = 0, junctions = 0;
+            const curtain = (p, q, zHi, zLo) => { const d = zHi - zLo; if (d > maxWall) maxWall = d; emit(p.x, p.y, zHi, q.x, q.y, zHi, q.x, q.y, zLo); emit(p.x, p.y, zHi, q.x, q.y, zLo, p.x, p.y, zLo); };   // VERTICAL curtain, 2 tris
+            const procTri = (A, B, C) => {
+                const la = A.hc, lb = B.hc, lc = C.hc;
+                if (la === lb && lb === lc) { flatTri(A, B, C, la + topZ); return; }
+                const hiL = Math.max(la, lb, lc), loL = Math.min(la, lb, lc), midL = la + lb + lc - hiL - loL;
+                if (midL !== hiL && midL !== loL) { flatTri(A, B, C, hiL + topZ); junctions++; return; }
+                const zHi = hiL + topZ, zLo = loL + topZ, isLo = (P) => P.hc === loL;
+                const los = [A, B, C].filter(isLo), his = [A, B, C].filter((P) => !isLo(P));
+                if (los.length === 1) { const a = los[0], b = his[0], d = his[1], pab = cross(a, b), pad = cross(a, d); flatTri(a, pab, pad, zLo); flatQuad(pab, b, d, pad, zHi); curtain(pab, pad, zHi, zLo); }
+                else { const cc = his[0], a = los[0], b = los[1], pca = cross(cc, a), pcb = cross(cc, b); flatTri(cc, pca, pcb, zHi); flatQuad(pca, a, b, pcb, zLo); curtain(pca, pcb, zHi, zLo); }
+            };
             const SW = { x: vx(i), y: vy(j), hc: hcAt(i, j), h: hAt(i, j) }, SE = { x: vx(i + 1), y: vy(j), hc: hcAt(i + 1, j), h: hAt(i + 1, j) };
             const NW = { x: vx(i), y: vy(j + 1), hc: hcAt(i, j + 1), h: hAt(i, j + 1) }, NE = { x: vx(i + 1), y: vy(j + 1), hc: hcAt(i + 1, j + 1), h: hAt(i + 1, j + 1) };
-            procTri(SW, NW, SE); procTri(SE, NW, NE);   // shared NW-SE diagonal → matched crossings across the split
-        }
-        // perimeter skirt (vertical, vertex-based) + bottom — the stock boundary, unchanged from the box outline
-        const zc = (i, j) => hcAt(i, j) + topZ;
-        const skirt = (i0, j0, i1, j1) => { const b0 = verts.length / 3; verts.push(vx(i0), vy(j0), zc(i0, j0), vx(i1), vy(j1), zc(i1, j1), vx(i1), vy(j1), botZ, vx(i0), vy(j0), botZ); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };
-        for (let i = 0; i < nx - 1; i++) { skirt(i, 0, i + 1, 0); skirt(i, ny - 1, i + 1, ny - 1); }
-        for (let j = 0; j < ny - 1; j++) { skirt(0, j, 0, j + 1); skirt(nx - 1, j, nx - 1, j + 1); }
-        flatQuad({ x: ox, y: oy }, { x: ox + X, y: oy }, { x: ox + X, y: oy + Y }, { x: ox, y: oy + Y }, botZ);   // bottom
-        const g = new THREE.BufferGeometry();
-        g.setIndex(idx);
-        g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+            procTri(SW, NW, SE); procTri(SE, NW, NE);
+            return { maxWall, junctions };
+        };
+        const perimeterTris = (out) => {
+            const emit = (ax, ay, az, bx, by, bz, cx, cy, cz) => out.push(ax, ay, az, bx, by, bz, cx, cy, cz);
+            const zc = (i, j) => hcAt(i, j) + topZ;
+            const skirt = (i0, j0, i1, j1) => { emit(vx(i0), vy(j0), zc(i0, j0), vx(i1), vy(j1), zc(i1, j1), vx(i1), vy(j1), botZ); emit(vx(i0), vy(j0), zc(i0, j0), vx(i1), vy(j1), botZ, vx(i0), vy(j0), botZ); };
+            for (let i = 0; i < nx - 1; i++) { skirt(i, 0, i + 1, 0); skirt(i, ny - 1, i + 1, ny - 1); }
+            for (let j = 0; j < ny - 1; j++) { skirt(0, j, 0, j + 1); skirt(nx - 1, j, nx - 1, j + 1); }
+            emit(ox, oy, botZ, ox + X, oy, botZ, ox + X, oy + Y, botZ); emit(ox, oy, botZ, ox + X, oy + Y, botZ, ox, oy + Y, botZ);   // bottom
+        };
+        return { nx, ny, cellTris, perimeterTris, mat: (color) => new this.THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.85, depthWrite: true, side: this.THREE.DoubleSide, flatShading: true }) };
+    }
+
+    /** Trimmed flat tiles + TRUE VERTICAL wall curtains following the ANALYTIC CONTOUR (t730 marching-triangles + t814 arc
+     *  snap) — the settled END-STATE mesh. Whole-mesh build over the shared per-cell marching (_crispContext). */
+    _buildCrispCarveMesh(c, color) {
+        const K = this._crispContext(c);
+        const verts = []; let maxWall = 0, junctions = 0;
+        for (let j = 0; j < K.ny - 1; j++) for (let i = 0; i < K.nx - 1; i++) { const r = K.cellTris(i, j, verts); if (r.maxWall > maxWall) maxWall = r.maxWall; junctions += r.junctions; }
+        K.perimeterTris(verts);
+        const g = new this.THREE.BufferGeometry();
+        g.setAttribute('position', new this.THREE.Float32BufferAttribute(verts, 3));
         g.computeVertexNormals();
-        this._carveMaxWall = maxWall; this._carveSkirtTop = null; this._carveNtop = 0; this._carveTriCount = idx.length / 3; this._carveTriJunctions = junctions;
-        const mat = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.85, depthWrite: true, side: THREE.DoubleSide, flatShading: true });   // flat-shade → crisp rims, no smeared normals
-        return new THREE.Mesh(g, mat);
+        this._carveMaxWall = maxWall; this._carveSkirtTop = null; this._carveNtop = 0; this._carveTriCount = verts.length / 9; this._carveTriJunctions = junctions;
+        return new this.THREE.Mesh(g, K.mat(color));
     }
 
     /** Build the SMOOTH grid geometry (interpolated top surface + skirt walls + bottom) in pg-local — the LIVE mesh (fast in-place Z remesh). */
@@ -1516,6 +1510,7 @@ export class GcodeViz3D {
         if (!this._carve || !this._stock) return;
         const feats = (() => { try { return projectWorkpiece(this._stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
         this._carve.reseed(this._stock, feats);
+        this._liveCrisp = null;   // t816 — a fresh play re-inits the live crisp cache from pristine
         if (this._carveMeshMode !== 'smooth') this._rebuildCarveMesh('smooth'); else this._remeshCarve();
     }
     carveDirty() { return !!(this._carve && this._carve.dirty); }
@@ -1523,6 +1518,7 @@ export class GcodeViz3D {
     /** t814 — the ANALYTIC ARC source for the crisp mesher: the FEED segments in MESH coords + the tool radius, so
      *  _buildCrispCarveMesh can SNAP corner iso-vertices onto the true fillet arc. A flat list (cheap); null → no snap. */
     _buildCarveArc(segs, toolR) {
+        this._carveArcSrc = { segs: segs || [], toolR };   // t816 — remembered: the live setup runs BEFORE the grid exists; carveLiveCrisp builds it once _carve is ready
         const c = this._carve; if (!c) { this._carveArc = null; return; }
         const ox = -c.X / 2, oy = -c.Y / 2, S = [];
         for (const s of (segs || [])) {
@@ -1547,7 +1543,61 @@ export class GcodeViz3D {
 
     /** Settle the LIVE carve into the CRISP vertical-wall mesh (playback stopped) — no reseed, just re-mesh the final heights (t682).
      *  `segs`/`toolR` (when the caller has them) feed the analytic-arc corner snap; omitted → the last arc data (or none). */
-    carveFinalize(segs, toolR, tip) { if (!this._carve) return; if (segs) this._buildCarveArc(segs, toolR); this._rebuildCarveMesh('crisp'); this.render(); }
+    carveFinalize(segs, toolR, tip) { if (!this._carve) { return; } if (segs) this._buildCarveArc(segs, toolR); this._liveCrisp = null; this._rebuildCarveMesh('crisp'); this.render(); }
+
+    // ── t816 — INCREMENTAL LIVE CRISPING: the wall crisps a beat behind the cutter DURING play, via the retained dirty rect.
+    // The FIRST call builds the per-cell crisp cache + swaps the smooth live mesh for a crisp one; later calls re-march ONLY
+    // the dirty rect (+ apron) and reassemble the position buffer (a memcpy — NO computeVertexNormals, flatShading). The
+    // cell marching is the SAME _crispContext the stop path uses → they cannot diverge (the safety guard re-checks it). ──
+    carveLiveCrisp() {
+        const c = this._carve; if (!c) return 0;
+        if (!this._carveArc && this._carveArcSrc) this._buildCarveArc(this._carveArcSrc.segs, this._carveArcSrc.toolR);   // t816 — arc snap on the live crisp too
+        const now = () => (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+        const t0 = now();
+        if (!this._liveCrisp || this._liveCrisp.nx !== c.nx || this._liveCrisp.ny !== c.ny) this._liveCrispInit(c);
+        else this._liveCrispSplice(c);
+        c.dirty = false; if (c.clearDirtyRect) c.clearDirtyRect();
+        return now() - t0;
+    }
+
+    _liveCrispInit(c) {
+        const K = this._crispContext(c), NCX = K.nx - 1, NCY = K.ny - 1, NC = NCX * NCY;
+        const cache = new Array(NC); let maxWall = 0;
+        for (let j = 0; j < NCY; j++) for (let i = 0; i < NCX; i++) { const t = []; const r = K.cellTris(i, j, t); cache[j * NCX + i] = Float32Array.from(t); if (r.maxWall > maxWall) maxWall = r.maxWall; }
+        const perimA = []; K.perimeterTris(perimA);
+        this._liveCrisp = { nx: c.nx, ny: c.ny, ncx: NCX, ncy: NCY, cache, perim: Float32Array.from(perimA), maxWall };
+        if (this._carveMesh) { this._partGroup.remove(this._carveMesh); this._carveMesh.geometry.dispose(); this._carveMesh.material.dispose(); }
+        const g = new this.THREE.BufferGeometry();
+        g.setAttribute('position', new this.THREE.Float32BufferAttribute(this._liveCrispAssemble(), 3));   // NO normals (flatShading)
+        this._carveMesh = new this.THREE.Mesh(g, K.mat(this._carveColor));
+        this._partGroup.add(this._carveMesh);
+        this._carveMeshMode = 'live-crisp'; this._carveSkirtTop = null; this._carveNtop = 0; this._carveMaxWall = maxWall; this._liveCrisp.geom = g;
+        this.render();
+    }
+
+    _liveCrispAssemble() {
+        const L = this._liveCrisp, cache = L.cache;
+        let n = L.perim.length; for (let ci = 0; ci < cache.length; ci++) n += cache[ci].length;
+        const out = new Float32Array(n); let o = 0;
+        for (let ci = 0; ci < cache.length; ci++) { const t = cache[ci]; out.set(t, o); o += t.length; }   // native typed memcpy per cell
+        out.set(L.perim, o);
+        return out;
+    }
+
+    _liveCrispSplice(c) {
+        const L = this._liveCrisp; if (!c.dirtyRect) return;
+        const K = this._crispContext(c), rect = c.dirtyRect;
+        // a changed VERTEX (i,j) affects quad cells (i−1..i, j−1..j); a 1-cell apron keeps the seam continuous
+        const i0 = Math.max(0, rect.i0 - 2), i1 = Math.min(L.ncx - 1, rect.i1 + 1), j0 = Math.max(0, rect.j0 - 2), j1 = Math.min(L.ncy - 1, rect.j1 + 1);
+        let maxWall = L.maxWall;
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const t = []; const r = K.cellTris(i, j, t); L.cache[j * L.ncx + i] = Float32Array.from(t); if (r.maxWall > maxWall) maxWall = r.maxWall; }
+        const perimA = []; K.perimeterTris(perimA); L.perim = Float32Array.from(perimA);   // the skirt follows a cut reaching the edge (cheap)
+        L.maxWall = maxWall; this._carveMaxWall = maxWall;
+        const verts = this._liveCrispAssemble(), g = this._carveMesh.geometry, pa = g.attributes.position;
+        if (pa.array.length === verts.length) { pa.array.set(verts); pa.needsUpdate = true; }
+        else { g.setAttribute('position', new this.THREE.Float32BufferAttribute(verts, 3)); }
+        L.geom = g; this.render();
+    }
 
     /** Update the SMOOTH grid mesh Z in-place from the carve heights (throttled; LIVE only). Returns the ms cost (degrade watch). */
     _remeshCarve() {

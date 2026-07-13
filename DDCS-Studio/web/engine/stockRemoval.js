@@ -50,9 +50,22 @@ export class HeightmapCarve {
         for (const f of (features || [])) this._preCarveFeature(f);
         this.seedSnapshot = this.h.slice();   // the untouched-by-cutting baseline (probe-carves-nothing assert)
         this.dirty = true;
+        this.dirtyRect = null;   // t816 — retained changed-cell bounds {i0,i1,j0,j1} (VERTEX space) for the live crisp splice; null = none pending
     }
 
     idx(i, j) { return j * this.nx + i; }
+
+    // t816 — grow the retained DIRTY RECT (accumulated across carves, cleared on splice) so the live path re-meshes JUST
+    // the changed neighborhood (the sub-rect crisp) instead of the whole grid. Vertex-space bounds; the mesher expands by
+    // one to the owning quad cells + an apron.
+    _growDirty(i0, i1, j0, j1) {
+        if (i1 < i0 || j1 < j0) return;
+        const r = this.dirtyRect;
+        if (!r) this.dirtyRect = { i0, i1, j0, j1 };
+        else { if (i0 < r.i0) r.i0 = i0; if (i1 > r.i1) r.i1 = i1; if (j0 < r.j0) r.j0 = j0; if (j1 > r.j1) r.j1 = j1; }
+    }
+    /** Clear the pending dirty rect (the live path calls this right after it splices the sub-rect crisp geometry). */
+    clearDirtyRect() { this.dirtyRect = null; }
     /** The stock-local XY centre of cell (i,j). */
     cellXY(i, j) { return { x: i * this.dx, y: j * this.dy }; }
 
@@ -116,7 +129,7 @@ export class HeightmapCarve {
         const i0 = Math.max(0, Math.floor((Math.min(ax, bx) - band) / this.dx)), i1 = Math.min(this.nx - 1, Math.ceil((Math.max(ax, bx) + band) / this.dx));
         const j0 = Math.max(0, Math.floor((Math.min(ay, by) - band) / this.dy)), j1 = Math.min(this.ny - 1, Math.ceil((Math.max(ay, by) + band) / this.dy));
         const bandR2 = band * band, flat = tip !== 'ball' && tip !== 'vee';   // flat → the profile offset is 0 → BYTE-IDENTICAL to the pre-tip carve
-        let changed = false;
+        let changed = false, ci0 = 1e9, ci1 = -1e9, cj0 = 1e9, cj1 = -1e9;   // t816 — track the actual changed-cell bounds
         for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
             const cx = i * this.dx, cy = j * this.dy;
             const pc = this._segDist2(cx, cy, ax, ay, dxv, dyv, len2);
@@ -132,11 +145,14 @@ export class HeightmapCarve {
             if (cutZ < this.bottom) cutZ = this.bottom;   // can't cut below the stock
             const k = this.idx(i, j), h0 = this.h[k];
             const targetZ = h0 + c * (cutZ - h0);   // c=1 → cutZ exactly; c<1 → a partial lowering (bounded in [cutZ,h0] → never over-cuts)
-            if (targetZ < h0) { this.h[k] = targetZ; changed = true; }
+            let cc = false;
+            if (targetZ < h0) { this.h[k] = targetZ; changed = true; cc = true; }
             // CRISP floor (for the vertical-wall mesh): a cell counts as fully cut once the tool covers ≥ half of it.
-            if (c >= 0.5 && cutZ < this.hc[k]) this.hc[k] = cutZ;
+            if (c >= 0.5 && cutZ < this.hc[k]) { this.hc[k] = cutZ; cc = true; }
+            if (cc) { if (i < ci0) ci0 = i; if (i > ci1) ci1 = i; if (j < cj0) cj0 = j; if (j > cj1) cj1 = j; }
         }
         if (changed) this.dirty = true;
+        if (ci1 >= ci0) this._growDirty(ci0, ci1, cj0, cj1);   // t816 — h OR hc change dirties the crisp sub-rect
         return changed;
     }
 

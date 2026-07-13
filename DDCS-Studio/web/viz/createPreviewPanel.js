@@ -230,11 +230,14 @@ export function createPreviewPanel(container, opts = {}) {
         _carveRaf = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame(run) : (run(), 0);
     }
     function carveRemeshThrottled() {
-        if (!_carveDirty || !viz || !viz._remeshCarve) return;
+        if (!_carveDirty || !viz || !viz.carveLiveCrisp) return;
         const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
         if (now - _carveLastRemesh < 45) return;   // carve EVERY tick; re-mesh batched (~22fps) — the ruling's rAF throttle
         _carveLastRemesh = now; _carveDirty = false;
-        const cost = viz._remeshCarve();
+        // t816 — INCREMENTAL LIVE CRISPING: re-mesh the CRISP walls over JUST the dirty rect (the wall crisps a beat behind
+        // the cutter). The first call swaps the smooth mesh for the crisp one (a one-time build ~ the stop-crisp cost); later
+        // calls splice the sub-rect (~0.1ms). Degrade still guards a sustained heavy program (the one-time init self-resets).
+        const cost = viz.carveLiveCrisp();
         // DEGRADE (F): re-mesh cost > 8ms sustained ~1s → stop the live re-mesh and JUMP to the full end-state (a manual toggle overrides)
         if (cost > 8) { if (!_carveHeavySince) _carveHeavySince = now; else if (!_carveDegraded && now - _carveHeavySince > 1000) {
             _carveDegraded = true; setStatus('Live carve paused (heavy program) — showing the end-state');
@@ -643,6 +646,7 @@ export function createPreviewPanel(container, opts = {}) {
                     const tl = simTool(code, parsed); _carveTR = (Number(tl && tl.dia) || 6) / 2;
                     _carveTip = carveTipForToolType(tl && tl.type);   // ball-nose → spherical carve (one source: the tool `type`)
                     _carveSegs = (parsed && parsed.segments) || [];   // remembered for the LIVE→end-state degrade jump (F)
+                    if (v._buildCarveArc) v._buildCarveArc(_carveSegs, _carveTR);   // t816 — the whole toolpath is known upfront → the t814 arc snap applies to the LIVE crisp splice too
                     const hasCut = !!(parsed.stats && parsed.stats.feed > 0);   // material removal only for CUTTING programs; probe/rapid → the plain box
                     scheduleEndStateCarve(v, hasCut);   // DEFERRED (perf): never block setGcode; a transient/probe wizard costs ~nothing
                     // honest note (rulings B/E + t682): NAME the tip in use — ball-nose is modelled; flat is exact; a vee/chamfer
