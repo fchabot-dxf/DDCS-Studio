@@ -11,7 +11,9 @@ import { pointsBBox } from './placement.js';
 export function patternPoints(p) {
     const pts = [];
     const type = p.pattern || 'grid';
-    if (type === 'circle') {
+    if (type === 'single') {   // t846 — one hole at the position (the drill's simplest pattern)
+        pts.push({ x: num(p.cx, num(p.x0, 0)), y: num(p.cy, num(p.y0, 0)) });
+    } else if (type === 'circle') {
         const cx = num(p.cx, 0), cy = num(p.cy, 0), R = num(p.dia, 50) / 2;
         const n = Math.max(1, Math.round(num(p.count, 6))), a0 = num(p.startAngle, 0) * Math.PI / 180;
         for (let k = 0; k < n; k++) { const a = a0 + k * 2 * Math.PI / n; pts.push({ x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }); }
@@ -58,6 +60,7 @@ export const arrayBlock = {
     /** Which fields to show depends on the chosen pattern. */
     fieldsFor(p) {
         const base = ['pattern', 'x0', 'y0'];
+        if (p.pattern === 'single') return [...base];   // t846 — just the position; no pattern params
         if (p.pattern === 'circle') return [...base, 'dia', 'count', 'startAngle', 'skip'];
         if (p.pattern === 'line') return [...base, 'count', 'spacing', 'angle', 'skip'];
         if (p.pattern === 'rect') return [...base, 'w', 'h', 'nx', 'ny', 'skip'];   // rect-perimeter

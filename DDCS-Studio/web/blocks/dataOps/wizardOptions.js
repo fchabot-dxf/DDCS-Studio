@@ -29,7 +29,7 @@ export const STOCK_DATUM_OPTIONS = [
 
 /** Drill / Bore hole pattern. Values = the patternPoints kind. */
 export const DRILL_PATTERN_OPTIONS = [
-    ['Grid', 'grid'], ['Bolt circle', 'circle'], ['Rectangle (perimeter)', 'rect'], ['Line', 'line'],
+    ['Single hole', 'single'], ['Grid', 'grid'], ['Bolt circle', 'circle'], ['Row (line)', 'line'], ['Rectangle (perimeter)', 'rect'],   // t846 — Single added; Line labelled Row (line) per the advisor's naming
 ];
 
 /** Surfacing raster strategy. Values = the surfacing socket value (the form's 'raster' maps to 'parallel'). */
