@@ -3475,11 +3475,20 @@ body #editor.editor-layer {
    t812 riders: the strip is INSET by the 3D-drawer pull-tab width (--gm-tab, 30px) so the tab never occludes it; and
    in SPLIT view (the 3D drawer open) it hugs the TEXT pane's right edge (right = the drawer width + the tab inset),
    never the window edge over the 3D pane. `:has()` is already used for the editor (the Transform-button rule). */
-/* --gm-right = the strip's distance from the container's RIGHT edge: the pull-tab inset alone (drawer closed), or the
-   drawer width + the tab inset (drawer OPEN → hug the text pane). One var drives the strip, its padding, and the toggle. */
-.editor-container { --gm-tab: 30px; --gm-right: var(--gm-tab); }
+/* --gm-right = the strip's distance from the container's RIGHT edge. t828 — FLUSH to the pane edge by DEFAULT (editor-only
+   has nothing to dodge); the pull-tab inset (--gm-tab) applies ONLY in SPLIT view (drawer OPEN), where the tab rides the
+   drawer edge at the strip's position — hug the text pane there. --gm-flush = a thin sliver so the strip never floats over
+   the editor's scrollbar. One var drives the strip, its padding, and the toggle. */
+.editor-container { --gm-tab: 30px; --gm-flush: 2px; --gm-right: var(--gm-flush); }
 .editor-container:has(.viz3d-drawer.open) { --gm-right: calc(var(--viz3d-size, 50%) + var(--gm-tab)); }
 .editor-container.has-minimap .editor-layer { padding-right: calc(var(--gm-right) + var(--gm-w, 62px) + 6px); }
+/* t828 — with the strip now FLUSH, keep the top-right Copy button ABOVE it (a small overlay on the map's corner, still
+   clickable), and in EDITOR-ONLY view (drawer closed) shift the vertically-centred pull-tab to the strip's LEFT edge so it
+   no longer occludes the map. In SPLIT view the tab rides the drawer edge and the --gm-tab inset keeps the strip clear (t812, unchanged). */
+.editor-container .editor-copy-float { z-index: 5; }
+/* minimap shown → the closed pull-tab sits at the strip's LEFT edge (clear of the flush map). When the drawer OPENS the
+   later `.viz3d-handle.open` rule (same specificity, wins on source order) moves it back to the drawer edge — split unchanged. */
+.editor-container.has-minimap .viz3d-handle { right: calc(var(--gm-w, 62px) + 4px) !important; }
 .gcode-minimap {
     position: absolute; top: 0; right: var(--gm-right); bottom: 0; width: var(--gm-w, 62px); z-index: 4;
     background: color-mix(in srgb, var(--panel, #111) 55%, transparent);
@@ -3499,8 +3508,12 @@ body #editor.editor-layer {
     border-radius: 1px;
 }
 .gcode-minimap .gm-exec[hidden] { display: none; }
+/* t828 — the toggle moves OFF the Copy cluster: it was at the editor's top-right corner, one mis-tap from the Copy button.
+   Now it sits at the top just LEFT of the strip (a real touch-target clear of Copy at the far corner), over the usually-empty
+   top-right of the code — clickable there (the bottom-right is covered by the panel resize handle), and reachable when the
+   strip is hidden (--gm-w holds even when off). It reads as the minimap's own control, adjacent to the strip's top edge. */
 .gm-toggle {
-    position: absolute; top: 4px; right: calc(var(--gm-right, 30px) + 4px); z-index: 7; width: 22px; height: 22px; padding: 0;
+    position: absolute; top: 8px; right: calc(var(--gm-right) + var(--gm-w, 62px) + 20px); z-index: 7; width: 22px; height: 22px; padding: 0;
     border: 1px solid var(--border, #333); border-radius: 5px; background: var(--panel, #1a1a1a); color: var(--text-dim, #889);
     font-size: 13px; line-height: 1; cursor: pointer; opacity: .55;
 }

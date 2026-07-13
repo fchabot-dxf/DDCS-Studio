@@ -110,25 +110,32 @@ test.describe('desktop', () => {
     expect(Math.abs(s.top - (s.idx / s.n) * s.H), 'the marker sits at the executing line (idx/n·H) during real playback').toBeLessThan(3);
   });
 
-  test('t812 riders: the strip is inset clear of the pull-tab, and hugs the TEXT pane in split view', async ({ page }) => {
+  test('t828 placement riders: the strip is FLUSH clear of the pull-tab, the toggle is off the Copy cluster, split hugs the text pane', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && document.querySelector('.gcode-minimap') && window.setGcodeView);
-    // (1) drawer CLOSED: the strip does not overlap the 3D-drawer pull-tab
-    const closed = await page.evaluate(() => {
+    await page.waitForFunction(() => document.querySelector('.editor-container').classList.contains('has-minimap'));   // the strip is mounted + has-minimap applied (drives the pull-tab move)
+    await page.waitForTimeout(300);   // layout settle
+    // (1) EDITOR-ONLY (drawer closed): t828 rider 2 — the strip is FLUSH to the pane right edge (the t812 30px inset applied
+    //     everywhere with nothing to dodge; now only SPLIT view insets). The pull-tab moved to the strip's LEFT so it never
+    //     occludes the map. t828 rider 1 — the ▤ toggle is a real touch-target away from the top-right Copy button (was one mis-tap).
+    const eo = await page.evaluate(() => {
       const s = document.querySelector('.gcode-minimap').getBoundingClientRect();
       const tab = document.querySelector('.viz3d-handle').getBoundingClientRect();
-      return { overlaps: !(s.left >= tab.right || s.right <= tab.left), insetFromRight: window.innerWidth - s.right };
+      const tog = document.querySelector('.gm-toggle').getBoundingClientRect();
+      const copy = document.querySelector('#editor-copy-btn').getBoundingClientRect();
+      const dist = Math.hypot((tog.left + tog.right) / 2 - (copy.left + copy.right) / 2, (tog.top + tog.bottom) / 2 - (copy.top + copy.bottom) / 2);
+      return { overlaps: !(s.left >= tab.right || s.right <= tab.left), rightGap: window.innerWidth - s.right, toggleCopyDist: Math.round(dist), copyVisibleZ: getComputedStyle(document.querySelector('#editor-copy-btn')).zIndex };
     });
-    expect(closed.overlaps, 'the strip never overlaps the pull-tab (rider 1)').toBe(false);
-    expect(closed.insetFromRight, 'the strip is inset from the window edge by the tab gutter').toBeGreaterThan(10);
-    // (2) SPLIT view: the strip hugs the TEXT pane's right edge (left of the 3D pane), not the window edge
+    expect(eo.overlaps, 'the strip never overlaps the pull-tab (the tab moved to the strip left)').toBe(false);
+    expect(eo.rightGap, 'the strip is FLUSH to the pane right edge (only a scrollbar sliver; the t812 30px inset is gone)').toBeLessThan(6);
+    expect(eo.toggleCopyDist, 'the minimap toggle is a real touch-target (>44px) away from the Copy button (was one mis-tap)').toBeGreaterThan(44);
+    await page.locator('.editor-container').screenshot({ path: 'scratchpad/minimap-editoronly-828.png' }).catch(() => {});
+    // (2) SPLIT view: the strip hugs the TEXT pane's right edge (left of the 3D pane), not the window edge — t812 clearance KEPT
     await page.evaluate(() => window.setGcodeView('3d'));
     await page.waitForTimeout(300);
-    const split = await page.evaluate(() => {
-      const s = document.querySelector('.gcode-minimap').getBoundingClientRect();
-      return { insetFromRight: window.innerWidth - s.right };
-    });
-    expect(split.insetFromRight, 'in split view the strip sits well left of the window edge (over the text pane, not the 3D pane)').toBeGreaterThan(closed.insetFromRight + 100);
+    const split = await page.evaluate(() => ({ insetFromRight: window.innerWidth - document.querySelector('.gcode-minimap').getBoundingClientRect().right }));
+    expect(split.insetFromRight, 'in split view the strip sits well left of the window edge (over the text pane, not the 3D pane) — t812 clearance').toBeGreaterThan(eo.rightGap + 100);
+    await page.locator('.editor-container').screenshot({ path: 'scratchpad/minimap-split-828.png' }).catch(() => {});
   });
 
   test('the TOGGLE persists across reload (panePrefs ddcs_minimap)', async ({ page }) => {
