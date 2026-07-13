@@ -12,6 +12,7 @@ export class EditorManager {
         this.highlight = el('editor-highlight');
         this.activeLineIndex = null;
         this._execTrail = [];          // ring of recent line indices, newest-first, max EXEC_TRAIL_CAP entries
+        this._activeLineSubs = new Set();   // t810 — the minimap marker subscribes here so it reads the SAME activeLineIndex the in-text highlight consumes (one source, no second tracker)
         this.backTimer = null;
         this.backInterval = null;
 
@@ -231,6 +232,7 @@ export class EditorManager {
             this.activeLineIndex = null;
             this._execTrail = [];
             this._applyTrail();
+            this._notifyActiveLine();
             return;
         }
 
@@ -251,7 +253,13 @@ export class EditorManager {
         this.activeLineIndex = lineIndex;
         // No _scrollToLine: the editor must not jump while playing (unified with the wizard CODE PREVIEW —
         // the pulsing highlight tracks the line in place instead of scrolling the text).
+        this._notifyActiveLine();
     }
+
+    // t810 — subscribe to executing-line changes (the minimap marker). Fires with the CURRENT activeLineIndex (null when
+    // idle) in the SAME call that (un)marks the in-text highlight, so the map marker + the text highlight are one source.
+    onActiveLine(cb) { if (typeof cb === 'function') this._activeLineSubs.add(cb); return () => this._activeLineSubs.delete(cb); }
+    _notifyActiveLine() { for (const cb of this._activeLineSubs) { try { cb(this.activeLineIndex); } catch (_) { /* a bad subscriber never breaks playback */ } } }
 
     // Tag trail lines with data-exec-age="1..CAP" (1 = most-recently-left, CAP = oldest/dimmest).
     // Strips stale exec-age from any lines that have aged out of the ring.

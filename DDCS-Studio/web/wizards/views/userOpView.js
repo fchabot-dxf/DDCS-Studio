@@ -246,6 +246,7 @@ export const userOpView = {
     applyVariant(variant) { if (variant != null && variant !== '' && _def && (_def.bindings || []).some((b) => b.param === 'mode')) _seed = { ...(_seed || {}), mode: variant }; },
 
     onShow(mgr) { _mgr = mgr; _layoutSpots = {}; _simStartFracs = {}; _clearThrottle(); applyPanel(); render(); },   // t122 — clear marker spots per OPEN (fresh session = undragged = byte-identical); t508 clear the sim-start fractions too; t808 drop any pending throttled update
+    onHide() { _clearThrottle(); },   // t810 — clear the throttle on CLOSE too, so a trailing update can't ghost-fire ~200ms after the modal closes
 
     update(mgr) {
         _mgr = mgr;

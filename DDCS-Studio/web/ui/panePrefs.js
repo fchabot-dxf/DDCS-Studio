@@ -90,3 +90,31 @@ export function onRatioChange(cb) { _ratioSubs.add(cb); return () => _ratioSubs.
 
 /** Subscribe to collapse changes (one wizard folds a kind → others re-apply live). Returns an unsubscribe fn. */
 export function onPaneChange(cb) { _subs.add(cb); return () => _subs.delete(cb); }
+
+// ── The editor MINIMAP toggle (t810) — a VS Code-style program-overview strip on the editor's right edge. Like every
+// pane pref it is an app-wide DISPLAY preference (localStorage, NEVER the machine profile). Default ON (VS Code parity);
+// a phone width hides it via CSS regardless. ──
+const MINIMAP_KEY = 'ddcs_minimap';
+let _minimap = null;
+const _minimapSubs = new Set();
+
+/** True if the editor minimap is enabled (default true). */
+export function getMinimapOn() {
+    if (_minimap == null) {
+        _minimap = true;
+        try { const raw = localStorage.getItem(MINIMAP_KEY); if (raw === '0' || raw === 'false') _minimap = false; } catch (_) { /* defaults on */ }
+    }
+    return _minimap;
+}
+
+/** Enable/disable the editor minimap; persists + notifies (the strip shows/hides live). */
+export function setMinimapOn(on) {
+    const next = !!on;
+    if (next === _minimap) return;
+    _minimap = next;
+    try { localStorage.setItem(MINIMAP_KEY, next ? '1' : '0'); } catch (_) { /* private mode */ }
+    for (const cb of _minimapSubs) { try { cb(next); } catch (_) { /* isolate */ } }
+}
+
+/** Subscribe to minimap-toggle changes. Returns an unsubscribe fn. */
+export function onMinimapChange(cb) { _minimapSubs.add(cb); return () => _minimapSubs.delete(cb); }

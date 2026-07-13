@@ -382,6 +382,9 @@ export class WizardManager {
      * the form's edits are discarded by restoring the snapshot taken on open.
      */
     close(reverse = true, isCancel = true) {
+        // t810 — let the active view tear down (symmetric with onShow): userOpView drops any pending throttled recompute
+        // so a trailing update can't ghost-fire ~200ms after the modal closes.
+        { const view = this.activeView(); if (view && typeof view.onHide === 'function') view.onHide(this); }
         if (reverse) {
             playClickReverse();
         }

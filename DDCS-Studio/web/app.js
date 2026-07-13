@@ -82,6 +82,8 @@ class DDCSStudio {
         console.debug('DDCSStudio: VariableDatabase initialized');
         this.editorManager = new EditorManager();
         console.debug('DDCSStudio: EditorManager initialized');
+        import('./ui/gcodeMinimap.js').then((m) => m.initGcodeMinimap(this.editorManager)).catch(() => { /* minimap is optional chrome */ });   // t810 — the editor overview strip
+
         this.dockManager = new DockManager(this.variableDB, this.editorManager);
         console.debug('DDCSStudio: DockManager initialized');
         this.wizardManager = new WizardManager(this.editorManager);
