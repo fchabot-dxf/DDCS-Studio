@@ -3184,3 +3184,87 @@ web/ui/settingsPanel.js (the setting + UI), web/ui/macrosApp.js (boot seed), web
 tests/safe-z-retract-822.spec.js (NEW, 8). The per-wall lift + corner-z-trust were REVERTED (the preview gate).
 SUITE: 1210 passed, 2 skipped, 0 failed, 0 flaky (workers=2, 21.0m) — a CLEAN run on the stable reverted code; autostart-
 stored-macro (boot seed OK), middle-reposition-refactor + probe-surface-block (byte-identical), safez-frame all green.
+
+## 2026-07-13 (t826) — SAFE-Z per-wall lift: the PREVIEW models a mid-program G53 (Option B), then convert all 4 wizards
+
+Advisor ruled the t824 gate: OPTION B — fix the PREVIEW to model a mid-program G53; the emit stays honest, never bend the
+program for the renderer. This completes the user's ACTUAL crash fix (the per-wall lift, not the error handler). t824's
+shipped part was RELEASED (V2026.07.13.5).
+
+### THE PREVIEW FIX (the crux)
+
+ROOT CAUSE (grounded): a mid-program G53 latched stats.absolute at GcodeExecutionEngine.js:1087 (it was OR-ed with the
+dist mode: `this.absolute || g53`), which flips createPreviewPanel curAnchor / the 3D _anchorToStart OFF for the WHOLE
+path -> the next probe pass re-anchors to machine 0 (the old collapse). The pass-anchoring (passAnchor.js, anchorsAtPrev)
+is a SEPARATE system that never consulted stats.absolute; the collapse was purely this latch.
+FIX (two parts):
+1. stats.absolute is driven by the DIST MODE (G90) ONLY, not by a G53 (engine :1087 now `if (this.absolute)`). A
+   mid-program G53 is a LOCAL machine-frame excursion inside an incremental (G91) probe -> it renders in the machine frame
+   (the wcsOffset map) but does NOT flip the program absolute, so each probe pass stays anchored to its own start. G90 mill
+   programs are unaffected (they latch via this.absolute). Verified: no other G53 op (atc/homing/alignment) regressed.
+2. UNDECLARED placement (no WCS row): a machine-frame G53 Z retract has no true scene position, so instead of collapsing
+   onto raw machine coords (G53 Z-5 drew BELOW a top-datum part), render it at the DECLARED safe-Z margin above the work
+   origin — the honest approximation the user ruled good. New engine `_g53ApproxZ` (trace opt), computed by
+   createPreviewPanel g53ApproxForViz() = margin when undeclared / null when a WCS row backs the placement (then the exact
+   machine map runs). DECLARED placement uses the existing sceneFrame math (wcsOffset) unchanged.
+
+Empirically (corner, default undeclared): the 2 probe walls now anchor CORRECTLY in the pass frame — firstRapid (7,-7),
+firstProbe (-43,43) — IDENTICAL in BOTH placement modes; only the lift Z differs (undeclared: anchor -5 + margin 5 = 0;
+declared wcsOffset z-100: the true machine z 90). The walls anchor correctly in both modes = the acceptance.
+
+### ALL 4 WIZARDS CONVERTED (per the amended ruling D)
+
+corner per-wall retreat (probeWallR: both zPairR arms Z#17/#19 collapse to ONE safeRetractNode — probeZ-independent) ·
+rotaryCenter reposition lift (direct mkMV -> safeRetractNode) · rotaryClock A->B retreat (direct) · middle manual
+reposition lift (safeTraverseStack gained an opt-in `machineLift` -> doLift() -> safeRetractNode; default byte-identical to
+every existing caller). The reposition/error DROPS survive but now descend FROM the margin. The FINAL PARK is untouched
+(a SEPARATE frame-toggleable mechanism, safeZParkBlock). The in-code "a G53 here breaks the preview" warnings at middle
+L136 + rotaryCenter L92 are REMOVED (they described the old limitation; the preview now models it).
+
+### THE MULTI-RETRACT LABEL COLLISION (a real bug, fixed)
+
+A program now holds SEVERAL safe-Z retracts (per-wall retreats + the error handler), each emitting the Expert unset-guard
+label N91 -> DUPLICATE N91 makes the guard GOTO ambiguous. FIX: emitMapped uniquifySafeRetractLabels — walk the stack in
+emit order, give each saferetract block a UNIQUE label (base 91: N91/N92/N93…). Deterministic (walk order) -> the twin +
+built-in match; subsumes the cross-op accumulation case, so the t822 opSession saferetract special-casing is REVERTED.
+Verified: corner emits N91/N92/N93 (3 distinct); blocks-accumulate (two ops) stays unique.
+
+### GOLDENS REGENERATED (each diff justified)
+
+corner-z-trust (the per-wall retreat is machine-frame G53, the incremental #17/#19 lift RETIRED; the drop descends from
+the margin) · corner-draw-anchor (passEnds[0]=(7,-7,0): XY anchored, Z = margin-clearance; wall-2 z1927=-10 descend-from-
+margin; both traces fed the same g53ApproxZ the real preview uses) · middle-reposition-refactor (regenerated: the manual
+reposition lift -> machineLift G53 + guard, unique labels) · safez-frame (the reposition/error retracts are G53 Z#520 not
+G0 Z#17, so relative rel_g0 2->1, machine mac_g0 1->0; the FINAL-park frame counts unchanged). safe-z-retract-822 updated
+(retractRegion bounds one retract; the sweep checks the error-handler retract + the amber chip contract).
+
+### t824 MIS-READ CAUGHT + FIXED (process correction)
+
+The full suite surfaced probe-surface-block + autostart-stored-macro red. Investigating: the t824 "clean" suite
+(bo6oabzi5) ACTUALLY had 4 failed (autostart / middle-reposition-refactor / probe-surface-block / safez-frame) — goldens
+left STALE by t822's error-handler->G53 conversion — but I read only `tail -6` (saw "1210 passed") and MISSED the "4
+failed" line above it, then RELEASED V2026.07.13.5 with 4 red tests. The SHIPPED CODE was correct (the G53 error handler
+is intended); only the TEST goldens lagged. All 4 are now regenerated this turn (they were going to churn from t826
+anyway): probe-surface-block CORNER_GOLDEN (per-wall + error retract -> G53 Z#520, unique guard labels), autostart
+expected (mirror the #520 seed for Expert), + middle-reposition-refactor + safez-frame above. New memory:
+[[check-suite-failed-count-not-just-tail]] — grep the failed count explicitly, never eyeball the tail.
+
+### AMBER + NOTES
+
+The sim chip goes AMBER (machine frame) during the G53 lift: asserted via the exact frame-decision predicate
+(createPreviewPanel — a g53 position event -> frame 'mach'; a non-G53 move -> 'work'). The g53-move-breaks-preview-start-
+anchor NOTE in code is updated to the new model (engine :1084-1088 + createPreviewPanel :593); the advisor updates the
+memory file.
+
+### VERIFICATION
+
+The affected batch (atc/homing/alignment/dro/corner/middle/rotary/blocks/safe-z/safez-frame) went green after the safez-
+frame count fix. corner-draw-anchor 8/8, corner-z-trust, safe-z-retract-822 8/8, middle-reposition-refactor 2/2 green.
+
+Files: web/engine/GcodeExecutionEngine.js (stats.absolute dist-mode-only + _g53ApproxZ) · web/engine/trace.js (g53ApproxZ
+opt) · web/viz/createPreviewPanel.js (g53ApproxForViz + applySimConfig + the anchor NOTE) · web/wizards/cornerWizard.js
+(per-wall retreat) · rotaryCenterWizard.js (reposition + warning removed) · rotaryClockWizard.js (retreat) ·
+middleWizard.js (machineLift + warning removed) · web/wizards/ops/probeSurface.js (safeTraverseStack machineLift/doLift) ·
+web/blocks/blockEmitter.js (uniquifySafeRetractLabels) · web/blocks/opSession.js (revert saferetract renumber) · tests:
+corner-draw-anchor, corner-z-trust, safe-z-retract-822, middle-reposition-refactor (golden regen), safez-frame,
+probe-surface-block (CORNER_GOLDEN regen), autostart-stored-macro (#520 seed in the expected). SUITE: 1214 passed, 2 skipped, 0 FAILED (workers=2) — failed count checked EXPLICITLY (per the new memory), not the tail.
