@@ -1398,9 +1398,39 @@ export class GcodeViz3D {
         const flatQuad = (p, q, r, s, z) => { flatTri(p, q, r, z); flatTri(p, r, s, z); };
         let maxWall = 0;
         const curtain = (p, q, zHi, zLo) => { const d = zHi - zLo; if (d > maxWall) maxWall = d; const b0 = verts.length / 3; verts.push(p.x, p.y, zHi, q.x, q.y, zHi, q.x, q.y, zLo, p.x, p.y, zLo); idx.push(b0, b0 + 1, b0 + 2, b0, b0 + 2, b0 + 3); };   // VERTICAL (rim+floor share XY)
+        // t814 — ANALYTIC-ARC CORNERS: the marching crossing lands on a cell EDGE (a linear interp of h[]), so a corner arc
+        // chords through ~½-cell-off points → visible facets. But the coverage-½ iso IS the analytic tool-offset boundary, and
+        // at a corner that boundary is a true ARC of radius toolR about the TOOLPATH VERTEX. So SNAP the crossing onto that
+        // exact circle when its CLOSEST toolpath feature is a vertex (a corner) at ≈ toolR — round corners at zero grid cost
+        // (do not refine the grid). A straight wall's closest feature is a segment INTERIOR → left untouched (stays crisp).
+        const arc = this._carveArc;
+        // the band around toolR within which a corner crossing is snapped: a near-tangent cell edge makes the linear-interp
+        // crossing wander up to a few cells off the true arc, so span a few cells (the closest-feature-is-a-vertex test — not
+        // TOL — is the real guard against snapping a straight wall, so a generous band is safe).
+        const TOL = Math.max(Math.max(dx, dy) * 3, (arc ? arc.r : 3) * 0.45);
+        const snapArc = (x, y) => {
+            if (!arc || !arc.segs.length) return { x, y };
+            const r = arc.r; let best = null;
+            for (const s of arc.segs) {
+                if (x < s.minx - r - TOL || x > s.maxx + r + TOL || y < s.miny - r - TOL || y > s.maxy + r + TOL) continue;   // bbox early-out
+                const ex = s.bx - s.ax, ey = s.by - s.ay, L2 = ex * ex + ey * ey;
+                let t = L2 > 1e-12 ? ((x - s.ax) * ex + (y - s.ay) * ey) / L2 : 0;
+                let vx, vy, endpoint;
+                if (t <= 0) { vx = s.ax; vy = s.ay; endpoint = true; }
+                else if (t >= 1) { vx = s.bx; vy = s.by; endpoint = true; }
+                else { vx = s.ax + t * ex; vy = s.ay + t * ey; endpoint = false; }
+                const d = Math.hypot(x - vx, y - vy);
+                if (!best || d < best.d) best = { vx, vy, d, endpoint };
+            }
+            // snap ONLY when the closest feature is a VERTEX (a corner) sitting ~toolR away — the true fillet arc there
+            if (best && best.endpoint && best.d > 1e-6 && Math.abs(best.d - r) <= TOL) {
+                return { x: best.vx + r * (x - best.vx) / best.d, y: best.vy + r * (y - best.vy) / best.d };
+            }
+            return { x, y };
+        };
         // the contour crossing on edge P→Q: the analytic edge sits at the AA half-depth iso (coverage 0.5), interpolated on
         // h[]. Symmetric in P,Q → the crossing on a SHARED edge matches from both cells (a continuous, seamless contour).
-        const cross = (P, Q) => { const iso = (P.hc + Q.hc) / 2, den = Q.h - P.h; let t = Math.abs(den) < 1e-9 ? 0.5 : (iso - P.h) / den; t = t < 0 ? 0 : t > 1 ? 1 : t; return { x: P.x + t * (Q.x - P.x), y: P.y + t * (Q.y - P.y) }; };
+        const cross = (P, Q) => { const iso = (P.hc + Q.hc) / 2, den = Q.h - P.h; let t = Math.abs(den) < 1e-9 ? 0.5 : (iso - P.h) / den; t = t < 0 ? 0 : t > 1 ? 1 : t; return snapArc(P.x + t * (Q.x - P.x), P.y + t * (Q.y - P.y)); };
         let junctions = 0;
         // Marching TRIANGLES on the 4-corner cell (2 tris, shared NW-SE diagonal): 3 cases per tri, NO saddle ambiguity.
         const procTri = (A, B, C) => {
@@ -1490,17 +1520,34 @@ export class GcodeViz3D {
     }
     carveDirty() { return !!(this._carve && this._carve.dirty); }
 
+    /** t814 — the ANALYTIC ARC source for the crisp mesher: the FEED segments in MESH coords + the tool radius, so
+     *  _buildCrispCarveMesh can SNAP corner iso-vertices onto the true fillet arc. A flat list (cheap); null → no snap. */
+    _buildCarveArc(segs, toolR) {
+        const c = this._carve; if (!c) { this._carveArc = null; return; }
+        const ox = -c.X / 2, oy = -c.Y / 2, S = [];
+        for (const s of (segs || [])) {
+            const cls = s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
+            if (cls !== 'feed') continue;
+            const a = this._toStockLocal(s.x1, s.y1, s.z1), b = this._toStockLocal(s.x2, s.y2, s.z2);
+            const ax = a.x + ox, ay = a.y + oy, bx = b.x + ox, by = b.y + oy;
+            S.push({ ax, ay, bx, by, minx: Math.min(ax, bx), maxx: Math.max(ax, bx), miny: Math.min(ay, by), maxy: Math.max(ay, by) });
+        }
+        this._carveArc = S.length ? { segs: S, r: toolR > 0 ? toolR : 3 } : null;
+    }
+
     /** Instant settled END-STATE: reseed + carve ALL segments once + build the CRISP vertical-wall mesh. segs = parsed.segments; tip = flat|ball. */
     carveEndState(segs, toolR, tip) {
         if (!this._carve || !this._stock) return;
         const feats = (() => { try { return projectWorkpiece(this._stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
         this._carve.reseed(this._stock, feats);
         for (const s of (segs || [])) this.carveSeg(s, toolR, tip);
+        this._buildCarveArc(segs, toolR);
         this._rebuildCarveMesh('crisp'); this.render();
     }
 
-    /** Settle the LIVE carve into the CRISP vertical-wall mesh (playback stopped) — no reseed, just re-mesh the final heights (t682). */
-    carveFinalize() { if (!this._carve) return; this._rebuildCarveMesh('crisp'); this.render(); }
+    /** Settle the LIVE carve into the CRISP vertical-wall mesh (playback stopped) — no reseed, just re-mesh the final heights (t682).
+     *  `segs`/`toolR` (when the caller has them) feed the analytic-arc corner snap; omitted → the last arc data (or none). */
+    carveFinalize(segs, toolR, tip) { if (!this._carve) return; if (segs) this._buildCarveArc(segs, toolR); this._rebuildCarveMesh('crisp'); this.render(); }
 
     /** Update the SMOOTH grid mesh Z in-place from the carve heights (throttled; LIVE only). Returns the ms cost (degrade watch). */
     _remeshCarve() {

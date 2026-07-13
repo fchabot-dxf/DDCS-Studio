@@ -780,7 +780,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (typeof opts.onLine === 'function') opts.onLine(null);
         for (const cb of toolPosSubs) cb(null, 0);   // t309 — tell the Layout overlay the sim stopped (clears its red head, redraws the static path)
         // t680/t682 — the run finished/stopped: settle the live carve into the CRISP vertical-wall END-STATE mesh (no-op if no carve)
-        if (viz && viz.carveFinalize && carveEnabled()) viz.carveFinalize();
+        if (viz && viz.carveFinalize && carveEnabled()) viz.carveFinalize(_carveSegs, _carveTR, _carveTip);   // t814 — feed the arc-corner snap
         updateRunBtn();
     }
     // #18: dragging/declaring the start re-runs the sim animation from the NEW start (not just the static re-trace), so
