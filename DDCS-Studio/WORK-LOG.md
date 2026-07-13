@@ -3073,3 +3073,114 @@ the per-post register-or-literal + the unset-guard (extend safeZframe.js, one so
 error-handlers to it (corner = the gated pilot) -> all data twins inherit in the same commit -> per-post fold +
 unset-guard + sim-amber asserts -> regenerate ONLY the safe-height-class goldens, each diff justified. NO emit touched
 this turn -- this is the GATE.
+
+## 2026-07-13 (t824) — SAFE-Z RETRACT: the build (advisor ruled all four t822 forks; machine-frame G53 retract, all posts)
+
+Advisor synthesis (t822 gate): A the boot-init seam EXISTS (sysstart/advstart via macrosApp buildAutostartBody, shared
+with Homing) - EXTEND it + pick a CLEAN slot; B emit-side guard AND boot-init BOTH (defense-in-depth); C DM500
+CONSERVATIVE (direct G53 only if a factory macro LINE uses it - none does - else work-frame + honest comment + user-gated
+list); D corner L211 per-wall lift STAYS.
+
+MID-TURN AMENDMENT (RULING D REVERSED - field evidence: the user probed the FIRST WALL then the per-wall LIFT walked into
+the Z limit): the per-wall retreat IS the user's actual crash, so it must convert too, + the same #17-shaped lifts in
+middle/rotaryCenter/rotaryClock. I attempted the corner per-wall conversion and it SURFACED A HARD CONFLICT (see the GATE
+below) - so this turn ships the INFRA + the four ERROR-HANDLER (miss-path) retracts (preview-safe), and HOLDS the per-wall
+lift at a gate. Safe-height class landed this turn = the four ERROR-HANDLER retracts; the final parks were already on
+safeZParkBlock (prior turns).
+
+### THE SHARED ATOM (ops/saferetract.js) — dialect-agnostic block, per-post emit
+
+The stack is built ONCE (dialect-agnostic) and emitMapped renders per post, so the per-post divergence (register vs
+literal vs work-frame degrade) MUST live at emit time - hence a single `saferetract` atom whose emit branches per
+dialect, exactly like machinemove. Only THREE dialects override dialect.safeRetract; grbl/rs274/centroid fall through to
+a DEFAULT (machineMove with the literal margin - a literal G53 coord is native there):
+- Expert: G53 needs a #var (a literal fails on M350) -> read the boot-seeded register #520 with an INLINE unset-guard
+  IF #520<0 GOTO91 / #520=<margin> / N91 / G53 Z#520. Controller value wins if set (negative); else seed the declared
+  margin; NEVER G53 Z0 (= the top switch). ONE margin value drives the guard fallback AND the literal posts.
+- V4.1: no Studio boot macro writes a register (advstart is the honest UNVERIFIED stub) -> bake the literal, staged in
+  the verified-free #190, then the CONFIRMED G0 G53 Z#190 form.
+- DM500: direct G53 NOT dump-grounded (no factory macro LINE emits G53; machine frame is reached only via M98 P100/P101
+  subprograms; #395 is a setting NAME not usage) -> DEGRADE to G90 / G0 Z#17 (absolute WORK-frame - an absolute move
+  KILLS the compounding crash even without G53) + an honest comment. DM500-direct-G53-confirm -> the USER-GATED list
+  (advisor to add to NEXT-SESSION; I do not edit it). Do NOT ride M98 P101 (a factory park may move XY).
+
+The margin RESOLVES to a number in the block param at build (valid-by-construction) via safeZMarginNeg(), which reads
+window.ddcsGetSettings().machine.safeZMargin with the policy default (5 -> -5) as the floor; tests boot the app so the
+DEFAULT config flows through -> byte-goldens use -5. One node-builder safeRetractNode() (ops/safeZframe.js) so corner
+(the pilot) + all inheritors build the SAME block.
+
+### THE REGISTER (#520) — grounded clean
+
+data/varMap.js RESERVED documents #520: macro-free across the whole M350 dump (a FINDINGS persistence test that TOUCHED
+it only PROVES it is a live persistent cell); neighbours in use are park #470-471, tool-change #472-473, SN #490,
+tool-change working #500/#510 -> #520 is clear. sysstart.nc seeds it from the setting (Expert only - only Expert gets a
+real boot body; V4.1/DM500 get the UNVERIFIED stub, so no register seed there, which is why they bake the literal).
+
+### THE GUARD-LABEL COLLISION (real bug, caught by blocks-accumulate, FIXED)
+
+The guard emits N91 as RAW TEXT inside the atom (not a label BLOCK), so two ACCUMULATED probe ops (two middles in one
+program) both emitted N91 -> duplicate label. offsetLabels/maxLabelNum (opSession.js) renumber label/goto/ifgoto BLOCKS
+on append but could not see the atom-internal label. FIX: teach BOTH about a `saferetract` block's params.label - it is a
+real renumberable label, like the others. Now first op {N1,N2,N91}, second op offset past 91 -> no collision.
+blocks-accumulate (two middles) is the canonical guard and passes; a single op keeps N91 (off=0, no renumber).
+
+### SETTINGS + BOOT + SIM + TWIN + ROUND-TRIP
+
+- settings.machine.safeZMargin = 5 (USER-OWNED) + a Settings->Machine input (below soft-limits, the machine-frame home)
+  + read/write on both save paths (commitMachine + the main save) + a live change listener. Home Z0 = top, so 5 -> Z-5.
+- Boot: macrosApp buildAutostartBody appends `#520=<-margin>` for Expert. Verified: sysstart Regenerate body contains it.
+- Sim: the retract emits G53 -> the engine's EXISTING G53 -> machine->part map + poschip-amber path renders it (no new
+  sim code). Verified the isolated retract TRACES to machine z=-5 with stats.absolute true (the amber-triggering frame).
+- Twin: inherits via cornerStack (corner-data-emit twin==built-in sweep still byte-identical -> the twin carries the
+  retract). Asserted user_corner_data emits G53 Z#520.
+- Round-trip: Expert/V4.1 retract (a #VAR ref) round-trips BYTE-IDENTICAL. grbl/rs274/centroid bake a LITERAL coord,
+  which the machinemove atom re-stages via #99 + post-gates on re-emit - a PRE-EXISTING literal-machine-move behavior,
+  NOT introduced here; the DIRECT emit that runs on the machine is the correct G53 G0 Z-5.
+
+### THE PER-WALL LIFT GATE (the amendment's ask vs the sim-preview anchoring) - ADVISOR TO RULE
+
+The amendment rules the per-wall retreat lift (corner probeWallR: zPairR([Z#17],[Z#19]), + the #17-shaped lifts in
+middle/rotary) converts to the machine-frame margin. I DID it on corner + updated corner-z-trust, and it FAILED
+corner-draw-anchor: a G53 mid-sequence sets stats.absolute -> the sim preview's MULTI-PASS anchoring collapses (the wall-2
+pass no longer anchors to the runtime wall-1 END). This is [[g53-move-breaks-preview-start-anchor]] and it is EXACTLY what
+rotaryCenter L92 + middle L136 already warn in-code: "a G53 here would mark the whole trace absolute and the 3 probe paths
+would collapse onto the macro's machine coords." So the amendment (machine-frame lifts for limit-safety) genuinely
+CONFLICTS with the preview start-anchoring the per-wall/reposition lifts are deliberately incremental to preserve.
+
+I REVERTED the corner per-wall change + corner-z-trust (kept the suite GREEN); the error-handler retracts stay (they are
+the MISS branch, never in the success-path preview, so preview-safe). The conflict needs a design ruling. Options:
+- A RE-CENTRE AFTER G53: emit the machine G53 retract then an incremental move to re-establish the preview anchor (the
+  memory's fix). Localized but adds emitted moves + is fiddly to keep the multi-pass fan-out correct.
+- B PREVIEW HANDLES MID-PROGRAM G53 (my rec): the emit stays correct + limit-proof; fix the preview's pass-anchoring
+  (viz/engine) to keep the runtime-END anchor across a G53 retract. Cleanest per the north star (the sim is a VIEW that
+  should faithfully render the machine-frame retract - it already renders G53 amber; only the multi-pass ANCHOR breaks).
+- C ABSOLUTE WORK-FRAME lift (G90 Z<safeZ>): limit-proof IF the work Z0 is in-envelope + preview-native (no stats.absolute
+  machine collapse). But the wall probes do not always set a work Z for Z, so the reference is not guaranteed.
+Recommend B (fix the preview once, all wizards inherit, emit stays honest). Until ruled, the per-wall lifts stay
+incremental; middle/rotaryCenter/rotaryClock per-wall/reposition lifts are UNTOUCHED (same conflict + a shared
+safeTraverseStack primitive + the manual-jog flow). corner is the gated pilot: the mechanism is not PERFECT on corner yet
+(the preview), so per [[corner-gated-pilot]] the middle/rotary sweep waits.
+
+### GOLDEN CHURN = ZERO existing goldens
+
+The sweep found NO existing golden asserted the error-handler retract line: corner-post-fold / corner-data-emit /
+corner-z-trust + middle-data-emit / middle-reposition-refactor (byte-identical sweeps) ALL pass UNCHANGED - the retract
+region was never goldened, and the twins moved identically with the built-ins. So there is no golden to regenerate; the
+NEW coverage is tests/safe-z-retract-822.spec.js (8 tests): the machine-frame retract + no-G91-in-the-class (all 4
+wizards) + the unset-guard order (never G53 Z0) + per-post fold + round-trip + USER-OWNED setting flow + twin + boot seed
++ sim-to-machine-z. corner L211 per-wall lift UNCHANGED (ruling D).
+
+### VERIFICATION (real symptom)
+
+Drove the corner emit across ALL SIX posts and EYEBALLED the error-handler region: Expert register+guard+G53 Z#520; V4.1
+staged G0 G53 Z#190; DM500 work-frame G90/G0 Z#17 + honest comment; grbl/rs274 G53 G0 Z-5; centroid G53 Z-5. The
+incremental crash vector G91/G0 Z#17/G90 is GONE from the safe-height class. Set safeZMargin=8 -> the emit follows (-8).
+
+Files: web/wizards/ops/saferetract.js (NEW atom), web/wizards/ops/safeZframe.js (SAFEZ_MARGIN_* + safeZMarginNeg +
+safeRetractNode), web/wizards/ops/index.js (palette), web/wizards/dialects/{ddcs-expert-m350,ddcs-v41,ddcs-v3-dm500}.js
+(safeRetract), web/wizards/{corner,middle,rotaryCenter,rotaryClock}Wizard.js (wire the 4 ERROR-HANDLER retracts; corner
+also carries a gate comment where the per-wall lift is HELD), web/blocks/opSession.js (renumber the guard label),
+web/ui/settingsPanel.js (the setting + UI), web/ui/macrosApp.js (boot seed), web/data/varMap.js (RESERVED #520),
+tests/safe-z-retract-822.spec.js (NEW, 8). The per-wall lift + corner-z-trust were REVERTED (the preview gate).
+SUITE: 1210 passed, 2 skipped, 0 failed, 0 flaky (workers=2, 21.0m) — a CLEAN run on the stable reverted code; autostart-
+stored-macro (boot seed OK), middle-reposition-refactor + probe-surface-block (byte-identical), safez-frame all green.
