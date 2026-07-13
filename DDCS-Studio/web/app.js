@@ -84,6 +84,7 @@ class DDCSStudio {
         console.debug('DDCSStudio: EditorManager initialized');
         import('./ui/gcodeMinimap.js').then((m) => m.initGcodeMinimap(this.editorManager)).catch(() => { /* minimap is optional chrome */ });   // t810 — the editor overview strip
         import('./ui/preflightBadge.js').then((m) => m.initPreflightBadge(this.editorManager)).catch(() => { /* pre-flight badge is optional chrome */ });   // t838 — the pre-flight envelope check badge
+        import('./ui/timeChip.js').then((m) => m.initTimeChip()).catch(() => { /* time-estimate chip is optional chrome */ });   // t844 — the estimated run-time chip
 
         this.dockManager = new DockManager(this.variableDB, this.editorManager);
         console.debug('DDCSStudio: DockManager initialized');

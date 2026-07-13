@@ -10,6 +10,12 @@
 import { showOpMenu, showGroupMenu, hideOpMenu } from './opContextMenu.js';
 import { onChange } from '../blocks/programModel.js';   // t736 — refresh the rotation badge on every program change
 import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program rotation
+import { secondsForLines, fmtDuration } from '../engine/timeEstimate.js';   // t844 — the per-op run-time on the hover chip
+
+// t844 — the op's estimated run time from the cached program estimate (window.ddcsTimeEstimate), summed over its lines.
+function opTimeLabel(lines) {
+    try { const est = window.ddcsTimeEstimate && window.ddcsTimeEstimate(); if (!est || !est.perLine) return ''; const s = secondsForLines(est.perLine, lines); return s > 0 ? '  ·  ≈ ' + fmtDuration(s) : ''; } catch (_) { return ''; }
+}
 
 const r3 = (n) => { const v = Math.round(n * 1000) / 1000; return Object.is(v, -0) ? 0 : v; };
 
@@ -154,7 +160,7 @@ export function initEditorOpHover() {
         lines.forEach((j) => { const s = overlay.querySelector(`.g-line[data-line-index="${j}"]`); if (s) s.classList.add('op-hover'); });
         const first = lines.length ? lines[0] : 0;
         const editable = !window.ddcsCanEditOp || window.ddcsCanEditOp(op.opType);
-        chip.textContent = (editable ? '✎ ' : '🔒 ') + (op.label || op.opType);
+        chip.textContent = (editable ? '✎ ' : '🔒 ') + (op.label || op.opType) + opTimeLabel(lines);   // t844 — per-op run-time estimate
         chip.disabled = !editable;
         chip.title = editable ? `Edit this ${op.label || op.opType}` : `${op.label || op.opType}: form-edit not wired yet`;
         chip.style.top = Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)) + 'px';

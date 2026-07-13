@@ -84,7 +84,7 @@ export const SETTINGS_DEFAULTS = {
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
     // Travel x/y/z are SIGNED (sign = home direction). workOrigin = the active WCS offset (machine coords of
     // part-zero), kept in sync from wcs.table[active-1]. wcs = the G54–G59 table pulled from the controller.
-    machine: { x: 300, y: 300, z: -120, show: true, softLimits: true, safeZMargin: 5, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },   // Z is negative: homes at the TOP (machine 0) and travels down into the work — the router/mill norm. safeZMargin (t822) = mm below home the error-handler retract falls to via G53 (USER-OWNED); home Z0 = top, so 5 → machine Z -5
+    machine: { x: 300, y: 300, z: -120, show: true, softLimits: true, safeZMargin: 5, rapidRate: 6000, toolChangeSec: 15, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },   // Z is negative: homes at the TOP (machine 0) and travels down into the work — the router/mill norm. safeZMargin (t822) = mm below home the error-handler retract via G53. rapidRate (t844) = G0 traverse mm/min for the time estimate + time-true sim (pull-seeded from the controller G0-speed register when read); toolChangeSec = per-M6 allowance (s)
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
     probes:  {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)

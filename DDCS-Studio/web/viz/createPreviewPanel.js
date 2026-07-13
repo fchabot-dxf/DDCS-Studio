@@ -376,6 +376,7 @@ export function createPreviewPanel(container, opts = {}) {
             stock: previewStock(),
             wcsOffset: wcsForViz(),
             simSpeed: simSpeed(),
+            rapidRate: (machineForViz() || {}).rapidRate,   // t844 — time-true playback uses the DECLARED G0 rate, so it matches the time estimate
             createVarStore: opts.createVarStore || null,
             onLineChange: ({ lineIndex, raw }) => {
                 if (typeof opts.onLine === 'function') opts.onLine(lineIndex);

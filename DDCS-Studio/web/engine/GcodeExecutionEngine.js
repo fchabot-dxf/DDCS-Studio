@@ -291,6 +291,8 @@ export class GcodeExecutionEngine {
             skipped: 0,
             steps: 0,
             absolute: false,   // did the program ever establish an ABSOLUTE position (G90 move / G53)? → path is start-INDEPENDENT
+            dwellMs: 0,        // t844 — TIME ESTIMATE: sum of G4 P dwell (ms); non-motion, so not in the segments — accumulated here
+            toolChanges: 0,    // t844 — count of M6 tool changes (× a declared per-change allowance in the estimate)
         };
         this.totalLines = 0;
         this._started = false;
@@ -414,7 +416,7 @@ export class GcodeExecutionEngine {
             segments,
             bounds: segments.length ? b : null,
             passEnds: this._passEnds.slice(0, this._maxPass + 1),   // t107 — per-pass runtime world-ENDs (machine-faithful re-park anchors); preview-only
-            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, passSources: this._passSources.slice(0, this._maxPass + 1), skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute },
+            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, passSources: this._passSources.slice(0, this._maxPass + 1), skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute, dwellMs: this.stats.dwellMs, toolChanges: this.stats.toolChanges },
         };
     }
 
@@ -874,6 +876,7 @@ export class GcodeExecutionEngine {
         let wasNativeHome = false;  // any M98 P501 home line — short-circuit so its X-word (axis index) is never read as a coord
         for (const m of mcodes) {
             if (m === 6) {
+                this.stats.toolChanges += 1;   // t844 — time estimate: each M6 costs a declared tool-change allowance
                 // Tool change request: M6 Tn stores the target tool in #1504 (real DDCS
                 // semantics — T.nc performs the change) and, for simple sims, also makes
                 // it the active tool #1300 so offset macros keep working.
@@ -1011,6 +1014,7 @@ export class GcodeExecutionEngine {
 
         // G4 dwell — DDCS unit is ms (dispatcher capture: G04 P500). Paced by simSpeed.
         if (gcodes.includes(4) && wm.P != null && Number.isFinite(wm.P) && wm.P > 0) {
+            this.stats.dwellMs += wm.P;   // t844 — time estimate: the REAL dwell ms (not simSpeed-scaled)
             const ms = wm.P / (this.simSpeed > 0 ? this.simSpeed : 1);
             this._nextDelayMs = Math.max(8, Math.min(10000, ms));
             this._setStatus(`G4 dwell ${wm.P} ms`, true);

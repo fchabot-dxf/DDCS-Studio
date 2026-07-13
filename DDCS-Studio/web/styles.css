@@ -681,6 +681,14 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .editor-container .preflight-row { padding: 4px 7px; border-radius: 6px; cursor: pointer; font-variant-numeric: tabular-nums; color: var(--text, #e6edf5); }
 .editor-container .preflight-row:hover { background: color-mix(in srgb, #ff5964 20%, transparent); }
 .editor-container .preflight-pop-note { margin-top: 6px; opacity: .82; font-size: 10.5px; color: var(--text, #e6edf5); }
+/* t844 — the TIME-ESTIMATE chip: an unobtrusive pill at the editor top-centre, the program's estimated run time (hover = the breakdown). */
+.editor-container .time-estimate-chip {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 12; cursor: default;
+    font: 600 11px/1 inherit; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+    background: color-mix(in srgb, var(--panel, #161b22) 90%, transparent); color: var(--text-dim, #8b949e);
+    border: 1px solid var(--border, #30363d); box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+}
+.editor-container .time-estimate-chip[hidden] { display: none; }
 /* t738 — the PREVIEW VISIBILITY modal rows: a visible toggle + label on the left, an opacity slider on the right. */
 .vis-modal-pop .vis-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 3px 0; }
 .vis-modal-pop .vis-tog { display: flex; align-items: center; gap: 7px; cursor: pointer; white-space: nowrap; color: var(--text, #e6edf5); }
