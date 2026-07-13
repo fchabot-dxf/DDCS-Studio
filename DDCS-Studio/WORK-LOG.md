@@ -2695,3 +2695,71 @@ Files: web/ui/gcodeMinimap.js (NEW — the strip), web/ui/panePrefs.js (the ddcs
 (onActiveLine — the one-source subscription), web/wizardManager.js (onHide hook in close), web/wizards/views/userOpView.js
 (onHide → clear throttle, the RIDER), web/app.js (mount the minimap), web/styles.css (.gcode-minimap + phone media),
 tests/gcode-minimap-810.spec.js (NEW). Commit 2ad184c.
+
+## 2026-07-13 (t812) — THE .nc PROGRAM-LEVEL MARKER SLOT (xform + entry) + the minimap cosmetic RIDERS
+
+The advisor dispatched the ratified Transform fast-follow: a program-level marker slot so the two childless program-level
+declarations survive a `.nc` (G-code text) export/reimport. Commit 193ace6.
+
+### GROUNDING (empirical, not guessed)
+
+`serializeWithMarkers` (programModel) is per-op-line: a marker rides each `type:'op'` container's first projected line. A
+childless program-level declaration (the `xform` sibling; a program-level `entry` sibling) projects NO line → gets NO
+marker. I drove it: build [xform{angle:7}, pocket] → serializeWithMarkers → importMarkedNc → **`xformSurvives:false`,
+`programRotation → {angle:0}`**. Confirmed: the rotated coordinates export, the editable/clearable DECLARATION drops (it
+round-trips only via `.mjson`, which rides the whole stack).
+
+The `( @DDCS:N {…} )` grammar (opSchema) dispatches on the JSON `op` field, NOT on `:N` (N = the format version). So a
+PROGRAM-scope marker is expressible as `( @DDCS:1 {"op":"prog", …} )` — no `:prog` (isMarker requires `@DDCS:\d+`).
+
+### THE ONE SLOT
+
+- **Emit** (programModel `progMarkerLine`, prepended in `serializeWithMarkers`): scan the TOP-LEVEL stack for an `xform`
+  sibling (angle ≠ 0 → {angle,pivotX,pivotY}) and an `entry` sibling (finite entryX/entryY). Build ONE
+  `( @DDCS:1 {"op":"prog", …} )` header carrying BOTH; if neither is set → emit NOTHING (byte-identical export). Only
+  TOP-LEVEL siblings ride the slot — a per-op NESTED entry keeps its own op marker (no double-apply on reimport).
+- **Parse** (programModel `importMarkedNc`): intercept `rec.opType === 'prog'` BEFORE `opFromMarker` (which drops a
+  non-builder type) → `progBlocksFromMarker` rebuilds the `xform` (makeXform) + `entry` (new `makeEntry`, mirror of
+  makeXform) siblings onto the stack. The header owns no body.
+- **makeEntry** (programFraming): the missing top-level `entry` constructor (only `appendEntry` — nested — existed). So
+  BOTH declarations sit on the ONE slot; no third bespoke path.
+
+### THE SPLIT-FIX (surfaced while wiring entry — a latent bug, now fixed)
+
+The applied entry waypoint `G0 X Y ( entry )` is owned by the entry sibling (src=[entry.id]), not the op it lands inside.
+`serializeWithMarkers` reset the op context to null on that line → it emitted a SECOND op marker for the rest of the op →
+**a DUPLICATE op on reimport** (backTypes came back `[entry, op, op]`, emit +85 lines). Fix: a null (program-level
+inserted) line no longer ENDS the op — keep `lastOpId` across it; the next genuinely-different op still starts its own
+marker. This also fixes the same latent duplication for a nested-entry data-op. Byte-identical for programs with no
+program-level insertion (no null-in-op lines → unchanged).
+
+### RIDERS (t811 minimap cosmetics, CSS-only)
+
+The 3D-drawer pull-tab (`.viz3d-handle`, 28px, right edge) and the split-view 3D pane were occluding the strip.
+- Declared `--gm-right` on `.editor-container` = the strip's distance from the container's right edge: the pull-tab inset
+  (`--gm-tab` 30px) when the drawer is CLOSED, or `calc(var(--viz3d-size) + var(--gm-tab))` when the drawer is OPEN
+  (`:has(.viz3d-drawer.open)` — already used for the editor). One var drives the strip `right`, the text-layer
+  right-padding, and the toggle. So: the strip is inset clear of the pull-tab (never occluded), and in SPLIT view it hugs
+  the TEXT pane's right edge (left of the 3D pane), never the window edge.
+
+### VERIFY (prog-marker-slot-812.spec.js 4/4 + the RIDER guard + 28/28 regressions)
+
+- XFORM: rotate → export `.nc` → reimport → `programRotation` restored + the reimported program re-emits the SAME rotated
+  G-code (byte-identical) + the `#xform-badge` shows the angle after reimport.
+- ENTRY: a program-level entry (moved) → export → reimport → the declaration restored + the same `( entry )` move + emit
+  byte-identical (the split-fix — no duplicate op).
+- UNSET: no `xform`/`entry` → NO prog marker in the export (byte-identical, goldens untouched); the marker parses on the
+  opSchema registry path (`isMarker`/`parseMarker` round-trip the params, op key `prog`).
+- BLOCKS round-trip: the reimported xform + entry survive stack → Blockly → stack (values, via workspaceToStack).
+- Riders: the strip never overlaps the pull-tab (closed) and hugs the text pane in split view (asserted geometry).
+- Regressions 28/28: atc-inline-onesource + def-change-notice + wcs-emit-resolved + atc-backcompat + protocol-validator
+  (the marker codec + serializeWithMarkers), transform-declared-736 + mill-entry-726 (xform/entry), gcode-minimap-810.
+
+Real symptom driven: the actual serialize → import round-trip on the real programModel at localhost:3211.
+
+SUITE: 1195 passed, 2 skipped, 0 failed, 0 flaky (workers=2, retries=0, 20.5m) (workers=2 — a program-level marker prepend + one import branch + a serialize null-line rule + a
+constructor + CSS; the prog marker is emit-gated on a set declaration → unset programs byte-identical; verified).
+
+Files: web/blocks/programModel.js (progMarkerLine + progBlocksFromMarker + import branch + the serialize split-fix),
+web/blocks/programFraming.js (makeEntry), web/styles.css (--gm-right rider geometry), tests/prog-marker-slot-812.spec.js
+(NEW), tests/gcode-minimap-810.spec.js (the rider guard). Commit 193ace6.
