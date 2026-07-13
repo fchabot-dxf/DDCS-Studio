@@ -19,6 +19,8 @@ import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';   /
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
 import { getToolLibrary, getTool } from '../wizards/toolPicker.js';   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
 import { THREAD_PRESETS, threadPreset } from '../wizards/threads.js';   // t778 — the thread preset table for the tapping wizard's pitch picker
+import { isSectionCollapsed, setSectionCollapsed } from './panePrefs.js';   // t820 — collapsible form sections (app-wide per section kind)
+import { applyState as applyFold } from './paneAccordion.js';   // t820 — REUSE the accordion motion engine (theme drawer tokens), not a duplicate
 
 // t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
 // widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
@@ -30,6 +32,11 @@ const SEG_GATE_PREDS = { ioInput: () => ioInputSupported() };
 const SEG_OPTS_PREDS = { ioEdge: () => ioEdgeOptions() };
 
 const SVGNS = 'http://www.w3.org/2000/svg';
+// t820 — collapsible form sections: only forms with MORE than this many rows AND ≥2 declared sections render the fold
+// chrome ("where sensible" — short forms stay plain). The chevron rotates off the section's [data-collapsed] (CSS).
+const SECTION_THRESHOLD = 8;
+const SEC_CHEVRON = '<svg class="form-sec-chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+const escHtml = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
 const ROW_CSS = 'display:flex; align-items:center; justify-content:space-between; gap:14px; margin:9px 0;';
 const CTRL_CSS = 'padding:5px 8px; background:var(--bg,#0b0f14); color:inherit; border:1px solid var(--border,#2a3340); border-radius:6px;';
 const numOr = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
@@ -710,7 +717,7 @@ export function renderOpForm(host, bindings) {
         if (b.group) { if (!byGroup[b.group]) { byGroup[b.group] = []; units.push(byGroup[b.group]); } byGroup[b.group].push(b); }
         else units.push([b]);
     }
-    const addRow = (spec, label) => {
+    const addRow = (spec, label, target) => {
         const row = document.createElement('div');
         // ③ — a `when`-gated binding tags its row so the view can show/hide it from the live params (e.g. corner's start
         // #21/#22, visible only under probeZFirst). Purely a marker; the widget still renders + reads (dead when hidden).
@@ -730,17 +737,43 @@ export function renderOpForm(host, bindings) {
         catch (e) { console.warn('widget render failed for', label, e); }
         const gear = linkGear(fieldLinkFor(w));   // t796 P4 — the row-end deep-link gear (declared `link` / FIELD_LINKS)
         if (gear) { row.classList.add('has-field-link'); row.appendChild(gear); }
-        host.appendChild(row);
+        (target || host).appendChild(row);
     };
-    for (const unit of units) {
+    const renderUnit = (unit, target) => {
         // A canvas multi-widget (xy-pad / rect) renders the whole group as ONE widget that owns its value. A
         // number-role group (2D point / rect declared as plain numbers) instead renders each member as its OWN
         // number field — each carries data-param so the Form+2D preview's role-derived handle can drag-write it,
         // while the value stays a plain number on the form. The shared group/role still drives the preview handle
         // (layoutSpecFromOp); only the FORM rendering differs.
         if (unit.length > 1 && !MULTI_WIDGETS.has(unit[0] && unit[0].widget)) {
-            for (const b of unit) addRow(b, b && b.param);
-        } else addRow(unit, unit[0] && unit[0].param);
+            for (const b of unit) addRow(b, b && b.param, target);
+        } else addRow(unit, unit[0] && unit[0].param, target);
+    };
+    // t820 — COLLAPSIBLE SECTIONS on a LONG form. Bucket units by their declared `section` (GEOMETRY / TOOL & CUT / …);
+    // ONLY a form with > SECTION_THRESHOLD rows AND ≥ 2 sections renders the fold chrome ("where sensible" — a short form
+    // stays plain). Rows go INTO a per-section body (folded ≠ removed → still in the DOM for the form-integrity/help
+    // guards). The header reuses the accordion motion engine (theme drawer tokens) + a panePrefs per-kind fold state.
+    const sectionOf = (unit) => (unit[0] && unit[0].section) || null;
+    const secList = []; for (const u of units) { const s = sectionOf(u); if (s && !secList.includes(s)) secList.push(s); }
+    const rowCount = units.reduce((n, u) => n + ((u.length > 1 && !MULTI_WIDGETS.has(u[0] && u[0].widget)) ? u.length : 1), 0);
+    const sectionize = rowCount > SECTION_THRESHOLD && secList.length >= 2;
+    if (sectionize) {
+        const secEls = {};
+        const ensureSec = (s) => {
+            if (secEls[s]) return secEls[s];
+            const sec = document.createElement('div'); sec.className = 'form-sec'; sec.dataset.section = s;
+            const hdr = document.createElement('button'); hdr.type = 'button'; hdr.className = 'form-sec-hdr';
+            hdr.innerHTML = `${SEC_CHEVRON}<span class="form-sec-title">${escHtml(s)}</span>`;
+            const body = document.createElement('div'); body.className = 'wiz-pane-body';
+            sec.append(hdr, body); host.appendChild(sec);
+            applyFold(sec, isSectionCollapsed(s), false);   // apply the persisted fold (snapped)
+            hdr.addEventListener('click', () => { const now = !(sec.getAttribute('data-collapsed') === '1'); applyFold(sec, now, true); setSectionCollapsed(s, now); });
+            secEls[s] = { body };
+            return secEls[s];
+        };
+        for (const unit of units) { const s = sectionOf(unit); renderUnit(unit, s ? ensureSec(s).body : host); }
+    } else {
+        for (const unit of units) renderUnit(unit, host);
     }
     // t289 — SOURCE CHIPS (parity-gap #2): a binding whose `sourceField` maps to a controller register gets the SAME
     // inline source dot the built-in forms use. Click toggles studio↔controller (the global per-field setting both

@@ -2165,6 +2165,23 @@ button.primary:hover {
 [data-collapsed="1"][data-reveal="fade"]   > .wiz-pane-body { opacity: 0; }
 [data-collapsed="1"][data-reveal="roll"]   > .wiz-pane-body { transform: scaleY(.5); opacity: .25; }
 [data-collapsed="1"][data-reveal="wipe"]   > .wiz-pane-body { clip-path: inset(0 0 100% 0); }
+
+/* t820 — collapsible FORM SECTIONS (long twin forms). Reuse the accordion motion: applyState sets --drawer-dur-eff/-ease
+   + data-collapsed/-reveal/-dir on .form-sec, so the generic .wiz-pane-body transition + reveal personalities above drive
+   the fold — no duplicate engine. The header is a HORIZONTAL labeled bar (≥44px touch); the chevron rotates with state. */
+/* `.form-sec > .form-sec-hdr` (2 classes) out-specifies the theme `[data-theme] button` pill rule, so the 44px touch
+   target + look hold in every theme. */
+.form-sec > .form-sec-hdr {
+    display: flex; align-items: center; gap: 7px; width: 100%; min-height: 44px; height: auto; padding: 8px; margin: 3px 0 0; box-sizing: border-box;
+    background: color-mix(in srgb, var(--panel2, rgba(255,255,255,.06)) 55%, transparent);
+    border: none; border-top: 1px solid var(--border); border-radius: 6px 6px 0 0;
+    color: var(--text-main); font: 600 11px inherit; letter-spacing: .4px; text-transform: uppercase; cursor: pointer; text-align: left;
+}
+.form-sec > .form-sec-hdr:hover { background: var(--panel2, rgba(255,255,255,.1)); }
+.form-sec > .form-sec-hdr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.form-sec-chev { flex: none; transition: transform var(--drawer-dur-eff, 180ms) var(--drawer-ease-eff, ease); }
+.form-sec[data-collapsed="1"] .form-sec-chev { transform: rotate(-90deg); }
+.form-sec > .wiz-pane-body { padding: 2px 0 4px; }
 [data-collapsed="1"][data-reveal="unfold"] > .wiz-pane-body { transform: perspective(700px) rotateX(-88deg); opacity: .35; }
 [data-collapsed="1"][data-reveal="slide"][data-dir="left"]  > .wiz-pane-body { transform: translateX(-10%); opacity: .4; }
 [data-collapsed="1"][data-reveal="slide"][data-dir="right"] > .wiz-pane-body { transform: translateX(10%); opacity: .4; }

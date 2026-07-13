@@ -62,7 +62,7 @@ function hostsResizeOnce(body) {
     for (const el of body.querySelectorAll('*')) { if (el.__panel) { try { const v = el.__panel.viz; if (v && v._resize) v._resize(); } catch (_) { /* */ } } }
 }
 
-function applyState(pane, collapsed, animate) {
+export function applyState(pane, collapsed, animate) {
     const body = pane.querySelector(':scope > .wiz-pane-body');
     const bar = pane.querySelector(':scope > .wiz-pane-bar');
     if (!body) return;

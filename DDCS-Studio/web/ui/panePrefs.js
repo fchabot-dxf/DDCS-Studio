@@ -118,3 +118,25 @@ export function setMinimapOn(on) {
 
 /** Subscribe to minimap-toggle changes. Returns an unsubscribe fn. */
 export function onMinimapChange(cb) { _minimapSubs.add(cb); return () => _minimapSubs.delete(cb); }
+
+// ── FORM-SECTION collapse (t820) — a long twin form's declared SECTIONS (GEOMETRY / TOOL & CUT / …) fold independently.
+// App-wide per section KIND (the section title), like the panes: fold TOOL & CUT in one wizard → every long form opens
+// with it folded. A DISPLAY pref (localStorage, NEVER the machine profile). Default false = expanded. ──
+const FSEC_KEY = 'ddcs_form_sections';
+let _fsec = null;
+const _fsecSubs = new Set();
+function _fsecLoad() { let o = {}; try { const raw = localStorage.getItem(FSEC_KEY); if (raw) { const p = JSON.parse(raw) || {}; for (const k in p) if (typeof p[k] === 'boolean') o[k] = p[k]; } } catch (_) { /* defaults */ } return o; }
+
+/** True if the form section KIND (its title) is currently collapsed (unknown → false = expanded). */
+export function isSectionCollapsed(kind) { if (!_fsec) _fsec = _fsecLoad(); return !!_fsec[kind]; }
+
+/** Fold/unfold a form section KIND; persists + notifies (every open long form re-applies). */
+export function setSectionCollapsed(kind, collapsed) {
+    if (!_fsec) _fsec = _fsecLoad();
+    _fsec[kind] = !!collapsed;
+    try { localStorage.setItem(FSEC_KEY, JSON.stringify(_fsec)); } catch (_) { /* private mode */ }
+    for (const cb of _fsecSubs) { try { cb(kind); } catch (_) { /* isolate */ } }
+}
+
+/** Subscribe to form-section fold changes. Returns an unsubscribe fn. */
+export function onSectionChange(cb) { _fsecSubs.add(cb); return () => _fsecSubs.delete(cb); }

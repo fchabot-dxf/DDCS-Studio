@@ -46,6 +46,11 @@ function findModelById(stack, id) {
 // round-trip + emit/sim byte-identical. Adaptive: re-run on every load + structural change (a sim block plugged/pulled).
 function syncSimSocket(b) {
     const sim = b.getInput && b.getInput('SIM'); if (!sim) return;
+    // t788/t819 — the op block's SIM mouth is redundant for MOST ops (the sim declarations live in the user-op Presentation
+    // section now); show it ONLY when it actually holds SIM content (an authored child plugged in). Every no-override op
+    // (pocket, …) with an empty SIM mouth hides the socket AND its "SIM" label. setVisible (NOT removeInput) keeps the
+    // connection → round-trip + emit/sim byte-identical. The ATC change's sim-OVERRIDE is a declared function (def.simGcode,
+    // applied at PREVIEW via getUserSimGcode), not a SIM block, so it needs no socket — the override still shows + round-trips.
     const has = !!(sim.connection && sim.connection.targetBlock());
     if (sim.isVisible && sim.isVisible() === has) return;   // already in the right state
     try { sim.setVisible(has); const lbl = b.getInput('SIM_LBL'); if (lbl) lbl.setVisible(has); if (b.rendered && b.render) b.render(); } catch (_) { /* older Blockly */ }
