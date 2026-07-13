@@ -3736,3 +3736,11 @@ assertion) + io-home-backfill (a homing screenshot) — are the KNOWN w4 CPU-CON
 (5 passed), are UNRELATED to depth-entry, and the box ran loaded (concurrent session). My change: byte-identical on all
 plunge defaults + 5 new tests + 72 op-regressions green. (The prior gate's lone failure, slot-as-data's routing map, is
 fixed above — not in this run.) The advisor re-runs on a quiet box for the release gate.
+
+
+### VERIFIED (addendum) — sim-play + form screenshots (the last 2 acceptance items)
+
+depth-entry-everywhere-842 test 6: (a) the SIM plays every mode per op — traceToolpath the emit for surfacing/slot x
+plunge/ramp/helix + contour x plunge/ramp → segments produced (the preview animates exactly this). (b) each TWIN FORM
+renders the Depth Entry cluster (screenshots at the two-pane wide viewport, VIEWED): surfacing shows Depth Entry=Helix +
+the when-gated Helix Ø (mm) + Helix Pitch (mm/rev) — units in parens, labels clean (t806). All 6 spec tests green.

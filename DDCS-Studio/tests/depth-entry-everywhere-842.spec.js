@@ -6,6 +6,7 @@ import { test, expect } from '@playwright/test';
  * contour→its first segment) at ≤ the angle. Helix fits the op geometry (a narrow slot degrades with a why); contour
  * offers plunge+ramp only (a helix would gouge the profile interior). One shared levelEntry/entryOrPlunge seam.
  */
+test.use({ viewport: { width: 1400, height: 1000 } });   // the two-pane wizard: form-left / viz-right → the Depth Entry cluster is visible in the form pane
 const XYZ = (ln) => { const m = /X(-?[\d.]+)\s+Y(-?[\d.]+)(?:\s+Z(-?[\d.]+))?/.exec(ln); return m ? { x: +m[1], y: +m[2], z: m[3] != null ? +m[3] : null } : null; };
 const Z = (ln) => { const m = /(?:^|\s)Z(-?[\d.]+)/.exec(ln); return m ? +m[1] : null; };
 // ramp blocks: [G0 X x0 Y y0] [G0 Z prevZ] [G1 X Y Z ( ramp )] — the t804 shape.
@@ -139,4 +140,44 @@ test('CONTOUR twin: user_contour_data offers plunge+ramp (no helix) + ramp round
     expect(r.rampHas, 'twin ramp: the binding writes contourfill.entry → ramp emits').toBe(true);
     expect(r.helixSafe, 'a stray helix on contour is coerced to a safe plunge (no helix, no NaN)').toBe(true);
     expect(r.fillEntry, 'contourfill carries entry=ramp (round-trip)').toBe('ramp');
+});
+
+// ---------------- SIM plays every mode + the twin FORMS show the cluster (screenshots) ----------------
+test('SIM plays all modes per op (trace) + each twin FORM renders the Depth Entry cluster', async ({ page }, testInfo) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.ddcsGetBlockProgram);
+    // (a) the sim plays each mode — traceToolpath the emit (the exact path the preview animates) → segments produced
+    const play = await page.evaluate(async () => {
+        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { slotStack } = await import('/wizards/slotWizard.js');
+        const { contourStack } = await import('/wizards/contourWizard.js');
+        const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { traceToolpath } = await import('/engine/trace.js');
+        const segs = (text) => (traceToolpath(text, {}).segments || []).length;
+        const out = {};
+        for (const [k, st, base] of [
+            ['surf', surfacingStack, { w: 120, h: 100, toolDia: 12, depth: 6, stepdown: 2 }],
+            ['slot', slotStack, { ax: 0, ay: 0, bx: 60, by: 0, width: 20, toolDia: 6, depth: 4, stepdown: 1.5 }],
+            ['cont', contourStack, { shape: 'rect', w: 80, h: 60, toolDia: 6, depth: 4, stepdown: 1.5 }],
+        ]) {
+            const modes = k === 'cont' ? ['plunge', 'ramp'] : ['plunge', 'ramp', 'helix'];
+            out[k] = {};
+            for (const m of modes) out[k][m] = segs(emitMapped(st({ ...base, entry: m, rampAngle: 5, helixPitch: 1.5 })).text);
+        }
+        return out;
+    });
+    for (const k of Object.keys(play)) for (const m of Object.keys(play[k])) expect(play[k][m], `${k} ${m} traces (the sim plays it)`).toBeGreaterThan(3);
+
+    // (b) each twin FORM renders the Depth Entry cluster — open, set the mode to reveal the when-gated fields, screenshot
+    for (const [op, mode] of [['user_surfacing_data', 'helix'], ['user_slot_data', 'helix'], ['user_contour_data', 'ramp']]) {
+        await page.evaluate((op) => window.openWiz(op), op);
+        await page.waitForSelector('#wizard', { state: 'visible', timeout: 8000 });
+        await page.waitForTimeout(300);
+        const sel = page.locator('#wizard select').filter({ has: page.locator('option[value="ramp"]') }).first();
+        if (await sel.count()) { await sel.selectOption(mode).catch(() => {}); await page.waitForTimeout(250); await sel.evaluate((e) => e.scrollIntoView({ block: 'center' })).catch(() => {}); await page.waitForTimeout(150); }
+        await expect(page.locator('#wizard'), `${op} form shows a Depth Entry field`).toContainText('Depth Entry');
+        await page.locator('#wizard').screenshot({ path: testInfo.outputPath(`form-${op}.png`) });
+        await page.evaluate(() => window.closeWiz && window.closeWiz());
+        await page.waitForTimeout(250);
+    }
 });
