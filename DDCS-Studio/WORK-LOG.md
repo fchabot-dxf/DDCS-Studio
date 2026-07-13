@@ -2818,3 +2818,55 @@ carve time; smooth/live path untouched, no emit path touched → the goldens are
 
 Files: web/viz/gcodeViz3d.js (the arc snap in _buildCrispCarveMesh + _buildCarveArc + carveEndState/carveFinalize feed),
 web/viz/createPreviewPanel.js (carveFinalize passes the segs), tests/carve-arc-814.spec.js (NEW). Commit 05a8cf9.
+
+## 2026-07-13 (t816) — E1.7 (2) INCREMENTAL LIVE CRISPING (Option A: retained dirty rect + sub-rect crisp splice)
+
+The advisor RULED Option A (B eliminated: the 90ms full re-mesh at 512² breaks the fps floor). Commit 5bd8336.
+
+### MEASURE FIRST (the design pivots on these)
+
+Full crisp re-mesh on a 512² grid (554k tris): **112.7ms**, of which **computeVertexNormals = 40.9ms**; a full
+position memcpy is **2.9ms**. The current SHIPPING live path (the smooth `_remeshCarve`: whole-grid Z rewrite +
+computeVertexNormals + render) is **34.5ms** on 512² — that IS the "current fps floor." three.js r137 `flatShading:true`
+renders with NO normal attribute (verified: delete it → no error). So: cache per-cell crisp triangles, re-march ONLY the
+dirty rect, reassemble (native memcpy), and DROP computeVertexNormals (flatShading) → the incremental crisp is faster
+than the shipping remesh.
+
+### THE BUILD
+
+- **Retained dirty rect** (engine/stockRemoval.js): `carveSegment` tracks the actual changed-cell bounds (h OR hc) and
+  `_growDirty`s a retained `dirtyRect`; `clearDirtyRect()` after a splice. The old single `dirty` boolean stays for the
+  smooth/reseed path (stop-crisp path unchanged).
+- **ONE-SOURCE marching** (`_crispContext`, gcodeViz3d.js): the t730 per-cell marching + t814 arc snap extracted into
+  `cellTris(i,j,out)` + `perimeterTris(out)`. The STOP build (`_buildCrispCarveMesh`) was refactored to use it
+  (non-indexed, positions identical → verified byte-identical: t730 + arc-814 + stock-removal all green). The live splice
+  calls the SAME `cellTris` → the two cannot diverge (the mandated guard re-checks it).
+- **Live incremental** (`carveLiveCrisp`): first call `_liveCrispInit` builds the per-cell Float32Array cache + swaps the
+  smooth live mesh for a crisp one (a one-time transition, ~85–193ms on 512², ≈ the existing 112ms stop build); later
+  calls `_liveCrispSplice` re-march ONLY the dirty rect (+ a 2-cell apron for seam continuity), reassemble via native
+  `TypedArray.set`, and update the position buffer in place — NO computeVertexNormals (flatShading). The panel throttle
+  (createPreviewPanel, the existing ~45ms rAF cadence) now calls `carveLiveCrisp` instead of the smooth remesh; the whole
+  toolpath is known upfront so `_buildCarveArc` is fed at setGcode → the t814 arc snap applies inside the live sub-rect
+  too. `carveFinalize`/`carveReseed` drop the live cache; the degrade guard's one-time init self-resets (next splice cheap).
+
+### VERIFY (carve-live-crisp-816.spec.js 3/3 + carve regressions 24/24)
+
+- **SAFETY GUARD (non-negotiable)**: the spliced live-crisp mesh EQUALS a full crisp re-mesh over the SAME field —
+  `sameLen` + **maxErr 0.000000** (identical positions, one source → the splice cannot drift). MID-PLAY: the mode is
+  `live-crisp` and the carved wake renders true crisp vertical walls (a beat behind the cutter). PERF: a realistic
+  per-throttle splice (one small extra cut → a small dirty band) is NO SLOWER than the current whole-grid smooth remesh
+  (asserted `spliceMs ≤ smoothMs` — the incremental crisp drops the 41ms normals, so it's a net win; the fps floor holds).
+- STOP-CRISP unchanged: `carveFinalize` settles to the whole-mesh crisp (mode `crisp`, walls hold); the live cache drops.
+- The ARC SNAP applies inside the live sub-rect too: a live-crisp corner fillet sits on the true arc (max dev < 0.1mm).
+- Regressions 24/24: t730 (3), carve-arc-814 (2), stock-removal-app + core (16) — the byte-identical stop refactor + the
+  smooth/reseed path all green.
+
+Real symptom driven: the actual carve engine + viz at localhost:3211 (real toolpath, real mesh geometry); the guard reads
+the actual position buffers.
+
+SUITE: 1200 passed, 2 skipped, 0 failed, 0 flaky (workers=2, retries=0, 20.6m) (workers=2 — the incremental crisp is confined to the live path (dirty rect + a per-cell cache); the
+stop-crisp refactor is verified byte-identical; no emit path touched → the goldens are unaffected; verified).
+
+Files: web/engine/stockRemoval.js (retained dirty rect), web/viz/gcodeViz3d.js (_crispContext one-source + the byte-identical
+stop refactor + carveLiveCrisp/_liveCrispInit/Splice/Assemble + arc-for-live), web/viz/createPreviewPanel.js (throttle →
+crisp splice; feed the arc), tests/carve-live-crisp-816.spec.js (NEW). Commit 5bd8336.
