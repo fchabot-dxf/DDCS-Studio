@@ -57,7 +57,9 @@ export function contourStack(params = {}) {
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
 
     const contour = newBlock('contourfill');
-    contour.params = { ...contourFlatParams(params), side: params.side || 'outside', tool: num(params.toolDia, 6), z: 'z', feed, plunge, clearance };
+    contour.params = { ...contourFlatParams(params), side: params.side || 'outside', tool: num(params.toolDia, 6),
+        entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3), by: 'by',   // t842 — depth entry (by from the StepDown scope for prevZ)
+        z: 'z', feed, plunge, clearance };
     const down = newBlock('stepdown');
     down.params = { to: depth, by: stepdown };
     down.children = [contour];

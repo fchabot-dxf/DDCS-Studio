@@ -33,7 +33,9 @@ export function surfacingStack(params = {}) {
     // are a single placement socket — bindable like drill, not woven through the geometry. Byte-identical: placementShift
     // anchors the bbox min-corner (x = originX − bbox.minX), so region-at-0 + shift originX == region-at-originX + shift 0.
     const fill = newBlock('surfacefill');
-    fill.params = { shape: 'rect', x: 0, y: 0, w, h, stepover: so, strategy: strat, direction: 'bothways', z: 'z', feed, plunge, clearance: clr };
+    fill.params = { shape: 'rect', x: 0, y: 0, w, h, stepover: so, strategy: strat, direction: 'bothways',
+        entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3), helixDia: num(params.helixDia, 0), helixPitch: num(params.helixPitch, 1), by: 'by', toolDia: tool,   // t842 — depth entry (plunge/ramp/helix); by from the StepDown scope; toolDia feeds the helix clamp
+        z: 'z', feed, plunge, clearance: clr };
 
     const down = newBlock('stepdown');
     down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };

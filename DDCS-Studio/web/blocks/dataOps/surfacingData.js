@@ -30,12 +30,13 @@ import { userOpFromStack } from '../userOps.js';
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
 import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
-import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, SURFACING_STRATEGY_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options (were undeclared → empty dropdowns)
+import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, SURFACING_STRATEGY_OPTIONS, ENTRY_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options (were undeclared → empty dropdowns); t842 ENTRY_OPTIONS
 
 /** Author defaults — match surfacingStack's own num() fallbacks (+ flat stepover/strategy) so the seeded template == the
  *  true default stack. stepover 7.2 == the default tool·% (Ø12 · 60%); strategy 'parallel' == the form's default 'raster'. */
 export const SURFACING_DEFAULTS = {
     w: 100, h: 80, stepover: 7.2, strategy: 'parallel', depth: 0.5, stepdown: 0.5,
+    entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1,   // t842 — depth entry (plunge default = byte-identical)
     clearance: 5, feed: 800, plunge: 200, wcs: 'active',
     // placement (makePlace) — region is local-0-based, so originX/originY are the placement offset (offX/offY) like drill.
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
@@ -67,6 +68,11 @@ const SURFACING_EXEC_BINDINGS = [
     { param: 'strategy', help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", blockIndex: 4, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed },
     { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge },
+    // t842 — DEPTH ENTRY cluster (per-level descent + its per-mode when-gated fields; toward-centre ramp like pocket — an area fill)
+    { param: 'entry', blockIndex: 4, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
+    { param: 'rampAngle', blockIndex: 4, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
+    { param: 'helixDia', blockIndex: 4, key: 'helixDia', type: 'number', default: SURFACING_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the area.' },
+    { param: 'helixPitch', blockIndex: 4, key: 'helixPitch', type: 'number', default: SURFACING_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler.' },
 ];
 
 const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group

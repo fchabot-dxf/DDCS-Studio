@@ -21,12 +21,13 @@ import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - th
 import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
 import { regionDesc } from '../../wizards/ops/region.js';      // t712 — the true boundary ring (polygon/ellipse) for the 2D preview
 import { contourRegion } from '../../wizards/ops/contour.js';  // t712 — the OFFSET toolpath (tool-centre) so the 2D matches the cut
-import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy)
+import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, ENTRY_OPTIONS_NO_HELIX } from './wizardOptions.js';   // t722 P2a rider — one-source; t842 depth entry (no helix — a profile trace)
 
 /** Author defaults — match contourStack's num() fallbacks + the built-in Contour form defaults. Geometry is local-0-based
  *  (originX/originY ride the placement). All 4 shape dims present; the contourfill atom picks w×h vs dia+sides by shape. */
 export const CONTOUR_DEFAULTS = {
     shape: 'rect', w: 80, h: 60, dia: 50, sides: 6, side: 'outside', toolDia: 6,
+    entry: 'plunge', rampAngle: 3,   // t842 — depth entry (plunge default = byte-identical; no helix — a profile trace)
     depth: 4, stepdown: 1.5, feed: 400, plunge: 200, clearance: 5, wcs: 'active',
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
@@ -61,6 +62,10 @@ const CONTOUR_EXEC_BINDINGS = [
     { param: 'dia', blockIndex: 4, key: 'dia', type: 'number', default: CONTOUR_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: 'GEOMETRY' },   // t722 P2a — Ø for circle AND polygon
     { param: 'sides', blockIndex: 4, key: 'sides', type: 'number', default: CONTOUR_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: 'GEOMETRY' },
     { param: 'toolDia', blockIndex: 4, key: 'tool', type: 'number', default: CONTOUR_DEFAULTS.toolDia, label: 'Tool Ø', section: 'TOOL & CUT' },
+    // t842 — DEPTH ENTRY: plunge or ramp (NO helix — a helix would gouge inside the profile). Polyline → ramp along the first
+    // segment; circle → a helical lead-in around the arc. Degrades to plunge (with a why) if the first segment is too short.
+    { param: 'entry', blockIndex: 4, key: 'entry', type: 'enum', default: CONTOUR_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS_NO_HELIX }, label: 'Depth Entry', section: 'TOOL & CUT', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a lead-in descent at ≤ the ramp angle along the profile (degrades to plunge where the first segment is too short).' },
+    { param: 'rampAngle', blockIndex: 4, key: 'rampAngle', type: 'number', default: CONTOUR_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, section: 'TOOL & CUT', help: 'Max descent angle of the ramp lead-in (degrees from horizontal).' },
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: CONTOUR_DEFAULTS.feed, label: 'Feed', section: 'TOOL & CUT' },
     { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: CONTOUR_DEFAULTS.plunge, label: 'Plunge', section: 'TOOL & CUT' },
 ];

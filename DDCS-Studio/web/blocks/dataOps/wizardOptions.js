@@ -36,3 +36,8 @@ export const DRILL_PATTERN_OPTIONS = [
 export const SURFACING_STRATEGY_OPTIONS = [
     ['Parallel (raster)', 'parallel'], ['Concentric', 'concentric'],
 ];
+
+// t842 — DEPTH ENTRY (the per-level descent), shared by the clearing-family twins (pocket declares its own local copy).
+// Plunge = straight down (default, byte-identical). Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix.
+export const ENTRY_OPTIONS = [['Plunge (straight)', 'plunge'], ['Ramp', 'ramp'], ['Helix', 'helix']];
+export const ENTRY_OPTIONS_NO_HELIX = [['Plunge (straight)', 'plunge'], ['Ramp', 'ramp']];   // a profile trace (contour) can't helix without gouging the interior

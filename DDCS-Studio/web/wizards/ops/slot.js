@@ -8,7 +8,7 @@
  * SlotWizard and this block both emit through it, so they're one implementation (like drill = array(bore)).
  */
 import { num, r3 } from './util.js';
-import { depthLevels } from '../clearing.js';
+import { depthLevels, entryOrPlunge } from '../clearing.js';
 import { pointsBBox } from './placement.js';
 
 /** Slot toolpath: clearance preamble + zig-zag offset passes stepping down (+ zero-length single-plunge guard). */
@@ -35,6 +35,12 @@ export function slotPath(p) {
     if (band < 1e-6) offs.push(0);
     else { const half = band / 2; for (let o = -half; o < half - 1e-6; o += so) offs.push(o); offs.push(half); }
 
+    // t842 — DEPTH ENTRY: ramp runs along the slot LENGTH (the pass direction, not toward-centre); a helix must fit the
+    // slot WIDTH (helix + tool ≤ width/2) — a tool-width slot degrades to plunge with a why. Plunge (default) = byte-identical.
+    const entry = p.entry || 'plunge';
+    const wantR = num(p.helixDia, 0) > 0 ? num(p.helixDia, 0) / 2 : tool / 2;
+    const helixMaxR = width / 2 - tool / 2, helixR = Math.max(0.2, Math.min(wantR, helixMaxR));
+    let prevD = 0;
     for (const d of levels) {
         const z = -d;
         L.push(`( level Z${r3(z)} )`);
@@ -42,20 +48,28 @@ export function slotPath(p) {
         for (const o of offs) {
             let sx = x0 + nx * o, sy = y0 + ny * o, ex = x1 + nx * o, ey = y1 + ny * o;
             if (dir < 0) { [sx, ex] = [ex, sx];[sy, ey] = [ey, sy]; }
-            if (first) { L.push(`G0 X${r3(sx)} Y${r3(sy)}`, `G1 Z${r3(z)} F${plunge}`); first = false; }
+            if (first) {
+                const ctx = { entry, z, prevZ: -prevD, rampAngle: num(p.rampAngle, 3), feed,
+                    runX: ex - sx, runY: ey - sy, runLen: len,                                   // ramp along the pass (the slot length)
+                    helixR, helixPitch: num(p.helixPitch, 1), maxHelixR: helixMaxR,
+                    cx: sx + helixR * (ex - sx) / len, cy: sy + helixR * (ey - sy) / len };       // helix centred R into the slot (stays inside)
+                L.push(...entryOrPlunge(ctx, sx, sy, [`G0 X${r3(sx)} Y${r3(sy)}`, `G1 Z${r3(z)} F${plunge}`]));
+                first = false;
+            }
             else L.push(`G1 X${r3(sx)} Y${r3(sy)} F${feed}`);   // step across to the next pass
             L.push(`G1 X${r3(ex)} Y${r3(ey)} F${feed}`);
             dir = -dir;
         }
         L.push(`G0 Z${clr}`);
+        prevD = d;
     }
     return L;
 }
 
 export const slotBlock = {
     type: 'slot', label: 'Slot', kind: 'leaf', category: 'Toolpaths',
-    defaults: { x0: 0, y0: 0, x1: 60, y1: 0, width: 6, tool: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5 },
-    fields: ['x0', 'y0', 'x1', 'y1', 'width', 'tool', 'stepoverPct', 'depth', 'stepdown', 'feed', 'plunge', 'clearance'],
+    defaults: { x0: 0, y0: 0, x1: 60, y1: 0, width: 6, tool: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, feed: 600, plunge: 150, clearance: 5 },
+    fields: ['x0', 'y0', 'x1', 'y1', 'width', 'tool', 'stepoverPct', 'depth', 'stepdown', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'feed', 'plunge', 'clearance'],
     emit: (p, dx = 0, dy = 0) => slotPath({
         ...p,
         x0: num(p.x0, 0) + dx, y0: num(p.y0, 0) + dy,

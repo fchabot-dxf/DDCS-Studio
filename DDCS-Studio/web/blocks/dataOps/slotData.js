@@ -25,13 +25,14 @@ import { userOpFromStack } from '../userOps.js';
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
 import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
-import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy)
+import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, ENTRY_OPTIONS } from './wizardOptions.js';   // t722 P2a rider — one-source (was a local copy); t842 ENTRY_OPTIONS
 
 /** Author defaults — match slotStack's num() fallbacks. width default == toolDia (a slot is ≥ tool wide). pattern:'single'
  *  (bare leaf, no array) + optIn:true (slot is an opt-in/absolute placement op — the seed must carry it). */
 export const SLOT_DEFAULTS = {
     pattern: 'single', optIn: true,
     ax: 0, ay: 0, bx: 60, by: 0, width: 6, toolDia: 6, stepoverPct: 40, depth: 4, stepdown: 1.5,
+    entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1,   // t842 — depth entry (plunge default = byte-identical)
     feed: 600, plunge: 150, clearance: 5, wcs: 'active',
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
@@ -73,6 +74,11 @@ const SLOT_EXEC_BINDINGS = [
     { param: 'stepoverPct', blockIndex: 3, key: 'stepoverPct', type: 'number', default: SLOT_DEFAULTS.stepoverPct },
     { param: 'depth', blockIndex: 3, key: 'depth', type: 'number', default: SLOT_DEFAULTS.depth },
     { param: 'stepdown', blockIndex: 3, key: 'stepdown', type: 'number', default: SLOT_DEFAULTS.stepdown },
+    // t842 — DEPTH ENTRY cluster: ramp runs along the slot length; a helix needs the slot to be wider than the tool (else degrades).
+    { param: 'entry', blockIndex: 3, key: 'entry', type: 'enum', default: SLOT_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle, ALONG the slot length (degrades to plunge on a slot shorter than the ramp needs). Helix = a descending helix (needs a slot wider than the tool; else degrades).' },
+    { param: 'rampAngle', blockIndex: 3, key: 'rampAngle', type: 'number', default: SLOT_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal).' },
+    { param: 'helixDia', blockIndex: 3, key: 'helixDia', type: 'number', default: SLOT_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped to the slot width; a tool-width slot degrades to plunge.' },
+    { param: 'helixPitch', blockIndex: 3, key: 'helixPitch', type: 'number', default: SLOT_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev).' },
     { param: 'feed', blockIndex: 3, key: 'feed', type: 'number', default: SLOT_DEFAULTS.feed },
     { param: 'plunge', blockIndex: 3, key: 'plunge', type: 'number', default: SLOT_DEFAULTS.plunge },
 ];

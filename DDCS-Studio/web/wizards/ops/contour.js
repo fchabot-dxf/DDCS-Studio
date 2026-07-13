@@ -84,9 +84,23 @@ export function contourRegion(p) {
 
 /** Crisp circular contour: rapid to the rim, plunge, one full G3 circle, retract. Exported so the FLAT twin atom
  *  (contourfill — the region-pill→flat reframe) reuses the EXACT circle emit → byte-identical to this region-socket atom. */
-export function circleTrace(rg, z, clr, feed, plunge) {
+export function circleTrace(rg, z, clr, feed, plunge, entry, prevZ, rampAngle) {
     const x = r3(rg.cx + rg.r), y = r3(rg.cy);
-    return [`G0 Z${r3(clr)}`, `G0 X${x} Y${y}`, `G1 Z${r3(z)} F${plunge}`, `G3 X${x} Y${y} I${r3(-rg.r)} J0 F${feed}   ( contour )`];
+    const L = [`G0 Z${r3(clr)}`, `G0 X${x} Y${y}`];
+    const drop = (prevZ != null ? prevZ : 0) - z;
+    if (entry === 'ramp' && rg.r > 1e-6 && drop > 1e-6) {
+        // t842 — a circle profile has no straight "first segment": ramp = a HELICAL descent AROUND the circle (the standard
+        // circular lead-in), revs sized so the per-rev descent stays ≤ the ramp angle, then a flat finishing pass.
+        const ang = Math.min(45, Math.max(0.5, num(rampAngle, 3)));
+        const perRev = 2 * Math.PI * rg.r * Math.tan(ang * Math.PI / 180);
+        const revs = Math.max(1, Math.ceil(drop / perRev));
+        L.push(`G0 Z${r3(prevZ)}`);
+        for (let i = 1; i <= revs; i++) L.push(`G3 X${x} Y${y} I${r3(-rg.r)} J0 Z${r3(prevZ - drop * i / revs)} F${feed}   ( ramp )`);
+        L.push(`G3 X${x} Y${y} I${r3(-rg.r)} J0 F${feed}   ( contour )`);
+        return L;
+    }
+    L.push(`G1 Z${r3(z)} F${plunge}`, `G3 X${x} Y${y} I${r3(-rg.r)} J0 F${feed}   ( contour )`);
+    return L;
 }
 
 export const contourBlock = {

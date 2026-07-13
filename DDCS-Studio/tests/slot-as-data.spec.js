@@ -76,6 +76,10 @@ test('slot-as-data: byte-identical G-code to slotStack across a param sweep + bi
       { param: 'stepoverPct', blockIndex: 3, key: 'stepoverPct' },
       { param: 'depth', blockIndex: 3, key: 'depth' },
       { param: 'stepdown', blockIndex: 3, key: 'stepdown' },
+      { param: 'entry', blockIndex: 3, key: 'entry' },            // t842 — depth entry
+      { param: 'rampAngle', blockIndex: 3, key: 'rampAngle' },
+      { param: 'helixDia', blockIndex: 3, key: 'helixDia' },
+      { param: 'helixPitch', blockIndex: 3, key: 'helixPitch' },
       { param: 'feed', blockIndex: 3, key: 'feed' },
       { param: 'plunge', blockIndex: 3, key: 'plunge' },
     ];
@@ -107,7 +111,7 @@ test('slot-as-data: byte-identical G-code to slotStack across a param sweep + bi
   expect(r.resolves, 'slot-as-data resolves via builderOf').toBe(true);
   expect(r.independentPath, 'data builder is NOT slotStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
-  expect(r.bindingCount, 'all bindable slot params are bound').toBe(21);
+  expect(r.bindingCount, 'all bindable slot params are bound (t842 +4 depth-entry: entry/rampAngle/helixDia/helixPitch)').toBe(25);
   expect(r.wiringFails, 'every binding routes to the same socket slotStack uses').toEqual([]);
   if (!r.main.pass) console.log('FIRST DIFF @', JSON.stringify(r.main.firstDiff && r.main.firstDiff.params) + '\n--- slotStack ---\n' + (r.main.firstDiff && r.main.firstDiff.a) + '\n--- data def ---\n' + (r.main.firstDiff && r.main.firstDiff.b));
   expect(r.main.count, 'the sweep is substantial').toBeGreaterThan(12);

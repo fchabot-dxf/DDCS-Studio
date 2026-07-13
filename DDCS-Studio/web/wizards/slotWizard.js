@@ -53,6 +53,7 @@ export function slotStack(params = {}) {
         x0: num(params.ax, 0), y0: num(params.ay, 0), x1: num(params.bx, 60), y1: num(params.by, 0),
         width: num(params.width, num(params.toolDia, 6)), tool: num(params.toolDia, 6),
         stepoverPct: num(params.stepoverPct, 40), depth: num(params.depth, 4), stepdown: num(params.stepdown, 1.5),
+        entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3), helixDia: num(params.helixDia, 0), helixPitch: num(params.helixPitch, 1),   // t842 — depth entry
         feed: num(params.feed, 600), plunge: num(params.plunge, 150), clearance: num(params.clearance, 5),
     };
     // Repeat the slot in a pattern: wrap it in an Array container (origin 0,0 → offsets), exactly like drill = array(hole).

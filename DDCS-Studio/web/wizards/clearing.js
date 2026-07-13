@@ -33,13 +33,27 @@ export function levelEntry(mode, o) {
     if (!(drop > 1e-6)) return { ok: false };   // no descent this level → let the kernel plunge (defensive)
     if (mode === 'ramp') {
         const ang = Math.min(45, Math.max(0.5, num(o.rampAngle, 3))), run = drop / Math.tan(ang * Math.PI / 180);
-        const toC = Math.hypot(cx - x0, cy - y0);
-        if (!(toC >= run)) return { ok: false, why: `ramp ${r3(ang)}deg needs ${r3(run)}mm, first move ${r3(toC)}mm -> plunge` };
-        const t = run / toC, mx = x0 + t * (cx - x0), my = y0 + t * (cy - y0);
+        let mx, my;
+        if (o.runX != null && o.runY != null) {
+            // t842 — a DECLARED run vector: a SLOT ramps along its LENGTH, a CONTOUR along its FIRST SEGMENT (toward-centre
+            // is geometrically wrong for those). `runLen` = the run available that way; too short → degrade with the why.
+            const rl = Math.hypot(o.runX, o.runY) || 1, avail = num(o.runLen, rl);
+            if (!(avail >= run)) return { ok: false, why: `ramp ${r3(ang)}deg needs ${r3(run)}mm along the run, have ${r3(avail)}mm -> plunge` };
+            mx = x0 + run * o.runX / rl; my = y0 + run * o.runY / rl;
+        } else {
+            // toward the region CENTRE (pocket/surfacing area-fill) — unchanged, byte-identical
+            const toC = Math.hypot(cx - x0, cy - y0);
+            if (!(toC >= run)) return { ok: false, why: `ramp ${r3(ang)}deg needs ${r3(run)}mm, first move ${r3(toC)}mm -> plunge` };
+            const t = run / toC; mx = x0 + t * (cx - x0); my = y0 + t * (cy - y0);
+        }
         return { ok: true, lines: [`G0 X${r3(x0)} Y${r3(y0)}`, `G0 Z${r3(prevZ)}`, `G1 X${r3(mx)} Y${r3(my)} Z${r3(z)} F${feed}   ( ramp )`, `G1 X${r3(x0)} Y${r3(y0)} F${feed}`] };
     }
     if (mode === 'helix') {
-        const R = Math.max(0.2, num(o.helixR, 3)), pitch = Math.max(0.1, num(o.helixPitch, 1));
+        // t842 — honest fit: when the op declares a max helix radius it can hold (a narrow slot), a helix that needs more
+        // room degrades to the plunge with a why (the ramp precedent). Absent maxHelixR (pocket/surfacing) → unchanged.
+        if (o.maxHelixR != null && !(o.maxHelixR >= 0.2)) return { ok: false, why: `helix needs room the geometry lacks -> plunge` };
+        const cap = o.maxHelixR != null ? Math.min(num(o.helixR, 3), o.maxHelixR) : num(o.helixR, 3);
+        const R = Math.max(0.2, cap), pitch = Math.max(0.1, num(o.helixPitch, 1));
         const pts = helixPoints({ cx, cy, radius: R, depth: drop, pitch, seg: 24 });   // p.z ∈ (0,−drop] → world prevZ+p.z ∈ [prevZ, z]
         const L = [`G0 X${r3(cx + R)} Y${r3(cy)}`, `G0 Z${r3(prevZ)}`];
         for (const p of pts) L.push(`G1 X${r3(p.x)} Y${r3(p.y)} Z${r3(prevZ + p.z)} F${feed}`);
@@ -55,7 +69,7 @@ const num = (v, d) => { const n = Number(v); return isFinite(n) ? n : d; };
  *  plunge with a `( why )` comment (the honest greyed-ramp case). ctx carries {entry, cx, cy, z, prevZ, rampAngle, helixR, helixPitch, feed}. */
 export function entryOrPlunge(ctx, x0, y0, plungeLines) {
     if (ctx && ctx.entry && ctx.entry !== 'plunge') {
-        const e = levelEntry(ctx.entry, { x0, y0, cx: ctx.cx, cy: ctx.cy, z: ctx.z, prevZ: ctx.prevZ, rampAngle: ctx.rampAngle, helixR: ctx.helixR, helixPitch: ctx.helixPitch, feed: ctx.feed });
+        const e = levelEntry(ctx.entry, { x0, y0, cx: ctx.cx, cy: ctx.cy, z: ctx.z, prevZ: ctx.prevZ, rampAngle: ctx.rampAngle, helixR: ctx.helixR, helixPitch: ctx.helixPitch, feed: ctx.feed, runX: ctx.runX, runY: ctx.runY, runLen: ctx.runLen, maxHelixR: ctx.maxHelixR });
         if (e && e.ok) return e.lines;
         if (e && e.why) return [`( ${e.why} )`, ...plungeLines];
     }
@@ -160,7 +174,14 @@ export function contourLevel(contours, ctx) {
     const L = [];
     for (const c of contours) {
         if (c.length < 2) continue;
-        L.push(`G0 Z${r3(clr)}`, `G0 X${r3(c[0].x)} Y${r3(c[0].y)}`, `G1 Z${r3(z)} F${plunge}`);
+        L.push(`G0 Z${r3(clr)}`);
+        // t842 — depth entry at the ring start: ramp along the FIRST SEGMENT c[0]→c[1] (a profile lead-in). ctx.entry absent
+        // (pocket wall finish / a plain contour) → the exact plunge, byte-identical. Contour offers NO helix (it would gouge
+        // the profile interior) so only ramp is threaded here.
+        const ec = ctx.entry && ctx.entry !== 'plunge'
+            ? { ...ctx, runX: c[1].x - c[0].x, runY: c[1].y - c[0].y, runLen: Math.hypot(c[1].x - c[0].x, c[1].y - c[0].y) }
+            : ctx;
+        L.push(...entryOrPlunge(ec, c[0].x, c[0].y, [`G0 X${r3(c[0].x)} Y${r3(c[0].y)}`, `G1 Z${r3(z)} F${plunge}`]));
         for (let i = 1; i < c.length; i++) L.push(`G1 X${r3(c[i].x)} Y${r3(c[i].y)} F${feed}`);
         L.push(`G1 X${r3(c[0].x)} Y${r3(c[0].y)} F${feed}`);
     }
