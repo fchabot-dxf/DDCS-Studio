@@ -3567,3 +3567,64 @@ w6 speed for the other 1209).
 proc-health: clean, 0 flagged. Zero asserts weakened, zero isolation changes, no retries. Diff = playwright.config.js (workers
 6→4) only; the clustering spike was reverted (measured, but the bottleneck is CPU not the server loop count, so it added
 complexity for no gain).
+
+
+## 2026-07-13 (t838) — BACKLOG 1: THE PRE-FLIGHT ENVELOPE CHECK (the safety story's third layer — warn BEFORE motion).
+
+Studio warns before motion; the controller's soft limit faults AT motion; the switch is physics. GROUND-FIRST + declare-
+never-infer: the check is a THIN consumer of what the sim already computes — ONE frame implementation, never a second.
+
+### GROUNDING (4 parallel Explore agents) — the reuse targets
+
+- `traceToolpath(program, opts)` (engine/trace.js:22) — THE one line-numbered trace every preview uses; each segment carries
+  `line` (0-based source line), `probe`/`type` (G31), work-frame coords.
+- work→machine = `work + wcsOffsetAt(machine, active)` (viz/sceneFrame.js) — THE one frame map (trace coords are already
+  mm-scaled → no unit division). Declared-placement predicate = the sim's OWN (createPreviewPanel g53ApproxForViz): a
+  non-empty `machine.wcs.table`.
+- envelope per axis = `axisSpan(machine.x/.y/.z)` (engine/limitSwitches.js) → {lo,hi} from the SIGNED travel (z:-120 homes at
+  top). No stored {xMin..}; computed.
+- badge precedent = the xform-badge (editorOpHover.js) + the editor-statusbar; program-change hook = programModel.onChange;
+  jump-to-line = editorManager._scrollToLine; send chokepoint = send.js submitJob; confirm = dlgConfirm (ui/dialog.js).
+
+### BUILT
+
+1. **engine/envelopeCheck.js** (NEW, pure) — `checkEnvelope(program, settings)` → `{status, violations:[{line(1-based),
+   axis:'Z+'…,overshoot mm}], uncheckedProbes, reason}`. Traces via traceToolpath, maps each segment endpoint to the machine
+   frame (work+wcsOffset), tests vs axisSpan, dedups line|axis keeping the worst overshoot. DECLARED → full check; UNDECLARED
+   (no WCS table) → **amber "cannot verify"** (never false-green, never a guess); **G31 probe segments** are trip-dependent →
+   COUNTED + NAMED as unchecked, the deterministic moves around them checked.
+2. **ui/preflightBadge.js** (NEW) — the editor badge: GREEN "fits" / AMBER "can't verify (why)" / RED "N outside envelope".
+   Click → the violation list; a row-click → `editorManager.revealLine(line)` (scroll + flash). Subscribes to
+   programModel.onChange + editor input (debounced 250ms) + ddcs:settings-changed. Tooltip/pop name the probe class + (bonus)
+   a disabled soft-limit. Wired in app.js (like the minimap).
+3. **ui/editorManager.js** — a PUBLIC `revealLine(line1Based)` (scroll + flash) reusing the existing _scrollToLine/flashLine.
+4. **ui/gateway/views/send.js** — a PRE-FLIGHT CONFIRM before `submitJob`: red → `dlgConfirm(... danger, Send anyway/Cancel)`.
+   ASK, never silently block (the machine is the user's); advisory (a checker error never blocks the send).
+5. **ui/settingsPanel.js** (bonus) — persist the pulled `softLimitEnabled` → `machine.softLimitsPulled` (2 candidate builders
+   + 1 apply line) so the badge can flag "soft limits DISABLED on your controller — Studio is your only guard" (the user hit
+   exactly this).
+6. **styles.css** — the badge pill (green/amber/red) + popover, theme-token (`--panel/--text/--border`) → legible both themes.
+
+### VERIFIED (real symptom)
+
+- **engine test** `envelope-check-838.spec.js` (5): RED reports exact line+axis+overshoot (Z+3 climb = the user crash);
+  GREEN in-envelope; AMBER undeclared with a why; PROBE deterministic-checked + G31 counted-unchecked; PROBE + a real rapid
+  breach = red AND the probe still counted.
+- **UI test** `preflight-badge-838.spec.js` (6): red badge + list names line 62 · Z+ · 3.0mm, row-click SCROLLS the editor
+  (jump-to-line asserted); green "fits"; amber; the SEND CONFIRM (mounted the real send view + mock client — cancel aborts
+  submitJob, green sends without asking); the probe + soft-limit NOTES; THEME screenshots (dark + light) VIEWED — badge +
+  popover legible + theme-adapting in both.
+- READ-ONLY feature: no emit touched → byte goldens untouched (the gate confirms below).
+
+### NOTES / v1 scope (flagged for review)
+
+- The check uses the CONTROLLER's declared WCS offset (wcsOffsetAt = the G54 table row) as the machine truth — the sim's
+  display-seating (simWcsOffset seats an absolute-mill stock on the table for a coherent preview) is a VIEW convenience, not
+  used for the check. Correct: the controller moves by the WCS table, so that is what we verify against.
+- Single active-WCS framing: a program that SWITCHES WCS mid-run (G54→G55) is framed by the active WCS throughout (v1). Multi-
+  WCS re-framing is a refinement if it matters.
+
+### GATE (w4, full log — no tail truncation)
+
+VERBATIM: 1225 passed / 0 failed / 2 skipped (11.6m, 696s). +11 vs t836 baseline 1214 = the 11 new pre-flight
+tests; NO regressions, NO failure blocks; the read-only feature left byte goldens untouched. w4 held reliably green.
