@@ -3268,3 +3268,42 @@ middleWizard.js (machineLift + warning removed) · web/wizards/ops/probeSurface.
 web/blocks/blockEmitter.js (uniquifySafeRetractLabels) · web/blocks/opSession.js (revert saferetract renumber) · tests:
 corner-draw-anchor, corner-z-trust, safe-z-retract-822, middle-reposition-refactor (golden regen), safez-frame,
 probe-surface-block (CORNER_GOLDEN regen), autostart-stored-macro (#520 seed in the expected). SUITE: 1214 passed, 2 skipped, 0 FAILED (workers=2) — failed count checked EXPLICITLY (per the new memory), not the tail.
+
+## 2026-07-13 (t828) — MINIMAP PLACEMENT RIDERS (user t823 screenshot, ratified) — small CSS/placement turn
+
+Two cosmetic riders on the t810 g-code minimap. Grounded by INSPECTING the live layout + screenshots (not just reading).
+
+### RIDER 2 — the strip FLUSH to the pane edge (was a 30px dark gap in editor-only)
+
+`--gm-right` defaulted to the pull-tab inset `var(--gm-tab)` (30px) EVERYWHERE, incl. editor-only where nothing needs
+dodging. Fix: `--gm-right` defaults to `--gm-flush` (2px — a sliver; the editor-layer uses OVERLAY scrollbars, measured
+offsetWidth==clientWidth so there is no layout scrollbar to clear); the 30px inset now applies ONLY in SPLIT view (the
+existing `:has(.viz3d-drawer.open)` rule, where the tab rides the drawer edge at the strip's position — t812 clearance KEPT).
+Flushing surfaced two z/overlap conflicts, both fixed:
+- The top-right COPY button (z3) sat inside the flushed strip's x-range -> bumped `.editor-copy-float` to z5 (a small
+  overlay on the map's corner, still clickable).
+- The vertically-centred PULL-TAB (z6) overlapped the flush strip's middle -> in editor-only (`.has-minimap` + drawer
+  closed) the tab now sits at the strip's LEFT edge (`right: gm-w+4`), clear of the map; when the drawer OPENS the later
+  `.viz3d-handle.open` rule (same specificity, wins on source order) moves it back to the drawer edge. NOTE: my first cut
+  used `:not(:has(...))` which didn't apply (nested :has); the plain `.has-minimap .viz3d-handle` + source-order override works.
+
+### RIDER 1 — the toggle OFF the Copy cluster (was one mis-tap from Copy)
+
+The advisor LEANED the 👁 visibility family, but it is INFEASIBLE for the minimap: the 👁 button lives on the PREVIEW
+toolbar (createPreviewPanel.js:101) — NOT reachable in editor-only view where the minimap lives — and the modal is
+preview-specific ("Show in preview" + alpha sliders), an editor-overview toggle does not belong there. So the other
+sanctioned option (the strip): the ▤ toggle moves to the TOP just LEFT of the strip — a real touch-target (>44px) clear of
+Copy at the far corner, over the usually-empty top-right of the code, clickable there and reachable when the strip is
+hidden (`--gm-w` holds). (First tried the strip's BOTTOM but it is covered by the panel resize `.header-handle` — a click
+timeout proved it; moved to the top-left.)
+
+### ACCEPTANCE (gcode-minimap-810 the t812-rider test → t828, 8/8)
+
+editor-only: the strip's right edge == the pane right edge (rightGap < 6px, was 30) ASSERTED; the pull-tab never overlaps
+the flush strip (moved to the strip left) ASSERTED; the ▤ toggle > 44px (a real touch-target) from the Copy button ASSERTED;
+Copy stays visible (z5). SPLIT view: the strip sits well left of the window edge (hugs the text pane, t812 clearance) —
+the existing guard, still green. Screenshots both views (scratchpad/minimap-editoronly-828.png + -split-828.png), eyeballed:
+strip flush, Copy alone top-right, the toggle a distinct button left of the strip, the tab at the strip's left-middle clear of the map.
+
+Files: web/styles.css (--gm-flush default + split-only inset + Copy z5 + pull-tab-left + toggle top-left-of-strip),
+tests/gcode-minimap-810.spec.js (the t812-rider test rewritten to t828 flush/toggle/tab-clear + screenshots). SUITE: 1214 passed, 2 skipped, 0 FAILED (workers=2) — failed count checked explicitly.
