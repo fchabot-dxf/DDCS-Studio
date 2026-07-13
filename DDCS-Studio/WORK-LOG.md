@@ -3672,3 +3672,67 @@ marker, Blocks round-trip, sim preview, byte-identical-when-unset) is already bu
 
 VERBATIM: 1228 passed / 0 failed / 2 skipped (11.6m, 698s). +3 vs t838 baseline 1225 = the 3 new alignment-
 correction tests; NO regressions, NO failure blocks; transform/alignment goldens byte-identical.
+
+
+## 2026-07-13 (t842) — BACKLOG 3: DEPTH ENTRY EVERYWHERE (the t804 plunge/ramp/helix trio → SLOT, CONTOUR, SURFACING).
+
+GROUND-FIRST (3 parallel Explore agents) reshaped the work: t804 already wired the KERNEL seam (levelEntry/entryOrPlunge in
+clearing.js) for pocket + surfacing (via fillStrategy) + wired it dormant elsewhere; the ramp ran ONLY toward the region
+centre (cx,cy) with no direction param. So the residue: extend the seam with a per-op RUN VECTOR, wire ctx.entry per op,
+add the form cluster to the three twins, and honour each op's honest geometry.
+
+### THE SHARED ENABLER — levelEntry + entryOrPlunge (clearing.js), byte-identical for pocket/surfacing
+
+- `levelEntry` RAMP: an optional DECLARED run vector `{runX,runY,runLen}` — ramp ALONG it (slot length / contour first
+  segment) instead of toward-centre; absent → the exact toward-centre path (pocket/surfacing) UNCHANGED, byte-identical.
+- `levelEntry` HELIX: an optional `maxHelixR` — clamps the radius, and DEGRADES to plunge with a why when the geometry
+  can't hold a helix (the "narrow slot" case, the ramp precedent); absent → unchanged (pocket clamps upstream).
+- `entryOrPlunge` threads the 4 new ctx fields (runX/runY/runLen/maxHelixR) → levelEntry. Undefined for pocket/surfacing.
+
+### SURFACING (form-only — already rides fillStrategy → the seam; area-fill → toward-centre ramp like pocket)
+
+Surfaced the entry params on the `surfacefill` leaf (defaults+fields incl. `by` from the StepDown scope + `toolDia` for the
+helix clamp), threaded them in `surfacingStack`, added the 4 when-gated bindings (Depth Entry / Ramp Angle° / Helix Ø mm /
+Helix Pitch mm-per-rev) to surfacingData. All 3 modes.
+
+### SLOT (kernel + form — its OWN descent; ramp along the LENGTH; helix needs width > tool)
+
+`slotPath` now calls `entryOrPlunge` at each level's first plunge with a ctx whose run vector = the pass direction (the
+slot AXIS x0,y0→x1,y1) and `maxHelixR = width/2 − tool/2` (helix centred R into the slot so it stays inside). A tool-width
+slot → maxHelixR ≤ 0 → helix DEGRADES to plunge with the why. Added the 4 fields to the slot leaf + slotStack + slotData.
+
+### CONTOUR (kernel + form — its OWN descent; ramp along the FIRST SEGMENT; NO helix)
+
+`contourLevel` ramps along the ring's first segment c[0]→c[1] (a profile lead-in); `circleTrace` ramps as a HELICAL
+descent around the arc (revs sized so the per-rev drop stays ≤ the angle) — a circle has no straight segment. contourfill.
+emit builds the entry ctx (prevZ = z + the StepDown `by`); wired through contourStack + contourData.
+- **DESIGN CALL (flagged) — contour offers PLUNGE + RAMP ONLY, no helix.** Decision-sieve gate 1 (correctness): a helix
+  removes a circular AREA, but a contour is a thin profile trace — a helix would GOUGE inside the profile (or the kept
+  boss, depending on the offset side). So helix is eliminated for contour (ENTRY_OPTIONS_NO_HELIX). A stray `helix` from the
+  GLOBAL Blockly `entry` dropdown is COERCED to plunge in contourfill.emit (no cx/cy in a contour ctx → would emit NaN).
+  This is a justified deviation from the advisor's "same fields on each twin" — the honest, safe choice for a profile.
+
+### ONE-SOURCE
+
+`ENTRY_OPTIONS` + `ENTRY_OPTIONS_NO_HELIX` declared in wizardOptions.js (the siblings share them; pocket keeps its local
+copy). The Blockly bridge `SELECTS.entry` was already global (no bridge change).
+
+### VERIFIED (real symptom) — depth-entry-everywhere-842.spec.js (5)
+
+- SURFACING: plunge byte-identical; ramp ≤ angle (3 levels); helix emits; twin binding round-trips.
+- SLOT: plunge byte-identical; ramp runs ALONG the slot (Δy≈0, +X); wide-slot helix fits; tool-width degrades with the why.
+- CONTOUR: plunge byte-identical; rect ramps along the first segment ≤ angle; circle = a descending G3 helical lead-in
+  (monotonic); NEVER emits a helix; twin offers plunge+ramp + coerces a stray helix safely (no NaN).
+- BYTE-IDENTITY regressions (72 passed): depth-entry-804 (pocket) + pocket-data-emit + pocket-e0-superset + contour-data-
+  emit + surfacing/slot/contour goldens — plunge default byte-identical, the seam's toward-centre path unchanged.
+- Binding-count guards updated for the 4 new bindings each: surfacing 18→22, slot 21→25 (legitimately bound, not weakened).
+  slot-as-data's hardcoded REF_BINDINGS routing map (asserts every binding routes to slotStack's socket) gained the 4 new
+  entries at blockIndex 3 (the slot leaf) — they ARE correctly wired (slotStack sets all 4); a completeness-map update.
+
+### GATE (w4, full log — no tail truncation)
+
+VERBATIM: 1231 passed / 2 failed / 2 skipped (11.6m, 698s). The 2 failures — carve-live-crisp-816 (a perf-median
+assertion) + io-home-backfill (a homing screenshot) — are the KNOWN w4 CPU-CONTENTION class (t836); BOTH pass ISOLATED
+(5 passed), are UNRELATED to depth-entry, and the box ran loaded (concurrent session). My change: byte-identical on all
+plunge defaults + 5 new tests + 72 op-regressions green. (The prior gate's lone failure, slot-as-data's routing map, is
+fixed above — not in this run.) The advisor re-runs on a quiet box for the release gate.
