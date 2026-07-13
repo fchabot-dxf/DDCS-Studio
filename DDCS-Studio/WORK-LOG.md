@@ -3307,3 +3307,53 @@ strip flush, Copy alone top-right, the toggle a distinct button left of the stri
 
 Files: web/styles.css (--gm-flush default + split-only inset + Copy z5 + pull-tab-left + toggle top-left-of-strip),
 tests/gcode-minimap-810.spec.js (the t812-rider test rewritten to t828 flush/toggle/tab-clear + screenshots). SUITE: 1214 passed, 2 skipped, 0 FAILED (workers=2) — failed count checked explicitly.
+
+## 2026-07-13 (t830) — STRUCTURAL SUITE DIET: MEASURE (arc turn 1/2). Both proposed levers RE-DIAGNOSED; no code shipped.
+
+Advisor: land MEASURE + the biggest lever first, pass back the numbers (2-turn arc); the FULL suite STAYS the release
+gate. I MEASURED thoroughly and it REDIRECTS the plan — so this turn ships the numbers + a re-diagnosis, no code (both
+proposed levers were tried and each has a blocker). FAILED count read EXPLICITLY on every run [[check-suite-failed-count-not-just-tail]].
+
+### MEASURE (the numbers)
+
+- SCALE: 1216 tests in 511 files (~2.4/file). Box = 24 CPU cores, 4% idle load (quiet). os.loadavg() = [0,0,0] (Windows).
+- PER-TEST FIXED "BOOT" OVERHEAD: 12 trivial tests (fresh context + goto + `window.ddcsStudio` ready + trivial body) =
+  11.1s at w1 → ~0.93s/test. A WARM goto ALONE is ~97ms (median-5, one reused page). So the 0.93s is the Playwright
+  per-test CONTEXT + the app LOAD (346 ESM modules fetched+parsed each boot), not the goto. ×1216 ≈ 19min single-threaded
+  of pure boot overhead — the advisor's "redundant boots" CONFIRMED as the dominant cost.
+- THE SERVER: the test webServer is ONE `npx http-server ./web` process; each boot pulls ~100s of the 346 web/*.js modules.
+- BASELINE: full suite = 21min at workers=2, 0 failed.
+
+### LEVER 3 (load-aware workers) — BUILT, MEASURED, DISPROVEN → removed
+
+I built scripts/run-suite.cjs (CPU-load-sampled worker pick) and MEASURED the full suite at workers=4 on the QUIET box:
+**1269s = 21.2min, 17 FAILED.** Same wall-clock as w2, WORSE reliability. The 17 failures are ~all
+`waitForFunction Timeout 5000ms` — BOOT timeouts. Mechanism: w4 achieved ~3.8× parallelism (sum of durations 4790s /
+1269s), but each boot took ~2× LONGER under contention on the single http-server (346 concurrent-ish module fetches × 4
+workers), so the parallelism is exactly cancelled → NO wall speedup + boot timeouts. The suite is DEV-SERVER/BOOT-BOUND,
+NOT CPU-bound → adding workers cannot help; it hurts. Removed the runner (shipping a non-lever would mislead).
+
+### LEVER 2 (shared app load) — PILOTED, works mechanically, but NOT free → reverted the pilot
+
+Piloted the per-file shared-boot on the heaviest file (cam-slot-sim, 21 PURE tests: import + trace + assert, no visible
+state mutation): wrapped in `test.describe.serial` + a beforeAll ONE-boot + shared page, per-test goto removed. Test 1
+PASSED and the file's boot cost collapsed (21 boots → 1). BUT test 2 (corner probe slot) FAILED — and it fails run ALONE
+in the shared describe, so it is NOT a bleed from test 1: its trace-direction result DIFFERS between a fresh per-test goto
+and the beforeAll page (which waited for `ddcsGetBlockProgram` — a MORE-initialized app). So even a "pure" file can be
+INIT-STATE-SENSITIVE: the tests silently rely on the exact just-after-goto init the per-test boot gives. Reverted the file.
+CONCLUSION: shared-boot is real (~0.9s × ~705 removable boots ≈ 11min single-threaded of headroom) but is a per-file,
+green-gated, sometimes-fix-the-test job — NOT a bulk transform. This is EXACTLY the advisor's "never weaken isolation
+silently; any state-bleed suspicion → opts back out" — and it bites even on files that look pure.
+
+### RE-DIAGNOSIS + RECOMMENDATION (advisor to rule turn 2)
+
+The ≤10min target CANNOT come from workers (server-bound). It must attack the BOOT: either (A) make each boot cheaper —
+fewer server round-trips per boot (a test-time bundle that PRESERVES the tests' path-based dynamic imports, or a
+concurrent/HTTP-caching server + a worker-scoped browser context so a worker's tests reuse the module cache) — which
+speeds up EVERY boot with NO per-file isolation risk; or (B) shared-boot rolled FILE-BY-FILE with green-gating + fixing
+the init-sensitive tests (laborious; some files will opt out). I RECOMMEND probing (A) first (broad, low-isolation-risk),
+with (B) as the targeted follow-on for boot-heavy files that are genuinely pure. A smoke tier (if built) gates MID-TURN
+iteration only; the full suite stays the release gate. Passing back the numbers for the re-ruling before I invest turn 2.
+
+No code shipped (measurements + reverts). SUITE unchanged (21min@w2, 0 failed — the released gate). NOTE: I did NOT re-run
+the full green gate this turn (no code changed); the last green full run was t828 (1214 passed, 0 failed, verified).
