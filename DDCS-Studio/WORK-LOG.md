@@ -3628,3 +3628,47 @@ never-infer: the check is a THIN consumer of what the sim already computes — O
 
 VERBATIM: 1225 passed / 0 failed / 2 skipped (11.6m, 696s). +11 vs t836 baseline 1214 = the 11 new pre-flight
 tests; NO regressions, NO failure blocks; the read-only feature left byte goldens untouched. w4 held reliably green.
+
+
+## 2026-07-13 (t840) — BACKLOG 2: ALIGNMENT REAL CORRECTION (the settled t716 design — cheap now the machinery exists).
+
+The alignment wizard stays PURELY a measurer (probes the fence → the misalignment angle into #1512; never cuts). The
+correction = ONE new entry in the ⟳ Transform modal: the user TYPES the measured angle read off the controller, and it
+writes the SAME declared program-level xform the Transform modal already writes — so EVERYTHING downstream (badge, .nc
+marker, Blocks round-trip, sim preview, byte-identical-when-unset) is already built.
+
+### GROUNDING (docs + code)
+
+- The t716/t737 ruling (WORK-LOG/NEXT-SESSION): the pivot = the DATUM / WCS origin = (0,0) in work coords; UI wording
+  "Rotate program … about the datum"; v1 angle TYPED from the controller screen, pull-prefill LATER (note the seam).
+- The Transform modal (globalFunctions.js openTransformModal): two tabs (Align rotate / Position move); the Align pane's
+  "Rotate editor program" writes a flat `xform{angle,pivotX,pivotY}` at the TOP of the stack via `makeXform` +
+  `ddcsLoadBlockStack` (replace-never-nest; angle 0 → DROP → byte-identical). The .nc program-marker slot (t812) carries
+  it; Blocks round-trips it; the emitter applies it once (applyProgramTransform).
+
+### BUILT (globalFunctions.js only — 56/-10)
+
+1. Extracted **`writeXformDeclaration(ed, angle, px, py)`** — the ONE xform writer (replace-never-nest; angle 0 → drop).
+   Refactored the Align pane's apply (data-rgo) to call it, and the new alignfix entry calls it too → the declaration is
+   written in exactly ONE place (declare-never-infer / one-source).
+2. Added a THIRD tab **"📐 Alignment fix"** (buildAlignFixPane): a note (the alignment probe MEASURES the skew into #1512;
+   it only measures — read it off the controller and type it; Studio rotates the whole program ABOUT THE DATUM to match;
+   DDCS has no G68 so Studio rewrites every XY move + arc; simulate first) + a signed angle field (deg, sane clamp ±45,
+   prefilled from a current datum-rotation) + Apply → `writeXformDeclaration(ed, angle, 0, 0)` — rotate about the datum
+   (0,0). Raw-text fallback (no block program) mirrors the Align tab. Pull-prefill seam noted in the comment.
+   The alignment WIZARD is UNTOUCHED (no wizard file changed).
+
+### VERIFIED (real symptom)
+
+- `alignment-correction-840.spec.js` (3): (1) type 1.25 → the xform{angle 1.25, pivotX 0, pivotY 0} is declared at the top
+  AND every emitted XY position = the base one ROTATED 1.25° CCW ABOUT THE DATUM (numeric assert vs hand-computed, running
+  position tracker) + the badge shows 1.25° + the xform SURVIVES the .nc marker → reimport (programRotation) + ✕ clears →
+  BYTE-IDENTICAL; (2) typing 100 → clamped to +45; (3) THEME screenshots (dark + light) VIEWED — the pane legible + adapting.
+- REGRESSIONS (16 passed): transform-declared-736 + transform-modal + align-rotate-gui + rotate-atom (the writeXform-
+  Declaration refactor is safe — the released rotate path unchanged) + alignment-data-emit + alignment-in-place (the
+  alignment WIZARD is BYTE-IDENTICAL — the acceptance's "alignment wizard byte-identical").
+
+### GATE (w4, full log — no tail truncation)
+
+VERBATIM: 1228 passed / 0 failed / 2 skipped (11.6m, 698s). +3 vs t838 baseline 1225 = the 3 new alignment-
+correction tests; NO regressions, NO failure blocks; transform/alignment goldens byte-identical.
