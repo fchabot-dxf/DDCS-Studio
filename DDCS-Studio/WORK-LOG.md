@@ -2763,3 +2763,58 @@ constructor + CSS; the prog marker is emit-gated on a set declaration → unset 
 Files: web/blocks/programModel.js (progMarkerLine + progBlocksFromMarker + import branch + the serialize split-fix),
 web/blocks/programFraming.js (makeEntry), web/styles.css (--gm-right rider geometry), tests/prog-marker-slot-812.spec.js
 (NEW), tests/gcode-minimap-810.spec.js (the rider guard). Commit 193ace6.
+
+## 2026-07-13 (t814) — E1.7 CARVE FIDELITY ROUND 2: (1) ANALYTIC-ARC CORNERS done · (2) live crisping SPLIT (measured why)
+
+The advisor dispatched two halves sharing the crisp mesher, with the explicit escape hatch: "if the perf budget forces a
+split, land (1) first and pass back the measured why." Commit 05a8cf9.
+
+### (1) ANALYTIC-ARC CORNERS — done (the user's red-circled corner)
+
+GROUND: the t730 crisp mesher (`_buildCrispCarveMesh`, marching-triangles over the heightmap) puts each wall iso-vertex
+on a CELL EDGE via `cross()` — a linear interp of the AA field h[] to the half-depth iso. The coverage-½ iso IS the
+analytic tool-offset boundary (the carve stamps `c = 0.5 + (r−d)/cell`, so c=0.5 ⇔ d=toolR), and at a corner that
+boundary is a true ARC of radius toolR about the TOOLPATH VERTEX. But the linear-interp crossing wanders up to a few
+cells off that arc → the visible facets.
+
+FIX: thread the FEED segments (in mesh coords) + toolR into the mesher (`_buildCarveArc`, stored on `this._carveArc`;
+fed by carveEndState + carveFinalize). In `cross()`, SNAP each crossing onto the exact circle when its CLOSEST toolpath
+feature is a VERTEX (a corner) at ≈ toolR: `P' = V + r·(P−V)/|P−V|`. The "closest feature is a vertex" test (not the
+distance band) is the guard — a straight wall's closest feature is a segment INTERIOR → left untouched (stays crisp).
+Zero grid cost (no refinement); shared-edge symmetry preserved (deterministic snap → watertight). Falls back to the
+plain crossing when no arc data (safe).
+
+VERIFY (carve-arc-814.spec.js 2/2 + carve regressions 21/21): the BL fillet of the t730 overlapping-raster pocket — the
+CURTAIN crossings (exact-XY rim+floor pairs, the true wall contour, isolated from floor/top grid corners) sit on the true
+circle (centre = the toolpath corner (30,20), r=3) with **max deviation 0.000mm** (< 0.1mm), sweeping > 55°; the diagonal
+groove's straight wall stays straight (RMS < 0.35, unchanged — the snap never touches a straight wall); t730 3/3 +
+stock-removal-app/core stay green. Measurement note: a COARSE bin (t730's 0.25mm) conflates a snapped crossing with an
+adjacent floor/top GRID CORNER (~0.2mm off, correctly not snapped) → a spurious ~0.11mm; keying by exact XY + the wall
+z-span isolates the genuine wall contour (dev 0).
+
+### (2) INCREMENTAL LIVE CRISPING — SPLIT, per the dispatch's escape hatch (measured why)
+
+MEASURED: a full crisp re-mesh is **~22.9ms** on a 100×80 stock (256² grid, ~135k tris) — and the grid caps at 512²
+(≈4× cells → ~90ms) on sheet stock. A full crisp per frame/throttle blows the interactive budget (that is exactly why
+the live path is the smooth in-place remesh today).
+
+INFRA GAP: the dispatch's premise ("the carve ALREADY tracks per-move dirty cells") is not the current state — the carve
+tracks dirty as a single BOOLEAN (`this.dirty`), NOT a retained dirty rect; the per-segment AABB band is computed in
+`carveSegment` then DISCARDED; and `_buildCrispCarveMesh` rebuilds WHOLE geometry (no sub-rect mode). So the
+dirty-neighborhood approach needs NET-NEW infrastructure: (a) accumulate a retained dirty rect from the per-segment band,
+(b) a sub-rect crisp build, and (c) splicing a changing-count indexed triangle soup into the live BufferGeometry (or a
+crisp-trail overlay without z-fighting against the smooth base). That is a substantial, higher-risk build that warrants
+its own turn rather than riding (1) — the perf budget forces the split exactly as the dispatch anticipated.
+
+RECOMMENDATION for (2)'s turn — two options for the advisor to rule:
+- **A. Dirty-rect + sub-rect crisp splice** (what the dispatch describes): most faithful, lowest per-frame cost, but the
+  BufferGeometry splice is the risk; needs the retained dirty rect first.
+- **B. Throttled full crisp during play** (~every 200–250ms): low risk (reuses the shipped crisp path), crisps the wall a
+  beat behind — but 22.9–90ms per rebuild dips the fps floor on big stock, so it may fail the perf-budget assert there.
+I lean A for the perf budget; flagging so the next turn is scoped with the measurement.
+
+SUITE: 1197 passed, 2 skipped, 0 failed, 0 flaky (workers=2, retries=0, 20.5m) (workers=2 — the snap is local to the crisp mesher's crossing + a flat arc-segment list fed at
+carve time; smooth/live path untouched, no emit path touched → the goldens are unaffected; verified).
+
+Files: web/viz/gcodeViz3d.js (the arc snap in _buildCrispCarveMesh + _buildCarveArc + carveEndState/carveFinalize feed),
+web/viz/createPreviewPanel.js (carveFinalize passes the segs), tests/carve-arc-814.spec.js (NEW). Commit 05a8cf9.
