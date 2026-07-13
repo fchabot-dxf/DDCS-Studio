@@ -152,9 +152,11 @@ export function setupGlobalFunctions(app) {
                 <div class="settings-row" style="gap:6px; align-items:center">
                     <button class="toolbar-btn settings-io" data-tab="align" style="flex:1">⟳ Align (rotate)</button>
                     <button class="toolbar-btn settings-io" data-tab="position" style="flex:1">✥ Position (move)</button>
+                    <button class="toolbar-btn settings-io" data-tab="alignfix" style="flex:1">📐 Alignment fix</button>
                 </div>
                 <div data-pane="align" style="display:flex; flex-direction:column; gap:10px"></div>
                 <div data-pane="position" style="display:flex; flex-direction:column; gap:10px"></div>
+                <div data-pane="alignfix" style="display:flex; flex-direction:column; gap:10px"></div>
             </div>`;
             document.body.appendChild(ov);
             const close = () => ov.remove();
@@ -162,22 +164,70 @@ export function setupGlobalFunctions(app) {
 
             const alignFc = buildAlignPane(ov.querySelector('[data-pane="align"]'), ed, { allRuns, feedRuns, rapidRuns, segs }, close);
             const posFc = buildPositionPane(ov.querySelector('[data-pane="position"]'), ed, { allRuns, feedRuns, rapidRuns, segs }, close);
+            buildAlignFixPane(ov.querySelector('[data-pane="alignfix"]'), ed, close);   // t840 — the measured-alignment correction entry
 
-            const panes = { align: ov.querySelector('[data-pane="align"]'), position: ov.querySelector('[data-pane="position"]') };
-            const tabBtns = { align: ov.querySelector('[data-tab="align"]'), position: ov.querySelector('[data-tab="position"]') };
+            const panes = { align: ov.querySelector('[data-pane="align"]'), position: ov.querySelector('[data-pane="position"]'), alignfix: ov.querySelector('[data-pane="alignfix"]') };
+            const tabBtns = { align: ov.querySelector('[data-tab="align"]'), position: ov.querySelector('[data-tab="position"]'), alignfix: ov.querySelector('[data-tab="alignfix"]') };
             const show = (which) => {
-                for (const k of ['align', 'position']) {
+                for (const k of ['align', 'position', 'alignfix']) {
                     panes[k].style.display = k === which ? 'flex' : 'none';
                     tabBtns[k].style.fontWeight = k === which ? '700' : '';
                     tabBtns[k].style.opacity = k === which ? '1' : '.65';
                 }
                 // The just-shown canvas was display:none when first rendered (so it measured 0) — redraw now it's visible.
-                requestAnimationFrame(() => { (which === 'align' ? alignFc : posFc)?.(); });
+                requestAnimationFrame(() => { (which === 'align' ? alignFc : which === 'position' ? posFc : null)?.(); });
             };
             tabBtns.align.addEventListener('click', () => show('align'));
             tabBtns.position.addEventListener('click', () => show('position'));
-            show(initial === 'position' ? 'position' : 'align');
+            tabBtns.alignfix.addEventListener('click', () => show('alignfix'));
+            show(initial === 'position' ? 'position' : initial === 'alignfix' ? 'alignfix' : 'align');
         };
+
+        // The ONE program-level xform writer (t737): replace-never-nest a flat xform{angle,pivotX,pivotY} at the stack top;
+        // angle 0 → DROP the declaration → byte-identical. Returns true if it wrote into the block program; false when
+        // there's no block program to declare into (the caller does the lossy text-rewrite fallback). Shared by the Align
+        // (rotate) pane and the Alignment-fix pane (t840) so the declaration is written in exactly ONE place.
+        function writeXformDeclaration(ed, angle, px, py) {
+            const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+            const proj = (window.ddcsGetBlockGcode && window.ddcsGetBlockGcode()) || '';
+            if (!(stack.length && proj.trim() && proj === ed.value && window.ddcsLoadBlockStack)) return false;
+            const rest = stack.filter((b) => !(b && b.type === 'xform'));   // drop the old declaration (replace, not compose)
+            window.ddcsLoadBlockStack(angle ? [makeXform({ angle, pivotX: px, pivotY: py }), ...rest] : rest);
+            return true;
+        }
+
+        // Alignment-fix tab (t840) — the MEASURED alignment correction. The alignment wizard is a pure MEASURER: it probes
+        // the fence and writes the misalignment angle into #1512 on the controller (it never moves or cuts). Read that angle
+        // off the controller screen and type it here; Studio rotates the whole program about the DATUM (the WCS origin =
+        // (0,0) in work coords — the pivot the t716 ruling names) to match — the SAME declared program-level xform the Align
+        // tab writes (badge + .nc marker + Blocks all follow), so you needn't physically re-square the part. Pull-prefill of
+        // #1512 is a LATER upgrade (the seam: read the pulled/typed #1512 into the field here).
+        function buildAlignFixPane(pane, ed, close) {
+            const cur = (window.ddcsGetBlockProgram) ? programRotation(window.ddcsGetBlockProgram() || []) : { angle: 0, pivotX: 0, pivotY: 0 };
+            const seed = (cur.angle && !cur.pivotX && !cur.pivotY) ? cur.angle : 0;   // prefill only a rotation already about the datum
+            pane.innerHTML = `
+                <div class="settings-hint" style="margin:0">The <b>alignment probe</b> measures your workpiece's skew into <b>#1512</b> on the controller — it only MEASURES, it never moves or cuts. Read that angle off the controller screen and type it here: Studio rotates the whole program <b>about the datum</b> to match, so you don't have to physically re-square the part. DDCS has no G68, so Studio rewrites every XY move + arc. <b>Simulate before cutting.</b></div>
+                <div class="settings-row" style="gap:10px; align-items:flex-end">
+                    <label style="flex:1">Measured angle (deg, signed)<input type="number" data-afang value="${seed || ''}" step="0.001" min="-45" max="45" placeholder="e.g. 1.25" style="width:100%"></label>
+                </div>
+                <div data-afout class="settings-hint" style="margin:0"></div>
+                <div class="settings-row" style="justify-content:flex-end"><button class="toolbar-btn settings-io" data-afc>Cancel</button><button class="toolbar-btn settings-io" data-afgo>Apply alignment rotation</button></div>`;
+            const angI = pane.querySelector('[data-afang]'), out = pane.querySelector('[data-afout]');
+            pane.querySelector('[data-afc]').addEventListener('click', close);
+            pane.querySelector('[data-afgo]').addEventListener('click', () => {
+                const a = Math.max(-45, Math.min(45, r3(parseFloat(angI.value) || 0)));   // signed, sane clamp (a skew, not a re-orient)
+                if (writeXformDeclaration(ed, a, 0, 0)) {   // rotate about the datum (0,0)
+                    window.ddcsTrack?.('feature', a ? 'align-correction' : 'align-correction-clear');
+                    close(); return;
+                }
+                if (!a) { out.textContent = 'Type the measured angle (read #1512 off the controller).'; return; }
+                const r = rotateProgram(ed.value, a, 0, 0);   // fallback: raw text, no block program to declare into (lossy)
+                ed.value = r.text; ed.dispatchEvent(new Event('input', { bubbles: true }));
+                window.ddcsTrack?.('feature', 'align-correction');
+                out.innerHTML = `Rotated ${r.rotated} move(s) by ${a}° about the datum. ⚠ Text rewrite (no block program) — not reversible.` + (r.hadIncremental ? ' G91 incremental moves left unrotated — check them.' : ' Simulate to verify.');
+                out.style.color = r.hadIncremental ? '#ff6b6b' : '#fd0';
+            });
+        }
 
         // Align tab — the existing 2D rotate GUI: pivot + angle handle (clock hand) + live rotated outline. Returns a
         // redraw fn (the modal calls it when the tab becomes visible, so the canvas measures a real size).
@@ -254,11 +304,7 @@ export function setupGlobalFunctions(app) {
                 // EMITTER applies it at generation (ops untouched); it round-trips through Blocks + save/load and drives the
                 // rotation BADGE. st is the ABSOLUTE angle (prefilled from the current), so apply REPLACES the one declaration
                 // (never composes/nests); st.ang 0 → drop it (BYTE-IDENTICAL). Only when the editor matches the projection.
-                const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-                const proj = (window.ddcsGetBlockGcode && window.ddcsGetBlockGcode()) || '';
-                if (stack.length && proj.trim() && proj === ed.value && window.ddcsLoadBlockStack) {
-                    const rest = stack.filter((b) => !(b && b.type === 'xform'));   // drop the old declaration (replace, not compose)
-                    window.ddcsLoadBlockStack(st.ang ? [makeXform({ angle: st.ang, pivotX: st.px, pivotY: st.py }), ...rest] : rest);
+                if (writeXformDeclaration(ed, st.ang, st.px, st.py)) {
                     window.ddcsTrack?.('feature', st.ang ? 'align-rotate-xform' : 'align-rotate-clear');
                     close();   // done — the editor + preview show the rotated result; the xform declaration + badge are live
                     return;
