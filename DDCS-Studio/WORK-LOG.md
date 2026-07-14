@@ -3961,3 +3961,63 @@ VERBATIM: 1258 passed / 1 failed / 2 skipped (12.4m). The 1 failure was header-r
 vs 9) — the DIRECT, expected consequence of adding the Setup-sheet menu row; FIXED (exclude setupSheet from the count,
 as above) + re-verified: header-responsive + field-deeplink-796 + setup-sheet-850 = 11 passed isolated, exit 0. No
 other regressions across the 1258. Advisor: a clean-box re-run confirms 1259/0/2.
+
+
+## 2026-07-13 (t852) — ONE-FILE BACKUP (backlog 7) + the t851 drill-form rider.
+
+### ONE-FILE BACKUP — export / restore ALL user state as a single json
+
+New `web/data/backup.js` + `web/ui/backupModal.js` + a Settings > General > Backup tab. NORTH STAR (declare-never-
+infer / one source): every store already persists itself as JSON under its own localStorage key (or verbatim IDB
+entries), so a backup MOVES each store's OWN persisted bytes — it NEVER re-serializes with a second, divergeable
+codec. The set of stores is a DECLARED registry (BACKUP_STORES); adding a store = one declared row.
+
+Stores captured (each = one registry row reusing its own persisted form): settings `ddcs_studio_settings` (incl. the
+tool table atc.tools + machine + I/O + wcs), profiles `ddcs_profile_library`, custom wizards `ddcs_user_ops`
+(re-registered via loadUserOps on restore so they appear without a reload), wizard bar layout `ddcs_wizard_layout`,
+presets `ddcs_tpl_*` (prefix-aggregated), variables `ddcs_vars_persistent`, display prefs `ddcs_display`, pane layout
+(`ddcs_panes`/`ddcs_pane_ratio`/`ddcs_minimap`/`ddcs_form_sections`), projects IDB `ddcs_projects` (added exported
+exportAllEntries/importAllEntries to projectStore — the one gap; getAll was private). Sensitive keys (tokens / cloud
+creds / device identity) are NOT captured. File shape: {kind:'ddcs.backup', v, app, date, stores:{<id>:<value>}}.
+
+UI (mirrors the existing "Pull from controller" review modal): [Export everything] downloads one json via
+UIUtils.downloadFile. [Restore from file] = pick a file -> PREVIEW modal (per-store counts, the app version it came
+from, a newer-format warning) -> tick which stores (default all PRESENT; absent ones shown "not in this backup" +
+disabled) -> a SAFETY auto-export of the current state downloads FIRST (the undo path) -> restore writes each selected
+store's persisted form verbatim -> reload. HONESTY: absent stores are left UNTOUCHED, never silently dropped.
+
+VERIFIED (backup-852.spec.js, 2 tests): (1) seed profiles + a project + settings(+tool table) + a custom wizard +
+presets + vars -> buildBackup -> WIPE (localStorage.clear + delete the IDB project) -> restoreBackup -> EVERY store
+DEEP-EQUALS its pre-wipe state (asserted store by store; tool dia round-trips === 6); the preview counts asserted
+{settings:2 profiles:2 projects:1 userOps:1 presets:1 variables:1}; the pre-restore safety export asserted (the undo
+path); an OLDER PARTIAL backup (projects+userOps removed) restores only its stores, reports them skipped, and leaves a
+DIFFERENT current userOps UNTOUCHED. (2) the Settings Backup tab shows Export+Restore; the restore modal previews the
+counts + the honest not-in-this-backup rows. VIEWED: the modal + tab render correctly in both themes (studio+futuristic).
+
+### RIDER (t851 triage) — the classic drill form default = single, consistent with the t848 sweep
+
+The classic `#wiz_drill` form (openWiz('drill')) still defaulted to a grid pattern while t848 had set the twin +
+drillWizard builder fallback to single — the exact twin-default-mirrors-form-not-fallback divergence I flagged in t850.
+Swept the two unswept coupled places: index.html `<select id=d_pattern>` gains a Single-hole FIRST option + drops the
+inert `value="circle"` attr; drillView.update() `v('d_pattern') || 'grid'` -> `|| 'single'`. Now openWiz('drill')
+defaults to one hole, consistent with drillWizard.js:24 + patternPoints. Adding the single <option> ALSO fixes reverse-
+sync for single-pattern drill ops (the option existed nowhere in the classic form before).
+
+### TEST-GUARD fixes (legit consequences, not weakenings)
+
+(a) drill-canvas.spec.js:56 exercises the GRID pattern (reads d_dx pitch + the multi-hole zoom + a size handle) but
+opened the drill wizard at the DEFAULT, which is now single (one hole, no dx) -> boundingBox timeout. Seeded
+`selectOption('#d_pattern','grid')` (same fix pattern as t848's mill-layout-716; the test's intent is grid).
+(b) settings-done-faq.spec.js asserts "Feedback immediately before About". The new Backup tab was inserted between them
+-> broke adjacency. MOVED the Backup tab to sit after Cloud (grouping it with the other data-portability tab), so
+Feedback stays immediately before About. No test edit — the invariant is preserved by the correct tab placement.
+
+### GATE (w4, full log — no tail truncation)
+
+FIRST run: 1258 passed / 3 failed / 2 skipped. The 3: settings-done-faq (tab adjacency, MINE, fixed) + drill-canvas:56
+(the rider default, MINE, fixed with the grid seed) + informed-merge-notice:52 (KNOWN w4 contention flake, passed
+isolated). RE-GATE after the fixes VERBATIM: 1261 passed / 0 failed / 2 skipped (12.1m), exit 0 — clean.
+
+PROCESS NOTE: the mem-server preloads web/ ONCE at startup + serves the buffer, never re-reading disk. A NEW file 404s
+(loud); an EDITED file is served STALE (silent). Must KILL the port-3211 PID (a `node -e` port CHECK does NOT free it)
+after any web/ edit so a fresh server re-walks the tree. This bit me once (backup.js 404) before I diagnosed it.
