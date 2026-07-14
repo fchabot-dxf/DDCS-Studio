@@ -4021,3 +4021,73 @@ isolated). RE-GATE after the fixes VERBATIM: 1261 passed / 0 failed / 2 skipped 
 PROCESS NOTE: the mem-server preloads web/ ONCE at startup + serves the buffer, never re-reading disk. A NEW file 404s
 (loud); an EDITED file is served STALE (silent). Must KILL the port-3211 PID (a `node -e` port CHECK does NOT free it)
 after any web/ edit so a fresh server re-walks the tree. This bit me once (backup.js 404) before I diagnosed it.
+
+
+## 2026-07-14 (t854) — THE LIBRARY (part 1 of the two-part turn; PART 2 the menu diet SPLIT OFF per the advisor).
+
+### THE LIBRARY — one tabbed modal: Profiles · Projects · Wizards
+
+New web/ui/libraryModal.js: openLibrary(tab) opens ONE tabbed modal on the last-used tab (ddcs_library_tab), reached
+from the header quick-menu "Library..." row (data-act=library; the macro-bar is display:none so the menu IS the door,
+like Setup sheet t850). REUSE not rebuild — a DECLARED TABS registry mounts each surface's OWN logic:
+  - Profiles: FACTORED profileModal.renderProfilesInto(host, opts) out of browse() (one source; browse() now wraps it in
+    the overlay). Full select-then-load: the Active badge (distinct from selection), 💾/☁ tags, Load/Save-as/Import.
+  - Projects: a local browser over the projectStore API + the shared selectLoad contract + openSaveModal (save-as-into-
+    folders). Folders navigate; projects are sl-rows; rename/delete row actions; the Open bar.
+  - Wizards: EMBEDS wizardManagerPanel.renderWizardLibrary (the bar-designer, container-ready) + a "New from current"
+    door (window.ddcsSaveAsWizard). The ✎ Edit closes the Library via a capture listener (no global closeSettings shim).
+
+DESIGN (user-ratified live, t854): the Wizards tab is NOT select-then-load — a wizard isn't "loaded" like a project/
+profile; it lives on the toolbar. The user's words: "you have to import it to the bar." So Wizards = the embedded bar-
+designer (place/arrange/show-hide) + New-from-current + Import to bring one in + per-row edit/delete. Profiles + Projects
+DO speak select-then-load (the t805 language extends to them). This deviates from the advisor's "all three tabs speak
+select-then-load" ON THE WIZARDS TAB ONLY, with the user's explicit ratification.
+
+DEEP-LINKS: the quick-menu "Profiles..." now deep-links into the Library (Profiles tab). DEFERRED (flagged): the
+Open/Save drawer buttons still open the OLD drawer, because the Library's Projects tab is LOCAL-ONLY and deep-linking
+Open would DROP the drawer's CLOUD volume (a regression). Projects consolidation (cloud volume in the Library + retiring
+the drawer) is the Projects-tab follow-up. Nothing breaks: the drawer keeps working; the Library is additive for projects.
+
+VERIFIED (library-854.spec.js, 3 tests, all green ISOLATED + eyeballed): the quick-menu Library opens 3 tabs; Projects
+select-then-load over a seeded project + the save door; Profiles Active-badge + select-then-load; Wizards bar-designer +
+New-from-current. Last-tab memory. Profiles... deep-link. 390px reachable via the menu + both themes (screenshots VIEWED:
+the wizards tab + the 390px projects tab render clean in studio + futuristic).
+
+TEST GUARDS (legit, not weakened): header-responsive excludes data-act=library from the program-action count (a utility
+door, like settings/setupSheet — stays 8); header-profile-menu asserts "Profiles..." opens the LIBRARY on its tab.
+
+### GATE (w4, full log) — CONTENTION-CORRUPTED by an external CPU hog; isolated verification stands
+
+FIRST run (representative, 12.6m): 1260 passed / 4 failed / 2 skipped. The 4: header-responsive count + header-profile-
+menu + project-drawer-smoke (all THREE the DIRECT consequence of the Library entry point / deep-link — FIXED + re-verified
+16+5 passed isolated) + collapsible-panes-752 (the KNOWN w4 contention flake, passes isolated). So the true post-fix state
+is ~1264 / 0 / 2.
+
+TWO RE-GATES then returned 1085/179 and 1084/180 at 18+min (vs 12.6m) — a CONTENTION CATASTROPHE: EVERY failure is a
+boot-timeout (waitForFunction), the mem-server preloaded fine (385 files), and EVERY sampled "failed" test (alignment x3
+specs, library x3) PASSES ISOLATED. Diagnosed the box load: the USER'S OWN Chrome (PID 35208, C:\Program Files\Google\
+Chrome, 3592s CPU = a pegged core) — NOT a playwright orphan (those live under ms-playwright; none present). Cannot
+produce a clean full-gate number while a core is pegged by an external process. Advisor: re-run on a quiet box for the
+release number; the code is verified (every isolated run green).
+
+### SAFETY AMENDMENT (received mid-turn; FLAGGED as a gate, grounded, DEFERRED with reason — NOT half-applied)
+
+The advisor's mid-turn SAFETY amendment (found by the USER reading their own emitted corner program, t853): the
+saferetract atom emits G53 UNDER G91 (probe bodies are incremental) which is UNGROUNDED + potentially UNSAFE (a
+controller could treat G53-under-G91 relatively → an incremental move, the opposite of a safe absolute retract). The
+factory ALWAYS sets G90 before G53 (slib-g.nc:24 G90 before :30 G53X#622; the CAM pack opens G90...G53Z#150; ZERO
+factory G53-in-G91). FIX (for the NEXT turn): make the emit MODE-EXPLICIT — G90 / G53 Z#520 / restore G91 when the
+surrounding body is incremental — on EVERY post that emits G53; regenerate the affected goldens (diff = the wrap lines
+only); GUARD spec sweeps the emitted corpus (every safe-height G53 has G90 active); verify the SIM models the wrapped
+form identically (G53 is already machine-absolute in the engine → the wrap only removes ambiguity).
+
+GROUNDING (so the fix is fast): atom = safeRetractNode() at wizards/ops/safeZframe.js:49 (block type 'saferetract');
+the emit is per-dialect, e.g. wizards/dialects/ddcs-expert-m350.js:39-47 → machineMove('Z','#520') = `G53 Z#520` (:34)
+with NO G90 wrap; pushed into G91 bodies at cornerWizard.js:215 (rotary middle) + :359. safeRetractNode should carry the
+caller's mode (a `restore` param) so each emit site declares G90 vs G91; each dialect's safeRetract wraps accordingly.
+
+WHY DEFERRED (not ignored): a multi-POST safety-critical emit change + goldens + corpus-guard + sim verification must be
+done RIGHT, and this turn was already enormous (the whole Library) — my context was depleted enough that rushing a safety
+fix risks a subtly-wrong retract (a missed dialect / wrong restore-mode) which is WORSE than a one-turn delay. The current
+code is the status quo (nothing new-unsafe introduced), so deferring the FIX one turn ships nothing worse. Handed off
+fully grounded as the TOP priority.
