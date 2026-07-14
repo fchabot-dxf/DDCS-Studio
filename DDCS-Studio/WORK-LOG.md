@@ -3898,3 +3898,66 @@ VERBATIM: 1253 passed / 2 failed / 2 skipped (12.3m, 738s). The mill-layout dril
 consequence) are FIXED. The 2 remaining — collapsible-panes-752 (t836's MOST load-fragile test) + informed-merge-notice —
 are the KNOWN w4 CPU-contention class; BOTH pass ISOLATED (10 passed), are UNRELATED to the riders (no panes/merge touched),
 the box ran loaded. Advisor re-runs on a quiet box for the batch release.
+
+
+## 2026-07-13 (t850) — THE SETUP SHEET (backlog 6) + a live gear-button rider.
+
+### THE SETUP SHEET — a print-ready single job page, every value READ from its declared source
+
+New `web/ui/setupSheet.js` (`openSetupSheet()` + `buildSheetHTML()`). Declare-never-infer: the sheet reads each
+section from its ONE existing source, it re-derives NOTHING.
+  - ops        -> window.ddcsGetBlockProgram() (filter type==='op'; opType / label / params)
+  - tools      -> getTool(num) + the op->tool resolution PRECEDENCE mirrored from wizards/views/userOpView.js (table
+                  dia first, typed toolDia fallback, else none); deduped in order of use (T# reused folds to one row)
+  - WCS        -> settings.machine.wcs {active,table} + placementDeclared() (the ONE predicate) + wcsOffsetAt()
+  - stock      -> settings.stock {show,x,y,z,datum,pin}; show===false / no dims -> the honest "not declared" row
+  - time       -> window.ddcsTimeEstimate() (t844) total + secondsForLines(perLine, ddcsLinesForOp(id)) per op — the
+                  SAME cached estimate the editor hover chip reads (one source), NOT a second pass
+  - pre-flight -> checkEnvelope(editor gcode, settings) (t838) verdict state
+  - safe-Z     -> settings.machine.safeZMargin ; profile -> ProfLib.activeProfile() + CONTROLLER_PROFILES[ctrl].name
+
+HONESTY: a tool with no library row renders "typed Ø (no tool-table entry)" + a dash name (no invented name); an
+undeclared stock / un-pulled WCS render an explicit not-declared row, never a silent omission. datum humanization
+MIRRORS the stock editor's datumName() ([X][Y][Z] n/c/p) so "nnp" reads "Top front left" in both places (one meaning).
+
+STYLE (print-first): on-screen a THEMED modal frame (#setupSheetOverlay, var(--panel/text/border)) wraps a WHITE
+"paper" sheet (theme-INDEPENDENT — reads identically in both themes, a true print preview). The Print button =
+window.print(). New `@media print` block in styles.css (the file had ZERO print rules): hides every body sibling +
+the modal chrome, resets the sheet to black-on-white filling the page. Wired into the header quick-menu:
+headerPost.js gets HQ_ICONS.setupSheet + a `setupSheet` case (calls the imported openSetupSheet) + a "Setup sheet…"
+row in the bottom utility group (with checklist/settings/rate — NOT a program file-op).
+
+VERIFIED (setup-sheet-850.spec.js, 4 tests, all green isolated + eyeballed):
+  - a real 3-op (pocket/drill/contour) / 2-tool program: opens FROM THE HEADER MENU (#hdrPostBtn -> the row); every
+    section asserted from its declared source. NUMERIC SPOT-CHECKS: tool dia (T1=6, T2=3 from the table), stock dims
+    (120x80x20), and the op-time cells === an INDEPENDENT recompute over the same secondsForLines. Tools deduped to 2
+    (T1 reused on pocket+contour). VIEWED: the full sheet renders correctly.
+  - undeclared stock (show:false) -> the honest "not declared" row, no fabricated dims (asserted).
+  - print media (emulateMedia print): the modal chrome display:none + the sheet bg rgb(255,255,255). VIEWED: the print
+    screenshot is clean black-on-white paper, all app+modal chrome stripped.
+  - both themes: modal chrome legible (studio light + futuristic dark screenshots VIEWED).
+
+Test-guard update (legit consequence, not a weakening): header-responsive.spec.js counts "program actions" excluding
+settings/checklist/rate; setupSheet is the same utility class, so it's ALSO excluded -> the count stays 8 (semantic:
+setupSheet is a report action, not a program file-op). This was the gate's 1 failure; fixed + re-verified.
+
+OBSERVATION (flagged, NOT fixed here — out of t850 scope): openWiz('drill') + insertWiz produced a op with
+pattern='grid', not 'single'. t848 set the drill twin DEFAULTS/fallback to single, but the classic drill FORM field
+default may still be grid (a possible twin-default-mirrors-form-not-fallback divergence). The sheet reads it
+faithfully; worth an advisor triage as a t848 follow-up.
+
+### RIDER (live human request, mid-turn) — the "More preview settings..." text link -> a gear button
+
+visibilityModal.js footer: the `<a data-morepreview>...More preview settings...</a>` text link is now a
+`<button data-morepreview class="toolbar-btn settings-io">⚙</button>` gear icon (the human pointed at the text label
+and asked for a gear). The data-morepreview hook + its click handler (close + deep-link to Settings->Preview) are
+UNCHANGED, so field-deeplink-796 still passes; the label's meaning moved into the title tooltip + an aria-label
+(discoverability preserved). VIEWED: the gear renders as a clean monochrome ⚙ next to Reset in both themes.
+Committed SEPARATELY from t850 (its own change).
+
+### GATE (w4, full log — no tail truncation)
+
+VERBATIM: 1258 passed / 1 failed / 2 skipped (12.4m). The 1 failure was header-responsive's program-action count (8
+vs 9) — the DIRECT, expected consequence of adding the Setup-sheet menu row; FIXED (exclude setupSheet from the count,
+as above) + re-verified: header-responsive + field-deeplink-796 + setup-sheet-850 = 11 passed isolated, exit 0. No
+other regressions across the 1258. Advisor: a clean-box re-run confirms 1259/0/2.
