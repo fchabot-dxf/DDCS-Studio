@@ -41,7 +41,7 @@ export function openVisibilityModal(anchor) {
         + `<div class="vis-rows">${rowsHtml()}</div>`
         + `<div class="vis-foot" style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,0.1)">`
         + `<div style="display:flex; gap:10px; align-items:center;">`
-        + `<a href="#" data-morepreview style="font-size:11.5px; color:var(--accent,#0ea5e9); opacity:.9; text-decoration:none;" title="Deeper preview prefs — default 2D/3D, follow-cam, sim probe dims, speed…">More preview settings…</a>`
+        + `<button type="button" data-morepreview class="toolbar-btn settings-io" aria-label="More preview settings" title="More preview settings — default 2D/3D, follow-cam, sim probe dims, speed…" style="font-size:15px; padding:4px 9px; line-height:1;">⚙</button>`
         + `<button type="button" data-reset class="toolbar-btn settings-io" style="font-size:12px">Reset</button></div>`
         + `<button type="button" data-done class="primary" style="padding:5px 18px; font-size:13px">Done</button></div>`;
     document.body.appendChild(pop);
