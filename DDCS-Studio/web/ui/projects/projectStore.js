@@ -89,3 +89,8 @@ export async function rename(oldPath, newPath) {
         await put({ ...e, path: n + e.path.slice(o.length) });
     }
 }
+
+// ── backup (t852) — the whole volume as verbatim entries, so the one-file backup moves the store's OWN persisted
+//    shape (path/type/data/savedAt), never a second project serializer. importAllEntries puts each entry back as-is.
+export async function exportAllEntries() { return getAll(); }
+export async function importAllEntries(entries) { for (const e of (entries || [])) if (e && e.path) await put(e); }

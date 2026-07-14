@@ -27,6 +27,7 @@ import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js'
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 import { openProfileModal, setProfileChangeHook } from './profileModal.js';   // t684 b — the profile browser (save-as / browse)
+import './backupModal.js';   // t852 — registers window.ddcsExportBackup + window.openBackupRestore (the one-file backup)
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
 // --- Tool library ----------------------------------------------------------
@@ -897,6 +898,7 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_wizards">Wizards</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_backup">Backup</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_faq">FAQ</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
@@ -1151,6 +1153,18 @@ function buildSettingsOverlay() {
                     <div class="settings-section">
                         <div class="settings-section-title">CREDITS</div>
                         <div class="settings-hint">Built by Frédéric Chabot · MIT License</div>
+                    </div>
+                </div>
+
+                <!-- GENERAL: BACKUP (t852) — export/restore ALL user state as one file -->
+                <div id="set_tab_backup" style="display:none">
+                    <div class="settings-section">
+                        <div class="settings-section-title">ONE-FILE BACKUP</div>
+                        <div class="settings-hint">Export everything you have set up — profiles, projects, settings, the tool table, custom wizards, presets, prefs — as a single file, and restore it on another machine or after a reset. Tokens and cloud credentials are never included.</div>
+                        <div class="settings-row" style="margin-top:10px; gap:8px;">
+                            <button type="button" class="toolbar-btn settings-io" id="set_backup_export" title="Download one .json holding all your data">⭳ Export everything</button>
+                            <button type="button" class="toolbar-btn settings-io" id="set_backup_restore" title="Load a backup file — you'll pick what to restore, and a safety copy of your current state is saved first">⭱ Restore from file…</button>
+                        </div>
                     </div>
                 </div>
 
@@ -2740,7 +2754,7 @@ function wireSettingsOverlay(ov) {
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_wizards', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_about',
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_wizards', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_backup', 'set_tab_about',
                      'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
     function showPanel(id) {
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
@@ -2762,6 +2776,9 @@ function wireSettingsOverlay(ov) {
     }
     mainTabs.forEach(t => t.addEventListener('click', () => showGroup(t.dataset.group)));
     sideTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
+    // t852 — the one-file backup buttons (the module registered the globals on import).
+    ov.querySelector('#set_backup_export')?.addEventListener('click', () => window.ddcsExportBackup && window.ddcsExportBackup());
+    ov.querySelector('#set_backup_restore')?.addEventListener('click', () => window.openBackupRestore && window.openBackupRestore());
     // Expose group+panel navigation so callers (e.g. the Homing wizard's "⚙ Homing setup" link) can deep-link
     // to Settings → Hardware → Machine where the homing section now lives.
     _settingsNavTo = (group, panelId) => { showGroup(group); if (panelId) showPanel(panelId); };
