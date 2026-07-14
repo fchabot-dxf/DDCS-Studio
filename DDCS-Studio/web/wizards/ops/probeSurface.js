@@ -97,7 +97,7 @@ export function safeTraverseStack(p = {}) {
     // t826 — the clearing LIFT before the traverse. Default = the incremental G0 Z<lift> (byte-identical to every existing
     // caller). `machineLift` (opt-in) retracts to the DECLARED MACHINE MARGIN instead (limit-proof; the sim models the
     // mid-program G53) — for a manual reposition whose auto lift could otherwise compound into the top switch from a high start.
-    const doLift = () => { if (!p.lift) return; if (p.machineLift) S.push(safeRetractNode()); else push('move', { mode: 'rapid', z: p.lift }); };
+    const doLift = () => { if (!p.lift) return; if (p.machineLift) S.push(safeRetractNode({ restore: 'inc' })); else push('move', { mode: 'rapid', z: p.lift }); };   // t856 — the machine-lift path fires inside the G91 traverse body → G90-wrap the G53, restore G91
     const axis = p.axis || 'X';
     const second = p.second || 'Y';
     const alc = axis.toLowerCase(), slc = second.toLowerCase();

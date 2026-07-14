@@ -216,13 +216,13 @@ export function middleStack(params = {}, opts = {}) {
         ...circularOnly([mkMM(axis, '#53')]),
         mkC(`2axis_${axis === 'X' ? 'XtoY' : 'YtoX'}_${resolvedDir2}`),
         ...seqR(second, dir2Plus, 54),
-        safeZParkBlock(safeZFrame, '#17'),   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
+        safeZParkBlock(safeZFrame, '#17', 'inc'),   // SPATIAL-MODEL 1c: frame-aware final park; t856 — inside the G91 body → G90-wrap the machine G53, restore G91
         // #53 = centre of the PRIMARY axis, #56 = centre of the SECONDARY — write each to ITS axis's WCS offset
         // (not hardcoded X=0/Y=1, which swapped them when the primary axis was Y).
         mkWcsWrite({ axis, wcs: wcsArgOf(wcs), offset: AX[axis].off, value: '#53', direct: true }), mkWcsWrite({ axis: second, wcs: wcsArgOf(wcs), offset: AX[second].off, value: '#56', direct: true }),
     ];
     const twoAxisOff = [
-        safeZParkBlock(safeZFrame, '#17'),   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
+        safeZParkBlock(safeZFrame, '#17', 'inc'),   // SPATIAL-MODEL 1c: frame-aware final park; t856 — inside the G91 body → G90-wrap the machine G53, restore G91
         mkWcsWrite({ axis, wcs: wcsArgOf(wcs), offset: AX[axis].off, value: '#53', direct: true }),
     ];
     S.push(...twoAxisFork(twoAxisOn, twoAxisOff));

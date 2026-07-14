@@ -18,7 +18,7 @@
  * The margin RESOLVES to a number in the block params at build time (valid-by-construction; safeZMarginNeg()).
  */
 import { num, r3 } from './util.js';
-import { SAFEZ_MARGIN_DEFAULT } from './safeZframe.js';
+import { SAFEZ_MARGIN_DEFAULT, wrapMachineFrame } from './safeZframe.js';
 
 export const safeRetractBlock = {
     type: 'saferetract', label: 'Safe-Z Retract', kind: 'leaf', category: 'Move',
@@ -27,8 +27,12 @@ export const safeRetractBlock = {
     defaults: { margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', label: 91 }, fields: ['margin', 'workClear', 'label'],
     emit: (p, dx, dy, dialect) => {
         const opts = { margin: r3(num(p.margin, -SAFEZ_MARGIN_DEFAULT)), workClear: p.workClear || '#17', label: num(p.label, 91) };
-        if (dialect && typeof dialect.safeRetract === 'function') return dialect.safeRetract(opts);
-        // DEFAULT — machine-frame rapid to the literal margin (grbl/rs274/centroid: a literal G53 coord is native).
-        return ['( Safe-Z retract - machine frame )', ...dialect.machineMove('Z', String(opts.margin))];
+        const core = (dialect && typeof dialect.safeRetract === 'function')
+            ? dialect.safeRetract(opts)
+            // DEFAULT — machine-frame rapid to the literal margin (grbl/rs274/centroid: a literal G53 coord is native).
+            : ['( Safe-Z retract - machine frame )', ...dialect.machineMove('Z', String(opts.margin))];
+        // t856 SAFETY — the retract's G53 must run under G90 (a G53-under-G91 could move INCREMENTALLY). Force G90
+        // explicit before it on EVERY post; restore G91 when the surrounding body is incremental (p.restore='inc').
+        return wrapMachineFrame(dialect, core, p.restore);
     },
 };

@@ -7,6 +7,7 @@
  */
 import { num, r3 } from './util.js';
 import { M, line } from '../words.js';
+import { wrapMachineFrame } from './safeZframe.js';
 
 export const machineMoveBlock = {
     type: 'machinemove', label: 'Machine Move', kind: 'leaf', category: 'Move',
@@ -15,9 +16,13 @@ export const machineMoveBlock = {
     // from Read Machine) → move straight to it; if it's a number → stage it in `var` first, then move.
     emit: (p, dx, dy, dialect) => {
         const axis = p.axis || 'Z', t = p.to;
-        if (typeof t === 'string' && t.trim().startsWith('#')) return dialect.machineMove(axis, t.trim());
-        const v = p.var || '#99';
-        return [`${v}=${r3(num(t, 0))}`, ...dialect.machineMove(axis, v)];
+        const core = (typeof t === 'string' && t.trim().startsWith('#'))
+            ? dialect.machineMove(axis, t.trim())
+            : [`${p.var || '#99'}=${r3(num(t, 0))}`, ...dialect.machineMove(axis, p.var || '#99')];
+        // t856 SAFETY — a machine move flagged `restore` is a SAFE-HEIGHT PARK (safeZParkBlock): force G90 before its G53
+        // (+ restore G91 for an incremental body). A bare machine move (no restore — ATC dance, re-centre) is UNCHANGED.
+        if (p.restore == null) return core;
+        return wrapMachineFrame(dialect, core, p.restore);
     },
 };
 

@@ -45,11 +45,29 @@ export function safeZMarginNeg() {
 
 /** The shared `saferetract` block node for a wizard's error-handler retract — ONE source so corner (the pilot) and
  *  all the twins that inherit it build the SAME block. Resolves the declared margin now (valid-by-construction).
- *  workClear = the wizard's own safe-Z clearance var (the DM500 work-frame degrade target); default the corner-family #17. */
-export function safeRetractNode({ workClear = '#17' } = {}) {
+ *  workClear = the wizard's own safe-Z clearance var (the DM500 work-frame degrade target); default the corner-family #17.
+ *  restore (t856) — the DECLARED dist mode the SURROUNDING body is in ('inc' for a G91 probe body). The emit forces G90
+ *  before the machine-frame G53 (a G53 under G91 could move INCREMENTALLY on the controller — the factory ALWAYS sets G90
+ *  first) and restores G91 after when restore==='inc'. Omit in a G90 body (the explicit G90 is then a harmless no-op). */
+export function safeRetractNode({ workClear = '#17', restore } = {}) {
     const b = newBlock('saferetract');
     b.params = { margin: safeZMarginNeg(), workClear, label: SAFEZ_GUARD_LABEL };
+    if (restore != null) b.params.restore = restore;
     return b;
+}
+
+/** t856 — MODE-EXPLICIT machine-frame wrap. A G53 is machine-ABSOLUTE only under G90 (the factory pattern: G90G00 →
+ *  G53 on every dump; ZERO factory G53-in-G91). The fix targets ONLY the INCREMENTAL (G91) bodies — that is where a bare
+ *  G53 could move relatively; a G90 body already has G90 active (safe, unchanged). So when `restore==='inc'`: force G90
+ *  before the machine move (unless the core already asserts it — the DM500 degrade self-asserts G90, so no double), then
+ *  restore G91 after. ONE source for the saferetract + safeZParkBlock(machine) emits. */
+export function wrapMachineFrame(dialect, core, restore) {
+    if (restore !== 'inc' && restore !== 'G91') return core;   // G90 body → already under G90; no wrap (the machine G53 is safe as-is)
+    const g90 = dialect.distMode('abs');
+    const hasAbs = core.some((ln) => String(ln) === g90);      // DM500's work-frame degrade already emits G90 → don't double it
+    const out = hasAbs ? [...core] : [g90, ...core];
+    out.push(dialect.distMode('inc'));                          // restore G91 so the body's next incremental move is correct
+    return out;
 }
 
 export const SAFEZ_FRAMES = ['relative', 'machine'];
@@ -61,8 +79,10 @@ export const safeZFrameOf = (v) => (v === 'machine' ? 'machine' : 'relative');
  *   relative → the rapid lift `move` atom (G0 Z#var in the active dist mode) — IDENTICAL to a plain MV('Z', varRef).
  *   machine  → the `machinemove` atom → the dialect's G53 machine-coord move to the absolute Z (varRef must be a #var).
  */
-export function safeZParkBlock(frame, varRef) {
-    if (safeZFrameOf(frame) === 'machine') { const b = newBlock('machinemove'); b.params = { axis: 'Z', to: varRef }; return b; }
+export function safeZParkBlock(frame, varRef, restore) {
+    // t856 — the machine-frame park is a safe-height G53; carry the surrounding dist mode so its emit forces G90 (and
+    // restores G91 for an incremental body). The relative 'move' frame is a plain G0 Z (no G53) — no wrap needed.
+    if (safeZFrameOf(frame) === 'machine') { const b = newBlock('machinemove'); b.params = { axis: 'Z', to: varRef }; if (restore != null) b.params.restore = restore; return b; }
     const b = newBlock('move'); b.params = { mode: 'rapid', z: varRef };
     return b;
 }

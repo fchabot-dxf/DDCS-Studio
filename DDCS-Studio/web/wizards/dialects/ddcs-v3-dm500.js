@@ -39,6 +39,9 @@ export const dialect = {
     // without G53 — plus an honest comment. DM500-direct-G53-confirm is on the user-gated list (do NOT ride M98 P101: a
     // factory park may move XY, and a mid-program behavior change is worse than an honest work-frame retract).
     safeRetract: function ({ workClear = '#17' } = {}) {
+        // The degrade is an ABSOLUTE work-frame clearance (no G53) — already mode-safe, self-asserting G90. t856 leaves it
+        // untouched: wrapMachineFrame(saferetract.js) sees the G90 already present (hasAbs) and does NOT double it; in a G91
+        // body it only appends the G91 restore after.
         return ['( Safe-Z retract - machine G53 not grounded on DM500; absolute work-frame clearance )', this.distMode('abs'), `G0 Z${workClear}`];
     },
     // DM500 macros zero with G92 (defprobe.nc:21) — value is a WORK coord (plate thickness), NOT a machine coord

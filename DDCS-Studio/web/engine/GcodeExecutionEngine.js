@@ -1096,7 +1096,12 @@ export class GcodeExecutionEngine {
         // absolute, or the NEXT probe pass re-anchors to machine 0 (the old g53-move-breaks-preview-start-anchor collapse, t826).
         // The G53 move still RENDERS in the machine frame via the wcsOffset map above; the preview models it as a local
         // excursion while each probe pass stays anchored to its own start (passAnchor.js). See gcodeViz3d _anchorToStart.
-        if (this.absolute) this.stats.absolute = true;
+        // t856 — EXCLUDE the G53 line itself (`&& !g53`): the safe-Z retract now emits a MODE-EXPLICIT `G90 / G53 / G91`
+        // wrap (so the controller can't move it incrementally). Under that wrap the G53 line runs with this.absolute=true,
+        // so without this guard it would set stats.absolute inside a G91 macro — exactly the t826 re-anchor collapse. A G53
+        // is a machine-frame excursion, never the signal that the PROGRAM is absolute; the surrounding real (non-G53) moves
+        // are. This makes the wrap stats.absolute-NEUTRAL (positions were already identical — G53 is machine-absolute regardless).
+        if (this.absolute && !g53) this.stats.absolute = true;
 
         const isProbe = gcodes.includes(31) || this._probeArmed;   // G31, or a G01 inside a DM500 M101/M102 cycle
         // G53 (machine-coord positioning, e.g. the end "safe Z" park) is a RAPID, not a cut — but on DDCS it's

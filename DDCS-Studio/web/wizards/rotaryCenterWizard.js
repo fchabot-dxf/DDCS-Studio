@@ -91,7 +91,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
         // sim preview MODELS this mid-program G53 (t826), so the 3 probe passes still fan out to their own start markers (each
         // pass stays anchored — the G53 is a local excursion, not a whole-trace absolute flip). The jog + the −#17 drop-back
         // (now descending from the margin) are unchanged.
-        safeRetractNode(), mkC(`REPOSITION: ${msg}`), mkCF('Press Enter when repositioned - ESC=cancel', 2), mkMV('Z', '[0-#17]'), mkDM('inc'),
+        safeRetractNode({ restore: 'inc' }), mkC(`REPOSITION: ${msg}`), mkCF('Press Enter when repositioned - ESC=cancel', 2), mkMV('Z', '[0-#17]'), mkDM('inc'),   // t856 — reposition lift is inside the G91 body → G90-wrap, restore G91
     ];
 
     const _hdr = rotaryCenterHeaderComments(params);   // ONE format, shared with the twin's postInstantiate recompose
@@ -163,7 +163,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
 
     // FINAL retract/park via the DECLARED safe-Z frame: relative → MV('Z','#17') BYTE-IDENTICAL; machine → G53 Z#17 (park at
     // the absolute machine Z). #17 = the user's safe-Z value, interpreted per the frame (a clearance, or the absolute Z).
-    C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17'));
+    C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17', 'inc'));   // t856 — inside the G91 body → G90-wrap the machine G53, restore G91
     C(_hdr.writeOrigin);
     SWO('Y', '#54');                         // Y0 to centreline
     SWO('Z', datum === 'top' ? '#50' : '#56');

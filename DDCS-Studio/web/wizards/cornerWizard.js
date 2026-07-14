@@ -212,7 +212,7 @@ export function cornerStack(params = {}, opts = {}) {
         // (safeRetractNode → G53, absolute, limit-proof) on every post. Both old zPairR arms (#17/#19) collapse to the same
         // machine retract (probeZ-independent). The reposition below then DESCENDS from the margin (no longer the −#17 round-trip):
         // slower + limit-proof, the ruled divergence from the factory macro. wall2's retract is the clean final position.
-        out.push(mkMV(ax, retractVar), safeRetractNode());
+        out.push(mkMV(ax, retractVar), safeRetractNode({ restore: 'inc' }));   // t856 — per-wall retreat is INSIDE the G91 probe body → G90-wrap the G53, restore G91
         return out;
     };
 

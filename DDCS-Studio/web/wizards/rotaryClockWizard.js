@@ -103,7 +103,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
     CF('Position over the flat, near A0. Enter to probe - ESC=cancel', 2);
     DM('inc');
     C('Point A: probe down onto the flat'); ppZdown('#51');
-    S.push(safeRetractNode());               // t824/t826 — retract clear via the machine-frame margin (was G0 Z#17, an incremental lift that compounds into the top switch from a high start)
+    S.push(safeRetractNode({ restore: 'inc' }));   // t824/t826 — retract clear via the machine-frame margin (was G0 Z#17, an incremental lift that compounds into the top switch); t856 — inside the G91 body → G90-wrap, restore G91
     MV('Y', '#6');                           // step across the flat by the span (+Y)
     C('Point B: probe down onto the flat'); ppZdown('#52');
     C('Tilt of the flat (degrees) = atan( dZ / span )');
@@ -131,7 +131,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
     ];
     S.push(...actionFork(setKids, reportKids, rotateKids));
 
-    C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17'));   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
+    C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17', 'inc'));   // SPATIAL-MODEL 1c: frame-aware final park; t856 — inside the G91 body → G90-wrap the machine G53, restore G91
     DM('abs');
     MSG(_hdr.msg);
     GO(2);
