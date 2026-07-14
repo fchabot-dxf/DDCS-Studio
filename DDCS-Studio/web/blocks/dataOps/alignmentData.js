@@ -106,7 +106,7 @@ function applySafeZFrame(stack, resolved) {
     const ai = flat.findIndex((b) => b && b.type === 'assign' && b.params && b.params.var === '#54' && /ATAN/.test(String(b.params.value)));
     if (ai < 0) return stack;
     const park = flat[ai + 1];
-    if (park && park.type === 'move') { park.type = 'machinemove'; park.params = { axis: 'Z', to: '#19' }; }
+    if (park && park.type === 'move') { park.type = 'machinemove'; park.params = { axis: 'Z', to: '#19', restore: 'abs' }; }   // t858 — mirror safeZParkBlock default 'abs': the machine park G53 gets an explicit G90 (jump-proof), no G91 restore
     return stack;
 }
 

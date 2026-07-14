@@ -117,7 +117,7 @@ export const middleView = {
         const dir2val = el('m_dir2')?.value || (dir1val === 'pos' ? 'neg' : 'pos');
 
         const params = {
-            featureType: el('m_type')?.value || 'pocket',
+            featureType: el('m_type')?.value || 'boss',
             inAxis: el('m_inaxis')?.value || 'auto',        // INC3: per-traverse toggles (replace the single approach)
             transAxis: el('m_transaxis')?.value || 'auto',
             clearOver: el('m_clear')?.value || '15',

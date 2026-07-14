@@ -1,6 +1,6 @@
 {
     "livePreview.defaultPreviewPath": "/DDCS-Studio/web/index.html",
-    "liveServer.settings.port": 5503,
+    "liveServer.settings.port": 5504,
     "workbench.colorCustomizations": {
         "titleBar.activeBackground": "#f2c200",
         "titleBar.activeForeground": "#1a1a1a",

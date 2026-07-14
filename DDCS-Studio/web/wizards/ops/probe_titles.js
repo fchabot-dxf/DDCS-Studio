@@ -11,10 +11,10 @@ export const middleTitleBlock = {
     type: 'middle_title',
     label: 'Middle Probe',
     category: 'Control',
-    defaults: { featureType: 'pocket', axis: 'X', dir1: 'pos', twoAxis: false, dir2: 'pos' },
+    defaults: { featureType: 'boss', axis: 'X', dir1: 'pos', twoAxis: false, dir2: 'pos' },
     fields: ['featureType', 'axis', 'dir1', 'twoAxis', 'dir2'],
     emit: (p) => {
-        const ft = p.featureType || 'pocket';
+        const ft = p.featureType || 'boss';
         const ax = p.axis || 'X';
         const d1 = p.dir1 || 'pos';
         if (p.twoAxis) {

@@ -56,17 +56,18 @@ export function safeRetractNode({ workClear = '#17', restore } = {}) {
     return b;
 }
 
-/** t856 — MODE-EXPLICIT machine-frame wrap. A G53 is machine-ABSOLUTE only under G90 (the factory pattern: G90G00 →
- *  G53 on every dump; ZERO factory G53-in-G91). The fix targets ONLY the INCREMENTAL (G91) bodies — that is where a bare
- *  G53 could move relatively; a G90 body already has G90 active (safe, unchanged). So when `restore==='inc'`: force G90
- *  before the machine move (unless the core already asserts it — the DM500 degrade self-asserts G90, so no double), then
- *  restore G91 after. ONE source for the saferetract + safeZParkBlock(machine) emits. */
+/** t856/t858 — MODE-EXPLICIT machine-frame wrap. A G53 is machine-ABSOLUTE only under G90 (the factory pattern: G90G00 →
+ *  G53 on every dump; ZERO factory G53-in-G91). MODE-EXPLICIT means NO ambient-mode inference: EVERY safe-height G53
+ *  emits its OWN G90 immediately before it, so it is correct under ANY control flow (t858 — the probe-MISS error handler
+ *  is reached by a GOTO from INSIDE the G91 region; the success-path G90 is jumped over, so a textual "G90 body" read was
+ *  wrong). So ALWAYS force G90 first (unless the core already asserts it — the DM500 degrade self-asserts G90, no double);
+ *  restore G91 AFTER only where the body continues incremental (restore==='inc'); the error handler needs no restore
+ *  (M30/N2 follows). ONE source for the saferetract + safeZParkBlock(machine) emits. */
 export function wrapMachineFrame(dialect, core, restore) {
-    if (restore !== 'inc' && restore !== 'G91') return core;   // G90 body → already under G90; no wrap (the machine G53 is safe as-is)
     const g90 = dialect.distMode('abs');
     const hasAbs = core.some((ln) => String(ln) === g90);      // DM500's work-frame degrade already emits G90 → don't double it
-    const out = hasAbs ? [...core] : [g90, ...core];
-    out.push(dialect.distMode('inc'));                          // restore G91 so the body's next incremental move is correct
+    const out = hasAbs ? [...core] : [g90, ...core];           // G90 IMMEDIATELY before the G53 on every path — jump-proof
+    if (restore === 'inc' || restore === 'G91') out.push(dialect.distMode('inc'));   // restore G91 only where the body continues incremental
     return out;
 }
 
@@ -82,7 +83,9 @@ export const safeZFrameOf = (v) => (v === 'machine' ? 'machine' : 'relative');
 export function safeZParkBlock(frame, varRef, restore) {
     // t856 — the machine-frame park is a safe-height G53; carry the surrounding dist mode so its emit forces G90 (and
     // restores G91 for an incremental body). The relative 'move' frame is a plain G0 Z (no G53) — no wrap needed.
-    if (safeZFrameOf(frame) === 'machine') { const b = newBlock('machinemove'); b.params = { axis: 'Z', to: varRef }; if (restore != null) b.params.restore = restore; return b; }
+    // t858 — ALWAYS flag the machine park so its G53 gets an explicit G90 (default 'abs' = G90 only; 'inc' also restores
+    // G91 for a body that continues incremental). No ambient inference — jump-proof on every path.
+    if (safeZFrameOf(frame) === 'machine') { const b = newBlock('machinemove'); b.params = { axis: 'Z', to: varRef, restore: restore || 'abs' }; return b; }
     const b = newBlock('move'); b.params = { mode: 'rapid', z: varRef };
     return b;
 }

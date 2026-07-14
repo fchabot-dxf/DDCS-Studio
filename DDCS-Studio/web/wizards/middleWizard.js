@@ -84,7 +84,7 @@ export function middleStack(params = {}, opts = {}) {
     const mkA = (v, val, note) => { const b = newBlock('assign'); b.params = { var: v, value: String(val), note: note || '' }; return b; };
     const mkGO = (n) => { const b = newBlock('goto'); b.params = { n }; return b; };
     const mkLB = (n) => { const b = newBlock('label'); b.params = { n }; return b; };
-    const mkMM = (ax, ref) => { const b = newBlock('machinemove'); b.params = { axis: ax, to: ref }; return b; };
+    const mkMM = (ax, ref, restore) => { const b = newBlock('machinemove'); b.params = { axis: ax, to: ref }; if (restore) b.params.restore = restore; return b; };
     const mkMV = (ax, v) => { const b = newBlock('move'); b.params = { mode: 'rapid', [ax.toLowerCase()]: v }; return b; };
     const mkMSG = (text) => { const b = newBlock('message'); b.params = { text }; return b; };
     const mkDM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; return b; };

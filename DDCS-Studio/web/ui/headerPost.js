@@ -116,102 +116,96 @@ export function initHeaderPost() {
 
     const svgIco = (k) => `<svg class="hq-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${HQ_ICONS[k].c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k].d}</svg>`;
 
-    // Build the quick-actions popover: Program (file ops) · Post-processor (dialect) · Theme. The dialect
-    // and theme rows carry a ✓ on the active one; the chevron's tooltip names the active post.
-    let postSubOpen = false;    // Generate-for + Theme are collapsible submenus (start collapsed)
+    // Build the quick-actions popover — menu diet (t851): ~17 rows → ~9.
+    // Layout: identity row · Library… · gcode row (Load/Insert/Export) · Clear editor · Theme · Setup sheet… · Settings… · Rate.
+    // MOVED NOT LOST: Save/Open/wizard → Library; Pull → Gateway (↧ on identity row); standalone/checklist → Settings.
+    let postSubOpen = false;    // (preserved for the post-switch handler below; no post rows emitted in the slimmed menu)
     let themeSubOpen = false;
 
     const fillMenu = () => {
         const machinePost = getDialect(getActiveProfile().id);
         const active = getActivePostId();
-        const autoLabel = `Auto · ${machinePost.name}`;
         const curTheme = document.body.getAttribute('data-theme') || 'studio';
-        const activeName = active === 'auto' ? autoLabel : (listPosts().find((p) => p.id === active)?.name || active);
-
         const actionRow = (a) =>
             `<button type="button" role="menuitem" class="hdr-quick-item" data-act="${a.act}">`
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco(a.act)
             + `<span class="hdr-quick-lbl">${a.label}</span></button>`;
-        const postRow = (value, label, warn) =>
-            `<button type="button" role="menuitemradio" class="hdr-quick-item" data-post="${esc(value)}" aria-checked="${active === value}">`
-            + `<span class="hdr-quick-check" aria-hidden="true">${active === value ? '✓' : ''}</span>`
-            + `<span class="hdr-quick-lbl">${esc(label)}</span>`
-            + (warn ? '<span class="hdr-quick-warn" title="Not yet verified">⚠</span>' : '')
-            + '</button>';
-        // Theme picker = a horizontal row of colour chips (tooltip = theme name); the active one gets a ring.
         const themeRow = (name) => {
             const label = name[0].toUpperCase() + name.slice(1);
             return `<button type="button" role="menuitemradio" class="hq-theme-chip${curTheme === name ? ' active' : ''}" data-theme="${name}" title="${label}" aria-label="${label} theme" aria-checked="${curTheme === name}" style="--chip:${HQ_THEME_SWATCH[name] || '#888'}"></button>`;
         };
 
-        // Post-processor + Theme are collapsible SUBMENUS: the row shows the active value; click expands.
-        const sub = (key, label, cur, open, body) =>
-            `<button type="button" class="hdr-quick-item hdr-quick-sub${open ? ' is-open' : ''}" data-sub="${key}" aria-expanded="${open}">`
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>'
-            + `<span class="hdr-quick-lbl">${label}<span class="hq-cur"> · ${esc(cur)}</span></span>`
-            + '<span class="hq-caret" aria-hidden="true">▸</span></button>'
-            + `<div class="hdr-quick-subitems" data-subitems="${key}"${open ? '' : ' hidden'}>${body}</div>`;
-
-        // t688 b2 — the PROFILE section REPLACES "Generate for". Read-only current profile + controller, up to 3 recents
-        // (one-click full-swap), and the modal doors. NO dialect/controller switching here — that stays on the Settings
-        // controller dropdown (with its per-post warning triangles). One override surface beats two.
+        // ── IDENTITY ROW ──────────────────────────────────────────────────────────────────────────────
+        // Menu diet (t851): ONE compound row — profile name · controller · ☁ state · ↧ pull.
+        // Tap main area → Library Profiles tab. ☁ span → cloud connect. ↧ span → Pull from controller.
         const ap = ProfLib.activeProfile() || {};
         const apCtrl = (CONTROLLER_PROFILES[ap.controllerId] || {}).name || ap.controllerId || '';
-        const recents = recentProfileIds().filter((id) => id !== ProfLib.activeProfileId()).slice(0, 3);
-        const recentRows = recents.map((id) => {
-            const p = ProfLib.listProfiles().find((x) => x.id === id); if (!p) return '';
-            const c = (CONTROLLER_PROFILES[p.controllerId] || {}).name || p.controllerId || '';
-            return `<button type="button" role="menuitem" class="hdr-quick-item" data-profswitch="${esc(id)}" title="Switch to this profile (full-swap)"><span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">↔ ${esc(p.name || '(unnamed)')}<span class="hq-cur"> · ${esc(c)}</span></span></button>`;
-        }).join('');
-        const profAct = (act, label) => `<button type="button" role="menuitem" class="hdr-quick-item" data-profact="${act}"><span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">${label}</span></button>`;
-        // t742 — the ACCOUNT row: cloud connection state at a glance (invisible on mobile before this). Reads the ONE shared
-        // cloudAccount API; tap opens the SAME connect flow (renderCloudLogin) Settings + the Projects drawer use.
         const acc = getAccount();
-        const accTxt = acc.connected ? ('☁ ' + esc(acc.email || acc.name || 'Connected')) : '☁ Cloud: not connected · Connect';
-        const accountRow = `<button type="button" role="menuitem" class="hdr-quick-item" data-cloud="1" title="${acc.connected ? 'Cloud account — tap to manage or disconnect' : 'Connect your cloud account to sync projects to your own Drive'}"><span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">${accTxt}</span></button>`;
-        const profileSection = '<div class="hdr-quick-head">Profile &amp; account</div>'
-            + `<div class="hdr-quick-cur" style="display:flex; align-items:center; gap:8px; padding:5px 12px; font-size:13px; opacity:.92; cursor:default;"><span class="hdr-quick-lbl"><b>${esc(ap.name || '(unnamed configuration)')}</b><span class="hq-cur"> · ${esc(apCtrl)}</span></span></div>`
-            + accountRow
-            + recentRows
-            + profAct('browse', '🗂 Profiles…') + profAct('saveas', '＋ Save as…') + profAct('pull', '↧ Pull from controller');
-        // Theme picker is no longer collapsed — the chips are compact, so show them directly under a heading.
+        const cloudCls = acc.connected ? 'hq-cloud-badge connected' : 'hq-cloud-badge';
+        const cloudTitle = acc.connected
+            ? `Cloud: ${esc(acc.email || acc.name || 'connected')} — tap to manage`
+            : 'Connect cloud account';
+        const identityRow =
+            `<button type="button" class="hdr-quick-item hq-identity" data-profact="browse" title="Open Library — Profiles · Projects · Wizards">`
+            + `<span class="hdr-quick-check" aria-hidden="true"></span>`
+            + `<span class="hdr-quick-lbl"><b>${esc(ap.name || '(unnamed)')}</b><span class="hq-cur"> · ${esc(apCtrl)}</span></span>`
+            + `<span class="${cloudCls}" data-cloud="1" title="${cloudTitle}">☁</span>`
+            + `<span class="hq-pull-btn" data-profact="pull" title="Pull from controller">↧</span>`
+            + `</button>`;
+
+        // ── GCODE ROW — Load / Insert / Export inline ─────────────────────────────────────────────────
+        const gcodeRow =
+            `<div class="hq-gcode-row">`
+            + `<button type="button" class="hq-gcode-btn" data-act="load"   title="Load gcode (replace)">${svgIco('load')} Load</button>`
+            + `<button type="button" class="hq-gcode-btn" data-act="insert" title="Insert gcode at cursor">${svgIco('insert')} Insert</button>`
+            + `<button type="button" class="hq-gcode-btn" data-act="export" title="Export / download">${svgIco('export')} Export</button>`
+            + `</div>`;
+
+        // ── CLEAR ─────────────────────────────────────────────────────────────────────────────────────
+        const clearRow = actionRow({ act: 'clear', label: 'Clear editor' });
+
+        // ── THEME ─────────────────────────────────────────────────────────────────────────────────────
         const themeSection = '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
             + `<div class="hdr-quick-subitems" data-subitems="theme">${THEMES.map(themeRow).join('')}</div>`;
 
-        // The Setup checklist entry is hidden when the master health switch is off (Settings / the checklist toggle).
+        // ── UTILITY ROWS ──────────────────────────────────────────────────────────────────────────────
+        // t854 — the Library: one door to Profiles · Projects · Wizards.
+        const libraryRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="library">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('library')
+            + '<span class="hdr-quick-lbl">Library…</span></button>';
         const healthOn = (window.ddcsHealthSignalsOn ? window.ddcsHealthSignalsOn() : true);
         const checklistRow = !healthOn ? '' :
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="checklist">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('checklist')
             + '<span class="hdr-quick-lbl">Setup checklist</span></button>';
-        const settingsRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
-            + '<span class="hdr-quick-lbl">Settings…</span></button>';
-        // t854 — the Library: one door to Profiles · Projects · Wizards (opens on the last-used tab).
-        const libraryRow =
-            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="library">'
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('library')
-            + '<span class="hdr-quick-lbl">Library…</span></button>';
-        // t850 — the Setup sheet: a print-ready single job page (tools / WCS / stock / ops / time), read from declared sources.
+
+        // t850 — print-ready job page.
         const setupSheetRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="setupSheet">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('setupSheet')
             + '<span class="hdr-quick-lbl">Setup sheet…</span></button>';
-        // t598 — ALWAYS-AVAILABLE "Rate / Feedback" (the unprompted path — opens the GitHub repo to star / give feedback).
+        const settingsRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
+            + '<span class="hdr-quick-lbl">Settings…</span></button>';
+        // t598 — always-available Rate / Feedback.
         const rateRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭐ Rate / Feedback</span></button>';
 
-        menu.innerHTML = '<div class="hdr-quick-head">Program</div>'
-            + HQ_ACTIONS.map(actionRow).join('')
+        // ── ASSEMBLE — ≤9 logical rows ────────────────────────────────────────────────────────────────
+        menu.innerHTML =
+            identityRow
             + '<div class="hdr-quick-sep"></div>'
-            + actionRow(HQ_STANDALONE)
-            + '<div class="hdr-quick-sep"></div>' + profileSection
+            + libraryRow
+            + gcodeRow
+            + clearRow
             + themeSection
-            + '<div class="hdr-quick-sep"></div>' + libraryRow + setupSheetRow + checklistRow + settingsRow + rateRow;
+            + '<div class="hdr-quick-sep"></div>'
+            + setupSheetRow + checklistRow + settingsRow + rateRow;
 
-        btn.title = `Quick actions — open / save / load / export, profile (${ap.name || 'unnamed'} · ${apCtrl}), theme. Click to open.`;
+        btn.title = `Quick actions — profile: ${ap.name || 'unnamed'} · ${apCtrl}`;
         btn.setAttribute('aria-label', `Quick actions (profile: ${ap.name || 'unnamed'} · ${apCtrl})`);
     };
 
@@ -307,8 +301,26 @@ export function initHeaderPost() {
 
     btn.addEventListener('click', (e) => { e.stopPropagation(); if (menu.hidden) openMenu(); else closeMenu(); });
 
-    // Route a menu click: a file action, a theme, or a post pick (the post path keeps the old <select> effects).
+    // Route a menu click: a file action, a theme, or a gcode-row btn, or an identity-row sub-target.
     menu.addEventListener('click', (e) => {
+        // The identity row's inner ☁ and ↧ spans carry their own data-* — check the EXACT target first before
+        // ascending to the parent .hdr-quick-item (so tapping ☁ opens cloud, not Library).
+        const exactCloud = e.target.closest('[data-cloud]');
+        if (exactCloud && exactCloud !== e.target.closest('.hdr-quick-item')) {
+            closeMenu(); openCloudModal(); return;
+        }
+        const exactPull = e.target.closest('.hq-pull-btn[data-profact]');
+        if (exactPull) {
+            closeMenu();
+            if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' });
+            setTimeout(() => { const b = document.getElementById('set_profile_pull'); if (b) b.click(); }, 60);
+            return;
+        }
+
+        // gcode-row inline action buttons (hq-gcode-btn carry data-act)
+        const gcodeBtn = e.target.closest('.hq-gcode-btn');
+        if (gcodeBtn && gcodeBtn.dataset.act) { closeMenu(); runQuickAction(gcodeBtn.dataset.act); return; }
+
         const it = e.target.closest('.hdr-quick-item, .hq-theme-chip');
         if (!it) return;
 
@@ -338,6 +350,7 @@ export function initHeaderPost() {
             return;
         }
         if (!it.dataset.post) return;   // (dialect switching removed from the menu — no data-post items remain)
+
         setActivePostId(it.dataset.post);                           // persist the active post (override or 'auto')
 
         // Automatically sync the variable DB to the active post's family

@@ -33,7 +33,7 @@ import { makeProvider } from '../../viz/opSimStarts.js';   // E2 — reuse the D
  *  their default shape (pocket / auto travel / single-axis / active-WCS / no-Z / no-sync). axis/dir1 baked X-primary/+. */
 export const MIDDLE_DEFAULTS = {
     // structural (STRING enums / bools — the guards match by value-equality / !! coercion)
-    featureType: 'pocket', inAxis: 'auto', transAxis: 'auto', travelShape: 'dogleg', twoAxis: false, circular: false, probeZ: 0, wcs: 'active', syncA: 0,
+    featureType: 'boss', inAxis: 'auto', transAxis: 'auto', travelShape: 'dogleg', twoAxis: false, circular: false, probeZ: 0, wcs: 'active', syncA: 0,
     // baked value/order swaps (NOT bound in E1)
     axis: 'X', dir1: 'pos', slave: '3',
     // scalars — dist default 200 (t381: 20 was too small to reach the wall on a typical stock → "retract-only"; matches middleStack's fallback + the m_dist form default)
