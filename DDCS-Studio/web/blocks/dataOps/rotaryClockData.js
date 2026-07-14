@@ -124,7 +124,7 @@ function applySafeZFrame(stack, resolved) {
     const ci = flat.findIndex((b) => b && b.type === 'comment' && b.params && b.params.text === 'Final retract');
     if (ci < 0) return stack;
     const park = flat[ci + 1];
-    if (park && park.type === 'move') { park.type = 'machinemove'; park.params = { axis: 'Z', to: '#17' }; }
+    if (park && park.type === 'move') { park.type = 'machinemove'; park.params = { axis: 'Z', to: '#17', restore: 'inc' }; }   // t856 — mirror safeZParkBlock(...,'inc'): the machine park is inside the G91 body, so its G53 is G90-wrapped + G91-restored
     return stack;
 }
 
