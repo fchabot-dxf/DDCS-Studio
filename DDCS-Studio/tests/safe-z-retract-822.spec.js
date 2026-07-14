@@ -170,7 +170,10 @@ test('the SIM executes the machine-frame retract to the declared safe height (�
       liftFrame: chipFrame({ g53: true, probing: false }), cutFrame: chipFrame({ g53: false, probing: false }) };
   });
   expect(r.code, 'the isolated retract is the machine-frame register form').toContain('G53 Z#520');
-  expect(r.absolute, 'a G53 machine-frame move ran').toBe(true);
+  // t856 — stats.absolute is now driven by the DIST MODE, NOT by a G53 (the engine excludes the G53 line so the safe-Z
+  // MODE-EXPLICIT wrap can't flip a G91 probe macro absolute — the t826 re-anchor collapse). A retract-ONLY program has
+  // no dist-mode-absolute move, so the flag is false; the retract still RAN (endZ=-5 below proves the machine-frame move).
+  expect(r.absolute, 'a lone G53 no longer flips stats.absolute (t856: dist-mode-driven, not G53-driven)').toBe(false);
   expect(r.endZ, 'the sim retracts to the declared machine safe height (-5)').toBeCloseTo(-5, 1);
   // the chip goes AMBER (machine frame) during the G53 lift, and stays cyan (work) for a normal move
   expect(r.liftFrame, 'the poschip is AMBER (machine frame) during the G53 safe-Z lift').toBe('mach');
