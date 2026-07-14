@@ -3849,3 +3849,52 @@ gap (SINGLE) + VERIFY the whole feature numerically (which wasn't covered by a d
 
 VERBATIM: 1250 passed / 0 failed / 2 skipped (12.2m, 733s). CLEAN — no failures (the box was quiet this run); +9 new
 drill-pattern tests, no regressions, no contention flake. Byte-identity held (single/grid/circle/line defaults unchanged).
+
+
+## 2026-07-13 (t848) — RIDERS (four ruled items; then the advisor releases the #4+#5+riders batch).
+
+### (1) DRILL DEFAULT = SINGLE (the advisor's ruling on my t846 flag — a 6-hole grid default is a latent surprise)
+
+Changed grid→single in ALL FOUR coupled places together (the twin-default rule — else byte-identity breaks): drillWizard's
+builder fallback (`params.pattern || 'single'`, covers bore too — bore uses drillStack), drillData DRILL_DEFAULTS, drillData
+drillPatternGeometry view fallback, boreData BORE_DEFAULTS. VERIFIED: the default drill emits 1 hole; an explicit
+`pattern:'grid'` still emits 6 (saved projects/presets carry their own pattern → unaffected). The emit tests are twin==stack
+(both single → still byte-identical) + explicit-param. ONE test rebased, justified as the default-change only:
+mill-layout-716's drill/bore "size-handle drag" assumed the default had a pitch size handle — single has only the pos
+handle, so those two now SEED `pattern:'grid'` to exercise the size handle (the feature is unchanged; the default is). This
+also confirmed the twin form DOES live-re-render its when-gated cluster on a pattern change (via the data-param element) —
+my t846 "no live re-render" note was a test artifact (I had driven a hidden backing select).
+
+### (2) PULL-SEED settings.machine.rapidRate from the dump G0-rate register
+
+dumpImport now reads the per-profile G0 speed: Expert via the index map (`EXP.rapid = #63` "G00 speed") → geometry.rapidRate;
+V4.1/DM500 via the by-name resolver (`ENG_NAME.rapid = 'g0+\s*speed'` → byNameIndices.rapid) → geometry.rapidRate (DM500
+ungrounded → null). The pull apply persists it to `settings.machine.rapidRate` (alongside the t838 softLimitsPulled), which
+stays a user-editable field; absent register → null → keep the honest 6000 default. VERIFIED per profile register.
+
+### (3) UNIFY the gateway instrument-estimator onto the ONE engine-trace time model
+
+instrument.js's quoted `total_est_time_s` now READS the t844 `estimateProgram` (the engine trace, identical to the editor
+chip) — its own scan()-time model (rapid 6000 / feed→1000) is RETIRED as the source of the quote. scan() stays ONLY the
+Z-up/beacon detector + the RELATIVE pacer; per-beacon `cum_time_s` is scaled onto the engine total (percent unchanged).
+Headless fallback to scan's total if the engine can't run. VERIFIED: the gateway total == the editor estimate (same program).
+
+### (4) LABEL HUMANIZATION (t820 "when next touched" — they were touched)
+
+drill/bore `x0`/`y0`/`offZ` and the shared entry pair `entryX`/`entryY` (deriveBindings) gained human labels + units + help
++ `section: 'GEOMETRY'`: "Pattern origin X/Y", "Z offset", "Entry point X/Y". The form-integrity guard (form-section-
+collapse-820 + form-kernel-720) passes UNCHANGED — no label-heuristic update needed. Screenshot VIEWED: the drill form shows
+the humanized labels + "Single hole" default + the single-hole layout + code preview.
+
+### VERIFIED — riders-848.spec.js (5) + regressions
+
+(1) default=single, grid still 6; (2) Expert #63 + the by-name resolver seed rapidRate, honest default when absent, the
+setting is user-editable 6000; (3) gateway total == editor estimate; (4) the humanized labels asserted. Regressions: 10
+drill/bore/canvas + 7 form-integrity/kernel green.
+
+### GATE (w4, full log — no tail truncation)
+
+VERBATIM: 1253 passed / 2 failed / 2 skipped (12.3m, 738s). The mill-layout drill/bore failures (the real default-change
+consequence) are FIXED. The 2 remaining — collapsible-panes-752 (t836's MOST load-fragile test) + informed-merge-notice —
+are the KNOWN w4 CPU-contention class; BOTH pass ISOLATED (10 passed), are UNRELATED to the riders (no panes/merge touched),
+the box ran loaded. Advisor re-runs on a quiet box for the batch release.
