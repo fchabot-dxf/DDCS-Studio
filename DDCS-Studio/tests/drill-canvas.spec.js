@@ -62,6 +62,10 @@ test('drill 2D layout canvas: zoom + pan are view-only, drag still works after',
   await page.waitForFunction(() => window.ddcsStudio);
   await page.evaluate(() => window.openWiz('drill'));
   await page.waitForSelector('#drillLayoutCanvas svg.feature-canvas');
+  // t851 — the drill default is now a single hole (no dx pitch / size handle); this test exercises the GRID pattern
+  // (multi-hole zoom + the d_dx-driven size handle), so seed grid.
+  await page.selectOption('#d_pattern', 'grid');
+  await page.waitForTimeout(100);
 
   const hole = page.locator('#drillLayoutCanvas .fc-hole').first();
   const canvas = page.locator('#drillLayoutCanvas svg.feature-canvas');

@@ -149,7 +149,7 @@ export const drillView = {
     },
 
     update(ctx) {
-        const pattern = v('d_pattern') || 'grid';
+        const pattern = v('d_pattern') || 'single';   // t851 — default = single, consistent with the t848 builder fallback (drillWizard.js) + the twin; the form no longer diverges to grid
         const method = v('d_method') || 'peck';
         const s = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
         // One shared position drives whichever anchor the active pattern uses (centre for circle,
