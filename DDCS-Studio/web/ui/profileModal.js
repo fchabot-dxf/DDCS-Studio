@@ -75,40 +75,54 @@ async function saveAsFlow() {
     dlgNotice(`Saved “${nm}”.`);
 }
 
-/** BROWSE — local + cloud rows; Load (full-swap) / Delete / Export per local row; download / delete per cloud-only row. */
+/** BROWSE — local + cloud rows; Load (full-swap) / Delete / Export per local row; download / delete per cloud-only row.
+ *  The overlay is a thin wrapper around renderProfilesInto(), which is ALSO mounted by the Library modal's Profiles tab
+ *  (one source for the browser body). */
 async function browse() {
-    await refreshCloud();
     const ov = document.createElement('div');
     ov.className = 'profile-modal';   // NOT 'app-dialog' — dialogs (dlgConfirm etc.) are a distinct layer that sits ABOVE this modal
     ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
     ov.style.cssText = 'position:fixed; inset:0; z-index:13100; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:16px;';
     const panel = document.createElement('div');
     panel.style.cssText = 'width:min(560px,96vw); max-height:88vh; display:flex; flex-direction:column; background:var(--panel,#161b22); color:var(--text-main,#e6ecf2); border:1px solid var(--border,#2a313b); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.6);';
-    panel.innerHTML = `
+    ov.appendChild(panel);
+    document.body.appendChild(ov);
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
+    document.addEventListener('keydown', onKey, true);
+    ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });
+    await renderProfilesInto(panel, { onClose: close, showDone: true });
+}
+
+/**
+ * Render the profile browser body (header + list + footer + all wiring) INTO `host`. Used by the standalone modal
+ * (browse) AND the Library modal's Profiles tab — one source. opts.onClose = the Done handler; opts.showDone hides the
+ * Done button when the host chrome already has a close (the Library).
+ */
+export async function renderProfilesInto(host, opts = {}) {
+    const { onClose = () => {}, showDone = false } = opts;
+    await refreshCloud();
+    host.innerHTML = `
         <div style="padding:14px 18px 8px; display:flex; align-items:center; gap:10px;">
             <h2 style="margin:0; font-size:15px; flex:1;">Profiles</h2>
             <button type="button" data-pa="save" class="toolbar-btn settings-io" title="Save the current configuration as a new profile">＋ Save as…</button>
         </div>
         <div data-plist style="flex:1; overflow:auto; padding:4px 18px; display:flex; flex-direction:column; gap:5px; min-height:120px;"></div>
-        <div style="padding:10px 18px 14px; display:flex; gap:8px; align-items:center; border-top:1px solid var(--border,#2a313b);">
+        <div style="padding:10px 18px 14px; display:flex; gap:8px; align-items:center; border-top:1px solid var(--border,#2a313b); flex-wrap:wrap;">
             <button type="button" data-pa="import" class="toolbar-btn settings-io" title="Import a profile from a .json export">⬆ Import file</button>
             <button type="button" data-pa="cloudsave" class="toolbar-btn settings-io" title="Save the CURRENT profile to your cloud (Google Drive)">☁ Save to cloud</button>
             <button type="button" data-pa="sync" class="toolbar-btn settings-io" title="Refresh the cloud profile list">☁ Sync</button>
             <span style="flex:1"></span>
             <button type="button" data-sl-primary class="sl-primary" disabled title="Load the selected profile (full-swap)">Load</button>
-            <button type="button" data-pa="done" style="padding:6px 16px; font-size:12px; border-radius:5px; cursor:pointer; border:1px solid var(--border,#2a313b); background:transparent; color:var(--text-main,#e6ecf2);">Done</button>
+            ${showDone ? '<button type="button" data-pa="done" style="padding:6px 16px; font-size:12px; border-radius:5px; cursor:pointer; border:1px solid var(--border,#2a313b); background:transparent; color:var(--text-main,#e6ecf2);">Done</button>' : ''}
         </div>`;
-    ov.appendChild(panel);
+    const panel = host;
     const importInput = document.createElement('input');
     importInput.type = 'file'; importInput.accept = '.json,application/json'; importInput.style.display = 'none';
-    ov.appendChild(importInput);
-    document.body.appendChild(ov);
+    host.appendChild(importInput);
 
     const listEl = panel.querySelector('[data-plist]');
-    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true); };
-    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
-    document.addEventListener('keydown', onKey, true);
-    ov.addEventListener('mousedown', (e) => { if (e.target === ov) close(); });
+    const close = onClose;
 
     function render() {
         const active = L.activeProfile() || {};

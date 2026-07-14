@@ -5428,6 +5428,25 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .setup-sheet-page .ss-verdict-amber { color:#9a6a1a; }
 .setup-sheet-page .ss-verdict-red { color:#b3261e; }
 
+/* ── The Library (t854): one tabbed modal — Profiles · Projects · Wizards. Themed; 13100 tier (below dialogs). ──── */
+.library-overlay { position:fixed; inset:0; z-index:13100; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
+.library-modal { width:min(640px,96vw); height:min(680px,90vh); display:flex; flex-direction:column; background:var(--panel,#161b22); color:var(--text-main,#e6ecf2); border:1px solid var(--border,#2a313b); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.6); overflow:hidden; }
+.library-head { display:flex; align-items:center; gap:8px; padding:8px 12px 0; border-bottom:1px solid var(--border,#2a313b); }
+.library-tabs { display:flex; gap:4px; flex:1; flex-wrap:wrap; }
+.library-tab { font:inherit; font-size:13px; padding:8px 18px; border-radius:7px 7px 0 0; border:1px solid transparent; border-bottom:0; background:transparent; color:var(--text-dim,#9fb0c4); cursor:pointer; }
+.library-tab:hover { color:var(--text-main,#e6ecf2); }
+.library-tab.active { color:var(--text-main,#e6ecf2); background:var(--bg,#11151c); border-color:var(--border,#2a313b); font-weight:600; }
+.library-x { font:inherit; font-size:15px; background:none; border:0; color:var(--text-dim,#9fb0c4); cursor:pointer; padding:4px 10px; align-self:flex-start; }
+.library-x:hover { color:var(--text-main,#fff); }
+.library-body { flex:1; overflow:auto; display:flex; flex-direction:column; min-height:180px; }
+.lib-projhead, .lib-wizhead { display:flex; align-items:center; gap:8px; padding:12px 16px 8px; flex-wrap:wrap; }
+.lib-crumb { font-size:12px; color:var(--text-dim,#9fb0c4); }
+.lib-crumb-link { background:none; border:0; color:var(--accent,#2d7ff9); cursor:pointer; font:inherit; font-size:12px; padding:0 2px; }
+.lib-list { flex:1; overflow:auto; padding:0 16px 8px; display:flex; flex-direction:column; gap:4px; }
+.lib-row { display:flex; align-items:center; gap:8px; padding:7px 10px; border:1px solid var(--border,#2a313b); border-radius:6px; }
+.lib-name { background:none; border:0; color:inherit; cursor:pointer; font:inherit; text-align:left; }
+#library_wizard_manager { padding:0 16px 12px; }
+
 /* ── One-file backup: the restore preview-then-confirm modal (t852). Themed (both-theme legible). ─────────────── */
 .backup-restore-overlay { position:fixed; inset:0; z-index:13200; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(0,0,0,.55); }
 .backup-restore-modal { width:100%; max-width:560px; max-height:calc(100vh - 48px); display:flex; flex-direction:column; background:var(--panel, #1a1f27); color:var(--text, #e7edf5); border:1px solid var(--border, #333a45); border-radius:8px; box-shadow:0 12px 40px rgba(0,0,0,.5); overflow:hidden; }
