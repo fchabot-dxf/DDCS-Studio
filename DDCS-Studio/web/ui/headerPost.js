@@ -21,6 +21,7 @@ import * as ProfLib from '../data/profileLibrary.js';
 import { THEMES } from './themes.js';
 import { getAccount, renderCloudLogin } from './cloudAccount.js';   // t742 — the header ACCOUNT row consumes the ONE shared cloud-account API (no second connect impl)
 import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
+import { openSetupSheet } from './setupSheet.js';   // t850 — the print-ready job page (reads every value from its declared source)
 
 // Quick-menu glyphs (24×24 stroke grid) — mirror the dock toolbar icons so the menu reads consistently.
 const HQ_ICONS = {
@@ -34,6 +35,7 @@ const HQ_ICONS = {
     standalone: { c: '#22c55e', d: '<rect x="3" y="3" width="18" height="14" rx="2"/><line x1="3" y1="8" x2="21" y2="8"/><polyline points="9 13 12 16 15 13"/><line x1="12" y1="11" x2="12" y2="16"/>' },
     settings: { c: '#94a3b8', d: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' },
     checklist: { c: '#3ddc84', d: '<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>' },
+    setupSheet: { c: '#c084fc', d: '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>' },
     wizard: { c: '#a855f7', d: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>' },
 };
 // data-act → the existing handler it proxies (file ops are window globals; Open/Save click their header buttons).
@@ -68,6 +70,7 @@ function runQuickAction(act) {
             break;
         case 'settings': window.openSettings?.(); break;
         case 'checklist': window.openSetupChecklist?.(); break;
+        case 'setupSheet': openSetupSheet(); break;   // t850 — the print-ready job page
         case 'rate': window.ddcsOpenRate?.(); break;   // t598 — the always-available Rate / Feedback path (opens the repo)
     }
 }
@@ -182,6 +185,11 @@ export function initHeaderPost() {
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
             + '<span class="hdr-quick-lbl">Settings…</span></button>';
+        // t850 — the Setup sheet: a print-ready single job page (tools / WCS / stock / ops / time), read from declared sources.
+        const setupSheetRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="setupSheet">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('setupSheet')
+            + '<span class="hdr-quick-lbl">Setup sheet…</span></button>';
         // t598 — ALWAYS-AVAILABLE "Rate / Feedback" (the unprompted path — opens the GitHub repo to star / give feedback).
         const rateRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
@@ -193,7 +201,7 @@ export function initHeaderPost() {
             + actionRow(HQ_STANDALONE)
             + '<div class="hdr-quick-sep"></div>' + profileSection
             + themeSection
-            + '<div class="hdr-quick-sep"></div>' + checklistRow + settingsRow + rateRow;
+            + '<div class="hdr-quick-sep"></div>' + setupSheetRow + checklistRow + settingsRow + rateRow;
 
         btn.title = `Quick actions — open / save / load / export, profile (${ap.name || 'unnamed'} · ${apCtrl}), theme. Click to open.`;
         btn.setAttribute('aria-label', `Quick actions (profile: ${ap.name || 'unnamed'} · ${apCtrl})`);
