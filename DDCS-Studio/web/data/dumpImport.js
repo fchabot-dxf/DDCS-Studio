@@ -61,7 +61,8 @@ const round4 = (x) => Math.round(x * 1e4) / 1e4;
 
 // ── Expert-M350 — the confirmed index map (ports _map_geometry_to_profile). Values grounded (index = offset). ──
 const EXP = { softNeg: [161, 162, 163], softPos: [166, 167, 168], homingDir: [112, 113, 114],
-    homingSpeed: [107, 108, 109], precision: 118, machZero: [235, 236, 237], activeWcs: 78, wcsBase: 305, wcsStride: 5 };
+    homingSpeed: [107, 108, 109], precision: 118, machZero: [235, 236, 237], activeWcs: 78, wcsBase: 305, wcsStride: 5,
+    rapid: 63 };   // t848 — #63 "G00 speed" (mm/min): seeds settings.machine.rapidRate for the time estimate + time-true sim
 
 function farReach(neg, pos) {
     const ns = Math.abs(neg) >= SENTINEL, ps = Math.abs(pos) >= SENTINEL;
@@ -105,6 +106,7 @@ export function mapExpertGeometry(params) {
         homeDir: hd, homeEdge: edge, homeEdgeConflict: conflict,
         homingFeeds: { speed: { x: at(EXP.homingSpeed[0]), y: at(EXP.homingSpeed[1]), z: at(EXP.homingSpeed[2]) }, precision: at(EXP.precision) },
         machZero: { x: at(EXP.machZero[0]), y: at(EXP.machZero[1]), z: at(EXP.machZero[2]) },
+        rapidRate: at(EXP.rapid) > 0 ? round4(at(EXP.rapid)) : null,   // t848 — #63 G00 speed (mm/min); null when absent → keep the honest default
     };
 }
 export function mapExpertWcs(params) {
@@ -119,6 +121,7 @@ export function mapExpertWcs(params) {
 // ── V4.1 / DM500 — DERIVE BY NAME from the eng (ports _v41_geo_indices + _map_geometry_to_profile_v41). ──
 const ENG_NAME = {
     enable: 'enable\\s+soft',
+    rapid: 'g0+\\s*speed',   // t848 — "G0 Speed" / "G00 speed" (mm/min) → settings.machine.rapidRate
     softNeg: 'soft.?limited\\s+po\\w+\\s+value\\s+of\\s+{AX}--',
     softPos: 'soft.?limited\\s+po\\w+\\s+value\\s+of\\s+{AX}\\+\\+',
     homeDir: '{AX}\\s+axis\\s+home\\s+direction',
@@ -128,7 +131,7 @@ const ENG_NAME = {
 export function byNameIndices(eng) {
     const keys = Object.keys(eng).map(Number).sort((a, b) => a - b);
     const find = (pat) => { const rx = new RegExp(pat, 'i'); for (const i of keys) { if (rx.test(eng[i].name)) return i; } return null; };
-    const idx = { enable: find(ENG_NAME.enable) };
+    const idx = { enable: find(ENG_NAME.enable), rapid: find(ENG_NAME.rapid) };   // t848 — rapid = G0 speed (non-per-axis)
     for (const role of ['softNeg', 'softPos', 'homeDir', 'seek', 'slow']) {
         idx[role] = { x: find(ENG_NAME[role].replace('{AX}', 'X')), y: find(ENG_NAME[role].replace('{AX}', 'Y')), z: find(ENG_NAME[role].replace('{AX}', 'Z')) };
     }
@@ -162,6 +165,7 @@ export function mapByNameGeometry(params, engText, grounded = true) {
         homeDir: hd, homeEdge: edge, homeEdgeConflict: conflict,
         homingFeeds: anySpeed ? { speed, precision: val(slowI.x) } : null,
         machZero: null,
+        rapidRate: (has(gi.rapid) && at(gi.rapid) > 0) ? round4(at(gi.rapid)) : null,   // t848 — G0 speed (mm/min); null when ungrounded (DM500) / absent
         softLimitEnabled: enable == null ? null : !!Math.trunc(enable),
         _indices: gi,   // provenance for the review's raw rows (which eng # each field resolved to)
         _grounded: grounded,

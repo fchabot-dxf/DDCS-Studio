@@ -2024,7 +2024,7 @@ function wireSettingsOverlay(ov) {
                 detail.push({ label: `${L} envelope`, raw: `soft-limits ${slRaw(a)}`, derived: `travel ${signed(a) > 0 ? '+' : ''}${signed(a)} mm` });
                 if (he[a]) detail.push({ label: `${L} home edge`, raw: `dir bit ${hd[a] > 0 ? '+1' : (hd[a] < 0 ? '−1' : '0')}${hec[a] ? ' · far soft-limit end DISAGREES' : ' · far soft-limit end agrees'}`, derived: `home ${edgeLabel(a)}` });
             });
-            cands.push({ group: 'Machine envelope', label: 'Travel + home switches', value: desc, changed, kind: 'travel', data: { travel: tv, homeDir: hd, homeEdge: he, homeEdgeConflict: hec, softLimitEnabled: geo ? geo.softLimitEnabled : null }, detail });
+            cands.push({ group: 'Machine envelope', label: 'Travel + home switches', value: desc, changed, kind: 'travel', data: { travel: tv, homeDir: hd, homeEdge: he, homeEdgeConflict: hec, softLimitEnabled: geo ? geo.softLimitEnabled : null, rapidRate: geo ? geo.rapidRate : null }, detail });
             // t650 — honesty: when the controller has soft limits DISABLED (V4.1 #234=0), the envelope VALUES are still the
             // declared config but are NOT enforced by the machine — surface that as the reason (never silently imply they're live).
             if (geo && geo.softLimitEnabled === false) notes.push({ group: 'Machine envelope', label: 'Soft limits DISABLED on the controller', value: 'the travel values above are the declared config, not enforced (enable them on the controller)', kind: 'note' });
@@ -2082,6 +2082,7 @@ function wireSettingsOverlay(ov) {
             const set = (cur, v, dir) => { const mag = Math.abs(v || 0); if (!mag) return cur; const s = dir || (v < 0 ? -1 : (cur < 0 ? -1 : 1)); return s * mag; };
             mm.x = set(mm.x, tv.x, hd.x); mm.y = set(mm.y, tv.y, hd.y); mm.z = set(mm.z, tv.z, hd.z);
             if (typeof tvc.data.softLimitEnabled === 'boolean') mm.softLimitsPulled = tvc.data.softLimitEnabled;   // t838 — the pre-flight badge notes when the controller's soft limits are OFF (declared envelope not machine-enforced)
+            if (tvc.data.rapidRate > 0) mm.rapidRate = tvc.data.rapidRate;   // t848 — seed the G0 traverse rate from the controller (the time estimate + time-true sim); stays user-editable
             let touched = false;
             for (const a of ['x', 'y', 'z']) if (he[a] === 'min' || he[a] === 'max') { applyHomeEdge(_ddcsSettings, a, he[a]); touched = true; }
             if (touched) syncFlatFromIO(_ddcsSettings);   // mirror the IO home rows → the flat settings.limits (declaredHomeEdgeSide reads these)
@@ -2274,7 +2275,7 @@ function wireSettingsOverlay(ov) {
                 const edgeLabel = (a) => he[a] ? ((he[a] === 'max' ? 'MAX-home' : 'min-home') + (hec[a] ? ' ⚠dir-bit differs' : '')) : '';
                 const detail = [];
                 declared.forEach(([a, L]) => { detail.push({ label: `${L} envelope`, raw: `soft-limits min ${sl[a + 'Min'] ?? '—'} · max ${sl[a + 'Max'] ?? '—'}`, derived: `travel ${signed(a) > 0 ? '+' : ''}${signed(a)} mm` }); if (he[a]) detail.push({ label: `${L} home edge`, raw: `dir ${hd[a] > 0 ? '+1' : (hd[a] < 0 ? '−1' : '0')}`, derived: `home ${edgeLabel(a)}` }); });
-                cands.push({ group: 'Machine envelope', label: 'Travel + home switches', value: declared.map(([a, L]) => `${L} ${signed(a) > 0 ? '+' : ''}${signed(a)}`).join(' · '), changed: true, kind: 'travel', data: { travel: tv, homeDir: hd, homeEdge: he, homeEdgeConflict: hec, softLimitEnabled: geo ? geo.softLimitEnabled : null }, detail });
+                cands.push({ group: 'Machine envelope', label: 'Travel + home switches', value: declared.map(([a, L]) => `${L} ${signed(a) > 0 ? '+' : ''}${signed(a)}`).join(' · '), changed: true, kind: 'travel', data: { travel: tv, homeDir: hd, homeEdge: he, homeEdgeConflict: hec, softLimitEnabled: geo ? geo.softLimitEnabled : null, rapidRate: geo ? geo.rapidRate : null }, detail });
             }
             if (geo.softLimitEnabled === false) notes.push({ group: 'Machine envelope', label: 'Soft limits DISABLED on the controller', value: 'the travel values are the declared config, not enforced (enable them on the controller)', kind: 'note' });
             const hf = geo.homingFeeds;

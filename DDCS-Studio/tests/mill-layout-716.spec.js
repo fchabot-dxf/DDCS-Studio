@@ -7,13 +7,18 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1300, height: 980 } });
 
-async function openTwin(page, opType) {
+async function openTwin(page, opType, seedPattern) {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz, null, { timeout: 15000 });
     await page.evaluate(() => { const s = window.ddcsGetSettings(); s.stock = { show: true, x: 200, y: 150, z: 25, datum: 'nnp' }; s.preview = s.preview || {}; s.preview.autoLoop = false; });
     await page.evaluate((t) => window.openWiz(t), opType);
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
     await page.waitForTimeout(500);
+    // t848 — the drill/bore DEFAULT is now a single hole (no size handle); to exercise a size-handle drag, seed a pattern.
+    if (seedPattern) {
+        await page.evaluate((p) => { const f = document.querySelector('#wiz_user_form [data-param="pattern"]'); if (f) { f.value = p; f.dispatchEvent(new Event('change', { bubbles: true })); f.dispatchEvent(new Event('input', { bubbles: true })); } }, seedPattern);
+        await page.waitForTimeout(500);
+    }
 }
 const layoutState = (page) => page.evaluate(() => ({
     paths: document.querySelectorAll('#wiz_user .fc-path, #wiz_user .fc-guide').length,
@@ -30,14 +35,14 @@ async function dragHandle(page, selector, dx, dy) {
     await page.waitForTimeout(200);
 }
 
-for (const { op, name, sizeParams } of [
+for (const { op, name, sizeParams, seedPattern } of [
     { op: 'user_surfacing_data', name: 'surfacing', sizeParams: ['w', 'h'] },
     { op: 'user_pocket_data', name: 'pocket', sizeParams: ['w', 'h'] },
-    { op: 'user_drill_data', name: 'drill', sizeParams: ['dx', 'dy'] },   // default grid
-    { op: 'user_bore_data', name: 'bore', sizeParams: ['dx', 'dy'] },
+    { op: 'user_drill_data', name: 'drill', sizeParams: ['dx', 'dy'], seedPattern: 'grid' },   // t848 — default is now single; seed grid to test the pitch size-handle
+    { op: 'user_bore_data', name: 'bore', sizeParams: ['dx', 'dy'], seedPattern: 'grid' },
 ]) {
     test(`${name} twin: the 2D draws the feature + handles; a size-handle drag writes its param`, async ({ page }) => {
-        await openTwin(page, op);
+        await openTwin(page, op, seedPattern);
         const st = await layoutState(page);
         expect(st.paths, `${name}: the feature geometry is drawn`).toBeGreaterThanOrEqual(1);
         expect(st.handles, `${name}: pos + size handles present`).toBeGreaterThanOrEqual(2);

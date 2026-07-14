@@ -47,7 +47,7 @@ import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, DRILL_PATTERN_OPTIO
 
 /** The author defaults — match drillStack's own num() fallbacks so the seeded template == the true default stack. */
 export const DRILL_DEFAULTS = {
-    pattern: 'grid', x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20,
+    pattern: 'single', x0: 0, y0: 0, cols: 3, rows: 2, dx: 20, dy: 20,   // t848 — default = single hole (matches drillWizard's fallback: the twin-default rule)
     count: 4, spacing: 20, angle: 0, dia: 50, startAngle: 0, w: 100, h: 80, nx: 2, ny: 2, skip: '',
     depth: 5, peck: 5, feed: 100, clearance: 5, wcs: 'active', method: 'peck',
     // placement (makePlace) — now bindable: the placeOnStock bbox snapshot is computed LIVE from the pattern at emit
@@ -72,11 +72,11 @@ const DRILL_EXEC_BINDINGS = [
     { param: 'stockZ', formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: DRILL_DEFAULTS.stockZ },
     { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: DRILL_DEFAULTS.originX },
     { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: DRILL_DEFAULTS.originY },
-    { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: DRILL_DEFAULTS.offZ },
+    { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: DRILL_DEFAULTS.offZ, label: 'Z offset', units: 'mm', section: 'GEOMETRY', help: 'Shift the whole pattern up or down in Z from the datum.' },
     // pattern + geometry (block 3, the `array` container — patternPoints reads these scalars at emit)
     { param: 'pattern', blockIndex: 3, key: 'pattern', type: 'enum', default: DRILL_DEFAULTS.pattern, widget: 'dropdown', widgetConfig: { options: DRILL_PATTERN_OPTIONS } },
-    { param: 'x0', blockIndex: 3, key: 'x0', type: 'number', default: DRILL_DEFAULTS.x0 },
-    { param: 'y0', blockIndex: 3, key: 'y0', type: 'number', default: DRILL_DEFAULTS.y0 },
+    { param: 'x0', blockIndex: 3, key: 'x0', type: 'number', default: DRILL_DEFAULTS.x0, label: 'Pattern origin X', units: 'mm', section: 'GEOMETRY', help: 'The pattern local X origin (usually 0 — the Origin X placement positions it on the stock).' },
+    { param: 'y0', blockIndex: 3, key: 'y0', type: 'number', default: DRILL_DEFAULTS.y0, label: 'Pattern origin Y', units: 'mm', section: 'GEOMETRY', help: 'The pattern local Y origin (usually 0 — the Origin Y placement positions it on the stock).' },
     // t722 P2a — per-PATTERN field visibility (map the real fields): grid → cols/rows/dx/dy · circle → dia/startAngle/count ·
     // line → spacing/angle/count · rect → w/h/nx/ny (`count` is shared by circle + line). + labels (were cryptic param names).
     { param: 'cols', blockIndex: 3, key: 'cols', type: 'number', default: DRILL_DEFAULTS.cols, when: { param: 'pattern', is: 'grid' }, label: 'Columns', section: 'GEOMETRY' },
@@ -111,7 +111,7 @@ const _holeRing = (cx, cy, r) => { const pts = []; for (let i = 0; i <= 12; i++)
  *  W/H). Bore (boreDia=true) ALSO gets a draggable hole-DIAMETER handle (holeDia). Mirrors drillView.buildDrillSpec; handles
  *  write the TWIN params directly (preview-side → emit unaffected). SHARED by drillData + boreData (bore imports it). */
 export function drillPatternGeometry(p, boreDia) {
-    const pattern = p.pattern || 'grid';
+    const pattern = p.pattern || 'single';   // t848 — the view fallback tracks the default (twin-default rule)
     const ox = _dn(p.originX, 0), oy = _dn(p.originY, 0);
     const holeR = boreDia ? Math.max(0.5, _dn(p.holeDia, 12) / 2) : 3;   // bore = the real bore Ø; drill = a small display dot
     const pts = patternPoints({ ...p, cx: ox, cy: oy, x0: ox, y0: oy }) || [];   // patternPoints reads cx/cy or x0/y0 per pattern

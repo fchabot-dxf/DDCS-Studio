@@ -3,6 +3,7 @@
 // Settings (PROTOCOL §1/§2): count (max beacons), pacing (time|line), var/marker. Default = the Python
 // behaviour; the frame must never change without re-proving on the machine.
 import { scan, stripComment } from "./gcode-parse.js";
+import { estimateProgram } from "../../../engine/timeEstimate.js";   // t848 — the ONE time model (the engine trace, same as the editor chip)
 
 export const DEFAULTS = { max: 255, varNum: 250, markerVar: 251, marker: 111, pacing: "time",
                           rapid: 6000, defaultFeed: 1000 };
@@ -45,16 +46,21 @@ export function instrument(text, opts = {}) {
   const o = { ...DEFAULTS, ...opts };
   const source = opts.source || "job.nc";
   const lines = text.split(/\r?\n/);
-  const { moves, totalTime } = scan(lines, { rapid: o.rapid, defaultFeed: o.defaultFeed });
+  const { moves, totalTime: scanTotal } = scan(lines, { rapid: o.rapid, defaultFeed: o.defaultFeed });
+  // t848 — the QUOTED estimate is the ONE engine-trace model (identical to the editor's time chip); scan stays ONLY the
+  // Z-up / beacon detector + its RELATIVE pacing. Fall back to scan's own total if the engine can't run (headless).
+  let totalTime = scanTotal;
+  try { const e = estimateProgram(text, { rapidRate: o.rapid }); if (e && e.seconds > 0) totalTime = e.seconds; } catch (_) { /* headless → scan total */ }
+  const scale = scanTotal > 0 ? totalTime / scanTotal : 1;   // map scan's relative per-move times onto the engine total
   const zups = moves.filter((m) => m.zup);
   const reserve = o.max - 1;                          // reserve one for the forced M30 beacon
-  const chosen = o.pacing === "line" ? chooseByLine(zups, reserve) : chooseByTime(zups, totalTime, reserve);
+  const chosen = o.pacing === "line" ? chooseByLine(zups, reserve) : chooseByTime(zups, scanTotal, reserve);
 
   const m30 = findM30(lines);
   const inserts = new Map();
   const add = (idx, item) => { (inserts.get(idx) || inserts.set(idx, []).get(idx)).push(item); };
   for (const m of chosen) add(m.idx, { kind: "beacon", op: m.op, cumT: m.cumT });
-  if (m30 !== null) add(m30 - 1, { kind: "complete", op: chosen.length ? chosen[chosen.length - 1].op : null, cumT: totalTime });
+  if (m30 !== null) add(m30 - 1, { kind: "complete", op: chosen.length ? chosen[chosen.length - 1].op : null, cumT: scanTotal });
 
   const out = [];
   let n = 0, markerDone = false;
@@ -73,8 +79,8 @@ export function instrument(text, opts = {}) {
       out.push(mset);
       beacons.push({
         n, orig_line: i + 1, op,
-        cum_time_s: r2(cumT),
-        percent: totalTime > 0 ? r1(100 * cumT / totalTime) : null,
+        cum_time_s: r2(cumT * scale),                                   // t848 — scan's relative time mapped onto the engine total
+        percent: scanTotal > 0 ? r1(100 * cumT / scanTotal) : null,
         complete: kind === "complete",
       });
     }

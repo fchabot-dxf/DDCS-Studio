@@ -102,8 +102,8 @@ export function deriveBindingsFor(stack, specs) {
  *  (NOT the exported EXEC bindings the as-data goldens iterate), so the wiring goldens stay untouched. */
 export function entryBindingsFor(stack) {
     return deriveBindingsFor(stack, [
-        { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
-        { param: 'entryY', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '' },
+        { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '', label: 'Entry point X', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
+        { param: 'entryY', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '', label: 'Entry point Y', units: 'mm', section: 'GEOMETRY', help: 'Optional rapid-to point before the first cut (leave blank for none) — a safe lead-in position.' },
     ]);
 }
 
