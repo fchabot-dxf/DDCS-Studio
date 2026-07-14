@@ -4091,3 +4091,65 @@ done RIGHT, and this turn was already enormous (the whole Library) — my contex
 fix risks a subtly-wrong retract (a missed dialect / wrong restore-mode) which is WORSE than a one-turn delay. The current
 code is the status quo (nothing new-unsafe introduced), so deferring the FIX one turn ships nothing worse. Handed off
 fully grounded as the TOP priority.
+
+
+## 2026-07-14 (t856) — THE G53 MODE-EXPLICIT SAFETY FIX (the t853 amendment, its own dedicated turn).
+
+### THE FIX — G90 before every safe-height G53 in a G91 body, on every post
+
+A machine-frame G53 is absolute ONLY under G90 (the factory ALWAYS sets G90 before a G53 — slib-g.nc:24 G90G00 then
+:30 G53; the CAM pack G90 header before G53Z#150; ZERO factory G53-in-G91). A safe-Z retract emitted INSIDE a G91 probe
+body could therefore move INCREMENTALLY on the controller — the opposite of a safe absolute retract (found by the USER
+reading their own emitted corner program, t853). Grounded exhaustively (two Explore agents) before touching emit.
+
+ONE shared seam: `wrapMachineFrame(dialect, core, restore)` in wizards/ops/safeZframe.js. When the caller declares
+`restore:'inc'` (its surrounding body is incremental) it emits G90 before the machine move + restores G91 after; DM500's
+work-frame degrade already self-asserts G90, so the wrap sees it (hasAbs) and does NOT double it. A G90 body needs no
+wrap (its G53 is already under G90 — the guard passes via ambient), so error handlers + alignment are UNCHANGED (zero
+churn, twins stay equal). Wired at the two atoms both retract paths flow through: saferetract.js (all dialects; Expert
+#520 / V4.1 #190 / grbl+rs274+centroid literals) and macro.js machinemove (only when flagged — a bare machine move, ATC
+dance, re-centre, is untouched). safeRetractNode/safeZParkBlock gained a `restore` param.
+
+The 8 G91-body sites declare restore:'inc' (per the agent's mode-traced map): saferetract — cornerWizard:215 (per-wall
+retreat), rotaryClockWizard:106, rotaryCenterWizard:94, probeSurface:100 (the shared machineLift); safeZParkBlock (final
+machine park) — middleWizard:219/225, rotaryClockWizard:134, rotaryCenterWizard:166. The rotary DATA-OP TWINS swap their
+park move→machinemove in place, so rotaryClockData:127 + rotaryCenterData:125 also carry restore:'inc' to stay byte-
+identical to the builtin (the 3 rotary byte-diff-ZERO failures the first gate caught — fixed).
+
+### SIM — the wrap is TRACE-NEUTRAL (the t826 anchoring caveat, resolved)
+
+The sim computes a G53 machine-absolute REGARDLESS of G90/G91 (positions unchanged), but stats.absolute at
+GcodeExecutionEngine.js:1099 (`if(this.absolute)`) would, under the new G90-wrap, FLIP a G91 probe macro absolute — the
+exact t826 collapse (the next probe pass re-anchors to machine 0). The engine's OWN comment says stats.absolute is
+dist-mode-driven NOT G53-driven; the code only held by luck (the G53 sat under G91). Fixed to match its intent:
+`if(this.absolute && !g53)` — a G53 line never sets stats.absolute. Now the wrap is anchoring-NEUTRAL: verified the
+anchoring suites stay green (sim-start-decouple, corner-draw-anchor, alignment-fresh-seat). A retract-ONLY program now
+reports stats.absolute=false (no dist-mode-absolute move) — safe-z-retract-822:173 updated (a correct consequence).
+
+### GUARD + SIM-IDENTITY (new g53-mode-explicit-856.spec.js)
+
+(3) CORPUS GUARD: emits the safe-Z/probe corpus (corner/middle/rotaryClock/rotaryCenter/edge/alignment, + machine-frame
+park variants) across ALL 6 posts, strips comments, tracks the modal G90/G91 state line-by-line, and asserts every G53
+executes under G90 — no future emit can regress it. (4) SIM IDENTITY: a purely-G91 body with the wrapped retract — the
+G53 reaches the absolute machine Z, does NOT flip stats.absolute, and the restored G91 keeps later moves incremental.
+The guard caught a real one mid-build: DM500's machineMove DOES emit G53 (its safeRetract degrades, but a machine park
+uses machineMove) → now wrapped.
+
+### GOLDENS regenerated (diff = the modal wrap lines ONLY)
+
+middle-reposition-refactor (BEFORE) + probe-surface-block (CORNER_GOLDEN) regenerated programmatically (throwaway spec
+captured the emit, a node line-replace patched the frozen literals) — each row's diff is exactly a +G90 before the
+retract guard and a +G91 after G53 Z#520, nothing else. The twin==builtin byte-diff-ZERO tests (corner/drill/alignment/
+rotary superset + in-place) move on BOTH sides so stay equal.
+
+### FLAGGED follow-up (out of this turn's "nothing else" scope)
+
+probeToSlot.js:311/368/369 — the CAM-slot raw-text generator emits G53 in a G91 body (same class), a DISTINCT surface
+from the wizard retract the user hit. Not swept by the corpus guard (which covers the wizard emit). Worth a separate pass.
+
+### GATE (w2 — workers=4 boot-timeouts under the persistent external CPU load; the USER's own Chrome pegged a core)
+
+First w2 run: 1263 passed / 3 failed / 2 skipped — the 3 were the rotary twin byte-diff (MINE, fixed). RE-GATE after the
+twin fix VERBATIM: 1266 passed / 0 failed / 2 skipped (18.6m), exit 0 — CLEAN. Ran at workers=2 because the box stayed
+loaded by the user's Chrome (4032s CPU on one process); w2 halves the concurrent boots and avoids the mass boot-timeout.
+Commits: 19b1e3b fix (emit+sim+call sites), eb90897 test (goldens+guard), 97a8355 fix (rotary twins).
