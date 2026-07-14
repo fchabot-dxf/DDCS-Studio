@@ -73,11 +73,12 @@ test('a recent row full-swaps; Profiles… / Save as… open the modal; Pull ope
     await page.click('[data-profswitch]');
     await page.waitForTimeout(150);
     expect(await page.evaluate(() => window.ddcsGetSettings().machine.x), 'a recent one-click FULL-SWAPS the envelope to 700').toBe(700);
-    // PROFILES… opens the browser modal
+    // PROFILES… deep-links into the Library on the Profiles tab (t854)
     await openMenu(page);
     await page.click('[data-profact="browse"]');
-    await expect(page.locator('.profile-modal')).toHaveCount(1);
-    await page.click('.profile-modal [data-pa="done"]');
+    await expect(page.locator('#libraryOverlay')).toBeVisible();
+    await expect(page.locator('#libraryOverlay .library-tab[data-lib-tab="profiles"]')).toHaveClass(/active/);
+    await page.click('#libraryOverlay .library-x');
     // SAVE AS… opens the modal in save mode (a dlgPrompt for the name)
     await openMenu(page);
     await page.click('[data-profact="saveas"]');
