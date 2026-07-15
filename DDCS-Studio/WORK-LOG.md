@@ -4153,3 +4153,57 @@ First w2 run: 1263 passed / 3 failed / 2 skipped — the 3 were the rotary twin 
 twin fix VERBATIM: 1266 passed / 0 failed / 2 skipped (18.6m), exit 0 — CLEAN. Ran at workers=2 because the box stayed
 loaded by the user's Chrome (4032s CPU on one process); w2 halves the concurrent boots and avoids the mass boot-timeout.
 Commits: 19b1e3b fix (emit+sim+call sites), eb90897 test (goldens+guard), 97a8355 fix (rotary twins).
+
+
+## 2026-07-15 (t859) — MENU DIET PART 2 + RIDERS A/B done; RIDER C (projects-cloud) deferred-with-grounding.
+
+Three grounding Explore agents mapped: the current menu vs the 9-row mock + the skipped tests; the probeToSlot G53
+sites + the corpus-guard extension; the Library Projects tab + the drawer's cloud browser.
+
+### RIDER B (SAFETY) — G53 mode-explicit on the CAM-slot generator (my own t856 flag)
+
+probeToSlot's inside/boss-centre slots emitted raw `G53` machine moves inside a G91 body (same crash class as the wizard
+retract, a distinct surface). Wrapped all THREE sites (:311 G53 X#53, :368 G53 recentre, :369 G53 Z#57) with an adjacent
+G90. Reuse subtlety: importing wrapMachineFrame from safeZframe pulls the safeZframe→blockEmitter→ops→saferetract cycle
+into the CAM path → a TDZ ReferenceError on SAFEZ_MARGIN_DEFAULT that broke the whole CAM module load. Fixed by importing
+`distModeBlock` from distmode.js instead (the ONE source of the G90/G91 strings that wrapMachineFrame itself uses;
+distmode.js has zero imports → no cycle) with a tiny `g90Before(line)=[G90, line]` helper — per-line, jump-proof, no
+whole-body hasAbs scan to be fooled. Each site's TRAILING G91 already restores incremental. The corpus guard
+(g53-mode-explicit-856) extends to sweep the CAM-slot macro corpus (insideCentre + bossCentre via slotMacro) so no future
+CAM emit regresses. cam-slot-sim unaffected (G90/G91 don't touch bracket counts or traces). Commit b6ee975.
+
+### PART 2 (MENU) — the 44px identity tap targets
+
+The compact diet menu is LARGELY shipped already (identity row + Library + one gcode row + Clear + Theme + Setup sheet +
+Settings + Rate; Save/Open/Save-as/wizard/standalone/recents/dialect all gone). The one headline GAP vs the mock: the
+identity row's THREE tap targets were all <44px. Fixed the CSS: `.hq-identity` min-height:44px; the ☁ badge + ↧ pull
+min 44×44 (inline-flex centred). TENSION FLAGGED (not changed): the mock relocates Setup checklist → Settings, but
+98f0bc1 recently RESTORED it to the menu; left in place (menu still ≤9 rows, checklist reachable) pending the advisor's
+ruling rather than undo recent work — the moved-not-lost actions are all otherwise reachable (Save/Save-as → Library;
+Save-as-wizard → Library Wizards New-from-current; standalone → the Gateway page; pull → the ↧ icon + Settings→Profile).
+
+### RIDER A — rewrite the two skipped header-profile-menu specs
+
+Both `test.skip` asserted the RETIRED profile section (head + recents + [Profiles…][Save as…][Pull]). Rewritten (ZERO
+test.skip in the file) as the NEW menu's asserts: (1) the compound identity row (name·controller, the ☁ + ↧ affordances),
+the compact ≤9-row shape, and that Save/Open/Save-as/Save-as-wizard/Standalone/recents/dialect/"Generate for" are all
+gone; the three identity tap targets each ≥44px (boundingBox). (2) the three taps route: row → Library Profiles, ☁ →
+the cloud connect flow, ↧ → the pull flow (Settings→Controller→Profile). Commit 9a574d0 (with PART 2).
+
+### RIDER C (projects-cloud consolidation) — DEFERRED with full grounding
+
+The Library Projects tab is local-only; adding the cloud volume requires factoring the drawer's ~100-line renderCloud
+(projectModal.js:205-308) off its module singletons (cloudMount / cloudStack / closeDrawer) into a reusable
+`renderCloudInto(mount, {closeFn})`, PLUS restructuring the Library Projects tab to Local/Cloud volume tabs with SEPARATE
+select-load roots (Agent C: the current single-root-on-body would collide two [data-sl-primary]). That is a real refactor
+of the WORKING drawer (still the primary projects UI). Not rushed at this session's depth (a half-embedded cloud volume
+or a broken drawer is worse than a fresh clean turn). FULLY GROUNDED for a fast next turn: factor renderCloud/
+renderCloudConnect/cloudErrMsg + the installSelectLoad(mount, gdrive.read→loadProject) wiring; deps getAccount/connect/
+gdrive/providers/pickFolder/serializeProject; the cloud rows are sl-rows with data-sl-id = the Drive file id; test via
+installDriveMock (select-load-805.spec.js:14-43) + openViaMenu (library-854), asserting the t806 select-then-load on the
+new cloud root. It is a FEATURE (originally deferred at t854), not safety.
+
+### GATE (w4, quiet box) — VERBATIM: 1266 passed / 0 failed / 4 skipped (11.3m), exit 0. CLEAN.
+
+The 4 skips are pre-existing in other files (e.g. project-drawer-smoke); the two header-profile-menu tests are now
+UN-skipped + passing. Commits: b6ee975 (rider B safety), 9a574d0 (part 2 + rider A).
