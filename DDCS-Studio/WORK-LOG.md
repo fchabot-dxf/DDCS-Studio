@@ -4243,3 +4243,70 @@ plausibility hint on a positive top-homed Z (and hides on a negative Z); pre-fli
 route. The poschip frame-color (mach/work) is driven by pos.g53/probing — NOT touched.
 
 ### GATE (w4, quiet box) — VERBATIM: 1270 passed / 0 failed / 4 skipped (11.1m), exit 0. CLEAN. commit 5743d38.
+
+
+## 2026-07-15 (t863) — THE PROJECTS-CLOUD REFACTOR (rider C): renderCloudInto + the Library Projects tab hosts BOTH volumes; the Open deep-link retires the drawer.
+
+### THE FACTOR — renderCloud -> renderCloudInto (off the drawer singletons)
+
+The drawer's ~100-line cloud browser (projectModal.renderCloud + renderCloudConnect) was bound to three module
+singletons: cloudMount (the DOM), cloudStack (the folder path, REASSIGNED on nav), and closeDrawer (via the select-load
+onLoad). Factored into ONE exported `renderCloudInto(mount, { onClose })` (the renderProfilesInto precedent, t854): the
+folder path is now a CLOSURE `stack` (each call owns its own -> no cross-surface leak), `mount` replaces cloudMount,
+`onClose` replaces closeDrawer. It installs the shared select-then-load on `mount` ONCE (gdrive.read -> loadProject ->
+onClose) and returns { render, reset } so the caller re-renders when its volume shows + resets the crumb to the Drive
+root on entry. The module-level `cloudStack` singleton is DELETED.
+
+The DRAWER now reuses it (ONE source): buildDrawer creates `_drawerCloud = renderCloudInto(cloudMount, { onClose:
+closeDrawer })` (the inline installSelectLoad(cloudMount,...) is gone -> moved inside), switchVol('cloud') ->
+`_drawerCloud.reset(); _drawerCloud.render()`, and the ddcs:cloud-account listener -> `_drawerCloud.render()`.
+
+### THE LIBRARY PROJECTS TAB — two volumes, two select-load roots (t806 pattern)
+
+renderProjectsTab (libraryModal) restructured from local-only into Local/Cloud volume tabs (.proj-voltab, reusing the
+drawer's CSS; data-lvol so it's distinct from the drawer's data-vol) over TWO separate roots: #libProjLocal (the existing
+projectStore browser, its select-load + click handler now scoped to that SUB-ROOT not `body`) + #libProjCloud
+(renderCloudInto, its OWN stack). Each root owns its own [data-sl-primary] so a selection on one can't drive the other's
+[Open] (the collision the t806 two-root pattern avoids). switchVol toggles display + renders the shown volume.
+
+### THE DEEP-LINK — the Open button retires the drawer entry point
+
+macroBar: #projOpenBtn -> openLibrary('projects') (was openOpenDrawer). The Library now hosts BOTH volumes, so the t854
+blocker (deep-linking would drop cloud access) is resolved. The drawer (openOpenDrawer) STAYS mounted for the save flow +
+is still reachable via the module, but NO UI path opens it: the menu-diet already removed the 'open'/'save' quick-menu
+rows, and #projOpenBtn is a hidden .macro-bar (display:none) proxy target -> its WIRING is the deep-link. The Save button
++ the quick-menu "Library..." row are unchanged; save-as is reachable via the Library's "Save current..." (-> the same
+openSaveModal).
+
+Every path the drawer served is now in the Library Projects tab: local+cloud open, folder nav (both), rename/delete
+(both), mkdir (both), Choose-folder + Save-here (cloud), Save current... (local, -> openSaveModal). ASSERTED reachable.
+
+### DECLARE-OR-HANDROLL
+
+renderCloudInto is the DECLARED reusable renderer (one source for the drawer + the Library); the closure `stack` replaces
+the hand-rolled module singleton that leaked between surfaces. No new machinery — a factor, not an abstraction.
+
+### VERIFIED (library-projects-cloud-863.spec.js, 5 tests)
+
+1. the Open deep-link opens the Library Projects tab (not the .proj-drawer, which is never built) with Local+Cloud tabs.
+   Poll-clicks #projOpenBtn (hidden proxy; the click fires the macroBar listener) to dodge the boot race.
+2. LOCAL root: folder nav (Jobs -> inner Plate project, crumb +1) + select-then-load ([Open] disabled until selected,
+   commit loads + the Library closes).
+3. CLOUD root: keyless drive.file list + folder nav + select-then-load (a SECOND independent select-load root, its own
+   [data-sl-primary]) via the in-memory Drive mock (t805/t806 pattern).
+4. save-as ROUND-TRIPS through the Library door: Save current... -> save modal -> the project reappears + reloads (seeded
+   a minimal op stack first -- openSaveModal guards empty programs and would just toast + return).
+5. NO singleton leak: the drawer cloud (nav'd into Jobs) + the Library cloud (fresh at Drive) keep INDEPENDENT stacks;
+   after the Library mounts, re-rendering the drawer (its ddcs:cloud-account listener) STILL shows Jobs -- not the
+   Library's Drive. That re-render is the discriminator the OLD shared cloudStack would fail (it would jump to Drive).
+
+Regression: select-load-805 (drawer cloud+local), library-854 (three tabs), profile-cloud-library, macros-tabs all
+green -- the drawer refactor is behavior-preserving.
+
+Stale-but-harmless (advisor's file, left untouched -- surgical): library-854.spec.js:75-76 comment still reads "Projects
+stays on the drawer for now"; that test's assertions are the Profiles deep-link only, so it passes. Worth a 1-line update.
+
+### GATE (w4) — VERBATIM: 1275 passed / 0 failed / 4 skipped (11.7m), exit 0. CLEAN.
+Baseline was 1270 passed; +5 new t863 tests = 1275, 0 regressions. box: msedge heavy (accumulated CPU) but w4 stayed
+0-flake this run. Committing ONLY the 4 owned files (libraryModal.js, macroBar.js, projectModal.js, the new spec); the
+dirty PNGs + HANDOFF.md + scratchpad/snippets.js are session-start/other and NOT mine.
