@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { autoAppDialog } from './_appDialog.js';
 
 /**
  * t688 b2 — the header quick-menu's "Generate for" (dialect) section is REPLACED by a PROFILE section: a read-only
@@ -8,85 +7,103 @@ import { autoAppDialog } from './_appDialog.js';
  */
 const openMenu = async (page) => { await page.click('#hdrPostBtn'); await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 4000 }); };
 
-test.skip('the header menu shows the PROFILE section (current + recents + doors), NOT the dialect list', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    // t710 FLAKE FIX (real race): #hdrPostBtn is static HTML but its click handler is wired ~5 dynamic-imports later by
-    // initHeaderPost()→fillMenu(), which populates #hdrPostMenu (the `.hdr-quick-head` header) right before attaching the
-    // handler. Awaiting the POPULATED menu ⇔ the button is wired → openMenu's click can't land on a dead button. Explicit
-    // 15s budget: this signal arrives later in boot than ddcsProfileLib, so it must not inherit the 5s actionTimeout cap.
+// t859 — REWRITTEN for the t851 MENU DIET. The retired "Profile section (head + recents + [Profiles…][Save as…][Pull])"
+// is GONE; profile lives in the ONE compound IDENTITY row (name · controller · ☁ cloud state, with the ↧ pull icon).
+// Recents + Save-as moved to the Library; Save/Open moved to the Library; dialect list already gone.
+const seedProfile = async (page) => {
     await page.waitForFunction(() => window.ddcsProfileLib && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
-    // two profiles: Rig A (x=700), Rig B (active, x=320); Rig A seeded as a recent
     await page.evaluate(() => {
-        localStorage.removeItem('ddcs_profile_library');
         const L = window.ddcsProfileLib;
-        window.ddcsGetSettings().machine = { x: 700, y: 500, z: 300, show: true };
-        L.renameProfile(L.activeProfileId(), 'Rig A'); L.saveActiveSnapshot();
-        const idA = L.activeProfileId();
-        L.createProfile({ from: 'baseline', controllerId: 'ddcs-expert-m350', name: 'Rig B' });   // active = Rig B
-        window.ddcsGetSettings().machine.x = 320; L.saveActiveSnapshot();
-        localStorage.setItem('ddcs_profile_recents', JSON.stringify([idA]));
+        L.renameProfile(L.activeProfileId(), 'Rig B'); L.saveActiveSnapshot();
     });
+};
+
+test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library + one gcode row; retired profile section GONE, ≤9 rows', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await seedProfile(page);
     await openMenu(page);
-    const menu = await page.evaluate(() => {
-        const m = document.getElementById('hdrPostMenu');
+    const m = await page.evaluate(() => {
+        const menu = document.getElementById('hdrPostMenu');
+        const id = menu.querySelector('.hq-identity');
         return {
-            hasProfileHead: [...m.querySelectorAll('.hdr-quick-head')].some((h) => /Profile/.test(h.textContent)),
-            current: (m.querySelector('.hdr-quick-cur') || {}).textContent || '',
-            recentCount: m.querySelectorAll('[data-profswitch]').length,
-            recentText: [...m.querySelectorAll('[data-profswitch]')].map((b) => b.textContent).join(' '),
-            hasBrowse: !!m.querySelector('[data-profact="browse"]'),
-            hasSaveas: !!m.querySelector('[data-profact="saveas"]'),
-            hasPull: !!m.querySelector('[data-profact="pull"]'),
-            dialectItems: m.querySelectorAll('[data-post]').length,   // dialect switching → must be GONE
-            hasGenerateFor: /Generate for/.test(m.textContent),
+            hasIdentity: !!id,
+            identityIsBrowse: !!(id && id.matches('[data-profact="browse"]')),
+            identityName: id ? (id.querySelector('b') || {}).textContent || '' : '',
+            identityCtrl: id ? (id.querySelector('.hq-cur') || {}).textContent || '' : '',
+            hasCloud: !!menu.querySelector('.hq-identity [data-cloud]'),
+            hasPull: !!menu.querySelector('.hq-identity .hq-pull-btn[data-profact="pull"]'),
+            hasLibrary: menu.querySelectorAll('[data-act="library"]').length,
+            gcodeRows: menu.querySelectorAll('.hq-gcode-row').length,
+            gcodeBtns: menu.querySelectorAll('.hq-gcode-row .hq-gcode-btn[data-act]').length,
+            hasClear: menu.querySelectorAll('[data-act="clear"]').length,
+            hasSetupSheet: menu.querySelectorAll('[data-act="setupSheet"]').length,
+            hasSettings: menu.querySelectorAll('[data-act="settings"]').length,
+            hasRate: menu.querySelectorAll('[data-act="rate"]').length,
+            themeChips: menu.querySelectorAll('.hq-theme-chip[data-theme]').length,
+            // RETIRED shape — must be absent
+            recents: menu.querySelectorAll('[data-profswitch]').length,
+            saveasRows: menu.querySelectorAll('[data-profact="saveas"]').length,
+            saveRows: menu.querySelectorAll('[data-act="save"]').length,
+            openRows: menu.querySelectorAll('[data-act="open"]').length,
+            wizardRows: menu.querySelectorAll('[data-act="wizard"]').length,
+            standaloneRows: menu.querySelectorAll('[data-act="standalone"]').length,
+            dialectItems: menu.querySelectorAll('[data-post]').length,
+            oldCur: menu.querySelectorAll('.hdr-quick-cur').length,
+            generateFor: /Generate for/.test(menu.textContent),
+            // ≤9 top-level rows: the identity + each hdr-quick-item + the gcode row + the theme swatch strip
+            rowCount: menu.querySelectorAll('.hdr-quick-item, .hq-gcode-row, .hdr-quick-subitems[data-subitems="theme"]').length,
         };
     });
-    expect(menu.hasProfileHead, 'a Profile section heading').toBe(true);
-    expect(menu.current, 'line 1 = the current profile + controller').toMatch(/Rig B/);
-    expect(menu.current, 'line 1 names the controller').toMatch(/Expert/);
-    expect(menu.recentCount, 'one recent (Rig A) — one-click switch').toBe(1);
-    expect(menu.recentText, 'the recent names Rig A').toMatch(/Rig A/);
-    expect(menu.hasBrowse && menu.hasSaveas && menu.hasPull, '[Profiles…] [Save as…] [Pull from controller]').toBe(true);
-    expect(menu.dialectItems, 'NO dialect list in the menu (no data-post items)').toBe(0);
-    expect(menu.hasGenerateFor, 'the "Generate for" label is gone').toBe(false);
+    // The ONE compound identity row + its three affordances
+    expect(m.hasIdentity, 'the compound identity row').toBe(true);
+    expect(m.identityIsBrowse, 'the identity row opens the Library (data-profact=browse)').toBe(true);
+    expect(m.identityName, 'identity shows the profile name').toMatch(/Rig B/);
+    expect(m.identityCtrl, 'identity shows the controller').toMatch(/·/);
+    expect(m.hasCloud, 'the ☁ cloud-state tap target').toBe(true);
+    expect(m.hasPull, 'the ↧ pull tap target').toBe(true);
+    // The compact rows
+    expect(m.hasLibrary, 'Library row').toBe(1);
+    expect(m.gcodeRows, 'ONE gcode row').toBe(1);
+    expect(m.gcodeBtns, 'Load / Insert / Export inline').toBe(3);
+    expect(m.hasClear + m.hasSetupSheet + m.hasSettings + m.hasRate, 'Clear + Setup sheet + Settings + Rate all present').toBe(4);
+    expect(m.themeChips, 'theme swatches present').toBeGreaterThan(1);
+    // RETIRED shape gone
+    expect(m.recents, 'no recents rows (moved to the Library)').toBe(0);
+    expect(m.saveasRows + m.saveRows + m.openRows + m.wizardRows + m.standaloneRows, 'Save/Open/Save-as/Save-as-wizard/Standalone all moved out of the menu').toBe(0);
+    expect(m.dialectItems, 'no dialect list').toBe(0);
+    expect(m.oldCur, 'the old .hdr-quick-cur profile line is gone').toBe(0);
+    expect(m.generateFor, 'the "Generate for" label is gone').toBe(false);
+    // ≤9 rows (the diet target)
+    expect(m.rowCount, 'the diet menu is ≤9 rows').toBeLessThanOrEqual(9);
+
+    // the three identity tap targets are each ≥44px (the mock's touch requirement)
+    const box = async (sel) => (await page.locator(sel).first().boundingBox()) || { width: 0, height: 0 };
+    const rowB = await box('.hq-identity'), cloudB = await box('.hq-identity [data-cloud]'), pullB = await box('.hq-identity .hq-pull-btn');
+    expect(Math.min(rowB.height), 'the identity ROW is ≥44px tall').toBeGreaterThanOrEqual(44);
+    expect(Math.min(cloudB.width, cloudB.height), 'the ☁ target is ≥44px').toBeGreaterThanOrEqual(44);
+    expect(Math.min(pullB.width, pullB.height), 'the ↧ target is ≥44px').toBeGreaterThanOrEqual(44);
 });
 
-test.skip('a recent row full-swaps; Profiles… / Save as… open the modal; Pull opens the pull flow', async ({ page }) => {
+test('the identity row taps: row → Library Profiles, ☁ → connect, ↧ → pull flow', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    // t710 FLAKE FIX (real race): #hdrPostBtn is static HTML but its click handler is wired ~5 dynamic-imports later by
-    // initHeaderPost()→fillMenu(), which populates #hdrPostMenu (the `.hdr-quick-head` header) right before attaching the
-    // handler. Awaiting the POPULATED menu ⇔ the button is wired → openMenu's click can't land on a dead button. Explicit
-    // 15s budget: this signal arrives later in boot than ddcsProfileLib, so it must not inherit the 5s actionTimeout cap.
-    await page.waitForFunction(() => window.ddcsProfileLib && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
-    await page.evaluate(() => {
-        localStorage.removeItem('ddcs_profile_library');
-        const L = window.ddcsProfileLib;
-        window.ddcsGetSettings().machine = { x: 700, y: 500, z: 300, show: true };
-        L.renameProfile(L.activeProfileId(), 'Rig A'); L.saveActiveSnapshot();
-        const idA = L.activeProfileId();
-        L.createProfile({ from: 'baseline', controllerId: 'ddcs-expert-m350', name: 'Rig B' });
-        window.ddcsGetSettings().machine.x = 320; L.saveActiveSnapshot();
-        localStorage.setItem('ddcs_profile_recents', JSON.stringify([idA]));
-    });
-    // RECENT → full-swap: clicking Rig A swaps the envelope back to 700
+    await seedProfile(page);
+
+    // ROW tap → the Library on the Profiles tab
     await openMenu(page);
-    await page.click('[data-profswitch]');
-    await page.waitForTimeout(150);
-    expect(await page.evaluate(() => window.ddcsGetSettings().machine.x), 'a recent one-click FULL-SWAPS the envelope to 700').toBe(700);
-    // PROFILES… deep-links into the Library on the Profiles tab (t854)
-    await openMenu(page);
-    await page.click('[data-profact="browse"]');
+    await page.click('.hq-identity');
     await expect(page.locator('#libraryOverlay')).toBeVisible();
     await expect(page.locator('#libraryOverlay .library-tab[data-lib-tab="profiles"]')).toHaveClass(/active/);
     await page.click('#libraryOverlay .library-x');
-    // SAVE AS… opens the modal in save mode (a dlgPrompt for the name)
+
+    // ☁ CLOUD tap → the cloud connect flow (not connected → the login/connect UI)
     await openMenu(page);
-    await page.click('[data-profact="saveas"]');
-    await expect(page.locator('.app-dialog input')).toHaveCount(1);
+    await page.click('.hq-identity [data-cloud]');
+    await expect(page.locator('.cloud-login, .cloud-connect').first()).toBeVisible({ timeout: 6000 });
     await page.keyboard.press('Escape');
-    // PULL opens the pull flow (the review/import modal)
-    await autoAppDialog(page, { accept: true });
+
+    // ↧ PULL tap → the pull flow (Settings → Controller → Profile, where the pull lives)
     await openMenu(page);
-    await page.click('[data-profact="pull"]');
-    await expect(page.locator('#import-close'), 'Pull opened the review/import modal').toBeVisible({ timeout: 6000 });
+    await page.click('.hq-identity .hq-pull-btn[data-profact="pull"]');
+    await expect(page.locator('#settings-app')).toBeVisible({ timeout: 6000 });
+    await expect(page.locator('#set_tab_profile')).toBeVisible({ timeout: 6000 });
 });
