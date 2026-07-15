@@ -16,6 +16,11 @@
  */
 import { nextParam } from './slotPack.js';
 import { PROBE, wcsBase, writeAxis, twoPassProbe, probeSave } from './camMacroKit.js';
+import { distModeBlock } from '../wizards/ops/distmode.js';   // t859 — the ONE source of the G90/G91 strings (the same distModeBlock wrapMachineFrame uses). Imported LIGHT (distmode.js has no imports) so the CAM path avoids the safeZframe→blockEmitter→saferetract cycle.
+// t859 — the SAME adjacent-G90 wrap the wizard retracts use, for a single raw G53 line: these CAM-slot G53s were raw
+// G53-under-G91 (same crash class as t853, a distinct surface). One G90 immediately before the G53 (the trailing G91
+// already present at each site restores incremental). Per-line = jump-proof, and no whole-body hasAbs scan to be fooled.
+const g90Before = (g53line) => [distModeBlock.emit({ dist: 'abs' })[0], g53line];
 
 // Probe port + trigger level are MACHINE-CONSTANT config, so the macros read them from the controller's
 // floating-probe params (Pr578→#1078 port, Pr580→#1080 level) instead of charging a form row for each — the
@@ -308,7 +313,7 @@ export function insideCentreSlot(used = new Set(), varOffset = 0) {
         ...twoPass('X', '#91', '#92', '#52'),
         '#53=[[#51+#52]/2]   ;X centre (machine coord)',
         '( re-centre X so the Y touch is a true diameter, not a chord )',
-        'G53 X#53',
+        ...g90Before('G53 X#53'),   // t859 — G90 immediately before the G53 (was raw G53-under-G91); the trailing G91 below restores incremental
         'G91   ( incremental )',
         '',
         '( Y axis: probe both walls at the X centre → Y centre )',
@@ -365,8 +370,8 @@ export function bossCentreSlot(used = new Set(), varOffset = 0) {
     // Save probe-height Z, lift clear, optional re-centre, PAUSE for the operator to move around, return to Z.
     const reposition = (msg, recentreAx, recentreVal) => {
         const L = ['#57=#882   ;save probe-height Z (machine DRO)', `G0 Z${v.safeZ}   ;lift clear of the boss`];
-        if (recentreAx) L.push(`G53 ${recentreAx}${recentreVal}   ;re-centre at safe Z (never cross the boss at depth)`);
-        L.push(`#1505=1   ;REPOSITION: ${msg}, then press Enter`, 'IF #1505 EQ 0 GOTO 2', 'G53 Z#57   ;back to probe height', 'G91   ( incremental )');
+        if (recentreAx) L.push(...g90Before(`G53 ${recentreAx}${recentreVal}   ;re-centre at safe Z (never cross the boss at depth)`));   // t859 — G90 before the G53
+        L.push(`#1505=1   ;REPOSITION: ${msg}, then press Enter`, 'IF #1505 EQ 0 GOTO 2', ...g90Before('G53 Z#57   ;back to probe height'), 'G91   ( incremental )');   // t859 — G90 before the G53; the trailing G91 restores
         return L;
     };
     const body = [

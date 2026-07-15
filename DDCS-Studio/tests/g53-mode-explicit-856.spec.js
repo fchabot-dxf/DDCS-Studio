@@ -77,6 +77,28 @@ test('(3) CORPUS GUARD: every emitted G53 in the safe-Z/probe corpus executes un
   expect(violations, `every emitted G53 must run under G90:\n${violations.join('\n')}`).toEqual([]);
 });
 
+test('(3b) CORPUS GUARD extends to the CAM-slot corpus: every raw G53 also runs under G90 (t859)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetSettings, null, { timeout: 15000 });
+  // The CAM-slot generators (probeToSlot) are RAW-TEXT (not the block-atom path); the inside/boss slots emit G53 in a G91
+  // body — same crash class as the wizard retract, a distinct surface (t856 flag). Sweep their full macro text too.
+  const macros = await page.evaluate(async () => {
+    const { insideCentreSlot, bossCentreSlot } = await import('/data/probeToSlot.js');
+    const { slotMacro } = await import('/data/slotPack.js');
+    const out = [];
+    for (const [name, f] of [['insideCentre', insideCentreSlot], ['bossCentre', bossCentreSlot]]) {
+      const s = f();
+      out.push({ label: name, text: slotMacro({ slot: 22, name: s.name, fields: s.fields, body: s.body }) });
+    }
+    return out;
+  });
+  const withG53 = macros.filter((m) => /(^|\n)[^\n]*G53/.test(m.text));
+  expect(withG53.length, 'the CAM-slot corpus exercises G53 (non-vacuous)').toBe(2);
+  const violations = [];
+  for (const m of macros) { const bad = g53ViolationsUnderG91(m.text); if (bad.length) violations.push(`${m.label} — G53 under G91:\n    ${bad.join('\n    ')}`); }
+  expect(violations, `every CAM-slot G53 must run under G90:\n${violations.join('\n')}`).toEqual([]);
+});
+
 test('(4) SIM IDENTITY: the G90-wrapped G53 is machine-absolute, does NOT flip a G91 macro, and G91 is restored', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
