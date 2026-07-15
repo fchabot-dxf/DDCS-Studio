@@ -4207,3 +4207,39 @@ new cloud root. It is a FEATURE (originally deferred at t854), not safety.
 
 The 4 skips are pre-existing in other files (e.g. project-drawer-smoke); the two header-profile-menu tests are now
 UN-skipped + passing. Commits: b6ee975 (rider B safety), 9a574d0 (part 2 + rider A).
+
+
+## 2026-07-15 (t861) — HONEST MACH PREDICTION (user field report: sim chip quoted Mach Z +40 on a top-homed machine).
+
+### GROUNDED — the +40 leak named
+
+The DRO Mach column = Work + the active WCS offset, read via `wcsOffsetAt(machine, active)` (viz/sceneFrame.js). When
+NO WCS row is declared (table null), wcsOffsetAt FALLS BACK to `machine.workOrigin` — but workOrigin is a SCENE PLACEMENT
+value (where the stock sits for rendering), NOT controller truth. On the user's top-homed machine a stale/placeholder
+workOrigin.z of +40 got quoted as Mach Z +40 — impossible (Z homes at the TOP = machine 0, travels negative, so the work
+origin sits BELOW home → Mach Z ≤ 0). Two readers, two Z conventions: wcsOffsetAt fell back raw, while partZeroShift
+(the 3D scene) deliberately distrusts the stored WCS-Z (uses the fixed machine table). The SCENE was never wrong — only
+the Mach QUOTE leaked. Reproduced in honest-mach-861.spec.js (LEAK_MACHINE: workOrigin.z=40, table null → old wcsOffsetAt
+returned +40).
+
+### THE FIX — three parts, the scene untouched
+
+(1) HONEST Mach source: new `declaredWcsOffset(machine, idx)` (sceneFrame.js) = the table row IF declared (typed or
+pulled), else NULL — NO workOrigin fallback. The DRO `updateDro` (createPreviewPanel) reads THIS: a null → the Mach cell
+shows "—" rather than a scene-placement placeholder dressed as machine truth. `wcsOffsetAt` is UNTOUCHED (keeps the
+workOrigin fallback for RENDERING — the engine G53 + 2D scene; atc-magazine-frame's "part rides workOrigin" still green),
+and `partZeroShift` + the 3D scene are UNTOUCHED (verified: scene Z = fixed table − stock floor = −140, not +40).
+
+(2) PLAUSIBILITY at entry: `renderWcsTable` (settingsPanel) ambers a POSITIVE WCS-Z the moment it is typed when the
+machine is top-homed (machine.z<0 — the honest home-end), with an amber input outline + a hint ("expect Z ≤ 0"). The
+point-of-entry guard for the leak.
+
+(3) PRE-FLIGHT: `checkEnvelope` already ambers an undeclared placement (placementDeclared) via the shared wcsOffsetAt
+route — no leaked Mach. ASSERTED (undeclared → amber; declared → not amber).
+
+VERIFIED (honest-mach-861.spec.js, 4 tests): the leak named + declaredWcsOffset null-no-fallback while wcsOffsetAt +
+partZeroShift stay put; the DRO Mach shows "—" undeclared / exact Work+offset declared (driven via .pp-run); the amber
+plausibility hint on a positive top-homed Z (and hides on a negative Z); pre-flight ambers undeclared via the shared
+route. The poschip frame-color (mach/work) is driven by pos.g53/probing — NOT touched.
+
+### GATE (w4, quiet box) — VERBATIM: 1270 passed / 0 failed / 4 skipped (11.1m), exit 0. CLEAN. commit 5743d38.
