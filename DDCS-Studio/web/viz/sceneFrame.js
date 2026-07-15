@@ -70,6 +70,17 @@ export function wcsOffsetAt(machine, idx) {
     return r ? { x: +r.x || 0, y: +r.y || 0, z: +r.z || 0 } : (m.workOrigin || { x: 0, y: 0, z: 0 });
 }
 
+/** t861 — THE HONEST Mach source. The DECLARED WCS offset for a 1-based index: the table row IF it exists (typed or
+ *  pulled), else NULL — with NO machine.workOrigin fallback. workOrigin is a SCENE PLACEMENT value (where the stock sits
+ *  for rendering), NOT controller truth; quoting it as Mach leaked an impossible Mach Z (+40 on a top-homed machine). So
+ *  wcsOffsetAt keeps the fallback for RENDERING (engine G53 + 2D placement — the scene was never wrong), and the DRO/DRO
+ *  Mach + pre-flight read THIS: a null result means "no declared WCS → don't quote Mach as machine truth". */
+export function declaredWcsOffset(machine, idx) {
+    const m = machine, w = m && m.wcs;
+    const r = w && Array.isArray(w.table) && w.table[((idx || (w && w.active) || 1)) - 1];
+    return r ? { x: +r.x || 0, y: +r.y || 0, z: +r.z || 0 } : null;
+}
+
 /** The 2D top-down STOCK PIN — the fixture offset of the stock from part-zero in the PART frame: the stock's WCS table row
  *  MINUS the active work origin, ONLY when the stock is explicitly pinned (else {0,0} — an unpinned stock IS part-zero).
  *  Same table read as partZeroShift (ONE source: the pin index + lookup can't drift); the part-frame base subtracts

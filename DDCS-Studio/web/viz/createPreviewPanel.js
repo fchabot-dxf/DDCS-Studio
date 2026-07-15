@@ -21,7 +21,7 @@ import { createToolpath2d } from './toolpath2d.js';
 import { LEGEND_ROWS } from './pathStyle.js';   // t317 — the ONE declared path-visual palette (the legend reads it, can't drift from the renderers)
 import { traceToolpath } from '../engine/trace.js';
 import { carveTipForToolType } from '../engine/stockRemoval.js';   // t682 — the carve tip PROFILE from the tool `type` (ball-nose etc.), one source
-import { wcsOffsetAt } from './sceneFrame.js';   // t588 PREVIEW-PARITY E2d — THE ONE WCS table read (the DRO Mach + the engine G53 + the 2D frame all read it; no local lookup)
+import { wcsOffsetAt, declaredWcsOffset } from './sceneFrame.js';   // t588 — wcsOffsetAt = the ONE WCS read for RENDERING (engine G53 + 2D frame; keeps the workOrigin fallback). t861 — declaredWcsOffset = the HONEST Mach source (null when no declared WCS row, no scene-placement fallback).
 import { toggleVisibilityModal } from '../ui/visibilityModal.js';   // t738 — the preview-visibility modal (opens from the toolbar 👁)
 import { onDisplayChange } from './displayPrefs.js';   // t738 — re-apply the visibility registry to THIS panel on any modal change
 import { GcodeExecutionEngine } from '../engine/index.js';
@@ -265,11 +265,14 @@ export function createPreviewPanel(container, opts = {}) {
     }
     function updateDro(pos) {
         if (!droBody) return;
-        const off = activeWcsOffset();
+        // t861 — HONEST Mach: quote Mach = Work + the DECLARED WCS offset ONLY. No declared WCS row (typed or pulled) →
+        // we cannot know the machine offset, so the Mach column shows "—" rather than a scene-placement placeholder dressed
+        // as controller truth (the +40 Mach-Z leak). The engine G53 rendering keeps activeWcsOffset() (workOrigin fallback).
+        const off = declaredWcsOffset(machineForViz(), activeWcsIdx());
         droAxes.forEach((ax) => {
-            const w = +(pos && pos[ax]) || 0, m = w + (+off[ax] || 0);
+            const w = +(pos && pos[ax]) || 0;
             const row = droBody.querySelector(`tr[data-ax="${ax}"]`);
-            if (row) { row.children[1].textContent = w.toFixed(3); row.children[2].textContent = m.toFixed(3); }
+            if (row) { row.children[1].textContent = w.toFixed(3); row.children[2].textContent = off ? (w + (+off[ax] || 0)).toFixed(3) : '—'; }
         });
     }
     function setDroWcs(raw) {   // a G54-G59 select drives the SIM active WCS — label + Mach offset (G10 set-offset keeps the current label)

@@ -822,11 +822,32 @@ function renderWcsTable(host, machine) {
         ['x', 'y', 'z'].forEach((k) => {
             const inp = document.createElement('input'); inp.type = 'number'; inp.step = '0.001'; inp.value = row[k] ?? '';
             inp.style.cssText = 'width:100%; box-sizing:border-box;';
-            inp.addEventListener('change', () => { row[k] = inp.value === '' ? '' : Number(inp.value); if (w.active === i + 1) syncWorkOrigin(machine); saveSettings(); });
+            if (k === 'z') inp.dataset.wcsZ = String(i);   // t861 — mark the WCS-Z inputs for the plausibility check
+            inp.addEventListener('change', () => { row[k] = inp.value === '' ? '' : Number(inp.value); if (w.active === i + 1) syncWorkOrigin(machine); saveSettings(); if (k === 'z') flagImplausibleZ(); });
             tr.appendChild(inp);
         });
         host.appendChild(tr);
     });
+    // t861 — PLAUSIBILITY AT ENTRY: on a top-homed machine (Z0 at the TOP, negative travel — the router/mill norm) the work
+    // Z-origin sits BELOW the home, so a POSITIVE WCS-Z is impossible (it would be above the home switch). Amber-flag it the
+    // moment it is typed — the honest home-end is machine.z < 0. This is the point-of-entry guard for the +40 Mach-Z leak.
+    const zTopHomed = Number(machine.z) < 0;
+    const zHint = document.createElement('div');
+    zHint.className = 'wcs-z-implausible-hint';
+    zHint.style.cssText = 'font-size:10.5px; color:#e0a63a; padding:5px 2px 0; display:none;';
+    zHint.textContent = '⚠ A positive WCS Z is above the top home. On this machine Z homes at the top and the work origin sits below it — expect Z ≤ 0.';
+    const flagImplausibleZ = () => {
+        let any = false;
+        host.querySelectorAll('input[data-wcs-z]').forEach((inp) => {
+            const bad = zTopHomed && inp.value !== '' && Number(inp.value) > 0;
+            inp.style.outline = bad ? '1px solid #e0a63a' : '';
+            inp.title = bad ? 'A positive WCS Z is above the top home (Z homes at the top; the work origin is below it)' : '';
+            if (bad) any = true;
+        });
+        zHint.style.display = any ? '' : 'none';
+    };
+    host.appendChild(zHint);
+    flagImplausibleZ();   // reflect a stored positive Z on open too
 }
 
 let _fillSettingsInputs = null;
