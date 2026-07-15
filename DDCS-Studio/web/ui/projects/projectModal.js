@@ -24,7 +24,7 @@ let drawer = null, listEl = null, crumbEl = null, footEl = null, importInput = n
 let localWrap = null, cloudWrap = null, cloudMount = null;
 let cwd = '', vol = 'local';
 let saveTarget = 'local';   // t754 — the save modal's current target (local | cloud), defaulted from preferredSaveTarget()
-let cloudStack = [];   // cloud folder path [{ id, name }] — mirrors Local's cwd but by provider file IDs
+let _drawerCloud = null;   // t863 — the drawer's own renderCloudInto instance (its OWN folder stack; no singleton leak)
 
 export function openOpenDrawer() {
     if (!drawer) buildDrawer();
@@ -47,7 +47,7 @@ function switchVol(v) {
     if (cloudWrap) cloudWrap.style.display = v === 'cloud' ? '' : 'none';
     drawer.querySelectorAll('.proj-voltab').forEach((t) => t.classList.toggle('on', t.dataset.vol === v));
     if (v === 'local') renderDrawer();
-    else { cloudStack = []; renderCloud(); }
+    else if (_drawerCloud) { _drawerCloud.reset(); _drawerCloud.render(); }
 }
 
 // t696 c — the drawer width, clamped to a sane range (never off-screen, never a sliver).
@@ -105,17 +105,15 @@ function buildDrawer() {
     drawer.addEventListener('click', onDrawerClick);
     importInput.addEventListener('change', onImportFile);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drawer && !drawer.hidden) closeDrawer(); });
-    window.addEventListener('ddcs:cloud-account', () => { if (drawer && !drawer.hidden && vol === 'cloud') renderCloud(); });
+    window.addEventListener('ddcs:cloud-account', () => { if (drawer && !drawer.hidden && vol === 'cloud' && _drawerCloud) _drawerCloud.render(); });
     // t805 — SELECT-THEN-LOAD: a project row selects; the dedicated [Open] (disabled until selected) or a
     // double-click opens. Folders navigate on their own click (not sl-rows). Two roots = local vs cloud.
     installSelectLoad(localWrap, async (path) => {
         try { const obj = await store.readProject(path); if (obj) { loadProject(obj); closeDrawer(); } }
         catch (err) { dlgNotice('open failed: ' + err.message); }
     });
-    installSelectLoad(cloudMount, async (id) => {
-        try { loadProject(await gdrive.read(id)); closeDrawer(); }
-        catch (e) { dlgNotice(cloudErrMsg(e)); }
-    });
+    // t863 — the cloud root is the REUSABLE renderCloudInto (shared with the Library Projects tab); its own folder stack.
+    _drawerCloud = renderCloudInto(cloudMount, { onClose: closeDrawer });
 }
 
 function mkCrumb(label, path) {
@@ -202,109 +200,125 @@ function onImportFile(e) {
 const cloudErrMsg = (e) => (String(e && e.message) === 'cloud-auth')
     ? 'Session expired — reconnect in the Cloud tab.' : ('cloud error: ' + (e && e.message));
 
-async function renderCloud() {
-    const acct = getAccount();
-    if (!acct.connected) return renderCloudConnect();
-    if (acct.provider !== 'google') {
-        cloudMount.innerHTML = `<div class="muted" style="padding:10px">${providerLabel(acct.provider)} browse is coming — only Google is wired so far.</div>`;
-        return;
-    }
-    let rootId;
-    try { rootId = await gdrive.ensureRoot(); }
-    catch (e) { cloudMount.innerHTML = `<div class="muted" style="padding:10px">${cloudErrMsg(e)}</div>`; return; }
-    if (!cloudStack.length) cloudStack = [{ id: rootId, name: 'Drive' }];
-    const cur = cloudStack[cloudStack.length - 1];
-
-    const mkBtn = (label, fn, cls) => { const b = document.createElement('button'); b.className = 'op-btn ' + (cls || ''); b.textContent = label; b.addEventListener('click', fn); return b; };
-
-    const bar = document.createElement('div'); bar.className = 'proj-bar';
-    const crumb = document.createElement('span'); crumb.className = 'proj-crumb';
-    cloudStack.forEach((f, i) => {
-        if (i) crumb.append(document.createTextNode(' / '));
-        const b = document.createElement('button'); b.className = 'proj-crumb-link'; b.textContent = f.name;
-        b.addEventListener('click', () => { cloudStack = cloudStack.slice(0, i + 1); renderCloud(); });
-        crumb.append(b);
+/** t863 — THE CLOUD PROJECT BROWSER, factored off the drawer singletons into a REUSABLE mount-scoped renderer (the
+ *  renderProfilesInto precedent, t854). Each call owns its OWN cloud folder `stack` closure — so the drawer and the
+ *  Library Projects tab never leak folder state into each other (the singleton `cloudStack` is gone). Installs the shared
+ *  select-then-load on `mount` ONCE (gdrive.read → loadProject → onClose). Returns { render, reset } so the caller
+ *  re-renders when its volume becomes visible and reset()s the crumb to the Drive root on (re)entry. */
+export function renderCloudInto(mount, { onClose } = {}) {
+    if (!mount) return { render: () => {}, reset: () => {} };
+    let stack = [];   // THIS mount's cloud folder path [{id,name}] — replaces the old module-level `cloudStack` singleton
+    // t805 — SELECT-THEN-LOAD on this root: a project row selects; [Open]/dblclick opens (folders navigate on their own click).
+    installSelectLoad(mount, async (id) => {
+        try { loadProject(await gdrive.read(id)); if (onClose) onClose(); }
+        catch (e) { dlgNotice(cloudErrMsg(e)); }
     });
-    const acts = document.createElement('span'); acts.className = 'proj-actions';
-    acts.append(
-        // Pick WHERE your projects live in Drive (Google Picker — drive.file can't browse, so the picker grants access).
-        mkBtn('📂 Choose folder', async () => {
-            try {
-                if (!googleApiKey()) {
-                    const k = await dlgPrompt('One-time setup: paste your Google API key (Cloud console → APIs & Services → Credentials → "Create credentials" → API key) and enable the "Google Picker API". Stored locally in this browser.');
-                    if (!k || !k.trim()) return;
-                    setGoogleApiKey(k.trim());
-                }
-                const f = await pickFolder();
-                gdrive.setRoot(f.id);
-                cloudStack = [{ id: f.id, name: f.name }];   // re-root the browser at the chosen folder
-                renderCloud();
-            } catch (e) {
-                const m = String(e && e.message);
-                if (m === 'cancelled') return;
-                if (m === 'no-api-key') { dlgNotice('A Google API key is needed for the folder picker (see the prompt).'); return; }
-                dlgNotice(cloudErrMsg(e));
-            }
-        }, 'op-btn'),
-        mkBtn('+ Folder', async () => { const n = await dlgPrompt('New folder name:'); if (!n) return; try { await gdrive.mkdir(sanitize(n), cur.id); renderCloud(); } catch (e) { dlgNotice(cloudErrMsg(e)); } }),
-        mkBtn('⤓ Save here', async () => {
-            const st = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-            if (!st.length) { dlgNotice('Nothing to save — build a program first.'); return; }
-            const n = await dlgPrompt('Save project as:', 'macro'); if (!n) return;
-            try { await gdrive.write(sanitize(n) + '.mjson', serializeProject(sanitize(n)), cur.id); renderCloud(); } catch (e) { dlgNotice(cloudErrMsg(e)); }
-        }),
-    );
-    bar.append(crumb, acts);
 
-    const listc = document.createElement('div'); listc.className = 'proj-list';
-    const openbar = document.createElement('div'); openbar.className = 'sl-openbar';
-    openbar.innerHTML = '<button class="sl-primary" data-sl-primary disabled title="Open the selected project">Open</button>';
-    let items = [];
-    try { items = await gdrive.list(cur.id); }
-    catch (e) { listc.innerHTML = `<div class="muted" style="padding:10px">${cloudErrMsg(e)}</div>`; cloudMount.replaceChildren(bar, listc); return; }
-    if (!items.length) listc.innerHTML = '<div class="muted" style="padding:10px">empty — Save a project or + Folder</div>';
-    for (const it of items) {
-        const isFolder = it.type === 'folder';
-        const row = document.createElement('div');
-        // A FOLDER navigates on click; a PROJECT is an sl-row — selected then opened via [Open]/dblclick (t805).
-        row.className = isFolder ? 'proj-row' : 'proj-row sl-row';
-        if (!isFolder) row.dataset.slId = it.id;
-        let name;
-        if (isFolder) {
-            name = document.createElement('button'); name.className = 'proj-name';
-            name.addEventListener('click', () => { cloudStack.push({ id: it.id, name: it.name }); renderCloud(); });
-        } else {
-            name = document.createElement('span'); name.className = 'sl-name';
+    /** Disconnected: status + per-provider connect buttons (only providers actually wired — t805). */
+    function renderConnect() {
+        const wrap = document.createElement('div'); wrap.className = 'cloud-login';
+        const status = document.createElement('div'); status.className = 'cloud-status muted';
+        status.textContent = 'Not connected — connect your own cloud to save projects there.';
+        wrap.appendChild(status);
+        const row = document.createElement('div'); row.className = 'cloud-providers';
+        for (const id of AVAILABLE_PROVIDER_IDS) {
+            const b = document.createElement('button'); b.className = 'op-btn cloud-connect';
+            b.innerHTML = providerIcon(id) + '<span>Connect ' + providerLabel(id) + '</span>';
+            b.addEventListener('click', () => connect(id));
+            row.appendChild(b);
         }
-        name.textContent = (isFolder ? '📁 ' : '📄 ') + it.name;
-        const meta = document.createElement('span'); meta.className = 'proj-meta muted'; meta.textContent = it.savedAt ? it.savedAt.slice(0, 16).replace('T', ' ') : '';
-        const ra = document.createElement('span'); ra.className = 'proj-rowacts';
-        ra.append(
-            mkBtn('✎', async () => { const c = it.name.replace(/\.mjson$/, ''); const n = await dlgPrompt('Rename to:', c); if (!n || sanitize(n) === c) return; try { await gdrive.rename(it.id, it.type === 'folder' ? sanitize(n) : sanitize(n) + '.mjson'); renderCloud(); } catch (e) { dlgNotice(cloudErrMsg(e)); } }),
-            mkBtn('🗑', async () => { if (!await dlgConfirm('Delete "' + it.name + '"?')) return; try { await gdrive.del(it.id); renderCloud(); } catch (e) { dlgNotice(cloudErrMsg(e)); } }, 'danger'),
-        );
-        row.append(name, meta, ra); listc.append(row);
+        wrap.appendChild(row);
+        mount.replaceChildren(wrap);
     }
-    cloudMount.replaceChildren(bar, listc, openbar);
-    syncPrimary(cloudMount);   // t805 — fresh list (or a folder switch) carries no selection → disable [Open]
-}
 
-/** Disconnected Cloud tab: status + per-provider connect buttons (drawer-local; Settings uses renderCloudLogin). */
-function renderCloudConnect() {
-    const wrap = document.createElement('div'); wrap.className = 'cloud-login';
-    const status = document.createElement('div'); status.className = 'cloud-status muted';
-    status.textContent = 'Not connected — connect your own cloud to save projects there.';
-    wrap.appendChild(status);
-    const row = document.createElement('div'); row.className = 'cloud-providers';
-    // t805 — only OFFER providers that are actually wired (was PROVIDER_IDS → dead Dropbox/OneDrive connect buttons).
-    for (const id of AVAILABLE_PROVIDER_IDS) {
-        const b = document.createElement('button'); b.className = 'op-btn cloud-connect';
-        b.innerHTML = providerIcon(id) + '<span>Connect ' + providerLabel(id) + '</span>';
-        b.addEventListener('click', () => connect(id));
-        row.appendChild(b);
+    async function render() {
+        const acct = getAccount();
+        if (!acct.connected) return renderConnect();
+        if (acct.provider !== 'google') {
+            mount.innerHTML = `<div class="muted" style="padding:10px">${providerLabel(acct.provider)} browse is coming — only Google is wired so far.</div>`;
+            return;
+        }
+        let rootId;
+        try { rootId = await gdrive.ensureRoot(); }
+        catch (e) { mount.innerHTML = `<div class="muted" style="padding:10px">${cloudErrMsg(e)}</div>`; return; }
+        if (!stack.length) stack = [{ id: rootId, name: 'Drive' }];
+        const cur = stack[stack.length - 1];
+
+        const mkBtn = (label, fn, cls) => { const b = document.createElement('button'); b.className = 'op-btn ' + (cls || ''); b.textContent = label; b.addEventListener('click', fn); return b; };
+
+        const bar = document.createElement('div'); bar.className = 'proj-bar';
+        const crumb = document.createElement('span'); crumb.className = 'proj-crumb';
+        stack.forEach((f, i) => {
+            if (i) crumb.append(document.createTextNode(' / '));
+            const b = document.createElement('button'); b.className = 'proj-crumb-link'; b.textContent = f.name;
+            b.addEventListener('click', () => { stack = stack.slice(0, i + 1); render(); });
+            crumb.append(b);
+        });
+        const acts = document.createElement('span'); acts.className = 'proj-actions';
+        acts.append(
+            // Pick WHERE your projects live in Drive (Google Picker — drive.file can't browse, so the picker grants access).
+            mkBtn('📂 Choose folder', async () => {
+                try {
+                    if (!googleApiKey()) {
+                        const k = await dlgPrompt('One-time setup: paste your Google API key (Cloud console → APIs & Services → Credentials → "Create credentials" → API key) and enable the "Google Picker API". Stored locally in this browser.');
+                        if (!k || !k.trim()) return;
+                        setGoogleApiKey(k.trim());
+                    }
+                    const f = await pickFolder();
+                    gdrive.setRoot(f.id);
+                    stack = [{ id: f.id, name: f.name }];   // re-root the browser at the chosen folder
+                    render();
+                } catch (e) {
+                    const m = String(e && e.message);
+                    if (m === 'cancelled') return;
+                    if (m === 'no-api-key') { dlgNotice('A Google API key is needed for the folder picker (see the prompt).'); return; }
+                    dlgNotice(cloudErrMsg(e));
+                }
+            }, 'op-btn'),
+            mkBtn('+ Folder', async () => { const n = await dlgPrompt('New folder name:'); if (!n) return; try { await gdrive.mkdir(sanitize(n), cur.id); render(); } catch (e) { dlgNotice(cloudErrMsg(e)); } }),
+            mkBtn('⤓ Save here', async () => {
+                const st = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+                if (!st.length) { dlgNotice('Nothing to save — build a program first.'); return; }
+                const n = await dlgPrompt('Save project as:', 'macro'); if (!n) return;
+                try { await gdrive.write(sanitize(n) + '.mjson', serializeProject(sanitize(n)), cur.id); render(); } catch (e) { dlgNotice(cloudErrMsg(e)); }
+            }),
+        );
+        bar.append(crumb, acts);
+
+        const listc = document.createElement('div'); listc.className = 'proj-list';
+        const openbar = document.createElement('div'); openbar.className = 'sl-openbar';
+        openbar.innerHTML = '<button class="sl-primary" data-sl-primary disabled title="Open the selected project">Open</button>';
+        let items = [];
+        try { items = await gdrive.list(cur.id); }
+        catch (e) { listc.innerHTML = `<div class="muted" style="padding:10px">${cloudErrMsg(e)}</div>`; mount.replaceChildren(bar, listc); return; }
+        if (!items.length) listc.innerHTML = '<div class="muted" style="padding:10px">empty — Save a project or + Folder</div>';
+        for (const it of items) {
+            const isFolder = it.type === 'folder';
+            const row = document.createElement('div');
+            // A FOLDER navigates on click; a PROJECT is an sl-row — selected then opened via [Open]/dblclick (t805).
+            row.className = isFolder ? 'proj-row' : 'proj-row sl-row';
+            if (!isFolder) row.dataset.slId = it.id;
+            let name;
+            if (isFolder) {
+                name = document.createElement('button'); name.className = 'proj-name';
+                name.addEventListener('click', () => { stack.push({ id: it.id, name: it.name }); render(); });
+            } else {
+                name = document.createElement('span'); name.className = 'sl-name';
+            }
+            name.textContent = (isFolder ? '📁 ' : '📄 ') + it.name;
+            const meta = document.createElement('span'); meta.className = 'proj-meta muted'; meta.textContent = it.savedAt ? it.savedAt.slice(0, 16).replace('T', ' ') : '';
+            const ra = document.createElement('span'); ra.className = 'proj-rowacts';
+            ra.append(
+                mkBtn('✎', async () => { const c = it.name.replace(/\.mjson$/, ''); const n = await dlgPrompt('Rename to:', c); if (!n || sanitize(n) === c) return; try { await gdrive.rename(it.id, it.type === 'folder' ? sanitize(n) : sanitize(n) + '.mjson'); render(); } catch (e) { dlgNotice(cloudErrMsg(e)); } }),
+                mkBtn('🗑', async () => { if (!await dlgConfirm('Delete "' + it.name + '"?')) return; try { await gdrive.del(it.id); render(); } catch (e) { dlgNotice(cloudErrMsg(e)); } }, 'danger'),
+            );
+            row.append(name, meta, ra); listc.append(row);
+        }
+        mount.replaceChildren(bar, listc, openbar);
+        syncPrimary(mount);   // t805 — fresh list (or a folder switch) carries no selection → disable [Open]
     }
-    wrap.appendChild(row);
-    cloudMount.replaceChildren(wrap);
+
+    return { render, reset: () => { stack = []; } };
 }
 
 // ── SAVE modal (name + folder tree picker) ────────────────────────────────────

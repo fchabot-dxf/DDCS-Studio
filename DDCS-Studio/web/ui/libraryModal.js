@@ -15,7 +15,7 @@ import { renderProfilesInto } from './profileModal.js';
 import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { installSelectLoad, syncPrimary } from './selectLoad.js';
 import * as store from './projects/projectStore.js';
-import { openSaveModal } from './projects/projectModal.js';
+import { openSaveModal, renderCloudInto } from './projects/projectModal.js';
 import { loadProject } from '../blocks/programFile.js';
 import { dlgPrompt, dlgConfirm, dlgNotice } from './dialog.js';
 
@@ -73,17 +73,28 @@ export function openLibrary(tab) {
 // ── PROJECTS tab — the local project browser, reusing the store API + the shared select-then-load + openSaveModal ──
 function renderProjectsTab(body, ctx) {
     let cwd = '';
+    // t863 — TWO VOLUMES, two select-load roots (the t806 drawer pattern): Local (projectStore) + Cloud (renderCloudInto,
+    // its OWN folder stack). Each root owns its own [data-sl-primary] so a selection on one can't drive the other's [Open].
     body.innerHTML = `
-        <div class="lib-projhead">
-            <span class="lib-crumb" data-crumb></span>
-            <span style="flex:1"></span>
-            <button type="button" class="toolbar-btn settings-io" data-pa="mkdir" title="New folder here">+ Folder</button>
-            <button type="button" class="toolbar-btn settings-io" data-pa="save" title="Save the current program into a folder">💾 Save current…</button>
+        <div class="proj-voltabs" role="tablist">
+            <button type="button" class="proj-voltab on" data-lvol="local" role="tab">💾 Local</button>
+            <button type="button" class="proj-voltab" data-lvol="cloud" role="tab">☁ Cloud</button>
         </div>
-        <div class="lib-list" data-list></div>
-        <div class="sl-openbar"><button type="button" class="sl-primary" data-sl-primary disabled title="Open the selected project">Open</button></div>`;
-    const listEl = body.querySelector('[data-list]');
-    const crumbEl = body.querySelector('[data-crumb]');
+        <div id="libProjLocal">
+            <div class="lib-projhead">
+                <span class="lib-crumb" data-crumb></span>
+                <span style="flex:1"></span>
+                <button type="button" class="toolbar-btn settings-io" data-pa="mkdir" title="New folder here">+ Folder</button>
+                <button type="button" class="toolbar-btn settings-io" data-pa="save" title="Save the current program into a folder">💾 Save current…</button>
+            </div>
+            <div class="lib-list" data-list></div>
+            <div class="sl-openbar"><button type="button" class="sl-primary" data-sl-primary disabled title="Open the selected project">Open</button></div>
+        </div>
+        <div id="libProjCloud" style="display:none"></div>`;
+    const localWrap = body.querySelector('#libProjLocal');
+    const cloudWrap = body.querySelector('#libProjCloud');
+    const listEl = localWrap.querySelector('[data-list]');
+    const crumbEl = localWrap.querySelector('[data-crumb]');
 
     async function render() {
         // breadcrumb
@@ -98,14 +109,14 @@ function renderProjectsTab(body, ctx) {
             if (en.type === 'folder') return `<div class="proj-row lib-row"><button class="lib-name" data-cd="${esc(en.path)}" title="Open folder">📁 ${esc(en.name)}</button><span style="flex:1"></span><button class="op-btn" data-ren="${esc(en.path)}" title="Rename">✎</button><button class="op-btn" data-del="${esc(en.path)}" title="Delete">🗑</button></div>`;
             return `<div class="proj-row lib-row sl-row" data-sl-id="${esc(en.path)}"><span class="sl-name">📄 ${esc(en.name)}</span><span class="sl-tag">💾 local</span><button class="op-btn" data-ren="${esc(en.path)}" title="Rename">✎</button><button class="op-btn" data-del="${esc(en.path)}" title="Delete">🗑</button></div>`;
         }).join('') || '<div style="opacity:.6; padding:16px; text-align:center;">Empty — Save current… to add a project.</div>';
-        syncPrimary(body);
+        syncPrimary(localWrap);
     }
 
-    installSelectLoad(body, async (path) => {
+    installSelectLoad(localWrap, async (path) => {
         try { const obj = await store.readProject(path); if (obj) { loadProject(obj); ctx.close(); } }
         catch (err) { dlgNotice('Open failed: ' + (err && err.message || err)); }
     });
-    body.addEventListener('click', async (e) => {
+    localWrap.addEventListener('click', async (e) => {
         const cd = e.target.closest('[data-cd]'); if (cd) { cwd = cd.dataset.cd; render(); return; }
         const ren = e.target.closest('[data-ren]');
         if (ren) {
@@ -123,6 +134,19 @@ function renderProjectsTab(body, ctx) {
         if (pa && pa.dataset.pa === 'mkdir') { const nn = await dlgPrompt('New folder name:', ''); if (nn) { await store.mkdir(store.joinPath(cwd, nn)); render(); } return; }
         if (pa && pa.dataset.pa === 'save') { ctx.close(); openSaveModal(); return; }
     });
+
+    // t863 — CLOUD volume: the reusable renderCloudInto (mounts its browser + select-load on cloudWrap; its own folder stack).
+    const cloudBrowser = renderCloudInto(cloudWrap, { onClose: ctx.close });
+
+    function switchVol(v) {
+        localWrap.style.display = v === 'local' ? '' : 'none';
+        cloudWrap.style.display = v === 'cloud' ? '' : 'none';
+        body.querySelectorAll('.proj-voltab').forEach((t) => t.classList.toggle('on', t.dataset.lvol === v));
+        if (v === 'local') render();
+        else { cloudBrowser.reset(); cloudBrowser.render(); }
+    }
+    body.querySelectorAll('.proj-voltab').forEach((t) => t.addEventListener('click', () => switchVol(t.dataset.lvol)));
+
     render();
 }
 
