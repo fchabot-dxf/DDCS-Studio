@@ -11086,3 +11086,51 @@ Files: web/wizards/ops/contour.js (concentricRings + concentricContour + regionI
 (fillStrategy dispatch + import), web/wizards/ops/pocketfill.js (export stepoverMm), web/blocks/dataOps/pocketData.js
 (preview draws the rings + imports), tests/fixtures/pocket-golden.json (14 polygon/ellipse concentric emits regenerated),
 tests/concentric-shapes-802.spec.js (NEW). Commit 421fada.
+
+---
+
+## 2026-07-15 — t828 minimap placement riders: GROUNDING RUN + account-row spec correction
+
+### CONTEXT
+
+Woke on the queued task "TWO MINIMAP PLACEMENT RIDERS" from NEXT-SESSION.md line 40 (ratified at t823,
+dispatched to ride after the safe-Z fix at t826). Grounded the implementation BEFORE touching anything.
+
+### WHAT I FOUND (no code to write for the minimap itself)
+
+Both riders were already fully implemented and committed (commit 98f0bc1, 2026-07-14):
+- **Rider 2** (strip flush in editor-only view): CSS at styles.css:3541–3545 — `--gm-right: var(--gm-flush)` by
+  default (a 2px scrollbar sliver), with `calc(var(--viz3d-size,50%) + var(--gm-tab))` only when the split
+  drawer is open. Exactly the design.
+- **Rider 1** (toggle off the Copy cluster): gm-toggle now sits LEFT of the strip top edge at
+  `right: calc(var(--gm-right) + var(--gm-w, 62px) + 20px)` — well away from the Copy button.
+- The t828 acceptance spec was already in gcode-minimap-810.spec.js (test at line 113) and was GREEN: 8/8.
+
+### THE REAL PROBLEM FOUND (a spec lag from the menu diet)
+
+While grounding, ran the full header test family and found 2 RED tests in header-account-row-742.spec.js:
+- DESKTOP test: asserted `toContainText('not connected')` — but the t851 menu diet's identity row puts cloud
+  state in the `title=` attribute of the ☁ badge (compact row: badge shows ☁ only, email/state in tooltip).
+- CONNECTED test: asserted `toContainText('maker@example.com')` — same root cause.
+
+The CODE was correct (the badge title says "Connect cloud account" / "Cloud: <email> — tap to manage" exactly
+as designed). The specs were testing the OLD standalone account-row shape (which had the email as visible text).
+This is the "stale spec" failure class — the implementation moved, the spec didn't follow.
+
+### FIX
+
+Updated tests/header-account-row-742.spec.js: changed both assertions from `toContainText(...)` to
+`toHaveAttribute('title', /<pattern>/i)`, matching the compact badge's actual data surface. Added a comment
+explaining the t851 design decision so the next reader doesn't re-chase this.
+
+### VERIFY
+
+header-account-row-742: 3/3 passed. Full scoped run (minimap + all 5 header specs): 18/18 passed, 2 skipped
+(the 2 skipped are the old test.skip'd profile-menu tests, already archived). Zero regressions.
+
+WHY these tests were wrong: the menu diet shipped in commit 98f0bc1 alongside the minimap riders. The spec for
+the account row predates the diet (t742) and wasn't updated when the diet landed. Nothing in the spec runner
+caught it because the badge element `[data-cloud]` still EXISTS and is VISIBLE — the is-visible assertions
+passed; only the content assertion failed. Caught now; fixed surgically (assertions only, no HTML change).
+
+Files changed: tests/header-account-row-742.spec.js (2 assertion fixes).

@@ -26,8 +26,9 @@ test('DESKTOP: the account row is in the header menu (not-connected state) + tap
     await page.evaluate(() => { ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email', 'ddcs_cloud_name'].forEach((k) => localStorage.removeItem(k)); });
     await openMenu(page);
     const row = page.locator('#hdrPostMenu [data-cloud]');
-    await expect(row, 'the account row is visible in the header menu').toBeVisible();
-    await expect(row, 'not-connected state is stated at a glance').toContainText('not connected');
+    await expect(row, 'the ☁ badge is visible in the header menu identity row').toBeVisible();
+    // t851 menu diet: cloud state is in the title= attr (compact badge shows ☁ only, state at a glance via tooltip)
+    await expect(row, 'not-connected state is stated in the badge title').toHaveAttribute('title', /Connect cloud|not connected|Connect/i);
 
     // tap → the SHARED connect flow opens (a modal hosting renderCloudLogin — its .cloud-login component)
     await row.click();
@@ -59,6 +60,6 @@ test('CONNECTED state: the row shows the account identity', async ({ page }) => 
     // simulate a connected account (the ONE source cloudAccount.getAccount reads)
     await page.evaluate(() => { localStorage.setItem('ddcs_cloud_token', 'tok'); localStorage.setItem('ddcs_cloud_provider', 'google'); localStorage.setItem('ddcs_cloud_email', 'maker@example.com'); });
     await openMenu(page);
-    await expect(page.locator('#hdrPostMenu [data-cloud]'), 'the connected state shows the account email identity').toContainText('maker@example.com');
+    await expect(page.locator('#hdrPostMenu [data-cloud]'), 'the connected state shows the account email in the badge title').toHaveAttribute('title', /maker@example\.com/);
     await page.evaluate(() => { ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email', 'ddcs_cloud_name'].forEach((k) => localStorage.removeItem(k)); });
 });
