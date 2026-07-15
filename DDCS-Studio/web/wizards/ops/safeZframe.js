@@ -17,6 +17,7 @@
  * invented. The block is the existing `move` / `machinemove` atom, so it round-trips through gcodeToStack as-is.
  */
 import { newBlock } from '../../blocks/blockEmitter.js';
+import { distModeBlock } from './distmode.js';
 
 // ── MACHINE-FRAME SAFE-Z MARGIN (t822) — the DECLARED safety policy for the SYSTEM safe-height retract ────────────────
 // Distinct from the per-wizard safe-Z VALUE above (a user clearance, frame-toggleable). This is the machine-frame margin
@@ -64,10 +65,15 @@ export function safeRetractNode({ workClear = '#17', restore } = {}) {
  *  restore G91 AFTER only where the body continues incremental (restore==='inc'); the error handler needs no restore
  *  (M30/N2 follows). ONE source for the saferetract + safeZParkBlock(machine) emits. */
 export function wrapMachineFrame(dialect, core, restore) {
-    const g90 = dialect.distMode('abs');
-    const hasAbs = core.some((ln) => String(ln) === g90);      // DM500's work-frame degrade already emits G90 → don't double it
-    const out = hasAbs ? [...core] : [g90, ...core];           // G90 IMMEDIATELY before the G53 on every path — jump-proof
-    if (restore === 'inc' || restore === 'G91') out.push(dialect.distMode('inc'));   // restore G91 only where the body continues incremental
+    const out = [];
+    const g90 = distModeBlock.emit({ dist: 'abs' })[0];
+    // comment-proof G90 detection: strip ( ... ) comments, then word-match — a NOTE mentioning G90 must never suppress the wrap
+    const hasAbs = core.some((ln) => /(^|\s)G90(\s|$)/.test(String(ln).replace(/\([^)]*\)/g, '')));
+    core.forEach(ln => {
+        if (!hasAbs && /(^|\s)G53(\s|$)/.test(ln)) out.push(g90);
+        out.push(ln);
+    });
+    if (restore === 'inc' || restore === 'G91') out.push(distModeBlock.emit({ dist: 'inc' })[0]);   // restore G91 only where the body continues incremental
     return out;
 }
 

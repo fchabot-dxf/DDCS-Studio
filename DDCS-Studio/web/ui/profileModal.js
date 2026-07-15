@@ -139,6 +139,7 @@ export async function renderProfilesInto(host, opts = {}) {
                 <span class="sl-name" style="flex:1; ${on ? 'font-weight:700;' : ''}">${esc(p.name || '(unnamed)')} <span style="opacity:.6; font-weight:400;">· ${esc(ctrlName(p.controllerId))}</span></span>
                 ${on ? '<span class="sl-active-badge">Active</span>' : ''}
                 <span class="sl-tag">${tag}</span>
+                <button type="button" class="toolbar-btn settings-io" data-rename="${p.id}" title="Rename this profile">✎</button>
                 <button type="button" class="toolbar-btn settings-io" data-export="${p.id}" title="Export this profile to a .json file">⤓</button>
                 <button type="button" class="op-btn" data-del="${p.id}" title="Delete this profile">🗑</button>
             </div>`);
@@ -177,6 +178,11 @@ export async function renderProfilesInto(host, opts = {}) {
             L.deleteProfile(p.id); _afterChange(); render();
         }
         else if (t.dataset.export) { exportProfile(t.dataset.export); }
+        else if (t.dataset.rename) {
+            const p = L.listProfiles().find((x) => x.id === t.dataset.rename); if (!p) return;
+            const name = await dlgPrompt('Enter a new name for this profile:', p.name || '', { title: 'Rename profile', okLabel: 'Rename' });
+            if (name != null) { L.renameProfile(p.id, name); _afterChange(); render(); }
+        }
         else if (t.dataset.cdel) {
             if (!(await dlgConfirm('Delete this cloud profile? (Only the cloud copy — nothing on this device changes.)', { danger: true, okLabel: 'Delete' }))) return;
             try { await window.ddcsDeleteCloudProfile(t.dataset.cdel); await refreshCloud(); render(); }

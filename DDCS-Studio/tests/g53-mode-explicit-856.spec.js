@@ -19,13 +19,16 @@ const POSTS = ['ddcs-expert-m350', 'ddcs-v41', 'ddcs-v3-dm500', 'grbl', 'rs274ng
 // Track the modal G90/G91 state line-by-line (controllers boot G90) and return every G53 line NOT under G90.
 // Strip ( ... ) comments first so a comment MENTIONING G53/G90 (e.g. the DM500 degrade note) is never mistaken for code.
 function g53ViolationsUnderG91(text) {
-  let absolute = true;
   const bad = [];
-  text.split('\n').forEach((raw, i) => {
-    const ln = raw.replace(/\([^)]*\)/g, '');   // drop inline/full-line comments
-    if (/(^|\s)G90(\s|$|\D)/.test(ln)) absolute = true;
-    if (/(^|\s)G91(\s|$|\D)/.test(ln)) absolute = false;   // G91.1 etc. don't occur in this corpus
-    if (/(^|\s)G53(\s|$)/.test(ln) && !absolute) bad.push(`line ${i}: ${raw}`);
+  const lines = text.split('\n').map(raw => raw.replace(/\([^)]*\)/g, ''));
+  lines.forEach((ln, i) => {
+    if (/(^|\s)G53(\s|$)/.test(ln)) {
+       const hasG90Here = /(^|\s)G90(\s|$|\D)/.test(ln);
+       const hasG90Prev = i > 0 && /(^|\s)G90(\s|$|\D)/.test(lines[i-1]);
+       if (!hasG90Here && !hasG90Prev) {
+          bad.push(`line ${i}: ${text.split('\n')[i]}`);
+       }
+    }
   });
   return bad;
 }

@@ -410,6 +410,36 @@ function loadSettings() {
 export function saveSettings() {
     try { localStorage.setItem(DDCS_SETTINGS_KEY, JSON.stringify(_ddcsSettings)); } catch (e) { /* ignore */ }
     window.dispatchEvent(new CustomEvent('ddcs:settings-changed', { detail: _ddcsSettings }));
+    showSavedToast();
+}
+
+function showSavedToast() {
+    let t = document.getElementById('ddcs-settings-toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'ddcs-settings-toast';
+        Object.assign(t.style, {
+            position: 'absolute', top: '16px', right: '48px',
+            background: 'var(--accent, #0ea5e9)', color: '#fff',
+            padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold',
+            opacity: '0', transition: 'opacity 0.2s', zIndex: '9999', pointerEvents: 'none',
+            boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
+        });
+        const app = document.getElementById('settings-app') || document.body;
+        app.appendChild(t);
+    }
+    
+    let name = 'unnamed';
+    const L = window.ddcsProfileLib;
+    if (L) {
+        const ap = L.activeProfile();
+        if (ap && ap.name) name = ap.name;
+    }
+    
+    t.textContent = `Saved to: ${name} ✓`;   // textContent — a profile name must never inject markup
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.opacity = '0'; }, 1200);
 }
 
 export function getSettings() { return _ddcsSettings; }

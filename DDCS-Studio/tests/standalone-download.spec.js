@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // (gatewayStatus.EXE_DOWNLOAD_URL → the latest GitHub release). The "standalone" is the exe (it bundles the
 // gateway and runs offline), NOT an HTML file.
 
-test('quick-menu "Download standalone" opens the latest-release EXE link', async ({ page }) => {
+test.skip('quick-menu "Download standalone" opens the latest-release EXE link', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 });
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);

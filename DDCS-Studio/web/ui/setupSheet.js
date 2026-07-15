@@ -164,8 +164,8 @@ export function buildSheetHTML() {
         + `<span>Safe-Z margin: <b>${esc(String(safez))} mm below home</b></span>`
         + `</div>`;
 
-    return `<div class="ss-title">${esc(jobName)}</div>`
-        + `<div class="ss-sub">${esc(dateStr)}${ap.name ? ' · ' + esc(ap.name) : ''}${ctrl ? ' · ' + esc(ctrl) : ''}</div>`
+    return `<div class="ss-title" contenteditable="true" spellcheck="false" title="Click to edit job name">${esc(jobName)}</div>`
+        + `<div class="ss-sub" contenteditable="true" spellcheck="false" title="Click to edit notes/details">${esc(dateStr)}${ap.name ? ' · ' + esc(ap.name) : ''}${ctrl ? ' · ' + esc(ctrl) : ''}</div>`
         + `<section><h3>Stock</h3>${stockHTML}</section>`
         + `<section><h3>Work coordinate system</h3>${wcsHTML}</section>`
         + `<section><h3>Tools</h3>${toolsHTML}</section>`

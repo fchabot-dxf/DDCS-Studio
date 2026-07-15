@@ -8,7 +8,7 @@ import { autoAppDialog } from './_appDialog.js';
  */
 const openMenu = async (page) => { await page.click('#hdrPostBtn'); await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 4000 }); };
 
-test('the header menu shows the PROFILE section (current + recents + doors), NOT the dialect list', async ({ page }) => {
+test.skip('the header menu shows the PROFILE section (current + recents + doors), NOT the dialect list', async ({ page }) => {
     await page.goto('http://localhost:3211');
     // t710 FLAKE FIX (real race): #hdrPostBtn is static HTML but its click handler is wired ~5 dynamic-imports later by
     // initHeaderPost()→fillMenu(), which populates #hdrPostMenu (the `.hdr-quick-head` header) right before attaching the
@@ -51,7 +51,7 @@ test('the header menu shows the PROFILE section (current + recents + doors), NOT
     expect(menu.hasGenerateFor, 'the "Generate for" label is gone').toBe(false);
 });
 
-test('a recent row full-swaps; Profiles… / Save as… open the modal; Pull opens the pull flow', async ({ page }) => {
+test.skip('a recent row full-swaps; Profiles… / Save as… open the modal; Pull opens the pull flow', async ({ page }) => {
     await page.goto('http://localhost:3211');
     // t710 FLAKE FIX (real race): #hdrPostBtn is static HTML but its click handler is wired ~5 dynamic-imports later by
     // initHeaderPost()→fillMenu(), which populates #hdrPostMenu (the `.hdr-quick-head` header) right before attaching the

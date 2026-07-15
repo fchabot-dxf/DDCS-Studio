@@ -20,6 +20,20 @@
 
 ---
 
+## Recently Shipped (Session Updates)
+- **Settings Auto-Save Visual Feedback**: Added a "Saved ✓" toast notification to indicate when settings are automatically saved to the active profile.
+- **Profile Field Editing**: Added a "✎ Rename" button to the Library Profiles tab to easily rename the active profile.
+
+---
+
+## Feature Ideas (Candidate Backlog)
+- **SVG icon library**: Implement a comprehensive internal SVG library to replace inline icons and clean up UI components.
+- **Per-point Z coordlist**: Allow users to specify discrete Z heights per coordinate point instead of a single depth per operation.
+- **Sim intent v2**: Upgrade the simulation model to better capture operational intent and visualize toolpaths more accurately.
+- **Community wizards**: Develop a platform or sharing mechanism for users to publish, discover, and install custom-built wizards from the broader community.
+
+---
+
 ## North star (the *why*) — total wizard control by the user
 
 Every wizard becomes **data, interpreted** — not hand-coded JS. The moment a user can edit *any* wizard, the built-ins
