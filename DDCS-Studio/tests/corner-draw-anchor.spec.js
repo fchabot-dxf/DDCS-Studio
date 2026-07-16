@@ -119,10 +119,12 @@ test('(1) engine-frame: the wall-2 probe trigger #1926 == the RELOCATED ②.y (f
   expect(R1(r.y1926), 'the sim wall-2 probe trigger Y == the RELOCATED ②.y (machine-faithful)').toBe(R1(r.relY));
   expect(R1(r.y1926), 'machine-faithful #1926 == 43').toBe(43);
   expect(R1(r.y1926), 'NOT the static (t94 start-based) ②.y = 7').not.toBe(R1(r.staticY));
-  // #1925 (contact X) contacts the X face at -tipR = -2 (reachable from the relocated ②), #1927 (probe height): the tool
-  // now descends from the machine-frame margin retract (rendered at the margin-clearance) then drops -#19 → -10 (t826; was -5).
+  // #1925 (contact X) contacts the X face at -tipR = -2 (reachable from the relocated ②). #1927 (probe height): t897 MIGRATION
+  // — the old -10 CODIFIED THE BUG (an absolute G53 margin lift + a relative -#19 drop landed an arbitrary Z). The honest
+  // lift/drop pairing (probeWallR saveMachineZNode ↔ repoTraverse returnZ '#95') now RETURNS the tool to the SAVED probe depth,
+  // so wall-2 fires from the SAME Z as wall-1 (= 0 here, the consistent scan depth) — proven independently by lift-drop-pairing-897.
   expect(R1(r.x1925), 'the wall-2 contact X = front-face 0 − tipR 2 = -2 (on-stock, reachable from the relocated ②)').toBe(-2);
-  expect(R1(r.z1927), 'the wall-2 probe fires at the descend-from-margin height z = -10 (machine-frame retract then drop)').toBe(-10);
+  expect(R1(r.z1927), 'the wall-2 probe fires at the RETURNED probe depth z = 0 (the honest saved-Z return, NOT the buggy -10 margin-drop)').toBe(0);
 });
 
 // (2) FALLBACK — the #1 all-ops-regression guard. drawAnchorFor with NO flag resolves to SELF (never undefined/NaN),

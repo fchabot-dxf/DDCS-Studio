@@ -10,14 +10,18 @@
  *              Expert `G53 Z#var`, V4.1 `G0 G53 Z#var`). The height stays a value the user sets, not a profile push.
  *   wcs      — future (absolute in the work frame); the field will admit it, the conversion is built when someone needs it.
  *
- * SCOPE (inc 1): the FINAL retract / PARK only — a single lift with no drop-back. Inter-move traverses STAY relative (a
- * machine lift between points breaks the symmetric −value drop-back + is wasteful) — that's a deferred follow-up.
+ * SCOPE (inc 1): the FINAL retract / PARK only — a single lift with no drop-back. Inter-move traverses STAYED relative (a
+ * machine lift between points breaks the symmetric −value drop-back). t897 lands that follow-up where a traverse ALREADY
+ * machine-lifts (corner wall1->wall2, middle reposition): saveMachineZNode records the pre-lift Z, the paired
+ * safeZParkBlock(..., { ret: true }) returns to it — so the drop is honest by construction (returns to the probe depth,
+ * not lift+old-relative-drop = an arbitrary Z). Traverses that stay relative-symmetric (middle trans/over) are unchanged.
  *
  * It's an EMIT declaration (changes real G-code) → relative MUST stay byte-identical; machine emits the confirmed G53, never
  * invented. The block is the existing `move` / `machinemove` atom, so it round-trips through gcodeToStack as-is.
  */
 import { newBlock } from '../../blocks/blockEmitter.js';
 import { distModeBlock } from './distmode.js';
+import { SAVE_PROBE_Z_MARK, RETURN_PROBE_Z_MARK } from '../../data/simMarkers.js';
 
 // ── MACHINE-FRAME SAFE-Z MARGIN (t822) — the DECLARED safety policy for the SYSTEM safe-height retract ────────────────
 // Distinct from the per-wizard safe-Z VALUE above (a user clearance, frame-toggleable). This is the machine-frame margin
@@ -57,6 +61,19 @@ export function safeRetractNode({ workClear = '#17', restore } = {}) {
     return b;
 }
 
+/** t897 — SAVE the live machine Z into `varRef` (a `readmachine` block → Expert `#varRef=#882`) so a following
+ *  machine-frame G53 safe-height LIFT can RETURN the tool to THIS exact Z (the inter-move traverse the file scope note
+ *  above deferred). Carries the DECLARED sim SAVE marker (a trailing comment) so the sim records the scene-Z HERE and
+ *  the paired `safeZParkBlock('machine', varRef, restore, { ret: true })` return restores it EXACTLY — bypassing the
+ *  undeclared-placement G53 approximation. Pairs 1:1 with that return (LIFO; an unpaired final save is a harmless
+ *  scratch). The register is a WRITE to `varRef` (a free scratch — #95 in the corner/middle family), never read back
+ *  by the macro (the controller's own G53 uses it; the sim uses the recorded scene-Z). */
+export function saveMachineZNode(varRef = '#95') {
+    const b = newBlock('readmachine');
+    b.params = { axis: 'Z', var: varRef, mark: SAVE_PROBE_Z_MARK };
+    return b;
+}
+
 /** t856/t858 — MODE-EXPLICIT machine-frame wrap. A G53 is machine-ABSOLUTE only under G90 (the factory pattern: G90G00 →
  *  G53 on every dump; ZERO factory G53-in-G91). MODE-EXPLICIT means NO ambient-mode inference: EVERY safe-height G53
  *  emits its OWN G90 immediately before it, so it is correct under ANY control flow (t858 — the probe-MISS error handler
@@ -86,12 +103,14 @@ export const safeZFrameOf = (v) => (v === 'machine' ? 'machine' : 'relative');
  *   relative → the rapid lift `move` atom (G0 Z#var in the active dist mode) — IDENTICAL to a plain MV('Z', varRef).
  *   machine  → the `machinemove` atom → the dialect's G53 machine-coord move to the absolute Z (varRef must be a #var).
  */
-export function safeZParkBlock(frame, varRef, restore) {
+export function safeZParkBlock(frame, varRef, restore, opts = {}) {
     // t856 — the machine-frame park is a safe-height G53; carry the surrounding dist mode so its emit forces G90 (and
     // restores G91 for an incremental body). The relative 'move' frame is a plain G0 Z (no G53) — no wrap needed.
     // t858 — ALWAYS flag the machine park so its G53 gets an explicit G90 (default 'abs' = G90 only; 'inc' also restores
     // G91 for a body that continues incremental). No ambient inference — jump-proof on every path.
-    if (safeZFrameOf(frame) === 'machine') { const b = newBlock('machinemove'); b.params = { axis: 'Z', to: varRef, restore: restore || 'abs' }; return b; }
+    // t897 — opts.ret marks this machine park as the RETURN half of a saveMachineZNode pairing (a DECLARED sim marker on
+    // its G53 line so the sim restores the recorded scene-Z exactly). Unset → byte-identical to every existing caller.
+    if (safeZFrameOf(frame) === 'machine') { const b = newBlock('machinemove'); b.params = { axis: 'Z', to: varRef, restore: restore || 'abs' }; if (opts.ret) b.params.mark = RETURN_PROBE_Z_MARK; return b; }
     const b = newBlock('move'); b.params = { mode: 'rapid', z: varRef };
     return b;
 }

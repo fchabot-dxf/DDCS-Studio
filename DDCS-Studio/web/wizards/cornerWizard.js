@@ -17,7 +17,7 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';
-import { safeRetractNode } from './ops/safeZframe.js';   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix)
+import { safeRetractNode, saveMachineZNode } from './ops/safeZframe.js';   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix); t897 — record the pre-lift Z for the wall1->wall2 return
 import { num } from './ops/util.js';
 import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
@@ -212,7 +212,11 @@ export function cornerStack(params = {}, opts = {}) {
         // (safeRetractNode → G53, absolute, limit-proof) on every post. Both old zPairR arms (#17/#19) collapse to the same
         // machine retract (probeZ-independent). The reposition below then DESCENDS from the margin (no longer the −#17 round-trip):
         // slower + limit-proof, the ruled divergence from the factory macro. wall2's retract is the clean final position.
-        out.push(mkMV(ax, retractVar), safeRetractNode({ restore: 'inc' }));   // t856 — per-wall retreat is INSIDE the G91 probe body → G90-wrap the G53, restore G91
+        // t897 — SAVE the probe-depth machine Z (after the lateral retract, before the G53 lift) so the wall1->wall2 traverse
+        // can RETURN the tool to it (repoTraverse returnZ '#95'). Without this, the tool lifted ABSOLUTE (G53 margin) then
+        // dropped a RELATIVE amount → landed an arbitrary Z → the next wall probed from the wrong height. The save (#95=#882)
+        // pairs 1:1 with that traverse's return; wall2's save has no following traverse → a harmless unpaired scratch write.
+        out.push(mkMV(ax, retractVar), saveMachineZNode('#95'), safeRetractNode({ restore: 'inc' }));   // t856 — per-wall retreat is INSIDE the G91 probe body → G90-wrap the G53, restore G91
         return out;
     };
 
@@ -307,23 +311,26 @@ export function cornerStack(params = {}, opts = {}) {
     // ROUTING ORDER (an XY preference), NOT a safety requirement. Forked in csFork so the twin's superset + the built-in pick
     // the same order per corner×probeSeq (sA from axesOf) → byte-parity holds. (manual ignores firstAxis.)
     const repoTraverse = (comment, approach, firstAxis, drop) => safeTraverseStack({
-        mode: 'seq', crossX: '#23', crossY: '#24', drop, comment, approach, firstAxis,
+        mode: 'seq', crossX: '#23', crossY: '#24', drop, returnZ: '#95', comment, approach, firstAxis,
         promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, then drop (only when a drop is passed — see repoArmR)
     });
-    // Z-TRUST (③ wall-1 Z frame, human-approved): the reposition drop returns the tool to the probing depth = the NEGATIVE of
-    // the per-wall lift (round-trip nets zero). AUTO always drops: probeZ-ON → #18 (=-#17), probeZ-OFF → [0-#19] (=-safeZ, the
-    // Option-B safe-Z travel — mirrors the #19 lift so scanDepth stays unused off-path). MANUAL drops only when probeZ ON (a
-    // real measured Z reference); probeZ-OFF the operator RE-JOGS Z, so NEVER auto-adjust after a human jog → no drop. Per-arm
-    // scoping rides the existing zPairR fork below (repoArmR is called once per probeZ state → z is known here).
+    // Z-RETURN (t897 — the HONEST lift/drop pairing; supersedes the old relative "nets zero" drop, which became FALSE once
+    // the per-wall lift went ABSOLUTE at t824/t826: an absolute G53 lift + a relative drop landed an ARBITRARY Z → the next
+    // wall probed from the wrong height). The reposition now RETURNS the tool to the probe depth SAVED before the lift
+    // (probeWallR saveMachineZNode #95=#882 ↔ repoTraverse returnZ '#95' → G53 Z#95), so every wall probes from the SAME Z BY
+    // CONSTRUCTION (the value-assert proves it, which corner-z-trust's emit-literal golden could not). The drop arg is now a
+    // PRESENCE GATE (the return target is #95, not a relative amount). AUTO always returns (drop=true). MANUAL returns only
+    // when probeZ ON (a real measured Z reference); probeZ-OFF the operator RE-JOGS Z, so NEVER auto-adjust after a human jog
+    // → no drop. Per-arm scoping rides the existing zPairR fork below (repoArmR is called once per probeZ state → z is known here).
     // ② B4 step 4e (t328, OPT-A): the AUTO arm forks on travelShape. dogleg = firstAxis=sA (routes around the corner, BYTE-
-    // IDENTICAL to today); diagonal = NO firstAxis (a single straight XY) at the EXISTING post-retract height with the SAME drop
-    // — the wall retract already lifted to the safe-traverse height, so ZERO added Z. Manual is travelShape-agnostic (jog only).
+    // IDENTICAL to today); diagonal = NO firstAxis (a single straight XY) at the EXISTING post-retract height with the SAME
+    // return — the wall retract already lifted to the safe-traverse height, so ZERO added Z. Manual is travelShape-agnostic (jog only).
     const repoArmR = (z, sA) => taPair(
         () => tsPair(
-            () => repoTraverse(repoLbl(z, sA), 'auto', sA, z ? '#18' : '[0-#19]'),
-            () => repoTraverse(repoLbl(z, sA), 'auto', undefined, z ? '#18' : '[0-#19]'),
+            () => repoTraverse(repoLbl(z, sA), 'auto', sA, true),
+            () => repoTraverse(repoLbl(z, sA), 'auto', undefined, true),
         ),
-        () => repoTraverse(repoLbl(z, sA), 'manual', sA, z ? '#18' : undefined),
+        () => repoTraverse(repoLbl(z, sA), 'manual', sA, z ? true : undefined),
     );
     S.push(...csFork((c, s, ax) => [
         ...zPairR([mkC(firstLbl(true, ax.fA))], [mkC(firstLbl(false, ax.fA))]),

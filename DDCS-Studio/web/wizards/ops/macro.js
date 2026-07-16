@@ -16,9 +16,13 @@ export const machineMoveBlock = {
     // from Read Machine) → move straight to it; if it's a number → stage it in `var` first, then move.
     emit: (p, dx, dy, dialect) => {
         const axis = p.axis || 'Z', t = p.to;
-        const core = (typeof t === 'string' && t.trim().startsWith('#'))
+        let core = (typeof t === 'string' && t.trim().startsWith('#'))
             ? dialect.machineMove(axis, t.trim())
             : [`${p.var || '#99'}=${r3(num(t, 0))}`, ...dialect.machineMove(axis, p.var || '#99')];
+        // `mark` (optional, t897) — a DECLARED sim marker appended to the core G53 line (safeZParkBlock ret:true uses it so
+        // the sim restores the saved scene-Z). Appended BEFORE the wrap so wrapMachineFrame still G90-detects the G53 (it
+        // strips comments first). Unset → byte-identical.
+        if (p.mark && core.length) core = [...core.slice(0, -1), `${core[core.length - 1]} ( ${p.mark} )`];
         // t856 SAFETY — a machine move flagged `restore` is a SAFE-HEIGHT PARK (safeZParkBlock): force G90 before its G53
         // (+ restore G91 for an incremental body). A bare machine move (no restore — ATC dance, re-centre) is UNCHANGED.
         if (p.restore == null) return core;

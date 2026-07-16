@@ -16,6 +16,7 @@ import { arcPoints } from './core/arc.js';
 import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
 import { axisHomeMotion, limitSwitchTrips, axisSpan } from './limitSwitches.js';   // H1 (t481) home-end; H3 (t485) — the live home/limit trip model; t499 — axisSpan for the homing-seek envelope clamp
 import { passAnchorFor } from './passAnchor.js';   // t94/t107 — the probe-collision + DRO origin O is a pass's re-park draw-anchor (auto reposition): the RUNTIME END of the previous pass (t107 machine-faithful) via the published _passEnds, else the static previous START (t94)
+import { SAVE_PROBE_Z_MARK, RETURN_PROBE_Z_MARK } from '../data/simMarkers.js';   // t897 — the DECLARED save/return-Z markers a machine-lift traverse emits; the sim restores the saved scene-Z exactly (declare, not infer)
 
 // Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
 // read-machine (RM) reads ITS dialect's base; the sim populates them ALL (cheap, dialect-agnostic) so RM returns the real
@@ -277,6 +278,7 @@ export class GcodeExecutionEngine {
         this._waitPin = null;
         this._move = null;     // in-flight timed move (interpolated at the programmed feedrate)
         this._probeArmed = false;   // DM500 move-until-input: M101 arms, the next G01 is a probe, M102 disarms
+        this._savedReturnZ = [];    // t897 — a LIFO stack of scene-Z recorded at each saveMachineZNode SAVE (@saveProbeZ); the paired G53 @returnProbeZ move pops it → the machine-lift traverse returns to the EXACT probe depth (declared, map-independent)
         this._datumOrigin = {};     // t644 — machine coord of work-0 per axis after a WCS write (G92 / register); the datum check
         this._traceSink = null;   // when non-null (trace()), moves snap + push a segment here instead of animating
         this._pass = 0;           // manual-REPOSITION pass index (mirrors gcodeParser): each reposition starts a new pass
@@ -827,6 +829,10 @@ export class GcodeExecutionEngine {
 
         if (/^#/.test(line)) {
             this._handleAssignment(line);
+            // t897 — a DECLARED save-Z marker (saveMachineZNode → `#95=#882 ( @saveProbeZ )`): RECORD the current scene-Z so the
+            // paired G53 @returnProbeZ move can restore it EXACTLY. Read off the RAW line (same pattern as the REPOSITION: marker).
+            // The #95=#882 assignment still runs (harmless) — the sim uses this recorded scene-Z, not the mapped register value.
+            if (step.raw.includes(SAVE_PROBE_Z_MARK)) this._savedReturnZ.push(this.pos.z);
             this.ip += 1;
             return false;
         }
@@ -1065,6 +1071,12 @@ export class GcodeExecutionEngine {
         // frame, so a `G53 Z-5` safe-Z retract drew below the part. Now we map machine -> part:
         // part = machine - wcsOffset (wcsOffset defaults to origin, so it's a no-op until a dump/profile sets it).
         const g53 = gcodes.includes(53);
+        // t897 — a DECLARED machine-RETURN (safeZParkBlock ret:true → `G53 Z#95 ( @returnProbeZ )`): this G53 is the paired
+        // drop-back for an earlier saveMachineZNode lift, so its Z must restore the EXACT scene-Z recorded at that save (a
+        // machine-lift round-trip nets zero). Read off the RAW line (same pattern as g53/probe). Correct under BOTH declared
+        // and undeclared placement (an exact restore needs no machine->part map, so it bypasses g53Approx). Every OTHER G53
+        // keeps the existing approximate/exact path unchanged.
+        const machineReturn = g53 && step.raw.includes(RETURN_PROBE_Z_MARK);
 
         const target = { x: this.pos.x, y: this.pos.y, z: this.pos.z };
         let bad = false;
@@ -1075,6 +1087,10 @@ export class GcodeExecutionEngine {
                 bad = true;
                 return;
             }
+            // t897 — the declared machine-RETURN restores the saved scene-Z EXACTLY (pop the LIFO save stack). Guarded to a
+            // non-empty stack so an orphaned return (e.g. a round-tripped program that dropped the save comment) safely falls
+            // through to the normal G53 path instead of throwing / undefined.
+            if (field === 'z' && machineReturn && this._savedReturnZ.length) { target[field] = this._savedReturnZ.pop(); return; }
             // t826 — UNDECLARED placement (no WCS row backs the work origin): a machine-frame G53 Z retract has no true
             // scene position, so instead of collapsing onto raw machine coords (a G53 Z-5 would draw BELOW a top-datum part),
             // render it as the DECLARED safe-Z margin above the work origin — the honest approximation the user ruled good for
@@ -1252,7 +1268,7 @@ export class GcodeExecutionEngine {
                 const realMs = rate > 0 ? (d / rate) * 60000 : 0;
                 const speed = this.simSpeed > 0 ? this.simSpeed : 1;
                 if (realMs / speed > 50) {
-                    this._move = { from: { ...this.pos }, to: target, durMs: realMs, elapsed: 0, last: null, touchName, g53, probe: isProbe };   // t780 (user) — the position event states its frame semantics
+                    this._move = { from: { ...this.pos }, to: target, durMs: realMs, elapsed: 0, last: null, touchName, g53, probe: isProbe, machineReturn };   // t780 (user) — the position event states its frame semantics; t897 — flag the declared machine-return
                     const kind = isProbe ? 'G31 probe' : rapid ? 'G0 rapid' : 'G1 feed';
                     this._setStatus(`${kind} ${d.toFixed(1)} mm at F${rate} — ${(realMs / 1000).toFixed(1)} s${speed !== 1 ? ` @ ${speed}×` : ''}`, true, true);   // t867 rider — transient move paraphrase
                     this._nextDelayMs = 16;

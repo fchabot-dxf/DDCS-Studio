@@ -5,7 +5,8 @@ import { test, expect } from '@playwright/test';
  * reshapes ONLY the wall1→wall2 AUTO traverse. dogleg (default) routes AROUND the outside corner (firstAxis=sA → two axis-aligned
  * rapids) = BYTE-IDENTICAL to today; diagonal omits firstAxis (a single straight XY) at the EXISTING post-retract height —
  * OPT-A (advisor t328): the wall retract ALREADY lifted the tool to the safe-traverse height, so the diagonal crosses STRAIGHT
- * with ZERO added Z and the SAME drop.
+ * with ZERO added Z and the SAME drop-back — which t897 makes the HONEST return (G53 Z#95 ( @returnProbeZ )) instead of a
+ * relative value; that return is identical on dogleg + diagonal, so the diagonal is STILL just the dogleg with the XY L merged.
  *
  * It READS the enum binding's OWN wiring from def.bindings (a mis-declaration fails here), then asserts:
  *   (1) the binding declares type:'enum', default 'dogleg', options {dogleg, diagonal};
@@ -62,8 +63,10 @@ test('travelShape LIVE: dogleg==cornerStack byte-for-byte (default no-op); diago
         doglegIsTwoMove: /G0 X#23\nG0 Y#24/.test(dogleg) && !/^G0 X#23 Y#24$/m.test(dogleg),
         // ZERO added Z: the count of rapid-Z moves is IDENTICAL (the diagonal only merges the two XY rapids).
         zCountEqual: (diagonal.match(/G0 Z/g) || []).length === (dogleg.match(/G0 Z/g) || []).length,
-        // the correct OPT-A drop is present + UNCHANGED from the dogleg: ON → #18 (=-#17), OFF → [0-#19] (=-safeZ).
-        dropValueOk: pz ? /G0 Z#18/.test(diagonal) : /G0 Z\[0-#19\]/.test(diagonal),
+        // t897 — the OPT-A drop-back is now the HONEST return (G53 Z#95 ( @returnProbeZ )), present + IDENTICAL on both shapes
+        // (onlyDiffIsTheMerge below proves the diagonal is STILL just the dogleg with the XY L merged — the return is unchanged
+        // between shapes). NB the probeZ-ON plunge before wall-1 is a legit `G0 Z#18` — distinct from the retired reposition drop.
+        returnPresent: /^G53 Z#95 \( @returnProbeZ \)$/m.test(diagonal),
         // THE TIGHTEST PROOF: the diagonal IS the dogleg with the two-move L merged into one — nothing else changed (no Z, no reorder).
         onlyDiffIsTheMerge: diagonal === dogleg.replace('G0 X#23\nG0 Y#24', 'G0 X#23 Y#24'),
       });
@@ -93,7 +96,7 @@ test('travelShape LIVE: dogleg==cornerStack byte-for-byte (default no-op); diago
     expect(c.diagHasCombined, `diagonal: one combined G0 X#23 Y#24 straight move at probeZFirst=${c.pz}`).toBe(true);
     expect(c.doglegIsTwoMove, `dogleg (contrast): the two-move L, NOT the combined move, at probeZFirst=${c.pz}`).toBe(true);
     expect(c.zCountEqual, `diagonal adds ZERO Z moves (same rapid-Z count as the dogleg) at probeZFirst=${c.pz}`).toBe(true);
-    expect(c.dropValueOk, `diagonal keeps the correct OPT-A drop (${c.pz ? '#18' : '[0-#19]'}) at probeZFirst=${c.pz}`).toBe(true);
+    expect(c.returnPresent, `diagonal keeps the honest return G53 Z#95 ( @returnProbeZ ) at probeZFirst=${c.pz}`).toBe(true);
     expect(c.onlyDiffIsTheMerge, `diagonal IS the dogleg with the two-move L merged into one — nothing else changed at probeZFirst=${c.pz}`).toBe(true);
   }
 

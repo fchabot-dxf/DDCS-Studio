@@ -52,7 +52,12 @@ export const probeCheckBlock = {
 export const readMachineBlock = {
     type: 'readmachine', label: 'Read Machine', kind: 'leaf', category: 'Probing',
     defaults: { axis: 'Z', var: '#57' }, fields: ['axis', 'var'],
-    emit: (p, dx, dy, dialect) => dialect.readMachine(p.axis || 'Z', p.var || '#57'),
+    // `mark` (optional, t897) — a DECLARED sim marker appended as a trailing comment (safeZframe saveMachineZNode uses
+    // it so the sim records the scene-Z for a paired G53 return). Unset → byte-identical for every existing caller.
+    emit: (p, dx, dy, dialect) => {
+        const out = dialect.readMachine(p.axis || 'Z', p.var || '#57');
+        return p.mark && out.length ? [...out.slice(0, -1), `${out[out.length - 1]} ( ${p.mark} )`] : out;
+    },
 };
 
 export const probeGuardBlock = {

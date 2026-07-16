@@ -132,9 +132,12 @@ export function middleStack(params = {}, opts = {}) {
     // t824/t826 — the retreat-to-clear before the operator jogs was an incremental G0 Z#17 lift (compounds into the top
     // switch from a high start). It now retracts to the DECLARED MACHINE MARGIN (machineLift → safeRetractNode → G53,
     // limit-proof); the sim preview MODELS this mid-program G53 (t826), so each pass stays anchored to its own start marker
-    // (the "REPOSITION:" comment still delimits the pass). The jog + the −#17 drop-back (now from the margin) are unchanged.
+    // (the "REPOSITION:" comment still delimits the pass).
+    // t897 — the drop-back is now HONEST: the old −#17 (`[0-#17]`) was a RELATIVE drop off an ABSOLUTE margin lift → it landed
+    // an arbitrary Z (the user's "Safe-Z changes nothing" symptom). returnZ '#95' saves the pre-lift Z (doLift → saveMachineZNode)
+    // and returns to it (G53 Z#95), so the next wall probes from the SAME Z. drop=true is now a presence gate (the target is #95).
     const repositionR = (msg) => safeTraverseStack({
-        approach: 'manual', lift: '#17', machineLift: true, drop: '[0-#17]',
+        approach: 'manual', lift: '#17', machineLift: true, drop: true, returnZ: '#95',
         comment: `REPOSITION: ${msg || 'jog the probe to the next wall'}`,
     });
     // Boss, AUTO in-axis: clear over the feature to the far side, hands-free (the #19/#20 cross-over spans the feature). RETURNS.

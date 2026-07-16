@@ -17,7 +17,7 @@
  *         raw · rawAxis(opt-in: dialect trigger reg per post) · result · radius · compEnable(=true) · failGoto(=1) · comment · compNote · stopVar · limitVar · limitVal
  */
 import { newBlock } from '../../blocks/blockEmitter.js';
-import { safeRetractNode } from './safeZframe.js';   // t826 — opt-in machine-frame safe-height lift (safeTraverseStack machineLift)
+import { safeRetractNode, saveMachineZNode, safeZParkBlock } from './safeZframe.js';   // t826 — opt-in machine-frame safe-height lift (safeTraverseStack machineLift); t897 — the paired save/return for a machine-lift traverse
 
 export function probeSurfaceStack(p = {}) {
     const S = [];
@@ -76,6 +76,10 @@ export function probeSurfaceStack(p = {}) {
  * @param p.axis, p.second - primary and secondary axes ('X' or 'Y')
  * @param p.lift, p.drop - variables/expressions for Z lift and drop (e.g. '#18', '[0-#18]')
  * @param p.comment - comment to emit before the traverse
+ * @param p.returnZ - (t897, e.g. '#95') the scratch var for an HONEST machine-lift drop-back. When set, the drop returns
+ *   the tool to the machine Z SAVED just before the lift (saveMachineZNode ↔ safeZParkBlock ret) instead of a relative
+ *   drop off an absolute lift (which lands an arbitrary Z). Only meaningful where the lift is ABSOLUTE (machineLift here, or
+ *   an out-of-band per-wall G53 lift as in corner). Omit → relative drop (byte-identical). Requires p.drop truthy (the drop point).
  *
  * @param p.approach - 'auto' (default) | 'manual'. AUTO emits the hands-free G0 XY move (the mode dispatch below).
  *   MANUAL emits an operator JOG-and-wait instead (NO XY move — the operator jogs): [lift] → [comment] → #1505 prompt →
@@ -97,7 +101,24 @@ export function safeTraverseStack(p = {}) {
     // t826 — the clearing LIFT before the traverse. Default = the incremental G0 Z<lift> (byte-identical to every existing
     // caller). `machineLift` (opt-in) retracts to the DECLARED MACHINE MARGIN instead (limit-proof; the sim models the
     // mid-program G53) — for a manual reposition whose auto lift could otherwise compound into the top switch from a high start.
-    const doLift = () => { if (!p.lift) return; if (p.machineLift) S.push(safeRetractNode({ restore: 'inc' })); else push('move', { mode: 'rapid', z: p.lift }); };   // t856 — the machine-lift path fires inside the G91 traverse body → G90-wrap the G53, restore G91
+    // t897 — when this traverse machine-lifts AND a returnZ is declared, RECORD the pre-lift machine Z first (saveMachineZNode)
+    // so the drop-back below returns to THAT exact Z (honest pairing) instead of lift-to-margin + old-relative-drop = an
+    // arbitrary Z. The save must precede the G53 lift (it reads the live Z). Corner saves out-of-band (in probeWallR, its lift
+    // is the per-wall retract, not this doLift) so its repoTraverse passes returnZ WITHOUT machineLift → doLift is a no-op here.
+    const doLift = () => {
+        if (!p.lift) return;
+        if (p.machineLift) { if (p.returnZ) S.push(saveMachineZNode(p.returnZ)); S.push(safeRetractNode({ restore: 'inc' })); }   // t856 — the machine-lift path fires inside the G91 traverse body → G90-wrap the G53, restore G91
+        else push('move', { mode: 'rapid', z: p.lift });
+    };
+    // t897 — the drop-back. returnZ (declared) → the paired G53 RETURN to the saved machine Z (byte-honest: returns to the
+    // probe depth, sim-exact via the marker); else the old relative drop (byte-identical for every caller that omits returnZ).
+    // `restore` is PER-ARM (a wrong G90/G91 could make the G53 move incrementally): 'inc' where the arm has NO trailing
+    // distmode (seq — the return restores G91), 'abs' where the arm's own trailing distmode restores G91 (manual/center/in-axis).
+    const emitDrop = (restore) => {
+        if (!p.drop) return;
+        if (p.returnZ) S.push(safeZParkBlock('machine', p.returnZ, restore, { ret: true }));
+        else push('move', { mode: 'rapid', z: p.drop });
+    };
     const axis = p.axis || 'X';
     const second = p.second || 'Y';
     const alc = axis.toLowerCase(), slc = second.toLowerCase();
@@ -114,7 +135,7 @@ export function safeTraverseStack(p = {}) {
         // the operator jog-and-wait gate via the profile-aware hmiconfirm atom: Expert = `#1505=1 ( note )` + `IF #1505==0
         // GOTO<fail>` (byte-identical to the old assign+ifgoto); off-HMI both fold to a comment (no ESC → no mis-branch).
         push('hmiconfirm', { value: String(promptVal), note: promptNote, cancel: failGoto });
-        if (p.drop) push('move', { mode: 'rapid', z: p.drop });
+        emitDrop('abs');   // trailing distmode below restores G91 → the return only needs its G90 wrap
         push('distmode', { dist: 'inc' });
         return S;
     }
@@ -133,7 +154,7 @@ export function safeTraverseStack(p = {}) {
         } else {
             push('move', { mode: 'rapid', [alc]: pmove, [slc]: smove });   // one straight XY diagonal
         }
-        if (p.drop) push('move', { mode: 'rapid', z: p.drop });
+        emitDrop('abs');   // trailing distmode below restores G91
         if (p.comment) push('comment', { text: p.comment });
         push('distmode', { dist: 'inc' });
     } else if (p.mode === 'seq') {
@@ -154,11 +175,11 @@ export function safeTraverseStack(p = {}) {
         } else {
             push('move', { mode: 'rapid', x: String(p.crossX), y: String(p.crossY) });
         }
-        if (p.drop) push('move', { mode: 'rapid', z: p.drop });
+        emitDrop('inc');   // seq has NO trailing distmode → the return itself restores G91
     } else if (p.mode === 'in-axis') {
         doLift();
         push('move', { mode: 'rapid', [alc]: String(p.move) });
-        if (p.drop) push('move', { mode: 'rapid', z: p.drop });
+        emitDrop('abs');   // trailing distmode below restores G91
         if (p.comment) push('comment', { text: p.comment });
         push('distmode', { dist: 'inc' });
     }
