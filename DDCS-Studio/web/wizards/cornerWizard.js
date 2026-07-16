@@ -299,10 +299,13 @@ export function cornerStack(params = {}, opts = {}) {
     const firstLbl = (z, fA) => `Step ${z ? 2 : 1}: ${fA} Probe`;
     const repoLbl = (z, sA) => `Step ${z ? 3 : 2}: REPOSITION: Traverse past corner and set up for ${sA}`;
     const secondLbl = (z, sA) => `Step ${z ? 4 : 3}: ${sA} Probe`;
-    // SAFE DOG-LEG: this wall1→wall2 traverse runs at SCAN DEPTH (drop #18) → it crosses the material plane, so a diagonal
-    // could clip the corner. firstAxis = the SECOND wall's axis (ax.sA) routes it AROUND the outside corner (see the
-    // safeTraverseStack SAFE DOG-LEG note). Geometry-aware per corner×probeSeq (sA from axesOf), forked in csFork so the
-    // twin's superset + the built-in pick the same order per combo → byte-parity holds. (manual ignores firstAxis.)
+    // WALL1→WALL2 TRAVERSE (post-t826/t824 — the stale "runs at SCAN DEPTH, a diagonal could clip the corner" note is GONE,
+    // t893): this reposition runs at the SAFE-TRAVERSE height. The per-wall retract upstream (probeWallR → safeRetractNode,
+    // the G53 machine-frame lift to the safe margin) already raised the tool BEFORE this traverse, so BOTH travel shapes —
+    // dogleg AND diagonal — cross LIFTED, above the material; NEITHER can clip the corner (a top-down view shows the diagonal
+    // crossing the corner in XY, but it is safe in Z). firstAxis = the SECOND wall's axis (ax.sA) is now just the dogleg
+    // ROUTING ORDER (an XY preference), NOT a safety requirement. Forked in csFork so the twin's superset + the built-in pick
+    // the same order per corner×probeSeq (sA from axesOf) → byte-parity holds. (manual ignores firstAxis.)
     const repoTraverse = (comment, approach, firstAxis, drop) => safeTraverseStack({
         mode: 'seq', crossX: '#23', crossY: '#24', drop, comment, approach, firstAxis,
         promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, then drop (only when a drop is passed — see repoArmR)

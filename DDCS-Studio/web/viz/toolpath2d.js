@@ -21,12 +21,18 @@ import { displayOf } from './displayPrefs.js';   // t744 — the ONE declared pr
 // Colours + progress states are the ONE declared source in viz/pathStyle.js (t317) — rapid=yellow(dashed),
 // retract=green, probe=blue(slow=light blue, dotted), feed=a blue→teal gradient by DEPTH (Z) which also surfaces the
 // Z you can't see top-down. The 3D + the legend read the SAME module. Exported for the one-source parity assertion.
-const typeOf = (s) => s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
+// t893 — a LIFTED SAFE-TRAVEL traverse: a horizontal rapid (z1≈z2) that moves in XY (single-axis dog-leg leg OR 2-axis
+// diagonal). Rendered dimmed/dashed (PATH_TYPES.lifted) so a TOP-DOWN view reads it as "moving over", never as cutting
+// (the corner-diagonal misread this fix answers). A rapid with a Z change (plunge/retract) stays `rapid`; feeds stay `feed`.
+const isRawRapid = (s) => s.type === 'rapid' || (!s.type && s.rapid);
+const isLifted = (s) => isRawRapid(s) && Math.abs((s.z1 || 0) - (s.z2 || 0)) < 1e-6 && (Math.abs((s.x1 || 0) - (s.x2 || 0)) > 0.02 || Math.abs((s.y1 || 0) - (s.y2 || 0)) > 0.02);
+const typeOf = (s) => isLifted(s) ? 'lifted' : (s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed'));
 // t331 — the 2D now READS the token dash (was hardcoded): rapid.dash=[] → solid, probe/jog [5,4] → dashed. 'probe' maps to
 // probeFast (both probe types share a dash). The 3D still hardcodes its dash (advisor-flagged future task) — kept in sync.
 const dashFor = (t) => (t === 'probe' ? PATH_TYPES.probeFast.dash : (PATH_TYPES[t] && PATH_TYPES[t].dash)) || [];
 export function segColor(s, zMin, zRange, maxPF) {
     const t = typeOf(s);
+    if (t === 'lifted') return hexCss(PATH_TYPES.lifted.color);   // t893 — dimmed safe-travel
     if (t === 'rapid') return hexCss(PATH_TYPES.rapid.color);
     if (t === 'retract') return hexCss(PATH_TYPES.retract.color);
     if (t === 'probe') return hexCss(((s.feed || 0) > 0 && (s.feed || 0) < maxPF) ? PATH_TYPES.probeSlow.color : PATH_TYPES.probeFast.color);
@@ -245,19 +251,19 @@ export function createToolpath2d(canvas, opts = {}) {
     }
     function strokeSegs(ctx, from, to, alpha, width, zMin, zRange, maxPF) {
         const isSlowProbe = (s) => (s.type === 'probe' || s.probe) && (s.feed || 0) > 0 && (s.feed || 0) < maxPF;   // t319 — the WHITE slow re-probe
-        const elOf = (t) => t === 'probe' ? 'probe' : (t === 'rapid' || t === 'retract' || t === 'jog') ? 'rapid' : 'cut';   // t744 — path type → the registry element (cut · rapid family · probe)
+        const elOf = (t) => t === 'probe' ? 'probe' : (t === 'rapid' || t === 'retract' || t === 'jog' || t === 'lifted') ? 'rapid' : 'cut';   // t744 — path type → the registry element (cut · rapid family · probe); t893 — lifted rides the rapid family
         const drawSeg = (s) => {
             const t = typeOf(s), el = elOf(t), d = displayOf(el);
             if (!d.visible) return;   // t744 — the registry hides this path type live
-            ctx.globalAlpha = alpha * d.alpha;   // compose the registry alpha onto the progress-state alpha
+            ctx.globalAlpha = alpha * d.alpha * ((PATH_TYPES[t] && PATH_TYPES[t].dim) || 1);   // compose the registry alpha onto the progress-state alpha; t893 — a lifted safe-travel is dimmed
             // MOTION-TYPE colouring (matches the 3D): a rapid is a rapid → the one-source rapid YELLOW, whether single-axis
             // (dogleg leg) or 2-axis (diagonal traverse) — it IS a G0 positioning move (human t328). The ONLY source-special
             // case is the MANUAL 2-axis jog, which arcs UP ('rainbow') in its own amber jog colour. Markers still carry the
             // SOURCE colour (auto=cyan / manual=amber) as a separate glyph layer — the travel LINE is decoupled from it.
-            const transV = t === 'rapid' && Math.abs((s.x2 || 0) - (s.x1 || 0)) > 0.05 && Math.abs((s.y2 || 0) - (s.y1 || 0)) > 0.05;
+            const transV = isRawRapid(s) && Math.abs((s.x2 || 0) - (s.x1 || 0)) > 0.05 && Math.abs((s.y2 || 0) - (s.y1 || 0)) > 0.05;   // t893 — read the RAW rapid (t is now 'lifted' for a horizontal traverse) so the manual-jog arc still fires
             const manualTrav = transV && startSources[s.pass] === 'manual';   // a MANUAL jog travel arcs UP ('rainbow'); AUTO stays straight
-            ctx.strokeStyle = manualTrav ? hexCss(PATH_TYPES.jog.color) : segColor(s, zMin, zRange, maxPF);   // t328 — the AUTO traverse is a G0 rapid → rapid-yellow (was marker-cyan #22d3ee); only the MANUAL jog LINE stays the one amber
-            ctx.lineWidth = t === 'rapid' ? width * 0.6 : width;
+            ctx.strokeStyle = manualTrav ? hexCss(PATH_TYPES.jog.color) : segColor(s, zMin, zRange, maxPF);   // t328 — the AUTO traverse is a G0 rapid → rapid-yellow (was marker-cyan #22d3ee); only the MANUAL jog LINE stays the one amber; t893 — an AUTO lifted traverse resolves to the dimmed safe-travel colour via segColor
+            ctx.lineWidth = width * ((PATH_TYPES[t] && PATH_TYPES[t].widthScale) || (t === 'rapid' ? 0.6 : 1));   // t893 — use the declared per-type width (lifted 0.5, rapid 0.6)
             ctx.setLineDash(dashFor(t));   // t331 — read the ONE token dash (rapid solid, probe/jog dashed [5,4])
             const ax = ptx(s.x1, s.pass), ay = pty(s.y1, s.pass), bx = ptx(s.x2, s.pass), by = pty(s.y2, s.pass);   // each pass rides its own start (INC4)
             ctx.beginPath(); ctx.moveTo(ax, ay);

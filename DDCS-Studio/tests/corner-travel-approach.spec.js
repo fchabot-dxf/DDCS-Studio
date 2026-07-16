@@ -54,9 +54,10 @@ test('corner travelApproach: AUTO = G0 move, MANUAL = #1505 jog prompt — both 
 });
 
 /**
- * SAFE DOG-LEG — the CORRECTNESS property (t89), not just "two moves exist": the wall1→wall2 auto traverse (at SCAN DEPTH,
- * crossing material) must route AROUND the outside corner. After probing wall-1 the tool is OUTSIDE the stock along wall-1's
- * axis but INSIDE its span along wall-2's; the SAFE order moves wall-2's axis FIRST (clears past the corner) then wall-1's.
+ * DOG-LEG ROUTING ORDER — the byte-parity property (t89; the traverse is LIFTED at the safe-traverse height post-t826, so
+ * this is a routing PREFERENCE not a clip-avoidance): the wall1→wall2 auto dog-leg routes AROUND the outside corner. After
+ * probing wall-1 the tool is OUTSIDE the stock along wall-1's axis but INSIDE its span along wall-2's; the order moves
+ * wall-2's axis FIRST (past the corner) then wall-1's — the twin's superset + the built-in must pick the same order.
  * Since axesOf's 2nd wall = the last char of probeSeq, the FIRST dog-leg leg must be that axis — for ALL 8 corner×probeSeq
  * combos (only the signs flip per quadrant). This is the geometry-aware order (from axesOf), NOT a hardcoded X-then-Y.
  */

@@ -28,6 +28,26 @@ export function initEditorOpHover() {
     chip.id = 'op-edit-chip'; chip.className = 'op-edit-chip'; chip.type = 'button'; chip.hidden = true;
     editor.parentElement.appendChild(chip);
 
+    // t893 (rider) — NEVER absolute-overlap the top-left PRE-FLIGHT BADGE. The op-edit chip is LINE-anchored (its top tracks
+    // the hovered op), so a literal flex row can't hold it; instead a declared collision rule: set the chip's top, then when
+    // its band intersects the badge's band, FLOW it to the RIGHT of the badge (a row, gap 6) — or, at a narrow editor, STACK
+    // it BELOW the badge. The two bounding boxes then never intersect. Off-badge (a lower op) the chip keeps its CSS left (12px).
+    function placeChip(topPx) {
+        chip.style.top = topPx + 'px';
+        chip.style.left = '';
+        const badge = document.getElementById('preflight-badge');
+        const cont = editor.parentElement;
+        if (!badge || badge.hidden || !cont) return;
+        const cr = cont.getBoundingClientRect(), br = badge.getBoundingClientRect();
+        if (!br.width) return;
+        const badgeTop = br.top - cr.top, badgeBot = badgeTop + br.height, gap = 6, chipH = 26;
+        if (topPx < badgeBot + gap && topPx + chipH > badgeTop - gap) {   // vertical bands overlap → they'd collide
+            const rightOfBadge = (br.right - cr.left) + gap;
+            if (rightOfBadge + 150 <= cr.width) chip.style.left = rightOfBadge + 'px';   // room → flow into the row beside the badge
+            else chip.style.top = (badgeBot + gap) + 'px';                                // narrow → drop BELOW the badge (stack)
+        }
+    }
+
     // t736 — the PROGRAM ROTATION badge: a program-level pill beside the ⟳ Transform button showing the DECLARED xform
     // rotation ("⟳ 6.98°"). Click the label = reopen Transform prefilled; the ✕ = clear the declaration to 0 (the emit's
     // 0° fold makes that BYTE-IDENTICAL). Program-level (NOT on an op pill — the rotation is program-wide). Updated on
@@ -144,7 +164,7 @@ export function initEditorOpHover() {
                 chip.textContent = '✎ Hand-built';
                 chip.disabled = false;
                 chip.title = 'Edit this hand-built stack as a form';
-                chip.style.top = Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)) + 'px';
+                placeChip(Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)));
                 chip.dataset.opId = '';                          // no op yet — the wrap happens on click
                 chip.dataset.autoRun = JSON.stringify(run);
                 chip.hidden = false;

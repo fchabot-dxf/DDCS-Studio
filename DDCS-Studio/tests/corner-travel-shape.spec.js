@@ -102,12 +102,13 @@ test('travelShape LIVE: dogleg==cornerStack byte-for-byte (default no-op); diago
 });
 
 /**
- * t328 AMENDMENT (human, from the screenshot) — the DIAGONAL traverse is a G0 positioning move → it must render RAPID-COLOURED
- * (the one-source PATH_TYPES.rapid yellow) in BOTH previews, NOT the source-cyan the 2D used to paint 2-axis auto rapids. The
- * shared invariant is the segment TYPE='rapid' (the 3D colours by type already; the 2D override that painted trans-axis auto
- * rapids cyan is removed). Colour is render-only — byte-parity untouched (proven by the emit test above).
+ * t328 → t893 — the DIAGONAL traverse is a LIFTED safe-height positioning move (a horizontal rapid, z1≈z2). t328 painted it
+ * rapid-yellow (not the old source-cyan); t893 makes it DISTINCT as SAFE-TRAVEL (the dimmed/dashed PATH_TYPES.lifted) so a
+ * top-down view can never read the lifted corner-diagonal cross-over as a cutting move. The segment TYPE stays 'rapid' (the
+ * reclassification to `lifted` is render-time in toolpath2d.typeOf); it is NEVER source-cyan. Colour is render-only —
+ * byte-parity untouched (proven by the emit test above).
  */
-test('travelShape=diagonal: the traverse renders as a RAPID (yellow), not source-cyan, in the Layout (t328 amendment)', async ({ page }) => {
+test('travelShape=diagonal: the traverse renders as LIFTED safe-travel (dimmed, distinct), not source-cyan, in the Layout (t893)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
@@ -128,30 +129,30 @@ test('travelShape=diagonal: the traverse renders as a RAPID (yellow), not source
     const segs = (panel && panel.getSegments && panel.getSegments()) || [];
     // the diagonal reposition = the trans-axis RAPID (both dx,dy non-zero). Under probeZ-off default it's the only one.
     const trans = segs.find((s) => (s.type === 'rapid' || s.rapid) && Math.abs((s.x2 || 0) - (s.x1 || 0)) > 0.05 && Math.abs((s.y2 || 0) - (s.y1 || 0)) > 0.05);
-    const rapidHex = hexCss(PATH_TYPES.rapid.color);
+    const liftedHex = hexCss(PATH_TYPES.lifted.color), cyanHex = hexCss(PATH_TYPES.probeFast.color);
 
-    // real paint — sample the Layout overlay canvas: the diagonal draws rapid-yellow pixels (the trans-axis-auto→cyan override is gone).
-    // NB (t331): the source-cyan override was removed AND the fast PROBE is now cyan #22d3ee, so a global 'no cyan' check no longer
-    // isolates the traverse — the segColor(trans)==rapid-yellow assertion below is the specific proof the traverse isn't source-coloured.
+    // real paint — sample the Layout overlay canvas: t893 — the diagonal draws DIMMED lifted-safe-travel pixels (grey-blue
+    // #8a97ad), NOT source-cyan and NOT the old rapid-yellow. A count of the lifted grey-blue band proves the distinct render.
     const c = document.querySelector('#userVizContainer .fc-anim-overlay');
     const ctx = c && c.getContext('2d');
-    let yellow = 0;
+    let lifted = 0;
     if (ctx) {
       const d = ctx.getImageData(0, 0, c.width, c.height).data;
       for (let i = 0; i < d.length; i += 4) {
         const R = d[i], G = d[i + 1], B = d[i + 2], A = d[i + 3];
-        if (A < 40) continue;
-        if (R > 200 && G > 160 && G < 235 && B < 90) yellow++;               // rapid yellow #ffcc00
+        if (A < 15) continue;
+        if (B > R + 6 && B > G && R > 55 && R < 175 && B > 90 && B < 215) lifted++;   // dimmed grey-blue #8a97ad (blue dominant, moderate brightness — tolerant of the alpha blend)
       }
     }
-    return { transType: trans && (trans.type || (trans.rapid ? 'rapid' : 'other')), transColor: trans ? segColor(trans, 0, 1, 0) : null, rapidHex, yellow };
+    return { transType: trans && (trans.type || (trans.rapid ? 'rapid' : 'other')), transColor: trans ? segColor(trans, 0, 1, 0) : null, liftedHex, cyanHex, lifted };
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 
-  // the diagonal reposition IS a rapid → pathStyle colours it yellow (the ONE invariant both previews key on: 3D by type, 2D via segColor)
+  // t893 — the diagonal reposition's segment TYPE stays 'rapid', but segColor renders it as the DISTINCT dimmed lifted safe-travel
   expect(r.transType, 'the diagonal reposition traced segment carries type=rapid').toBe('rapid');
-  expect(r.transColor, 'segColor paints the diagonal reposition the one-source rapid yellow (NOT the source-cyan the 2-axis override used to force)').toBe(r.rapidHex);
-  // the real Layout paint: rapid-yellow present on the diagonal traverse
-  expect(r.yellow, 'the Layout draws rapid-yellow pixels for the diagonal traverse').toBeGreaterThan(20);
+  expect(r.transColor, 'segColor paints the diagonal reposition the DIMMED lifted safe-travel (distinct; NEVER source-cyan)').toBe(r.liftedHex);
+  expect(r.transColor, 'the lifted safe-travel is NOT the probe cyan').not.toBe(r.cyanHex);
+  // the real Layout paint: dimmed lifted grey-blue present on the diagonal traverse
+  expect(r.lifted, 'the Layout draws dimmed lifted-safe-travel pixels for the diagonal traverse').toBeGreaterThan(2);
 });
 

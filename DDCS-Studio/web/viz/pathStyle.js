@@ -17,6 +17,10 @@ export const hexCss = (n) => '#' + (((n >>> 0) & 0xffffff)).toString(16).padStar
  *  gradient was removed) · retract green. (PENDING split: a FEED with z1≠z2 [plunge/ramp] renders red 0xef4444 — not yet.) */
 export const PATH_TYPES = {
     rapid:     { color: 0xffcc00, dash: [],     widthScale: 0.6, shape: 'line', label: 'Rapid' },   // t331 — SOLID (was dashed); rapid solid + jog dashed → distinct by line-style AND colour
+    // t893 — SAFE-HEIGHT TRAVEL: a horizontal rapid traverse (z1≈z2, an XY move at constant height) reads as a DIMMED DASHED
+    // line so a TOP-DOWN view can never mistake a LIFTED cross-over (e.g. the corner diagonal traverse crossing the corner in
+    // XY, but safe in Z) for a cutting move. Distinct from `rapid` (positioning/plunge, solid) + `feed` (cutting, solid blue).
+    lifted:    { color: 0x8a97ad, dash: [6, 5], widthScale: 0.6, shape: 'line', label: 'Safe travel', dim: 0.7 },
     feed:      { color: 0x3b82f6, dash: [],    widthScale: 1,   shape: 'line', label: 'Cut' },       // t331 — FLAT blue (was the FEED_HIGH teal gradient top); the Z-depth gradient was removed
     probeFast: { color: 0x22d3ee, dash: [5, 4], widthScale: 1,   shape: 'line', label: 'Probe' },     // t331 — CYAN (was #3b82f6 blue), stepped off the new blue feed; DASHED (was dotted [2,3], human t330)
     probeSlow: { color: 0xffffff, dash: [5, 4], widthScale: 1,   shape: 'line', label: 'Probe slow' },   // t319 — WHITE; drawn ON TOP of the fast at the collinear re-probe overlap; t331 DASHED (was dotted)
