@@ -136,10 +136,15 @@ export function middleStack(params = {}, opts = {}) {
     // t897 — the drop-back is now HONEST: the old −#17 (`[0-#17]`) was a RELATIVE drop off an ABSOLUTE margin lift → it landed
     // an arbitrary Z (the user's "Safe-Z changes nothing" symptom). returnZ '#95' saves the pre-lift Z (doLift → saveMachineZNode)
     // and returns to it (G53 Z#95), so the next wall probes from the SAME Z. drop=true is now a presence gate (the target is #95).
-    const repositionR = (msg) => safeTraverseStack({
-        approach: 'manual', lift: '#17', machineLift: true, drop: true, returnZ: '#95',
-        comment: `REPOSITION: ${msg || 'jog the probe to the next wall'}`,
-    });
+    const repositionR = (msg) => {   // t901 — the safetraverse BUNDLE (manual jog reposition: machine lift + jog + honest return)
+        const b = newBlock('safetraverse');
+        b.params = { to: 'next-wall', shape: 'jog' };
+        b.children = safeTraverseStack({
+            approach: 'manual', lift: '#17', machineLift: true, drop: true, returnZ: '#95',
+            comment: `REPOSITION: ${msg || 'jog the probe to the next wall'}`,
+        });
+        return [b];
+    };
     // Boss, AUTO in-axis: clear over the feature to the far side, hands-free (the #19/#20 cross-over spans the feature). RETURNS.
     const traverseOverR = (ax, firstPlus) => { const cv = ax === 'X' ? '#19' : '#20'; return [mkMV('Z', '#18'), mkMV(ax, firstPlus ? cv : `[0-${cv}]`), mkMV('Z', '[0-#18]')]; };
     // Boss, AUTO trans-axis: the X→Y CONNECTING move (lift → re-centre-primary + travel-out-secondary → drop → REPOSITION mark).
@@ -148,13 +153,18 @@ export function middleStack(params = {}, opts = {}) {
     // primary to #22 (the #52/retract/±#6 cancel so it lands exactly on #22) + the secondary out by the Diag-travel #21, then
     // marks the REPOSITION so the trace anchors the NEXT pass to ②. RETURNS. (Value-identical to the old inline; the #22 note
     // now names the real primary axis rather than a hardcoded "X".)
-    const transTraverseR = (shape) => safeTraverseStack({
-        mode: 'center', axis, second,
-        dir1Plus, dir2Plus, diagPrimary, diagTravel: '#21', wall2Var: '#52', radiusVar: '#6',
-        lift: '#18', drop: '[0-#18]',
-        comment: 'REPOSITION: auto-traverse to the perpendicular walls',
-        dogleg: shape === 'dogleg',   // t383 — DOGLEG (default): secondary out first, then re-centre primary; diagonal: one straight move
-    });
+    const transTraverseR = (shape) => {   // t901 — the safetraverse BUNDLE (auto trans-axis connect: lift + shaped re-centre/travel + drop)
+        const b = newBlock('safetraverse');
+        b.params = { to: 'perp-walls', shape };
+        b.children = safeTraverseStack({
+            mode: 'center', axis, second,
+            dir1Plus, dir2Plus, diagPrimary, diagTravel: '#21', wall2Var: '#52', radiusVar: '#6',
+            lift: '#18', drop: '[0-#18]',
+            comment: 'REPOSITION: auto-traverse to the perpendicular walls',
+            dogleg: shape === 'dogleg',   // t383 — DOGLEG (default): secondary out first, then re-centre primary; diagonal: one straight move
+        });
+        return [b];
+    };
     // The two opposite walls' BETWEEN move. POCKET probes both from the centre (nothing). BOSS needs the 2nd face from the
     // far side: the IN-AXIS toggle — MANUAL pauses for the operator to jog over, AUTO traverses over hands-free. RETURNS.
     const betweenR = (ax, firstPlus) => featBossOnly(inAxisFork(traverseOverR(ax, firstPlus), repositionR('jog clear, around to the opposite wall')));

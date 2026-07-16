@@ -286,11 +286,16 @@ export function cornerStack(params = {}, opts = {}) {
     // moves (the other is 0), so a dog-leg would only add a no-op leg. The SAFE dog-leg is the wall1→wall2 traverse below,
     // which runs at scan depth (crosses material). (It also isn't forked per-combo here, so a geometry-aware order would
     // desync the twin's superset from the built-in — another reason to keep it the un-split diagonal. Byte-identical.)
-    const zWall1 = (approach) => safeTraverseStack({
-        mode: 'seq', crossX: '#21', crossY: '#22', lift: '#19',
-        comment: 'REPOSITION: Traverse to first wall',
-        approach, promptNote: 'Jog clear, over to the first wall. Press Enter',
-    });
+    const zWall1 = (approach) => {   // t901 — the safetraverse BUNDLE (Z-surface → wall-1: lift + travel, no drop — the wall-1 step plunges)
+        const b = newBlock('safetraverse');
+        b.params = { to: 'wall1', shape: 'diagonal' };
+        b.children = safeTraverseStack({
+            mode: 'seq', crossX: '#21', crossY: '#22', lift: '#19',
+            comment: 'REPOSITION: Traverse to first wall',
+            approach, promptNote: 'Jog clear, over to the first wall. Press Enter',
+        });
+        return [b];
+    };
     zOnly([...wcsFork((w, label) => zSurfaceProbe(w, label)), ...taPair(() => zWall1('auto'), () => zWall1('manual'))]);
 
     // ── Two walls, in the chosen order ──
@@ -310,10 +315,15 @@ export function cornerStack(params = {}, opts = {}) {
     // crossing the corner in XY, but it is safe in Z). firstAxis = the SECOND wall's axis (ax.sA) is now just the dogleg
     // ROUTING ORDER (an XY preference), NOT a safety requirement. Forked in csFork so the twin's superset + the built-in pick
     // the same order per corner×probeSeq (sA from axesOf) → byte-parity holds. (manual ignores firstAxis.)
-    const repoTraverse = (comment, approach, firstAxis, drop) => safeTraverseStack({
-        mode: 'seq', crossX: '#23', crossY: '#24', drop, returnZ: '#95', comment, approach, firstAxis,
-        promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, then drop (only when a drop is passed — see repoArmR)
-    });
+    const repoTraverse = (comment, approach, firstAxis, drop) => {   // t901 — the SAFETRAVERSE BUNDLE: one transparent brick composing lift + shaped travel + return (byte-identical to the inline safeTraverseStack it wraps)
+        const b = newBlock('safetraverse');
+        b.params = { to: 'wall2', shape: firstAxis ? 'dogleg' : 'diagonal' };
+        b.children = safeTraverseStack({
+            mode: 'seq', crossX: '#23', crossY: '#24', drop, returnZ: '#95', comment, approach, firstAxis,
+            promptNote: 'Jog clear, around to the next wall. Press Enter',   // manual: jog, then drop (only when a drop is passed — see repoArmR)
+        });
+        return [b];
+    };
     // Z-RETURN (t897 — the HONEST lift/drop pairing; supersedes the old relative "nets zero" drop, which became FALSE once
     // the per-wall lift went ABSOLUTE at t824/t826: an absolute G53 lift + a relative drop landed an ARBITRARY Z → the next
     // wall probed from the wrong height). The reposition now RETURNS the tool to the probe depth SAVED before the lift

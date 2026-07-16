@@ -20,6 +20,17 @@
 import { num, r3 } from './util.js';
 import { SAFEZ_MARGIN_DEFAULT, wrapMachineFrame } from './safeZframe.js';
 
+// t901 — the SAFETRAVERSE BUNDLE atom: a declared block that COMPOSES a safe-height lift (saferetract) + shaped XY travel +
+// a descend/return onto the target (reusing the t897 save/return-Z pairing). A TRANSPARENT container — its children ARE the
+// composed atoms (built by safeTraverseStack), and blockEmitter emits them in order (byte-identical to the inline builder it
+// wraps; NO marker in the live projection). One brick in Blocks; the primitives stay first-class (wizards use the bundle,
+// machinists author from primitives). `emit` here is the childless fallback ([]); the real lines come from its children.
+export const safeTraverseBlock = {
+    type: 'safetraverse', label: 'Safe Traverse', kind: 'leaf', category: 'Move',
+    defaults: { to: 'wall2', shape: 'dogleg' }, fields: ['to', 'shape'],
+    emit: () => [],
+};
+
 export const safeRetractBlock = {
     type: 'saferetract', label: 'Safe-Z Retract', kind: 'leaf', category: 'Move',
     // margin = the machine-frame margin as a NEGATIVE machine Z (below home); workClear = the work-frame clearance var
