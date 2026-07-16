@@ -519,12 +519,15 @@ export class GcodeExecutionEngine {
                 this.onLineChange({ lineIndex, ip: this.ip, raw: this.program[this.ip].raw });
             }
         }
-        this._setStatus(`Running line ${lineIndex + 1}/${this.totalLines}`, true);
+        this._setStatus(`Running line ${lineIndex + 1}/${this.totalLines}`, true, true);   // t867 rider — transient playback counter
     }
 
-    _setStatus(message, running = this.running) {
+    // t867 rider — `transient` marks a PLAYBACK-progress status (the per-line counter + the per-move length/feed/seconds
+    // paraphrase) that a UI may demote to a tooltip. Operator statuses (waiting on I/O, M-codes, homing, dwell, errors,
+    // completion) leave it false → they stay in the primary status surface.
+    _setStatus(message, running = this.running, transient = false) {
         if (typeof this.onStatus === 'function') {
-            this.onStatus({ message, running, stats: { ...this.stats } });
+            this.onStatus({ message, running, transient, stats: { ...this.stats } });
         }
     }
 
@@ -1251,7 +1254,7 @@ export class GcodeExecutionEngine {
                 if (realMs / speed > 50) {
                     this._move = { from: { ...this.pos }, to: target, durMs: realMs, elapsed: 0, last: null, touchName, g53, probe: isProbe };   // t780 (user) — the position event states its frame semantics
                     const kind = isProbe ? 'G31 probe' : rapid ? 'G0 rapid' : 'G1 feed';
-                    this._setStatus(`${kind} ${d.toFixed(1)} mm at F${rate} — ${(realMs / 1000).toFixed(1)} s${speed !== 1 ? ` @ ${speed}×` : ''}`, true);
+                    this._setStatus(`${kind} ${d.toFixed(1)} mm at F${rate} — ${(realMs / 1000).toFixed(1)} s${speed !== 1 ? ` @ ${speed}×` : ''}`, true, true);   // t867 rider — transient move paraphrase
                     this._nextDelayMs = 16;
                     this.ip += 1;
                     return false;   // ticks now advance the move; next line runs when it lands
@@ -1306,7 +1309,7 @@ export class GcodeExecutionEngine {
                 const speed = this.simSpeed > 0 ? this.simSpeed : 1;
                 if (realMs / speed > 50) {
                     this._move = { from: { ...pts[0] }, to: { ...pts[pts.length - 1] }, path: pts, durMs: realMs, elapsed: 0, last: null, touchName: null, g53: false, probe: false };
-                    this._setStatus(`${effMotion === 2 ? 'G2 cw' : 'G3 ccw'} arc ${len.toFixed(1)} mm at F${rate} — ${(realMs / 1000).toFixed(1)} s${speed !== 1 ? ` @ ${speed}×` : ''}`, true);
+                    this._setStatus(`${effMotion === 2 ? 'G2 cw' : 'G3 ccw'} arc ${len.toFixed(1)} mm at F${rate} — ${(realMs / 1000).toFixed(1)} s${speed !== 1 ? ` @ ${speed}×` : ''}`, true, true);   // t867 rider — transient move paraphrase
                     this._nextDelayMs = 16;
                     this.ip += 1;
                     return false;   // ticks now advance along the arc; next line runs when it lands

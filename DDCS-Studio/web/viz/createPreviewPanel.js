@@ -306,10 +306,19 @@ export function createPreviewPanel(container, opts = {}) {
         new ResizeObserver(() => { if (mode === '2d') t2.redraw(); }).observe(container);
     }
 
+    // t867 rider — the status chip shows the RAW EXECUTING LINE (one source with the editor highlight): "N · <verbatim
+    // source>", end-trimmed with an ellipsis when long. The per-move paraphrase (length / feed / seconds) demotes to the
+    // hover tooltip (set from the engine's RUNNING status; see onStatus). The progress bar underneath is unchanged (t865).
+    const CHIP_MAX = 52;
+    const fmtExecLine = (lineNo, raw) => {
+        const t = String(raw == null ? '' : raw).trim();
+        return `${lineNo} · ${t.length > CHIP_MAX ? t.slice(0, CHIP_MAX - 1) + '…' : t}`;
+    };
     const setStatus = (text, isError = false) => {
         if (!statusEl) return;
         statusEl.textContent = text || '';
         statusEl.classList.toggle('has-error', !!isError);
+        statusEl.title = '';   // t867 rider — a fresh text status clears any stale paraphrase tooltip (the tooltip is owned by the running paraphrase)
         const cp = q('.pp-copy'); if (cp) cp.classList.toggle('visible', !!(text && text.length));
     };
     const SPEEDS = [1, 2, 5, 10, 20];   // 20× tier (t786) — a fast fly-through for long programs; app-wide (users get it too)
@@ -394,7 +403,7 @@ export function createPreviewPanel(container, opts = {}) {
             createVarStore: opts.createVarStore || null,
             onLineChange: ({ lineIndex, raw }) => {
                 if (typeof opts.onLine === 'function') opts.onLine(lineIndex);
-                if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`);
+                if (raw != null) setStatus(fmtExecLine(lineIndex + 1, raw));   // t867 rider — the RAW executing line (one source with the editor highlight), not a paraphrase
                 setProgress(lineIndex);   // t865 — the progress bar fills from the SAME line index the counter shows (one source)
                 // SLICE 3: a previous G31 has now FINISHED (the engine clamped it to the contact; the tool sits there) →
                 // build that axis of the probe-WCS. Resolving on the NEXT line guarantees the tool is at the contact.
@@ -452,7 +461,13 @@ export function createPreviewPanel(container, opts = {}) {
                 if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(kSeg); t2.setToolPosition(pos); } if (toolPosSubs.length) { for (const cb of toolPosSubs) cb(pos, kSeg); }
                 // t680 — LIVE progressive carve: remove material along the swept sub-step (feed class handled inside carveStep), re-mesh throttled.
                 if (viz && viz.carveStep && carveEnabled() && !_carveDegraded) { if (_carvePrev) viz.carveStep(_carvePrev, pos, _carveTR, _carveTip); _carvePrev = pos; if (viz.carveDirty && viz.carveDirty()) _carveDirty = true; carveRemeshThrottled(); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
-            onStatus: ({ message }) => setStatus(message),
+            onStatus: ({ message, transient }) => {
+                // t867 rider — a TRANSIENT playback status (the per-move length/feed/seconds paraphrase + the line counter)
+                // belongs in the hover TOOLTIP, not the chip (the chip shows the raw executing line). EVERY other status —
+                // waiting on I/O, M-codes, homing, dwell, errors, completion — is an operator message that stays IN the chip.
+                if (transient) { if (statusEl) statusEl.title = message || ''; }
+                else setStatus(message);
+            },
             onWait: (wait) => { if (!window.ioPanel) return; if (wait) window.ioPanel.show(); window.ioPanel.setWait(wait); },   // float the I/O panel during a probe/M-code wait
             onFinish: () => {
                 if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe, engine.feedVal); firePulse(pendingProbe); }   // SLICE 3: a trailing G31 (last line) — t319 pulse too

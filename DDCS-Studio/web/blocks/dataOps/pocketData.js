@@ -128,6 +128,11 @@ const POCKET_STRUCT_BINDINGS = [
     { param: 'strategy', help: "Clearing pattern: Spiral = concentric offset rings inward (no wall pass); Raster = parallel zig-zag passes then a wall-finish pass.", type: 'enum', default: POCKET_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: STRATEGY_OPTIONS }, label: 'Strategy', section: T, group: 'clearing' },   // t800 P6 — group:'clearing' + spliced ahead of direction/stepover so it LEADS the cluster
 ];
 
+// t867 — FEEDS & SPEEDS: the material picker + the advisory "Suggest feed" button (the feedsuggest composite widget).
+// A bindingless binding (no socket) in TOOL & CUT next to Feed — it drives NO G-code, so an unset/empty material is
+// byte-identical; a picked material round-trips like a dropdown (the widget's read omits it when empty).
+const MATERIAL_BINDING = { param: 'material', type: 'enum', default: '', widget: 'feedsuggest', label: 'Material', section: T, help: 'Feeds & speeds helper: pick the stock material, then ✨ Suggest fills Feed from the tool Ø / flutes and the declared spindle (RPM = surface speed ÷ circumference, clamped to the spindle range; feed = RPM × flutes × chip load). Advisory — it never overwrites until you click, and you own the final numbers.' };
+
 export const POCKET_DATA_OPTYPE = 'user_pocket_data';
 
 const _pn = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
@@ -198,9 +203,14 @@ export function pocketDataDef() {
     // separately, so it would otherwise trail at the form's end); splice it in just before the first derived clearing
     // binding (direction) so the toggle LEADS its gated dependents, right after shape/size.
     const clAt = POCKET_BINDINGS.findIndex((b) => b.group === 'clearing');
-    const orderedBindings = clAt < 0
+    const withStrategy = clAt < 0
         ? [...POCKET_BINDINGS, ...POCKET_STRUCT_BINDINGS]
         : [...POCKET_BINDINGS.slice(0, clAt), ...POCKET_STRUCT_BINDINGS, ...POCKET_BINDINGS.slice(clAt)];
+    // t867 — the feeds-helper sits right after Feed in the TOOL & CUT cluster (it fills that field).
+    const fdAt = withStrategy.findIndex((b) => b.param === 'feed');
+    const orderedBindings = fdAt < 0
+        ? [...withStrategy, MATERIAL_BINDING]
+        : [...withStrategy.slice(0, fdAt + 1), MATERIAL_BINDING, ...withStrategy.slice(fdAt + 1)];
     const def = userOpFromStack('pocket_data', 'Pocket (data)', pocketDataStack(POCKET_DEFAULTS),
         orderedBindings, 'form3d+2d');   // t726 P2b — entryX/entryY are in POCKET_BINDINGS (via the specs, re-derived by bindingSpecs)
     def.bindingSpecs = POCKET_BINDING_SPECS;                       // re-derive value sockets BY IDENTITY over the PRUNED stack each build

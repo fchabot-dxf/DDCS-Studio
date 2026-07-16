@@ -19,6 +19,7 @@ import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';   /
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
 import { getToolLibrary, getTool } from '../wizards/toolPicker.js';   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
 import { THREAD_PRESETS, threadPreset } from '../wizards/threads.js';   // t778 — the thread preset table for the tapping wizard's pitch picker
+import { MATERIALS, suggestFeedsSpeeds } from '../wizards/materials.js';   // t867 — feeds & speeds: the material table + the classic RPM/feed math
 import { isSectionCollapsed, setSectionCollapsed } from './panePrefs.js';   // t820 — collapsible form sections (app-wide per section kind)
 import { applyState as applyFold } from './paneAccordion.js';   // t820 — REUSE the accordion motion engine (theme drawer tokens), not a duplicate
 
@@ -589,8 +590,73 @@ function actionWidget(host, b) {
     return { read: () => ({}) };
 }
 
+// t867 — the FEEDS & SPEEDS working string (the tooltip): the material · tool · the formula worked through · the honest
+// ranges · any spindle clamp. Shown on the button + the inline note so the suggestion is transparent, never a magic number.
+function feedsWorking(s, matName, dia) {
+    const range = s.clamped === 'max' ? `clamped to spindle max ${s.spindle.maxRpm} (wanted ${s.wantedRpm})`
+        : s.clamped === 'min' ? `clamped to spindle min ${s.spindle.minRpm} (wanted ${s.wantedRpm})`
+        : `spindle ${s.spindle.minRpm}–${s.spindle.maxRpm || '∞'}, in range`;
+    return `${matName} · Ø${dia} · ${s.flutes} flute${s.flutes === 1 ? '' : 's'}\n`
+        + `RPM = ${s.surfaceSpeed}×1000 / (π×${dia}) = ${s.wantedRpm} → ${s.rpm}  (${range})\n`
+        + `feed = ${s.rpm} × ${s.flutes} × ${s.chipLoad} = ${s.feed} mm/min\n`
+        + `SS ${s.ssRange[0]}–${s.ssRange[1]} m/min · chip ${s.chipRange[0]}–${s.chipRange[1]} mm/flute — advisory, tune to taste`;
+}
+
+// t867 — FEEDS & SPEEDS helper widget (the toolPickWidget composite pattern): a material dropdown + an advisory
+// "Suggest feed" button. On click it reads the picked material + the resolved tool (Ø from the toolDia field or the
+// selected tool; flutes from the selected tool, else 2) + the declared spindle range, computes the classic RPM/feed,
+// and FILLS the sibling feed field (+ rpm where such a field exists) — dispatching input so the op re-emits. It NEVER
+// auto-fills; the user clicks apply and owns the numbers ([[dont-declare-away-user-responsibility]]). The button/note
+// show the full working. The material param round-trips like a dropdown; an EMPTY pick is omitted from params, so the
+// emit stays byte-identical (material drives no G-code socket).
+function feedSuggestWidget(host, b) {
+    host.style.cssText = ROW_CSS;
+    const sel = document.createElement('select');
+    sel.style.cssText = CTRL_CSS + ' min-width:130px;';
+    sel.dataset.param = b.param;
+    const mk = (val, lab) => { const o = document.createElement('option'); o.value = String(val); o.textContent = lab; if (String(val) === String(b.default ?? '')) o.selected = true; sel.appendChild(o); };
+    mk('', 'Material…');   // '' = none → no suggestion, byte-identical emit
+    MATERIALS.forEach((m) => mk(m.name, m.name));
+
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'feedsuggest-btn'; btn.textContent = '✨ Suggest feed';
+    btn.title = 'Suggest a feed from the material, the tool Ø / flutes, and the declared spindle range';
+    btn.style.cssText = 'margin-left:6px; padding:4px 9px; background:var(--panel,#232833); color:inherit; border:1px solid var(--border,#2a3340); border-radius:6px; cursor:pointer; flex:0 0 auto;';
+    const note = document.createElement('span');
+    note.className = 'feedsuggest-note';
+    note.style.cssText = 'margin-left:8px; font-size:11px; opacity:.75; flex:0 0 auto;';
+
+    btn.addEventListener('click', () => {
+        const form = host.closest('#wiz_user_form') || host.parentElement; if (!form) return;
+        const matName = sel.value;
+        if (!matName) { note.textContent = 'Pick a material first.'; note.title = ''; return; }
+        const toolNumEl = form.querySelector('[data-param="toolNum"]');
+        const tool = (toolNumEl && toolNumEl.value !== '') ? getTool(toolNumEl.value) : null;
+        const toolDiaEl = form.querySelector('[data-param="toolDia"]');
+        const dia = (toolDiaEl && toolDiaEl.value !== '') ? numOr(toolDiaEl.value, 0) : (tool ? numOr(tool.dia, 0) : 0);
+        const flutes = tool ? numOr(tool.flutes, 0) : 0;   // 0 → the helper defaults to 2
+        const spindle = (typeof window !== 'undefined' && window.ddcsGetSettings) ? (window.ddcsGetSettings().spindle || {}) : {};
+        const s = suggestFeedsSpeeds({ materialName: matName, dia, flutes, spindle });
+        if (!s) { note.textContent = 'Set a tool Ø first (pick a tool or type Tool Ø).'; note.title = ''; return; }
+        const feedEl = form.querySelector('[data-param="feed"]');
+        if (feedEl) { feedEl.value = s.feed; feedEl.dispatchEvent(new Event('input', { bubbles: true })); }
+        const rpmEl = form.querySelector('[data-param="rpm"]');   // no rpm field on pocket/drill today → no-op; future-proof
+        if (rpmEl) { rpmEl.value = s.rpm; rpmEl.dispatchEvent(new Event('input', { bubbles: true })); }
+        const working = feedsWorking(s, matName, dia);
+        btn.title = working; note.title = working;
+        note.textContent = s.clamped ? `feed ${s.feed} · RPM ${s.rpm} (clamped)` : `feed ${s.feed} · RPM ${s.rpm}`;
+    });
+
+    const right = document.createElement('span');
+    right.style.cssText = 'display:inline-flex; align-items:center; flex-wrap:wrap; gap:2px;';
+    right.append(sel, btn, note);
+    host.append(labelSpan(b), right);
+    return { read: () => (sel.value ? { [b.param]: sel.value } : {}) };   // omit when empty → byte-identical (material drives no socket)
+}
+
 export const FORM_WIDGETS = {
     number: numberWidget,
+    feedsuggest: feedSuggestWidget,
     slider: sliderWidget,
     dropdown: dropdownWidget,
     segmented: segmentedWidget,

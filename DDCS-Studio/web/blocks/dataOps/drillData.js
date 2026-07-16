@@ -102,6 +102,11 @@ const DRILL_EXEC_BINDINGS = [
 const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
 export const DRILL_BINDINGS = DRILL_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
 
+// t867 — FEEDS & SPEEDS: the material picker + advisory "Suggest feed" button (the feedsuggest composite widget). A
+// bindingless binding (no socket) next to Feed — drives NO G-code, so unset = byte-identical; a picked material round-
+// trips like a dropdown. Drill has no tool-Ø field, so the helper reads the diameter from the selected tool row.
+const MATERIAL_BINDING = { param: 'material', type: 'enum', default: '', widget: 'feedsuggest', label: 'Material', help: 'Feeds & speeds helper: pick the stock material, then ✨ Suggest fills Feed from the selected tool’s Ø / flutes and the declared spindle (RPM = surface speed ÷ circumference, clamped to the spindle range; feed = RPM × flutes × chip load). Advisory — it never overwrites until you click, and you own the final numbers.' };
+
 export const DRILL_DATA_OPTYPE = 'user_drill_data';
 
 const _dn = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
@@ -153,7 +158,11 @@ export function drillDataDef() {
         ],
         children: appendToolSel(appendEntry(exec)),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
     }];
-    const def = userOpFromStack('drill_data', 'Drill (data)', stack, [...toolBindingsFor(stack), ...DRILL_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
+    // t867 — the feeds-helper sits right after Feed (it fills that field).
+    const baseBindings = [...toolBindingsFor(stack), ...DRILL_BINDINGS, ...entryBindingsFor(stack)];
+    const fdAt = baseBindings.findIndex((b) => b.param === 'feed');
+    const bindings = fdAt < 0 ? [...baseBindings, MATERIAL_BINDING] : [...baseBindings.slice(0, fdAt + 1), MATERIAL_BINDING, ...baseBindings.slice(fdAt + 1)];
+    const def = userOpFromStack('drill_data', 'Drill (data)', stack, bindings, 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = (p) => drillPatternGeometry(p, false);   // t716 — hole pattern + pos + pattern handles (diameter DISPLAY)
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     return def;

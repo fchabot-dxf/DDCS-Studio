@@ -44,22 +44,23 @@ test.describe('t865 minimap → progress bar + follow toggle', () => {
             host.querySelector('.pp-loop').click();   // loop → always mid-run (no finish-race)
             host.querySelector('.pp-run').click();
         });
-        // wait for a mid-run moment: the bar is visible + the counter shows a real N/total
+        // wait for a mid-run moment: the bar is visible + the chip shows the raw executing line ("N · <src>", t867 rider)
         await page.waitForFunction(() => {
             const bar = document.querySelector('.__mp865 .pp-progress');
             const st = document.querySelector('.__mp865 .pp-status');
-            return bar && bar.classList.contains('on') && /Running line \d+\/\d+/.test(st ? st.textContent : '');
+            return bar && bar.classList.contains('on') && /^\d+ · /.test(st ? st.textContent : '') && window.__mp && window.__mp.engine && window.__mp.engine.totalLines > 0;
         }, null, { timeout: 15000 });
-        // ONE SOURCE: read the fill % and the counter N/total in the same synchronous snapshot; they must agree
+        // ONE SOURCE: the fill % and the chip's executing-line number (N) both derive from the SAME engine line index;
+        // read them (+ engine.totalLines) in one snapshot and require fill == N/total.
         const snap = await page.evaluate(() => {
             const fill = document.querySelector('.__mp865 .pp-progress-fill');
             const st = document.querySelector('.__mp865 .pp-status').textContent;
-            const m = st.match(/Running line (\d+)\/(\d+)/);
-            return { fillPct: parseFloat(fill.style.width) || 0, n: +m[1], total: +m[2] };
+            const n = +((st.match(/^(\d+) · /) || [])[1]);
+            return { fillPct: parseFloat(fill.style.width) || 0, n, total: window.__mp.engine.totalLines };
         });
         expect(snap.fillPct, 'the fill has a real width during play').toBeGreaterThan(0);
         const expectedPct = (snap.n / snap.total) * 100;
-        expect(Math.abs(snap.fillPct - expectedPct), `fill ${snap.fillPct}% == counter ${snap.n}/${snap.total} (${expectedPct.toFixed(1)}%) — one source`).toBeLessThan(1.2);
+        expect(Math.abs(snap.fillPct - expectedPct), `fill ${snap.fillPct}% == executing line ${snap.n}/${snap.total} (${expectedPct.toFixed(1)}%) — one source`).toBeLessThan(1.2);
         // stops → the bar hides (visible only while playing)
         const hidden = await page.evaluate(async () => {
             window.__mp.stop && window.__mp.stop();
