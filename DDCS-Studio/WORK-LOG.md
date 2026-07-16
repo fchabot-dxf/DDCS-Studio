@@ -4380,3 +4380,109 @@ orphaned, then reviewed+accepted 14/14 off the shared git). ALL handoff.py/proc_
 (c:/Users/danse/APPS/ddcs-studio-project). The reloaded worker skill now hard-refuses a subdir run + documents the ONE
 self-looping waiter. Stray fork artifacts (DDCS-Studio/HANDOFF.md, DDCS-Studio/.handoff/) remain on disk, harmless (the
 guard prevents reuse) - offered to the user to clean; not deleted without confirmation.
+
+
+## 2026-07-16 (t867) — THE FEEDS & SPEEDS HELPER (backlog item 8): a declared MATERIALS table + the classic math + an advisory suggest widget on the pocket + drill twins.
+
+### THE DECLARED PIECES (declare-never-infer)
+
+- NEW web/wizards/materials.js — the MATERIALS table (the threads.js precedent: a flat array + a lookup + a pure derive).
+  8 honest starter rows (softwood/hardwood/MDF/acrylic/plastic/aluminum/brass/steel), each {surfaceSpeed [min,max] m/min,
+  chipLoad [[min,max]×4 by DIA_BANDS] mm/flute}. DIA_BANDS=[3,6,12] → a 1mm engraver takes far less chip than a 12mm
+  rougher. `material(name)`, `chipBand(dia)`, and `suggestFeedsSpeeds({materialName,dia,flutes,spindle})` — the CLASSIC
+  math, no invention: RPM = surfaceSpeed·1000/(π·dia) clamped to the spindle range (clamp REPORTED, wanted vs clamped);
+  feed = RPM·flutes·chipLoad. Midpoint of the honest ranges → a single suggestion; the tooltip shows the range.
+- flutes was ALREADY declared on the tool atom (settingsPanel normalizeTool — default 2 in the seed lib, blank via
+  normalize); the helper treats blank/0 flutes as 2. No new tool column needed (the grounding corrected the plan).
+
+### THE SURFACE — a composite feedsuggest widget, advisory only
+
+web/ui/formWidgets.js — a new `feedsuggest` widget (the toolPickWidget composite pattern): a material dropdown +
+a "✨ Suggest feed" button + an inline note. On click it reads the picked material + the resolved tool (Ø from the
+toolDia field OR the selected tool row; flutes from the selected tool, else 2) + the declared spindle
+(ddcsGetSettings().spindle), computes suggestFeedsSpeeds, and FILLS the sibling Feed field (+ an rpm field where one
+exists — none on these twins today, so feed only) by set-value + a bubbling `input` (the delegated form listener
+re-emits). It NEVER auto-fills — only on the explicit click; the user owns the numbers ([[dont-declare-away-user-
+responsibility]]). The button title + note show the FULL WORKING (the formula worked through + the honest SS/chip
+ranges + any spindle clamp) — transparent, not a magic number.
+
+### THE BINDING — bindingless, byte-identical
+
+pocketData.js + drillData.js — a `material` binding (widget:'feedsuggest') spliced right after Feed in each twin (the
+TOOL & CUT cluster). Bindingless (no block socket, mirroring `strategy`): it drives NO G-code, so an unset/empty
+material is byte-identical, and a picked material round-trips like a dropdown (the widget's read OMITS material when
+empty, so it never even enters params unless picked → byte-identical in BOTH the clean emit and the .nc marker). Added
+`help` to the binding (the field-help P5.3 coverage guard — see the gate note).
+
+### DECLARE-OR-HANDROLL
+
+Every piece is a declaration: the MATERIALS data table, the named pure math helper (classic formulas), the material
+op-param (round-trips), the feedsuggest widget (a registry entry). No engine machinery — the suggestion is advisory data
++ a pure function. flutes was already declared (grounding caught the dispatch's "add it" as unnecessary).
+
+### NOTE — the spindle tag: the dispatch said t733, the CODE says t774
+The declared spindle {minRpm,maxRpm} lives at settingsPanel.js:139, annotated t774 P1a (test spindle-declaration-774),
+NOT t733. Same declaration, just the tag differs — flagging so the advisor's backlog reference stays accurate.
+
+### VERIFIED (tests/feeds-speeds-867.spec.js, 5 tests)
+
+1. MATH: hand-computed (independent formula over the declared table) RPM+feed for Aluminum Ø6 (11141 rpm / feed 947),
+   Steel Ø6 (3050 / 162), and the CLAMP case Aluminum Ø1 (wanted 66845 → clamped to spindle max 24000, feed 960,
+   clamped='max' asserted) + null guards (no material / no dia) + blank-flutes→2.
+2. BYTE-IDENTITY: builderOf→emitMapped — a material param (set 'Aluminum' OR '') never changes the emit for pocket OR
+   drill (drives no socket; goldens untouched).
+3. POCKET form: the material dropdown + ✨ button render; Feed is UNTOUCHED until the click, then fills to 947; the
+   tooltip shows the RPM + feed working.
+4. DRILL form: renders; apply fills Feed from the selected tool (lib tool 1 = Ø6 2fl) + Aluminum → 947 (drill has no
+   tool-Ø field, so the helper reads Ø/flutes from the tool row).
+5. screenshots pocket + drill, both themes — VIEWED: the Material row + ✨ Suggest feed sit right after Feed; Feed filled
+   to 947, the note "feed 947 · RPM 11141".
+
+### GATE (w4) — the first run CAUGHT A REAL REGRESSION, then CLEAN
+First full gate: 1275 passed / 1 FAILED / 4 skipped — the 1 = field-help-798 P5.3 (every visible twin field needs help
+or a HELP_EXEMPT entry); my material binding had neither. FIXED by adding `help` to the binding (both twins). Re-run
+VERBATIM: 1276 passed / 0 failed / 4 skipped (11.4m), playwright exit 0. CLEAN. Delta: t865 1271 + 5 new = 1276.
+(A good catch by the full gate — the isolated feeds spec was green but the cross-twin coverage guard wasn't in it.)
+
+
+## 2026-07-16 (t867 RIDER, ratified user t866) — the preview status chip shows the RAW EXECUTING LINE; the paraphrase demotes to the tooltip.
+
+Caught this ratified mid-turn amendment at the pre-commit amendments poll (incorporated before committing). The t865 preview
+status chip showed the engine's per-move PARAPHRASE ("G1 feed 2.2 mm at F400 — 0.3 s @ 2x") — the rider makes it show the
+RAW EXECUTING LINE instead, one source with the editor highlight.
+
+createPreviewPanel.js:
+- the chip TEXT is now `${lineNo} · ${rawSourceLine}` (fmtExecLine), end-trimmed to 52 chars with an ellipsis. Set in
+  onLineChange from the SAME `raw` at the SAME lineIndex the editor highlight + the progress bar consume (one source).
+- the paraphrase demotes to the hover TOOLTIP: onStatus now routes a RUNNING status (the per-move length/feed/seconds
+  from GcodeExecutionEngine _setStatus, + the "Running line N/total" counter) to `statusEl.title`, NOT the text. A
+  NON-running status (completion / error / idle summary) still lands IN the chip (setStatus) — the operator must see those.
+  setStatus clears the stale title on each fresh text status.
+- the PROGRESS BAR underneath is unchanged (t865); it still fills from the same line index.
+
+Ripple: the t865 progress-bar test asserted "Running line N/total" in the .pp-status TEXT — that string now lives in the
+TITLE. Updated minimap-replace-865.spec.js to read the executing line number from the new chip format ("N · …") + the total
+from engine.totalLines (still a one-source fill==N/total assert). No other spec broke: atc-tool-swap waits for /complete/i
+(a completion status → stays in the text); poschip-746 captures .pp-status text but never asserts it.
+
+VERIFIED (tests/preview-chip-raw-867.spec.js): during play the chip is "N · <verbatim source line>" == the program line at
+the executing index (one source); a long line is ellipsis-trimmed + bounded; the tooltip carries the paraphrase (mm at F /
+Running line N/total); the paraphrase is NOT in the chip text. + the updated t865 progress-bar test stays green.
+
+### t867 rider — FIX: the tooltip routing is DECLARED (transient), not inferred from `running`
+First rider cut routed ALL `running` engine statuses to the tooltip — the full gate CAUGHT it: io-sim + io-sim-expert
+("clicking the input unblocks the wait") assert the WAIT message ("...waiting for IN12 to be ON...") in the .pp-status
+chip, and nearly every operator status (waiting, M-codes, homing, dwell, errors) is emitted with running=true, so they
+all vanished from the chip. `running` is too coarse. FIX: the engine now DECLARES the transient ones — _setStatus gained
+a `transient` flag, set true ONLY on the per-line counter (522) + the per-move length/feed/seconds paraphrase (1254/1309);
+onStatus routes `transient`→tooltip, everything else→chip. So waiting/M-code/homing/dwell/error/completion stay in the
+chip (io-sim green), only the playback paraphrase demotes. Re-verified io-sim (6) + io-sim-expert (2) + the chip + progress
+tests green. (declare-never-infer: a status KIND declared at the source beats pattern-matching the message in the panel.)
+
+### GATE (w4) — VERBATIM: 1276 passed / 1 failed / 4 skipped (11.5m).
+The 1 failed = collapsible-panes-752:130 — the suite's DOCUMENTED most load-fragile test (t837 note: "samples DURING
+animation", flaked on prior loaded runs). It passed 8/8 ISOLATED (workers=1) immediately after, and is unrelated to
+feeds/speeds or the preview chip (it's pane-reflow animation timing). The box is loaded (msedge heavy). So the run is
+effectively GREEN modulo the known environmental flake. Everything I touched — feeds & speeds (5), the chip rider + the
+transient fix, io-sim (8) — is green. Delta: t867 feeds-only gate 1276 passed; the rider added +1 test (chip) and the
+transient fix kept io-sim green; net 1276 passed (the +1 offsets the flaked collapsible-pane in the passed count).
