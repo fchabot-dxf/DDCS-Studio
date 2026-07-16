@@ -138,8 +138,15 @@ test.describe('desktop reflow — the surviving pane FILLS the freed space', () 
 
     // collapse the 3D → the 2D fills the freed column
     await strip(page, 'contour', 'preview3d').click();
-    await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').getAttribute('data-collapsed') === '1', null, { timeout: 3000 });
-    await page.waitForTimeout(400);
+    // t869 rider — a REAL READINESS SIGNAL, not a timing window: wait until the reflow has SETTLED — the collapsed pane
+    // folded to the strip (≤28, the .wiz-pane-body height transition complete) AND the surviving pane grew to fill. Keys
+    // off the SAME height-settle the assertions check (the sibling mobile test at :53 uses this pattern); robust under a
+    // loaded box + reduced-motion (no transitionend attach race, no fixed delay racing the animation).
+    await page.waitForFunction((h2b) => {
+        const c = document.querySelector('#wiz_contour [data-viz-pane="preview3d"]');
+        const s = document.querySelector('#wiz_contour [data-viz-pane="layout2d"]');
+        return c && s && c.getAttribute('data-collapsed') === '1' && c.getBoundingClientRect().height <= 28 && s.getBoundingClientRect().height > h2b + 100;
+    }, h2Both, { timeout: 5000 });
     const h2Filled = (await pane(page, 'contour', 'layout2d').boundingBox()).height;
     const h3Strip = (await pane(page, 'contour', 'preview3d').boundingBox()).height;
     expect(h2Filled, 'the 2D grew to fill the freed 3D space').toBeGreaterThan(h2Both + 100);
@@ -149,8 +156,12 @@ test.describe('desktop reflow — the surviving pane FILLS the freed space', () 
     await strip(page, 'contour', 'preview3d').click();
     await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').getAttribute('data-collapsed') === '0', null, { timeout: 3000 });
     await strip(page, 'contour', 'layout2d').click();
-    await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="layout2d"]').getAttribute('data-collapsed') === '1', null, { timeout: 3000 });
-    await page.waitForTimeout(400);
+    // t869 rider — the same layout-stable settle wait (no timing window): the 2D folded to a strip AND the 3D grew to fill.
+    await page.waitForFunction((h3b) => {
+        const c = document.querySelector('#wiz_contour [data-viz-pane="layout2d"]');
+        const s = document.querySelector('#wiz_contour [data-viz-pane="preview3d"]');
+        return c && s && c.getAttribute('data-collapsed') === '1' && c.getBoundingClientRect().height <= 28 && s.getBoundingClientRect().height > h3b + 100;
+    }, h3Both, { timeout: 5000 });
     const h3Filled = (await pane(page, 'contour', 'preview3d').boundingBox()).height;
     const h2Strip = (await pane(page, 'contour', 'layout2d').boundingBox()).height;
     expect(h3Filled, 'the 3D grew to fill the freed 2D space').toBeGreaterThan(h3Both + 100);
