@@ -1,4 +1,24 @@
 # V4.1 rig experiments — the three observations that gate the Params design
+
+## ⏸ RESUME HERE (paused 2026-07-16, mid-session)
+**PROVEN today, agent-driven, on the live V4.1 (10.0.0.50):** the `SYSDISK/setting` file is a flat little-endian
+f64 array, **param #N at byte N×8** (confirmed: X−−/Y−−/Z−− matched the screen). Direct SMB write of 3 fields
+(X++/Y++/Z++ = −0.2), diff-proven, **adopted on REBOOT**. Live pickup while running = NO (RAM-cached). Shutdown did
+NOT overwrite. → Strategy A is real; see PARAM-WRITE-STRATEGY.md (the "PROVEN" block).
+**CURRENT DISK STATE:** X++=−0.2, Y++=−0.2, **Z++=−0.5** (a deliberate live-pickup test payload); the controller's
+RAM/screen still shows all three = −0.2 from the reboot. **#234 enable still Disabled.**
+**THE PENDING TEST (do first on resume):** press the controller's **Import** (no reboot) → photograph the params
+page. Z++ = −0.5 ⇒ Import is the live-refresh (ceremony = write→Import, no reboot); Z++ = −0.2 ⇒ Import didn't
+live-load, reboot stays the apply step. Either answer completes the refresh-mechanism question.
+**ROLLBACK:** the pristine setting (all ++ = 0) was backed up to the session scratchpad as `setting.live.bak`
+(session-temp — re-pull a fresh copy on resume before any further write; the controller is the live source).
+**PERMISSION:** the user added `Bash(powershell:*)` to `~/.claude/settings.json` to let the agent perform the write.
+**A-axis:** the user does NOT care about A on this bench — leave A±± at 0, ignore.
+**Also open:** whether ALL params are macro-writable live (Strategy B / #655-style) — untested; the read-first
+mapping-discovery (experiment 3 below) still stands as the way to ground it.
+
+---
+
 *(see PARAM-WRITE-STRATEGY.md for why; run in order; report observations verbatim)*
 
 ## 1 — Soft limits (config only)

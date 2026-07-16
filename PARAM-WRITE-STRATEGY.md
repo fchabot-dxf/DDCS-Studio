@@ -54,6 +54,28 @@ landed. The ceremony ends with an explicit **strategy picker**:
 > user added a `Bash(powershell:*)` allow-rule + explicitly authorized the bench write — Studio's own gateway code
 > has no such gate; it just writes a file.)
 
+### ⚠ SHIPPING TO USERS — the mechanism is proven, so the CEREMONY must be bulletproof
+This is a PLATFORM, not one bench. A user's real machine has a real spindle and real travels; a wrong soft-limit /
+homing / steps-per-unit write is a genuine crash-or-damage risk. The proven write path therefore ships ONLY behind
+a ceremony that makes it safe for someone who isn't the developer:
+1. **Mandatory auto-backup before every write** — the pristine `setting` is copied to a timestamped restore file
+   FIRST, always; one-click rollback is never more than a click away (today's bench write did this by hand — the
+   feature does it by construction).
+2. **Read-modify-WRITE the whole file, never a blind offset poke** — pull the current `setting`, patch in memory,
+   push the whole file; the diff is computed and **shown to the user** ("3 fields change: Z++ 0 → −0.2 …") and
+   **confirmed** before anything is written. No silent field a user didn't see.
+3. **Per-controller format grounding** — the f64 / byte-N×8 layout is PROVEN for the V4.1; Expert & DM500 get the
+   SAME empirical validation (match known on-screen values to decoded bytes) before their write is enabled — never
+   assumed from the V4.1.
+4. **Reboot-to-apply is stated, not surprising** — the ceremony ends with "reboot the controller to apply" because
+   that's the proven behavior; the re-pull-verify closes the loop after the reboot.
+5. **The values stay the USER's responsibility** ([[dont-declare-away-user-responsibility]]) — Studio suggests
+   where it honestly can (stock-top for a clearance plane) but never auto-writes a safety value; the human owns
+   every number and confirms the diff.
+6. **Risk-aware confirmation copy** — writing soft-limits/homing/steps-per-unit shows a plain-language "this changes
+   how your machine physically moves — back up taken, reboot needed" before the write; low-risk params (UI, MPG
+   speed) get a lighter touch. (The advisor's earlier risk-tier idea, now load-bearing.)
+
 ### Strategy A — the native file swap
 Studio stages a modified copy of the controller's **own export format** (proven readable — the system-backup is
 exactly this), pushes it, and the **controller's own import** applies it under its own rules. Studio adds what the
