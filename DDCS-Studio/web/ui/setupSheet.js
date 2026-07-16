@@ -114,20 +114,41 @@ function setupGroups(raw) {
     const setups = (raw || []).filter((b) => b && b.type === 'setup');
     if (!setups.length) return null;   // no two-sided structure → the classic single Operations section
     return setups.map((s) => ({
+        id: s.id,
         title: (s.params && s.params.title) || 'Setup',
         index: Number((s.params && s.params.index) || 0),
         ops: collectOps(s.children || [], []),
         flip: flipForSetup(raw, Number((s.params && s.params.index) || 0)),
     }));
 }
-// The flip INSTRUCTION for a setup, stated from the declaration (plain wording, taste-level pending the user). Carries the
-// HONEST carve note (t879 phase 1): the toolpaths render mirrored for free, but the SIM does not yet flip the carved stock
-// from the prior setup — that carry-over is a queued fast-follow (phase 3).
+// The flip INSTRUCTION for a setup, stated from the declaration (plain wording, taste-level pending the user). The t879
+// "not yet re-shown flipped" caveat is RETIRED at t881 — the sim now flips the stock + carries the carve field.
 function flipInstruction(flip) {
     const axis = (flip && flip.params && String(flip.params.axis).toUpperCase() === 'Y') ? 'Y' : 'X';
     const about = axis === 'X' ? 'the X axis (front ↔ back)' : 'the Y axis (left ↔ right)';
-    return `<div class="ss-row ss-flip"><b>Flip the part about ${about}.</b> Keep the registered edge against the fence, then re-zero (or probe) the new top face as this setup's WCS.</div>`
-        + `<div class="ss-row ss-muted ss-flip-note">Preview note: the side-2 toolpaths are shown mirrored, but the material carved in the prior setup is not yet re-shown flipped (coming next).</div>`;
+    return `<div class="ss-row ss-flip"><b>Flip the part about ${about}.</b> Keep the registered edge against the fence, then re-zero (or probe) the new top face as this setup's WCS.</div>`;
+}
+// t881 — PER-SETUP PREFLIGHT (a REPORTING split over the ONE existing whole-program trace: the emitted text already carries
+// the baked side-2 mirror, so the single checkEnvelope sees the mirrored side-2 coords). Bucket each violation onto its
+// owning setup via the projection map: proj.map[line-1][0] = the top-level ancestor block id (a `setup` is top-level). →
+// { index → [violations] }. Empty when no projection / no setups.
+export function violationsBySetup(verdict, groups) {
+    const bySetup = new Map();
+    const proj = (window.ddcsGetProjection && window.ddcsGetProjection()) || null;
+    if (!verdict || !groups || !proj || !proj.map) return bySetup;
+    for (const v of (verdict.violations || [])) {
+        const anc = proj.map[(v.line | 0) - 1];
+        const topId = anc && anc[0];
+        const g = groups.find((grp) => grp.id === topId);
+        if (g) { if (!bySetup.has(g.index)) bySetup.set(g.index, []); bySetup.get(g.index).push(v); }
+    }
+    return bySetup;
+}
+// The per-setup pre-flight rows: name each violation (line, axis, overshoot) on this setup's page — or a green line.
+export function setupPreflightHTML(list) {
+    if (!list || !list.length) return `<div class="ss-row ss-verdict-green">✓ this setup fits the envelope</div>`;
+    return `<div class="ss-row ss-verdict-red">✕ ${list.length} move${list.length === 1 ? '' : 's'} outside the envelope:</div>`
+        + list.slice(0, 8).map((v) => `<div class="ss-row ss-muted">line ${esc(v.line)} · ${esc(v.axis)} · ${fmtN(v.overshoot)} mm over</div>`).join('');
 }
 // The Operations table for a set of ops (shared by the single-page + per-setup paths). Returns the table + its subtotal.
 function opsTable(ops, est) {
@@ -199,6 +220,7 @@ export function buildSheetHTML() {
     // single Operations section (byte-identical to a pre-t879 program).
     let opsSection;
     if (groups) {
+        const bySetup = violationsBySetup(verdict, groups);   // t881 — the per-setup preflight split (over the one whole-program trace)
         opsSection = groups.map((g, gi) => {
             const secs = g.ops.reduce((a, op) => a + (opTime(op, est) || 0), 0);
             return `<section class="ss-setup"${gi > 0 ? ' style="page-break-before:always"' : ''}>`
@@ -206,6 +228,7 @@ export function buildSheetHTML() {
                 + (g.flip ? flipInstruction(g.flip) : '')
                 + opsTable(g.ops, est)
                 + `<div class="ss-row ss-muted">Setup run time: ${secs > 0 ? esc(fmtDuration(secs)) : '—'}</div>`
+                + setupPreflightHTML(bySetup.get(g.index))
                 + `</section>`;
         }).join('');
     } else {

@@ -70,6 +70,32 @@ export class HeightmapCarve {
     /** The stock-local XY centre of cell (i,j). */
     cellXY(i, j) { return { x: i * this.dx, y: j * this.dy }; }
 
+    /**
+     * t881 — carry the carved TOP-material state through a two-sided FLIP (the same axis + thickness the emit's mirror uses,
+     * ONE source). The part turns over about the declared axis: flip-about-X reflects rows in Y (j'=ny-1-j); flip-about-Y
+     * reflects cols in X (i'=nx-1-i). A 2.5D top-only field can only carry a THROUGH cut across the flip — a cell cut clean
+     * through (h reaches the bottom) stays open from the new top (-Z); every other cell reads intact from the new top (0),
+     * because a blind top pocket becomes an underside feature this top-down field cannot represent (the honest limit — a
+     * side-1 through-hole is the case that carries + shows on side-2 where the depths overlap). Re-seeds the baseline so
+     * side-2's own carving builds on the carried state. In place.
+     */
+    mirrorField(axis, thickness) {
+        const isX = String(axis || 'X').toUpperCase() === 'X';   // flip about X → reflect Y (rows); flip about Y → reflect X (cols)
+        const Z = Math.max(0, Number(thickness) || this.Z);
+        const eps = 1e-3, floor = -Z + eps;
+        const nh = new Float32Array(this.nx * this.ny), nc = new Float32Array(this.nx * this.ny);
+        for (let j = 0; j < this.ny; j++) for (let i = 0; i < this.nx; i++) {
+            const si = isX ? i : (this.nx - 1 - i);
+            const sj = isX ? (this.ny - 1 - j) : j;
+            nh[this.idx(i, j)] = (this.h[this.idx(si, sj)] <= floor) ? -Z : 0;    // a through cut carries; else the new top is intact
+            nc[this.idx(i, j)] = (this.hc[this.idx(si, sj)] <= floor) ? -Z : 0;
+        }
+        this.h = nh; this.hc = nc;
+        this.seedSnapshot = this.h.slice();   // side-2 carves on top of the carried side-1 through-holes
+        this.dirty = true; this.dirtyRect = null;
+        return this;
+    }
+
     /** Pre-carve a declared recess: rect (size.x/y) or round (size.d) footprint at `pos`, to −depth. */
     _preCarveFeature(f) {
         if (!f || f.side === 'outside') return;   // outside features (bosses) add nothing to the initial top

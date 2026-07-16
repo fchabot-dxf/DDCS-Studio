@@ -808,6 +808,16 @@ export class GcodeViz3D {
         pg.rotation.set(0, 0, 0);
         pg.rotation[rax.a || 'x'] = (a || 0) * deg;
         if (rax.b) pg.rotation[rax.b] = (b || 0) * deg;
+        if (this._partFlip) pg.rotation[this._partFlip === 'Y' ? 'y' : 'x'] += Math.PI;   // t881 — the two-sided flip: turn the part over (persists across the per-frame re-apply + a setStock rebuild; only _partGroup flips, the toolpaths/tool stay put)
+    }
+
+    // t881 — TWO-SIDED FLIP: turn the stock + carve visual over about the declared axis at the setup-2 boundary (X → spin π
+    // about X, front↔back; Y → about Y). Threaded through _applyPartRotation so it survives the play loop's per-frame
+    // re-apply and a setStock rebuild. Pass null to clear (single-setup / before the boundary).
+    setPartFlip(axis) {
+        this._partFlip = axis ? (String(axis).toUpperCase() === 'Y' ? 'Y' : 'X') : null;
+        this._applyPartRotation(this._jogA || 0, this._jogB || 0);
+        this.render();
     }
 
     // Short beep at the end of each animation loop (Web Audio; silent until a user gesture)
@@ -1514,6 +1524,16 @@ export class GcodeViz3D {
         if (this._carveMeshMode !== 'smooth') this._rebuildCarveMesh('smooth'); else this._remeshCarve();
     }
     carveDirty() { return !!(this._carve && this._carve.dirty); }
+
+    /** t881 — TWO-SIDED CARVE-CARRY: at the setup-2 boundary, mirror the carve height-field through the flip (same axis +
+     *  thickness the emit uses, ONE source) so side-1's through-holes carry to side-2's new top, then re-mesh. */
+    carveMirrorField(axis, thickness) {
+        if (!this._carve) return;
+        this._carve.mirrorField(axis, thickness);
+        this._liveCrisp = null;   // the carried field is a fresh baseline for the live crisp splice
+        this._rebuildCarveMesh(this._carveMeshMode === 'crisp' ? 'crisp' : 'smooth');
+        this.render();
+    }
 
     /** t814 — the ANALYTIC ARC source for the crisp mesher: the FEED segments in MESH coords + the tool radius, so
      *  _buildCrispCarveMesh can SNAP corner iso-vertices onto the true fillet arc. A flat list (cheap); null → no snap. */

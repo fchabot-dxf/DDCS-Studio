@@ -222,6 +222,7 @@ export function createPreviewPanel(container, opts = {}) {
     // with an honest degrade (F). ON by default; a preview.carve=false toggle turns it off. Per-panel (G) — the viz owns the map.
     const carveEnabled = () => previewPrefs().carve !== false;
     let _carveTR = 3, _carveTip = 'flat', _carveAngle = 90, _carvePrev = null, _carveDirty = false, _carveLastRemesh = 0, _carveHeavySince = 0, _carveDegraded = false, _carveSegs = [], _carveRaf = 0;
+    let _flipBoundaries = [], _flipsApplied = new Set();   // t881 — two-sided setup-flip boundaries {emitted-line, axis} + which fired this run
     // t875 — V-CARVE: the vee included angle for the carve cone (the tool's declared angle, else a per-type default).
     const _VEE_DEFAULT = { vbit: 90, chamfer: 90, engraver: 30 };
     const veeAngleOf = (t) => (Number(t && t.angle) > 0 ? Number(t.angle) : (_VEE_DEFAULT[t && t.type] || 90));
@@ -395,6 +396,24 @@ export function createPreviewPanel(container, opts = {}) {
         if (typeof opts.getOps === 'function') { try { return opts.getOps() || []; } catch (_) { return []; } }
         const op = getLastOp(); return op ? [op] : [];
     };
+    // t881 — TWO-SIDED FLIP boundaries: each `setup` that a `flip` sibling names gets its FIRST emitted line (via the
+    // projection map, window.ddcsLinesForOp) → {line, axis}. During playback, crossing that line turns the stock over +
+    // carries the carve field. No setup+flip → [] (single-setup untouched). Sorted by line.
+    const computeFlipBoundaries = () => {
+        const out = [];
+        try {
+            const blocks = compOps() || [];
+            const setups = blocks.filter((b) => b && b.type === 'setup');
+            for (const fl of blocks.filter((b) => b && b.type === 'flip')) {
+                const idx = Number((fl.params || {}).setup);
+                const su = setups.find((s) => Number((s.params || {}).index) === idx);
+                if (!su || !window.ddcsLinesForOp) continue;
+                const lines = window.ddcsLinesForOp(su.id) || [];
+                if (lines.length) out.push({ line: Math.min(...lines), axis: (fl.params || {}).axis || 'X' });
+            }
+        } catch (_) { /* projection not ready → no boundaries */ }
+        return out.sort((a, b) => a.line - b.line);
+    };
     function ensureEngine() {
         if (engine) return engine;
         engine = new GcodeExecutionEngine({
@@ -408,6 +427,17 @@ export function createPreviewPanel(container, opts = {}) {
                 if (typeof opts.onLine === 'function') opts.onLine(lineIndex);
                 if (raw != null) setStatus(fmtExecLine(lineIndex + 1, raw));   // t867 rider — the RAW executing line (one source with the editor highlight), not a paraphrase
                 setProgress(lineIndex);   // t865 — the progress bar fills from the SAME line index the counter shows (one source)
+                // t881 — TWO-SIDED FLIP: crossing a setup-2 boundary turns the stock over about the declared axis + carries the
+                // carve field (side-1's through-holes) to the new top. Once per boundary per run.
+                if (_flipBoundaries.length && viz) {
+                    for (const b of _flipBoundaries) {
+                        if (lineIndex >= b.line && !_flipsApplied.has(b.line)) {
+                            _flipsApplied.add(b.line);
+                            if (viz.setPartFlip) viz.setPartFlip(b.axis);
+                            if (viz.carveMirrorField && carveEnabled() && !_carveDegraded) viz.carveMirrorField(b.axis, (previewStock() || {}).z);
+                        }
+                    }
+                }
                 // SLICE 3: a previous G31 has now FINISHED (the engine clamped it to the contact; the tool sits there) →
                 // build that axis of the probe-WCS. Resolving on the NEXT line guarantees the tool is at the contact.
                 if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe, engine.feedVal); flashDro(); firePulse(pendingProbe); }   // probe re-references the DRO (feedVal = the just-finished probe's feed → disc size); t319 — pulse the 2D + Layout too
@@ -718,15 +748,8 @@ export function createPreviewPanel(container, opts = {}) {
                 }
                 if (v.applyDisplay) v.applyDisplay();   // t738 — apply the ONE declared visibility registry across every element (after all the rebuilds)
             }
-            // t879 — the HONEST two-sided note: when the program declares a FLIP, the side-2 toolpaths render mirrored for
-            // free (the emit bakes the mirror into coordinates), but the SIM does not yet re-show the prior-setup carved stock
-            // flipped — that carry-over is a queued fast-follow (phase 3). Surfaced on the sim until then. Takes precedence
-            // over the carve tip note (the more important caveat); non-two-sided programs are untouched.
-            const flipNote = q('.pp-carve-note');
-            if (flipNote && compOps().some((b) => b && b.type === 'flip')) {
-                flipNote.textContent = 'Two-sided: side-2 toolpaths shown mirrored; the material carved in the prior setup is not yet re-shown flipped.';
-                flipNote.style.display = '';
-            }
+            // t881 — the t879 honest two-sided note is RETIRED: the sim now flips the stock at the setup-2 boundary and carries
+            // the carve field (through-holes) through the flip (onLineChange + carveMirrorField), so the caveat no longer holds.
         }
         const s = parsed.stats || {};
         setStatus(!s.drawable ? 'No drawable moves' : [s.feed && `${s.feed} cuts`, s.probe && `${s.probe} probes`, s.rapid && `${s.rapid} rapids`].filter(Boolean).join(' · '));
@@ -831,6 +854,8 @@ export function createPreviewPanel(container, opts = {}) {
         if (viz && startSeated() && viz.setToolPosition) viz.setToolPosition(getStartPos() || { x: 0, y: 0, z: 0 });
         // t680 — the LIVE progressive carve starts from PRISTINE stock (recesses seeded) and removes material as the tool moves.
         if (viz && viz.carveReseed && carveEnabled() && !_carveDegraded) { viz.carveReseed(); _carvePrev = null; _carveDirty = false; }
+        if (viz && viz.setPartFlip) viz.setPartFlip(null);   // t881 — a fresh run starts un-flipped; recompute the two-sided boundaries for THIS program
+        _flipsApplied.clear(); _flipBoundaries = computeFlipBoundaries();
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
         updateRunBtn();

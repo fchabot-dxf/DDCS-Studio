@@ -118,7 +118,6 @@ test('the SETUP SHEET loops a page per setup with the flip instruction + honest 
             count: setups.length,
             hasBreak: setups.some((s) => /page-break-before/.test(s.getAttribute('style') || '')),
             flipInstr: /Flip the part about the X axis/.test(pg.innerHTML),
-            carveNote: /not yet re-shown flipped/.test(pg.innerHTML),
             splitLen: split && split.length,
             splitIdx: split && split.map((g) => g.index),
         };
@@ -126,7 +125,6 @@ test('the SETUP SHEET loops a page per setup with the flip instruction + honest 
     expect(r.count, 'one section per setup (two pages)').toBe(2);
     expect(r.hasBreak, 'the second setup starts a new page').toBe(true);
     expect(r.flipInstr, 'the flip instruction is stated from the declaration').toBe(true);
-    expect(r.carveNote, 'the honest carve-carry note is shown').toBe(true);
     expect(r.splitLen, 'the estimate splits into two per-setup groups').toBe(2);
     expect(r.splitIdx, 'the split is keyed by setup index').toEqual([1, 2]);
     await page.locator('#setupSheetPage').screenshot({ path: testInfo.outputPath('t879-setup-sheet.png') });
