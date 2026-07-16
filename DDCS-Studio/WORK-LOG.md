@@ -4586,3 +4586,49 @@ can't param-compare; caught at emit + the declared reason); ramp/helix entry for
 ### GATE (w4) — VERBATIM: 1282 passed / 0 failed / 4 skipped (11.5m), playwright exit 0. CLEAN.
 Delta: t869 1277 + 5 new = 1282. NO pocket-golden or twin regression (byte-identity held across the suite). panes-752
 stayed green (the rider fix holds in-suite). The advisor's gate ruling (Option A) built + verified end-to-end.
+
+
+## 2026-07-16 (t873) — V-CARVE PREVIEW (backlog item 10): GROUNDED → the crisp-mesher V is STRUCTURAL → GATE (passed back).
+
+Grounded with 2 Explore agents over the carve engine (web/engine/stockRemoval.js), the mesher (web/viz/gcodeViz3d.js),
+the tool table (settingsPanel.js), the sim tool (toolProfile.js), and the text twin (textView/fillText). The V cross-
+section (width = 2·depth·tan(halfAngle)) SPLITS cleanly into parameter work + ONE structural piece:
+
+NON-STRUCTURAL (ready to build, no gate):
+- (1) TOOL-TABLE ANGLE: no `angle` field on the atom today (the 60° V-Bit stores it only in its NAME). But toolProfile.js
+  ALREADY reads tool.angle (DEFAULT_ANGLE {vbit:90,chamfer:90,engraver:30,...}) — add the atom field + a table column +
+  the seed value; the silhouette + sim cone pick it up.
+- (2a) HEIGHT-FIELD VEE PROFILE: the reserved-but-unbuilt slot — stockRemoval carveTipForToolType maps vbit→'flat' (never
+  'vee'), and _tipOffset returns 0 for vee (flat floor); the comment reserves "d·tan(halfAngle)". Build: 'vee' branch in
+  carveTipForToolType + _tipOffset (ρ·cot(halfAngle)) + a DEPTH-DRIVEN swept radius (the groove half-width = depth·
+  tan(halfAngle), not the fixed toolR) + thread the angle through carveSeg/carveStep/carveEndState → carveSegment.
+- (3) SIM TOOL CONE VISUAL: ALREADY renders — the sim tool is a LatheGeometry revolving toolHalfProfile's cone branch
+  (vbit/chamfer/engraver), driven by tool.angle. The ONLY gap: the tool TYPE+angle must REACH _simTool (the T#-path at
+  createPreviewPanel.js:512 + the text op drop type/angle → falls to a flat endmill). Route them through.
+- (4) TEXT PREVIEW: textView maps only dia/feed/plunge/rpm on pick (drops type/angle); route the picked tool's type+angle
+  into an __opTool (the userOpView.js:275 precedent) so the text carve + sim tool see the vee.
+- The SMOOTH live mesh (_buildSmoothCarveMesh displaces verts to the height field h[]) renders a V height field AUTOMATICALLY
+  — for the smooth mesh, a V is a PARAMETER change (feed it a V height field).
+
+STRUCTURAL (the GATE — the crisp/arc-snap end-state mesher):
+The crisp mesh (_buildCrispCarveMesh) hard-assumes a VERTICAL wall (the `curtain` quad shares XY at top+bottom) + a plan-
+view radius-r fillet (snapArc rounds the XY corner to r). A slanted V wall (top rim pushed outward by depth·tan(halfAngle))
+has NO representation, and snapArc has no cone analog (a real V corner is a cone-of-revolution intersection, not a circular
+fillet). The settled preview SWAPS to crisp (carveEndState/carveFinalize → _rebuildCarveMesh('crisp')), so a V renders
+correctly WHILE PLAYING (smooth) then FLATTENS on settle unless the crisp path changes. This is the "cone analog of the
+arc-snap" the dispatch flagged — STRUCTURAL, not a parameter tweak.
+
+THE GATE — how to render the SETTLED V (a structural fork; I recommend A):
+- OPTION A (recommended): the SMOOTH-MESH path — build all the non-structural parts above, and for a vee-CONTAINING carve
+  KEEP the settled preview on the SMOOTH mesh (which renders the V height field correctly) instead of swapping to crisp. A
+  conditional (a _carveHasVee flag), NOT a structural mesher change. The V renders correctly live AND settled + the sim
+  cone + the width assert (on the smooth mesh). CAVEAT: a MIXED flat+vee program keeps the flat regions smooth (slightly
+  less crisp) — acceptable for v1 (v-carve/engraving is usually all-vee); the caveat is logged, not hidden.
+- OPTION B: the CRISP CONE-ANALOG — replace the vertical `curtain` with a slanted cone quad (top rim out by depth·
+  tan(halfAngle)) + a cone-intersection corner replacing snapArc. Full crisp V for mixed programs. STRUCTURAL, heavy.
+- OPTION C: defer the settled V — the live smooth preview shows the V, the settled state is a documented flatten. Least
+  work, but the settled preview is wrong (dishonest for a "preview" feature). REJECT.
+
+I did NOT build the carve (a structural gate on the crisp mesher, per the dispatch's "gate back if structural"). Passing
+back for the A/B/C synthesis. The non-structural parts (tool angle, height-field vee, sim cone routing, text routing) are
+grounded + ready to build once the settled-V approach is chosen.
