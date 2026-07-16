@@ -4632,3 +4632,43 @@ THE GATE — how to render the SETTLED V (a structural fork; I recommend A):
 I did NOT build the carve (a structural gate on the crisp mesher, per the dispatch's "gate back if structural"). Passing
 back for the A/B/C synthesis. The non-structural parts (tool angle, height-field vee, sim cone routing, text routing) are
 grounded + ready to build once the settled-V approach is chosen.
+
+
+## 2026-07-16 (t875) — V-CARVE PREVIEW built (backlog item 10, Option A as ruled): a vee tool carves a real V cross-section.
+
+The gate ruled Option A: the crisp mesher SHARPENS vertical walls and a v-carve has NONE, so the SMOOTH mesh IS the correct
+settled render for a vee-containing carve (not a degrade); flat-only programs stay crisp. Preview-only — no emit touched.
+
+BUILD (all non-structural, per the ruling):
+- CARVE ENGINE (stockRemoval.js): carveTipForToolType now maps vbit/chamfer/engraver → 'vee'; carveSegment gained an
+  `angle` param → for a vee, the groove half-width r_eff = plunge-depth·tan(halfAngle) (capped at the shank r) drives the
+  coverage, and cutZ = tipZ + d·cot(halfAngle) is the CONE floor (rises from the tip). A cell where the cone is above the
+  stock top is skipped. FLAT/BALL are byte-identical (the vee branch is gated on tip==='vee'; the `cutZ>0` skip only fires
+  where there'd be no change anyway).
+- MESH CONDITIONAL (gcodeViz3d.js): carveEndState/carveFinalize rebuild `tip==='vee' ? 'smooth' : 'crisp'` — the vee stays
+  smooth (the V renders; no vertical wall to sharpen), flat/ball keep the crisp arc-snap path unchanged. The angle threads
+  through carveSeg/carveStep/carveEndState → carveSegment.
+- ANGLE PLUMBING (createPreviewPanel.js): _carveAngle tracked from the tool (veeAngleOf = tool.angle else a per-type
+  default 90/90/30), passed to carveStep/carveEndState; the tip label now reads "vbit (v-carve)" (was "as flat"); simTool
+  carries angle on the T#-path.
+- TOOL TABLE (settingsPanel.js): normalizeTool gained `angle`; the seed 60° V-Bit stores angle:60; a table Angle° column
+  (V-bit/chamfer/engraver rows get an editable cell, others a blank cell; colspan 11→12; the profile re-cuts on angle edit).
+  toolProfile already read tool.angle (per-type DEFAULT_ANGLE) — the atom just never supplied one.
+- ROUTING: userOpView _opTool carries angle; textView passes the picked tool (type+angle) as preview3D's 6th arg so an
+  engraving program previews the V (the text stack had no T#/host tool → fell to a flat endmill before).
+- The SIM TOOL CONE already renders (a LatheGeometry revolving toolHalfProfile's cone branch, driven by tool.angle) — it
+  just needed the type+angle to reach _simTool.
+
+VERIFIED (tests/vcarve-preview-875.spec.js, 5): the V width = 2·d·tan(halfAngle) at 3 depths × 2 angles on the captured
+height field (within ~2 cells, the AA edge) + the V floor centre = the tip depth; FLAT stays a flat floor / VEE is a V (the
+tip branch); MESH MODE vee→smooth + flat→crisp (both asserted); the tool-table Angle° column + the seed angle 60; the vee
+sim CONE + the text-engraving preview screenshots — VIEWED: the status reads "vbit (v-carve) Ø6" + the sim tool is a pointed
+cone; the text wizard previews with the 60° V-Bit.
+
+Deferred honestly (per the ruling): the mixed flat+vee program keeps the flat regions on the smooth mesh (slightly less
+crisp) — accepted for v1 (engraving is all-vee); the crisp cone-analog (a slanted curtain + a cone-corner) is the structural
+Option B, out of v1. A live TYPE change to vbit shows the Angle° cell on the next table render (the seed vbit shows it now).
+
+### GATE (w4) — VERBATIM: 1287 passed / 0 failed / 4 skipped (13.1m), playwright exit 0. CLEAN.
+Delta: t871 1282 + 5 new = 1287. NO flat-carve regression, NO golden change (preview-only, emits untouched). The gate's
+Option A ruling built + verified end-to-end.
