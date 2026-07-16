@@ -4310,3 +4310,73 @@ stays on the drawer for now"; that test's assertions are the Profiles deep-link 
 Baseline was 1270 passed; +5 new t863 tests = 1275, 0 regressions. box: msedge heavy (accumulated CPU) but w4 stayed
 0-flake this run. Committing ONLY the 4 owned files (libraryModal.js, macroBar.js, projectModal.js, the new spec); the
 dirty PNGs + HANDOFF.md + scratchpad/snippets.js are session-start/other and NOT mine.
+
+
+## 2026-07-16 (t865) — MINIMAP REMOVED, replaced by a preview PROGRESS BAR + an editor FOLLOW-EXECUTION toggle (ratified t862).
+
+### THE REMOVAL, clean (grep-asserted zero)
+
+The g-code minimap (not as good as VS Code's, not worth the polish debt; its only real value was the execution
+position) is fully gone. Deleted web/ui/gcodeMinimap.js + tests/gcode-minimap-810.spec.js (git rm). Removed: the app.js
+mount line, the panePrefs ddcs_minimap slot (get/set/onMinimapChange), the backup.js ddcs_minimap backup key, and the
+ENTIRE styles.css minimap block (the old 3538-3592: --gm-tab/--gm-flush/--gm-right vars, .has-minimap padding inset,
+.gcode-minimap / .gm-canvas / .gm-viewport / .gm-exec / .gm-toggle, the phone media rule, the .editor-copy-float z-index
+rider, AND the .has-minimap .viz3d-handle pull-tab left-shift). The pull-tab reverts to its BASE right:0 (pre-t812)
+automatically: the accommodation was gated on the .has-minimap class, which only gcodeMinimap.js ever added -> gone with
+it. Grep-asserted ZERO functional minimap tokens (.gcode-minimap / .gm- / has-minimap / ddcs_minimap / getMinimapOn /
+--gm- / initGcodeMinimap) across web/ + tests/; the only remaining "minimap" strings are explanatory comments about the
+removal. The editorManager.onActiveLine seam STAYS (its two comments reworded) - both replacements consume it.
+
+### (1) THE PREVIEW PROGRESS BAR - ONE SOURCE with the counter
+
+createPreviewPanel: added a thin <div class="pp-progress"><div class="pp-progress-fill"></div></div> inside the
+.pp-statusbar, beside the existing "Running line N/total" counter. setProgress(lineIndex) fills it from the SAME source
+the counter uses - the engine's current line index + engine.totalLines - hooked in the existing onLineChange callback
+(where lineIndex is already emitted); NO second state variable. Shown at play() start (empty), filled per line, hidden on
+stopPlay() + onFinish() (visible only while playing; a looped run re-shows it on its next line). CSS .pp-progress/.on/
+.pp-progress-fill next to the statusbar rule, accent fill, .08s width transition.
+
+### (2) THE EDITOR FOLLOW-EXECUTION TOGGLE - OFF by default, the no-jump rule intact
+
+New web/ui/followExec.js (mounted from app.js in place of the old minimap mount): a small floating ⤓ button in
+.editor-container (CSS .follow-toggle, mirrors the old .gm-toggle look, top:8px right:44px - a touch-target clear of the
+Copy button). It CONSUMES editorManager.onActiveLine (0-based index) and scrolls ONLY when the pref is ON:
+mgr._scrollToLine(idx) (the existing t838 helper - centres the line). A null idx (idle/stopped) is a no-op, so the strict
+no-jump-while-playing rule (setActiveLine deliberately never scrolls - UNTOUCHED) holds unchanged for everyone who does
+not opt in. Turning it ON mid-play jumps to the current line immediately (onFollowExecChange). Pref persists via a new
+panePrefs ddcs_follow_exec block (default FALSE - the load default inverted from the minimap's default-true), the display-
+pref family (localStorage, never the machine profile); added to the backup.js panePrefs key set in place of ddcs_minimap.
+
+### DECLARE-OR-HANDROLL
+
+The follow toggle is a DECLARED display pref (ddcs_follow_exec) mirroring the panePrefs family, not a hand-rolled flag.
+The progress bar reuses the ONE existing line-index source (no parallel tracker) - the same one-source discipline the
+minimap marker held (the seam outlived the map). followExec.js is a small self-contained consumer of the public seam.
+
+### VERIFIED (tests/minimap-replace-865.spec.js, 4 tests)
+
+1. minimap fully removed: no .gcode-minimap / .gm-toggle / .has-minimap DOM; the editor text layer padding-right < 40px
+   (full-width - the minimap added ~70px); the ⤓ .follow-toggle replacement is present.
+2. the progress bar renders + fills during play, ONE SOURCE with the counter: sampled mid-run (loop, waitForFunction), the
+   fill % equals the counter's N/total within 1.2% (same computation, same source); hidden after stop.
+3. the follow toggle: OFF -> a far running line (180) does NOT scroll the editor (no-jump holds); ON (real button click) ->
+   the editor jumps the running line into view (scrollTop > +200) and TRACKS a new near-top line back up; OFF again -> a
+   far line no longer moves it.
+4. screenshots 850px + desktop, idle + playing - VIEWED: editor full-width, no strip, ⤓ toggle top-right, the progress bar
+   filling in the preview status pill during play.
+
+Count delta reconciled EXACTLY: deleted minimap spec (8 tests) - new spec (4 tests) = -4; baseline 1275 -> 1271, no
+hidden test loss. No other spec depended on the removed pull-tab/padding/minimap (grep-checked).
+
+### GATE (w4) — VERBATIM: 1271 passed / 0 failed / 4 skipped (11.2m), playwright exit 0. CLEAN.
+Zero "failed"/"failure" markers anywhere in the log (checked the whole log, not the tail). box: msedge heavy but w4 held
+0-flake. NOTE: the wrapping bash command reported exit 1 - that was the trailing `grep -c` returning 1 on ZERO failure
+markers (the good outcome), not a test failure; GATE_EXIT=0 is the real playwright code.
+
+### LOOP HYGIENE (t865) — the split-brain that ate t863's pass-back is FIXED
+My prior turns ran handoff.py from the DDCS-Studio SUBDIR, forking a second HANDOFF.md + .handoff/ there; the advisor
+runs from the git ROOT, so my t863 pass-back landed in the fork and the advisor never saw it (it re-passed t863 as
+orphaned, then reviewed+accepted 14/14 off the shared git). ALL handoff.py/proc_health.py now run from the git root
+(c:/Users/danse/APPS/ddcs-studio-project). The reloaded worker skill now hard-refuses a subdir run + documents the ONE
+self-looping waiter. Stray fork artifacts (DDCS-Studio/HANDOFF.md, DDCS-Studio/.handoff/) remain on disk, harmless (the
+guard prevents reuse) - offered to the user to clean; not deleted without confirmation.
