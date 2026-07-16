@@ -718,6 +718,15 @@ export function createPreviewPanel(container, opts = {}) {
                 }
                 if (v.applyDisplay) v.applyDisplay();   // t738 — apply the ONE declared visibility registry across every element (after all the rebuilds)
             }
+            // t879 — the HONEST two-sided note: when the program declares a FLIP, the side-2 toolpaths render mirrored for
+            // free (the emit bakes the mirror into coordinates), but the SIM does not yet re-show the prior-setup carved stock
+            // flipped — that carry-over is a queued fast-follow (phase 3). Surfaced on the sim until then. Takes precedence
+            // over the carve tip note (the more important caveat); non-two-sided programs are untouched.
+            const flipNote = q('.pp-carve-note');
+            if (flipNote && compOps().some((b) => b && b.type === 'flip')) {
+                flipNote.textContent = 'Two-sided: side-2 toolpaths shown mirrored; the material carved in the prior setup is not yet re-shown flipped.';
+                flipNote.style.display = '';
+            }
         }
         const s = parsed.stats || {};
         setStatus(!s.drawable ? 'No drawable moves' : [s.feed && `${s.feed} cuts`, s.probe && `${s.probe} probes`, s.rapid && `${s.rapid} rapids`].filter(Boolean).join(' · '));

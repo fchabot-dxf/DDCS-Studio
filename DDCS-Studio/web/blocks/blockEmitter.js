@@ -25,8 +25,8 @@ import { firstRapidXY } from '../wizards/ops/entry.js';   // t726 P2b — THE ON
 import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { placeShiftFromParams } from '../wizards/ops/placement.js';
-import { translateProgram, rotateProgram } from '../data/rotateProgram.js';
-import { programRotation } from '../wizards/ops/transform.js';   // t736 — the DECLARED program-level rotation ({angle,pivotX,pivotY})
+import { translateProgram, rotateProgram, mirrorProgram } from '../data/rotateProgram.js';
+import { programRotation, flipForSetup } from '../wizards/ops/transform.js';   // t736 — the DECLARED program-level rotation ({angle,pivotX,pivotY}); t879 — the two-sided per-setup FLIP
 import { serialBump, serialInline, glyphLibrary } from '../wizards/serialEngrave.js';   // t764 — {SN} dynamic serial: bump + per-digit dispatch + the shared glyph library
 
 let _seq = 0;
@@ -145,7 +145,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;
     }
-    if (block.type === 'param_group' || block.type === 'guard' || block.type === 'section') {   // t130 — section is transparent (emit its children in order); guard is normally pruned pre-emit
+    if (block.type === 'param_group' || block.type === 'guard' || block.type === 'section' || block.type === 'setup') {   // t130 — section is transparent (emit its children in order); guard is normally pruned pre-emit; t879 — setup is the two-sided section derivative (transparent group; the per-setup mirror is applied at the emit choke point)
         const out = [];
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;
@@ -231,6 +231,8 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 
     if (def.kind === 'xform') return [];       // PROGRAM ROTATION (t736): a childless DECLARATION — emits nothing here; it's
                                                // applied ONCE over the whole program in emitMapped (applyProgramTransform).
+    if (def.kind === 'flip') return [];        // TWO-SIDED FLIP (t879): a childless DECLARATION — emits nothing here; the mirror
+                                               // is applied to the named setup's line range in emitMapped (applySetupFlips).
     if (def.kind === 'entry') return [];       // ENTRY POINT (t726 P2b): a childless MARKER — emits nothing here. The waypoint
                                                // is applied ONCE over the whole program in emitMapped (applyEntryWaypoint), so the
                                                // marker sits as a sibling (no body-index shift → the goldens' positional bindings hold).
@@ -301,6 +303,7 @@ export function emitMapped(blocks, settings = {}) {
     const T = [];
     const opRanges = [];                  // t772 P2 — each top-level block = one op; record its [start,end) line range as emitted
     (blocks || []).forEach((b) => { const s = T.length; T.push(...emit(b, 0, 0, [], scope, dialect)); opRanges.push([s, T.length]); });
+    applySetupFlips(T, opRanges, blocks, settings);   // t879 — the two-sided FLIP: mirror each setup-section's own line range (BEFORE tool/entry insert, so opRanges is fresh; mirrorProgram is 1:1 so ranges stay valid). No setup+flip → byte-identical.
     applyToolChanges(T, opRanges, dialect);   // t772 P2 — the DECLARED tool change: per op range, read its @TOOL marker, track the loaded tool, inject the arm (ATC/manual/none) ONLY on a difference. No tool declared → byte-identical.
     applyEntryWaypoint(T, blocks);        // t726 P2b — the DECLARED mill entry point: route the opening rapid through it (no-op unless it moves the cut entry)
     applyProgramTransform(T, blocks);     // t736 — the DECLARED program rotation: rotate the whole emitted program about the pivot (AFTER the entry so that move rotates too; 0°/none → byte-identical)
@@ -343,6 +346,26 @@ function applyProgramTransform(T, blocks) {
     if (!angle) return;   // 0° / none → the emit is byte-identical to the un-rotated program
     const rotated = rotateProgram(T.map((t) => t.line).join('\n'), angle, pivotX, pivotY).text.split('\n');
     for (let i = 0; i < T.length && i < rotated.length; i++) T[i].line = rotated[i];
+}
+
+/** t879 — THE TWO-SIDED FLIP: each top-level `setup` block whose section declares a `flip` child gets its OWN emitted
+ *  line range mirrored about the flip axis (data/mirrorProgram, using the declared stock span + thickness). SCOPED per
+ *  setup (unlike the whole-program applyProgramTransform) so setup 1 stays put and only setup 2+ mirrors. mirrorProgram is
+ *  a 1:1 line map, so opRanges (computed just above, pre tool/entry insert) stays valid. No setup / no flip → byte-identical. */
+function applySetupFlips(T, opRanges, blocks, settings) {
+    const stock = (settings && settings.stock) || {};
+    (blocks || []).forEach((b, i) => {
+        if (!b || b.type !== 'setup') return;
+        const flip = flipForSetup(blocks, Number((b.params || {}).index));   // the flip sibling that names THIS setup index
+        if (!flip || !flip.params) return;
+        const axis = flip.params.axis || 'X';
+        const [s, e] = opRanges[i] || [];
+        if (s == null || e <= s) return;                          // an empty setup → nothing to mirror
+        const seg = [];
+        for (let k = s; k < e; k++) seg.push(T[k].line);
+        const out = mirrorProgram(seg.join('\n'), axis, stock.x, stock.y, stock.z).text.split('\n');
+        for (let k = s; k < e && (k - s) < out.length; k++) T[k].line = out[k - s];   // rewrite in place (length-preserving)
+    });
 }
 
 /** t772 P2 — parse a `( @TOOL n )` marker (the toolsel block emits one per op that declares a tool). */

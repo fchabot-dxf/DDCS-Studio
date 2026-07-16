@@ -13,7 +13,7 @@ import { emitMapped } from './blockEmitter.js';
 import { reconcileGcodeToStack, parseGcodeToStack } from './gcodeToStack.js';
 import { markerLine, isMarker, parseMarker } from './opSchema.js';
 import { builderOf, makeOp, _builderAtoms, opLabelOf } from './opBuilders.js';   // codec: rebuild ops from markers (declare, never infer)
-import { makeXform, makeEntry } from './programFraming.js';   // t812 — reconstruct the program-level declarations from the prog marker
+import { makeXform, makeEntry, makeFlip } from './programFraming.js';   // t812 — reconstruct the program-level declarations from the prog marker; t879 — the two-sided flip
 import { defVOf } from './userOps.js';   // N1 — the declared per-def version stamp (marker stamp + import staleness lookup)
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
@@ -123,6 +123,8 @@ function progMarkerLine() {
     if (xf && xf.params && Number(xf.params.angle)) { rec.angle = Number(xf.params.angle); rec.pivotX = Number(xf.params.pivotX) || 0; rec.pivotY = Number(xf.params.pivotY) || 0; }
     const en = (stack || []).find((b) => b && b.type === 'entry');
     if (en && en.params) { const ex = parseFloat(en.params.entryX), ey = parseFloat(en.params.entryY); if (Number.isFinite(ex) && Number.isFinite(ey)) { rec.entryX = ex; rec.entryY = ey; } }
+    const fl = (stack || []).find((b) => b && b.type === 'flip' && (b.params || {}).axis && Number((b.params || {}).setup));   // t879 — the two-sided flip declaration
+    if (fl && fl.params) { rec.flipAxis = String(fl.params.axis).toUpperCase() === 'Y' ? 'Y' : 'X'; rec.flipSetup = Number(fl.params.setup); }
     return Object.keys(rec).length ? markerLine(PROG_KEY, rec) : null;
 }
 /** Reconstruct the program-level sibling blocks from a parsed `prog` marker's params (the inverse of progMarkerLine). */
@@ -131,6 +133,7 @@ function progBlocksFromMarker(p) {
     if (Number(p.angle)) blocks.push(makeXform({ angle: Number(p.angle), pivotX: Number(p.pivotX) || 0, pivotY: Number(p.pivotY) || 0 }));
     const ex = parseFloat(p.entryX), ey = parseFloat(p.entryY);
     if (Number.isFinite(ex) && Number.isFinite(ey)) blocks.push(makeEntry({ entryX: ex, entryY: ey }));
+    if (p.flipAxis && Number(p.flipSetup)) blocks.push(makeFlip({ axis: String(p.flipAxis), setup: Number(p.flipSetup) }));   // t879
     return blocks;
 }
 

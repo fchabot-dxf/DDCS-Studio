@@ -25,6 +25,7 @@ import { checkEnvelope, placementDeclared } from '../engine/envelopeCheck.js';
 import { wcsOffsetAt } from '../viz/sceneFrame.js';
 import * as ProfLib from '../data/profileLibrary.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
+import { flipForSetup } from '../wizards/ops/transform.js';   // t879 — the two-sided FLIP declaration (per-setup page + instruction)
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmtN = (v) => { const n = Number(v); return Number.isFinite(n) ? String(Math.round(n * 1000) / 1000) : String(v == null ? '' : v); };
@@ -99,12 +100,61 @@ function opTime(op, est) {
     } catch (_) { return null; }
 }
 
+// t879 — TWO-SIDED SETUP GROUPS. Ops nest inside `setup` containers; collect the op blocks (recursively — an op may sit
+// directly under a setup or deeper). No `setup` blocks → null (the single-page path stays byte-identical).
+function collectOps(blocks, out) {
+    for (const b of (blocks || [])) {
+        if (!b) continue;
+        if (b.type === 'op') out.push(b);
+        if (b.children) collectOps(b.children, out);
+    }
+    return out;
+}
+function setupGroups(raw) {
+    const setups = (raw || []).filter((b) => b && b.type === 'setup');
+    if (!setups.length) return null;   // no two-sided structure → the classic single Operations section
+    return setups.map((s) => ({
+        title: (s.params && s.params.title) || 'Setup',
+        index: Number((s.params && s.params.index) || 0),
+        ops: collectOps(s.children || [], []),
+        flip: flipForSetup(raw, Number((s.params && s.params.index) || 0)),
+    }));
+}
+// The flip INSTRUCTION for a setup, stated from the declaration (plain wording, taste-level pending the user). Carries the
+// HONEST carve note (t879 phase 1): the toolpaths render mirrored for free, but the SIM does not yet flip the carved stock
+// from the prior setup — that carry-over is a queued fast-follow (phase 3).
+function flipInstruction(flip) {
+    const axis = (flip && flip.params && String(flip.params.axis).toUpperCase() === 'Y') ? 'Y' : 'X';
+    const about = axis === 'X' ? 'the X axis (front ↔ back)' : 'the Y axis (left ↔ right)';
+    return `<div class="ss-row ss-flip"><b>Flip the part about ${about}.</b> Keep the registered edge against the fence, then re-zero (or probe) the new top face as this setup's WCS.</div>`
+        + `<div class="ss-row ss-muted ss-flip-note">Preview note: the side-2 toolpaths are shown mirrored, but the material carved in the prior setup is not yet re-shown flipped (coming next).</div>`;
+}
+// The Operations table for a set of ops (shared by the single-page + per-setup paths). Returns the table + its subtotal.
+function opsTable(ops, est) {
+    if (!ops.length) return `<div class="ss-row ss-undeclared">No operations in this setup.</div>`;
+    const rows = ops.map((op, i) => {
+        const secs = opTime(op, est);
+        return `<tr><td>${i + 1}</td><td>${esc(op.label || op.opType || 'op')}</td><td>${esc(opKeyParams(op))}</td><td>${secs != null ? esc(fmtDuration(secs)) : '—'}</td></tr>`;
+    }).join('');
+    return `<table class="ss-table"><thead><tr><th>#</th><th>Operation</th><th>Key params</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+// t879 — the per-setup time split (the estimate splits for free: sum each setup's own ops). null with no setup structure.
+export function setupTimeSplit() {
+    const raw = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+    const groups = setupGroups(raw);
+    if (!groups) return null;
+    const est = (window.ddcsTimeEstimate && window.ddcsTimeEstimate()) || null;
+    return groups.map((g) => ({ index: g.index, title: g.title, seconds: g.ops.reduce((a, op) => a + (opTime(op, est) || 0), 0) }));
+}
+
 /** Build the print-ready sheet's inner HTML, reading every value from its declared source. */
 export function buildSheetHTML() {
     const S = (window.ddcsGetSettings && window.ddcsGetSettings()) || {};
     const machine = S.machine || {};
     const stock = S.stock;
-    const ops = ((window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || []).filter((b) => b && b.type === 'op');
+    const raw = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+    const groups = setupGroups(raw);   // t879 — per-setup pages when the stack declares setup boundaries; else null (single page)
+    const ops = groups ? groups.flatMap((g) => g.ops) : raw.filter((b) => b && b.type === 'op');   // all ops → Tools + the whole-program estimate
     const editor = document.getElementById('editor');
     const prog = editor ? editor.value : '';
     let est = (window.ddcsTimeEstimate && window.ddcsTimeEstimate()) || null;
@@ -144,14 +194,24 @@ export function buildSheetHTML() {
           ).join('') + `</tbody></table>`
         : `<div class="ss-row ss-undeclared">No tools referenced by the program.</div>`;
 
-    // OPERATIONS — order, name, key params, time.
-    const opsHTML = ops.length
-        ? `<table class="ss-table"><thead><tr><th>#</th><th>Operation</th><th>Key params</th><th>Time</th></tr></thead><tbody>`
-          + ops.map((op, i) => {
-              const secs = opTime(op, est);
-              return `<tr><td>${i + 1}</td><td>${esc(op.label || op.opType || 'op')}</td><td>${esc(opKeyParams(op))}</td><td>${secs != null ? esc(fmtDuration(secs)) : '—'}</td></tr>`;
-          }).join('') + `</tbody></table>`
-        : `<div class="ss-row ss-undeclared">No operations in the program.</div>`;
+    // OPERATIONS — order, name, key params, time. t879: when the stack declares setups, render ONE section per setup
+    // (a page break between them), each stating its flip instruction + its own time subtotal. No setups → the classic
+    // single Operations section (byte-identical to a pre-t879 program).
+    let opsSection;
+    if (groups) {
+        opsSection = groups.map((g, gi) => {
+            const secs = g.ops.reduce((a, op) => a + (opTime(op, est) || 0), 0);
+            return `<section class="ss-setup"${gi > 0 ? ' style="page-break-before:always"' : ''}>`
+                + `<h3>${esc(g.title)}${g.index ? ' <span class="ss-muted">· setup ' + g.index + '</span>' : ''}</h3>`
+                + (g.flip ? flipInstruction(g.flip) : '')
+                + opsTable(g.ops, est)
+                + `<div class="ss-row ss-muted">Setup run time: ${secs > 0 ? esc(fmtDuration(secs)) : '—'}</div>`
+                + `</section>`;
+        }).join('');
+    } else {
+        const opsHTML = ops.length ? opsTable(ops, est) : `<div class="ss-row ss-undeclared">No operations in the program.</div>`;
+        opsSection = `<section><h3>Operations</h3>${opsHTML}</section>`;
+    }
 
     // FOOTER — total time, the pre-flight verdict state, the safe-Z margin.
     const total = (est && est.seconds) ? fmtDuration(est.seconds) : '—';
@@ -169,7 +229,7 @@ export function buildSheetHTML() {
         + `<section><h3>Stock</h3>${stockHTML}</section>`
         + `<section><h3>Work coordinate system</h3>${wcsHTML}</section>`
         + `<section><h3>Tools</h3>${toolsHTML}</section>`
-        + `<section><h3>Operations</h3>${opsHTML}</section>`
+        + opsSection
         + footHTML;
 }
 

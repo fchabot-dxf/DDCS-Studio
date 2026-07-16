@@ -27,3 +27,33 @@ export function programRotation(stack) {
     const p = (findProgramXform(stack) || {}).params || {};
     return { angle: Number(p.angle) || 0, pivotX: Number(p.pivotX) || 0, pivotY: Number(p.pivotY) || 0 };
 }
+
+/**
+ * t879 - TWO-SIDED JOBS (backlog item 11, phase 1). A `setup` boundary groups the ops of ONE machine setup (side 1 /
+ * side 2 / ...) - a `section` derivative (titled, transparent emit, so wrapping ops in it is byte-transparent) carrying
+ * a setup INDEX. A `flip` sibling declared INSIDE a setup-2+ boundary is the FLIP: a flat childless declaration modeled
+ * EXACTLY on xform (emits nothing itself) carrying {axis: X|Y}. The emit BAKES the mirror into that setup's coordinates
+ * (blockEmitter.applySetupFlips, SCOPED to the section's line range) via data/mirrorProgram - the Z-invert reads the
+ * declared stock thickness. No setup with a flip -> byte-identical (goldens untouched). Round-trips through Blocks (the
+ * generic fields path) + save/load (rides the stack) exactly as xform does.
+ */
+export const setupBlock = {
+    type: 'setup', label: 'Setup', kind: 'setup', category: 'Transforms',
+    defaults: { title: 'Setup', index: 1 },
+    fields: ['title', 'index'],
+    emit: (params, children) => children || [],   // transparent group; the mirror is applied at the emit choke point, not here
+};
+
+export const flipBlock = {
+    type: 'flip', label: 'Flip part (2nd setup)', kind: 'flip', category: 'Transforms',
+    defaults: { axis: 'X', setup: 2 },
+    fields: ['axis', 'setup'],   // axis = flip about X|Y (user's taste, parked); setup = which setup index this flip applies to
+};
+
+/** The FLIP declaration for a given setup INDEX: a flat top-level `flip` sibling whose `setup` matches (modeled on xform's
+ *  top-level sibling; the LAST wins if several). null when that setup declares no flip -> that setup is not mirrored. */
+export function flipForSetup(stack, index) {
+    let f = null;
+    (stack || []).forEach((b) => { if (b && b.type === 'flip' && Number((b.params || {}).setup) === Number(index)) f = b; });
+    return f;
+}

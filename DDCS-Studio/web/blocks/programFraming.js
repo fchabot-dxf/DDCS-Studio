@@ -63,6 +63,15 @@ export function makeEntry(params = {}) {
     return b;
 }
 
+/** t879 — the TWO-SIDED FLIP as a flat childless `flip` sibling carrying {axis, setup}. Emits nothing itself;
+ *  blockEmitter.applySetupFlips mirrors the named setup's own line range. Mirror of makeXform — used to RECONSTRUCT the
+ *  flip declaration from its .nc prog marker (the setup containers themselves round-trip via .mjson). See ops/transform.js. */
+export function makeFlip(params = {}) {
+    const b = newBlock('flip');
+    b.params = { axis: String(params.axis || 'X').toUpperCase() === 'Y' ? 'Y' : 'X', setup: num(params.setup, 2) };
+    return b;
+}
+
 /** Program End from wizard params: the configured end-of-program routine. */
 export function makeEnd(params = {}) {
     const ep = params.endProgram || {};

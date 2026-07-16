@@ -64,6 +64,42 @@ export function rotateProgram(gcode, angleDeg, px = 0, py = 0) {
  * @param {string} gcode @param {number} [dx=0] @param {number} [dy=0] @param {number} [dz=0]
  * @returns {{ text:string, hadIncremental:boolean, moved:number }}
  */
+/**
+ * t879 - MIRROR a program's geometry for a two-sided FLIP (the second setup). Flipping the part about the X axis
+ * reflects Y (front/back); about the Y axis reflects X (left/right). The reflection is about the STOCK span
+ * (Y'=sy-Y / X'=sx-X) so the part stays in its footprint (re-registered to the same corner). Cut geometry (Z<=0)
+ * inverts through the stock thickness (Z'=-(Z+sz)) - a bottom feature authored in the design frame lands under the
+ * new top; clearance/positioning moves (Z>0) stay above the part. An arc mirror REVERSES handedness (G2<->G3) and
+ * flips the reflected centre offset. G91 incremental + G53 machine-coord moves are left alone. Pure; the SIM renders
+ * it for free (the mirror is baked into the coordinates - the xform-rotate precedent).
+ * @param {string} gcode @param {'X'|'Y'} axis  the flip axis @param {number} sx @param {number} sy  stock span
+ * @param {number} sz  stock thickness (the Z-invert reference)
+ * @returns {{ text:string, mirrored:number }}
+ */
+export function mirrorProgram(gcode, axis, sx = 0, sy = 0, sz = 0) {
+    const isX = String(axis || 'X').toUpperCase() === 'X';   // flip ABOUT X -> reflect Y; flip ABOUT Y -> reflect X
+    sx = Number(sx) || 0; sy = Number(sy) || 0; sz = Number(sz) || 0;
+    let abs = true, mirrored = 0;
+    const out = String(gcode == null ? '' : gcode).split(/\r?\n/).map((raw) => {
+        if (/\bG91\b/.test(raw)) abs = false;
+        if (/\bG90\b/.test(raw)) abs = true;
+        if (!abs || /\bG53\b/.test(raw)) return raw;   // incremental / machine-coord: a mirror doesn't apply
+        let line = raw;
+        const X = numAfter(raw, 'X'), Y = numAfter(raw, 'Y'), Z = numAfter(raw, 'Z'), I = numAfter(raw, 'I'), J = numAfter(raw, 'J');
+        if (isX) { if (Y) { line = line.replace(Y.token, 'Y' + r3(sy - Y.val)); mirrored += 1; } }
+        else { if (X) { line = line.replace(X.token, 'X' + r3(sx - X.val)); mirrored += 1; } }
+        if (Z && Z.val <= 1e-9) line = line.replace(Z.token, 'Z' + r3(-(Z.val + sz)));   // Z-invert the CUT geometry (clearance Z>0 stays above)
+        if (/\bG0?[23]\b/.test(line)) {   // an arc: a mirror reverses handedness + flips the reflected centre offset
+            if (isX && J) line = line.replace(J.token, 'J' + r3(-J.val));
+            if (!isX && I) line = line.replace(I.token, 'I' + r3(-I.val));
+            if (/\bG0?2\b/.test(line)) line = line.replace(/\bG0?2\b/, 'G3');   // G2->G3 (a mirror reverses arc handedness)
+            else line = line.replace(/\bG0?3\b/, 'G2');
+        }
+        return line;
+    });
+    return { text: out.join('\n'), mirrored };
+}
+
 export function translateProgram(gcode, dx = 0, dy = 0, dz = 0) {
     dx = Number(dx) || 0; dy = Number(dy) || 0; dz = Number(dz) || 0;
     let abs = true, hadIncremental = false, moved = 0;
