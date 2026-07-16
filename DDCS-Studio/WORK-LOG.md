@@ -4486,3 +4486,103 @@ feeds/speeds or the preview chip (it's pane-reflow animation timing). The box is
 effectively GREEN modulo the known environmental flake. Everything I touched — feeds & speeds (5), the chip rider + the
 transient fix, io-sim (8) — is green. Delta: t867 feeds-only gate 1276 passed; the rider added +1 test (chip) and the
 transient fix kept io-sim green; net 1276 passed (the +1 offsets the flaked collapsible-pane in the passed count).
+
+
+## 2026-07-16 (t869) — REST MACHINING (backlog item 9): GROUNDED → a STRUCTURAL GATE (passed back). + the panes-752 flake fix DONE.
+
+### THE STANDING RIDER — collapsible-panes-752:130 flake FIXED (a real readiness signal)
+
+The worst load-flake (it red-flagged my gate again t867). Root cause (grounded): after the correct data-collapsed attr-wait,
+a fixed `waitForTimeout(400)` RACED the reflow — data-collapsed flips at the START of the animation (paneAccordion.js:74),
+so the 400ms window could expire mid-reflow on a loaded box and boundingBox() sampled a still-growing pane. FIX: replaced
+BOTH timeouts (spec :142, :153) with a layout-stable `waitForFunction` that gates on the actual SETTLE — the collapsed pane
+folded to the strip (data-collapsed==='1' && height<=28, the .wiz-pane-body height transition complete) AND the surviving
+pane grew (>baseline+100). Keys off the SAME height-settle the assertions check; the sibling mobile test at :53 already uses
+this pattern. Robust under a loaded box + reduced-motion (no transitionend attach race, no timing window). PROVEN on the
+LOADED box (heavy msedge): the :130 test 3x consecutive single-worker GREEN + the full file 2x at workers=4 (concurrent
+boots = the flake's contention) 8/8 GREEN. Test-only change; the fix is deterministic by construction, not re-tried.
+
+### REST MACHINING — GROUNDED, it is STRUCTURAL → GATE (options below, awaiting the advisor synthesis)
+
+Grounding (2 Explore agents over the clearing kernel): the pocket clear is `concentricRings(region, step)` (contour.js:46)
+walking `offsetRegion(rg, -step)` (contour.js:19) — an ANALYTIC per-shape offset (circle/rect/polygon/ellipse ONLY; no
+arbitrary point-list polygon), reading only `contour[0]` (a single simply-connected ring) and finishing with a drag-to-
+centre (assumes a solid core). `regionInradius` (t802) is analytic-only. The t814 arc-corner math (snapArc, gcodeViz3d.js)
+is VIZ-MESH only — NOT a toolpath/region. There is NO boolean-difference / polygon-clip / Minkowski routine ANYWHERE.
+
+VERDICT (the dispatch's gate question): the concentric kernel CANNOT clear a bounded corner/annular rest region as-is.
+The rest region = (pocket cleared by r2) minus (pocket cleared by r1) = the corner slivers between the two fillet radii
+(rect/polygon have real corners; circle/ellipse are smooth → ~no rest). Clearing it needs new geometry. The ONE reusable
+primitive: `scanlineFill(contours, step)` (clearing.js:108) does NON-ZERO-WINDING raster + already handles HOLES from
+MULTIPLE contours — so a rest region expressed as [r2-cleared-ring (outer), r1-cleared-ring (inner hole)] rasters the
+corner slivers WITHOUT a boolean engine (the straight walls coincide → only the corners fall between the rings).
+
+THE GATE — how to CONSTRUCT + CLEAR the rest region (a structural fork; I recommend A):
+- OPTION A (recommended): an analytic CLEARED-REGION-RING builder (the design boundary with each interior corner rounded
+  to a fillet arc of radius r — per shape, extending the existing analytic offset) → build the r1-ring + r2-ring → hand
+  [r2ring, r1ring] to the EXISTING scanlineFill (non-zero winding rasters the corner-slivers annulus). NO new boolean/
+  offset engine; reuses the one hole-capable primitive. Handles rect + polygon; circle/ellipse → coincident rings → no
+  rest (honest). Bounded machinery = the ring builder only.
+- OPTION B: PER-CORNER analytic clearing — at each interior corner compute the sliver (corner angle + r1 + r2) and emit a
+  small r2 tracing path. Most surgical, no scanlineFill, but a bespoke per-corner path generator; more code per shape.
+- OPTION C: a general polygon-clipping library (Clipper-style offset + boolean) — full general rest machining. Over-scoped
+  for v1; rule-of-three says don't build the engine until a 3rd case forces it. REJECT for v1.
+
+Shared v1 wiring once the approach is chosen (grounded, ready): a `restTool` (2nd tool-table row via the picker) +
+`restStepover` optional pocket declaration → an appended rest fill-leaf in pocketStack kids (pocketWizard.js:108) reading
+the rest region at the pocketfill.js:50 seam (entry per t804, retract per the standing G53 policy); UNSET = byte-identical
+(bindingless, no leaf appended). Preview: push rest `paths` with a new `cls` (e.g. fc-rest) in pocketPreviewGeometry
+(pocketData.js:169). Estimate + setup sheet pick up the 2nd tool for free. HONESTY: r2 >= r1 greys the field.
+
+I did NOT build the rest kernel (a structural gate, per the dispatch). Passing back for the A/B/C synthesis.
+
+
+## 2026-07-16 (t871) — REST MACHINING v1 (backlog item 9, Option A as ruled): a smaller 2nd tool clears the pocket corners.
+
+### THE GEOMETRY (new web/wizards/ops/restmachining.js) — Option A, no new boolean engine
+
+A round tool of radius r leaves a fillet r at each interior pocket corner; the REST = the corner slivers between the r1
+and r2 fillets. `clearedRegionRing(designRg, r)` builds the design boundary with each corner ROUNDED to a fillet arc of r
+(rounded-rect for rect, per-vertex fillet arcs for a convex polygon; null for circle/ellipse — no corners). `restRegion`
+returns [r2-ring (outer), r1-ring (reversed inner hole)] — the corner slivers (the coincident straight walls cancel under
+scanlineFill's non-zero winding; only corners carry area) + the corner COUNT + the per-corner sliver-area class
+((1−π/4)(r1²−r2²) at a right angle). ZERO new machinery beyond the ring builder — reuses the existing scanlineFill.
+
+THE TOOLPATH (`restLevelMoves`): the naive raster of the sliver MATERIAL gouged (the slivers sit OUTSIDE the inset-r2
+tool-centre region — the tool clears them with its EDGE from inset-r2, verified: 0 safe moves). FIX: raster the inset-r2
+MINUS inset-r1 tool-centre frame (offsetRegion, analytic), MASKED to within ~1.15·r1 of a corner (so it's the CORNERS, not
+a wall band), fillLevelMoves lifting to clearance between the disconnected corners (the safe-height retract between
+corners). Verified: rect → all moves near the 4 corners, retracts between; hex → 6; circle → 0.
+
+### THE WIRING — pocketrest leaf + the twin, byte-identical when unset
+
+pocketRestBlock (kind:'leaf', loops its OWN depth levels so the pocket keeps its ONE StepDown — a 2nd stepdown collided
+the depth binding). pocketStack appends the rest section (a static marker comment + the rest leaf) INSIDE the main clear's
+ONE placeonstock (a 2nd place collided the placement bindings) when restValid (a smaller tool on a cornered shape). The
+twin (pocketData): _rest derived guard + CANONICAL_BIND._rest so the leaf derives; restTool (a toolpick picker filling
+restDia — generalised toolPickWidget with widgetConfig.fill) + restDia + restStepover STRUCT bindings; postInstantiate
+rewrites ALL the rest leaf's params from the resolved op (ONE source, no 16 fan-out bindings). UNSET (restDia 0) or a
+smooth shape → the rest section is ABSENT → byte-identical (node + twin verified).
+
+### PREVIEW · GREYING · SETUP SHEET · ESTIMATE
+- 2D layout: pocketPreviewGeometry pushes the r1/r2 opening rings as fc-rest paths (a distinct amber, styles.css) — the
+  corner slivers drawn distinctly.
+- GREYING: the rest fields grey (disabled + data-op-gated + the honest smooth-walls tip) on circle/ellipse via a `gate`
+  (whenOk `in` — the declarative gate can't express the r2≥r1 param-compare / OR; that case is caught at emit + the
+  declared restGreyReason). r2 ≥ r1 → restValid false → no emit + restGreyReason names the smaller-tool rule.
+- SETUP SHEET: toolList now adds the rest (2nd) tool for free (resolveOpTool on restTool/restDia).
+- ESTIMATE: the rest pass adds cut moves → the run-time estimate (derived from the emit) grows (asserted).
+
+### VERIFIED (tests/rest-machining-871.spec.js, 5) + the panes-flake rider (committed e2d7735 earlier this turn)
+1. GEOMETRY: rect 4 / hex 6 corners; the right-angle sliver = (1−π/4)(r1²−r2²); circle/ellipse null.
+2. GREY-with-why: r2≥r1 + circle/ellipse restGreyReason; restValid flags.
+3. BYTE-IDENTITY: the pocket twin emit unchanged unset; the rest section appears + grows when set; circle no-rest.
+4. FORM+PREVIEW: the rest picker + Ø render; a set rest tool draws fc-rest slivers (screenshot VIEWED).
+5. GREYING (circle → restDia disabled + gated + why-tip) + ESTIMATE (cut moves grow).
+
+Rest-of-rest (a 3rd tool) is OUT of v1 (per the ruling). Deferred honestly: the r2≥r1 VISUAL grey (the declarative gate
+can't param-compare; caught at emit + the declared reason); ramp/helix entry for the tiny corner slivers (plunge only).
+
+### GATE (w4) — VERBATIM: 1282 passed / 0 failed / 4 skipped (11.5m), playwright exit 0. CLEAN.
+Delta: t869 1277 + 5 new = 1282. NO pocket-golden or twin regression (byte-identity held across the suite). panes-752
+stayed green (the rider fix holds in-suite). The advisor's gate ruling (Option A) built + verified end-to-end.
