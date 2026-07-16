@@ -4672,3 +4672,75 @@ Option B, out of v1. A live TYPE change to vbit shows the Angle° cell on the ne
 ### GATE (w4) — VERBATIM: 1287 passed / 0 failed / 4 skipped (13.1m), playwright exit 0. CLEAN.
 Delta: t871 1282 + 5 new = 1287. NO flat-carve regression, NO golden change (preview-only, emits untouched). The gate's
 Option A ruling built + verified end-to-end.
+
+
+## 2026-07-16 (t877) — TWO-SIDED JOBS (backlog item 11): GROUND + DESIGN GATE (no build; docs only).
+
+Grounded the six seams a flip-the-part model composes (all SINGLE-setup by construction today; each names its attach point):
+- WCS TABLE (settingsPanel.js:89 machine.wcs {active, table[6]{x,y,z}}; sceneFrame.js:66/78): ONE active pointer + 6 rows
+  (G54-G59). An op selects a WCS via a `sys` param → the wcszero atom (wcsData.js:15, wcszero.js) — it SELECTS/zeroes in
+  G-code, never writes a row. Per-setup: a convention (Setup 1→G54, Setup 2→G55) + a per-setup active selection. EXTEND.
+- STOCK/WORKPIECE (settingsPanel.js:85 stock{x,y,z,shape,datum,pin,features[]}; workpiece.js:90 projectWorkpiece): one
+  flat block + features[] (shape×side inside/outside). datum = a 3-char [X][Y][Z] code (nnp = front-left/top-Z) — a
+  Z-datum EXISTS. NO flip/side flag (grep mirror|flip = zero geometry hits). EXTEND (a per-feature face tag OR a datum flip).
+- PROGRAM STACK (programModel.js:21 flat op list; blockEmitter.js:297 emit in order): THREE grouping constructs exist —
+  `section` (userRoot.js:39, a TITLED TRANSPARENT-EMIT nestable container, the closest to a Setup boundary), param_group,
+  group. The structural boundary EXISTS (section, byte-transparent); no setup SEMANTICS attach yet. EXTEND on `section`.
+- XFORM (transform.js:12 xform{angle,pivotX,pivotY}; blockEmitter.js:341 applyProgramTransform at ONE choke point;
+  programModel.js:120 the `prog` marker slot): program-level ROTATE only. NO mirror/flip. A flip = a new childless sibling
+  `flip{axis,pivot}` at the SAME choke point + the SAME prog marker slot — the pattern is right there. EXTEND (add a mirror).
+- SETUP SHEET (setupSheet.js:103, sections at :169-173): ONE page, fixed sections, the single ACTIVE WCS, a flat ops table.
+  EXTEND (loop per setup: Stock+WCS+Ops per side + a flip/re-zero row).
+- PRE-FLIGHT (envelopeCheck.js:33/41): ONE trace, ONE wcsOffsetAt(active), whole program. The blocks exist (wcsOffsetAt
+  takes any idx; traceToolpath is line-numbered → sliceable) but no per-setup loop. EXTEND (per-segment WCS+flip frames).
+
+### THE DESIGN QUESTIONS (named honestly)
+Q1 — is a SETUP a DECLARED boundary in ONE stack (ops grouped under Setup 1 / Setup 2) or TWO linked programs?
+Q2 — how is the FLIP declared: the axis (flip-about-X = rotate 180° about X → Y mirrors + Z inverts; vs flip-about-Y) +
+     the REGISTRATION edge (which edge stays against the fence/pins → the side-2 origin) + optional registration pins?
+Q3 — does side 2 get its own WCS ROW by declaration (G55), and does the sheet/emit say "flip the part about <axis>, keep
+     <edge> registered, RE-ZERO or PROBE G55"?
+Q4 — what does the SIM show at the flip: the stock MIRRORS (the flip transform on the stock model) + the carve state
+     CARRIES OVER flipped (side-1 cuts appear on the now-flipped stock)?
+
+### THE FLOW (Option A shape)
+    [ Setup 1: ops in G54, top-Z datum ]
+              │  emit: M0 + "( SETUP 2 — flip about X, keep -X edge registered, re-zero/probe G55 )"
+              ▼  (SIM: stock flips about X, side-1 carve carries over)
+    [ Setup 2: ops in G55, the flipped frame ]  ← a program-level flip sibling scoped to the Setup-2 section
+
+### OPTIONS (my lean: A)
+OPTION A (LEAN) — ONE stack, a declared `setup` boundary + a program-level flip sibling (the north-star composition).
+  A `setup` block (a `section` derivative, Seam 3) groups the ops per side; each setup declares a WCS selection (Seam 1:
+  Setup 1→G54, Setup 2→G55) + (side 2) a FLIP declaration {axis, registration edge}. The FLIP is a new childless sibling
+  `flip{axis, pivot}` (Seam 4, modeled EXACTLY on xform: same emit choke point, same prog marker slot) — mirror one axis
+  about the pivot + Z-invert — SCOPED to the Setup-2 section (the one real extension past xform, which is whole-program).
+  The emit inserts a flip pause + instruction between setups. The setup sheet (Seam 5) + preflight (Seam 6) LOOP the
+  sections, each in its own wcsOffsetAt(idx) frame + flip. The sim flips the stock + carries the carve. A single-setup
+  program (no Setup 2) → no boundary, no flip → BYTE-IDENTICAL.
+  PRO: one stack / one project / one program; the setup boundary + the flip are DECLARED (valid-by-construction, one-source);
+  composes ALL six seams; reuses section + xform + the prog marker slot. CON: the flip mirror is new (bounded — the xform
+  pattern); scoping the transform to a section (not whole-program) is a small extension; the SIM stock-flip + carve-carry is
+  the heaviest piece → PHASE it (declaration + emit + sheet + preflight first; the sim flip a fast-follow).
+OPTION B — TWO linked programs (each side a normal single-side program), linked at the PROJECT level.
+  Each side is its own stack/WCS/stock-orientation; the project links Setup 1 + Setup 2 + the flip/registration/shared-stock
+  as project metadata. The operator runs prog 1, flips, runs prog 2. PRO: each side is a NORMAL program (no new stack /
+  transform machinery); independently valid + previewable. CON: NOT one stack (two programs — against "one project, one
+  stack"); the flip/registration/shared-stock is CONVENTION/metadata, not a declared transform (weaker one-source); two
+  files; sim/preflight are per-program (no unified two-sided view); the project-linkage is new project-model machinery.
+OPTION C — a FEATURE-side model (setups DERIVED from per-feature top/bottom face tags, Seam 2).
+  The workpiece declares features on both faces; a feature's face routes its ops to a setup; the flip is implied by the
+  face. PRO: very declarative, grounded in the workpiece. CON: couples the setup to the feature model (not all ops reference
+  a feature; cross-face ordering is implicit); the flip + WCS are DERIVED (harder to make explicit for the operator);
+  over-complex for v1 — REJECT for v1 (the feature model is not the op-ordering source).
+
+### THE RESIDUE (advisor rules the mechanical shape; taste-level parked for the user)
+- MECHANICAL (advisor): A vs B (one stack vs two programs); is the flip a PER-SETUP-SECTION transform or a program-level
+  transform the emit applies only after the boundary; does the flip sibling ride the prog marker slot (like xform) or a
+  per-setup marker; is the sim stock-flip/carve-carry v1 or a fast-follow phase.
+- TASTE (user): the default flip AXIS (flip-about-X vs Y) + the registration-edge convention; re-zero vs probe for side 2;
+  whether Setup 2 defaults to G55 or asks; the setup-sheet layout (repeat sections per setup vs a grouped ops table).
+
+My lean is A, PHASED: Phase 1 = the declared `setup` boundary + the WCS selection + the flip sibling (declaration + emit +
+the byte-identity guard) + the setup sheet loop; Phase 2 = the preflight per-setup frames; Phase 3 = the sim stock-flip +
+carve-carry. NO code this turn — grounded design only, per the dispatch. Awaiting the advisor's ruling on the mechanical shape.
