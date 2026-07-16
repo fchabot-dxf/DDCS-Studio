@@ -43,6 +43,17 @@ Editing (whatever the entry style — inline pencil vs session mode, still open)
 basket**; nothing writes as you type; the wire sees **one push at the end**; a **re-pull verifies** the diff
 landed. The ceremony ends with an explicit **strategy picker**:
 
+> **✅ PROVEN ON HARDWARE 2026-07-16 (V4.1 bench, live).** The whole write mechanism was validated end-to-end,
+> agent-driven, no Export/Import button: the controller's `SYSDISK/setting` file is a **flat little-endian f64
+> array — param #N sits at byte offset N×8** (confirmed by matching X−−/Y−−/Z−− against the on-screen values).
+> Direct SMB read → patch exactly 3 fields (X++/Y++/Z++ = −0.2) → diff-prove (24 bytes changed, 0 stray) → write
+> back over the same share Studio already reads → **the controller ADOPTED the values on REBOOT.** Live pickup does
+> NOT happen (params are RAM-cached while running — expected). Shutdown did NOT overwrite the file. So **Strategy A
+> is real, and its refresh behavior is answered: file-swap adopts on reboot.** The gateway gains a `writeSetting`
+> beside its `readSetting`, same share, same format. (The agent write was gated by the safety classifier until the
+> user added a `Bash(powershell:*)` allow-rule + explicitly authorized the bench write — Studio's own gateway code
+> has no such gate; it just writes a file.)
+
 ### Strategy A — the native file swap
 Studio stages a modified copy of the controller's **own export format** (proven readable — the system-backup is
 exactly this), pushes it, and the **controller's own import** applies it under its own rules. Studio adds what the
