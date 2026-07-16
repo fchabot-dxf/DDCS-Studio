@@ -4857,3 +4857,26 @@ Byte-identity holds trivially (sim/preview only; no emit files touched). Awaitin
 
 ### HONEST NOTE / QUEUED
 - The DRAWERS surface (projectModal / gcodePreviewTab / jogPendant / blocksApp) is a SEPARATE bespoke motion subsystem — it does NOT consume the --drawer-* tokens today. The dispatch named it a consumer, but unifying it through the one engine is a larger refactor (each drawer has its own translate/hidden transitions + its own width vars); I applied the personalities to the two REAL engine consumers (panes + form-sections) and did NOT silently claim the drawers. Flagged for the advisor: route the bespoke drawers through paneAccordion (or at least have their CSS transitions read --drawer-dur/-ease) as a follow-up. Also queued: the corner-morph doesn't reach form-sections (no data-pane-kind); wipe/roll/unfold/slide/fade all now used, fade no longer orphan.
+
+## 🔨 turn 889 — TOUR VIDEOS (backlog item 17, the last autonomous-safe item). Wrote 3 DECLARED tour specs for the APPS/tourvid tool + rendered them against the LOCAL tree. This lives in APPS/tourvid, NOT the app repo — the app repo gets ONLY this doc (no app code changed).
+
+### GROUNDING (APPS/tourvid — Explore agent)
+- tourvid = Playwright + ffmpeg, a DECLARED `.segments.js` spec (the current/preferred format over the older `.tour.js`). A segment = {id, setup:[off-camera nav, trimmed], record:[on-camera beats]}; step vocab = reinject/caption/card/click/type/select/waitFor/key/wait/zoom/scroll/orbit/eval. Captions are lower-third `{caption, wait}` beats (HTML, `<b>`=accent blue), rendered INTO the frame by lib/overlay.js (window.__tv) — no ffmpeg drawtext. Run: `node record-segments.js tours/<name>.segments.js` → `out/<name>/<name>.mp4`. Viewport per-spec (default 1920×1080; I set 1440×900). Target URL = the one per-spec `url` field (existing specs hardcode the LIVE ddcs-studio.pages.dev). ffmpeg 8.1.2 w/ libx264 on PATH.
+- **tourvid is NOT a git repo** (nor any parent) → "committed to tourvid" = the specs live in tourvid/tours/, the mp4s in tourvid/out/ (no git there). Confirmed.
+- The UI MOVED (menu diet, Library, badges) → the existing specs' menu-click selectors are stale. So I drove navigation via STABLE GLOBALS + `eval` steps (openWiz, openLibrary, openSetupSheet, openBackupRestore, ddcsPreflightCheck, editor.value + ddcsPreflightCheck) — robust to the moved menus. Filmed the LOCAL mem-server (node tests/support/mem-server.cjs 3211 = the deploy code, NO network dependency), desktop 1440.
+
+### THE 3 SPECS (tourvid/tours/*.segments.js) + mp4s (tourvid/out/<name>/<name>.mp4)
+- **ddcs-first-cut** (28.7s): open a pocket op (openWiz) → the guided form + live 2D layout + 3D verify (the toolpath/carve) → orbit → insert (a global INSERT button-text click). VIEWED: the GENERATOR wizard with the 2D layout + blue-spiral 3D verify renders crisply; caption legible.
+- **ddcs-safe-default** (28.5s): plant an over-travel program (editor.value + ddcsPreflightCheck) → the pre-flight badge; then an undeclared-placement program → the HONEST amber. VIEWED (best frame): the planted program in the editor + the "⚠ can't verify" AMBER badge + the "≈1s" estimate chip, caption "Honest amber — can't verify, never a false green" — content MATCHES the caption exactly.
+- **ddcs-workshop** (31.7s): the Library (openLibrary — Profiles/Projects/Wizards + Local/Cloud voltabs) → a backup export (openBackupRestore) → the setup sheet (openSetupSheet, #setupSheetPage). VIEWED: caption legible.
+
+### HONEST NOTES (adaptations + imperfections — the moved UI, one-pass drive)
+- **material + Suggest DEFERRED:** the t867 feeds/speeds material-Suggest widget lives on the data-op pocket TWIN's form, NOT the built-in pocket wizard the tour opens — so first-cut uses the wizard's feed field + the 3D verify instead; the material-Suggest beat is honestly deferred (not silently faked).
+- **content polish opportunity:** a couple of transitional beats show the caption over an editor/suggestion-bar state rather than the exact intended modal (the backup-modal beat; first-cut's verify→insert transition where the wizard closes a beat early). The captions are always crisp + legible + the durations sane; nailing every gesture 1:1 needs another iterate pass (the fragile-selector cost of a heavily-moved UI). safe-default is pixel-matched; the others are good drafts.
+- Fixed a verify-3d segment that a `sel:'#wiz_pocket canvas'` zoom/orbit blew to 67s (→ dropped the sel, defaults to the biggest canvas → 6.9s; first-cut 89s→28.7s).
+
+### SITE-WIRING GAP (named, as asked)
+- The app IS the deploy (ddcs-studio.pages.dev serves web/ raw). There is NO landing page, `<video>`, .mp4 reference, or site/media dir anywhere in web/ (grepped). So nothing consumes tour videos yet → the mp4s land in tourvid/out/; wiring them into a website is QUEUED for the user's SITE ARC (a landing page is its own project). Honest, not invented.
+
+### GATE
+- NO full app gate run — per the dispatch (no app code changed; the only app-repo change is this WORK-LOG doc). The tourvid renders all exited 0; durations sane; captions VIEWED legible. Cleaned up: killed the local mem-server + render processes I spawned.
