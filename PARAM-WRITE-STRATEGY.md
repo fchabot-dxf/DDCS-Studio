@@ -1,0 +1,88 @@
+# Controller Parameters — the read/write strategy
+
+*Designed in a live brainstorm 2026-07-16 (advisor t892). Status: design settled in shape; the build is gated on
+three at-the-machine experiments (below). This document is the canonical detail; ROADMAP carries the summary.*
+
+---
+
+## The two rooms
+
+| | **Settings (the record)** | **Gateway → Params (the operating room)** |
+|---|---|---|
+| shows | what the **profile declares** — the pulled snapshot | what the **controller says live** |
+| available | always, offline included | only with the wire up |
+| persists | with the profile ("never just a notification") | n/a — it *is* the live view |
+| can edit | **never grows a pen** | all change ceremonies live here |
+
+The **pull** bridges them: it refreshes the Settings record from live truth. **Drift** = the diff between the rooms.
+
+## The Params sub-tab (Gateway)
+
+- **The controller's own parameter tree** — generated from the **eng dictionary** (the schema is declared by the
+  machine itself: label, type, min/max, enum labels, and the controller's own menu grouping). No hand-rolled lists.
+- **Search** filters the tree live (label, number, or value).
+- **★ Favorites** — per-controller-profile pinned group at the top of the tree.
+- **"Show only drift"** — a filter, not a separate screen: live vs profile, differences inline on the row.
+- First concrete resident: the **soft-limits block** (#234 enable + #235-237/#240-242 the six positions —
+  grounded in the rig's own eng). The Settings room shows the persisted snapshot of the same facts.
+
+## Ownership rules (ruled during the #520 arc — standing law)
+
+1. **Programs never write controller state.** The safe-Z guard uses the scratch-var read-with-fallback form
+   (`#30=#520 / IF #30<0 → #30=baked / G53 Z#30`); the corpus guard asserts no emitted line ever assigns a
+   persistent register. Wizards read; they do not write.
+2. **The boot macro (sysstart) is the USER'S file.** Studio pushes it verbatim when asked; it never injects
+   config into it. (The t824 auto-seeding is removed.)
+3. **Deliberate writes get a deliberate door** — the explicit channels below, always user-confirmed, always
+   visible in job history. The machine's own screen is always authoritative.
+4. **Settings-class values are display-only until a write path is dump-grounded.**
+
+## The change ceremony
+
+Editing (whatever the entry style — inline pencil vs session mode, still open) accumulates into a **staged
+basket**; nothing writes as you type; the wire sees **one push at the end**; a **re-pull verifies** the diff
+landed. The ceremony ends with an explicit **strategy picker**:
+
+### Strategy A — the native file swap
+Studio stages a modified copy of the controller's **own export format** (proven readable — the system-backup is
+exactly this), pushes it, and the **controller's own import** applies it under its own rules. Studio adds what the
+native flow lacks: the diff, the review, the backup-before (free rollback), the verify-after.
+- Coverage: **everything** in the dictionary, by construction.
+- Refresh behavior: **unknown — Experiment 2 decides** (silent apply vs reboot-required).
+- If reboot is required, routine editing via this road loses its point (the user's ruling: "if we need reboot I
+  don't see the advantage") — the road then serves **provisioning and recovery** (board swap, cloning, fresh
+  machine: one restore beats five hundred screen-pokes).
+
+### Strategy B — the param macro (an executed run-once job)
+A tiny program (`#655=0` …) submitted via the existing `submitJob` channel — immediate, no file, no reboot
+question. **Grounded precedent: the factory's own slib-g.nc writes the soft-limit enable (#655) live** — the
+mechanism exists; the manufacturer uses it.
+- Coverage: only params **proven macro-writable** (the usage standard — a name in the dictionary proves nothing).
+- The user's hypothesis: *all* params are macro-writable → **Experiment 3 decides**; if it holds, B becomes the
+  everyday road and A retires to provisioning.
+- Two numbering worlds: the runtime param number (#655) ≠ the eng menu number (#234). The mapping is discovered
+  **empirically by diff** (Experiment 3's method) — never assumed.
+
+Not size tiers — **two strategies with different properties** (immediacy vs coverage/rollback); any changeset can
+ride either; the picker greys a road honestly when a staged param falls outside its coverage.
+
+### The #520 first citizen
+The Settings → Machine safe-Z margin field gains **[Apply now]** — the first concrete Strategy-B write: a
+confirmed one-line job, gateway-live, history-visible. The pattern generalizes from there.
+
+## The three rig experiments (gate the build — on the user's checklist)
+
+1. **Soft-limit enable ritual** — fill all six values *first* (a zeroed window may refuse all motion — #234 is one
+   global switch), then enable, then the jog-wall + G0-past-limit two-minute test.
+2. **Restore/reboot behavior** — restore an *unmodified* backup via the controller's own flow; observe: silent
+   refresh, reboot prompt, or reboot-required. Decides Strategy A's role.
+3. **Macro-writability + mapping discovery** — pull-snapshot → a tiny macro writes 3–4 innocent params (distinct
+   values, different classes) → re-pull: **the diff reveals the runtime↔eng mapping for free** → reboot → pull:
+   the persistence answer. Decides whether Strategy B is universal (the user's hypothesis) or partial.
+
+## Build order (once the experiments report)
+
+1. Read-only Params sub-tab (tree + search + favorites + drift) + the Settings soft-limits block — valuable
+   regardless of any write outcome.
+2. The #520 Apply-now (Strategy B's first citizen — already grounded).
+3. The staged basket + strategy picker, shaped by Experiments 2–3.

@@ -31,6 +31,12 @@
 - **Profile Field Editing**: Added a "✎ Rename" button to the Library Profiles tab to easily rename the active profile.
 - **Next up**: minimap removed in favor of a preview progress bar + a follow-execution editor toggle (ratified); then feeds & speeds and the rest of the 17-item backlog (NEXT-SESSION.md is the live queue).
 
+## Controller Params — read, drift, and the write strategy (designed 2026-07-16)
+One new surface + one standing law, detailed in **[PARAM-WRITE-STRATEGY.md](PARAM-WRITE-STRATEGY.md)**:
+- **Gateway → Params**: the controller's own parameter tree (generated from its eng dictionary — never a hand-rolled list), with search, per-profile ★ favorites, and a live-vs-profile drift filter. Settings keeps the persisted snapshot (the record); Gateway is the operating room.
+- **The write law**: programs never write controller state (scratch-var reads only); the boot macro belongs to the user; deliberate changes go through explicit, confirmed, history-visible channels only — either the controller's **own import** (Studio stages the native file, the machine applies it) or a **param macro** run-once job (factory-precedented: slib-g.nc writes #655 live).
+- **Build gates on three at-the-machine experiments** (soft-limit enable ritual · restore/reboot behavior · macro-writability mapping discovery) — the machine testifies about itself before Studio grows a pen.
+
 ---
 
 ## Feature Ideas (Candidate Backlog)
