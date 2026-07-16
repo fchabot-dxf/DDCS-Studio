@@ -2224,12 +2224,23 @@ button.primary:hover {
                 opacity var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
                 transform var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease),
                 clip-path var(--drawer-dur-eff, 200ms) var(--drawer-ease-eff, ease);
-    transform-origin: top left;
+    transform-origin: top;
 }
+/* t887 — DIRECTION drives the fold ORIGIN (4-way up|down|left|right), so every theme's --drawer-dir is CONSUMED: the
+   transforming reveals (roll/unfold) pivot from it; slide/fade translate along it; wipe clips from that edge. The design's
+   "8-way" is TRIMMED to 4-way honestly — the diagonals were never implemented and read poorly on a vertical accordion
+   (a trimmed vocab beats a silently-no-op token). */
+[data-dir="up"]    > .wiz-pane-body { transform-origin: top; }
+[data-dir="down"]  > .wiz-pane-body { transform-origin: bottom; }
+[data-dir="left"]  > .wiz-pane-body { transform-origin: left; }
+[data-dir="right"] > .wiz-pane-body { transform-origin: right; }
 /* REVEAL personalities — applied only while collapsed; the height collapse always runs underneath (gives the space). */
 [data-collapsed="1"][data-reveal="fade"]   > .wiz-pane-body { opacity: 0; }
-[data-collapsed="1"][data-reveal="roll"]   > .wiz-pane-body { transform: scaleY(.5); opacity: .25; }
-[data-collapsed="1"][data-reveal="wipe"]   > .wiz-pane-body { clip-path: inset(0 0 100% 0); }
+[data-collapsed="1"][data-reveal="roll"]   > .wiz-pane-body { transform: scaleY(.5); opacity: .25; }   /* pivots from the dir edge (origin above) */
+[data-collapsed="1"][data-reveal="wipe"][data-dir="up"]    > .wiz-pane-body { clip-path: inset(0 0 100% 0); }
+[data-collapsed="1"][data-reveal="wipe"][data-dir="down"]  > .wiz-pane-body { clip-path: inset(100% 0 0 0); }
+[data-collapsed="1"][data-reveal="wipe"][data-dir="left"]  > .wiz-pane-body { clip-path: inset(0 100% 0 0); }
+[data-collapsed="1"][data-reveal="wipe"][data-dir="right"] > .wiz-pane-body { clip-path: inset(0 0 0 100%); }
 
 /* t820 — collapsible FORM SECTIONS (long twin forms). Reuse the accordion motion: applyState sets --drawer-dur-eff/-ease
    + data-collapsed/-reveal/-dir on .form-sec, so the generic .wiz-pane-body transition + reveal personalities above drive
@@ -2247,40 +2258,49 @@ button.primary:hover {
 .form-sec-chev { flex: none; transition: transform var(--drawer-dur-eff, 180ms) var(--drawer-ease-eff, ease); }
 .form-sec[data-collapsed="1"] .form-sec-chev { transform: rotate(-90deg); }
 .form-sec > .wiz-pane-body { padding: 2px 0 4px; }
-[data-collapsed="1"][data-reveal="unfold"] > .wiz-pane-body { transform: perspective(700px) rotateX(-88deg); opacity: .35; }
+[data-collapsed="1"][data-reveal="unfold"] > .wiz-pane-body { transform: perspective(700px) rotateX(-88deg); opacity: .35; }   /* hinges at the dir edge (origin above) */
 [data-collapsed="1"][data-reveal="slide"][data-dir="left"]  > .wiz-pane-body { transform: translateX(-10%); opacity: .4; }
 [data-collapsed="1"][data-reveal="slide"][data-dir="right"] > .wiz-pane-body { transform: translateX(10%); opacity: .4; }
+[data-collapsed="1"][data-reveal="slide"][data-dir="up"]    > .wiz-pane-body { transform: translateY(-10%); opacity: .4; }   /* t887 — slide now honors up/down (was left/right only → up was a no-op) */
+[data-collapsed="1"][data-reveal="slide"][data-dir="down"]  > .wiz-pane-body { transform: translateY(10%); opacity: .4; }
+[data-collapsed="1"][data-reveal="fade"][data-dir="up"]    > .wiz-pane-body { transform: translateY(-6%); }   /* t887 — fade DRIFTS along dir, so a fade theme's dir is consumed too */
+[data-collapsed="1"][data-reveal="fade"][data-dir="down"]  > .wiz-pane-body { transform: translateY(6%); }
+[data-collapsed="1"][data-reveal="fade"][data-dir="left"]  > .wiz-pane-body { transform: translateX(-6%); }
+[data-collapsed="1"][data-reveal="fade"][data-dir="right"] > .wiz-pane-body { transform: translateX(6%); }
 
-/* ---- The DECLARED per-theme drawer-motion personalities (the engine reads these; distinct per theme) ---- */
+/* ---- The DECLARED per-theme drawer-motion personalities (t887): each theme MOVES differently, from PURE DATA the one
+   engine reads — a distinct REVEAL + a consumed DIRECTION + a KEYWORD easing (linear|ease-out|overshoot|spring, mapped to
+   a curve in paneAccordion.js) + a CORNER morph. No two blocks identical; no token value silently no-ops (every reveal,
+   dir, and easing keyword here has an engine/CSS effect — asserted by the no-op sweep). ---- */
 :root {
-    --drawer-dur: 200ms; --drawer-ease: cubic-bezier(.2,.8,.2,1);
+    --drawer-dur: 200ms; --drawer-ease: ease-out;
     --drawer-reveal: slide; --drawer-dir: up;
     --drawer-corner-expanded: 6px; --drawer-corner-collapsed: 6px;
 }
-[data-theme="studio"] {      /* machined nameplate — stiff, fast, SQUARE, a crisp near-linear slide */
-    --drawer-dur: 150ms; --drawer-ease: cubic-bezier(.4,0,.6,1);
+[data-theme="studio"] {      /* silver studio — CALM: a quick ease-out SLIDE up, crisp near-square corners */
+    --drawer-dur: 150ms; --drawer-ease: ease-out;
     --drawer-reveal: slide; --drawer-dir: up;
-    --drawer-corner-expanded: 0px; --drawer-corner-collapsed: 0px;
+    --drawer-corner-expanded: 2px; --drawer-corner-collapsed: 2px;
 }
-[data-theme="normal"] {      /* clean flat — a gentle ease-out slide, small radius */
-    --drawer-dur: 200ms; --drawer-ease: cubic-bezier(.2,.8,.2,1);
-    --drawer-reveal: slide; --drawer-dir: up;
+[data-theme="normal"] {      /* clean flat — NEUTRAL: a plain linear FADE drifting down, small radius */
+    --drawer-dur: 190ms; --drawer-ease: linear;
+    --drawer-reveal: fade; --drawer-dir: down;
     --drawer-corner-expanded: 5px; --drawer-corner-collapsed: 5px;
 }
-[data-theme="futuristic"] {  /* neon tech — a fast WIPE with a slight overshoot, sharp square corners */
-    --drawer-dur: 240ms; --drawer-ease: cubic-bezier(.34,1.4,.64,1);
-    --drawer-reveal: wipe; --drawer-dir: up;
+[data-theme="futuristic"] {  /* neon tech — QUICK OVERSHOOT: a fast WIPE from the right, sharp square corners */
+    --drawer-dur: 200ms; --drawer-ease: overshoot;
+    --drawer-reveal: wipe; --drawer-dir: right;
     --drawer-corner-expanded: 0px; --drawer-corner-collapsed: 0px;
 }
-[data-theme="organic"] {     /* humanist soft — a slow UNFOLD/fade, a big rounded radius morph */
-    --drawer-dur: 320ms; --drawer-ease: cubic-bezier(.34,1.2,.64,1);
+[data-theme="organic"] {     /* humanist soft — SPRING: a slow UNFOLD from the top hinge, a big rounded radius morph */
+    --drawer-dur: 340ms; --drawer-ease: spring;
     --drawer-reveal: unfold; --drawer-dir: up;
     --drawer-corner-expanded: 14px; --drawer-corner-collapsed: 22px;
 }
-[data-theme="steampunk"] {   /* mechanical shutter — a firm ROLL up, medium radius */
-    --drawer-dur: 300ms; --drawer-ease: cubic-bezier(.5,0,.2,1);
-    --drawer-reveal: roll; --drawer-dir: up;
-    --drawer-corner-expanded: 8px; --drawer-corner-collapsed: 8px;
+[data-theme="steampunk"] {   /* mechanical shutter — FIRM: an ease-out ROLL down from the top, medium radius that tightens */
+    --drawer-dur: 300ms; --drawer-ease: ease-out;
+    --drawer-reveal: roll; --drawer-dir: down;
+    --drawer-corner-expanded: 8px; --drawer-corner-collapsed: 6px;
 }
 @media (prefers-reduced-motion: reduce) {
     .wiz-pane-body, .wiz-pane-chev, [data-viz-pane], .preview-block[data-pane-kind] { transition: none !important; }

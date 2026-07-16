@@ -11,11 +11,12 @@
  * FORM below (content-sized stack). This engine only drives the measured-height collapse + the data-reveal/-dir keys.
  *
  * THE MOTION IS DECLARED PER THEME, not hand-rolled here: each theme sets a drawer-motion token block in styles.css —
- *   --drawer-dur (capped ≤350ms so personality never costs responsiveness) · --drawer-ease (timing function) ·
- *   --drawer-reveal (slide|roll|fade|wipe|unfold) · --drawer-dir (up|down|left|right) · --drawer-corner-{expanded,collapsed}.
- * This engine READS those tokens and drives ONE mechanism (measured-height collapse + a data-reveal/data-dir the CSS
- * keys the personality off) → N distinct personalities from pure data. prefers-reduced-motion ⇒ instant (rate-toast
- * precedent). View-only: no emit path is touched.
+ *   --drawer-dur (capped ≤350ms so personality never costs responsiveness) · --drawer-ease (a KEYWORD: linear|ease-out|
+ *   overshoot|spring, mapped to a curve by mapEase — a raw bezier still passes through) · --drawer-reveal (slide|roll|
+ *   fade|wipe|unfold, all implemented) · --drawer-dir (up|down|left|right — 4-way; drives the fold origin + slide/fade/wipe
+ *   axis so every reveal consumes it) · --drawer-corner-{expanded,collapsed}. This engine READS those tokens and drives ONE
+ *   mechanism (measured-height collapse + a data-reveal/data-dir the CSS keys the personality off) → N distinct personalities
+ *   from pure data. Every declared token value has an effect (no silent no-ops). prefers-reduced-motion ⇒ instant. View-only.
  */
 import { isPaneCollapsed, setPaneCollapsed, onPaneChange, PANE_KINDS, getPaneRatio, setPaneRatio, onRatioChange, RATIO_MIN, RATIO_MAX } from './panePrefs.js';
 
@@ -23,12 +24,18 @@ const LABEL = Object.fromEntries(PANE_KINDS.map((k) => [k.id, k.label]));
 const DUR_CAP = 350;   // ms — the hard ceiling on any theme's drawer duration
 const reduced = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
 const numDur = (raw) => { const m = /([\d.]+)\s*(ms|s)?/.exec(raw || ''); if (!m) return 220; const v = parseFloat(m[1]); return m[2] === 's' ? v * 1000 : v; };
+// t887 — the DECLARED easing VOCABULARY: a keyword → its curve, so a theme declares `--drawer-ease: overshoot` (semantic),
+// not a magic bezier. A raw cubic-bezier()/CSS timing keyword passes through (back-compat). Guarantees no easing keyword
+// reaches CSS as an invalid timing-function (which would silently no-op to the browser default).
+const EASE = { linear: 'linear', 'ease-out': 'cubic-bezier(.2,.7,.3,1)', overshoot: 'cubic-bezier(.34,1.5,.64,1)', spring: 'cubic-bezier(.5,1.65,.5,1)' };
+const mapEase = (v) => EASE[String(v || '').trim()] || v || 'ease';
 
 // A chevron that rotates with the collapsed state (CSS handles the rotation off [data-collapsed]).
 const CHEVRON = '<svg class="wiz-pane-chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
 
+export { mapEase };   // t887 — the keyword→curve map (the no-op sweep verifies every declared easing keyword resolves)
 // Read the ACTIVE theme's drawer tokens (getComputedStyle on <body>, where data-theme lives — the established pattern).
-function motionTokens() {
+export function motionTokens() {
     let cs; try { cs = getComputedStyle(document.body); } catch (_) { cs = null; }
     const t = (n, d) => { try { return (cs && cs.getPropertyValue(n).trim()) || d; } catch (_) { return d; } };
     return {
@@ -70,7 +77,7 @@ export function applyState(pane, collapsed, animate) {
     pane.dataset.reveal = tk.reveal;
     pane.dataset.dir = tk.dir;
     pane.style.setProperty('--drawer-dur-eff', (animate && !reduced() ? tk.dur : 0) + 'ms');
-    pane.style.setProperty('--drawer-ease-eff', tk.ease);
+    pane.style.setProperty('--drawer-ease-eff', mapEase(tk.ease));   // t887 — keyword easing → its curve
     pane.setAttribute('data-collapsed', collapsed ? '1' : '0');
     if (bar) bar.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
 
