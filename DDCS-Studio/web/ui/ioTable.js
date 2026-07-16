@@ -312,9 +312,14 @@ export function renderMagazineTable(container, atc, onChange) {
         [['+y', '+Y'], ['-y', '-Y'], ['+x', '+X'], ['-x', '-X']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if ((atc.diskAxis || '+y') === v) o.selected = true; axSel.appendChild(o); });
         axSel.addEventListener('change', () => { atc.diskAxis = axSel.value; onChange(); });
         pkr.appendChild(field('Disk toward', axSel, 64));
+        // t885 — the DECLARED carousel mounting offset (deg): rotates the WHOLE ring so pocket 0 sits at pickup+offset
+        // (slot angle = index × 360/n + offset). User-owned machine truth (no controller register seeds it).
+        const off = document.createElement('input'); off.type = 'number'; off.step = '1'; off.value = atc.diskOffsetDeg ?? '';
+        off.addEventListener('change', () => { atc.diskOffsetDeg = off.value === '' ? '' : Number(off.value); onChange(); });
+        pkr.appendChild(field('Offset°', off, 64));
         container.appendChild(pkr);
         const note = document.createElement('div'); note.className = 'settings-hint';
-        note.textContent = 'Disk: one fixed pickup — the carousel (Ø) rotates each pocket to it by index, so per-pocket XYZ aren’t needed (just the pickup + which tool is in each pocket).';
+        note.textContent = 'Disk: one fixed pickup — the carousel (Ø) rotates each pocket to it by index, so per-pocket XYZ aren’t needed (just the pickup + which tool is in each pocket). Offset° rotates the whole carousel.';
         container.appendChild(note);
     }
 

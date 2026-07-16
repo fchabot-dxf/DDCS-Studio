@@ -73,14 +73,18 @@ export function magazinePockets(a, theta) {
         const dirs = { '+x': [1, 0], '-x': [-1, 0], '+y': [0, 1], '-y': [0, -1] };
         const o = dirs[a.diskAxis] || dirs['+y'];              // pickup → centre direction (the carousel axis)
         const cx = num(pk.x, 0) + R * o[0], cy = num(pk.y, 0) + R * o[1], cz = num(pk.z, 0);
-        const ang0 = Math.atan2(-o[1], -o[0]);                // angle from centre back to the pickup = pocket 1
+        // t885 — the DECLARED carousel mounting offset (a.diskOffsetDeg): rotate the WHOLE ring by it (folded into ang0), so
+        // pocket 0 sits at pickup+offset. Slot i angle = ang0_base + offset + i*(360/n). index stays the array position.
+        const ang0 = Math.atan2(-o[1], -o[0]) + num(a.diskOffsetDeg, 0) * Math.PI / 180;   // angle from centre back to the pickup (+ the declared offset) = pocket 0
         const n = mag.length || 1;
-        return mag.map((p, i) => {
+        const out = mag.map((p, i) => {
             const ang = ang0 + (i / n) * Math.PI * 2 + (Number(theta) || 0);
-            return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), z: cz, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p) };
+            return { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang), z: cz, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p), empty: (p.tool === '' || p.tool == null), ang };
         });
+        out.disk = { cx, cy, cz, R };   // t885 — the carousel plate geometry for the 3D render (setMagazine draws a thin disc)
+        return out;
     }
-    return mag.map((p, i) => ({ x: p.x, y: p.y, z: p.z, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p) }));
+    return mag.map((p, i) => ({ x: p.x, y: p.y, z: p.z, pocket: p.pocket != null ? p.pocket : i + 1, tool: toolOf(p), empty: (p.tool === '' || p.tool == null) }));
 }
 
 /**

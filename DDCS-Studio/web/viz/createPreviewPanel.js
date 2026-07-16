@@ -1097,10 +1097,11 @@ export function createPreviewPanel(container, opts = {}) {
     const magToolNums = () => (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).filter((p) => p && p.tool !== '' && p.tool != null).map((p) => Number(p.tool));
     const isDiskMag = () => atcCfg().magType === 'disk';
     const magPocketIndex = (toolN) => (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).findIndex((p) => p && Number(p.tool) === Number(toolN));   // 0-based slot
-    // DISK: the ring angle (theta) that brings a tool's pocket to the fixed PICKUP (pocket 0's spot). -(i/n)·2π.
-    const diskTheta = (toolN) => { if (!isDiskMag()) return 0; const n = (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).length || 1; const i = magPocketIndex(toolN); return i < 0 ? 0 : -(i / n) * Math.PI * 2; };
+    // DISK: the ring angle (theta) that brings a tool's pocket to the fixed PICKUP (pocket 0's spot). -(offset + i/n·2π):
+    // it cancels BOTH the declared mounting offset (t885) and the pocket's index so the target lands exactly at the pickup.
+    const diskTheta = (toolN) => { if (!isDiskMag()) return 0; const n = (Array.isArray(atcCfg().magazine) ? atcCfg().magazine : []).length || 1; const i = magPocketIndex(toolN); const off = (Number(atcCfg().diskOffsetDeg) || 0) * Math.PI / 180; return i < 0 ? 0 : -(off + (i / n) * Math.PI * 2); };
     // the pocket list for the OCCUPIED tools, at the current ring rotation (theta); disk = ring-laid, else per-tool XY.
-    const magPocketList = (occupied, theta) => magazinePockets(atcCfg(), theta || 0).filter((p) => p.tool && occupied.has(Number(p.tool.num)));
+    const magPocketList = (occupied, theta) => { const all = magazinePockets(atcCfg(), theta || 0); const list = all.filter((p) => p.tool && occupied.has(Number(p.tool.num))); list.disk = all.disk; return list; };   // t885 — keep the carousel-plate metadata through the occupancy filter
     const pocketPos = (toolN, theta) => { const p = magazinePockets(atcCfg(), theta || 0).find((q) => q.tool && Number(q.tool.num) === Number(toolN)); return p ? { x: Number(p.x) || 0, y: Number(p.y) || 0, z: Number(p.z) || 0 } : null; };
     // Render the pick-place magazine with `spindleTool` REMOVED (it is on the spindle) + the disk ring ROTATED so
     // spindleTool's pocket sits at the pickup (the carousel just indexed it there). theta stored on the viz for tests.

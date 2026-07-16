@@ -1873,22 +1873,38 @@ export class GcodeViz3D {
         if (!this._magazine) { this.render(); return; }
         const n = (v, d) => { const x = Number(v); return Number.isFinite(x) ? x : d; };
         const grp = new THREE.Group();
+        // t885 — the CAROUSEL PLATE: a thin disc at the declared centre/radius (disk magazines carry pockets.disk), so the
+        // 3D magazine reads as a carousel, not floating pockets. Drawn first (below the pockets). Straight racks have no disc.
+        const disk = pockets && pockets.disk;
+        if (disk && n(disk.R, 0) > 0) {
+            const dgeo = new THREE.CylinderGeometry(n(disk.R, 0), n(disk.R, 0), 3, 48); dgeo.rotateX(Math.PI / 2);   // Y-axis cylinder → Z-up disc
+            const plate = new THREE.Mesh(dgeo, new THREE.MeshBasicMaterial({ color: 0x6b7684, transparent: true, opacity: 0.18, depthWrite: false }));
+            plate.position.set(n(disk.cx, 0), n(disk.cy, 0), n(disk.cz, 0) - 2);   // just under the pocket Z
+            grp.add(plate);
+            const ring = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.CylinderGeometry(n(disk.R, 0), n(disk.R, 0), 3, 48).rotateX(Math.PI / 2)), new THREE.LineBasicMaterial({ color: 0x8b98a8, transparent: true, opacity: 0.4 }));
+            ring.position.copy(plate.position); grp.add(ring);
+        }
         this._magazine.forEach((p, i) => {
             const px = n(p.x, 0), py = n(p.y, 0), pz = n(p.z, 0);   // RAW machine coords — fixed machine frame, like the envelope (t163)
             const td = p.tool || { type: 'endmill', dia: n(p.dia, 6), length: Math.max(15, n(p.length, 30)) };
             const dia = n(td.dia, 6), len = Math.max(15, n(td.length, 30));
             const col = (p.color != null) ? p.color : 0xffab40;   // amber — distinct from stock + the cyan toolpath
-            // Real tool: revolve its accurate half-profile (round ballnose, pointed V-bit) — tip at the pocket Z,
-            // body extends up. Lathe revolves around Y, so rotate Y→Z for the Z-up scene.
-            const pts = toolHalfProfile(td).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1]));
-            const geo = new THREE.LatheGeometry(pts, 24); geo.rotateX(Math.PI / 2);
-            const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, depthWrite: false }));
-            mesh.position.set(px, py, pz - len);   // align tool TOPS at the pocket Z (holder reference); tips hang down by length
-            grp.add(mesh);
-            // Pocket bounding box: a wireframe slot enclosing the tool, marking the pocket extent on the envelope.
+            // t885 — an EMPTY pocket (no tool assigned) draws its slot box + number only, NOT a tool silhouette (no fake tool).
+            if (!p.empty) {
+                // Real tool: revolve its accurate half-profile (round ballnose, pointed V-bit) — tip at the pocket Z,
+                // body extends up. Lathe revolves around Y, so rotate Y→Z for the Z-up scene.
+                const pts = toolHalfProfile(td).map((q) => new THREE.Vector2(Math.max(0.001, q[0]), q[1]));
+                const geo = new THREE.LatheGeometry(pts, 24); geo.rotateX(Math.PI / 2);
+                const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.55, depthWrite: false }));
+                mesh.position.set(px, py, pz - len);   // align tool TOPS at the pocket Z (holder reference); tips hang down by length
+                grp.add(mesh);
+            }
+            // Pocket bounding box: a wireframe slot enclosing the tool, marking the pocket extent on the envelope. Empty
+            // pockets show a dimmed box (the slot is there, just unloaded).
+            const bcol = p.empty ? 0x6b7280 : col;
             const bw = Math.max(dia * 1.8, 14), bh = len;
             const bgeo = new THREE.BoxGeometry(bw, bw, bh);
-            const box = new THREE.LineSegments(new THREE.EdgesGeometry(bgeo), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.5 }));
+            const box = new THREE.LineSegments(new THREE.EdgesGeometry(bgeo), new THREE.LineBasicMaterial({ color: bcol, transparent: true, opacity: p.empty ? 0.35 : 0.5 }));
             box.position.set(px, py, pz - bh / 2); grp.add(box);
             bgeo.dispose();
             const sp = this._makeNumberSprite(p.pocket != null ? p.pocket : i + 1);
