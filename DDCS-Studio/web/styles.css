@@ -2528,6 +2528,7 @@ button.primary:hover {
 .feature-canvas .fc-path-ghost { fill: none; stroke: #43525f; stroke-width: 1.2; }   /* original path (before rotate) */
 .feature-canvas .fc-path { fill: none; stroke: #4ab3ff; stroke-width: 1.8; }          /* rotated result — cut moves */
 .feature-canvas .fc-path-rapid { fill: none; stroke: #4ab3ff; stroke-width: 1; stroke-dasharray: 4 3; opacity: .5; }
+.feature-canvas .fc-rest { fill: none; stroke: #ff9d3c; stroke-width: 1.4; stroke-dasharray: 2 2; }   /* t871 — REST corner slivers (a 2nd smaller tool clears these), a distinct amber */
 .feature-canvas .fc-hole { fill: rgba(63,182,255,0.18); stroke: #3fb6ff; stroke-width: 1.5; }
 .feature-canvas .fc-hole-skip { fill: none; stroke: #5a6470; stroke-width: 1.2; stroke-dasharray: 3 2; }
 .feature-canvas .fc-hole-label { fill: #9fd8ff; font: 10px var(--mono, monospace); text-anchor: middle; }

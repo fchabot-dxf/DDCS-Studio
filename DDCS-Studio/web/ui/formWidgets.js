@@ -220,8 +220,10 @@ function toolPickWidget(host, b) {
         if (!tool) return;
         const form = host.parentElement;   // renderOpForm mounts every row under one container → siblings are queryable here
         if (!form) return;
-        const put = (key, param) => { const el = form.querySelector(`[data-param="${param}"]`); if (el && tool[key] !== '' && tool[key] != null) el.value = tool[key]; };
-        put('dia', 'toolDia'); put('feed', 'feed'); put('plunge', 'plunge'); put('rpm', 'rpm');
+        const put = (key, param) => { const el = form.querySelector(`[data-param="${param}"]`); if (el && tool[key] !== '' && tool[key] != null) { el.value = tool[key]; el.dispatchEvent(new Event('input', { bubbles: true })); } };
+        // t871 — the target fields default to the MAIN tool cluster; a picker can override (e.g. the rest tool fills restDia).
+        const fill = (b.widgetConfig && b.widgetConfig.fill) || { dia: 'toolDia', feed: 'feed', plunge: 'plunge', rpm: 'rpm' };
+        for (const key in fill) put(key, fill[key]);
     });
     // LIVE: re-fill when the tool library changes (a tool added/edited in Settings). Detach when the row leaves the DOM.
     const onSettings = () => { if (!sel.isConnected) { if (typeof window !== 'undefined') window.removeEventListener('ddcs:settings-changed', onSettings); return; } fill(); };

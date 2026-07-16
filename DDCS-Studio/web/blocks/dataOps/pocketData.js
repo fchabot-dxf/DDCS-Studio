@@ -28,12 +28,14 @@ import { pruneGuards } from '../whenGuard.js';
 import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true boundary ring (polygon/ellipse) for the 2D preview
 import { pocketInsetRegion, stepoverMm } from '../../wizards/ops/pocketfill.js';   // t802 — the tool-inset boundary + ring spacing (one source with the emit)
 import { concentricRings } from '../../wizards/ops/contour.js';   // t802 — the inward offset rings the concentric emit cuts (draw them in the 2D preview)
+import { restValid, restRegion, restGreyReason } from '../../wizards/ops/restmachining.js';   // t871 — REST MACHINING: the _rest guard + the corner-sliver preview + the grey-out reason
 
 /** Author defaults — match pocketStack's num() fallbacks AND the built-in Pocket form defaults (index.html p_*). */
 export const POCKET_DEFAULTS = {
     shape: 'rect', w: 80, h: 60, dia: 50, sides: 6, toolDia: 6, wallOffset: 0, stepoverPct: 40,
     strategy: 'spiral', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, wcs: 'active',
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
+    restTool: 0, restDia: 0, restStepover: 40,   // t871 — REST MACHINING: 0 = no rest pass (byte-identical); a smaller tool clears the corners
 };
 
 const WCS_OPTIONS = [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']];
@@ -124,8 +126,18 @@ const POCKET_BINDING_SPECS = [
 
 /** The strategy fork is a STRUCTURAL driver (guard key), no block socket — declared as a bindingless (blockIndex-free)
  *  binding so withGuardDefaults fills it before prune + the form renders it. tooSmall is NOT here (it's the derive-hook). */
+// t871 — the rest fields GREY (with the why) on a smooth shape: circle/ellipse have no corners → no rest to clear. The
+// r2 ≥ r1 case is caught at emit (restValid false → byte-identical) + the restGreyReason (declared why); the shape gate is
+// what whenOk can express declaratively (no param-to-param compare / OR).
+const SMOOTH_GATE = { param: 'shape', in: ['circle', 'ellipse'], tip: 'Smooth walls (circle / ellipse) leave no corner material — there is no rest to clear.' };
 const POCKET_STRUCT_BINDINGS = [
     { param: 'strategy', help: "Clearing pattern: Spiral = concentric offset rings inward (no wall pass); Raster = parallel zig-zag passes then a wall-finish pass.", type: 'enum', default: POCKET_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: STRATEGY_OPTIONS }, label: 'Strategy', section: T, group: 'clearing' },   // t800 P6 — group:'clearing' + spliced ahead of direction/stepover so it LEADS the cluster
+    // t871 — REST MACHINING: a smaller 2nd tool clears the corner material this tool leaves. restTool picks the tool (fills
+    // restDia); restDia > 0 on a cornered shape (rect/polygon) appends the rest pass. Bindingless (structural drivers of the
+    // geometry-derived _rest guard) so they always render + drive prune; the value sockets bind on the pocketrest leaf.
+    { param: 'restTool', type: 'number', default: POCKET_DEFAULTS.restTool, widget: 'toolpick', widgetConfig: { fill: { dia: 'restDia' } }, label: 'Rest tool', section: T, group: 'rest', gate: SMOOTH_GATE, help: 'REST MACHINING: pick a SMALLER second tool to clear the corner material this tool leaves (rect + polygon only — smooth walls have no corners). Its Ø fills Rest tool Ø below.' },
+    { param: 'restDia', type: 'number', default: POCKET_DEFAULTS.restDia, label: 'Rest tool Ø', units: 'mm', section: T, group: 'rest', gate: SMOOTH_GATE, help: 'Diameter of the rest tool (mm) — must be SMALLER than the main tool Ø. 0 = no rest pass (byte-identical). Filled by the Rest tool picker, or type it.' },
+    { param: 'restStepover', type: 'number', default: POCKET_DEFAULTS.restStepover, label: 'Rest stepover %', section: T, group: 'rest', gate: SMOOTH_GATE, help: 'Stepover of the rest tool as a % of its Ø (like the main stepover). Only used when a rest tool is set.' },
 ];
 
 // t867 — FEEDS & SPEEDS: the material picker + the advisory "Suggest feed" button (the feedsuggest composite widget).
@@ -173,6 +185,14 @@ export function pocketPreviewGeometry(p) {
             }
         } catch (_) { /* degenerate pocket (smaller than the tool) — no rings to draw */ }
     }
+    // t871 — REST regions: the corner slivers a smaller 2nd tool clears, drawn in a DISTINCT colour (fc-rest) between the
+    // r1- and r2-cleared boundaries. Only when a valid rest tool is declared on a cornered shape (rect/polygon).
+    try {
+        const rest = restRegion(p);
+        if (rest) for (const ring of [rest.ring1, rest.ring2]) {
+            if (ring && ring.length > 1) paths.push({ pts: [...ring, ring[0]].map((q) => ({ x: q.x, y: q.y })), cls: 'fc-rest' });
+        }
+    } catch (_) { /* no rest to draw */ }
     return { paths, handles, bbox };
 }
 
@@ -192,7 +212,7 @@ function pocketDataStack(defaults) {
 
 // The FORM bindings are DERIVED over a CANONICAL-pruned stack (raster + big pocket → every clearing socket present once)
 // then DEDUPED by param (fan-out yields N specs per param; the form wants ONE — keep the first, which carries the label).
-const CANONICAL_BIND = { ...POCKET_DEFAULTS, strategy: 'raster', _tooSmall: false };
+const CANONICAL_BIND = { ...POCKET_DEFAULTS, strategy: 'raster', _tooSmall: false, _rest: true, restDia: 3 };   // t871 — _rest+a real restDia so the pocketrest leaf is present → restDia/restStepover derive their bindings
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(pocketDataStack(POCKET_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const POCKET_BINDINGS = mergeBindingsByParam(deriveBindingsFor(canonicalPrunedStack(), POCKET_BINDING_SPECS));
 
@@ -214,14 +234,19 @@ export function pocketDataDef() {
     const def = userOpFromStack('pocket_data', 'Pocket (data)', pocketDataStack(POCKET_DEFAULTS),
         orderedBindings, 'form3d+2d');   // t726 P2b — entryX/entryY are in POCKET_BINDINGS (via the specs, re-derived by bindingSpecs)
     def.bindingSpecs = POCKET_BINDING_SPECS;                       // re-derive value sockets BY IDENTITY over the PRUNED stack each build
-    def.deriveGuards = (p) => ({ _tooSmall: pocketTooSmall(p || {}) });   // GEOMETRY-DERIVED guard key, injected before prune
+    def.deriveGuards = (p) => ({ _tooSmall: pocketTooSmall(p || {}), _rest: restValid(p || {}) && !pocketTooSmall(p || {}) });   // t871 — _rest: a valid smaller rest tool on a cornered pocket (GEOMETRY-DERIVED, injected before prune)
     def.postInstantiate = (stack, resolved) => {                  // rewrite the DERIVED sockets the frozen superset baked at DEFAULT geometry
         const { cx, cy } = pocketDrillCentre(resolved || {});     // the drill arm's plunge point (geometry-derived)
         const bb = pocketBBox(resolved || {});                    // the PlaceOnStock footprint bbox (drives placementShift's corner; baked-stale otherwise → a phantom shift)
+        const r = resolved || {};
         for (const b of flattenBlocks(stack)) {
             if (!b || !b.params) continue;
             if (b.type === 'drill') { b.params.x = cx; b.params.y = cy; }
             else if (b.type === 'placeonstock') { b.params.bminX = bb.minX; b.params.bmaxX = bb.maxX; b.params.bminY = bb.minY; b.params.bmaxY = bb.maxY; }
+            else if (b.type === 'pocketrest') {   // t871 — the rest leaf is frozen at DEFAULT geometry in the superset; rewrite ALL its params from the resolved op (one source, no fan-out bindings)
+                for (const k of ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'restDia', 'restStepover', 'depth', 'feed', 'plunge', 'clearance']) if (r[k] !== undefined) b.params[k] = r[k];
+                if (r.stepdown !== undefined) b.params.by = r.stepdown;
+            }
         }
         return stack;
     };

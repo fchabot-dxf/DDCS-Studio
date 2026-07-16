@@ -56,11 +56,11 @@ function resolveOpTool(params) {
 // The tool list, DEDUPED in order of use: a real tool folds by T#, a typed-only Ø folds by its diameter.
 function toolList(ops) {
     const seen = new Map();
+    const add = (t) => { if (!t) return; const key = t.typedOnly ? ('D' + t.dia) : ('T' + t.num); if (!seen.has(key)) seen.set(key, t); };
     for (const op of ops) {
-        const t = resolveOpTool(op.params || {});
-        if (!t) continue;
-        const key = t.typedOnly ? ('D' + t.dia) : ('T' + t.num);
-        if (!seen.has(key)) seen.set(key, t);
+        add(resolveOpTool(op.params || {}));
+        const p = op.params || {};
+        if (Number(p.restDia) > 0) add(resolveOpTool({ toolNum: p.restTool, toolDia: p.restDia }));   // t871 — the REST (2nd, smaller) tool picks up for free
     }
     return [...seen.values()];
 }

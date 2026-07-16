@@ -13,6 +13,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
 import { regionDesc } from './ops/region.js';
+import { restValid } from './ops/restmachining.js';   // t871 — REST MACHINING: append a corner-clear pass with a smaller 2nd tool
 
 /** The TRUE pocket region (rect = corner+size, circle/polygon = centre±R, ellipse = centre±(rx,ry)) — the size you
  *  type, before insetting. Shape-centred at (originX, originY) except rect (its corner). */
@@ -102,14 +103,23 @@ export function pocketStack(params = {}, opts = {}) {
     const fillLeaf = (strat) => { const b = newBlock('pocketfill'); b.params = { ...geom, stepoverPct: num(params.stepoverPct, 40), strategy: strat, direction: params.direction || 'bothways', entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3), helixDia: num(params.helixDia, 0), helixPitch: num(params.helixPitch, 1), by: 'by', z: 'z', feed, plunge, clearance: clr }; return b; };   // strat: parallel (raster) | concentric (spiral); direction (t800 P6); entry (t804 P?) = per-level descent, params.entry || plunge → byte-identical; by='by' resolves the StepDown step from scope
     const wallLeaf = () => { const b = newBlock('pocketwall'); b.params = { ...geom, z: 'z', feed, plunge, clearance: clr }; return b; };
     const drillPlace = () => { const hole = newBlock('drill'); hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr }; return makePlace(params, bbox, hole); };
-    const clearPlace = (kids) => { const down = newBlock('stepdown'); down.params = { to: depth, by }; down.children = kids; return makePlace(params, bbox, down); };
     const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
+    // t871 — the REST section rides INSIDE the main clear's ONE placeonstock (a second place would duplicate the placement
+    // bindings): a StepDown of the pocketrest leaf, preceded by a STATIC marker comment (so the twin freezes byte-identically
+    // — the tool specifics live on the op + the setup sheet, not the baked text). Only when a valid smaller rest tool is
+    // declared on a cornered shape → otherwise ABSENT, so the emit is byte-identical (goldens untouched).
+    const restLeaf = () => { const b = newBlock('pocketrest'); b.params = { ...geom, restDia: num(params.restDia, 0), restStepover: num(params.restStepover, 40), depth, by, feed, plunge, clearance: clr }; return b; };   // a LEAF that loops its own depth levels (no 2nd stepdown → no depth-binding collision)
+    const restInner = () => {
+        const note = newBlock('comment'); note.params = { text: 'REST — smaller tool clears the corners; change tools here' };
+        return [note, restLeaf()];
+    };
+    const clearPlace = (kids, restKids) => { const down = newBlock('stepdown'); down.params = { to: depth, by }; down.children = kids; return makePlace(params, bbox, restKids ? [down, ...restKids] : [down]); };
 
     if (!superset) {   // concrete: the geometry-derived tooSmall + strategy select the arm directly
         if (tooSmall) return [makeStart(params), wcs, drillPlace(), makeEnd(params)];
         const kids = [fillLeaf(raster ? 'parallel' : 'concentric')];
         if (raster) kids.push(wallLeaf());   // raster leaves the wall un-finished → a Contour(on) finish pass
-        return [makeStart(params), wcs, clearPlace(kids), makeEnd(params)];
+        return [makeStart(params), wcs, clearPlace(kids, restValid(params) ? restInner() : null), makeEnd(params)];   // t871 — rest inside the ONE place (byte-identical when unset)
     }
     // superset: BOTH forks present + guarded — tooSmall (drill vs clearing) on the derived `_tooSmall` key, strategy
     // (parallel+wall vs concentric) on the real param. prune keeps one tooSmall arm + one strategy arm → concrete shape.
@@ -119,7 +129,7 @@ export function pocketStack(params = {}, opts = {}) {
         GUARD({ param: '_tooSmall', is: false }, [clearPlace([
             GUARD({ param: 'strategy', is: 'raster' }, [fillLeaf('parallel'), wallLeaf()]),
             GUARD({ param: 'strategy', is: 'spiral' }, [fillLeaf('concentric')]),
-        ])]),
+        ], [GUARD({ param: '_rest', is: true }, restInner())])]),   // t871 — the rest corner-clear rides the SAME place, on the geometry-derived `_rest` guard (absent → byte-identical)
         makeEnd(params),
     ];
 }
