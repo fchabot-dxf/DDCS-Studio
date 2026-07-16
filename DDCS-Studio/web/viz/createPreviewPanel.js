@@ -114,7 +114,7 @@ const PANEL_HTML = `
     <table class="pp-dro-tbl"><thead><tr><th></th><th>Work</th><th>Mach</th></tr></thead><tbody></tbody></table>
   </div>
   <div class="viz3d-hint">drag orbit · wheel zoom · right/middle-drag pan · dbl-click fit work/machine</div>
-  <div class="pp-carve-note" style="display:none" title="Material-removal preview: flat endmills and ball-nose tools are modelled from the tool type; a vee/chamfer is shown flat for now; with no tool picked, an op carves at its typed Ø (Ø6 default)."></div>
+  <div class="pp-carve-note" style="display:none" title="Material-removal preview: flat, ball-nose, and V-bit / chamfer / engraver tips are modelled from the tool type (a vee carves a V groove that widens with depth); with no tool picked, an op carves at its typed Ø (Ø6 default)."></div>
 `;
 
 // SLICE 2 (WCS VISIBLE): classify an executing line as a WCS call or a spindle/start call, from the RAW text only
@@ -221,7 +221,10 @@ export function createPreviewPanel(container, opts = {}) {
     // t680 — MATERIAL REMOVAL (E1): the static END-STATE (on setGcode) + the LIVE progressive carve (during play), throttled
     // with an honest degrade (F). ON by default; a preview.carve=false toggle turns it off. Per-panel (G) — the viz owns the map.
     const carveEnabled = () => previewPrefs().carve !== false;
-    let _carveTR = 3, _carveTip = 'flat', _carvePrev = null, _carveDirty = false, _carveLastRemesh = 0, _carveHeavySince = 0, _carveDegraded = false, _carveSegs = [], _carveRaf = 0;
+    let _carveTR = 3, _carveTip = 'flat', _carveAngle = 90, _carvePrev = null, _carveDirty = false, _carveLastRemesh = 0, _carveHeavySince = 0, _carveDegraded = false, _carveSegs = [], _carveRaf = 0;
+    // t875 — V-CARVE: the vee included angle for the carve cone (the tool's declared angle, else a per-type default).
+    const _VEE_DEFAULT = { vbit: 90, chamfer: 90, engraver: 30 };
+    const veeAngleOf = (t) => (Number(t && t.angle) > 0 ? Number(t.angle) : (_VEE_DEFAULT[t && t.type] || 90));
     // The END-STATE carve (build the grid mesh + carve every segment + re-mesh) is DEFERRED to the next frame so it never
     // blocks setGcode / a drag / a wizard open. A panel that closes before the frame (a transient wizard, e.g. the params
     // sweep opening 40 wizards in a tight loop) cancels it via setActive(false) → the carve costs nothing there. The LIVE
@@ -236,7 +239,7 @@ export function createPreviewPanel(container, opts = {}) {
             _carveRaf = 0;
             if (!active || !v.setCarve) return;   // deactivated/closed before the frame → skip
             v.setCarve(true);
-            if (!(engine && engine.running)) v.carveEndState(_carveSegs, _carveTR, _carveTip);
+            if (!(engine && engine.running)) v.carveEndState(_carveSegs, _carveTR, _carveTip, _carveAngle);
         };
         _carveRaf = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame(run) : (run(), 0);
     }
@@ -252,7 +255,7 @@ export function createPreviewPanel(container, opts = {}) {
         // DEGRADE (F): re-mesh cost > 8ms sustained ~1s → stop the live re-mesh and JUMP to the full end-state (a manual toggle overrides)
         if (cost > 8) { if (!_carveHeavySince) _carveHeavySince = now; else if (!_carveDegraded && now - _carveHeavySince > 1000) {
             _carveDegraded = true; setStatus('Live carve paused (heavy program) — showing the end-state');
-            if (viz.carveEndState) viz.carveEndState(_carveSegs, _carveTR);   // fall back to end-state-only NOW, not a frozen partial
+            if (viz.carveEndState) viz.carveEndState(_carveSegs, _carveTR, _carveTip, _carveAngle);   // fall back to end-state-only NOW, not a frozen partial
         } } else _carveHeavySince = 0;
     }
 
@@ -460,7 +463,7 @@ export function createPreviewPanel(container, opts = {}) {
                 pos.wcs = (droWcsEl && droWcsEl.textContent) || '';
                 if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(kSeg); t2.setToolPosition(pos); } if (toolPosSubs.length) { for (const cb of toolPosSubs) cb(pos, kSeg); }
                 // t680 — LIVE progressive carve: remove material along the swept sub-step (feed class handled inside carveStep), re-mesh throttled.
-                if (viz && viz.carveStep && carveEnabled() && !_carveDegraded) { if (_carvePrev) viz.carveStep(_carvePrev, pos, _carveTR, _carveTip); _carvePrev = pos; if (viz.carveDirty && viz.carveDirty()) _carveDirty = true; carveRemeshThrottled(); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
+                if (viz && viz.carveStep && carveEnabled() && !_carveDegraded) { if (_carvePrev) viz.carveStep(_carvePrev, pos, _carveTR, _carveTip, _carveAngle); _carvePrev = pos; if (viz.carveDirty && viz.carveDirty()) _carveDirty = true; carveRemeshThrottled(); } },   // 2D head rides the SAME live pos as the 3D (in sync; ptx/pty puts it on the pinned stock) — t309: ALSO tee to the Layout overlay in ANY mode (a mode==='2d' gate would starve corner's 3D-top Layout)
             onStatus: ({ message, transient }) => {
                 // t867 rider — a TRANSIENT playback status (the per-move length/feed/seconds paraphrase + the line counter)
                 // belongs in the hover TOOLTIP, not the chip (the chip shows the raw executing line). EVERY other status —
@@ -509,7 +512,7 @@ export function createPreviewPanel(container, opts = {}) {
         const m = /\bT(\d+)\b/.exec(code || '');
         if (m) {
             const t = toolsForViz().find((x) => parseInt(x && x.num, 10) === parseInt(m[1], 10));
-            if (t) return withProbe({ type: t.type || 'endmill', dia: Number(t.dia) || 6, length: Number(t.length) || undefined });
+            if (t) return withProbe({ type: t.type || 'endmill', dia: Number(t.dia) || 6, length: Number(t.length) || undefined, angle: Number(t.angle) || undefined });   // t875 — carry the vee angle to the carve + sim cone
         }
         if ((parsed && parsed.stats && parsed.stats.probe) > 0) return withProbe({ type: 'probe', dia: 6 });
         return { type: 'endmill', dia: 6, _default: true };   // no host tool / no T# / not a probe → the honest 6mm default (E); flagged so the carve note can own up to the assumption
@@ -691,7 +694,8 @@ export function createPreviewPanel(container, opts = {}) {
                 // (carve every segment once). During play the live progressive carve drives it instead. Tool Ø from simTool (E).
                 if (v.setCarve) {
                     const tl = simTool(code, parsed); _carveTR = (Number(tl && tl.dia) || 6) / 2;
-                    _carveTip = carveTipForToolType(tl && tl.type);   // ball-nose → spherical carve (one source: the tool `type`)
+                    _carveTip = carveTipForToolType(tl && tl.type);   // ball-nose → spherical carve; vbit/chamfer/engraver → vee cone (one source: the tool `type`)
+                    _carveAngle = veeAngleOf(tl);   // t875 — the vee cone included angle
                     _carveSegs = (parsed && parsed.segments) || [];   // remembered for the LIVE→end-state degrade jump (F)
                     if (v._buildCarveArc) v._buildCarveArc(_carveSegs, _carveTR);   // t816 — the whole toolpath is known upfront → the t814 arc snap applies to the LIVE crisp splice too
                     const hasCut = !!(parsed.stats && parsed.stats.feed > 0);   // material removal only for CUTTING programs; probe/rapid → the plain box
@@ -702,7 +706,7 @@ export function createPreviewPanel(container, opts = {}) {
                     if (note) {
                         const show = carveEnabled() && !!(parsed.stats && parsed.stats.feed > 0);   // only when there's material to remove
                         const tp = tl && tl.type;
-                        const tipName = _carveTip === 'ball' ? 'ball-nose' : (['vbit', 'chamfer', 'engraver'].includes(tp) ? tp + ' (as flat)' : 'flat endmill');
+                        const tipName = _carveTip === 'ball' ? 'ball-nose' : (_carveTip === 'vee' ? tp + ' (v-carve)' : 'flat endmill');
                         // t722 P2a (2)+(4) — HONEST wording (no cognition verbs) + the op's TYPED Ø: an unset tool states the
                         // default fact; an op-value tool discloses only the tip-shape unknown (the Ø is the typed op value).
                         const dia = Math.round((Number(tl && tl.dia) || 6) * 10) / 10;

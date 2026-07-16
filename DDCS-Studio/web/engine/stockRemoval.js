@@ -24,7 +24,8 @@ export const CARVE_DEFAULT_DIA = 6;   // mm — the honest default endmill Ø (E
  *  vee profile is built); everything else → 'flat'. (t682 ballnose amendment.) */
 export function carveTipForToolType(type) {
     if (type === 'ballnose') return 'ball';
-    return 'flat';   // 'vbit' | 'chamfer' | 'engraver' → 'vee' when that profile lands
+    if (type === 'vbit' || type === 'chamfer' || type === 'engraver') return 'vee';   // t875 — V-CARVE PREVIEW: the cone profile
+    return 'flat';
 }
 
 export class HeightmapCarve {
@@ -117,9 +118,13 @@ export class HeightmapCarve {
      * Returns true if any cell changed.
      * @param {{x,y,z}} prev  @param {{x,y,z}} pos  @param {number} toolR tool radius (mm)  @param {string} cls segment class
      */
-    carveSegment(prev, pos, toolR, cls, tip = 'flat') {
+    carveSegment(prev, pos, toolR, cls, tip = 'flat', angle = 0) {
         if (cls !== 'feed') return false;   // probe / rapid never carve
         const r = toolR > 0 ? toolR : CARVE_DEFAULT_DIA / 2;
+        // t875 — V-CARVE: a vee tool's groove half-width GROWS with plunge depth (= depth·tan(halfAngle), capped at the
+        // shank radius r); the floor is the CONE (cutZ rises d·cot(halfAngle) from the tip). halfAngle = the included angle/2.
+        const isVee = tip === 'vee';
+        const halfRad = (Math.max(1, angle || 90) / 2) * Math.PI / 180, tanHalf = Math.tan(halfRad), cotHalf = 1 / tanHalf;
         const ax = Number(prev.x) || 0, ay = Number(prev.y) || 0, az = Number(prev.z) || 0;
         const bx = Number(pos.x) || 0, by = Number(pos.y) || 0, bz = Number(pos.z) || 0;
         // skip entirely-above-the-top segments (both tips above 0): nothing to remove (perf + correctness)
@@ -135,13 +140,17 @@ export class HeightmapCarve {
             const pc = this._segDist2(cx, cy, ax, ay, dxv, dyv, len2);
             if (pc.d2 > bandR2) continue;      // the whole cell is clear of the tool (past the AA band)
             const d = pc.d2 <= 0 ? 0 : Math.sqrt(pc.d2);
-            // COVERAGE: a distance ramp across the tool edge — c=1 fully inside, 0.5 at the edge, 0 a half-cell past it.
-            const c = pc.d2 <= 0 ? 1 : Math.min(1, Math.max(0, 0.5 + (r - d) / cell));
-            if (c <= 0) continue;
             // tip Z at the cell's CLOSEST approach, then the tool-TIP PROFILE: flat = the tip (a plane floor); ball = the
-            // spherical bottom rising toward the edge → scallops between stepover passes emerge naturally (t682).
+            // spherical bottom rising toward the edge; vee = the CONE (the floor rises d·cot(halfAngle) from the tip, and the
+            // groove half-width r_eff = plunge-depth·tan(halfAngle) — capped at the shank — so the V widens with depth).
             let tipZ = (len2 < 1e-9) ? Math.min(az, bz) : az + pc.t * (bz - az);
-            let cutZ = flat ? tipZ : tipZ + this._tipOffset(d, r, tip);
+            let cutZ, rEff = r;
+            if (isVee) { rEff = Math.min(r, Math.max(0, -tipZ) * tanHalf); cutZ = tipZ + d * cotHalf; }
+            else cutZ = flat ? tipZ : tipZ + this._tipOffset(d, r, tip);
+            // COVERAGE: a distance ramp across the (effective) tool edge — c=1 fully inside, 0.5 at the edge, 0 a half-cell past.
+            const c = pc.d2 <= 0 ? 1 : Math.min(1, Math.max(0, 0.5 + (rEff - d) / cell));
+            if (c <= 0) continue;
+            if (cutZ > 0) continue;   // t875 — the vee cone above the stock top → nothing to remove here
             if (cutZ < this.bottom) cutZ = this.bottom;   // can't cut below the stock
             const k = this.idx(i, j), h0 = this.h[k];
             const targetZ = h0 + c * (cutZ - h0);   // c=1 → cutZ exactly; c<1 → a partial lowering (bounded in [cutZ,h0] → never over-cuts)

@@ -272,7 +272,7 @@ export const userOpView = {
         const _tbl = (params.toolNum !== '' && params.toolNum != null) ? getTool(params.toolNum) : null;
         const _tdia = _tbl ? Number(_tbl.dia) : NaN;
         const _dia = (_tdia > 0) ? _tdia : ((_opToolDia > 0) ? _opToolDia : NaN);
-        if (_tbl && Number.isFinite(_dia)) _opTool = { type: _tbl.type || 'endmill', dia: _dia, name: _tbl.name };
+        if (_tbl && Number.isFinite(_dia)) _opTool = { type: _tbl.type || 'endmill', dia: _dia, name: _tbl.name, angle: Number(_tbl.angle) || undefined };   // t875 — the vee angle → the carve cone + sim tool
         else if (_opToolDia > 0) _opTool = { type: 'endmill', dia: _opToolDia, _opValue: true };
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).

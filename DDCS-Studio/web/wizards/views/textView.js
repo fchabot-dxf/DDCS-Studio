@@ -94,7 +94,11 @@ export const textView = {
 
         const gcode = wizard.generate(params);
         el('wiz_text_code').innerHTML = UIUtils.formatGCode(gcode);
-        ctx.preview3D(gcode, 'textVizContainer');
+        // t875 — route the PICKED tool's type + vee ANGLE to the preview so an engraving program shows the V cross-section
+        // (varying stroke width with depth). The text stack has no T#/host tool otherwise → the sim falls to a flat endmill.
+        const _pick = el('tx_tool'), _pt = (_pick && _pick.value) ? getTool(_pick.value) : null;
+        const _opTool = _pt ? { type: _pt.type || 'endmill', dia: Number(_pt.dia) || num(params.toolDia, 6), angle: Number(_pt.angle) || undefined } : null;
+        ctx.preview3D(gcode, 'textVizContainer', null, null, null, _opTool);
         layout.render(el('textLayoutCanvas'), buildTextSpec(params, s.stock));
 
         const status = el('textVizStatus');

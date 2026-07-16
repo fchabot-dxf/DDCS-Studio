@@ -43,7 +43,7 @@ export const STANDARD_TOOLS = [
     { num: 1, name: '6mm Flat Endmill',  type: 'endmill',  dia: 6,     flutes: 2, length: '', rpm: 18000, feed: 1200, plunge: 400 },
     { num: 2, name: '1/8" Flat Endmill', type: 'endmill',  dia: 3.175, flutes: 2, length: '', rpm: 18000, feed: 800,  plunge: 300 },
     { num: 3, name: '6mm Ball Nose',     type: 'ballnose', dia: 6,     flutes: 2, length: '', rpm: 18000, feed: 1000, plunge: 350 },
-    { num: 4, name: '60° V-Bit',         type: 'vbit',     dia: 6,     flutes: 1, length: '', rpm: 18000, feed: 600,  plunge: 200 },
+    { num: 4, name: '60° V-Bit',         type: 'vbit',     dia: 6,     flutes: 1, length: '', rpm: 18000, feed: 600,  plunge: 200, angle: 60 },
 ];
 const standardTools = () => STANDARD_TOOLS.map((t) => ({ ...t }));
 // Coerce a legacy bare-number slot (was the length offset) — or a partial object — into the
@@ -58,6 +58,7 @@ export function normalizeTool(t, fallbackNum) {
         name: o.name || '', type: o.type || '',
         dia: o.dia ?? '', flutes: o.flutes ?? '', length: o.length ?? '',
         rpm: o.rpm ?? '', feed: o.feed ?? '', plunge: o.plunge ?? '',
+        angle: o.angle ?? '',   // t875 — the V-bit/chamfer/engraver included angle (degrees); blank = the per-type default
     };
 }
 // The library as a sparse list of real tools: normalized, with a tool number, blanks dropped.
@@ -2444,7 +2445,7 @@ function wireSettingsOverlay(ov) {
             TOOL_TYPES.map((ty) => '<option value="' + ty + '"' + (ty === cur ? ' selected' : '') + '>' + ty + '</option>').join('');
         const cell = (i, f, val, step) =>
             '<td><input type="number" step="' + (step || 'any') + '" data-tool="' + i + '" data-field="' + f + '" value="' + (val === '' || val == null ? '' : val) + '"></td>';
-        if (!tools.length) { body.innerHTML = '<tr><td colspan="11" class="tl-empty">No tools yet — “＋ Add tool” to start your library.</td></tr>'; return; }
+        if (!tools.length) { body.innerHTML = '<tr><td colspan="12" class="tl-empty">No tools yet — “＋ Add tool” to start your library.</td></tr>'; return; }
         let html = '';
         tools.forEach((raw, i) => {
             const t = normalizeTool(raw, i + 1);
@@ -2455,6 +2456,7 @@ function wireSettingsOverlay(ov) {
                 '<td class="tl-prof" data-prof="' + i + '">' + toolProfileSvg(t, { w: 26, h: 40 }) + '</td>' +
                 cell(i, 'dia', t.dia) + cell(i, 'flutes', t.flutes, '1') + cell(i, 'length', t.length, '0.001') +
                 cell(i, 'rpm', t.rpm, '1') + cell(i, 'feed', t.feed, '1') + cell(i, 'plunge', t.plunge, '1') +
+                (['vbit', 'chamfer', 'engraver'].includes(t.type) ? cell(i, 'angle', t.angle, '1') : '<td class="tl-noangle" title="Included angle applies to V-bit / chamfer / engraver tips only"></td>') +
                 '<td class="tl-actcell"><button class="tl-use" data-usenum="' + (t.num === '' || t.num == null ? '' : t.num) + '" title="Use this tool in the wizard">Use</button><button class="tl-del" data-del="' + i + '" title="Remove tool">✕</button></td>' +
                 '</tr>';
         });
@@ -2500,7 +2502,7 @@ function wireSettingsOverlay(ov) {
                 <div class="tl-body">
                     <table>
                         <thead><tr>
-                            <th>Tool #</th><th>Name</th><th>Type</th><th>Profile</th><th>Ø mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th></th>
+                            <th>Tool #</th><th>Name</th><th>Type</th><th>Profile</th><th>Ø mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th title="Included angle — V-bit / chamfer / engraver only">Angle°</th><th></th>
                         </tr></thead>
                         <tbody id="toollib-rows"></tbody>
                     </table>
@@ -2532,7 +2534,7 @@ function wireSettingsOverlay(ov) {
                 const span = m.querySelector('.tl-var[data-var="' + i + '"]');
                 if (span) span.textContent = lenVarLabel(rec.num, parseInt(a.baseVar, 10) || 1430);
             }
-            if (f === 'type' || f === 'dia' || f === 'length') {   // redraw the silhouette in place (keeps focus)
+            if (f === 'type' || f === 'dia' || f === 'length' || f === 'angle') {   // redraw the silhouette in place (keeps focus) — t875: angle re-cuts the cone
                 const cellEl = m.querySelector('.tl-prof[data-prof="' + i + '"]');
                 if (cellEl) cellEl.innerHTML = toolProfileSvg(rec, { w: 26, h: 40 });
             }

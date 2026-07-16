@@ -1496,14 +1496,14 @@ export class GcodeViz3D {
     _toStockLocal(x, y, z) { const D = this._datumFrac(this._stock || {}), Z = (this._carve && this._carve.Z) || 0; return { x: (x || 0) + D[0], y: (y || 0) + D[1], z: (z || 0) + (D[2] - Z) }; }
 
     /** Carve one G-code/part-frame segment (live or end-state). toolR = tool radius mm; tip = flat|ball profile. Marks dirty. */
-    carveSeg(seg, toolR, tip) {
+    carveSeg(seg, toolR, tip, angle) {
         if (!this._carve || !seg) return;
         const cls = seg.type || (seg.probe ? 'probe' : seg.rapid ? 'rapid' : 'feed');
-        this._carve.carveSegment(this._toStockLocal(seg.x1, seg.y1, seg.z1), this._toStockLocal(seg.x2, seg.y2, seg.z2), toolR, cls, tip || 'flat');
+        this._carve.carveSegment(this._toStockLocal(seg.x1, seg.y1, seg.z1), this._toStockLocal(seg.x2, seg.y2, seg.z2), toolR, cls, tip || 'flat', angle);   // t875 — angle → the vee cone
     }
 
     /** Carve a per-frame swept sub-step from the live engine (prev→pos, G-code/part coords), cut class only. */
-    carveStep(prev, pos, toolR, tip) { if (!this._carve || !prev || !pos) return; this._carve.carveSegment(this._toStockLocal(prev.x, prev.y, prev.z), this._toStockLocal(pos.x, pos.y, pos.z), toolR, 'feed', tip || 'flat'); }
+    carveStep(prev, pos, toolR, tip, angle) { if (!this._carve || !prev || !pos) return; this._carve.carveSegment(this._toStockLocal(prev.x, prev.y, prev.z), this._toStockLocal(pos.x, pos.y, pos.z), toolR, 'feed', tip || 'flat', angle); }
 
     /** Reseed the carve to PRISTINE (full stock + declared recesses) + the SMOOTH mesh — the live progressive carve starts here. */
     carveReseed() {
@@ -1532,18 +1532,20 @@ export class GcodeViz3D {
     }
 
     /** Instant settled END-STATE: reseed + carve ALL segments once + build the CRISP vertical-wall mesh. segs = parsed.segments; tip = flat|ball. */
-    carveEndState(segs, toolR, tip) {
+    carveEndState(segs, toolR, tip, angle) {
         if (!this._carve || !this._stock) return;
         const feats = (() => { try { return projectWorkpiece(this._stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
         this._carve.reseed(this._stock, feats);
-        for (const s of (segs || [])) this.carveSeg(s, toolR, tip);
+        for (const s of (segs || [])) this.carveSeg(s, toolR, tip, angle);
         this._buildCarveArc(segs, toolR);
-        this._rebuildCarveMesh('crisp'); this.render();
+        // t875 — a V-carve has NO vertical walls, so the crisp mesher (which SHARPENS vertical walls) has nothing to sharpen
+        // → the SMOOTH mesh IS the correct settled render for a vee carve (not a degrade); flat/ball keep the crisp path.
+        this._rebuildCarveMesh(tip === 'vee' ? 'smooth' : 'crisp'); this.render();
     }
 
     /** Settle the LIVE carve into the CRISP vertical-wall mesh (playback stopped) — no reseed, just re-mesh the final heights (t682).
      *  `segs`/`toolR` (when the caller has them) feed the analytic-arc corner snap; omitted → the last arc data (or none). */
-    carveFinalize(segs, toolR, tip) { if (!this._carve) { return; } if (segs) this._buildCarveArc(segs, toolR); this._liveCrisp = null; this._rebuildCarveMesh('crisp'); this.render(); }
+    carveFinalize(segs, toolR, tip) { if (!this._carve) { return; } if (segs) this._buildCarveArc(segs, toolR); this._liveCrisp = null; this._rebuildCarveMesh(tip === 'vee' ? 'smooth' : 'crisp'); this.render(); }   // t875 — vee → keep the smooth mesh (no vertical walls to sharpen)
 
     // ── t816 — INCREMENTAL LIVE CRISPING: the wall crisps a beat behind the cutter DURING play, via the retained dirty rect.
     // The FIRST call builds the per-cell crisp cache + swaps the smooth live mesh for a crisp one; later calls re-march ONLY
