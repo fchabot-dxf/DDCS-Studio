@@ -4994,3 +4994,39 @@ Awaiting the ruling on the plan / phasing before building (so the safety-adjacen
 
 ### GATE
 - FULL gate: **1311 passed / 0 failed / 4 skipped (12.4m), GATE_EXIT=0** (grepped the whole log for the failed count — zero). +5 vs the t893 baseline 1306 = the new lift-drop-pairing-897 5-test spec. Files: web/data/simMarkers.js (new), web/wizards/ops/{safeZframe,probeSurface,measure,macro}.js, web/wizards/{cornerWizard,middleWizard}.js, web/engine/GcodeExecutionEngine.js; tests/{lift-drop-pairing-897 (new), corner-draw-anchor, corner-z-trust, corner-travel-shape, middle-reposition-refactor, probe-surface-block}.spec.js.
+
+
+## 🔨 turn 899 — RIDER 5: #520 REGISTER-OWNERSHIP (read-only to programs) + the sanctioned Apply-Now write door. All 4 parts SHIPPED, co-located with the t897 safe-height sites. Full gate GREEN (1314 passed / 0 failed).
+
+THE RULING (user, via advisor): the persistent Expert register #520 (safe-Z margin) is NEVER written by an emitted program — programs READ it; the ONLY write is a deliberate Settings button. Four parts, all built + verified.
+
+### PART 1 — THE GUARD REWRITE (read-only): Expert dialect safeRetract
+- WAS: `IF #520<0 GOTO<L> / #520=<margin> / N<L> / G53 Z#520` — the seed line ASSIGNED #520 when unset.
+- NOW: `#42=#520 / IF #42<0 GOTO<L> / #42=<margin> / N<L> / G53 Z#42` — READ #520 into a scratch, fall back to the baked margin IN THE SCRATCH, move to the scratch. #520 is never assigned. Same safety (never G53 Z0), +1 line (the register read). Centralized in the ONE dialect.safeRetract → every consumer inherits it (corner/middle/edge/rotary/CAM); V4.1/DM500/grbl/rs274/centroid already never touched #520 (they bake a literal / stage #190 / degrade).
+- SCRATCH VAR = **#42**, GROUNDED FREE: 0 refs across every wizard/CAM emit + every golden + tests (I scanned #25-#98; rejected #30=corner-num/CAM-row, #40/#41=CAM bore opToSlot, #95=t897 return). Reserved in data/varMap.js. Reused across a program's several retracts (sequential — each re-reads; the LIFO/label stay unique).
+
+### PART 2 — REMOVE THE SYSSTART SEED (macrosApp.buildAutostartBody): the t822 Expert-only `#520=<szm>` boot injection is GONE — Studio never injects config into the user's boot macro (a user-authored surface). The safeRetract guard's baked fallback covers an un-pushed machine. varMap #520 doc reworded (READ-ONLY; the only write is Apply-Now). Two tests flipped: safe-z-retract-822 (the "seeds #520" test → asserts the body carries NO `#520=`), autostart-stored-macro (removed the mirror seed block from its `expected` builder + the now-orphaned getActiveProfile import).
+
+### PART 3 — THE CORPUS GUARD (permanent read-only invariant): a NEW sweep in safe-z-retract-822 asserts NO emitted line ASSIGNS #520 across EVERY wizard x EVERY post (4 x 6 = 24, non-vacuous). Plus the existing guard-form assertions updated to the #42 read form (+ `.not.toMatch(/#520=/)` at each retract).
+
+### PART 4 — THE SANCTIONED WRITE DOOR (Settings Apply-Now): the safe-Z margin field gained an "Apply to #520 →" button. On click: dlgConfirm (danger, distinct okLabel "Write #520 now") → `makeClient().submitJob('set-safez-520.nc', '#520=<margin>\nM30\n')` (deliver-only, no beacon map) → toast the queued job id (surfaces in Gateway > Jobs history). Click-time gating (submitJob throws a clear toast if no controller is bridged — leak-free, no persistent modal listener). The field's stale "seeded by sysstart" title reworded to the read/Apply-Now model. Imports reused (makeClient, dlgConfirm already in settingsPanel; added toast).
+
+### VERIFICATION
+- **tests/safez-apply-899.spec.js 2/2** (mocked gateway via page.route /api/jobs): Apply-Now submits EXACTLY `#520=-7\nM30\n` (name set-safez-520.nc, deliver-only no map) after the confirm; CANCEL submits NOTHING (the confirm gates it).
+- **safe-z-retract-822 9/9**: the read-only invariant sweep (0 assignments, 24 checked), the sysstart-does-NOT-seed, the guard reads #42 with a #520 fallback (never assigns #520), the round-trip + sim (retracts to -5 via #42), the per-post folds (V4.1/DM500/grbl/rs274/centroid unchanged).
+- **GOLDENS regenerated + DIFF-VERIFIED (guard-only, t897 UNTOUCHED):**
+  - middle-reposition-refactor (frozen 6-row __GOLDEN__): DIFF = ONLY `IF #520<0`/`#520=-5`/`G53 Z#520` -> `#42=#520`/`IF #42<0`/`#42=-5`/`G53 Z#42` per guard; the t897 `#95=#882`/`G53 Z#95` save/return lines untouched; row 4 (auto controls) still byte-identical for the t897 property. Regenerated via cornerStack/middleStack matching each test's exact emit call.
+  - probe-surface-block CORNER golden (stripAnnotations): DIFF = the 3 guards/corner rewritten to #42; the Z-surface block (rows 1,2) intact; t897 save/return untouched. (First regen mistakenly used the data twin `build` which reads probeZFirst not probeZ and dropped the Z-surface — CAUGHT by the diff, redone with cornerStack.)
+  - corner-z-trust (retreatG53 -> /^G53 Z#42$/), corner-travel-shape (unaffected — asserts the merge/return), safez-frame (Z#17 counts unaffected; comments corrected).
+- corner-draw-anchor + lift-drop-pairing-897 (the t897 tests) STILL GREEN — the guard's `#42=#520` read + `G53 Z#42` renders in the sim identically to the old `G53 Z#520` (both hit the g53Approx margin), so the anchor/one-Z/wall-2-hits properties are unaffected.
+- Affected cluster 37/37 + Apply-Now 2/2 green before the full gate.
+
+### DECLARE-OR-HAND-ROLL
+- DECLARED: the read-only invariant is now a NAMED convention (varMap #520 + the #42 scratch reservation + the corpus-guard test that ENFORCES it permanently). The Apply-Now is the single declared write path. No new machinery — the guard is one dialect function; Apply-Now reuses submitJob/dlgConfirm/toast.
+
+### HONEST NOTES
+- The guard is +1 line (the register read) vs the old seed — the ruling said "same line count"; the extra READ is inherent to reading-not-writing. Noted.
+- Apply-Now gates at click-time (submitJob throws if offline) rather than a persistent bridged-state listener — leak-free for a transient modal; the button title says it requires a bridged controller. A live bridged-state disable is a small follow-up if desired.
+
+### GATE
+- FULL gate: **1314 passed / 0 failed / 4 skipped (12.3m), GATE_EXIT=0** (grepped the whole log for the failed count — zero). +3 vs the t897 baseline 1311 = safez-apply-899 (2) + the corpus-guard sweep (1). Files: web/wizards/dialects/ddcs-expert-m350.js, web/ui/macrosApp.js, web/ui/settingsPanel.js, web/data/varMap.js; tests/{safez-apply-899 (new), safe-z-retract-822, autostart-stored-macro, corner-z-trust, corner-travel-shape, safez-frame, middle-reposition-refactor, probe-surface-block}.spec.js. Queued after: P2 (safetraverse atom) + RIDER 3 (inline diagnostics).
