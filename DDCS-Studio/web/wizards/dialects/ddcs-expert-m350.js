@@ -32,17 +32,22 @@ export const dialect = {
     probeGuard: (p = {}) => { const o = []; if (p.stopVar) o.push(`${p.stopVar}=0 ( Stop mode: decelerate )`); if (p.limitVar) o.push(`${p.limitVar}=${p.limitVal ?? ''} ( Limit protect )`); return o; },
     // G53 Z#99   (snippets.nc:4). NO G0 prefix; ref MUST be a #var on M350 (a literal fails)
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],
-    // safeRetract (t822) — the SYSTEM safe-height retract to the machine-frame margin. G53 needs a #var on M350, so
-    // read the boot-seeded persistent register #520 (data/varMap.js RESERVED; sysstart.nc seeds it from the setting).
-    // INLINE UNSET-GUARD (defense-in-depth): a controller value wins if set (negative); else seed the declared margin —
-    // NEVER `G53 Z0` (= the top switch). A `function` (not arrow) so `this` is the dialect (reuses ifGoto/label/machineMove).
+    // safeRetract (t822) — the SYSTEM safe-height retract to the machine-frame margin. G53 needs a #var on M350, so the
+    // persistent register #520 (data/varMap.js RESERVED) holds the margin. t899 REGISTER-OWNERSHIP: #520 is READ-ONLY to
+    // every emitted program — READ it into a scratch var with a BAKED-MARGIN fallback, NEVER assign it (a program must
+    // never write config; only the sanctioned Settings Apply-Now door writes #520, deliberately). The controller value
+    // wins if set (negative); else fall back to the baked margin IN THE SCRATCH — NEVER `G53 Z0` (= the top switch).
+    // `rd` = #42, a grounded-FREE scratch: 0 refs across every wizard/CAM emit + the goldens (distinct from t897's #95 and
+    // the CAM #30/#40/#41; reserved in data/varMap.js). A `function` (not arrow) so `this` is the dialect (reuses ifGoto/label/machineMove).
     safeRetract: function ({ margin = -5, label = 91 } = {}) {
+        const rd = '#42';   // the read-into scratch (see the note above); reused across a program's several retracts (sequential — each re-reads)
         return [
             '( Safe-Z retract - machine frame )',
-            ...this.ifGoto('#520', '<', '0', label),   // IF #520<0 GOTO<L>  — margin already set, skip the seed
-            `#520=${margin} ( safe-Z margin - controller value wins if set )`,
+            `${rd}=#520`,                              // READ the persistent register into the scratch (never assign #520)
+            ...this.ifGoto(rd, '<', '0', label),       // IF #42<0 GOTO<L>  — a controller value is set (negative), use it
+            `${rd}=${margin} ( safe-Z margin - baked fallback; controller #520 wins if set )`,   // else the baked margin, INTO THE SCRATCH
             ...this.label(label),                      // N<L>
-            ...this.machineMove('Z', '#520'),          // G53 Z#520
+            ...this.machineMove('Z', rd),              // G53 Z#42
         ];
     },
     // #[805+[idx-1]*5+ax]=value   (SAVE_WCS_XY_AUTO.nc:21-26). base 805, stride 5; X=base,Y=+1,Z=+2,A=+3

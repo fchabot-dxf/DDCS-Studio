@@ -35,9 +35,10 @@ test('Z-trust: probeZ-off wall-1 straight to G31 (no pre-plunge) · probeZ-ON ke
       offAutoBefore: beforeFirstWallG31(offAuto),                           // probeZ-off auto: what precedes wall-1's G31?
       onAutoBefore: beforeFirstWallG31(onAuto),                             // probeZ-on auto: ...
       offManualHasZ18: /^G0 Z#18$/m.test(emit({ travelApproach: 'manual' })),  // probeZ-off manual: ANY G0 Z#18? (no plunge + no drop → false)
-      // t824/t826 — the per-wall RETREAT is now the machine-frame G53 retract (register #520 on Expert); the OLD incremental
-      // safeZ/#17 per-wall LIFT is RETIRED. t897 — the reposition DROP is now the SAVE + honest RETURN, NOT a relative value.
-      retreatG53: /^G53 Z#520$/m.test(offAuto),                            // the per-wall retreat is the machine-frame margin → true
+      // t824/t826 — the per-wall RETREAT is the machine-frame G53 retract; the OLD incremental safeZ/#17 per-wall LIFT is
+      // RETIRED. t897 — the reposition DROP is the SAVE + honest RETURN. t899 — the G53 reads the read-only scratch #42
+      // (which mirrors the persistent #520 with a baked fallback), NEVER #520 directly.
+      retreatG53: /^G53 Z#42$/m.test(offAuto),                             // the per-wall retreat is the machine-frame margin (via #42) → true
       offAutoLift19: /^G0 Z#19$/m.test(offAuto),                            // the OLD incremental safeZ per-wall lift is GONE on the off path → false
       offAutoDropNeg19: /^G0 Z\[0-#19\]$/m.test(offAuto),                   // t897 — the OLD relative reposition drop [0-#19] is RETIRED → false
       offAutoDrop18: /^G0 Z#18$/m.test(offAuto),                            // no #18 on the off path → false
@@ -63,7 +64,7 @@ test('Z-trust: probeZ-off wall-1 straight to G31 (no pre-plunge) · probeZ-ON ke
   // (4) MANUAL-OFF has NO drop: probeZ-off manual emits NO `G0 Z#18` at all (no wall-1 plunge + no post-jog drop — operator sets Z).
   expect(r.offManualHasZ18, 'probeZ-off MANUAL: no G0 Z#18 (no pre-plunge, no auto-drop after the jog)').toBe(false);
   // (5) t824/t826 — the per-wall RETREAT is the machine-frame G53 margin (limit-proof); the OLD incremental safeZ/#17 LIFT is GONE.
-  expect(r.retreatG53, 'the per-wall retreat is the machine-frame G53 Z#520 margin').toBe(true);
+  expect(r.retreatG53, 'the per-wall retreat is the machine-frame G53 margin (via the read-only scratch #42)').toBe(true);
   expect(r.offAutoLift19, 'probeZ-off AUTO: the OLD incremental safeZ (#19) per-wall lift is RETIRED').toBe(false);
   expect(r.onAutoLift17, 'probeZ-ON: the OLD incremental #17 per-wall lift is RETIRED').toBe(false);
   // (6) t897 — the OLD relative reposition DROP is RETIRED (it landed an arbitrary Z off the absolute lift); the HONEST

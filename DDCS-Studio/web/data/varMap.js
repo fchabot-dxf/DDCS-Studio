@@ -37,9 +37,13 @@ export const WCS = { min: 805, max: 834 };       // G54..G59 offset table (base 
 /** RESERVED persistent uservar slots — a Studio meaning is pinned to the # so nothing else allocates it. Grounded CLEAN
  *  in the M350 dump (macro-free; a FINDINGS persistence test that touched a slot only PROVES it is a live persistent cell). */
 export const RESERVED = {
-    520: 'safe-Z margin (t822) — machine-frame retract height as a NEGATIVE machine Z (below home). sysstart.nc seeds it '
-        + 'from settings.machine.safeZMargin; the error-handler retract reads G53 Z#520 with an inline unset-guard. '
+    520: 'safe-Z margin (t822) — machine-frame retract height as a NEGATIVE machine Z (below home). t899 READ-ONLY to every '
+        + 'emitted program: the safeRetract guard READS #520 into scratch #42 with a baked-margin fallback (never assigns it); '
+        + 'the ONLY write is the Settings safe-Z margin Apply-Now button (a deliberate one-line run-once job). NO sysstart seed. '
         + 'Neighbours in use: park #470-471, tool-change #472-473, SN #490, tool-change working #500/#510 — #520 is clear.',
+    // Not a persistent slot — a SCRATCH reservation (t899): the Expert safeRetract guard reads #520 into #42 (grounded free:
+    // 0 refs across every wizard/CAM emit + goldens; distinct from t897 #95, CAM #30/#40/#41). Volatile, re-read per retract.
+    42: 'safe-Z guard scratch (t899) — dialect.safeRetract reads #520 into #42 with a baked-margin fallback (keeps #520 read-only).',
 };
 
 /** Which class a macro var # belongs to. */

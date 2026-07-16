@@ -35,10 +35,11 @@ async function emitAll(page) {
 }
 
 /** slice ONE safe-Z retract's lines (a program can now hold several: per-wall retreats + the error handler). `which`
- *  = 'first' (default) or 'last' (the error handler, nearest M30). A retract is at most ~6 lines (comment+guard+G53). */
+ *  = 'first' (default) or 'last' (the error handler, nearest M30). t899 — the Expert guard grew a line (it now READS #520
+ *  into a scratch before the G53), and with the G90 wrap (+ optional G91 restore) a retract is now up to 8 lines. */
 function retractRegion(text, which = 'first') {
   const i = which === 'last' ? text.lastIndexOf('Safe-Z retract') : text.indexOf('Safe-Z retract');
-  return i >= 0 ? text.slice(i).split('\n').slice(0, 6).join('\n') : '';
+  return i >= 0 ? text.slice(i).split('\n').slice(0, 8).join('\n') : '';
 }
 
 test('the safe-height class retracts in the MACHINE frame (Expert G53 #520) — ZERO incremental per-wall Z-lifts survive', async ({ page }) => {
@@ -50,21 +51,40 @@ test('the safe-height class retracts in the MACHINE frame (Expert G53 #520) — 
   //  class; corner-z-trust asserts corner's per-wall retreat converted specifically.)
   for (const w of Object.keys(STACKS)) {
     const text = em[w]['ddcs-expert-m350'];
-    expect(text, `${w}: emits the machine-frame G53 retract`).toContain('G53 Z#520');
+    // t899 — the machine move reads the scratch #42 (which mirrors #520 with a baked fallback), never #520 directly.
+    expect(text, `${w}: emits the machine-frame G53 retract (via the read-only scratch)`).toContain('G53 Z#42');
+    expect(text, `${w}: reads the persistent register into the scratch (#42=#520)`).toContain('#42=#520');
     // the ERROR-HANDLER retract (the LAST safe-Z retract, at the miss branch near M30) is machine-frame with no incremental lift
     const err = retractRegion(text, 'last');
-    expect(err, `${w}: the error-handler retract is machine-frame G53`).toContain('G53 Z#520');
+    expect(err, `${w}: the error-handler retract is machine-frame G53 (via #42)`).toContain('G53 Z#42');
     expect(err, `${w}: no incremental G91 in the error-handler retract`).not.toContain('G91');
   }
 });
 
-test('the UNSET-GUARD: controller value wins if set, else seed the declared margin — never G53 Z0', async ({ page }) => {
+// t899 — THE READ-ONLY INVARIANT (permanent): NO emitted program anywhere ASSIGNS #520. The persistent register is written
+// ONLY by the sanctioned Settings Apply-Now door; every wizard READS it (into scratch #42) with a baked-margin fallback.
+test('t899 read-only invariant: NO emitted line assigns #520, across every wizard x every post', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetSettings);
+  const em = await emitAll(page);
+  let checked = 0;
+  for (const w of Object.keys(em)) for (const id of Object.keys(em[w])) {
+    const text = em[w][id];
+    const assigns = (text.match(/^\s*#520\s*=/gm) || []);   // a bare `#520=<v>` assignment anywhere in the program
+    expect(assigns.length, `${w}/${id}: NO line assigns #520 (read-only; the guard reads it into a scratch)`).toBe(0);
+    checked++;
+  }
+  expect(checked, 'the sweep covered every wizard x post (non-vacuous)').toBeGreaterThanOrEqual(24);   // 4 wizards x 6 posts
+});
+
+test('t899 the UNSET-GUARD: READ #520 into a scratch, controller value wins if set else the baked fallback — never assign #520, never G53 Z0', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetSettings);
   const em = await emitAll(page);
   const reg = retractRegion(em.corner['ddcs-expert-m350']);
-  // the guard, IN ORDER: skip-if-set → seed-default → label → the machine move. And NEVER a bare G53 Z0.
-  expect(reg).toMatch(/IF #520<0 GOTO91[\s\S]*#520=-5[\s\S]*N91[\s\S]*G53 Z#520/);
+  // the guard, IN ORDER: READ the register into the scratch → skip-if-set → baked fallback into the SCRATCH → label → the move.
+  expect(reg).toMatch(/#42=#520[\s\S]*IF #42<0 GOTO91[\s\S]*#42=-5[\s\S]*N91[\s\S]*G53 Z#42/);
+  expect(reg, 't899 — the guard NEVER assigns #520 (read-only)').not.toMatch(/#520\s*=/);
   expect(reg, 'never rapids to the machine top (Z0)').not.toMatch(/G53 Z0\b/);
 });
 
@@ -109,7 +129,7 @@ test('the safe-Z retract ROUND-TRIPS byte-identical (emit → parse → emit) �
     return out;
   });
   for (const id of Object.keys(r)) expect(r[id].t2, `${id}: the safe-Z retract round-trips byte-identical`).toBe(r[id].t1);
-  expect(r['ddcs-expert-m350'].t1).toContain('G53 Z#520');
+  expect(r['ddcs-expert-m350'].t1, 't899 — the machine move reads the scratch (G53 Z#42), never #520 directly').toContain('G53 Z#42');
 });
 
 test('the margin is USER-OWNED: the declared setting flows to the retract (Expert guard + literal posts)', async ({ page }) => {
@@ -118,7 +138,9 @@ test('the margin is USER-OWNED: the declared setting flows to the retract (Exper
   // set the declared margin to 8mm below home
   await page.evaluate(() => { const s = window.ddcsGetSettings(); s.machine = s.machine || {}; s.machine.safeZMargin = 8; });
   const em = await emitAll(page);
-  expect(retractRegion(em.corner['ddcs-expert-m350']), 'Expert guard seeds the declared -8').toContain('#520=-8');
+  // t899 — the declared margin flows to the guard's BAKED FALLBACK (into the scratch #42), never into #520 (read-only).
+  expect(retractRegion(em.corner['ddcs-expert-m350']), 'Expert guard bakes the declared -8 as the scratch fallback').toContain('#42=-8');
+  expect(retractRegion(em.corner['ddcs-expert-m350']), 't899 — never assigns #520').not.toMatch(/#520\s*=/);
   expect(retractRegion(em.corner['grbl']), 'grbl bakes the declared -8').toContain('G53 G0 Z-8');
   // restore the default so later tests see 5
   await page.evaluate(() => { window.ddcsGetSettings().machine.safeZMargin = 5; });
@@ -133,10 +155,10 @@ test('the twin inherits: user_corner_data emits the same machine-frame retract',
     const { getDialect } = await import('/wizards/dialects/index.js');
     return emitMapped(cornerDataStack({}), { dialect: getDialect('ddcs-expert-m350') }).text;
   });
-  expect(r, 'the data twin carries the machine-frame safe-Z retract').toContain('G53 Z#520');
+  expect(r, 'the data twin carries the machine-frame safe-Z retract (via the read-only scratch #42)').toContain('G53 Z#42');
 });
 
-test('the sysstart BOOT macro seeds #520 from the declared setting (Expert)', async ({ page }) => {
+test('t899 — the sysstart BOOT macro does NOT seed #520 (Studio never injects config; #520 is read-only to programs)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetSettings && window.showApp);
   await page.evaluate(() => { const s = window.ddcsGetSettings(); s.machine = s.machine || {}; s.machine.safeZMargin = 5; s.autostartBody = undefined; s.autostartHandEdited = false; });
@@ -148,7 +170,11 @@ test('the sysstart BOOT macro seeds #520 from the declared setting (Expert)', as
   await page.evaluate(() => { const b = document.getElementById('sysstart_regen'); if (b) b.click(); });
   await page.waitForTimeout(300);
   const body = await page.evaluate(() => { const t = document.getElementById('sysstart_body'); return t ? t.value : (window.ddcsGetSettings().autostartBody || ''); });
-  expect(body, 'the boot macro seeds the safe-Z margin register').toContain('#520=-5');
+  // t899 REGISTER-OWNERSHIP: the boot macro is a USER-authored surface — Studio never injects config. The t822 #520 seed is
+  // RETIRED; the safeRetract guard reads #520 with a baked-margin fallback so an un-pushed machine is still safe, and the ONLY
+  // sanctioned write is the Settings safe-Z Apply-Now door.
+  expect(body, 'the boot macro carries NO #520 assignment (the t822 seed is retired — read-only invariant)').not.toMatch(/#520\s*=/);
+  expect(body, 'the boot macro still builds (homing + program end)').toMatch(/M30/);
 });
 
 test('the SIM executes the machine-frame retract to the declared safe height (→ amber poschip)', async ({ page }) => {
@@ -169,7 +195,7 @@ test('the SIM executes the machine-frame retract to the declared safe height (�
     return { code, endZ: last ? last.z2 : null, absolute: trace.stats.absolute,
       liftFrame: chipFrame({ g53: true, probing: false }), cutFrame: chipFrame({ g53: false, probing: false }) };
   });
-  expect(r.code, 'the isolated retract is the machine-frame register form').toContain('G53 Z#520');
+  expect(r.code, 'the isolated retract is the machine-frame form (G53 Z#42, reading the read-only register)').toContain('G53 Z#42');
   // t856 — stats.absolute is now driven by the DIST MODE, NOT by a G53 (the engine excludes the G53 line so the safe-Z
   // MODE-EXPLICIT wrap can't flip a G91 probe macro absolute — the t826 re-anchor collapse). A retract-ONLY program has
   // no dist-mode-absolute move, so the flag is false; the retract still RAN (endZ=-5 below proves the machine-frame move).

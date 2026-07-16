@@ -61,14 +61,10 @@ test('Regenerate rebuilds body == homingStack emit + the additional-G-code suffi
     const expected = await page.evaluate(async () => {
         const { homingStack, homingRunParams } = await import('/wizards/homingWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
-        const { getActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
         let code = emitMapped(homingStack(homingRunParams(window.ddcsGetSettings()))).text || '';
         code = code.replace(/\s*M30\s*$/, '');   // the homing emit's trailing M30 is stripped so the additional G-code runs before the end
-        // t822 — Expert ALSO seeds the machine-frame safe-Z margin register #520 from the setting (mirror buildAutostartBody)
-        if (((getActiveProfile() || {}).id || 'ddcs-expert-m350') === 'ddcs-expert-m350') {
-            const szm = -Math.abs(Number((window.ddcsGetSettings().machine || {}).safeZMargin) || 5);
-            code += `\n( --- Safe-Z Margin --- )\n#520=${szm} ( machine-frame safe-Z retract - mm below home )`;
-        }
+        // t899 — the t822 #520 seed is RETIRED from buildAutostartBody (Studio never injects config; #520 is read-only to
+        // programs). The mirror block that added `#520=<szm>` here is removed in lockstep so the byte-equality holds.
         const custom = String(window.ddcsGetSettings().sysstartCustomGcode || '').trim();
         if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom;
         code += '\nM30\n';

@@ -568,13 +568,10 @@ export function initMacrosApp() {
     function buildAutostartBody() {
         let code = emitMapped(homingStack(homingRunParams(getSettings())), activeDialectOpts()).text || '';   // t626/t646 — the REAL homing sequence, per active post
         code = code.replace(/\s*M30\s*$/, '');   // t656 — strip the homing emit's trailing M30: the additional G-code must run BEFORE the program end, and the body ends with ONE M30 (a human caught the double-M30 + dead trailing custom)
-        // t822 — SEED the machine-frame safe-Z margin register #520 from the declared setting (Expert only: the register
-        // is Expert uservar, and only Expert gets a real boot body — V4.1/DM500 get the honest UNVERIFIED stub). The
-        // error-handler retract reads G53 Z#520 with an inline unset-guard, so this boot push is the primary source.
-        if (curProfileId() === 'ddcs-expert-m350') {
-            const szm = -Math.abs(Number((getSettings().machine || {}).safeZMargin) || 5);
-            code += `\n( --- Safe-Z Margin --- )\n#520=${szm} ( machine-frame safe-Z retract - mm below home )`;
-        }
+        // t899 — the t822 #520 auto-seed is REMOVED. Studio never injects config into the user's boot macro (the editor is a
+        // user-authored surface). #520 is now READ-ONLY to every emitted program: the safeRetract guard READS it with a baked-
+        // margin fallback (dialect.safeRetract), so a machine that never got a #520 push is still safe. The ONLY sanctioned
+        // write is the Settings safe-Z margin field's Apply-Now button (a deliberate one-line run-once job). See varMap #520.
         const custom = String(getSettings().sysstartCustomGcode || '').trim();
         if (custom) code += '\n( --- Additional Boot G-code --- )\n' + custom;
         code += '\nM30\n';

@@ -12,6 +12,7 @@ import { UIUtils } from './uiUtils.js';
 import { CONTROLLER_PROFILES, getActiveProfile, setActiveProfile, registerProfile } from '../shared/js/profiles/controllerProfiles.js';
 import { listPosts, getActivePostId, setActivePostId, isPostVerified, getDialect } from '../wizards/dialects/index.js';
 import { makeClient } from '../shared/js/client.js';
+import { toast } from './gateway/util.js';   // t899 — the safe-Z Apply-Now feedback (submit + result), mirrors bridgeTransfer
 import { renderIoTable, renderMagazineTable, renderAtcPinPicker } from './ioTable.js';
 import { renderAtcSetupCanvas, defaultFirmwareStation } from '../viz/atcSetupCanvas.js';
 import { renderAtcChanger } from './atcChangerGui.js';
@@ -1240,7 +1241,7 @@ function buildSettingsOverlay() {
                         <!-- t744 — Show-machine-envelope folded into the 👁 visibility modal (the envelope element, everywhere + default-on). Soft limits stay below (a real machine bound, not a display toggle). -->
                         <label class="settings-check" title="Soft limits (#655). On = the controller bounds travel to this envelope, so the box closes. Off = no software bound — the box opens, unbounded in the travel direction (still pinned at home). Studio never writes #655 to the controller; this mirrors the machine's own setting (pull it)."><input type="checkbox" id="set_mach_softlimit"> Enable soft limits (#655) — closes the envelope</label>
                         <!-- t822 — the DECLARED machine-frame safe-Z margin. The error-handler retract (on a probe miss) drops to this height in MACHINE coords via G53, so it never compounds into the top switch. YOUR value (headroom below home). -->
-                        <label class="mach-travel-row" style="margin-top:8px;" title="Safe-Z margin (mm below machine home). On a probe fault the tool retracts to G53 Z −(this) — a fixed machine height, immune to where the tool sits — instead of an incremental lift that can slam the top switch. Home Z0 = the top, so 5 → machine Z −5. Seeded to the controller register #520 by the sysstart boot macro (Expert)."><span class="mach-ax" style="color:#d8a35a;">⤒</span><input type="number" id="set_safez_margin" class="dim-edit mach-col-field" step="1" min="0" title="Safe-Z margin — mm below machine home"><span style="font-size:11px; opacity:.7;">Safe-Z margin (mm below home)</span></label>
+                        <label class="mach-travel-row" style="margin-top:8px;" title="Safe-Z margin (mm below machine home). On a probe fault the tool retracts to G53 Z −(this) — a fixed machine height, immune to where the tool sits — instead of an incremental lift that can slam the top switch. Home Z0 = the top, so 5 → machine Z −5. Every probe program READS this from controller register #520 (with a baked fallback) and NEVER writes it; use Apply Now to write #520 on the live controller (the only sanctioned write)."><span class="mach-ax" style="color:#d8a35a;">⤒</span><input type="number" id="set_safez_margin" class="dim-edit mach-col-field" step="1" min="0" title="Safe-Z margin — mm below machine home"><span style="font-size:11px; opacity:.7;">Safe-Z margin (mm below home)</span><button class="toolbar-btn settings-io" id="set_safez_apply" style="margin-left:8px;" title="Write this safe-Z margin to the live controller's persistent register #520 — a confirmed one-line run-once job (#520=… / M30) via the gateway. Probe programs never write #520; this is the only sanctioned way to set it. Requires a bridged controller.">Apply to #520 →</button></label>
                     </div>
                     <div class="settings-section" id="set_homing_section">
                         <div class="settings-section-title">HOMING</div>
@@ -2850,6 +2851,23 @@ function wireSettingsOverlay(ov) {
     // Machine envelope GUI: typing redraws the iso box (origin follows the signs); on commit persist so the 3D updates.
     ['set_mach_x', 'set_mach_y', 'set_mach_z'].forEach(id => { const el = q(id); if (el) { el.addEventListener('input', renderMachineGui); el.addEventListener('change', commitMachine); } });
     { const el = q('set_safez_margin'); if (el) el.addEventListener('change', commitMachine); }   // t822 — commit the safe-Z margin live (no envelope redraw needed)
+    // t899 — APPLY NOW: the SANCTIONED write door for #520. Probe programs NEVER write #520 (they READ it with a baked
+    // fallback); this button is the deliberate way to set the persistent register — a CONFIRMED one-line run-once job
+    // (#520=<margin> / M30, deliver-only) to the LIVE controller via submitJob, surfacing in Gateway > Jobs history.
+    { const el = q('set_safez_apply'); if (el) el.addEventListener('click', async () => {
+        const margin = -Math.abs(num(q('set_safez_margin').value, 5));   // mm below home → the NEGATIVE machine Z (same convention as the guard)
+        const ok = await dlgConfirm(
+            `Write the safe-Z margin to the controller's persistent register #520?\n\nThis runs a one-line job on the LIVE machine:\n  #520=${margin}\n  M30\n\nProbe programs never write #520 — this is the deliberate way to set it.`,
+            { title: 'Apply safe-Z margin to #520', danger: true, okLabel: 'Write #520 now', cancelLabel: 'Cancel' });
+        if (!ok) return;
+        el.disabled = true;
+        try {
+            const r = await makeClient().submitJob('set-safez-520.nc', `#520=${margin}\nM30\n`);   // no map ⇒ deliver-only
+            toast(`Safe-Z margin queued to #520 (job ${(r && (r.jobId || r.name)) || 'sent'}) — see Gateway ▸ Jobs.`);
+        } catch (e) {
+            toast('Apply failed — is a controller bridged? ' + ((e && e.message) || e), true);
+        } finally { el.disabled = false; }
+    }); }
     { const el = q('set_mach_softlimit'); if (el) el.addEventListener('change', () => { commitMachine(); renderMachineGui(); }); }   // soft-limit toggle redraws the box closed/open
     // HOMING section (t624, moved here from Macros → sysstart) — the simultaneous flag + the safe-default reset (the per-axis
     // row inputs + ▲▼ are wired inside renderHomingGui on each render).
