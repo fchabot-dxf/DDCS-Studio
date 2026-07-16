@@ -4813,3 +4813,28 @@ carve-carry. NO code this turn — grounded design only, per the dispatch. Await
 2. PIECE 2: BUILD option A (`diskOffsetDeg`) — the named gap, fold into magazinePockets ang0 + diskTheta + the disk edit UI (ioTable.js disk block) + the default. Assert slot angle = i*360/n + offset. (B/C deferred unless you rule otherwise.)
 3. PIECE 3: BUILD the disk-plate 3D mesh + empty-slot boxes (the genuine visual polish); the loaded-tool glyphs already ship.
 Byte-identity holds trivially (sim/preview only; no emit files touched). Awaiting your ruling on the DECLARE shape (A/B/C) + whether piece-3 disk-plate polish is in scope this cycle.
+
+## 🔨 turn 885 — ATC LEFTOVERS BUILD (backlog item 12), the advisor-ruled re-scope: piece 1 VERIFY-ONLY, piece 2 = option A (declare atc.diskOffsetDeg), piece 3 = disk-plate mesh + empty slots. Sim/preview only; ATC emit goldens untouched.
+
+### PIECE 2 — DISK INDEXING (option A: the DECLARED angular offset)
+- `atc.diskOffsetDeg` (deg) folded into magazinePockets' ang0 (atcViews.js:76): `ang0 = atan2(-o[1],-o[0]) + diskOffsetDeg*pi/180`. Slot i angle = ang0_base + offset + i*(2pi/n); index stays the ARRAY POSITION, n = magazine.length (option A literal; B/C not built — B waits for empty PHYSICAL slots as a real case, C over-declares).
+- `diskTheta` (createPreviewPanel.js:1101) updated to cancel BOTH the offset AND the index so a change indexes the target to the fixed pickup: `theta = -(offsetRad + (i/n)*2pi)` (was `-(i/n)*2pi`). Without this, an offset carousel wouldn't bring the pocket exactly to the pickup during a swap.
+- The offset is a SETTINGS field on the disk magazine declaration (user-owned machine truth) — added the `Offset°` input to the disk edit block (ioTable.js), lazily on the atc.diskOffsetDeg key (consistent with pickup/diskDia/diskAxis, NOT in SETTINGS_DEFAULTS). The pull seeds it NEVER (no controller register exists) — confirmed: no pull/mergeEng path reads it.
+
+### PIECE 3 — 3D MAGAZINE POLISH (plate + empty slots)
+- B-TRIGGER CHECK (the advisor's "if empty pockets are NOT array entries, gate rather than invent"): empty slots ARE entries — a magazine row with `tool: ''`. magazinePockets maps ALL rows; I added `empty: (p.tool === '' || p.tool == null)` per pocket. NO invention, NO B trigger.
+- The CAROUSEL PLATE: magazinePockets' disk branch attaches `out.disk = {cx,cy,cz,R}` (R = diskDia/2). setMagazine (gcodeViz3d.js) draws a thin translucent CylinderGeometry disc (Z-up) + an edge ring at the declared centre, below the pockets. Straight racks carry no `.disk` → no plate (unchanged). magPocketList (the swap path) re-attaches `.disk` through the occupancy filter so the plate persists during a change.
+- EMPTY slots: setMagazine skips the tool silhouette for `p.empty` (no fake tool) and dims the slot box + keeps the number sprite. Occupied pockets unchanged.
+
+### PIECE 1 — MACHINE-FRAME ATC SIM: VERIFY-ONLY (no code)
+- Already built + locked by atc-magazine-frame.spec (setMagazine adds to this.scene = the fixed machine frame at raw declared coords). Re-verified by the t885 screenshot: the carousel renders at the declared machine coords (pickup 150,100 + the ring), NOT shifted by a WCS.
+
+### BYTE-IDENTITY (sim-only — the key safety check)
+- magazinePockets IS read on the emit-adjacent path (atcChangeData.js:150) — but ONLY inside `def.simGcode` (the CHOREOGRAPHY PREVIEW, atcChangeData:145-150). The REAL ATC emit is `T# M6` (macroCall) or the inline body; for a DISK the interpreter emits NO XY for the ring rotation (atcInterpreter.js:78 `case 'rotate': break; // disk — the ring rotates in the sim; no XY move`) and picks at the fixed pickup. So the ring positions (which the offset rotates) NEVER reach the .nc → the offset is genuinely sim-only for ANY value, not just leak-free at 0.
+
+### VERIFY
+- tests/atc-leftovers-885.spec.js 4/4: the offset rotates the whole carousel by exactly the declared angle + slot angle = index x 360/n + offset (asserted); a change indexes the target to the pickup cancelling offset+index; magazinePockets carries .disk (R=diskDia/2) + flags the empty pocket; the machine-frame magazine renders the plate + occupied silhouettes + the empty slot (screenshot VIEWED — plate disc, amber tools in 1/2/4, pocket 3 empty). App boots ZERO console errors.
+- **FULL GATE: 1300 passed / 0 failed / 4 skipped (12.4m), GATE_EXIT=0.** Fully green — every ATC emit spec (atc-backcompat, atc-io-labeling, atc-*-twin/superset, atc-roundtrip, atc-dialect …) passed → the emit goldens are byte-identical. Ran from DDCS-Studio (cwd discipline).
+
+### STILL QUEUED / PARKED
+- Option B (declared slot count `diskSlots`) — only if empty PHYSICAL slots (not array rows) become a real case (rule-of-three). Option C (per-slot declared index/angle) — the long-tail. The animated-tool-part-frame seam (rides the part frame + WCS-cancel) — works, a possible future tightening. diskAxis is the "disk toward" direction, not a declared rotation axis (rotation implicit Z).
