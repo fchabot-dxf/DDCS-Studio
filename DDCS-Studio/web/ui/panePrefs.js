@@ -91,33 +91,33 @@ export function onRatioChange(cb) { _ratioSubs.add(cb); return () => _ratioSubs.
 /** Subscribe to collapse changes (one wizard folds a kind → others re-apply live). Returns an unsubscribe fn. */
 export function onPaneChange(cb) { _subs.add(cb); return () => _subs.delete(cb); }
 
-// ── The editor MINIMAP toggle (t810) — a VS Code-style program-overview strip on the editor's right edge. Like every
-// pane pref it is an app-wide DISPLAY preference (localStorage, NEVER the machine profile). Default ON (VS Code parity);
-// a phone width hides it via CSS regardless. ──
-const MINIMAP_KEY = 'ddcs_minimap';
-let _minimap = null;
-const _minimapSubs = new Set();
+// ── The editor FOLLOW-EXECUTION toggle (t865, replaced the minimap) — when ON, the editor auto-scrolls to keep the
+// running line in view during playback. Like every pane pref it is an app-wide DISPLAY preference (localStorage, NEVER
+// the machine profile). Default OFF — the no-jump-while-playing rule holds for everyone who does not opt in. ──
+const FOLLOW_KEY = 'ddcs_follow_exec';
+let _follow = null;
+const _followSubs = new Set();
 
-/** True if the editor minimap is enabled (default true). */
-export function getMinimapOn() {
-    if (_minimap == null) {
-        _minimap = true;
-        try { const raw = localStorage.getItem(MINIMAP_KEY); if (raw === '0' || raw === 'false') _minimap = false; } catch (_) { /* defaults on */ }
+/** True if follow-execution auto-scroll is enabled (default false). */
+export function getFollowExecOn() {
+    if (_follow == null) {
+        _follow = false;
+        try { const raw = localStorage.getItem(FOLLOW_KEY); if (raw === '1' || raw === 'true') _follow = true; } catch (_) { /* defaults off */ }
     }
-    return _minimap;
+    return _follow;
 }
 
-/** Enable/disable the editor minimap; persists + notifies (the strip shows/hides live). */
-export function setMinimapOn(on) {
+/** Enable/disable follow-execution auto-scroll; persists + notifies (the toggle + the seam react live). */
+export function setFollowExecOn(on) {
     const next = !!on;
-    if (next === _minimap) return;
-    _minimap = next;
-    try { localStorage.setItem(MINIMAP_KEY, next ? '1' : '0'); } catch (_) { /* private mode */ }
-    for (const cb of _minimapSubs) { try { cb(next); } catch (_) { /* isolate */ } }
+    if (next === _follow) return;
+    _follow = next;
+    try { localStorage.setItem(FOLLOW_KEY, next ? '1' : '0'); } catch (_) { /* private mode */ }
+    for (const cb of _followSubs) { try { cb(next); } catch (_) { /* isolate */ } }
 }
 
-/** Subscribe to minimap-toggle changes. Returns an unsubscribe fn. */
-export function onMinimapChange(cb) { _minimapSubs.add(cb); return () => _minimapSubs.delete(cb); }
+/** Subscribe to follow-execution-toggle changes. Returns an unsubscribe fn. */
+export function onFollowExecChange(cb) { _followSubs.add(cb); return () => _followSubs.delete(cb); }
 
 // ── FORM-SECTION collapse (t820) — a long twin form's declared SECTIONS (GEOMETRY / TOOL & CUT / …) fold independently.
 // App-wide per section KIND (the section title), like the panes: fold TOOL & CUT in one wizard → every long form opens

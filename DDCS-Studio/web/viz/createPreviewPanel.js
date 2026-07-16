@@ -94,6 +94,7 @@ const PANEL_HTML = `
   <div class="pp-statusbar">
     <button class="pp-copy viz3d-status-copy" type="button" title="Copy this status line to the clipboard" aria-label="Copy status">${ICON_COPY}</button>
     <div class="pp-status viz3d-status"></div>
+    <div class="pp-progress" aria-hidden="true"><div class="pp-progress-fill"></div></div>
   </div>
   <div class="viz3d-controls">
     <button class="pp-mtoggle viz3d-2dtoggle" type="button" title="Toggle 2D / 3D view">3D</button>
@@ -158,6 +159,16 @@ export function createPreviewPanel(container, opts = {}) {
     const q = (sel) => container.querySelector(sel);
     const cv2d = q('.pp-2d');
     const statusEl = q('.pp-status');
+    // t865 — the PROGRESS BAR: a thin fill next to the "Running line N/total" counter, ONE SOURCE with it (both driven
+    // by the engine's current line + engine.totalLines; see onLineChange). Visible only while playing; hidden when idle.
+    const progressEl = q('.pp-progress'), progressFill = q('.pp-progress-fill');
+    const setProgress = (lineIndex) => {
+        if (!progressEl || !progressFill) return;
+        const total = (engine && engine.totalLines) || 0;
+        if (lineIndex == null || total <= 0) { progressEl.classList.remove('on'); progressFill.style.width = '0%'; return; }
+        const frac = Math.max(0, Math.min(1, (lineIndex + 1) / total));
+        progressEl.classList.add('on'); progressFill.style.width = (frac * 100).toFixed(1) + '%';
+    };
     let curStart = null;   // operator start the user dragged (2D handle / 3D marker); getStartPos() reads it (pass 0)
     let passStarts = [];   // INC1: per-pass operator starts [{x,y,z}] — the shared source of truth for BOTH views' numbered markers
     let userStarts = [];   // INC2: per-pass USER overrides (a jog or a drag) — these BEAT the wizard's inferStarts HINT so an edited ② STICKS (the hint only positions an un-touched pass)
@@ -384,6 +395,7 @@ export function createPreviewPanel(container, opts = {}) {
             onLineChange: ({ lineIndex, raw }) => {
                 if (typeof opts.onLine === 'function') opts.onLine(lineIndex);
                 if (raw) setStatus(`Executing line ${lineIndex + 1}: ${raw.trim()}`);
+                setProgress(lineIndex);   // t865 — the progress bar fills from the SAME line index the counter shows (one source)
                 // SLICE 3: a previous G31 has now FINISHED (the engine clamped it to the contact; the tool sits there) →
                 // build that axis of the probe-WCS. Resolving on the NEXT line guarantees the tool is at the contact.
                 if (pendingProbe && viz && viz.probeAxisTouched) { viz.probeAxisTouched(pendingProbe, engine.feedVal); flashDro(); firePulse(pendingProbe); }   // probe re-references the DRO (feedVal = the just-finished probe's feed → disc size); t319 — pulse the 2D + Layout too
@@ -452,6 +464,7 @@ export function createPreviewPanel(container, opts = {}) {
                 pendingDatum = null;
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
+                setProgress(null);   // t865 — run finished → hide the progress bar (a looped run re-shows it on its next line)
                 if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); pendingProbe = null; pendingDatum = null; compMap = readEnabledComps(compOps()); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
             },
         });
@@ -793,6 +806,7 @@ export function createPreviewPanel(container, opts = {}) {
         lastRunCode = get('getGcode') || '';
         eng.run(lastRunCode);
         updateRunBtn();
+        setProgress(0);   // t865 — show the progress bar (empty) at run start now the program is loaded (engine.totalLines set); onLineChange fills it
     }
     function stopPlay() {
         if (loopTimer) { clearTimeout(loopTimer); loopTimer = null; }
@@ -801,6 +815,7 @@ export function createPreviewPanel(container, opts = {}) {
         t2.stop();
         if (viz) viz.setAnimate(false);
         if (typeof opts.onLine === 'function') opts.onLine(null);
+        setProgress(null);   // t865 — playback stopped → hide the progress bar (visible only while playing)
         for (const cb of toolPosSubs) cb(null, 0);   // t309 — tell the Layout overlay the sim stopped (clears its red head, redraws the static path)
         // t680/t682 — the run finished/stopped: settle the live carve into the CRISP vertical-wall END-STATE mesh (no-op if no carve)
         if (viz && viz.carveFinalize && carveEnabled()) viz.carveFinalize(_carveSegs, _carveTR, _carveTip);   // t814 — feed the arc-corner snap

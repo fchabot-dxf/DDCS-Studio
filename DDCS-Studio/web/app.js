@@ -82,7 +82,7 @@ class DDCSStudio {
         console.debug('DDCSStudio: VariableDatabase initialized');
         this.editorManager = new EditorManager();
         console.debug('DDCSStudio: EditorManager initialized');
-        import('./ui/gcodeMinimap.js').then((m) => m.initGcodeMinimap(this.editorManager)).catch(() => { /* minimap is optional chrome */ });   // t810 — the editor overview strip
+        import('./ui/followExec.js').then((m) => m.initFollowExec(this.editorManager)).catch(() => { /* follow-exec toggle is optional chrome */ });   // t865 — editor auto-scroll-to-running-line toggle (replaced the minimap; consumes onActiveLine)
         import('./ui/preflightBadge.js').then((m) => m.initPreflightBadge(this.editorManager)).catch(() => { /* pre-flight badge is optional chrome */ });   // t838 — the pre-flight envelope check badge
         import('./ui/timeChip.js').then((m) => m.initTimeChip()).catch(() => { /* time-estimate chip is optional chrome */ });   // t844 — the estimated run-time chip
 

@@ -12,7 +12,7 @@ export class EditorManager {
         this.highlight = el('editor-highlight');
         this.activeLineIndex = null;
         this._execTrail = [];          // ring of recent line indices, newest-first, max EXEC_TRAIL_CAP entries
-        this._activeLineSubs = new Set();   // t810 — the minimap marker subscribes here so it reads the SAME activeLineIndex the in-text highlight consumes (one source, no second tracker)
+        this._activeLineSubs = new Set();   // t865 — the follow-exec toggle subscribes here so its auto-scroll reads the SAME activeLineIndex the in-text highlight consumes (one source; outlived the minimap)
         this.backTimer = null;
         this.backInterval = null;
 
@@ -256,8 +256,9 @@ export class EditorManager {
         this._notifyActiveLine();
     }
 
-    // t810 — subscribe to executing-line changes (the minimap marker). Fires with the CURRENT activeLineIndex (null when
-    // idle) in the SAME call that (un)marks the in-text highlight, so the map marker + the text highlight are one source.
+    // t865 — subscribe to executing-line changes (the follow-exec auto-scroll + the preview progress bar consume this).
+    // Fires with the CURRENT activeLineIndex (null when idle) in the SAME call that (un)marks the in-text highlight, so a
+    // subscriber's view + the text highlight are one source. The seam outlived the minimap that first defined it.
     onActiveLine(cb) { if (typeof cb === 'function') this._activeLineSubs.add(cb); return () => this._activeLineSubs.delete(cb); }
     _notifyActiveLine() { for (const cb of this._activeLineSubs) { try { cb(this.activeLineIndex); } catch (_) { /* a bad subscriber never breaks playback */ } } }
 

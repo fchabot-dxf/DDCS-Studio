@@ -56,7 +56,7 @@ export const BACKUP_STORES = [
     { id: 'presets', label: 'Wizard presets', ...lsPrefix('ddcs_tpl_'), count: (v) => (v ? Object.values(v).reduce((n, list) => n + len(list), 0) : 0), unit: 'presets' },
     { id: 'variables', label: 'Variables', ...ls('ddcs_vars_persistent'), count: (v) => (Array.isArray(v) ? v.filter((x) => x && !x.isSys).length : 0), unit: 'user vars' },
     { id: 'displayPrefs', label: 'Preview display prefs', ...ls('ddcs_display'), count: (v) => (v ? Object.keys(v).length : 0), unit: 'elements' },
-    { id: 'panePrefs', label: 'Panel layout', ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_minimap', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },
+    { id: 'panePrefs', label: 'Panel layout', ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_follow_exec', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },
     { id: 'projects', label: 'Projects (local)', count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects', read: () => exportAllEntries(), write: (val) => importAllEntries(val) },
 ];
 
