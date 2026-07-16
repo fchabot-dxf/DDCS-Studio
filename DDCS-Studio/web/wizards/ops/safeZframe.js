@@ -14,7 +14,9 @@
  * machine lift between points breaks the symmetric −value drop-back). t897 lands that follow-up where a traverse ALREADY
  * machine-lifts (corner wall1->wall2, middle reposition): saveMachineZNode records the pre-lift Z, the paired
  * safeZParkBlock(..., { ret: true }) returns to it — so the drop is honest by construction (returns to the probe depth,
- * not lift+old-relative-drop = an arbitrary Z). Traverses that stay relative-symmetric (middle trans/over) are unchanged.
+ * not lift+old-relative-drop = an arbitrary Z). t909 B2 lands the UNIFICATION: middle's trans-axis traverse joins that
+ * same honest machine-margin pairing via the DECLARED clearance mode (clearTraverseParams, `max` default) — it no longer
+ * hops +#18 relative. Middle's traverse-OVER (in-axis, #18) stays relative (a same-axis cross at the probe Z).
  *
  * It's an EMIT declaration (changes real G-code) → relative MUST stay byte-identical; machine emits the confirmed G53, never
  * invented. The block is the existing `move` / `machinemove` atom, so it round-trips through gcodeToStack as-is.
@@ -97,6 +99,28 @@ export function wrapMachineFrame(dialect, core, restore) {
 export const SAFEZ_FRAMES = ['relative', 'machine'];
 /** Normalise a frame value (default `relative`; anything unknown → `relative`, so an absent/garbage field is the status quo). */
 export const safeZFrameOf = (v) => (v === 'machine' ? 'machine' : 'relative');
+
+// ── t909 B2 — the DECLARED CLEARANCE MODE for a PLANNED traverse's lift/drop ──────────────────────────────────────────
+// ONE source both wizards read, so corner's per-wall margin lift and middle's trans-axis hop become the SAME chosen
+// clearance — the user's "not the same in both". Until t909 the three traverse mechanisms had DIVERGED (corner→#520
+// machine margin, middle trans-axis→+#18 relative hop, park→safeZframe); byte-identity FROZE the divergence. The mode
+// unifies them. SCOPE: the mode governs PLANNED traverses ONLY; miss-path error handlers + final parks stay ALWAYS the
+// machine margin (lost = max caution — see safeRetractNode, unchanged). 'max' (default) = the #520 machine margin + the
+// honest save/return pairing (safeTraverseStack machineLift + returnZ) — higher than any boss, limit-proof, and the
+// drop-back is honest BY CONSTRUCTION (returns to the saved probe Z, never lift-to-margin + relative-drop = arbitrary Z).
+export const CLEAR_MODES = ['max', 'hop', 'plane'];
+/** Normalise a clearance mode (default `max`; unknown/absent → `max`, the safe default). B2b admits `hop`/`plane`. */
+export const clearModeOf = (v) => (CLEAR_MODES.includes(v) ? v : 'max');
+/** The safeTraverseStack lift/drop params for a declared clearance MODE. `saveVar` = the free scratch that records the
+ *  pre-lift Z for the honest return (#95 in the corner/middle family). B2a wires `max` (the #520 machine margin, reusing
+ *  the t826/t897 machinery corner + middle-manual already prove); `hop` (a relative lift CAPPED at the margin) and
+ *  `plane` (a declared absolute plane) branch HERE in B2b — each also gets its own when-gated form field + a Plane
+ *  "not below stock top" floor (the one net-new hazard). Until then every mode resolves to the safe machine margin. */
+export function clearTraverseParams(mode = 'max', { saveVar = '#95' } = {}) {
+    // 'max' — lift to the machine margin (safeRetractNode #520) + return to the saved Z (safeZParkBlock ret). lift/drop
+    // are presence GATES here (the value is the margin / the saved Z, resolved inside safeTraverseStack, not these).
+    return { lift: true, machineLift: true, drop: true, returnZ: saveVar };
+}
 
 /**
  * The safe-Z PARK block for a frame, parking at the macro var `varRef` (e.g. `#17`):
