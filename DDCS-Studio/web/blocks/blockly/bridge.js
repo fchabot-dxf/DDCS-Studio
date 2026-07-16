@@ -403,7 +403,7 @@ const shadow = (v) => ({ shadow: { type: 'math_number', fields: { NUM: Number(v)
  *  injected by the caller so this low-level module needn't import the higher-level stack→flyout converter (cycle). */
 export function buildToolbox(extraCategories = []) {
     const byCat = {};
-    PALETTE.forEach((def) => {
+    PALETTE.filter((def) => !def.hidden).forEach((def) => {   // t903 — hidden atoms (e.g. safetraverse until P2.5) stay in BLOCKS but never appear as a DRAGGABLE toolbox entry
         const inputs = {};
         fieldsOf(def).forEach((f) => { if (fieldKind(def, f) === 'value') inputs[FN(f)] = shadow(def.defaults[f]); });
         (byCat[def.category] ||= []).push({ kind: 'block', type: def.type, ...(Object.keys(inputs).length ? { inputs } : {}) });

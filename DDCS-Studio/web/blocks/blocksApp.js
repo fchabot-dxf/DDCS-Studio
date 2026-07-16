@@ -233,7 +233,7 @@ async function buildWorkspace() {
     const fl = flyout(); if (!tb || !fl) return;
     if (!q) { try { tb.clearSelection(); fl.hide(); } catch (_) { /* */ } return; }
     const hits = PALETTE
-      .filter((d) => `${d.label || ''} ${d.type} ${d.category || ''}`.toLowerCase().includes(q))
+      .filter((d) => !d.hidden && `${d.label || ''} ${d.type} ${d.category || ''}`.toLowerCase().includes(q))   // t903 — hidden atoms (safetraverse until P2.5) are not droppable from search either
       .map((d) => ({ kind: 'block', type: d.type }));
     try { tb.clearSelection(); fl.show(hits.length ? hits : [{ kind: 'label', text: 'No matching blocks' }]); } catch (_) { /* */ }
   };
@@ -243,7 +243,7 @@ async function buildWorkspace() {
 
   // ---- Suggested-next strip (A): chips for the most-likely next blocks (learned from your programs + a curated
   //      seed); click to append. Updates as the program changes. ----
-  const STMT = new Set(PALETTE.filter((d) => d.kind !== 'reporter').map((d) => d.type));   // insertable (no reporters)
+  const STMT = new Set(PALETTE.filter((d) => d.kind !== 'reporter' && !d.hidden).map((d) => d.type));   // insertable (no reporters; t903 — no hidden atoms like safetraverse until P2.5)
   const labelOf = (t) => (BLOCKS[t] && BLOCKS[t].label) || t;
   const catSlugOf = (t) => ((BLOCKS[t] && BLOCKS[t].category) || 'ops').toLowerCase().replace(/[^a-z0-9]+/g, '');
   const strip = document.createElement('div');

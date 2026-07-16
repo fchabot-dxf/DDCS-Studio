@@ -183,7 +183,7 @@ export function initEditorOpHover() {
         chip.textContent = (editable ? '✎ ' : '🔒 ') + (op.label || op.opType) + opTimeLabel(lines);   // t844 — per-op run-time estimate
         chip.disabled = !editable;
         chip.title = editable ? `Edit this ${op.label || op.opType}` : `${op.label || op.opType}: form-edit not wired yet`;
-        chip.style.top = Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)) + 'px';
+        placeChip(Math.max(2, Math.round(first * lineHeight() + padTop() - editor.scrollTop)));   // t903 — route the REAL-op chip through placeChip too (was a direct top-set), so it never overlaps the amber pre-flight badge (the chip-row collision contract now covers BOTH paths)
         // Chip floats on the LEFT of the editor (left: 12px in CSS) — clear of the right-side 3D preview
         // drawer / view-cube gizmo, so it's always reachable (the "out of reach" report).
         chip.dataset.opId = op.id;

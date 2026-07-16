@@ -715,6 +715,18 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .editor-container .preflight-row { padding: 4px 7px; border-radius: 6px; cursor: pointer; font-variant-numeric: tabular-nums; color: var(--text, #e6edf5); }
 .editor-container .preflight-row:hover { background: color-mix(in srgb, #ff5964 20%, transparent); }
 .editor-container .preflight-pop-note { margin-top: 6px; opacity: .82; font-size: 10.5px; color: var(--text, #e6edf5); }
+/* t862/t903 — INLINE PER-LINE PRE-FLIGHT DIAGNOSTIC. A red-tinted annotation at the violating line's row RIGHT edge
+   ("Z+ 3.0mm over"). Absolutely positioned inside the .g-line overlay span (out of the text flow → adds NO line height,
+   so the highlight overlay stays aligned with the textarea, and it can never push the code off-canvas). pointer-events
+   none so it never blocks typing/clicks; sits ABOVE the exec-highlight background so the two coexist legibly. */
+#editor-highlight .g-line { position: relative; }
+#editor-highlight .g-line .preflight-annot {
+    position: absolute; right: 6px; top: 0; z-index: 4; pointer-events: none;
+    font: 700 10px/1.6 inherit; letter-spacing: .1px; font-variant-numeric: tabular-nums; white-space: nowrap;
+    color: #ff5964; background: color-mix(in srgb, #e5484d 30%, rgba(10,6,7,.72));
+    border: 1px solid color-mix(in srgb, #ff5964 55%, transparent); border-radius: 5px; padding: 0 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.45);
+}
 /* t844 — the TIME-ESTIMATE chip: an unobtrusive pill at the editor top-centre, the program's estimated run time (hover = the breakdown). */
 .editor-container .time-estimate-chip {
     position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 12; cursor: default;

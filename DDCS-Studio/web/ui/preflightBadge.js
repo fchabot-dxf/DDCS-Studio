@@ -58,22 +58,54 @@ function renderPop(res) {
     }
 }
 
+// t862/t903 — INLINE PER-LINE DIAGNOSTICS. RED no longer shows a COUNTING chip; instead each violating source line gets a
+// red-tinted annotation at its row's right edge ("Z+ 3.0mm over"), from the SAME checkEnvelope violations (one source). The
+// annotation is ABSOLUTELY positioned inside the `.g-line` overlay span (out of the text flow → adds no height, so the
+// overlay stays line-aligned with the textarea; and it can never push the code off-canvas). One annotation per bad LINE (a
+// line breaching multiple edges lists them). Cleared + re-injected on every re-check (so it clears the moment a line is
+// edited to fitness). Only in RED — amber/green carry no violations.
+function renderAnnotations(res) {
+    const overlay = document.getElementById('editor-highlight');
+    if (!overlay) return;
+    overlay.querySelectorAll('.preflight-annot').forEach((el) => el.remove());
+    if (!res || res.status !== 'red' || !res.violations.length) return;
+    const notes = [probeNote(res), softLimitNote()].filter(Boolean).join('\n');   // caveats ride the annotation title (no chip in RED)
+    const byLine = new Map();   // a line can breach multiple edges → one annotation listing them
+    for (const v of res.violations) { if (!byLine.has(v.line)) byLine.set(v.line, []); byLine.get(v.line).push(v); }
+    for (const [line, vs] of byLine) {
+        const span = overlay.querySelector(`.g-line[data-line-index="${line - 1}"]`);   // violation `line` is 1-based; data-line-index is 0-based
+        if (!span) continue;
+        const a = document.createElement('span');
+        a.className = 'preflight-annot';
+        a.textContent = vs.map((v) => `${v.axis} ${fmt(v.overshoot)}mm over`).join(' · ');
+        if (notes) a.title = notes;
+        span.appendChild(a);
+    }
+}
+
 function render() {
     if (!badge) return;
     const prog = editorProgram();
-    if (!prog || !prog.trim()) { badge.hidden = true; pop.hidden = true; return; }
+    if (!prog || !prog.trim()) { badge.hidden = true; pop.hidden = true; renderAnnotations(null); return; }
     let res;
-    try { res = checkEnvelope(prog, settings()); } catch (_) { badge.hidden = true; return; }
+    try { res = checkEnvelope(prog, settings()); } catch (_) { badge.hidden = true; renderAnnotations(null); return; }
     lastResult = res;
-    badge.hidden = false;
-    badge.className = 'preflight-badge preflight-' + res.status;
-    const n = res.violations.length;
-    const pn = probeNote(res), sn = softLimitNote();
-    const tip = (t) => { label.title = [t, pn, sn].filter(Boolean).join('\n\n'); };
-    if (res.status === 'green') { label.textContent = '✓ fits envelope'; tip('Every move stays inside the declared machine travel.'); }
-    else if (res.status === 'amber') { label.textContent = '⚠ can’t verify'; tip(res.reason); }
-    else { label.textContent = `✕ ${n} outside envelope`; tip(`${n} move${n > 1 ? 's' : ''} would leave the machine travel — click for the list.`); }
-    renderPop(res);
+    if (res.status === 'red') {
+        // RED — NO chip; the per-line inline annotations ARE the diagnostic (one per bad line).
+        badge.hidden = true; pop.hidden = true;
+        renderAnnotations(res);
+    } else if (res.status === 'amber') {
+        // AMBER (can't verify) — keep a SMALL chip (there are no lines to annotate); the popover carries the reason.
+        renderAnnotations(null);
+        badge.hidden = false; badge.className = 'preflight-badge preflight-amber';
+        label.textContent = '⚠ can’t verify';
+        label.title = [res.reason, probeNote(res), softLimitNote()].filter(Boolean).join('\n\n');
+        renderPop(res);
+    } else {
+        // GREEN — nothing (silence).
+        badge.hidden = true; pop.hidden = true;
+        renderAnnotations(null);
+    }
 }
 
 export function initPreflightBadge(mgr) {
