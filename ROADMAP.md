@@ -21,8 +21,15 @@
 ---
 
 ## Recently Shipped (Session Updates)
+- **The G53 safety arc (complete)**: every safe-height retract on every controller is machine-frame with an adjacent G90 (jump-proof, factory-grounded), a boot-seeded margin register with an unset-guard, and a corpus guard covering the wizard AND CAM-slot emits. Found and driven by real field crashes.
+- **Pre-flight envelope check**: the editor badge reads the program's travel in the machine frame before anything runs — "line N exceeds Z+ by 3mm", honest amber when the placement isn't declared.
+- **Honest Mach column**: the sim's machine numbers quote only a DECLARED WCS row (dash otherwise); an impossible positive Z on a top-homed machine is flagged as you type it.
+- **The Library**: one door for Profiles · Projects (local + cloud) · Wizards, with the compact 9-row menu; select-then-load everywhere.
+- **Time estimates** (editor chip + per-op), **drill patterns** (bolt circle / row / grid, single-hole default), **one-file backup** (preview-confirm restore + safety export), **setup sheet** (print-ready, honest rows), **depth entry everywhere** (plunge/ramp/helix on pocket, slot, contour, surfacing).
+- **Suite structural diet**: the full gate 21min → ~11.5min reliably green (in-memory per-run server, workers=4, no asserts weakened).
 - **Settings Auto-Save Visual Feedback**: Added a "Saved ✓" toast notification to indicate when settings are automatically saved to the active profile.
 - **Profile Field Editing**: Added a "✎ Rename" button to the Library Profiles tab to easily rename the active profile.
+- **Next up**: minimap removed in favor of a preview progress bar + a follow-execution editor toggle (ratified); then feeds & speeds and the rest of the 17-item backlog (NEXT-SESSION.md is the live queue).
 
 ---
 
