@@ -5056,3 +5056,35 @@ THE RULING (user, via advisor): the persistent Expert register #520 (safe-Z marg
 
 ### GATE
 - FULL gate: **1313 passed / 1 failed / 4 skipped (12.3m), GATE_EXIT=0.** The 1 failure = blocks-live-form.spec.js:164 (a Blocks-authoring UI test) — a `waitForSelector` TIMEOUT, and it passes **6/6 in isolation**. A load-sensitive UI-render flake under the 4-worker contention (playwright.config documents ~1 such flake/run), NOT a correctness break: it's a block-authoring UI test unrelated to the byte-identical probe emit (which the goldens independently verify green). Files: web/blocks/blockEmitter.js (transparent-type list), web/wizards/ops/saferetract.js (safeTraverseBlock def), web/wizards/ops/index.js (PALETTE), web/wizards/cornerWizard.js + web/wizards/middleWizard.js (the 4 wraps). NO test/golden changes (byte-identical — the goldens are untouched). Queued: P2.5 (round-trip) + RIDER 3.
+
+
+## 🔨 turn 903 — RIDER 3: INLINE PER-LINE PRE-FLIGHT DIAGNOSTICS (the ratified t862 shape) — the counting chip RETIRED, each violating line annotated at its row end from the SAME checkEnvelope (one source). PLUS the placeChip collision fix on BOTH chip paths + the safetraverse palette-hide rider. Screenshots VIEWED. Full gate GREEN (1318 passed / 0 failed).
+
+### THE RECULEMENT (the states, one source = checkEnvelope violations)
+- **RED** = NO chip; each violating line gets an INLINE red-tinted annotation at its row's right edge ("Z+ 3.0mm over"), one per bad LINE (a line breaching several edges lists them: "X+ 100.0mm over . Y+ 50.0mm over"). The counting summary chip ("N outside envelope") + its popover list are GONE.
+- **AMBER** (can't verify) = a small chip (the existing #preflight-badge, amber state) — no lines to annotate; the popover carries the reason.
+- **GREEN** = nothing (silence) — the green "fits" chip retires too.
+- The annotations come from the SAME checkEnvelope({line,axis,overshoot}) the send-path reads (preflightBadge.renderAnnotations groups the violations by line). No new check; no second source.
+
+### THE ANNOTATION (the surface decision, grounded)
+- The editor is a `<textarea>` + a `#editor-highlight` overlay where each line is `<span class="g-line" data-line-index>`. The annotation is an ABSOLUTELY-positioned child of the violating `.g-line` (`.preflight-annot`, right:6px), red-tinted with its OWN dark pill bg (legible on any theme's editor). Absolute = OUT OF THE TEXT FLOW → it adds NO line height (so the overlay stays line-aligned with the textarea — the syncText alignment contract) AND it can never push the code off-canvas (the code's horizontal extent is unchanged whether the annotation is present or not; the overlay is `pre`, so a long line's own overflow is inherent, not the annotation's). pointer-events:none (never blocks typing); z-index above the exec-highlight background so the two coexist legibly.
+- Re-injected on every re-check (onChange + the 250ms-debounced input + settings-changed), so an annotation CLEARS the moment its line is edited to fitness (the re-check drops it).
+
+### placeChip COLLISION (the chip-row fix rides here)
+- placeChip (t893) already moves the op-edit chip clear of #preflight-badge. But the REAL-op path (editorOpHover:186) set `chip.style.top` DIRECTLY, bypassing placeChip (a pre-existing inconsistency the auto-run path at :167 didn't have). t903 routes :186 through placeChip too → BOTH chip paths honour the collision contract, so the op-edit chip never overlaps the amber pre-flight badge.
+- The SEND-PATH confirm (gateway/views/send.js) reads checkEnvelope DIRECTLY (not the chip DOM) — unchanged, asserted (retiring the chip doesn't touch it).
+
+### THE PALETTE-HIDE RIDER (no broken affordance ships)
+- The t901 safetraverse atom is a droppable palette entry that's INERT until P2.5 (a childless drop emits nothing). Per the empty-dropdown lesson, HIDDEN from the DRAGGABLE surfaces: a `hidden:true` flag on the def, filtered in buildToolbox (Blockly toolbox) + the Blocks-tab palette search + the insertable suggestions. It STAYS in BLOCKS (newBlock — wizard-composed use unaffected) + keeps its Blockly jsonDef (a wizard-composed brick still renders). Asserted: safetraverse in BLOCKS = true, in buildToolbox() = false.
+
+### VERIFICATION
+- **tests/preflight-badge-838.spec.js REWRITTEN, 10/10:** RED (2 planted violations on 2 lines = EXACTLY 2 inline annotations, each with axis+overshoot; #preflight-badge HIDDEN — zero chips); GREEN (badge hidden + 0 annotations); AMBER (small can't-verify chip + 0 annotations + honest reason); annotations CLEAR on edit-to-fitness; a LONG line (850px) — the annotation is `position:absolute` and adds ZERO overlay width (the code is never pushed off-canvas); exec-highlight + annotation COEXIST on the same line; the safetraverse standalone palette entry HIDDEN (asserted BLOCKS yes / toolbox no); SEND CONFIRM reads the CHECK (red asks, cancel aborts, green sends); NOTES (probe + soft-limit caveats ride the red annotation's title); THEMES (dark + light screenshots).
+- **SCREENSHOTS VIEWED** (scratchpad): RED at futuristic(dark) 1280 + normal 1280 + futuristic 850 — no chip, the per-line annotations legible + line-aligned + code intact at both widths; AMBER 1280 — the small "can't verify" chip. The editor stays dark across themes; the annotation's own dark-red pill is legible everywhere (I removed a speculative light-theme override that assumed a light editor + was less legible than the default pill).
+- Smoke (16): blocks-exec-glow + blockly-port + setup-sheet-850 + preflight — the `.g-line{position:relative}` + the placeChip change + the palette-hide cause NO collateral (glow/hover/setup-sheet's own checkEnvelope consumer unaffected).
+
+### HONEST NOTES
+- The checkEnvelope flags a segment that STARTS out of travel too, so a violation followed by a RECOVERY move flags the recovery line as well (an honest departing-from-out-of-envelope). So a clean "2 violations on 2 lines" fixture uses two moves each going FURTHER out (no recovery). The per-line annotation groups a line's multiple edges into one annotation (real programs show "X+ . Y+" on a modal line) — matches the screenshots.
+- The probe/soft-limit caveats (a t838 bonus) have no chip home in RED now; they ride the red annotation's `title` tooltip (verified). GREEN=silence per the ruling → those caveats are not surfaced when everything fits (a green program with a disabled soft-limit shows nothing — the ruling's silence).
+
+### GATE
+- FULL gate: **1318 passed / 0 failed / 4 skipped (12.3m), GATE_EXIT=0** (grepped the whole log for the failed count = zero). +5 vs the t901 baseline 1313 (the rewritten preflight suite + the palette-hide RIDER test). Files: web/ui/preflightBadge.js (render + renderAnnotations), web/styles.css (.preflight-annot + .g-line relative), web/ui/editorOpHover.js (placeChip on both paths), web/wizards/ops/saferetract.js (hidden flag), web/blocks/blockly/bridge.js + web/blocks/blocksApp.js (filter hidden); tests/preflight-badge-838.spec.js (rewritten). Queued: P2.5 (safetraverse standalone round-trip — ground the nested-marker first) — the last of Turn A.
