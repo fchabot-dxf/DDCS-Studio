@@ -5616,3 +5616,37 @@ BUT the GEOMETRY the check depends on is UNRELIABLE from checkEnvelope:
 - **1328 passed / 0 failed / 4 skipped** (12.3m) — the corner floor-warn drop + the plane-suggest opt-in are clean (the 933 corner assists spec updated + green; envelope byte-identical WIP unchanged).
 
 ### AFTER (your queued items, unchanged): the HOP-default flip (clearModeOf default + MIDDLE/CORNER_DEFAULTS + the form dropdown default; hopDist stays 15; goldens regen), THEN RELEASE the whole bundle.
+
+
+---
+
+## 🔨 turn 941 — TURN B2b-4 HOP-DEFAULT FLIP (the user's decision): the clearance mode now DEFAULTS to relative Hop (capped 15mm), not Max. Flipped in all COUPLED places (twin-default rule), regen'd the 5 affected goldens (diff-verified ONLY the clearance-lift lines + the consequent label numbers change), new anchor VERIFIED (default emit === explicit clearMode:hop per post), both forms DEFAULT to Hop (screenshots viewed). hopDist stays 15; the cap unchanged.
+
+### FLIPPED (max -> hop) — all coupled places (or byte-parity breaks)
+- **web/wizards/ops/safeZframe.js** — clearModeOf fallback max->hop (unknown/absent -> hop; the cap keeps it limit-proof, safe as the last-resort default); clearLiftNode default clearMode 'hop'. Comments updated.
+- **web/wizards/ops/saferetract.js** — the clearLiftBlock defaults clearMode 'hop' (a bare block; callers pass it explicitly).
+- **web/blocks/dataOps/cornerData.js** — CORNER_DEFAULTS.clearMode 'hop' (the corner form's clearMode binding default rides CORNER_DEFAULTS -> the corner form defaults to Hop).
+- **web/index.html** — m_clear_mode: the `selected` option moved Max -> Hop up (the middle form defaults to Hop).
+- **web/wizards/views/middleView.js** — the m_clear_mode read fallback max->hop.
+- NOTE: MIDDLE_DEFAULTS has NO clearMode (only a stale clearOver:15) — the middle twin relies on clearModeOf's fallback, so flipping THAT flips the twin. No MIDDLE_DEFAULTS.clearMode to change.
+
+### GOLDENS REGEN (5 specs; diff-verified)
+- **corner-clearance-emit-929** — the ANCHOR flipped: default === explicit clearMode:hop (was === max). Added a per-post test: a default-params emit is BYTE-IDENTICAL to explicit hop on EVERY post (Expert/V4.1/DM500/grbl/rs274/centroid) + is NOT the old Max retract.
+- **clearance-modes-909** ("Max unification") — PINNED clearMode:'max' (it verifies middle-trans == corner-wall at the SAME mode; Max is still valid; the new default is anchored in 929).
+- **middle-reposition-refactor** + **probe-surface-block** (frozen MIGRATION byte-identity goldens) — PINNED clearMode:'max' (like middle-reposition already pins dist/travelShape): these froze at the OLD max default; the flip only changes the clearance-lift, so pinning keeps the refactor artifacts valid.
+- **safe-z-retract-822** (#520 unset-guard) — made the guard-label pattern LABEL-AGNOSTIC (GOTO\d+/N\d+): the default hop consumes labels 91/92, so the first Max-retract's guard label shifts; the guard STRUCTURE is unchanged.
+
+### DIFF-VERIFY (default clearMode:max vs default hop, git diff) — CONSISTENT
+- ONLY the wall1 clearance-lift changes: `( Safe-Z retract - machine frame ) / #42=#520 ... G53 Z#42` -> `( Clearance hop - capped at the machine margin ) / #43=[#95+15] / #42=#520 ... IF #43<#42 / #43=#42 / G53 Z#43` (the capped hop).
+- CONSEQUENCE: the subsequent Max-retract GUARD LABELS shift (GOTO92->93, N92->93, GOTO93->94, N93->94) because the hop cap consumes 2 labels (91/92) vs Max's 1. The guard STRUCTURE (#42=#520 / skip / fallback / G53 Z#42) is byte-identical — only the label NUMBER shifts.
+- UNCHANGED: every probe/wcs/traverse-distance (#23/#24) / @saveProbeZ / @returnProbeZ / config-assign line.
+
+### VERIFIED
+- **default === explicit hop, PER POST** (corner-clearance-emit-929 new test — Expert/V4.1/DM500/grbl/rs274/centroid all byte-identical).
+- **the forms DEFAULT to Hop (screenshots VIEWED):** MIDDLE (m_clear_mode = "Hop up" + HOP HEIGHT 15 shown) + CORNER data-op (Clearance = "Hop up" + Hop Height 15 when-gated). Both default to hop with the hopDist field revealed.
+- **round-trip** unchanged (corner-clearance-form-931 clearMode:hop marker round-trip — still green in the gate).
+
+### FULL GATE
+- **1329 passed / 0 failed / 4 skipped** (12.4m) — the 5 regen'd specs + the new per-post anchor all green; the flip is surgical (the first enumeration gate showed EXACTLY these 5 emit specs affected, no .png/visual goldens). No isolation flakes.
+
+### NEXT: RELEASE the whole clearance bundle (clean full gate). No release before this flip is verified — it is (pending the gate line).
