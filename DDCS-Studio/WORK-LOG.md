@@ -5585,3 +5585,34 @@ The classification is tractable (the block map decides it — that half leans bu
 
 ### NOTE
 The built code is a SAFE additive WIP (no through-stock kind fires without a stock/plow; envelope untouched). Committed so you can review the diff. If you rule the scope+provenance, next turn completes it (middle-focused acceptance: a middle Plane-below traverse flags; a probe approach does not; own screenshots; full gate) then RELEASE.
+
+
+---
+
+## 🔨 turn 939 — TURN B2b-3 completion: DELIVERED the corner floor-warn DROP (your approved change) + confirmed corner is outside-only. But building the MIDDLE acceptance surfaced a FIDELITY BLOCKER that invalidates "best-effort start is enough" — the runtime through-stock check cannot work from checkEnvelope. GATE with A/B/C + a recommendation.
+
+### DELIVERED (your approved change)
+- **Dropped the CORNER floor-warn** (formWidgets plane-suggest widget: the floor warn is now OPT-IN via widgetConfig.floorWarn; the corner binding omits it -> no warn). The Suggest button + the field are unchanged (fixture clearance). An OUTSIDE-corner traverse stays OUTSIDE the stock (traced), so "may cross into the part" was a FALSE ALARM. corner-clearance-plane-assists-933 updated (asserts NO warn element, keeps the Suggest + no-clamp). An inside-feature data-op can still opt IN (floorWarn:true) when its traverse truly crosses.
+- **Confirmed corner is OUTSIDE-only** (cornerWizard: "find an OUTSIDE corner (boss)"; wall at trigger +/- stylus radius = boss; no inside/pocket-corner mode). So nothing to flag for corner.
+
+### THE RUNTIME THROUGH-STOCK CHECK — a FIDELITY BLOCKER (gate)
+The MECHANISM is CORRECT and I proved each piece:
+- Block-type scoping works; MIDDLE does emit safetraverse blocks (a boss + two-axis auto config emits 11 safetraverse cross segments); the stock AABB + the mid-segment rayBox are right; envelope stays byte-identical.
+
+BUT the GEOMETRY the check depends on is UNRELIABLE from checkEnvelope:
+- checkEnvelope CANNOT reproduce the real operator start -- it is LIVE wizard/panel state (getStartPos: a drag / the wizard-inferred inferStart / the viz default), NOT derivable from settings.
+- WITHOUT the real start the traced PROBES DO NOT STOP at the walls: a boss probe traced to X=396 instead of the wall at X=60 (the datum best-effort start sits INSIDE the boss; a boss probes from OUTSIDE). So the traverse coordinates are GARBAGE (safetraverse crosses at X=80..476, all outside the 120-wide boss AABB) -> the plow test cannot fire (through=0 for ALL modes, including plane-below).
+- So "best-effort start is enough (the AABB gives enough for the rayBox)" DOES NOT HOLD: the start determines where the probes stop, which determines the traverse geometry. Garbage-in.
+
+### OPTIONS (yours)
+- **A -- move the check to the PREVIEW path.** createPreviewPanel already traces with the REAL start (getStartPos / computePassStarts) -> correct geometry; reuse the WIP mechanism there. BUT it is per-op in the preview, and the GATEWAY-SEND guard (the last gate before the controller -- your KEY Option-B reason) uses checkEnvelope -> would NOT get the check (a coverage gap on the exact surface you wanted covered).
+- **B -- reproduce the real start in checkEnvelope** via opSimStarts(opType, params, stock) + per-op passStarts (the SAME helper the preview uses; checkEnvelope pulls the op records from the block stack). Faithful geometry -> the check works at the badge AND gateway-send. Medium/deep (checkEnvelope becomes op-aware + threads per-op starts).
+- **C -- DROP the runtime geometric check; keep the AUTHORING floor-warn** (planeZ < stockTop -- NO trace/start needed) as the catch, scoped to middle/inside (valid) and dropped for corner (done this turn). The authoring warn catches the plane-below case at AUTHOR time (when the user sets the plane); the runtime check's marginal extra value (hop / complex) is not worth the fidelity build.
+
+### MY RECOMMENDATION
+**C** -- ship the authoring floor-warn as the practical catch (it needs no trace/start and fires exactly when planeZ < the stock top, which IS the plane risk), drop/defer the runtime geometric pre-flight. The WIP mechanism (fea8ea3) stays committed -- additive, dormant, envelope byte-identical, reusable if you later choose A or B. If you want the full runtime catch at the gateway-send, **B** is the path (reproduce the start). NOTE: with C, the "Plane ships WITH its pre-flight" line becomes "Plane ships with its AUTHORING floor-warn"; the runtime catch is a follow-up gated on B's start work.
+
+### FULL GATE
+- **1328 passed / 0 failed / 4 skipped** (12.3m) — the corner floor-warn drop + the plane-suggest opt-in are clean (the 933 corner assists spec updated + green; envelope byte-identical WIP unchanged).
+
+### AFTER (your queued items, unchanged): the HOP-default flip (clearModeOf default + MIDDLE/CORNER_DEFAULTS + the form dropdown default; hopDist stays 15; goldens regen), THEN RELEASE the whole bundle.
