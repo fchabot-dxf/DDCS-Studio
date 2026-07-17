@@ -5341,3 +5341,29 @@ NUMERIC HAND-CHECK (V4.1, same frame as Expert): probe #95=-50, hop 15 -> #191=-
 
 ### NEXT (unchanged from the split)
 - B2b-2b (the MIDDLE FORM: the clearance dropdown replacing Safe-Z + when-gated hopDist/planeZ + the Plane not-below-stock floor + the Suggest; screenshots each mode; the Safe-Z-drives-nothing complaint closed). Then B2b-2c (corner data-op) then B2b-3 (through-stock). FLAGGED fast-follows: the park-sweep (alignment/rotary_center/rotary_clock parks → Max + migrate their safez-frame/rollout rows) + the DM500 traverse-RETURN work-frame consistency (the G53-return flag; needs the DM500 relative-lift+drop degrade). No release (bundle rule).
+
+## 🔨 turn 921 — TURN B2b-2b THE MIDDLE FORM (the CLEARANCE dropdown replaces Safe-Z): BUILT + verified with VIEWED screenshots. Split accepted; this is the dropdown + when-gated fields half (the Plane floor + Suggest = B2b-2b-2, the advisor's offered split). The user-facing piece: the confusing Safe-Z field is GONE, replaced by a CLEARANCE mode dropdown whose per-mode field appears only when relevant and DRIVES the emit. Closes the "Safe-Z drives nothing" complaint.
+
+### BUILT
+- **web/index.html** — the GEOMETRY row's SAFE Z field became the CLEARANCE `<select id="m_clear_mode">` (Max safe height / Hop up / Clearance plane), + two WHEN-GATED blocks below it: `m_hop_block` (HOP HEIGHT `m_hop_dist`, shows for Hop) + `m_plane_block` (CLEARANCE PLANE work-Z `m_plane_z`, shows for Plane). Honest tooltips (the Hop cap is Expert+V4.1; the Plane is a WORK-Z with the unset-WCS-Z caveat noted).
+- **web/wizards/views/middleView.js** — inputIds: dropped `m_safe_z`, added `m_clear_mode`/`m_hop_dist`/`m_plane_z`. The param object now reads `clearMode`/`hopDist`/`planeZ` (removed `safeZ`/`safeZFrame` + the safeZFrameValue import). Hand-rolled the when-gate show/hide (the middleView precedent): HOP field only for Hop, PLANE field only for Plane, Max shows neither.
+- **web/ui/safeZFrameToggle.js** — removed `m_safe_z` from ADOPTING_FIELDS (middle's rel|mach frame toggle is retired — the park is always Max).
+
+### VERIFIED (tests/clearance-form-921.spec.js — passes; screenshots VIEWED)
+- The old `m_safe_z` field + its injected `m_safe_z_frame` toggle are GONE; the `m_clear_mode` dropdown is present.
+- WHEN-GATED (screenshots VIEWED, all 3 modes on a two-axis boss): Max → neither field; Hop → HOP HEIGHT (MM) appears; Plane → CLEARANCE PLANE (WORK Z) appears; the other hides.
+- DRIVES THE EMIT (read back from #wiz_middle_code): Max → no hop/plane; Hop → the capped hop `#43=[#95+15]`; changing HOP HEIGHT to 22 → the emit moves to `#43=[#95+22]`; Plane (planeZ=13) → the absolute `G0 Z13` work-Z lift, NOT the hop cap. Each mode's emit differs. The complaint is CLOSED (every visible field drives its mode).
+- Max byte-identical: the dropdown defaults to Max = today's emit (asserted no hop/plane markers in Max; the goldens cluster stays green).
+- ROUND-TRIP: clearMode/hopDist/planeZ ride the op marker (opSchema, wired in B2b-1) — clearance-hop-plane-913's round-trip test stays green (a middle op with clearMode=hop survives .nc export→reimport byte-identical).
+
+### ⚠ COVERAGE GAP FLAGGED (an emit follow-up — surfaced building the form)
+- **clearMode currently governs ONLY the TRANS-axis auto traverse (transTraverseR, B2b-1).** For a SINGLE-axis boss (the default) or the in-axis cross-over, the dropdown is present but drives NOTHING — because the in-axis cross-over (traverseOverR, middleWizard.js:149, a relative `G0 Z#18` lift/cross/drop) + the manual reposition (already Max) don't read clearMode. So on the default single-axis view, changing the dropdown doesn't move the emit — a residue of the "drives nothing" complaint for that config.
+- FIX (an EMIT follow-up, goldens regen): route traverseOverR through the clearTraverseParams machinery (like transTraverseR) so the in-axis cross-over honours Hop/Plane/Max too; consider whether the reposition should follow the mode as well (it's currently always Max, which is the safe standing-split default). RECOMMEND folding this into a small emit turn (near B2b-2b-2 or the corner port) so the dropdown is meaningful for every middle config, not just two-axis. NOT done this turn (form-scoped); the dropdown genuinely drives the emit where clearMode applies (two-axis), verified.
+
+### FULL GATE
+- **1323 passed / 0 failed / 4 skipped (12.3m), GATE_EXIT=0** — CLEAN (explicit failed-count grep = 0; no flake; +1 vs B2b-2a = the new clearance-form-921 spec).
+- Files (git hash-object pre-commit): web/index.html `e7210b0` (the CLEARANCE dropdown + when-gated blocks) · web/wizards/views/middleView.js `8e54439` (read clearMode/hopDist/planeZ + when-gate show/hide, retire safeZ) · web/ui/safeZFrameToggle.js `123d6bb` (drop m_safe_z) · tests/clearance-form-921.spec.js `456fa36` (NEW). Commit hashes below.
+- No release (bundle rule). No lingering procs.
+
+### NEXT
+- B2b-2b-2 (the Plane not-below-stock-top FLOOR + the WCS-Z-unset tooltip + the SUGGEST beside Plane Z — the tall-stock assists, needs the stock-top source from the workpiece model) + the flagged traverseOverR coverage fix. THEN B2b-2c (corner data-op) then B2b-3 (through-stock). FLAGGED fast-follows still open: the park-sweep (alignment/rotary → Max) + the DM500 traverse-return consistency. No release (bundle rule).
