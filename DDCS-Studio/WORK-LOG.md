@@ -5391,3 +5391,27 @@ NUMERIC HAND-CHECK (V4.1, same frame as Expert): probe #95=-50, hop 15 -> #191=-
 
 ### NEXT
 - B2b-2b-2 (the Plane not-below-stock-top FLOOR + the WCS-Z-unset tooltip + the SUGGEST beside Plane Z — needs the stock-top source from the workpiece model) then B2b-2c (corner data-op) then B2b-3 (through-stock). FLAGGED fast-follows still open: the park-sweep (alignment/rotary → Max + their spec rows) + the DM500 traverse-return work-frame consistency. No release (bundle rule).
+
+## 🔨 turn 925 — TURN B2b-2b-2 THE PLANE TALL-STOCK ASSISTS (floor WARN + Suggest): BUILT + verified with VIEWED screenshots. Pure FORM/validation — the Plane EMIT is unchanged from B2b-1 (Max/Hop/Plane byte-identical; the assists guide the VALUE, not the emit shape). The user's real workflow: tall stock → Plane, measured by hand — so a Suggest offers the declared-stock-top + margin, and a floor WARNS (never clamps) when the plane sits below the stock top.
+
+### GROUNDING
+- **Stock-top work-Z** = `outer.z * (1 - datumZFrac(outer.datum))`. datumZFrac (createPreviewPanel.js:71-76) returns the Z datum fraction from the bottom: n=0/c=0.5/p=1 (default 'nnp' = top). So a TOP datum → stock top at work-Z 0; a bottom datum → the full height; centre → half. getWorkpiece() (engine/workpiece.js) is ALREADY imported in middleView.js. Null when no stock declared → the assists stay quiet.
+- **Suggest pattern** = feedSuggestWidget (formWidgets.js:623-650): a plain button that computes + fills the field via `.value` + a dispatched `input` event (so the emit re-runs as if typed); ADVISORY — fills ONLY on click, never auto.
+
+### BUILT (form-only, MIDDLE hand-rolled)
+- **web/index.html** — the CLEARANCE PLANE block gained a `✨ Suggest` button (beside the field) + an inline amber WARN span (`m_plane_warn`). Honest tooltip on Suggest: "the system knows only the DECLARED stock; clamps and fixtures are yours to add."
+- **web/wizards/views/middleView.js** — a `stockTopWorkZ()` helper (getWorkpiece + the datum-Z fraction). onOpen binds the Suggest click ONCE: fill `m_plane_z` = stock-top + `abs(settings.machine.safeZMargin)` (default 5), dispatch input. update() toggles the FLOOR WARN: shown ONLY in Plane mode when `planeZ < stockTop` — a HINT, NOT a clamp (the plane Z is the user's to own — dont-declare-away-user-responsibility; the pre-flight through-stock class B2b-3 is the runtime catch).
+
+### VERIFIED (tests/clearance-plane-assists-925.spec.js — passes; screenshots VIEWED)
+- SUGGEST fills stock-top + the safe margin (independent truth re-derived from getWorkpiece + settings; default box z=20 top-datum → top 0 + margin 5 = planeZ 5).
+- FLOOR WARNS when planeZ is set below the stock top (screenshot VIEWED: the amber "⚠ below the declared stock top — this traverse may cross into the part (check clamps / fixtures)" under the field); HIDES above the stock top + in Max mode.
+- NOT A CLAMP: a below-stock value is KEPT as typed (the user owns it) — asserted.
+- EMIT UNCHANGED: middle-reposition-refactor + clearance-modes-909 + clearance-hop-plane-913 + clearance-form-921 green (7) — the assists touch only the form; no golden moves. Round-trip unaffected (planeZ still rides the op marker, B2b-1).
+
+### FULL GATE
+- **1325 passed / 0 failed / 4 skipped (12.8m), GATE_EXIT=0** — CLEAN (explicit failed-count grep = 0; NO flakes this run — the load flakes did not recur, so this is a clean full gate the bundle release can key on once B2b completes).
+- Files (git hash-object): web/index.html `0abb8bd` (the Suggest button + warn span) · web/wizards/views/middleView.js `31e0cb8` (stockTopWorkZ + the Suggest bind + the floor warn) · tests/clearance-plane-assists-925.spec.js `9e1c57a` (NEW). Commit hashes below.
+- No release (bundle rule — B2b-2c + B2b-3 remain). No lingering procs.
+
+### NEXT
+- B2b-2c (corner data-op, the SAME clearance model — the dropdown + when-gated fields + floor + Suggest via the data-op descriptor path, which has native when-gating) then B2b-3 (through-stock pre-flight — the runtime catch the floor points at). FLAGGED fast-follows still open: the park-sweep (alignment/rotary → Max) + the DM500 traverse-return consistency. No release (bundle rule; also the gate has load flakes — a release needs a clean full gate).
