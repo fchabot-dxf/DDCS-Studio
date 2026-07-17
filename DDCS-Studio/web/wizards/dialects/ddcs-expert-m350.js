@@ -50,6 +50,28 @@ export const dialect = {
             ...this.machineMove('Z', rd),              // G53 Z#42
         ];
     },
+    // safeHop (t913 B2b-1) — the CAPPED clearance HOP for a planned traverse: lift the tool by `hopDist` above the SAVED
+    // probe Z (`saveVar`, machine frame), but NEVER above the machine-safe margin. No native min() on M350, so the cap is an
+    // IF/GOTO into a scratch (the same idiom as safeRetract's #520 guard). Home Z0 = TOP, machine Z travels NEGATIVE, the
+    // margin is a NEGATIVE machine Z below home — so min(saved+hop, margin) keeps the LOWER (less-lifted, still-below-margin)
+    // of the two: keep #43 when it is below the margin (#43<#42), else clamp #43 to the margin. `hv`=#43 (grounded-FREE scratch,
+    // RESERVED in varMap — peer to safeRetract's #42/t897's #95). The paired G53 return to `saveVar` (emitDrop) nets it back.
+    safeHop: function ({ hopDist = 15, saveVar = '#95', margin = -5, guardLabel = 82, capLabel = 83 } = {}) {
+        const rd = '#42';   // margin scratch (shared with safeRetract; re-read here)
+        const hv = '#43';   // hop-target scratch (grounded free)
+        return [
+            '( Clearance hop - capped at the machine margin )',
+            `${hv}=[${saveVar}+${hopDist}]`,           // proposed hop target = saved probe Z + hopDist (machine Z)
+            `${rd}=#520`,                              // read the margin (read-only, like safeRetract)
+            ...this.ifGoto(rd, '<', '0', guardLabel),  // IF #42<0 GOTO<g>  — a controller value is set, use it
+            `${rd}=${margin} ( safe-Z margin - baked fallback; controller #520 wins if set )`,
+            ...this.label(guardLabel),                 // N<g>
+            ...this.ifGoto(hv, '<', rd, capLabel),     // IF #43<#42 GOTO<c>  — the hop is below the margin, KEEP it
+            `${hv}=${rd} ( cap the hop at the safe machine margin )`,   // else CLAMP the hop to the margin (do not over-lift)
+            ...this.label(capLabel),                   // N<c>
+            ...this.machineMove('Z', hv),              // G53 Z#43  (lift to the capped target)
+        ];
+    },
     // #[805+[idx-1]*5+ax]=value   (SAVE_WCS_XY_AUTO.nc:21-26). base 805, stride 5; X=base,Y=+1,Z=+2,A=+3
     setWorkOffset: (wcsExpr, axis, value) => [`#[805+[${wcsExpr}-1]*5+${AX[axis]}]=${value}`],
     // wcsBaseInto(wcs) — the WCS-table BASE-address compute into #70, the dump-grounded INDIRECT idiom shared by the probe

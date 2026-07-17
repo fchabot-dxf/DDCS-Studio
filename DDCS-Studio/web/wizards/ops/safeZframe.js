@@ -111,14 +111,40 @@ export const safeZFrameOf = (v) => (v === 'machine' ? 'machine' : 'relative');
 export const CLEAR_MODES = ['max', 'hop', 'plane'];
 /** Normalise a clearance mode (default `max`; unknown/absent → `max`, the safe default). B2b admits `hop`/`plane`. */
 export const clearModeOf = (v) => (CLEAR_MODES.includes(v) ? v : 'max');
+
+/** t913 B2b-1 — SAVE the pre-lift Z (saveMachineZNode) then a CAPPED clearance HOP. The `safehop` atom folds per post:
+ *  Expert emits the IF/GOTO cap (lift to min(saved+hop, margin)); posts with no real flow-skip (grbl/rs274/centroid)
+ *  degrade to a plain relative hop + an honest uncapped comment. The paired G53 return to `saveVar` (emitDrop) nets it back.
+ *  Labels are placeholders — uniquifySafeRetractLabels (blockEmitter) rewrites them unique per program before the fold. */
+export function safeHopNode({ hopDist = 15, saveVar = '#95' } = {}) {
+    const b = newBlock('safehop');
+    b.params = { hopDist, saveVar, margin: safeZMarginNeg(), guardLabel: 82, capLabel: 83, restore: 'inc' };
+    return b;
+}
+
+/** t913 B2b-1 — the CLEARANCE-PLANE lift: a WORK-FRAME absolute move to `planeZ` (G90 G0 Z<planeZ>), then restore G91 for
+ *  the incremental XY re-centre that follows. UNIVERSAL — every post emits a G90 absolute Z move (no register, no flow), so
+ *  no dialect method is needed. The paired G53 return to the SAVED machine Z (emitDrop) brings the tool back to the probe
+ *  depth. ⚠ WCS-Z CAVEAT: `planeZ` is a WORK Z — if this traverse runs BEFORE the WCS Z datum is set, the plane references an
+ *  unset/old WCS-Z. The B2b-2 not-below-stock-top FLOOR + its tooltip surface this to the user; the pre-flight through-stock
+ *  class (B2b-3) is the runtime guardrail. */
+export function planeLiftNodes(planeZ) {
+    const abs = newBlock('distmode'); abs.params = { dist: 'abs' };            // G90 — work-frame absolute for the plane move
+    const mv = newBlock('move'); mv.params = { mode: 'rapid', z: String(planeZ) };   // G0 Z<planeZ>  (universal; no register)
+    const inc = newBlock('distmode'); inc.params = { dist: 'inc' };            // G91 — restore incremental for the XY re-centre
+    return [abs, mv, inc];
+}
+
 /** The safeTraverseStack lift/drop params for a declared clearance MODE. `saveVar` = the free scratch that records the
- *  pre-lift Z for the honest return (#95 in the corner/middle family). B2a wires `max` (the #520 machine margin, reusing
- *  the t826/t897 machinery corner + middle-manual already prove); `hop` (a relative lift CAPPED at the margin) and
- *  `plane` (a declared absolute plane) branch HERE in B2b — each also gets its own when-gated form field + a Plane
- *  "not below stock top" floor (the one net-new hazard). Until then every mode resolves to the safe machine margin. */
-export function clearTraverseParams(mode = 'max', { saveVar = '#95' } = {}) {
-    // 'max' — lift to the machine margin (safeRetractNode #520) + return to the saved Z (safeZParkBlock ret). lift/drop
-    // are presence GATES here (the value is the margin / the saved Z, resolved inside safeTraverseStack, not these).
+ *  pre-lift Z for the honest return (#95 in the corner/middle family). `max` = the #520 machine margin (t826/t897);
+ *  `hop` = a relative lift CAPPED at the margin (safeHopNode); `plane` = a declared absolute work-Z plane (planeLiftNodes).
+ *  All three share the SAME honest per-post return (returnZ → G53 Z#95). The mode governs a PLANNED traverse only; miss-path
+ *  handlers + final parks stay the machine margin (safeRetractNode, unchanged). `hopDist`/`planeZ` come from the wizard form. */
+export function clearTraverseParams(mode = 'max', { saveVar = '#95', hopDist, planeZ } = {}) {
+    if (mode === 'hop') return { lift: true, clearMode: 'hop', hopDist, drop: true, returnZ: saveVar };
+    if (mode === 'plane') return { lift: true, clearMode: 'plane', planeZ, drop: true, returnZ: saveVar };
+    // 'max' (default) — lift to the machine margin (safeRetractNode #520) + return to the saved Z. lift/drop are presence
+    // GATES here (the value is the margin / the saved Z, resolved inside safeTraverseStack). BYTE-IDENTICAL to B2a.
     return { lift: true, machineLift: true, drop: true, returnZ: saveVar };
 }
 

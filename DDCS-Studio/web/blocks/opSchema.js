@@ -92,6 +92,7 @@ export const SCHEMA = {
     middle: {
         featureType: Enum(), approach: Enum(), inAxis: Enum(), transAxis: Enum(), axis: Enum(), dir1: Enum(), dir2: Enum(), twoAxis: Bool(),
         findBoth: Bool(), circular: Bool(), probeZ: Bool(), wcs: Enum(), dist: N(null, 'maxDist'), retract: N(), safeZ: N(), safeZFrame: Enum(),
+        clearMode: Enum(), hopDist: N(), planeZ: N(),   // t913 B2b-1 — the declared clearance mode + its per-mode fields (round-trip the mode; the form lands in B2b-2)
         clearOver: N(), crossX: Str(), crossY: Str(), diagTravel: Str(), diagPrimary: Str(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), syncA: Bool(), slave: Enum(), qStop: N(),
     },
     corner: {

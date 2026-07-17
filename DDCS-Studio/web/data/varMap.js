@@ -44,6 +44,10 @@ export const RESERVED = {
     // Not a persistent slot — a SCRATCH reservation (t899): the Expert safeRetract guard reads #520 into #42 (grounded free:
     // 0 refs across every wizard/CAM emit + goldens; distinct from t897 #95, CAM #30/#40/#41). Volatile, re-read per retract.
     42: 'safe-Z guard scratch (t899) — dialect.safeRetract reads #520 into #42 with a baked-margin fallback (keeps #520 read-only).',
+    // Not a persistent slot — a SCRATCH reservation (t913 B2b-1): the Expert safeHop cap computes the proposed hop target into
+    // #43 (= saved probe Z #95 + hopDist) and clamps it at the #42 margin. Grounded free (0 refs across every wizard/CAM emit +
+    // goldens; peer to #42/#95). Volatile, re-computed per hop. Only emitted when the clearance MODE is 'hop' (default is 'max').
+    43: 'clearance-hop cap scratch (t913) — dialect.safeHop computes #43=[#95+hopDist] then clamps it at the #42 machine margin.',
 };
 
 /** Which class a macro var # belongs to. */

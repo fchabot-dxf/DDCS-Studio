@@ -17,7 +17,7 @@
  *         raw · rawAxis(opt-in: dialect trigger reg per post) · result · radius · compEnable(=true) · failGoto(=1) · comment · compNote · stopVar · limitVar · limitVal
  */
 import { newBlock } from '../../blocks/blockEmitter.js';
-import { safeRetractNode, saveMachineZNode, safeZParkBlock } from './safeZframe.js';   // t826 — opt-in machine-frame safe-height lift (safeTraverseStack machineLift); t897 — the paired save/return for a machine-lift traverse
+import { safeRetractNode, saveMachineZNode, safeZParkBlock, safeHopNode, planeLiftNodes } from './safeZframe.js';   // t826 — opt-in machine-frame safe-height lift (safeTraverseStack machineLift); t897 — the paired save/return for a machine-lift traverse; t913 — the hop/plane clearance modes
 
 export function probeSurfaceStack(p = {}) {
     const S = [];
@@ -107,7 +107,12 @@ export function safeTraverseStack(p = {}) {
     // is the per-wall retract, not this doLift) so its repoTraverse passes returnZ WITHOUT machineLift → doLift is a no-op here.
     const doLift = () => {
         if (!p.lift) return;
-        if (p.machineLift) { if (p.returnZ) S.push(saveMachineZNode(p.returnZ)); S.push(safeRetractNode({ restore: 'inc' })); }   // t856 — the machine-lift path fires inside the G91 traverse body → G90-wrap the G53, restore G91
+        // t913 — the declared clearance MODE. 'plane' → a work-frame absolute lift to p.planeZ (universal); 'hop' → a capped
+        // relative hop (safeHopNode, Expert-capped / degrade elsewhere). Both SAVE the pre-lift Z first so the paired G53 return
+        // (emitDrop) nets back to the probe depth — the same honest pairing as 'max'. Default (max/machineLift) is unchanged.
+        if (p.clearMode === 'plane') { if (p.returnZ) S.push(saveMachineZNode(p.returnZ)); planeLiftNodes(p.planeZ).forEach((b) => S.push(b)); }
+        else if (p.clearMode === 'hop') { if (p.returnZ) S.push(saveMachineZNode(p.returnZ)); S.push(safeHopNode({ hopDist: p.hopDist, saveVar: p.returnZ || '#95' })); }
+        else if (p.machineLift) { if (p.returnZ) S.push(saveMachineZNode(p.returnZ)); S.push(safeRetractNode({ restore: 'inc' })); }   // t856 — the machine-lift path fires inside the G91 traverse body → G90-wrap the G53, restore G91
         else push('move', { mode: 'rapid', z: p.lift });
     };
     // t897 — the drop-back. returnZ (declared) → the paired G53 RETURN to the saved machine Z (byte-honest: returns to the

@@ -54,7 +54,9 @@ export function middleStack(params = {}, opts = {}) {
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const dist = num(params.dist, 200), retract = num(params.retract, 2), safeZ = num(params.safeZ, 10);   // MAX PROBE default 200 (t381 — 20 was too small to reach the wall → the probe fired short + retracted → "retract-only")
     const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL 1c: relative (default) | machine (G53 final park)
-    const clearMode = clearModeOf(params.clearMode);   // t909 B2 — the DECLARED clearance mode the trans-axis traverse reads (max default = the #520 machine margin, unified with corner); hop/plane land in B2b
+    const clearMode = clearModeOf(params.clearMode);   // t909 B2 — the DECLARED clearance mode the trans-axis traverse reads (max default = the #520 machine margin, unified with corner)
+    const hopDist = num(params.hopDist, 15);   // t913 B2b-1 — Hop mode: how far to lift (capped at the machine margin). Only emitted when clearMode==='hop'
+    const planeZ = num(params.planeZ, 10);     // t913 B2b-1 — Plane mode: the absolute work-Z clearance plane. Only emitted when clearMode==='plane' (B2b-2 adds the not-below-stock floor)
     const clearOver = num(params.clearOver, 15);   // boss AUTO: how high to lift before crossing over the part
     // Boss-AUTO probe-both: the in-axis wall1→wall2 cross-over — the straight TRAVERSE that spans the feature, SEPARATE
     // per axis (non-square boss). DECOUPLED from MAX PROBE: max-probe (#1) is the probe REACH (how far G31 searches);
@@ -165,7 +167,7 @@ export function middleStack(params = {}, opts = {}) {
         b.children = safeTraverseStack({
             mode: 'center', axis, second,
             dir1Plus, dir2Plus, diagPrimary, diagTravel: '#21', wall2Var: '#52', radiusVar: '#6',
-            ...clearTraverseParams(clearMode),   // t909 B2 — UNIFY to the declared clearance (max = the #520 machine margin + honest save/return, like corner)
+            ...clearTraverseParams(clearMode, { hopDist, planeZ }),   // t909 B2 — UNIFY to the declared clearance (max = the #520 machine margin + honest save/return, like corner); t913 — hop/plane read their fields
             comment: 'REPOSITION: auto-traverse to the perpendicular walls',
             dogleg: shape === 'dogleg',   // t383 — DOGLEG (default): secondary out first, then re-centre primary; diagonal: one straight move
         });

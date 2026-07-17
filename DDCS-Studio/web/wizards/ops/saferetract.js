@@ -20,6 +20,30 @@
 import { num, r3 } from './util.js';
 import { SAFEZ_MARGIN_DEFAULT, wrapMachineFrame } from './safeZframe.js';
 
+// t913 B2b-1 — the CLEARANCE HOP atom: a capped relative lift for a planned traverse (the 'hop' clearance mode). Folds per
+// post at emit: Expert (dialect.safeHop) emits the IF/GOTO cap (lift to min(saved probe Z + hopDist, machine margin)); posts
+// with NO real flow-skip (grbl 'none', rs274 O-word-runs-not-skips, centroid) DEGRADE to a plain relative hop + an honest
+// 'uncapped on this post' comment (byte-safe = the pre-B2a relative form). The paired G53 return (safeTraverseStack emitDrop →
+// safeZParkBlock ret) brings the tool back to the SAVED probe Z on every post, so the hop nets zero by construction. HIDDEN
+// from the palette (wizard-composed only, like safetraverse). The guard/cap LABELS are rewritten unique per program by
+// uniquifySafeRetractLabels (blockEmitter) before the fold, so several hops never collide their forward-jump labels.
+export const safeHopBlock = {
+    type: 'safehop', label: 'Clearance Hop', kind: 'leaf', category: 'Move', hidden: true,
+    defaults: { hopDist: 15, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, guardLabel: 82, capLabel: 83 },
+    fields: ['hopDist', 'saveVar', 'margin', 'guardLabel', 'capLabel'],
+    emit: (p, dx, dy, dialect) => {
+        const opts = {
+            hopDist: r3(num(p.hopDist, 15)), saveVar: p.saveVar || '#95',
+            margin: r3(num(p.margin, -SAFEZ_MARGIN_DEFAULT)), guardLabel: num(p.guardLabel, 82), capLabel: num(p.capLabel, 83),
+        };
+        // Expert (and any post that defines safeHop) — the capped machine-frame hop → G90-wrap the G53 (t856).
+        if (dialect && typeof dialect.safeHop === 'function') return wrapMachineFrame(dialect, dialect.safeHop(opts), p.restore);
+        // DEGRADE — no cap flow on this controller: a plain RELATIVE hop + the honest note. NO G53 → no wrap; the paired G53
+        // return (emitDrop) still nets it back to the saved Z (the return is absolute-to-saved, honest regardless of the lift).
+        return [`( Clearance hop ${opts.hopDist}mm - uncapped on this controller )`, `G0 Z${opts.hopDist}`];
+    },
+};
+
 // t901 — the SAFETRAVERSE BUNDLE atom: a declared block that COMPOSES a safe-height lift (saferetract) + shaped XY travel +
 // a descend/return onto the target (reusing the t897 save/return-Z pairing). A TRANSPARENT container — its children ARE the
 // composed atoms (built by safeTraverseStack), and blockEmitter emits them in order (byte-identical to the inline builder it

@@ -285,10 +285,14 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 // this subsumes the cross-op accumulation case (offsetLabels no longer special-cases saferetract). Idempotent (re-run safe).
 function uniquifySafeRetractLabels(blocks) {
     let n = 91;
+    // t913 — a `safehop` (the capped clearance hop, Expert) carries TWO forward-jump labels (its #520-guard + its cap check);
+    // they draw from the SAME counter so a program mixing retracts and hops never collides any N<label>. In the DEFAULT max
+    // mode there are NO safehop blocks, so the counter sees only saferetract → 91+ unchanged (byte-identical to B2a).
     const walk = (list) => {
         for (const b of (list || [])) {
             if (!b) continue;
             if (b.type === 'saferetract') { b.params = { ...(b.params || {}), label: n++ }; }
+            else if (b.type === 'safehop') { b.params = { ...(b.params || {}), guardLabel: n++, capLabel: n++ }; }
             if (b.children) walk(b.children);
             if (b.uiChildren) walk(b.uiChildren);
         }
