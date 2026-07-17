@@ -48,6 +48,10 @@ export const RESERVED = {
     // #43 (= saved probe Z #95 + hopDist) and clamps it at the #42 margin. Grounded free (0 refs across every wizard/CAM emit +
     // goldens; peer to #42/#95). Volatile, re-computed per hop. Only emitted when the clearance MODE is 'hop' (default is 'max').
     43: 'clearance-hop cap scratch (t913) — dialect.safeHop computes #43=[#95+hopDist] then clamps it at the #42 machine margin.',
+    // V4.1-ONLY (t915 B2b-1b): the V4.1 hop cap's proposed-target scratch. #42/#43 are NOT safe on V4.1 (firmware executable
+    // macros write #0-148 — see ddcs-v41.js missScratch note), so V4.1's cap uses native FREE vars in the vetted #149-489 band:
+    // #190 (the margin, already vetted free + used by V4.1 safeRetract) + #191 (adjacent, 0 refs in Studio emit + the dump).
+    191: 'V4.1 clearance-hop proposed-target scratch (t915) — dialect(v41).safeHop computes #191=[#95+hopDist] then clamps at #190 (the baked margin). V4.1-native free (adjacent to the vetted-free #190; Expert uses #43, unsafe on V4.1).',
 };
 
 /** Which class a macro var # belongs to. */

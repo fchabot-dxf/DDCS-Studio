@@ -35,6 +35,27 @@ export const dialect = {
     safeRetract: function ({ margin = -5 } = {}) {
         return ['( Safe-Z retract - machine frame )', `#190=${margin} ( safe-Z margin - machine frame )`, ...this.machineMove('Z', '#190')];
     },
+    // safeHop (t915 B2b-1b) — the CAPPED clearance hop on V4.1 (the user's LIVE bench). Mirrors Expert's min(saved+hop, margin)
+    // IF/GOTO cap, but with V4.1's OWN idioms: the margin is BAKED into #190 (V4.1 seeds no #520 register — its safeRetract does
+    // the same), the machine move is `G0 G53`, and ifGoto has no space before GOTO. V4.1 has EVERY primitive confirmed LIVE
+    // (ifGoto probe-h.nc:7, G0 G53 probe-fix.nc, label/goto) — an UNCAPPED hop here is the exact Z-limit crash class the arc kills.
+    // VARS: #42/#43 (Expert's cap scratch) are NOT safe on V4.1 — firmware executable macros WRITE #0-148 (see the missScratch
+    // note above). So the cap uses V4.1-native FREE vars in the vetted #149-489 band: #190 (margin, already vetted free) + #191
+    // (proposed target, adjacent to #190, 0 refs in Studio emit). Only ONE label (the cap check) — no #520 read guard is needed
+    // since the margin is baked. The paired G53 return to `saveVar` (emitDrop) nets the hop back to the saved probe Z.
+    safeHop: function ({ hopDist = 15, saveVar = '#95', margin = -5, capLabel = 83 } = {}) {
+        const mg = '#190';   // baked margin (V4.1 idiom; no #520 register)
+        const pt = '#191';   // proposed-target scratch (V4.1-native free, adjacent to the vetted-free #190)
+        return [
+            '( Clearance hop - capped at the machine margin )',
+            `${mg}=${margin} ( safe-Z margin - machine frame )`,   // BAKE the margin (like safeRetract)
+            `${pt}=[${saveVar}+${hopDist}]`,                       // proposed target = saved probe Z + hopDist
+            ...this.ifGoto(pt, '<', mg, capLabel),                 // IF #191<#190GOTO<c>  — keep the hop when BELOW the margin
+            `${pt}=${mg} ( cap the hop at the safe machine margin )`,   // else CLAMP to the margin
+            ...this.label(capLabel),                               // N<c>
+            ...this.machineMove('Z', pt),                          // G0 G53 Z#191  (lift to the capped target)
+        ];
+    },
     // CONFIRMED live (probe-vertex.nc): zero at the probed point with G90 G92 <axis><WORK value> — a work coord,
     // NOT a machine coord like Expert's register write. ("zero here" macros zeroz/zeroxy write #1506-1509 directly.)
     // t644 (F4 datum fix) — `value` is the MACHINE coord that should become work-0 (Expert writes it to the offset register).

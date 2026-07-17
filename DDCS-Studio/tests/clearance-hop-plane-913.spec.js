@@ -76,6 +76,20 @@ test('B2b-1 hop/plane emit per post: Expert capped, degrade posts relative+note,
   expect(iCap, 'cap compare before the clamp').toBeLessThan(iClamp);
   expect(iClamp, 'clamp before the G53 lift').toBeLessThan(iLift);
 
+  // ── HOP — V4.1 (the user's LIVE bench) is CAPPED too, via its BAKED #190 margin idiom (NOT Expert's #520 read) ──
+  // V4.1 has every cap primitive confirmed live (ifGoto, G0 G53, label). An uncapped hop here = the Z-limit crash class.
+  const hv = transSlice(r.hop['ddcs-v41']);
+  expect(hv, 'V4.1 hop: bakes the margin into #190 (V4.1 idiom — no #520 register)').toMatch(/#190=-5 \( safe-Z margin - machine frame \)/);
+  expect(hv, 'V4.1 hop: proposed target in #191 (V4.1-native free var)').toMatch(/#191=\[#95\+15\]/);
+  expect(hv, 'V4.1 hop: cap keeps the hop when BELOW the margin (no space before GOTO)').toMatch(/IF #191<#190GOTO\d+/);
+  expect(hv, 'V4.1 hop: clamps to the margin').toMatch(/#191=#190 \( cap the hop at the safe machine margin \)/);
+  expect(hv, 'V4.1 hop: lifts to the capped target via G0 G53').toMatch(/G0 G53 Z#191/);
+  expect(hv, 'V4.1 hop: does NOT use Expert #42/#43 (firmware-unsafe on V4.1)').not.toMatch(/#4[23]=/);
+  const j1 = hv.indexOf('#191=[#95+15]'), j2 = hv.indexOf('IF #191<#190'), j3 = hv.indexOf('#191=#190 '), j4 = hv.indexOf('G0 G53 Z#191');
+  expect(j1, 'V4.1: proposed before cap').toBeLessThan(j2);
+  expect(j2, 'V4.1: cap before clamp').toBeLessThan(j3);
+  expect(j3, 'V4.1: clamp before lift').toBeLessThan(j4);
+
   // ── HOP — degrade posts: plain relative hop + the honest uncapped note, no cap regs ─────────────────────────
   for (const id of DEGRADE) {
     const s = transSlice(r.hop[id]);
