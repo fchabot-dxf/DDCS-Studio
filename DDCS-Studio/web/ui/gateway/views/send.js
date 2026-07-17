@@ -74,11 +74,12 @@ export default {
         try {
           const pre = checkEnvelope(file.text, (window.ddcsGetSettings && window.ddcsGetSettings()) || {});
           if (pre.status === 'red') {
-            const top = pre.violations.slice(0, 4).map(v => `line ${v.line}: ${v.axis} by ${Math.round(v.overshoot * 10) / 10} mm`).join('\n');
+            const hasStock = pre.violations.some(v => v.kind === 'through-stock');   // t937 — a through-stock kind softens the envelope-only wording
+            const top = pre.violations.slice(0, 4).map(v => v.kind === 'through-stock' ? `line ${v.line}: crosses the stock` : `line ${v.line}: ${v.axis} by ${Math.round(v.overshoot * 10) / 10} mm`).join('\n');
             const more = pre.violations.length > 4 ? `\n…and ${pre.violations.length - 4} more` : '';
             const ok = await dlgConfirm(
-              `Pre-flight found ${pre.violations.length} move(s) that would leave the machine travel:\n\n${top}${more}\n\nSend to the controller anyway?`,
-              { title: 'Envelope violation', danger: true, okLabel: 'Send anyway', cancelLabel: 'Cancel' });
+              `Pre-flight found ${pre.violations.length} move(s) that would ${hasStock ? 'leave the machine travel or cross the stock' : 'leave the machine travel'}:\n\n${top}${more}\n\nSend to the controller anyway?`,
+              { title: hasStock ? 'Pre-flight violation' : 'Envelope violation', danger: true, okLabel: 'Send anyway', cancelLabel: 'Cancel' });
             if (!ok) return;   // the finally block re-enables the button
           }
         } catch (_) { /* advisory — never block the send on a checker error */ }

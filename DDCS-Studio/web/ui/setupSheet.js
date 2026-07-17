@@ -147,8 +147,11 @@ export function violationsBySetup(verdict, groups) {
 // The per-setup pre-flight rows: name each violation (line, axis, overshoot) on this setup's page — or a green line.
 export function setupPreflightHTML(list) {
     if (!list || !list.length) return `<div class="ss-row ss-verdict-green">✓ this setup fits the envelope</div>`;
-    return `<div class="ss-row ss-verdict-red">✕ ${list.length} move${list.length === 1 ? '' : 's'} outside the envelope:</div>`
-        + list.slice(0, 8).map((v) => `<div class="ss-row ss-muted">line ${esc(v.line)} · ${esc(v.axis)} · ${fmtN(v.overshoot)} mm over</div>`).join('');
+    const hasStock = list.some((v) => v.kind === 'through-stock');   // t937 — a through-stock kind softens the envelope-specific header
+    return `<div class="ss-row ss-verdict-red">✕ ${list.length} move${list.length === 1 ? '' : 's'} ${hasStock ? 'flagged' : 'outside the envelope'}:</div>`
+        + list.slice(0, 8).map((v) => v.kind === 'through-stock'
+            ? `<div class="ss-row ss-muted">line ${esc(v.line)} · crosses the stock</div>`
+            : `<div class="ss-row ss-muted">line ${esc(v.line)} · ${esc(v.axis)} · ${fmtN(v.overshoot)} mm over</div>`).join('');
 }
 // The Operations table for a set of ops (shared by the single-page + per-setup paths). Returns the table + its subtotal.
 function opsTable(ops, est) {

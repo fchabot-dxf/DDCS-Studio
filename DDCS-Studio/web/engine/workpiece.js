@@ -122,9 +122,9 @@ export function getWorkpiece() {
 // the SUGGEST), shared by the middle wizard AND the corner data-op's plane-suggest widget (D3 — DRY). The datum's Z char
 // (n/c/p = bottom/centre/top; default 'nnp' = top) sets where work-0 sits in the block: stock top = height·(1 − datumZfrac).
 // So a top datum → 0, a bottom datum → the full height. Null when no stock is declared (the assists then stay quiet).
-export function stockTopWorkZ() {
+export function stockTopWorkZ(outer) {
     try {
-        const o = getWorkpiece() && getWorkpiece().outer;
+        const o = outer || (getWorkpiece() && getWorkpiece().outer);   // t937 — optional explicit outer (the pre-flight passes its settings stock); default = the live global
         if (!o) return null;
         const z = Number(o.z) || 0;
         const code = /^[ncp]{3}$/.test(String(o.datum)) ? String(o.datum) : 'nnp';
@@ -141,6 +141,24 @@ export function suggestedPlaneZ() {
     if (top == null) return null;
     const margin = Math.abs(Number(((typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().machine) || {}).safeZMargin)) || 5;
     return Math.round((top + margin) * 10) / 10;
+}
+
+// t937 B2b-3 — the declared stock AABB in the WORK frame, for the through-stock pre-flight (the runtime catch the Plane
+// floor + Suggest point at). datumXY places part-zero in the stock's min-XY frame, so the stock spans work-X [-dp.x, x-dp.x]
+// / work-Y [-dp.y, y-dp.y]; the Z top is stockTopWorkZ() and it runs down by the full height. ONE source with datumXY +
+// stockTopWorkZ (the same datum projection the plane assists use). Null when no rectangular stock is declared — a pure
+// cylinder (x/y unset) returns null so the check stays quiet (no false-positive); a rect box is exact. Cylinders would be a
+// conservative bbox later (rayCylinder) if needed. Origin-relative trace segments (work frame) compare to this directly.
+export function stockWorkAABB(stock) {
+    const o = stock ? projectWorkpiece(stock).outer : (getWorkpiece() && getWorkpiece().outer);   // t937 — project the GIVEN stock (the pre-flight's settings stock), so the AABB matches the same stock the trace uses; default = the live global
+    if (!o || !(Number(o.x) > 0 && Number(o.y) > 0 && Number(o.z) > 0)) return null;
+    const top = stockTopWorkZ(o);
+    if (top == null) return null;
+    const dp = datumXY(o);
+    return {
+        min: { x: -dp.x, y: -dp.y, z: top - Number(o.z) },
+        max: { x: Number(o.x) - dp.x, y: Number(o.y) - dp.y, z: top },
+    };
 }
 
 /**

@@ -32,6 +32,14 @@ export function traceToolpath(text, opts = {}) {
     });
     eng._passStarts = opts.passStarts || null;   // Part 1: per-pass starts → the probe collision fires from each pass's start ②
     const result = eng.trace(String(text || ''));
+    // t937 — DECLARE-ON-THE-SEGMENT: when the caller supplies the block map (line → owning block-id ancestry, from the live
+    // projection), stamp each segment with its owning block TYPES. A consumer (the through-stock pre-flight; later the 2D/3D
+    // legends) can then scope by DECLARED intent — a clearance traverse (clearlift/safetraverse/…) vs a probe approach —
+    // instead of inferring from move class (both are G0 rapids → indistinguishable). Purely additive; no map → unchanged.
+    if (opts.blockMap && Array.isArray(result.segments)) {
+        const typesOf = (src) => (Array.isArray(src) ? src.map((id) => String(id).replace(/[0-9]+$/, '')) : []);
+        for (const seg of result.segments) if (seg && seg.line != null) seg.blockTypes = typesOf(opts.blockMap[seg.line]);
+    }
     if (Array.isArray(opts.captureVars)) {   // opt-in: read resolved #vars (e.g. the ATC station #1320-1326) before disposing
         result.vars = {};
         for (const n of opts.captureVars) result.vars[n] = Number(eng.vars.get(n)) || 0;
