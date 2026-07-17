@@ -663,9 +663,14 @@ function feedSuggestWidget(host, b) {
 // The warn shows when the entered work-Z sits BELOW the declared stock top (it WARNS, never clamps). Reusable across
 // data-ops via widget:'plane-suggest'; reads app state through the shared workpiece helpers (no new architecture).
 function planeSuggestWidget(host, b) {
+    const cfg = b.widgetConfig || {};
+    // t939 B2b-3 — the FLOOR warn ("may cross into the part") is OPT-IN (widgetConfig.floorWarn). Only an op whose clearance
+    // traverse actually CROSSES the material (a middle / inside feature) sets it; an OUTSIDE-corner traverse stays OUTSIDE the
+    // stock (traced), so the corner omits it — the warn there was a false alarm. The Suggest button + the field are unchanged.
+    const withWarn = !!cfg.floorWarn;
     host.style.cssText = ROW_CSS;
     const inp = document.createElement('input');
-    inp.type = 'number'; inp.step = (b.widgetConfig && b.widgetConfig.step) || 'any';
+    inp.type = 'number'; inp.step = cfg.step || 'any';
     inp.value = b.default ?? 0;
     inp.dataset.param = b.param;   // so [data-param="planeZ"] resolves (round-trip + the form drive) exactly like a plain number field
     inp.style.cssText = CTRL_CSS + ' width:110px;';
@@ -673,11 +678,15 @@ function planeSuggestWidget(host, b) {
     btn.type = 'button'; btn.className = 'plane-suggest-btn'; btn.textContent = '✨ Suggest';
     btn.title = 'Fill with the declared stock top + the safe-Z margin. Advisory — the system knows only the DECLARED stock; clamps and fixtures are yours to add, so raise it if needed.';
     btn.style.cssText = 'margin-left:6px; padding:4px 9px; background:var(--panel,#232833); color:inherit; border:1px solid var(--border,#2a3340); border-radius:6px; cursor:pointer; flex:0 0 auto;';
-    const warn = document.createElement('span');
-    warn.className = 'plane-floor-warn hidden';
-    warn.style.cssText = 'flex:1 0 100%; margin-top:4px; font-size:11px; color:#e0a030;';
-    warn.textContent = '⚠ below the declared stock top — this traverse may cross into the part (check clamps / fixtures)';
+    let warn = null;
+    if (withWarn) {
+        warn = document.createElement('span');
+        warn.className = 'plane-floor-warn hidden';
+        warn.style.cssText = 'flex:1 0 100%; margin-top:4px; font-size:11px; color:#e0a030;';
+        warn.textContent = '⚠ below the declared stock top — this traverse may cross into the part (check clamps / fixtures)';
+    }
     const refreshWarn = () => {
+        if (!warn) return;
         const top = stockTopWorkZ();
         const v = parseFloat(inp.value);
         warn.classList.toggle('hidden', !(top != null && Number.isFinite(v) && v < top));
@@ -689,7 +698,8 @@ function planeSuggestWidget(host, b) {
     inp.addEventListener('input', refreshWarn);
     const right = document.createElement('span');
     right.style.cssText = 'display:inline-flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:2px;';
-    right.append(inp, btn, warn);
+    right.append(inp, btn);
+    if (warn) right.append(warn);
     host.append(labelSpan(b), right);
     refreshWarn();
     return { read: () => {

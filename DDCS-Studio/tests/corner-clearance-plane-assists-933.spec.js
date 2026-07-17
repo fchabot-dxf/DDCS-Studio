@@ -44,20 +44,12 @@ test('corner data-op Plane: Suggest fills stock-top+margin; the floor WARNS (not
   expect(Number(await planeVal()), `Suggest fills stock-top(${expected.top}) + safe margin`).toBeCloseTo(expected.sugg, 1);
   await page.screenshot({ path: testInfo.outputPath('corner-suggest-filled.png') });
 
-  // FLOOR WARNS below the stock top
+  // t939 B2b-3 — the CORNER has NO floor warn (dropped): an OUTSIDE-corner clearance traverse stays OUTSIDE the stock
+  // (traced), so "may cross into the part" was a FALSE ALARM. The Suggest stays (fixture clearance); the warn opts out.
+  expect(await page.evaluate(() => !!document.querySelector('.plane-floor-warn')), 'the corner opts OUT of the floor warn (outside corner → no stock-crossing)').toBe(false);
   await setPlane(String(expected.top - 5));
-  expect(await warnShown(), 'planeZ below the stock top → the floor warns').toBe(true);
-  await page.screenshot({ path: testInfo.outputPath('corner-floor-warn.png') });
+  expect(await page.evaluate(() => !!document.querySelector('.plane-floor-warn')), 'still no warn element even below the stock top').toBe(false);
 
-  // above the stock top → no warn
-  await setPlane(String(expected.top + 8));
-  expect(await warnShown(), 'planeZ above the stock top → no warn').toBe(false);
-
-  // it is a WARNING, NOT a clamp — a below-stock value is KEPT as typed (the user owns it)
-  await setPlane(String(expected.top - 5));
+  // the field never clamps — a below-stock value is KEPT as typed (the user owns it)
   expect(await planeVal(), 'the below-stock value is NOT clamped (kept as typed — the user owns it)').toBe(String(expected.top - 5));
-
-  // the warn hides when NOT in Plane mode (Max shows no plane field + no warn)
-  await setMode('max');
-  expect(await warnShown(), 'Max mode: no plane warn').toBe(false);
 });
