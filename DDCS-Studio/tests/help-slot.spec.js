@@ -42,6 +42,6 @@ test('help slot: the SAME help shows on the real ported wizard form (Corner (dat
     };
   });
   expect(r.distTitle, 'the wizard form shows the declared field help too (same declaration, same renderer)').toContain('travels toward each wall');
-  expect(r.safeZTitle, 'a value binding').toContain('clear of the stock');
+  expect(r.safeZTitle, 'a value binding (t931 — safeZ help fixed: it is the approach/plunge, not the between-walls travel)').toContain('APPROACH / PLUNGE');
   expect(r.probeZTitle, 'a structural binding carries help too').toContain('anchors the sideways probes');
 });

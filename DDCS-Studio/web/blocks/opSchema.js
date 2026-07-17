@@ -99,6 +99,7 @@ export const SCHEMA = {
         corner: Enum(), probeSeq: Enum(), probeZ: Bool(), probeZFirst: Bool(), wcs: Enum(), dist: N(null, 'maxDist'),
         retract: N(), f_fast: N('F', 'feedFast'), f_slow: N('F', 'feedSlow'), port: N(), level: N(null, 'triggerLevel'),
         safeZ: N(), travelDist: N(), scanDepth: N(), radius: N(), sources: Struct(), syncA: Bool(), slave: Enum(), qStop: N(),
+        clearMode: Enum(), hopDist: N(), planeZ: N(),   // t931 B2b-2c — the declared clearance mode + its per-mode fields (round-trip via the clearlift atom's value params)
     },
     alignment: {
         checkAxis: Enum(), probeDir: Enum(), safeZ: N(), safeZFrame: Enum(), dist: N(null, 'maxDist'), retract: N(),

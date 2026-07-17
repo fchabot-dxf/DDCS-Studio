@@ -17,7 +17,7 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';
-import { safeRetractNode, saveMachineZNode, clearModeOf, clearLiftNodes } from './ops/safeZframe.js';   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix); t897 — record the pre-lift Z for the wall1->wall2 return; t929 B2b-2c — the declared clearance mode on the wall1->wall2 lift
+import { safeRetractNode, saveMachineZNode, clearModeOf, clearLiftNode } from './ops/safeZframe.js';   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix); t897 — record the pre-lift Z for the wall1->wall2 return; t931 B2b-2c — the clearlift folding atom on the wall1->wall2 lift
 import { num } from './ops/util.js';
 import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
@@ -197,7 +197,7 @@ export function cornerStack(params = {}, opts = {}) {
     // Probe one wall via the shared PROBE-SURFACE BLOCK (t127): touch+comp → the TRUE wall in a temp (#102/#101); the
     // corner keeps its own WCS write + retract + safe-Z (trailingRetract:false). Byte-identical to the old hand-rolled wall.
     // RETURNS one wall's probe blocks (composed inside the corner×probeSeq csFork so directions/order fork per combo).
-    const probeWallR = (ax, dir, liftMode = 'max') => {   // t929 — liftMode: the WALL1 retreat reads the clearance mode (Max/Hop/Plane); WALL2 (final) defaults 'max' (standing split)
+    const probeWallR = (ax, dir, useMode = false) => {   // t931 — useMode: WALL1's retreat is the clearlift folding atom (reads the clearance MODE); WALL2 (final) stays the Max safeRetractNode (standing split)
         const av = AX[ax], probeVar = dir === '+' ? '#8' : '#7', retractVar = dir === '+' ? '#9' : '#10';
         const compOp = dir === '+' ? '+' : '-';   // boss: wall is at trigger ± stylus radius
         const out = [...probeSurfaceStack({
@@ -220,7 +220,9 @@ export function cornerStack(params = {}, opts = {}) {
         // can RETURN the tool to it (repoTraverse returnZ '#95'). Without this, the tool lifted ABSOLUTE (G53 margin) then
         // dropped a RELATIVE amount → landed an arbitrary Z → the next wall probed from the wrong height. The save (#95=#882)
         // pairs 1:1 with that traverse's return; wall2's save has no following traverse → a harmless unpaired scratch write.
-        out.push(mkMV(ax, retractVar), saveMachineZNode('#95'), ...clearLiftNodes(liftMode, { hopDist, planeZ, saveVar: '#95', restore: 'inc' }));   // t856 — per-wall retreat is INSIDE the G91 probe body → G90-wrap the G53, restore G91; t929 — the lift honours the clearance mode (max=safeRetractNode, byte-identical)
+        // t856 — per-wall retreat is INSIDE the G91 probe body → G90-wrap the G53, restore G91. t931 — WALL1 uses the clearlift
+        // folding atom (honours the clearance MODE; max is byte-identical to safeRetractNode); WALL2 (final retract) stays Max.
+        out.push(mkMV(ax, retractVar), saveMachineZNode('#95'), useMode ? clearLiftNode({ clearMode, hopDist, planeZ, saveVar: '#95', restore: 'inc' }) : safeRetractNode({ restore: 'inc' }));
         return out;
     };
 
@@ -353,7 +355,7 @@ export function cornerStack(params = {}, opts = {}) {
         // height → NO plunge, go STRAIGHT to G31 (trust the jog). Gated via zOnlyR so the twin's superset prunes it away on the
         // OFF leaf too (a bare `if(probeZ)` would leave the superset emitting it → twin≠built-in for OFF).
         ...zOnlyR([mkMV('Z', '#18')]),             // plunge to scan depth (probeZ ON only)
-        ...probeWallR(ax.fA, ax.fD, clearMode),   // t929 — WALL1 (between-walls): the retreat lift + the following repoTraverse honour the clearance mode
+        ...probeWallR(ax.fA, ax.fD, true),   // t931 — WALL1 (between-walls): the retreat lift is the clearlift atom (honours the clearance mode); the following repoTraverse returns to #95
         ...zPairR(repoArmR(true, ax.sA), repoArmR(false, ax.sA)),
         ...zPairR([mkC(secondLbl(true, ax.sA))], [mkC(secondLbl(false, ax.sA))]),
         ...probeWallR(ax.sA, ax.sD),

@@ -18,7 +18,9 @@
  * The margin RESOLVES to a number in the block params at build time (valid-by-construction; safeZMarginNeg()).
  */
 import { num, r3 } from './util.js';
-import { SAFEZ_MARGIN_DEFAULT, wrapMachineFrame } from './safeZframe.js';
+import { SAFEZ_MARGIN_DEFAULT, wrapMachineFrame, clearModeOf } from './safeZframe.js';
+import { distModeBlock } from './distmode.js';
+import { moveBlock } from './move.js';
 
 // t913 B2b-1 — the CLEARANCE HOP atom: a capped relative lift for a planned traverse (the 'hop' clearance mode). Folds per
 // post at emit: Expert (dialect.safeHop) emits the IF/GOTO cap (lift to min(saved probe Z + hopDist, machine margin)); posts
@@ -73,5 +75,26 @@ export const safeRetractBlock = {
         // t856 SAFETY — the retract's G53 must run under G90 (a G53-under-G91 could move INCREMENTALLY). Force G90
         // explicit before it on EVERY post; restore G91 when the surrounding body is incremental (p.restore='inc').
         return wrapMachineFrame(dialect, core, p.restore);
+    },
+};
+
+// t931 B2b-2c (Option B) — the CLEARLIFT FOLDING ATOM: ONE leaf whose EMIT folds max / hop / plane on its VALUE params
+// (clearMode/hopDist/planeZ), so a data-op carries ONE block and re-emits the chosen mode with NO structural fork and NO
+// spurious assign #var (the corner M2-template fit; unifies the corner+middle clearance-lift DECLARE, in the safehop/
+// saferetract/safetraverse vocabulary). It DELEGATES to the existing atom emits so the G-code is BYTE-IDENTICAL to the
+// clearLiftNodes it replaces: max → safeRetractBlock (the #520 machine margin), hop → safeHopBlock (the capped hop), plane →
+// distmode/move (the absolute work-Z). Its guard/cap labels are uniquified per the resolved clearMode (max=1 / hop=2 /
+// plane=0) by uniquifySafeRetractLabels. HIDDEN (wizard-composed only). The paired save (#95) + the G53 return are the
+// CALLER's (corner probeWallR / middle safeTraverseStack), so this block emits ONLY the lift.
+export const clearLiftBlock = {
+    type: 'clearlift', label: 'Clearance Lift', kind: 'leaf', category: 'Move', hidden: true,
+    defaults: { clearMode: 'max', hopDist: 15, planeZ: 10, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', guardLabel: 91, capLabel: 92 },
+    fields: ['clearMode', 'hopDist', 'planeZ', 'saveVar', 'margin', 'workClear', 'guardLabel', 'capLabel'],
+    emit: (p, dx, dy, dialect) => {
+        const mode = clearModeOf(p.clearMode);
+        if (mode === 'hop') return safeHopBlock.emit({ hopDist: p.hopDist, saveVar: p.saveVar, margin: p.margin, guardLabel: p.guardLabel, capLabel: p.capLabel, restore: p.restore }, dx, dy, dialect);
+        if (mode === 'plane') return [...distModeBlock.emit({ dist: 'abs' }), ...moveBlock.emit({ mode: 'rapid', z: String(r3(num(p.planeZ, 10))) }, dx, dy, dialect), ...distModeBlock.emit({ dist: 'inc' })];
+        // 'max' — delegate to the safe-Z retract (byte-identical to a direct safeRetractNode; the guardLabel is the #520 unset-guard label)
+        return safeRetractBlock.emit({ margin: p.margin, workClear: p.workClear, label: p.guardLabel, restore: p.restore }, dx, dy, dialect);
     },
 };

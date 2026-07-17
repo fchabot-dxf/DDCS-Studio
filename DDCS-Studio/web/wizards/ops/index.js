@@ -65,7 +65,7 @@ import { regionPickBlock } from './regionpick.js';
 import { coordListBlock } from './coordlist.js';
 import { mathBlock } from './math.js';
 import { machineMoveBlock, endProgramBlock, mcodeBlock, rawBlock } from './macro.js';
-import { safeRetractBlock, safeTraverseBlock, safeHopBlock } from './saferetract.js';   // t822 — the shared machine-frame SAFE-HEIGHT retract; t901 — the safetraverse BUNDLE atom (lift+travel+return); t913 — the clearance-HOP atom (capped relative lift)
+import { safeRetractBlock, safeTraverseBlock, safeHopBlock, clearLiftBlock } from './saferetract.js';   // t822 — the shared machine-frame SAFE-HEIGHT retract; t901 — the safetraverse BUNDLE atom (lift+travel+return); t913 — the clearance-HOP atom (capped relative lift); t931 — the CLEARLIFT folding atom (max/hop/plane on value params)
 import { progStartBlock, progEndBlock } from './program.js';
 import { labelBlock, gotoBlock, ifGotoBlock } from './flow.js';
 import { probeReadBlock, probeCheckBlock, probeStartBlock, readMachineBlock, probeGuardBlock, toolOffsetBlock } from './measure.js';
@@ -85,7 +85,7 @@ import { evalExpr } from './expr.js';
  *  own `category` (the single source of truth — the toolbox buckets by it; array order is just within-group order). */
 export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
-    moveBlock, arcBlock, probeBlock, machineMoveBlock, safeRetractBlock, safeTraverseBlock, safeHopBlock, homeBlock, pathModeBlock,   // Move (+ G53 machine-coord move + machine-frame safe-Z retract + safetraverse bundle + clearance-hop + G28 home + G64/G61 path mode)
+    moveBlock, arcBlock, probeBlock, machineMoveBlock, safeRetractBlock, safeTraverseBlock, safeHopBlock, clearLiftBlock, homeBlock, pathModeBlock,   // Move (+ G53 machine-coord move + machine-frame safe-Z retract + safetraverse bundle + clearance-hop + clearlift folding atom + G28 home + G64/G61 path mode)
     lineBlock, slotBlock, boreBlock, drillBlock, tapBlock, contourBlock, contourFillBlock, pocketFillBlock, pocketWallBlock, pocketRestBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + tap + contour/profile [contour=region-socket for pocket-wall; contourfill/pocketfill/pocketwall=flat for the twins] + native canned cycles G81-85/G80)
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, stepdownBlock, placeOnStockBlock, rotateBlock, entryBlock, toolSelBlock, xformBlock, setupBlock, flipBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align + entry-point + tool-select marker + declared program rotation + two-sided setup boundary + flip sibling)
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)

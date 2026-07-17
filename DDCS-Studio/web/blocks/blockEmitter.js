@@ -293,6 +293,14 @@ function uniquifySafeRetractLabels(blocks) {
             if (!b) continue;
             if (b.type === 'saferetract') { b.params = { ...(b.params || {}), label: n++ }; }
             else if (b.type === 'safehop') { b.params = { ...(b.params || {}), guardLabel: n++, capLabel: n++ }; }
+            // t931 — the clearlift FOLDING atom takes labels per its resolved clearMode: max → 1 (the #520 unset-guard, same as
+            // a saferetract → byte-identical), hop → 2 (guard + cap, like safehop), plane → 0 (no flow). One shared counter.
+            else if (b.type === 'clearlift') {
+                const m = b.params && b.params.clearMode;
+                if (m === 'plane') { /* no forward-jump labels */ }
+                else if (m === 'hop') { b.params = { ...(b.params || {}), guardLabel: n++, capLabel: n++ }; }
+                else { b.params = { ...(b.params || {}), guardLabel: n++ }; }
+            }
             if (b.children) walk(b.children);
             if (b.uiChildren) walk(b.uiChildren);
         }
