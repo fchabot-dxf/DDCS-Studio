@@ -5317,3 +5317,27 @@ NUMERIC HAND-CHECK (V4.1, same frame as Expert): probe #95=-50, hop 15 -> #191=-
 
 ### GATE
 - NO gate run (no source change — only this WORK-LOG + grounding). Tree green at the B2b-1b tip (1322/0). Recommend dispatching B2b-2a (the middle park retirement) first — it's now fully de-risked as a SURGICAL middle-only goldens-regen turn (I know exactly which lines move). No release (bundle rule).
+
+## 🔨 turn 919 — TURN B2b-2a THE MIDDLE PARK RETIREMENT (retire Safe-Z; the end PARK always takes Max safe height): BUILT + verified. Surgical, MIDDLE-ONLY. The ratified user decision — the relative park (`G0 Z#17`) was the ORIGINAL crash cause, so the end-of-program park now ALWAYS retracts to Max safe height (per-post), and the Safe-Z field + its rel|mach frame toggle are retired. Split accepted; this is the first of the 3 sub-turns (park / form / DM500-return).
+
+### BUILT (middleWizard.js — surgical)
+- **Park (240/246):** `safeZParkBlock(safeZFrame, '#17', 'inc')` → `safeRetractNode({ restore: 'inc' })` — the end park now takes MAX per-post (G53 posts → the #520 machine margin; DM500 → its work-frame degrade, no G53). The rel|mach frame toggle is GONE.
+- **Retired `params.safeZ` + `params.safeZFrame`** (the reads + the import of safeZParkBlock/safeZFrameOf). `repositionR` lift `'#17'` → `true` (a presence gate — machineLift already overrides it with the margin).
+- **`#17` survives ONLY as the DM500 work-frame degrade clearance** (dialect.safeRetract on DM500 = `G0 Z#17`, no G53). Kept at a SENSIBLE FIXED WORK height (10, the established default) with an honest comment — NOT `abs(safeZMarginNeg())`=5 (per your steer: that machine-margin magnitude is a category-confusion vs a work clearance + would SILENTLY SHRINK the DM500 lift 10→5). So DM500 behavior is UNCHANGED.
+
+### MIGRATED (the spec your fresh-eyes review flagged that my de-risking missed)
+- **tests/safez-frame-rollout.spec.js** — removed the `middle` row from WIZ (middle no longer carries the safeZFrame toggle; park-always-Max supersedes it). The 4 middle assertions (defaults-relative / machine-G53 / round-trip) are RETIRED as MIGRATION (the relative park was the crash cause). rotary_center/rotary_clock/alignment rows stay (they keep the toggle until the flagged park-sweep). CONFIRMED **tests/safez-frame.spec.js (rotary-only) stays GREEN** (middle-only change didn't touch it).
+
+### VERIFIED (goldens diff-verified — ONLY the park moves)
+- **middle-reposition-refactor golden regenerated (dump-and-compare, all 6 rows).** DIFF-VERIFIED: in EACH row the park `G0 Z#17` became the per-post machine-margin retract (`( Safe-Z retract - machine frame )` / `#42=#520` / `IF #42<0 GOTO<k>` / `#42=-5` / `N<k>` / `G90` / `G53 Z#42` / `G91`), the trailing error-handler label bumped by one (the park's safeRetract claims the prior label — e.g. row 0: reposition N91, park N92, error-handler 92→N93), and `#17`'s COMMENT changed (value stays 10). EVERY probe / traverse / wcs / @saveProbeZ / @returnProbeZ line is BYTE-IDENTICAL. Provenance comment updated.
+- **18 targeted specs green**: middle-reposition-refactor + middle-superset + safez-frame (rotary, untouched) + safez-frame-rollout (migrated) + safe-z-retract-822 (DM500 `G0 Z#17` still matches — #17=10 unchanged) + clearance-modes-909 + clearance-hop-plane-913.
+- safeZ/safeZFrame stay in opSchema (harmless — the emit now ignores them; old-program round-trip safe; the FORM field removal is B2b-2b).
+- **TWIN PARITY (a first-gate catch):** the middle DATA-TWIN (middleData.js) carried a `safeZ`->#17 binding; after #17 became a FIXED literal (not param-driven), middle-data-emit's derived-wiring check flagged it (the emit stayed byte-identical — only the wiring check failed). RETIRED the twin's safeZ binding to mirror the built-in (#17 is now a fixed DM500-degrade config assign, not a bound scalar) + updated the bindingCount assertion 12->11 (7 always-present #1-6,#18 + 4 prune-gated). Re-verified 4/4.
+
+### FULL GATE
+- **1322 passed / 0 failed / 4 skipped (12.3m), GATE_EXIT=0** — CLEAN (explicit failed-count grep = 0; no flake this run). A FIRST full-gate run flagged the middle-data-emit twin-wiring divergence (above); fixed the twin binding + re-ran clean.
+- Files (git hash-object pre-commit): web/wizards/middleWizard.js `cc94c17` (park→Max + retire safeZ/safeZFrame + #17 fixed) · web/blocks/dataOps/middleData.js `3ee0e18` (retire the twin safeZ binding) · tests/middle-reposition-refactor.spec.js `9c39dfc` (golden regen + provenance) · tests/safez-frame-rollout.spec.js `7b8b1c4` (middle row migrated out) · tests/middle-data-emit.spec.js `0384650` (bindingCount 12→11). Commit hashes below. (The tests/*.png changes in the tree are PRE-EXISTING/gate-touched visual baselines — NOT committed by this turn.)
+- No release (bundle rule). No lingering procs.
+
+### NEXT (unchanged from the split)
+- B2b-2b (the MIDDLE FORM: the clearance dropdown replacing Safe-Z + when-gated hopDist/planeZ + the Plane not-below-stock floor + the Suggest; screenshots each mode; the Safe-Z-drives-nothing complaint closed). Then B2b-2c (corner data-op) then B2b-3 (through-stock). FLAGGED fast-follows: the park-sweep (alignment/rotary_center/rotary_clock parks → Max + migrate their safez-frame/rollout rows) + the DM500 traverse-RETURN work-frame consistency (the G53-return flag; needs the DM500 relative-lift+drop degrade). No release (bundle rule).
