@@ -5215,3 +5215,49 @@ THE RULING (user, via advisor): the persistent Expert register #520 (safe-Z marg
 
 ### GATE
 - NO gate run (no source change this turn — only this WORK-LOG doc + the grounding). Tree green at the B2a tip (1320/0). Recommend the advisor dispatch B2b-1 (emit) first — I'll build it fresh + verified. The full grounding above (file:line for every touchpoint) makes each sub-turn a clean build.
+
+## 🔨 turn 913 — TURN B2b-1 THE CLEARANCE-MODE EMIT FOUNDATION (Hop + Plane; no form; default MAX byte-identical): BUILT + verified per-post. The declared clearance seam (safeZframe.clearTraverseParams, B2a wired `max`) now emits `hop` (a capped relative lift) and `plane` (a work-frame absolute plane) when the mode is set; MAX stays the default and is BYTE-IDENTICAL everywhere. No form/Suggest/through-stock (B2b-2/B2b-3). Safety-critical emit — verified NUMERICALLY per post.
+
+### BUILT
+- **web/wizards/dialects/ddcs-expert-m350.js** — `safeHop({hopDist,saveVar,margin,guardLabel,capLabel})`: the CAPPED hop = min(saved+hop, margin) via IF/GOTO (no native min). `#43=[#95+hopDist]` (proposed) → read #520 into #42 (read-only, the safeRetract guard idiom) → `IF #43<#42 GOTO<c>` keep the hop when BELOW the margin, else `#43=#42` clamp → `G53 Z#43`.
+- **web/wizards/ops/saferetract.js** — `safeHopBlock` (type `safehop`, hidden, wizard-composed): dispatches dialect.safeHop (Expert, G90-wrapped) ELSE the DEGRADE (no real flow-skip: grbl 'none' / rs274 O-word-runs / centroid) = a plain relative `G0 Z<hop>` + the honest `( Clearance hop <n>mm - uncapped on this post )` note. The paired G53 return (emitDrop) nets it back to the saved Z on every post (the return is absolute-to-saved → honest regardless of a relative lift).
+- **web/wizards/ops/safeZframe.js** — `safeHopNode` (the save + the safehop atom) + `planeLiftNodes(planeZ)` (UNIVERSAL: distmode abs + `G0 Z<planeZ>` + distmode inc — a work-Z absolute move, no register, all posts) + extended `clearTraverseParams(mode,{saveVar,hopDist,planeZ})` (max/hop/plane; all share the SAME honest returnZ). The plane's WCS-Z-unset caveat is a code comment (the B2b-2 floor tooltip surfaces it to the user).
+- **web/wizards/ops/probeSurface.js** — safeTraverseStack `doLift` branches on clearMode: 'plane' → save + planeLiftNodes; 'hop' → save + safeHopNode; else max/relative (unchanged). emitDrop is UNCHANGED (the return is the same G53 Z#95 for all three modes).
+- **web/blocks/blockEmitter.js** — extended `uniquifySafeRetractLabels` to give each `safehop` TWO unique forward-jump labels (guard + cap) from the SAME counter as saferetract, so a program mixing retracts+hops never collides an N<label>. DEFAULT max has NO safehop → counter sees only saferetract → 91+ unchanged (byte-identical).
+- **web/wizards/middleWizard.js** — reads `hopDist`(15)/`planeZ`(10) + passes them to clearTraverseParams (only used when the mode is set; default max unchanged).
+- **web/data/varMap.js** — RESERVED #43 (the hop cap scratch; grounded free, peer to #42/#95).
+- **web/blocks/opSchema.js** — the middle op schema carries `clearMode`/`hopDist`/`planeZ` so the mode ROUND-TRIPS through the .nc marker (the form lands in B2b-2).
+
+### THE PER-POST TRACE (pasted per the acceptance) — Expert HOP (numeric hand-check below), Expert PLANE, grbl DEGRADE
+HOP (Expert):
+```
+#22=#53 ( Diag primary ... )
+#95=#882 ( @saveProbeZ )                                  <- save the probe machine Z
+( Clearance hop - capped at the machine margin )
+#43=[#95+15]                                             <- proposed = probe Z + hopDist
+#42=#520                                                 <- read the margin (read-only)
+IF #42<0 GOTO91 / #42=-5 ( baked fallback ) / N91         <- margin guard (controller #520 wins if set)
+IF #43<#42 GOTO92 / #43=#42 ( cap the hop at the safe machine margin ) / N92   <- min(saved+hop, margin)
+G90 / G53 Z#43 / G91                                      <- lift to the capped target
+G0 Y#21 / G0 X[#22-#52-#10-#6]                           <- dogleg XY at hop height (unchanged)
+G90 / G53 Z#95 ( @returnProbeZ )                         <- honest return to the saved probe Z
+( REPOSITION: auto-traverse to the perpendicular walls )
+```
+NUMERIC HAND-CHECK (home Z0=top, machine Z negative-down, margin negative): probe #95=-50, hop 15 -> #43=-35; margin #42=-5; IF -35<-5 TRUE -> keep #43=-35 -> lift 15 above the probe (below the margin). hop 50 -> #43=0; IF 0<-5 FALSE -> clamp #43=#42=-5 (the margin). => lift = min(saved+hop, margin). CORRECT.
+PLANE (Expert): `#95=#882 ( @saveProbeZ ) / G90 / G0 Z12 / G91 / <dogleg XY> / G90 / G53 Z#95 ( @returnProbeZ )` — the absolute work-Z plane, universal.
+HOP (grbl DEGRADE): `( Clearance hop 15mm - uncapped on this post ) / G0 Z15` (the #var save/return/XY are gated on grbl, the SAME pre-existing degrade as max — grbl users send G10 live; the literal hop survives).
+
+### VERIFIED (tests/clearance-hop-plane-913.spec.js — 2 tests, pass)
+- HOP Expert CAPPED: the save, `#43=[#95+15]`, `#42=#520`, the guard, `IF #43<#42`, the clamp, `G53 Z#43`, the return — asserted present + IN ORDER (proposed<cap<clamp<lift = the min structure). DEGRADE posts (grbl/rs274/centroid): the honest uncapped note + `G0 Z15` + NO #43. None throws.
+- PLANE UNIVERSAL: `G0 Z12` + the G90...G91 wrap on EVERY post; the save/return pairing asserted on Expert (the reference — it rides the existing per-post returnZ machinery; posts with readMachine=[] i.e. grbl/centroid omit the save, the pre-existing degrade).
+- LABEL UNIQUIFIER: two hops in one program -> 4 DISTINCT N-labels.
+- ROUND-TRIP: a middle op with clearMode=hop survives .nc export -> reimport (marker carries clearMode:hop; reimport restores it; byte-identical re-emit; the cap re-emits).
+- MAX BYTE-IDENTICAL: middle-reposition-refactor + middle-superset + clearance-modes-909 (5 tests) green untouched — the hop/plane branches fire ONLY when the mode is explicitly set (no golden does).
+
+### FULL GATE
+- **1321 passed / 1 failed / 4 skipped (13.2m)** — the 1 failure = preflight-badge-838:101 (a UI-render coexistence test), which passes **30/30 in isolation** (3×10) = a load-sensitive UI flake under 4-worker contention (same class as the documented blocks-live-form flake). DEFINITIVELY NOT MINE: every change this turn is EMIT-side (dialects/atoms/seam/uniquifier/schema/varMap) — zero UI/preflight touch. A FIRST full-gate run flagged my OWN wording regression (the degrade note said "on this post" — the controller-vocabulary sweep correctly caught it); FIXED to "uncapped on this controller" (wording-sweep + the hop-plane spec re-verified 3/3), then this clean re-run.
+- Files (git hash-object pre-commit): ddcs-expert-m350.js `efbfe9e` (safeHop cap) · saferetract.js `d667d44` (safehop atom + reword) · safeZframe.js `16c0dd9` (safeHopNode/planeLiftNodes/clearTraverseParams) · probeSurface.js `9c9009b` (doLift hop/plane) · blockEmitter.js `01d7c90` (uniquifier) · middleWizard.js `e3bef9e` (hopDist/planeZ) · varMap.js `90e4c15` (#43) · opSchema.js `b878ad5` (mode round-trip) · ops/index.js (register) · tests/clearance-hop-plane-913.spec.js `54c2712` (NEW). Commit hashes below.
+- No release (mid-arc, bundle rule — no release until B2b-2/B2b-3). No lingering procs (Playwright-managed mem-server).
+
+### NEXT (B2b-2 / B2b-3, unchanged from the B2b split)
+- B2b-2: the Clearance dropdown on BOTH wizards (middle hand-rolled HTML + view; corner data-op descriptors with when-gating) replacing Safe-Z + the Plane not-below-stock-top floor + the Plane Suggest. B2b-3: the pre-flight through-stock class. No release until all land (bundle rule). Default stays MAX (the Hop-everyday lean = a recorded one-line taste flip, not applied).
