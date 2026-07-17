@@ -58,7 +58,8 @@ export const MIDDLE_BINDING_SPECS = [
     { param: 'radius',    type: 'number', default: MIDDLE_DEFAULTS.radius,    label: 'Stylus Radius',  help: 'The probe stylus tip radius (mm) — applied to each wall touch to give the true wall coordinate.', section: 'TOOL & CUT', match: { type: 'assign', var: '#6' },  key: 'value' },
     // t919 B2b-2a — the `safeZ` binding is RETIRED: the end park now always takes Max safe height (no user Safe-Z field), and #17
     // survives only as a FIXED DM500 work-frame degrade clearance (not param-driven), so it's no longer a bound/editable scalar.
-    { param: 'clearOver', type: 'number', default: MIDDLE_DEFAULTS.clearOver, label: 'Traverse-Over Clearance', help: 'Boss auto: how high to lift before crossing over the part to reach the far wall.', section: 'GEOMETRY',   match: { type: 'assign', var: '#18' }, key: 'value' },
+    // t923 B2b-2b-cov — the `clearOver`/#18 binding is RETIRED: the in-axis cross-over now follows the CLEARANCE mode (Max/Hop/
+    // Plane) like the trans-axis, so there's no separate Traverse-Over Clearance knob (one clearance concept). #18 is no longer emitted.
     // prune-gated optionals — present only in their structural shape (deriveBindings skips when the socket is pruned away)
     { param: 'crossX',    type: 'number', default: 80, optional: true, when: { param: 'featureType', is: 'boss' }, label: 'X Cross-Over', help: 'Boss auto: how far to traverse across the feature from wall 1 to wall 2 in X (≈ feature width + 2× approach).', section: 'GEOMETRY', match: { type: 'assign', var: '#19' }, key: 'value' },
     { param: 'crossY',    type: 'number', default: 80, optional: true, when: { param: 'featureType', is: 'boss' }, label: 'Y Cross-Over', help: 'Boss auto: how far to traverse across the feature from wall 1 to wall 2 in Y (≈ feature width + 2× approach).', section: 'GEOMETRY', match: { type: 'assign', var: '#20' }, key: 'value' },

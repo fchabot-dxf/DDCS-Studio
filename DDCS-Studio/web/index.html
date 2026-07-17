@@ -258,10 +258,8 @@
                     </div>
                 </div>
                 <div class="grid-2">
-                    <div id="m_clear_block" class="hidden">
-                        <span class="label">TRAVERSE HEIGHT (mm)</span>
-                        <input id="m_clear" value="15" title="Boss auto only: how high to lift before crossing over the part to the far wall. Set it to clear the top of your boss with margin. Stored as #18."/>
-                    </div>
+                    <!-- t923 B2b-2b-cov: TRAVERSE HEIGHT (#18) RETIRED — the in-axis cross-over now follows the CLEARANCE mode
+                         dropdown (Max/Hop/Plane), like the trans-axis. One clearance concept; the X/Y CROSS-OVER distances stay. -->
                     <!-- TRAVEL-START inc2a: the DIAG TRAVEL field is REMOVED from the UI — #21 is DERIVED from the ② start
                          marker (drag ② on the canvas; tieDiagTravel writes the value). m_diag_block stays permanently hidden;
                          the input is a readonly value-store (the ② is the sole source) that persists the derived #21 + round-trips. -->

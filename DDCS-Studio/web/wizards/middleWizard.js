@@ -59,7 +59,8 @@ export function middleStack(params = {}, opts = {}) {
     const clearMode = clearModeOf(params.clearMode);   // t909 B2 — the DECLARED clearance mode the trans-axis traverse reads (max default = the #520 machine margin, unified with corner)
     const hopDist = num(params.hopDist, 15);   // t913 B2b-1 — Hop mode: how far to lift (capped at the machine margin). Only emitted when clearMode==='hop'
     const planeZ = num(params.planeZ, 10);     // t913 B2b-1 — Plane mode: the absolute work-Z clearance plane. Only emitted when clearMode==='plane' (B2b-2 adds the not-below-stock floor)
-    const clearOver = num(params.clearOver, 15);   // boss AUTO: how high to lift before crossing over the part
+    // t923 B2b-2b-cov — RETIRED clearOver/#18 (the TRAVERSE HEIGHT field): the in-axis cross-over now follows the CLEARANCE mode
+    // (Max/Hop/Plane) like the trans-axis, so there's no separate traverse-height knob (one clearance concept, the user's decision).
     // Boss-AUTO probe-both: the in-axis wall1→wall2 cross-over — the straight TRAVERSE that spans the feature, SEPARATE
     // per axis (non-square boss). DECOUPLED from MAX PROBE: max-probe (#1) is the probe REACH (how far G31 searches);
     // the cross-over is the TRAVERSE DISTANCE (how far to move across) — different things. It can't be computed before
@@ -151,7 +152,22 @@ export function middleStack(params = {}, opts = {}) {
         return [b];
     };
     // Boss, AUTO in-axis: clear over the feature to the far side, hands-free (the #19/#20 cross-over spans the feature). RETURNS.
-    const traverseOverR = (ax, firstPlus) => { const cv = ax === 'X' ? '#19' : '#20'; return [mkMV('Z', '#18'), mkMV(ax, firstPlus ? cv : `[0-${cv}]`), mkMV('Z', '[0-#18]')]; };
+    // t923 B2b-2b-cov — the in-axis cross-over now READS THE CLEARANCE MODE (clearTraverseParams), exactly like the trans-axis
+    // traverse, so the CLEARANCE dropdown drives it too (closing the single-axis coverage gap). The #19/#20 HORIZONTAL cross is
+    // PRESERVED (the X/Y CROSS-OVER distance fields stay); the old relative Z#18 lift/drop is replaced by the mode's lift + the
+    // honest save #95 / G53 return pairing (Max = the #520 machine margin; Hop = the capped hop; Plane = the absolute work-Z).
+    // Retired #18/clearOver (the TRAVERSE HEIGHT field) — Max is now the full-retract safe default; Hop restores the fast ~15mm.
+    const traverseOverR = (ax, firstPlus) => {
+        const cv = ax === 'X' ? '#19' : '#20';
+        const b = newBlock('safetraverse');
+        b.params = { to: 'opposite-wall', shape: 'cross' };
+        b.children = safeTraverseStack({
+            mode: 'in-axis', axis: ax,
+            move: firstPlus ? cv : `[0-${cv}]`,   // the #19/#20 in-axis cross (PRESERVED — the CROSS-OVER distance)
+            ...clearTraverseParams(clearMode, { hopDist, planeZ }),   // Max/Hop/Plane lift + honest save/return (like transTraverseR)
+        });
+        return [b];
+    };
     // Boss, AUTO trans-axis: the X→Y CONNECTING move (lift → re-centre-primary + travel-out-secondary → return → REPOSITION mark).
     // Routed through the shared safeTraverseStack `mode:'center'` — middle no longer hand-rolls the diagonal: it assigns #22
     // (=diagPrimary; #53 re-centre at rest, ②'s primary coord when placed), moves the primary to #22 (the #52/retract/±#6
@@ -162,7 +178,7 @@ export function middleStack(params = {}, opts = {}) {
     // to the SAVED probe Z (the same t826/t897 machineLift+returnZ pairing corner's repoTraverse + middle's manual reposition
     // already use) — so the trans-axis traverse clears the boss by the SAME margin as everything else (higher = safer), and the
     // drop-back is honest by construction (never lift-to-margin + a relative drop = an arbitrary Z). Emit DELIBERATELY changes
-    // (row-4 golden regenerates — byte-identity was what held the divergence). #18 stays for the in-axis traverse-OVER only.
+    // (row-4 golden regenerates — byte-identity was what held the divergence). t923 — the in-axis traverse-OVER now reads it too.
     const transTraverseR = (shape) => {   // t901 — the safetraverse BUNDLE (auto trans-axis connect: lift + shaped re-centre/travel + honest return)
         const b = newBlock('safetraverse');
         b.params = { to: 'perp-walls', shape };
@@ -197,7 +213,7 @@ export function middleStack(params = {}, opts = {}) {
     // A sensible fixed WORK height (mm above work-0), distinct from the machine safe-Z margin (a below-home machine Z) — sourcing
     // it from abs(margin) would be a category-confusion that silently shrinks the DM500 clearance, so keep the established 10.
     S.push(mkA('#9', '[0-#2]', 'Negative retract'), mkA('#10', '#2', 'Positive retract'), mkA('#17', 10, 'DM500 work-frame safe clearance (mm above work-0; DM500 has no G53) - other posts park at the machine margin'));
-    S.push(mkA('#18', clearOver, 'Traverse-over clearance (boss auto: lift this high to clear the part before crossing)'));
+    // t923 — #18 (Traverse-over clearance) RETIRED: the in-axis cross-over reads the clearance MODE (machine margin / hop / plane).
     // #19/#20 = the IN-axis cross-over (traverseOver — boss + inAxis auto ONLY); #21 = the TRANS-axis Diag travel
     // (transTraverse — boss + transAxis auto + twoAxis ONLY). Each present only when its own auto-traverse is active, so
     // pocket/manual macros stay unchanged. (#21 is a fixed default; the trans-axis re-centres to #53, so it no longer needs #19/#20.)

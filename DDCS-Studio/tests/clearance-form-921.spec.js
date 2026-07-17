@@ -67,3 +67,46 @@ test('the CLEARANCE dropdown replaces Safe-Z, when-gates its field per mode, and
   expect(planeCode, 'Plane is NOT the hop cap').not.toMatch(/#43=\[#95/);
   await page.screenshot({ path: testInfo.outputPath('mode-plane.png') });
 });
+
+// t923 B2b-2b-cov — the coverage gap CLOSED: a SINGLE-axis boss (the default) now drives the emit across all 3 modes,
+// because the in-axis cross-over (traverseOverR) follows the clearance mode too (it was inert before). Screenshot + per-post fold.
+test('coverage fix: a SINGLE-axis boss drives the emit 3/3 across modes (the in-axis cross-over follows the mode); per-post; screenshot', async ({ page }, testInfo) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings, null, { timeout: 15000 });
+  await page.evaluate(() => window.ddcsStudio.wizardManager.open('middle'));
+  await page.waitForSelector('#wiz_middle', { state: 'visible', timeout: 10000 });
+  // SINGLE-axis boss, in-axis AUTO (m_both UNCHECKED → the trans-axis traverse is absent; only the in-axis cross-over runs)
+  await page.evaluate(() => {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) { el.value = v; ['change', 'input'].forEach((e) => el.dispatchEvent(new Event(e, { bubbles: true }))); } };
+    const uncheck = (id) => { const el = document.getElementById(id); if (el && el.type === 'checkbox' && el.checked) el.click(); };
+    set('m_type', 'boss'); uncheck('m_both'); set('m_inaxis', 'auto');
+  });
+  await page.waitForTimeout(400);
+  await page.waitForFunction(() => { const c = document.getElementById('wiz_middle_code'); return c && c.textContent.includes('G31'); }, null, { timeout: 8000 });
+  const setMode = async (m) => { await page.evaluate((mode) => { const el = document.getElementById('m_clear_mode'); el.value = mode; ['change', 'input'].forEach((e) => el.dispatchEvent(new Event(e, { bubbles: true }))); }, m); await page.waitForTimeout(300); };
+  const code = () => page.evaluate(() => document.getElementById('wiz_middle_code').textContent);
+
+  await setMode('max'); const mx = await code();
+  await page.screenshot({ path: testInfo.outputPath('single-max.png') });
+  await setMode('hop'); const hp = await code();
+  await setMode('plane'); const pl = await code();
+  // the gap is CLOSED — all three modes now move the emit on a single-axis boss (was 1/3 identical before)
+  expect(mx, 'single-axis: Max differs from Hop').not.toBe(hp);
+  expect(hp, 'single-axis: Hop differs from Plane').not.toBe(pl);
+  expect(mx, 'single-axis: Max differs from Plane').not.toBe(pl);
+  expect(hp, 'single-axis Hop: the in-axis cross-over now emits the capped hop').toMatch(/#43=\[#95\+15\]/);
+  expect(mx, 'single-axis Max: the cross-over clears to the machine margin (no relative Z#18)').not.toMatch(/G0 Z#18\b/);
+
+  // per-post FOLD of the in-axis cross-over (direct emit) — Expert #520/#42, V4.1 #190, none throws
+  const pp = await page.evaluate(async () => {
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { getDialect } = await import('/wizards/dialects/index.js');
+    const P = { featureType: 'boss', inAxis: 'auto', clearMode: 'max' };
+    const em = (id) => { try { return emitMapped(middleStack(P), { dialect: getDialect(id) }).text; } catch (e) { return 'THREW:' + e; } };
+    return { expert: em('ddcs-expert-m350'), v41: em('ddcs-v41'), dm500: em('ddcs-v3-dm500') };
+  });
+  expect(pp.expert, 'Expert cross-over: #520 margin guard + the #19 cross').toMatch(/#42=#520[\s\S]*?G0 X#19/);
+  expect(pp.v41, 'V4.1 cross-over: the #190 baked margin').toMatch(/#190=/);
+  expect(pp.dm500, 'DM500 cross-over does not throw (work-frame degrade)').not.toMatch(/^THREW/);
+});

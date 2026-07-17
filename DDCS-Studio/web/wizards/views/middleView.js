@@ -100,7 +100,7 @@ export const middleView = {
     twoPane: true,
     inputIds: [
         'm_type', 'm_inaxis', 'm_transaxis', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_probe_z_first', 'm_sync_a', 'm_wcs', 'm_slave',
-        'm_dist', 'm_retract', 'm_clear_mode', 'm_hop_dist', 'm_plane_z', 'm_clear', 'm_crossX', 'm_crossY', 'm_diag_travel',
+        'm_dist', 'm_retract', 'm_clear_mode', 'm_hop_dist', 'm_plane_z', 'm_crossX', 'm_crossY', 'm_diag_travel',
         'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
     ],
     // Controller-source chips (PROBE-CONFIG-SOURCE.md)
@@ -119,7 +119,6 @@ export const middleView = {
             featureType: el('m_type')?.value || 'boss',
             inAxis: el('m_inaxis')?.value || 'auto',        // INC3: per-traverse toggles (replace the single approach)
             transAxis: el('m_transaxis')?.value || 'auto',
-            clearOver: el('m_clear')?.value || '15',
             crossX: el('m_crossX')?.value,   // boss-auto per-axis cross-over (string: a number or the [#1+#2] expression default)
             crossY: el('m_crossY')?.value,
             diagTravel: el('m_diag_travel')?.value,   // boss probe-both auto trans-axis: the diagonal traverse distance (#21)
@@ -182,8 +181,7 @@ export const middleView = {
 
         // Traverse-over clearance + per-axis cross-over apply to a BOSS with the IN-axis traverse on AUTO (traverseOver).
         const inAxisAuto = isBoss && params.inAxis === 'auto';
-        const clearBlock = el('m_clear_block'); if (clearBlock) clearBlock.classList.toggle('hidden', !inAxisAuto);
-        const crossBlock = el('m_crossover_block'); if (crossBlock) crossBlock.classList.toggle('hidden', !inAxisAuto);
+        const crossBlock = el('m_crossover_block'); if (crossBlock) crossBlock.classList.toggle('hidden', !inAxisAuto);   // t923 — TRAVERSE HEIGHT retired; only the X/Y CROSS-OVER distances remain (boss in-axis auto)
         // t921 B2b-2b — the per-mode CLEARANCE field WHEN-GATES on the dropdown: HOP HEIGHT shows only for Hop, CLEARANCE PLANE
         // only for Plane; Max shows neither (it needs no field). Every visible field now DRIVES the emit (the Safe-Z-drives-nothing complaint closed).
         const hopBlock = el('m_hop_block'); if (hopBlock) hopBlock.classList.toggle('hidden', params.clearMode !== 'hop');
