@@ -83,7 +83,10 @@ test('t899 the UNSET-GUARD: READ #520 into a scratch, controller value wins if s
   const em = await emitAll(page);
   const reg = retractRegion(em.corner['ddcs-expert-m350']);
   // the guard, IN ORDER: READ the register into the scratch → skip-if-set → baked fallback into the SCRATCH → label → the move.
-  expect(reg).toMatch(/#42=#520[\s\S]*IF #42<0 GOTO91[\s\S]*#42=-5[\s\S]*N91[\s\S]*G53 Z#42/);
+  // t941 B2b-4 — the label number is LABEL-AGNOSTIC here (the default clearance flipped to Hop, which consumes labels 91/92,
+  // so the first Max-margin retract's guard label shifted; the GUARD STRUCTURE is unchanged — byte-identity of labels is
+  // probe-surface-block's golden).
+  expect(reg).toMatch(/#42=#520[\s\S]*IF #42<0 GOTO\d+[\s\S]*#42=-5[\s\S]*N\d+[\s\S]*G53 Z#42/);
   expect(reg, 't899 — the guard NEVER assigns #520 (read-only)').not.toMatch(/#520\s*=/);
   expect(reg, 'never rapids to the machine top (Z0)').not.toMatch(/G53 Z0\b/);
 });

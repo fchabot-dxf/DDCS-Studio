@@ -149,7 +149,7 @@ export const middleView = {
             wcs: el('m_wcs')?.value || 'active',
             dist: el('m_dist')?.value || '200',
             retract: el('m_retract')?.value || '2',
-            clearMode: el('m_clear_mode')?.value || 'max',   // t921 B2b-2b — the declared CLEARANCE MODE (replaces the retired Safe-Z field): max (machine margin) | hop | plane
+            clearMode: el('m_clear_mode')?.value || 'hop',   // t921 B2b-2b — the declared CLEARANCE MODE (replaces the retired Safe-Z field): max (machine margin) | hop | plane; t941 B2b-4 — default hop (matches the m_clear_mode selected option + clearModeOf)
             hopDist: el('m_hop_dist')?.value || '15',         // shown only when clearMode==='hop'
             planeZ: el('m_plane_z')?.value || '10',           // shown only when clearMode==='plane'
             clearance: '2',

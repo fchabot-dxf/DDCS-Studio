@@ -109,8 +109,10 @@ export const safeZFrameOf = (v) => (v === 'machine' ? 'machine' : 'relative');
 // honest save/return pairing (safeTraverseStack machineLift + returnZ) — higher than any boss, limit-proof, and the
 // drop-back is honest BY CONSTRUCTION (returns to the saved probe Z, never lift-to-margin + relative-drop = arbitrary Z).
 export const CLEAR_MODES = ['max', 'hop', 'plane'];
-/** Normalise a clearance mode (default `max`; unknown/absent → `max`, the safe default). B2b admits `hop`/`plane`. */
-export const clearModeOf = (v) => (CLEAR_MODES.includes(v) ? v : 'max');
+/** Normalise a clearance mode. t941 B2b-4 — the DEFAULT is now `hop` (the user's decision: a small relative lift, CAPPED at
+ *  the machine margin, is the friendly baseline — Max was over-lifting on every traverse). Unknown/absent → `hop`; the cap
+ *  keeps it limit-proof (never exceeds the margin), so it is safe as the last-resort default. `max`/`plane` are explicit picks. */
+export const clearModeOf = (v) => (CLEAR_MODES.includes(v) ? v : 'hop');
 
 /** t913 B2b-1 — SAVE the pre-lift Z (saveMachineZNode) then a CAPPED clearance HOP. The `safehop` atom folds per post:
  *  Expert emits the IF/GOTO cap (lift to min(saved+hop, margin)); posts with no real flow-skip (grbl/rs274/centroid)
@@ -141,7 +143,7 @@ export function planeLiftNodes(planeZ) {
  *  capped hop; plane = the absolute work-Z) — so a data-op holds ONE block and re-emits the chosen mode with no structural
  *  fork or spurious assign #var. The CALLER saves the pre-lift Z (saveMachineZNode) before this + returns via safeZParkBlock
  *  ret. Labels are placeholders — uniquifySafeRetractLabels rewrites guard/cap per the resolved mode (max 1 / hop 2 / plane 0). */
-export function clearLiftNode({ clearMode = 'max', hopDist = 15, planeZ = 10, saveVar = '#95', restore } = {}) {
+export function clearLiftNode({ clearMode = 'hop', hopDist = 15, planeZ = 10, saveVar = '#95', restore } = {}) {   // t941 B2b-4 — default hop
     const b = newBlock('clearlift');
     b.params = { clearMode: clearModeOf(clearMode), hopDist, planeZ, saveVar, margin: safeZMarginNeg(), workClear: '#17', guardLabel: 91, capLabel: 92 };
     if (restore != null) b.params.restore = restore;

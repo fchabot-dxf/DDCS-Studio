@@ -45,14 +45,16 @@ test('B2a clearance unification: middle trans-axis == corner wall-traverse (Max 
     const { cornerStack } = await import('/wizards/cornerWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { getDialect } = await import('/wizards/dialects/index.js');
-    // Expert (default) full emits
-    const middle = emitMapped(middleStack(MIDDLE_AUTO)).text;
-    const corner = emitMapped(cornerStack({})).text;
+    // Expert full emits — t941 B2b-4: the DEFAULT clearance flipped max->hop, so this Max-UNIFICATION test pins clearMode:'max'
+    // explicitly (it verifies middle-trans == corner-wall at the SAME chosen mode; Max is still a valid mode — the new default
+    // hop is anchored in corner-clearance-emit-929 + the full-macro goldens).
+    const middle = emitMapped(middleStack({ ...MIDDLE_AUTO, clearMode: 'max' })).text;
+    const corner = emitMapped(cornerStack({ clearMode: 'max' })).text;
     // per-post middle trans-traverse SLICE (Diag-primary .. the REPOSITION marker) — comments are post-agnostic
     const perPost = {};
     for (const id of POSTS) {
       try {
-        const txt = emitMapped(middleStack(MIDDLE_AUTO), { dialect: getDialect(id) }).text;
+        const txt = emitMapped(middleStack({ ...MIDDLE_AUTO, clearMode: 'max' }), { dialect: getDialect(id) }).text;
         const L = txt.split('\n');
         const a = L.findIndex((l) => l.includes('Diag primary'));
         const b = L.findIndex((l) => l.includes('auto-traverse to the perpendicular'));

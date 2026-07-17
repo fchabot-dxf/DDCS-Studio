@@ -18,15 +18,15 @@ test('corner honours the clearance mode on the wall1 traverse; wall2 + error sta
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
-  // MAX byte-identical: clearMode omitted (default max) === clearMode:'max' === today's emit
+  // t941 B2b-4 — the DEFAULT is now HOP (a capped 15mm lift): clearMode omitted (default) === clearMode:'hop' (byte-identical).
   const bare = await em(page, {}, 'ddcs-expert-m350');
-  const max = await em(page, { clearMode: 'max' }, 'ddcs-expert-m350');
-  expect(max, 'clearMode:max is byte-identical to the default (no relative Z lift introduced)').toBe(bare);
-  expect(bare, 'Max: no hop cap').not.toMatch(/#43=\[#95/);
-  expect(bare, 'Max: no clearance-hop block').not.toMatch(/Clearance hop - capped/);
-
-  // HOP: WALL1 gets the capped hop (exactly one), wall2 + error stay the #520 margin
   const hop = await em(page, { clearMode: 'hop', hopDist: 15 }, 'ddcs-expert-m350');
+  expect(bare, 'clearMode omitted (default) is byte-identical to explicit clearMode:hop').toBe(hop);
+  const max = await em(page, { clearMode: 'max' }, 'ddcs-expert-m350');
+  expect(max, 'explicit Max: no hop cap (the #520 margin retract)').not.toMatch(/#43=\[#95/);
+  expect(max, 'explicit Max: no clearance-hop block').not.toMatch(/Clearance hop - capped/);
+
+  // HOP (the default): WALL1 gets the capped hop (exactly one), wall2 + error stay the #520 margin
   expect(hop, 'Expert hop: the wall1 retreat is the capped hop').toMatch(/#43=\[#95\+15\]/);
   expect((hop.match(/Clearance hop - capped/g) || []).length, 'exactly ONE hop block (wall1 only — wall2 is the final Max retract)').toBe(1);
   expect(hop, 'the wall2 final + error handler retreats stay the #520 machine margin').toMatch(/#42=#520/);
@@ -44,4 +44,19 @@ test('corner honours the clearance mode on the wall1 traverse; wall2 + error sta
   expect(v41, 'V4.1: the wall1 hop caps against the baked #190 margin via #191').toMatch(/#191=\[#95\+15\]/);
   const dm500 = await em(page, { clearMode: 'hop', hopDist: 15 }, 'ddcs-v3-dm500');
   expect(typeof dm500, 'DM500 hop emits without throwing (work-frame degrade)').toBe('string');
+});
+
+// t941 B2b-4 — the DEFAULT clearance mode is now Hop (the user's decision). The ACCEPTANCE anchor: a default-params emit is
+// BYTE-IDENTICAL to an explicit clearMode:'hop' emit, on EVERY post (capped on Expert/V4.1, honest degrade on DM500/grbl/
+// rs274/centroid). Max byte-identity is deliberately GONE — Max is now the explicit non-default.
+test('t941 B2b-4 — the DEFAULT is Hop: a default-params emit === an explicit clearMode:hop emit, per post', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  for (const id of ['ddcs-expert-m350', 'ddcs-v41', 'ddcs-v3-dm500', 'grbl', 'rs274ngc', 'centroid']) {
+    const bare = await em(page, {}, id);
+    const hop = await em(page, { clearMode: 'hop', hopDist: 15 }, id);
+    const max = await em(page, { clearMode: 'max' }, id);
+    expect(bare, `${id}: the default-params emit is byte-identical to explicit clearMode:hop (the flipped default)`).toBe(hop);
+    expect(bare === max, `${id}: the default is NO LONGER the old Max retract (the flip took effect)`).toBe(false);
+  }
 });

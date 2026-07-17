@@ -88,7 +88,7 @@ export const safeRetractBlock = {
 // CALLER's (corner probeWallR / middle safeTraverseStack), so this block emits ONLY the lift.
 export const clearLiftBlock = {
     type: 'clearlift', label: 'Clearance Lift', kind: 'leaf', category: 'Move', hidden: true,
-    defaults: { clearMode: 'max', hopDist: 15, planeZ: 10, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', guardLabel: 91, capLabel: 92 },
+    defaults: { clearMode: 'hop', hopDist: 15, planeZ: 10, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', guardLabel: 91, capLabel: 92 },   // t941 B2b-4 — default hop (a bare clearlift block; the callers pass clearMode explicitly)
     fields: ['clearMode', 'hopDist', 'planeZ', 'saveVar', 'margin', 'workClear', 'guardLabel', 'capLabel'],
     emit: (p, dx, dy, dialect) => {
         const mode = clearModeOf(p.clearMode);

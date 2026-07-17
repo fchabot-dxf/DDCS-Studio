@@ -325,8 +325,8 @@
                         <div><span class="label">MAX PROBE</span><input id="m_dist" value="200" title="Max probe travel distance (mm). Stored as #1. Used as #7=[0-#1] (neg) or #8=#1 (pos) in G31."/></div>
                         <div><span class="label">RETRACT</span><input id="m_retract" value="2" title="Retract between fast and slow probe passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
                         <div><span class="label">CLEARANCE</span><select id="m_clear_mode" title="How the probe clears between moves and parks at the end. Max safe height: retract to the machine safe-Z margin (clears everything). Hop up: a small relative lift, capped at that margin. Clearance plane: an absolute work-Z plane (for fixtures / tall stock).">
-                            <option value="max" selected>Max safe height</option>
-                            <option value="hop">Hop up</option>
+                            <option value="max">Max safe height</option>
+                            <option value="hop" selected>Hop up</option>
                             <option value="plane">Clearance plane</option>
                         </select></div>
                     </div>

@@ -84,7 +84,10 @@ test("CORNER migration — functional G-code BYTE-IDENTICAL to the hand-rolled w
     const { cornerStack } = await import("/wizards/cornerWizard.js");
     const { emitMapped } = await import("/blocks/blockEmitter.js");
     const { stripAnnotations } = await import("/blocks/dataOps/equivalence.js");
-    return sweep.map((p) => stripAnnotations(emitMapped(cornerStack(p)).text));
+    // t941 B2b-4 — pin clearMode:'max': this MIGRATION byte-identity golden was captured at the OLD max default. The flip to a
+    // hop default only changes the wall1 clearance-lift (Max margin -> hop cap); pinning max keeps this refactor artifact valid.
+    // The new hop default is anchored in corner-clearance-emit-929 (default === explicit hop).
+    return sweep.map((p) => stripAnnotations(emitMapped(cornerStack({ ...p, clearMode: 'max' })).text));
   }, CORNER_SWEEP);
   for (let i = 0; i < CORNER_GOLDEN.length; i++) expect(out[i], JSON.stringify(CORNER_SWEEP[i])).toBe(CORNER_GOLDEN[i]);
 });

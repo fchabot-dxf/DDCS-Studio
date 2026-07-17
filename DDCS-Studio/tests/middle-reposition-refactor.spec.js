@@ -64,7 +64,10 @@ test('middle full-macro sweep: byte-identical after the reposition refactor (fro
     // dist:20 + travelShape:'diagonal' PINNED — the frozen BEFORE golden was captured when the MAX PROBE default was 20
     // (t381 bumped it to 200) and the trans-axis route was the single diagonal (t383 made DOGLEG the default). This one-shot
     // artifact proves the REPOSITION-refactor byte-identity, independent of those later defaults, so pin the values it froze at.
-    return rows.map((p) => emitMapped(middleStack({ dist: 20, travelShape: 'diagonal', ...p })).text);
+    // t941 B2b-4 — pin clearMode:'max' too (like dist/travelShape): this frozen BEFORE golden was captured at the OLD max
+    // default; the hop-default flip only changes ROW 4's trans-axis clearance-lift (Max margin -> hop cap), so pinning max keeps
+    // the reposition-refactor byte-identity artifact valid. The new hop default is anchored in corner-clearance-emit-929.
+    return rows.map((p) => emitMapped(middleStack({ dist: 20, travelShape: 'diagonal', clearMode: 'max', ...p })).text);
   }, MATRIX);
   // Frozen snapshot — REGENERATED at t826 (retreat-to-clear → machine-frame safe-Z margin), t897 (the CRASH-ADJACENT lift/drop
   // fix: each reposition's `G0 Z[0-#17]` drop → the HONEST pairing, a SAVE `#95=#882 ( @saveProbeZ )` before the G53 lift + a
