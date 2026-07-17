@@ -5491,3 +5491,26 @@ NUMERIC HAND-CHECK (V4.1, same frame as Expert): probe #95=-50, hop 15 -> #191=-
 
 ### NEXT
 - B2b-2c-2 (corner Plane FLOOR + SUGGEST — the reusable FORM_WIDGET + the shared stockTopWorkZ extracted from middleView, per your D3). MIDDLE unification onto the clearlift atom = DEFERRED (a follow-up; middle's doLift works + is byte-verified — not surgical to swap this turn). THEN B2b-3 (through-stock pre-flight). No release until after B2b-3 (clean full gate at the hold point). FLAGGED fast-follows: the park-sweep (alignment/rotary → Max) + the DM500 traverse-return consistency.
+
+
+---
+
+## 🔨 turn 933 — TURN B2b-2c-2 CORNER PLANE FLOOR + SUGGEST (the widget path, per your D3): BUILT + verified with VIEWED screenshots. The corner data-op's Clearance-Plane field now has the same tall-stock assists as middle (t925) — a Suggest (stock top + safe-Z margin) + an inline FLOOR warn (below the stock top) — via a REUSABLE plane-suggest form-widget, and stockTopWorkZ is now ONE SOURCE shared by both. Pure FORM/validation; the Plane EMIT is unchanged (Max/Hop/Plane still byte-identical).
+
+### BUILT (D3 — DRY: share the derivation, not the DOM)
+- **web/engine/workpiece.js** — EXTRACTED `stockTopWorkZ()` (moved verbatim from middleView) + added `suggestedPlaneZ()` (= stock top + |machine.safeZMargin| (5mm floor), rounded to 0.1) as the ONE SOURCE both middle and the corner widget read. stockTopWorkZ depends only on getWorkpiece() (already in this file) — a clean, self-contained home.
+- **web/ui/formWidgets.js** — NEW `plane-suggest` widget (the feedSuggest composite pattern): a number input + an advisory "Suggest" button + an inline FLOOR warn. Suggest fills suggestedPlaneZ() on click ONLY (never auto; dispatches input so the emit re-runs). The warn shows when the entered work-Z sits BELOW stockTopWorkZ() — it WARNS, never clamps (the value is the user's; the B2b-3 pre-flight is the runtime catch). Stamps data-param so [data-param="planeZ"] resolves exactly like a plain number field (round-trip + form-drive unchanged). Registered in FORM_WIDGETS as 'plane-suggest'. REUSABLE across data-ops (any plane-Z field opts in via widget:'plane-suggest').
+- **web/blocks/dataOps/cornerData.js** — the planeZ binding spec += `widget:'plane-suggest'`. Nothing else changed (when/match/key/section all stay); bindingCount unchanged (16) so the twin byte-parity + corner-data-emit are untouched.
+- **web/wizards/views/middleView.js** (part 3 — REFACTORED onto the shared helper, surgical + byte-identical): removed the local stockTopWorkZ (now imported); the Plane SUGGEST handler now calls suggestedPlaneZ() (same math, one source); the FLOOR warn calls the imported stockTopWorkZ(). getWorkpiece/workpieceBackdrop imports kept (still used by the pocket backdrop). No orphans.
+
+### VERIFIED (screenshots VIEWED; middle still green; round-trip preserved)
+- **CORNER assists (corner-clearance-plane-assists-933, NEW):** open the corner data-op -> Clearance plane -> the plane field shows + the Suggest button is present. INDEPENDENT oracle (recompute top+margin from getWorkpiece + settings, NOT via the shared helper): Suggest fills stock-top+margin (0.1). planeZ below the stock top -> the floor WARNS; above -> no warn; the below-stock value is KEPT (not clamped); Max mode -> no warn.
+- **SCREENSHOTS VIEWED:** corner-suggest-filled (Clearance Plane [5] + Suggest, no warn — stock top 0 + margin 5) + corner-floor-warn ([-5] + the amber "below the declared stock top — this traverse may cross into the part (check clamps / fixtures)" wrapping cleanly below the field). Layout consistent with the rest of the GEOMETRY section.
+- **MIDDLE assists still green (clearance-plane-assists-925):** PASSES unchanged after the refactor -> the shared helpers are behaviourally byte-identical (the spec recomputes the same top+margin as its independent oracle).
+- **Round-trip preserved (corner-clearance-form-931):** PASSES -> the planeZ widget change did not disturb the marker round-trip or the fold (data-param still resolves; read() mirrors numberWidget).
+
+### FULL GATE
+- **1328 passed / 0 failed / 4 skipped** (12.4m, full suite). The new corner assists spec + the unchanged middle assists (925) + the corner form (931) all green; no isolation flakes.
+
+### NEXT
+- B2b-3 (through-stock pre-flight — the runtime catch BOTH middle+corner Plane point at; Plane ships WITH it) then RELEASE at the hold point (clean full gate). No release before B2b-3. FLAGGED fast-follows unchanged: the park-sweep (alignment/rotary -> Max), the DM500 traverse-return consistency, the standalone-safetraverse round-trip, B1 (probe-start inversion).
