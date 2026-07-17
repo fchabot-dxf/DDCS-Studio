@@ -5543,3 +5543,45 @@ The classification is tractable (the block map decides it — that half leans bu
 
 ### FULL GATE
 - Not run this turn (no code changed — ground + gate only). The tree is clean.
+
+
+---
+
+## 🔨 turn 937 — TURN B2b-3 through-stock PRE-FLIGHT: BUILT the mechanism (Option B, per your ruling) + verified it on atom provenance, but TRACING THE REAL GEOMETRY surfaced THREE premise failures that the ruling did not anticipate. GATE (you flagged this exact "reword-tooltip vs continue" decision). The code is committed as a SAFE ADDITIVE WIP (envelope byte-identical), no shippable through-stock behavior yet — I need your rethink on scope + provenance before completing.
+
+### BUILT (Option B, as you ruled — correct + reusable; proven on atom provenance)
+- **web/engine/trace.js** — DECLARE-ON-THE-SEGMENT: traceToolpath stamps each segment's owning block TYPES from opts.blockMap (the live projection map). Additive; no map -> unchanged.
+- **web/engine/workpiece.js** — stockWorkAABB(stock) = the work-frame stock box (datumXY + stockTopWorkZ, one source with the plane assists); stockTopWorkZ(outer) took an optional explicit outer (back-compat).
+- **web/engine/envelopeCheck.js** — the through-stock class ADDED ALONGSIDE: the envelope trace + loop + violations are UNTOUCHED (byte-identical); a SEPARATE stock-aware trace stamps block types, then flags any CLEARANCE-TRAVERSE segment (clearlift/safehop/saferetract/safetraverse) whose path plows through the stock box via a TRUE MID-SEGMENT rayBox, as a new kind ('through-stock'). Probe approaches excluded by construction.
+- **3 render sites** (preflightBadge annotation+pop+head, setupSheet, gateway-send) learn the kind; envelope-only text stays byte-identical (branch only when a through-stock kind is present).
+- **PROVEN the mechanism works**: on the raw cornerStack ATOM stack it correctly scopes 5 clearance-traverse segments (clearlift/safetraverse/saferetract) out of 13; envelope-check-838 stays green (byte-identical guard holds).
+
+### THREE PREMISE FAILURES found by TRACING THE REAL GEOMETRY (the gate)
+1. **The corner is a DATA-OP; the built-in Corner is RETIRED** (app.js:307 "openCorner retired -- the built-in Corner is replaced by the Corner (data) twin"). A data-op COLLAPSES provenance: the emitted lines' map is ["op1", null, null, null] (the userOps template STRIPS block ids and instantiate does not reassign them into the map). So Option B's block-type scoping SILENTLY NO-OPS for the corner — the exact op this feature targets. It works only on atom-provenance stacks (the retired built-in). Agent B's "the block map recovers intent" held for the built-in emit, NOT the data-op.
+
+2. **A corner clearance traverse is OUTSIDE the stock — the through-stock risk is geometrically MOOT for corner.** Corner probes an OUTSIDE corner; the wall1->wall2 traverse stays outside the footprint (traced coords: safetraverse (0,0)->(-50,50), clearlift descends at (0,990) — all outside [0,100]x[0,100], for both dogleg AND diagonal). So a corner Plane-BELOW traverse does NOT cross the part -> the pre-flight correctly would NOT fire. The real through-stock risk is a MIDDLE / inside-feature concern (a traverse/descent across a boss or into a pocket) — traced middle Plane-below DOES plow (1 segment). Corollary: the t933 corner Plane FLOOR warn ("may cross into the part") is arguably a FALSE alarm for outside corners (there is no crossing).
+
+```
+  OUTSIDE CORNER (corner wizard)          BOSS CENTRE (middle wizard)
+    tool goes AROUND, outside               tool crosses OVER the boss
+        ┌───────────┐                          ┌───────────┐
+        │   STOCK    │                          │   █████    │  <- plane-below cross
+     ●--┘           └          ●──────┼─────────┼──► ●        │     PLOWS through
+     traverse outside                 └──────────┘   the boss
+     -> never crosses -> no flag       -> crosses -> FLAG
+```
+
+3. **Trace fidelity**: checkEnvelope cannot get the real (draggable/wizard) operator start; a datum-derived best-effort start leaves probes not stopping realistically (a traced corner probe ran 990mm), so the traverse coordinates are unreliable for a geometric plow test.
+
+### THE DECISION (yours) — scope + provenance + fidelity
+- **SCOPE**: refocus the through-stock pre-flight + the Plane floor/Suggest on MIDDLE / inside-feature ops (where a traverse truly crosses material) and DROP or REWORD the corner Plane floor warn (outside corner -> no crossing -> your "reword-tooltip" option); OR keep corner and accept the check never fires there.
+- **DATA-OP PROVENANCE** (required for middle-data + any data-op coverage): (A) fix instantiate to reassign block ids into the map (touches the SHARED wizards-as-data path + the edit-glow — medium/deep, 15 data-ops to re-verify); (B) a DECLARED in-text marker on the traverse emit (a ( @clearTraverse ) comment) read by the pre-flight — survives flattening, works for built-in + data-op, but CHANGES emit bytes (update the corner/middle goldens + twin parity); (C) RE-EMIT the built-in stack (builderOf(opType)(op.params), byte-identical -> line-aligned) to borrow its atom map without changing bytes or core machinery.
+- **START FIDELITY**: how the pre-flight should obtain a faithful operator start, or accept best-effort + note the limitation.
+
+**MY RECOMMENDATION**: refocus on MIDDLE / inside ops (drop the moot corner plow; reword the corner floor warn); resolve provenance via (C) re-emit-the-built-in-for-the-map (no byte change, no core-machinery risk, works for every data-op through the already-guarded twin byte-parity); accept a best-effort start with the stock-stop giving adequate fidelity for the mid-segment test. This is a real scope+approach rethink, so I am gating rather than pushing a shape into safety-critical code.
+
+### FULL GATE
+- **1328 passed / 0 failed / 4 skipped** (12.5m) — the additive WIP does NOT regress anything (envelope byte-identical guard holds; render-site edits byte-safe; the trace stamping is inert without a blockMap).
+
+### NOTE
+The built code is a SAFE additive WIP (no through-stock kind fires without a stock/plow; envelope untouched). Committed so you can review the diff. If you rule the scope+provenance, next turn completes it (middle-focused acceptance: a middle Plane-below traverse flags; a probe approach does not; own screenshots; full gate) then RELEASE.
