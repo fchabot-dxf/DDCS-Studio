@@ -5261,3 +5261,43 @@ HOP (grbl DEGRADE): `( Clearance hop 15mm - uncapped on this post ) / G0 Z15` (t
 
 ### NEXT (B2b-2 / B2b-3, unchanged from the B2b split)
 - B2b-2: the Clearance dropdown on BOTH wizards (middle hand-rolled HTML + view; corner data-op descriptors with when-gating) replacing Safe-Z + the Plane not-below-stock-top floor + the Plane Suggest. B2b-3: the pre-flight through-stock class. No release until all land (bundle rule). Default stays MAX (the Hop-everyday lean = a recorded one-line taste flip, not applied).
+
+## 🔨 turn 915 — TURN B2b-1b EXTEND THE HOP CAP TO V4.1 (the user's LIVE bench): BUILT + verified. The advisor's own per-post emit dump surfaced the gap my B2b-1 spec missed — V4.1 was DEGRADING Hop to an UNCAPPED relative lift (only because safeHop was Expert-only), yet V4.1 has EVERY cap primitive confirmed live (ifGoto probe-h.nc:7, G0 G53 probe-fix.nc, label/goto). An uncapped hop on V4.1 is the exact Z-limit crash class this arc exists to kill. Now V4.1 is CAPPED with its own idioms; the 4 real-degrade posts stay honest; MAX unchanged.
+
+### GROUNDING (the V4.1 free-var question the advisor flagged — verified before writing)
+- **#42/#43 (Expert's cap scratch) are NOT firmware-safe on V4.1.** The V4.1 dialect's OWN vetted comment (ddcs-v41.js:25-29, the missScratch grounding): firmware EXECUTABLE MACROS write #0-148 + #490-536, read #101-148 — so #42/#43 (in #0-148) are firmware locals, not free. #190 is verified FREE (outside those ranges + outside Studio's #1-74/#101/#102/#578). The free band is #149-489.
+- **V4.1's cap uses V4.1-NATIVE free vars:** #190 (the margin, BAKED — V4.1 seeds no #520 register, its safeRetract does the same) + #191 (the proposed-target scratch, adjacent to the vetted-free #190, in the #149-489 band; 0 refs across Studio emit — grep-confirmed). Reserved in varMap with the V4.1-specific basis. (The in-repo dump does not carry the live V4.1 SMB capture; the dialect's documented firmware-local analysis is the authority, same standard that vetted #190.)
+
+### BUILT
+- **web/wizards/dialects/ddcs-v41.js** — `safeHop({hopDist,saveVar,margin,capLabel})`: mirrors Expert's min(saved+hop, margin) IF/GOTO cap, but V4.1-native — BAKE the margin into #190 (no #520 read), proposed target into #191, `IF #191<#190GOTO<c>` (no space before GOTO), clamp, `G0 G53 Z#191` (V4.1 machineMove). ONE label (the cap check) — no #520 read-guard needed since the margin is baked; the uniquifier's guardLabel is simply unused on V4.1 (harmless).
+- **web/data/varMap.js** — RESERVED #191 (V4.1 hop proposed-target; the V4.1-native counterpart to Expert's #43, which is firmware-unsafe on V4.1).
+
+### THE V4.1 TRACE (pasted; numeric hand-check below)
+```
+#95=#1502 ( @saveProbeZ )                                <- save (V4.1 DRO Z = #1502)
+( Clearance hop - capped at the machine margin )
+#190=-5 ( safe-Z margin - machine frame )                <- BAKE the margin (V4.1 idiom; no #520)
+#191=[#95+15]                                            <- proposed = saved probe Z + hopDist
+IF #191<#190GOTO92                                       <- cap: keep the hop if BELOW the margin (no space before GOTO)
+#191=#190 ( cap the hop at the safe machine margin )     <- else clamp to the margin
+N92
+G90 / G0 G53 Z#191 / G91                                 <- lift to the capped target (G0 G53 = V4.1 machineMove)
+G0 Y#21 / G0 X[#22-#52-#10-#6]                           <- dogleg XY at hop height
+G90 / G0 G53 Z#95 ( @returnProbeZ )                      <- honest return to the saved probe Z
+```
+NUMERIC HAND-CHECK (V4.1, same frame as Expert): probe #95=-50, hop 15 -> #191=-35; margin #190=-5; IF -35<-5 TRUE -> keep #191=-35 (lift 15 above the probe). hop 50 -> #191=0; IF 0<-5 FALSE -> clamp #191=#190=-5 (the margin). => lift = min(saved+hop, margin). CORRECT — identical math to Expert, V4.1 registers.
+
+### VERIFIED (clearance-hop-plane-913.spec.js updated — V4.1 moved OUT of degrade into a CAPPED assertion)
+- V4.1 CAPPED (numeric, in-order): #190 baked margin, #191=[#95+15], `IF #191<#190GOTO`, clamp `#191=#190`, `G0 G53 Z#191`; asserts NO #42/#43 (firmware-unsafe on V4.1); proposed<cap<clamp<lift (the min structure).
+- The 4 REAL-degrade posts (grbl no-flow / rs274 O-word / centroid / DM500 no-G53) still degrade honestly (plain relative hop + the uncapped note; none throws) — that classification is CORRECT.
+- MAX byte-identical all posts (V4.1 max unchanged — safeHop fires ONLY in hop mode); label uniquifier still distinct; round-trip intact. (middle-reposition-refactor + clearance-modes-909 green.)
+
+### DM500 FLAG (the advisor's ALSO-confirm — pre-existing, not a blocker, NOT changed this turn)
+- DM500's MAX (and the hop degrade) LIFT is a grounded work-frame clearance (`G0 Z#17`, dialect.safeRetract degrade — G53 not dump-grounded on DM500), but the RETURN uses `G53 Z#95` (dialect.machineMove, which the DM500 dialect flags "G53 gated by config #395; dump safe-Z is M98 P101 — TO CONFIRM"). So DM500's return frame is UNGROUNDED (the same TO-CONFIRM status as its machineMove) while its lift degrades honestly — an inconsistency. NOT fixed here (out of B2b-1b scope; a MAX-touching change). Options for a dedicated item: (a) make the DM500 return ALSO work-frame (consistent with the lift, but then it can't return to the exact saved MACHINE Z — a semantic change), or (b) confirm DM500 G53 on hardware (the user-gated item). The B2b-2 form could suggest Plane on DM500 (a declared work-Z plane sidesteps the machine-frame question). FLAGGED for the advisor to route.
+
+### FULL GATE
+- **1322 passed / 0 failed / 4 skipped (12.4m), GATE_EXIT=0** — CLEAN (explicit failed-count grep = 0; no flake this run; +1 vs B2b-1's 1321 = the new V4.1 capped assertion in the same spec... same test count, the +1 is the prior run's flake now passing). Files (git hash-object pre-commit): ddcs-v41.js `922e0b4` (safeHop) · varMap.js `e7203e3` (#191) · tests/clearance-hop-plane-913.spec.js `aa9f66a` (V4.1 capped assertion). Commit hashes below.
+- No release (bundle rule). No lingering procs (Playwright-managed mem-server).
+
+### NEXT
+- B2b-2 (the Clearance dropdown BOTH wizards + Plane floor + Suggest) then B2b-3 (through-stock pre-flight). No release until all land (bundle rule). Now Expert + V4.1 (the two DDCS controllers that CAN cap) are both capped; DM500/grbl/rs274/centroid degrade honestly.
