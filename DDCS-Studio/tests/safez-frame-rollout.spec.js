@@ -4,11 +4,13 @@ import { test, expect } from '@playwright/test';
 // Per wizard: relative (default) emits the park as the rapid lift (no G53 — byte-identical to today); machine parks the FINAL
 // retract via G53 Z#<var>; the frame round-trips through the op marker. (corner is FLAGGED — #17 folds in scanDepth; atc has no
 // safe-Z UI field — both deferred, see WORK-LOG.)
+// t919 B2b-2a — MIDDLE MIGRATED OUT: middle's end PARK now ALWAYS takes Max safe height (park-always-Max supersedes the rel|mach
+// toggle — the relative park was the original crash cause), so middle no longer carries the safeZFrame toggle this test asserts.
+// The park-sweep (alignment + rotary → Max too) is a flagged fast-follow; until then they keep the toggle and stay covered here.
 const WIZ = [
   { op: 'rotary_center', cls: 'RotaryCenterWizard', mod: 'rotaryCenterWizard.js', v: '#17', base: { method: 'known', diameter: 76.2, datum: 'top' } },
   { op: 'rotary_clock', cls: 'RotaryClockWizard', mod: 'rotaryClockWizard.js', v: '#17', base: {} },
   { op: 'alignment', cls: 'AlignmentWizard', mod: 'alignmentWizard.js', v: '#19', base: {} },
-  { op: 'middle', cls: 'MiddleWizard', mod: 'middleWizard.js', v: '#17', base: { featureType: 'boss' } },
 ];
 
 test('safe-Z frame rollout: each wizard relative byte-identical (no G53), machine = G53 final park, frame round-trips', async ({ page }) => {

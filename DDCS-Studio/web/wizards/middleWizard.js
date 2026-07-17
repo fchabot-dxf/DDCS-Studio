@@ -22,7 +22,7 @@ import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';   // the shared probe + travel primitives (middle composes them — t131 inc1, ① auto/manual travel)
-import { safeZParkBlock, safeZFrameOf, safeRetractNode, clearTraverseParams, clearModeOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive (+ t822 machine-frame safe-height retract; t909 B2 the declared clearance mode)
+import { safeRetractNode, clearTraverseParams, clearModeOf } from './ops/safeZframe.js';   // t822 machine-frame safe-height retract; t909 B2 the declared clearance mode (t919 B2b-2a retired the frame-toggle park → always Max)
 import { opSimStarts } from '../viz/opSimStarts.js';
 
 const AX = {
@@ -52,8 +52,10 @@ export function middleStack(params = {}, opts = {}) {
     const resolvedDir2 = (typeof params.dir2 === 'string') ? params.dir2 : (dir1Plus ? 'neg' : 'pos');
     const dir2Plus = resolvedDir2 === 'pos';
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
-    const dist = num(params.dist, 200), retract = num(params.retract, 2), safeZ = num(params.safeZ, 10);   // MAX PROBE default 200 (t381 — 20 was too small to reach the wall → the probe fired short + retracted → "retract-only")
-    const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL 1c: relative (default) | machine (G53 final park)
+    const dist = num(params.dist, 200), retract = num(params.retract, 2);   // MAX PROBE default 200 (t381 — 20 was too small to reach the wall → the probe fired short + retracted → "retract-only")
+    // t919 B2b-2a — RETIRED params.safeZ + params.safeZFrame: the end PARK now ALWAYS takes Max safe height (the ratified reading —
+    // the relative park was the ORIGINAL crash cause), so there's no user Safe-Z field + no rel|mach toggle. #17 survives ONLY as
+    // the DM500 work-frame degrade clearance (below), a WORK height distinct from the machine safe-Z margin.
     const clearMode = clearModeOf(params.clearMode);   // t909 B2 — the DECLARED clearance mode the trans-axis traverse reads (max default = the #520 machine margin, unified with corner)
     const hopDist = num(params.hopDist, 15);   // t913 B2b-1 — Hop mode: how far to lift (capped at the machine margin). Only emitted when clearMode==='hop'
     const planeZ = num(params.planeZ, 10);     // t913 B2b-1 — Plane mode: the absolute work-Z clearance plane. Only emitted when clearMode==='plane' (B2b-2 adds the not-below-stock floor)
@@ -143,7 +145,7 @@ export function middleStack(params = {}, opts = {}) {
         const b = newBlock('safetraverse');
         b.params = { to: 'next-wall', shape: 'jog' };
         b.children = safeTraverseStack({
-            approach: 'manual', lift: '#17', machineLift: true, drop: true, returnZ: '#95',
+            approach: 'manual', lift: true, machineLift: true, drop: true, returnZ: '#95',   // t919 — lift is just a presence GATE (machineLift → the #520 margin); #17's value no longer feeds the reposition lift
             comment: `REPOSITION: ${msg || 'jog the probe to the next wall'}`,
         });
         return [b];
@@ -191,7 +193,10 @@ export function middleStack(params = {}, opts = {}) {
     S.push(mkA('#51', 0, 'Wall 1 pos'), mkA('#52', 0, 'Wall 2 pos'), mkA('#53', 0, 'Center pos'));
     S.push(mkA('#54', 0, 'Wall 3 pos'), mkA('#55', 0, 'Wall 4 pos'), mkA('#56', 0, 'Center pos 2'));
     S.push(mkA('#7', '[0-#1]', 'Negative max probe'), mkA('#8', '#1', 'Positive max probe'));
-    S.push(mkA('#9', '[0-#2]', 'Negative retract'), mkA('#10', '#2', 'Positive retract'), mkA('#17', safeZ, 'Safe Z retract'));
+    // t919 B2b-2a — #17 is now ONLY the DM500 work-frame degrade clearance (DM500 has no G53 → safeRetract degrades to G0 Z#17).
+    // A sensible fixed WORK height (mm above work-0), distinct from the machine safe-Z margin (a below-home machine Z) — sourcing
+    // it from abs(margin) would be a category-confusion that silently shrinks the DM500 clearance, so keep the established 10.
+    S.push(mkA('#9', '[0-#2]', 'Negative retract'), mkA('#10', '#2', 'Positive retract'), mkA('#17', 10, 'DM500 work-frame safe clearance (mm above work-0; DM500 has no G53) - other posts park at the machine margin'));
     S.push(mkA('#18', clearOver, 'Traverse-over clearance (boss auto: lift this high to clear the part before crossing)'));
     // #19/#20 = the IN-axis cross-over (traverseOver — boss + inAxis auto ONLY); #21 = the TRANS-axis Diag travel
     // (transTraverse — boss + transAxis auto + twoAxis ONLY). Each present only when its own auto-traverse is active, so
@@ -237,13 +242,13 @@ export function middleStack(params = {}, opts = {}) {
         ...circularOnly([mkMM(axis, '#53')]),
         mkC(`2axis_${axis === 'X' ? 'XtoY' : 'YtoX'}_${resolvedDir2}`),
         ...seqR(second, dir2Plus, 54),
-        safeZParkBlock(safeZFrame, '#17', 'inc'),   // SPATIAL-MODEL 1c: frame-aware final park; t856 — inside the G91 body → G90-wrap the machine G53, restore G91
+        safeRetractNode({ restore: 'inc' }),   // t919 B2b-2a — the end PARK always takes MAX safe height (per-post: G53 posts → #520 machine margin; DM500 → work-frame degrade). Retired the rel|mach frame toggle (the relative park was the crash cause). t856 — inside the G91 body → G90-wrap, restore G91
         // #53 = centre of the PRIMARY axis, #56 = centre of the SECONDARY — write each to ITS axis's WCS offset
         // (not hardcoded X=0/Y=1, which swapped them when the primary axis was Y).
         mkWcsWrite({ axis, wcs: wcsArgOf(wcs), offset: AX[axis].off, value: '#53', direct: true }), mkWcsWrite({ axis: second, wcs: wcsArgOf(wcs), offset: AX[second].off, value: '#56', direct: true }),
     ];
     const twoAxisOff = [
-        safeZParkBlock(safeZFrame, '#17', 'inc'),   // SPATIAL-MODEL 1c: frame-aware final park; t856 — inside the G91 body → G90-wrap the machine G53, restore G91
+        safeRetractNode({ restore: 'inc' }),   // t919 B2b-2a — the end PARK always takes MAX safe height (per-post: G53 posts → #520 machine margin; DM500 → work-frame degrade). Retired the rel|mach frame toggle (the relative park was the crash cause). t856 — inside the G91 body → G90-wrap, restore G91
         mkWcsWrite({ axis, wcs: wcsArgOf(wcs), offset: AX[axis].off, value: '#53', direct: true }),
     ];
     S.push(...twoAxisFork(twoAxisOn, twoAxisOff));

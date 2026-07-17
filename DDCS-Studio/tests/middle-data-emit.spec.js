@@ -87,7 +87,7 @@ test('middle-data-emit: data-op == built-in middleStack byte-identical across th
   expect(r.resolves, 'middle-data resolves via builderOf').toBe(true);
   expect(r.independentPath, 'data builder is NOT middleStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
-  expect(r.bindingCount, 'the 12 bound scalars: 8 always-present (#1-6,#17,#18) + 4 prune-gated (#19,#20,#21,#22)').toBe(12);
+  expect(r.bindingCount, 'the 11 bound scalars: 7 always-present (#1-6,#18) + 4 prune-gated (#19,#20,#21,#22) — t919 retired the safeZ→#17 binding (park always Max; #17 is now a fixed DM500-degrade clearance)').toBe(11);
   expect(r.structBindingCount, 'the 9 structural toggles (+ travelShape, t383)').toBe(9);
   expect(r.sourcesActive, 'no probe sources resolve in this env (studio profile) → applyProbeSources is a no-op → the byte-test is meaningful').toBe(false);
   expect(r.wiringFails, 'every DERIVED binding routes to the same assign var middleStack writes').toEqual([]);
