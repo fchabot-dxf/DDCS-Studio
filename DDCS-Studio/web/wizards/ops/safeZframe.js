@@ -135,6 +135,18 @@ export function planeLiftNodes(planeZ) {
     return [abs, mv, inc];
 }
 
+/** t929 B2b-2c — the CLEARANCE-MODE LIFT node(s) for an OUT-OF-BAND lift (a lift NOT inside safeTraverseStack — corner's
+ *  per-wall retreat builds the lift itself, then a separate repoTraverse returns). Returns the lift block(s) for the mode:
+ *  `max` → the #520 machine-margin retract (BYTE-IDENTICAL to a direct safeRetractNode({restore}) — so a Max default is
+ *  byte-identical); `hop` → the capped hop (safeHopNode, restore baked 'inc'); `plane` → the absolute work-Z plane
+ *  (planeLiftNodes). The CALLER saves the pre-lift Z (saveMachineZNode) before this and returns via safeZParkBlock ret. ONE
+ *  declared source, mirroring safeTraverseStack's doLift semantics. (`restore` applies to the `max` path; hop/plane bake their own.) */
+export function clearLiftNodes(mode = 'max', { hopDist = 15, planeZ = 10, saveVar = '#95', restore } = {}) {
+    if (mode === 'hop') return [safeHopNode({ hopDist, saveVar })];
+    if (mode === 'plane') return planeLiftNodes(planeZ);
+    return [safeRetractNode(restore != null ? { restore } : {})];   // 'max' — the machine margin (byte-identical to today)
+}
+
 /** The safeTraverseStack lift/drop params for a declared clearance MODE. `saveVar` = the free scratch that records the
  *  pre-lift Z for the honest return (#95 in the corner/middle family). `max` = the #520 machine margin (t826/t897);
  *  `hop` = a relative lift CAPPED at the margin (safeHopNode); `plane` = a declared absolute work-Z plane (planeLiftNodes).

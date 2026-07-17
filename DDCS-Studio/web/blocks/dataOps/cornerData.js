@@ -56,6 +56,7 @@ export const CORNER_DEFAULTS = {
     corner: 'FL', probeSeq: 'YX', probeZFirst: 0, travelApproach: 'auto', travelShape: 'dogleg', wcs: 'active',
     dist: 500, retract: 5, f_fast: 200, f_slow: 50, port: 3,
     level: 0, safeZ: 10, scanDepth: 5, radius: 2, travelDist: 50,
+    clearMode: 'max', hopDist: 15, planeZ: 10,   // t929 B2b-2c — the declared clearance mode for the wall1->wall2 traverse (max default = byte-identical); hopDist/planeZ are literals (no assign #var), read by cornerStack when the mode is set
     // NOTE: startX/startY/cross1_x/cross1_y are deliberately ABSENT — the reposition sockets default to their signed-travelDist
     // EXPRESSION (via the binding's socket-default), so a seed with no cross override stays non-degenerate. Listing them here as
     // literal 0 would make `'cross1_x' in params` true → instantiate() overwrites the expression with 0 (the degenerate default).

@@ -17,7 +17,7 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';
-import { safeRetractNode, saveMachineZNode } from './ops/safeZframe.js';   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix); t897 — record the pre-lift Z for the wall1->wall2 return
+import { safeRetractNode, saveMachineZNode, clearModeOf, clearLiftNodes } from './ops/safeZframe.js';   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix); t897 — record the pre-lift Z for the wall1->wall2 return; t929 B2b-2c — the declared clearance mode on the wall1->wall2 lift
 import { num } from './ops/util.js';
 import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
@@ -88,6 +88,10 @@ export function cornerStack(params = {}, opts = {}) {
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const level = num(params.level, 0), safeZ = num(params.safeZ, 10);
     const travelDist = num(params.travelDist, 50), scanDepth = num(params.scanDepth, 5), radius = num(params.radius, 2.0);
+    // t929 B2b-2c — the DECLARED clearance mode for the between-walls traverse lift (max default = the #520 machine margin,
+    // BYTE-IDENTICAL to today). Only the WALL1 lift (followed by the repoTraverse) reads it; the WALL2 lift is the FINAL retract
+    // and stays Max (the standing split — final parks are always max caution). safeZ (#19) is the PLUNGE/approach, NOT this.
+    const clearMode = clearModeOf(params.clearMode), hopDist = num(params.hopDist, 15), planeZ = num(params.planeZ, 10);
     const src = params.sources || {};   // controller-resident probe fields (PROBE-CONFIG-SOURCE.md)
     // ① AUTO/MANUAL TRAVEL — ONE toggle governs BOTH travels (Z→wall1 + wall1→wall2). 'auto' (default) = the hands-free G0
     // seq move; 'manual' = an operator jog-and-wait via the shared safeTraverseStack (approach:'manual'), reusing each
@@ -193,7 +197,7 @@ export function cornerStack(params = {}, opts = {}) {
     // Probe one wall via the shared PROBE-SURFACE BLOCK (t127): touch+comp → the TRUE wall in a temp (#102/#101); the
     // corner keeps its own WCS write + retract + safe-Z (trailingRetract:false). Byte-identical to the old hand-rolled wall.
     // RETURNS one wall's probe blocks (composed inside the corner×probeSeq csFork so directions/order fork per combo).
-    const probeWallR = (ax, dir) => {
+    const probeWallR = (ax, dir, liftMode = 'max') => {   // t929 — liftMode: the WALL1 retreat reads the clearance mode (Max/Hop/Plane); WALL2 (final) defaults 'max' (standing split)
         const av = AX[ax], probeVar = dir === '+' ? '#8' : '#7', retractVar = dir === '+' ? '#9' : '#10';
         const compOp = dir === '+' ? '+' : '-';   // boss: wall is at trigger ± stylus radius
         const out = [...probeSurfaceStack({
@@ -216,7 +220,7 @@ export function cornerStack(params = {}, opts = {}) {
         // can RETURN the tool to it (repoTraverse returnZ '#95'). Without this, the tool lifted ABSOLUTE (G53 margin) then
         // dropped a RELATIVE amount → landed an arbitrary Z → the next wall probed from the wrong height. The save (#95=#882)
         // pairs 1:1 with that traverse's return; wall2's save has no following traverse → a harmless unpaired scratch write.
-        out.push(mkMV(ax, retractVar), saveMachineZNode('#95'), safeRetractNode({ restore: 'inc' }));   // t856 — per-wall retreat is INSIDE the G91 probe body → G90-wrap the G53, restore G91
+        out.push(mkMV(ax, retractVar), saveMachineZNode('#95'), ...clearLiftNodes(liftMode, { hopDist, planeZ, saveVar: '#95', restore: 'inc' }));   // t856 — per-wall retreat is INSIDE the G91 probe body → G90-wrap the G53, restore G91; t929 — the lift honours the clearance mode (max=safeRetractNode, byte-identical)
         return out;
     };
 
@@ -349,7 +353,7 @@ export function cornerStack(params = {}, opts = {}) {
         // height → NO plunge, go STRAIGHT to G31 (trust the jog). Gated via zOnlyR so the twin's superset prunes it away on the
         // OFF leaf too (a bare `if(probeZ)` would leave the superset emitting it → twin≠built-in for OFF).
         ...zOnlyR([mkMV('Z', '#18')]),             // plunge to scan depth (probeZ ON only)
-        ...probeWallR(ax.fA, ax.fD),
+        ...probeWallR(ax.fA, ax.fD, clearMode),   // t929 — WALL1 (between-walls): the retreat lift + the following repoTraverse honour the clearance mode
         ...zPairR(repoArmR(true, ax.sA), repoArmR(false, ax.sA)),
         ...zPairR([mkC(secondLbl(true, ax.sA))], [mkC(secondLbl(false, ax.sA))]),
         ...probeWallR(ax.sA, ax.sD),
