@@ -5464,3 +5464,30 @@ NUMERIC HAND-CHECK (V4.1, same frame as Expert): probe #95=-50, hop 15 -> #191=-
 
 ### NEXT (after you rule A/B)
 - B2b-2c FORM: build the chosen approach (the dropdown + when-gated hopDist/planeZ + round-trip + screenshots) + fix the stale cornerData:82 safeZ help. Then B2b-2c-2 (corner Plane floor + Suggest via the reusable FORM_WIDGET + the shared stockTopWorkZ). Then B2b-3 (through-stock pre-flight). No release until after B2b-3 (clean full gate at the hold point). FLAGGED fast-follows: the park-sweep (alignment/rotary → Max) + the DM500 traverse-return consistency.
+
+
+---
+
+## 🔨 turn 931 — TURN B2b-2c CORNER FORM (Option B, the folding atom): BUILT + verified with a VIEWED screenshot. You ruled Option B; built it. The corner data-op now has the CLEARANCE dropdown (Max/Hop/Plane) + when-gated hopDist/planeZ, and the built-in cornerStack + the twin both honour the mode via ONE `clearlift` folding atom — byte-identical to the verified clearLiftNodes output. safeZ (#19, the plunge/approach) is kept + its stale help fixed.
+
+### BUILT (Option B — the clearlift FOLDING ATOM + the data-op form)
+- **web/wizards/ops/saferetract.js** — the `clearlift` LEAF atom: its EMIT folds on its VALUE params (clearMode/hopDist/planeZ) by DELEGATING to the existing atom emits — max → safeRetractBlock.emit (the #520 margin), hop → safeHopBlock.emit (the capped hop), plane → distmode/move (the absolute work-Z). So the G-code is BYTE-IDENTICAL to clearLiftNodes by construction, and the BLOCK STRUCTURE is fixed (one leaf) → a data-op carries ONE block + re-emits the mode with NO structural fork and NO spurious assign #var (honours D2; the M2-template fit). HIDDEN; emits only the lift (the save #95 + the G53 return are the caller's).
+- **web/blocks/blockEmitter.js** — uniquifySafeRetractLabels gives a clearlift its labels per RESOLVED clearMode: max → 1 (the #520 unset-guard, same as saferetract → byte-identical), hop → 2 (guard+cap), plane → 0. One shared counter.
+- **web/wizards/ops/safeZframe.js** — clearLiftNodes → `clearLiftNode` (returns the clearlift block). **web/wizards/ops/index.js** — registered clearLiftBlock.
+- **web/wizards/cornerWizard.js** — probeWallR takes `useMode`: WALL1 (between-walls) uses `clearLiftNode({clearMode,hopDist,planeZ})` (the folding atom, honours the mode); WALL2 (final retract) stays `safeRetractNode` (Max — the standing split). ONLY wall1 is a clearlift block (the form binding matches it unambiguously).
+- **web/blocks/dataOps/cornerData.js** — the clearMode enum + hopDist/planeZ number bindings, `match:{type:'clearlift'}` + key (VALUE bindings on the folding atom, NO assign #var — D2). when-gated (hopDist when hop, planeZ when plane). CORNER_DEFAULTS += clearMode:'max'/hopDist:15/planeZ:10. **FIXED the stale safeZ:82 help** ("travel between walls" → the APPROACH/PLUNGE Z; the between-walls clearance is the Clearance mode).
+- **web/blocks/opSchema.js** — the corner schema += clearMode/hopDist/planeZ (round-trip).
+
+### VERIFIED (screenshot VIEWED; byte-identical; folds; round-trips)
+- **BYTE-IDENTICAL (the atom == clearLiftNodes):** corner-clearance-emit-929 (max byte-identical, hop cap ONCE on wall1, wall2/error Max, per-post Expert/V4.1/DM500) + corner-draw-anchor byte-parity + corner-data-emit twin byte-parity — all GREEN after the atom refactor. safe-z-retract-822 + clearance-hop-plane-913 (middle) unaffected.
+- **THE DATA-OP FOLDS PER MODE (direct builder):** max → no hop; hop → #43=[#95+15]; hopDist=22 → #43=[#95+22] (the value flows through the binding → the clearlift block → the emit folds); plane → G0 Z13.
+- **ROUND-TRIP (corner-clearance-form-931):** a corner op with clearMode:hop + hopDist:18 -> .nc marker carries them -> reimport restores clearMode=hop + hopDist=18 -> byte-identical re-emit -> the cap re-emits (#43=[#95+18]).
+- **FORM (screenshot VIEWED):** the corner data-op renders GEOMETRY → Safe Z / Scan Depth / **Clearance [Max|Hop|Plane]** (segmented) → **Hop Height (mm)** appears when Hop is picked (when-gated); Safe Z (10) KEPT (the plunge/approach, distinct from the clearance mode).
+- **corner-data-emit updated:** bindingCount + robustness onCount 13→16 (the 3 clearlift value bindings derive via match:{type:'clearlift'}); the wiring check skips non-assign (value) bindings — their byte-parity is the main sweep + corner-clearance-emit-929.
+- **A first-gate catch, migrated:** clearMode renders as a SELECT dropdown (matches middle; NOT segmented) so segmented-widget.spec's `.seg-control` count stays 2 (travelApproach+travelShape). help-slot's safeZ-help assertion migrated to the fixed text (APPROACH/PLUNGE, not the stale "clear of the stock"). All green.
+
+### FULL GATE
+- **1327 passed / 0 failed / 4 skipped** (12.3m, full suite). The 3 migrated specs green (corner-data-emit onCount 16, help-slot safeZ APPROACH/PLUNGE, segmented-widget count stays 2 — clearMode is a select). No isolation flakes this run.
+
+### NEXT
+- B2b-2c-2 (corner Plane FLOOR + SUGGEST — the reusable FORM_WIDGET + the shared stockTopWorkZ extracted from middleView, per your D3). MIDDLE unification onto the clearlift atom = DEFERRED (a follow-up; middle's doLift works + is byte-verified — not surgical to swap this turn). THEN B2b-3 (through-stock pre-flight). No release until after B2b-3 (clean full gate at the hold point). FLAGGED fast-follows: the park-sweep (alignment/rotary → Max) + the DM500 traverse-return consistency.
