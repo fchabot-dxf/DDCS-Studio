@@ -5514,3 +5514,32 @@ NUMERIC HAND-CHECK (V4.1, same frame as Expert): probe #95=-50, hop 15 -> #191=-
 
 ### NEXT
 - B2b-3 (through-stock pre-flight — the runtime catch BOTH middle+corner Plane point at; Plane ships WITH it) then RELEASE at the hold point (clean full gate). No release before B2b-3. FLAGGED fast-follows unchanged: the park-sweep (alignment/rotary -> Max), the DM500 traverse-return consistency, the standalone-safetraverse round-trip, B1 (probe-start inversion).
+
+
+---
+
+## 🔨 turn 935 — TURN B2b-3 through-stock PRE-FLIGHT: GROUNDED (two agents) + GATE. Safety-critical + a real design fork, as you flagged. No code built — the crux is answered and a violation class is proposed, but the INTEGRATION surfaces a structural fork I need you to rule on before I touch the safety-critical trace machinery.
+
+### THE CRUX — ANSWERED (confirmed: your false-positive fear is real)
+- **Move-class CANNOT separate a clearance traverse from a probe approach.** Both a mode-governed lift (G53 Z / hop G0 / plane G0) AND the between-walls XY cross AND a probe POSITIONING rapid all emit as G0 -> the tracer classes them ALL `type:'rapid'`. Only the G31 itself is `type:'probe'` (and checkEnvelope already skips probes -> uncheckedProbes). In corner the wall1->wall2 reposition IS simultaneously the clearance traverse AND wall-2's approach — no move-class can split them. A naive "does this rapid cross the stock XY footprint" check WOULD false-positive on every probe approach. (envelopeCheck.js + GcodeExecutionEngine trace sink; toolpath2d isLifted is pure geometry, not intent.)
+- **Intent IS recoverable — by DECLARE, not infer.** The block-trace map (blockEmitter stamps each emitted line's owning block-id ancestry -> programModel keeps it live as proj.map) lets `proj.map[seg.line]` -> the owning block TYPE. A segment from a clearlift / safetraverse / safehop / saferetract block = a CLEARANCE TRAVERSE; from a probe block = an APPROACH. The flattened .nc lost the intent; the block stack keeps it. (In-text markers @saveProbeZ / @returnProbeZ / REPOSITION: also survive but are coarse/fragile — rejected in favour of the block map.)
+
+### THE PROPOSED VIOLATION CLASS (scoped by DECLARED block-type; valid-by-construction)
+- For each traced segment whose owning block is a clearance-traverse type (NOT a probe): transform its endpoints by +O (the pass anchor / stockOffset — exactly as the engine's own probe test + the 3D mesh do) into the STOCK-LOCAL frame, then a TRUE MID-SEGMENT box test (reuse probeGeometry.rayBox — the envelope's ENDPOINT-only test misses a rapid that plows through with both ends clear) against the stock AABB (probeGeometry box X[0,x] Y[0,y] Z[-z,0]) below the stock top.
+- A hit -> a violation with a NEW kind (through-stock), flagged at the line's own end via the SAME inline-annotation path the envelope class uses.
+- Probe approaches NEVER fire — excluded by construction (their owning block is a probe block), not by a geometry heuristic. That is the whole point: scope by declared intent, not by move shape.
+
+### THE FORK — how the checker learns each segment's owning block-type (YOUR ruling)
+- **[A] the checker looks up proj.map[seg.line] itself.** Minimal; runs where proj is live (the editor badge). Cost: line-index alignment care (post-emit transforms — applyToolChanges / entry-waypoint / serial expansion — shift indices, so it must trace the SAME proj.text whose map it holds), and coverage is BADGE-ONLY (setup-sheet + gateway-send would NOT get the through-stock check).
+- **[B] the TRACE stamps seg.blockType (thread the block map into traceToolpath -> the trace sink writes each segment's owning block-type).** ONE SOURCE on the segment; EVERY consumer (badge + setup-sheet + gateway-send + even the 2D/3D legends) sees it for free; robust (no re-alignment). Cost: a bigger change to the safety-critical trace/engine. **RECOMMEND [B]** — aligned (declare-on-the-segment, one-source, valid-by-construction) + it gives the safety check FULL coverage (the gateway-send guard is exactly where a through-stock plow must be caught before it reaches the controller). The gates don't force A-vs-B (both DECLARE; both can be safe) -> it is a scope/cost residue = your call; I recommend B for the coverage.
+
+### SUB-DECISIONS (I implement whatever you pick; flagging so the synthesis is complete)
+- Intersection = mid-segment rayBox (NOT the endpoint test), each segment frame-transformed by the pass anchor.
+- Verdict = the SAME violations[] array + a `kind` discriminator (envelope entries keep their EXACT text -> byte-safe); renderAnnotations / setupSheet / gateway-send each learn ONE 2nd kind ("crosses stock").
+- checkEnvelope must start passing stock + start to traceToolpath (today it deliberately passes only wcsOffset). Either fold the through-stock test into checkEnvelope (one verdict, one trace) or a sibling checker composed into the same verdict — I lean fold-in (one trace, one verdict the 3 consumers already read).
+
+### WHY GATE (not build)
+The classification is tractable (the block map decides it — that half leans build), BUT the integration is a structural change to safety-critical trace code with a legit A/B fork on the CORE mechanism (block-type-onto-segment) + the verdict-kind + the new mid-segment algorithm + the frame transform + making the pre-flight stock-aware. You said GROUND-FIRST, do not rush, GATE if integration surfaces a structural fork — it does. Building the wrong shape into the trace machinery then redoing it is worse than one gate round. If you rule [B] + confirm the sub-decisions, next turn is a clean build to your acceptance (a Plane-below-stock traverse + a low-Hop-through-stock traverse each flag at their line; a probe approach does NOT false-positive; screenshots; full gate), then RELEASE the whole clearance bundle at the hold point.
+
+### FULL GATE
+- Not run this turn (no code changed — ground + gate only). The tree is clean.
