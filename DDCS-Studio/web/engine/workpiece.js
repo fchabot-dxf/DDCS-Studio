@@ -118,6 +118,31 @@ export function getWorkpiece() {
     return projectWorkpiece(s);
 }
 
+// t933 B2b-2c-2 — the declared STOCK TOP in the WORK frame: the ONE SOURCE for the Plane-mode assists (the FLOOR warn +
+// the SUGGEST), shared by the middle wizard AND the corner data-op's plane-suggest widget (D3 — DRY). The datum's Z char
+// (n/c/p = bottom/centre/top; default 'nnp' = top) sets where work-0 sits in the block: stock top = height·(1 − datumZfrac).
+// So a top datum → 0, a bottom datum → the full height. Null when no stock is declared (the assists then stay quiet).
+export function stockTopWorkZ() {
+    try {
+        const o = getWorkpiece() && getWorkpiece().outer;
+        if (!o) return null;
+        const z = Number(o.z) || 0;
+        const code = /^[ncp]{3}$/.test(String(o.datum)) ? String(o.datum) : 'nnp';
+        const f = ({ n: 0, c: 0.5, p: 1 })[code[2]];   // Z datum fraction from the bottom
+        return z * (1 - (f == null ? 1 : f));           // stock top in the WORK frame (0 for a top datum)
+    } catch (_) { return null; }
+}
+
+// t933 — the SUGGESTED clearance-plane work-Z: the declared stock top + the machine safe-Z margin, rounded to 0.1.
+// Advisory (a Suggest button fills it on click; the user owns the value — clamps/fixtures are theirs). Null when no stock
+// is declared. The margin mirrors the middle handler exactly: |settings.machine.safeZMargin| with a 5 mm floor.
+export function suggestedPlaneZ() {
+    const top = stockTopWorkZ();
+    if (top == null) return null;
+    const margin = Math.abs(Number(((typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().machine) || {}).safeZMargin)) || 5;
+    return Math.round((top + margin) * 10) / 10;
+}
+
 /**
  * Produce a FeatureCanvas spec { stock:{w,h,ox,oy}, items:[cavity glyphs] } from a workpiece — the ONE
  * SOURCE for the 2D top-down backdrop (P1/P5 migrate the ~13 hand-rolled stock→{w,h,ox,oy} flattens to

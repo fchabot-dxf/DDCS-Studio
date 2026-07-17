@@ -13,7 +13,7 @@
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
 import { buildRegions, paintRegions, regionValueFromEvent, regionLabel } from './regionPickSvg.js';
 import { FeatureCanvas } from '../viz/featureCanvas.js';
-import { workpieceFeatureItems } from '../engine/workpiece.js';
+import { workpieceFeatureItems, stockTopWorkZ, suggestedPlaneZ } from '../engine/workpiece.js';   // t933 — the shared stock-top + suggested-plane-Z (Plane assists, one source with the middle wizard)
 import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inline source dot the built-in forms use, on sourceField bindings
 import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';   // t522 declared-I/O picker; t768 P1b the tool-library modal opener (pickable from a wizard)
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
@@ -656,9 +656,54 @@ function feedSuggestWidget(host, b) {
     return { read: () => (sel.value ? { [b.param]: sel.value } : {}) };   // omit when empty → byte-identical (material drives no socket)
 }
 
+// t933 B2b-2c-2 — the PLANE-SUGGEST widget (the feedSuggest composite pattern) for a clearance-plane work-Z field: a
+// number input + an advisory "✨ Suggest" button + an inline FLOOR warn. Suggest fills the declared stock top + the
+// safe-Z margin (suggestedPlaneZ, shared with the middle wizard) on click only — never auto; the user owns the value
+// ([[dont-declare-away-user-responsibility]]; clamps/fixtures are theirs, the B2b-3 pre-flight is the runtime catch).
+// The warn shows when the entered work-Z sits BELOW the declared stock top (it WARNS, never clamps). Reusable across
+// data-ops via widget:'plane-suggest'; reads app state through the shared workpiece helpers (no new architecture).
+function planeSuggestWidget(host, b) {
+    host.style.cssText = ROW_CSS;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.step = (b.widgetConfig && b.widgetConfig.step) || 'any';
+    inp.value = b.default ?? 0;
+    inp.dataset.param = b.param;   // so [data-param="planeZ"] resolves (round-trip + the form drive) exactly like a plain number field
+    inp.style.cssText = CTRL_CSS + ' width:110px;';
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'plane-suggest-btn'; btn.textContent = '✨ Suggest';
+    btn.title = 'Fill with the declared stock top + the safe-Z margin. Advisory — the system knows only the DECLARED stock; clamps and fixtures are yours to add, so raise it if needed.';
+    btn.style.cssText = 'margin-left:6px; padding:4px 9px; background:var(--panel,#232833); color:inherit; border:1px solid var(--border,#2a3340); border-radius:6px; cursor:pointer; flex:0 0 auto;';
+    const warn = document.createElement('span');
+    warn.className = 'plane-floor-warn hidden';
+    warn.style.cssText = 'flex:1 0 100%; margin-top:4px; font-size:11px; color:#e0a030;';
+    warn.textContent = '⚠ below the declared stock top — this traverse may cross into the part (check clamps / fixtures)';
+    const refreshWarn = () => {
+        const top = stockTopWorkZ();
+        const v = parseFloat(inp.value);
+        warn.classList.toggle('hidden', !(top != null && Number.isFinite(v) && v < top));
+    };
+    btn.addEventListener('click', () => {
+        const s = suggestedPlaneZ(); if (s == null) return;   // no declared stock → the assist stays quiet
+        inp.value = String(s); inp.dispatchEvent(new Event('input', { bubbles: true })); refreshWarn();
+    });
+    inp.addEventListener('input', refreshWarn);
+    const right = document.createElement('span');
+    right.style.cssText = 'display:inline-flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:2px;';
+    right.append(inp, btn, warn);
+    host.append(labelSpan(b), right);
+    refreshWarn();
+    return { read: () => {
+        const n = parseFloat(inp.value);
+        if (Number.isFinite(n)) return { [b.param]: n };
+        const v = numOr(inp.value, b.default ?? 0);
+        return Number.isFinite(v) ? { [b.param]: v } : {};
+    } };
+}
+
 export const FORM_WIDGETS = {
     number: numberWidget,
     feedsuggest: feedSuggestWidget,
+    'plane-suggest': planeSuggestWidget,
     slider: sliderWidget,
     dropdown: dropdownWidget,
     segmented: segmentedWidget,

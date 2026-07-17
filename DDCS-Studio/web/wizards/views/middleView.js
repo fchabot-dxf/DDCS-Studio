@@ -3,7 +3,7 @@ import { el, UIUtils } from '../../ui/uiUtils.js';
 import { MiddleWizard } from '../middleWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
-import { getWorkpiece, workpieceBackdrop } from '../../engine/workpiece.js';   // flatten-migration: draw the DECLARED workpiece cavity at its OFFSET (byte-identical to the legacy centered inset for a derived pocket)
+import { getWorkpiece, workpieceBackdrop, stockTopWorkZ, suggestedPlaneZ } from '../../engine/workpiece.js';   // flatten-migration: draw the DECLARED workpiece cavity at its OFFSET; t933 — the shared Plane assists (one source with the corner widget)
 import { slaveFollowing } from '../../engine/gantry.js';   // t648 — the Dual-Gantry Sync A field gates on the DECLARED topology (a Y-slave in Settings → Axes), one source
 
 const wizard = new MiddleWizard();
@@ -52,19 +52,8 @@ function buildFeatureItems(sw, sh, stock) {
     return [{ kind: 'rect', x: 0, y: 0, w: sw, h: sh, cls: 'fc-feature-boss' }];   // BOSS block (the probe approaches it from outside)
 }
 
-// t925 B2b-2b-2 — the declared STOCK TOP in the WORK frame, for the Plane FLOOR (warn) + the SUGGEST. The datum's Z char
-// (n/c/p = bottom/centre/top; default 'nnp' = top) sets where work-0 sits in the block: stock top = height·(1 − datumZfrac).
-// So a top datum → 0, a bottom datum → the full height. Null when no stock is declared (the assists then stay quiet).
-function stockTopWorkZ() {
-    try {
-        const o = getWorkpiece() && getWorkpiece().outer;
-        if (!o) return null;
-        const z = Number(o.z) || 0;
-        const code = /^[ncp]{3}$/.test(String(o.datum)) ? String(o.datum) : 'nnp';
-        const f = ({ n: 0, c: 0.5, p: 1 })[code[2]];   // Z datum fraction from the bottom
-        return z * (1 - (f == null ? 1 : f));           // stock top in the WORK frame (0 for a top datum)
-    } catch (_) { return null; }
-}
+// t933 — stockTopWorkZ + suggestedPlaneZ moved to engine/workpiece.js (the ONE source shared with the corner data-op's
+// plane-suggest widget). Imported above; the Plane FLOOR warn + the SUGGEST below read them.
 
 // The op-type PRESELECTS the stock shape (so a pocket op shows a pocket in BOTH the 2D canvas AND the 3D, which both read
 // stock.shape). Only on an op-type/circular CHANGE — never on every update — so a stock-panel OVERRIDE isn't clobbered. The
@@ -129,10 +118,9 @@ export const middleView = {
         if (btn && !btn._ddcsBound) {
             btn._ddcsBound = true;
             btn.addEventListener('click', () => {
-                const top = stockTopWorkZ(); if (top == null) return;
-                const margin = Math.abs(Number(((window.ddcsGetSettings && window.ddcsGetSettings().machine) || {}).safeZMargin)) || 5;
+                const s = suggestedPlaneZ(); if (s == null) return;   // t933 — the shared suggest (stock top + safe-Z margin, 0.1); same math, one source
                 const inp = el('m_plane_z');
-                if (inp) { inp.value = String(Math.round((top + margin) * 10) / 10); inp.dispatchEvent(new Event('input', { bubbles: true })); }
+                if (inp) { inp.value = String(s); inp.dispatchEvent(new Event('input', { bubbles: true })); }
             });
         }
         setTimeout(() => { ctx.update(); }, 50);
