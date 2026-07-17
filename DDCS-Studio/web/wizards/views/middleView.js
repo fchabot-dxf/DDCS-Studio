@@ -52,6 +52,20 @@ function buildFeatureItems(sw, sh, stock) {
     return [{ kind: 'rect', x: 0, y: 0, w: sw, h: sh, cls: 'fc-feature-boss' }];   // BOSS block (the probe approaches it from outside)
 }
 
+// t925 B2b-2b-2 — the declared STOCK TOP in the WORK frame, for the Plane FLOOR (warn) + the SUGGEST. The datum's Z char
+// (n/c/p = bottom/centre/top; default 'nnp' = top) sets where work-0 sits in the block: stock top = height·(1 − datumZfrac).
+// So a top datum → 0, a bottom datum → the full height. Null when no stock is declared (the assists then stay quiet).
+function stockTopWorkZ() {
+    try {
+        const o = getWorkpiece() && getWorkpiece().outer;
+        if (!o) return null;
+        const z = Number(o.z) || 0;
+        const code = /^[ncp]{3}$/.test(String(o.datum)) ? String(o.datum) : 'nnp';
+        const f = ({ n: 0, c: 0.5, p: 1 })[code[2]];   // Z datum fraction from the bottom
+        return z * (1 - (f == null ? 1 : f));           // stock top in the WORK frame (0 for a top datum)
+    } catch (_) { return null; }
+}
+
 // The op-type PRESELECTS the stock shape (so a pocket op shows a pocket in BOTH the 2D canvas AND the 3D, which both read
 // stock.shape). Only on an op-type/circular CHANGE — never on every update — so a stock-panel OVERRIDE isn't clobbered. The
 // in-memory mutation is on the SAME _ddcsSettings object the 3D/sim read, and gets persisted on the next saveSettings; we
@@ -108,6 +122,19 @@ export const middleView = {
 
     onOpen(ctx) {
         restoreBoxStock();   // not a rotary op → revert a forced cylinder back to the box (no-op if already a box)
+        // t925 — bind the Plane SUGGEST (once): fill CLEARANCE PLANE with the declared stock top + the safe-Z margin. ADVISORY —
+        // it fills only on click (never auto), the user owns the value (dont-declare-away-user-responsibility). Filling dispatches
+        // 'input' so the emit re-runs exactly as if typed. The system knows only the declared stock (clamps/fixtures are the user's).
+        const btn = el('m_plane_suggest');
+        if (btn && !btn._ddcsBound) {
+            btn._ddcsBound = true;
+            btn.addEventListener('click', () => {
+                const top = stockTopWorkZ(); if (top == null) return;
+                const margin = Math.abs(Number(((window.ddcsGetSettings && window.ddcsGetSettings().machine) || {}).safeZMargin)) || 5;
+                const inp = el('m_plane_z');
+                if (inp) { inp.value = String(Math.round((top + margin) * 10) / 10); inp.dispatchEvent(new Event('input', { bubbles: true })); }
+            });
+        }
         setTimeout(() => { ctx.update(); }, 50);
     },
 
@@ -186,6 +213,15 @@ export const middleView = {
         // only for Plane; Max shows neither (it needs no field). Every visible field now DRIVES the emit (the Safe-Z-drives-nothing complaint closed).
         const hopBlock = el('m_hop_block'); if (hopBlock) hopBlock.classList.toggle('hidden', params.clearMode !== 'hop');
         const planeBlock = el('m_plane_block'); if (planeBlock) planeBlock.classList.toggle('hidden', params.clearMode !== 'plane');
+        // t925 B2b-2b-2 — the Plane FLOOR WARNING (inline, NOT a clamp — the plane Z is the user's to own per
+        // dont-declare-away-user-responsibility): warn when planeZ sits BELOW the declared stock top (the traverse would cross
+        // into the part). The pre-flight through-stock class (B2b-3) is the runtime catch; this is the authoring-time hint.
+        const planeWarn = el('m_plane_warn');
+        if (planeWarn) {
+            const top = stockTopWorkZ();
+            const below = params.clearMode === 'plane' && top != null && Number.isFinite(Number(params.planeZ)) && Number(params.planeZ) < top;
+            planeWarn.classList.toggle('hidden', !below);
+        }
         // TRAVEL-START inc2a: the DIAG TRAVEL field is GONE from the UI — #21 is DERIVED from the dragged ② (tieDiagTravel).
         // m_diag_block stays permanently hidden (no show-toggle); the readonly input persists the derived value + round-trips.
 

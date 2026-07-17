@@ -334,7 +334,12 @@
                         <span class="label">HOP HEIGHT (mm)</span><input id="m_hop_dist" value="15" title="Hop up: how far to lift above the probe before crossing, CAPPED at the machine safe-Z margin so it can't overshoot into the top switch. Capped on DDCS Expert + V4.1; other controllers do an uncapped relative hop (noted in the G-code)."/>
                     </div>
                     <div id="m_plane_block" class="hidden" style="margin-top:8px;">
-                        <span class="label">CLEARANCE PLANE (work Z)</span><input id="m_plane_z" value="10" title="Clearance plane: an absolute WORK-Z the probe clears to, for fixtures / tall stock. NOTE it is a WORK Z — if you run the probe before the Z datum is set, it references an unset Z. (A not-below-stock floor + a Suggest land next.)"/>
+                        <span class="label">CLEARANCE PLANE (work Z)</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <input id="m_plane_z" value="10" title="Clearance plane: an absolute WORK-Z the probe clears to, for fixtures / tall stock. NOTE it is a WORK Z — if you run the probe before the Z datum is set, it references an unset Z." style="flex:1 1 auto; min-width:0;"/>
+                            <button id="m_plane_suggest" type="button" title="Fill with the declared stock top + the safe-Z margin. Advisory — the system knows only the DECLARED stock; clamps and fixtures are yours to add, so raise it if needed." style="margin-left:2px; padding:4px 9px; background:var(--panel,#232833); color:inherit; border:1px solid var(--border,#2a3340); border-radius:6px; cursor:pointer; flex:0 0 auto; white-space:nowrap;">✨ Suggest</button>
+                        </div>
+                        <span id="m_plane_warn" class="hidden" style="display:block; margin-top:4px; font-size:11px; color:#e0a030;">⚠ below the declared stock top — this traverse may cross into the part (check clamps / fixtures)</span>
                     </div>
                     <div id="m_crossover_block" class="grid-2 hidden">
                         <div><span class="label">X CROSS-OVER</span><input id="m_crossX" value="80" title="Boss probe-both (auto): the in-axis TRAVERSE distance — how far to move from the X wall 1 across to wall 2. This is the traverse, NOT the probe reach (Max Probe) — set it to span YOUR feature: ≈ feature width + 2×approach. Default 80 (a moderate feature). Stored as #19."/></div>
