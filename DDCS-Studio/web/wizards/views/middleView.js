@@ -1,6 +1,5 @@
 /** views/middleView.js — Middle (pocket/boss centre) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { safeZFrameValue } from '../../ui/safeZFrameToggle.js';   // SPATIAL-MODEL 1c: shared safe-Z frame read
 import { MiddleWizard } from '../middleWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
@@ -101,7 +100,7 @@ export const middleView = {
     twoPane: true,
     inputIds: [
         'm_type', 'm_inaxis', 'm_transaxis', 'm_axis', 'm_dir', 'm_dir2', 'm_both', 'm_circular', 'm_probe_z_first', 'm_sync_a', 'm_wcs', 'm_slave',
-        'm_dist', 'm_retract', 'm_safe_z', 'm_clear', 'm_crossX', 'm_crossY', 'm_diag_travel',
+        'm_dist', 'm_retract', 'm_clear_mode', 'm_hop_dist', 'm_plane_z', 'm_clear', 'm_crossX', 'm_crossY', 'm_diag_travel',
         'm_feed_fast', 'm_feed_slow', 'm_port', 'm_level', 'm_q',
     ],
     // Controller-source chips (PROBE-CONFIG-SOURCE.md)
@@ -136,8 +135,9 @@ export const middleView = {
             wcs: el('m_wcs')?.value || 'active',
             dist: el('m_dist')?.value || '200',
             retract: el('m_retract')?.value || '2',
-            safeZ: el('m_safe_z')?.value || '10',
-            safeZFrame: safeZFrameValue('m_safe_z'),   // SPATIAL-MODEL 1c: final-park frame (relative | machine G53)
+            clearMode: el('m_clear_mode')?.value || 'max',   // t921 B2b-2b — the declared CLEARANCE MODE (replaces the retired Safe-Z field): max (machine margin) | hop | plane
+            hopDist: el('m_hop_dist')?.value || '15',         // shown only when clearMode==='hop'
+            planeZ: el('m_plane_z')?.value || '10',           // shown only when clearMode==='plane'
             clearance: '2',
             f_fast: el('m_feed_fast')?.value || '200',
             f_slow: el('m_feed_slow')?.value || '50',
@@ -184,6 +184,10 @@ export const middleView = {
         const inAxisAuto = isBoss && params.inAxis === 'auto';
         const clearBlock = el('m_clear_block'); if (clearBlock) clearBlock.classList.toggle('hidden', !inAxisAuto);
         const crossBlock = el('m_crossover_block'); if (crossBlock) crossBlock.classList.toggle('hidden', !inAxisAuto);
+        // t921 B2b-2b — the per-mode CLEARANCE field WHEN-GATES on the dropdown: HOP HEIGHT shows only for Hop, CLEARANCE PLANE
+        // only for Plane; Max shows neither (it needs no field). Every visible field now DRIVES the emit (the Safe-Z-drives-nothing complaint closed).
+        const hopBlock = el('m_hop_block'); if (hopBlock) hopBlock.classList.toggle('hidden', params.clearMode !== 'hop');
+        const planeBlock = el('m_plane_block'); if (planeBlock) planeBlock.classList.toggle('hidden', params.clearMode !== 'plane');
         // TRAVEL-START inc2a: the DIAG TRAVEL field is GONE from the UI — #21 is DERIVED from the dragged ② (tieDiagTravel).
         // m_diag_block stays permanently hidden (no show-toggle); the readonly input persists the derived value + round-trips.
 

@@ -326,7 +326,17 @@
                     <div class="grid-3">
                         <div><span class="label">MAX PROBE</span><input id="m_dist" value="200" title="Max probe travel distance (mm). Stored as #1. Used as #7=[0-#1] (neg) or #8=#1 (pos) in G31."/></div>
                         <div><span class="label">RETRACT</span><input id="m_retract" value="2" title="Retract between fast and slow probe passes (mm). Stored as #2. #9=[0-#2] (neg), #10=#2 (pos)."/></div>
-                        <div><span class="label">SAFE Z</span><input id="m_safe_z" value="10" title="Z retract height between probing moves (mm). Stored as #17. Used as G0 Z#17."/></div>
+                        <div><span class="label">CLEARANCE</span><select id="m_clear_mode" title="How the probe clears between moves and parks at the end. Max safe height: retract to the machine safe-Z margin (clears everything). Hop up: a small relative lift, capped at that margin. Clearance plane: an absolute work-Z plane (for fixtures / tall stock).">
+                            <option value="max" selected>Max safe height</option>
+                            <option value="hop">Hop up</option>
+                            <option value="plane">Clearance plane</option>
+                        </select></div>
+                    </div>
+                    <div id="m_hop_block" class="hidden" style="margin-top:8px;">
+                        <span class="label">HOP HEIGHT (mm)</span><input id="m_hop_dist" value="15" title="Hop up: how far to lift above the probe before crossing, CAPPED at the machine safe-Z margin so it can't overshoot into the top switch. Capped on DDCS Expert + V4.1; other controllers do an uncapped relative hop (noted in the G-code)."/>
+                    </div>
+                    <div id="m_plane_block" class="hidden" style="margin-top:8px;">
+                        <span class="label">CLEARANCE PLANE (work Z)</span><input id="m_plane_z" value="10" title="Clearance plane: an absolute WORK-Z the probe clears to, for fixtures / tall stock. NOTE it is a WORK Z — if you run the probe before the Z datum is set, it references an unset Z. (A not-below-stock floor + a Suggest land next.)"/>
                     </div>
                     <div id="m_crossover_block" class="grid-2 hidden">
                         <div><span class="label">X CROSS-OVER</span><input id="m_crossX" value="80" title="Boss probe-both (auto): the in-axis TRAVERSE distance — how far to move from the X wall 1 across to wall 2. This is the traverse, NOT the probe reach (Max Probe) — set it to span YOUR feature: ≈ feature width + 2×approach. Default 80 (a moderate feature). Stored as #19."/></div>

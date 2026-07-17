@@ -8,7 +8,7 @@
  *   relative (default) — a clearance ABOVE the surface (incremental lift). machine — an absolute machine Z (G53 park).
  * The EMIT side is the shared safeZParkBlock(frame, var) primitive (wizards/ops/safeZframe.js); this is just the matching UI.
  */
-const ADOPTING_FIELDS = ['rc_safe_z', 'rcl_safe_z', 'al_safe_z', 'm_safe_z'];   // safe-Z inputs that get the frame toggle (add as wizards adopt)
+const ADOPTING_FIELDS = ['rc_safe_z', 'rcl_safe_z', 'al_safe_z'];   // safe-Z inputs that get the frame toggle (add as wizards adopt). t921 — middle (m_safe_z) RETIRED: its Safe-Z field is replaced by the CLEARANCE dropdown (park always Max), so no rel|mach toggle.
 const TOGGLE_TITLE = 'Safe-Z frame for the final park\nrel: a clearance ABOVE the surface (the value is a height; incremental lift — the default)\nmach: an ABSOLUTE machine Z (G53 park clear of clamps/tall fixtures — the value IS the machine Z)';
 
 /** The declared frame for a safe-Z field (default `relative`; the toggle absent/unknown → relative = the status quo). */
