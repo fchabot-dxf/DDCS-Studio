@@ -11199,3 +11199,56 @@ tap-regression, tap/text excluded by construction. Deciding gate: G3 (one-source
 resolves) + safety (no double-spindle path). Requesting the advisor's synthesis before building (safety-critical
 contract; the dispatched seam does not exist).
 
+
+---
+
+## 🔨 turn 945 — BUILD Option C: the DEAD-SPINDLE fix (shared spindleHeadPatch, opted into by the 6 cutting twins)
+
+RULING (advisor, from the t943 gate): Option C. A shared spindleHeadPatch postInstantiate helper opted into by the 6
+makeStart-framed cutting twins — resolves the live machine Head defaultRpm at BUILD (the SAME moment the FORM resolves
+at insert) → the framing progstart gets the Head rpm → M3. TAP + TEXT opt OUT by construction. Gates that decided:
+one-source (twin + form share one semantic), safety (opt-in → no tap double-spindle, no emit-contract flag).
+
+### THE FIX
+- **NEW web/blocks/dataOps/spindleHead.js** — `spindleHeadPatch(stack)`: walks the instantiated stack, and for a BLANK
+  (rpm <= 0) framing progstart fills rpm/dir/spin-up from the LIVE Head (window.ddcsGetSettings().spindle), exactly as
+  makeStart({spindle: Head}) would. `rpm > 0 wins` (mirrors makeStart — an explicit picked-tool speed is left as-is).
+  One-source: the Head is read live every build, never frozen into the def. dir is set too (a wrong M3 on a ccw Head
+  would spin BACKWARDS); spin-up too (form-parity: makeStart bakes the Head spin-up dwell, so the data-op header is now
+  BYTE-IDENTICAL to the form's for the same machine — not just the M3 line but its spin-up dwell).
+- **6 cutting twins opt in** (surfacing/drill/contour/bore/slot: `def.postInstantiate = spindleHeadPatch`; pocket:
+  COMPOSED into its existing postInstantiate — the derived-drill-centre rewrite runs, then `return spindleHeadPatch(stack)`).
+- **TAP opts out** — its progstart hardcodes rpm 0 DELIBERATELY (the tap cycle owns M3/M4/M5) and it skips makeStart; no hook.
+- **TEXT opts out (my call, reasoned)** — text bakes its OWN engrave default (12000) on BOTH its form (textWizard's own
+  fallback, NOT makeStart/the Head) AND its twin, so form == twin already. It is NOT dead. Opting only the twin into the
+  Head would CREATE a new form-vs-data divergence (the exact bug class we're fixing) → left as-is (still M3 S12000).
+
+### WHY THIS SEAM (recap of the gate finding)
+makeStart resolves blank-rpm -> Head EAGERLY at STACK-BUILD; a data-op emits via instantiate() over a FROZEN template
+(rpm is not a bound socket), so makeStart is NEVER re-run on data-op emit and the progstart rpm 0 stays frozen -> no M3
+-> a DEAD spindle (plunge + cut, spindle off). The 6 makeStart twins were ALL affected (not just surfacing). Built-in
+twins are code-seeded each boot (app.seedDefaultPortedUserOps -> updateUserOp overwrites the template), so the fix
+propagates; postInstantiate runs at BUILD, so a re-insert / marker-reimport HEALS a frozen op.
+
+### VERIFY (real symptom, value-asserted vs the live Head — not golden==golden)
+- **NEW tests/spindle-head-inherit-945.spec.js** (green): each of the 6 twins' data-op emit now carries M3 S<Head> (the
+  live defaultRpm, asserted > 0 first so the check is meaningful) + `( spindle on )`; TAP has NO header S<Head> (its
+  cycle self-spindles, M[34] S<rpm> present) -> no double; TEXT keeps M3 S12000, never S<Head>.
+
+### GOLDENS DIFF-VERIFIED (the byte-identity specs that broke — 12 total, all the SAME class)
+Each compared a data-op emit (now with the Head M3) to a BARE <op>Stack(p) (no spindle -> no M3). Fixed by seeding the
+SAME live Head into the REFERENCE stack (the FORM path passes spindle: s.spindle -> makeStart), so both sides spin up
+-> byte-identical again. The invariant is UPGRADED (and more honest): twin == the FORM path, not twin == a spindle-less
+stack. Frontier divergences (clearance/method/placement) are UNTOUCHED (they still diverge on their own axis; only the
+spindle stopped being a spurious diff). params.spindle is INERT for the data builder itself (no spindle binding; the
+patch reads the live Head), so seeding it changes only the reference side.
+  Round 1 (found before the first full gate): surfacing-as-data, drill-as-data, bore-as-data, slot-as-data,
+    contour-data-emit, pocket-data-emit (x2 tests).
+  Round 2 (found by the first full gate): clearing-cluster-800, concentric-shapes-802, drill-in-place, form-kernel-720,
+    mill-atc-in-place.
+
+### FULL GATE
+- **1330 passed / 0 failed / 4 skipped** (12.6m) — grepped the whole log for a failed-count (no non-404 errors).
+  Isolation-checked: all 12 fixed specs + the new spec were run STANDALONE (green) before the full gate.
+
+### NEXT: PART 2 (advisor) — a PRE-FLIGHT class "cutting program has G1 cuts but no M3 spindle-on" (the make-sure backstop).
