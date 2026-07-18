@@ -15,7 +15,8 @@ import { DEFAULT_DIALECT } from './dialects/index.js';
 function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Number(v); }
 
 /** Program header: absolute mode + spindle on. `rpm` (e.g. from the picked tool) overrides the
- *  Head's default RPM when given; otherwise the Head's defaultRpm is used. */
+ *  Head's default RPM when given; otherwise the Head's defaultRpm is used. rpm 0 (and no defaultRpm)
+ *  emits NO spindle line ON PURPOSE — tapping relies on this (the tap cycle drives the spindle itself). */
 export function headerBlock({ spindle, rpm, dialect } = {}) {
     const d = dialect || DEFAULT_DIALECT;
     const L = ['G90   ( absolute )'];

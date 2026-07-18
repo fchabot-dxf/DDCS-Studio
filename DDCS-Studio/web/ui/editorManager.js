@@ -183,6 +183,11 @@ export class EditorManager {
             title = 'Program';
         }
 
+        // A G-code comment cannot contain parentheses — DDCS flags a nested ( … ( … ) ) as
+        // "Unrecognized characters:L1[]" and refuses the line. The title is wrapped in (…) below and
+        // may have been taken from a raw code line like `G90 ( absolute )`, so strip any parens first.
+        title = title.replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim() || 'Program';
+
         // Body: emit self-describing op markers ( @DDCS:1 {…} ) when the editor matches the model (a clean,
         // model-tracked program). If it's been hand-edited beyond the model, export the raw text as-is.
         const _proj = window.ddcsGetProjection && window.ddcsGetProjection();
