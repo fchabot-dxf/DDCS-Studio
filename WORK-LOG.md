@@ -11134,3 +11134,68 @@ caught it because the badge element `[data-cloud]` still EXISTS and is VISIBLE �
 passed; only the content assertion failed. Caught now; fixed surgically (assertions only, no HTML change).
 
 Files changed: tests/header-account-row-742.spec.js (2 assertion fixes).
+
+---
+
+## 🔨 turn 943 — GATE: spindle-start dead-spindle root fix — dispatched seam is IMPOSSIBLE; 3-way fork (recommend C)
+
+TASK (advisor, relaying the user "there was a problem with spindle start make sure its fixed"): a surfacing DATA-OP
+emit has NO M3 → the machine plunges + cuts with a DEAD SPINDLE. DIRECTION given: "honor the field's own 'blank =
+use the Head setting' contract in EVERY path" by injecting the machine spindle at the SHARED emit boundary
+(emitMapped / opBuilders / activeDialectOpts) so `params.spindle.defaultRpm` reaches `makeStart` in the DATA-OP /
+EXPORT / TRANSFER paths. Advisor: "GROUND-then-BUILD; gate if the injection point or the tap path is structurally
+deeper than this."
+
+### GROUNDING — two findings that diverge from the dispatched seam
+
+1. **The dispatched injection point is IMPOSSIBLE.** `makeStart` (blocks/programFraming.js:12) resolves the
+   `rpm>0 ? rpm : spindle.defaultRpm` fallback EAGERLY, at STACK-BUILD time. A data-op emits via `instantiate(def,
+   params)` (blocks/userOps.js:428): it clones the FROZEN template and substitutes only the BOUND sockets. Surfacing
+   has NO rpm/spindle binding (SURFACING_EXEC_BINDINGS, dataOps/surfacingData.js:49), so the progstart's baked
+   `rpm:0` is never touched. `makeStart` is NEVER re-run on data-op emit → injecting `params.spindle` at
+   emitMapped/activeDialectOpts CANNOT reach it. The `rpm:0` was frozen when surfacingDataDef() seeded
+   `surfacingStack(SURFACING_DEFAULTS)` (defaults carry no spindle → makeStart → rpm 0 → progstart.rpm 0). And the
+   progstart emit itself (wizards/ops/program.js:17) only reads the baked `p.rpm` — it never sees the machine Head.
+
+2. **The bug is BROADER than surfacing.** Every makeStart-based cutting twin bakes rpm:0 the same way:
+   surfacing, drill, pocket, contour, bore, slot → all dead-spindle as data-ops. (text spreads the block DEFAULT
+   rpm 12000 via `{...ps.params, rpm: num(params.rpm, ps.params.rpm)}` textWizard.js:42 → emits M3 S12000, not dead
+   but not the Head value. TAP hardcodes progstart rpm:0 tapWizard.js:24 DELIBERATELY and does NOT use makeStart —
+   the tap CYCLE owns M3/M4/M5, so tap must stay M3-less in the header.)
+
+   Consequence: a progstart `rpm:0` is AMBIGUOUS — tap means "no spindle on purpose", a cutting twin means "blank,
+   I never got the Head default". They are byte-identical today, so any lazy resolution must DECLARE the difference
+   (declare-not-infer), it cannot infer it.
+
+### SEED / PERSISTENCE (matters for whether a fix propagates + heals frozen ops)
+Built-in twins are seeded by app.js:163 seedDefaultPortedUserOps() → createUserOp/updateUserOp (PERSISTS to
+localStorage, but RE-SEEDS from code each boot: the seed declares defV:1, updateUserOp respects it and OVERWRITES
+the stored template in place). So a code change to a wizard stack regenerates the TEMPLATE next boot. BUT op
+containers already PLACED in a saved program keep their FROZEN instantiated children — only the marker-reimport
+path (makeOp → builderOf(opType)(params) → instantiate) rebuilds from the current template.
+
+### THE FORK (3 legitimate seams; A eliminated as strictly worse)
+- **A — makeStart falls back to live Head when no params.spindle.** Simplest; tap-safe for free (tap skips
+  makeStart). BUT resolves at SEED time → bakes the Head rpm frozen → per-boot STALE (drifts from a mid-session
+  Head change; the FORM path resolves live at each insert, so A is INCONSISTENT with the form) + fragile on the
+  settings-loaded-before-seed boot ordering. Loses the one-source gate (G3). ELIMINATED.
+- **B — progStartBlock.emit resolves the live Head when rpm blank + a DECLARED `selfSpindle` flag on progstart.**
+  Truly one-source AT EMIT; heals already-frozen dead ops on the next export. BUT: (i) changes the progstart EMIT
+  CONTRACT + adds a safety-critical declared flag; (ii) the flag DEFAULT is a dilemma — existing PLACED taps have
+  frozen progstart children with NO flag, so a "spindle-on unless flagged off" default would DOUBLE-spindle them
+  (header M3 S18000 then the tap cycle) — a safety regression; the inverse default leaves frozen cutting ops dead.
+- **C (RECOMMEND) — a shared `spindleHeadPatch` postInstantiate helper, opted into by the 6 cutting twins' defs.**
+  Resolves the live Head at BUILD/instantiate time (userOps.js:520 builder runs postInstantiate) — EXACTLY the
+  FORM's own insert-time semantics (surfacingView bakes s.spindle at generate). tap + text simply do NOT opt in →
+  naturally excluded, no flag, no emit-contract change, ZERO tap-regression risk. One shared helper (DRY), each
+  cutting twin DECLARES "my header uses the machine Head" (declare-not-infer). Heals on re-insert / marker-reimport
+  (not already-frozen saved-program children — acceptable; the reported symptom is the data-op/export path, which
+  rebuilds). Advisor asked for "shared" — a fully-shared-in-instantiate variant is possible but would need B's flag
+  to exclude tap, re-introducing the frozen-tap dilemma; the per-twin opt-in is the shared-helper form WITHOUT it.
+
+### RECOMMENDATION
+C — consistency with the FORM (the twin should behave like the wizard it twins), no emit-contract change, no
+tap-regression, tap/text excluded by construction. Deciding gate: G3 (one-source at the SAME moment the form
+resolves) + safety (no double-spindle path). Requesting the advisor's synthesis before building (safety-critical
+contract; the dispatched seam does not exist).
+
