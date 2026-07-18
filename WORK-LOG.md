@@ -11252,3 +11252,57 @@ patch reads the live Head), so seeding it changes only the reference side.
   Isolation-checked: all 12 fixed specs + the new spec were run STANDALONE (green) before the full gate.
 
 ### NEXT: PART 2 (advisor) — a PRE-FLIGHT class "cutting program has G1 cuts but no M3 spindle-on" (the make-sure backstop).
+
+---
+
+## 🔨 turn 947 — BUILD PART 2: THE DEAD-SPINDLE GUARD (pre-flight class + send-confirm gate) — the PRIMARY spindle-safety guarantee
+
+TASK (advisor, elevating the guard to the primary guarantee): a PRE-FLIGHT class "this program CUTS but never commands
+the spindle" — flag inline + gate the SEND — so a dead-spindle program is IMPOSSIBLE to send even if Option C's default
+slips (a zeroed Head, a new op that forgets to opt in, a refactor). Heuristic: a G1/G2/G3 FEED move with no preceding
+M3/M4. KEY: it NATURALLY excludes probes (G0 + G31, no feed cut) — works on raw .nc, no block-types (simpler than
+through-stock). Ground the existing pre-flight machinery + ADD this class; BUILD if a clean extension.
+
+### RULING: clean extension → BUILT (no gate). It slots into the existing checkEnvelope + its 3 consumers exactly like
+the t937 through-stock class did (a new violation `kind`), so no structural depth → build.
+
+### THE GUARD (web/engine/envelopeCheck.js)
+- `spindleGuard(program)` — a RAW-TEXT scan (no trace / machine / block-map). Strips `( comments )` first (a commented
+  M3/G1 never counts), tracks `commanded` (M3/M4 seen, M03/M04 tolerated), returns ONE `{ line, kind:'no-spindle' }`
+  at the FIRST G1/G2/G3 feed cut that has no preceding spindle-on. `\bG0*[123]\b` matches G1/G2/G3 but NOT G0 (rapid),
+  G17/G28/G53/G90 (word-boundary guards). A probe (G0 + G31, no feed) never matches → EXCLUDED by construction.
+- Wired into checkEnvelope: computed FIRST + UNCONDITIONALLY (independent of the machine/placement), so it fires even
+  when the envelope is unverifiable (amber) or on a raw .nc — a dead-spindle is text-verifiable, so it PROMOTES an
+  otherwise-amber verdict to RED (which gates the send). Prepended to `all` (most severe first). Empty spindleViol →
+  BYTE-IDENTICAL to before (the envelope + through-stock trace/loop/violations are UNTOUCHED; concat of [] is a no-op).
+
+### THE 3 CONSUMERS (a new `kind:'no-spindle'` branch each — same pattern as through-stock)
+- **preflightBadge.js** — the inline red annotation `spindle OFF · no M3` at the offending line (renderAnnotations) + the
+  pop-list row `line N · cuts with the spindle OFF (no M3)`.
+- **gateway/views/send.js** — THE SEND-CONFIRM GATE. Already fires on status:'red'; a `hasNoSpindle` case leads with the
+  dead-spindle danger ("makes a cutting move but never turns the spindle on ... it would plunge and cut with the spindle
+  STOPPED"), title "Dead spindle — pre-flight". Cancel aborts the push (reads the CHECK, not a chip).
+- **setupSheet.js** — the per-setup row `line N · cuts with the spindle OFF (no M3)`.
+
+### VERIFY (real symptom — value-asserted + SCREENSHOTS VIEWED)
+- **NEW tests/spindle-guard-947.spec.js** (8 tests, green): DEAD (G1 no M3) -> red + no-spindle at the first cut line;
+  PROBE (G0+G31) -> NO false-positive; NORMAL (M3 + in-envelope) -> green; M4 counts, a COMMENTED M3 does not; DEAD under
+  an UNVERIFIABLE envelope -> promoted RED; ENVELOPE coexists (Z+ still fires alongside); a post-C surfacing DATA-OP emit
+  (has the Head M3) -> no flag; SEND GATE -> the dead-spindle confirm appears + Cancel aborts submitJob.
+- **SCREENSHOTS VIEWED (my own):** shot947-flag.png — the red `spindle OFF · no M3` inline annotation on line 3 (the
+  first G1 feed, correctly NOT line 2's G0 rapid); shot947-send-confirm.png — the "Dead spindle — pre-flight" dialog
+  ("would plunge and cut with the spindle STOPPED", "line 3: cuts with the spindle OFF (no M3)", Cancel / red Send anyway).
+
+### GOLDENS (the pre-existing envelope tests used bare G1 snippets = genuinely dead programs -> my guard flagged them)
+Fixed by adding `M3 S1000` to LINE 1 (`G21 G90 M3 S1000`) of each CUTTING snippet in envelope-check-838 + preflight-badge-838
+— M3 is not a move -> the trace + envelope violations are BYTE-IDENTICAL and NO line numbers shift (so the line/annotation
+assertions hold), while the guard is satisfied so those tests keep testing the ENVELOPE, not the spindle. Probe snippets
+(G0 + G31) needed no change — the guard excludes them (this is exactly the "probe doesn't false-positive" acceptance,
+also asserted directly in the new spec). A note in each file explains the M3.
+
+### FULL GATE
+- **1338 passed / 0 failed / 4 skipped** (13.2m) — grepped the whole log (no non-404 errors). Envelope/through-stock
+  classes still fire (byte-identical); the guard specs + the 2 re-anchored envelope specs green. Isolation-checked
+  (spindle-guard-947 + envelope-check-838 + preflight-badge-838 run standalone green before the full gate).
+
+### NEXT (advisor): DEPLOY the COMPLETE spindle fix (C + the guard) together — merge port/corner-clean -> main, one clean deploy.
