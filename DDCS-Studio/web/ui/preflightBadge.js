@@ -46,7 +46,7 @@ function renderPop(res) {
         for (const v of res.violations) {
             const li = document.createElement('li');
             li.className = 'preflight-row'; li.setAttribute('data-line', v.line);
-            li.textContent = v.kind === 'through-stock' ? `line ${v.line} · crosses the stock` : `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over`;
+            li.textContent = v.kind === 'no-spindle' ? `line ${v.line} · cuts with the spindle OFF (no M3)` : v.kind === 'through-stock' ? `line ${v.line} · crosses the stock` : `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over`;
             li.title = 'Jump to this line';
             li.addEventListener('click', () => { if (_mgr && _mgr.revealLine) _mgr.revealLine(v.line); pop.hidden = true; });
             ul.appendChild(li);
@@ -78,7 +78,7 @@ function renderAnnotations(res) {
         if (!span) continue;
         const a = document.createElement('span');
         a.className = 'preflight-annot';
-        a.textContent = vs.map((v) => v.kind === 'through-stock' ? 'crosses the stock' : `${v.axis} ${fmt(v.overshoot)}mm over`).join(' · ');
+        a.textContent = vs.map((v) => v.kind === 'no-spindle' ? 'spindle OFF · no M3' : v.kind === 'through-stock' ? 'crosses the stock' : `${v.axis} ${fmt(v.overshoot)}mm over`).join(' · ');
         if (notes) a.title = notes;
         span.appendChild(a);
     }

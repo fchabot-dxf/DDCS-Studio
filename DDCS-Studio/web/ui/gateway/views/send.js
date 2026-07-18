@@ -74,12 +74,18 @@ export default {
         try {
           const pre = checkEnvelope(file.text, (window.ddcsGetSettings && window.ddcsGetSettings()) || {});
           if (pre.status === 'red') {
+            const hasNoSpindle = pre.violations.some(v => v.kind === 'no-spindle');   // t947 — the DEAD-SPINDLE breach leads (most severe)
             const hasStock = pre.violations.some(v => v.kind === 'through-stock');   // t937 — a through-stock kind softens the envelope-only wording
-            const top = pre.violations.slice(0, 4).map(v => v.kind === 'through-stock' ? `line ${v.line}: crosses the stock` : `line ${v.line}: ${v.axis} by ${Math.round(v.overshoot * 10) / 10} mm`).join('\n');
+            const top = pre.violations.slice(0, 4).map(v =>
+              v.kind === 'no-spindle' ? `line ${v.line}: cuts with the spindle OFF (no M3)`
+              : v.kind === 'through-stock' ? `line ${v.line}: crosses the stock`
+              : `line ${v.line}: ${v.axis} by ${Math.round(v.overshoot * 10) / 10} mm`).join('\n');
             const more = pre.violations.length > 4 ? `\n…and ${pre.violations.length - 4} more` : '';
-            const ok = await dlgConfirm(
-              `Pre-flight found ${pre.violations.length} move(s) that would ${hasStock ? 'leave the machine travel or cross the stock' : 'leave the machine travel'}:\n\n${top}${more}\n\nSend to the controller anyway?`,
-              { title: hasStock ? 'Pre-flight violation' : 'Envelope violation', danger: true, okLabel: 'Send anyway', cancelLabel: 'Cancel' });
+            const msg = hasNoSpindle
+              ? `Pre-flight: this program makes a cutting move (G1/G2/G3) but never turns the spindle on (M3/M4) — it would plunge and cut with the spindle STOPPED (a broken tool / part / worse):\n\n${top}${more}\n\nSend to the controller anyway?`
+              : `Pre-flight found ${pre.violations.length} move(s) that would ${hasStock ? 'leave the machine travel or cross the stock' : 'leave the machine travel'}:\n\n${top}${more}\n\nSend to the controller anyway?`;
+            const ok = await dlgConfirm(msg,
+              { title: hasNoSpindle ? 'Dead spindle — pre-flight' : hasStock ? 'Pre-flight violation' : 'Envelope violation', danger: true, okLabel: 'Send anyway', cancelLabel: 'Cancel' });
             if (!ok) return;   // the finally block re-enables the button
           }
         } catch (_) { /* advisory — never block the send on a checker error */ }

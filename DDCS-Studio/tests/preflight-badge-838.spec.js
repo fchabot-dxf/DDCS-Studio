@@ -5,6 +5,9 @@
 import { test, expect } from '@playwright/test';
 
 // Envelope X/Y 0..300, Z -120..0. Declared = a non-empty WCS table; undeclared = table null.
+// t947 — the cutting snippets carry `M3 S1000` on line 1 so the dead-spindle guard does not fire (isolating the envelope
+// UX under test); M3 is not a move so the trace/annotations are byte-identical and no line numbers shift. The G0-only
+// snippet (RED annotations test) needs none (no feed cut → the guard never fires). See spindle-guard-947.spec.js.
 async function configure(page, { declared, program }) {
     await page.evaluate(({ declared }) => {
         const s = window.ddcsGetSettings();
@@ -52,13 +55,13 @@ test('RED: each violating line gets an INLINE annotation (axis + overshoot); NO 
 });
 
 test('GREEN: a program inside the envelope shows NOTHING (no chip, no annotations)', async ({ page }) => {
-    await configure(page, { declared: true, program: 'G21 G90\nG0 X10 Y10\nG1 Z-5 F100\nG1 X20 Y20' });
+    await configure(page, { declared: true, program: 'G21 G90 M3 S1000\nG0 X10 Y10\nG1 Z-5 F100\nG1 X20 Y20' });
     await expect(page.locator('#preflight-badge')).toBeHidden();
     await expect(page.locator('#editor-highlight .preflight-annot')).toHaveCount(0);
 });
 
 test('AMBER: undeclared placement → a small can\'t-verify chip, and NO line annotations', async ({ page }) => {
-    await configure(page, { declared: false, program: 'G21 G90\nG1 Z3 F100' });
+    await configure(page, { declared: false, program: 'G21 G90 M3 S1000\nG1 Z3 F100' });
     const badge = page.locator('#preflight-badge');
     await expect(badge).toBeVisible();
     await expect(badge).toHaveClass(/preflight-amber/);
@@ -69,9 +72,9 @@ test('AMBER: undeclared placement → a small can\'t-verify chip, and NO line an
 });
 
 test('annotations CLEAR when a violating line is edited to fitness', async ({ page }) => {
-    await configure(page, { declared: true, program: 'G21 G90\nG1 Z3 F100' });
+    await configure(page, { declared: true, program: 'G21 G90 M3 S1000\nG1 Z3 F100' });
     await expect(page.locator('#editor-highlight .preflight-annot')).toHaveCount(1);
-    await configure(page, { declared: true, program: 'G21 G90\nG1 Z-3 F100' });   // edit the climb to a safe depth
+    await configure(page, { declared: true, program: 'G21 G90 M3 S1000\nG1 Z-3 F100' });   // edit the climb to a safe depth
     await expect(page.locator('#editor-highlight .preflight-annot'), 'editing the line into the envelope clears its annotation').toHaveCount(0);
     await expect(page.locator('#preflight-badge')).toBeHidden();
 });
@@ -79,7 +82,7 @@ test('annotations CLEAR when a violating line is edited to fitness', async ({ pa
 test('a LONG violating line: the annotation is OUT OF FLOW and never pushes the code off-canvas (850px)', async ({ page }) => {
     await page.setViewportSize({ width: 850, height: 720 });
     const longLine = 'G1 Z3 F100 ' + '(a very long trailing comment segment) '.repeat(6);
-    await configure(page, { declared: true, program: 'G21 G90\n' + longLine });
+    await configure(page, { declared: true, program: 'G21 G90 M3 S1000\n' + longLine });
     const annot = page.locator('.g-line[data-line-index="1"] .preflight-annot');
     await expect(annot).toHaveCount(1);
     // it sits at the line's END, ABSOLUTELY positioned (out of the text flow) → it adds ZERO width, so the code's
@@ -99,7 +102,7 @@ test('a LONG violating line: the annotation is OUT OF FLOW and never pushes the 
 });
 
 test('exec-highlight + annotation COEXIST on the same line (legible together)', async ({ page }) => {
-    await configure(page, { declared: true, program: 'G21 G90\nG1 Z3 F100' });
+    await configure(page, { declared: true, program: 'G21 G90 M3 S1000\nG1 Z3 F100' });
     await page.evaluate(() => document.querySelector('.g-line[data-line-index="1"]').classList.add('active-line'));   // simulate the exec highlight on the violating line
     const line = page.locator('.g-line[data-line-index="1"]');
     await expect(line).toHaveClass(/active-line/);
@@ -130,7 +133,7 @@ test('SEND CONFIRM: a red program asks an explicit confirm before the push (read
     await expect(sendRoot.locator('button.primary')).toBeVisible();
 
     // RED program → Send → an explicit confirm (from checkEnvelope, NOT the retired chip); Cancel → NOT submitted.
-    await configure(page, { declared: true, program: 'G21 G90\nG1 Z3 F100' });
+    await configure(page, { declared: true, program: 'G21 G90 M3 S1000\nG1 Z3 F100' });
     await sendRoot.getByText('Use current Studio program').click();
     await sendRoot.locator('button.primary').click();
     await expect(page.locator('.app-dialog')).toContainText('leave the machine travel');
@@ -141,7 +144,7 @@ test('SEND CONFIRM: a red program asks an explicit confirm before the push (read
     expect(await page.evaluate(() => window.__submitted), 'cancel aborted the push').toBe(0);
 
     // GREEN program → Send → no confirm, submitJob is called.
-    await configure(page, { declared: true, program: 'G21 G90\nG1 Z-5 F100' });
+    await configure(page, { declared: true, program: 'G21 G90 M3 S1000\nG1 Z-5 F100' });
     await sendRoot.getByText('Use current Studio program').click();
     await sendRoot.locator('button.primary').click();
     await expect.poll(() => page.evaluate(() => window.__submitted), { timeout: 4000 }).toBe(1);
@@ -149,7 +152,7 @@ test('SEND CONFIRM: a red program asks an explicit confirm before the push (read
 });
 
 test('NOTES: the probe + soft-limit caveats ride the red annotation (title)', async ({ page }) => {
-    await configure(page, { declared: true, program: 'G21 G90\nG1 Z3 F100\nG31 Z-50 F100' });   // a Z+ violation (line 2) + a trip-dependent probe
+    await configure(page, { declared: true, program: 'G21 G90 M3 S1000\nG1 Z3 F100\nG31 Z-50 F100' });   // a Z+ violation (line 2) + a trip-dependent probe
     await page.evaluate(() => { window.ddcsGetSettings().machine.softLimitsPulled = false; document.getElementById('editor').dispatchEvent(new Event('input', { bubbles: true })); });
     await page.waitForTimeout(340);
     const annot = page.locator('.g-line[data-line-index="1"] .preflight-annot');
@@ -158,7 +161,7 @@ test('NOTES: the probe + soft-limit caveats ride the red annotation (title)', as
 });
 
 test('THEMES: the inline annotation is legible in dark and light', async ({ page }, testInfo) => {
-    await configure(page, { declared: true, program: 'G21 G90\nG1 Z3 F100' });
+    await configure(page, { declared: true, program: 'G21 G90 M3 S1000\nG1 Z3 F100' });
     for (const theme of ['futuristic', 'normal']) {
         await page.evaluate((t) => { document.body.setAttribute('data-theme', t); }, theme);
         await page.waitForTimeout(80);

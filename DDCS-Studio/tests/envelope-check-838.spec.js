@@ -6,6 +6,10 @@ import { test, expect } from '@playwright/test';
 const DECLARED = { machine: { x: 300, y: 300, z: -120, wcs: { active: 1, table: [{ x: 0, y: 0, z: 0 }] } }, limits: {} };
 const UNDECLARED = { machine: { x: 300, y: 300, z: -120, wcs: { active: 1, table: null } }, limits: {} };
 
+// t947 — the cutting snippets carry `M3 S1000` on line 1 so the DEAD-SPINDLE guard (a G1/G2/G3 feed with no preceding
+// spindle-on) does not fire, isolating the ENVELOPE behaviour under test. M3 is not a move → the trace + envelope
+// violations are byte-identical, and it sits on the existing G21 G90 line so no line number shifts. Probe snippets
+// (G0 + G31, no feed cut) need no M3 — the guard excludes probes by construction (see spindle-guard-947.spec.js).
 const run = (page, program, settings) => page.evaluate(async ({ program, settings }) => {
     const { checkEnvelope } = await import('/engine/envelopeCheck.js');
     return checkEnvelope(program, settings);
@@ -18,7 +22,7 @@ test.beforeEach(async ({ page }) => {
 
 test('RED: a move that climbs above the Z top reports LINE + AXIS + exact OVERSHOOT (the user crash)', async ({ page }) => {
     // Line 0: G21 G90 ; line 1: a Z+3 move → machine Z=3, 3mm above the Z max (0) → Z+ by 3.
-    const r = await run(page, 'G21 G90\nG1 Z3 F100', DECLARED);
+    const r = await run(page, 'G21 G90 M3 S1000\nG1 Z3 F100', DECLARED);
     expect(r.status).toBe('red');
     expect(r.violations.length).toBeGreaterThanOrEqual(1);
     const v = r.violations.find(v => v.axis === 'Z+');
@@ -29,14 +33,14 @@ test('RED: a move that climbs above the Z top reports LINE + AXIS + exact OVERSH
 });
 
 test('GREEN: a program that stays inside the envelope fits', async ({ page }) => {
-    const r = await run(page, 'G21 G90\nG0 X10 Y10\nG1 Z-5 F100\nG1 X20 Y20', DECLARED);
+    const r = await run(page, 'G21 G90 M3 S1000\nG0 X10 Y10\nG1 Z-5 F100\nG1 X20 Y20', DECLARED);
     expect(r.status).toBe('green');
     expect(r.violations.length).toBe(0);
 });
 
 test('AMBER: undeclared placement (no WCS table) cannot be verified — never false-green', async ({ page }) => {
     // Same climbing move, but placement is UNDECLARED → we must NOT map/verify → amber with a why.
-    const r = await run(page, 'G21 G90\nG1 Z3 F100', UNDECLARED);
+    const r = await run(page, 'G21 G90 M3 S1000\nG1 Z3 F100', UNDECLARED);
     expect(r.status).toBe('amber');
     expect(r.violations.length).toBe(0);
     expect(r.reason).toMatch(/placement not declared|WCS/i);

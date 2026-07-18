@@ -28,6 +28,23 @@ const EPS = 0.01;   // mm — below this an "overshoot" is trace/float noise, no
 // so it is excluded BY CONSTRUCTION — never a geometry heuristic. clearlift/safehop/saferetract = the lift; safetraverse = the cross.
 const TRAVERSE_BLOCKS = new Set(['clearlift', 'safehop', 'saferetract', 'safetraverse']);
 
+// t947 — THE DEAD-SPINDLE GUARD: a raw-text scan (no trace / machine / block-map needed) — the PRIMARY spindle-safety
+// guarantee that makes Option C's default impossible to slip past (a zeroed Head, a new op that forgets to opt in, a
+// refactor). A program that COMMANDS a cut — a G1/G2/G3 FEED move — with NO preceding spindle-on (M3/M4) would plunge and
+// cut with a DEAD spindle. Flag the FIRST such feed move. Comments are stripped first so a `( … M3 … )` / `( G1 … )` note
+// never counts. PROBE programs use G0 rapids + G31 (no G1/G2/G3 feed cut), so this NEVER fires on a probe — the heuristic
+// EXCLUDES probes by construction, with no block-types (simpler than the through-stock class). Returns [] or one violation.
+function spindleGuard(program) {
+    const lines = String(program).split('\n');
+    let commanded = false;   // an M3/M4 has turned the spindle on somewhere above
+    for (let i = 0; i < lines.length; i++) {
+        const code = lines[i].replace(/\([^)]*\)/g, ' ').toUpperCase();   // drop ( comments ) so a commented M3/G1 doesn't count
+        if (/\bM0*[34]\b/.test(code)) { commanded = true; continue; }      // M3 / M4 (M03/M04) — spindle on
+        if (!commanded && /\bG0*[123]\b/.test(code)) return [{ line: i + 1, kind: 'no-spindle' }];   // a feed cut (G1/G2/G3, not G0) before any spindle-on
+    }
+    return [];
+}
+
 // The sim's own declared-placement predicate (createPreviewPanel g53ApproxForViz) — ONE source, never re-derived here.
 export function placementDeclared(machine) {
     return !!(machine && machine.wcs && Array.isArray(machine.wcs.table) && machine.wcs.table.length > 0);
@@ -40,9 +57,14 @@ export function placementDeclared(machine) {
 export function checkEnvelope(program, settings) {
     const machine = settings && settings.machine;
     const s = settings || {};
-    if (!machine) return { status: 'amber', reason: 'no machine envelope configured (Settings → Machine)', violations: [], uncheckedProbes: 0 };
+    // t947 — the dead-spindle guard runs FIRST + UNCONDITIONALLY (independent of the machine envelope / placement) so it
+    // fires even when the envelope can't be verified (amber) or on a raw .nc with no WCS table. A dead-spindle is a definite,
+    // text-verifiable breach → it PROMOTES an otherwise-amber verdict to RED (which gates the send). Empty → byte-identical.
+    const spindleViol = spindleGuard(program || '');
+    const promote = (amber) => spindleViol.length ? { status: 'red', violations: spindleViol.slice(), uncheckedProbes: 0, reason: '' } : amber;
+    if (!machine) return promote({ status: 'amber', reason: 'no machine envelope configured (Settings → Machine)', violations: [], uncheckedProbes: 0 });
     if (!placementDeclared(machine)) {
-        return { status: 'amber', reason: 'placement not declared — no WCS table pulled/entered, so the program cannot be mapped into the machine frame to verify', violations: [], uncheckedProbes: 0 };
+        return promote({ status: 'amber', reason: 'placement not declared — no WCS table pulled/entered, so the program cannot be mapped into the machine frame to verify', violations: [], uncheckedProbes: 0 });
     }
 
     const wo = wcsOffsetAt(machine, (machine.wcs && machine.wcs.active) || 1) || { x: 0, y: 0, z: 0 };
@@ -115,7 +137,9 @@ export function checkEnvelope(program, settings) {
         stockViol.sort((a, b) => a.line - b.line);
     }
 
-    const all = violations.concat(stockViol);   // envelope entries stay FIRST + UNCHANGED → byte-identical whenever stockViol is empty
+    // t947 — the dead-spindle violation leads (most severe: a stopped-spindle cut); envelope + through-stock follow, both
+    // UNCHANGED. When spindleViol is empty this is byte-identical to before (concat of [] is a no-op).
+    const all = spindleViol.concat(violations).concat(stockViol);
     const status = all.length ? 'red' : 'green';
     return { status, violations: all, uncheckedProbes, reason: '' };
 }
