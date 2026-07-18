@@ -17,7 +17,9 @@ test('byte-diff ZERO: user_bore_data == drillStack(helical) across pattern × ra
         const { drillStack } = await import('/wizards/drillWizard.js');
         registerUserOp(boreDataDef());
         const build = builderOf('user_bore_data');
-        const D = BORE_DEFAULTS;
+        // t945 — the data-op inherits the machine Head at BUILD (spindleHeadPatch), like the FORM path at insert; seed the SAME
+        // live Head so the reference drillStack (via makeStart) spins up identically → the M3 header is not a spurious diff.
+        const D = { ...BORE_DEFAULTS, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
 
         const combos = [
             D,

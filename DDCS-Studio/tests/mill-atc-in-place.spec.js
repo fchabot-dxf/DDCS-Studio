@@ -28,7 +28,9 @@ test('opensAs wiring + emit BYTE-IDENTICAL: all 4 built-ins open their twin IN-P
             const M = await import(c.mod), SM = await import(c.stackMod);
             const defaults = M[c.defKey];
             const builtin = builderOf(c.op) ? emitMapped(builderOf(c.op)(defaults)).text : null;
-            const shim = emitMapped(SM[c.stackKey](defaults)).text;
+            // t945 — the cutting twin inherits the machine Head at build (spindleHeadPatch); seed the same live Head into the
+            // reference shim stack so its header spins up identically (inert for a non-cutting stack that skips makeStart).
+            const shim = emitMapped(SM[c.stackKey]({ ...defaults, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} })).text;
             const entry = entries.find((e) => e.id === c.id);
             const twinEntry = entries.find((e) => e.type === c.op);   // the SEPARATE Data-Wiz entry (should be gone)
             out.push({

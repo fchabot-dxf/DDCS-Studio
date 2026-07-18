@@ -17,7 +17,9 @@ test('E1 byte-diff ZERO: user_contour_data == contourStack across side × 4 shap
         const { contourStack } = await import('/wizards/contourWizard.js');
         registerUserOp(contourDataDef());   // NOT seeded yet in this test → register
         const build = builderOf('user_contour_data');
-        const D = CONTOUR_DEFAULTS;
+        // t945 — the data-op inherits the machine Head at BUILD (spindleHeadPatch), like the FORM path at insert; seed the SAME
+        // live Head so the reference contourStack (via makeStart) spins up identically → the M3 header is not a spurious diff.
+        const D = { ...CONTOUR_DEFAULTS, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
 
         const SIDES = ['outside', 'inside', 'on'], SHAPES = ['rect', 'circle', 'polygon', 'ellipse'];
         const combos = [];

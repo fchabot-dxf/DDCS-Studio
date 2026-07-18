@@ -24,7 +24,9 @@ test('slot-as-data: byte-identical G-code to slotStack across a param sweep + bi
     registerUserOp(slotDataDef());
     const dataBuilder = builderOf(SLOT_DATA_OPTYPE);   // === instantiate(def, …): an INDEPENDENT path from slotStack
 
-    const base = SLOT_DEFAULTS;
+    // t945 — the data-op inherits the machine Head at BUILD (spindleHeadPatch), like the FORM path at insert; seed the SAME
+    // live Head here so the reference slotStack (via makeStart) spins up identically → the M3 header is not a spurious diff.
+    const base = { ...SLOT_DEFAULTS, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
     const S = (o) => ({ ...base, ...o });              // full param set (wizard names ax/ay/bx/by/toolDia)
 
     const sweep = [

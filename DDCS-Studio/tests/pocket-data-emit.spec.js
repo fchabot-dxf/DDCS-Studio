@@ -26,7 +26,9 @@ test('user_pocket_data == built-in pocketStack, byte-identical across strategy �
         const hasType = (stack, t) => JSON.stringify(stack).includes(`"type":"${t}"`);
         let diffs = 0, cases = 0, first = null, drillArm = 0, stepArm = 0, armWrong = 0;
         for (const shape of SHAPES) for (const strategy of STRAT) for (const sz of Object.keys(SIZES)) for (let si = 0; si < SCALARS.length; si++) {
-            const p = { shape, strategy, ...SIZES[sz], ...SCALARS[si] };
+            // t945 — seed the live machine Head so the reference pocketStack (via makeStart) spins up like the data-op does at
+            // build (spindleHeadPatch) → the M3 header is byte-matched (params.spindle is inert for the data builder itself).
+            const p = { shape, strategy, ...SIZES[sz], ...SCALARS[si], spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
             cases++;
             const twinStack = build(p);
             const twin = emitMapped(twinStack).text;
@@ -71,7 +73,8 @@ test('cross-dialect: user_pocket_data == pocketStack under grbl + rs274ngc (byte
             const post = resolveActivePost ? resolveActivePost(dialect) : dialect;
             for (const p of sweep) {
                 const twin = emitMapped(build(p), post).text;
-                const builtin = emitMapped(pocketStack(p), post).text;
+                // t945 — the data-op inherits the Head at build; seed the same live Head into the reference pocketStack so the M3 header matches.
+                const builtin = emitMapped(pocketStack({ ...p, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} }), post).text;
                 if (twin !== builtin) { diffs++; if (!first) first = { dialect, p, twin: twin.slice(0, 800), builtin: builtin.slice(0, 800) }; }
             }
         }

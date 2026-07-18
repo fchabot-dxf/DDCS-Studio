@@ -23,7 +23,8 @@ test('(d) placement stock resolve: cc-attach twin emit == built-in for a non-def
         registerUserOp(surfacingDataDef());
         const twin = builderOf(SURFACING_DATA_OPTYPE);
         const STOCK = { x: 200, y: 150, z: 25 };
-        const base = { ...SURFACING_DEFAULTS, w: 150, h: 100, stockAttach: 'cc', pathDatum: 'cc' };   // stockW/H default 0
+        // t945 — seed the live machine Head so the reference surfacingStack spins up like the twin does at build (spindleHeadPatch) → M3 byte-matched.
+        const base = { ...SURFACING_DEFAULTS, w: 150, h: 100, stockAttach: 'cc', pathDatum: 'cc', spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };   // stockW/H default 0
         const filled = resolvePlacementStock(base, STOCK);   // → { stockW:200, stockH:150, stockZ:25 }
         const builtinTxt = emitMapped(surfacingStack({ ...base, stockW: 200, stockH: 150, stockZ: 25 })).text;
         const twinResolvedTxt = emitMapped(twin({ ...base, ...filled })).text;

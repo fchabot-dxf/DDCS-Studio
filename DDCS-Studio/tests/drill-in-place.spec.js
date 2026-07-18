@@ -49,7 +49,7 @@ test('emit BYTE-IDENTICAL: user_drill_data == the built-in drillStack across a p
         let diffs = 0, first = null;
         for (const p of sweep) {
             const twin = emitMapped(builderOf('user_drill_data')(p)).text;
-            const builtin = emitMapped(drillStack(p)).text;
+            const builtin = emitMapped(drillStack({ ...p, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} })).text;   // t945 — seed the Head so the reference drillStack spins up like the twin (spindleHeadPatch)
             if (twin !== builtin) { diffs++; if (!first) first = { p, twin: twin.slice(0, 800), builtin: builtin.slice(0, 800) }; }
         }
         return { diffs, first, registered: !!builderOf('user_drill_data') };

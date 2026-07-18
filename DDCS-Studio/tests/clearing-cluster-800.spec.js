@@ -41,7 +41,9 @@ test('P6.2 direction is HONORED end-to-end (raster oneway ≠ bothways) + byte-i
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const build = builderOf('user_pocket_data');
     const em = (p) => emitMapped(build(p)).text;
-    const base = { shape: 'rect', w: 80, h: 60 };
+    // t945 — the data-op inherits the machine Head at build (spindleHeadPatch); seed the same live Head so the reference
+    // pocketStack (via makeStart) spins up identically → the M3 header is byte-matched (params.spindle is inert for the twin).
+    const base = { shape: 'rect', w: 80, h: 60, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
     const rasterZig = em({ ...base, strategy: 'raster', direction: 'bothways' });
     const rasterOne = em({ ...base, strategy: 'raster', direction: 'oneway' });
     const rasterOther = em({ ...base, strategy: 'raster', direction: 'otherway' });

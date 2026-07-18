@@ -122,7 +122,8 @@ test('BYTE-IDENTITY unchanged: circle + rect concentric untouched (pocket-data-e
     let diffs = 0;
     for (const shape of ['rect', 'circle', 'polygon', 'ellipse']) {
       const p = { shape, originX: 0, originY: 0, w: 80, h: 60, dia: 80, sides: 8, strategy: 'spiral', toolDia: 6 };
-      if (emitMapped(build(p)).text !== emitMapped(pocketStack(p)).text) diffs++;
+      // t945 — seed the Head so the reference pocketStack spins up like the twin does at build (spindleHeadPatch) → M3 byte-matched.
+      if (emitMapped(build(p)).text !== emitMapped(pocketStack({ ...p, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} })).text) diffs++;
     }
     return { diffs };
   });

@@ -28,7 +28,9 @@ test('drill-as-data: the data def emits byte-identical G-code to drillStack acro
     registerUserOp(def);
     const dataBuilder = builderOf(DRILL_DATA_OPTYPE);     // === instantiate(def, …) — an INDEPENDENT path from drillStack
 
-    const base = DRILL_DEFAULTS;
+    // t945 — the data-op inherits the machine Head at BUILD (spindleHeadPatch), like the FORM path at insert; seed the SAME
+    // live Head here so the reference drillStack (via makeStart) spins up identically → the M3 header is not a spurious diff.
+    const base = { ...DRILL_DEFAULTS, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
     const S = (o) => ({ ...base, ...o });                 // full param set so both builders agree on every unbound default
 
     // The sweep now spans EVERYTHING the placement-portable def reproduces — frontier #2 (live bbox) is SOLVED, so

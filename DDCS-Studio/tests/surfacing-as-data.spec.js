@@ -27,7 +27,10 @@ test('surfacing-as-data: byte-identical G-code to surfacingStack across a param 
     registerUserOp(surfacingDataDef());
     const dataBuilder = builderOf(SURFACING_DATA_OPTYPE);   // === instantiate(def, …): an INDEPENDENT path from surfacingStack
 
-    const base = SURFACING_DEFAULTS;
+    // t945 — the data-op now inherits the machine Head at BUILD (spindleHeadPatch), exactly as the FORM path does at insert
+    // (surfacingView passes spindle: s.spindle → makeStart). Seed the SAME live Head here so the reference surfacingStack spins
+    // up identically → the M3 header is byte-matched on both sides (the comparison now proves the twin == the FORM path).
+    const base = { ...SURFACING_DEFAULTS, spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} };
     const S = (o) => ({ ...base, ...o });                   // full FLAT param set (stepover/strategy, not toolDia/% or 'raster')
 
     // The sweep spans every bound dimension: placement offset (originX/originY → the placement, region is local-0),

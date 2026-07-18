@@ -21,6 +21,7 @@
  */
 import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox } from '../../wizards/pocketWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
+import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { deriveBindingsFor, mergeBindingsByParam, TOOL_BINDING_SPECS } from './deriveBindings.js';
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b — the declared mill entry point (entryX/entryY bind via POCKET_BINDING_SPECS)
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a — the declared tool-selection marker (toolNum binds via POCKET_BINDING_SPECS)
@@ -248,7 +249,7 @@ export function pocketDataDef() {
                 if (r.stepdown !== undefined) b.params.by = r.stepdown;
             }
         }
-        return stack;
+        return spindleHeadPatch(stack);   // t945 — after the derived-socket rewrite, fill the blank framing progstart's rpm/dir/spin-up from the live Head → M3 (was a DEAD spindle)
     };
     def.previewGeometry = pocketPreviewGeometry;   // t716 — per-feature 2D handles (shape boundary + pos/size per kind) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b — the emitting-square entry marker (replaces the sim-only ○)
