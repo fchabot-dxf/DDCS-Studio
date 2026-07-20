@@ -11793,3 +11793,41 @@ The repeated cycle = `[stop/limit preamble] -> fast G31 -> miss-check -> back-of
 3. The dead `twoPassProbe` (probeBlocks.js:74) + its `confirmStart` sibling: remove as part of A (orphan cleanup), or leave (flag only)?
 
 No release this turn (B1 t965 still HELD for the batch; nothing new built).
+
+---
+
+## 🔨 turn 969 — BUILD (RULING A, scoped): migrate rotaryClock + alignment to probeSurfaceStack (the declared probe cycle). Turned out BYTE-IDENTICAL (not the ==0->!=2 regen you predicted -- those two never had the drift). PLUS: GROUNDED the ATC carry -> GATE (not a clean carry; recommend LEAVE).
+
+RULING (t968): A scoped -- migrate the CLEAN hand-rollers rotaryClock+alignment now; GATE the ATC carry (verify the t640 seam carries byte-for-byte); B deferred; dead twoPassProbe remove only if the migration fully orphans it.
+
+### THE MIGRATION (rotaryClock.ppZdown + alignment.twoPass -> probeSurfaceStack)
+Both wizards hand-assembled the exact cycle probeSurfaceStack encapsulates, via local ST/PR/CK/RD/MV closures. Folded the fast/back-off/slow/miss-check to ONE atom call; kept the RAW read + retract tail (both read a flat/fence with NO radius-comp -> skipComp:true, trailingRetract:false, then RD + MV -- the corner zSurfaceProbe template):
+- **rotaryClockWizard.js**: `ppZdown` -> `probeSurfaceStack({axis:'Z', dir:'-', probeVar:'#7', retractVar:'#10', feedFast:'#3', feedSlow:'#4', port:'#5', level, twoPass:true, skipComp:true, trailingRetract:false}).forEach(push)` + `RD('Z',v); MV('Z','#10')`. Removed the now-orphaned PR/ST/CK closures (0 dangling refs); kept RD. Imported probeSurfaceStack.
+- **alignmentWizard.js**: `twoPass` -> `probeSurfaceStack({axis:probeAxis, dir:plus?'+':'-', probeVar, retractVar, feedFast:'#3', feedSlow:'#4', port:'#5', level:num(params.level,0), twoPass:true, skipComp:true, trailingRetract:false}).forEach(push)` + `RD(probeAxis,v); MV(probeAxis,retractVar)`. Removed orphaned PR/ST/CK; kept RD/MV (used elsewhere). Imported probeSurfaceStack.
+
+### PREMISE CORRECTED: this is BYTE-IDENTICAL, not a correctness regen
+Your ruling assumed rotaryClock/alignment carried the `==0` miss-guard drift -> `!=2` correctness change -> goldens regen. GROUNDED: NOT so for these two. Their CK closures already used `newBlock('probecheck')` -- the SAME atom leaf edge/middle/corner use -- so their Expert miss-check was ALREADY `IF #192x != 2 GOTO` (probeCheckBlock.emit via dialect.probeStatus). The `==0` drift the survey flagged was in corner + ATC; corner was already migrated. So folding rotaryClock/alignment to the atom moves ZERO emitted bytes -- only the SOURCE assembly changes. (confirm-premise-before-regression-blocker: I verified the drift claim before acting on it; it did not hold for these two.)
+
+### VERIFY (empirical byte-identity -- stronger than a manual diff)
+The data-op TWINS are frozen templates captured from the OLD built-in emit; if my migrated built-in changed any byte, twin parity breaks. It did not:
+- **rotary-clock-data-emit** (E1 byte-diff ZERO across 84 structural + a scalar sweep, studio AND Expert) GREEN.
+- **rotary-clock-superset** (prune(superset)==concrete byte-identical, 84-combo) + **rotary-clock-in-place** (emit byte-identical across the action/reference/wcs sweep) GREEN.
+- **alignment-data-emit** (E1 byte-diff ZERO 8 structural + scalar incl safeZ/tolerance, studio+Expert; E2 sim-starts twin==built-in) GREEN.
+- **alignment-correction-840** (byte-identical) + **probe-miss-check** (the exact miss-check behavior, all posts) GREEN.
+- 13/13 targeted GREEN; SOURCE git-diff = only the intended fold lines move (the closures -> one atom call; imports). Zero golden edits.
+
+### ATC CARRY -- GROUNDED -> GATE (not a clean carry; recommend LEAVE both)
+atcToolCheck (:71) + atcLength (:81) both hand-roll the SAME cycle (ST/PR/CK/MV + ST/PR/CK). Findings:
+- **The t640 safety CARRIES byte-for-byte through the atom's failGoto seam.** t640 = ST (probestart, pre-probe DRO capture) + CK (probecheck, miss->goto:1) + the wizard's dedicated fault handlers (LB1 "no contact - tool broken or missing"; LB4 "length off by #56"). probeSurfaceStack emits probestart + probecheck(failGoto:1) IDENTICALLY; the failGoto:1 seam branches to the wizard's LB1 (which stays in the wizard). The DECLARED-miss-target design works: atom carries the seam, wizard keeps the handler.
+- **BUT byte-identity is BLOCKED by the interleaved per-pass NARRATION comments** -- `C('Fast probe down')` before + `C('Slow precision touch')` BETWEEN the two passes (atcLength: 'Step 1: Fast Probe Down' / 'Step 2: Slow Precision Touch'). probeSurfaceStack emits ONE leading comment, not a mid-cycle one -> a byte-clean fold would DROP/move the 'Slow' comment = an emit change on a WCS-severity tool-setter routine.
+- To migrate byte-identically I'd have to either (a) drop the mid-cycle comment (emit change -> regen ATC goldens on a safety routine), or (b) extend probeSurfaceStack to carry per-pass comments (build machinery for 2 consumers -> violates restructure-source-not-abstraction). Neither is worth it: rule-of-three is already satisfied 8x (edge/middle/corner x2/rotaryCenter/rotaryClock/alignment); the ATC pair adds no one-source pressure.
+
+**RECOMMENDATION: LEAVE both ATC hand-rolled + note.** Their per-pass step narration on a safety-critical tool-setter routine is a legit specialization; the safety already carries via the failGoto pattern, and neither dropping the comment nor extending the atom is justified for 2 consumers. (Available if you want full consolidation: migrate + drop the mid-cycle comment -> regen 2 ATC goldens -- I recommend against.)
+
+### DEAD twoPassProbe / confirmStart (probeBlocks.js) -- LEAVE + note
+`twoPassProbe` (probeBlocks.js:74, the OLD string-based cycle) + `confirmStart` (:118) are FULLY orphaned in the wizard layer (definition only, no importers; the camMacroKit/probeToSlot twoPassProbe is a SEPARATE fn). BUT my migration did NOT orphan them -- they were already dead (rotaryClock/alignment used LOCAL closures, never twoPassProbe). Per your "remove ONLY if the migration leaves it orphaned (else leave + note)" + guideline-3 (unrelated pre-existing dead code -> mention, don't delete): LEFT them. Recommend a separate trivial cleanup commit if you want them gone.
+
+### FULL GATE
+- **1344 passed / 0 failed / 4 skipped** (11.1m) -- emit BYTE-IDENTICAL (sim + emit goldens unchanged; the migration moves zero emitted bytes -> same count as t965). Round-trip + twins intact. No isolation flakes.
+
+### NEXT: your ruling on the ATC gate (LEAVE vs migrate+drop-comment) + twoPassProbe cleanup. Then LOOP #3 = soft-limits home (ground-first). B1 t965 + this migration still HELD for the batch release.
