@@ -11874,3 +11874,29 @@ All data is STATIC (settings + a dropped dump) -- NO rig needed (survey confirme
 3. Or did "soft-limits home" actually mean the ENABLE RITUAL (gated) -> then NOTHING software-buildable + it goes to the user's at-the-machine list?
 
 B1 t965 + LOOP #2 t969 still HELD for the batch; the batch release follows whatever LOOP #3 resolves to.
+
+---
+
+## 🔨 turn 973 — BUILD (RULING A): soft-limit AWARENESS — label the envelope breach kind:soft-limit + the ENABLE-STATE severity (soft limits OFF -> UNGUARDED crash-risk escalation). Additive, no emit change. Gate 1350 passed / 0 real fails / 4 skip (+1 PRE-EXISTING flake, proven not mine).
+
+RULING (t972): build A (label + enable-state severity), DEFER B (asymmetric min/max -- you are surfacing its premise to the user). GUARDRAIL: ADDITIVE -- the overshoot STAYS red in BOTH cases; OFF ESCALATES (crash risk), NEVER downgrades/clears. Fold softLimitNote to ONE source. No emit change (pre-flight only).
+
+### THE BUILD (3 files + 1 spec; the core awareness already existed -- this labels it + adds the severity)
+- **engine/envelopeCheck.js** -- (1) the overshoot violations now carry `kind:'soft-limit'` (was unnamed); (2) computed `softLimitsEnforced` ONCE from machine.softLimitsPulled (false=OFF/UNGUARDED, true=ON/self-protected, null=never-pulled/unknown) and threaded it onto EVERY return (the red-promote, both amber early-returns, the final) -> the ONE source for the enable state. Detection UNCHANGED (same lines/axes/overshoots flag; status logic untouched) -- byte-identical envelope behaviour, only the label + the new result field are added.
+- **ui/preflightBadge.js** -- (1) softLimitNote(res) now reads `res.softLimitsEnforced` (the ONE source) instead of re-reading settings.machine.softLimitsPulled -> the note + the per-row escalation can't drift. (2) the OFF note is unconditional (unchanged behaviour); ADDED an ON note gated to a soft-limit VIOLATION ("it will stop at the envelope, but the breach still halts the job mid-run" -- so a guarded breach never reads as "ignore"). (3) the popover row + the inline annotation keep the base "N mm over" text and APPEND " . UNGUARDED - the machine will NOT stop" ONLY when softLimitsEnforced===false (additive; enforced/unknown stay byte-identical). The ANNOTATION appends UNGUARDED ONCE per line (a line can breach two edges -- verified by SCREENSHOT that the per-edge repeat was deduped to a single trailing UNGUARDED); the popover ROWS stay per-violation (one <li> each).
+- **ui/gateway/views/send.js** -- the safety-critical PUSH surface: the pre-flight confirm appends an UNGUARDED crash-risk warning when softLimitsEnforced===false + a soft-limit breach exists. Additive -- the send is already gated red; this only escalates the wording. Per-row text unchanged.
+- **setupSheet.js** -- LEFT (renders the breach via its overshoot fallback = "N mm over", still accurate; a printed sheet doesn't convey live enable-state, and softLimitsEnforced isn't threaded to it). Noted, not touched.
+
+### WHY "N mm over" is PRESERVED (not renamed to "past soft limit")
+"LABEL kind:soft-limit" = the DATA label (routes the escalation + send-gate logic); the VISIBLE value is the enable-state severity, not a rename. Keeping the base "mm over" (a) honours the guardrail (additive -- the enforced/unknown case is byte-identical; only OFF appends the escalation), (b) keeps the 3 surfaces consistent (badge/send/setupSheet), (c) avoids churning the envelope-check-838 / preflight-badge-838 assertions that pin "mm over". The word "soft limit" surfaces in the notes (OFF + the new ON context).
+
+### VERIFY (my own drive; the ruling's ACCEPT)
+- **tests/soft-limit-awareness-973 (7 GREEN):** CORE -- an over-travel move is kind:'soft-limit' + RED, line/axis/overshoot BYTE-IDENTICAL to the envelope check; softLimitsEnforced is false/true/null per softLimitsPulled AND the breach is RED in all three (the enable state never downgrades); within-travel stays GREEN (softLimitsEnforced still reported). REAL-SYMPTOM (drive the actual badge) -- OFF: the annotation carries "X+ 100.0mm over . UNGUARDED"; ON: the SAME breach is red + "mm over" with NO UNGUARDED on the line + the "halts the job" context on the title; GUARD: an in-travel program shows nothing (no escalation invented). SEND-GATE -- the confirm carries "soft limits are DISABLED" when OFF + still gates (cancel aborts, __submitted=0).
+- **envelope-check-838 (5) + preflight-badge-838 (10) GREEN unchanged** -- detection byte-identical; the existing "mm over" + notes + send-confirm assertions all hold (the escalation is additive; the NOTES test's soft-limit title still fires via the folded source).
+- Screenshot of the UNGUARDED annotation VIEWED: a 2-edge over-travel line renders "X+ 100.0mm over . Y+ 60.0mm over . UNGUARDED" (red, legible; the single trailing UNGUARDED after the dedupe). The absolute-positioned annotation overlaps the code only on the narrow test pane -- the out-of-flow 850px test confirms it never pushes code off-canvas.
+
+### FULL GATE
+- **1350 passed / 4 skipped + 1 PRE-EXISTING FLAKE** -- NO emit goldens moved (pre-flight only); +7 new (soft-limit-awareness-973).
+- The lone "failure" is **collapsible-panes-752:38** (a mobile pane-collapse ANIMATION-timing race, unrelated to pre-flight). PROVEN pre-existing + not mine: (a) passes STANDALONE (:38 alone 2/2) + under --reporter=list; (b) STASH TEST -- with my 3 files stashed the clean tree flaked **3/4**, WITH my changes only **1/4** (my change fails it LESS, i.e. pure timing variance); (c) my change is pre-flight annotation TEXT (out-of-flow, zero-width -- the 850px test proves it can't affect layout), it cannot touch mobile pane sizing. Flagged as a deflake candidate (not this task, not a blocker).
+
+### NEXT: the BATCH RELEASE (B1 t965 + LOOP #2 t969 + LOOP #3 t973) -- the loop queue is complete. B (asymmetric min/max) deferred pending the user's read.
