@@ -11694,3 +11694,51 @@ The acceptance says "sim-start == the TRACED traverse landing." The toolpath tra
 OK to verify against the EMIT's declared #21/#22 landing formula instead (the cornerReposOffsets method — connect-by-
 construction, no flaky trace)? If yes -> I build it. If you know a reliable sim-panel trace setup that yields the clean boss
 landing, point me at it. No code this turn (gate). RECOMMEND: build with the emit-formula mirror + emit-declared verification.
+
+---
+
+## 🔨 turn 965 — BUILD: B1 probe-start inversion — the middle sim wall-2 marker derives from the declared #21/#22 landing
+
+GREENLIGHT (advisor t964): drop the trace-based check (a bare traceToolpath overshoots a boss probe — the same start-fidelity
+gap). BUILD middleReposLanding mirroring the emit's declared #21/#22 (the cornerReposOffsets method); VERIFY non-circularly
+against the ACTUAL emitted program (parsed), both shapes + both dir2; the test must FAIL before the fix.
+
+### THE BUG (confirmed vs the emitted ground truth)
+The middle sim's wall-2 marker (a boss two-axis AUTO trans-traverse) used `opSimStarts.middle -> outside(second, dir2Plus)`
+= EDGE+OUTSET, computed INDEPENDENTLY of the emit -> it drifts from the tool's real landing as the operator edits Diag travel
+(#21) or the geometry changes (a wrong sim start MISLEADS the operator = the trust surface). The EMITTED trans-traverse is
+the ground truth: `#21=<diagTravel>`; dir2:neg -> `G0 Y#21` (+#21); dir2:pos -> `G0 Y[0-#21]` (-#21); the primary lands at
+`G0 X[#22-#52-#10-#6]` = #22 = the measured centre (#53). So the wall-2 approach = (centre on the primary axis, centre +/-
+diagTravel on the secondary, sign per dir2). For a 100x80 boss the old sim gave (50, 92) but the emit lands at (50, 90).
+
+### THE FIX (sim-only, emit BYTE-IDENTICAL)
+- **middleReposLanding(params, stock)** (viz/opSimStarts.js) — the #21/#22 analog of cornerReposOffsets: secondary = centre
+  +/- diagTravel (dir2:pos -> -, dir2:neg -> +, mirroring the emitted Y#21 / Y[0-#21]); primary = centre (#22). Gated to the
+  AUTO trans-traverse (transAxisAuto) -- a MANUAL trans jog is operator-placed, untouched.
+- **opSimStarts.middle**: the auto secondary pass now = middleReposLanding (was outside(second, dir2Plus)).
+- **the TWIN (middleData.middleSimStartsProvider)**: after makeProvider, overrides the sec pass (the last, when !inAxisManual
+  && boss && twoAxis && transAxis auto) with middleReposLanding -> connect-by-construction on BOTH the built-in + the twin.
+
+### VERIFY (non-circular + real-symptom guard)
+- **tests/middle-repos-landing-963 (green):** asserts the sim wall-2 marker == the landing PARSED FROM THE ACTUAL EMITTED
+  PROGRAM (the #21 value + the emitted trans-traverse Y sign), evaluated with the test geometry -- NOT a re-run of the sim JS
+  (the emit is ground truth). BOTH travelShapes (dogleg/diagonal) x BOTH dir2 (neg/pos); built-in provider + the twin provider.
+- **REAL-SYMPTOM GUARD proven:** git-stashed opSimStarts.js + middleData.js -> the test FAILS against the pre-fix edge+outset
+  sim (built-in wall-2 != the emit landing); popped -> PASSES. So it provably catches the inversion, not just passes green.
+- **emit BYTE-IDENTICAL:** the fix touches only the SIM providers (def.simStartsProvider / opSimStarts); middleStack's emit +
+  the twin's frozen template are untouched -> no golden changes.
+
+### SIM-START REGRESSION SPECS (2 pinned the OLD edge+outset ②; updated to the derived landing; NOT emit)
+- op-sim-starts-registry: the boss-both auto ② value locked 92 -> 90 (cy + diagTravel; verified vs the emit in
+  middle-repos-landing-963). Counts/other cases unchanged.
+- sim-starts-data (rows-sufficiency: a built-in pattern as edge-rows == inferStarts): the boss-both AUTO trans-traverse is now
+  a DERIVED landing (NOT a simple anchor row -- like cornerReposOffsets), so the rows-proof uses the MANUAL trans variant
+  (transAxis:'manual' -> the secondary stays edge+outset, rows-expressible); the auto landing is covered by 963. Honest scope note.
+- middle-data-emit (twin == built-in byte-identical) HOLDS -- the fix is sim-only; the emit is untouched.
+
+### FULL GATE
+- **1344 passed / 0 failed / 4 skipped** (11.0m) -- emit goldens BYTE-IDENTICAL (sim-only); the 2 sim-start regression specs
+  updated to the corrected marker; +1 (the new middle-repos-landing-963). Isolation-checked (963 standalone green + the
+  fail-before-fix stash proof).
+
+### NEXT (advisor): LOOP #2 = the probe-cycle atom (ground-first -- less characterized), per the committed loop queue.
