@@ -11900,3 +11900,74 @@ RULING (t972): build A (label + enable-state severity), DEFER B (asymmetric min/
 - The lone "failure" is **collapsible-panes-752:38** (a mobile pane-collapse ANIMATION-timing race, unrelated to pre-flight). PROVEN pre-existing + not mine: (a) passes STANDALONE (:38 alone 2/2) + under --reporter=list; (b) STASH TEST -- with my 3 files stashed the clean tree flaked **3/4**, WITH my changes only **1/4** (my change fails it LESS, i.e. pure timing variance); (c) my change is pre-flight annotation TEXT (out-of-flow, zero-width -- the 850px test proves it can't affect layout), it cannot touch mobile pane sizing. Flagged as a deflake candidate (not this task, not a blocker).
 
 ### NEXT: the BATCH RELEASE (B1 t965 + LOOP #2 t969 + LOOP #3 t973) -- the loop queue is complete. B (asymmetric min/max) deferred pending the user's read.
+
+---
+
+## 🔨 turn 975 — GROUND (READ-ONLY): SURFACING investigation — a coherent map + a recommended BUILD PRIORITY + the Z-mode A-vs-B recommendation (which INVERTS the ROADMAP) + collision risk. GATE the plan.
+
+READ-ONLY per your dispatch (a 2nd session is LIVE on surfacing + main; NO build this turn). Grounded via 3 parallel Explore agents (surfacing surface / CAM-slot path / frame-reasoners) + my own reads of [e]. VERIFIED FROM CODE (the ROADMAP lags; flags below where it does).
+
+### THE MAP (5 ideas, current VERIFIED state)
+```
+  [e] first-line comment  -- mill ops emit `G90   ( absolute )` as line 1 -> buildProgram's title
+      regex (^\(...\)$) FAILS on it -> falls to the raw line -> "g90 absolute" -> g90_absolute.nc.
+      STATE: the ROADMAP:15 "no name comment -> junk title" is STILL ACCURATE on BOTH my branch AND main
+      (headerBlock cuttingBlocks.js:22 = 'G90 ( absolute )'; NO name comment added in ANY committed branch).
+      *** ROADMAP-LAG / already-fixed nuance: the NESTED-PAREN L1 crash WAS fixed (917f885 paren-strip +
+      V2026.07.20.4 "export L1 fix reaches the exe") -- that is likely the user's "it was fixed". The JUNK
+      TITLE is a DIFFERENT bug + is STILL OPEN. The "wrong comment" the user cites = the ( absolute ) line
+      being picked up as the title (I find NO added-but-wrong op-name comment in committed code).
+      FIX: emit a descriptive op-name comment as the TRUE line 1 (e.g. `( Surfacing 367x45 )`) so
+      buildProgram derives a clean title+filename. Files: makeStart/per-op naming (programFraming.js).
+
+  [d] rpm socket        -- CONFIRMED gap. The data-op/Blocks path has NO rpm binding (surfacingData
+      SURFACING_EXEC_BINDINGS); the toolsel marker carries only toolNum (no rpm); spindleHeadPatch then
+      fills rpm from the machine HEAD -> the tool-table RPM never reaches the spindle line (feed DOES track).
+      The FORM path copies rpm one-shot at tool-pick (surfacingView.applyTool). NOT fixed. FIX: bind rpm as
+      a socket -> progstart in the cutting data-ops. *** HIGHEST COLLISION: ROADMAP:14 itself says
+      "coordinate with the spindle subsystem the other PC just changed."
+
+  [c] CAM-slot robustness -- CONFIRMED fragile + well-contained. surfacingSlot's `toolDia` is a DEAD field
+      (collected, never used -> no overhang/stepover coupling); `clearance` min=0 (no safe-Z floor);
+      rasterClear has NO stepover>0 / stepdown>0 guard (controller DIV-BY-ZERO / INFINITE-LOOP risk) + an
+      UNCLAMPED ramp that overshoots a narrow area (cuts outside the requested box). All OPEN-LOOP vs the
+      probe slots' per-op miss-check + abort-to-safe-Z error-handler. 1 test, defaults only. Files:
+      data/millToSlot.js (SURFACE_FIELDS) + data/camMacroKit.js (rasterClear guards).
+
+  [b] depth GUI         -- PARTIALLY EXISTS. The live pass-count TEXT readout is ALREADY there for surfacing
+      (surfacingView.js:93-94 counts the Step-Down markers). The draggable Z-PROFILE does NOT (featureCanvas
+      is XY-only; no elevation/XZ view anywhere). Buildable increments: (1) extend the readout to
+      pocket/contour/slot; (2) the draggable Z-profile (a NEW canvasWidgets Z-gesture + an XZ canvas mode).
+      NO emit change. Files: viz/canvasWidgets.js + viz/featureCanvas.js + views/*View.js.
+
+  [a] Z-mode current-pos=Z0 -- NOT built (surfacing is hard-wired G90-absolute, Z0=stock-top; no G92/G91,
+      no zMode param). THE GATED DECISION -> my recommendation INVERTS the ROADMAP (below).
+```
+
+### [a] Z-MODE A-vs-B — MY RECOMMENDATION INVERTS THE ROADMAP (grounded, not vibes)
+The ROADMAP:59 recommends **A (G92 Z0 + clear-on-exit)** for EMIT SIMPLICITY and calls B "bigger rework + riskier." The frame-reasoner grounding shows that is BACKWARDS for the PREFLIGHT SAFETY layer we just spent t935-973 hardening:
+
+- **traceToolpath models G91 CORRECTLY** (GcodeExecutionEngine move handler: `this.pos + value` for incremental) but does **NOT** model G92 as a coordinate shift -- the G92 handler records `_datumOrigin` for the PROBE datum-check ONLY and applies NOTHING to subsequent moves (no reader subtracts it from a move target).
+- => **Option A (G92) would SILENTLY MISREPORT** the envelope check, the through-stock plow, AND honest-Mach/DRO-Mach by the FULL G92 offset -> a GREEN verdict where the real motion breaches (or a phantom breach). That is the exact "wrong operator safety message" the preflight layer exists to prevent (decision-sieve G1). Making A safe requires BUILDING G92-offset modeling into GcodeExecutionEngine + threading it into checkEnvelope + through-stock + declaredWcsOffset -- significant, safety-critical, none of it exists.
+- **Option B (whole-op G91)** needs the reasoners to understand NOTHING new: G91 is already modeled; the G53 safe-Z retract's mode-explicit G90/G53/G91 wrap (safeZframe wrapMachineFrame) was PURPOSE-BUILT for a G91 body (g53-mode-explicit-856); honest-Mach is untouched (G91 sets no datum). B's cost is on the EMIT side (surfacing's absolute depthLevels + clearance + multi-pass Z reframed to incremental) -- real work, but LOCAL to the surfacing emit, NOT the safety reasoners.
+
+**RECOMMENDATION: B (whole-op G91), OR A only if we FIRST build G92-offset modeling into the engine + the 3 reasoners.** Gate-1 (safety) eliminates A-as-it-stands (silent misreport). The ROADMAP's "recommend A" weighed emit-simplicity but not the reasoner-misreport it flagged as a risk -- the risk is real + unbuilt. (You surface A-vs-B to the user; this is the grounded input.)
+
+### RECOMMENDED BUILD PRIORITY (weighting VALUE x SAFETY x COLLISION-avoidance)
+The other session is LIVE on surfacing + main + the SPINDLE subsystem + releases. So the lowest-collision builds are the ones OFF the spindle/framing/surfacing-emit path:
+1. **[c] CAM-slot robustness** -- real controller-safety gaps (div-by-zero / infinite-loop / ramp-overshoot / dead toolDia / no safe-Z), well-contained, LOW collision (data/millToSlot + camMacroKit, a different subsystem). Strong first pick.
+2. **[b] depth GUI -- draggable Z-profile** (the pass-count slice already exists) -- highest user-want ("single most-wanted"), NO emit change, LOW collision (viz layer). Strong second.
+3. **[e] first-line comment** -- small, high daily value (junk filenames), well-characterized; MODERATE collision (touches makeStart/framing -- coordinate, or do it per-data-op to dodge programFraming).
+4. **[d] rpm socket** -- real gap but HIGHEST collision (the other PC just changed the spindle subsystem; ROADMAP:14 says coordinate) -> DEFER/coordinate.
+5. **[a] Z-mode** -- the gated decision (recommend B); higher complexity + on the contended surfacing-emit path -> AFTER the A-vs-B ruling + when the surface is less contended.
+
+### COLLISION RISK (build-safety with the other session)
+HIGH: [d] rpm (spindle), [a] Z-mode + [e] (surfacing-emit/framing). LOW: [c] (CAM slot path), [b] (viz, no emit). If a build is greenlit this batch, [c] or [b] are the safest to touch without stepping on the other PC.
+
+### GATE
+1. Which idea(s) to BUILD next (recommend [c] and/or [b] for low collision), and in what order?
+2. The Z-mode A-vs-B: I recommend **B** (or A-with-engine-modeling-first) on the safety grounding -- surface to the user with this framing?
+3. Confirm [e]'s scope: emit a descriptive op-name line-1 comment (the junk title is OPEN; the L1 nested-paren crash is already fixed) -- build it, and via makeStart or per-data-op (collision-dodge)?
+4. [d] rpm: coordinate with / wait for the other session's spindle work, or is it settled?
+
+No build this turn (read-only). Nothing is fully already-fixed; [b]'s pass-count slice + [e]'s L1-crash are the partial-done pieces (flagged).
