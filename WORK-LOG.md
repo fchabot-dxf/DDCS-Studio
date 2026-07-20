@@ -11603,3 +11603,52 @@ ACCEPT (on build): my own drive — corner + middle Plane greyed unless (Active 
 greys/reverts live; a selected Plane auto-reverts to Hop. my own emit dump — plane + non-active/no-Z-first emits the Hop
 backstop (not G90 Z<planeZ>) with the comment; valid Active+Z-first emits the plane; corner twin parity; full gate.
 RECOMMEND: BUILD AS PROPOSED. No code this turn (gate). Awaiting greenlight or steer.
+
+---
+
+## 🔨 turn 961 — BUILD: gate Clearance PLANE to (WCS==Active AND Z-set-first) — corner + middle, per the t960 greenlight
+
+USER SAFETY BUG (corner pilot): Clearance=Plane moved the safe-Z DOWN (planeLiftNodes emits a WORK-frame G90 G0 Z<planeZ>
+that reads the runtime-active WCS-Z which the corner may never set). GREENLIGHT (advisor t960): BUILD AS PROPOSED, 2
+guardrails — (a) ONE SOURCE (planeGuaranteed/resolveClearMode) read by all 3 layers, no duplicated condition; (b) the corner
+optionGate stays MINIMAL (a declared per-option predicate read by the EXISTING userOpView loop, marked data-op-gated).
+
+### THE BUILD (3 layers off ONE source)
+1. **safeZframe.js (ONE SOURCE):** `planeGuaranteed(wcs, zFirst) = (wcs==='active' && !!zFirst)`; `resolveClearMode(clearMode,
+   {wcs, zFirst})` folds 'plane'->'hop' when not met. clearLiftNode gains a `planeFellBack` passthrough.
+2. **EMIT BACKSTOP (defense-in-depth — a saved config / a twin can't slip a descending plane past it):**
+   - clearlift emit (saferetract.js): when `planeFellBack`, PREPEND the honest comment `( Clearance plane needs the Active WCS
+     + a Z datum - using Hop )`.
+   - CORNER form (cornerWizard:94): resolveClearMode(params.clearMode, {wcs, zFirst: probeZ}) + planeFellBack -> clearLiftNode.
+   - CORNER twin (cornerData): applyClearModeBackstop composed into postInstantiate — folds the frozen clearlift plane->hop +
+     sets planeFellBack from resolved.wcs/probeZFirst ([[dataop-live-values-postinstantiate-not-emit]]) -> byte-parity with the
+     form (both set the SAME clearlift params -> the shared emit produces the same comment).
+   - MIDDLE form (middleWizard:59): resolveClearMode + a standalone mkC comment when folded (middle has no clearMode twin).
+3. **UI GATE (grey ONLY the Plane option; Max/Hop usable; auto-revert to Hop; reactive on wcs/probeZ):**
+   - MIDDLE (middleView.update): grey the m_clear_mode 'plane' <option> + auto-revert + dispatch change (planeGuaranteed).
+   - CORNER (data-op): a DECLARED `optionGate` on the clearMode binding + a generic userOpView loop (grey the option +
+     auto-revert + data-op-gated). PLUS deriveBindings now CARRIES optionGate through the derive (it was DROPPED like
+     widget/widgetConfig once were — the root cause of the option gate not rendering; found + fixed via my own drive).
+
+### VERIFY (two-method, real symptom)
+- **EMIT (tests/plane-guarantee-961, green):** corner form + twin + middle — plane+Active+Z-first EMITS the plane; plane+
+  non-active OR no-Z-first folds to Hop + the honest comment (NO descending G90 Z<planeZ>). CORNER TWIN BYTE-PARITY: the
+  postInstantiate output === the form output for BOTH the valid + backstop cases (exact).
+- **UI DRIVE (tests/plane-guarantee-ui-961, green):** MIDDLE + CORNER — the Plane option is greyed unless (Active WCS + Probe
+  Z First); Max/Hop stay usable; toggling either greys live; a selected Plane AUTO-REVERTS to Hop. (A closed <select> can't
+  visually show a disabled <option>, so the DRIVE — option.disabled + the revert — is the proof; a screenshot would only show
+  the closed control.)
+
+### GOLDENS (the plane tests exercised Plane WITHOUT the guarantee -> they now correctly fold; set the guarantee to keep testing plane)
+- EMIT: corner-clearance-emit-929 (+probeZFirst:1), clearance-hop-plane-913 (+probeZ:true, wcs:active), my own
+  through-stock-957 (the check params gain probeZ:true + wcs:active so a Plane-below traverse actually emits to be caught).
+- UI: clearance-plane-assists-925 + corner-clearance-plane-assists-933 + clearance-form-921 (x2) — turn on Probe Z First
+  before selecting Plane so the option isn't greyed/auto-reverted.
+- FLAKES (NOT mine): blocks-mobile-drawers + knob-persist failed once under the first parallel full run but PASS STANDALONE
+  (isolation-order flakes) — unrelated; the clean re-gate confirms.
+
+### FULL GATE
+- **1343 passed / 0 failed / 4 skipped** (11.3m) — clean re-gate (grepped the whole log; only 404 noise). 1341 -> 1343 = +2
+  (the new plane-guarantee-961 + plane-guarantee-ui-961). Isolation-checked (both plane specs standalone green).
+
+### NEXT (advisor): review -> RELEASE (corner-pilot correctness/safety fix). The plane now emits ONLY when it is provably safe.
