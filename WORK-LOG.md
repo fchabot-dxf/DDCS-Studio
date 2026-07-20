@@ -11742,3 +11742,54 @@ diagTravel on the secondary, sign per dir2). For a 100x80 boss the old sim gave 
   fail-before-fix stash proof).
 
 ### NEXT (advisor): LOOP #2 = the probe-cycle atom (ground-first -- less characterized), per the committed loop queue.
+
+---
+
+## 🔨 turn 967 — GROUND + PROPOSE + GATE: LOOP #2 = the probe-cycle atom. FINDING: the atom ALREADY EXISTS and is already adopted (probeSurfaceStack). This is a MIGRATION question, not an extraction question -- plus one genuine fork (source-fold-done vs the user's t890 single-block one-brick UX) I need you to rule on before building.
+
+NO CODE this turn (you required "PROPOSE the atom shape + scope + which wizards adopt it BEFORE building; GATE the atom design back for ruling").
+
+### GROUNDING (survey of every probe wizard, agent + my own reads)
+The repeated cycle = `[stop/limit preamble] -> fast G31 -> miss-check -> back-off -> slow G31 -> miss-check -> [read+radius-comp] -> [final retract]`.
+
+**It is ALREADY a declared atom: `probeSurfaceStack()` (web/wizards/ops/probeSurface.js:22).** Its own header: "ONE declared probe primitive that every probe wizard composes instead of hand-rolling its own G31 sequence." It is BROADER than surface/comp -- the radius-comp is one OPTIONAL stage (`compEnable` / `skipComp`), so it is the full cycle, not just the comped-surface case. The declared on-miss seam is `failGoto` (the shared error-handler label), exactly the "declare the miss target" design point from the t890 characterization. Per-post folding already handled (probeguard/probestart fold to [] on Expert; DRO-compare miss on V4.1/DM500).
+
+**Adoption today:**
+```
+  probeSurfaceStack (probeSurface.js:22)  <- THE ATOM (exists, block-stack builder)
+    |
+    +-- ADOPTED (4 wizards, 5 call-sites) -- rule-of-three ALREADY satisfied + paid off:
+    |     edge (probeArm) . middle (touchR) . corner (probeWallR + zSurfaceProbe) . rotaryCenter (touchR)
+    |
+    +-- STILL HAND-ROLL the same cycle from granular atoms (4 wizards, 6 call-sites):
+          rotaryClock (ppZdown x2) . alignment (twoPass x2) . atcToolCheck (inline) . atcLength (inline)
+
+  twoPassProbe (probeBlocks.js:74)  <- the OLD string-based cycle atom; DEAD in the wizard layer
+                                       (no wizard imports it; probeSurfaceStack superseded it). Orphan -- FLAG, not deleting unasked.
+```
+
+### VARIES vs INVARIANT (the varies-set is small + already the atom's params)
+- **INVARIANT (centralized in the atom / its leaf blocks):** G31 P/L/Q form; the `IF #192x != 2 GOTO<fail>` miss-guard; the two-pass fast->slow ordering; back-off shape; feeds `#3`/`#4`; port `#5`; the `#192x` status var (DERIVED from axis via AXIS_VARS, not hand-picked).
+- **VARIES (params):** axis; direction (drives probeVar `#8`/`#7`, retractVar `#9`/`#10`, limitVal `2`/`1`, comp sign); level; result var; radius-comp on/off (`compEnable`/`skipComp`); trailing-retract on/off.
+- **REAL one-source payoff, already observed:** the survey (+ probeBlocks.js:6-8 header) records that the pre-atom hand-rolled copies had DRIFTED -- some used a `== 0` miss-guard vs the atom's `!= 2`. That drift is exactly what folding to one source kills. The 4 remaining hand-rollers are a LIVE one-source violation (gate 3).
+
+### DECISION SIEVE (which gate fires)
+- G1 safety / G2 declare-not-infer: both readings byte-identical + declared -> don't decide.
+- **G3 one-source: FIRES on the 4 hand-rollers** -- they are 6 duplicate copies of the cycle that can drift (and historically did). Folding them to probeSurfaceStack removes the duplication. G3 says MIGRATE; it does NOT decide "stack-builder vs single-block" (both are one-source).
+- G4/G5: apply to whatever we build.
+- **Residue (the USER's call, not a principle):** does the user want the t890 "ONE `probecycle` brick per wall" Blockly UX, given probeSurfaceStack already met the intent at the SOURCE level?
+
+### THE FORK (two readings of "make it an atom")
+- **A. SOURCE-fold is DONE -> finish the migration.** probeSurfaceStack IS the one source; migrate the 4 hand-rollers (rotaryClock/alignment/atcToolCheck/atcLength) onto it. Blockly shows the composed primitives (probe/probecheck/probestart/move). Small, byte-identical-target, removes the live drift risk. [[restructure-source-not-abstraction]]-compliant (use the existing source; build NO new leaf). Caveat: the ATC pair + rotaryClock are Z-down single-direction NO-comp tool-setter touches -- they'd adopt with `compEnable:false`/`skipComp`; byte-identity per wizard x per post is UNVERIFIED and IS the acceptance -- if any adoption changes emit, that's a GATE.
+- **B. NEW single folding block `probecycle` (the t890 literal).** A declared block (like clearlift) that folds the whole cycle -> ONE brick per wall in Blockly + round-trip. Gives the one-brick UX the user asked for. But it is NEW machinery (a block emit + round-trip + sim) layered on top of / replacing probeSurfaceStack -- a value/UX call, not a correctness need (the source-level one-source is already achievable via A).
+
+### MY RECOMMENDATION
+- **Do A now** (migrate the 4 hand-rollers to probeSurfaceStack). It is the real one-source win, byte-identical-target, and rule-of-three was already validated by the 4 existing adopters. Accept = my per-wizard x per-post byte-identity check (only the intended lines move) + full gate; any emit change -> GATE.
+- **Defer B** unless the user actively wants the one-brick Blockly view. probeSurfaceStack already delivered the t890 intent at the source level; the single-block is additive UX, and [[restructure-source-not-abstraction]] says don't build the new abstraction without a pull for it.
+
+### GATE QUESTIONS FOR YOU
+1. Approve **A** -- migrate the 4 hand-rollers (rotaryClock/alignment/atcToolCheck/atcLength) to probeSurfaceStack, byte-identical, GATE on any emit change? (Note the ATC/rotaryClock four are no-comp Z-down; the alignment/rotaryClock pair already use `probecheck` so the delta is small; the ATC pair is the cleanest win.)
+2. **B** (the single `probecycle` folding block for the one-brick Blockly UX, user t890): wanted NOW, deferred, or dropped -- given the source-level intent is already met?
+3. The dead `twoPassProbe` (probeBlocks.js:74) + its `confirmStart` sibling: remove as part of A (orphan cleanup), or leave (flag only)?
+
+No release this turn (B1 t965 still HELD for the batch; nothing new built).
