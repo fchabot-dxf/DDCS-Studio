@@ -16,7 +16,9 @@ const check = (page, extra, post) => page.evaluate(async ({ extra, post, STOCK, 
   const { emitMapped } = await import('/blocks/blockEmitter.js');
   const { getDialect } = await import('/wizards/dialects/index.js');
   const { checkEnvelope } = await import('/engine/envelopeCheck.js');
-  const params = { featureType: 'boss', twoAxis: true, inAxis: 'auto', transAxis: 'auto', dia: 40, ...extra };
+  // t961 — the plane clearance is offered only with its guarantee (Active WCS + Z-first); establish it so a Plane-below
+  // traverse actually EMITS (else the safety backstop folds it to Hop) and the through-stock check has a plane to catch.
+  const params = { featureType: 'boss', twoAxis: true, inAxis: 'auto', transAxis: 'auto', dia: 40, probeZ: true, wcs: 'active', ...extra };
   const em = emitMapped(middleStack(params), post ? { dialect: getDialect(post) } : {});
   // the pre-flight reads the block program (opSimStarts source) + the projection (blockMap) off these globals
   window.ddcsGetBlockProgram = () => [{ type: 'op', opType: 'middle', params }];

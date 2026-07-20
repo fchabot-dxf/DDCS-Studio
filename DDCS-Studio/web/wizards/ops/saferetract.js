@@ -89,12 +89,16 @@ export const safeRetractBlock = {
 export const clearLiftBlock = {
     type: 'clearlift', label: 'Clearance Lift', kind: 'leaf', category: 'Move', hidden: true,
     defaults: { clearMode: 'hop', hopDist: 15, planeZ: 10, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', guardLabel: 91, capLabel: 92 },   // t941 B2b-4 — default hop (a bare clearlift block; the callers pass clearMode explicitly)
-    fields: ['clearMode', 'hopDist', 'planeZ', 'saveVar', 'margin', 'workClear', 'guardLabel', 'capLabel'],
+    fields: ['clearMode', 'hopDist', 'planeZ', 'saveVar', 'margin', 'workClear', 'guardLabel', 'capLabel', 'planeFellBack'],
     emit: (p, dx, dy, dialect) => {
         const mode = clearModeOf(p.clearMode);
-        if (mode === 'hop') return safeHopBlock.emit({ hopDist: p.hopDist, saveVar: p.saveVar, margin: p.margin, guardLabel: p.guardLabel, capLabel: p.capLabel, restore: p.restore }, dx, dy, dialect);
+        // t961 — the plane-guarantee backstop: when Plane was requested but not guaranteed (WCS!=Active or no Z-datum-first), the
+        // caller folded it to Hop and set planeFellBack → emit an honest comment (defense-in-depth; the same param on both the
+        // form path (clearLiftNode) and the twin path (postInstantiate) → byte-identical).
+        const lead = p.planeFellBack ? ['( Clearance plane needs the Active WCS + a Z datum - using Hop )'] : [];
+        if (mode === 'hop') return [...lead, ...safeHopBlock.emit({ hopDist: p.hopDist, saveVar: p.saveVar, margin: p.margin, guardLabel: p.guardLabel, capLabel: p.capLabel, restore: p.restore }, dx, dy, dialect)];
         if (mode === 'plane') return [...distModeBlock.emit({ dist: 'abs' }), ...moveBlock.emit({ mode: 'rapid', z: String(r3(num(p.planeZ, 10))) }, dx, dy, dialect), ...distModeBlock.emit({ dist: 'inc' })];
         // 'max' — delegate to the safe-Z retract (byte-identical to a direct safeRetractNode; the guardLabel is the #520 unset-guard label)
-        return safeRetractBlock.emit({ margin: p.margin, workClear: p.workClear, label: p.guardLabel, restore: p.restore }, dx, dy, dialect);
+        return [...lead, ...safeRetractBlock.emit({ margin: p.margin, workClear: p.workClear, label: p.guardLabel, restore: p.restore }, dx, dy, dialect)];
     },
 };

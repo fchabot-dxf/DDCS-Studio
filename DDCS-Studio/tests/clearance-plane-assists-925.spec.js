@@ -18,6 +18,10 @@ test('Plane Suggest fills stock-top+margin; the floor WARNS (not clamps) below t
   const shown = (id) => page.evaluate((i) => { const e = document.getElementById(i); return !!e && !e.classList.contains('hidden'); }, id);
   const val = (id) => page.evaluate((i) => document.getElementById(i).value, id);
 
+  // t961 — Plane is offered ONLY with the guarantee (Active WCS + Probe Z First); establish it so the Plane option isn't
+  // greyed + doesn't auto-revert to Hop (WCS defaults to Active).
+  await page.evaluate(() => { const c = document.getElementById('m_probe_z_first'); c.checked = true; ['change', 'input'].forEach((e) => c.dispatchEvent(new Event(e, { bubbles: true }))); });
+  await page.waitForTimeout(200);
   await setMode('plane');
   expect(await shown('m_plane_block'), 'Plane field shows').toBe(true);
   expect(await shown('m_plane_suggest'), 'the Suggest button is present').toBe(true);

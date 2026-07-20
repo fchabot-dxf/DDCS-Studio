@@ -52,7 +52,7 @@ test('B2b-1 hop/plane emit per post: Expert capped, degrade posts relative+note,
 
     return {
       hop: emitAll({ ...MIDDLE_AUTO, clearMode: 'hop', hopDist: 15 }),
-      plane: emitAll({ ...MIDDLE_AUTO, clearMode: 'plane', planeZ: 12 }),
+      plane: emitAll({ ...MIDDLE_AUTO, clearMode: 'plane', planeZ: 12, probeZ: true, wcs: 'active' }),   // t961 — Plane needs the guarantee (Active WCS + Z-first) or the safety backstop folds it to Hop
       twoHopExpert,
     };
   }, { MIDDLE_AUTO, POSTS });

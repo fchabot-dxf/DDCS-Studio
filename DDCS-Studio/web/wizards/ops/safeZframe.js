@@ -114,6 +114,19 @@ export const CLEAR_MODES = ['max', 'hop', 'plane'];
  *  keeps it limit-proof (never exceeds the margin), so it is safe as the last-resort default. `max`/`plane` are explicit picks. */
 export const clearModeOf = (v) => (CLEAR_MODES.includes(v) ? v : 'hop');
 
+/** t961 — the CLEARANCE-PLANE guarantee (ONE SOURCE for all 3 layers: form emit / twin postInstantiate / UI gate).
+ *  planeLiftNodes emits a WORK-frame `G90 G0 Z<planeZ>` — safe ONLY when the plane reads the SAME WCS whose Z datum was
+ *  set. That holds ⟺ the WCS is ACTIVE (Active binds both the write-target and the plane to the runtime-active WCS) AND the
+ *  Z datum is established first (probe-Z-first). A specific G54-G59 writes that register while the plane reads active → no
+ *  guarantee; a plane before the Z datum reads an unset/old WCS-Z → the "safe Z" can DESCEND. So grey Plane + back off to Hop. */
+export function planeGuaranteed(wcs, zFirst) { return wcs === 'active' && !!zFirst; }
+/** Fold a clearance mode: 'plane' → 'hop' when the plane guarantee is NOT met (the emit BACKSTOP — a saved config / a data-op
+ *  twin can't slip a descending plane past this). max/hop are frame-independent (unchanged). */
+export function resolveClearMode(clearMode, { wcs, zFirst } = {}) {
+    const m = clearModeOf(clearMode);
+    return (m === 'plane' && !planeGuaranteed(wcs, zFirst)) ? 'hop' : m;
+}
+
 /** t913 B2b-1 — SAVE the pre-lift Z (saveMachineZNode) then a CAPPED clearance HOP. The `safehop` atom folds per post:
  *  Expert emits the IF/GOTO cap (lift to min(saved+hop, margin)); posts with no real flow-skip (grbl/rs274/centroid)
  *  degrade to a plain relative hop + an honest uncapped comment. The paired G53 return to `saveVar` (emitDrop) nets it back.
@@ -143,10 +156,11 @@ export function planeLiftNodes(planeZ) {
  *  capped hop; plane = the absolute work-Z) — so a data-op holds ONE block and re-emits the chosen mode with no structural
  *  fork or spurious assign #var. The CALLER saves the pre-lift Z (saveMachineZNode) before this + returns via safeZParkBlock
  *  ret. Labels are placeholders — uniquifySafeRetractLabels rewrites guard/cap per the resolved mode (max 1 / hop 2 / plane 0). */
-export function clearLiftNode({ clearMode = 'hop', hopDist = 15, planeZ = 10, saveVar = '#95', restore } = {}) {   // t941 B2b-4 — default hop
+export function clearLiftNode({ clearMode = 'hop', hopDist = 15, planeZ = 10, saveVar = '#95', restore, planeFellBack = false } = {}) {   // t941 B2b-4 — default hop; t961 — planeFellBack = the plane-guarantee backstop tripped
     const b = newBlock('clearlift');
     b.params = { clearMode: clearModeOf(clearMode), hopDist, planeZ, saveVar, margin: safeZMarginNeg(), workClear: '#17', guardLabel: 91, capLabel: 92 };
     if (restore != null) b.params.restore = restore;
+    if (planeFellBack) b.params.planeFellBack = true;   // t961 — emit an honest comment (the clearlift emit prepends it)
     return b;
 }
 

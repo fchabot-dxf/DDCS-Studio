@@ -46,6 +46,7 @@ import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards, whenOk } from '../whenGuard.js';   // ③b — derive CORNER_BINDINGS over a CANONICAL-pruned stack (the 8-way corner×probeSeq guard duplicates the bound sockets in the raw superset)
 import { makeProvider } from '../../viz/opSimStarts.js';   // sim-marker positions: reuse the base frac provider, then CHAIN the reposition-destination passes off their anchor
 import { srcVal, srcNote } from '../../wizards/probeBlocks.js';   // t87 — the SAME source functions the built-in uses: srcVal picks src.ctrl over the literal; srcNote appends "- controller PrNNN"
+import { clearModeOf, resolveClearMode } from '../../wizards/ops/safeZframe.js';   // t961 — the plane-guarantee backstop (ONE SOURCE): fold the frozen clearlift plane->hop when WCS!=Active or no Z-first
 
 /** Author defaults — match cornerStack's fallbacks + the built-in Corner field defaults. Structural params (corner/
  *  probeSeq/probeZFirst/wcs/syncA) are baked at their defaults: the twin is the FL / YX / no-Z / active-WCS shape. */
@@ -86,7 +87,7 @@ export const CORNER_BINDING_SPECS = [
     { param: 'scanDepth',  type: 'number', default: CORNER_DEFAULTS.scanDepth,  label: 'Scan Depth',       help: 'How far below Safe Z the stylus drops before probing sideways into each wall.', section: 'GEOMETRY',   match: { type: 'assign', var: '#20' }, key: 'value' },
     // t931 B2b-2c (Option B) — the CLEARANCE MODE + its per-mode fields, bound to the WALL1 clearlift folding atom's VALUE params
     // (NO assign #var — the atom folds max/hop/plane on these literals; matches middle's literals + the D2 ruling). when-gated.
-    { param: 'clearMode', type: 'enum', default: CORNER_DEFAULTS.clearMode, label: 'Clearance', help: 'How the probe clears between the walls. Max: retract to the machine safe-Z margin. Hop: a small relative lift, capped at that margin. Plane: an absolute work-Z (for fixtures / tall stock). Safe Z above stays the plunge/approach.', section: 'GEOMETRY', match: { type: 'clearlift' }, key: 'clearMode', widgetConfig: { options: [['Max safe height', 'max'], ['Hop up', 'hop'], ['Clearance plane', 'plane']] } },   // a SELECT dropdown (matches middle; not a segmented toggle)
+    { param: 'clearMode', type: 'enum', default: CORNER_DEFAULTS.clearMode, label: 'Clearance', help: 'How the probe clears between the walls. Max: retract to the machine safe-Z margin. Hop: a small relative lift, capped at that margin. Plane: an absolute work-Z (for fixtures / tall stock). Safe Z above stays the plunge/approach.', section: 'GEOMETRY', match: { type: 'clearlift' }, key: 'clearMode', widgetConfig: { options: [['Max safe height', 'max'], ['Hop up', 'hop'], ['Clearance plane', 'plane']] }, optionGate: { option: 'plane', requireAll: [{ param: 'wcs', is: 'active' }, { param: 'probeZFirst', is: true }], fallback: 'hop', tip: 'Clearance plane needs the Active WCS + a Z datum — set WCS = Active and turn on Probe Z First (a work-Z plane against an unset WCS-Z can descend).' } },   // a SELECT dropdown (matches middle); t961 — grey the Plane option unless the plane guarantee holds (declare-not-infer; the userOpView loop reads optionGate)
     { param: 'hopDist',   type: 'number', default: CORNER_DEFAULTS.hopDist,   label: 'Hop Height (mm)', help: 'Hop mode: how far to lift above the probe before crossing, capped at the machine margin.', section: 'GEOMETRY', when: { param: 'clearMode', is: 'hop' }, match: { type: 'clearlift' }, key: 'hopDist' },
     { param: 'planeZ',    type: 'number', widget: 'plane-suggest', default: CORNER_DEFAULTS.planeZ,    label: 'Clearance Plane (work Z)', help: 'Plane mode: an absolute WORK-Z the probe clears to (fixtures / tall stock). A WORK Z — set the Z datum first.', section: 'GEOMETRY', when: { param: 'clearMode', is: 'plane' }, match: { type: 'clearlift' }, key: 'planeZ' },   // t933 — the plane-suggest widget: Suggest (stock top + margin) + inline floor warn
     // ② B4 step 4a — SEMANTIC relTo: anchor the drag to the sim-start row NAMED 'wall1' (not a fragile numeric index).
@@ -309,6 +310,22 @@ function applyStructCtl(stack, resolved) {
     return stack;
 }
 
+/** t961 — the plane-guarantee BACKSTOP for the TWIN: the frozen clearlift carries the SAVED clearMode (a bound socket), which
+ *  can be 'plane' with a config the UI gate never vetted (WCS!=Active or no Z-first). Fold it plane->hop at BUILD via the ONE
+ *  source (resolveClearMode) + set planeFellBack (the same param the form path passes → the clearlift emit produces the same
+ *  honest comment → twin byte-parity holds). Z-first for corner = probeZFirst (or probeZ). */
+function applyClearModeBackstop(stack, resolved) {
+    const wcs = resolved && resolved.wcs, zFirst = !!(resolved && (resolved.probeZFirst || resolved.probeZ));
+    for (const b of flattenBlocks(stack)) {
+        if (!b || b.type !== 'clearlift' || !b.params) continue;
+        const requested = clearModeOf(b.params.clearMode);
+        const folded = resolveClearMode(b.params.clearMode, { wcs, zFirst });
+        b.params.clearMode = folded;
+        if (requested === 'plane' && folded !== 'plane') b.params.planeFellBack = true; else delete b.params.planeFellBack;
+    }
+    return stack;
+}
+
 /** Build the corner-as-data def — same userOpFromStack pattern as drill/surfacing/slot/text/atcWarmup, PLUS `bindingSpecs`
  *  (instantiate re-derives the value sockets by identity over the pruned superset) + the structural probeZFirst toggle. */
 export function cornerDataDef() {
@@ -322,6 +339,6 @@ export function cornerDataDef() {
         bindings, 'form3d+2d', {});   // t714 — no forceMachine (part-frame probe; the sim block above is the effective source, this fallback matches it)
     def.bindingSpecs = CORNER_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     def.simStartsProvider = cornerSimStartsProvider;   // t73 — sim markers CHAIN off their anchor via the emit's reposition geometry (preview-only)
-    def.postInstantiate = (stack, resolved) => applyStructCtl(applyHeaderComments(applyProbeSources(stack), resolved), resolved);   // t87 source-chips + t138 header recompose + t154 struct-control value sync (all rewrite from resolved state)
+    def.postInstantiate = (stack, resolved) => applyClearModeBackstop(applyStructCtl(applyHeaderComments(applyProbeSources(stack), resolved), resolved), resolved);   // t87 source-chips + t138 header recompose + t154 struct-control value sync + t961 plane-guarantee backstop
     return def;
 }

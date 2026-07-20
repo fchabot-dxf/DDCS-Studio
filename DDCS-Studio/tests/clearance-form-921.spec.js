@@ -57,6 +57,9 @@ test('the CLEARANCE dropdown replaces Safe-Z, when-gates its field per mode, and
   expect(await code(), 'changing HOP HEIGHT moves the emit (22 appears in the cap)').toMatch(/#43=\[#95\+22\]|Clearance hop 22/);
 
   // PLANE: the CLEARANCE PLANE field appears; the emit gains the absolute work-Z plane
+  // t961 — Plane is offered only with the guarantee (Active WCS + Probe Z First); establish it so Plane isn't greyed/reverted.
+  await page.evaluate(() => { const c = document.getElementById('m_probe_z_first'); c.checked = true; ['change', 'input'].forEach((e) => c.dispatchEvent(new Event(e, { bubbles: true }))); });
+  await page.waitForTimeout(200);
   await setMode('plane');
   await setVal('m_plane_z', '13');
   expect(await shown('m_plane_block'), 'Plane: CLEARANCE PLANE field shows').toBe(true);
@@ -89,6 +92,9 @@ test('coverage fix: a SINGLE-axis boss drives the emit 3/3 across modes (the in-
   await setMode('max'); const mx = await code();
   await page.screenshot({ path: testInfo.outputPath('single-max.png') });
   await setMode('hop'); const hp = await code();
+  // t961 — Plane needs the guarantee (Active WCS + Probe Z First) or it greys/reverts + the emit folds to Hop.
+  await page.evaluate(() => { const c = document.getElementById('m_probe_z_first'); c.checked = true; ['change', 'input'].forEach((e) => c.dispatchEvent(new Event(e, { bubbles: true }))); });
+  await page.waitForTimeout(200);
   await setMode('plane'); const pl = await code();
   // the gap is CLOSED — all three modes now move the emit on a single-axis boss (was 1/3 identical before)
   expect(mx, 'single-axis: Max differs from Hop').not.toBe(hp);

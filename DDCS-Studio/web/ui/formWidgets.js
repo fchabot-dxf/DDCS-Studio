@@ -156,6 +156,7 @@ function dropdownWidget(host, b) {
     const sel = document.createElement('select');
     sel.style.cssText = CTRL_CSS + ' min-width:120px;';
     sel.dataset.param = b.param;   // t112 — targetable by [data-param] (parity with numeric fields) so a canvas picker (corner-selector) can set it + dispatch change
+    if (b.optionGate) sel.dataset.optionGate = JSON.stringify(b.optionGate);   // t961 — a DECLARED per-option enable predicate the userOpView update loop reads (grey the option unless requireAll holds; auto-revert)
     for (const o of options) {
         const val = Array.isArray(o) ? o[1] : o, lab = Array.isArray(o) ? o[0] : o;
         const op = document.createElement('option');

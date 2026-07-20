@@ -5,6 +5,7 @@ import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { getWorkpiece, workpieceBackdrop, stockTopWorkZ, suggestedPlaneZ } from '../../engine/workpiece.js';   // flatten-migration: draw the DECLARED workpiece cavity at its OFFSET; t933 — the shared Plane assists (one source with the corner widget)
 import { slaveFollowing } from '../../engine/gantry.js';   // t648 — the Dual-Gantry Sync A field gates on the DECLARED topology (a Y-slave in Settings → Axes), one source
+import { planeGuaranteed } from '../ops/safeZframe.js';   // t961 — the plane-guarantee predicate (ONE SOURCE with the emit backstop): grey the Plane option unless WCS==Active AND Probe Z First
 
 const wizard = new MiddleWizard();
 const layout = new FeatureCanvas();
@@ -209,6 +210,17 @@ export const middleView = {
             const top = stockTopWorkZ();
             const below = params.clearMode === 'plane' && top != null && Number.isFinite(Number(params.planeZ)) && Number(params.planeZ) < top;
             planeWarn.classList.toggle('hidden', !below);
+        }
+        // t961 — the plane-guarantee UI GATE: grey ONLY the Plane <option> (Max/Hop stay usable) unless (WCS==Active AND Probe
+        // Z First), and AUTO-REVERT the dropdown to Hop when Plane is selected but not guaranteed. ONE SOURCE: planeGuaranteed
+        // (the same predicate the emit backstop reads). The WORK-frame plane against an unset/non-active WCS-Z can DESCEND.
+        const clearSel = el('m_clear_mode');
+        if (clearSel) {
+            const planeOk = planeGuaranteed(params.wcs, params.probeZ);
+            const planeOpt = [...clearSel.options].find((o) => o.value === 'plane');
+            if (planeOpt) { planeOpt.disabled = !planeOk; planeOpt.title = planeOk ? '' : 'Clearance plane needs the Active WCS + a Z datum — set WCS = Active and turn on Probe Z First.'; }
+            clearSel.setAttribute('data-op-gated', planeOk ? 'off' : 'true');
+            if (!planeOk && clearSel.value === 'plane') { clearSel.value = 'hop'; params.clearMode = 'hop'; clearSel.dispatchEvent(new Event('change', { bubbles: true })); }
         }
         // TRAVEL-START inc2a: the DIAG TRAVEL field is GONE from the UI — #21 is DERIVED from the dragged ② (tieDiagTravel).
         // m_diag_block stays permanently hidden (no show-toggle); the readonly input persists the derived value + round-trips.

@@ -34,7 +34,9 @@ test('corner honours the clearance mode on the wall1 traverse; wall2 + error sta
   expect(hop, 'the wall1 traverse still returns to the saved probe Z').toMatch(/G53 Z#95 \( @returnProbeZ \)/);
 
   // PLANE: WALL1 gets the absolute work-Z lift; wall2 + error stay Max
-  const plane = await em(page, { clearMode: 'plane', planeZ: 13 }, 'ddcs-expert-m350');
+  // t961 — Plane is offered ONLY with the plane guarantee (Active WCS + Z-first); set probeZFirst so the plane emits (else the
+  // safety backstop folds it to Hop). wcs defaults to 'active'.
+  const plane = await em(page, { clearMode: 'plane', planeZ: 13, probeZFirst: 1 }, 'ddcs-expert-m350');
   expect(plane, 'Expert plane: the wall1 retreat is the absolute work-Z lift').toMatch(/G0 Z13\b/);
   expect(plane, 'Plane: NOT the hop cap').not.toMatch(/#43=\[#95/);
   expect(plane, 'the wall2 final + error handler stay the #520 margin').toMatch(/#42=#520/);

@@ -302,6 +302,17 @@ export const userOpView = {
             inp.title = off && spec.tip ? spec.tip : '';
             row.style.opacity = off ? '0.5' : '';
         });
+        // t961 — DECLARED per-OPTION enable gate (optionGate): grey a single <option> (Max/Hop stay usable) unless requireAll
+        // holds, and AUTO-REVERT the select to `fallback` + dispatch change when the gated option is the current value. Marks
+        // the select data-op-gated so postGating's cap-ON pass doesn't fight it. One source: the same predicate the emit reads.
+        if (fhost) fhost.querySelectorAll('[data-option-gate]').forEach((sel) => {
+            let spec; try { spec = JSON.parse(sel.dataset.optionGate); } catch (_) { return; }
+            const ok = (spec.requireAll || []).every((c) => whenOk(c, gp));
+            const opt = [...sel.options].find((o) => o.value === spec.option);
+            if (opt) { opt.disabled = !ok; opt.title = !ok && spec.tip ? spec.tip : ''; }
+            sel.setAttribute('data-op-gated', ok ? 'off' : 'true');
+            if (!ok && sel.value === spec.option) { sel.value = spec.fallback || (sel.options[0] && sel.options[0].value) || ''; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+        });
         // t417 E3 — a per-op SIM-STOCK override (the rotary twin projects a round bar from #57; sim-only, no global mutation).
         // Feeds BOTH the sim-starts (opSimStarts) AND the preview render (preview3D) so the bar + the flank starts agree.
         let _simStock = null;

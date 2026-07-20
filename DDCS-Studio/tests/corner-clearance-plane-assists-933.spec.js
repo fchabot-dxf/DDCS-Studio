@@ -22,6 +22,10 @@ test('corner data-op Plane: Suggest fills stock-top+margin; the floor WARNS (not
   const warnShown = () => page.evaluate(() => { const w = document.querySelector('.plane-floor-warn'); return !!w && !w.classList.contains('hidden') && w.offsetParent !== null; });
   const planeRowShown = () => page.evaluate(() => { const el = document.querySelector('[data-param="planeZ"]'); const row = el && (el.closest('[data-when]') || el.closest('.field') || el.parentElement); return row ? row.offsetParent !== null : false; });
 
+  // t961 — Plane is offered ONLY with the guarantee (Active WCS + Probe Z First); establish it so the Plane option isn't
+  // greyed + doesn't auto-revert to Hop (WCS defaults to Active).
+  await page.evaluate(() => { const c = document.querySelector('[data-param="probeZFirst"]'); c.checked = true; ['change', 'input'].forEach((e) => c.dispatchEvent(new Event(e, { bubbles: true }))); });
+  await page.waitForTimeout(250);
   await setMode('plane');
   expect(await planeRowShown(), 'the Clearance Plane field shows in Plane mode').toBe(true);
   expect(await page.evaluate(() => !!document.querySelector('.plane-suggest-btn')), 'the Suggest button is present').toBe(true);

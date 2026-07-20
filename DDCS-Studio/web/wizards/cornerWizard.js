@@ -17,7 +17,7 @@ import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';
-import { safeRetractNode, saveMachineZNode, clearModeOf, clearLiftNode } from './ops/safeZframe.js';   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix); t897 — record the pre-lift Z for the wall1->wall2 return; t931 B2b-2c — the clearlift folding atom on the wall1->wall2 lift
+import { safeRetractNode, saveMachineZNode, clearModeOf, resolveClearMode, clearLiftNode } from './ops/safeZframe.js';   // t961 — resolveClearMode = the plane-guarantee backstop (folds plane->hop when WCS!=Active or no Z-first)   // t822 — the machine-frame SAFE-HEIGHT retract (error-handler crash fix); t897 — record the pre-lift Z for the wall1->wall2 return; t931 B2b-2c — the clearlift folding atom on the wall1->wall2 lift
 import { num } from './ops/util.js';
 import { toNum as toNumShared, srcVal, srcNote } from './probeBlocks.js';
 
@@ -91,7 +91,12 @@ export function cornerStack(params = {}, opts = {}) {
     // t929 B2b-2c — the DECLARED clearance mode for the between-walls traverse lift (max default = the #520 machine margin,
     // BYTE-IDENTICAL to today). Only the WALL1 lift (followed by the repoTraverse) reads it; the WALL2 lift is the FINAL retract
     // and stays Max (the standing split — final parks are always max caution). safeZ (#19) is the PLUNGE/approach, NOT this.
-    const clearMode = clearModeOf(params.clearMode), hopDist = num(params.hopDist, 15), planeZ = num(params.planeZ, 10);
+    // t961 — the plane-guarantee BACKSTOP (one source: resolveClearMode): Plane needs the Active WCS + a Z datum first, else
+    // it would emit a WORK-frame G90 Z<planeZ> against an unset WCS-Z and DESCEND → fold to Hop + an honest comment.
+    const requestedMode = clearModeOf(params.clearMode);
+    const clearMode = resolveClearMode(params.clearMode, { wcs, zFirst: probeZ });
+    const planeFellBack = requestedMode === 'plane' && clearMode !== 'plane';
+    const hopDist = num(params.hopDist, 15), planeZ = num(params.planeZ, 10);
     const src = params.sources || {};   // controller-resident probe fields (PROBE-CONFIG-SOURCE.md)
     // ① AUTO/MANUAL TRAVEL — ONE toggle governs BOTH travels (Z→wall1 + wall1→wall2). 'auto' (default) = the hands-free G0
     // seq move; 'manual' = an operator jog-and-wait via the shared safeTraverseStack (approach:'manual'), reusing each
@@ -222,7 +227,7 @@ export function cornerStack(params = {}, opts = {}) {
         // pairs 1:1 with that traverse's return; wall2's save has no following traverse → a harmless unpaired scratch write.
         // t856 — per-wall retreat is INSIDE the G91 probe body → G90-wrap the G53, restore G91. t931 — WALL1 uses the clearlift
         // folding atom (honours the clearance MODE; max is byte-identical to safeRetractNode); WALL2 (final retract) stays Max.
-        out.push(mkMV(ax, retractVar), saveMachineZNode('#95'), useMode ? clearLiftNode({ clearMode, hopDist, planeZ, saveVar: '#95', restore: 'inc' }) : safeRetractNode({ restore: 'inc' }));
+        out.push(mkMV(ax, retractVar), saveMachineZNode('#95'), useMode ? clearLiftNode({ clearMode, hopDist, planeZ, saveVar: '#95', restore: 'inc', planeFellBack }) : safeRetractNode({ restore: 'inc' }));
         return out;
     };
 

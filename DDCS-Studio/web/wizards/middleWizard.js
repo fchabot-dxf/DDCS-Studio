@@ -22,7 +22,7 @@ import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack, safeTraverseStack } from './ops/probeSurface.js';   // the shared probe + travel primitives (middle composes them — t131 inc1, ① auto/manual travel)
-import { safeRetractNode, clearTraverseParams, clearModeOf } from './ops/safeZframe.js';   // t822 machine-frame safe-height retract; t909 B2 the declared clearance mode (t919 B2b-2a retired the frame-toggle park → always Max)
+import { safeRetractNode, clearTraverseParams, clearModeOf, resolveClearMode } from './ops/safeZframe.js';   // t961 — resolveClearMode = the plane-guarantee backstop (folds plane->hop when WCS!=Active or no Z-first)   // t822 machine-frame safe-height retract; t909 B2 the declared clearance mode (t919 B2b-2a retired the frame-toggle park → always Max)
 import { opSimStarts } from '../viz/opSimStarts.js';
 
 const AX = {
@@ -56,7 +56,11 @@ export function middleStack(params = {}, opts = {}) {
     // t919 B2b-2a — RETIRED params.safeZ + params.safeZFrame: the end PARK now ALWAYS takes Max safe height (the ratified reading —
     // the relative park was the ORIGINAL crash cause), so there's no user Safe-Z field + no rel|mach toggle. #17 survives ONLY as
     // the DM500 work-frame degrade clearance (below), a WORK height distinct from the machine safe-Z margin.
-    const clearMode = clearModeOf(params.clearMode);   // t909 B2 — the DECLARED clearance mode the trans-axis traverse reads (max default = the #520 machine margin, unified with corner)
+    // t961 — the plane-guarantee BACKSTOP (one source: resolveClearMode): Plane needs the Active WCS + a Z datum first, else the
+    // WORK-frame G90 Z<planeZ> traverse reads an unset WCS-Z and DESCENDS → fold to Hop + an honest comment (below).
+    const requestedMode = clearModeOf(params.clearMode);
+    const clearMode = resolveClearMode(params.clearMode, { wcs, zFirst: probeZ });
+    const planeFellBack = requestedMode === 'plane' && clearMode !== 'plane';
     const hopDist = num(params.hopDist, 15);   // t913 B2b-1 — Hop mode: how far to lift (capped at the machine margin). Only emitted when clearMode==='hop'
     const planeZ = num(params.planeZ, 10);     // t913 B2b-1 — Plane mode: the absolute work-Z clearance plane. Only emitted when clearMode==='plane' (B2b-2 adds the not-below-stock floor)
     // t923 B2b-2b-cov — RETIRED clearOver/#18 (the TRAVERSE HEIGHT field): the in-axis cross-over now follows the CLEARANCE mode
@@ -203,6 +207,7 @@ export function middleStack(params = {}, opts = {}) {
     ];
 
     // ── Configuration ──
+    if (planeFellBack) S.push(mkC('Clearance plane needs the Active WCS + a Z datum - using Hop'));   // t961 — the plane-guarantee backstop's honest comment (middle has no data-op twin, so it stands alone here)
     S.push(mkA('#1', dist, 'Max probe distance'), mkA('#2', retract, 'Retract distance'));
     S.push(mkA('#3', fFast, 'Fast feedrate'), mkA('#4', fSlow, 'Slow feedrate'), mkA('#5', port, 'Probe port'));
     S.push(mkA('#6', radius, 'Probe stylus radius'));   // declared ONE source for the comp — now EVERY wall touch comps via the block (not just circular/Z)
