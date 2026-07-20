@@ -11306,3 +11306,53 @@ also asserted directly in the new spec). A note in each file explains the M3.
   (spindle-guard-947 + envelope-check-838 + preflight-badge-838 run standalone green before the full gate).
 
 ### NEXT (advisor): DEPLOY the COMPLETE spindle fix (C + the guard) together — merge port/corner-clean -> main, one clean deploy.
+
+---
+
+## 🔨 turn 949 — GROUND + PROPOSE (GATE): THE PARK-SWEEP (alignment + rotary_center + rotary_clock park -> Max)
+
+Task: the 3 wizards STILL final-park via the OLD relative safeZParkBlock (the crash class). Ground each, PROPOSE the
+migration (mirror middle B2b-2a) BEFORE building, GATE if a park-semantics fork surfaces. GROUNDED all 3 + the coupling.
+
+### GROUNDING — the crash class + the current shape (CONFIRMED per wizard)
+- ALL 3 park via `safeZParkBlock(safeZFrame, var, restore)`; `safeZFrame` defaults to 'relative' -> a `move` atom (G0 Z#var,
+  an INCREMENTAL lift) = THE CRASH CLASS (compounds into the top limit in a G91 body — the exact safe-Z-arc bug). The user
+  can toggle 'machine' (G53). A rel|mach UI toggle (ui/safeZFrameToggle.js, fields rc_safe_z / rcl_safe_z / al_safe_z) picks it.
+- **rotary_center** (rotaryCenterWizard.js:166): `safeZParkBlock(safeZFrame,'#17','inc')` (inside a G91 body). Its error
+  handler (line 174) + reposition (line 94, `[0-#17]`) ALREADY use safeRetractNode/#17. -> a CLEAN parallel to middle:261.
+- **rotary_clock** (rotaryClockWizard.js:134): `safeZParkBlock(safeZFrame,'#17','inc')`. Error handler (line 137) already
+  safeRetractNode. -> CLEAN parallel.
+- **alignment** (alignmentWizard.js:164): `safeZParkBlock(safeZFrame,'#19')` (default restore 'abs', a G90 body). #19 is
+  ALSO used for an earlier lift. NO 'Final retract' comment anchor (its twin finds the park via the #54 ATAN assign).
+- **THE 3 DATA-OP TWINS** (alignmentData:103 / rotaryCenterData:119 / rotaryClockData:121) each post-patch the emitted park
+  (`applySafeZFrame`: if safeZFrame==='machine', `move` -> `machinemove` G53 at #19/#17). After the wizard park becomes a
+  `saferetract` block, that `park.type==='move'` patch no longer matches -> it must be REMOVED (the twin inherits the new
+  park via the frozen template). The twins' `safeZFrame` binding/param also goes moot.
+- middle's precedent (safez-frame-rollout.spec:8) RETIRED m_safe_z ENTIRELY (its safe-Z was ONLY the park). Here the safe-Z
+  var (#17 rotary / #19 alignment) is used ELSEWHERE (reposition / earlier lift) -> the FIELD STAYS; only the final PARK
+  migrates + the rel|mach TOGGLE retires. (This is the one shape-difference from middle.)
+
+### PROPOSED MIGRATION (RECOMMEND — mirror middle B2b-2a; a clean parallel, per-wizard details noted)
+```
+  rotary_center:166  safeZParkBlock(safeZFrame,'#17','inc')  ->  safeRetractNode({ restore:'inc' })
+  rotary_clock:134   safeZParkBlock(safeZFrame,'#17','inc')  ->  safeRetractNode({ restore:'inc' })
+  alignment:164      safeZParkBlock(safeZFrame,'#19')        ->  safeRetractNode({ workClear:'#19' })   (G90 body, no restore)
+```
+- Drop `safeZFrame = safeZFrameOf(params.safeZFrame)` in each wizard (unused after) + the `safeZParkBlock`/`safeZFrameOf` imports.
+- Retire the rel|mach TOGGLE: empty ADOPTING_FIELDS in safeZFrameToggle.js (the 3 fields lose the select) — like middle.
+- KEEP the safe-Z FIELD (rc_safe_z/rcl_safe_z/al_safe_z) — its value still drives the intermediate lifts/reposition.
+- Rework the 3 twins: DELETE applySafeZFrame + its call + the safeZFrame binding/param (park now always safeRetractNode).
+- Per-post (via safeRetractNode, one source): Expert #520 / V4.1 #190 machine margin; DM500 honest work-frame degrade (keep
+  10 — the t920 steer; workClear #17 rotary / #19 alignment so the DM500 park keeps each wizard's own safe-Z var).
+- Migrate spec rows: safez-frame-rollout (DROP the alignment + rotary rows, as middle dropped out); safez-frame (rotary rows).
+
+### THE 4 CONFIRM-POINTS (why I GATE — the advisor asked to PROPOSE before building; this touches safety code x3 wizards + 3 twins + toggle + 2 specs)
+1. SCOPE: migrate ONLY the final park; KEEP the safe-Z field (used for lifts/reposition), do NOT fully retire it like middle. OK?
+2. alignment DM500: `safeRetractNode({ workClear:'#19' })` to keep alignment's #19 on the DM500 degrade (rotary keeps #17). OK?
+3. TOGGLE: fully retire the rel|mach select on all 3 fields. Behavior change: a user who picked 'machine' park (G53 at their
+   #17/#19) now gets the #520 MARGIN park (higher, limit-proof) — STRICTLY SAFER, but a changed park height for them. OK?
+4. TWINS: delete applySafeZFrame + the safeZFrame binding entirely (the park is uniform now). OK?
+
+ACCEPT (on build): my own golden diffs show ONLY the park lines move per wizard (probe/traverse/wcs/reposition byte-identical);
+the 3 relative parks GONE (sweep-asserted); full gate failed-count verbatim. Recommend: BUILD AS PROPOSED — no semantics fork,
+rotary is byte-parallel to middle, alignment differs only mechanically (#19/abs). Awaiting the greenlight (or adjustments).
