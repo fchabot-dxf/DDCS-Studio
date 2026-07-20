@@ -11405,3 +11405,55 @@ through the shared safeRetractNode (per-post machine margin), retiring the relat
 
 ### NEXT (advisor): the COMPLETE spindle fix is already deployed (V2026.07.19.1). Fast-follow #2 = B2b-3 Option-B runtime
 through-stock (WIP fea8ea3 dormant + reusable) on fresh context.
+
+---
+
+## 🔨 turn 953 — GROUND + PROPOSE (GATE): B2b-3 the RUNTIME through-stock pre-flight (Option B), fast-follow #2
+
+Task: the runtime geometric through-stock catch (blocked TWICE on start-fidelity). GROUND-FIRST — re-verify the fea8ea3 WIP
+vs the tree + whether opSimStarts can supply a FAITHFUL per-pass start for middle at pre-flight; PROPOSE the start-fidelity
+mechanism (the crux) BEFORE building; BUILD if faithfully reproducible, GATE if not.
+
+### GROUNDING
+- **The dormant fea8ea3 WIP is INTACT** in the current tree: envelopeCheck.js through-stock class (a SEPARATE stock-aware
+  trace + a mid-segment rayBox on clearance-traverse-owned segments -> kind:'through-stock'; scoped by blockMap block-TYPE
+  so probes are excluded by construction), trace.js blockMap stamping, workpiece.stockWorkAABB, the 3 consumers' kind branch.
+  Envelope trace/loop/violations UNCHANGED (byte-identical). My t945/t947 edits to envelopeCheck.js (the spindle guard) sit
+  ABOVE it and don't touch it.
+- **The twice-blocking crux = the NAIVE datum start.** The dormant class threads `start = { datumXY(stk), stk.z }` -> the
+  probe traces from the datum (INSIDE the boss) -> overshoots the walls -> the traverse geometry is garbage -> the plow test
+  fires on nothing (t937/t940: a boss probe traced to X=396 vs the wall X=60).
+- **THE ENABLING FACT (new, resolves the crux):** `opSimStarts(opType, params, stock)` (viz/opSimStarts.js:253) is a PURE
+  function — a provider lookup (USER_STARTS / BUILT_IN) returning per-pass [{x,y,z}], NO DOM/panel/drag dependency. It is the
+  SAME start-derivation the sim/preview uses (getStartHints -> computePassStarts -> the trace's passStarts). So checkEnvelope
+  CAN call it at pre-flight. `window.ddcsGetBlockProgram()` supplies the per-op type+params. traceToolpath ALREADY accepts
+  opts.passStarts + opts.stock + opts.start + opts.blockMap (all threading in place).
+
+### EMPIRICAL PROOF (my own — a throwaway spike, a middle boss dia=40 + low Plane, 100x100x30 stock)
+- opSimStarts('middle', params, stock) -> real EDGE-relative per-pass starts [(-12,50,-5),(50,112,-5)] — NOT the datum centre.
+- trace NAIVE (no passStarts): probes OVERSHOOT to X=102 / X=180 — OUTSIDE the 100mm stock (the "X=396 inside the boss"
+  garbage; the plow test fires on nothing) — reproduces the blocker.
+- trace FAITHFUL (passStarts = opSimStarts output): probes CONVERGE to ~X=10 — realistic, inside the stock, near the feature.
+  -> opSimStarts + passStarts DIRECTIONALLY WORKS (the naive garbage is gone).
+
+### PROPOSED PLAN (Option B — replace the naive datum in the dormant class)
+1. In checkEnvelope's stock-aware trace: get window.ddcsGetBlockProgram() -> for each op, opSimStarts(op.type, op.params, stk).
+2. Assemble the flat passStarts array in program order (mirror computePassStarts' aggregation).
+3. Thread passStarts (+ stock + start) to the stock-aware trace (REPLACING datumXY start) -> probes stop at the real walls.
+4. The EXISTING rayBox class fires on real geometry (a mid-segment plow of a clearance traverse) -> kind:'through-stock'
+   (already wired to badge + setup-sheet + gateway-send). SCOPE = MIDDLE/inside (built-in middle has provenance; corner
+   traverses are outside the stock = moot; confirm no inside-corner mode).
+
+### WHY I GATE (the advisor asked to PROPOSE the start-fidelity mechanism BEFORE building; it blocked twice; safety-critical)
+The crux is NOW ENABLED (opSimStarts is pure + faithful — the naive-datum blocker is replaced), and the empirical shows it
+works directionally. REMAINING BUILD-RISK to confirm before/within the build:
+1. FRAME ALIGNMENT — the faithful probes land at X~10, not the exactly-computed boss wall; the passStarts frame (work vs
+   stock vs machine) + the emit's coord frame must be nailed so probes land EXACTLY at the walls (else the traverse geometry
+   is off + the plow mis-fires). This is the deep fidelity work that blocked twice.
+2. MULTI-OP ASSEMBLY — a middle-plus-other-ops program needs passStarts concatenated in the exact flat trace order.
+3. SCOPE — confirm the check fires ONLY on middle/inside clearance traverses; confirm no inside-corner mode.
+
+RECOMMEND: BUILD (the crux is enabled) — I take the frame-alignment + assembly as the build work, targeting the acceptance
+(a MIDDLE Plane-below traverse flags; a probe does NOT false-positive; gateway-send sees the kind; envelope byte-identical;
+own screenshots; full gate). ALTERNATIVELY, if you'd rather I first prove-out the FRAME fidelity in a spike (the faithful
+probes land EXACTLY at the walls) before committing to the full build, say so. No code built this turn (gate). WIP stays dormant.
