@@ -20,6 +20,7 @@ import { axisSpan } from './limitSwitches.js';
 import { wcsOffsetAt } from '../viz/sceneFrame.js';
 import { datumXY, stockWorkAABB } from './workpiece.js';   // t937 — datum-derived probe start + the work-frame stock AABB (the through-stock class)
 import { rayBox } from './probeGeometry.js';               // t937 — the shared segment-vs-box test (a true MID-SEGMENT plow, not the endpoint test)
+import { opSimStarts } from '../viz/opSimStarts.js';       // t957 — the DECLARED per-pass operator start (the sim's own derivation) → the pre-flight trace stops probes at the real walls, not the naive datum
 
 const EPS = 0.01;   // mm — below this an "overshoot" is trace/float noise, not a real breach worth warning about
 
@@ -117,14 +118,35 @@ export function checkEnvelope(program, settings) {
     const stk = (s.stock && s.stock.show) ? s.stock : null;   // the SAME stock the AABB + the trace use (mirrors the preview's stockForViz show-gate)
     const stockBox = (blockMap && stk) ? stockWorkAABB(stk) : null;
     if (stockBox) {
+        // t957 B2b-3 Option B — reproduce the FAITHFUL per-pass operator start (the crux that blocked twice). Call the
+        // DECLARED opSimStarts(opType, params, stock) for every block-program op (the SAME start-derivation the sim uses —
+        // blocksApp.blkStartHints), assembled in program order → passStarts, threaded WITH the real wcsOffset. So the probes
+        // stop at the real walls (not the naive datum inside the boss) and the clearance traverses carry real geometry — the
+        // t955 spike proved this frames the Plane/Hop plows EXACTLY (a datum fallback keeps it working off a block program).
+        let passStarts = null;
+        try {
+            const prog = (typeof window !== 'undefined' && window.ddcsGetBlockProgram) ? (window.ddcsGetBlockProgram() || []) : [];
+            const hints = [];
+            for (const b of prog) { if (b && b.type === 'op' && b.opType) { const h = opSimStarts(b.opType, b.params || {}, stk); if (Array.isArray(h) && h.length) hints.push(...h); } }
+            passStarts = hints.length ? hints : null;
+        } catch (_) { passStarts = null; }
         const dxy = datumXY(stk);
-        const start = { x: dxy.x, y: dxy.y, z: Number(stk.z) || 0 };
+        const start = passStarts ? passStarts[0] : { x: dxy.x, y: dxy.y, z: Number(stk.z) || 0 };
         let t2;
-        try { t2 = traceToolpath(program || '', { wcsOffset: wo, stock: stk, start, blockMap }); } catch (_) { t2 = null; }
+        try { t2 = traceToolpath(program || '', { wcsOffset: wo, stock: stk, start, passStarts, blockMap }); } catch (_) { t2 = null; }
         const seen = new Set();
+        const top = stockBox.max.z;
         for (const seg of ((t2 && t2.segments) || [])) {
             if (seg.probe || seg.type === 'probe') continue;   // a probe move itself is not a traverse
             if (!Array.isArray(seg.blockTypes) || !seg.blockTypes.some((t) => TRAVERSE_BLOCKS.has(t))) continue;   // scope to DECLARED traverses
+            // t957 TIGHTEN — a real plow is a HORIZONTAL cross BELOW the stock top; both guards err ONLY toward more plows,
+            // never fewer (no false-negative). (1) exclude a PURE-VERTICAL lift/drop (no XY extent → it retracts along a wall,
+            // it cannot plow across the stock); a horizontal OR diagonal cross is still tested. (2) require SOME of the segment
+            // strictly below the stock top by a TINY float epsilon (EPS — a float-equality guard, NOT a clearance margin): a
+            // Max lift-to-margin cross sits at/above the top → excluded, while any dip below the top is still tested.
+            const seglen = Math.hypot((seg.x2 || 0) - (seg.x1 || 0), (seg.y2 || 0) - (seg.y1 || 0));
+            if (seglen < EPS) continue;                                          // (1) pure vertical lift/drop → not a cross
+            if (Math.min(seg.z1 || 0, seg.z2 || 0) >= top - EPS) continue;       // (2) entirely at/above the stock top → not a plow
             const rb = rayBox({ x: seg.x1, y: seg.y1, z: seg.z1 }, { x: seg.x2, y: seg.y2, z: seg.z2 }, stockBox.min, stockBox.max);
             if (!rb.hit) continue;
             const enter = Math.max(rb.tEnter, 0), exit = Math.min(rb.tExit, 1);
