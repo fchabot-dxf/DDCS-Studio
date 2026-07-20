@@ -17,9 +17,12 @@ test('(a) PROOF-OF-SUFFICIENCY: a built-in pattern as def.sim.starts rows == its
   const r = await page.evaluate(async () => {
     const { makeProvider, opSimStarts } = await import('/viz/opSimStarts.js');
 
-    // MIDDLE boss-both (auto): two wall-edge passes, the 2nd gated on twoAxis — exercises edge + @dir + @outset + probe + when
+    // MIDDLE boss-both — two wall-edge passes, the 2nd gated on twoAxis — exercises edge + @dir + @outset + probe + when.
+    // t963 B1: a MANUAL trans-traverse keeps the secondary wall at edge+outset (rows-expressible). The AUTO trans-traverse's
+    // secondary now DERIVES from the declared #21/#22 landing (not a simple anchor row — like cornerReposOffsets), verified
+    // against the emit in middle-repos-landing-963; so this rows-sufficiency proof uses the edge-expressible manual variant.
     const stockM = { x: 100, y: 80, z: 20 };
-    const pM = { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', dist: 100 };
+    const pM = { featureType: 'boss', twoAxis: true, axis: 'X', dir1: 'pos', dir2: 'neg', dist: 100, transAxis: 'manual' };
     const middleRows = [
       { anchor: 'edge', axis: 'X', side: '@dir1', out: '@outset', plane: 'probe' },
       { anchor: 'edge', axis: 'Y', side: '@dir2', out: '@outset', plane: 'probe', when: { param: 'twoAxis', is: true } },

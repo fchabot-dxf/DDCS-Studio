@@ -31,6 +31,27 @@ const n = (v, d) => num(v, d);
 // INSIDE the cavity, so an OFF-CENTRE pocket needs the start to follow its pos (else the probe starts outside → never stops).
 const insideCentre = (stock) => { try { const wp = projectWorkpiece(stock); const f = (wp.features || []).find((x) => x && x.side === 'inside' && x.pos); return f ? { x: +f.pos.x, y: +f.pos.y } : null; } catch (_) { return null; } };
 
+/** t963 B1 — the middle wall-2 traverse LANDING (the #21/#22 analog of cornerReposOffsets), for a boss two-axis AUTO
+ *  trans-traverse. The sim's wall-2 marker must sit where the tool actually LANDS, not at an independent edge+outset guess
+ *  that drifts as the operator edits Diag travel (#21) or the geometry changes. MIRRORS the emit's DECLARED reposition move
+ *  (parsed as ground truth in middle-repos-landing-963.spec): dir2:neg -> `G0 Y#21` (+diagTravel); dir2:pos -> `G0 Y[0-#21]`
+ *  (-diagTravel); the primary axis lands at #22 (=#53=the measured centre). So the wall-2 approach = centre on the primary
+ *  axis, centre +/- diagTravel on the secondary (sign per dir2) -> connect-by-construction with the emit. */
+export function middleReposLanding(params, stock) {
+    const p = params || {};
+    const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
+    const cx = sx / 2, cy = sy / 2, probeZ = -Math.min(5, sz * 0.5);   // a boss centre-finds the STOCK centre (insideCentre is a pocket-only concept)
+    const axis = (p.axis || 'X') === 'Y' ? 'Y' : 'X';
+    const second = axis === 'X' ? 'Y' : 'X';
+    const dir1Plus = (p.dir1 || 'pos') === 'pos';
+    const dir2Plus = (typeof p.dir2 === 'string' ? p.dir2 : (dir1Plus ? 'neg' : 'pos')) === 'pos';
+    const diagTravel = n(p.diagTravel, 50);
+    const secOff = dir2Plus ? -diagTravel : diagTravel;   // emit: dir2:pos -> Y[0-#21] (-), dir2:neg -> Y#21 (+)
+    return second === 'Y' ? { x: cx, y: cy + secOff, z: probeZ } : { x: cx + secOff, y: cy, z: probeZ };
+}
+/** t963 — the derivation applies only to the AUTO trans-traverse (#21/#22); a MANUAL trans jog is operator-placed. */
+const transAxisAuto = (params) => ((params && params.transAxis) || 'auto') === 'auto';
+
 // ── BUILT-IN per-pass start inference (MOVED verbatim from the wizards; pure (params, stock) → [{x,y,z}, …]) ───────────
 const BUILT_IN = {
     // MIDDLE — boss/pocket centre. Pocket = 1 pass (centre). Boss: in-axis manual → each wall its own pass; the trans
@@ -60,7 +81,9 @@ const BUILT_IN = {
         if (!boss) return [...lead, centre];                         // pocket: [Z?] then one pass from the centre
         const prim = inAxisManual ? [outside(axis, dir1Plus), outside(axis, !dir1Plus)] : [outside(axis, dir1Plus)];
         if (!twoAxis) return [...lead, ...prim];                     // single-axis: in-axis manual → 2 walls, auto → 1 (+ Z?)
-        const sec = inAxisManual ? [outside(second, dir2Plus), outside(second, !dir2Plus)] : [outside(second, dir2Plus)];
+        const sec = inAxisManual
+            ? [outside(second, dir2Plus), outside(second, !dir2Plus)]
+            : [transAxisAuto(params) ? middleReposLanding(params, stock) : outside(second, dir2Plus)];   // t963 B1 — the AUTO trans-traverse lands at the declared #21/#22 point (connect-by-construction), not an independent edge+outset guess
         return [...lead, ...prim, ...sec];                           // [Z?] + primary + the trans pass (auto or manual) secondary
     },
 

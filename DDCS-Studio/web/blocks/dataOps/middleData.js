@@ -27,7 +27,7 @@ import { middleStack } from '../../wizards/middleWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive MIDDLE_BINDINGS over a CANONICAL-pruned stack (the boss/twoAxis sockets are prune-gated in the superset)
-import { makeProvider } from '../../viz/opSimStarts.js';   // E2 — reuse the DECLARED anchor geometry (rowToStart) so the twin's per-pass markers == BUILT_IN.middle
+import { makeProvider, middleReposLanding } from '../../viz/opSimStarts.js';   // E2 — reuse the DECLARED anchor geometry (rowToStart) so the twin's per-pass markers == BUILT_IN.middle; t963 B1 — the auto trans-traverse wall-2 landing (#21/#22)
 
 /** Author defaults — match middleStack's num() fallbacks + the built-in Middle field defaults. Structural params baked at
  *  their default shape (pocket / auto travel / single-axis / active-WCS / no-Z / no-sync). axis/dir1 baked X-primary/+. */
@@ -141,7 +141,14 @@ export function middleSimStartsProvider(params, stock) {
         { anchor: 'edge', axis: second, side: opp(dir2), out: '@outset', plane: 'probe', when: { param: '_secW2', is: true } },   // boss two-axis secondary wall 2 (in-axis manual)
     ];
     const gated = { ...p, _zlead: !!p.probeZ, _pocket: !boss, _boss: boss, _primW2: boss && inAxisManual, _sec: boss && twoAxis, _secW2: boss && twoAxis && inAxisManual };
-    return makeProvider(rows)(gated, stock);
+    const passes = makeProvider(rows)(gated, stock);
+    // t963 B1 — the AUTO trans-traverse's secondary marker (the LAST pass when !inAxisManual) LANDS at the declared #21/#22
+    // point, not edge+outset (mirror BUILT_IN.middle). Preserve the pass's emits/source fields; sim-only, emit untouched.
+    if (boss && twoAxis && !inAxisManual && ((p.transAxis || 'auto') === 'auto') && passes.length) {
+        const i = passes.length - 1;
+        passes[i] = { ...passes[i], ...middleReposLanding(p, stock) };
+    }
+    return passes;
 }
 
 /** Build the middle-as-data def — same userOpFromStack pattern as corner/edge/drill/slot, PLUS `bindingSpecs` (instantiate
