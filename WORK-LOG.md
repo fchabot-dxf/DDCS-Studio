@@ -11497,3 +11497,57 @@ The frame is EXACT for the plow cases + CONSERVATIVE for the clear cases (no fal
 ACCEPTANCE (next turn): a MIDDLE Plane-below traverse flags; a low-Hop-through-stock flags; a probe does NOT false-positive;
 Max does NOT over-flag (after the tighten); gateway-send sees the kind; envelope byte-identical; own screenshots; full gate.
 RECOMMEND: proceed to the full build with the step-2 tighten. No code shipped this turn (spike was throwaway + deleted).
+
+---
+
+## 🔨 turn 957 — BUILD: the RUNTIME through-stock pre-flight (Option B), per the t956 greenlight (+ 2 guardrails)
+
+GREENLIGHT (advisor t956): BUILD AS PLANNED with 2 guardrails on the tighten (exclude ONLY vertical lift/drop; EPS a TINY
+float guard, not a clearance margin) + the frame-regression guard (reproduce the spike's 4-mode verdicts). Scope MIDDLE/inside.
+
+### THE BUILD (web/engine/envelopeCheck.js — the dormant fea8ea3 through-stock class, ACTIVATED)
+- **Faithful start (Option B):** replaced the naive datumXY start with opSimStarts-assembled passStarts — iterate the block
+  program (window.ddcsGetBlockProgram), call opSimStarts(op.opType, op.params, stock) per op (the SAME derivation the sim uses,
+  blocksApp.blkStartHints), concat in program order, thread WITH the real wcsOffset. So the probes stop at the real walls and
+  the clearance traverses carry real geometry (the t955 spike's crux). Datum fallback if no block program.
+- **The TIGHTEN (2 guardrails — neither can hide a real plow):** (1) exclude a PURE-VERTICAL lift/drop (seglen < EPS — it
+  retracts along a wall, cannot plow across the stock); a horizontal OR diagonal cross is still tested. (2) require SOME of
+  the segment strictly below the stock top by a TINY float EPS (0.01mm, NOT a clearance margin) — min(z1,z2) >= top - EPS
+  -> skip. A Max lift-to-margin cross sits at/above the top -> excluded; any dip below the top is still tested. Then the
+  existing mid-segment rayBox. kind:'through-stock' -> the 3 consumers (badge/setup/gateway-send) already branch (fea8ea3).
+- ENVELOPE byte-identical: all changes are INSIDE the `if (stockBox)` block; when there's no blockMap+stock the block is
+  skipped (stockViol empty) -> `all` is byte-identical (confirmed: 1341 passed, no existing spec broke).
+
+### VERIFY (real checkEnvelope path — tests/through-stock-957.spec.js, 4 green; the frame-regression guard)
+- a MIDDLE Plane-below traverse (planeZ -2) FLAGS through-stock at its line. (the realizable risk)
+- a Plane-ABOVE traverse (planeZ +10) does NOT flag — and the G31 probes crossing the footprint do NOT false-positive.
+- MAX does NOT over-flag (the tighten excludes the lift-to-margin cross + the vertical lifts).
+- a HOP clears (see the finding).
+
+### ! KEY FINDING (changes an acceptance item): a low-Hop-through-stock is NOT realizably constructable in the current ops
+Tracing the real geometry (spike + dumps) showed a hop CANNOT plow in practice:
+- Capped posts (Expert/V4.1): the hop caps at the machine margin -> CLEAR BY CONSTRUCTION — the cap IS the protection.
+- A BOSS wall-probe sits at the stock top (work Z 0) -> any hop (capped or not) lands at/above the top -> clear.
+- A POCKET middle uses plain `move` blocks between walls (dump: 1 traverse seg = the final retract, NO safetraverse) -> the
+  between-walls repositioning is not a clearance-traverse lift -> not a TRAVERSE_BLOCK -> correctly NOT tested (and it is
+  inside the empty cavity anyway).
+So the ONLY realizable through-stock plow is a PLANE set below the stock top (a work-frame clearance the user lowers) — which
+the check catches. The tighten has NO hop special-casing: a hop that DID render below the top would flag via the IDENTICAL
+horizontal-cross-below-top path proven by the Plane-below test. The frame-regression guard is met for the realizable risk;
+the low-Hop acceptance item is MOOT (protected by construction). SURFACED FOR YOUR CONFIRMATION.
+- FRAME: the real wcsOffset gives the FAITHFUL frame (Plane work-Z maps exactly; a G53 Max maps to a high work-Z = clear).
+  A flat g53ApproxZ was REJECTED in the spike (it broke the Hop = a false-negative). No inside-corner mode (confirmed t955).
+
+### SCREENSHOTS (my own — VIEWED)
+- shot957-send-confirm: the gateway-send confirm reads "...leave the machine travel OR CROSS THE STOCK" (the through-stock
+  kind IS seen at the send gate). NOTE: the envelope check inherently over-flags a middle PROBE program (its trace is
+  start-blind -> the probes overshoot the envelope), so the isolated through-stock line rides among envelope lines in a
+  synthetic setup; the 4-test spec is the clean proof the through-stock fires on Plane-below + clears otherwise.
+
+### FULL GATE
+- **1341 passed / 0 failed / 4 skipped** (11.1m) — grepped the whole log (only 404 noise). 1337 -> 1341 = +4 (the new
+  through-stock-957 spec). Envelope violations byte-identical (no existing spec has the block-program + stock + below-top
+  middle combo, so the through-stock never fires on them). Isolation-checked (through-stock-957 standalone green).
+
+### NEXT (advisor): review -> this completes the clearance-bundle Plane story -> release. Recommend confirming the low-Hop
+finding (moot/protected) so the acceptance reflects the realizable Plane-below coverage.
