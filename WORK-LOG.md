@@ -11356,3 +11356,52 @@ migration (mirror middle B2b-2a) BEFORE building, GATE if a park-semantics fork 
 ACCEPT (on build): my own golden diffs show ONLY the park lines move per wizard (probe/traverse/wcs/reposition byte-identical);
 the 3 relative parks GONE (sweep-asserted); full gate failed-count verbatim. Recommend: BUILD AS PROPOSED — no semantics fork,
 rotary is byte-parallel to middle, alignment differs only mechanically (#19/abs). Awaiting the greenlight (or adjustments).
+
+---
+
+## 🔨 turn 951 — BUILD: THE PARK-SWEEP (alignment + rotary_center + rotary_clock final park -> Max), per the t950 greenlight
+
+GREENLIGHT (advisor t950): BUILD AS PROPOSED, all 4 confirm-points agreed. Mirror middle B2b-2a — the final park routes
+through the shared safeRetractNode (per-post machine margin), retiring the relative-frame crash class + the rel|mach toggle.
+
+### THE MIGRATION (source)
+- **3 wizards** — the final park swaps safeZParkBlock(safeZFrame,var[,restore]) -> safeRetractNode:
+  - alignmentWizard:164   safeZParkBlock(safeZFrame,'#19')        -> safeRetractNode({ workClear:'#19' })   (G90 body)
+  - rotaryCenterWizard:166 safeZParkBlock(safeZFrame,'#17','inc') -> safeRetractNode({ restore:'inc' })
+  - rotaryClockWizard:134  safeZParkBlock(safeZFrame,'#17','inc') -> safeRetractNode({ restore:'inc' })
+  Dropped `const safeZFrame = safeZFrameOf(...)` + the safeZParkBlock/safeZFrameOf imports (unused after).
+- **3 views** — removed the `safeZFrame: safeZFrameValue(...)` read + the orphaned safeZFrameToggle import.
+- **3 data-op twins** — DELETED applySafeZFrame (the move->machinemove post-patch) + its postInstantiate chain wrap + the
+  safeZFrame binding + the safeZFrame default. The twin now inherits the safeRetractNode park via the frozen template (no
+  patch) -> twin byte-parity holds automatically (the *-data-emit specs pass UNCHANGED).
+- **CLEANUP (surgical)** — the rel|mach TOGGLE was fully orphaned (these 3 were the last adopters; middle retired at t919):
+  DELETED web/ui/safeZFrameToggle.js + removed the wizardManager import + mount call. safeZParkBlock/safeZFrameOf STAY
+  (probeSurface.js:124 still uses safeZParkBlock('machine',...) for the machine-return half). SAFEZ_FRAMES export is now
+  orphaned (1 line, no users) — LEFT dormant (not worth churn; noted here). The safe-Z FIELDS (rc_/rcl_/al_safe_z) STAY —
+  their #17/#19 value still drives the intermediate reposition/jog lifts (UNLIKE middle, whose safe-Z was ONLY the park).
+
+### VERIFY (two-method, real symptom)
+- **GOLDEN DIFF (my own, acceptance a):** captured the full emit of all 3 wizards x Expert/V4.1/DM500 BEFORE (git stash of
+  the 3 wizard files) vs AFTER. Every diff hunk is AT THE FINAL PARK: the old `G0 Z#17`/`G0 Z#19` relative park -> the
+  safeRetractNode margin (Expert `#42=#520 / IF #42<0 / G53 Z#42`; V4.1 `#190=-5 / G0 G53 Z#190`; DM500 `G90 / G0 Z#var`
+  work-frame). The ONLY other changes are the consequent guard-LABEL renumbers (GOTO91->92 etc.) as the new park consumes a
+  label. Probe / wcs / reposition / jog / results ALL byte-identical -> ONLY the park line moved.
+- **NEW tests/park-sweep-951.spec.js** (green): per wizard — Expert final park is the safeRetractNode #520-margin WITH the
+  unset-guard (acceptance b: IF #520<0 seed -> G53 Z#42, never a bare G53 Z0); NO G53 Z#17/#19 machine-park (toggle retired);
+  the relative G0 Z#var final park GONE (rotary 0; alignment 1 = only the kept earlier jog-lift); V4.1 #190 margin; DM500
+  keeps its own #17/#19 (acceptance d). Replaces the retired safez-frame + safez-frame-rollout specs.
+- **twin byte-parity (acceptance c):** alignment-data-emit + rotary-center/clock-data-emit PASS UNCHANGED (the twin inherits
+  the built-in's new park).
+
+### SPECS
+- DELETED tests/safez-frame.spec.js + tests/safez-frame-rollout.spec.js (they asserted the retired rel|mach toggle).
+- NEW tests/park-sweep-951.spec.js (the park-sweep assertion above).
+- NO superset/in-place fallout — the safeZFrame binding was a VALUE-SWAP (not a structural socket) + the field was
+  toggle-injected (not a static form field), so removing them touched no other spec. The ONLY suite delta is -2 (deleted) +1 (new).
+
+### FULL GATE
+- **1337 passed / 0 failed / 4 skipped** (11.2m) — grepped the whole log (no non-404 errors). 1338 -> 1337 = the 2 retired
+  toggle specs removed + the 1 park-sweep spec added. Isolation-checked (park-sweep-951 + the 3 *-data-emit standalone green).
+
+### NEXT (advisor): the COMPLETE spindle fix is already deployed (V2026.07.19.1). Fast-follow #2 = B2b-3 Option-B runtime
+through-stock (WIP fea8ea3 dormant + reusable) on fresh context.
