@@ -51,6 +51,7 @@ One new surface + one standing law, detailed in **[PARAM-WRITE-STRATEGY.md](PARA
 - **Per-point Z coordlist**: Allow users to specify discrete Z heights per coordinate point instead of a single depth per operation.
 - **Sim intent v2**: Upgrade the simulation model to better capture operational intent and visualize toolpaths more accurately.
 - **Community wizards**: Develop a platform or sharing mechanism for users to publish, discover, and install custom-built wizards from the broader community.
+- **Dual mm/inch display on input fields** (user request 2026-07-20): show both units on select numeric inputs (e.g. a live "= 0.5 in" hint beside a mm field, or an inline unit toggle), so shop users who think in inches can read/enter values without converting. Scope to the fields where it matters (dimensions/feeds/clearances), not every input; the app is mm-native so this is a DISPLAY/convenience layer — no change to emitted G-code. Files: `web/ui/formWidgets.js` (the numeric widget), settings for a default-display-unit preference.
 
 ---
 
