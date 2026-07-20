@@ -11831,3 +11831,46 @@ atcToolCheck (:71) + atcLength (:81) both hand-roll the SAME cycle (ST/PR/CK/MV 
 - **1344 passed / 0 failed / 4 skipped** (11.1m) -- emit BYTE-IDENTICAL (sim + emit goldens unchanged; the migration moves zero emitted bytes -> same count as t965). Round-trip + twins intact. No isolation flakes.
 
 ### NEXT: your ruling on the ATC gate (LEAVE vs migrate+drop-comment) + twoPassProbe cleanup. Then LOOP #3 = soft-limits home (ground-first). B1 t965 + this migration still HELD for the batch release.
+
+---
+
+## 🔨 turn 971 — GROUND + PROPOSE + GATE: LOOP #3 = soft-limits home. FINDING: the core soft-limit AWARENESS ALREADY EXISTS (checkEnvelope's overshoot check IS the machine soft-travel breach, just unnamed). Your acceptance ("a program exceeding the soft limits flags; within stays clean") ALREADY PASSES today. So the remaining work is a small labeling/accuracy fork -- I'm gating the scope before building (like the t967 probe-cycle finding).
+
+NO CODE this turn (you required "PROPOSE the scope BEFORE building"; the premise shifted -> re-rule the scope).
+
+### GROUNDING (survey + my own reads of envelopeCheck.js / limitSwitches.js)
+```
+  checkEnvelope(program, settings)   [engine/envelopeCheck.js]
+    trace program -> MACHINE frame (wcsOffsetAt: machine = work + wcsOffset)
+    spans = axisSpan(machine.{x,y,z})   <-- the 0..travel SOFT-TRAVEL box
+                                            (travel magnitude = the controller soft-limit regs #161-163/#166-168)
+    each segment endpoint outside {lo,hi} -> violation { line, axis:'X+'|'X-'|..., overshoot }  [NO 'kind']
+    -> red; consumers: preflightBadge . gateway send-gate . setupSheet
+```
+So the envelope check ALREADY IS the soft-limit check -- it flags any program point beyond the machine's soft-travel envelope. It just isn't NAMED "soft-limit," and it uses a symmetric 0..travel box. Covered today by tests/envelope-check-838 (exceeds -> red; within -> green). **Your acceptance test is already green.**
+
+### THE ENABLE RITUAL (writing #655) is GATED -- NOT this task
+- write-law (ROADMAP:43): programs NEVER write controller state; #655 soft-limit ENABLE = a confirmed run-once param macro (slib-g.nc precedent), NOT a normal emit.
+- ROADMAP:44: the soft-limit ENABLE RITUAL is 1 of 3 AT-THE-MACHINE experiments (user-gated). The homing wizard already re-enables #655=1 at home-end (homingWizard.js:191-195; opt-in HOMING_DEFAULTS.softLimits). NOT software-buildable now.
+
+### THE BUILDABLE RIG-FREE INCREMENTS (a value fork -- your/the user's call)
+All data is STATIC (settings + a dropped dump) -- NO rig needed (survey confirmed).
+- **A. LABEL + enable-state honesty (cheap, surgical, no new field).** Tag the overshoot violations `kind:'soft-limit'` so the operator reads "exceeds soft-travel limit" (today: a generic unnamed overshoot). AND reflect the enable state in the violation severity: when `softLimitsPulled===false` the controller does NOT enforce -> the breach is UNGUARDED (Studio's flag is the only guard); when true/unknown the machine self-protects at the limit. (preflightBadge already has a softLimitNote for the false case -- A folds that awareness into the violation itself, one-source.)
+- **B. ACCURACY: asymmetric min/max (needs a net-new settings field).** The pull captures `geometry.softLimits.{xMin,xMax,...}` (dumpImport.js:104) but DROPS them on Apply -- only the symmetric signed travel survives, so the check assumes 0..travel. If a controller's REAL soft box is tighter/offset than the entered travel (a margin inside the hard switch), the check UNDER-flags -> a FALSE GREEN ("fits" but the machine halts mid-program). Persisting the pulled min/max to a settings field + using it in `spans` (fallback symmetric when not pulled) fixes that. Rule-of-three: ONE consumer (checkEnvelope) -> a new field for one reader.
+
+### DECISION SIEVE
+- G1 safety: B fixes a FALSE-GREEN (Studio says "fits", the enforced soft limit halts the run) -- a misleading operator verdict, but the controller still self-protects (unexpected halt, not a crash). Real, mild. A improves the operator MESSAGE honesty (unguarded vs enforced) -- also G1-adjacent (a wrong/soft operator message).
+- G3 one-source: A folds the scattered softLimitNote into the violation (one source). B adds a field (more state, but derived from the dump one-source).
+- Residue (VALUE/COST -- your call): is the asymmetric-soft-box case (B) real for DDCS users (do they set soft limits INSIDE the travel)? If not, B is a speculative field. A is cheap + always-valuable.
+
+### RECOMMENDATION
+- The acceptance is ALREADY met -> do NOT rebuild the awareness.
+- Build **A** (label the existing breach as soft-limit + fold in the enable-state severity) -- clean, valuable, no new field, makes the existing check speak "soft limit" and honest about whether the controller enforces.
+- DEFER **B** unless you/the user confirm asymmetric DDCS soft limits are real -- it's a new settings field (rule-of-three: 1 reader) for a false-green that only bites pulled controllers whose soft box != entered travel.
+
+### GATE QUESTIONS
+1. Is **A** (label overshoot -> kind:'soft-limit' + enable-state severity, folding softLimitNote in) the intended slice? Build it now?
+2. **B** (persist + honor asymmetric pulled min/max) -- build now, or defer (new field; only helps pulled controllers with an offset soft box)?
+3. Or did "soft-limits home" actually mean the ENABLE RITUAL (gated) -> then NOTHING software-buildable + it goes to the user's at-the-machine list?
+
+B1 t965 + LOOP #2 t969 still HELD for the batch; the batch release follows whatever LOOP #3 resolves to.
