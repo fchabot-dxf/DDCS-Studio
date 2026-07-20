@@ -11457,3 +11457,43 @@ RECOMMEND: BUILD (the crux is enabled) — I take the frame-alignment + assembly
 (a MIDDLE Plane-below traverse flags; a probe does NOT false-positive; gateway-send sees the kind; envelope byte-identical;
 own screenshots; full gate). ALTERNATIVELY, if you'd rather I first prove-out the FRAME fidelity in a spike (the faithful
 probes land EXACTLY at the walls) before committing to the full build, say so. No code built this turn (gate). WIP stays dormant.
+
+---
+
+## 🔨 turn 955 — SPIKE-FRAME-FIRST (advisor t954 ruling): prove the through-stock FRAME before the full build
+
+RULING (advisor t954): SPIKE-FRAME-FIRST. opSimStarts-purity is the unlock, but the passStarts-vs-stock-AABB FRAME is a
+SYSTEMATIC correctness question (a false-NEGATIVE = the only unacceptable failure). Prove it in a SMALL THROWAWAY spike:
+on a known-PLOW + a known-CLEAR middle case the rayBox verdict is CORRECT + any residual frame error is EXACT or provably
+CONSERVATIVE (expands the plow region, never shrinks). If proven -> full build next turn; else GATE.
+
+### THE SPIKE (throwaway, run + deleted) — a middle boss dia=40, 100x100x30 stock (AABB top = work Z 0), passStarts from opSimStarts
+Verdicts (anyPlow) across the 4 modes:
+- **PLOW plane -2** (planeZ below the stock top) -> TRUE ✓  — the cross-traverse `(8,0,-2)->(88,0,-2)` at Z=-2 crosses the footprint.
+- **CLEAR plane +10** (planeZ above the top) -> FALSE ✓ — `(8,0,10)->(88,0,10)` sits above the stock.
+- **PLOW low hop 3** -> TRUE ✓ — a 3mm hop from the LOW wall-probe Z stays inside the stock.
+- **CLEAR max** -> TRUE (conservative false-POSITIVE) — see below.
+
+### THE FRAME IS PROVEN (faithful-for-plows, conservative-for-clear -> NO false-negative)
+- opSimStarts' passStarts make the trace produce traverse coords in the WORK frame, matching stockWorkAABB (top = Z 0). The
+  Plane + Hop clearance heights (planeZ / saved-probe-Z + hopDist) map EXACTLY to the work frame -> Plane-below + low-Hop
+  plows are detected EXACTLY, Plane-above is exactly clear. THE TARGETED cases (a Plane-below or low-Hop plow) are EXACT.
+- **g53ApproxZ is the WRONG lever:** a flat g53ApproxZ=20 fixed the Max false-positive but pushed the low HOP up too ->
+  a FALSE-NEGATIVE (missed a real plow). Rejected — never use a flat G53 approx for this check.
+- **The Max false-positive is CONSERVATIVE (safe):** Max lifts via a G53 to the machine margin (#42=#520/baked -5). Rendering
+  that faithfully needs the real machine-margin-vs-stock geometry; in a synthetic/degenerate setup (margin ~= stock top) +
+  because the VERTICAL lift/drop segments AT the wall pass through the box, Max over-flags. This ERRS toward MORE plows
+  (false-positive) -> SAFE by the advisor's criterion; NEVER a false-negative.
+- **No inside-corner mode** — CONFIRMED (grep cornerWizard: the "inside" hits are code-structure comments, not a cavity mode).
+
+### CONCLUSION -> PROCEED TO THE FULL BUILD (per the advisor's rule: proven faithful-or-conservative)
+The frame is EXACT for the plow cases + CONSERVATIVE for the clear cases (no false-negative possible). Build plan (next turn):
+1. checkEnvelope's stock-aware trace: opSimStarts(op.type, op.params, stk) per block-program op -> assemble the flat
+   passStarts (program order) + thread with the REAL wcsOffset (wo, already computed) -> REPLACE the naive datumXY start.
+2. TIGHTEN the false-positives (usability, keeps safety): restrict the rayBox to the HORIZONTAL cross-traverse (exclude the
+   vertical lift/drop segments at the wall) + require the segment Z strictly below the stock top by EPS -> clears Max +
+   grazing while keeping every real Plane/Hop plow. (Conservative fallback if unsure — a false-positive is safe.)
+3. kind:'through-stock' (already wired to badge + setup-sheet + gateway-send); envelope violations BYTE-IDENTICAL; scope MIDDLE.
+ACCEPTANCE (next turn): a MIDDLE Plane-below traverse flags; a low-Hop-through-stock flags; a probe does NOT false-positive;
+Max does NOT over-flag (after the tighten); gateway-send sees the kind; envelope byte-identical; own screenshots; full gate.
+RECOMMEND: proceed to the full build with the step-2 tighten. No code shipped this turn (spike was throwaway + deleted).
