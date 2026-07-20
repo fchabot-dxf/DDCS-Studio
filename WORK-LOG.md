@@ -11551,3 +11551,55 @@ the low-Hop acceptance item is MOOT (protected by construction). SURFACED FOR YO
 
 ### NEXT (advisor): review -> this completes the clearance-bundle Plane story -> release. Recommend confirming the low-Hop
 finding (moot/protected) so the acceptance reflects the realizable Plane-below coverage.
+
+---
+
+## 🔨 turn 959 — GROUND + PROPOSE (GATE): gate Clearance PLANE to (WCS==Active AND Z-set-first) — corner + middle
+
+USER-REPORTED SAFETY BUG (corner pilot, advisor-converged design — do NOT re-litigate): Clearance=Plane makes the safe-Z
+move DOWN — planeLiftNodes emits G90 G0 Z<planeZ> (WORK frame, safeZframe.js:127-138); a corner writes WCS X/Y offset
+registers but NEVER activates a target WCS (wcsArgOf writes offsets, no modal G5x) so the plane reads the RUNTIME-ACTIVE
+WCS Z which the corner may never set -> the safe-Z can descend. Max(G53)/Hop(relative) are frame-independent (fine).
+DESIGN (decided): PLANE offered IFF (WCS==Active) AND (Z established first); else grey Plane + auto-revert to Hop; emit backstop.
+
+### GROUNDED (3 mapping agents + code) — the surfaces
+- **planeLiftNodes** = G90 G0 Z<planeZ> WORK-frame (safeZframe.js:127-138). clearModeOf/clearLiftNode resolve the mode.
+- **CORNER (a DATA-OP form)**: clearMode dropdown (cornerData.js:89, data-param="clearMode", opts max/hop/plane), planeZ
+  plane-suggest (:91), wcs dropdown (:185, active/G54..G59, default active), probeZFirst toggle (:178, default OFF).
+  FORM emit: cornerWizard:83 probeZ=!!(probeZFirst|probeZ), :94 clearMode=clearModeOf(params.clearMode), :225 clearLiftNode.
+  Data-op fields address by [data-param=...] (NOT id); gating is the generic userOpView [data-gate]/[data-when] loop
+  (:284-304) + the twin postInstantiate chain (cornerData:325 applyStructCtl(applyHeaderComments(applyProbeSources))).
+- **MIDDLE (a built-in form)**: m_clear_mode (index.html:327-330), m_wcs (:311-318, default active), m_probe_z_first checkbox
+  (:295, param probeZ, default OFF), m_plane_z (:339). middleView.update reads them (:146/149/152/154) + already greys fields
+  reactively (Sync-A :216-233). FORM emit: middleWizard:59 clearMode=clearModeOf(params.clearMode).
+  MIDDLE is NEVER pure-Z (Z is opt-in via probeZ). **The MIDDLE TWIN (middleData) does NOT bind clearMode -> it can't be
+  Plane -> no twin gate/backstop needed there.** Only the CORNER twin binds clearMode.
+- **Precedents:** option-level grey + auto-revert = postGating.js:57-74 (the w_sys picker: per-option o.disabled + revert +
+  dispatch bubbling change); reactive field-grey = atcViews.gateField / middleView Sync-A (disable + data-op-gated='true' +
+  opacity + tooltip). data-op-gated='true' survives postGating's blanket cap-ON re-enable (postGating:85).
+
+### PROPOSED IMPLEMENTATION (the decided design; 3 layers, defense-in-depth)
+1. **Shared predicate (safeZframe.js, one source):** `planeGuaranteed(wcs, zFirst) = (wcs==='active' && !!zFirst)`;
+   `resolveClearMode(clearMode, {wcs, zFirst})` = folds 'plane'->'hop' when !guaranteed (else clearModeOf).
+2. **Emit backstop (a saved config / a twin can't bypass it):**
+   - FORM: cornerWizard:94 + middleWizard:59 call resolveClearMode(params.clearMode, {wcs, zFirst}) + emit an honest comment
+     when it folds ("Clearance plane needs Active WCS + Z datum - fell back to Hop", like the spindle-guard comment).
+   - TWIN: compose a step into the corner twin postInstantiate (cornerData:325) that folds the frozen clearlift block's
+     clearMode plane->hop when !planeGuaranteed(resolved.wcs, resolved.probeZFirst) ([[dataop-live-values-postinstantiate-not-emit]]).
+3. **UI gate (grey ONLY the Plane option, Max/Hop stay usable; auto-revert to Hop; reactive on wcs/probeZ change):**
+   - MIDDLE (built-in): in middleView.update, grey the m_clear_mode 'plane' <option> (disabled + tooltip) + auto-revert to
+     'hop' + dispatch change, when !(m_wcs==active && m_probe_z_first). Runs every field change (existing update cycle).
+   - CORNER (data-op): a DECLARED `optionGate` on the clearMode binding (option:'plane', requireAll:[{wcs:active},
+     {probeZFirst:true}], fallback:'hop', tip) + a small GENERIC userOpView mechanism (grey the option + auto-revert +
+     tooltip). The corner-pilot pattern; declare-not-infer; survives postGating (option-level, the select stays enabled).
+
+### THE 4 CONFIRM-POINTS (why I GATE — you asked to propose the gate+auto-revert+backstop before building; safety code x2 surfaces + a twin)
+1. Grey ONLY the Plane option (keep Max/Hop usable), not the whole Clearance field. OK?
+2. CORNER: a new DECLARED `optionGate` binding + generic userOpView mechanism (vs hardcoding). The reusable pilot pattern. OK?
+3. TWIN backstop via the corner twin's postInstantiate (fold the frozen clearlift plane->hop at build). OK?
+4. SCOPE: corner (form+twin) + middle (form only; the middle twin has no clearMode -> out). Confirm middle-twin exclusion.
+
+ACCEPT (on build): my own drive — corner + middle Plane greyed unless (Active WCS AND Probe Z First); toggling either
+greys/reverts live; a selected Plane auto-reverts to Hop. my own emit dump — plane + non-active/no-Z-first emits the Hop
+backstop (not G90 Z<planeZ>) with the comment; valid Active+Z-first emits the plane; corner twin parity; full gate.
+RECOMMEND: BUILD AS PROPOSED. No code this turn (gate). Awaiting greenlight or steer.
