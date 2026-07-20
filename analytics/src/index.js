@@ -23,6 +23,39 @@ const CORS = {
 const clip = (v, n) => String(v == null ? '' : v).slice(0, n);
 const DEV_TTL = 60 * 60 * 24 * 120;   // dev-IP tag lifetime (~120 days)
 
+// ── Bot classification (Layer B) ─────────────────────────────────────────────────────────────
+// Coarse visitor class from edge-only signals (User-Agent header + request.cf), computed at
+// INGEST because Analytics Engine is append-only — this is gone a moment later. We store the
+// CLASS (enum), never the raw UA/IP, so the no-PII promise holds.
+//   'verified-crawler' named search/AI crawler (Googlebot, Bingbot, GPTBot, ClaudeBot, …)
+//   'ua-bot'           UA self-identifies as automation (bot/crawl/spider/headless/curl/python…)
+//   'no-ua'            no User-Agent at all (almost always a script)
+//   'datacenter'       browser-like UA but from a hosting/cloud network — SOFT flag (VPNs exist)
+//   'clean'            looks like a genuine browser from a consumer network
+const CRAWLER_UA = /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex(bot|)|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-web|anthropic-ai|perplexitybot|applebot|facebookexternalhit|meta-externalagent|bytespider|amazonbot|semrushbot|ahrefsbot|mj12bot|dotbot|petalbot/i;
+const AUTOMATION_UA = /\bbot\b|crawl|spider|scraper|headless|phantomjs|puppeteer|playwright|selenium|python-requests|python-urllib|aiohttp|httpx|\bcurl\/|\bwget\/|go-http-client|okhttp|\bjava\/|libwww|scrapy|axios\/|node-fetch/i;
+// Named hosting/cloud orgs only. Kept conservative on purpose — 'datacenter' is a soft flag that
+// Layer C tempers, and a real user on a VPN/corporate proxy can trip it. Tune to taste.
+const DATACENTER_ORG = /amazon|\baws\b|digitalocean|linode|\bovh\b|hetzner|contabo|vultr|scaleway|leaseweb|choopa|\bm247\b|datacamp|alibaba|tencent|azure/i;
+
+function classifyBot(request, cf, app) {
+  // The .exe is a human by definition; its beacon is relayed via Python, so its UA
+  // ("python-requests") is meaningless. Short-circuit BEFORE any UA check. ← critical.
+  if (app === 'exe') return 'clean';
+
+  const ua = (request.headers.get('user-agent') || '').trim();
+  if (!ua) return 'no-ua';
+
+  // Cloudflare's own verdict when present (free tier may expose verifiedBotCategory; score is Enterprise).
+  if (cf.verifiedBotCategory || CRAWLER_UA.test(ua)) return 'verified-crawler';
+  if (AUTOMATION_UA.test(ua)) return 'ua-bot';
+  const score = cf.botManagement && typeof cf.botManagement.score === 'number' ? cf.botManagement.score : null;
+  if (score !== null && score <= 30) return 'ua-bot';
+
+  if (DATACENTER_ORG.test(String(cf.asOrganization || ''))) return 'datacenter';
+  return 'clean';
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -82,6 +115,7 @@ export default {
           clip(cf.city, 64),         // blob7: city (edge-derived)
           clip(cf.region, 64),       // blob8: region (edge-derived)
           dev,                       // blob9: "1" = developer's own (browser flag OR registered network)
+          classifyBot(request, cf, clip(ev.app, 8)),   // blob10: bot class (edge-derived enum; no UA/IP stored)
         ],
         doubles: [1],                // one event
         indexes: [anon || clip(cf.country, 4)],   // sampling key — spreads by visitor
@@ -228,6 +262,9 @@ async function handleDash(request, env) {
   const days = clampInt(url.searchParams.get('days'), 30, 1, 365);
   const showDev = url.searchParams.get('dev') === '1';
   const devF = showDev ? '' : "AND (blob9 != '1' OR blob9 IS NULL)";
+  const showBot = url.searchParams.get('bot') === '1';   // include bots (default: exclude hard bot classes)
+  const botF = showBot ? '' : "AND (blob10 NOT IN ('verified-crawler','ua-bot','no-ua') OR blob10 IS NULL)";
+  const realF = `${devF} ${botF}`;   // real users = not-dev AND not-hard-bot (datacenter+clean stay counted)
   // Date floor — excludes the 2026-06-20 build-day self-test burst (162 hits that predate dev-tagging).
   // It can't be DELETED (Analytics Engine is append-only), so we floor it out of every view. Override with ?from=YYYY-MM-DD.
   const fromReq = url.searchParams.get('from') || '2026-06-21';
@@ -237,14 +274,16 @@ async function handleDash(request, env) {
   const perInterval = per === 'week' ? "INTERVAL '7' DAY" : "INTERVAL '1' DAY";
 
   const Q = {
-    total:   `SELECT SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since}`,
-    byDay:   `SELECT toStartOfInterval(timestamp, INTERVAL '1' DAY) AS day, SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since} GROUP BY day ORDER BY day`,
-    country: `SELECT blob3 AS country, SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since} GROUP BY country ORDER BY visits DESC LIMIT 20`,
-    feature: `SELECT blob2 AS feature, SUM(_sample_interval) AS uses FROM ddcs_events WHERE blob1 = 'feature' ${devF} AND ${since} GROUP BY feature ORDER BY uses DESC LIMIT 20`,
-    app:     `SELECT blob4 AS app, SUM(_sample_interval) AS n FROM ddcs_events WHERE blob1 IN ('visit','app_launch') ${devF} AND ${since} GROUP BY app ORDER BY n DESC`,
-    version: `SELECT blob5 AS version, blob4 AS app, SUM(_sample_interval) AS n FROM ddcs_events WHERE blob1 IN ('visit','app_launch') ${devF} AND ${since} GROUP BY version, app ORDER BY n DESC LIMIT 25`,
-    byCountryPeriod: `SELECT toStartOfInterval(timestamp, ${perInterval}) AS period, blob3 AS country, SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since} GROUP BY period, country ORDER BY period`,
-    recentVisits: `SELECT toStartOfInterval(timestamp, INTERVAL '1' SECOND) AS ts, blob3 AS country, blob7 AS city, blob8 AS region, blob4 AS app, blob5 AS ver FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since} ORDER BY ts DESC LIMIT 200`,
+    total:   `SELECT SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${realF} AND ${since}`,
+    byDay:   `SELECT toStartOfInterval(timestamp, INTERVAL '1' DAY) AS day, SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${realF} AND ${since} GROUP BY day ORDER BY day`,
+    country: `SELECT blob3 AS country, SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${realF} AND ${since} GROUP BY country ORDER BY visits DESC LIMIT 20`,
+    feature: `SELECT blob2 AS feature, SUM(_sample_interval) AS uses FROM ddcs_events WHERE blob1 = 'feature' ${realF} AND ${since} GROUP BY feature ORDER BY uses DESC LIMIT 20`,
+    app:     `SELECT blob4 AS app, SUM(_sample_interval) AS n FROM ddcs_events WHERE blob1 IN ('visit','app_launch') ${realF} AND ${since} GROUP BY app ORDER BY n DESC`,
+    version: `SELECT blob5 AS version, blob4 AS app, SUM(_sample_interval) AS n FROM ddcs_events WHERE blob1 IN ('visit','app_launch') ${realF} AND ${since} GROUP BY version, app ORDER BY n DESC LIMIT 25`,
+    byCountryPeriod: `SELECT toStartOfInterval(timestamp, ${perInterval}) AS period, blob3 AS country, SUM(_sample_interval) AS visits FROM ddcs_events WHERE blob1 = 'visit' ${realF} AND ${since} GROUP BY period, country ORDER BY period`,
+    recentVisits: `SELECT toStartOfInterval(timestamp, INTERVAL '1' SECOND) AS ts, blob3 AS country, blob7 AS city, blob8 AS region, blob4 AS app, blob5 AS ver FROM ddcs_events WHERE blob1 = 'visit' ${realF} AND ${since} ORDER BY ts DESC LIMIT 200`,
+    // Traffic quality — the full visit split by bot class, still dev-filtered so the bot slice shows.
+    quality: `SELECT COALESCE(blob10,'(unclassified)') AS class, SUM(_sample_interval) AS n FROM ddcs_events WHERE blob1 = 'visit' ${devF} AND ${since} GROUP BY class ORDER BY n DESC`,
   };
 
   const keys = Object.keys(Q);
@@ -264,7 +303,7 @@ async function handleDash(request, env) {
   }
   const tagged = !!myIp && devIps.includes(myIp);
 
-  return new Response(renderDash({ data, errors, sql: Q, days, showDev, key, search: url.search, devIps, myIp, tagged, from, per }), {
+  return new Response(renderDash({ data, errors, sql: Q, days, showDev, showBot, key, search: url.search, devIps, myIp, tagged, from, per }), {
     headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
   });
 }
@@ -287,12 +326,12 @@ async function handleDashAction(request, env, url, key) {
   return Response.redirect(`${url.origin}${url.pathname}${url.search}`, 303);
 }
 
-function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myIp, tagged, from, per }) {
+function renderDash({ data, errors, sql, days, showDev, showBot, key, search, devIps, myIp, tagged, from, per }) {
   const total = Number((data.total && data.total[0] && data.total[0].visits) || 0);
   const k = encodeURIComponent(key);
-  const link = (d, dev) => `/dash?key=${k}&days=${d}&dev=${dev ? 1 : 0}&from=${esc(from)}&per=${per}`;
-  const perLink = (p) => `/dash?key=${k}&days=${days}&dev=${showDev ? 1 : 0}&from=${esc(from)}&per=${p}`;
-  const rangeBtn = (d) => `<a class="${d === days ? 'on' : ''}" href="${link(d, showDev)}">${d}d</a>`;
+  const link = (d, dev, bot) => `/dash?key=${k}&days=${d}&dev=${dev ? 1 : 0}&bot=${bot ? 1 : 0}&from=${esc(from)}&per=${per}`;
+  const perLink = (p) => `/dash?key=${k}&days=${days}&dev=${showDev ? 1 : 0}&bot=${showBot ? 1 : 0}&from=${esc(from)}&per=${p}`;
+  const rangeBtn = (d) => `<a class="${d === days ? 'on' : ''}" href="${link(d, showDev, showBot)}">${d}d</a>`;
   const errCount = Object.keys(errors).length;
   const payload = JSON.stringify({ data, errors }).replace(/</g, '\\u003c');
   const post = `/dash${esc(search || ('?key=' + k))}`;   // form action: preserves the current view across the redirect
@@ -318,6 +357,19 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
         return `<tr><td>${esc(String(p).slice(5, 10))}</td><td>${cells}</td><td>${tot}</td></tr>`;
       }).join('')}</table></div>`
     : '<span class="sub">no data</span>';
+
+  // Traffic quality — the visit split by bot class. real = clean+datacenter; bot = the three hard classes.
+  const HARD_BOT = new Set(['verified-crawler', 'ua-bot', 'no-ua']);
+  const qRows = (data.quality || []).map((r) => ({ cls: String(r.class || '(unclassified)'), n: Number(r.n) || 0 }))
+    .sort((a, b) => b.n - a.n);
+  const qReal = qRows.filter((r) => !HARD_BOT.has(r.cls)).reduce((s, r) => s + r.n, 0);
+  const qBot = qRows.filter((r) => HARD_BOT.has(r.cls)).reduce((s, r) => s + r.n, 0);
+  const qualityCard = `<div class="card"><h2>Traffic quality</h2>
+    <p class="sub" style="margin:0 0 8px">real (clean+datacenter) <b style="color:#2ea043">${qReal.toLocaleString()}</b> · bot <b style="color:#e3a008">${qBot.toLocaleString()}</b></p>
+    ${qRows.length
+      ? `<table><tr><th>class</th><th>visits</th></tr>${qRows.map((r) =>
+          `<tr><td>${esc(r.cls)}${HARD_BOT.has(r.cls) ? ' <span class="sub">bot</span>' : ''}</td><td>${r.n.toLocaleString()}</td></tr>`).join('')}</table>`
+      : '<span class="sub">no data</span>'}</div>`;
 
   const devRows = (devIps && devIps.length)
     ? `<table><tr><th>dev IP (hidden from default view)</th><th></th></tr>${devIps.map((ip) =>
@@ -376,7 +428,8 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
   <span class="sub">last ${days} days · since ${esc(from)} · ${showDev ? '<b style="color:#e3a008">incl. your dev traffic</b>' : 'real users only'}</span>
   <div class="controls">
     ${rangeBtn(7)}${rangeBtn(30)}${rangeBtn(90)}
-    <a href="${link(days, !showDev)}">${showDev ? 'hide dev' : 'show dev'}</a>
+    <a href="${link(days, !showDev, showBot)}">${showDev ? 'hide dev' : 'show dev'}</a>
+    <a href="${link(days, showDev, !showBot)}">${showBot ? 'hide bots' : 'show bots'}</a>
   </div>
 </header>
 <main>
@@ -390,6 +443,7 @@ function renderDash({ data, errors, sql, days, showDev, key, search, devIps, myI
   <div class="card full"><h2>Individual visits · latest ${visits.length} (UTC)</h2>${visitsList}</div>
   <div class="card"><h2>Top countries</h2><canvas id="c_country"></canvas></div>
   <div class="card"><h2>Web vs exe</h2><canvas id="c_app"></canvas></div>
+  ${qualityCard}
   <div class="card full"><h2>Top features used</h2><canvas id="c_feature"></canvas></div>
   <div class="card full"><h2>Versions</h2><div id="t_version"></div></div>
   ${devCard}
