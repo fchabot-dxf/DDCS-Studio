@@ -11652,3 +11652,45 @@ optionGate stays MINIMAL (a declared per-option predicate read by the EXISTING u
   (the new plane-guarantee-961 + plane-guarantee-ui-961). Isolation-checked (both plane specs standalone green).
 
 ### NEXT (advisor): review -> RELEASE (corner-pilot correctness/safety fix). The plane now emits ONLY when it is provably safe.
+
+---
+
+## 🔨 turn 963 — GROUND (GATE): B1 probe-start inversion — the trace-verification method is unreliable for a boss probe
+
+TASK (advisor t962, LOOP #1): sim-only, emit byte-identical — a middleReposLanding helper (the #21/#22 analog of
+cornerReposOffsets) so the sim wall-2 start DERIVES from the declared traverse landing, not edge+outset. Gate boss &&
+twoAxis && transAxis-auto. ACCEPT: my own check that sim-start == the TRACED traverse landing (both shapes); GATE if the
+sign/pose surfaces a real fork.
+
+### GROUNDED — the inversion CONFIRMED
+- The current sim wall-2 start = `opSimStarts.middle` -> `outside(second, dir2Plus)` (viz/opSimStarts.js:52-54, :63) = an
+  EDGE+OUTSET re-derivation, computed INDEPENDENTLY of the emit's traverse. For a 100x80 boss, dir1:pos:
+  dir2:neg -> sim wall-2 at (50, **92**, +Y side); dir2:pos -> (50, -12, -Y side).
+- The EMIT's actual trans-traverse goes the OTHER way: my continuous trace (from the faithful wall-1 start) shows dir2:neg
+  traversing toward **-Y**, dir2:pos toward +Y. So the sim marker is on the WRONG SIDE vs where the tool actually goes — the
+  exact "probe-start inversion" this task fixes. cornerReposOffsets (cornerWizard:43) is the template: it MIRRORS the emit's
+  `params.<sock> || formula` so the sim landing == the emit's traverse landing BY CONSTRUCTION.
+- The emit's #21 = diagTravel (default 50, the secondary traverse offset), #22 = the diagonal target; the wall-2 landing =
+  (primary = #53/diagPrimary, secondary = centre ± diagTravel, sign per dir2).
+
+### WHY I GATE — the advisor's acceptance METHOD ("assert sim-start == the TRACED landing") is UNRELIABLE here
+A bare `traceToolpath` does NOT cleanly yield the boss traverse landing: the virtual probe does not stop at the boss walls
+(the tool overshoots — probes trace to Y=±200/398/476, X pinned at 0 not the centre 50), the SAME start-fidelity + virtual-
+probe modelling gap that blocked the through-stock check twice (a boss probe needs the full sim panel's stock/feature model,
+not a raw trace). So "sim-start == traced-landing" can't be asserted cleanly from a toolpath trace in a test. This is
+safety-critical (a wrong sim start MISLEADS the operator — the trust surface; B1 was DELIBERATELY PAUSED once before for
+exactly this, WORK-LOG t907/pause note), so I will NOT hand-derive the sign/pose past an unreliable check.
+
+### PROPOSED PATH (recommend) — verify against the EMIT FORMULA, not a flaky toolpath trace
+Build middleReposLanding by MIRRORING the middle emit's #21/#22 formula (exactly as cornerReposOffsets mirrors the corner
+emit) — the incremental secondary offset centre ± diagTravel with the sign READ from the emit's declared trans-traverse move
+(the actual #21 offset + dir2 sign in the emit blocks/text), the primary from #53/diagPrimary. VERIFY: sim wall-2 == the
+emit's DECLARED traverse target (the #21/#22 landing computed the same way the emit computes it) for BOTH travelShapes +
+both dir2 -> connect-by-construction. Emit BYTE-IDENTICAL (sim-only). This is the corner template's own method (mirror the
+emit, not trace the toolpath).
+
+### THE CONFIRM-POINT
+The acceptance says "sim-start == the TRACED traverse landing." The toolpath trace is unreliable for a boss probe (above).
+OK to verify against the EMIT's declared #21/#22 landing formula instead (the cornerReposOffsets method — connect-by-
+construction, no flaky trace)? If yes -> I build it. If you know a reliable sim-panel trace setup that yields the clean boss
+landing, point me at it. No code this turn (gate). RECOMMEND: build with the emit-formula mirror + emit-declared verification.
