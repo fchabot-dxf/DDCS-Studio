@@ -76,14 +76,18 @@ export default {
           if (pre.status === 'red') {
             const hasNoSpindle = pre.violations.some(v => v.kind === 'no-spindle');   // t947 — the DEAD-SPINDLE breach leads (most severe)
             const hasStock = pre.violations.some(v => v.kind === 'through-stock');   // t937 — a through-stock kind softens the envelope-only wording
+            // t973 — soft limits OFF on the controller (softLimitsPulled===false) → a travel breach is UNGUARDED (the machine
+            // will NOT stop itself; a hard-stop crash risk). ADDITIVE — the send is already gated red; this only escalates the wording.
+            const unguarded = pre.softLimitsEnforced === false && pre.violations.some(v => v.kind === 'soft-limit');
             const top = pre.violations.slice(0, 4).map(v =>
               v.kind === 'no-spindle' ? `line ${v.line}: cuts with the spindle OFF (no M3)`
               : v.kind === 'through-stock' ? `line ${v.line}: crosses the stock`
               : `line ${v.line}: ${v.axis} by ${Math.round(v.overshoot * 10) / 10} mm`).join('\n');
             const more = pre.violations.length > 4 ? `\n…and ${pre.violations.length - 4} more` : '';
+            const unguardedNote = unguarded ? '\n\nWARNING: soft limits are DISABLED on your controller — the machine will NOT stop itself at these limits (a hard-stop crash risk). This pre-flight is your only guard.' : '';
             const msg = hasNoSpindle
-              ? `Pre-flight: this program makes a cutting move (G1/G2/G3) but never turns the spindle on (M3/M4) — it would plunge and cut with the spindle STOPPED (a broken tool / part / worse):\n\n${top}${more}\n\nSend to the controller anyway?`
-              : `Pre-flight found ${pre.violations.length} move(s) that would ${hasStock ? 'leave the machine travel or cross the stock' : 'leave the machine travel'}:\n\n${top}${more}\n\nSend to the controller anyway?`;
+              ? `Pre-flight: this program makes a cutting move (G1/G2/G3) but never turns the spindle on (M3/M4) — it would plunge and cut with the spindle STOPPED (a broken tool / part / worse):\n\n${top}${more}${unguardedNote}\n\nSend to the controller anyway?`
+              : `Pre-flight found ${pre.violations.length} move(s) that would ${hasStock ? 'leave the machine travel or cross the stock' : 'leave the machine travel'}:\n\n${top}${more}${unguardedNote}\n\nSend to the controller anyway?`;
             const ok = await dlgConfirm(msg,
               { title: hasNoSpindle ? 'Dead spindle — pre-flight' : hasStock ? 'Pre-flight violation' : 'Envelope violation', danger: true, okLabel: 'Send anyway', cancelLabel: 'Cancel' });
             if (!ok) return;   // the finally block re-enables the button

@@ -16,10 +16,15 @@ const settings = () => (window.ddcsGetSettings && window.ddcsGetSettings()) || {
 const fmt = (n) => (Math.round(n * 10) / 10).toFixed(1);
 
 // BONUS (t838): when the pull recorded that the controller's soft limits are OFF, say so — the declared envelope is then
-// NOT enforced by the machine, so Studio's warning is the only guard. (settings.machine.softLimitsPulled, set at pull.)
-function softLimitNote() {
-    const m = settings().machine || {};
-    if (m.softLimitsPulled === false) return 'Heads up: soft limits are DISABLED on your controller — the machine will NOT stop itself at these limits. This pre-flight is your only guard.';
+// NOT enforced by the machine, so Studio's warning is the only guard. t973 — folded to ONE source: the enable state now
+// rides checkEnvelope's result (res.softLimitsEnforced), not a second read of settings, so the note + the per-row UNGUARDED
+// escalation can never drift.
+function softLimitNote(res) {
+    if (!res) return '';
+    if (res.softLimitsEnforced === false) return 'Heads up: soft limits are DISABLED on your controller — the machine will NOT stop itself at these limits. This pre-flight is your only guard.';
+    // t973 — when the controller DOES enforce soft limits, a breach still halts the job mid-run (it just won't crash). Context
+    // only when there IS a soft-limit breach (no green-state noise), so a guarded overshoot never reads as "the machine handles it, ignore".
+    if (res.softLimitsEnforced === true && (res.violations || []).some((v) => v.kind === 'soft-limit')) return 'Soft limits are enabled on your controller — it will stop at the envelope, but the breach still halts the job mid-run.';
     return '';
 }
 function probeNote(res) {
@@ -46,14 +51,14 @@ function renderPop(res) {
         for (const v of res.violations) {
             const li = document.createElement('li');
             li.className = 'preflight-row'; li.setAttribute('data-line', v.line);
-            li.textContent = v.kind === 'no-spindle' ? `line ${v.line} · cuts with the spindle OFF (no M3)` : v.kind === 'through-stock' ? `line ${v.line} · crosses the stock` : `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over`;
+            li.textContent = v.kind === 'no-spindle' ? `line ${v.line} · cuts with the spindle OFF (no M3)` : v.kind === 'through-stock' ? `line ${v.line} · crosses the stock` : v.kind === 'soft-limit' ? `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over${res.softLimitsEnforced === false ? ' · UNGUARDED — the machine will NOT stop' : ''}` : `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over`;
             li.title = 'Jump to this line';
             li.addEventListener('click', () => { if (_mgr && _mgr.revealLine) _mgr.revealLine(v.line); pop.hidden = true; });
             ul.appendChild(li);
         }
         pop.appendChild(ul);
     }
-    for (const note of [probeNote(res), softLimitNote()]) {
+    for (const note of [probeNote(res), softLimitNote(res)]) {
         if (!note) continue;
         const d = document.createElement('div'); d.className = 'preflight-pop-note'; d.textContent = note; pop.appendChild(d);
     }
@@ -70,7 +75,7 @@ function renderAnnotations(res) {
     if (!overlay) return;
     overlay.querySelectorAll('.preflight-annot').forEach((el) => el.remove());
     if (!res || res.status !== 'red' || !res.violations.length) return;
-    const notes = [probeNote(res), softLimitNote()].filter(Boolean).join('\n');   // caveats ride the annotation title (no chip in RED)
+    const notes = [probeNote(res), softLimitNote(res)].filter(Boolean).join('\n');   // caveats ride the annotation title (no chip in RED)
     const byLine = new Map();   // a line can breach multiple edges → one annotation listing them
     for (const v of res.violations) { if (!byLine.has(v.line)) byLine.set(v.line, []); byLine.get(v.line).push(v); }
     for (const [line, vs] of byLine) {
@@ -78,7 +83,10 @@ function renderAnnotations(res) {
         if (!span) continue;
         const a = document.createElement('span');
         a.className = 'preflight-annot';
-        a.textContent = vs.map((v) => v.kind === 'no-spindle' ? 'spindle OFF · no M3' : v.kind === 'through-stock' ? 'crosses the stock' : `${v.axis} ${fmt(v.overshoot)}mm over`).join(' · ');
+        const parts = vs.map((v) => v.kind === 'no-spindle' ? 'spindle OFF · no M3' : v.kind === 'through-stock' ? 'crosses the stock' : `${v.axis} ${fmt(v.overshoot)}mm over`);
+        // t973 — the UNGUARDED escalation rides the line ONCE (a line can breach two edges; don't repeat it per-edge).
+        const unguarded = res.softLimitsEnforced === false && vs.some((v) => v.kind === 'soft-limit');
+        a.textContent = parts.join(' · ') + (unguarded ? ' · UNGUARDED' : '');
         if (notes) a.title = notes;
         span.appendChild(a);
     }

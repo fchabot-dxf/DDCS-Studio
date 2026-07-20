@@ -51,21 +51,29 @@ export function placementDeclared(machine) {
     return !!(machine && machine.wcs && Array.isArray(machine.wcs.table) && machine.wcs.table.length > 0);
 }
 
-// { status, violations, uncheckedProbes, reason }.
+// { status, violations, uncheckedProbes, reason, softLimitsEnforced }.
 //   status: 'green' (fits) | 'amber' (cannot verify — why in `reason`) | 'red' (violations.length breaches)
-//   violations: [{ line (1-based, for display), axis ('X+'|'X-'|'Y+'|'Y-'|'Z+'|'Z-'), overshoot (mm past the edge) }]
+//   violations: [{ line (1-based, for display), axis ('X+'|'X-'|'Y+'|'Y-'|'Z+'|'Z-'), overshoot (mm past the edge), kind:'soft-limit' }]
 //   uncheckedProbes: count of trip-dependent probe segments skipped (named in the tooltip)
+//   softLimitsEnforced: t973 — the controller's soft-limit enable state (false = UNGUARDED breach / crash risk · true = self-protected · null = unknown)
 export function checkEnvelope(program, settings) {
     const machine = settings && settings.machine;
     const s = settings || {};
+    // t973 — the controller's soft-limit ENABLE state: the ONE source for the enable-state severity + the badge note (folds
+    // the old preflightBadge.softLimitNote, which re-read settings). softLimitsPulled is captured at pull: false → the machine
+    // will NOT stop itself at the envelope (a breach is UNGUARDED — a hard-stop crash risk); true → self-protected; undefined
+    // (never pulled) → unknown. This NEVER downgrades or clears a breach — it only escalates the wording. Threaded onto every
+    // return so the consumers read it instead of re-deriving from settings.
+    const softLimitsEnforced = machine && machine.softLimitsPulled === false ? false
+        : machine && machine.softLimitsPulled === true ? true : null;
     // t947 — the dead-spindle guard runs FIRST + UNCONDITIONALLY (independent of the machine envelope / placement) so it
     // fires even when the envelope can't be verified (amber) or on a raw .nc with no WCS table. A dead-spindle is a definite,
     // text-verifiable breach → it PROMOTES an otherwise-amber verdict to RED (which gates the send). Empty → byte-identical.
     const spindleViol = spindleGuard(program || '');
-    const promote = (amber) => spindleViol.length ? { status: 'red', violations: spindleViol.slice(), uncheckedProbes: 0, reason: '' } : amber;
-    if (!machine) return promote({ status: 'amber', reason: 'no machine envelope configured (Settings → Machine)', violations: [], uncheckedProbes: 0 });
+    const promote = (amber) => spindleViol.length ? { status: 'red', violations: spindleViol.slice(), uncheckedProbes: 0, reason: '', softLimitsEnforced } : amber;
+    if (!machine) return promote({ status: 'amber', reason: 'no machine envelope configured (Settings → Machine)', violations: [], uncheckedProbes: 0, softLimitsEnforced });
     if (!placementDeclared(machine)) {
-        return promote({ status: 'amber', reason: 'placement not declared — no WCS table pulled/entered, so the program cannot be mapped into the machine frame to verify', violations: [], uncheckedProbes: 0 });
+        return promote({ status: 'amber', reason: 'placement not declared — no WCS table pulled/entered, so the program cannot be mapped into the machine frame to verify', violations: [], uncheckedProbes: 0, softLimitsEnforced });
     }
 
     const wo = wcsOffsetAt(machine, (machine.wcs && machine.wcs.active) || 1) || { x: 0, y: 0, z: 0 };
@@ -90,7 +98,7 @@ export function checkEnvelope(program, settings) {
             if (!edge) continue;
             const key = line + '|' + edge;
             const prev = worst.get(key);
-            if (!prev || over > prev.overshoot) worst.set(key, { line: (line | 0) + 1, axis: edge, overshoot: over });
+            if (!prev || over > prev.overshoot) worst.set(key, { line: (line | 0) + 1, axis: edge, overshoot: over, kind: 'soft-limit' });
         }
     };
 
@@ -163,5 +171,5 @@ export function checkEnvelope(program, settings) {
     // UNCHANGED. When spindleViol is empty this is byte-identical to before (concat of [] is a no-op).
     const all = spindleViol.concat(violations).concat(stockViol);
     const status = all.length ? 'red' : 'green';
-    return { status, violations: all, uncheckedProbes, reason: '' };
+    return { status, violations: all, uncheckedProbes, reason: '', softLimitsEnforced };
 }
