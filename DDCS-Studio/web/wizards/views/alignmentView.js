@@ -1,6 +1,5 @@
 /** views/alignmentView.js — Alignment wizard view (DOM glue + SVG animator). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { safeZFrameValue } from '../../ui/safeZFrameToggle.js';   // SPATIAL-MODEL 1c: shared safe-Z frame read
 import { AlignmentWizard } from '../alignmentWizard.js';
 import { applyPreviewIntent } from './atcViews.js';   // t714 — the ONE declared-intent apply (built-in view + twin agree by construction)
 
@@ -57,7 +56,6 @@ export const alignmentView = {
             dist:       el('al_dist')?.value         || '20',
             retract:    el('al_retract')?.value      || '2',
             safeZ:      el('al_safe_z')?.value       || '10',
-            safeZFrame: safeZFrameValue('al_safe_z'),   // SPATIAL-MODEL 1c: final-park frame (relative | machine G53)
             f_fast:     el('al_feed_fast')?.value    || '200',
             f_slow:     el('al_feed_slow')?.value    || '50',
             qStop:      el('al_q')?.value            || '1',

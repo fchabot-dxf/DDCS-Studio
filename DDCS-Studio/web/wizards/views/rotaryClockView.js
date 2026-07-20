@@ -1,6 +1,5 @@
 /** views/rotaryClockView.js — Rotary clock (A0 to a feature) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { safeZFrameValue } from '../../ui/safeZFrameToggle.js';   // SPATIAL-MODEL 1c: shared safe-Z frame read
 import { RotaryClockWizard } from '../rotaryClockWizard.js';
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { applyPreviewIntent } from './atcViews.js';   // t714 — the ONE declared-intent apply (rig + envelope), single-sourced with the twin
@@ -36,7 +35,6 @@ export const rotaryClockView = {
             dist: el('rcl_dist')?.value || '30',
             retract: el('rcl_retract')?.value || '2',
             safeZ: el('rcl_safe_z')?.value || '10',
-            safeZFrame: safeZFrameValue('rcl_safe_z'),   // SPATIAL-MODEL 1c: final-park frame (relative | machine G53)
             f_fast: el('rcl_feed_fast')?.value || '200',
             f_slow: el('rcl_feed_slow')?.value || '50',
             qStop: el('rcl_q')?.value || '1',

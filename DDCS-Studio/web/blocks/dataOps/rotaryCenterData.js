@@ -29,7 +29,7 @@ import { rotaryAxisOf } from '../../engine/probeGeometry.js';   // E3 — which 
 
 /** Author defaults — match rotaryCenterStack's own num() fallbacks + the structural default shape (known / auto / centreline / active / relative). */
 export const ROTARY_CENTER_DEFAULTS = {
-    method: 'known', approach: 'auto', datum: 'center', wcs: 'active', safeZFrame: 'relative',
+    method: 'known', approach: 'auto', datum: 'center', wcs: 'active',
     dist: 30, retract: 2, f_fast: 200, f_slow: 50, port: 3, radius: 2, safeZ: 15, diameter: 76.2, level: 0,
 };
 
@@ -56,7 +56,6 @@ export const ROTARY_CENTER_STRUCT_BINDINGS = [
 export const ROTARY_CENTER_VALUESWAP_BINDINGS = [
     { param: 'datum',      type: 'enum', default: ROTARY_CENTER_DEFAULTS.datum,      label: 'Z0 Datum',     help: 'Set Z0 at the centreline (the bar axis) or the OD top.', section: 'GEOMETRY', widgetConfig: { options: [['Centreline', 'center'], ['OD top', 'top']] } },
     { param: 'wcs',        type: 'enum', default: ROTARY_CENTER_DEFAULTS.wcs,        label: 'WCS',          help: 'Which work-coordinate register to store the found centre into.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
-    { param: 'safeZFrame', type: 'enum', default: ROTARY_CENTER_DEFAULTS.safeZFrame, label: 'Safe-Z Frame', help: 'Relative: safe Z is a clearance lift. Machine: safe Z is an absolute machine height, parked via G53.', section: 'GEOMETRY', widgetConfig: { options: [['Relative', 'relative'], ['Machine (G53)', 'machine']] } },
 ];
 
 export const ROTARY_CENTER_DATA_OPTYPE = 'user_rotary_center_data';
@@ -114,18 +113,6 @@ function applyDatumWcs(stack, resolved) {
     return stack;
 }
 
-/** RECOMPOSE the final PARK block for the safeZFrame value-swap: relative → the rapid `move` (seed default); machine → the
- *  `machinemove` (G53). Find the park by its 'Final retract' comment anchor + swap the block in place. */
-function applySafeZFrame(stack, resolved) {
-    if (!resolved || resolved.safeZFrame !== 'machine') return stack;   // relative = the seed → unchanged (byte-identical)
-    const flat = flattenBlocks(stack);
-    const ci = flat.findIndex((b) => b && b.type === 'comment' && b.params && b.params.text === 'Final retract');
-    if (ci < 0) return stack;
-    const park = flat[ci + 1];
-    if (park && park.type === 'move') { park.type = 'machinemove'; park.params = { axis: 'Z', to: '#17', restore: 'inc' }; }   // t856 — mirror safeZParkBlock(...,'inc'): the machine park is inside the G91 body, so its G53 is G90-wrapped + G91-restored
-    return stack;
-}
-
 // SOURCE-CHIPS (corner/atc precedent): on Expert, rewrite #2 (retract) / #3 (fastFeed) / #5 (port) to the controller register.
 const PROBE_SRC_VARS = { port: '#5', fastFeed: '#3', retract: '#2' };
 function applyProbeSources(stack) {
@@ -152,7 +139,7 @@ export function rotaryCenterDataDef() {
     const bindings = [...valueBindings, ...ROTARY_CENTER_STRUCT_BINDINGS, ...ROTARY_CENTER_VALUESWAP_BINDINGS];
     const def = userOpFromStack('rotary_center_data', 'Rotary Centreline (data)', rotaryCenterDataStack(ROTARY_CENTER_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = ROTARY_CENTER_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
-    def.postInstantiate = (stack, resolved) => applyProbeSources(applySafeZFrame(applyDatumWcs(applyHeaderComments(stack, resolved), resolved), resolved));
+    def.postInstantiate = (stack, resolved) => applyProbeSources(applyDatumWcs(applyHeaderComments(stack, resolved), resolved), resolved);   // t951 park-sweep — applySafeZFrame retired (the built-in now parks via safeRetractNode; no move→machinemove swap)
     // E2 — the per-pass PREVIEW-START provider: reuse BUILT_IN.rotary_center (opSimStarts.js:86) VERBATIM via the sim registry
     // (registerUserOp → setUserSimStarts), NOT the builder → sim-only, emit BYTE-IDENTICAL. KNOWN = 1 pass (top); FIT = 3 (top + 2 flanks).
     def.simStartsProvider = (params, stock) => opSimStarts('rotary_center', params, stock);

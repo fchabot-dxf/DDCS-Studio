@@ -24,7 +24,7 @@ import { alignEffectiveTravel, DEFAULT_ALIGN_SPAN } from '../../wizards/ops/alig
 
 /** Author defaults — match alignmentStack's own num() fallbacks + the structural default shape (X fence / pos probe / relative). */
 export const ALIGNMENT_DEFAULTS = {
-    checkAxis: 'X', probeDir: 'pos', safeZFrame: 'relative', travel: 'auto',
+    checkAxis: 'X', probeDir: 'pos', travel: 'auto',
     dist: 20, retract: 2, f_fast: 200, f_slow: 20, port: 0, safeZ: 10, tolerance: 0, level: 0,
     span: DEFAULT_ALIGN_SPAN,   // t544 — the A→B span (mm along checkAxis); handle B's drag / typing set it (the ONE source). ax/ay (A's sim-only anchor) default via alignAnchor.
 };
@@ -56,7 +56,6 @@ export const ALIGNMENT_STRUCT_BINDINGS = [
 /** VALUE-SWAP form controls — NOT structural (no guard, no #var socket): they drive the postInstantiate RECOMPOSE.
  *  tolerance is F3 DISPLAY-ONLY — a number field that recomposes ONLY the header comment (the macro never enforces it). */
 export const ALIGNMENT_VALUESWAP_BINDINGS = [
-    { param: 'safeZFrame', type: 'enum', default: ALIGNMENT_DEFAULTS.safeZFrame, label: 'Safe-Z Frame', help: 'Relative: safe Z is a clearance lift. Machine: safe Z is an absolute machine height, parked via G53.', section: 'GEOMETRY', widgetConfig: { options: [['Relative', 'relative'], ['Machine (G53)', 'machine']] } },
     { param: 'tolerance',  type: 'number', default: ALIGNMENT_DEFAULTS.tolerance, label: 'Tolerance', help: 'Informational only: the acceptable misalignment (mm), shown in the header comment. The macro measures the angle; it does not enforce a tolerance.', section: 'GEOMETRY' },
 ];
 
@@ -97,19 +96,6 @@ function applyHeaderComments(stack, resolved) {
     return stack;
 }
 
-/** RECOMPOSE the final PARK block for the safeZFrame value-swap: relative → the rapid `move` (seed default); machine → the
- *  `machinemove` (G53). Alignment has NO 'Final retract' comment anchor → find the park as the block right AFTER the #54 ATAN
- *  assign (the only such assign; the earlier MV Z#19 lift is disambiguated by this anchor). Parks at #19 (rotaryData precedent). */
-function applySafeZFrame(stack, resolved) {
-    if (!resolved || resolved.safeZFrame !== 'machine') return stack;   // relative = the seed → unchanged (byte-identical)
-    const flat = flattenBlocks(stack);
-    const ai = flat.findIndex((b) => b && b.type === 'assign' && b.params && b.params.var === '#54' && /ATAN/.test(String(b.params.value)));
-    if (ai < 0) return stack;
-    const park = flat[ai + 1];
-    if (park && park.type === 'move') { park.type = 'machinemove'; park.params = { axis: 'Z', to: '#19', restore: 'abs' }; }   // t858 — mirror safeZParkBlock default 'abs': the machine park G53 gets an explicit G90 (jump-proof), no G91 restore
-    return stack;
-}
-
 // t544 — applyAlignAutoTravel (the stock-dependent absolute-coord travel writer) is DELETED. AUTO no longer rapids to two
 // absolute points: it probes A in place + steps the declared SPAN (#73) as a relative jog. The span is a plain scalar bound
 // by the #73 value binding (like #1/#19) — no stock, no coord recompose. The emit has NO numeric X/Y moves to rewrite.
@@ -144,7 +130,7 @@ export function alignmentDataDef() {
     // t544 — inject the EFFECTIVE travel (auto default | manual) into the prune params so the superset collapses to the right
     // travel arm for an UNSET travel (the concrete alignmentStack resolves it identically via alignEffectiveTravel). No stock.
     def.deriveGuards = (p) => ({ travel: alignEffectiveTravel(p) });
-    def.postInstantiate = (stack, resolved) => applyProbeSources(applySafeZFrame(applyHeaderComments(stack, resolved), resolved));
+    def.postInstantiate = (stack, resolved) => applyProbeSources(applyHeaderComments(stack, resolved), resolved);   // t951 park-sweep — applySafeZFrame retired (the built-in now parks via safeRetractNode; no move→machinemove swap)
     // E2 — the per-pass PREVIEW-START provider: reuse the EXISTING BUILT_IN.alignment (opSimStarts.js) VERBATIM via the sim
     // registry (registerUserOp → setUserSimStarts), NOT the builder → sim-only, emit BYTE-IDENTICAL. 2 starts (A/B along the
     // fence). NO def.simStock: alignment probes a fence on the DEFAULT BOX (no round bar) — the global box stock is correct.

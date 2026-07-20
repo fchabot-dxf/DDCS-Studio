@@ -20,7 +20,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
-import { safeZParkBlock, safeZFrameOf } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive
+import { safeRetractNode } from './ops/safeZframe.js';   // t951 park-sweep — the final park takes MAX safe height (per-post machine margin), retiring the relative-frame crash class
 import { alignSpan, alignEffectiveTravel } from './ops/alignPoints.js';   // t544 — the ONE source of the A→B span + the effective travel mode (AUTO no longer needs a stock)
 
 const r3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
@@ -40,7 +40,6 @@ export function alignmentStack(params = {}, opts = {}) {
     const checkAxisSel = params.checkAxis === 'Y' ? 'Y' : 'X';   // axis the fence runs along (the concrete selection)
     const plusSel = (params.probeDir === 'neg' ? 'neg' : 'pos') === 'pos';
     const safeZ = num(params.safeZ, 10), dist = num(params.dist, 20), retract = num(params.retract, 2);
-    const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL 1c: relative (default) | machine (G53 park)
     const fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 20), port = num(params.port, 0);
     const src = params.sources || {};   // tolerance moved into alignmentHeaderComments (display-only, F3)
     const superset = !!opts.superset;   // E0 — carry checkAxis × probeDir arms guarded; prune collapses to the concrete shape
@@ -161,7 +160,7 @@ export function alignmentStack(params = {}, opts = {}) {
         A('#53', 'ABS[#72]', `Absolute span along ${checkAxis}`);
         IF('#53', '==', '0', 1);                      // abort if A and B are at the same position (zero span)
         A('#54', 'ATAN[#52]/[#53]', 'Misalignment angle (deg) = atan2(delta, span) — two-operand atan[a]/[b] form');
-        b.push(safeZParkBlock(safeZFrame, '#19')); DM('abs');   // SPATIAL-MODEL 1c: frame-aware final park (relative byte-identical | machine G53)
+        b.push(safeRetractNode({ workClear: '#19' })); DM('abs');   // t951 park-sweep — final park to MAX safe height (per-post: Expert #520 / V4.1 #190 margin; DM500 honest work-frame #19). Was safeZParkBlock relative = the compounding-Z-up crash class
 
         // ── Results ── the Expert HMI RESULT display registers (Delta/Span/Angle). Off-HMI they fold to comments that keep the
         // meaning as text (the wizard's OUTPUT must not vanish silently) — no unmapped #151x write on V4.1/DM500.

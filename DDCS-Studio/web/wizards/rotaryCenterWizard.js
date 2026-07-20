@@ -14,7 +14,7 @@ import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { probeSurfaceStack } from './ops/probeSurface.js';   // the shared probe primitive (rotary composes it — t129 inc1)
-import { safeZParkBlock, safeZFrameOf, safeRetractNode } from './ops/safeZframe.js';   // the shared safe-Z FRAME primitive (SPATIAL-MODEL inc1) + t822 machine-frame safe-height retract
+import { safeRetractNode } from './ops/safeZframe.js';   // t822 machine-frame safe-height retract; t951 park-sweep — the final park now also takes MAX safe height (retired the relative-frame crash class)
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 
@@ -43,7 +43,6 @@ export function rotaryCenterStack(params = {}, opts = {}) {
     const level = num(params.level, 0), diameter = num(params.diameter, 76.2), dist = num(params.dist, 30);
     const retract = num(params.retract, 2), safeZ = num(params.safeZ, 15), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
     const radius = num(params.radius, 2);   // stylus tip radius (#6) — the Z-down top probe lands a radius high, so Zc subtracts it (Yc bisect cancels)
-    const safeZFrame = safeZFrameOf(params.safeZFrame);   // SPATIAL-MODEL inc1: relative (default, clearance lift) | machine (G53 park at the absolute Z)
     const src = params.sources || {};
     const wcs = params.wcs || 'active';   // wcsLabel moved into rotaryCenterHeaderComments (the shared header format)
     const wcsArg = wcs === 'active' ? '#578' : String(parseInt(String(wcs).replace('G', ''), 10) - 53);
@@ -163,7 +162,7 @@ export function rotaryCenterStack(params = {}, opts = {}) {
 
     // FINAL retract/park via the DECLARED safe-Z frame: relative → MV('Z','#17') BYTE-IDENTICAL; machine → G53 Z#17 (park at
     // the absolute machine Z). #17 = the user's safe-Z value, interpreted per the frame (a clearance, or the absolute Z).
-    C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17', 'inc'));   // t856 — inside the G91 body → G90-wrap the machine G53, restore G91
+    C('Final retract'); S.push(safeRetractNode({ restore: 'inc' }));   // t951 park-sweep — final park to MAX safe height (per-post margin; DM500 work-frame #17). t856 — inside the G91 body → G90-wrap the G53, restore G91. Was safeZParkBlock relative = the crash class
     C(_hdr.writeOrigin);
     SWO('Y', '#54');                         // Y0 to centreline
     SWO('Z', datum === 'top' ? '#50' : '#56');

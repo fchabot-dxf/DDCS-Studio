@@ -29,7 +29,7 @@ import { opSimStarts } from '../../viz/opSimStarts.js';   // E2 — reuse BUILT_
 
 /** Author defaults — match rotaryClockStack's own num() fallbacks + the structural default shape (set A0 / top / active / relative). */
 export const ROTARY_CLOCK_DEFAULTS = {
-    action: 'set', reference: 'top', wcs: 'active', safeZFrame: 'relative',
+    action: 'set', reference: 'top', wcs: 'active',
     dist: 30, retract: 2, f_fast: 200, f_slow: 50, port: 3, span: 20, safeZ: 10, level: 0,
     clkAx: '', clkAy: '',   // t530 — SIM-ONLY point-A position (fractions of stock); empty → the centre-straddling default. The emit never uses A's absolute pos (the operator jogs there); B = A + span (#6), and dragging B writes #6.
 };
@@ -55,7 +55,6 @@ export const ROTARY_CLOCK_STRUCT_BINDINGS = [
 export const ROTARY_CLOCK_VALUESWAP_BINDINGS = [
     { param: 'reference',  type: 'enum', default: ROTARY_CLOCK_DEFAULTS.reference,  label: 'Reference',    help: 'Which orientation reads A0: the flat facing top (+Z) or the +Y side (3 o clock).', section: 'GEOMETRY', widgetConfig: { options: [['Top (+Z)', 'top'], ['+Y side', 'side']] } },
     { param: 'wcs',        type: 'enum', default: ROTARY_CLOCK_DEFAULTS.wcs,        label: 'WCS',          help: 'Which work-coordinate register to store the A datum into.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
-    { param: 'safeZFrame', type: 'enum', default: ROTARY_CLOCK_DEFAULTS.safeZFrame, label: 'Safe-Z Frame', help: 'Relative: safe Z is a clearance lift. Machine: safe Z is an absolute machine height, parked via G53.', section: 'GEOMETRY', widgetConfig: { options: [['Relative', 'relative'], ['Machine (G53)', 'machine']] } },
 ];
 
 export const ROTARY_CLOCK_DATA_OPTYPE = 'user_rotary_clock_data';
@@ -116,18 +115,6 @@ function applyReferenceWcs(stack, resolved) {
     return stack;
 }
 
-/** RECOMPOSE the final PARK block for the safeZFrame value-swap: relative → the rapid `move` (seed default); machine → the
- *  `machinemove` (G53). Find the park by its 'Final retract' comment anchor + swap the block in place (rotaryCenterData precedent). */
-function applySafeZFrame(stack, resolved) {
-    if (!resolved || resolved.safeZFrame !== 'machine') return stack;   // relative = the seed → unchanged (byte-identical)
-    const flat = flattenBlocks(stack);
-    const ci = flat.findIndex((b) => b && b.type === 'comment' && b.params && b.params.text === 'Final retract');
-    if (ci < 0) return stack;
-    const park = flat[ci + 1];
-    if (park && park.type === 'move') { park.type = 'machinemove'; park.params = { axis: 'Z', to: '#17', restore: 'inc' }; }   // t856 — mirror safeZParkBlock(...,'inc'): the machine park is inside the G91 body, so its G53 is G90-wrapped + G91-restored
-    return stack;
-}
-
 // SOURCE-CHIPS (corner/atc/centreline precedent): on Expert, rewrite #2 (retract) / #3 (fastFeed) / #5 (port) to the register.
 const PROBE_SRC_VARS = { port: '#5', fastFeed: '#3', retract: '#2' };
 function applyProbeSources(stack) {
@@ -154,7 +141,7 @@ export function rotaryClockDataDef() {
     const bindings = [...valueBindings, ...ROTARY_CLOCK_STRUCT_BINDINGS, ...ROTARY_CLOCK_VALUESWAP_BINDINGS];
     const def = userOpFromStack('rotary_clock_data', 'Rotary Clock (data)', rotaryClockDataStack(ROTARY_CLOCK_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true }, 'probe_datawiz');
     def.bindingSpecs = ROTARY_CLOCK_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
-    def.postInstantiate = (stack, resolved) => applyProbeSources(applySafeZFrame(applyReferenceWcs(applyHeaderComments(stack, resolved), resolved), resolved));
+    def.postInstantiate = (stack, resolved) => applyProbeSources(applyReferenceWcs(applyHeaderComments(stack, resolved), resolved), resolved);   // t951 park-sweep — applySafeZFrame retired (the built-in now parks via safeRetractNode; no move→machinemove swap)
     // E2 — the SINGLE PREVIEW-START provider: reuse BUILT_IN.rotary_clock (opSimStarts.js) VERBATIM via the sim registry
     // (registerUserOp → setUserSimStarts), NOT the builder → sim-only, emit BYTE-IDENTICAL. ONE start (the clock steps +Y
     // for the 2nd touch, it does not reposition). NO def.simStock: the clock datums off a FLAT on a rectangular BOX (the

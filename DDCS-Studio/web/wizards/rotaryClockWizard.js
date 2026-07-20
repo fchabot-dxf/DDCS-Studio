@@ -13,7 +13,7 @@ import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
-import { safeZParkBlock, safeZFrameOf, safeRetractNode } from './ops/safeZframe.js';   // SPATIAL-MODEL 1c: the shared safe-Z FRAME primitive (+ t822 machine-frame safe-height retract)
+import { safeRetractNode } from './ops/safeZframe.js';   // t822 machine-frame safe-height retract; t951 park-sweep — the final park now also takes MAX safe height (retired the relative-frame crash class)
 import { opSimStarts } from '../viz/opSimStarts.js';   // E2 — the shared single-start registry (BUILT_IN.rotary_clock) the built-in + twin both read
 
 /** The interpolated SUMMARY texts (the 2 header comments + the 2 action-arm comments + the final message) — extracted to ONE
@@ -38,7 +38,6 @@ export function rotaryClockHeaderComments(params = {}) {
 export function rotaryClockStack(params = {}, opts = {}) {
     const level = num(params.level, 0), span = num(params.span, 20), dist = num(params.dist, 30);
     const retract = num(params.retract, 2), safeZ = num(params.safeZ, 10), fFast = num(params.f_fast, 200), fSlow = num(params.f_slow, 50), port = num(params.port, 3);
-    const safeZFrame = safeZFrameOf(params.safeZFrame);   // relative (default, clearance lift) | machine (G53 park at the absolute Z)
     const src = params.sources || {};
     const action = ['set', 'report', 'rotate'].includes(params.action) ? params.action : 'set';
     const refAngle = params.reference === 'side' ? 90 : 0;   // refLabel/actLabel/wcsLabel moved into rotaryClockHeaderComments (E1 shared format)
@@ -131,7 +130,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
     ];
     S.push(...actionFork(setKids, reportKids, rotateKids));
 
-    C('Final retract'); S.push(safeZParkBlock(safeZFrame, '#17', 'inc'));   // SPATIAL-MODEL 1c: frame-aware final park; t856 — inside the G91 body → G90-wrap the machine G53, restore G91
+    C('Final retract'); S.push(safeRetractNode({ restore: 'inc' }));   // t951 park-sweep — final park to MAX safe height (per-post margin; DM500 work-frame #17). t856 — inside the G91 body → G90-wrap the G53, restore G91. Was safeZParkBlock relative = the crash class
     DM('abs');
     MSG(_hdr.msg);
     GO(2);
