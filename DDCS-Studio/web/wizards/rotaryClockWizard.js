@@ -14,6 +14,7 @@ import { recordOp } from '../blocks/opRecord.js';
 import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 import { safeRetractNode } from './ops/safeZframe.js';   // t822 machine-frame safe-height retract; t951 park-sweep — the final park now also takes MAX safe height (retired the relative-frame crash class)
+import { probeSurfaceStack } from './ops/probeSurface.js';   // t969 — the DECLARED probe cycle (fast/back-off/slow/miss-check); ppZdown folds to it (byte-identical)
 import { opSimStarts } from '../viz/opSimStarts.js';   // E2 — the shared single-start registry (BUILT_IN.rotary_clock) the built-in + twin both read
 
 /** The interpolated SUMMARY texts (the 2 header comments + the 2 action-arm comments + the final message) — extracted to ONE
@@ -62,11 +63,7 @@ export function rotaryClockStack(params = {}, opts = {}) {
     const LB = (n) => { const b = newBlock('label'); b.params = { n }; S.push(b); };
     const DM = (m) => { const b = newBlock('distmode'); b.params = { dist: m }; S.push(b); };
     const CF = (msg, cancel) => { const b = newBlock('confirm'); b.params = { msg, cancel }; S.push(b); };
-    const PR = (axis, to, feed) => { const b = newBlock('probe'); b.params = { axis, to, feed, port: '#5', level }; S.push(b); };
-    // t638 — probe-MISS safety: ST captures the pre-probe DRO (V4.1/DM500; [] on Expert); CK carries dir/seek so the DRO-compare
-    // branches on a no-contact. The Clock only probes Z DOWN (seek #7, dir '-'). Expert keeps its #192x check byte-identical.
-    const ST = (axis) => { const b = newBlock('probestart'); b.params = { axis }; S.push(b); };
-    const CK = (axis, goto) => { const b = newBlock('probecheck'); b.params = { axis, goto, dir: '-', seek: '#7', eps: 0.05 }; S.push(b); };
+    // t969 — the fast/back-off/slow/miss-check cycle folded to probeSurfaceStack (below); RD stays for the raw contact read (no radius-comp).
     const RD = (axis, v) => { const b = newBlock('proberead'); b.params = { axis, var: v }; S.push(b); };
     const RM = (axis, v) => S.push(mkRM(axis, v));
     const SWO = (axis, value) => S.push(mkSWO(axis, value));
@@ -83,9 +80,9 @@ export function rotaryClockStack(params = {}, opts = {}) {
         ? [GUARD({ param: 'action', is: 'set' }, setKids), GUARD({ param: 'action', is: 'report' }, reportKids), GUARD({ param: 'action', is: 'rotate' }, rotateKids)]
         : (action === 'report' ? reportKids : action === 'rotate' ? rotateKids : setKids);
 
-    const ppZdown = (resultVar) => {   // two-pass probe down (Z-)
-        ST('Z'); PR('Z', '#7', '#3'); CK('Z', 1); MV('Z', '#10');
-        ST('Z'); PR('Z', '#7', '#4'); CK('Z', 1); RD('Z', resultVar); MV('Z', '#10');
+    const ppZdown = (resultVar) => {   // two-pass probe down (Z-) — the DECLARED probe cycle; a raw read + retract follows (Clock reads the flat, no radius-comp)
+        probeSurfaceStack({ axis: 'Z', dir: '-', probeVar: '#7', retractVar: '#10', feedFast: '#3', feedSlow: '#4', port: '#5', level, twoPass: true, skipComp: true, trailingRetract: false }).forEach((b) => S.push(b));
+        RD('Z', resultVar); MV('Z', '#10');
     };
 
     C(_hdr.top1);

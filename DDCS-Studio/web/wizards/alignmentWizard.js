@@ -21,6 +21,7 @@ import { num } from './ops/util.js';
 import { srcVal, srcNote } from './probeBlocks.js';
 import { opSimStarts } from '../viz/opSimStarts.js';
 import { safeRetractNode } from './ops/safeZframe.js';   // t951 park-sweep — the final park takes MAX safe height (per-post machine margin), retiring the relative-frame crash class
+import { probeSurfaceStack } from './ops/probeSurface.js';   // t969 — the DECLARED probe cycle (fast/back-off/slow/miss-check); the fence twoPass folds to it (byte-identical)
 import { alignSpan, alignEffectiveTravel } from './ops/alignPoints.js';   // t544 — the ONE source of the A→B span + the effective travel mode (AUTO no longer needs a stock)
 
 const r3 = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
@@ -71,11 +72,7 @@ export function alignmentStack(params = {}, opts = {}) {
         const DM = (m) => { const x = newBlock('distmode'); x.params = { dist: m }; b.push(x); };
         const CF = (msg, cancel) => { const x = newBlock('confirm'); x.params = { msg, cancel }; b.push(x); };
         const RM = (axis, v) => { const x = newBlock('readmachine'); x.params = { axis, var: v }; b.push(x); };
-        const PR = (axis, to, feed) => { const x = newBlock('probe'); x.params = { axis, to, feed, port: '#5', level: num(params.level, 0) }; b.push(x); };
-        // t638 — probe-MISS safety: ST captures the pre-probe DRO (V4.1/DM500; [] on Expert); CK carries dir+seek so the DRO-
-        // compare branches to the fail label on a no-contact. Expert keeps its #192x status check byte-identical (dir/seek ignored).
-        const ST = (axis) => { const x = newBlock('probestart'); x.params = { axis }; b.push(x); };
-        const CK = (axis, goto) => { const x = newBlock('probecheck'); x.params = { axis, goto, dir: plus ? '+' : '-', seek: probeVar, eps: 0.05 }; b.push(x); };
+        // t969 — the fast/back-off/slow/miss-check cycle folded to probeSurfaceStack (in twoPass below); RD stays for the raw fence read (no radius-comp).
         const RD = (axis, v) => { const x = newBlock('proberead'); x.params = { axis, var: v }; b.push(x); };
         const MV = (axis, v) => { const x = newBlock('move'); x.params = { mode: 'rapid', [axis.toLowerCase()]: v }; b.push(x); };
         const MSG = (text) => { const x = newBlock('message'); x.params = { text }; b.push(x); };
@@ -84,10 +81,9 @@ export function alignmentStack(params = {}, opts = {}) {
         const HMI = (value, note, varName) => { const x = newBlock('hmiline'); x.params = { value: String(value), note: note || '', var: varName || '#1505' }; b.push(x); };
         const END = () => b.push(newBlock('endprogram'));
 
-        // Two-pass probe of the fence (fast → check → retract → slow → check → read → retract), all granular atoms.
+        // Two-pass probe of the fence (fast → check → retract → slow → check → read → retract) — the DECLARED probe cycle; a raw read + retract follows (fence read, no radius-comp).
         const twoPass = (resultVar) => {
-            ST(probeAxis); PR(probeAxis, probeVar, '#3'); CK(probeAxis, 1); MV(probeAxis, retractVar);
-            ST(probeAxis); PR(probeAxis, probeVar, '#4'); CK(probeAxis, 1);
+            probeSurfaceStack({ axis: probeAxis, dir: plus ? '+' : '-', probeVar, retractVar, feedFast: '#3', feedSlow: '#4', port: '#5', level: num(params.level, 0), twoPass: true, skipComp: true, trailingRetract: false }).forEach((x) => b.push(x));
             RD(probeAxis, resultVar); MV(probeAxis, retractVar);
         };
 
