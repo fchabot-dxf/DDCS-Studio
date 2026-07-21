@@ -73,6 +73,7 @@ export function rasterClear(o) {
     const lines = [
         `#27=FUP[[${stepHi}-${stepLo}]/${stepover}]   ;raster row count`,
         `#33=${stepover}   ;ramp lead-in length`,
+        `IF #33 GT [${rowHi}-${rowLo}] THEN #33=[${rowHi}-${rowLo}]   ;bound the ramp to the row span — a narrow area must not ramp past its far edge`,
         '',
         'G90   ( absolute )',
         `G0 Z${clearance}`,
