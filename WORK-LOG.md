@@ -12521,3 +12521,26 @@ RE-DIRECTED GROUND-FIRST (2 parallel Explore agents). Read-only; no code. Do NOT
 4. Confirm PILOT POCKET, declared section, others inherit?
 
 No build this turn (ground + propose + gate). Emit untouched -> nothing to release.
+
+---
+
+## 🔨 turn 1014 — BUILD ([b] Z-depth = TRUE LINKED cross-section leaf): a companion elevation SVG docked BENEATH the layout plan (featureCanvas UNTOUCHED). Pocket declares its rectangle; walls+floor+depthLevels() pass lines; drag floor=depth / gap=stepdown; byte-identical emit. Minimal (depth = first consumer), no framework.
+
+RULED (t1013): true cross-section, X-linked, cavity walls+floor + a pass line per depthLevels() slice, drag bottom=depth/gap=stepdown, declared per-op section-spec, clean GENERAL elevation primitive but BUILD MINIMAL (depth only, no framework — rule-of-three), pilot pocket.
+
+### THE BUILD (5 small parts, one consumer)
+1. **NEW web/viz/sectionCanvas.js — the general elevation LEAF (~110 lines).** `renderSection(container, spec, onEdit)` draws a dependency-free side-section SVG: stock top (Z=0), two cavity WALLS, a FLOOR, and one horizontal PASS LINE per slice; a green floor grip + an orange stepdown grip. Horizontal = the feature X-extent (X-linked); vertical = Z (0 top, +depth down), one linear scale. A grip drag tracks on WINDOW (survives the field-write re-render) and calls onEdit(param, value). The spec is GENERAL — `{ width, depth, stepdown, passes:[z…], depthParam, stepParam, label }` — so a future consumer (tool-Z, stock profile, probe-Z) drives the same leaf; depth is the FIRST/only consumer built.
+2. **panelTypes.js sectionSpecFromOp(def, params) (~12 lines) + import depthLevels.** Reads the DECLARED `def.section`, resolves live params, and builds the spec with `passes = depthLevels(depth, stepdown)` — the SAME function the emitter loops (blockEmitter.js:188) -> the drawn slices == the emitted passes (ONE SOURCE). Null for an op with no section.
+3. **pocketData.js — pocket DECLARES its section (2 lines, beside def.previewGeometry):** `def.section = { depthParam:'depth', stepParam:'stepdown', label:'Pocket', widthOf:(p)=> Ø|W }`. Declare-not-infer; other ops inherit by declaring their own.
+4. **userOpView.js renderSectionBeneath(c, def, params) (~14 lines) + 2 call sites.** Docks a `.viz-section` band as a FLEX SIBLING right after the plan canvas `c` (inside the layout2d .viz-container) — featureCanvas is UNTOUCHED. Present only when the op declares a section (else hidden -> non-section ops keep the full plan). The drag onEdit writes the depth/stepdown FORM field via [data-param] + dispatch input (+ change) -> the delegated listener re-runs mgr.update -> plan + section BOTH redraw (the entry-point two-editor precedent, userOpView:429).
+5. **styles.css — the `.viz-section` band + the sc-* section styles (~12 lines).**
+
+### VERIFY (ACCEPT: VIEWED pocket screenshot + drag-sim + pass lines==depthLevels + byte-identical + gate)
+- **MY VIEWED pocket screenshot (scratchpad, viewed):** the twin shows PLAN on top (layout canvas, untouched: pocket boundary + concentric rings + entry/WxH handles) and the NEW SECTION band below -- "Pocket depth 4 - step 1.5 - 3 passes", the stock-top line, cavity walls, dashed pass lines at -1.5/-3, the GREEN floor grip at -4 (=depth), the ORANGE stepdown grip, Z labels -1.5/-3/-4. CAM-standard plan+section.
+- **PASS LINES == depthLevels():** default 4/1.5 -> walls 2, floor 1, sc-pass 2 (+floor = 3 == depthLevels(4,1.5).length). Typing depth 9 -> 6 slices (depthLevels(9,1.5)) -> the section RE-RENDERS (type->redraw half of the two-editor sync).
+- **DRAG-SIM (drag->field half):** a synthetic pointer drag of the floor grip DOWN wrote a DEEPER depth into the form field (4 -> 4.72) -> the two-editor-of-one-source loop works (drag -> [data-param] write -> mgr.update -> redraw).
+- **BYTE-IDENTICAL EMIT:** the section is display-only (reads params, writes existing fields, adds NO param / NO emit path). pocket-data-emit E1 diffs:0 across 96 cases + cross-dialect GREEN -> the twin emit == built-in pocketStack, UNCHANGED. (My ad-hoc twin-vs-rawStack check diffs only on the pre-existing spindleHeadPatch t945 M3/dwell, NOT the section -> confirmed unrelated; dropped that confounded assertion.) No section artifact in the G-code; cuts still emit.
+- **GUARDRAIL:** built MINIMAL -- 1 leaf + a 12-line spec builder + a 2-line pocket declaration + 14-line wiring + 12-line CSS, ONE consumer. No stackup/tool-Z/probe-Z framework. No balloon -> no gate.
+- **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.2m) -- fully clean, NO flake. The new section leaf + wiring broke nothing; pocket-twin tests all green.
+
+### STATE: the pocket twin now shows a TRUE linked depth cross-section beneath the plan (walls+floor + depthLevels pass lines, draggable floor=depth / gap=stepdown, two-editor synced), as a companion elevation leaf (featureCanvas untouched, byte-identical emit, zero goldens). The leaf + declared section-spec are a clean general elevation primitive; surfacing/contour/slot inherit by declaring def.section. READY for review.
