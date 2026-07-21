@@ -12108,3 +12108,23 @@ The twin template = surfacingStack(SURFACING_DEFAULTS) = the FROZEN NORMAL stack
 5. Verify: twin Skim == built-in surfacingStack(skim) byte-for-byte (both modes); WCS greys in Skim; Blockly round-trip; full gate.
 
 ### STATE: the crash-critical built-in Skim emit is DONE + VERIFIED + dormant (byte-identical). The TWIN (structural superset fork + form binding + WCS gate + round-trip) is the coupled remaining piece -- precisely scoped above, patterned on the rotary superset. NOT crash-critical (a twin mismatch = a test failure, not a machine crash) but meaty; completing it cleanly is the next step. No user-reachable Skim yet -> nothing to release.
+
+---
+
+## 🔨 turn 984 — GATE FIX: the pre-G91 absolute clearance crash (your independent dump caught it) — makeStart now threads `skim` -> progstart DROPS its absolute clearance in Skim. Re-verified by my OWN dump + a new pre-G91 assertion.
+
+### THE BUG (your dump, real crash)
+Skim emitted `G90 / M3 S12000 / G0 Z5 ( clearance ) / G91 / ...` -- the `G0 Z5` is an ABSOLUTE work-Z move BEFORE the G91, and a Skim op has NO WCS-Z datum, so on the machine the tool rapids to an unknown work Z5 (into the stock = CRASH) before the relative body. My t982 `progstart drops the clearance` did NOT take, and surfacing-skim-982 only checked POST-G91 + was DELTA-based (asserted Z-5.5), so it slipped the stray abs move.
+
+### ROOT CAUSE + FIX
+**makeStart** rebuilt `b.params = { rpm, dir, spinUp, clearance }` -- it NEVER copied `skim` into the block's params, so `makeStart({...params, skim:true})` was silently dropped and progstart's `p.skim` was always undefined -> the clearance always emitted. FIX (web/blocks/programFraming.js): `b.params = { …, skim: !!params.skim }`. progstart's `p.skim ? [] : [G0 Z<clr>]` now fires. skim omitted/false -> byte-identical.
+
+### RE-VERIFY (two methods -- your advisor-verifies-two-methods)
+1. **My OWN dump** of the real Skim emit -- pre-G91 is now `G90 ( absolute ) / M3 S<rpm> ( spindle on )` ONLY (NO absolute Z); the FIRST Z move is `G0 Z5 ( clearance )` INSIDE the G91 (relative +5 lift); then `G1 Z-5.5` (one step below the surface); tail = `G90 / M5 / G53 Z#101 ( retract ) / M30` (the safe-Z retract is machine-frame absolute after the G90 exit). Correct end-to-end.
+2. **New test assertion** (surfacing-skim-982): split at the G91 line, the pre-G91 slice has ZERO `G0/G1 … Z…` moves (the exact class your dump caught). 2 green.
+
+### FULL GATE
+- **1359 passed / 4 skipped + 1 LOAD-FLAKE** -- makeStart threads skim to ALL cutting ops but skim=false everywhere except surfacing-Skim -> Normal BYTE-IDENTICAL (all 1359 incl. every emit/param/surfacing test green; no shift).
+- The lone failure is **preflight-badge-838:104** (exec-highlight + annotation COEXIST -- a DOM/timing test). NOT mine: (a) passes STANDALONE 2/2; (b) the full preflight file passes 10/10 x3 on the clean tree (makeStart stashed); (c) my change is EMIT-ONLY (progstart params) with ZERO causal path to the preflight annotation DOM. A full-suite parallel-load timing flake, coincident with this run. Deflake candidate (like collapsible-panes-752:38).
+
+### NEXT: the TWIN (structural superset fork + form Coordinates group + WCS grey + round-trip) now that the built-in Skim emit is CLEAN -- per your ruling. Precisely scoped in WORK-LOG t982.
