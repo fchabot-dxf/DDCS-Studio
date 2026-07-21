@@ -28,7 +28,7 @@ const n = sameDay ? (parseInt(prev[3], 10) || 0) + 1 : 1;
 const v = `${Y}.${M}.${D}.${n}`;
 
 html = html.replace(/(class="ver">V)[0-9][0-9.]*(<)/, `$1${v}$2`);                          // the chip (release + update-banner source of truth)
-html = html.replace(/(<title>DDCS Studio V)[0-9][0-9.]*( - Modular<\/title>)/, `$1${v}$2`); // the window title
+html = html.replace(/(<title>DDCS Studio V)[0-9][0-9.]*(<\/title>)/, `$1${v}$2`); // the window title
 fs.writeFileSync(htmlPath, html);
 
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
