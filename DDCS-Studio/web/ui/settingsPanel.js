@@ -23,6 +23,7 @@ import { tncProgram } from '../wizards/atcModel.js';   // INC-B2: the ONE shared
 import { renderCloudLogin } from './cloudAccount.js';
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
+import { TOOL_CATALOG, TOOL_CATALOG_GROUPS } from '../data/toolCatalog.js';   // the declared catalog the "＋ Add from catalog" picker adds individual tools from
 import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 — no-LAN machine-truth: drop the controller's dump folder → derive geometry → the review modal
 import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
@@ -36,7 +37,7 @@ const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 // tool-length offset written to #[baseVar + i] (#1430 = T1); the other fields are
 // the Studio-side tool library the Mill wizards pick from. Not ATC-specific — the
 // Tool table tab is always present, so this works for manual tool change too.
-export const TOOL_TYPES = ['endmill', 'drill', 'ballnose', 'chamfer', 'vbit', 'spotdrill', 'face', 'tap', 'reamer', 'engraver', 'other'];
+export const TOOL_TYPES = ['endmill', 'drill', 'ballnose', 'tapered', 'chamfer', 'vbit', 'spotdrill', 'surfacing', 'face', 'tap', 'reamer', 'engraver', 'other'];
 // A small starter library so the Mill wizards have tools to pick on a fresh install. Seeded into a new install's
 // defaults and, once, into an existing install with an empty library (the `toolsSeeded` flag means clearing it
 // stays cleared). Plain editable records — feeds/speeds are conservative starting points; tune per material.
@@ -2503,6 +2504,7 @@ function wireSettingsOverlay(ov) {
                 #toollib-modal.tl-pickmode .tl-body tbody tr:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
                 #toollib-modal .tl-foot { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 8px; }
                 #toollib-modal .tl-hint { font-size: 11px; color: var(--text-dim); }
+                #toollib-modal .tl-addgroup { display: inline-flex; gap: 8px; }
             </style>
             <div class="tl-panel">
                 <div class="tl-head"><span>🛠 Tool library</span><button id="toollib-close" title="Close">✕</button></div>
@@ -2515,7 +2517,10 @@ function wireSettingsOverlay(ov) {
                     </table>
                 </div>
                 <div class="tl-foot">
-                    <button class="toolbar-btn settings-io" id="toollib-add">＋ Add tool</button>
+                    <span class="tl-addgroup">
+                        <button class="toolbar-btn settings-io" id="toollib-catalog">＋ Add from catalog</button>
+                        <button class="toolbar-btn settings-io" id="toollib-add">＋ Blank</button>
+                    </span>
                     <span class="tl-hint">Tool # → length offset #[base + #−1]. Feeds in mm/min. The Mill wizards' Tool ▾ and the ATC magazine read this list.</span>
                     <button class="toolbar-btn settings-io primary" id="toollib-done">Done</button>
                 </div>
@@ -2556,6 +2561,7 @@ function wireSettingsOverlay(ov) {
                 saveSettings(); renderToolLibRows(); renderLibSummary();
                 return;
             }
+            if (e.target.id === 'toollib-catalog') { openToolCatalogPicker(); return; }
             const del = e.target.dataset ? e.target.dataset.del : null;
             if (del != null) {
                 const a = _ddcsSettings.atc; a.tools = a.tools || [];
@@ -2571,6 +2577,123 @@ function wireSettingsOverlay(ov) {
             if (useBtn) pick(useBtn.dataset.usenum);
         });
     }
+
+    // --- "＋ Add from catalog": browse TOOL_CATALOG, unit-filter, multi-select → add to the library ---
+    // The catalog is a declared array of tool TEMPLATES (data/toolCatalog.js). Each checked template becomes a
+    // real tool via the SAME add path as ＋ Blank (normalizeTool + next tool #), so nothing here is a second
+    // source of truth. Ø always stores mm-native; the picker DISPLAYS it in the user's unit pref.
+    let _toolCatShowAll = false;
+    function catDiaLabel(dia, units) {
+        const d = Number(dia);
+        if (!Number.isFinite(d)) return '—';
+        return units === 'inch' ? (d / 25.4).toFixed(4) + '″' : (Math.round(d * 1000) / 1000) + ' mm';
+    }
+    function updateCatCount() {
+        const btn = document.getElementById('toolcat-add');
+        if (!btn) return;
+        const n = document.querySelectorAll('#toolcat-modal .tc-chk:checked').length;
+        btn.textContent = n ? 'Add selected (' + n + ')' : 'Add selected';
+        btn.disabled = !n;
+    }
+    function renderToolCatRows() {
+        const body = document.getElementById('toolcat-rows');
+        if (!body) return;
+        const units = (_ddcsSettings.units === 'inch') ? 'inch' : 'mm';
+        const unitFiltered = new Set(['flat', 'ball']);   // only these carry a natural unit; the rest always show
+        let html = '';
+        TOOL_CATALOG_GROUPS.forEach((g) => {
+            const rows = TOOL_CATALOG.filter((t) => t.category === g.key &&
+                (_toolCatShowAll || !unitFiltered.has(g.key) || t.unit === units));
+            if (!rows.length) return;
+            html += '<div class="tc-group"><div class="tc-grouphd">' + g.label + '</div>';
+            rows.forEach((t) => {
+                const idx = TOOL_CATALOG.indexOf(t);
+                html += '<label class="tc-row">' +
+                    '<input type="checkbox" class="tc-chk" data-idx="' + idx + '">' +
+                    '<span class="tc-prof">' + toolProfileSvg(t, { w: 20, h: 30 }) + '</span>' +
+                    '<span class="tc-name">' + String(t.name).replace(/</g, '&lt;') + '</span>' +
+                    '<span class="tc-meta">Ø ' + catDiaLabel(t.dia, units) + '</span>' +
+                    '<span class="tc-meta">' + (t.flutes ? t.flutes + 'F' : '') + '</span>' +
+                    '<span class="tc-meta">' + (t.rpm ? (t.rpm / 1000) + 'k rpm' : '') + '</span>' +
+                    '<span class="tc-meta">' + (t.feed ? t.feed + ' mm/min' : '') + '</span>' +
+                    '</label>';
+            });
+            html += '</div>';
+        });
+        body.innerHTML = html || '<div class="tc-empty">No catalog tools match this filter.</div>';
+    }
+    function buildToolCatModal() {
+        if (document.getElementById('toolcat-modal')) return;
+        const m = document.createElement('div');
+        m.id = 'toolcat-modal';
+        m.innerHTML = `
+            <style>
+                /* z-index 13200 — opens FROM WITHIN the tool library (13100) so it sits above it. */
+                #toolcat-modal { position: fixed; inset: 0; z-index: 13200; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+                #toolcat-modal.active { display: flex; }
+                #toolcat-modal .tc-panel { background: var(--panel); color: var(--text-main); border: 1px solid var(--border); border-radius: var(--radius, 6px); width: min(720px, 94vw); max-height: 86vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+                #toolcat-modal .tc-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
+                #toolcat-modal .tc-head button { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
+                #toolcat-modal .tc-filter { display: flex; align-items: center; gap: 10px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-dim); }
+                #toolcat-modal .tc-filter label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+                #toolcat-modal .tc-body { overflow: auto; padding: 6px 16px 14px; }
+                #toolcat-modal .tc-group { margin-top: 10px; }
+                #toolcat-modal .tc-grouphd { font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--text-dim); padding: 4px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+                #toolcat-modal .tc-row { display: grid; grid-template-columns: 18px 24px 1fr auto auto auto auto; align-items: center; gap: 10px; padding: 5px 4px; border-radius: 4px; cursor: pointer; font-size: 12.5px; }
+                #toolcat-modal .tc-row:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+                #toolcat-modal .tc-prof { text-align: center; }
+                #toolcat-modal .tc-prof svg { display: block; margin: 0 auto; }
+                #toolcat-modal .tc-name { font-weight: 600; }
+                #toolcat-modal .tc-meta { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+                #toolcat-modal .tc-empty { padding: 20px; text-align: center; color: var(--text-dim); }
+                #toolcat-modal .tc-foot { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+                #toolcat-modal .tc-add[disabled] { opacity: .5; cursor: default; }
+            </style>
+            <div class="tc-panel">
+                <div class="tc-head"><span>🛠 Add tools from catalog</span><button id="toolcat-close" title="Close">✕</button></div>
+                <div class="tc-filter">
+                    <span>Showing <b id="toolcat-unitlabel">mm</b> tools.</span>
+                    <label><input type="checkbox" id="toolcat-showall"> Show all units</label>
+                    <span class="tc-meta">(V-bit / tapered / surfacing / drill always shown)</span>
+                </div>
+                <div class="tc-body"><div id="toolcat-rows"></div></div>
+                <div class="tc-foot">
+                    <button class="toolbar-btn settings-io" id="toolcat-cancel">Cancel</button>
+                    <button class="toolbar-btn settings-io primary tc-add" id="toolcat-add">Add selected</button>
+                </div>
+            </div>`;
+        document.body.appendChild(m);
+        const close = () => m.classList.remove('active');
+        m.querySelector('#toolcat-close').addEventListener('click', close);
+        m.querySelector('#toolcat-cancel').addEventListener('click', close);
+        m.addEventListener('mousedown', (e) => { if (e.target === m) close(); });
+        m.querySelector('#toolcat-showall').addEventListener('change', (e) => { _toolCatShowAll = !!e.target.checked; renderToolCatRows(); updateCatCount(); });
+        m.addEventListener('change', (e) => { if (e.target.classList && e.target.classList.contains('tc-chk')) updateCatCount(); });
+        m.querySelector('#toolcat-add').addEventListener('click', () => {
+            const checks = m.querySelectorAll('.tc-chk:checked');
+            if (!checks.length) return;
+            const a = _ddcsSettings.atc; a.tools = a.tools || [];
+            checks.forEach((c) => {
+                const tpl = TOOL_CATALOG[parseInt(c.dataset.idx, 10)];
+                if (!tpl) return;
+                a.tools.push(normalizeTool(tpl, nextToolNum(a.tools)));   // same add path as ＋ Blank; next # per push
+            });
+            saveSettings(); renderToolLibRows(); renderLibSummary();
+            close();
+        });
+    }
+    function openToolCatalogPicker() {
+        buildToolCatModal();
+        _toolCatShowAll = false;
+        const el = document.getElementById('toolcat-modal');
+        const units = (_ddcsSettings.units === 'inch') ? 'inch' : 'mm';
+        const sa = el.querySelector('#toolcat-showall'); if (sa) sa.checked = false;
+        const ul = el.querySelector('#toolcat-unitlabel'); if (ul) ul.textContent = (units === 'inch') ? 'inch (″)' : 'mm';
+        renderToolCatRows();
+        updateCatCount();
+        el.classList.add('active');
+    }
+
     // t768 P1b — the ONE opener, context-aware. No opts (or no onPick) = EDIT-ONLY (opened from Settings, exactly as before);
     // { onPick } = PICK mode (opened from a wizard's ⚙). ONE modal, one source — the wizard and Settings share it.
     function doOpenToolLib(opts) {
