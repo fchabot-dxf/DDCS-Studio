@@ -128,11 +128,13 @@ function numberWidget(host, b) {
     if (kind && !b.readonly) {
         const hint = document.createElement('span');
         hint.className = 'num-unit-hint';
-        hint.style.cssText = 'opacity:.55;font-size:.85em;margin-left:6px;white-space:nowrap;';
+        // t1002 — the hint sits LEFT of the input (muted, right-aligned): margin-left:auto absorbs the free space so the
+        // hint hugs the input, and the input column stays the clean right edge. Was appended far-right (stranded).
+        hint.style.cssText = 'opacity:.55;font-size:.85em;margin-left:auto;margin-right:8px;white-space:nowrap;text-align:right;';
         const refreshHint = () => { hint.textContent = hintText(parseFloat(inp.value), kind); };
         refreshHint();
         inp.addEventListener('input', refreshHint);
-        host.append(hint);
+        (inp.parentElement === host ? inp : inp.parentElement).before(hint);   // insert just before the input's host-level element
         if (displayUnit() === 'inch') {
             const shadow = document.createElement('input');
             shadow.type = 'number'; shadow.step = 'any'; shadow.style.cssText = inp.style.cssText;
