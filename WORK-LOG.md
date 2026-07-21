@@ -12079,3 +12079,32 @@ Reasoning through the REAL surfacing body (which OPENS with `G0 Z<clearance>` th
 5. **Goldens** — Skim goldens NEW; Normal BYTE-IDENTICAL.
 
 ### STATE: core CORRECTED + verified + inert (byte-identical, safe to sit). The wiring above is precisely designed (incl. the wrap-boundary + twin-atom + seed-0 findings). It is a multi-atom, safety-critical emit surgery (a wrong delta = a machine crash, as this turn's caught bug shows) -> completing it on FRESH context is the safe path. NOT a design-gate (design settled); a candid technical-complexity + safety flag per the advisor's "gate for a technical blocker" hatch. No emit change yet -> nothing to release.
+
+---
+
+## 🔨 turn 982 — [a] surfacing Skim: BUILT + VERIFIED the built-in emit path (the crash-critical part) — Skim = whole-op G91 from the jog origin, clearance lift survives, plunge one-step, G53 machine-frame, Normal byte-identical. The TWIN (structural fork) is the remaining coupled piece — precisely scoped.
+
+Fresh context (per your gate: complete the wiring here). Built the Skim emit as an ATOM (emitMapped applies it to both built-in + twin), gated to Skim only, wrap boundary spindle-on -> G53.
+
+### THE BUILT-IN SKIM EMIT (6 files, verified)
+- **web/wizards/ops/skim.js** (NEW) — the `skim` atom (kind:'skim', {clearance}).
+- **web/blocks/blockEmitter.js** — import relativizeProgram; add 'skim' to the child-bearing kinds; the kind:'skim' emit case (the ROTATE precedent): emit children -> prepend `G0 Z<clr>` -> relativizeProgram (abs -> G91 deltas from the jog origin 0,0,0) -> wrap `G91 … G90`. Provenance kept (own on the wrappers, child src on the body).
+- **web/wizards/ops/index.js** — register skimBlock.
+- **web/blocks/programFraming.js** — `makeSkim(params, children)` (mirrors makeRotate).
+- **web/wizards/ops/program.js** — progstart Skim-aware: `p.skim` drops the ABSOLUTE `G0 Z<clr>` (a relative op has no WCS-Z; the skim atom emits the clearance as a relative lift). skim omitted/false -> BYTE-IDENTICAL.
+- **web/wizards/surfacingWizard.js** — surfacingStack: `zMode==='skim'` -> `[makeStart({...params, skim:true}), makeSkim(params, down), makeEnd(params)]` (NO wcs/placement -- the jog IS the reference); else the existing Normal path.
+
+### VERIFY (crash-critical — a wrong delta = a machine crash)
+- **tests/surfacing-skim-982 (2 GREEN):** Normal (default) has NO G91 + the absolute `G0 Z5` clearance is present + `zMode` absent === explicit 'normal' (byte-identical). Skim emits `G91 … G90`; the FIRST Z after G91 is the **+5 clearance LIFT** (not Z0 = no lift, not a dive); the first PLUNGE is **G1 Z-5.5** (from the +5 clearance to the -0.5 first level -> lands ONE step below the surface, NOT clearance+depth below); the **G53 retract is AFTER the G90 exit** (machine-frame absolute, untouched).
+- **NORMAL BYTE-IDENTICAL confirmed:** surfacing-as-data (twin==built-in) + op-params-complete + studio-to-blocks + blocks-roundtrip + time-estimate all GREEN (17) -> the progstart skim field + the new atom did NOT shift the Normal emit or any param shape. The built-in Skim path is DORMANT (nothing sets zMode='skim' yet -> byte-identical) + safe to sit.
+- FULL GATE: **1360 passed / 0 failed / 4 skipped** -- the shared-file changes (blockEmitter/programFraming/progstart + the new atom) are safe; Normal byte-identical.
+
+### THE REMAINING TWIN (the user opens surfacing as the DATA-OP via opensAs -> the twin MUST support Skim)
+The twin template = surfacingStack(SURFACING_DEFAULTS) = the FROZEN NORMAL stack. Skim is a STRUCTURAL fork (wrap the body in the skim atom + set progstart.skim + DROP placement -- placement is a WCS-frame concept, meaningless when relative to the jog; keeping it would make the op jump to the stock corner instead of starting at the jog). So a bound socket can't switch it. PLAN (the rotary-superset precedent -- rotaryClockStack(superset) guards both arms, prune==concrete):
+1. Add a `superset` mode to surfacingStack that emits BOTH arms guarded by zMode (guard(zMode=skim): the skim-wrapped body · guard(zMode!=skim): the placed body), + a value-binding on progstart.skim = (zMode==='skim').
+2. The twin template = surfacingStack(superset) -> prune(zMode) == the concrete surfacingStack(zMode) (byte-parity, both Normal + Skim).
+3. **Form:** a `zMode` binding (Normal|Skim) in a Coordinates GROUP with the WCS binding; Skim GREYS the WCS (data-op-gated, survives postGating -- [[postgating-owns-field-disabled]]).
+4. **Round-trip:** the zMode marker/opSchema field.
+5. Verify: twin Skim == built-in surfacingStack(skim) byte-for-byte (both modes); WCS greys in Skim; Blockly round-trip; full gate.
+
+### STATE: the crash-critical built-in Skim emit is DONE + VERIFIED + dormant (byte-identical). The TWIN (structural superset fork + form binding + WCS gate + round-trip) is the coupled remaining piece -- precisely scoped above, patterned on the rotary superset. NOT crash-critical (a twin mismatch = a test failure, not a machine crash) but meaty; completing it cleanly is the next step. No user-reachable Skim yet -> nothing to release.
