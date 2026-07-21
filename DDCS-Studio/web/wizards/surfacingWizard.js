@@ -42,10 +42,12 @@ export function surfacingStack(params = {}) {
     down.children = [fill];
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
     if (params.zMode === 'skim') {
-        // SKIM (t982): whole-op RELATIVE (G91) from the jog start — jog to a corner, touch, face. No WCS, no placement
-        // (the jog IS the reference). progstart drops its absolute clearance; makeSkim prepends a relative lift + relativizes
-        // the body + wraps G91…G90; makeEnd's G53 safe-Z retract stays machine-frame absolute after the G90 exit.
-        return [makeStart({ ...params, skim: true }), makeSkim(params, down), makeEnd(params)];
+        // SKIM (t982): whole-op RELATIVE (G91) from the jog start — jog to a corner, touch, face. No placement (the jog IS
+        // the reference — makeSkim replaces makePlace at the SAME position, keeping wcs so the flat block indices stay parallel
+        // to Normal → the data-op bindings work unchanged for both modes). wcs='active' emits nothing (byte-identical). progstart
+        // drops its absolute clearance; makeSkim prepends a relative lift + relativizes the body + wraps G91…G90; makeEnd's G53
+        // safe-Z retract stays machine-frame absolute after the G90 exit.
+        return [makeStart({ ...params, skim: true }), wcs, makeSkim(params, down), makeEnd(params)];
     }
     return [makeStart(params), wcs, makePlace(params, { minX: 0, maxX: w, minY: 0, maxY: h }, down), makeEnd(params)];   // local 0-based bbox snapshot (live-extent overrides it)
 }

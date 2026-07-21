@@ -28,6 +28,7 @@
 import { surfacingStack } from '../../wizards/surfacingWizard.js';
 import { userOpFromStack } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
+import { applySkimStructure } from './skimStructure.js';   // t986 — the Skim Z-mode structural fork (whole-op G91 relative to the jog); Normal = byte-identical
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
 import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
@@ -38,7 +39,7 @@ import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, SURFACING_STRATEGY_
 export const SURFACING_DEFAULTS = {
     w: 100, h: 80, stepover: 7.2, strategy: 'parallel', depth: 0.5, stepdown: 0.5,
     entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1,   // t842 — depth entry (plunge default = byte-identical)
-    clearance: 5, feed: 800, plunge: 200, wcs: 'active',
+    clearance: 5, feed: 800, plunge: 200, wcs: 'active', zMode: 'normal',   // t986 — zMode: Normal (absolute WCS) | Skim (whole-op G91 relative to the jog)
     // placement (makePlace) — region is local-0-based, so originX/originY are the placement offset (offX/offY) like drill.
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
@@ -48,7 +49,8 @@ export const SURFACING_DEFAULTS = {
 // (clearance is deliberately NOT bound — frontier #3 fan-out to progstart + the surfacefill leaf. surfacefill's
 //  shape/x/y/z/direction stay at their constants: shape='rect', x=y=0 [local], z='z', direction='bothways'.)
 const SURFACING_EXEC_BINDINGS = [
-    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS } },
+    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, section: 'COORDINATES',
+        gate: { param: 'zMode', is: 'skim', tip: 'Skim faces RELATIVE to the jog start — there is no WCS frame to select.' } },   // t986 — grey (data-op-gated) in Skim
     // placement scalars (block 2, placeonstock) — origin owned by the placement now (region is local-0-based)
     { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: SURFACING_DEFAULTS.originX },
     { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: SURFACING_DEFAULTS.originY },
@@ -78,6 +80,14 @@ const SURFACING_EXEC_BINDINGS = [
 
 const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
 export const SURFACING_BINDINGS = SURFACING_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
+
+// t986 — the STRUCTURAL Z-mode toggle (NO value socket): it drives the applySkimStructure postInstantiate fork, not a
+// block param. Grouped in a COORDINATES section with the WCS dropdown; Skim greys the WCS (structGate below → data-op-gated).
+const SURFACING_STRUCT = [
+    { param: 'zMode', type: 'enum', default: SURFACING_DEFAULTS.zMode, label: 'Z-mode', section: 'COORDINATES', widget: 'dropdown',
+        widgetConfig: { options: [['Normal — WCS Z0', 'normal'], ['Skim — relative', 'skim']] },
+        help: 'Normal: cut at absolute Z, referencing the WCS Z0 (set your datum first). Skim: whole-op RELATIVE — jog to a corner, touch the surface, face from there (no WCS datum). Skim ignores the WCS.' },
+];
 
 export const SURFACING_DATA_OPTYPE = 'user_surfacing_data';
 
@@ -115,9 +125,11 @@ export function surfacingDataDef() {
         ],
         children: appendToolSel(appendEntry(exec)),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
     }];
-    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, [...toolBindingsFor(stack), ...SURFACING_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
+    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, [...toolBindingsFor(stack), ...SURFACING_STRUCT, ...SURFACING_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = surfacingPreviewGeometry;   // t716 — per-feature 2D handles (region extent) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
-    def.postInstantiate = spindleHeadPatch;   // t945 — fill the blank framing progstart's rpm/dir/spin-up from the live Head → M3 (was a DEAD spindle)
+    // t945 spindleHeadPatch (blank progstart → live Head) THEN t986 applySkimStructure (Skim: progstart drops the absolute
+    // clearance + placeonstock→skim). Normal/absent zMode → both are no-ops → BYTE-IDENTICAL to the frozen template.
+    def.postInstantiate = (stack, resolved) => applySkimStructure(spindleHeadPatch(stack), resolved);
     return def;
 }
