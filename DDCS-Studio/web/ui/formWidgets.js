@@ -22,6 +22,7 @@ import { THREAD_PRESETS, threadPreset } from '../wizards/threads.js';   // t778 
 import { MATERIALS, suggestFeedsSpeeds } from '../wizards/materials.js';   // t867 — feeds & speeds: the material table + the classic RPM/feed math
 import { isSectionCollapsed, setSectionCollapsed } from './panePrefs.js';   // t820 — collapsible form sections (app-wide per section kind)
 import { applyState as applyFold } from './paneAccordion.js';   // t820 — REUSE the accordion motion engine (theme drawer tokens), not a duplicate
+import { toDisp, fromDisp } from './units.js';   // t1008 — the ONE mm<->inch conversion leaf (shared with the tool-library editor + catalog picker)
 
 // t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
 // widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
@@ -47,12 +48,11 @@ const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
 // ── t990 — dual mm/inch DISPLAY layer. mm is ALWAYS the authoritative, exact storage; inch/IPM is a DERIVED VIEW
 // (1 in = 25.4 mm, and IPM = mm·min⁻¹ / 25.4). The stored mm NEVER re-derives from the rounded display, so emit is
 // byte-identical. A field opts in by its declared `units`: 'mm' → length, 'mm/min' → feed; anything else → unchanged.
-const MM_PER_IN = 25.4;
+// t1008 — toDisp/fromDisp (the ÷/×25.4 core) now live in the shared units.js leaf; the display helpers below stay form-local.
 const unitsOf = (b) => b.units || (b.widgetConfig && b.widgetConfig.units) || '';
 const unitKindOf = (b) => { const u = unitsOf(b); return u === 'mm' ? 'length' : u === 'mm/min' ? 'feed' : null; };
 /** The global display-unit preference ('mm' default | 'inch'). mm-native storage regardless. */
 const displayUnit = () => { try { return (window.ddcsGetSettings && window.ddcsGetSettings().units === 'inch') ? 'inch' : 'mm'; } catch (_) { return 'mm'; } };
-const toDisp = (mm) => Math.round((mm / MM_PER_IN) * 10000) / 10000;   // mm → inch/IPM (display only, 4 dp)
 const dispLabel = (kind) => (kind === 'feed' ? 'IPM' : 'in');
 /** The live "= X in / = X IPM" (mm-mode) or "= X mm" (inch-mode) hint text for a mm value. */
 const hintText = (mm, kind) => {
@@ -145,7 +145,7 @@ function numberWidget(host, b) {
             inp.after(shadow);
             shadow.addEventListener('input', () => {
                 const d = parseFloat(shadow.value);
-                inp.value = Number.isFinite(d) ? String(r3(d * MM_PER_IN)) : '';   // typed inch → EXACT mm
+                inp.value = Number.isFinite(d) ? String(fromDisp(d)) : '';   // typed inch → EXACT mm (shared fromDisp = r3(d·25.4))
                 inp.dispatchEvent(new Event('input', { bubbles: true }));
                 inp.dispatchEvent(new Event('change', { bubbles: true }));
             });

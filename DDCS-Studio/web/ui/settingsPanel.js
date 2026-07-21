@@ -24,6 +24,7 @@ import { renderCloudLogin } from './cloudAccount.js';
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { TOOL_CATALOG, TOOL_CATALOG_GROUPS } from '../data/toolCatalog.js';   // the declared catalog the "＋ Add from catalog" picker adds individual tools from
+import { toDisp, fromDisp } from './units.js';   // t1008 — the ONE shared mm<->inch conversion (tool-library editor + catalog picker; same leaf as the op-form widget)
 import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 — no-LAN machine-truth: drop the controller's dump folder → derive geometry → the review modal
 import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
@@ -51,6 +52,9 @@ const standardTools = () => STANDARD_TOOLS.map((t) => ({ ...t }));
 // Coerce a legacy bare-number slot (was the length offset) — or a partial object — into the
 // full record. `num` is the tool number (T-word); `fallbackNum` supplies it for legacy entries
 // that pre-date sparse storage (dense index + 1). Empty/blank fields read as "unset".
+// t1008 — the tool-library columns shown/entered in the user unit (dia+length → inch, feed+plunge → IPM). rpm/flutes/
+// angle/num are unitless (counts / rev-min / degrees) → never converted. Storage is ALWAYS mm-native; display/input only.
+const TOOL_UNIT_COLS = new Set(['dia', 'length', 'feed', 'plunge']);
 export function normalizeTool(t, fallbackNum) {
     const fb = (fallbackNum != null) ? fallbackNum : '';
     if (typeof t === 'number') return { num: fb, name: '', type: '', dia: '', flutes: '', length: t, rpm: '', feed: '', plunge: '' };
@@ -2449,10 +2453,18 @@ function wireSettingsOverlay(ov) {
         const a = _ddcsSettings.atc || {};
         const base = parseInt(a.baseVar, 10) || 1430;
         const tools = a.tools || (a.tools = []);
+        const inchMode = (_ddcsSettings.units === 'inch');   // t1008 — dual-unit DISPLAY (storage stays mm-native)
+        const modal = document.getElementById('toollib-modal');
+        if (modal) {   // flip the unit column headers + the "feeds in …" foot note to the user unit
+            const HDR = inchMode ? { dia: 'Ø in', length: 'Length in', feed: 'Feed IPM', plunge: 'Plunge IPM', feedunit: 'IPM' }
+                                 : { dia: 'Ø mm', length: 'Length', feed: 'Feed', plunge: 'Plunge', feedunit: 'mm/min' };
+            modal.querySelectorAll('[data-uhdr]').forEach((el) => { const k = el.getAttribute('data-uhdr'); if (HDR[k] != null) el.textContent = HDR[k]; });
+        }
+        const dispVal = (f, mm) => (inchMode && TOOL_UNIT_COLS.has(f) && mm !== '' && mm != null) ? toDisp(mm) : mm;   // mm → shown unit
         const opt = (cur) => '<option value="">—</option>' +
             TOOL_TYPES.map((ty) => '<option value="' + ty + '"' + (ty === cur ? ' selected' : '') + '>' + ty + '</option>').join('');
         const cell = (i, f, val, step) =>
-            '<td><input type="number" step="' + (step || 'any') + '" data-tool="' + i + '" data-field="' + f + '" value="' + (val === '' || val == null ? '' : val) + '"></td>';
+            '<td><input type="number" step="' + (step || 'any') + '" data-tool="' + i + '" data-field="' + f + '" value="' + (val === '' || val == null ? '' : dispVal(f, val)) + '"></td>';
         if (!tools.length) { body.innerHTML = '<tr><td colspan="12" class="tl-empty">No tools yet — “＋ Add tool” to start your library.</td></tr>'; return; }
         let html = '';
         tools.forEach((raw, i) => {
@@ -2511,7 +2523,7 @@ function wireSettingsOverlay(ov) {
                 <div class="tl-body">
                     <table>
                         <thead><tr>
-                            <th>Tool #</th><th>Name</th><th>Type</th><th>Profile</th><th>Ø mm</th><th>Flutes</th><th>Length</th><th>RPM</th><th>Feed</th><th>Plunge</th><th title="Included angle — V-bit / chamfer / engraver only">Angle°</th><th></th>
+                            <th>Tool #</th><th>Name</th><th>Type</th><th>Profile</th><th data-uhdr="dia">Ø mm</th><th>Flutes</th><th data-uhdr="length">Length</th><th>RPM</th><th data-uhdr="feed">Feed</th><th data-uhdr="plunge">Plunge</th><th title="Included angle — V-bit / chamfer / engraver only">Angle°</th><th></th>
                         </tr></thead>
                         <tbody id="toollib-rows"></tbody>
                     </table>
@@ -2521,7 +2533,7 @@ function wireSettingsOverlay(ov) {
                         <button class="toolbar-btn settings-io" id="toollib-catalog">＋ Add from catalog</button>
                         <button class="toolbar-btn settings-io" id="toollib-add">＋ Blank</button>
                     </span>
-                    <span class="tl-hint">Tool # → length offset #[base + #−1]. Feeds in mm/min. The Mill wizards' Tool ▾ and the ATC magazine read this list.</span>
+                    <span class="tl-hint">Tool # → length offset #[base + #−1]. Feeds in <span data-uhdr="feedunit">mm/min</span>. The Mill wizards' Tool ▾ and the ATC magazine read this list.</span>
                     <button class="toolbar-btn settings-io primary" id="toollib-done">Done</button>
                 </div>
             </div>`;
@@ -2538,7 +2550,10 @@ function wireSettingsOverlay(ov) {
             const a = _ddcsSettings.atc; a.tools = a.tools || [];
             const rec = normalizeTool(a.tools[i], i + 1);
             let val = t.value;
-            if (f !== 'name' && f !== 'type') val = (val === '') ? '' : parseFloat(val);
+            if (f !== 'name' && f !== 'type') {
+                val = (val === '') ? '' : parseFloat(val);
+                if (val !== '' && Number.isFinite(val) && _ddcsSettings.units === 'inch' && TOOL_UNIT_COLS.has(f)) val = fromDisp(val);   // t1008 — inch/IPM typed → mm STORAGE (exact; 0.25 → 6.35)
+            }
             rec[f] = val;
             a.tools[i] = rec;
             saveSettings();
@@ -2586,7 +2601,7 @@ function wireSettingsOverlay(ov) {
     function catDiaLabel(dia, units) {
         const d = Number(dia);
         if (!Number.isFinite(d)) return '—';
-        return units === 'inch' ? (d / 25.4).toFixed(4) + '″' : (Math.round(d * 1000) / 1000) + ' mm';
+        return units === 'inch' ? toDisp(d).toFixed(4) + '″' : (Math.round(d * 1000) / 1000) + ' mm';   // t1008 — shared toDisp (one 25.4)
     }
     function updateCatCount() {
         const btn = document.getElementById('toolcat-add');
