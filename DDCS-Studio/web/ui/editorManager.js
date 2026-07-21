@@ -5,6 +5,7 @@
 
 import { el, UIUtils } from './uiUtils.js';
 import { SNIPPETS } from '../data/snippets.js';
+import { opLabelOf } from '../blocks/opBuilders.js';   // t975 — derive a clean export title from the op model (fixes g90_absolute.nc)
 
 export class EditorManager {
     constructor() {
@@ -167,6 +168,25 @@ export class EditorManager {
 
     // Shared by EXPORT (downloadFile) and TRANSFER (bridgeTransfer.js) so the file on the controller
     // is byte-identical to the download — same (Title) line, same sanitized <name>.nc.
+    // t975 — a clean export title from the program MODEL: the first op's friendly label (+ its W×H area when it has
+    // one). Gated on the model MATCHING the editor text (proj.text === code) so a hand-edited program never gets a
+    // stale name. Returns '' when there's no matching model / no op → the caller falls back to the raw first line.
+    _firstOpTitle(code) {
+        try {
+            const proj = window.ddcsGetProjection && window.ddcsGetProjection();
+            if (!proj || proj.text !== code) return '';
+            const prog = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+            const op = prog.find((b) => b && b.type === 'op' && b.opType);
+            if (!op) return '';
+            let name = String(opLabelOf(op.opType) || '').replace(/\s*\([^)]*\)/g, '').trim();   // "Surfacing (data)" → "Surfacing"
+            if (!name) return '';
+            const p = op.params || {};
+            const w = Number(p.w), h = Number(p.h);
+            if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) name += ` ${Math.round(w)}x${Math.round(h)}`;
+            return name;
+        } catch (_) { return ''; }
+    }
+
     buildProgram() {
         let code = this.editor.value || '';
 
@@ -175,12 +195,18 @@ export class EditorManager {
         const m = firstNonEmpty.match(/^\s*\(([^)]+)\)\s*$/);
         let title = '';
         if (m) {
+            // The user's OWN header comment wins (an explicit ( My Program ) line).
             title = m[1].trim();
-        } else if (firstNonEmpty.trim().length > 0) {
-            // If there is a first line but not wrapped in parentheses, use it directly
-            title = firstNonEmpty.trim();
         } else {
-            title = 'Program';
+            // t975 — no explicit ( title ) header. Derive a clean name from the program MODEL (the first op's
+            // friendly label + its area, e.g. "Surfacing 367x45") so a generated program exports as
+            // "surfacing_367x45.nc" instead of the junk "g90_absolute.nc" — mill ops lead with `G90 ( absolute )`,
+            // which the old raw-line fallback used verbatim. Falls back to the raw first line when there's no
+            // matching model (hand-edited / raw paste).
+            const modelTitle = this._firstOpTitle(code);
+            if (modelTitle) title = modelTitle;
+            else if (firstNonEmpty.trim().length > 0) title = firstNonEmpty.trim();
+            else title = 'Program';
         }
 
         // A G-code comment cannot contain parentheses — DDCS flags a nested ( … ( … ) ) as
