@@ -110,7 +110,11 @@ export function mirrorProgram(gcode, axis, sx = 0, sy = 0, sz = 0) {
  * @param {string} gcode @returns {{ text:string, relativized:number }}
  */
 export function relativizeProgram(gcode) {
-    const cur = { X: null, Y: null, Z: null };
+    // Seed the running position at the program's coordinate ORIGIN (0,0,0) = the jog START (jog to the area corner at
+    // the touched surface). So the very first absolute move is a real delta FROM the start — e.g. the opening `G0 Z<clr>`
+    // stays a `+clr` LIFT, not a 0 no-op that would then let the first plunge dive the whole clearance+depth BELOW the
+    // surface. Every axis therefore references the jog position, not its own first-seen value.
+    const cur = { X: 0, Y: 0, Z: 0 };
     let abs = true, relativized = 0;
     const out = String(gcode == null ? '' : gcode).split(/\r?\n/).map((raw) => {
         if (/\bG91\b/.test(raw)) abs = false;
@@ -122,7 +126,7 @@ export function relativizeProgram(gcode) {
         for (const ax of ['X', 'Y', 'Z']) {
             const t = toks[ax];
             if (!t) continue;
-            const delta = cur[ax] == null ? 0 : (t.val - cur[ax]);   // first ref of this axis → 0 (its start = the jog position)
+            const delta = t.val - cur[ax];               // delta from the running position (seeded at the jog origin)
             line = line.replace(t.token, ax + r3(delta));
             cur[ax] = t.val;
             relativized += 1;
