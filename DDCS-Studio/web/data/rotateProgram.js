@@ -100,6 +100,38 @@ export function mirrorProgram(gcode, axis, sx = 0, sy = 0, sz = 0) {
     return { text: out.join('\n'), mirrored };
 }
 
+/**
+ * t979 — RELATIVIZE a program's linear geometry for the surfacing "Skim" Z-mode: rewrite each ABSOLUTE (G90) X/Y/Z
+ * move as an INCREMENTAL delta from the running position, so the whole op runs relative to wherever the tool starts
+ * (jog to a corner, touch, face from there — no WCS datum). Per-axis: the FIRST reference of an axis becomes a 0
+ * delta (that axis's start = the jogged position); subsequent moves are deltas. G53 machine-frame moves + already-
+ * G91 moves are LEFT ALONE (the safe-Z retract stays absolute machine coords). Arc I/J are relative centre offsets
+ * already → untouched. Pure; the caller wraps the result in G91 … G90. Simulate before cutting.
+ * @param {string} gcode @returns {{ text:string, relativized:number }}
+ */
+export function relativizeProgram(gcode) {
+    const cur = { X: null, Y: null, Z: null };
+    let abs = true, relativized = 0;
+    const out = String(gcode == null ? '' : gcode).split(/\r?\n/).map((raw) => {
+        if (/\bG91\b/.test(raw)) abs = false;
+        if (/\bG90\b/.test(raw)) abs = true;
+        if (!abs || /\bG53\b/.test(raw)) return raw;     // already incremental / machine-frame → leave absolute
+        const toks = { X: numAfter(raw, 'X'), Y: numAfter(raw, 'Y'), Z: numAfter(raw, 'Z') };
+        if (!toks.X && !toks.Y && !toks.Z) return raw;   // no linear geometry (M-codes, bare G-codes) → pass through
+        let line = raw;
+        for (const ax of ['X', 'Y', 'Z']) {
+            const t = toks[ax];
+            if (!t) continue;
+            const delta = cur[ax] == null ? 0 : (t.val - cur[ax]);   // first ref of this axis → 0 (its start = the jog position)
+            line = line.replace(t.token, ax + r3(delta));
+            cur[ax] = t.val;
+            relativized += 1;
+        }
+        return line;
+    });
+    return { text: out.join('\n'), relativized };
+}
+
 export function translateProgram(gcode, dx = 0, dy = 0, dz = 0) {
     dx = Number(dx) || 0; dy = Number(dy) || 0; dz = Number(dz) || 0;
     let abs = true, hadIncremental = false, moved = 0;
