@@ -12028,3 +12028,34 @@ The generated surfacing macro runs OPEN-LOOP on the controller with only a zero-
 - **1355 passed / 0 failed / 4 skipped** (11.1m; +1 new cam-slot-guards-977, no flake). Emit: only NARROW-area rasters clamp; normal configs BYTE-IDENTICAL -> no golden regen.
 
 ### NEXT (advisor): the BATCH RELEASE of [e] (export-title) + [c] (CAM-slot guards). [b] Z-profile queued; [d] rpm still deferred (spindle collision); [a] Z-mode awaits the user's A-vs-B (B recommended).
+
+---
+
+## 🔨 turn 979 — [a] surfacing Z-mode (Skim / whole-op G91): design SETTLED (2-mode) + collision-clean + the CORE transform built & verified (relativizeProgram, inert). The safety-critical WIRING is designed + ready — checkpointed here (deep context; the emit surgery on the safety path deserves a clean run).
+
+The turn evolved through 5 amendments (a live user+advisor discussion) to a FINAL GO. NOT the read-only I started; the design is now settled.
+
+### THE SETTLED DESIGN (user t979, GO — 2 modes, no write-WCS)
+Surfacing gets a **Z-mode selector** in a **Coordinates group** with the WCS dropdown:
+- **Normal** (DEFAULT) = absolute, use the WCS Z0 — the EXISTING path, BYTE-IDENTICAL.
+- **Skim** = WHOLE-OP G91 relative (jog to a corner, touch, face from there — X/Y AND Z relative to the start; the user CONFIRMED G91 swings XY too and that IS the intended jog-and-face workflow). No datum, no write-WCS (dropped — a datum action is not a motion mode). Skim GREYS the WCS dropdown (data-op-gated, survives postGating — the [[postgating-owns-field-disabled]] pattern). ZERO reasoner changes (G91 already handled; no write-WCS = nothing new to model).
+
+### COLLISION-CHECK (the surfacing emit = the other session's area)
+COMMITTED tree CLEAN: no recent other-session commits on surfacingWizard / surfaceFill / stepover / surfacingData / blockEmitter (newest is my own spindle fix 3d0315c); no uncommitted local state; origin/main stable. Residual risk = their LOCAL-unpushed work only (unknowable from here) — flag, but nothing to conflict with on the committed tree.
+
+### THE CORE — built + VERIFIED (inert, byte-identical)
+**web/data/rotateProgram.js `relativizeProgram(gcode)`** — the abs→incremental transform (mirrors translateProgram): per-axis, the FIRST reference of an axis → a 0 delta (that axis's start = the jog position), subsequent moves → deltas; **G53 machine-frame + already-G91 moves LEFT ABSOLUTE** (the safe-Z retract stays machine coords); arc I/J untouched. The caller wraps the result in G91 … G90.
+- VERIFIED: tests/relativize-program-979 (2 GREEN) — abs → per-axis deltas (first X/Y→0, first Z→0, ΔX=+20, ΔZ=+6), G53 line untouched, feeds/comments preserved, an already-G91 body left alone.
+- **INERT: nothing imports relativizeProgram yet → the emit is BYTE-IDENTICAL** (confirmed by grep — zero call sites). So this commit changes no program; the full gate is unaffected (1355 + 2 new unit tests).
+
+### THE REMAINING WIRING (designed — ready to complete)
+1. **The Skim emit** — a wrapping mechanism (the ROTATE-ATOM precedent, blockEmitter.js:223-229: emit children, then transform their text). Options: (a) a new `skim`/`relative` atom (kind like 'rotate') wrapping the surfacing cutting body, its blockEmitter case emits children then `relativizeProgram` + G91/G90; or (b) surfacingStack relativizes its own emit when Skim. Prefer (a) for round-trip parity.
+   - **THE RESOLVED SUBTLETY (the technical crux):** the wrap boundary is **spindle-on → the G53 retract**, NOT the literal whole program. The framing CLEARANCE lifts (makeStart `G0 Z<clr>`, inter-pass `G0 Z<clr>`) must ALSO relativize (a Skim op has no WCS-Z, so an absolute Z5 is meaningless) — relativizeProgram handles them (they're G90 Z moves). The **G53 safe-Z retract STAYS machine-frame absolute** (relativizeProgram skips G53); it sits at the tail after a `G90` exit (`… [G91 body] G90 G53 Z<safe> M5 M30`) so no G90/G53/G91 re-wrap is needed (program ends). This is why the transform SKIPS G53 — verified in the unit test.
+2. **The form** — a Coordinates group (WCS + Z-mode Normal|Skim) in index.html surfacing panel + surfacingView; Skim greys the WCS (data-op-gated).
+3. **The data-op twin** (surfacingData) — a zMode binding + the twin's Skim branch → byte-parity with the built-in.
+4. **Round-trip** — the marker/opSchema field for zMode (Blockly round-trip).
+5. **Goldens** — Skim emit goldens (new); Normal BYTE-IDENTICAL (no regen).
+
+### ACCEPT (advisor review, when wired): Skim emits whole-op G91 + restores G90 + safe-Z still G53 + envelope/through-stock/honest-Mach still reason (G91 best-effort from the seed, no G92-style misreport) + Normal byte-identical + WCS greys + Blockly round-trip + full gate.
+
+### STATE / NEXT: the CORE transform is DONE + verified + inert (safe to sit). The wiring above is designed + ready — completing it is the next step (fresh context best serves the safety-critical emit surgery). No emit change yet → nothing to release.
