@@ -12285,3 +12285,28 @@ Make the corner start marker's Z **X/Y-INDEPENDENT** — [[handles-are-independe
 3. The datum-frame: pin the marker Z to the ON-OPEN value (the correct approach-Z) — confirm that's the intended fixed Z (vs any surface/datum alternative)?
 
 No build this turn (ground+propose+gate). Emit un-touched → nothing to release.
+
+---
+
+## 🔨 turn 1000 — BUILD (gate ruled): corner start-marker drag moved Z — FIXED at the source (sim-only, byte-identical). repro → pinpoint → minimal Z-pin → verify, one turn.
+
+RULED (t999): emit-safe=YES (sim-only), repro-first=APPROVED, fixed-Z=the on-open approach-Z (pin X/Y-independent, handles-are-independent for Z).
+
+### REPRO (my own drive — confirmed the exact h-branch)
+tests/corner-start-z-1000: open the corner data-op, read getPassStarts()[0].z (on-open = **−5**, the approach-Z), then `panel.onStartDrag({x:+20,y:+15, z:999}, 0)` (an X/Y drag feeding a deliberately-wrong z). PRE-FIX: getPassStarts()[0].z became **999** — the bug. So the shifting Z entered via `userStarts[p]` (the `h = userStarts||st||hint||passStart` branch at createPreviewPanel:560).
+
+### THE LEAK (pinpointed at the source, createPreviewPanel.onStartDrag)
+`onStartDrag(pos, pass)`: when there's NO markerDragWriter — the corner (no simStartParams) falls here — it did `const np = {x, y, z: +pos.z||0}; passStarts[p]=np; userStarts[p]=np`, stamping the DRAG's pos.z into userStarts[p]. So an X/Y-plane drag pinned a Z, and the re-render's marker row (`row.z = h.z`, h=userStarts[p]) then drew the shifted Z. (The 3D gizmo path your grounding cited is dead — _pickGizmo disabled — so this generic-drag pin is the sole path.) EMIT-SAFE throughout: the markers emit nothing + writeSimStartFrac (the other-probes path) is X/Y-only.
+
+### THE FIX (source, minimal, sim-only) — refined after a ripple the gate caught
+createPreviewPanel.onStartDrag: for a WORK-FRAME start, hold the X/Y-INDEPENDENT provider Z instead of the dragged z —
+`const z0 = (!machineFrameTool && passStarts[p] && isFinite(+passStarts[p].z)) ? +passStarts[p].z : (+pos.z||0); const np = { x, y, z: z0 };`.
+- FIRST cut (no gate) BROKE homing-start-marker:(c): a HOMING start is a real 3D MACHINE position whose Z IS legitimately draggable (drag to Z=60 must persist) — my blanket z-hold pinned it to the 250 mid-default. The gate caught it.
+- REFINED with `!machineFrameTool` (t497 host hint: homing/ATC render machine-frame): a WORK-FRAME probe start (corner) holds the fixed approach-Z; a MACHINE-FRAME start (homing) keeps the dragged Z. Still a 1-liner (one condition), the principled distinction (positional machine start vs fixed probe approach-Z). Ops WITH a markerDragWriter (the other 4 probes) return early at the writer → untouched.
+
+### VERIFY (the ruling's ACCEPT)
+- **corner-start-z-1000 (GREEN post-fix):** the X/Y drag applies (x moved) + the start Z STAYS −5 (the on-open approach-Z, ignores the dragged 999).
+- **EMIT BYTE-IDENTICAL / other probes unaffected:** corner-post-fold (corner+edge+middle+alignment+rotary emit per-post byte-identical) + corner-data-sim-marker-emits (markers emit nothing, byte-parity) + alignment-handles-independent (the other probes' handle contract) all GREEN.
+- **FULL GATE:** 1372 passed / 0 failed / 4 skipped -- no flake, no ripple; corner start Z fixed, homing Z-drag preserved, emit byte-identical.
+
+### STATE: corner start-marker drag is now X/Y-only, Z pinned to the fixed approach-Z (sim-visual fix; emit byte-identical, no goldens, no hazard). READY for review + RELEASE.
