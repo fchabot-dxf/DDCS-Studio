@@ -2154,6 +2154,7 @@ function wireSettingsOverlay(ov) {
             const set = (cur, v, dir) => { const mag = Math.abs(v || 0); if (!mag) return cur; const s = dir || (v < 0 ? -1 : (cur < 0 ? -1 : 1)); return s * mag; };
             mm.x = set(mm.x, tv.x, hd.x); mm.y = set(mm.y, tv.y, hd.y); mm.z = set(mm.z, tv.z, hd.z);
             if (typeof tvc.data.softLimitEnabled === 'boolean') mm.softLimitsPulled = tvc.data.softLimitEnabled;   // t838 — the pre-flight badge notes when the controller's soft limits are OFF (declared envelope not machine-enforced)
+            if (tvc.data.softLimits) mm.softLimitBox = tvc.data.softLimits;   // t994 — persist the pulled PER-END asymmetric soft limits (machine coords) so the pre-flight checks the REAL box, not the symmetric travel (closes the false-green); ±9999 ends read as unbounded in envelopeCheck
             if (tvc.data.rapidRate > 0) mm.rapidRate = tvc.data.rapidRate;   // t848 — seed the G0 traverse rate from the controller (the time estimate + time-true sim); stays user-editable
             let touched = false;
             for (const a of ['x', 'y', 'z']) if (he[a] === 'min' || he[a] === 'max') { applyHomeEdge(_ddcsSettings, a, he[a]); touched = true; }

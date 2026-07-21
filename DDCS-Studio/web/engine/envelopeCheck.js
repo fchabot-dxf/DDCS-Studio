@@ -81,8 +81,17 @@ export function checkEnvelope(program, settings) {
     try { trace = traceToolpath(program || '', { wcsOffset: wo }); } catch (_) { trace = null; }
     const segments = (trace && trace.segments) || [];
 
-    // The declared envelope per axis, in MACHINE coords (signed travel → {lo,hi}).
-    const spans = { x: axisSpan(machine.x), y: axisSpan(machine.y), z: axisSpan(machine.z) };
+    // The declared envelope per axis, in MACHINE coords → {lo,hi}. t994 — prefer the PULLED per-end ASYMMETRIC soft-limit
+    // box (machine-confirmed real, FINDINGS V5: the Expert soft limits are per-end #161-168, can be OFFSET/tighter than the
+    // symmetric span — e.g. xMin −5 / xMax 295 — and use ±9999 as a per-end 'no-limit' SENTINEL even with #655=1). The old
+    // symmetric axisSpan(travel) UNDER-flags a tighter/offset real box → a FALSE GREEN (fits the check, the machine halts).
+    // softLimitBox present → the real min/max per axis (±9999 → UNBOUNDED, no over-travel flag on that end); absent (no pull)
+    // → fall back to axisSpan(travel), byte-identical for unpulled configs.
+    const box = machine.softLimitBox, SENT = 9999;
+    const softSpan = (mn, mx) => ({ lo: (mn == null || mn <= -SENT + 0.5) ? -Infinity : mn, hi: (mx == null || mx >= SENT - 0.5) ? Infinity : mx });
+    const spans = box
+        ? { x: softSpan(box.xMin, box.xMax), y: softSpan(box.yMin, box.yMax), z: softSpan(box.zMin, box.zMax) }
+        : { x: axisSpan(machine.x), y: axisSpan(machine.y), z: axisSpan(machine.z) };
 
     // Dedup key line|axis → keep the WORST overshoot (a line can breach the same edge on both endpoints / many passes).
     const worst = new Map();
