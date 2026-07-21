@@ -11971,3 +11971,30 @@ HIGH: [d] rpm (spindle), [a] Z-mode + [e] (surfacing-emit/framing). LOW: [c] (CA
 4. [d] rpm: coordinate with / wait for the other session's spindle work, or is it settled?
 
 No build this turn (read-only). Nothing is fully already-fixed; [b]'s pass-count slice + [e]'s L1-crash are the partial-done pieces (flagged).
+
+---
+
+## 🔨 turn 975 (part 2) — AMENDMENT absorbed: FIX [e] (built) + PROPOSE [d] shape (GATE); [a][b][c] stay investigated (part 1 above).
+
+Mid-turn amendments (user t974): the two FIRST-HAND bugs [d]+[e] need FIXING not just investigating; [d] is BIGGER (no rpm FIELD shown at all) -> ground+propose the shape before building; [a][b][c] stay investigate. Fallback: "PROPOSE [d] shape + do [e] + note [a-c]" -> that is exactly this turn.
+
+### [e] FIXED -- the mill-op export TITLE/filename (built + verified)
+ROOT CAUSE (verified): mill ops lead with `G90   ( absolute )` (cuttingBlocks.js:22 headerBlock); buildProgram's title regex `^\(...\)$` FAILS on it -> the raw-line fallback used "G90 absolute" verbatim -> `g90_absolute.nc`. *** ROADMAP-LAG NOTE: the nested-paren L1 CRASH was already fixed (917f885 + V2026.07.20.4) -- likely the user's "it was fixed"; the JUNK TITLE is a SEPARATE bug, still open. No added-but-wrong op-name comment exists in ANY committed branch (I checked my branch + main).
+
+FIX (chosen APPROACH + why): buildProgram now derives a clean title from the program MODEL -- the FIRST op's friendly label + its WxH area (opLabelOf + params) -> "Surfacing 100x80" -> `surfacing_100x80.nc`. An explicit user `( header )` still WINS; a hand-edited program (proj.text !== editor) falls back to the raw line (no stale name). Files: web/ui/editorManager.js only (+ opLabelOf import). Helper `_firstOpTitle(code)`.
+- **WHY MODEL-TITLE over the ROADMAP:15 EMIT-COMMENT** (each op emits `( Surfacing 367x45 )`): the emit-comment CASCADES -- it changes the progstart/shared framing emit -> ripples goldens across all mill ops + BREAKS the data-op TWIN byte-parity (the twin's frozen template would need the comment too) + is ON the surfacing-emit path the OTHER SESSION is actively editing (COLLISION). The model-title is SINGLE-POINT, ZERO emit change, ZERO twin impact, ZERO goldens, ZERO collision (editorManager is not a surfacing/spindle/framing file) -- and fixes the user's ACTUAL pain (the junk filename). The in-file .nc annotation (emit-comment) is a richer FOLLOW-ON, noted -- surface to the user if they want the comment IN the file (not just the filename).
+- VERIFY: tests/export-title-975 (3 GREEN) -- a generated surfacing op exports "Surfacing ..." not "g90/absolute" (real flow: open->update->insert, line 1 = ( Surfacing ... ), no nested paren); an explicit ( header ) wins; a hand-edited program falls back to the raw line.
+
+### [d] PROPOSED (NOT built -- your directive: propose the shape + GATE; spindle-subsystem collision)
+GROUNDED the "no rpm field" root cause: the DISCREPANCY reconciled -- the BUILT-IN forms DO have rpm fields for some ops (sf_rpm/ct_rpm/sl_rpm in index.html + the views read them), BUT the DATA-OP TWIN forms (what the user sees via opensAs) render from the *_EXEC_BINDINGS tables, which have NO rpm binding -> NO rpm field + rpm never reaches the emit (spindleHeadPatch fills from the Head). So [d] is a DATA-OP-binding job. THE 3-PART SHAPE:
+- (1) ADD an rpm binding (field) to each cutting DATA-OP's exec bindings (surfacing/pocket/contour/bore/drill/slot/text) so the data-op form SHOWS an rpm field.
+- (2) BIND the rpm SOCKET -> progstart (blockIndex 0, key 'rpm') so the form/tool rpm reaches the program; spindleHeadPatch already yields to an explicit rpm (its "explicit rpm wins" guard), no-tool still falls back to the Head.
+- (3) the TOOL-PICKER rpm populates the field (toolFieldMap already maps rpm->the built-in field; extend to the data-op field).
+EMIT + GOLDENS REGEN expected (the rpm socket adds/changes the spindle line). *** THIS IS DIRECTLY IN OUR spindleHeadPatch TERRITORY + the OTHER PC just changed the spindle subsystem (ROADMAP:14 says coordinate) -> HIGH COLLISION. GATE: build [d] only after you confirm the other session's spindle work is settled / non-conflicting, OR coordinate the socket addition. Recommend PROPOSE-then-build next turn once the spindle surface is clear.
+
+### [a][b][c] -- INVESTIGATED (part 1 above): [a] recommend B/G91 (A/G92 silently misreports the reasoners); [b] pass-count slice exists, draggable Z-profile is the build; [c] real controller-safety gaps, low collision.
+
+### FULL GATE
+- **1354 passed / 0 failed / 4 skipped** (11.1m; +3 new export-title-975, no flake this run). [e] = export-title only (NO emit goldens move); diff = editorManager.js single file + the new spec.
+
+### GATE for you: (1) [e] approach OK (model-title now; emit-comment follow-on if the user wants the .nc annotation)? (2) [d] shape approved + when to build re the spindle collision? (3) which of [a-c] next?
