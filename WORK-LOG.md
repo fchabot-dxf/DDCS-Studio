@@ -12544,3 +12544,30 @@ RULED (t1013): true cross-section, X-linked, cavity walls+floor + a pass line pe
 - **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.2m) -- fully clean, NO flake. The new section leaf + wiring broke nothing; pocket-twin tests all green.
 
 ### STATE: the pocket twin now shows a TRUE linked depth cross-section beneath the plan (walls+floor + depthLevels pass lines, draggable floor=depth / gap=stepdown, two-editor synced), as a companion elevation leaf (featureCanvas untouched, byte-identical emit, zero goldens). The leaf + declared section-spec are a clean general elevation primitive; surfacing/contour/slot inherit by declaring def.section. READY for review.
+
+---
+
+## 🔨 turn 1014 (cont.) — PIVOT (USER, direct): replace the layout cross-section with a SIMPLER in-form Z-DEPTH RULER widget. User weighed reuse: the cavity walls/floor only help pocket/slot; the universally-reusable essence is the depth-axis + pass ticks + draggable depth. So drop the sideview, build a narrow depth ruler as a form widget. Byte-identical emit.
+
+CONTEXT: after t1014 shipped the true cross-section (right-pane, then a left-right draggable split experiment), the USER (direct, not via advisor) reconsidered: a depth GUI is about HEIGHT, and the sideview reuses only PARTIALLY (pocket/slot get a real cavity; drill/bore/probe/surfacing degenerate to ~a depth ruler). Chose B: a simpler narrow depth ruler, reusable by ANY depth op, no layout-canvas coupling, no drag separation. (Design ruling was really the advisor's to make — flagged to the user; they said do it + pass the ball, so I built it and hand off with this note.)
+
+### REVERTED (the t1014 layout cross-section, cleanly)
+Removed web/viz/sectionCanvas.js (git rm), panelTypes.sectionSpecFromOp + its depthLevels import, pocket's def.section, the userOpView renderSectionBeneath + its 2 call sites + the imports, and the .viz-section / section-canvas CSS. (The uncommitted left-right split experiment was discarded first.) The layout plan is back to featureCanvas-only.
+
+### BUILT — the Z-DEPTH RULER (a MULTI form widget, formWidgets.js)
+`zDepthWidget(host, primary, group)` registered as `zdepth` in FORM_WIDGETS + MULTI_WIDGETS. A narrow vertical elevation of the CUT DEPTH beside the editable Depth/Step-Down fields:
+- A vertical Z axis (0 at the stock top → total depth at the bottom); one TICK per depthLevels(depth, stepdown) pass -- the SAME fn the emitter loops (one source, so the ticks == the emitted passes). A green FLOOR grip = total depth, an orange STEP grip = per-pass stepdown; a "N passes" readout.
+- The two NUMBER FIELDS are numberWidget instances REUSED (not hand-rolled): the Depth/Step rows keep EVERYTHING numberWidget gives -- their label, the mm/inch DUAL-UNIT hint + inch shadow (t990), socket-held read. The gate caught the regression when I first hand-rolled plain inputs (dual-units-990:43 -- pocket lost the hint); reusing numberWidget restored it. read() delegates to the two cores.
+- Editable beside the ruler (drag OR type -> one source): a grip drag writes the [data-param] input + dispatches input -> numberWidget syncs (incl. the inch shadow) + the ruler redraws + the form re-reads; typing redraws the ruler.
+- Reusable: it binds an op's depth+stepdown params by ROLE (depth/step). ANY depth op inherits it by tagging its two bindings `widget:'zdepth' + group:'zdepth' + role`. No layout-canvas dependency, no per-op cavity shape.
+- PILOT POCKET: tagged POCKET_BINDING_SPECS depth (role depth, the widget) + stepdown (role step) with group 'zdepth'.
+- DISPLAY/INPUT ONLY: read() returns the same {depth, stepdown} the two number widgets did -> NO new param, NO emit path -> byte-identical.
+
+### VERIFY (my VIEWED screenshot + ticks==depthLevels + drag + type + byte-identical + gate)
+- **MY VIEWED screenshot (scratchpad, viewed):** the widget renders IN the form (TOOL & CUT) -- "Depth (mm)" label, the narrow ruler (Z 0 top, dashed ticks −1.5/−3, green floor grip at −4, orange step grip), Depth [4] + Step Down [1.5] fields beside it, "3 passes". The layout canvas is CLEAN (no section band). Simple + narrow, as asked.
+- **TICKS == depthLevels():** default 4/1.5 -> floor 1 + pass 2 = 3 == depthLevels(4,1.5). Typing depth 9 -> 6 ticks.
+- **DRAG:** dragging the floor grip DOWN deepened the depth field (4 -> 4.6) -> two-editor sync.
+- **BYTE-IDENTICAL:** display/input only, no new param; no widget artifact in the G-code, cuts still emit. (pocket-data-emit is the authoritative parity gate.)
+- **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.2m) -- fully clean after the numberWidget-reuse fix (the first cut hand-rolled plain inputs and lost pocket's dual-unit hint; the gate caught it; reusing numberWidget restored it, all green).
+
+### STATE: the pocket twin's Depth/Step-Down fields are now a narrow in-form DEPTH RULER (Z axis + depthLevels ticks + draggable floor/step, numbers beside it); the layout cross-section is removed. A reusable form widget -- any depth op (surfacing/contour/slot/drill/bore) inherits it by tagging its depth+stepdown bindings `widget:'zdepth'`. Byte-identical emit, no layout coupling. READY for advisor review.
