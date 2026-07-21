@@ -12426,3 +12426,48 @@ Storage untouched (normalizeTool still mm-native); the tool profile SVG still re
 - **FULL GATE:** 1371 passed / 4 skipped / 1 flake -- the sole red was knob-persist:15 (a documented pre-existing isolation flake, unrelated to units/tool-library); re-ran standalone 1/1 GREEN. Green modulo the known flake.
 
 ### STATE: the tool-library editor + catalog picker are dual-unit (inch/IPM display+input) with mm-native exact storage; the mm<->inch conversion is ONE shared units.js leaf (three consumers, no drift); the op-form widget rides the same leaf byte-identically. READY for review.
+
+---
+
+## 🔨 turn 1010 — GROUND + PROPOSE + GATE ([b] Z-depth GUI, draggable Z-profile): infra is a proven FIT (FeatureCanvas in-form + the entry-point two-editor sync), the pass lines get a one-source from depthLevels(); proposing the widget shape + 2 sub-forks. No build — the advisor surfaces the UX to the user.
+
+GROUND-FIRST per dispatch (3 parallel Explore agents). Read-only; no code changed.
+
+### GROUNDED
+1. **The fields (all 4 ops bind BOTH depth(total) + stepdown(per-pass), uniform PARAM names `depth`/`stepdown`, already `units:'mm'`, NO widget tag yet):** surfacing surfacingData.js:65-66 (emit keys to/by; default depth 0.5 stepdown 0.5, a facing skim) · pocket pocketData.js:108-111 (match-by-type + drill-arm fan-out; default 4/1.5) · contour contourData.js:56-57 (to/by; 4/1.5) · slot slotData.js:76-77 (depth/stepdown; 4/1.5). Built-in HTML forms: sf_/p_/ct_/sl_ _depth + _stepdown (index.html). One declared widget on params depth+stepdown covers ALL FOUR (inherited, one pattern).
+2. **The 2D-SVG infra is a FIT (dispatch's hunch confirmed):** viz/featureCanvas.js is ALREADY reused as a ~175px in-form widget (xy-pad/rect/coord-list each embed `new FeatureCanvas()`), with real drag + click-to-edit + a handle vocabulary (move/size/length; `length` = a 1D draggable edge along an axis = exactly a depth edge). Closest precedent to CLONE: rectPadWidget (formWidgets.js:603) + buildCoordEditor (:514). Gap: FeatureCanvas is top-down XY, no elevation primitive -> a side view maps depth onto the Y axis (small `elevation` flag to suppress the CAM grid/machine chrome), OR a purpose-built SVG.
+3. **The two-editor-of-one-source sync is BUILT-IN (no new plumbing):** FeatureCanvas's own contract (header lines 9-12) + the entry-point precedent userOpView.js:429-443: a drag does `el('[data-param="depth"]').value = ...; dispatchEvent('input',{bubbles}); mgr.update()`, and typing a field flows through the delegated input listener (userOpView.js:220-226) -> mgr.update() -> re-render. The DECLARED seam is `inp.dataset.param` (formWidgets.js:94, stamped "so a 2D-preview handle can write this field back") -> the widget declares its target params, never infers from motion.
+
+### GROUNDING CORRECTION (surface): there is NO form-side pass-count readout today
+The dispatch says "the pass-count readout first-slice EXISTS." Ground truth: no form widget renders a pass count. What exists is (a) the pure slice function `depthLevels(depth, stepdown)` (clearing.js:314) returning [sd, 2sd, ..., depth] (the exact Z of every pass), consumed by the EMITTER (blockEmitter.js:188), and (b) the 3D-viz pass markers from PARSED g-code (`stats.passes` -> gcodeViz3d.js:867). => the Z-profile would be the FIRST form-side pass visualization. THE ONE-SOURCE WIN: draw the profile's pass lines from `depthLevels()` (the SAME function the emitter loops) -> the drawn passes are GUARANTEED identical to the emitted G-code passes, not a re-derived approximation (declare-not-infer).
+
+### PROPOSED WIDGET SHAPE (side-elevation, in the depth-op form)
+```
+  ┌─ Z DEPTH (Pocket) ─────────────────────┐
+  │   ▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁   Z=0  (stock top)   │
+  │   │              │                      │
+  │   │──────────────│  pass 1   Z −1.5     │  pass lines = depthLevels(depth,stepdown)
+  │   │──────────────│  pass 2   Z −3.0     │  (== the emitted passes, one source)
+  │   │≡≡≡≡≡≡≡≡≡≡≡≡≡≡│  pass 3   Z −4.0     │
+  │   ╚══════▼═══════╝  ◄ DRAG bottom = DEPTH│  drag bottom edge  ↕ -> writes `depth`
+  │      ↕ drag a pass gap = STEP DOWN       │  drag pass spacing ↕ -> writes `stepdown`
+  │   Depth [4.0]mm   Step [1.5]mm           │  number fields STAY (two editors, one source)
+  │   3 passes - first slice at Z -1.5       │  live readout (NEW on the form)
+  └──────────────────────────────────────────┘
+```
+- Drag the BOTTOM edge -> `depth`; drag the pass SPACING -> `stepdown`. Type either field -> the profile re-renders. Numbers (depth, step, pass count, first-slice Z) live on the block.
+- **Ops:** surfacing, pocket, contour, slot (all have both fields). Surfacing is a shallow skim (0.5) -> a 1-pass profile, still coherent.
+- **The declared TAG:** add `widget:'zprofile'` + a shared `group` + `role:'depth'`/`role:'stepdown'` to the EXISTING depth/stepdown bindings in the 4 dataOps twins (register `zprofile` in FORM_WIDGETS + MULTI_WIDGETS). One declaration, inherited by all four.
+- **BYTE-IDENTICAL EMIT (confirmed):** the widget only writes the existing `depth`/`stepdown` fields via [data-param]; it adds NO new param and NO emit path. The op stack is unchanged -> zero goldens, zero twin-parity risk.
+
+### SUB-FORKS to surface to the user (GUI-first, their call)
+**F1 - rendering:** (W1) reuse FeatureCanvas + a small `elevation` flag [lean: dispatch steered here + one-source with the canvas infra + rectPad clone] vs (W2) a purpose-built zProfileSvg.js leaf (like cornerGridSvg) [cleaner side-view, no XY chrome to suppress, but a new module]. Both are proven patterns.
+**F2 - layout:** (L1) a self-contained widget row = canvas + its OWN inline depth/stepdown number inputs (like coord-list) [lean: one tidy block] vs (L2) keep the existing two number rows AND add the canvas above them [more conservative, familiar fields]. MULTI_WIDGETS replaces the two rows with one widget, so L1 is the native shape.
+
+### GATE QUESTIONS (advisor surfaces to the user)
+1. Approve the side-elevation shape (draggable bottom=depth + pass-spacing=stepdown, live pass count from depthLevels, numbers on the block)?
+2. F1 rendering: W1 reuse-FeatureCanvas [lean] or W2 purpose-built zProfileSvg?
+3. F2 layout: L1 self-contained widget [lean] or L2 canvas-above-the-fields?
+4. All 4 ops now, or pilot ONE (e.g. pocket) first then inherit? (Recommend pilot pocket -> the one declaration inherits.)
+
+No build this turn (ground + propose + gate). Emit untouched -> nothing to release.
