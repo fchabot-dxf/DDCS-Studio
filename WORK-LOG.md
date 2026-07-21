@@ -12471,3 +12471,53 @@ The dispatch says "the pass-count readout first-slice EXISTS." Ground truth: no 
 4. All 4 ops now, or pilot ONE (e.g. pocket) first then inherit? (Recommend pilot pocket -> the one declaration inherits.)
 
 No build this turn (ground + propose + gate). Emit untouched -> nothing to release.
+
+---
+
+## 🔨 turn 1012 — GROUND + PROPOSE + GATE (Z-depth pivoted to a LINKED SECTION of the layout canvas): featureCanvas does NOT cleanly host a second axis (single-fit) -> propose a MINIMAL COMPANION section leaf beneath it, synced via the existing render-on-field-change contract. Byte-identical emit. No build — the advisor re-surfaces to the user.
+
+RE-DIRECTED GROUND-FIRST (2 parallel Explore agents). Read-only; no code. Do NOT build the standalone widget.
+
+### GROUNDED (pivoted design)
+1. **The layout canvas is ALREADY wired for all 4 ops + drill (the "drill-proto, pocket-next" memory is STALE):** each built-in op-view owns a FeatureCanvas + a buildXxxSpec -> layout.render(): drill drillView.js:183, POCKET pocketView.js:118 (NOT pending), slot slotView.js:110, surfacing surfacingView.js:89, contour contourView.js:133. The DATA-OP TWINS (what users open via opensAs) render through the GENERIC path: layoutSpecFromOp (panelTypes.js:143) -> renderLayout2D (panelTypes.js:487) -> userOpView.js:454. Every spec is `{stock, items, handles}` -- top-down XY only, NO Z/section field. So the section belongs in the GENERIC twin path (one declaration, inherited), where the user actually opens the op.
+2. **featureCanvas CANNOT cleanly host a linked section (single-fit architecture):** it assumes ONE isotropic world->screen transform `_tf` (featureCanvas.js:50/249) for the whole SVG; `_fit` (:220) fits the union of stock+items+handles into the FULL pane with a scalar scale; `_S`/`_W` (:252-253), `_hit` (:309), pan/zoom, `_followHandle` all assume that ONE frame; 3 fixed `<g>` layers, NO sub-region / secondary-axis / inset precedent (the machine-frame is the SAME XY frame, just decorated). A section strip with its OWN Z axis would need a 2nd transform + a reserved pixel band + which-band hit dispatch threaded through ~8 heavily-patched methods (t309/t528/t532/t732) = 150-250+ lines of regression risk on a load-bearing file, reusing ~none of its logic. => featureCanvas does NOT compose here.
+3. **The clean path = a MINIMAL COMPANION section leaf, synced via the EXISTING contract:** the repo's own precedent for "a second synced view" is a companion element (the toolpath2d animation overlay, featureCanvas.js:54), NOT an internal region. A ~80-140-line zSection leaf (its own small SVG) renders directly BENEATH the layout canvas, driven by the SAME depth/stepdown fields, redrawing on the SAME field->render loop. Reuse featureCanvas's CONTRACT (render cheap on every field change), not its transform.
+4. **One-source + two-editor sync (confirmed last turn):** pass lines from depthLevels(depth, stepdown) (clearing.js:314) -- the SAME function the emitter loops (blockEmitter.js:188) -> drawn passes == emitted passes. Drag writes the field via the entry-point precedent (userOpView.js:429): `el('[data-param="depth"]').value=...; dispatch('input'); mgr.update()`; typing re-renders both plan + section. Declared seam = inp.dataset.param (declare-not-infer).
+
+### PROPOSED: PLAN + SECTION (CAM-standard), the section a companion beneath the layout canvas
+```
+  ┌─ 2D LAYOUT (Pocket twin) ────────────────────┐
+  │  PLAN  (featureCanvas, top-down XY, UNCHANGED) │
+  │  ┌────────────────────┐                        │
+  │  │  ▓▓▓▓▓▓▓▓▓▓▓▓       │  stock + pocket + the  │
+  │  │  ▓  pocket  ▓       │  existing drag handles │
+  │  │  ▓▓▓▓▓▓▓▓▓▓▓▓       │                        │
+  │  └────────────────────┘                        │
+  │  ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  SECTION (new companion, XZ)
+  │   Z 0 ┌────────────────┐  stock top             │
+  │       │────────────────│  pass 1   Z −1.5       │  pass lines = depthLevels() (== emit)
+  │       │────────────────│  pass 2   Z −3.0       │
+  │       │≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡│  pass 3   Z −4.0       │
+  │       ╚════════▼═══════╝  ◄ drag bottom = DEPTH │  drag bottom edge  -> `depth`
+  │        ↕ drag a pass gap = STEP DOWN            │  drag pass spacing -> `stepdown`
+  │        depth 4.0 · step 1.5 · 3 passes          │  numbers + live pass count on the block
+  └────────────────────────────────────────────────┘
+```
+- The section shares the plan's X (part width) and sits directly below it -> the CAM-standard linked plan/section the user asked for. featureCanvas is UNTOUCHED (companion leaf beside it).
+- Drag the bottom edge -> writes `depth`; drag the pass spacing -> writes `stepdown`; type either field -> plan + section both re-render. Numbers (depth/step/pass-count/first-slice Z) on the block.
+- **PILOT POCKET** (has both fields, canvas already wired). The section is DECLARED (declare-not-infer) -- the op/def declares it has a depth-section (e.g. `def.section = { depthParam:'depth', stepParam:'stepdown' }` or a flag on renderLayout2D); pocket declares first, surfacing/contour/slot INHERIT as they declare. Absent declaration -> no section (unchanged).
+- **BYTE-IDENTICAL EMIT (confirmed):** the section writes ONLY the existing depth/stepdown fields via [data-param]; adds NO new param, NO emit path, NO op-stack change -> zero goldens, zero twin-parity risk.
+
+### SUB-FORKS to surface (advisor re-surfaces to the user)
+- **F1 companion vs extend -- I ELIMINATED extend (A):** extending featureCanvas breaks its single-fit invariant + threads 150-250 lines through 8 patched methods for ~no logic reuse = machinery for a structure mismatch (directive 1). RECOMMEND the companion leaf (B). (Surfacing this as decided, not a live fork, unless the advisor/user wants to re-open.)
+- **F2 section X axis:** (a) share the plan's X exactly (true linked CAM plan/section, aligned columns) [lean -- it's what the user pictured] vs (b) a schematic depth strip (a generic stock block, not scaled to part X) [simpler, less "linked"].
+- **F3 drag richness:** bottom edge=depth AND pass-spacing=stepdown [lean -- the ask] vs depth-only (stepdown stays a number).
+- **F4 rollout:** PILOT POCKET now, others inherit by declaring [lean/recommended per the per-op caveat].
+
+### GATE QUESTIONS
+1. Approve PLAN + SECTION with the section as a COMPANION leaf beneath the layout canvas (featureCanvas untouched)?
+2. F2: share the plan's X (linked) [lean] or a schematic strip?
+3. F3: both drags (depth + stepdown) [lean] or depth-only?
+4. Confirm PILOT POCKET, declared section, others inherit?
+
+No build this turn (ground + propose + gate). Emit untouched -> nothing to release.
