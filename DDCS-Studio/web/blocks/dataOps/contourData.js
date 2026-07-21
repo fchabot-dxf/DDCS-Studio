@@ -29,7 +29,7 @@ import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, ENTRY_OPTIONS_NO_HE
 export const CONTOUR_DEFAULTS = {
     shape: 'rect', w: 80, h: 60, dia: 50, sides: 6, side: 'outside', toolDia: 6,
     entry: 'plunge', rampAngle: 3,   // t842 — depth entry (plunge default = byte-identical; no helix — a profile trace)
-    depth: 4, stepdown: 1.5, feed: 400, plunge: 200, clearance: 5, wcs: 'active',
+    depth: 4, stepdown: 1.5, feed: 2000, plunge: 200, clearance: 5, wcs: 'active',
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
 

@@ -34,7 +34,7 @@ export const SLOT_DEFAULTS = {
     pattern: 'single', optIn: true,
     ax: 0, ay: 0, bx: 60, by: 0, width: 6, toolDia: 6, stepoverPct: 40, depth: 4, stepdown: 1.5,
     entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1,   // t842 — depth entry (plunge default = byte-identical)
-    feed: 600, plunge: 150, clearance: 5, wcs: 'active',
+    feed: 2000, plunge: 150, clearance: 5, wcs: 'active',
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
 

@@ -9,7 +9,7 @@ import { val } from './util.js';
 
 export const moveBlock = {
     type: 'move', label: 'Move', kind: 'leaf', category: 'Move',
-    defaults: { mode: 'cut', x: 0, y: 0, z: 0, feed: 200 },
+    defaults: { mode: 'cut', x: 0, y: 0, z: 0, feed: 2000 },
     fields: ['mode', 'x', 'y', 'z', 'feed'],
     // Only the axes that are set are emitted (a blank/absent axis is omitted → single-axis moves like `G0 X#9`).
     // Each coordinate/feed accepts a literal OR a #var/[expr] (val), so `Move(rapid, X=#9)` → `G0 X#9`.
@@ -25,6 +25,6 @@ export const moveBlock = {
         // Block structure reads from the marker comments (( Array N @ … ), ( Step Down z=… )), not per-line tags.
         if (p.mode === 'rapid') return [`G0 ${xyz}`];
         if (p.mode === 'probe') return [`G31 ${xyz} F${val(p.feed, 50)}`];
-        return [`G1 ${xyz} F${val(p.feed, 200)}`];
+        return [`G1 ${xyz} F${val(p.feed, 2000)}`];
     },
 };

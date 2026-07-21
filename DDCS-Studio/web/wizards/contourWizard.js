@@ -52,7 +52,7 @@ function contourFlatParams(params = {}) {
  *  atom (the region-pill→flat reframe) instead of a nested Region SOCKET — so the twin binds each dim positionally —
  *  and emits BYTE-IDENTICAL (contourfill rebuilds the same region descriptor + reuses the same emit kernels). */
 export function contourStack(params = {}) {
-    const feed = num(params.feed, 400), plunge = num(params.plunge, 200), clearance = num(params.clearance, 5);
+    const feed = num(params.feed, 2000), plunge = num(params.plunge, 200), clearance = num(params.clearance, 5);
     const depth = num(params.depth, 4), stepdown = num(params.stepdown, 1.5);
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
 

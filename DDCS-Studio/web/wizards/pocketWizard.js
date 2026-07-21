@@ -86,7 +86,7 @@ export function pocketDrillCentre(params = {}) {
 export function pocketStack(params = {}, opts = {}) {
     const superset = !!opts.superset;
     const shape = params.shape || 'rect';
-    const clr = num(params.clearance, 5), feed = num(params.feed, 600), plunge = num(params.plunge, 150);
+    const clr = num(params.clearance, 5), feed = num(params.feed, 2000), plunge = num(params.plunge, 150);
     const ox = num(params.originX, 0), oy = num(params.originY, 0);
     const raster = (params.strategy || 'spiral') === 'raster';
     const depth = num(params.depth, 4), by = num(params.stepdown, 1.5);

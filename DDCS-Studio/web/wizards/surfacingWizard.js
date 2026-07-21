@@ -26,7 +26,7 @@ export function surfacingStack(params = {}) {
     // legacy fallback for the toolDia/% form path. strategy: take the socket value directly (the form's 'raster' → parallel).
     const so = Math.max(0.2, ('stepover' in params) ? num(params.stepover, 0) : tool * num(params.stepoverPct, 60) / 100);
     const strat = (params.strategy === 'concentric') ? 'concentric' : 'parallel';
-    const clr = num(params.clearance, 5), feed = num(params.feed, 800), plunge = num(params.plunge, 200);
+    const clr = num(params.clearance, 5), feed = num(params.feed, 2000), plunge = num(params.plunge, 200);
     const w = num(params.w, 100), h = num(params.h, 80);
 
     // The fill region is defined LOCALLY at (0,0); PlaceOnStock owns the part position (offX = originX), so originX/originY

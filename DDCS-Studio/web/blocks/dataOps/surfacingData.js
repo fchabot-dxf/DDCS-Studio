@@ -39,7 +39,7 @@ import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, SURFACING_STRATEGY_
 export const SURFACING_DEFAULTS = {
     w: 100, h: 80, stepover: 7.2, strategy: 'parallel', depth: 0.5, stepdown: 0.5,
     entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1,   // t842 — depth entry (plunge default = byte-identical)
-    clearance: 5, feed: 800, plunge: 200, wcs: 'active', zMode: 'normal',   // t986 — zMode: Normal (absolute WCS) | Skim (whole-op G91 relative to the jog)
+    clearance: 5, feed: 2000, plunge: 200, wcs: 'active', zMode: 'normal',   // t986 — zMode: Normal (absolute WCS) | Skim (whole-op G91 relative to the jog)
     // placement (makePlace) — region is local-0-based, so originX/originY are the placement offset (offX/offY) like drill.
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };

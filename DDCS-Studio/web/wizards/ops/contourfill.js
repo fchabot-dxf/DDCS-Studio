@@ -37,12 +37,12 @@ function contourExtent(p) {
 
 export const contourFillBlock = {
     type: 'contourfill', label: 'Contour', kind: 'leaf', category: 'Toolpaths',
-    defaults: { shape: 'rect', x: 0, y: 0, w: 80, h: 60, dia: 50, sides: 6, side: 'outside', tool: 6, entry: 'plunge', rampAngle: 3, by: 'by', z: 'z', feed: 400, plunge: 200, clearance: 5 },
+    defaults: { shape: 'rect', x: 0, y: 0, w: 80, h: 60, dia: 50, sides: 6, side: 'outside', tool: 6, entry: 'plunge', rampAngle: 3, by: 'by', z: 'z', feed: 2000, plunge: 200, clearance: 5 },
     fields: ['shape', 'x', 'y', 'w', 'h', 'dia', 'sides', 'side', 'tool', 'entry', 'rampAngle', 'by', 'z', 'feed', 'plunge', 'clearance'],
     extent: (p) => contourExtent(p),   // live extent → PlaceOnStock tracks shape/size (byte-identical: == contourBBox)
     emit: (p) => {
         const rg = contourRegion({ region: regionDesc(regionFromFlat(p)), side: p.side || 'outside', tool: num(p.tool, 6) });
-        const z = num(p.z, 0), clr = num(p.clearance, 5), feed = num(p.feed, 400), plunge = num(p.plunge, 200);
+        const z = num(p.z, 0), clr = num(p.clearance, 5), feed = num(p.feed, 2000), plunge = num(p.plunge, 200);
         // t842 — depth entry: ramp along the first segment (polyline) / a helical lead-in (circle). Plunge default = byte-
         // identical. A contour has NO helix (it would gouge the profile interior) — coerce anything but ramp to plunge, so a
         // stray helix from the global Blockly dropdown can't reach the fill-only helix path (no cx/cy in a contour ctx).

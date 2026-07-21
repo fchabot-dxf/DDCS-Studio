@@ -18,7 +18,7 @@ export function slotPath(p) {
     const width = Math.max(tool, num(p.width, tool));
     const so = Math.max(0.2, tool * num(p.stepoverPct, 40) / 100);
     const depth = num(p.depth, 4);
-    const clr = num(p.clearance, 5), feed = num(p.feed, 600), plunge = num(p.plunge, 150);
+    const clr = num(p.clearance, 5), feed = num(p.feed, 2000), plunge = num(p.plunge, 150);
     const levels = depthLevels(depth, num(p.stepdown, 1.5));
     const dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy);
     const L = [];   // program-level clearance is provided by the enclosing program (emitMapped header)
@@ -68,7 +68,7 @@ export function slotPath(p) {
 
 export const slotBlock = {
     type: 'slot', label: 'Slot', kind: 'leaf', category: 'Toolpaths',
-    defaults: { x0: 0, y0: 0, x1: 60, y1: 0, width: 6, tool: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, feed: 600, plunge: 150, clearance: 5 },
+    defaults: { x0: 0, y0: 0, x1: 60, y1: 0, width: 6, tool: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, feed: 2000, plunge: 150, clearance: 5 },
     fields: ['x0', 'y0', 'x1', 'y1', 'width', 'tool', 'stepoverPct', 'depth', 'stepdown', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'feed', 'plunge', 'clearance'],
     emit: (p, dx = 0, dy = 0) => slotPath({
         ...p,

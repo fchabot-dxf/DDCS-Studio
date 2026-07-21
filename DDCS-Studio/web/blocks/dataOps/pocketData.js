@@ -34,7 +34,7 @@ import { restValid, restRegion, restGreyReason } from '../../wizards/ops/restmac
 /** Author defaults — match pocketStack's num() fallbacks AND the built-in Pocket form defaults (index.html p_*). */
 export const POCKET_DEFAULTS = {
     shape: 'rect', w: 80, h: 60, dia: 50, sides: 6, toolDia: 6, wallOffset: 0, stepoverPct: 40,
-    strategy: 'spiral', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, wcs: 'active',
+    strategy: 'spiral', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, depth: 4, stepdown: 1.5, feed: 2000, plunge: 150, clearance: 5, wcs: 'active',
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
     restTool: 0, restDia: 0, restStepover: 40,   // t871 — REST MACHINING: 0 = no rest pass (byte-identical); a smaller tool clears the corners
 };
