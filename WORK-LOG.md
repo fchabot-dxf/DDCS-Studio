@@ -12147,3 +12147,36 @@ GROUNDED: the rotary superset uses DERIVED bindingSpecs; surfacing's twin uses S
 - **FULL GATE (final, all tests):** 1362 passed / 4 skipped + 1 PRE-EXISTING flake. The lone failure is collapsible-panes-752:38 (mobile pane-collapse animation-timing) -- the SAME non-deterministic flake proven at t973 (clean-tree stash-test flaked 3/4; passes standalone [re-confirmed 1/1 here]); my Skim changes are emit/form-only with zero path to mobile pane sizing.
 
 ### STATE: Skim is now USER-REACHABLE (the data-op form offers it, greys the WCS, emits byte-identical to the built-in, round-trips) -> READY for the advisor's two-method review + RELEASE.
+
+---
+
+## 🔨 turn 988 — GROUND + PROPOSE + GATE: dual mm/inch + mm/min-IPM input fields (display layer, mm-native, NO emit change). PROPOSE the widget change + scope; GATE before building (your directive).
+
+READ-ONLY grounding this turn (you: "PROPOSE ... BEFORE building").
+
+### COLLISION-CHECK (formWidgets is the SHARED numeric widget — every form)
+Recent formWidgets.js commits are MINE / corner / pocket (clearance-gate, plane-suggest, rest-machining) — NO active OTHER-session churn there (they touch surfacingView, not formWidgets). Committed-collision LOW. BUT it is the SHARED numeric widget (all wizard + data-op forms) — a change touches every form, so it must be additive + gated-to-scope (flag).
+
+### GROUNDING (the numeric widget + the current unit surface)
+- **numberWidget** (formWidgets.js:64) builds an `<input type=number>` whose value IS the mm-native storage; `read()` (:113) returns `parseFloat(inp.value)` directly → any inch-display conversion must live in a WRITE (mm→display) + the READ (display→mm), leaving the STORED value mm.
+- **`units` label** already exists (labelSpan :54 → a ` (mm)` suffix). So a unit-KIND can DERIVE from `units`: 'mm' → LENGTH (in = mm/25.4), 'mm/min' → FEED (IPM = mm·min⁻¹/25.4). Others ('°','%','mm/rev') → no dual.
+- **SCOPE today:** 12 data-op fields carry `units:'mm'` (dimensions/clearances). **Feed/plunge fields are UNTAGGED** (no `units:'mm/min'`) → they'd need tagging to get the IPM treatment (a clean declare — a feed IS mm/min; it also gives them a proper unit label they lack today).
+- **No display-unit pref exists** in settings (grep: none) → a new `settings.units` pref ('mm' default | 'inch').
+
+### THE PROPOSED DESIGN (mm-native storage always; DISPLAY layer only → NO emit change, NO goldens)
+```
+  [ FEED            (mm/min) ]  [ 800    ]   = 31.5 IPM      ← live hint (.6 opacity), updates on input
+  [ SKIM DEPTH      (mm)     ]  [ 0.5    ]   = 0.02 in
+```
+1. **Unit-KIND** derived from `units`: length ('mm') · feed ('mm/min'). A binding without one of those units → unchanged (byte-identical).
+2. **The live HINT** (always shown, both display modes): a small span after the input showing the OTHER unit — mm-mode → "= X in / = X IPM"; inch-mode → "= X mm". Display-only, storage untouched.
+3. **The settings `units` pref** ('mm' | 'inch', default mm): mm-mode = today (the field holds mm) + the inch hint. inch-mode = the field DISPLAYS inch/IPM (mm/25.4) + ACCEPTS inch/IPM input → read() ×25.4 → **mm storage** (the round-trip); min/max/step convert for display too. read() ALWAYS returns mm → NO emit change.
+4. **SCOPE (recommend):** the DATA-OP forms (what the user opens via opensAs) — length fields (units:'mm') + feed/plunge (tag units:'mm/min'). NOT °/%/mm-rev. The built-in index.html raw-input wizards are OUT of v1 (separate raw inputs, not the widget) — note as a follow-on.
+
+### GATE QUESTIONS
+1. **Inch INPUT** — the settings-pref display-mode (field flips to inch + accepts inch → mm) [fuller, matches your ACCEPT "inch input → stored mm"], vs a hint-ONLY v1 (read-only "= in" hint, no inch typing) [simpler]? I read your ACCEPT as wanting the pref+input — confirm.
+2. **Feed tagging** — OK to add `units:'mm/min'` to the feed/plunge bindings (enables the IPM hint + gives feeds a unit label they lack)? Any field it should NOT touch?
+3. **Scope** — data-op forms only for v1 (recommend), or also the built-in index.html wizard inputs (a separate, bigger surface)?
+4. **The pref location/shape** — a global `settings.units` ('mm'|'inch') in Settings → confirm (vs per-field toggles, which I'd avoid — 21-combo clutter).
+
+No build this turn (ground+propose+gate). NO emit change in any option → no goldens.
