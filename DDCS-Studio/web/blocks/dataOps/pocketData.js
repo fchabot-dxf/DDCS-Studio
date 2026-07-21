@@ -114,6 +114,7 @@ const POCKET_BINDING_SPECS = [
     { param: 'plunge', type: 'number', units: 'mm/min', key: 'plunge', match: { type: 'pocketwall' }, optional: true },
     { param: 'plunge', type: 'number', units: 'mm/min', key: 'feed', match: { type: 'drill' }, optional: true },
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'progstart' }, default: POCKET_DEFAULTS.clearance, label: 'Clearance', section: T },
+    { param: 'rpm', type: 'number', key: 'rpm', match: { type: 'progstart' }, label: 'Spindle RPM', section: T, help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart (no default → socket-held: blank keeps the Head)
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'pocketfill' }, optional: true },
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'pocketwall' }, optional: true },
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'drill' }, optional: true },

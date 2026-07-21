@@ -78,6 +78,7 @@ const BORE_EXEC_BINDINGS = [
     { param: 'pitch', help: "Z step per full circle (mm).", blockIndex: 4, key: 'pitch', type: 'number', default: BORE_DEFAULTS.pitch, label: 'Pitch (Z / pass)', section: 'TOOL & CUT' },
     { param: 'ramp', blockIndex: 4, key: 'ramp', type: 'enum', default: BORE_DEFAULTS.ramp, widget: 'dropdown', widgetConfig: { options: RAMP_OPTIONS }, label: 'Ramp', help: 'Ring-step: plunge the pitch then a full G3 circle, repeat (the proven Expert form). Helix: continuous descent, linearized to G1 chords (the Expert has no proven helical G3).', section: 'TOOL & CUT' },
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', units: 'mm/min', default: BORE_DEFAULTS.feed, label: 'Feed', section: 'TOOL & CUT' },
+    { param: 'rpm', blockIndex: 0, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', section: 'TOOL & CUT', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
 ];
 
 const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group

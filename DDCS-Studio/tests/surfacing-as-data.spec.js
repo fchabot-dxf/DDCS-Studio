@@ -96,7 +96,7 @@ test('surfacing-as-data: byte-identical G-code to surfacingStack across a param 
   expect(r.independentPath, 'data builder is NOT surfacingStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
   // Every binding wired to the same socket surfacingStack routes its param to.
-  expect(r.bindingCount, 'all surfacing params are bound (t842 +4 depth-entry: entry/rampAngle/helixDia/helixPitch)').toBe(22);
+  expect(r.bindingCount, 'all surfacing params are bound (t842 +4 depth-entry; t996 +1 rpm → progstart)').toBe(23);
   expect(r.wiringFails, 'every binding routes to the same socket surfacingStack uses').toEqual([]);
   // The core claim: byte-identical across the whole sweep (placement offsets, size, parallel/concentric, depth, stock-attach).
   if (!r.main.pass) console.log('FIRST DIFF @', JSON.stringify(r.main.firstDiff && r.main.firstDiff.params) + '\n--- surfacingStack ---\n' + (r.main.firstDiff && r.main.firstDiff.a) + '\n--- data def ---\n' + (r.main.firstDiff && r.main.firstDiff.b));

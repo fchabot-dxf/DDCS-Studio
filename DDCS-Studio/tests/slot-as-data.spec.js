@@ -59,6 +59,7 @@ test('slot-as-data: byte-identical G-code to slotStack across a param sweep + bi
     const sentinelFor = (b) => (b.type === 'number' ? 4242 : '__SENTINEL__');
     const wiringFails = [];
     const REF_BINDINGS = [
+      { param: 'rpm', blockIndex: 0, key: 'rpm' },   // t996 — rpm → the framing progstart (slotStack flat[0])
       { param: 'wcs', blockIndex: 1, key: 'wcs' },
       { param: 'originX', blockIndex: 2, key: 'offX' },
       { param: 'originY', blockIndex: 2, key: 'offY' },
@@ -113,7 +114,7 @@ test('slot-as-data: byte-identical G-code to slotStack across a param sweep + bi
   expect(r.resolves, 'slot-as-data resolves via builderOf').toBe(true);
   expect(r.independentPath, 'data builder is NOT slotStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
-  expect(r.bindingCount, 'all bindable slot params are bound (t842 +4 depth-entry: entry/rampAngle/helixDia/helixPitch)').toBe(25);
+  expect(r.bindingCount, 'all bindable slot params are bound (t842 +4 depth-entry: entry/rampAngle/helixDia/helixPitch)').toBe(26);
   expect(r.wiringFails, 'every binding routes to the same socket slotStack uses').toEqual([]);
   if (!r.main.pass) console.log('FIRST DIFF @', JSON.stringify(r.main.firstDiff && r.main.firstDiff.params) + '\n--- slotStack ---\n' + (r.main.firstDiff && r.main.firstDiff.a) + '\n--- data def ---\n' + (r.main.firstDiff && r.main.firstDiff.b));
   expect(r.main.count, 'the sweep is substantial').toBeGreaterThan(12);

@@ -82,6 +82,7 @@ const SLOT_EXEC_BINDINGS = [
     { param: 'helixPitch', blockIndex: 3, key: 'helixPitch', type: 'number', default: SLOT_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev).' },
     { param: 'feed', blockIndex: 3, key: 'feed', type: 'number', units: 'mm/min', default: SLOT_DEFAULTS.feed },
     { param: 'plunge', blockIndex: 3, key: 'plunge', type: 'number', units: 'mm/min', default: SLOT_DEFAULTS.plunge },
+    { param: 'rpm', blockIndex: 0, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
 ];
 
 // Wrapped-template indexes (user_root + param_group precede execution children).

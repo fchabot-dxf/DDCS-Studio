@@ -69,6 +69,7 @@ const CONTOUR_EXEC_BINDINGS = [
     { param: 'rampAngle', blockIndex: 4, key: 'rampAngle', type: 'number', default: CONTOUR_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, section: 'TOOL & CUT', help: 'Max descent angle of the ramp lead-in (degrees from horizontal).' },
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', units: 'mm/min', default: CONTOUR_DEFAULTS.feed, label: 'Feed', section: 'TOOL & CUT' },
     { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', units: 'mm/min', default: CONTOUR_DEFAULTS.plunge, label: 'Plunge', section: 'TOOL & CUT' },
+    { param: 'rpm', blockIndex: 0, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', section: 'TOOL & CUT', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
 ];
 
 const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group

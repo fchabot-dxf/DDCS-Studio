@@ -98,6 +98,7 @@ const DRILL_EXEC_BINDINGS = [
     { param: 'depth', blockIndex: 4, key: 'depth', type: 'number', units: 'mm', default: DRILL_DEFAULTS.depth },
     { param: 'peck', help: "Peck increment (mm) — full retract to clearance each peck to clear chips.", blockIndex: 4, key: 'peck', type: 'number', default: DRILL_DEFAULTS.peck },
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', units: 'mm/min', default: DRILL_DEFAULTS.feed },
+    { param: 'rpm', blockIndex: 0, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
 ];
 
 const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group

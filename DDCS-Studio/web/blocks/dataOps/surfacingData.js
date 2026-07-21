@@ -71,6 +71,9 @@ const SURFACING_EXEC_BINDINGS = [
     { param: 'strategy', help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", blockIndex: 4, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
     { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed, units: 'mm/min' },
     { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge, units: 'mm/min' },
+    // t996 — RPM binding → the framing progstart (block 0). SOCKET-HELD: blank → the socket keeps the spindleHeadPatch
+    // Head default (byte-identical); a typed value / a picked tool's library rpm OVERRIDES it (rpm>0 → M3 S<rpm> + spindleHeadPatch yields).
+    { param: 'rpm', blockIndex: 0, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },
     // t842 — DEPTH ENTRY cluster (per-level descent + its per-mode when-gated fields; toward-centre ramp like pocket — an area fill)
     { param: 'entry', blockIndex: 4, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
     { param: 'rampAngle', blockIndex: 4, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
