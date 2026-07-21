@@ -87,6 +87,7 @@ export const SETTINGS_DEFAULTS = {
     stockTemplates: [],   // user-saved presets: { name, x, y, z, shape }
     // Travel x/y/z are SIGNED (sign = home direction). workOrigin = the active WCS offset (machine coords of
     // part-zero), kept in sync from wcs.table[active-1]. wcs = the G54–G59 table pulled from the controller.
+    units: 'mm',   // t990 — DISPLAY unit for numeric form fields ('mm' | 'inch'). mm-native STORAGE always; inch is a derived view (no emit change).
     machine: { x: 300, y: 300, z: -120, show: true, softLimits: true, safeZMargin: 5, rapidRate: 6000, toolChangeSec: 15, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },   // Z is negative: homes at the TOP (machine 0) and travels down into the work — the router/mill norm. safeZMargin (t822) = mm below home the error-handler retract via G53. rapidRate (t844) = G0 traverse mm/min for the time estimate + time-true sim (pull-seeded from the controller G0-speed register when read); toolChangeSec = per-M6 allowance (s)
     view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
     probes:  {
@@ -1240,6 +1241,8 @@ function buildSettingsOverlay() {
                         </div>
                         <!-- t744 — Show-machine-envelope folded into the 👁 visibility modal (the envelope element, everywhere + default-on). Soft limits stay below (a real machine bound, not a display toggle). -->
                         <label class="settings-check" title="Soft limits (#655). On = the controller bounds travel to this envelope, so the box closes. Off = no software bound — the box opens, unbounded in the travel direction (still pinned at home). Studio never writes #655 to the controller; this mirrors the machine's own setting (pull it)."><input type="checkbox" id="set_mach_softlimit"> Enable soft limits (#655) — closes the envelope</label>
+                        <!-- t990 — DISPLAY units for form fields. Storage is always mm; inch/IPM is a converted view (NO change to the emitted G-code). -->
+                        <label class="settings-check" title="Display unit for numeric form fields (dimensions, feeds). Storage stays mm — inch/IPM is a converted view; the emitted G-code is unchanged."><span style="opacity:.85;">Display units</span> <select id="set_units" class="settings-io" style="margin-left:8px;"><option value="mm">mm &amp; mm/min</option><option value="inch">inch &amp; IPM</option></select></label>
                         <!-- t822 — the DECLARED machine-frame safe-Z margin. The error-handler retract (on a probe miss) drops to this height in MACHINE coords via G53, so it never compounds into the top switch. YOUR value (headroom below home). -->
                         <label class="mach-travel-row" style="margin-top:8px;" title="Safe-Z margin (mm below machine home). On a probe fault the tool retracts to G53 Z −(this) — a fixed machine height, immune to where the tool sits — instead of an incremental lift that can slam the top switch. Home Z0 = the top, so 5 → machine Z −5. Every probe program READS this from controller register #520 (with a baked fallback) and NEVER writes it; use Apply Now to write #520 on the live controller (the only sanctioned write)."><span class="mach-ax" style="color:#d8a35a;">⤒</span><input type="number" id="set_safez_margin" class="dim-edit mach-col-field" step="1" min="0" title="Safe-Z margin — mm below machine home"><span style="font-size:11px; opacity:.7;">Safe-Z margin (mm below home)</span><button class="toolbar-btn settings-io" id="set_safez_apply" style="margin-left:8px;" title="Write this safe-Z margin to the live controller's persistent register #520 — a confirmed one-line run-once job (#520=… / M30) via the gateway. Probe programs never write #520; this is the only sanctioned way to set it. Requires a bridged controller.">Apply to #520 →</button></label>
                     </div>
@@ -1613,6 +1616,8 @@ function wireSettingsOverlay(ov) {
     renderCloudLogin(q('set_cloud_mount'));   // cloud account login (Network tab) — shared with the Project Manager drawer
     // t754 — Default save location (cloud-when-connected | always-local): an APP pref (savePrefs), not the machine profile.
     { const sel = q('set_save_location'); if (sel) import('./savePrefs.js').then((SP) => { sel.value = SP.getDefaultSaveLocation(); sel.addEventListener('change', () => SP.setDefaultSaveLocation(sel.value)); }); }
+    // t990 — Display units (mm | inch): an app-wide DISPLAY pref (mm-native STORAGE regardless). Live → re-render open forms via settings-changed.
+    { const un = q('set_units'); if (un) { un.value = getSettings().units || 'mm'; un.addEventListener('change', () => { getSettings().units = un.value; saveSettings(); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); }); } }
     renderMachineNet(q('set_machinenet_mount'));   // MACHINE NETWORK: live controller connection via the gateway
     renderLanAccess(q('set_lan_mount'));   // LAN ACCESS: shareable URL + QR for the exe-served Studio
 

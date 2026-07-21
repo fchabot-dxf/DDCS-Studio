@@ -44,6 +44,22 @@ const numOr = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n
 const r3 = (n) => Math.round(n * 1000) / 1000;
 const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
 
+// ── t990 — dual mm/inch DISPLAY layer. mm is ALWAYS the authoritative, exact storage; inch/IPM is a DERIVED VIEW
+// (1 in = 25.4 mm, and IPM = mm·min⁻¹ / 25.4). The stored mm NEVER re-derives from the rounded display, so emit is
+// byte-identical. A field opts in by its declared `units`: 'mm' → length, 'mm/min' → feed; anything else → unchanged.
+const MM_PER_IN = 25.4;
+const unitsOf = (b) => b.units || (b.widgetConfig && b.widgetConfig.units) || '';
+const unitKindOf = (b) => { const u = unitsOf(b); return u === 'mm' ? 'length' : u === 'mm/min' ? 'feed' : null; };
+/** The global display-unit preference ('mm' default | 'inch'). mm-native storage regardless. */
+const displayUnit = () => { try { return (window.ddcsGetSettings && window.ddcsGetSettings().units === 'inch') ? 'inch' : 'mm'; } catch (_) { return 'mm'; } };
+const toDisp = (mm) => Math.round((mm / MM_PER_IN) * 10000) / 10000;   // mm → inch/IPM (display only, 4 dp)
+const dispLabel = (kind) => (kind === 'feed' ? 'IPM' : 'in');
+/** The live "= X in / = X IPM" (mm-mode) or "= X mm" (inch-mode) hint text for a mm value. */
+const hintText = (mm, kind) => {
+    if (!Number.isFinite(mm)) return '';
+    return displayUnit() === 'inch' ? `= ${r3(mm)} mm` : `= ${toDisp(mm)} ${dispLabel(kind)}`;
+};
+
 function labelSpan(b) {
     const span = document.createElement('span');
     span.textContent = b.label || b.param;
@@ -52,9 +68,10 @@ function labelSpan(b) {
     // it for free. Dumb by design (native title=, no positioning framework); fields without `help` are unchanged.
     if (b.help) span.title = b.help;
     if (b.units || (b.widgetConfig && b.widgetConfig.units)) {
+        const kind = unitKindOf(b);   // t990 — flip the suffix to (in)/(IPM) in inch display mode
         const u = document.createElement('span');
         u.style.opacity = '.6';
-        u.textContent = ` (${b.units || b.widgetConfig.units})`;
+        u.textContent = ` (${kind && displayUnit() === 'inch' ? dispLabel(kind) : unitsOf(b)})`;
         span.appendChild(u);
     }
     return span;
@@ -103,6 +120,35 @@ function numberWidget(host, b) {
         host.append(labelSpan(b), wrap);
     } else {
         host.append(labelSpan(b), inp);   // DEFAULT — native input + native right spinner (source-chips decorate the input in the renderOpForm post-pass)
+    }
+    // t990 — dual mm/inch DISPLAY: `inp` stays the AUTHORITATIVE mm (read()/drag/preview unchanged, byte-identical). A
+    // unit-kind field (length 'mm' / feed 'mm/min') gets a live "= X in / IPM / mm" hint; in inch display mode a `shadow`
+    // input shows + edits inch/IPM and syncs the EXACT mm back to `inp` (typed inch → ×25.4 → mm; storage never drifts).
+    const kind = unitKindOf(b);
+    if (kind && !b.readonly) {
+        const hint = document.createElement('span');
+        hint.className = 'num-unit-hint';
+        hint.style.cssText = 'opacity:.55;font-size:.85em;margin-left:6px;white-space:nowrap;';
+        const refreshHint = () => { hint.textContent = hintText(parseFloat(inp.value), kind); };
+        refreshHint();
+        inp.addEventListener('input', refreshHint);
+        host.append(hint);
+        if (displayUnit() === 'inch') {
+            const shadow = document.createElement('input');
+            shadow.type = 'number'; shadow.step = 'any'; shadow.style.cssText = inp.style.cssText;
+            if (inp.placeholder) shadow.placeholder = inp.placeholder;
+            const mm2disp = () => { shadow.value = (inp.value === '' ? '' : String(toDisp(parseFloat(inp.value) || 0))); };
+            mm2disp();
+            inp.style.display = 'none';   // keep `inp` in the DOM as the mm source of truth; show the inch shadow instead
+            inp.after(shadow);
+            shadow.addEventListener('input', () => {
+                const d = parseFloat(shadow.value);
+                inp.value = Number.isFinite(d) ? String(r3(d * MM_PER_IN)) : '';   // typed inch → EXACT mm
+                inp.dispatchEvent(new Event('input', { bubbles: true }));
+                inp.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+            inp.addEventListener('input', () => { if (document.activeElement !== shadow) mm2disp(); });   // drag / programmatic mm write → refresh the inch view
+        }
     }
     // An UNTOUCHED field must not inject a value that overwrites the template's own (per-structural-combo) socket:
     //   • t114 SOCKET-HELD (no spec default → the socket holds a per-combo expression, e.g. corner #21-#24 which change with

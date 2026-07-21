@@ -62,15 +62,15 @@ const SURFACING_EXEC_BINDINGS = [
     { param: 'stockZ', formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: SURFACING_DEFAULTS.stockZ },
     { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: SURFACING_DEFAULTS.offZ },
     // depth pass (block 3, stepdown)
-    { param: 'depth', blockIndex: 3, key: 'to', type: 'number', default: SURFACING_DEFAULTS.depth },
-    { param: 'stepdown', blockIndex: 3, key: 'by', type: 'number', default: SURFACING_DEFAULTS.stepdown },
+    { param: 'depth', blockIndex: 3, key: 'to', type: 'number', default: SURFACING_DEFAULTS.depth, units: 'mm' },
+    { param: 'stepdown', blockIndex: 3, key: 'by', type: 'number', default: SURFACING_DEFAULTS.stepdown, units: 'mm' },
     // geometry + cut (block 4, the surfacefill leaf)
-    { param: 'w', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", blockIndex: 4, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w },
-    { param: 'h', help: "Height of the faced area (Y).", blockIndex: 4, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h },
-    { param: 'stepover', help: "Distance between parallel passes (mm). Smaller = finer finish, slower.", blockIndex: 4, key: 'stepover', type: 'number', default: SURFACING_DEFAULTS.stepover },
+    { param: 'w', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", blockIndex: 4, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w, units: 'mm' },
+    { param: 'h', help: "Height of the faced area (Y).", blockIndex: 4, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h, units: 'mm' },
+    { param: 'stepover', help: "Distance between parallel passes (mm). Smaller = finer finish, slower.", blockIndex: 4, key: 'stepover', type: 'number', default: SURFACING_DEFAULTS.stepover, units: 'mm' },
     { param: 'strategy', help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", blockIndex: 4, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
-    { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed },
-    { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge },
+    { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed, units: 'mm/min' },
+    { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge, units: 'mm/min' },
     // t842 — DEPTH ENTRY cluster (per-level descent + its per-mode when-gated fields; toward-centre ramp like pocket — an area fill)
     { param: 'entry', blockIndex: 4, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
     { param: 'rampAngle', blockIndex: 4, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
