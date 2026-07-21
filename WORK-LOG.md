@@ -12360,3 +12360,43 @@ The pocket golden is a FROZEN independent-truth snapshot of the retired pre-E0 p
 - **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.2m) -- fully clean, NO flake (preflight-badge passed this run too). No ripple anywhere from the feed bump.
 
 ### STATE: the no-tool cut-feed default is 2000 for surfacing/contour/pocket/slot + raw line/move/arc across every coupled site (twins byte-parity intact); bore/drill/cnc stay slow; plunge unchanged; a picked tool overrides; the pocket golden moved only the feed number (independent-truth snapshot preserved). READY for review.
+
+---
+
+## 🔨 turn 1006 — GROUND + PROPOSE + GATE (dual-unit tool-library EDITOR): A (reuse formWidgets widget) does NOT drop into the tool table; recommend B-SHARED (settingsPanel-local seams importing the ONE exported MM_PER_IN+toDisp) so there is NO 2nd conversion path. No build — gating the A/B + where the shared constant lives.
+
+GROUND-FIRST per dispatch. Read-only; no code changed this turn.
+
+### GROUNDED — the two surfaces
+1. **The tool table (settingsPanel.renderToolLibRows :2446 + the delegated input handler :2534):** built as an innerHTML STRING of per-cell `<input type=number data-tool=i data-field=f value=mm>` (the `cell()` helper :2454). Header cells are literal `<th>O mm</th>` / `<th>Feed</th>` (:2514); foot hint "Feeds in mm/min" (:2524). SAVE is a single delegated `input` listener on the modal: `rec[f] = parseFloat(t.value)` -> a.tools[i] -> saveSettings (:2540-2544). normalizeTool (:54) stores dia/length/feed/plunge as raw mm / mm-per-min (MM-NATIVE). A change re-reads the whole row via normalizeTool; dia/length/type also redraw the silhouette in place.
+2. **The dual-unit widget (formWidgets.numberWidget):** builds LIVE DOM nodes (labelSpan + inp + hint + optional inch shadow) with its OWN attached listeners, and returns a `{read}` closure that yields an op-form PARAM MAP keyed to a binding `b` (b.param / b.units / b.default). MM_PER_IN=25.4, toDisp (mm->inch 4dp), unitKindOf, displayUnit, hintText are all MODULE-PRIVATE (not exported).
+3. **Existing inch path in settingsPanel (:2589):** the "Add from catalog" picker already shows O as `(d/25.4).toFixed(4)+'"'` — a LOCAL, display-only 25.4 (a SECOND 25.4 exists TODAY, read-only).
+
+### THE FORK
+- **A — reuse formWidgets.numberWidget in the tool row.** MISFIT: the table is innerHTML-string cells + ONE delegated handler + wholesale re-render; numberWidget builds live DOM with per-widget listeners and returns a read() param-map tied to an op-form binding. Bridging them = rewriting the tool table into the op-form widget model (12 columns, per-cell widgets, focus/redraw retained) = building machinery to fix a STRUCTURE MISMATCH where the source table is fine (directive 1 says restructure the awkward SOURCE, not add an engine; the table is not the awkward one). Also numberWidget's shadow-swap + read()-closure assume a single standalone field, not a delegated table cell.
+- **B-SHARED — a settingsPanel-local dual-unit seam that FITS the table, importing the ONE shared conversion.** Two tiny localized transforms at the existing seams, NO markup rewrite:
+    - DISPLAY (renderToolLibRows): for dia/length show `toDisp(mm)`, for feed/plunge show `toDisp(mm)` when inch-mode; flip headers `O mm`->`O in`, `Feed`->`Feed IPM` (+ the plunge/length units). mm-mode: unchanged bytes.
+    - INPUT (the delegated handler): when inch-mode AND f in {dia,length,feed,plunge}, store `parseFloat(value) * MM_PER_IN` (EXACT mm); else unchanged. Storage stays MM-NATIVE; display/input only.
+  The dispatch's B-risk ("a 2nd conversion path = drift") is DESIGNED AWAY: EXPORT MM_PER_IN + toDisp from formWidgets (they already live there) and IMPORT them here, AND fold the :2589 catalog helper onto the same shared 25.4 -> ONE constant, three consumers (op-forms + tool-table + catalog). north-star G3 (one source, no duplicate) is the deciding gate; B-shared satisfies it, A satisfies it too but loses on drop-in cost + directive 1.
+
+```
+  TOOL ROW  (inch-mode)        stored (mm-native, unchanged)
+  O in   [ 0.5   ]  <-- toDisp(12.7)      dia: 12.7
+  Feed   [ 78.74 ] IPM <-- toDisp(2000)   feed: 2000
+        type 0.5 -> x25.4 -> store 12.7 (exact);  0.25 -> 6.35 (exact round-trip)
+  ^ same <td><input> markup; only the value is transformed at the display+input seams
+```
+
+### RECOMMENDATION: B-SHARED. (A eliminated: does not drop into the table without a rewrite; forcing it builds machinery to bridge a structure mismatch.)
+Fields to dual-unit: dia + length (length->inch), feed + plunge (feed->IPM). rpm / flutes / angle / num stay as-is (unitless / counts / degrees). *(length + plunge included for CONSISTENCY with Ø + feed — flagging for confirm; dispatch named only O + feed.)*
+
+### THE ONE SUB-DECISION TO RULE (where the shared constant/conversion lives)
+- (i) EXPORT MM_PER_IN + toDisp from formWidgets.js; settingsPanel imports them. MINIMAL — no new file; dep direction settingsPanel -> formWidgets (a UI-helper import, fine). LEAN (i).
+- (ii) extract a tiny web/ui/units.js that BOTH import. Cleaner dep direction, but a NEW web file -> the mem-server must be restarted for tests (new-file-needs-fresh-mem-server), and it is heavier than the one-liner exports.
+
+### GATE QUESTIONS
+1. Approve B-SHARED (settingsPanel-local seams + import the ONE exported conversion; fold :2589 onto it) over A? (Recommend YES.)
+2. Constant home: (i) export from formWidgets [lean] or (ii) a new units.js module?
+3. Dual-unit length + plunge too (consistency), or ONLY Ø + feed as literally dispatched?
+
+No build this turn (ground + propose + gate). Emit untouched -> nothing to release.
