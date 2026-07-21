@@ -12218,3 +12218,22 @@ Tagged each op's data-op field table: dimensions (depth/stepdown/stepover/w/h/di
 - **FULL GATE:** 1365 passed / 0 failed / 4 skipped -- no flake; every op byte-identical (data-emit specs green); no breakage.
 
 ### STATE: the dual mm/inch + mm/min-IPM display is now COMPLETE across all 6 mill ops (surfacing + the 5). mm-native storage, byte-identical emit, the settings.units pref flips the display. READY for RELEASE (surfacing + the 5). The built-in index.html raw-input wizards remain v2.
+
+---
+
+## 🔨 turn 994 — soft-limit B: the ASYMMETRIC per-end soft-limit box (machine-confirmed false-green CLOSED). GROUND + built the settled design (no fork surfaced).
+
+### GROUNDING (re-verified from code + FINDINGS V5)
+- **envelopeCheck** used `spans = { x: axisSpan(machine.x), ... }` = the SYMMETRIC 0..travel box. FINDINGS V5 (machine-confirmed): the Expert soft limits are PER-END (#161-168 -> #661-668), can be OFFSET/tighter than the symmetric span (e.g. xMin -5 / xMax 295), and use +/-9999 as a per-end 'no-limit' SENTINEL even with #655=1. So the symmetric box UNDER-flags a tighter/offset real box -> a FALSE GREEN (fits the check, the machine halts) = crash-adjacent.
+- **The pull CAPTURES it, Apply DROPPED it:** dumpImport.mapExpertGeometry builds `geometry.softLimits = {xMin,xMax,yMin,yMax,zMin,zMax}` (softNeg [161,162,163] / softPos [166,167,168], SENTINEL 9999); settingsPanel Apply stored only the derived travel + softLimitsPulled (the min/max were SHOWN in the review rows then dropped).
+
+### THE FIX (the design the advisor specified; no fork)
+- **web/engine/envelopeCheck.js** — when `machine.softLimitBox` is present, the per-axis span uses the REAL min/max (`softSpan`): a +/-9999 end -> UNBOUNDED (lo/hi = -/+Infinity -> the testPoint never flags that end); a real value -> the exact bound. Absent (no pull) -> fall back to `axisSpan(travel)` (symmetric, BYTE-IDENTICAL for unpulled configs). The box is machine-frame, matching the machine-coord testPoint (mach = work + wcsOffset). Orthogonal to t973 softLimitsEnforced (the box = the BOUNDS; the enable state = the UNGUARDED severity).
+- **web/ui/settingsPanel.js** — on Apply, persist `mm.softLimitBox = tvc.data.softLimits` (the pulled per-end box) so the pre-flight uses the REAL box, not the symmetric travel.
+
+### VERIFY (my own drive with the confirmed values)
+- **tests/soft-limit-box-994 (4 GREEN):** FALSE-GREEN CLOSED -- a move to X298 (past the real xMax 295, inside the symmetric 300): with the box -> RED (X+ over-travel); WITHOUT the box -> GREEN (the old false-green, proving the box fixes it). OFFSET min -- X-3 within xMin -5 fits, X-8 past it flags X-. SENTINEL -- xMax=9999 -> X5000 never flags (unbounded). SYMMETRIC FALLBACK -- no box -> X400 past travel 300 still RED (unchanged).
+- **NO REGRESSION:** envelope-check-838 (5) + soft-limit-awareness-973 (7) all GREEN -- the symmetric fallback + the t973 label/UNGUARDED severity are intact.
+- **FULL GATE:** 1368 passed / 4 skipped + 1 KNOWN FLAKE (knob-persist:15 -- the t961-documented isolation flake, passes standalone 1/1; my envelopeCheck/settings change has no path to form-knob persistence). soft-limit-box-994 + envelope-check-838 + soft-limit-awareness-973 all green.
+
+### STATE: the machine-confirmed FALSE-GREEN is closed -- a program exceeding the REAL asymmetric/offset soft box now flags (was a silent fits-but-halts); +/-9999 ends read as unbounded; unpulled configs byte-identical. READY for review + RELEASE.
