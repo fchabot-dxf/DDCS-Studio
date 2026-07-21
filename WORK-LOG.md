@@ -11998,3 +11998,33 @@ EMIT + GOLDENS REGEN expected (the rpm socket adds/changes the spindle line). **
 - **1354 passed / 0 failed / 4 skipped** (11.1m; +3 new export-title-975, no flake this run). [e] = export-title only (NO emit goldens move); diff = editorManager.js single file + the new spec.
 
 ### GATE for you: (1) [e] approach OK (model-title now; emit-comment follow-on if the user wants the .nc annotation)? (2) [d] shape approved + when to build re the spindle collision? (3) which of [a-c] next?
+
+---
+
+## 🔨 turn 977 — BUILD [c]: surfacing CAM-slot controller-safety guards — bad params error CLEANLY (no div-by-zero / infinite loop), a bounded ramp, a positive safe-Z. Gate <<FILL>>.
+
+RULING (t976): [e] accepted (held for batch), [a] inversion verified (surfacing B to the user), [d] deferred (spindle collision), [b] queued. NEXT = [c] the surfacing CAM-slot guards (LOW collision, the user's robust-CAM ask). BUILD the macro guards mirroring the existing zero-area guard (IF #24 LE #23 GOTO 8).
+
+### THE GAPS (verified in the survey + code)
+The generated surfacing macro runs OPEN-LOOP on the controller with only a zero-AREA pre-check:
+- `#27=FUP[[..]/stepover]` -> **DIV-BY-ZERO** if stepover=0.
+- `WHILE #28 LT depth` with `#28=[#28+stepdown]` -> **INFINITE LOOP** if stepdown<=0 (never advances).
+- `#33=stepover` ramp lead-in **UNCLAMPED** -> a narrow area ramps PAST its far edge (cuts outside the box).
+- `G0 Z<clearance>` with clearance min=0 -> an **UNSAFE Z0 retract**.
+- `toolDia` collected but a 0 is nonsense (dead field, but the operator can still enter garbage).
+
+### THE BUILD (2 files, mirrors the existing guard/error pattern)
+- **web/data/millToSlot.js surfacingSlot** — added FOUR positive-param guards right after the zero-area guard, each -> a CLEAN error (the same GOTO/N-label/#1505 pattern):
+  `IF <stepover> LE 0 GOTO 7` / `IF <stepdown> LE 0 GOTO 7` / `IF <toolDia> LE 0 GOTO 7` / `IF <clearance> LE 0 GOTO 7`
+  + a new error label `N7 -> #1505=1 ;ERROR: stepover / stepdown / tool / clearance must be > 0 -> GOTO 9 (M30)`. The N7 exit sits alongside the existing N8 (zero area) / N9 (M30). So a bad param HALTS with a message instead of a runaway. The clearance>0 guard is the SAFE-Z: the retract can no longer sit at Z0.
+- **web/data/camMacroKit.js rasterClear** — bounded the ramp lead-in to the row span:
+  `IF #33 GT [rowHi-rowLo] THEN #33=[rowHi-rowLo]  ;bound the ramp to the row span`. For a NORMAL config (stepover < row span) the IF is FALSE -> #33 unchanged -> BYTE-IDENTICAL behaviour (only a narrow area, where the old ramp overshot, now clamps). Shared by pocket/circle-pocket too -> they inherit the same safety, byte-identical on normal configs.
+
+### VERIFY (my own drive — the ruling's ACCEPT)
+- **tests/cam-slot-guards-977 (GREEN):** STRUCTURE — the 4 LE-0 guards + N7 + the ramp bound are in the macro. BEHAVIOUR (seed the field mirrors, trace via GcodeExecutionEngine): a NORMAL config rasters a real path (segs>20, not capped); zero-stepover / zero-stepdown / zero-tool / zero-clearance / NEGATIVE stepover each **error out before the raster** (segs << normal) and **NEVER cap** (no infinite loop / div-by-zero runaway). So each bad input halts cleanly, exactly the ACCEPT.
+- **tests/cam-slot-sim (all 21 GREEN unchanged):** the surfacing slot still rasters the full area (no inset, no wall); the cutting slots still manage the spindle; pocket/circle still sim — the ramp bound is a no-op on their normal configs. The slot still simulates.
+
+### FULL GATE
+- **1355 passed / 0 failed / 4 skipped** (11.1m; +1 new cam-slot-guards-977, no flake). Emit: only NARROW-area rasters clamp; normal configs BYTE-IDENTICAL -> no golden regen.
+
+### NEXT (advisor): the BATCH RELEASE of [e] (export-title) + [c] (CAM-slot guards). [b] Z-profile queued; [d] rpm still deferred (spindle collision); [a] Z-mode awaits the user's A-vs-B (B recommended).
