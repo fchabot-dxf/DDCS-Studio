@@ -12237,3 +12237,23 @@ Tagged each op's data-op field table: dimensions (depth/stepdown/stepover/w/h/di
 - **FULL GATE:** 1368 passed / 4 skipped + 1 KNOWN FLAKE (knob-persist:15 -- the t961-documented isolation flake, passes standalone 1/1; my envelopeCheck/settings change has no path to form-knob persistence). soft-limit-box-994 + envelope-check-838 + soft-limit-awareness-973 all green.
 
 ### STATE: the machine-confirmed FALSE-GREEN is closed -- a program exceeding the REAL asymmetric/offset soft box now flags (was a silent fits-but-halts); +/-9999 ends read as unbounded; unpulled configs byte-identical. READY for review + RELEASE.
+
+---
+
+## 🔨 turn 996 — BUILD [d]: cutting-op RPM — the data-op twins now bind rpm → progstart, so the tool/form RPM reaches M3 S<rpm> (was always the Head default). DECLARE+WIRE, no new machinery. All 6 mill ops.
+
+### THE GAP (grounded t976, re-confirmed)
+The DATA-OP twins had NO rpm binding, so the form/tool rpm never reached progstart.params.rpm → spindleHeadPatch always filled the Head default → the tool's RPM was IGNORED (feed tracked the tool, rpm did not).
+
+### THE FIX (declare + wire — all the wiring already existed)
+- **DECLARE:** added an rpm binding → the framing progstart (blockIndex 0 / match:progstart, key 'rpm'), SOCKET-HELD, to each cutting twin: surfacingData / contourData / boreData / drillData / slotData (static blockIndex 0) + pocketData (derived match:{type:'progstart'}, no default → socketHeld auto).
+- **WIRE (already there):** (1) progstart emits M3 S<num(p.rpm,0)>; (2) spindleHeadPatch's "rpm>0 wins" guard → a bound rpm>0 makes it YIELD (verified); (3) the toolpick widget's DEFAULT fill map ({dia,feed,plunge,rpm}) already writes the picked tool's library rpm → the 'rpm' field — so a new rpm binding is auto-populated on tool-pick with ZERO extra wiring.
+- **TOOL→RPM SOURCE (flagged, ONE-SOURCE, no ambiguity → no gate):** the STORED TOOL SPEED — the tool table's `rpm` column (toolPicker library), written to the field by the toolpick auto-fill. NOT the feeds-helper (that's a separate opt-in calculator that WRITES to the table; the fill READS the table). Clean one-source.
+
+### VERIFY (my own drive)
+- **tests/cutting-rpm-996 (2 GREEN):** surfacing — blank rpm → M3 S<Head=10000> (byte-identical, spindleHeadPatch fills); typed rpm 8000 → M3 S8000 (the tool/form rpm WINS, spindleHeadPatch YIELDS). Every cutting twin (pocket DERIVED + drill/slot static) → blank=Head 10000, typed=override 7000.
+- **BYTE-IDENTICAL (the no-op case):** contour-data-emit + pocket-data-emit (incl cross-dialect grbl/rs274) byte-diff ZERO — a blank rpm keeps the Head fill → emit unchanged. op-params-complete (4 shards) green.
+- **TEST UPDATES (a new binding = expected structural updates, NOT emit):** surfacing-as-data bindingCount 22→23; slot-as-data 25→26 + added rpm to its REF_BINDINGS map (blockIndex 0 = progstart — the FIRST binding to target progstart; the wiring check needed the ref mapping, the ROUTING was already correct: both progstart.rpm got the sentinel). drill-as-data uses `>=` (unaffected); contour/bore/pocket have no exact-count wiring assertion; text is NOT a cutting op (untouched).
+- **FULL GATE:** 1371 passed / 0 failed / 4 skipped -- no flake; every op byte-identical for the blank case; the rpm binding routes to progstart in all 6.
+
+### STATE: the tool/form RPM now reaches the program's spindle line for all 6 mill ops (was the Head default, ignoring the tool). Blank = Head (byte-identical); a typed value / a picked tool's library rpm overrides it. EMIT goldens byte-identical for the no-op case (regen only where a real rpm differs from the Head — none in the specs). READY for review + RELEASE. [b] Z-profile next.
