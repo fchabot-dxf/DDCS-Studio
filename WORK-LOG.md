@@ -12571,3 +12571,33 @@ Removed web/viz/sectionCanvas.js (git rm), panelTypes.sectionSpecFromOp + its de
 - **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.2m) -- fully clean after the numberWidget-reuse fix (the first cut hand-rolled plain inputs and lost pocket's dual-unit hint; the gate caught it; reusing numberWidget restored it, all green).
 
 ### STATE: the pocket twin's Depth/Step-Down fields are now a narrow in-form DEPTH RULER (Z axis + depthLevels ticks + draggable floor/step, numbers beside it); the layout cross-section is removed. A reusable form widget -- any depth op (surfacing/contour/slot/drill/bore) inherits it by tagging its depth+stepdown bindings `widget:'zdepth'`. Byte-identical emit, no layout coupling. READY for advisor review.
+
+---
+
+## 🔨 turn 1017 — BUILD + GATE (viz layout side-by-side): the 3D+2D previews go SIDE-BY-SIDE on wide / stacked on narrow (built + verified, splitter drag direction-aware). GATE: the COLLAPSE reflow is aspect/fit-ENTANGLED in row (the advisor's named gate trigger) — need a ruling on the collapse-on-wide approach.
+
+DISPATCH: viz 3D(top)+2D(bottom) stacked; user wants side-by-side; responsive fallback to stacked on narrow; PRESERVE the splitter + collapse chevrons + re-fit; GATE if resize/aspect/fit entangled.
+
+### BUILT + VERIFIED (the core ask — side-by-side / stacked / splitter)
+- **CSS:** a `@media (min-width:1024px)` flips `.viz-split` to `flex-direction: row` + a VERTICAL splitter (col-resize, 4x46 grip); panes get `min-width:0` (NOT `flex:1 1 0` — that reset the ratio flex-grow + locked 50/50 + killed the drag; my first-cut bug, caught by a drag test, fixed). Below 1024 = the base stacked COLUMN; <=860 mobile single-column untouched.
+- **paneAccordion.js:** the splitter drag is now DIRECTION-AWARE — `isRow()` reads the live flex-direction; `ratioAt(x,y)` uses X+width+LEFT pane for row, Y+height+TOP for column; keyboard + aria-orientation match. Column path byte-identical.
+- **VIEWED wide (1360px):** 3D | 2D side-by-side, vertical splitter, both render. **VIEWED narrow (800px):** stacked single-column, unbroken. **DRAG (wide):** the vertical splitter LEFT shrank the 3D pane 427->293 px (X-axis rebalance). Pure layout, emit untouched.
+
+### THE GATE — collapse reflow is ASPECT/FIT-ENTANGLED in row (the advisor's explicit gate trigger)
+The collapse animation (applyState) folds the pane BODY's HEIGHT to 0 (a strip) — a COLUMN concept (frees vertical space, survivor grows tall). In the new ROW layout:
+- WITHOUT a fix: collapsing a pane leaves it FULL-WIDTH but blank (body height 0), and the survivor does NOT fill the freed width (empirical: collapse 3D -> 3D stays 387px wide, 2D only 388->408). Broken.
+- A width-fold CSS (fold the body WIDTH in row) FIXES the fold (3D -> a 34px strip, 2D fills to 761px) BUT the survivor's FeatureCanvas re-fits to the new wide size and its aspect drives the pane HEIGHT to ~1419px (>viewport) -> vertical OVERFLOW. This is the resize/aspect/fit entanglement -- a clean CSS fold trips the canvas aspect. (Reverted the experiment; the base side-by-side is clean.)
+
+### OPTIONS (advisor's call -- "preserve collapse chevrons" vs the entanglement)
+- **A (RECOMMEND) — splitter-only on wide; collapse stays on narrow.** HIDE the collapse chevrons in the row layout; the SPLITTER is the side-by-side resize affordance (drag a pane to near-min). Collapse-to-reclaim-space is a STACKED concept -> keep it on narrow/stacked. Clean, ZERO entanglement, arguably the better UX (splitter for side-by-side, collapse for stacked). TRADE: chevrons gone on WIDE (vs your "preserve chevrons").
+- **B — width-fold collapse + resolve the aspect.** Keep the chevrons on wide + the width-fold, and constrain the pane/canvas so the survivor's re-fit doesn't grow the row (cap the pane height to the split, force the canvas to letterbox). More work; resolves the entanglement; fully preserves chevrons.
+- **C — direction-aware collapse animation.** Rework applyState to animate WIDTH in row. Most faithful but touches the load-bearing fold animation (t752/t869/t887) -> real regression risk.
+
+### ALSO (mechanical, do after the ruling): 4-5 desktop tests assert the OLD column layout
+collapsible-panes-752:38/:130 (collapse frees HEIGHT), pane-splitter-790:67 (inert-when-collapsed), wizard-onvector-dim:7 + wizard-pathdatum:118 (canvas CLICK positions) fail at their >=1024 viewports because desktop is now ROW (collapse frees width; the canvas moved). These re-anchor to the row layout once the collapse approach is ruled (the collapse tests depend on A/B/C).
+
+### GATE QUESTIONS
+1. Collapse-on-wide: A (splitter-only, hide chevrons on wide) [recommend] / B (width-fold + aspect fix, keep chevrons) / C (direction-aware animation)?
+2. Confirm I then re-anchor the 4-5 desktop layout tests to the row layout.
+
+No commit this turn (WIP: side-by-side built + clean, collapse pending the ruling). Emit untouched.
