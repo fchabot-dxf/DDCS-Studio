@@ -12400,3 +12400,29 @@ Fields to dual-unit: dia + length (length->inch), feed + plunge (feed->IPM). rpm
 3. Dual-unit length + plunge too (consistency), or ONLY Ø + feed as literally dispatched?
 
 No build this turn (ground + propose + gate). Emit untouched -> nothing to release.
+
+---
+
+## 🔨 turn 1008 — BUILD (dual-unit tool-library EDITOR, ruled B-SHARED): the tool table + catalog picker now show/enter Ø & feeds in the user unit (inch/IPM), storage stays mm-native. Extracted the ONE 25.4 conversion to a units.js leaf; formWidgets drops its private copy -> one source, three consumers.
+
+RULED (t1007): (1) B-SHARED over A. (2) constant home = a NEW units.js leaf (rule-of-three: 3 consumers). (3) YES length+plunge too (all unit columns; a half-converted table is worse). Storage mm-native exact; display/input only.
+
+### THE ONE-SOURCE EXTRACTION (units.js leaf)
+NEW web/ui/units.js exports the whole mm<->inch core: `MM_PER_IN=25.4`, `toDisp(mm)` (->inch/IPM, 4dp), `fromDisp(disp)` (->mm, 3dp = r3(d.25.4), the op-form's ORIGINAL inverse so emit stays byte-identical). formWidgets DROPS its private MM_PER_IN + toDisp and imports them; its inline inch->mm (`r3(d*MM_PER_IN)`) becomes `fromDisp(d)` (byte-identical). settingsPanel imports toDisp+fromDisp; the :2604 catalog-picker `(d/25.4)` folds onto `toDisp(d)` (same 4dp). RESULT: the display-conversion 25.4 now lives ONLY in units.js:13 (grep-confirmed) -- one constant, three consumers (op-form widget + tool-table editor + catalog picker). (The other repo 25.4s are unrelated non-conversions: toolCatalog tool DIAMETERS, G20 unitScale in the parser/engine, imperial thread pitch, an SVG icon path -- LEFT.)
+
+### THE TOOL-TABLE SEAMS (settingsPanel, FIT the existing markup -- no rewrite)
+Declared `TOOL_UNIT_COLS = {dia,length,feed,plunge}` (rpm/flutes/angle/num are unitless -> never touched). Two localized transforms at the seams renderToolLibRows already has:
+- DISPLAY: `dispVal(f,mm) = inchMode && TOOL_UNIT_COLS.has(f) ? toDisp(mm) : mm` in the `cell()` builder; the 4 unit column headers + the "feeds in ..." foot note flip via `[data-uhdr]` set on each open (O in / Length in / Feed IPM / Plunge IPM / IPM vs the mm labels).
+- INPUT: the delegated input handler, when inch-mode + a unit column, stores `fromDisp(parseFloat(value))` (exact mm) instead of the raw number.
+Storage untouched (normalizeTool still mm-native); the tool profile SVG still reads rec.dia mm; add/catalog/pick paths all read/write mm-native unchanged.
+
+### VERIFY (ACCEPT: one 25.4 + VIEWED inch screenshot + round-trip + mm unchanged + add/edit/del+picker + gate)
+- **CORE (the warning):** dual-units-990 GREEN -> the op-form dual-unit still works after the extraction (formWidgets on the shared leaf, byte-identical inch->mm).
+- **MY VIEWED inch screenshot (scratchpad/toollib-inch.png, viewed):** the 1/2in (12.7mm) tool row reads O 0.5 / Feed 100 IPM / Length 1 / Plunge 20; headers O IN, LENGTH IN, FEED IPM, PLUNGE IPM; foot "Feeds in IPM"; RPM 12000 + Flutes 2 UNCHANGED. Clean inch table.
+- **ROUND-TRIP EXACT:** typed 0.25 in the O cell -> stored dia = 6.35 mm EXACTLY (mm-native, no drift).
+- **mm-mode UNCHANGED:** reopened in mm -> O 6.35 / Feed 2540 shown directly; headers O mm / Feed / mm/min.
+- **add/edit/delete + picker:** + Blank adds, X deletes, tool-picker/select specs (tool-picker-1b-768, tool-select-768, sim-tool-table/profile) all GREEN.
+- **ONE 25.4:** grep -> the conversion constant lives only in units.js:13.
+- **FULL GATE:** 1371 passed / 4 skipped / 1 flake -- the sole red was knob-persist:15 (a documented pre-existing isolation flake, unrelated to units/tool-library); re-ran standalone 1/1 GREEN. Green modulo the known flake.
+
+### STATE: the tool-library editor + catalog picker are dual-unit (inch/IPM display+input) with mm-native exact storage; the mm<->inch conversion is ONE shared units.js leaf (three consumers, no drift); the op-form widget rides the same leaf byte-identically. READY for review.
