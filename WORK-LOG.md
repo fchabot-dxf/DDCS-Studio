@@ -12203,3 +12203,18 @@ The mm input `inp` stays the source of truth (read()/drag/preview UNCHANGED → 
 The WIDGET + the settings pref are SHARED (every form benefits once its fields are tagged). v1 tags SURFACING's dimensions + feeds (the op the user faces most + the Skim op). The other cutting ops (pocket/contour/bore/drill/slot) get the treatment on any already-`units`-tagged field for free; tagging THEIR dimension/feed fields is the trivial mechanical FOLLOW-ON (same units:'mm'/'mm/min' tags, no logic). The built-in index.html raw-input wizards = v2 (a separate surface, per your ruling). No emit change anywhere.
 
 ### NEXT: your two-method review (a length field's inch hint + inch-input→mm round-trip; a feed field's IPM hint; the settings pref flips the display; byte-identical) → then the FOLLOW-ON tags for the other cutting ops (mechanical) + RELEASE.
+
+---
+
+## 🔨 turn 992 — FOLLOW-ON: tag the other 5 cutting ops (pocket/contour/bore/drill/slot) with units → they inherit the dual-unit display via the SHARED widget. Mechanical (tags only, NO logic). Dual-unit feature now COMPLETE across all mill ops.
+
+### THE TAGS (display-only → byte-identical emit)
+Tagged each op's data-op field table: dimensions (depth/stepdown/stepover/w/h/dia/holeDia/toolDia/width/clearance) → `units:'mm'`; feeds (feed/plunge) → `units:'mm/min'`. Applied via a guarded sed (skips already-tagged lines; targets only the length/feed param names — never rpm/count/angle/%). deriveBindings.js:79 already carries `units` through, so pocket's DERIVED bindings work too.
+- web/blocks/dataOps/contourData.js (8) · bore (10) · drill (8) · slot (8) · pocket (14, derived).
+
+### VERIFY (my own drive + byte-identity per op)
+- **tests/dual-units-990 (+1 test, GREEN):** the follow-on ops inherit the hints via the shared widget — pocket (DERIVED bindings) depth shows the inch hint + plunge shows IPM; drill depth shows the inch hint; slot width shows the inch hint. (Plus the v1 surfacing test still green.)
+- **BYTE-IDENTICAL per op:** contour-data-emit + pocket-data-emit (incl. cross-dialect grbl/rs274) byte-diff ZERO — the units tags are display-only (no socket) → emit unchanged. bore/drill/slot covered by their byte-identity specs in the full gate.
+- **FULL GATE:** 1365 passed / 0 failed / 4 skipped -- no flake; every op byte-identical (data-emit specs green); no breakage.
+
+### STATE: the dual mm/inch + mm/min-IPM display is now COMPLETE across all 6 mill ops (surfacing + the 5). mm-native storage, byte-identical emit, the settings.units pref flips the display. READY for RELEASE (surfacing + the 5). The built-in index.html raw-input wizards remain v2.
