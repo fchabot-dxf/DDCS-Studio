@@ -70,18 +70,18 @@ const SLOT_EXEC_BINDINGS = [
     { param: 'ay', blockIndex: 3, key: 'y0', type: 'number', default: SLOT_DEFAULTS.ay },
     { param: 'bx', blockIndex: 3, key: 'x1', type: 'number', default: SLOT_DEFAULTS.bx },
     { param: 'by', blockIndex: 3, key: 'y1', type: 'number', default: SLOT_DEFAULTS.by },
-    { param: 'width', help: "Finished slot width (≥ tool Ø). Equal to the tool = a single pass.", blockIndex: 3, key: 'width', type: 'number', default: SLOT_DEFAULTS.width },
-    { param: 'toolDia', blockIndex: 3, key: 'tool', type: 'number', default: SLOT_DEFAULTS.toolDia },
+    { param: 'width', help: "Finished slot width (≥ tool Ø). Equal to the tool = a single pass.", blockIndex: 3, key: 'width', type: 'number', units: 'mm', default: SLOT_DEFAULTS.width },
+    { param: 'toolDia', blockIndex: 3, key: 'tool', type: 'number', units: 'mm', default: SLOT_DEFAULTS.toolDia },
     { param: 'stepoverPct', blockIndex: 3, key: 'stepoverPct', type: 'number', default: SLOT_DEFAULTS.stepoverPct },
-    { param: 'depth', blockIndex: 3, key: 'depth', type: 'number', default: SLOT_DEFAULTS.depth },
-    { param: 'stepdown', blockIndex: 3, key: 'stepdown', type: 'number', default: SLOT_DEFAULTS.stepdown },
+    { param: 'depth', blockIndex: 3, key: 'depth', type: 'number', units: 'mm', default: SLOT_DEFAULTS.depth },
+    { param: 'stepdown', blockIndex: 3, key: 'stepdown', type: 'number', units: 'mm', default: SLOT_DEFAULTS.stepdown },
     // t842 — DEPTH ENTRY cluster: ramp runs along the slot length; a helix needs the slot to be wider than the tool (else degrades).
     { param: 'entry', blockIndex: 3, key: 'entry', type: 'enum', default: SLOT_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle, ALONG the slot length (degrades to plunge on a slot shorter than the ramp needs). Helix = a descending helix (needs a slot wider than the tool; else degrades).' },
     { param: 'rampAngle', blockIndex: 3, key: 'rampAngle', type: 'number', default: SLOT_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal).' },
     { param: 'helixDia', blockIndex: 3, key: 'helixDia', type: 'number', default: SLOT_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped to the slot width; a tool-width slot degrades to plunge.' },
     { param: 'helixPitch', blockIndex: 3, key: 'helixPitch', type: 'number', default: SLOT_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev).' },
-    { param: 'feed', blockIndex: 3, key: 'feed', type: 'number', default: SLOT_DEFAULTS.feed },
-    { param: 'plunge', blockIndex: 3, key: 'plunge', type: 'number', default: SLOT_DEFAULTS.plunge },
+    { param: 'feed', blockIndex: 3, key: 'feed', type: 'number', units: 'mm/min', default: SLOT_DEFAULTS.feed },
+    { param: 'plunge', blockIndex: 3, key: 'plunge', type: 'number', units: 'mm/min', default: SLOT_DEFAULTS.plunge },
 ];
 
 // Wrapped-template indexes (user_root + param_group precede execution children).

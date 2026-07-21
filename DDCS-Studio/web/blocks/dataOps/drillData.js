@@ -87,17 +87,17 @@ const DRILL_EXEC_BINDINGS = [
     { param: 'count', blockIndex: 3, key: 'count', type: 'number', default: DRILL_DEFAULTS.count, when: { param: 'pattern', in: ['circle', 'line'] }, label: 'Count', section: 'GEOMETRY' },
     { param: 'spacing', blockIndex: 3, key: 'spacing', type: 'number', default: DRILL_DEFAULTS.spacing, when: { param: 'pattern', is: 'line' }, label: 'Spacing', section: 'GEOMETRY' },
     { param: 'angle', blockIndex: 3, key: 'angle', type: 'number', default: DRILL_DEFAULTS.angle, when: { param: 'pattern', is: 'line' }, label: 'Angle°', section: 'GEOMETRY' },
-    { param: 'dia', help: "Bolt-circle diameter — holes sit evenly on this circle.", blockIndex: 3, key: 'dia', type: 'number', default: DRILL_DEFAULTS.dia, when: { param: 'pattern', is: 'circle' }, label: 'Circle Ø', section: 'GEOMETRY' },
+    { param: 'dia', help: "Bolt-circle diameter — holes sit evenly on this circle.", blockIndex: 3, key: 'dia', type: 'number', units: 'mm', default: DRILL_DEFAULTS.dia, when: { param: 'pattern', is: 'circle' }, label: 'Circle Ø', section: 'GEOMETRY' },
     { param: 'startAngle', blockIndex: 3, key: 'startAngle', type: 'number', default: DRILL_DEFAULTS.startAngle, when: { param: 'pattern', is: 'circle' }, label: 'Start angle°', section: 'GEOMETRY' },
-    { param: 'w', blockIndex: 3, key: 'w', type: 'number', default: DRILL_DEFAULTS.w, when: { param: 'pattern', is: 'rect' }, label: 'Width', section: 'GEOMETRY' },
-    { param: 'h', blockIndex: 3, key: 'h', type: 'number', default: DRILL_DEFAULTS.h, when: { param: 'pattern', is: 'rect' }, label: 'Height', section: 'GEOMETRY' },
+    { param: 'w', blockIndex: 3, key: 'w', type: 'number', units: 'mm', default: DRILL_DEFAULTS.w, when: { param: 'pattern', is: 'rect' }, label: 'Width', section: 'GEOMETRY' },
+    { param: 'h', blockIndex: 3, key: 'h', type: 'number', units: 'mm', default: DRILL_DEFAULTS.h, when: { param: 'pattern', is: 'rect' }, label: 'Height', section: 'GEOMETRY' },
     { param: 'nx', blockIndex: 3, key: 'nx', type: 'number', default: DRILL_DEFAULTS.nx, when: { param: 'pattern', is: 'rect' }, label: 'X count', section: 'GEOMETRY' },
     { param: 'ny', blockIndex: 3, key: 'ny', type: 'number', default: DRILL_DEFAULTS.ny, when: { param: 'pattern', is: 'rect' }, label: 'Y count', section: 'GEOMETRY' },
     { param: 'skip', help: "1-based hole numbers to omit (as shown in the preview), e.g. 5, 9.", blockIndex: 3, key: 'skip', type: 'string', default: DRILL_DEFAULTS.skip },
     // cut params (block 4, the peck `drill` leaf)
-    { param: 'depth', blockIndex: 4, key: 'depth', type: 'number', default: DRILL_DEFAULTS.depth },
+    { param: 'depth', blockIndex: 4, key: 'depth', type: 'number', units: 'mm', default: DRILL_DEFAULTS.depth },
     { param: 'peck', help: "Peck increment (mm) — full retract to clearance each peck to clear chips.", blockIndex: 4, key: 'peck', type: 'number', default: DRILL_DEFAULTS.peck },
-    { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: DRILL_DEFAULTS.feed },
+    { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', units: 'mm/min', default: DRILL_DEFAULTS.feed },
 ];
 
 const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group

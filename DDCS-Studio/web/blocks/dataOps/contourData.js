@@ -53,22 +53,22 @@ const CONTOUR_EXEC_BINDINGS = [
     { param: 'stockZ', formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: CONTOUR_DEFAULTS.stockZ, label: 'Stock Z', section: 'GEOMETRY' },
     { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: CONTOUR_DEFAULTS.offZ, label: 'Z Offset', section: 'GEOMETRY' },
     // depth pass (block 3, stepdown)
-    { param: 'depth', blockIndex: 3, key: 'to', type: 'number', default: CONTOUR_DEFAULTS.depth, label: 'Depth', section: 'TOOL & CUT' },
-    { param: 'stepdown', blockIndex: 3, key: 'by', type: 'number', default: CONTOUR_DEFAULTS.stepdown, label: 'Step Down', section: 'TOOL & CUT' },
+    { param: 'depth', blockIndex: 3, key: 'to', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.depth, label: 'Depth', section: 'TOOL & CUT' },
+    { param: 'stepdown', blockIndex: 3, key: 'by', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.stepdown, label: 'Step Down', section: 'TOOL & CUT' },
     // geometry + cut (block 4, the contourfill leaf). shape picks which dims matter; the 4 dims all bind, emit uses the right pair.
     { param: 'shape', blockIndex: 4, key: 'shape', type: 'enum', default: CONTOUR_DEFAULTS.shape, widget: 'dropdown', widgetConfig: { options: SHAPE_OPTIONS }, label: 'Shape', section: 'GEOMETRY' },
     { param: 'side', blockIndex: 4, key: 'side', type: 'enum', default: CONTOUR_DEFAULTS.side, widget: 'dropdown', widgetConfig: { options: SIDE_OPTIONS }, label: 'Side', help: 'Outside/Inside offset the cut by the tool radius so the FINISHED edge matches the size you type; On traces the boundary itself.', section: 'GEOMETRY' },
-    { param: 'w', blockIndex: 4, key: 'w', type: 'number', default: CONTOUR_DEFAULTS.w, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Width', section: 'GEOMETRY' },   // t722 P2a — W/H for rect AND ellipse
-    { param: 'h', blockIndex: 4, key: 'h', type: 'number', default: CONTOUR_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: 'GEOMETRY' },
-    { param: 'dia', blockIndex: 4, key: 'dia', type: 'number', default: CONTOUR_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: 'GEOMETRY' },   // t722 P2a — Ø for circle AND polygon
+    { param: 'w', blockIndex: 4, key: 'w', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.w, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Width', section: 'GEOMETRY' },   // t722 P2a — W/H for rect AND ellipse
+    { param: 'h', blockIndex: 4, key: 'h', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.h, when: { param: 'shape', in: ['rect', 'ellipse'] }, label: 'Height', section: 'GEOMETRY' },
+    { param: 'dia', blockIndex: 4, key: 'dia', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.dia, when: { param: 'shape', in: ['circle', 'polygon'] }, label: 'Diameter', section: 'GEOMETRY' },   // t722 P2a — Ø for circle AND polygon
     { param: 'sides', blockIndex: 4, key: 'sides', type: 'number', default: CONTOUR_DEFAULTS.sides, when: { param: 'shape', is: 'polygon' }, label: 'Sides', section: 'GEOMETRY' },
-    { param: 'toolDia', blockIndex: 4, key: 'tool', type: 'number', default: CONTOUR_DEFAULTS.toolDia, label: 'Tool Ø', section: 'TOOL & CUT' },
+    { param: 'toolDia', blockIndex: 4, key: 'tool', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.toolDia, label: 'Tool Ø', section: 'TOOL & CUT' },
     // t842 — DEPTH ENTRY: plunge or ramp (NO helix — a helix would gouge inside the profile). Polyline → ramp along the first
     // segment; circle → a helical lead-in around the arc. Degrades to plunge (with a why) if the first segment is too short.
     { param: 'entry', blockIndex: 4, key: 'entry', type: 'enum', default: CONTOUR_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS_NO_HELIX }, label: 'Depth Entry', section: 'TOOL & CUT', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a lead-in descent at ≤ the ramp angle along the profile (degrades to plunge where the first segment is too short).' },
     { param: 'rampAngle', blockIndex: 4, key: 'rampAngle', type: 'number', default: CONTOUR_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, section: 'TOOL & CUT', help: 'Max descent angle of the ramp lead-in (degrees from horizontal).' },
-    { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: CONTOUR_DEFAULTS.feed, label: 'Feed', section: 'TOOL & CUT' },
-    { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: CONTOUR_DEFAULTS.plunge, label: 'Plunge', section: 'TOOL & CUT' },
+    { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', units: 'mm/min', default: CONTOUR_DEFAULTS.feed, label: 'Feed', section: 'TOOL & CUT' },
+    { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', units: 'mm/min', default: CONTOUR_DEFAULTS.plunge, label: 'Plunge', section: 'TOOL & CUT' },
 ];
 
 const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group

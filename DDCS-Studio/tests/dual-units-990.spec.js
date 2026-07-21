@@ -39,3 +39,21 @@ test('mm-mode hints (in / IPM); inch-mode shadow → exact mm (no drift)', async
   expect(r.mmAfterInch, '0.5 in typed → 12.7 mm stored EXACT (no drift)').toBeCloseTo(12.7, 6);
   expect(r.inchHint, 'inch-mode hint shows the mm equivalent').toMatch(/mm/);
 });
+
+test('the follow-on ops (pocket derived-bindings, drill, slot) inherit the hints via the shared widget', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.ddcsGetSettings);
+  const hintFor = async (optype, param) => page.evaluate(async ({ optype, param }) => {
+    const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+    window.ddcsGetSettings().units = 'mm';
+    window.openWiz(optype); await sleep(400);
+    const inp = document.querySelector(`[data-param="${param}"]`);
+    const host = inp && inp.parentElement;
+    const h = host && host.querySelector('.num-unit-hint');
+    return h ? h.textContent : null;
+  }, { optype, param });
+  expect(await hintFor('user_pocket_data', 'depth'), 'pocket (derived bindings) length field shows the inch hint').toMatch(/in\b/);
+  expect(await hintFor('user_pocket_data', 'plunge'), 'pocket feed field shows the IPM hint').toMatch(/IPM/);
+  expect(await hintFor('user_drill_data', 'depth'), 'drill length field shows the inch hint').toMatch(/in\b/);
+  expect(await hintFor('user_slot_data', 'width'), 'slot width field shows the inch hint').toMatch(/in\b/);
+});
