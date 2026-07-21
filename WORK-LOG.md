@@ -12180,3 +12180,26 @@ Recent formWidgets.js commits are MINE / corner / pocket (clearance-gate, plane-
 4. **The pref location/shape** — a global `settings.units` ('mm'|'inch') in Settings → confirm (vs per-field toggles, which I'd avoid — 21-combo clutter).
 
 No build this turn (ground+propose+gate). NO emit change in any option → no goldens.
+
+---
+
+## 🔨 turn 990 — BUILD (greenlit): dual mm/inch + mm/min-IPM display fields. mm-native storage (byte-identical emit); inch is a derived view. Surfacing v1.
+
+Built per your 4 answers (inch-input via the settings pref + always-on hint; tag feeds mm/min; data-op forms v1; global settings.units pref).
+
+### THE DESIGN (mm AUTHORITATIVE + EXACT — the guardrail)
+The mm input `inp` stays the source of truth (read()/drag/preview UNCHANGED → byte-identical). Inch/IPM is a DERIVED view (1 in = 25.4 mm; IPM = mm·min⁻¹/25.4). A field opts in by its declared `units` ('mm'→length, 'mm/min'→feed). To avoid ANY drift through the rounded display, the stored mm NEVER re-derives from the display.
+- **web/ui/formWidgets.js** — helpers (unitKindOf/displayUnit/toDisp/hintText); labelSpan flips the suffix to (in)/(IPM) in inch mode; numberWidget adds (a) an always-on live HINT ("= X in / IPM" in mm-mode · "= X mm" in inch-mode), and (b) in inch mode a `shadow` input that DISPLAYS + EDITS inch/IPM while `inp` (the mm source) is hidden — typed inch → ×25.4 → the EXACT mm on `inp` (dispatches input → drag/preview/read all see mm). read() is untouched (reads `inp` = mm).
+- **web/ui/settingsPanel.js** — `settings.units:'mm'` default + a "Display units" select (mm & mm/min | inch & IPM) in the Machine section; on change → save + dispatch ddcs:settings-changed (the display flips on the next form render / re-open).
+- **web/blocks/dataOps/surfacingData.js** — tagged the dimension + feed fields (depth/stepdown/w/h/stepover → units:'mm'; feed/plunge → units:'mm/min') so they get the treatment + a unit label they lacked. DISPLAY-only → NO emit change.
+
+### VERIFY (my own drive; the guardrail)
+- **tests/dual-units-990 (GREEN):** mm-mode — a length field shows "= X in", a feed shows "= X IPM", 25.4 mm → "= 1 in". inch-mode — the mm input is HIDDEN, a shadow inch input is shown; typing 0.5 in → the stored mm is EXACTLY 12.7 (toBeCloseTo 12.7, 6 dp → NO drift); the hint shows the mm equivalent.
+- **SCREENSHOT VIEWED (mm-mode):** the COORDINATES group (Z-mode | WCS) + depth (mm) [0.5] = 0.0197 in · stepdown (mm) = 0.0197 in · w (mm) [100] = 3.937 in · h (mm) [80] = 3.1496 in · stepover (mm) [7.2] = 0.2835 in — the labels + live inch hints render cleanly.
+- **BYTE-IDENTICAL emit:** surfacing-as-data (twin==built-in) GREEN — the units tags are display-only, no socket → the emit is unchanged (no goldens).
+- **FULL GATE:** 1364 passed / 0 failed / 4 skipped -- no flake; byte-identical emit (no goldens); settings render + all forms green.
+
+### v1 SCOPE + FOLLOW-ON
+The WIDGET + the settings pref are SHARED (every form benefits once its fields are tagged). v1 tags SURFACING's dimensions + feeds (the op the user faces most + the Skim op). The other cutting ops (pocket/contour/bore/drill/slot) get the treatment on any already-`units`-tagged field for free; tagging THEIR dimension/feed fields is the trivial mechanical FOLLOW-ON (same units:'mm'/'mm/min' tags, no logic). The built-in index.html raw-input wizards = v2 (a separate surface, per your ruling). No emit change anywhere.
+
+### NEXT: your two-method review (a length field's inch hint + inch-input→mm round-trip; a feed field's IPM hint; the settings pref flips the display; byte-identical) → then the FOLLOW-ON tags for the other cutting ops (mechanical) + RELEASE.
