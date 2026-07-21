@@ -2512,18 +2512,16 @@ button.primary:hover {
     overflow: auto;
 }
 
-/* t1014 — the DEPTH CROSS-SECTION band, docked directly below the layout plan (a flex sibling of the plan canvas,
-   so featureCanvas stays untouched). Present only for an op that declares def.section (pocket); hidden otherwise. */
-.viz-section { flex: 0 0 132px; width: 100%; margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border); overflow: hidden; }
-.section-canvas { background: transparent; width: 100%; height: 100%; display: block; }
-.section-canvas .sc-head { fill: var(--text-dim, #9aabbb); font-size: 11px; font-family: 'PixelArial', 'Arial', sans-serif; }
-.section-canvas .sc-z { fill: var(--text-dim, #7788aa); font-size: 9px; }
-.section-canvas .sc-top { stroke: #556677; stroke-width: 1.5; }
-.section-canvas .sc-wall { stroke: #8899aa; stroke-width: 2; }
-.section-canvas .sc-pass { stroke: #3a6ea5; stroke-width: 1; stroke-dasharray: 4 3; }
-.section-canvas .sc-floor { stroke: #4dff7a; stroke-width: 2; }
-.section-canvas .sc-grip { fill: #4dff7a; stroke: #006633; stroke-width: 1.5; cursor: ns-resize; }
-.section-canvas .sc-grip-step { fill: #ffb300; stroke: #663300; cursor: ns-resize; }
+/* t1014 — the Z-DEPTH RULER form widget: a narrow elevation of the cut depth beside the editable depth/step fields. */
+.zd-ruler { flex: 0 0 66px; align-self: stretch; min-height: 128px; border: 1px solid var(--border, #2a3340); border-radius: 8px; background: var(--bg, #0b0f14); padding: 2px; box-sizing: border-box; }
+.zd-fields { flex: 1 1 auto; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+.zd-readout { font-size: 11px; opacity: .6; }
+.zd-svg .zd-axis { stroke: #8899aa; stroke-width: 1.5; }
+.zd-svg .zd-pass { stroke: #3a6ea5; stroke-width: 1; stroke-dasharray: 4 3; }
+.zd-svg .zd-floor { stroke: #4dff7a; stroke-width: 2; }
+.zd-svg .zd-z { fill: var(--text-dim, #7788aa); font-size: 9px; }
+.zd-svg .zd-grip { fill: #4dff7a; stroke: #006633; stroke-width: 1.5; cursor: ns-resize; }
+.zd-svg .zd-grip-step { fill: #ffb300; stroke: #663300; cursor: ns-resize; }
 
 /* Side-by-side 2D layout + 3D verify (drill wizard) */
 .viz-split { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }

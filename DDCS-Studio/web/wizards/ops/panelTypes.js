@@ -18,7 +18,6 @@ import { BLOCKS } from './index.js';   // t708 — the block-def registry (type 
 import { builderOf } from '../../blocks/opBuilders.js';   // t708 — build the op's stack to find its geometry atom + its live params
 import { getUserPreviewGeometry } from '../../blocks/userOps.js';   // t712 — a twin's DECLARED preview-geometry hook (slot/contour per-feature handles)
 import { placeShiftOfStack } from '../../blocks/blockEmitter.js';   // t718 LAYOUT PLACEMENT PARITY — the op's DECLARED placement shift (== the emit's), to draw previewGeometry PLACED
-import { depthLevels } from '../clearing.js';   // t1014 — the ONE slice source (== the emitter) for the depth-section pass lines
 
 // t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
 // settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
@@ -499,19 +498,4 @@ export function renderDeclaredLayout(container, def, params) {
         return true;
     }
     return false;
-}
-
-// t1014 — the DECLARED depth-section spec. An op declares `def.section = { depthParam, stepParam, widthOf(params)?, label? }`
-// (pocket is the first consumer); this reads its live params into the general elevation-leaf spec. Pass lines come from
-// depthLevels() — the SAME function the emitter loops — so the drawn slices == the emitted passes (one source). Returns
-// null for an op with no declared section (unchanged). Display/input only → the emit is byte-identical.
-export function sectionSpecFromOp(def, params) {
-    const s = def && def.section;
-    if (!s) return null;
-    const p = params || {};
-    const depth = Math.max(0, Number(p[s.depthParam]) || 0);
-    const stepdown = Math.max(0.05, Number(p[s.stepParam]) || 0);
-    if (depth <= 0) return null;
-    const width = Math.max(1, (typeof s.widthOf === 'function' ? Number(s.widthOf(p)) || 0 : 0) || 80);
-    return { width, depth, stepdown, passes: depthLevels(depth, stepdown), depthParam: s.depthParam, stepParam: s.stepParam, label: s.label || 'Section' };
 }
