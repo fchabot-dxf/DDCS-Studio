@@ -12331,3 +12331,32 @@ Nothing else touched: `inp` stays the authoritative mm source, read()/drag/previ
 - **FULL GATE:** 1371 passed / 4 skipped / 1 flake -- the sole red was preflight-badge-838:104 (exec-highlight+annotation coexist), a documented pre-existing isolation flake: it passes 10/10 STANDALONE (re-ran) and is unrelated to a display-only hint change. Green modulo the known flake.
 
 ### STATE: the dual-unit conversion hint is now a muted right-aligned annotation LEFT of the input across every numeric field (shared widget); the input column is the clean right edge; mm-mode + inch-shadow-mode both verified clean; 4-digit precision kept; emit byte-identical. READY for review.
+
+---
+
+## 🔨 turn 1004 — BUILD (feed-default 2000, golden-affecting): the NO-TOOL cut-feed default → 2000 for surfacing/contour/pocket/slot + raw line/move/arc, across ALL coupled sites so twins stay byte-parity. bore/drill/cnc left slow, plunge untouched.
+
+DISPATCH: [d]+catalog now fill feed from the picked tool (2500-6000), so 2000 is the sensible NO-TOOL fallback (was op-specific 800/400/600/200). Bump surfacing(800)/contour(400)/pocket(600)/slot(600) + raw line/move/arc(200) -> 2000. LEAVE bore(100 helical)/drill(100 peck)/cnc(200 peck). Plunge UNCHANGED. Change the feed default in ALL coupled places per op (data-op *_DEFAULTS + built-in form default + mirrored fallback) so the twin stays byte-parity. Goldens: diff-verify only the feed value moved.
+
+### GROUNDING (3 parallel Explore agents mapped every coupled site — the risk was precision: pocket & slot both default 600, and MANY unrelated atoms also carry feed 600)
+Per op the no-tool default is DECLARED in up to 4 mirrored places that must move together (twin-default-mirrors-form): the data-op *_DEFAULTS object, the built-in HTML form field, the wizard num() fallback, and the toolpath ATOM default (+ its emit num() fallback). 24 source sites total:
+- surfacing (800): surfacingData.js:42, index.html sf_feed, surfacingWizard.js:29, ops/surfaceFill.js:11.
+- contour (400): contourData.js:32, index.html ct_feed, contourWizard.js:55, ops/contourfill.js:40+45. (contourWizard builds the `contourfill` atom, NOT ops/contour.js — that atom's feed is geometry-only, never emitted, so LEFT at 400.)
+- pocket (600): pocketData.js:37, index.html p_feed, pocketWizard.js:89, ops/pocketfill.js:47 (the concentric fill pocket builds at default; matched uniquely via `helixPitch:1, by:'by'` so pocketWall:56 raster-only stays).
+- slot (600): slotData.js:37, index.html sl_feed, slotWizard.js:57, ops/slot.js:71+21.
+- raw (200): ops/line.js:12+29, ops/move.js:12+28, ops/arc.js:9+13. (move.js:27 probe branch F50 LEFT; line/move/arc are Blockly-only atoms — no form, no twin.)
+
+### LEFT DELIBERATELY (600s NOT on the bumped ops default path)
+ops/stepover.js:37 fillStrategy num(p.feed,600) — SHARED kernel on pocket's runtime path, but feed is ALWAYS passed explicitly (the 600 never fires) and it is shared with surfacing/slot -> changing it would LEAK into other ops. ops/pocketfill.js:56/61 (pocketWall, raster-only), ops/restmachining.js:123/127 (rest pass, needs restDia>0), ops/fill.js + stepover.js:79 (surfacing fills / standalone Step Over) — none reached by the bumped ops at default. text (400) not in scope -> LEFT. bore/drill/cnc (100/100/200) untouched.
+
+### GOLDEN (the ONLY stored fixture affected: tests/fixtures/pocket-golden.json)
+The pocket golden is a FROZEN independent-truth snapshot of the retired pre-E0 pocketStack path (asserts the new flat leaves match it structurally). The feed scalar is ORTHOGONAL to that structural truth, so the correct regen is SURGICAL, not a wholesale re-capture (a re-capture from the current path would make the assertion vacuous -- assert-the-value-not-the-change). Bumped ONLY the default cut feed F600 -> F2000 (228 occurrences), word-boundary matched so a stray F6000 rapid could not be mangled (there are none). LEFT the 36 F800 (the sweep's explicit SCALARS[4] feed:800 OVERRIDE, not a default) and all F150/F120 (plunge). No surfacing/contour/slot golden exists — those twins are LIVE byte-parity, self-regenerating (both sides move together -> stay green).
+
+### VERIFY (the ACCEPT: my dump + goldens only-feed-moved + full gate)
+- **MY DUMP (tests/_feed2000-verify, temp, deleted):** surfacing/contour/pocket/slot/line/move/arc all emit F2000 at default; plunge intact (surfacing/contour F200, pocket/slot F150); bore F100, drill F100 UNCHANGED; a picked tool (surfacingStack{feed:3000}) emits F3000 and NO F2000 -> the tool STILL OVERRIDES the default. (cnc emitted no F in the bare-atom harness — no geometry; cnc.js:32 feed:200 untouched, confirmed by source.)
+- **GOLDEN only-feed-moved PROVEN:** pocket-e0-superset goldenDiffs:0 across the 96-combo sweep -- the hand-patched golden (F600->F2000, everything else frozen) matches the LIVE emit byte-for-byte, PROVING my source edit moved nothing but the feed. gateDiffs:0 too.
+- **TWINS BYTE-IDENTICAL:** surfacing-as-data / contour-data-emit / pocket-data-emit (E1 diffs:0) / slot-as-data all GREEN -> each twin == its built-in stack after the coupled bump.
+- **25 likely-affected emit specs** (surfacing-skim, contour-op/wizard, fills, concentric-shapes, depth-entry, rest-machining, blockly-port) GREEN -> no spec hardcodes an old default feed.
+- **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.2m) -- fully clean, NO flake (preflight-badge passed this run too). No ripple anywhere from the feed bump.
+
+### STATE: the no-tool cut-feed default is 2000 for surfacing/contour/pocket/slot + raw line/move/arc across every coupled site (twins byte-parity intact); bore/drill/cnc stay slow; plunge unchanged; a picked tool overrides; the pocket golden moved only the feed number (independent-truth snapshot preserved). READY for review.
