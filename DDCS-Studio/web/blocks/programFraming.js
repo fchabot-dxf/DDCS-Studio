@@ -13,7 +13,9 @@ export function makeStart(params = {}) {
     const sp = params.spindle || {};
     const rpm = num(params.rpm, 0) > 0 ? num(params.rpm, 0) : num(sp.defaultRpm, 0);
     const b = newBlock('progstart');
-    b.params = { rpm, dir: sp.dir || 'cw', spinUp: num(sp.spinUp, 0), clearance: num(params.clearance, 5) };
+    // t982/t984 — thread `skim` through: in Skim mode progstart drops its ABSOLUTE `G0 Z<clr>` (a relative op has no
+    // WCS-Z; an absolute pre-G91 Z move would rapid to an unknown work Z = a crash). Omitted/false → byte-identical.
+    b.params = { rpm, dir: sp.dir || 'cw', spinUp: num(sp.spinUp, 0), clearance: num(params.clearance, 5), skim: !!params.skim };
     return b;
 }
 

@@ -35,6 +35,13 @@ test('Skim emits whole-op G91 … G90; the clearance LIFT survives (+5); the plu
   expect(g91, 'G91 present').toBeGreaterThan(0);
   expect(g90after, 'G90 restore after the body').toBeGreaterThan(g91);
 
+  // CRASH-GUARD (t984, advisor's dump caught this): NO absolute Z move BEFORE the G91. A relative op has no WCS-Z,
+  // so any pre-G91 `G0/G1 … Z…` would rapid the tool to an UNKNOWN work Z (into the stock). The pre-G91 slice is
+  // spindle-on + mode only; the first Z move must be INSIDE the G91 (the skim atom's relative clearance).
+  const preG91 = lines.slice(0, g91);
+  const strayZ = preG91.filter((l) => /^G[0-3]\b/.test(l) && /Z-?\d/.test(l));
+  expect(strayZ, `no absolute Z move before G91 (found: ${strayZ.join(' | ')})`).toEqual([]);
+
   // FIRST Z move after G91 = the clearance LIFT +5 (NOT Z0 = no lift, NOT negative = a dive)
   const firstZ = lines.slice(g91 + 1).find((l) => /Z-?\d/.test(l));
   expect(firstZ, 'first Z after G91 is the +5 clearance lift').toMatch(/G0 Z5\b/);
