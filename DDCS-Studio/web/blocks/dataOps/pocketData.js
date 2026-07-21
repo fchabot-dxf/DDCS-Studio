@@ -254,5 +254,9 @@ export function pocketDataDef() {
     };
     def.previewGeometry = pocketPreviewGeometry;   // t716 — per-feature 2D handles (shape boundary + pos/size per kind) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b — the emitting-square entry marker (replaces the sim-only ○)
+    // t1014 — DECLARE the depth cross-section (the FIRST consumer of the general elevation leaf): the X-extent is the pocket's
+    // feature width (Ø for circle/polygon, W otherwise); depth/stepdown drive the floor + the depthLevels pass lines. Display/input only.
+    def.section = { depthParam: 'depth', stepParam: 'stepdown', label: 'Pocket',
+        widthOf: (p) => ((p.shape === 'circle' || p.shape === 'polygon') ? Number(p.dia) || 50 : Number(p.w) || 80) };
     return def;
 }

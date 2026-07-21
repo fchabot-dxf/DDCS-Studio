@@ -2512,6 +2512,19 @@ button.primary:hover {
     overflow: auto;
 }
 
+/* t1014 — the DEPTH CROSS-SECTION band, docked directly below the layout plan (a flex sibling of the plan canvas,
+   so featureCanvas stays untouched). Present only for an op that declares def.section (pocket); hidden otherwise. */
+.viz-section { flex: 0 0 132px; width: 100%; margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border); overflow: hidden; }
+.section-canvas { background: transparent; width: 100%; height: 100%; display: block; }
+.section-canvas .sc-head { fill: var(--text-dim, #9aabbb); font-size: 11px; font-family: 'PixelArial', 'Arial', sans-serif; }
+.section-canvas .sc-z { fill: var(--text-dim, #7788aa); font-size: 9px; }
+.section-canvas .sc-top { stroke: #556677; stroke-width: 1.5; }
+.section-canvas .sc-wall { stroke: #8899aa; stroke-width: 2; }
+.section-canvas .sc-pass { stroke: #3a6ea5; stroke-width: 1; stroke-dasharray: 4 3; }
+.section-canvas .sc-floor { stroke: #4dff7a; stroke-width: 2; }
+.section-canvas .sc-grip { fill: #4dff7a; stroke: #006633; stroke-width: 1.5; cursor: ns-resize; }
+.section-canvas .sc-grip-step { fill: #ffb300; stroke: #663300; cursor: ns-resize; }
+
 /* Side-by-side 2D layout + 3D verify (drill wizard) */
 .viz-split { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
 .viz-split > .viz-container { flex: 1 1 280px; min-width: 280px; }

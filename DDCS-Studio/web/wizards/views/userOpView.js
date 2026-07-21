@@ -15,7 +15,8 @@ import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../previewEmit.js';   // t634 — the data-op preview folds per the ACTIVE post (== insert), not Expert-default
 import { flattenBlocks, getUserStatusHint, getUserSimGcode } from '../../blocks/userOps.js';   // group: index the stored children for the live preview; t554: the declared in-place status hint (homing unset-travel); t566: the declared sim-gcode override (ATC change choreography)
-import { panelType, renderLayout2D, pinnedStartsFor } from '../ops/panelTypes.js';
+import { panelType, renderLayout2D, pinnedStartsFor, sectionSpecFromOp } from '../ops/panelTypes.js';
+import { renderSection } from '../../viz/sectionCanvas.js';   // t1014 — the depth cross-section leaf, docked beneath the layout plan
 import { resolvePlacementStock } from '../ops/placement.js';   // t720 P1 (d) — fill a twin's UNSET stockW/H from the settings stock so cc-attach places on the real stock
 import { firstRapidXY } from '../ops/entry.js';   // t726 P2b — the ONE cut-entry source (the entry marker sits here when unset, shared with the emit)
 import { getTool } from '../toolPicker.js';   // t768 P1a — resolve the DECLARED tool (toolNum → the library row's real type+Ø) so the sim renders the actual cutter
@@ -39,6 +40,23 @@ import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E
 // each call would leak). The overlay reads the SAME shared trace + starts/passEnds/anchor the top 2D panel uses, so its
 // path connects the SVG handles by construction, and pins its view from featureCanvas._tf so it registers pixel-exact.
 function _pinFromTf(tf) { return tf ? { scale: tf.scale, ox: tf.cx - tf.cxw * tf.scale, oy: tf.cy + tf.cyw * tf.scale } : null; }
+// t1014 — dock the DECLARED depth cross-section as a band directly BELOW the layout plan (a sibling of the plan canvas
+// `c`, so featureCanvas is untouched). Present only for an op that declares def.section (pocket); hidden otherwise, so
+// non-section ops keep the full-height plan. The drag writes the depth/stepdown FORM field (the ONE source) + dispatches
+// 'input' → the delegated listener re-runs mgr.update → plan + section both redraw. Emit byte-identical (fields only).
+function renderSectionBeneath(c, def, params) {
+    if (!c || !c.parentElement) return;
+    const spec = sectionSpecFromOp(def, params);
+    let band = c.parentElement.querySelector(':scope > .viz-section');
+    if (!spec) { if (band) band.style.display = 'none'; return; }
+    if (!band) { band = document.createElement('div'); band.className = 'viz-section'; c.insertAdjacentElement('afterend', band); }
+    band.style.display = '';
+    renderSection(band, spec, (param, value) => {
+        const f = el('wiz_user_form').querySelector('[data-param="' + param + '"]');
+        if (!f) return;
+        f.value = String(value); f.dispatchEvent(new Event('input', { bubbles: true })); f.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+}
 function wireAnimOverlay(container, fc, panel, starts, passEnds, sources) {
     if (!container || !fc || !panel || typeof panel.getSegments !== 'function' || typeof fc.getTransform !== 'function') return;
     let ov = container.__animOverlay;
@@ -453,6 +471,7 @@ export const userOpView = {
                         : { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } };
                     const fc = renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps, simMarkers);   // t301 Seam C + t508 simMarkers (declared marker→param handles)
                     wireAnimOverlay(c, fc, panel, ps, passEnds, sources);   // t309 — the 2D-animation overlay under the SVG (created once, fed the shared trace each render; driven by the panel's engine via onToolPos)
+                    renderSectionBeneath(c, _def, params);   // t1014 — the declared depth cross-section, docked below the plan
                 };
                 renderLayoutWithSim();
             }
@@ -465,7 +484,7 @@ export const userOpView = {
             const v = viz3dIn('userVizContainer'); if (v) v.style.display = ''; mgr.preview3D(previewGcode, 'userVizContainer', (starts3d && starts3d[0]) || null, (Array.isArray(starts3d) && starts3d.length) ? starts3d : null, _simStock, _opTool);
         } else if (pt.mode === '2d') {
             if (viz3dBox) viz3dBox.style.display = 'none';
-            const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params);
+            const v = viz3dIn('userVizContainer'); if (v) v.style.display = 'none'; const c = el('userVizContainer'); if (c) c.style.display = ''; renderLayout2D(c, _def, params); renderSectionBeneath(c, _def, params);
         } else if (pt.mode === 'commscreen') {
             // t518 — Comm/MDI: a live mock of the DDCS controller screen (popup / status / input / beep) instead of a toolpath.
             if (viz3dBox) viz3dBox.style.display = 'none';
