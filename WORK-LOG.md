@@ -12257,3 +12257,31 @@ The DATA-OP twins had NO rpm binding, so the form/tool rpm never reached progsta
 - **FULL GATE:** 1371 passed / 0 failed / 4 skipped -- no flake; every op byte-identical for the blank case; the rpm binding routes to progstart in all 6.
 
 ### STATE: the tool/form RPM now reaches the program's spindle line for all 6 mill ops (was the Head default, ignoring the tool). Blank = Head (byte-identical); a typed value / a picked tool's library rpm overrides it. EMIT goldens byte-identical for the no-op case (regen only where a real rpm differs from the Head — none in the specs). READY for review + RELEASE. [b] Z-profile next.
+
+---
+
+## 🔨 turn 998 — GROUND (corner start-marker drag moves Z): the EMIT is SAFE (sim-visual only, no hazard) + a grounding CORRECTION (leak-A is DEAD code) + the fix needs a datum-frame call → GATE.
+
+READ-ONLY ground+propose per your dispatch. NO build (propose-before-build + a datum-frame decision surfaces → GATE).
+
+### THE CRITICAL ANSWER: EMIT is NOT corrupted → SIM-VISUAL ONLY → NO machine hazard
+Two independent code facts, both verified:
+1. **The corner sim markers EMIT NOTHING.** cornerData.js:209 — `simStartsToBlocks(CORNER_SIM_STARTS)` are "per-pass preview markers (canonical; SIM only, emit nothing)"; def.simStartsProvider = cornerSimStartsProvider (:341). The draggable start markers are PREVIEW-ONLY by construction → dragging one cannot touch the emitted probe approach-Z. The probe approach-Z comes from the FIXED probe-depth params (the op stack), not the marker.
+2. **The drag WRITER writes X/Y ONLY.** writeSimStartFrac (userOpView:155) writes the X/Y fraction / a mm span into the FORM field; it IGNORES the incoming z entirely (no `z` write anywhere in it). So even the write-back path can't put a dragged Z into the params.
+=> **The GATE-trigger "emit-corrupted" is NOT met.** This is a preview/trust bug (a wrong sim Z misleads the eye), not a machine hazard.
+
+### GROUNDING CORRECTION — leak-A (the 3D gizmo) is DEAD CODE
+Your grounding pointed at the gizmo s.z formula (gcodeViz3d:2273, `s.z = _dragStart0.z + _dragDir.z*delta`). But **`_pickGizmo(e)` returns `null` (gcodeViz3d:849 — "gizmo picking is disabled")**, with NO subclass override → the whole `mode='gizmo'` drag block (2332-2345, incl. that s.z line) NEVER runs. So leak-A (a Z-axis / free gizmo drag) is IMPOSSIBLE. The drag is the 2D-canvas / marker path → onDrag/writeSimStartFrac → mgr.update re-render.
+
+### THE LEAK IS B (the re-render sim-Z recompute) — needs a REPRO to pinpoint the exact coupling
+On a drag, writeSimStartFrac writes the X/Y frac + the host RE-RENDERS. The 3D marker Z is rebuilt (createPreviewPanel:560-566) as `row.z = (+h.z||0)` where `h = userStarts[p] || (p===0 && st) || hintFor(p) || passStarts[p]`. The cornerSimStartsProvider Z I read is X/Y-INDEPENDENT (opSimStarts corner probeZ = −min(5, sz·0.5); the datum-Z simWcsOffset:584 = datumZFrac(datum)·stockZ) — both stable. So the X/Y→Z coupling must live in ONE of: the `st` (pass-0 start) value, a stale `userStarts[0]` Z pinned from a prior interaction, or a chain-off-anchor reposition that re-derives Z from the moved X/Y. I could not pin the exact one statically in-budget — it needs a REPRODUCTION (drive the corner, drag the ② marker, watch the marker Z) to see which `h` branch supplies the shifting Z.
+
+### PROPOSED FIX (sim-only) + the DATUM-FRAME decision to GATE
+Make the corner start marker's Z **X/Y-INDEPENDENT** — [[handles-are-independent]] extended to Z: on a drag, the marker keeps its FIXED approach-Z (the datum-derived probe Z), never re-derives Z from the new X/Y. Likely a one-line pin in the marker-row build or the provider (hold `row.z` = the anchor/approach Z, not the recomputed chain Z). **THE DATUM-FRAME DECISION (why GATE):** what Z SHOULD the ② start marker hold — the probe APPROACH Z (a few mm down the wall, opSimStarts probeZ), or the datum/surface Z? The user says "on open Z correct" → whatever the ON-OPEN Z is, is the intended fixed value; the fix must PIN that. Confirming "the on-open Z is the intended one" + which `h` branch to pin is the call I want ruled before I touch the corner pilot's sim markers.
+
+### GATE QUESTIONS
+1. Confirm EMIT-SAFE (sim markers emit nothing → sim-visual only, no hazard) — proceed as a preview-only fix?
+2. Approve a REPRO-first step (drive the drag, identify the shifting `h` branch) before the one-line Z-pin?
+3. The datum-frame: pin the marker Z to the ON-OPEN value (the correct approach-Z) — confirm that's the intended fixed Z (vs any surface/datum alternative)?
+
+No build this turn (ground+propose+gate). Emit un-touched → nothing to release.
