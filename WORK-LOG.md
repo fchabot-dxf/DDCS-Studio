@@ -12310,3 +12310,24 @@ createPreviewPanel.onStartDrag: for a WORK-FRAME start, hold the X/Y-INDEPENDENT
 - **FULL GATE:** 1372 passed / 0 failed / 4 skipped -- no flake, no ripple; corner start Z fixed, homing Z-drag preserved, emit byte-identical.
 
 ### STATE: corner start-marker drag is now X/Y-only, Z pinned to the fixed approach-Z (sim-visual fix; emit byte-identical, no goldens, no hazard). READY for review + RELEASE.
+
+---
+
+## 🔨 turn 1002 — BUILD (conversion-layout B, DISPLAY-ONLY): the dual-unit hint moved LEFT of the input (muted, right-aligned) — the input column is now the clean right edge. Shared widget, byte-identical emit, no goldens.
+
+DISPATCH: the inch/IPM hint was stranded at the far-right edge (clunky). MOVE it LEFT of the input (a muted annotation right-aligned just before the input; the input column stays the clean right edge). Keep 4-DIGIT precision. SCOPE = formWidgets.js (the SHARED numeric widget).
+
+### THE CHANGE (formWidgets.js numberWidget, the t990 dual-unit hint block — 2 lines)
+The hint was `host.append(hint)` with `margin-left:6px` -> in the ROW flex (`justify-content:space-between`) it got shoved to the far-right edge, past the input. Now:
+- style: `margin-left:auto; margin-right:8px; white-space:nowrap; text-align:right;` (margin-left:auto absorbs the free space so the hint hugs the input; right-aligned + no-wrap keeps it a tidy muted annotation).
+- placement: `(inp.parentElement === host ? inp : inp.parentElement).before(hint)` -- inserted just BEFORE the input's host-level element (handles both the bare-input case and the stepper-wrap case), so the row reads `label ........ hint [input]` with the input column as the clean right edge.
+Nothing else touched: `inp` stays the authoritative mm source, read()/drag/preview all unchanged. toDisp is still 4dp (untouched) -> 4-digit precision preserved.
+
+### VERIFY (the ruling ACCEPT: my own VIEWED screenshot + byte-identical emit + full gate)
+- **VIEWED mm-mode (surfacing-as-data form):** hint now sits LEFT of the input, right-aligned, input column clean -- depth (mm) `= 0.0197 in` [0.5], stepdown `= 0.0197 in`, w `= 3.937 in` [100], h `= 3.1496 in` [80], stepover `= 0.2835 in` [7.2]. 4-digit precision confirmed.
+- **VIEWED inch-shadow-mode:** label flips to (in), the shadow inch input is the right column, the mm hint sits left of it -- depth (in) `= 0.5 mm`, w (in) `= 100 mm`, h (in) `= 80 mm`, stepover (in) `= 7.2 mm`. Clean in both modes.
+- **dual-units-990 spec:** 2 passed (hint text + finding intact -- the hint stays in the same parent, only its position/style changed).
+- **BYTE-IDENTICAL EMIT:** DISPLAY-ONLY change (hint CSS + DOM insertion point); `inp` / read() / the emit path are untouched -> no goldens.
+- **FULL GATE:** 1371 passed / 4 skipped / 1 flake -- the sole red was preflight-badge-838:104 (exec-highlight+annotation coexist), a documented pre-existing isolation flake: it passes 10/10 STANDALONE (re-ran) and is unrelated to a display-only hint change. Green modulo the known flake.
+
+### STATE: the dual-unit conversion hint is now a muted right-aligned annotation LEFT of the input across every numeric field (shared widget); the input column is the clean right edge; mm-mode + inch-shadow-mode both verified clean; 4-digit precision kept; emit byte-identical. READY for review.
