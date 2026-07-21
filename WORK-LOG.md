@@ -12128,3 +12128,22 @@ Skim emitted `G90 / M3 S12000 / G0 Z5 ( clearance ) / G91 / ...` -- the `G0 Z5` 
 - The lone failure is **preflight-badge-838:104** (exec-highlight + annotation COEXIST -- a DOM/timing test). NOT mine: (a) passes STANDALONE 2/2; (b) the full preflight file passes 10/10 x3 on the clean tree (makeStart stashed); (c) my change is EMIT-ONLY (progstart params) with ZERO causal path to the preflight annotation DOM. A full-suite parallel-load timing flake, coincident with this run. Deflake candidate (like collapsible-panes-752:38).
 
 ### NEXT: the TWIN (structural superset fork + form Coordinates group + WCS grey + round-trip) now that the built-in Skim emit is CLEAN -- per your ruling. Precisely scoped in WORK-LOG t982.
+
+---
+
+## 🔨 turn 986 — [a] surfacing Skim: the TWIN — the data-op (opensAs) now emits Skim BYTE-IDENTICAL to the built-in + the form Coordinates group + WCS grey. Skim is now USER-REACHABLE.
+
+### THE TWIN (structural fork) — postInstantiate, NOT the superset (simpler for surfacing's static-binding twin)
+GROUNDED: the rotary superset uses DERIVED bindingSpecs; surfacing's twin uses STATIC blockIndex bindings, so a superset would force a disproportionate binding refactor. KEY INSIGHT: I made Skim's structure PARALLEL to Normal (the `skim` wrapper REPLACES placeonstock at the SAME position, wcs kept) so the FLAT block indices stay identical -> the existing static bindings work UNCHANGED for both modes. That lets a simple postInstantiate patch (the spindleHeadPatch pattern) do the fork:
+- **web/blocks/dataOps/skimStructure.js** (NEW) `applySkimStructure(stack, resolved)` — when resolved.zMode==='skim': set every progstart.skim=true (drop the absolute pre-G91 clearance = the crash guard) + swap the placeonstock wrapper -> a `skim` wrapper (keeping its socket-filled children). Normal/absent -> a no-op (byte-identical). Mirrors spindleHeadPatch (flattenBlocks + mutate + return).
+- **web/blocks/dataOps/surfacingData.js** — SURFACING_DEFAULTS += zMode:'normal'; a SURFACING_STRUCT `zMode` field (structural, NO socket — like the rotary `action`) in a COORDINATES section; the wcs binding gains `section:'COORDINATES'` + a `gate:{param:'zMode', is:'skim', tip}` (t566 grey-gate -> data-op-gated); postInstantiate composed: `applySkimStructure(spindleHeadPatch(stack), resolved)`.
+- **web/wizards/surfacingWizard.js** — the built-in Skim branch now KEEPS wcs (index-parallel to Normal; wcs='active' emits nothing -> byte-identical) so the twin's static bindings align.
+
+### VERIFY
+- **tests/surfacing-skim-twin-986 (GREEN):** the twin's Skim emit == the built-in surfacingStack(skim) BYTE-IDENTICAL across a sweep (depth/stepdown/size/feed); twin NORMAL byte-identical (absent + explicit); the CRASH-GUARD holds on the TWIN (NO absolute Z before the G91 — inherited via the shared skim atom) + the first Z after G91 is the +5 clearance lift.
+- **tests/surfacing-skim-form-986 (GREEN):** the data-op form shows a Coordinates group (Z-mode | WCS); Normal -> WCS enabled; Skim -> WCS greyed (disabled + data-op-gated='on'); back to Normal re-enables. Screenshot VIEWED: Z-mode = "Skim - relative", the WCS field is greyed ("Active", faded) below it.
+- **Round-trip (surfacing-skim-twin-986, GREEN):** the marker carries "zMode":"skim" (markerLine serializes all params) + parseMarker restores zMode=skim -> the reimported Skim op re-emits BYTE-IDENTICAL.
+- **surfacing-skim-982 + surfacing-as-data + built-in** all green (Normal byte-identical everywhere).
+- **FULL GATE (final, all tests):** 1362 passed / 4 skipped + 1 PRE-EXISTING flake. The lone failure is collapsible-panes-752:38 (mobile pane-collapse animation-timing) -- the SAME non-deterministic flake proven at t973 (clean-tree stash-test flaked 3/4; passes standalone [re-confirmed 1/1 here]); my Skim changes are emit/form-only with zero path to mobile pane sizing.
+
+### STATE: Skim is now USER-REACHABLE (the data-op form offers it, greys the WCS, emits byte-identical to the built-in, round-trips) -> READY for the advisor's two-method review + RELEASE.
