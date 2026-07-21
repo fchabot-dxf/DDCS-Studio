@@ -10,7 +10,7 @@
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
-import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
+import { makeStart, makeEnd, makePlace, makeSkim } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
 
 /** The faced area's footprint on the stock — shared by the stack (PlaceOnStock snapshot) + the 2D view. */
@@ -41,6 +41,12 @@ export function surfacingStack(params = {}) {
     down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };
     down.children = [fill];
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
+    if (params.zMode === 'skim') {
+        // SKIM (t982): whole-op RELATIVE (G91) from the jog start — jog to a corner, touch, face. No WCS, no placement
+        // (the jog IS the reference). progstart drops its absolute clearance; makeSkim prepends a relative lift + relativizes
+        // the body + wraps G91…G90; makeEnd's G53 safe-Z retract stays machine-frame absolute after the G90 exit.
+        return [makeStart({ ...params, skim: true }), makeSkim(params, down), makeEnd(params)];
+    }
     return [makeStart(params), wcs, makePlace(params, { minX: 0, maxX: w, minY: 0, maxY: h }, down), makeEnd(params)];   // local 0-based bbox snapshot (live-extent overrides it)
 }
 

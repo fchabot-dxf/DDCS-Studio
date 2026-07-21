@@ -25,7 +25,7 @@ import { firstRapidXY } from '../wizards/ops/entry.js';   // t726 P2b — THE ON
 import { getDialect, DEFAULT_DIALECT, getCaps } from '../wizards/dialects/index.js';
 import { num, r3 } from '../wizards/ops/util.js';
 import { placeShiftFromParams } from '../wizards/ops/placement.js';
-import { translateProgram, rotateProgram, mirrorProgram } from '../data/rotateProgram.js';
+import { translateProgram, rotateProgram, mirrorProgram, relativizeProgram } from '../data/rotateProgram.js';
 import { programRotation, flipForSetup } from '../wizards/ops/transform.js';   // t736 — the DECLARED program-level rotation ({angle,pivotX,pivotY}); t879 — the two-sided per-setup FLIP
 import { serialBump, serialInline, glyphLibrary } from '../wizards/serialEngrave.js';   // t764 — {SN} dynamic serial: bump + per-digit dispatch + the shared glyph library
 
@@ -35,7 +35,7 @@ export function newBlock(type) {
     const def = BLOCKS[type];
     if (!def) throw new Error(`unknown block type: ${type}`);
     const b = { id: `${type}${++_seq}`, type, params: { ...def.defaults } };
-    if (['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate', 'guard'].includes(def.kind)) b.children = [];
+    if (['container', 'path', 'loop', 'cond', 'depth', 'fill', 'place', 'rotate', 'skim', 'guard'].includes(def.kind)) b.children = [];
     return b;
 }
 
@@ -227,6 +227,17 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         if (!ang) return inner;                // 0° → pass through untouched
         const moved = rotateProgram(inner.map((t) => t.line).join('\n'), ang, px, py).text.split('\n');
         return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 rotate)
+    }
+
+    if (def.kind === 'skim') {                 // SKIM Z-MODE: emit the wrapped body, prepend a clearance LIFT, then
+        const inner = [];                      // relativizeProgram the whole thing (abs → G91 deltas from the jog origin
+        (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect)));   // 0,0,0) and wrap G91 … G90. The G53 retract sits OUTSIDE (footer, machine frame).
+        const clr = r3(num(p.clearance, 5));
+        const rel = relativizeProgram([`G0 Z${clr}   ( clearance )`, ...inner.map((t) => t.line)].join('\n')).text.split('\n');
+        const out = [tag('G91   ( skim - X/Y/Z relative to the jog start )', own), tag(rel[0], own)];   // G91 + the relativized clearance lift (own provenance)
+        for (let i = 0; i < inner.length; i++) { const t = inner[i]; out.push(t.cap ? { line: rel[i + 1], src: t.src, cap: t.cap } : { line: rel[i + 1], src: t.src }); }   // relativized body, provenance kept
+        out.push(tag('G90   ( absolute )', own));
+        return out;
     }
 
     if (def.kind === 'xform') return [];       // PROGRAM ROTATION (t736): a childless DECLARATION — emits nothing here; it's

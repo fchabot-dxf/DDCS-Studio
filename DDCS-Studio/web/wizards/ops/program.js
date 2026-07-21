@@ -12,11 +12,13 @@ import { headerBlock, footerBlock } from '../cuttingBlocks.js';
 
 export const progStartBlock = {
     type: 'progstart', label: 'Program Start', kind: 'leaf', category: 'Program',
-    defaults: { rpm: 12000, dir: 'cw', spinUp: 0, clearance: 5 },
-    fields: ['rpm', 'dir', 'spinUp', 'clearance'],
+    defaults: { rpm: 12000, dir: 'cw', spinUp: 0, clearance: 5, skim: false },
+    fields: ['rpm', 'dir', 'spinUp', 'clearance', 'skim'],
+    // t982 — `skim`: a relative (G91) op has no absolute WCS-Z, so the opening clearance can't be an absolute `G0 Z<clr>`;
+    // the wrapping skim atom emits the clearance as a RELATIVE lift instead. skim omitted/false → byte-identical (the clearance stays).
     emit: (p, dx, dy, dialect) => [
         ...headerBlock({ spindle: { dir: p.dir, spinUp: num(p.spinUp, 0) }, rpm: num(p.rpm, 0), dialect }),
-        `G0 Z${num(p.clearance, 5)}   ( clearance )`,
+        ...(p.skim ? [] : [`G0 Z${num(p.clearance, 5)}   ( clearance )`]),
     ],
 };
 

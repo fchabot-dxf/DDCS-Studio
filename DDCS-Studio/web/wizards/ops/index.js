@@ -31,6 +31,7 @@ import { fillTextBlock } from './fillText.js';
 import { stepdownBlock } from './stepdown.js';
 import { placeOnStockBlock } from './placeOnStock.js';
 import { rotateBlock } from './rotate.js';
+import { skimBlock } from './skim.js';
 import { entryBlock } from './entry.js';   // t726 P2b — the mill ENTRY-POINT fold (declared opening waypoint)
 import { toolSelBlock } from './toolsel.js';   // t768 P1a — the declared TOOL-SELECTION marker (which tool the op runs; emits nothing, drives the sim cutter)
 import { xformBlock, setupBlock, flipBlock } from './transform.js';   // t736 — the DECLARED program-level ROTATION (flat sibling marker, applied once at emit); t879 — the two-sided SETUP boundary + FLIP sibling
@@ -87,7 +88,7 @@ export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
     moveBlock, arcBlock, probeBlock, machineMoveBlock, safeRetractBlock, safeTraverseBlock, safeHopBlock, clearLiftBlock, homeBlock, pathModeBlock,   // Move (+ G53 machine-coord move + machine-frame safe-Z retract + safetraverse bundle + clearance-hop + clearlift folding atom + G28 home + G64/G61 path mode)
     lineBlock, slotBlock, boreBlock, drillBlock, tapBlock, contourBlock, contourFillBlock, pocketFillBlock, pocketWallBlock, pocketRestBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + tap + contour/profile [contour=region-socket for pocket-wall; contourfill/pocketfill/pocketwall=flat for the twins] + native canned cycles G81-85/G80)
-    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, stepdownBlock, placeOnStockBlock, rotateBlock, entryBlock, toolSelBlock, xformBlock, setupBlock, flipBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align + entry-point + tool-select marker + declared program rotation + two-sided setup boundary + flip sibling)
+    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, stepdownBlock, placeOnStockBlock, rotateBlock, skimBlock, entryBlock, toolSelBlock, xformBlock, setupBlock, flipBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align + skim relative Z-mode + entry-point + tool-select marker + declared program rotation + two-sided setup boundary + flip sibling)
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, wcsBaseIntoBlock, wcsWriteBlock, wcsZeroBlock, toolOffsetBlock,   // Coordinates (WCS select + dist-mode + G17-19 plane + work-offset/probe-family base+indirect-write/WCS-zero-at-current/tool-table write)
     progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)

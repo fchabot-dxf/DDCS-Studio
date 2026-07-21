@@ -44,6 +44,16 @@ export function makeRotate(params = {}, children) {
     return b;
 }
 
+/** t982 — SKIM Z-mode: wrap the cutting body in a `skim` atom so the whole op emits RELATIVE (G91) from the jog start
+ *  (jog to a corner, touch, face — no WCS datum). The atom prepends a clearance lift + relativizes the body (blockEmitter
+ *  kind:'skim'); pair it with makeStart({skim:true}) so progstart drops its own absolute clearance. `children` = the body. */
+export function makeSkim(params = {}, children) {
+    const b = newBlock('skim');
+    b.params = { clearance: num(params.clearance, 5) };
+    b.children = Array.isArray(children) ? children : [children];
+    return b;
+}
+
 /** t736 — the DECLARED program-level ROTATION: a flat childless `xform` sibling carrying {angle,pivotX,pivotY}. Emits
  *  nothing itself; blockEmitter.applyProgramTransform applies it ONCE over the whole program at generation. Sits at the
  *  TOP of the stack (a program declaration). See ops/transform.js. */
