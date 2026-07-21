@@ -187,7 +187,14 @@ export function createPreviewPanel(container, opts = {}) {
     // 3D marker, then re-traces + replays from the new start. ONE seam, so every view edits the SAME userStarts (the
     // feature-canvas drag is just another writer of it — exposed on the panel return for the view-owned canvas).
     function onStartDrag(pos, pass) {
-        const p = pass | 0, np = { x: +pos.x || 0, y: +pos.y || 0, z: +pos.z || 0 };
+        const p = pass | 0;
+        // t1000 — a WORK-FRAME start (a probe like the corner) has a FIXED approach-Z (the provider's, e.g. a few mm down the
+        // wall); dragging it in the XY plane must NOT move it in Z (handles-are-independent, extended to Z). The corner has no
+        // markerDragWriter → it fell to the pin below and stamped the dragged pos.z into userStarts[p], shifting the sim Z. So
+        // for a work-frame op hold the current provider Z. A MACHINE-FRAME start (homing) is a real 3D machine position whose Z
+        // IS draggable → keep pos.z there. (The other 4 probes route through markerDragWriter → they return early below.)
+        const z0 = (!machineFrameTool && passStarts[p] && Number.isFinite(+passStarts[p].z)) ? +passStarts[p].z : (+pos.z || 0);
+        const np = { x: +pos.x || 0, y: +pos.y || 0, z: z0 };
         if (markerDragWriter && markerDragWriter(p, np)) return;   // t592 — a declared op: the bound params were written + the host re-rendered; the marker follows the param, so no sim-only userStarts override
         passStarts[p] = np; userStarts[p] = np;          // shared source of truth + USER override (beats the hint, persists)
         if (p === 0) curStart = np;                      // pass 0 = the operator start getStartPos() reads
