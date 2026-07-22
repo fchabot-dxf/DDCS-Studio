@@ -3,6 +3,8 @@
  * surface that can identify an op: the editor (line→op), the Blocks code panel (span ancestry→op), and the
  * Blockly op blocks. Acts via the window hooks (ddcsEditOp + opSession duplicate/delete) — params stay the truth.
  */
+import { camTypeOf, isCamableType } from '../data/opCamMap.js';   // t1045 S1c — the per-op CAM action (door 1)
+
 let menu = null;
 function ensure() {
     if (menu) return menu;
@@ -39,6 +41,16 @@ export function showOpMenu(op, x, y) {
     const editable = !window.ddcsCanEditOp || window.ddcsCanEditOp(op.opType);
     item(m, `✎ Edit ${op.label || op.opType || 'op'}`, () => window.ddcsEditOp && window.ddcsEditOp(op.id), !editable);
     item(m, '⧉ Duplicate', async () => { try { (await import('../blocks/opSession.js')).duplicateOp(op.id); } catch (_) { /* */ } });
+    // t1045 S1c — the per-op CAM action (door 1): only for CAM-able op TYPES; greyed with the reason when this op's
+    // variant has no generator (e.g. a single-axis middle). Opens the SAME authoring modal, pre-seeded from THIS op.
+    if (isCamableType(op.opType)) {
+        const full = (window.ddcsGetBlockProgram && (window.ddcsGetBlockProgram() || []).find((b) => b && b.id === op.id)) || op;
+        const cam = camTypeOf(full);
+        item(m, cam.camType ? '▸ Build CAM slot' : '▸ Build CAM slot — not CAM-able', async () => {
+            try { (await import('./macrosApp.js')).initMacrosApp(); } catch (_) { /* */ }   // idempotent — ensures the opener is registered
+            if (window.ddcsOpenCamAuthoring) window.ddcsOpenCamAuthoring(full);
+        }, !!cam.unsupported);
+    }
     item(m, '🗑 Delete', async () => { try { (await import('../blocks/opSession.js')).deleteOp(op.id); } catch (_) { /* */ } });
     place(m, x, y);
 }

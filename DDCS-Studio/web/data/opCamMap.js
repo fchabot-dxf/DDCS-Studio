@@ -124,7 +124,7 @@ export function seedFromOp(op) {
         let value;
         if (derive[f.key]) value = derive[f.key](params);   // DERIVED (e.g. stepover from stepoverPct — mirrors the wizard)
         else { const opKey = alias[f.key] || f.key; value = params[opKey] !== undefined ? params[opKey] : f.def; }   // op value via alias, else the generator default
-        return { key: f.key, value, exposed: true, bakeable: !nb.includes(f.key) };
+        return { key: f.key, label: f.label, def: f.def, type: f.type, value, exposed: true, bakeable: !nb.includes(f.key) };
     });
     return { camType, fields };
 }
