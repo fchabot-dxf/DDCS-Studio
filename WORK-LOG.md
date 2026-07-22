@@ -12675,3 +12675,24 @@ The green 'Pocket (data) . N lines' title (an absolute top-left overlay) covered
 - **FULL GATE:** 1370 passed / 2 KNOWN-FLAKE / 4 skipped (11.4m). The 2 reds are the documented isolation flakes (collapsible-panes-752:38 + knob-persist:15) -- BOTH pass STANDALONE (re-ran green), unrelated to the ruler. Effectively 1372/0/4. (The title TOP=44 bump is display-only -> test-neutral, verified separately on a fresh server.)
 
 ### STATE: the depth-ruler grip now TRAVELS a frozen-scale ruler during a drag (no pin) + the axis re-fits on release; fields drive the plan/emit unchanged (byte-identical). Deepen range per drag is modest (freeze=display, no grip-teleport) -- flagged the headroom-vs-teleport tradeoff for the advisor's call. Still AWAITING the t1021 screenshot-vs-drawing confirm before release.
+
+---
+
+## 🔨 turn 1025 — ROLLOUT part 1: rolled the full depth ruler (zRulerStrip beside the 2D plan) to surfacing / contour / slot by DECLARATION only — reused the ONE component, no per-op fork. Byte-identical. AWAITING the advisor's per-op screenshot review before release.
+
+DISPATCH: roll the zRulerStrip to the 3 other stepdown ops; each tags depth+stepdown like pocket; REUSE the one component; GATE if any lacks a 2D feature canvas.
+
+### GROUNDED — all 3 already have a 2D feature canvas (no gate)
+surfacing/contour/slot twins each declare `panel: 'form3d+2d'` (the FeatureCanvas 2D plan) + a def.previewGeometry -> they render the 2D layout the strip docks beside. So the rollout is pure DECLARATION.
+
+### BUILT — one line per op (mirror pocket), zero component change
+Added `def.zRuler = { depthParam:'depth', stepParam:'stepdown' }` to surfacingData / contourData / slotData (right after def.entryPoint). The SAME zRulerStrip + userOpView.renderZRulerBeside (from t1021) light up for each -- NO per-op fork, NO viz change. Display/input only.
+
+### VERIFY (ACCEPT: my VIEWED screenshot PER OP -- strip left of the feature canvas, ticks==depthLevels, drag->depth, title cleared)
+- **surfacing (VIEWED scratchpad/zruler-user_surfacing_data.png):** ruler strip down the LEFT of 'Surfacing (data)'; depth/stepdown 0.5 -> ONE pass (depthLevels(0.5,0.5)=[0.5]) -> a single floor tick at -0.5 + the depth grip (the step grip only shows when multi-pass); '0' clears the title; DRAG floor -> depth 0.5->0.55.
+- **contour (VIEWED scratchpad/zruler-user_contour_data.png):** strip left of 'Contour (data)'; ticks -1.5/-3/-4 (depthLevels(4,1.5)) + orange step + green floor grips; '0' cleared; DRAG 4->4.41.
+- **slot (VIEWED scratchpad/zruler-user_slot_data.png):** strip left of 'Slot (data)'; ticks -1.5/-3/-4 + both grips; '0' cleared; DRAG 4->4.41.
+- **BYTE-IDENTICAL:** def.zRuler is view-only metadata (read by userOpView, drives the strip, writes the existing depth/stepdown fields) -- NOT in the stack/bindings/emit. The twin parity tests (surfacing-as-data/contour-data-emit/slot-as-data) are unaffected.
+- **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.7m) -- fully clean; the twin parity tests (surfacing/contour/slot) confirm byte-identical emit.
+
+### STATE: the depth ruler strip now appears on surfacing/contour/slot (+ pocket) -- the LEFT of each op's 2D plan, ticks==depthLevels, drag-synced to depth/stepdown, title cleared; ONE zRulerStrip reused (declaration-only rollout). Byte-identical emit. AWAITING the advisor's per-op screenshot review before release. (Queue part 2: a depthOnly MODE of zRulerStrip -- total-depth marker, no stepdown/pass-ticks -- for bore + drill.)
