@@ -12757,3 +12757,32 @@ GROUND-FIRST (3 parallel Explore agents). Read-only; no code.
 4. **N=1 semantics:** confirm every 1 pass = after EVERY pass (incl. the last?) -- pause after each pass EXCEPT the final (no point pausing when the op is done)? Recommend skip the pause after the LAST pass.
 
 No build this turn (ground + propose + gate). Emit untouched -> nothing to release.
+
+---
+
+## 🔨 turn 1031 — BUILD Pause & Confirm v1 (emit shape A): a thin pauseConfirm atom (message + M0) with TWO consumers — a standalone op + a stepdown `confirmEvery` field. Reuses the confirmed hmi.js atoms; default 0 → BYTE-IDENTICAL.
+
+Per the t1030 ruling: (A) emit = messageBlock (Expert #1505=-5000 banner / off-HMI ( MSG: ) comment) + pauseBlock (M00); (B) scope surfacing/pocket/contour (the shared stepdown seam) FIRST — slot self-loop + rest-machining are FOLLOW-ON; (C) a thin pauseConfirm atom WRAPPING messageBlock+pauseBlock; (D) confirmEvery=1 = pause after every pass EXCEPT the last; confirmEvery=0 → byte-identical.
+
+### BUILT
+- **hmi.js — new `pauseConfirmBlock`** (type:'pauseconfirm', kind:'leaf', Control): emit = messageBlock.emit({text:msg}) + pauseBlock.emit(). NO new emit logic — a thin WRAP of the two confirmed, dialect-aware atoms. Registered in ops/index.js (import + Control PALETTE row after confirmBlock).
+- **stepdown.js — `confirmEvery` field** (defaults confirmEvery:0, fields += confirmEvery). The DECLARE: the stepdown atom now DECLARES the pause-cadence param; blockEmitter reads it.
+- **blockEmitter.js kind:'depth' loop** — after each level's body, if confirmEvery>0 AND (i+1)%confirmEvery==0 AND i+1<levels.length, inject BLOCKS.pauseconfirm.emit({}, dx, dy, dialect). So the pause fires after every Nth pass EXCEPT the last. confirmEvery=0 → the branch is skipped → BYTE-IDENTICAL (goldens untouched).
+- **The 3 stepdown BUILDERS carry confirmEvery in params** (surfacingWizard:41, pocketWizard clearPlace:116, contourWizard:64): down.params += confirmEvery: num(params.confirmEvery, 0). REQUIRED so the twin's binding RESOLVES against the template block (validate checks key-in-params) AND the emit reads it. Default 0 → byte-identical for the built-ins too.
+- **confirmEvery binding on surfacing/pocket/contour data twins** (blockIndex 3 = the stepdown block; pocket uses a match-based optional binding): surfaces as 'Confirm every N passes' (0 = off) in TOOL & CUT. Help discloses the SIM CAVEAT (M0 is a sim no-op — a MACHINE pause, not visible in the sim).
+- **web/blocks/dataOps/pauseConfirmData.js (NEW)** — the standalone Pause/Confirm twin: userOpFromStack wrapping ONE pauseconfirm atom (msg field, blockIndex 2 = user_root(0)→param_group(1)→pauseconfirm(2)). Wired: wizardLibrary BUILTINS { id:'pause_confirm', group:'setup', opensAs:'user_pause_confirm' } + app.js import + boot seed. NEW file → killed the mem-server PID on 3211 (fs-walks once at startup) so it registers.
+
+### VERIFIED (temp emit-dump spec _pauseconfirm-verify, then removed)
+- confirmEvery=0 → NO pause emitted (byte-identical default path). confirmEvery=2 on surfacing depth=8/step=1.5 (6 passes) → exactly 2 pauses (after passes 2 and 4, NOT the last). Expert → the #1505=-5000 banner. Standalone op → 1 M0 + #1505 + the user message.
+- Profile split: DM500 (empty hmiToast) → NO #1505, degrades to ( MSG: ) + M0 (2 pauses). So Expert gets the on-screen banner; non-HMI posts get the honest comment + the same M0 halt.
+
+### GATE — full suite: 1368 passed, then 4 pre-fix failures triaged, ALL non-blocking to this work:
+- surfacing-as-data (bindingCount 23→24) — MINE: the new confirmEvery binding. FIXED the count assertion (t996-style enumeration bump). Byte-identity itself unaffected.
+- wizard-bar (Setup opener list) — MINE: the new pause_confirm menu entry. FIXED the expected array (added the user_pause_confirm opener between io_step and atc_warmup).
+- preflight-badge-838 — a PARALLEL-CONTENTION FLAKE (10 passed when run alone). Not real.
+- collapsible-panes-752 (collapsed 3D pane 30.25px vs the ≤28 threshold) — PRE-EXISTING + UNRELATED: confirmed by STASHING all my changes and re-running (still fails on the clean tree, 30.25px). It's the pane-CSS pixel threshold from the earlier splitter work (t1017-1019 area), NOT this feature. The advisor owns that subsystem's release — flagging, not fixing (surgical / not my task).
+- Re-ran surfacing-as-data + wizard-bar + preflight-badge (12 passed) and pocket-data-emit + contour-data-emit (3 passed) with the fixes — all green. My work adds ZERO new real failures.
+
+### FOLLOW-ON (queued, NOT this turn per the t1030 ruling): slot self-loop (slot.js:44) + rest-machining (restmachining.js:129) mirror the confirmEvery seam. And the BLOCKING-CONFIRM variant B (Expert #1505=1 OK/Cancel + ESC bail) — shaped so it slots into the same atom later.
+
+### STATE: Pause & Confirm v1 is live on surfacing/pocket/contour (Confirm every N passes) + as a standalone Setup op. Emit byte-identical at confirmEvery=0. The ONLY red in the suite is the pre-existing, unrelated collapsible-panes-752 pixel threshold (advisor's pane subsystem). SIM CAVEAT disclosed in the field help (M0 is a sim no-op).
