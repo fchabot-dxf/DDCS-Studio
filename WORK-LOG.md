@@ -12874,3 +12874,34 @@ User ruled the S1 forks: seed = pick-op-from-program, guards NON-BAKEABLE, enums
 - FULL GATE on the branch: 1373 passed, 0 failed. (S0's cam-allocfields-superset keeper still green.)
 
 ### STATE: the expose/bake declaration now flows end-to-end (op.exposed/op.baked -> declFromOp -> generateOp -> allocFieldsWith / slotFromOp's inline hook) but is INERT (empty today) -> byte-identical. Ready for S1b to write op.exposed/op.baked from the UI. NEXT: S1b — the in-panel Build-CAM-slot mode (seed-from-program-op picker + the expose/bake field table + non-bakeable guard params + inline preview + Build-to-slot modal). No code user-visible yet, no release.
+
+---
+
+## 🔨 turn 1041 — CAM Builder S1b (branch feat/cam-builder): the DECLARED op-to-CAM-spec maps + pure seedFromOp. DATA layer, no UI. Clean 1:1 core BUILT + tested; the variant forks GATED.
+
+Grounded via an Explore agent (the crux: op.params key names — do NOT invent). NEW FILE web/data/opCamMap.js: OPTYPE_TO_CAM, PARAM_ALIAS, NON_BAKEABLE, camTypeOf, seedFromOp, isCamableType.
+
+### GROUNDED (the correctness-critical facts)
+- **op.params keys are BARE** (depth, toolDia, w, ax, dist, f_fast, probeSeq, travelDist, scanDepth, x0/y0…) — the p_/sf_/c_/m_/d_ prefixes are DOM field ids + reconciler RETURNS only, NOT the stored params. So PARAM_ALIAS shrank to just the genuine RENAMES per CAM type (grounded from op.params bare keys + the generator SPECs): corner {seq<-probeSeq, maxProbe<-dist, travel<-travelDist, scan<-scanDepth, fast<-f_fast, slow<-f_slow}; edge {maxProbe<-dist, fast<-f_fast, slow<-f_slow}; drill/bore {posX<-x0, posY<-y0}; pocket/surface/slot = identity.
+- **NON_BAKEABLE (the SAFETY floor)** from grepping every IF line: corner [corner,seq,probeZ,wcs], edge [axis,dir,wcs], surface [stepover,stepdown,toolDia,clearance] (the IF x LE 0 GOTO-error guards), + wcs on every probe (wcsBase branches). Branch SELECTORS + validity-guard drivers are Expose-only; loop bounds (depth/count in WHILE/IF-THEN) stay bakeable (a fixed count still loops). pocket/cpocket guards are on COMPUTED #vars (geometry) -> left [] with a flag (baking geometry is safe: the guard still fires on the literals).
+
+### BUILT (clean 1:1 core, tested)
+- seedFromOp(op) PURE: camTypeOf -> genFieldsFor (reads the generator's OWN field keys, one-source, no SPEC duplication) -> per field {key, value (op.params via alias, else the generator default), exposed:true, bakeable (not NON_BAKEABLE)}. Enum values (corner/wcs/axis/dir/seq) pulled RAW (strings) -> the enum<->int conversion is S1d.
+- The clean 1:1: surfacing->surface, corner->corner, edge->edge, slot->slot, pocket(shape=rect)->pocket, drill(method=peck, pattern in circle/grid/line/rect)->drill.
+
+### GATED (variant-dependent / non-1:1 -> camTypeOf returns {unsupported}, no guess) — these need the advisor's ruling
+1. middle -> inside (featureType != 'boss') OR boss (featureType === 'boss'). GROUNDED disambiguation: middleWizard.js:41 `featureType === 'boss' ? 'boss' : 'pocket'`; every boss-only arm gated by featBossOnly === featureType==='boss'. (Also: middle has circular/twoAxis/findBoth modifiers that may affect the seed.)
+2. pocket shape 'circle' -> cpocket (circlePocketSlot). shape polygon/ellipse -> NO generator (unsupported).
+3. drill method 'helical' -> bore (slotFromOp 'bore'); drill pattern 'single' -> NO slotFromOp pattern (only circle/grid/line/rect). NB there is NO standalone 'bore' opType — bore is drill+method:helical.
+4. contour -> excluded (NO CAM generator).
+
+### VALUE-SEMANTIC notes for the advisor (surfaced, not guessed)
+- ENUM values seeded RAW (op corner='FR', wcs='G55', axis='X') — S1d converts to the pendant ints (FR->2, etc.). S1b asserts the raw aliased value.
+- pocket/surface `stepover` (absolute mm) has NO op source — the op stores stepoverPct (%). So stepover is intentionally UNSEEDED (shows the generator default) until a toolDia*%/100 derivation lands. Flag: fold the derivation into a later slice or S1c.
+
+### VERIFIED — two-method ACCEPT
+- METHOD 1 (diff): 3 declared maps + camTypeOf + pure seedFromOp in ONE new data file; grounded keys; no UI, no caller wired.
+- METHOD 2 (assertion, tests/cam-op-seed.spec.js KEEPER): seed pocket(rect)/surfacing/corner/drill(peck,circle)/slot -> right camType; aliased values (maxProbe<-dist=80, travel<-travelDist=40, fast<-f_fast=250, posX<-x0=10, identities); stepover unseeded -> default 2.4; all exposed; guard params non-bakeable (corner/seq false, retract true; surface stepdown false, depth true); contour/middle/pocket-circle/drill-helical all {unsupported} with the reason.
+- FULL GATE on the branch: 1374 passed, 0 failed.
+
+### STATE: the DATA layer maps a program op -> a CAM seed, verified by assertion BEFORE any UI. Clean 1:1 works; the 3 variant forks + contour + the 2 value-semantic gaps are surfaced/gated for the advisor. NEXT (pending the ruling): wire the gated arms, then S1c (the in-panel authoring UI consuming seedFromOp), then S1d (enums). No UI, no release.
