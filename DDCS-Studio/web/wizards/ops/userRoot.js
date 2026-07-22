@@ -57,6 +57,7 @@ export const opUnitBlock = {
     label: 'Op Unit',
     category: 'Wizard UI',
     kind: 'opunit',
+    hidden: true,   // created PROGRAMMATICALLY at fork/load-wrap (a boundary around a recognized op's atoms), never dragged from the palette — a bare opunit has no opType
     defaults: { opType: '', defV: 0 },
     fields: ['opType', 'defV'],
     emit: (params, children) => children || [],   // transparent — the boundary is authoring/routing-only; emit order = children order

@@ -234,7 +234,7 @@ function jsonDef(def) {
         block['message' + row] = '%1'; block['args' + row] = [{ type: 'input_statement', name }]; row++;
     };
     if (def.kind === 'user_root') { addMouth('PRESENTATION', 'Presentation (UI & Sim)'); addMouth('EXECUTION', 'Execution (G-code)'); }
-    else if (def.kind === 'param_group' || isSection) addMouth('DO');
+    else if (def.kind === 'param_group' || isSection || def.kind === 'opunit') addMouth('DO');   // t1069 — opunit renders as a titled transparent container (a DO mouth wrapping the standard sub-unit atoms)
     else if (isWrap(def)) addMouth('DO');
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)

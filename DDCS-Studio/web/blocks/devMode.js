@@ -18,8 +18,9 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings } from './userOps.js';
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings } from './userOps.js';
 import { createWizard } from './wizardLibrary.js';
+import { camTypeOf } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap
 import { workspaceToStack } from './blockly/stackBridge.js';
 import { openRegionEditor } from '../ui/regionEditor.js';   // the "make your own datum" authoring editor
 import { openCoordEditor } from '../ui/formWidgets.js';     // the coordinate-list ✎ editor (shares buildCoordEditor with the form)
@@ -56,7 +57,7 @@ function isAtom(blk) {
     // block's panel-type field and the param_group block's group-name field (t161 — both authoring labels, not values).
     // Value-bearing atoms (assign / param / move / …) are untouched → the value-knob expose path (deriveAuthoredDef / EXPOSE_) still works.
     const def = BLOCKS[blk.type];
-    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring): authoring metadata / guard drivers, not exposable values
+    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget' || def.kind === 'opunit'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring) + t1069 opunit: authoring/boundary metadata (opType/defV), not exposable values
 }
 
 // the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).
@@ -433,17 +434,45 @@ export function openCoordAuthor(blk) {   // exported so the pencil onClick AND t
 
 // RE-AUTHOR a saved wizard: load its template (with its param pills) back into the Blocks tab + dev mode, so the
 // GUI blocks round-trip and you can tweak them. Saving then UPDATES that wizard (same opType) instead of duplicating.
+// t1069 (SUB-STACK S3) — when opening a RECOGNIZED generator twin (surfacing/corner/…) to CUSTOMIZE, WRAP its exec atoms in an
+// opunit(opType, defV) at LOAD time. This is the RELIABLE moment (user_root.children still EQUALS the source exec run exactly);
+// save-time is unreliable (the run can be interleaved by free-form Blockly editing, and the standard atoms carry no identity —
+// north-star forbids inferring them). subStackToSlot then routes the opunit to its generator (the standard part stays LIVE) and
+// the added loose atoms unroll+expose. A genuine custom user op (camTypeOf → universal) is NOT wrapped. PURE + exported for test:
+// returns { template (possibly opunit-wrapped), recognized }.
+export function wrapRecognizedForFork(def) {
+    const opType = def && def.opType;
+    const ct = camTypeOf({ opType, params: defaultParams(def) });
+    const recognized = !!(ct && ct.camType && !ct.universal);
+    const tpl = JSON.parse(JSON.stringify((def && def.template) || []));
+    if (recognized) {
+        const root = tpl.find((b) => b && b.type === 'user_root') || tpl[0];
+        if (root && Array.isArray(root.children) && root.children.length) {
+            root.children = [{ type: 'opunit', params: { opType, defV: defVOf(opType) }, children: root.children }];   // the exec run → one opunit boundary
+        }
+    }
+    return { template: tpl, recognized };
+}
+
 export async function editWizardDef(opType) {
     const def = listUserOps().find((d) => d.opType === opType);
     if (!def) { alert('That wizard is no longer in your library.'); return; }
+    // t1069 — a RECOGNIZED generator twin opened here is a FORK/CUSTOMIZE: wrap its exec atoms in opunit AND treat the save as a
+    // NEW op (never overwrite the twin's own def — the opunit shifts its frozen bindings +1). A custom user op is a normal re-author.
+    const { template: forkTpl, recognized } = wrapRecognizedForFork(def);
     let opC;
     try {
         const { makeOp } = await import('./opBuilders.js');
-        opC = makeOp(opType, defaultParams(def), JSON.parse(JSON.stringify(def.template || [])));   // wrap template → an op (pills round-trip)
+        opC = makeOp(opType, defaultParams(def), forkTpl);   // wrap template → an op (pills round-trip)
     } catch (e) { console.warn('edit wizard: build failed', e); return; }
     if (window.showApp) window.showApp('blocks');
     for (let i = 0; i < 80 && !(window.ddcsLoadBlockStack && window.__blkws); i++) await new Promise((r) => setTimeout(r, 50));   // wait for the Blocks app
-    _editingWizard = opType; _editingLabel = def.label || opType;   // saving UPDATES this wizard; the dialog prefills from its def
+    // recognized fork → a FRESH op (no destructive in-place Update of the twin, which the opunit +1 shift would corrupt).
+    // EXCEPT a maintained-as-data twin (corner/edge/pocket/middle, bindingSpecs): lockUpdate ALREADY blocks its Update, so keep
+    // _editingWizard → its "maintained as data" guard + Save-as-new UX is unchanged. Only the NON-bindingSpecs recognized twins
+    // (surfacing/slot/drill/bore, previously Updatable) need the new fork-only protection.
+    const forkOnly = recognized && !isMaintainedAsData(def);
+    _editingWizard = forkOnly ? null : opType; _editingLabel = forkOnly ? null : (def.label || opType);
     refreshEditingChrome();   // glow + "✎ Editing: <name>" chip (the editing-context UI)
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack([opC]);
     await new Promise((r) => setTimeout(r, 150));   // let it project + render (authoring affordances grow automatically)
