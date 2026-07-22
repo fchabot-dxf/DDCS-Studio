@@ -53,16 +53,17 @@ const DERIVE = {
     surface: { stepover: stepoverMm },
 };
 
-// NON_BAKEABLE[camType] = generator field keys that MUST be Expose-only (Bake greyed). The SAFETY floor.
+// NON_BAKEABLE[camType] = generator field keys that MUST be Expose-only (Bake greyed). t1047 amend (user + advisor
+// verified): CHOICE params (corner/wcs/axis/seq/probeZ/dir) ARE BAKEABLE — every probe/mill field appears only in IF
+// CONDITIONS, arithmetic, or #var assignments (never as a GOTO/label TARGET), so a baked valid literal CONSTANT-FOLDS to
+// valid G-code (e.g. corner=1 → `IF 1 EQ 2 THEN …` = an always-false no-op; the signs resolve correctly). The enum
+// dropdown / numeric min-max CONSTRAINS the baked value to valid options + the live preview confirms it before save
+// (valid-by-construction), so the dropdown serves BOTH expose and bake. Motive: authors bake a choice to make a
+// single-purpose, clearly-illustrated slot (four clean FL/BL/BR/FR slots vs one ambiguous icon). Only a param that
+// STRUCTURALLY breaks when literalized would stay here — none of the CAM params do. surface's numeric validity guards
+// (IF x LE 0 GOTO error) are kept Expose-only for now (they'd fold safely too — flagged to the advisor).
 export const NON_BAKEABLE = {
-    corner: ['corner', 'seq', 'probeZ', 'wcs'],   // branch selectors (IF corner/seq/probeZ; wcsBase branches on wcs)
-    edge: ['axis', 'dir', 'wcs'],                 // IF axis/dir branch selectors + wcs
-    align: ['checkAxis', 'dir', 'wcs'],
-    zprobe: ['wcs'], inside: ['wcs'], boss: ['wcs'],
-    surface: ['stepover', 'stepdown', 'toolDia', 'clearance'],   // IF x LE 0 GOTO error — validity guards
-    pocket: [],    // guards are on COMPUTED #vars (x0/x1 from w/h/toolDia) — flagged for the advisor (geometry bake is safe: the guard still fires on the literals)
-    cpocket: [],
-    drill: [], bore: [], slot: [],   // only WHILE/IF-THEN loop bounds — baking a fixed count/depth still loops correctly
+    surface: ['stepover', 'stepdown', 'toolDia', 'clearance'],
 };
 
 // S1d — ENUM options per field key (shared across generators: corner/wcs/axis mean the same everywhere). GROUNDED

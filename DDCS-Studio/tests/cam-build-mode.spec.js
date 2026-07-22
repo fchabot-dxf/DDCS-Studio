@@ -66,7 +66,7 @@ test('modal (op-card door): seed pocket numeric, bake Feed, Build byte-safe', as
   expect(engHasFeed, 'baked: no Feed eng row').toBe(false);
 });
 
-test('S1d ENUM: a corner op shows friendly dropdowns mapping to ints; guards Bake-greyed; numeric unchanged', async ({ page }) => {
+test('S1d ENUM: a corner op shows friendly dropdowns mapping to ints; choice params are bakeable; bake corner inlines the int', async ({ page }) => {
   await openCam(page);
   await page.evaluate((op) => window.ddcsOpenCamAuthoring(op), CORNER);
   await page.waitForSelector('.cam-auth-overlay .cbm-eb');
@@ -82,21 +82,29 @@ test('S1d ENUM: a corner op shows friendly dropdowns mapping to ints; guards Bak
   expect(r.wcs, 'wcs → dropdown, G55 = int 2').toMatchObject({ tag: 'SELECT', value: '2', label: 'G55' });
   expect(r.seq, 'seq → dropdown, X then Y = int 1').toMatchObject({ tag: 'SELECT', value: '1', label: 'X then Y' });
   expect(r.probeZ, 'probeZ → dropdown, Yes = int 1').toMatchObject({ tag: 'SELECT', value: '1', label: 'Yes' });
-  // numeric field stays a number input
   expect(r.maxProbe, 'maxProbe (←dist) → number input = 80').toMatchObject({ tag: 'INPUT', value: '80' });
-  // guard enums: dropdown shown but Bake greyed (Expose-only)
-  expect(r.bake, 'corner/seq/wcs guard enums → Bake disabled').toMatchObject({ corner: true, seq: true, wcs: true });
+  // t1047 amend — choice params are BAKEABLE (Bake enabled), the dropdown serves both expose and bake
+  expect(r.bake, 'corner/seq/wcs choice enums → Bake ENABLED').toMatchObject({ corner: false, seq: false, wcs: false });
 
-  // VIEWED gate screenshot — the enum dropdowns
+  // demo BOTH on corner: BAKE it (its dropdown-picked int inlines, the row leaves the pendant)
+  await page.check('.cbm-eb[data-fkey="corner"][data-mode="bake"]');
+  await page.waitForFunction(() => { const tr = [...document.querySelectorAll('#cbm_table tbody tr')].find((x) => x.dataset.fkey === 'corner'); return tr && /baked = Front-Right \(2\)/.test(tr.children[3].textContent); });
+
+  // VIEWED gate screenshot — corner BAKED (Front-Right) + the other choice params as exposed dropdowns
   await page.screenshot({ path: 'test-results/cam-s1d-enum.png' });
 
-  // Build (all-exposed) → the corner field's #2600 default is the INT 2 (behaves identically to the wizard's FR)
+  // Build → corner is inlined as the literal 2 (valid G-code), its read + eng line vanish
   await page.click('[data-act="cbm-build"]');
   await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]');
   await page.click('.cam-sim-overlay [data-cbm="ok"]');
   await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
   const slot = (await camPack(page)).slots.slice(-1)[0];
-  expect(slot.fields.find((f) => f.key === 'corner').def, 'the built slot seeds corner = 2 (FR)').toBe(2);
+  expect(slot.ops[0].baked.corner, 'corner baked = int 2 (FR)').toBe(2);
+  expect(slot.body, 'baked corner: NO Corner read line').not.toMatch(/=#\d+\s+;Corner/);
+  expect(slot.body, 'baked corner constant-folds into the IF (valid G-code)').toContain('IF 2 EQ 2');
+  expect(slot.body, 'macro still ends M30 (structurally valid)').toContain('M30');
+  const engHasCorner = await page.evaluate((s) => import('/data/slotPack.js').then((m) => /"Corner/.test(m.slotEng(s))), slot);
+  expect(engHasCorner, 'baked corner: no Corner eng row').toBe(false);
 });
 
 test('door 2: the editor-toolbar button opens the authoring modal with the picker', async ({ page }) => {

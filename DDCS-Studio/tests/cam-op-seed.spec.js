@@ -72,6 +72,35 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
   expect(r.val.pocketStepover, 'pocket stepover == stepoverMm(op)').toBe(r.val.expectPocketStepover);
   // exposed defaults + NON-BAKEABLE guards
   expect(r.allExposed).toBe(true);
-  expect(r.bake.cornerCorner).toBe(false); expect(r.bake.cornerSeq).toBe(false); expect(r.bake.cornerRetract).toBe(true);
+  expect(r.bake.cornerCorner, 'choice params ARE bakeable now (t1047 amend)').toBe(true); expect(r.bake.cornerSeq).toBe(true); expect(r.bake.cornerRetract).toBe(true);
   expect(r.bake.surfStepdown).toBe(false); expect(r.bake.surfDepth).toBe(true); expect(r.bake.drillPosX).toBe(true);
+});
+
+// t1047 amend — bake-safety: a CHOICE param baked to a valid literal must produce VALID G-code (it appears only in IF
+// conditions / #var assignments, never as a GOTO/label target, so it CONSTANT-FOLDS). Verified per generator.
+test('S1d bake-safety: choice params constant-fold to valid G-code when baked', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const CASES = [
+    { gen: 'corner', key: 'corner', value: 1, read: 'Corner', folded: 'IF 1 EQ 2' },
+    { gen: 'corner', key: 'seq', value: 1, read: 'Wall order', folded: 'IF 1 EQ 1 GOTO' },
+    { gen: 'corner', key: 'wcs', value: 2, read: 'WCS', folded: '#71=2' },
+    { gen: 'corner', key: 'probeZ', value: 1, read: 'Probe Z', folded: 'IF 1 EQ 0 GOTO' },
+    { gen: 'edge', key: 'axis', value: 1, read: 'Axis', folded: 'IF 1 EQ 1 GOTO' },
+    { gen: 'edge', key: 'dir', value: 1, read: 'Direction', folded: 'IF 1 EQ 1 THEN' },
+  ];
+  const r = await page.evaluate(async (CASES) => {
+    const { cornerSlot, edgeSlot } = await import('/data/probeToSlot.js');
+    const GEN = { corner: cornerSlot, edge: edgeSlot };
+    return CASES.map((c) => {
+      const body = GEN[c.gen](new Set(), 0, '', { [c.key]: { exposed: false, value: c.value } }).body;
+      return { key: c.key, noRead: !new RegExp(';\s*' + c.read).test(body), validEnd: /\bM30\b/.test(body), folded: body.includes(c.folded), labelsIntact: /N10\b/.test(body) || /N20\b/.test(body) };
+    });
+  }, CASES);
+  for (const x of r) {
+    expect(x.noRead, `${x.key}: baked read line vanishes`).toBe(true);
+    expect(x.folded, `${x.key}: the literal constant-folds into the IF/assignment`).toBe(true);
+    expect(x.validEnd, `${x.key}: macro still ends M30 (structurally valid)`).toBe(true);
+    expect(x.labelsIntact, `${x.key}: GOTO-target labels survive (choice is not a label target)`).toBe(true);
+  }
 });
