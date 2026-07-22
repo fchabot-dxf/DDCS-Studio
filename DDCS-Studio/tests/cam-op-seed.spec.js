@@ -104,3 +104,46 @@ test('S1d bake-safety: choice params constant-fold to valid G-code when baked', 
     expect(x.labelsIntact, `${x.key}: GOTO-target labels survive (choice is not a label target)`).toBe(true);
   }
 });
+
+// t1049 FIX #1 — real programs are built from DATA-OP TWINS (user_*_data), not built-in optypes. camTypeOf/isCamableType/
+// seedFromOp must recognize + seed them via the declared opensAs bridge, with twin-aware param handling (surfacing flat
+// stepover, corner probeZFirst, bore variant). The built-in path must still work (covered by the tests above).
+test('S1 fix: data-op TWINS are CAM-able and seed correct values', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const r = await page.evaluate(async () => {
+    const { seedFromOp, isCamableType } = await import('/data/opCamMap.js');
+    const op = (opType, params) => ({ opType, params });
+    const byKey = (res, k) => (res.fields || []).find((f) => f.key === k);
+    // twin op.params keyed by the binding PARAM names (grounded from a runtime dump of the twin defs)
+    const surf = seedFromOp(op('user_surfacing_data', { originX: 0, originY: 0, w: 200, h: 150, depth: 0.8, stepdown: 0.4, stepover: 9.6, strategy: 'parallel', feed: 900, plunge: 180, rpm: 12000, wcs: 'G54' }));
+    const pocket = seedFromOp(op('user_pocket_data', { shape: 'rect', w: 120, h: 90, depth: 5, stepdown: 2, stepoverPct: 45, toolDia: 8, clearance: 6, feed: 1500, plunge: 120, rpm: 9000, originX: 0, originY: 0, wcs: 'active' }));
+    const corner = seedFromOp(op('user_corner_data', { corner: 'FR', wcs: 'G55', probeZFirst: true, probeSeq: 'XY', dist: 80, retract: 4, radius: 3, safeZ: 12, travelDist: 40, scanDepth: 6, f_fast: 250, f_slow: 60 }));
+    const bore = seedFromOp(op('user_bore_data', { pattern: 'circle', x0: 10, y0: 20, dia: 60, count: 6, startAngle: 0, holeDia: 12, toolDia: 6, pitch: 0.5, depth: 10, feed: 200, rpm: 8000 }));
+    return {
+      camable: { surf: isCamableType('user_surfacing_data'), pocket: isCamableType('user_pocket_data'), corner: isCamableType('user_corner_data'), bore: isCamableType('user_bore_data'), contour: isCamableType('user_contour_data') },
+      camType: { surf: surf.camType, pocket: pocket.camType, corner: corner.camType, bore: bore.camType },
+      contourUnsupported: seedFromOp(op('user_contour_data', {})).unsupported,
+      surf: { stepover: byKey(surf, 'stepover').value, depth: byKey(surf, 'depth').value, w: byKey(surf, 'w').value },
+      pocket: { stepover: byKey(pocket, 'stepover').value, toolDia: byKey(pocket, 'toolDia').value, depth: byKey(pocket, 'depth').value },
+      corner: { corner: byKey(corner, 'corner').value, probeZ: byKey(corner, 'probeZ').value, wcs: byKey(corner, 'wcs').value, maxProbe: byKey(corner, 'maxProbe').value },
+      bore: { holeDia: byKey(bore, 'holeDia').value, posX: byKey(bore, 'posX').value, camType: bore.camType },
+    };
+  });
+  // the FIX: twins are CAM-able; contour twin is NOT
+  expect(r.camable).toEqual({ surf: true, pocket: true, corner: true, bore: true, contour: false });
+  expect(r.camType).toEqual({ surf: 'surface', pocket: 'pocket', corner: 'corner', bore: 'bore' });
+  expect(r.contourUnsupported, 'contour twin correctly unsupported').toContain('NO CAM generator');
+  // surfacing twin: uses its FLAT stepover (no stepoverPct/toolDia to derive from)
+  expect(r.surf.stepover, 'surfacing twin uses its flat stepover 9.6').toBe(9.6);
+  expect(r.surf.depth).toBe(0.8); expect(r.surf.w).toBe(200);
+  // pocket twin: derives stepover from stepoverPct+toolDia (both present)
+  expect(r.pocket.stepover, 'pocket twin derives 8*45/100 = 3.6').toBe(3.6);
+  expect(r.pocket.toolDia).toBe(8); expect(r.pocket.depth).toBe(5);
+  // corner twin: probeZ read from probeZFirst; enums -> ints
+  expect(r.corner.corner, 'FR -> 2').toBe(2);
+  expect(r.corner.probeZ, 'probeZ read from twin probeZFirst -> Yes -> 1').toBe(1);
+  expect(r.corner.wcs, 'G55 -> 2').toBe(2); expect(r.corner.maxProbe, 'dist -> 80').toBe(80);
+  // bore twin: resolved via the inverted variant (no method param); posX from x0
+  expect(r.bore.holeDia).toBe(12); expect(r.bore.posX).toBe(10);
+});

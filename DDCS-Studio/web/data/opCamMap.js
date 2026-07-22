@@ -19,6 +19,7 @@ import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, ali
 import { pocketSlot, circlePocketSlot, surfacingSlot } from './millToSlot.js';
 import { slotFromOp } from './opToSlot.js';
 import { stepoverMm } from '../wizards/ops/pocketfill.js';   // t1043 — the CANONICAL exported stepoverPct->mm: max(0.2, max(0.1,toolDia)*stepoverPct/100). surfacingWizard.js:24-27 computes the identical formula inline (its absent-param defaults differ — 12/60 vs 6/40 — but are unreachable when the op provides toolDia+pct); the seed test verifies surface stepover == the real surfacingStack value.
+import { builtinTypeForTwin } from '../blocks/wizardLibrary.js';   // t1049 — the DECLARED twin->built-in bridge (inverts opensAs->type/variant). Real programs use data-op TWINS (user_surfacing_data …), not the bare built-in optypes.
 
 // The clean 1:1 opType -> CAM generator type. pocket/drill are the DEFAULT arm; their variant arms are gated in camTypeOf.
 export const OPTYPE_TO_CAM = { surfacing: 'surface', corner: 'corner', edge: 'edge', slot: 'slot', pocket: 'pocket', drill: 'drill' };
@@ -26,14 +27,17 @@ export const OPTYPE_TO_CAM = { surfacing: 'surface', corner: 'corner', edge: 'ed
 // The op types the S1c picker should offer (each has at least one working arm). Per-op variants may still be unsupported
 // (seedFromOp returns {unsupported}): pocket polygon/ellipse, drill pattern 'single', middle single-axis. contour excluded.
 export const SUPPORTED_OPTYPES = ['pocket', 'surfacing', 'corner', 'edge', 'slot', 'drill', 'middle'];
-export const isCamableType = (opType) => SUPPORTED_OPTYPES.includes(opType);
+// Accepts a built-in opType OR a data-op twin (user_*_data) — normalized via the declared bridge (defined below).
+export const isCamableType = (opType) => SUPPORTED_OPTYPES.includes(baseOf(opType).baseType);
 
 // PARAM_ALIAS[camType] = { generatorFieldKey: opParamsKey } — ONLY the renames; unlisted keys alias to themselves.
 // (Grounded from the op.params bare keys + the generator SPECs. stepover has NO op source — pocket/surface store
 //  stepoverPct (%) — so it is intentionally UNLISTED: it stays unseeded and shows the generator default until a
 //  toolDia*%/100 derivation lands. See the pass note value-semantics.)
+// An alias value may be a STRING (one op key) or an ARRAY of candidate keys (first present wins) — the built-in + its
+// data-op twin can name the SAME field differently (corner: built-in `probeZ`, twin `probeZFirst`).
 export const PARAM_ALIAS = {
-    corner: { seq: 'probeSeq', maxProbe: 'dist', travel: 'travelDist', scan: 'scanDepth', fast: 'f_fast', slow: 'f_slow' },
+    corner: { seq: 'probeSeq', maxProbe: 'dist', travel: 'travelDist', scan: 'scanDepth', fast: 'f_fast', slow: 'f_slow', probeZ: ['probeZ', 'probeZFirst'] },
     edge: { maxProbe: 'dist', fast: 'f_fast', slow: 'f_slow' },
     surface: {},
     pocket: {},
@@ -48,9 +52,11 @@ export const PARAM_ALIAS = {
 // DERIVE[camType][fieldKey] = (op.params) -> value. For fields with NO direct op source (pocket/surface/cpocket store
 // stepoverPct %, the generator wants absolute stepover mm). Mirrors the wizard one-source via the exported stepoverMm.
 const DERIVE = {
-    pocket: { stepover: stepoverMm },
+    pocket: { stepover: stepoverMm },     // pocket twin keeps stepoverPct + toolDia → derive
     cpocket: { stepover: stepoverMm },
-    surface: { stepover: stepoverMm },
+    // surfacing: the BUILT-IN op stores stepoverPct+toolDia (derive); the data-op TWIN precomputes a FLAT `stepover` and has
+    // NO stepoverPct/toolDia (surfacingData.js) — so use the flat value if present, else derive. Mirrors surfacingWizard.js:27.
+    surface: { stepover: (p) => (p.stepover != null && p.stepover !== '') ? Number(p.stepover) : stepoverMm(p) },
 };
 
 // NON_BAKEABLE[camType] = generator field keys that MUST be Expose-only (Bake greyed). t1047 amend (user + advisor
@@ -95,8 +101,17 @@ function genFieldsFor(camType, params) {
  * Resolve a program op to its CAM generator type. Returns { camType } for a clean mapping, or { unsupported: reason }
  * for a gated variant / excluded op. PURE — reads only op.opType + op.params.
  */
+// t1049 — normalize a program op's opType to its built-in base type (+ variant). A DATA-OP TWIN (user_*_data — what real
+// programs are built from) resolves via the declared opensAs bridge; a built-in op passes through. So camTypeOf/isCamableType
+// work on the twins users actually insert, not just built-ins.
+function baseOf(opType) {
+    const twin = opType && builtinTypeForTwin(opType);   // null for a built-in / unknown opType
+    return twin ? { baseType: twin.type, variant: twin.variant } : { baseType: opType, variant: undefined };
+}
+
 export function camTypeOf(op) {
-    const t = op && op.opType, p = (op && op.params) || {};
+    const p = (op && op.params) || {};
+    const { baseType: t, variant } = baseOf(op && op.opType);
     switch (t) {
         case 'surfacing': return { camType: 'surface' };
         case 'corner': return { camType: 'corner' };
@@ -109,9 +124,10 @@ export function camTypeOf(op) {
             return { unsupported: `pocket shape "${shape}" has no CAM generator (only rect + circle exist)` };   // polygon/ellipse
         }
         case 'drill': {
-            // t1043 ruling — pattern 'single' has no slotFromOp pattern (known S1 gap); otherwise method decides drill vs bore.
+            // t1043 ruling — pattern 'single' has no slotFromOp pattern (known S1 gap); otherwise it's a bore when the built-in
+            // op sets method:'helical' OR the twin resolves to variant:'bore' (user_bore_data — the twin has no `method`).
             if ((p.pattern || 'single') === 'single') return { unsupported: 'drill/bore pattern "single" has no slotFromOp pattern (circle/grid/line/rect only) — known S1 gap' };
-            return { camType: (p.method || 'peck') === 'helical' ? 'bore' : 'drill' };
+            return { camType: (variant === 'bore' || (p.method || 'peck') === 'helical') ? 'bore' : 'drill' };
         }
         case 'middle': {
             // t1043 ruling — the CAM inside/boss generators are FIXED BOTH-AXIS centre probes (no single-axis variant). A
@@ -120,8 +136,8 @@ export function camTypeOf(op) {
             if (!(p.twoAxis || p.findBoth)) return { unsupported: 'middle single-axis probe: the CAM inside/boss slot is BOTH-AXIS only (enable Find both axes)' };
             return { camType: p.featureType === 'boss' ? 'boss' : 'inside' };
         }
-        case 'contour': return { unsupported: 'contour has NO CAM generator (excluded from S1)' };
-        default: return { unsupported: `opType "${t}" is not CAM-able` };
+        case 'contour': return { unsupported: 'contour has NO CAM generator (excluded from S1)' };   // (user_contour_data resolves here too)
+        default: return { unsupported: `opType "${op && op.opType}" is not CAM-able` };
     }
 }
 
@@ -136,16 +152,18 @@ export function seedFromOp(op) {
     if (r.unsupported) return { unsupported: r.unsupported };
     const camType = r.camType, params = (op && op.params) || {};
     const alias = PARAM_ALIAS[camType] || {}, nb = NON_BAKEABLE[camType] || [], derive = DERIVE[camType] || {};
+    // Read a field's op value via its alias — a STRING key or an ARRAY of candidates (first present wins: built-in vs twin).
+    const readParam = (fkey) => { const a = alias[fkey], keys = Array.isArray(a) ? a : [a || fkey]; for (const k of keys) if (params[k] !== undefined) return params[k]; return undefined; };
     const fields = genFieldsFor(camType, params).map((f) => {
         const opts = ENUM_OPTIONS[f.key];
         let value, meta;
         if (opts) {   // ENUM — map the op's string/bool value to the CAM int (S1d); the friendly dropdown lives on `enum`
-            const opVal = params[alias[f.key] || f.key];
+            const opVal = readParam(f.key);
             const opt = opts.find((o) => o.op === opVal) || opts.find((o) => o.value === opVal);
             value = opt ? opt.value : f.def;
             meta = { type: 'enum', enum: opts };
-        } else if (derive[f.key]) { value = derive[f.key](params); meta = { type: f.type }; }   // DERIVED (e.g. stepover from stepoverPct)
-        else { const opKey = alias[f.key] || f.key; value = params[opKey] !== undefined ? params[opKey] : f.def; meta = { type: f.type }; }   // op value via alias, else the generator default
+        } else if (derive[f.key]) { value = derive[f.key](params); meta = { type: f.type }; }   // DERIVED (e.g. stepover from stepoverPct / the twin's flat stepover)
+        else { const opVal = readParam(f.key); value = opVal !== undefined ? opVal : f.def; meta = { type: f.type }; }   // op value via alias, else the generator default
         return { key: f.key, label: f.label, def: f.def, value, exposed: true, bakeable: !nb.includes(f.key), ...meta };
     });
     return { camType, fields };

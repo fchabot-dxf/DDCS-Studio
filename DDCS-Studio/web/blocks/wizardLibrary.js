@@ -135,6 +135,13 @@ export function builtinLabelForTwin(opType) {
     const b = BUILTINS.find((x) => x.opensAs === opType);
     return b ? b.label : null;
 }
+/** t1049 — the DECLARED twin→built-in bridge: a data-op twin's opType (opensAs target) resolved back to its built-in op
+ *  `type` (+ `variant`, e.g. drill/bore). ONE source: the same `opensAs` declaration that drives the slot re-point, so it
+ *  can't drift (no `user_`/`_data` string-munging). Returns null for a non-twin opType. Used by the CAM bridge. */
+export function builtinTypeForTwin(opType) {
+    const b = BUILTINS.find((x) => x.opensAs === opType);
+    return b ? { type: b.type, variant: b.variant } : null;
+}
 function userEntries() {
     return listUserOps().filter((d) => !OPENS_AS_TARGETS.has(d.opType)).map((d) => ({
         id: d.opType,

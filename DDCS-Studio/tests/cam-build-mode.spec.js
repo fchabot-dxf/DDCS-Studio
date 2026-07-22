@@ -107,6 +107,23 @@ test('S1d ENUM: a corner op shows friendly dropdowns mapping to ints; choice par
   expect(engHasCorner, 'baked corner: no Corner eng row').toBe(false);
 });
 
+test('t1049 FIX: a real data-op TWIN op opens the modal seeded (user_surfacing_data → surface slot)', async ({ page }) => {
+  await openCam(page);
+  const TWIN = { id: 's1', opType: 'user_surfacing_data', label: 'Surfacing (data)', params: { originX: 0, originY: 0, w: 200, h: 150, depth: 0.8, stepdown: 0.4, stepover: 9.6, strategy: 'parallel', feed: 900, plunge: 180, rpm: 12000, wcs: 'G54' } };
+  await page.evaluate((op) => window.ddcsOpenCamAuthoring(op), TWIN);
+  await page.waitForSelector('.cam-auth-overlay .cbm-eb');
+  const seeded = await page.evaluate(() => ({
+    recognized: document.querySelectorAll('#cbm_table tbody tr').length > 0,   // rows render ⇒ seedFromOp resolved the twin (not "pick an op")
+    fromOpSurface: /surface/.test(document.querySelector('.cam-build-mode').textContent),
+    stepover: document.querySelector('#cbm_table tr[data-fkey="stepover"] .cbm-val').value,
+    depth: document.querySelector('#cbm_table tr[data-fkey="depth"] .cbm-val').value,
+  }));
+  expect(seeded.recognized, 'the twin resolves to a CAM type (table renders, not unsupported)').toBe(true);
+  expect(seeded.fromOpSurface, 'the seed-locked header names the surface CAM type').toBe(true);
+  expect(seeded.stepover, 'the twin flat stepover 9.6 seeds the table').toBe('9.6');
+  expect(seeded.depth).toBe('0.8');
+});
+
 test('door 2: the editor-toolbar button opens the authoring modal with the picker', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => typeof window.showApp === 'function');
