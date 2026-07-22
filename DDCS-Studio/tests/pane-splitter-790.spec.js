@@ -20,9 +20,7 @@ const ratio = (page) => page.evaluate(() => getComputedStyle(document.documentEl
 const bodyH = (page, type, kind) => page.evaluate(([t, k]) => Math.round(document.querySelector(`#wiz_${t} [data-viz-pane="${k}"] > .wiz-pane-body`).getBoundingClientRect().height), [type, kind]);
 
 test.describe('desktop', () => {
-  // t1019 — these exercise the splitter with COLLAPSE (a stacked idiom now); on wide (>=1024) the panes go side-by-side
-  // (vertical splitter, no chevrons — asserted in viz-sidebyside-1019). Test here at a STACKED desktop width (<1024).
-  test.use({ viewport: { width: 1000, height: 900 } });
+  test.use({ viewport: { width: 1280, height: 900 } });
 
   test('the splitter shows between both panes, is a ≥44px grab, and DRAG rebalances live (no snap) + persists', async ({ page }) => {
     await page.goto('http://localhost:3211');

@@ -2146,24 +2146,6 @@ button.primary:hover {
 .viz-pane-splitter:focus-visible { outline: none; }
 .viz-pane-splitter:focus-visible .viz-pane-splitter-grip { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
 
-/* t1017 — WIDE screens: put the 3D verify + the 2D layout SIDE-BY-SIDE (row) instead of stacked. The visual pane is
-   ~1120px on a large modal, so each preview gets a comfortable half. The flex-grow ratio (main-axis) + followPanelResize
-   re-fit are direction-agnostic; the splitter turns VERTICAL (col-resize) and its drag reads X (paneAccordion, direction
-   aware). Below 1024px it stays the base stacked COLUMN (and ≤860px keeps the mobile single-column) — the responsive
-   fallback, so a narrow window is never cramped. Pure layout — emit is untouched. */
-@media (min-width: 1024px) {
-    .wiz-2pane .wiz-visual .viz-split { flex-direction: row; }
-    .wiz-2pane .wiz-visual .viz-split > .viz-container { min-width: 0; }   /* allow row-shrink; DON'T reset flex — the ratio flex-grow (below) must survive */
-    .wiz-2pane .wiz-visual .viz-pane-splitter { cursor: col-resize; }
-    .wiz-2pane .wiz-visual .viz-pane-splitter::before { left: -18px; right: -18px; top: 0; bottom: 0; }   /* 44px grab, now horizontal */
-    .wiz-2pane .wiz-visual .viz-pane-splitter-grip { width: 4px; height: 46px; }
-    .wiz-2pane .wiz-visual .viz-pane-splitter:hover .viz-pane-splitter-grip,
-    .wiz-2pane .wiz-visual .viz-split.is-dragging > .viz-pane-splitter .viz-pane-splitter-grip { width: 4px; height: 60px; }
-    /* t1018 (ruling A) — on a SIDE-BY-SIDE layout the SPLITTER is the resize; full-collapse is a stacked idiom, so HIDE
-       the collapse chevrons here (the fold animation stays untouched — pure CSS). */
-    .wiz-2pane .wiz-visual .viz-split > [data-viz-pane] > .wiz-pane-bar { display: none; }
-}
-
 @media (max-width: 860px) {
     /* Mobile: collapse to a single STACKED column. The desktop two-pane relies on a flex-grow chain
        (visual flex:1 1 0 → viz-container flex:1 1 auto → absolute canvas) that needs a DEFINITE modal

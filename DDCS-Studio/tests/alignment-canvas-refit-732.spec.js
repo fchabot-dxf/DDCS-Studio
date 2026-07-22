@@ -34,14 +34,9 @@ test('DEFAULT config: four consecutive away-drags each MOVE the handle on screen
         xs.push(await worldX());
     }
     console.log('REFIT deltas=' + JSON.stringify(deltas.map((d) => +d.toFixed(0))) + ' worldXs=' + JSON.stringify(xs.map((v) => v == null ? null : +v.toFixed(1))));
-    // NO GUTTER-PIN — the ESSENTIAL t732 property is that the value never saturates: each away-drag pushes A further out
-    // (the refit accommodates the marker so the next drag continues), and the handle is never HARD-pinned (0px) at the
-    // gutter. (t1019 — the earlier ">100px on all 4" was knife's-edge on the exact pane width: on the wider side-by-side
-    // canvas the world grows so fast that the 3rd/4th EXTREME drag zooms the fit way out and the handle compresses on
-    // screen — that's fit behaviour at ~45000mm out, NOT the gutter pin the fix targets. Assert the robust property.)
-    deltas.forEach((dl, i) => expect(dl, `drag ${i + 1} moved the handle ${dl.toFixed(0)}px (never HARD-pinned at the gutter)`).toBeGreaterThan(2));
-    expect(deltas[0], 'the first away-drag clearly relocates the handle (no immediate pin)').toBeGreaterThan(100);
-    // the WORLD keeps growing negative (each drag pushed A further out — the value never saturates — the t732 core)
+    // (a) NO PIN — every drag visibly relocated the handle (the canvas accommodated it), not stuck at the gutter
+    deltas.forEach((dl, i) => expect(dl, `drag ${i + 1} moved the handle ${dl.toFixed(0)}px on screen (no pin)`).toBeGreaterThan(100));
+    // (b) the WORLD keeps growing negative (each drag pushed A further out — the value never saturates)
     for (let i = 1; i < xs.length; i++) expect(xs[i], `drag ${i} pushed world X further negative`).toBeLessThan(xs[i - 1] - 1);
     { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_canvas_refit_732.png', clip: _b }); }
 });

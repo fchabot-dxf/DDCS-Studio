@@ -125,9 +125,7 @@ test.describe('collapse gives the form the space (mobile) — the surviving pane
 });
 
 test.describe('desktop reflow — the surviving pane FILLS the freed space', () => {
-  // t1019 — chevron-collapse is a STACKED idiom now; on wide (>=1024) the panes go SIDE-BY-SIDE and the splitter is the
-  // resize (no chevrons) — see viz-sidebyside-1019. So test the collapse-fill reflow at a STACKED desktop width (<1024).
-  test.use({ viewport: { width: 1000, height: 900 } });
+  test.use({ viewport: { width: 1280, height: 900 } });
 
   test('collapse the 3D → the 2D expands to fill; collapse the 2D → the 3D fills (both ways)', async ({ page }) => {
     await page.goto('http://localhost:3211');
@@ -173,8 +171,7 @@ test.describe('desktop reflow — the surviving pane FILLS the freed space', () 
 });
 
 test.describe('motion tokens + reduced-motion', () => {
-  // t1019 — the fold motion is exercised via a chevron-collapse (a STACKED idiom now) → a stacked-desktop width (<1024).
-  test.use({ viewport: { width: 1000, height: 900 } });
+  test.use({ viewport: { width: 1200, height: 900 } });
 
   test('each theme declares a DISTINCT drawer-motion personality (token block)', async ({ page }) => {
     await page.goto('http://localhost:3211');
