@@ -119,7 +119,7 @@ test('S1 fix: data-op TWINS are CAM-able and seed correct values', async ({ page
     const surf = seedFromOp(op('user_surfacing_data', { originX: 0, originY: 0, w: 200, h: 150, depth: 0.8, stepdown: 0.4, stepover: 9.6, strategy: 'parallel', feed: 900, plunge: 180, rpm: 12000, wcs: 'G54' }));
     const pocket = seedFromOp(op('user_pocket_data', { shape: 'rect', w: 120, h: 90, depth: 5, stepdown: 2, stepoverPct: 45, toolDia: 8, clearance: 6, feed: 1500, plunge: 120, rpm: 9000, originX: 0, originY: 0, wcs: 'active' }));
     const corner = seedFromOp(op('user_corner_data', { corner: 'FR', wcs: 'G55', probeZFirst: true, probeSeq: 'XY', dist: 80, retract: 4, radius: 3, safeZ: 12, travelDist: 40, scanDepth: 6, f_fast: 250, f_slow: 60 }));
-    const bore = seedFromOp(op('user_bore_data', { pattern: 'circle', x0: 10, y0: 20, dia: 60, count: 6, startAngle: 0, holeDia: 12, toolDia: 6, pitch: 0.5, depth: 10, feed: 200, rpm: 8000 }));
+    const bore = seedFromOp(op('user_bore_data', { pattern: 'grid', x0: 0, y0: 0, originX: 40, originY: 25, cols: 3, rows: 2, dx: 20, dy: 20, holeDia: 12, toolDia: 6, pitch: 0.5, depth: 10, feed: 200, rpm: 8000 }));
     return {
       camable: { surf: isCamableType('user_surfacing_data'), pocket: isCamableType('user_pocket_data'), corner: isCamableType('user_corner_data'), bore: isCamableType('user_bore_data'), contour: isCamableType('user_contour_data') },
       camType: { surf: surf.camType, pocket: pocket.camType, corner: corner.camType, bore: bore.camType },
@@ -144,6 +144,44 @@ test('S1 fix: data-op TWINS are CAM-able and seed correct values', async ({ page
   expect(r.corner.corner, 'FR -> 2').toBe(2);
   expect(r.corner.probeZ, 'probeZ read from twin probeZFirst -> Yes -> 1').toBe(1);
   expect(r.corner.wcs, 'G55 -> 2').toBe(2); expect(r.corner.maxProbe, 'dist -> 80').toBe(80);
-  // bore twin: resolved via the inverted variant (no method param); posX from x0
-  expect(r.bore.holeDia).toBe(12); expect(r.bore.posX).toBe(10);
+  // bore twin: resolved via the inverted variant (no method param); posX = the PLACED position (originX), not x0
+  expect(r.bore.holeDia).toBe(12); expect(r.bore.posX, 'bore twin posX = the placed originX 40, not x0').toBe(40);
+});
+
+// t1051 HARDENING — the other 4 CAM-able twins (edge/slot/drill/middle inside+boss) driven through seedFromOp against
+// their REAL twin values (the exact "tested-the-built-in-not-the-twin" gap that let FIX #1 through), + the drill/bore
+// PLACEMENT fix: posX/posY = the op's placed originX/originY, not the pattern-local x0/y0 (default 0).
+test('S1 fix hardening: edge/slot/drill/middle twins seeded + drill placement sources originX', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const r = await page.evaluate(async () => {
+    const { seedFromOp } = await import('/data/opCamMap.js');
+    const op = (opType, params) => ({ opType, params });
+    const byKey = (res, k) => (res.fields || []).find((f) => f.key === k);
+    const edge = seedFromOp(op('user_edge_data', { axis: 'Y', dir: 'neg', wcs: 'G56', dist: 60, retract: 3, radius: 2, f_fast: 200, f_slow: 40 }));
+    const slot = seedFromOp(op('user_slot_data', { ax: 5, ay: 10, bx: 105, by: 10, depth: 8, stepdown: 2, feed: 600, rpm: 8000, toolDia: 6, width: 10 }));
+    const drill = seedFromOp(op('user_drill_data', { pattern: 'grid', x0: 0, y0: 0, originX: 100, originY: 50, cols: 3, rows: 2, dx: 20, dy: 20, depth: 12, peck: 3, feed: 280, rpm: 8000 }));
+    const inside = seedFromOp(op('user_middle_data', { featureType: 'pocket', twoAxis: true, wcs: 'G54', dist: 30, retract: 2, radius: 2, f_fast: 200, f_slow: 50 }));
+    const boss = seedFromOp(op('user_middle_data', { featureType: 'boss', twoAxis: true, wcs: 'G55', dist: 60, retract: 3, radius: 2, f_fast: 200, f_slow: 50 }));
+    return {
+      camType: { edge: edge.camType, slot: slot.camType, drill: drill.camType, inside: inside.camType, boss: boss.camType },
+      edge: { axis: byKey(edge, 'axis').value, dir: byKey(edge, 'dir').value, wcs: byKey(edge, 'wcs').value, maxProbe: byKey(edge, 'maxProbe').value },
+      slot: { ax: byKey(slot, 'ax').value, bx: byKey(slot, 'bx').value, depth: byKey(slot, 'depth').value, feed: byKey(slot, 'feed').value },
+      drill: { posX: byKey(drill, 'posX').value, posY: byKey(drill, 'posY').value, cols: byKey(drill, 'cols').value, depth: byKey(drill, 'depth').value },
+      inside: { wcs: byKey(inside, 'wcs').value, maxProbe: byKey(inside, 'maxProbe').value },
+      boss: { wcs: byKey(boss, 'wcs').value },
+    };
+  });
+  expect(r.camType).toEqual({ edge: 'edge', slot: 'slot', drill: 'drill', inside: 'inside', boss: 'boss' });
+  // edge twin: enums -> ints (Y=1, neg=1, G56=3), maxProbe <- dist
+  expect(r.edge.axis).toBe(1); expect(r.edge.dir).toBe(1); expect(r.edge.wcs).toBe(3); expect(r.edge.maxProbe).toBe(60);
+  // slot twin: identity keys
+  expect(r.slot.ax).toBe(5); expect(r.slot.bx).toBe(105); expect(r.slot.depth).toBe(8); expect(r.slot.feed).toBe(600);
+  // drill twin PLACEMENT fix: posX/posY = the placed originX/originY (100/50), NOT the pattern-local x0/y0 (0)
+  expect(r.drill.posX, 'drill posX = placed originX 100 (not x0=0)').toBe(100);
+  expect(r.drill.posY, 'drill posY = placed originY 50').toBe(50);
+  expect(r.drill.cols).toBe(3); expect(r.drill.depth).toBe(12);
+  // middle -> inside/boss (both-axis); wcs enum + maxProbe<-dist
+  expect(r.inside.wcs, 'G54 -> 1').toBe(1); expect(r.inside.maxProbe).toBe(30);
+  expect(r.boss.wcs, 'G55 -> 2').toBe(2);
 });

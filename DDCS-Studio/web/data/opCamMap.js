@@ -43,8 +43,14 @@ export const PARAM_ALIAS = {
     pocket: {},
     cpocket: {},
     slot: {},
-    drill: { posX: 'x0', posY: 'y0' },
-    bore: { posX: 'x0', posY: 'y0' },
+    // t1051 — posX/posY = the op's PLACED position (originX/originY), NOT the pattern-local origin x0/y0 (default 0). The
+    // drill/bore CAM slot runs at the WCS origin with posX/posY as the pattern anchor + has NO separate #20/#21 offset, so
+    // it must carry the placement. x0/y0 structurally cancels through the placement datum-corner attach (grounded), so
+    // originX alone is right (never originX+x0). The fallback ['originX','x0'] keeps the built-in path identical (drillView
+    // force-sets x0===originX). CAVEAT flagged to the advisor: a CIRCLE pattern's centre-vs-min-corner MAY differ by dia/2 —
+    // not fixed here (the built-in centres the circle at originX, so it's ambiguous; the x0->originX fix is certain).
+    drill: { posX: ['originX', 'x0'], posY: ['originY', 'y0'] },
+    bore: { posX: ['originX', 'x0'], posY: ['originY', 'y0'] },
     inside: { maxProbe: 'dist', fast: 'f_fast', slow: 'f_slow' },   // middle -> inside; middle op stores dist/f_fast/f_slow
     boss: { maxProbe: 'dist', fast: 'f_fast', slow: 'f_slow' },     // middle -> boss (op has no plain safeZ -> generator default)
 };
