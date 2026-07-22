@@ -64,7 +64,7 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
   expect(r.unsupported.drillSingle, 'drill single unsupported').toContain('single');
   // aliased values
   expect(r.val.cornerMaxProbe).toBe(80); expect(r.val.cornerTravel).toBe(40); expect(r.val.cornerFast).toBe(250);
-  expect(r.val.cornerSeq).toBe('XY'); expect(r.val.cornerCorner).toBe('FR'); expect(r.val.cornerRetract).toBe(4);
+  expect(r.val.cornerSeq, 'seq enum XY -> int 1 (S1d)').toBe(1); expect(r.val.cornerCorner, 'corner enum FR -> int 2 (S1d)').toBe(2); expect(r.val.cornerRetract).toBe(4);
   expect(r.val.drillPosX).toBe(10); expect(r.val.drillDia).toBe(60); expect(r.val.pocketToolDia).toBe(8); expect(r.val.surfDepth).toBe(0.8);
   // DERIVED stepover == the real wizard value (surface) + the canonical stepoverMm (pocket)
   expect(r.val.surfStepover, 'surface stepover == the actual surfacingStack value').toBe(r.val.wizStepover);

@@ -1123,17 +1123,24 @@ function homingPostIsExpert() {
         const byKey = new Map((cbmPreviewSlot().fields || []).map((f) => [f.key, f]));   // exposed fields carry their allocated #idx
         const rows = _authoring.fields.map((f) => {
             const baked = _authoring.exposed[f.key] === false, val = cbmVal(f.key), pf = byKey.get(f.key);
-            const slotCell = baked ? `baked = ${val}` : (pf ? `#${pf.idx} → #${slotPack.mirrorVar(pf.idx)}` : '—');
+            const enumOpt = f.enum && f.enum.find((o) => o.value === Number(val));
+            // ENUM (S1d): a friendly dropdown of labels; the picked label maps to its int (the pendant/macro value).
+            const valCell = f.enum
+                ? `<select class="cbm-val" data-fkey="${camEsc(f.key)}" style="min-width:118px;">${f.enum.map((o) => `<option value="${o.value}"${o.value === Number(val) ? ' selected' : ''}>${camEsc(o.label)}</option>`).join('')}</select>`
+                : `<input class="cbm-val" data-fkey="${camEsc(f.key)}" type="number" value="${val}" style="width:72px;">`;
+            const slotCell = baked
+                ? `baked = ${f.enum ? (enumOpt ? enumOpt.label + ' (' + val + ')' : val) : val}`
+                : (pf ? `#${pf.idx} → #${slotPack.mirrorVar(pf.idx)}` : '—');
             const bakeTip = f.bakeable ? '' : ' title="Guard / branch param — must stay operator-set (Expose-only)"';
             return `<tr data-fkey="${camEsc(f.key)}">
                 <td style="padding:2px 6px;">${camEsc(f.label || f.key)}</td>
-                <td><input class="cbm-val" data-fkey="${camEsc(f.key)}" type="number" value="${val}" style="width:72px;"></td>
+                <td>${valCell}</td>
                 <td style="white-space:nowrap;"><label style="margin-right:8px;"><input type="radio" class="cbm-eb" name="eb_${camEsc(f.key)}" data-fkey="${camEsc(f.key)}" data-mode="expose"${baked ? '' : ' checked'}> Expose</label><label${bakeTip} style="${f.bakeable ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${camEsc(f.key)}" data-fkey="${camEsc(f.key)}" data-mode="bake"${baked ? ' checked' : ''}${f.bakeable ? '' : ' disabled'}> Bake</label></td>
                 <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">${camEsc(slotCell)}</td>
             </tr>`;
         }).join('');
         el.innerHTML = `<table style="width:100%; font-size:11.5px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th style="padding:2px 6px;">Param</th><th>Value</th><th>On the pendant?</th><th>Pendant slot</th></tr></thead><tbody>${rows}</tbody></table>
-            <div class="settings-hint" style="margin-top:6px;">Expose = the operator fills it on the pendant (#11xx → #2600). Bake = frozen into the macro; the row vanishes from the pendant. Enum params (corner / WCS / axis) stay operator-set for now — S1d adds their dropdowns.</div>`;
+            <div class="settings-hint" style="margin-top:6px;">Expose = the operator fills it on the pendant (#11xx → #2600). Bake = frozen into the macro; the row vanishes from the pendant. Enum params (corner / WCS / axis) pick a friendly label — the pendant stores its number (the eng label documents the options).</div>`;
     }
     function mountAuthoringSurface(body) {
         let picker;
@@ -1162,14 +1169,24 @@ function homingPostIsExpert() {
         root.addEventListener('input', (e) => {
             const t = e.target;
             if (t.id === 'cbm_name') { _authoring.name = t.value; return; }
-            if (t.classList.contains('cbm-val')) {
+            if (t.classList.contains('cbm-val') && t.tagName !== 'SELECT') {   // numeric value (enum selects go via change → re-render)
                 const key = t.dataset.fkey, num = (t.value === '' ? '' : parseFloat(t.value));
                 _authoring.values[key] = { ...(_authoring.values[key] || {}), def: num };
                 if (_authoring.exposed[key] === false) _authoring.baked[key] = num;   // keep the baked literal in sync
             }
         });
         root.addEventListener('click', (e) => { const a = e.target.dataset.act; if (a === 'cbm-cancel') cbmExit(); else if (a === 'cbm-sim') cbmSimulate(); else if (a === 'cbm-build') cbmBuild(); });
-        root.addEventListener('change', (e) => { const t = e.target; if (t.id === 'cbm_seed') cbmSeedPick(t.value); else if (t.classList.contains('cbm-eb') && t.checked) cbmToggle(t.dataset.fkey, t.dataset.mode); });
+        root.addEventListener('change', (e) => {
+            const t = e.target;
+            if (t.id === 'cbm_seed') { cbmSeedPick(t.value); return; }
+            if (t.classList.contains('cbm-eb') && t.checked) { cbmToggle(t.dataset.fkey, t.dataset.mode); return; }
+            if (t.tagName === 'SELECT' && t.classList.contains('cbm-val')) {   // ENUM pick → store the int (+ keep any baked literal in sync)
+                const key = t.dataset.fkey, iv = parseInt(t.value, 10);
+                _authoring.values[key] = { ...(_authoring.values[key] || {}), def: iv };
+                if (_authoring.exposed[key] === false) _authoring.baked[key] = iv;
+                renderCbmTable();
+            }
+        });
     }
     // The ONE opener — a modal over any surface. seedOp given (op-card door) → pre-seed + hide the picker; else (toolbar /
     // CAM-tab doors) → show the picker. Exposed as window.ddcsOpenCamAuthoring so the editor op card can trigger it.

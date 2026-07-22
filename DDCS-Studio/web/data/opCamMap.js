@@ -65,6 +65,21 @@ export const NON_BAKEABLE = {
     drill: [], bore: [], slot: [],   // only WHILE/IF-THEN loop bounds — baking a fixed count/depth still loops correctly
 };
 
+// S1d — ENUM options per field key (shared across generators: corner/wcs/axis mean the same everywhere). GROUNDED
+// one-source (t1047, do NOT invent): the friendly `label` + the program-op `op` value come from the wizard defs
+// (cornerData.js:186/190/191, wizardOptions.WCS_OPTIONS, index.html p_axis/p_dir); the CAM `value` (int) is the macro's
+// branch convention (probeToSlot.js field legends "1FL 2FR 3BL 4BR" etc. + the IF corner EQ 2 THEN … macro bodies). The
+// wizard value ORDER matches the CAM int order in every case (positional). corner is 1-based; the rest 0-based.
+export const ENUM_OPTIONS = {
+    corner: [{ label: 'Front-Left', value: 1, op: 'FL' }, { label: 'Front-Right', value: 2, op: 'FR' }, { label: 'Back-Left', value: 3, op: 'BL' }, { label: 'Back-Right', value: 4, op: 'BR' }],
+    wcs: [{ label: 'Active', value: 0, op: 'active' }, { label: 'G54', value: 1, op: 'G54' }, { label: 'G55', value: 2, op: 'G55' }, { label: 'G56', value: 3, op: 'G56' }, { label: 'G57', value: 4, op: 'G57' }, { label: 'G58', value: 5, op: 'G58' }, { label: 'G59', value: 6, op: 'G59' }],
+    probeZ: [{ label: 'No', value: 0, op: false }, { label: 'Yes', value: 1, op: true }],
+    seq: [{ label: 'Y then X', value: 0, op: 'YX' }, { label: 'X then Y', value: 1, op: 'XY' }],
+    axis: [{ label: 'X', value: 0, op: 'X' }, { label: 'Y', value: 1, op: 'Y' }],
+    checkAxis: [{ label: 'X', value: 0, op: 'X' }, { label: 'Y', value: 1, op: 'Y' }],
+    dir: [{ label: 'Positive', value: 0, op: 'pos' }, { label: 'Negative', value: 1, op: 'neg' }],
+};
+
 /** The generator's field list for a CAM type (one-source: read the SPEC keys off the generator itself, no duplication). */
 function genFieldsFor(camType, params) {
     const GEN = { corner: cornerSlot, edge: edgeSlot, surface: surfacingSlot, pocket: pocketSlot, cpocket: circlePocketSlot,
@@ -121,10 +136,16 @@ export function seedFromOp(op) {
     const camType = r.camType, params = (op && op.params) || {};
     const alias = PARAM_ALIAS[camType] || {}, nb = NON_BAKEABLE[camType] || [], derive = DERIVE[camType] || {};
     const fields = genFieldsFor(camType, params).map((f) => {
-        let value;
-        if (derive[f.key]) value = derive[f.key](params);   // DERIVED (e.g. stepover from stepoverPct — mirrors the wizard)
-        else { const opKey = alias[f.key] || f.key; value = params[opKey] !== undefined ? params[opKey] : f.def; }   // op value via alias, else the generator default
-        return { key: f.key, label: f.label, def: f.def, type: f.type, value, exposed: true, bakeable: !nb.includes(f.key) };
+        const opts = ENUM_OPTIONS[f.key];
+        let value, meta;
+        if (opts) {   // ENUM — map the op's string/bool value to the CAM int (S1d); the friendly dropdown lives on `enum`
+            const opVal = params[alias[f.key] || f.key];
+            const opt = opts.find((o) => o.op === opVal) || opts.find((o) => o.value === opVal);
+            value = opt ? opt.value : f.def;
+            meta = { type: 'enum', enum: opts };
+        } else if (derive[f.key]) { value = derive[f.key](params); meta = { type: f.type }; }   // DERIVED (e.g. stepover from stepoverPct)
+        else { const opKey = alias[f.key] || f.key; value = params[opKey] !== undefined ? params[opKey] : f.def; meta = { type: f.type }; }   // op value via alias, else the generator default
+        return { key: f.key, label: f.label, def: f.def, value, exposed: true, bakeable: !nb.includes(f.key), ...meta };
     });
     return { camType, fields };
 }

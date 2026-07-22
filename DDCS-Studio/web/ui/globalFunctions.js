@@ -403,6 +403,9 @@ export function setupGlobalFunctions(app) {
         // Both editor buttons open the ONE tabbed modal, each defaulting to its own tab.
         window.ddcsAlignRotate = () => openTransformModal('align');
         window.ddcsPositionTranslate = () => openTransformModal('position');
+        // t1047 S1d — CAM authoring door 2 (editor toolbar): ensure the Macros app is wired (idempotent), then open the
+        // authoring modal with the seed picker (no specific op).
+        window.ddcsBuildCamSlot = async () => { try { (await import('./macrosApp.js')).initMacrosApp(); } catch (_) { /* */ } if (window.ddcsOpenCamAuthoring) window.ddcsOpenCamAuthoring(); };
 
         // Insert in message function for wizards
         window.insertInMsg = (t) => {
