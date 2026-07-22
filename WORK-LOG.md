@@ -12806,3 +12806,27 @@ The dispatch asked to re-capture the confirmEvery>0 goldens. There are NONE: t10
 ### GATE — full suite: 1372 passed, 0 failed, 4 skipped. All 4 of last turn's failures are now green: surfacing-as-data + wizard-bar (fixed t1031), and preflight-badge-838 + collapsible-panes-752 (both were knife's-edge flakes — collapsible passed this run at ≤28px, confirming the earlier 30.25px was an environmental pixel flake, not a hard regression).
 
 ### STATE: Pause & Confirm v1 is correct end-to-end — the between-pass injection now shows the default operator message (no blank banner), one-sourced through PAUSE_DEFAULT_MSG. confirmEvery=0 byte-identical. Advisor releases after review. FOLLOW-ON still queued: slot self-loop + rest-machining mirror; blocking-confirm variant B.
+
+---
+
+## 🔨 turn 1035 — CAM BUILDER kickoff, SLICE S0 (branch feat/cam-builder, GROUND-FIRST): allocFieldsWith — a STRICT, byte-identical SUPERSET of allocFields. Additive only; ships nothing user-visible.
+
+Read scratchpad/cam-builder-plan.md (the t1028 architect pass). S0 = the pure-fn, no-UI, byte-identical safety net for the expose/bake concept before any UI/caller work.
+
+### STEP 1 — branch
+Created + checked out feat/cam-builder off the current tip (3b10b49, the V2026.07.21.16 Pause-and-Confirm release). Isolated from main per the ruling.
+
+### STEP 2 — GROUND allocFields (probeToSlot.js:50) + GATE check
+- Signature allocFields(spec, used, varOffset) -> { fields, v }. Per spec entry: idx = nextParam(taken) (the #11xx pool param, added to a LOCAL taken Set), var = '#' + (varOffset + i + 1) (the #-var mirror, POSITIONAL by the spec index i — NOT by idx), field = {key, idx, var, label, units, def, min, max, type}; v[key] = var.
+- 9 callers, all the SAME shape (const { fields, v } = allocFields(SPEC, used, varOffset)): millToSlot.js (POCKET/CIRCLE_POCKET/SURFACE) + probeToSlot.js (CORNER/ZPROBE/EDGE/INSIDE/BOSS/ALIGN). None need rewiring for S0.
+- HIDDEN-STATE GATE: nextParam(used) (slotPack.js:33) is PURE — scans the constant POOL_MIN..POOL_MAX avoiding the passed-in Set, no module-level mutable counter. So allocFields is a pure fn of (spec, used, varOffset). NO gate — a pure superset is clean (matches the plan exactly; no divergence to flag).
+
+### STEP 3 — BUILT allocFieldsWith(spec, used, varOffset, decl) — ADDITIVE, allocFields UNTOUCHED
+decl = { key: { exposed, value } }. A key absent from decl (or exposed !== false) is EXPOSED and allocated EXACTLY as allocFields (same nextParam order, same positional #-var, same field shape, same v[key]='#n'). A BAKED param (exposed === false): NO nextParam, NO field pushed, v[key] = String(value) (the generators interpolate v[key] as a string, so the read + eng lines vanish with the field). Placed it directly after allocFields; allocFields is byte-for-byte unchanged (git diff: probeToSlot.js +29/-0). The bake branch is PRESENT-BUT-UNEXERCISED (no caller uses allocFieldsWith yet) — plan decisions #1 (#2600 re-expose stability) + #2 (exposable/bakeable allow-list) are later slices.
+
+### VERIFIED — my own two-method ACCEPT
+- METHOD 1 (diff): probeToSlot.js +29/-0 (one new fn, allocFields untouched, no caller rewired, no UI) + one new test file. Purely additive.
+- METHOD 2 (equivalence, tests/cam-allocfields-superset.spec.js — a KEEPER): allocFieldsWith deep-equals (JSON) allocFields across 3 real-shaped specs (CORNER/POCKET/ONE) x 3 used-sets (empty, partial, pool-exhausted idx=null) x 3 varOffsets = 27 cases, for BOTH decl-omitted AND all-exposed decl. Result: 27 cases, 0 fails. Plus a present-but-unexercised bake sanity: baking 'fast' drops its field, sets v.fast='250', field count -1, other fields keep their positional #-vars.
+- FULL GATE on the branch: 1372 passed, 4 skipped, 1 failure = blocks-mobile-drawers (a mobile-drawer UI test, UNRELATED to a pure CAM data fn) which PASSES ALONE (14.1s) — a parallel-contention flake, same class as the earlier mobile/pane pixel tests. My zero-caller pure fn cannot affect it.
+
+### STATE: S0 landed on feat/cam-builder. allocFieldsWith is a proven byte-identical superset of allocFields (safety net for the expose/bake concept). Nothing user-visible, no release. NEXT per the plan: S1 (single-op slot + expose/bake one param + inline preview + Add-to-pack), which threads op.exposed/op.baked through generateOp/buildSlotFromOps and needs the opToSlot.js:127 hook too.
