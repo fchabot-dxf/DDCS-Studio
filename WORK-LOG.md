@@ -12696,3 +12696,25 @@ Added `def.zRuler = { depthParam:'depth', stepParam:'stepdown' }` to surfacingDa
 - **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.7m) -- fully clean; the twin parity tests (surfacing/contour/slot) confirm byte-identical emit.
 
 ### STATE: the depth ruler strip now appears on surfacing/contour/slot (+ pocket) -- the LEFT of each op's 2D plan, ticks==depthLevels, drag-synced to depth/stepdown, title cleared; ONE zRulerStrip reused (declaration-only rollout). Byte-identical emit. AWAITING the advisor's per-op screenshot review before release. (Queue part 2: a depthOnly MODE of zRulerStrip -- total-depth marker, no stepdown/pass-ticks -- for bore + drill.)
+
+---
+
+## 🔨 turn 1027 — ROLLOUT part 2: a depthOnly MODE of the zRulerStrip for BORE + DRILL (axis + a single total-depth grip, no stepdown / no pass ticks). Declaration-driven reuse. Byte-identical. Completes the ruler across all depth ops. AWAITING the advisor's per-op screenshot review before release.
+
+DISPATCH: depthOnly ruler for bore/drill (helical pitch / peck, no stepdown); add a depthOnly mode to the ONE zRulerStrip; declare def.zRuler = {depthParam, depthOnly:true}; GATE if bore lacks a 2D feature canvas.
+
+### GROUNDED — both have a 2D feature canvas (no gate)
+bore + drill twins each declare `panel: 'form3d+2d'` (the FeatureCanvas 2D plan) + a def.previewGeometry, and a `depth` param (bore:75, drill:98); NEITHER has a stepdown (bore=helical pitch, drill=peck). So the depth-only ruler fits + the rollout is declaration-only.
+
+### BUILT — a depthOnly branch in the ONE component + one line per op
+- **spec (userOpView.renderZRulerBeside):** when `def.zRuler.depthOnly`, build `{ depth, passes:[depth], depthParam, depthOnly:true }` — no stepdown/stepParam; the deepest (only) pass IS the floor.
+- **component (zRulerStrip _draw):** the step grip is drawn only `!spec.depthOnly && passes.length > 1` -> depthOnly shows ONLY the total-depth grip; passes=[depth] -> NO intermediate ticks (just the floor tick + the axis). No other change; the drag/freeze-scale/re-fit + [data-param] write-back are shared.
+- **declarations:** `def.zRuler = { depthParam:'depth', depthOnly:true }` on boreData + drillData (after def.entryPoint).
+
+### VERIFY (ACCEPT: my VIEWED screenshot PER OP -- depth-only ruler, axis + a single total-depth grip, no pass ticks, left of the feature canvas, 0 clears the title, drag->depth)
+- **bore (VIEWED scratchpad/zruler-user_bore_data.png):** ruler strip down the LEFT of 'Bore (data)'; the axis + a SINGLE green total-depth grip at -5; 0 pass ticks, 0 step grip (pass=0, floor=1, grips=1); '0' clears the title; DRAG total-depth -> depth 5->5.52.
+- **drill (VIEWED scratchpad/zruler-user_drill_data.png):** strip left of 'Drill (data)'; axis + a single total-depth grip at -5; 0 pass ticks, 0 step grip; '0' cleared; DRAG 5->5.52.
+- **BYTE-IDENTICAL:** def.zRuler is view-only metadata (not in the stack/bindings/emit); the bore/drill twin parity tests (bore-as-data/drill-as-data) unaffected.
+- **FULL GATE:** 1371 passed / 4 skipped / 1 flake -- the sole red is preflight-badge-838:63 (a documented isolation flake, re-ran STANDALONE 10/10, unrelated to the ruler). Effectively 1372/0/4.
+
+### STATE: the depth ruler is now on ALL depth ops -- pocket/surfacing/contour/slot show the FULL ruler (stepdown grip + depthLevels pass ticks), bore/drill show the DEPTH-ONLY ruler (axis + a single total-depth grip, no pass ticks). ONE zRulerStrip, declaration-driven (def.zRuler with an optional depthOnly). Byte-identical emit. AWAITING the advisor's per-op screenshot review before release.
