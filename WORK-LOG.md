@@ -13091,3 +13091,26 @@ Per cam-builder-finish-plan.md Gap 1 + Gap 3.
 - FULL GATE on the branch: 1384 passed; the lone red (blocks-live-form form-writeback, a STUDIO-editor subsystem unrelated to CAM) PASSES ALONE (6/6) - a parallel-contention flake.
 
 ### STATE: the headline works - import a whole program into ONE composed CAM slot (auto-import, group-by-op, empty-state). Screenshot GATED to the advisor. GATED follow-on: library-add op TYPES + per-op reorder/remove. NEXT: S-D table polish + S-E icon. No release from me.
+
+---
+
+## 🔨 turn 1057 — UNIVERSAL CAM U0: prove stackToSlot end-to-end (ENGINE ONLY, zero UI). A user-op block stack → a CAM slot via the existing emit path. GROUND-FIRST (Explore agent).
+
+Per cam-universal-plan.md (sub-stack composition builds on this). THE CRUX is ~90% pre-built: wizards/ops/util.js val() passes a #var/[expr] string THROUGH to G-code verbatim. Mechanism (ruled): bind-to-locate + val()-to-survive, NO emitter rewrite.
+
+### GROUNDED (Explore agent, exhaustive)
+- val() (util.js:17): a string with #/[ returns verbatim, else rounded. CRITICAL: the #var SURVIVES resolveParams -> evalExpr('#31') THROWS -> the catch keeps '#31' -> reaches val() -> '#31'. Confirmed end-to-end.
+- feedBlock (feed.js): socket `rate` -> F{val(rate)}. moveBlock (move.js): sockets x/y/z/feed/mode; cut -> G1 ...Z{val(z)} F{val(feed)}. Z is a SINGLE val (no depth loop).
+- Minimal wrap: [user_root{ uiChildren:[param_group], children:[feed, move] }] -> flatten 0 root/1 group/2 feed/3 move. NO base (progstart/progend) needed - emitMapped does no auto-framing; user_root/param_group are transparent at emit.
+- instantiate(def, params) (userOps.js:428, now EXPORTED) returns the pruned stack with blk.params[b.key] = params[b.param]; emitMapped(stack, activeDialectOpts()).text.
+
+### BUILT
+- EXPORTED instantiate from userOps.js (the ruled path; additive, no behaviour change).
+- NEW web/data/stackToSlot.js: stackToSlot(def, decl, used, varOffset): (1) per EXPOSED binding (decl.exposed===true) allocate a 11xx param (slotPack.nextParam) + a #2600 mirror + a field (same shape/contract as allocFieldsWith, so multi-op used/varOffset composition is unchanged) + set the op param to its LOCAL #var; (2) per BAKED binding the literal; others -> the binding default; (3) instantiate(def, tokenParams) lands each token at its socket; (4) emitMapped -> the #var rides val() to F#/Z#; (5) PREPEND one canonical readLine per field (probeToSlot.readLine, generator parity - the LOCAL #var reads the #2600 mirror, not the raw mirror at the socket). Returns {name, fields, body} - the SAME shape every generator returns. NO UI, NO generateOp change.
+
+### VERIFIED - two-method ACCEPT
+- METHOD 1 (diff): a new PURE stackToSlot.js injecting a local #var at the bound socket via instantiate, prepending readLines, returning {name,fields,body}, reusing slotPack.nextParam; no UI; no generateOp change.
+- METHOD 2 (tests/cam-stack-to-slot.spec.js): built a minimal custom op = a Feed atom + a Move cut. Case A (expose FEED + a single-plunge Z, bake X/Y + the cut feed): 2 fields (feed #1100->#2600 var #1, z #1101->#2601 var #2); the body has F#1 + Z#2 (the #vars ride val), X10/Y20/F500 (baked literals), and the PREPENDED reads #1=#2600 ;Feed + #2=#2601 ;Plunge Z; the #2600->#1->F#1 chain is asserted (the pendant's #2600 controls the feed); slotMacro renders. Case B (bake everything): 0 fields, the body is all literals (F250, Z-3, NO # anywhere).
+- FULL GATE on the branch: 1386 passed, 0 failed.
+
+### STATE: stackToSlot is proven - ANY user-op stack -> a CAM slot, reusing the emit path (val rides the #var), the allocation contract, and the {name,fields,body} generator shape. This is the S0 prereq for sub-stack composition. U0 takes a MANUAL decl; auto-classification (DECLARE not infer) is U1. NEXT: U1 classification + sub-stack per the plans. No release from me.
