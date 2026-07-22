@@ -1237,6 +1237,19 @@ function homingPostIsExpert() {
         else { delete _authoring.exposed[key]; delete _authoring.baked[key]; }   // Expose = the default (no decl entry)
         renderCbmTable();
     }
+    // t1053 (S-A / Gap 4) — a PROBE CAM slot's macro is INCREMENTAL (G31 from the operator start); with no stock/start the
+    // preview clamps the first probe to zero and traces from origin = empty/black. For a probe slot (G31) synthesize a
+    // CENTERED TOP-DATUM stock box (size from the probe's reach) + a start ABOVE it, so the incremental probe travels toward
+    // the stock. Preview-only (getStock/getStart) — NO settings.stock mutation; a non-probe slot passes NEITHER = byte-identical
+    // to today (previewStock falls back to the global). Mirrors the wizardManager getStock/getStart wiring.
+    const probePreviewStock = (slot) => {
+        const f = (k) => { const x = (slot.fields || []).find((y) => y.key === k); return x ? Number(x.def) : undefined; };
+        const xy = Math.max(40, f('maxProbe') || f('travel') || 120);   // F4b — size from maxProbe/travel; fallback 120×120×25
+        return { x: xy, y: xy, z: 25, shape: 'box', datum: 'ccp', show: true };   // centered, top datum (z=0 at the surface)
+    };
+    const probePreviewStart = (slot) => { const s = (slot.fields || []).find((y) => y.key === 'safeZ'); return { x: 0, y: 0, z: s ? Math.max(2, Number(s.def)) : 10 }; };
+    const probePreviewOpts = (slot, macro) => (/\bG31\b/.test(macro) ? { getStock: () => probePreviewStock(slot), getStart: () => probePreviewStart(slot) } : {});
+
     function cbmSimulate() {
         if (!_authoring.camType) { dlgNotice('Pick a program op first.'); return; }
         const host = document.getElementById('cbm_preview'); if (!host) return;
@@ -1245,7 +1258,7 @@ function homingPostIsExpert() {
         host.innerHTML = '';
         const s = cbmPreviewSlot(), macro = slotPack.slotMacro(s), seed = new Map();
         (s.fields || []).forEach((f) => seed.set(slotPack.mirrorVar(f.idx), Number(f.def)));
-        _cbmPanel = createPreviewPanel(host, { getGcode: () => macro, createVarStore: () => new Map(seed) });
+        _cbmPanel = createPreviewPanel(host, { getGcode: () => macro, createVarStore: () => new Map(seed), ...probePreviewOpts(s, macro) });
         _cbmPanel.setActive(true);
     }
     function cbmBuild() {
@@ -1360,7 +1373,7 @@ function homingPostIsExpert() {
             <div class="cam-sim-host" style="flex:1; position:relative; min-height:0;"></div>
         </div>`;
         document.body.appendChild(overlay);
-        const panel = createPreviewPanel(overlay.querySelector('.cam-sim-host'), { getGcode: () => macro, createVarStore: () => new Map(seed) });
+        const panel = createPreviewPanel(overlay.querySelector('.cam-sim-host'), { getGcode: () => macro, createVarStore: () => new Map(seed), ...probePreviewOpts(slot, macro) });
         panel.setActive(true);
         const close = () => { try { panel.stop(); panel.setActive(false); } catch (_) { /* noop */ } overlay.remove(); document.removeEventListener('keydown', onKey); };
         const onKey = (e) => { if (e.key === 'Escape') close(); };
