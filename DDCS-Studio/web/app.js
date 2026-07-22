@@ -39,6 +39,7 @@ import { rotaryClockDataDef } from './blocks/dataOps/rotaryClockData.js';   // t
 import { alignmentDataDef } from './blocks/dataOps/alignmentData.js';   // t431-t437 alignment port E0-E3 (the LAST probe): the "Alignment (data)" twin — opened IN-PLACE from the built-in Align slot (opensAs); box + 2 fence starts, no rig
 import { commDataDef } from './blocks/dataOps/commData.js';   // t518 1b-ii — the "Communication (data)" twin (Setup/IO port): opened IN-PLACE from the built-in Comm slot (opensAs); superset type × hmi × mode × conditional forks + value-bearing recompose
 import { ioStepDataDef } from './blocks/dataOps/ioStepData.js';   // t522 E2 — the grouped "I/O Step" twin (output/input/dwell): opened IN-PLACE from the built-in I/O Step setup slot (opensAs); declared-I/O by name + raw-pin fallback
+import { pauseConfirmDataDef } from './blocks/dataOps/pauseConfirmData.js';   // t1031 — the standalone Pause/Confirm twin (operator message + M0), opened in-place from the built-in setup slot (opensAs)
 import { homingDataDef } from './blocks/dataOps/homingData.js';   // t546-t552 homing port — the "Homing (data)" twin: opened IN-PLACE from the built-in Homing slot (opensAs); per-axis guarded arms + settings recompose (unroll) + the machine-frame preview (forced envelope + draggable Start)
 // Edge viz animator (registers `window.EdgeVizAnimator`)
 import './viz/edgeVizAnimator.js';
@@ -186,6 +187,7 @@ class DDCSStudio {
             alignmentDataDef(),   // t437 E3 — seed the alignment twin so its in-place Align slot (opensAs) opens a registered op on boot (completes the probe fan-out)
             commDataDef(),   // t518 1b-ii — seed the Comm/MDI twin so its in-place Comm slot (opensAs) opens a registered op on boot (completes the Setup/IO Comm port)
             ioStepDataDef(),   // t522 E2 — seed the grouped I/O-step twin so its in-place I/O Step slot (opensAs) opens a registered op on boot
+            pauseConfirmDataDef(),   // t1031 — seed the Pause/Confirm twin so its in-place setup slot (opensAs) opens a registered op on boot
             homingDataDef(),   // t552 E2 — seed the Homing twin so its in-place Homing slot (opensAs) opens a registered op on boot (machine-frame preview: forced envelope + draggable Start + plays the real emit)
         ];
         for (const def of seeds) {

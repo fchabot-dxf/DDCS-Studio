@@ -109,6 +109,7 @@ const POCKET_BINDING_SPECS = [
     { param: 'depth', type: 'number', units: 'mm', key: 'depth', match: { type: 'drill' }, optional: true },
     { param: 'stepdown', type: 'number', units: 'mm', key: 'by', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.stepdown, label: 'Step Down', section: T },
     { param: 'stepdown', type: 'number', units: 'mm', key: 'peck', match: { type: 'drill' }, optional: true },
+    { param: 'confirmEvery', type: 'number', key: 'confirmEvery', match: { type: 'stepdown' }, optional: true, default: 0, label: 'Confirm every N passes', section: T, help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
     // plunge → both leaves + the drill's FEED (drill plunges at the plunge feed); clearance → progstart + both leaves + drill
     { param: 'plunge', type: 'number', units: 'mm/min', key: 'plunge', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.plunge, label: 'Plunge', section: T },
     { param: 'plunge', type: 'number', units: 'mm/min', key: 'plunge', match: { type: 'pocketwall' }, optional: true },

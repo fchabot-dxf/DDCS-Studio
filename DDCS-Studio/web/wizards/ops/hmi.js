@@ -84,6 +84,18 @@ export const messageBlock = {
     },
 };
 
+// t1031 — PAUSE & CONFIRM (v1 = shape A): show the operator MESSAGE (Expert #1505=-5000 banner via messageBlock/hmiToast;
+// else a `( MSG: … )` comment) then M00 (program stop — the machine halts, resume on Cycle Start). A thin WRAP of the
+// existing messageBlock + pauseBlock — no new emit logic; the standalone Pause/Confirm op AND the stepdown `confirmEvery`
+// injection both emit THIS one atom. SIM NOTE: M0 is a MACHINE stop, not a sim-visible pause (the engine no-ops M0). The
+// Expert OK/Cancel BLOCKING confirm (shape B, via dialect.hmiPrompt + ESC-cancel) is the natural upgrade — swap the message
+// line for confirmBlock's prompt then. Default msg is a plain shop instruction.
+export const pauseConfirmBlock = {
+    type: 'pauseconfirm', label: 'Pause / Confirm', kind: 'leaf', category: 'Control',
+    defaults: { msg: 'Pause — check the part, then press Cycle Start to continue' }, fields: ['msg'],
+    emit: (p, dx, dy, dialect) => [...messageBlock.emit({ text: p.msg }, dx, dy, dialect), ...pauseBlock.emit()],
+};
+
 export const hmiStatusBlock = {
     // The status-bar idiom (comm's status arm): a colour-wrapped #1503 write + an optional visibility dwell. PROFILE-AWARE via
     // dialect.hmiStatus (Expert = the exact #2039/#1503/#2039/G4 bytes); a post with NO hmiStatus (V4.1/DM500/grbl/rs274/centroid —

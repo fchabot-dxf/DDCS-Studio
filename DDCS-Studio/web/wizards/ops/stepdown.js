@@ -6,8 +6,10 @@
  * StepDown{ StepOver } is a pocket; StepDown{ Wall } steps a wall finish. The depth loop lives in the emit
  * fold (it owns the scope); this def just declares the fields. `to` = total depth, `by` = stepdown per pass.
  */
+// t1031 — `confirmEvery` (default 0 = OFF): pause & confirm every N depth passes (the emit fold injects a pauseConfirm
+// after every Nth pass EXCEPT the last). 0 → NO injection → byte-identical.
 export const stepdownBlock = {
     type: 'stepdown', label: 'Step Down', kind: 'depth', category: 'Transforms',
-    defaults: { to: 5, by: 1 },
-    fields: ['to', 'by'],
+    defaults: { to: 5, by: 1, confirmEvery: 0 },
+    fields: ['to', 'by', 'confirmEvery'],
 };

@@ -64,6 +64,7 @@ const SURFACING_EXEC_BINDINGS = [
     // depth pass (block 3, stepdown)
     { param: 'depth', blockIndex: 3, key: 'to', type: 'number', default: SURFACING_DEFAULTS.depth, units: 'mm' },
     { param: 'stepdown', blockIndex: 3, key: 'by', type: 'number', default: SURFACING_DEFAULTS.stepdown, units: 'mm' },
+    { param: 'confirmEvery', blockIndex: 3, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
     // geometry + cut (block 4, the surfacefill leaf)
     { param: 'w', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", blockIndex: 4, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w, units: 'mm' },
     { param: 'h', help: "Height of the faced area (Y).", blockIndex: 4, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h, units: 'mm' },

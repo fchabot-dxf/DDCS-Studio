@@ -55,6 +55,7 @@ const CONTOUR_EXEC_BINDINGS = [
     // depth pass (block 3, stepdown)
     { param: 'depth', blockIndex: 3, key: 'to', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.depth, label: 'Depth', section: 'TOOL & CUT' },
     { param: 'stepdown', blockIndex: 3, key: 'by', type: 'number', units: 'mm', default: CONTOUR_DEFAULTS.stepdown, label: 'Step Down', section: 'TOOL & CUT' },
+    { param: 'confirmEvery', blockIndex: 3, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', section: 'TOOL & CUT', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
     // geometry + cut (block 4, the contourfill leaf). shape picks which dims matter; the 4 dims all bind, emit uses the right pair.
     { param: 'shape', blockIndex: 4, key: 'shape', type: 'enum', default: CONTOUR_DEFAULTS.shape, widget: 'dropdown', widgetConfig: { options: SHAPE_OPTIONS }, label: 'Shape', section: 'GEOMETRY' },
     { param: 'side', blockIndex: 4, key: 'side', type: 'enum', default: CONTOUR_DEFAULTS.side, widget: 'dropdown', widgetConfig: { options: SIDE_OPTIONS }, label: 'Side', help: 'Outside/Inside offset the cut by the tool radius so the FINISHED edge matches the size you type; On traces the boundary itself.', section: 'GEOMETRY' },

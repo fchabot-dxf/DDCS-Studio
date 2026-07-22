@@ -75,7 +75,7 @@ import { wcsBaseIntoBlock, wcsWriteBlock } from './wcsIndirect.js';   // F1/E1 �
 import { wcsZeroBlock } from './wcszero.js';   // t475 — WCS zero-at-current, dialect-aware at emit (M350 register / rs274·grbl G10 L20 / v41·dm500 G92)
 import { assignBlock } from './assign.js';
 import { radiuscompBlock } from './radiuscomp.js';
-import { pauseBlock, messageBlock, askNumberBlock, confirmBlock, hmilineBlock, hmiConfirmBlock, hmiStatusBlock, hmiBeepBlock } from './hmi.js';
+import { pauseBlock, messageBlock, askNumberBlock, confirmBlock, hmilineBlock, hmiConfirmBlock, hmiStatusBlock, hmiBeepBlock, pauseConfirmBlock } from './hmi.js';
 import { cornerConfigBlock } from './corner_config.js';
 import { pathModeBlock, drillCycleBlock, cancelCycleBlock, outPinBlock, waitInputBlock } from './cnc.js';
 import { stopBlock, planeBlock, feedModeBlock, homeBlock, callBlock, returnBlock } from './more.js';
@@ -93,7 +93,7 @@ export const PALETTE = [
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, wcsBaseIntoBlock, wcsWriteBlock, wcsZeroBlock, toolOffsetBlock,   // Coordinates (WCS select + dist-mode + G17-19 plane + work-offset/probe-family base+indirect-write/WCS-zero-at-current/tool-table write)
     progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)
     probeReadBlock, readMachineBlock, probeStartBlock, probeGuardBlock, radiuscompBlock,         // Probing (probe/DRO capture + pre-probe DRO capture for the miss-check + G31 stop/limit guard + stylus-radius comp)
-    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, askNumberBlock, hmilineBlock, hmiConfirmBlock, hmiStatusBlock, hmiBeepBlock, cornerConfigBlock, guardBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/input + probe #1505 note + spaced confirm gate + comm status-bar/beep idioms + corner-macro config + when-guard fork container)
+    countBlock, ifBlock, compareBlock, probeCheckBlock, ifGotoBlock, labelBlock, gotoBlock, callBlock, returnBlock, stopBlock, pauseBlock, confirmBlock, pauseConfirmBlock, askNumberBlock, hmilineBlock, hmiConfirmBlock, hmiStatusBlock, hmiBeepBlock, cornerConfigBlock, guardBlock,   // Control (loop/cond/bool + probe-branch + if-goto + label/goto + M98/M99 subprogram + M0/M1 stop + pause/confirm/pause-confirm/input + probe #1505 note + spaced confirm gate + comm status-bar/beep idioms + corner-macro config + when-guard fork container)
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)

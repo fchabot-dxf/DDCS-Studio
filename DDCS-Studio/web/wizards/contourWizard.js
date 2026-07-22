@@ -61,7 +61,7 @@ export function contourStack(params = {}) {
         entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3), by: 'by',   // t842 — depth entry (by from the StepDown scope for prevZ)
         z: 'z', feed, plunge, clearance };
     const down = newBlock('stepdown');
-    down.params = { to: depth, by: stepdown };
+    down.params = { to: depth, by: stepdown, confirmEvery: num(params.confirmEvery, 0) };   // t1031 — confirmEvery pause (0 = off → byte-identical)
     down.children = [contour];
 
     return [makeStart(params), wcs, makePlace(params, contourBBox(params), down), makeEnd(params)];

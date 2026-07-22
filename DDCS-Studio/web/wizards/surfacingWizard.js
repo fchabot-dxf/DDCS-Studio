@@ -38,7 +38,7 @@ export function surfacingStack(params = {}) {
         z: 'z', feed, plunge, clearance: clr };
 
     const down = newBlock('stepdown');
-    down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5) };
+    down.params = { to: num(params.depth, 0.5), by: num(params.stepdown, 0.5), confirmEvery: num(params.confirmEvery, 0) };   // t1031 — pause every N passes (0 = off → byte-identical)
     down.children = [fill];
     const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
     if (params.zMode === 'skim') {

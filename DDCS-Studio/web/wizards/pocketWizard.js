@@ -113,7 +113,7 @@ export function pocketStack(params = {}, opts = {}) {
         const note = newBlock('comment'); note.params = { text: 'REST — smaller tool clears the corners; change tools here' };
         return [note, restLeaf()];
     };
-    const clearPlace = (kids, restKids) => { const down = newBlock('stepdown'); down.params = { to: depth, by }; down.children = kids; return makePlace(params, bbox, restKids ? [down, ...restKids] : [down]); };
+    const clearPlace = (kids, restKids) => { const down = newBlock('stepdown'); down.params = { to: depth, by, confirmEvery: num(params.confirmEvery, 0) }; down.children = kids; return makePlace(params, bbox, restKids ? [down, ...restKids] : [down]); };   // t1031 — confirmEvery pause (0 = off → byte-identical)
 
     if (!superset) {   // concrete: the geometry-derived tooSmall + strategy select the arm directly
         if (tooSmall) return [makeStart(params), wcs, drillPlace(), makeEnd(params)];

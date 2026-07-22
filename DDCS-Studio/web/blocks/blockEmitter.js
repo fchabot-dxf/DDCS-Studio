@@ -184,12 +184,18 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     if (def.kind === 'depth') {                // STEP DOWN: run the body once per Z level, exposing scope `z` (negative)
         const ev = (x, d) => { try { return evalExpr(x, scope); } catch { return d; } };
         const to = ev(block.params.to, 5), by = ev(block.params.by, 1) || 1;
+        const confirmEvery = Math.max(0, Math.round(ev(block.params.confirmEvery, 0)) || 0);   // t1031 — pause & confirm every N passes (0 = off)
+        const levels = depthLevels(to, by);
         const out = [];
-        for (const L of depthLevels(to, by)) {
+        levels.forEach((L, i) => {
             const child = Object.create(scope); child.z = -L; child.by = by;   // t804 — expose `by` too: the fill's depth-entry (ramp/helix) descends exactly one level
             out.push(tag(`( ${def.label} z=${r3(-L)} )`, own));
             (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
-        }
+            // t1031 — pause & confirm after every Nth pass, but NOT after the last (the op is done → no point pausing)
+            if (confirmEvery > 0 && (i + 1) % confirmEvery === 0 && i + 1 < levels.length) {
+                BLOCKS.pauseconfirm.emit({}, dx, dy, dialect).forEach((ln) => out.push(tag(ln, own)));
+            }
+        });
         return out;
     }
 
