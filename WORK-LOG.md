@@ -12957,3 +12957,26 @@ AMENDMENT (advisor, 2 msgs, the 2nd superseded): the entry point moved from a CA
 - FULL GATE on the branch: 1376 passed, 0 failed (legacy + editor + all CAM tests).
 
 ### STATE: S1c shipped doors 1+3 of the reusable CAM authoring modal; door 2 (editor toolbar) gated as a trivial follow-on. Screenshot GATED to the advisor (no release). NEXT: door 2 (toolbar), then S1d (enum dropdowns + the enum<->int mapping).
+
+---
+
+## 🔨 turn 1047 — CAM Builder S1d (branch feat/cam-builder): ENUM DROPDOWNS + enum-to-int pendant mapping, one-sourced + grounded. + door 2 (editor toolbar). VIEWED screenshot matches.
+
+The user's #1 GUI element: enum params (corner/WCS/probe-Z/wall-order/axis/dir) rendered as plain numbers in S1c; S1d makes them friendly DROPDOWNS with a clean enum<->int mapping.
+
+### GROUNDED (one-source, do NOT invent — via an Explore agent)
+- The friendly LABELS + program-op VALUES come from the wizard defs: cornerData.js:186/190/191 (corner Front-Left/Front-Right/Back-Left/Back-Right = FL/FR/BL/BR; probeSeq "Y then X"/"X then Y" = YX/XY; wcs Active/G54..G59), wizardOptions.WCS_OPTIONS, index.html p_axis (X/Y) / p_dir (pos/neg). probeZ is a BOOL (No/Yes).
+- The CAM INT comes from the macro branch convention: probeToSlot.js field legends ("1FL 2FR 3BL 4BR", "0act 1G54.."), CONFIRMED against the macro bodies (IF corner EQ 2 THEN #90=0-1 = FR flips X; IF seq EQ 1 GOTO = XY; IF axis EQ 1 = Y; IF dir EQ 1 = neg). KEY: the wizard value ORDER matches the CAM int order positionally in every case (corner 1-based, the rest 0-based).
+
+### BUILT
+- opCamMap.ENUM_OPTIONS (keyed by field key, shared): {label, value:int, op:opString}. seedFromOp maps the op's string/bool value -> the CAM int (op match, else value match, else the generator default int) and attaches type:'enum' + enum:options to the seed field. FIXES the S1c "enum seeded as a raw string" gap (now an int).
+- renderCbmTable: enum fields render a <select> of friendly labels (selected = the int); numeric fields stay number inputs. The baked slot cell shows "baked = <label> (<int>)". attachCbmListeners: a SELECT.cbm-val change stores the int (+ syncs any baked literal) + re-renders. Enum guards (all current enums are in NON_BAKEABLE) show the dropdown but Bake greyed. The eng label already DOCUMENTS the options (the CAM field label carries "1FL 2FR 3BL 4BR") -> engLine unchanged.
+- NOTE: strategy/direction (pocket/surfacing) are VARIANTS, not CAM fields -> not table enums (correctly excluded).
+- DOOR 2 (editor toolbar): a floating "+ CAM slot" button (#editor-cam-btn, index.html near the Transform button) -> window.ddcsBuildCamSlot (globalFunctions.js) which ensures macrosApp init (idempotent) then opens the authoring modal with the picker.
+
+### VERIFIED — two-method ACCEPT (VIEWED)
+- METHOD 1 (diff): ENUM_OPTIONS + seedFromOp enum-int (one-sourced/grounded) + the dropdown render + door 2; macrosApp diff clean (22/5 - last turn's LF normalization prevented recurrence).
+- METHOD 2 (VIEWED screenshot cam-s1d-enum.png + tests/cam-build-mode.spec.js): I viewed it - a seeded CORNER op shows dropdowns Corner=Front-Right(2), WCS=G55(2), Probe-Z=Yes(1), Wall-order=X then Y(1); the guard enums have Bake GREYED; numeric fields (Max probe 80, etc.) stay inputs; the explainer notes the pendant stores the number. Tests assert: enum dropdowns + int mapping + guard-Bake-disabled + numeric-unchanged; the built slot seeds corner=2 (behaves identically to the wizard's FR); door 2 opens the modal with the picker; the pocket-numeric flow + Feed bake still pass. Updated cam-op-seed: corner/seq now assert the ints (2/1), not raw strings.
+- FULL GATE on the branch: 1377 passed, 0 failed.
+
+### STATE: CAM Builder v1 is FEATURE-COMPLETE on feat/cam-builder - S0 (superset) -> S1a (plumbing) -> S1b (op->CAM maps + seed) -> S1c (reusable authoring modal, 3 doors) -> S1d (enum dropdowns). All 3 entry doors live (op card, editor toolbar, CAM tab). Screenshot GATED to the advisor. Per the advisor's plan: they add .gitattributes eol=lf + MERGE v1 to main. No release from me.
