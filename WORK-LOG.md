@@ -13070,3 +13070,24 @@ ROOT CAUSE (advisor-diagnosed, confirmed): the two CAM preview builders (cbmSimu
 - FULL GATE on the branch: 1382 passed, 0 failed.
 
 ### STATE: probe CAM slot previews now show the stock + probe path instead of black; non-probe previews byte-identical. Screenshot GATED to the advisor. NEXT: S-B/S-C multi-op + the new seed model (auto-import all CAM-able ops, drop the inserted-op dropdown, op-card direct, library-add for op TYPES, group-by-op) per cam-builder-finish-plan.md. No release from me.
+
+---
+
+## 🔨 turn 1055 — CAM FINISH S-C: MULTI-OP + the NEW SEED MODEL + group-by-op (the headline: import a whole program into ONE slot). Shipped the core; library-add + reorder/remove GATED as a follow-on (escape hatch).
+
+Per cam-builder-finish-plan.md Gap 1 + Gap 3.
+
+### BUILT
+- **DATA MODEL**: _authoring.ops = an ARRAY of {opType, camType, variant, fields, values, exposed, baked, label} (was a single-op flat shape). makeAuthOp(op) = seedFromOp -> an authoring op (null if unsupported). toManifest(a) -> the op-manifest entry. cbmPreviewSlot/cbmBuild map _authoring.ops. buildSlotFromOps already composes multi-op (allocates params around siblings, tags f._op) - NO generator/slotPack change.
+- **NEW SEED MODEL - the dropdown is DROPPED**. The GLOBAL doors (editor-toolbar / CAM-tab) AUTO-IMPORT every CAM-able op from ddcsGetBlockProgram (filtered by camTypeOf.camType, in program order) into _authoring.ops; the OP-CARD door seeds that ONE op (single). No re-select-of-inserted-ops dropdown.
+- **GROUP-BY-OP table**: renderCbmTable renders a SECTION per op (a header "N. label -> camType" + that op's field table). The row + eb + val controls carry data-oi + data-fkey; the value/toggle handlers key by (oi, key). Pendant slots are allocated UNIQUELY across ops (buildSlotFromOps).
+- **EMPTY-STATE** (subsumes S-B): 0 CAM-able ops -> a clear message ("No CAM-able ops ... supports Pocket / Surface / Probe corner-edge / Slot / Drill-Bore / Probe centre") + each present-but-unsupported op's reason. NO greyed dropdown, Build disabled.
+
+### GATED as a follow-on (per the escape hatch - too much for one turn otherwise): library/catalog add-more-op-TYPES + per-op reorder/remove. Shipped: the multi-op data model + auto-import + group-by-op + build + empty-state.
+
+### VERIFIED - two-method ACCEPT (VIEWED)
+- METHOD 1 (diff): _authoring.ops[], cbmBuild maps toManifest, the dropdown REMOVED, auto-import wired, group-by-op render, empty-state; the single-op op-card S1c/S1d path intact (op-card door -> 1 op).
+- METHOD 2 (VIEWED cam-s-c-multiop.png + tests): I viewed it - a program of Surfacing+Drill+Probe-corner (+ a contour skipped) AUTO-IMPORTED as a group-by-op table, EACH op a section (Drill #1111-1121, Probe-corner #1122-1133 - params allocated around siblings), the inline preview renders the probe stock, one Build -> ONE slot composing all 3. Tests assert: 3 groups (contour skipped), slot.ops == [surface,drill,corner], slot.fields span all 3 ops (group-by-op), door-2 auto-imports with NO picker, empty-state names the supported ops + the contour reason, the op-card door still seeds a single op, all the S1c/S1d/S1d-bake/probe-preview tests still pass.
+- FULL GATE on the branch: 1384 passed; the lone red (blocks-live-form form-writeback, a STUDIO-editor subsystem unrelated to CAM) PASSES ALONE (6/6) - a parallel-contention flake.
+
+### STATE: the headline works - import a whole program into ONE composed CAM slot (auto-import, group-by-op, empty-state). Screenshot GATED to the advisor. GATED follow-on: library-add op TYPES + per-op reorder/remove. NEXT: S-D table polish + S-E icon. No release from me.
