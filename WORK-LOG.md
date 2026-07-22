@@ -12905,3 +12905,30 @@ Grounded via an Explore agent (the crux: op.params key names — do NOT invent).
 - FULL GATE on the branch: 1374 passed, 0 failed.
 
 ### STATE: the DATA layer maps a program op -> a CAM seed, verified by assertion BEFORE any UI. Clean 1:1 works; the 3 variant forks + contour + the 2 value-semantic gaps are surfaced/gated for the advisor. NEXT (pending the ruling): wire the gated arms, then S1c (the in-panel authoring UI consuming seedFromOp), then S1d (enums). No UI, no release.
+
+---
+
+## 🔨 turn 1043 — CAM Builder S1b-wire (branch feat/cam-builder): finalized opCamMap.js per the advisor's rulings. The 4 variant forks ENCODED, stepover DERIVED one-source, NON_BAKEABLE unchanged. DATA layer, no UI.
+
+Applied the t1042 rulings; grounded the 2 things flagged "do not assume" (the middle modifiers + the real stepover formula).
+
+### GROUNDED (do not guess)
+- **CAM inside/boss generators are FIXED BOTH-AXIS centre probes** (insideCentreSlot probes ±X, re-centres X via G53, probes ±Y, writes both centres + reports spans/roundness; bossCentreSlot the same with repositions). NO single-axis variant. The middle op (middleWizard.js:40-49) has featureType (boss/pocket, default pocket), axis (single primary), twoAxis||findBoth (default FALSE), circular (default false, adds re-centre + diameter — which the CAM slot ALREADY does, "harmless for a rectangle"). So the covered config = BOTH-AXIS; a single-axis middle would probe an axis the operator didn't intend -> unsupported.
+- **The real stepoverPct->mm formula** = pocketfill.js:40 `stepoverMm(p) = max(0.2, max(0.1, toolDia) * stepoverPct / 100)` (EXPORTED — one-source). surfacingWizard.js:24-27 computes the identical formula inline (absent-param defaults differ, 12/60 vs 6/40, but unreachable when the op provides toolDia+pct). Imported stepoverMm; the test verifies surface stepover == the ACTUAL surfacingStack value (not just the formula).
+
+### ENCODED (rulings 1-4) in camTypeOf
+- pocket shape circle -> cpocket; polygon/ellipse unsupported.
+- drill pattern single -> unsupported (known S1 gap, flagged); else method helical -> bore / peck -> drill.
+- middle -> boss (featureType==boss) else inside, ONLY when twoAxis||findBoth; single-axis -> unsupported (never a wrong slot). PARAM_ALIAS inside/boss {maxProbe<-dist, fast<-f_fast, slow<-f_slow}.
+- contour unsupported. SUPPORTED_OPTYPES now includes middle.
+
+### DERIVED (ruling 6) + CONFIRMED (5,7)
+- DERIVE[pocket|cpocket|surface].stepover = stepoverMm(op.params) — mirrors the wizard one-source; the seed now fills stepover instead of falling to the generator default.
+- Enum values still seeded RAW (ruling 5). NON_BAKEABLE UNCHANGED (ruling 7 — pocket/cpocket geometry stays bakeable, the operand-vs-selector refinement deferred to S3; safety not loosened).
+
+### VERIFIED — two-method ACCEPT
+- METHOD 1 (diff): 4 forks encoded, unsupported flagged, stepover imported+derived, NON_BAKEABLE unchanged.
+- METHOD 2 (assertion, cam-op-seed.spec.js): camType map == {pocket,surface,corner,drill,slot, middleBoss:boss, middleInside:inside, pocketCircle:cpocket, drillHelical:bore}; unsupported (middle single-axis / polygon / contour / drill single); aliased values; DERIVED surface stepover == the real surfacingStack value (9.6 = 16*60/100) AND pocket stepover == stepoverMm(op); guards non-bakeable.
+- FULL GATE on the branch: 1374 passed, 0 failed.
+
+### STATE: opCamMap.js is the finalized DATA bridge (op -> CAM seed), all forks resolved + the stepover derivation one-source-verified against the wizard. NEXT: S1c — the in-panel authoring UI consuming seedFromOp (seed-from-program-op picker + the expose/bake field table + inline preview + Build-to-slot modal). No UI, no release this turn.
