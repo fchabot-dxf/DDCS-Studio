@@ -12855,3 +12855,22 @@ S1 is the first user-visible surface of a GUI-first feature, so per the dispatch
 - STRUCTURAL VERDICT: NOT awkward — the in-panel mode fits; seeding is a missing DECLARED map (cheap), not a structural mismatch. No structural gate; awaiting the advisor's ruling on the 2 forks + the safety requirement before any UI build.
 
 No code, no release. NEXT: implement S1 per the advisor's synthesis of the forks.
+
+---
+
+## 🔨 turn 1039 — CAM Builder S1a (branch feat/cam-builder): decl PLUMBING through the slot-gen pipeline. allocFieldsWith is now USED but output is BYTE-IDENTICAL (decl empty = all-exposed). NO UI.
+
+User ruled the S1 forks: seed = pick-op-from-program, guards NON-BAKEABLE, enums folded in. S1 builds in 3 increments — S1a plumbing (this turn), S1b UI, S1c enums. S1a threads a `decl` arg so allocFieldsWith replaces allocFields everywhere, changing NOTHING yet.
+
+### BUILT (all BYTE-IDENTICAL at decl-empty)
+- **generateOp (macrosApp.js:1007)** gains a `decl` arg -> `CAM_GEN[type](used,off,variant,decl)` / `slotFromOp(type,variant,used,off,decl)`.
+- **declFromOp (new helper, macrosApp.js near FIELD_OVR_COLS)**: builds decl={key:{exposed:false,value}} from op.exposed[key]===false + op.baked[key]. BOTH maps are ABSENT until S1b's UI writes them -> decl is {} today -> all-exposed. buildSlotFromOps (L1033) now passes declFromOp(op).
+- **9 generator call sites swapped** allocFields -> allocFieldsWith(SPEC,used,varOffset,decl): probeToSlot {96,208,256,321,395,478} (6 probe gens gained a `_variant, decl` tail — probes ignore the CAM_GEN variant slot), millToSlot {68,104,135} (import switched to allocFieldsWith; the 3 gens gained `, decl` after their dir/arc variant).
+- **opToSlot.js:127** (the GATE-flagged inline loop): converted order.map -> order.forEach with the SAME bake branch, PRESERVING the `order` composition + the holeDia default-override (def = key==='holeDia' ? (bore?12:6) : s.def). slotFromOp signature gained `, decl`. All-exposed reproduces the old order.map exactly (same nextParam order, same positional #var, same field shape, v built inline == v built after). NO gate needed — the holeDia/order preserved cleanly.
+
+### VERIFIED — two-method ACCEPT
+- METHOD 1 (diff): decl threaded through generateOp + buildSlotFromOps; 9 allocFields sites -> allocFieldsWith; opToSlot:127 inline hook added; NO UI, no seed picker, no enum, no new maps.
+- METHOD 2 (before/after byte-identity): a temp capture spec dumped {name,fields,body} for EVERY generator across variants x 3 (used,off) combos — the 9 CAM_GEN gens (mill x dir/arc variants) + slotFromOp drill/bore x 4 patterns + the standalone slot. Ran POST-S1a (185727 bytes) -> stashed the 4 web files -> ran on HEAD (185727 bytes) -> diff = IDENTICAL byte-for-byte. So every existing slot + pack is unchanged. Temp spec removed.
+- FULL GATE on the branch: 1373 passed, 0 failed. (S0's cam-allocfields-superset keeper still green.)
+
+### STATE: the expose/bake declaration now flows end-to-end (op.exposed/op.baked -> declFromOp -> generateOp -> allocFieldsWith / slotFromOp's inline hook) but is INERT (empty today) -> byte-identical. Ready for S1b to write op.exposed/op.baked from the UI. NEXT: S1b — the in-panel Build-CAM-slot mode (seed-from-program-op picker + the expose/bake field table + non-bakeable guard params + inline preview + Build-to-slot modal). No code user-visible yet, no release.
