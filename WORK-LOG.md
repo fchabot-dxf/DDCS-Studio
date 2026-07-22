@@ -12932,3 +12932,28 @@ Applied the t1042 rulings; grounded the 2 things flagged "do not assume" (the mi
 - FULL GATE on the branch: 1374 passed, 0 failed.
 
 ### STATE: opCamMap.js is the finalized DATA bridge (op -> CAM seed), all forks resolved + the stepover derivation one-source-verified against the wizard. NEXT: S1c — the in-panel authoring UI consuming seedFromOp (seed-from-program-op picker + the expose/bake field table + inline preview + Build-to-slot modal). No UI, no release this turn.
+
+---
+
+## 🔨 turn 1045 — CAM Builder S1c (branch feat/cam-builder): the AUTHORING UI, first visible surface. Reworked mid-turn per a user amendment: ONE reusable modal surface, THREE triggers (op-card door + CAM-tab door shipped; toolbar door gated). VIEWED screenshot matches.
+
+USER (mid-turn, "where do we put the button" → "as you [wish], we might move it later"): placed +Build CAM slot beside +Add slot (A), movable later.
+
+AMENDMENT (advisor, 2 msgs, the 2nd superseded): the entry point moved from a CAM-tab in-panel picker to ONE reusable authoring surface opened as a MODAL, with THREE triggers (DRY — one component): (1) a per-op CAM action on each OP CARD (pre-seeded from THAT op, picker hidden) — the PRIMARY; (2) an editor-toolbar button (picker shown); (3) the CAM-Pack-Builder button (picker shown). Escape hatch: if it balloons, ship the surface + the op-card door, gate the toolbar/CAM-tab triggers.
+
+### RECONCILED (built the surface first door-3-in-panel, then MOVED per the amendment — reused the table/preview/build)
+- **Reusable MODAL surface**: openCamAuthoring(seedOp?) opens an overlay (document.body) with the same expose/bake table + toggles + inline preview + Build-to-confirm-modal. seedOp given → pre-seed via cbmSeedFromOp + hide the picker (seedLocked "From op X → camType"); no seedOp → show the seed picker (getStack CAM-able ops). Exposed as window.ddcsOpenCamAuthoring; window.ddcsCamTypeOf for the ability check.
+- **Door 1 (op card)** — opContextMenu.showOpMenu (the shared Edit/Duplicate/Delete menu, reused by the editor/Blocks/Blockly): added "▸ Build CAM slot" for CAM-able op TYPES (isCamableType), greyed with the reason when the op's variant is unsupported (e.g. middle single-axis), absent for non-CAM types. Resolves the full op (params) via getStack by id; ensures macrosApp init (idempotent _wired) then opens the modal seeded from THAT op.
+- **Door 3 (CAM tab)** — #cam_build_slot now opens the SAME modal (picker). Legacy pack list / per-slot table / blank op picker UNTOUCHED.
+- **Door 2 (editor toolbar)** — GATED as the trivial follow-on (once the global exists it's a one-line toolbar button); not built this turn per the escape hatch.
+
+### KEY DETAILS
+- Build reuses buildSlotFromOps (op manifest {type:camType, variant, values, exposed, baked}) so all-exposed == the generator (byte-safe); Bake sets op.exposed[key]=false + op.baked[key]=value → declFromOp → allocFieldsWith drops the read + eng line + inlines the literal. Numeric values seeded (enum strings are S1d); stepover DERIVED via pocketfill.stepoverMm (shows 3.6 = 8*45/100 live in the table). Preview docks createPreviewPanel inline (not the throwaway overlay). Build-to-slot confirm modal (new camN / overwrite).
+- BUG fixed: the modal is on document.body but `q` is #macros-app-root-scoped → q('cbm_table') returned null → empty table. Switched the modal's element lookups to document.getElementById.
+
+### VERIFIED — two-method ACCEPT (VIEWED)
+- METHOD 1 (diff): one reusable modal surface consuming seedFromOp; op-card door in the shared menu; exposed/baked persisted; legacy pack view untouched.
+- METHOD 2 (VIEWED screenshot + driven flow, tests/cam-build-mode.spec.js): (a) the op-card action is enabled for pocket, greyed for a single-axis middle, ABSENT for contour; (b) the op-card door opens the modal pre-seeded ("From op Pocket → pocket", no picker), feed=1500, stepover=3.6; (c) Simulate docks + renders the 3D; (d) all-exposed Build keeps the Feed read line + the manifest is all-exposed; (e) baking Feed drops its read + eng line, inlines 1500, records op.baked.feed=1500. I VIEWED the screenshot: it matches the blessed mockup as a MODAL over the app (op-card door). 
+- FULL GATE on the branch: 1376 passed, 0 failed (legacy + editor + all CAM tests).
+
+### STATE: S1c shipped doors 1+3 of the reusable CAM authoring modal; door 2 (editor toolbar) gated as a trivial follow-on. Screenshot GATED to the advisor (no release). NEXT: door 2 (toolbar), then S1d (enum dropdowns + the enum<->int mapping).
