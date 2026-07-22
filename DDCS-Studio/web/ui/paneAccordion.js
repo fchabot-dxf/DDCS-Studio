@@ -168,18 +168,23 @@ function addPaneSplitter(split) {
     sp.innerHTML = '<span class="viz-pane-splitter-grip" aria-hidden="true"></span>';
     panes[0].after(sp);                                            // sits BETWEEN the two panes
 
-    // the pointer Y → the 3D pane's fraction, order-independent (twin = 3D on top, built-in = 2D on top).
-    const ratioAt = (y) => {
-        const s = split.getBoundingClientRect();
-        if (s.height <= 0) return getPaneRatio();
-        const frac = (y - s.top) / s.height;                       // the TOP pane's share
+    // t1017 — the split is ROW (side-by-side) on wide screens, COLUMN (stacked) otherwise; read the LIVE direction so the
+    // drag axis + the "which pane is first" match. Row → the pointer X maps to the LEFT pane's share; column → Y / TOP.
+    const isRow = () => { try { return getComputedStyle(split).flexDirection === 'row'; } catch (_) { return false; } };
+    // the pointer → the 3D pane's fraction, order-independent (twin = 3D first, built-in = 2D first) AND direction-independent.
+    const ratioAt = (x, y) => {
+        const s = split.getBoundingClientRect(), row = isRow();
+        const size = row ? s.width : s.height;
+        if (size <= 0) return getPaneRatio();
+        const frac = ((row ? x - s.left : y - s.top)) / size;      // the FIRST (left/top) pane's share
         const a = split.querySelector(':scope > [data-viz-pane="preview3d"]');
         const b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
-        const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
-        return Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDTop ? frac : 1 - frac));
+        const ra = a && a.getBoundingClientRect(), rb = b && b.getBoundingClientRect();
+        const threeDFirst = ra && rb && (row ? ra.left <= rb.left : ra.top <= rb.top);
+        return Math.max(RATIO_MIN, Math.min(RATIO_MAX, threeDFirst ? frac : 1 - frac));
     };
     let dragging = false, stopFollow = null;
-    const onMove = (e) => { if (!dragging) return; e.preventDefault(); applyPaneRatio(ratioAt(e.clientY)); };   // live, unpersisted
+    const onMove = (e) => { if (!dragging) return; e.preventDefault(); applyPaneRatio(ratioAt(e.clientX, e.clientY)); };   // live, unpersisted
     const onUp = (e) => {
         if (!dragging) return;
         dragging = false;
@@ -187,11 +192,12 @@ function addPaneSplitter(split) {
         sp.removeEventListener('pointermove', onMove); sp.removeEventListener('pointerup', onUp); sp.removeEventListener('pointercancel', onUp);
         if (stopFollow) { stopFollow(); stopFollow = null; }
         split.classList.remove('is-dragging');
-        setPaneRatio(ratioAt(e.clientY));                          // persist + notify (final) → survives reload, app-wide
+        setPaneRatio(ratioAt(e.clientX, e.clientY));               // persist + notify (final) → survives reload, app-wide
     };
     sp.addEventListener('pointerdown', (e) => {
         if (split.dataset.splitOn !== '1') return;                 // inert while a pane is collapsed / hidden
         dragging = true; e.preventDefault();
+        sp.setAttribute('aria-orientation', isRow() ? 'vertical' : 'horizontal');   // match the live layout for a11y
         try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         split.classList.add('is-dragging');
         stopFollow = followPanelResize(split);                     // reuse t785 — rAF-resize BOTH canvases live during the drag
@@ -204,8 +210,9 @@ function addPaneSplitter(split) {
         if (!d) return;
         e.preventDefault();
         const a = split.querySelector(':scope > [data-viz-pane="preview3d"]'), b = split.querySelector(':scope > [data-viz-pane="layout2d"]');
-        const threeDTop = a && b && a.getBoundingClientRect().top <= b.getBoundingClientRect().top;
-        setPaneRatio(getPaneRatio() + (threeDTop ? -d : d));       // ArrowDown grows the bottom pane, regardless of which it is
+        const ra = a && a.getBoundingClientRect(), rb = b && b.getBoundingClientRect();
+        const threeDFirst = ra && rb && (isRow() ? ra.left <= rb.left : ra.top <= rb.top);
+        setPaneRatio(getPaneRatio() + (threeDFirst ? -d : d));     // ArrowDown/Right grows the SECOND (bottom/right) pane, regardless of order/direction
         hostsResizeOnce(split);
     });
 

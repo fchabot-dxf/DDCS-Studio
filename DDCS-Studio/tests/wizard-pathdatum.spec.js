@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 // Path datum (the toolpath's own datum): which corner of the pattern anchors on the stock. It defaults to the
 // STOCK's datum, so the path FOLLOWS the stock onto it instead of always running +X/+Y off a max-corner datum.
 // The 3×3 picker on the 2D layout canvas overrides it. Placement rewrites the G-code (translateProgram).
-test.use({ viewport: { width: 1280, height: 900 } });
+test.use({ viewport: { width: 1000, height: 900 } });   // t1019 — a stacked-desktop width so the drill 2D layout is full-width (>=1024 puts it side-by-side w/ the 3D — a tall/narrow pane; the canvas interaction here is layout-agnostic)
 
 const numsOf = (code, letter) => (code.match(new RegExp(letter + '\\s*(-?\\d*\\.?\\d+)', 'gi')) || []).map((t) => parseFloat(t.replace(new RegExp(letter, 'i'), '')));
 const xsOf = (code) => numsOf(code, 'X');

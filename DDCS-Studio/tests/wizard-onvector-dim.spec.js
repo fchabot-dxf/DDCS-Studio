@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // On-vector dimension editing (Centroid-style): the wizard's 2D canvas handles show their VALUE and are
 // click-to-edit (type the dimension, not just drag). Generic in FeatureCanvas; prototyped on the drill wizard.
-test.use({ viewport: { width: 1280, height: 900 } });
+test.use({ viewport: { width: 1000, height: 900 } });   // t1019 — a stacked-desktop width so the drill 2D layout is full-width (>=1024 puts it side-by-side w/ the 3D; the canvas interaction here is layout-agnostic)
 
 test('drill canvas dimension label shows the value and is click-to-edit', async ({ page }) => {
   await page.goto('http://localhost:3211');
