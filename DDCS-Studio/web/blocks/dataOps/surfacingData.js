@@ -131,6 +131,7 @@ export function surfacingDataDef() {
     const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, [...toolBindingsFor(stack), ...SURFACING_STRUCT, ...SURFACING_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = surfacingPreviewGeometry;   // t716 — per-feature 2D handles (region extent) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
+    def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1025 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)
     // t945 spindleHeadPatch (blank progstart → live Head) THEN t986 applySkimStructure (Skim: progstart drops the absolute
     // clearance + placeonstock→skim). Normal/absent zMode → both are no-ops → BYTE-IDENTICAL to the frozen template.
     def.postInstantiate = (stack, resolved) => applySkimStructure(spindleHeadPatch(stack), resolved);

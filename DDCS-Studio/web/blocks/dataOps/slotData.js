@@ -138,6 +138,7 @@ export function slotDataDef() {
     const def = userOpFromStack('slot_data', 'Slot (data)', stack, [...toolBindingsFor(stack), ...SLOT_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = slotPreviewGeometry;   // t712 — per-feature 2D handles (A/B endpoints + width) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
+    def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1025 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)
     def.postInstantiate = spindleHeadPatch;   // t945 — fill the blank framing progstart's rpm/dir/spin-up from the live Head → M3 (was a DEAD spindle)
     return def;
 }

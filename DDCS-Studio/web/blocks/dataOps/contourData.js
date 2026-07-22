@@ -135,6 +135,7 @@ export function contourDataDef() {
     const def = userOpFromStack('contour_data', 'Contour (data)', stack, [...toolBindingsFor(stack), ...CONTOUR_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = contourPreviewGeometry;   // t712 — per-feature 2D handles (pos + shape size per kind) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
+    def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1025 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)
     def.postInstantiate = spindleHeadPatch;   // t945 — fill the blank framing progstart's rpm/dir/spin-up from the live Head → M3 (was a DEAD spindle)
     return def;
 }
