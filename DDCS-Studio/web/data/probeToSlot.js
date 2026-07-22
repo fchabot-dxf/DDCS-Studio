@@ -57,6 +57,35 @@ export function allocFields(spec, used, varOffset) {
     return { fields, v };
 }
 
+/**
+ * CAM Builder S0 — the expose/bake SUPERSET of allocFields. `decl` = { key: { exposed, value } } declares per-param
+ * intent; a key absent from decl (or exposed !== false) is EXPOSED. Exposed params are allocated EXACTLY as allocFields
+ * (same nextParam order, same positional #-var `#(varOffset+i+1)`, same field shape, same v[key]='#n'). A BAKED param
+ * (exposed === false) allocates NO #11xx param and pushes NO field — v[key] becomes the literal string, which the
+ * generators interpolate directly (so the read + eng lines vanish with the field). By construction, `decl` omitted or
+ * all-exposed makes this BYTE-IDENTICAL to allocFields.
+ *
+ * S0 SCOPE: additive only — no caller is rewired, so the bake branch is PRESENT-BUT-UNEXERCISED here; #2600-index
+ * stability under re-expose (plan decision #1) and the exposable/bakeable allow-list (decision #2) are later slices.
+ */
+export function allocFieldsWith(spec, used, varOffset, decl) {
+    const taken = new Set(used);
+    const fields = [];
+    const v = {};
+    spec.forEach((s, i) => {
+        const d = decl && decl[s.key];
+        if (d && d.exposed === false) {                 // BAKED — no param, no field; the literal substitutes for the #var
+            v[s.key] = String(d.value);
+            return;
+        }
+        const idx = nextParam(taken); if (idx != null) taken.add(idx);   // EXPOSED — identical to allocFields
+        const f = { key: s.key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def: s.def, min: s.min, max: s.max, type: s.type };
+        fields.push(f);
+        v[s.key] = f.var;
+    });
+    return { fields, v };
+}
+
 export const readLine = (f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`;
 
 /**
