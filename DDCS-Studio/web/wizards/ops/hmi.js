@@ -90,10 +90,14 @@ export const messageBlock = {
 // injection both emit THIS one atom. SIM NOTE: M0 is a MACHINE stop, not a sim-visible pause (the engine no-ops M0). The
 // Expert OK/Cancel BLOCKING confirm (shape B, via dialect.hmiPrompt + ESC-cancel) is the natural upgrade — swap the message
 // line for confirmBlock's prompt then. Default msg is a plain shop instruction.
+// t1032 REVIEW-FIX — ONE-SOURCE default message: the field default AND the emit fallback read this const, so the
+// between-pass INJECTION (which calls emit with empty params → p.msg undefined) carries the same text as the standalone op
+// instead of a BLANK banner (#1505=-5000() ) / blank ( MSG: ) comment.
+export const PAUSE_DEFAULT_MSG = 'Pause — check the part, then press Cycle Start to continue';
 export const pauseConfirmBlock = {
     type: 'pauseconfirm', label: 'Pause / Confirm', kind: 'leaf', category: 'Control',
-    defaults: { msg: 'Pause — check the part, then press Cycle Start to continue' }, fields: ['msg'],
-    emit: (p, dx, dy, dialect) => [...messageBlock.emit({ text: p.msg }, dx, dy, dialect), ...pauseBlock.emit()],
+    defaults: { msg: PAUSE_DEFAULT_MSG }, fields: ['msg'],
+    emit: (p, dx, dy, dialect) => [...messageBlock.emit({ text: p.msg || PAUSE_DEFAULT_MSG }, dx, dy, dialect), ...pauseBlock.emit()],
 };
 
 export const hmiStatusBlock = {

@@ -7,9 +7,10 @@
  * pauseConfirm atom — no new logic. The Expert OK/Cancel BLOCKING confirm is the natural upgrade (see hmi.js pauseConfirmBlock).
  */
 import { userOpFromStack } from '../userOps.js';
+import { PAUSE_DEFAULT_MSG } from '../../wizards/ops/hmi.js';   // t1032 — one-source default msg (shared with the atom + the injection fallback)
 
 export const PAUSE_CONFIRM_OPTYPE = 'user_pause_confirm';
-const DEFAULT_MSG = 'Pause — check the part, then press Cycle Start to continue';
+const DEFAULT_MSG = PAUSE_DEFAULT_MSG;
 
 /** The wrapped user_root template: one pauseconfirm exec child (blockIndex 0). */
 export function pauseConfirmStack() {
