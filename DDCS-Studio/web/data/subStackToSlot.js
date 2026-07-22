@@ -20,6 +20,7 @@ import { flattenBlocks, getUserDef } from '../blocks/userOps.js';
 import { camTypeOf, seedFromOp } from './opCamMap.js';
 import { stackToSlot } from './stackToSlot.js';
 import { readLine } from './probeToSlot.js';   // the SAME read-line fn the generators emit → the value re-sync stays format-identical
+import { composeParts } from './slotPack.js';   // normalize the composed part-bodies into ONE executable program (strip non-terminal ends + uniquify labels)
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from './probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from './millToSlot.js';
 import { slotFromOp } from './opToSlot.js';
@@ -138,5 +139,5 @@ export function subStackToSlot(def) {
             names.push(gen.name || '');
         }
     });
-    return { name: names.filter(Boolean).join(' + '), fields, body: bodies.join('\n\n') };
+    return { name: names.filter(Boolean).join(' + '), fields, body: composeParts(bodies) };   // ONE executable program: strip non-terminal M30s + uniquify labels across parts
 }

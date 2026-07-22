@@ -1064,7 +1064,7 @@ function homingPostIsExpert() {
             name = name ? name + ' + ' + gen.name.replace(/^(Drill|Bore) — /, '') : gen.name;
         });
         slot.fields = fields;
-        slot.body = parts.join('\n\n');
+        slot.body = slotPack.composeParts(parts);   // normalize the composed parts into ONE executable program (strip non-terminal M30s + uniquify labels) — else the controller stops after part 1
         if (name) slot.name = name;
         slot.bodyDirty = false;
     }

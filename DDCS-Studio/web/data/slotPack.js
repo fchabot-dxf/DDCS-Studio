@@ -83,6 +83,55 @@ export function slotMacro(slot) {
     return head.concat(reads, body ? [body] : [], hasEnd ? [] : ['M99']).join('\n') + '\n';
 }
 
+// ── compose N parts into ONE executable program ─────────────────────────────────────────────────────────────
+// Each CAM-slot generator emits a SELF-CONTAINED program: probe/mill bodies converge (success + error paths) on a label
+// then M30 (corner `…GOTO 2 / N2 / M30`, surfacing `…GOTO 9 / N7 N8 N9 / M30`); opToSlot/stackToSlot are fragments (end M5 /
+// raw atom emit, no M30 — the wrapper appends M99). Concatenating them raw put an M30 in the MIDDLE → the controller stopped
+// after part 1 and every later part was dead code (the shipped multi-op + sub-stack bug). composeParts normalizes:
+//   1. UNIQUIFY each part's labels (N-defs + GOTO / IF..GOTO targets) into a band strictly above the previous part's max, so
+//      a GOTO in part 2 can never resolve to part 1's identically-numbered label (the generators reuse N1/N2/N8/N9 per part).
+//   2. STRIP the terminal program-end (M30 / M2 / M02) from every part EXCEPT the last — keeping the convergence label above
+//      it as the fall-through into the next part. A fragment part (no M30) is untouched.
+// The last part keeps its own end; slotMacro's hasEnd then leaves it (or appends the single M99). One terminal end, in order.
+// (Loop DO/END labels are sequential+balanced across parts → not rewritten. Spindle M5→M3 brackets are KEPT — safe teardown.)
+
+// Max N-label / GOTO-target number in a body (mirrors opSession.js maxLabelNum, but over raw macro TEXT). GOTO spacing
+// varies by controller — the hand-written generators emit `GOTO 2` (space) but the DDCS Expert dialect emits `GOTO2` (no
+// space) for flow/saferetract atoms (ddcs-expert-m350.js) — so `\s*` matches BOTH, else a no-space GOTO is missed.
+function maxLabelIn(body) {
+    let max = 0, m;
+    const nre = /^\s*N(\d+)\b/gm; while ((m = nre.exec(body)) !== null) max = Math.max(max, Number(m[1]));
+    const gre = /\bGOTO\s*(\d+)\b/gi; while ((m = gre.exec(body)) !== null) max = Math.max(max, Number(m[1]));
+    return max;
+}
+// Shift every N-label DEFINITION (line-start `N<n>`) + every GOTO / IF..GOTO TARGET by `off` (both, so they stay consistent).
+// The GOTO replacement PRESERVES the original spacing (space or no-space) so the emitted dialect form is unchanged.
+function offsetBodyLabels(body, off) {
+    if (!off) return body;
+    return String(body)
+        .replace(/^(\s*)N(\d+)\b/gm, (_, sp, n) => `${sp}N${Number(n) + off}`)
+        .replace(/\bGOTO(\s*)(\d+)\b/gi, (_, sp, n) => `GOTO${sp}${Number(n) + off}`);
+}
+// Strip a TERMINAL program-end (M30 / M2 / M02) at the very end of a body — so control flows into the next part. Keeps the
+// convergence label above it; a fragment body (ends M5 / atom emit, no M30) is unaffected.
+function stripTerminalEnd(body) {
+    return String(body).replace(/(\r?\n)?[ \t]*M(30|0?2)\b[^\n]*[ \t]*$/i, '');
+}
+/**
+ * Normalize N composed part-bodies into ONE executable program: uniquify labels per part (running max, so no cross-part
+ * collision) + strip the terminal end from all but the last. Returns the joined body. Shared by buildSlotFromOps (multi-op)
+ * and subStackToSlot (sub-stack); a single part is returned unchanged (offset 0, last part → no strip).
+ */
+export function composeParts(parts) {
+    const clean = (parts || []).map((p) => String(p == null ? '' : p).replace(/\r/g, '')).filter((p) => p.trim() !== '');
+    let base = 0;
+    return clean.map((body, i) => {
+        const uni = offsetBodyLabels(body, base);
+        base = maxLabelIn(uni) + 1;                                 // the next part's labels start strictly above this part's max
+        return (i < clean.length - 1) ? stripTerminalEnd(uni) : uni;   // strip the program-end from every part EXCEPT the last
+    }).join('\n\n');
+}
+
 /**
  * Merge a pack's `additions` (eng param lines) into the controller's CURRENT `eng` text — the safe install
  * that community packs get wrong (they ship a full-replacement eng and clobber the operator's customisations;
