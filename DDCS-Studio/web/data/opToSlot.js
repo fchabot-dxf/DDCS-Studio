@@ -120,18 +120,25 @@ function loopBody(pattern, v, method) {
  * `used` = Set of #11xx already taken in the pack (for collision-free allocation).
  * Returns { name, fields:[{idx,label,units,def,min,max,type,var}], body }  — plugs straight into slotPack.
  */
-export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
+export function slotFromOp(method, pattern, used = new Set(), varOffset = 0, decl) {
     const std = STANDALONE[method];
     const order = std ? std.fields : ['posX', 'posY', ...PATTERN_FIELDS[pattern], ...HOLE_FIELDS[method], 'feed', 'clearance', 'rpm'];
     const taken = new Set(used);
-    const fields = order.map((key, i) => {
-        const idx = nextParam(taken); if (idx != null) taken.add(idx);
+    // S1a — the expose/bake hook (the inline twin of allocFieldsWith), preserving the `order` composition + the holeDia
+    // default override. A BAKED param (decl[key].exposed === false) takes no #11xx param and pushes no field; its literal
+    // substitutes for the #var at every interpolation site. decl absent / all-exposed → byte-identical to the old order.map.
+    const fields = [];
+    const v = {};
+    order.forEach((key, i) => {
         const s = SPEC[key];
         // Bore needs hole Ø > tool Ø (else the cut radius is 0); drill bores at tool Ø.
         const def = key === 'holeDia' ? (method === 'bore' ? 12 : 6) : s.def;
-        return { key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type };
+        const d = decl && decl[key];
+        if (d && d.exposed === false) { v[key] = String(d.value); return; }   // BAKED
+        const idx = nextParam(taken); if (idx != null) taken.add(idx);        // EXPOSED — identical alloc order
+        fields.push({ key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type });
+        v[key] = '#' + (varOffset + i + 1);
     });
-    const v = {}; fields.forEach((f) => { v[f.key] = f.var; });
     if (std) {   // standalone op (slot) — no pattern, no shared sub
         const reads = fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);
         const body = [`( ${std.label} )`, ...reads, '', ...spindleOn(v.rpm), '', std.body(v), ...spindleOff()].join('\n');

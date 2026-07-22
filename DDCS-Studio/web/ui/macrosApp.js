@@ -1004,11 +1004,20 @@ function homingPostIsExpert() {
     const opTypeOpts = (sel) => Object.entries(OP_LABEL).map(([v, l]) => `<option value="${v}"${sel === v ? ' selected' : ''}>${l}</option>`).join('');
     const defaultVariant = (type) => (SECOND_CTL[type] ? SECOND_CTL[type].opts[0][0] : '');
     // Generate one op into a starting point. The mill/probe ops live in CAM_GEN; drill/bore/slot go via slotFromOp.
-    const generateOp = (type, variant, used, off) => (CAM_GEN[type] ? CAM_GEN[type](used, off, variant) : slotFromOp(type, variant, used, off));
+    // S1a — a `decl` (the expose/bake declaration) threads through to allocFieldsWith / slotFromOp's inline hook.
+    const generateOp = (type, variant, used, off, decl) => (CAM_GEN[type] ? CAM_GEN[type](used, off, variant, decl) : slotFromOp(type, variant, used, off, decl));
     // Columns the user can tune in the field table that we PERSIST per op (so a regenerate keeps them, matched by
     // field key). `var` is generator-assigned (renaming would desync the body) and `type` has no column, so neither
     // is persisted. Stored on the op as op.values[key] = {def, min, max, label, units}.
     const FIELD_OVR_COLS = ['label', 'units', 'def', 'min', 'max'];
+    // S1a — the expose/bake declaration for a manifest op (siblings of op.values): a param is BAKED when
+    // op.exposed[key] === false, its frozen literal = op.baked[key]. Both maps are ABSENT until S1b's UI writes them,
+    // so decl is empty today → allocFieldsWith / slotFromOp run all-exposed → every existing slot is byte-identical.
+    const declFromOp = (op) => {
+        const ex = op.exposed || {}, bk = op.baked || {}, decl = {};
+        new Set([...Object.keys(ex), ...Object.keys(bk)]).forEach((k) => { if (ex[k] === false) decl[k] = { exposed: false, value: bk[k] }; });
+        return decl;
+    };
     // A read-line in canonical form (identical to what every generator emits) — used to re-sync the macro comment
     // to a tuned field so the table, the macro, Simulate and "Refresh fields" all agree.
     const canonicalRead = (f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`;
@@ -1030,7 +1039,7 @@ function homingPostIsExpert() {
         _camPack.slots.forEach((s) => { if (s !== slot) (s.fields || []).forEach((f) => used.add(f.idx)); });
         let fields = [], parts = [], name = '';
         (slot.ops || []).forEach((op, oi) => {
-            const gen = generateOp(op.type, op.variant, used, fields.length);
+            const gen = generateOp(op.type, op.variant, used, fields.length, declFromOp(op));
             let body = gen.body;
             gen.fields.forEach((f) => {
                 used.add(f.idx);

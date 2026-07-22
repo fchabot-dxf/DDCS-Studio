@@ -92,8 +92,8 @@ export const readLine = (f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units
  * Build the "Probe outside corner" CAM slot. One branching macro: #corner→signs, #wcs→base address,
  * #probeZ→optional Z surface, #seq→wall order. Returns { name, fields, body } (plugs into slotPack).
  */
-export function cornerSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(CORNER_FIELDS, used, varOffset);
+export function cornerSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(CORNER_FIELDS, used, varOffset, decl);
 
     // One wall: fast touch → check → retract → slow touch → check → radius-comp → WCS write → back off + lift.
     // sgn = ±1 sign var for this axis; the wall is at trigger + sgn*radius (outside/boss corner).
@@ -204,8 +204,8 @@ const ZPROBE_FIELDS = [
  * WCS Z datum. Two-pass G31 down; WCS Z = trigger − (trigger − surfaceZ), i.e. the touched point reads as the
  * `Surface = Z` value (default 0 → touch is Z0). Position the probe over the surface, press Enter.
  */
-export function probeZSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(ZPROBE_FIELDS, used, varOffset);
+export function probeZSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(ZPROBE_FIELDS, used, varOffset, decl);
     const body = [
         '( Probe Z down to a surface → set the WCS Z datum. Position the probe over the surface, press Enter. )',
         ...fields.map(readLine),
@@ -252,8 +252,8 @@ const EDGE_FIELDS = [
  * edge (trigger + sign*radius). #axis branches X/Y (the G31 letter is fixed), #dir is a sign var. No Z motion
  * (probes at the current height) — position the tool clear of the wall at probing depth, press Enter.
  */
-export function edgeSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(EDGE_FIELDS, used, varOffset);
+export function edgeSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(EDGE_FIELDS, used, varOffset, decl);
     const wallProbe = (ax) => [
         ...twoPassProbe(ax, { tgt: '#93', ret: '#95', fast: v.fast, slow: v.slow, port: PORT, level: LEVEL }),
         `#50=[${PROBE[ax].result}+#90*${v.radius}]   ;edge = trigger + sign*radius`,
@@ -317,8 +317,8 @@ const INSIDE_FIELDS = [
  * Position the probe INSIDE the feature at probe depth, press Enter. Ported from circularStack (bore). Inside
  * only: the tool crosses the open cavity. (Outside/boss needs operator repositions — a separate slot.)
  */
-export function insideCentreSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(INSIDE_FIELDS, used, varOffset);
+export function insideCentreSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(INSIDE_FIELDS, used, varOffset, decl);
     // Two-pass probe (fast→slow) in one direction, saving the trigger; retract after each pass.
     const twoPass = (ax, tgt, ret, into) =>
         probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: PORT, level: LEVEL });
@@ -391,8 +391,8 @@ const BOSS_FIELDS = [
  * DRO (#882) + G53, and re-centres X at safe Z before the Y faces (never cross the boss at depth). Writes the
  * centre to WCS X/Y; reports span/roundness. Ported from circularStack (boss).
  */
-export function bossCentreSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(BOSS_FIELDS, used, varOffset);
+export function bossCentreSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(BOSS_FIELDS, used, varOffset, decl);
     // Two-pass probe of one face: approach (tgt), retract (ret = away from the face), save trigger.
     const face = (ax, tgt, ret, into) =>
         probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: PORT, level: LEVEL });
@@ -474,8 +474,8 @@ const ALIGN_FIELDS = [
  * #1510-1512 popups; it does NOT write a WCS. #checkAxis (0=fence along X→probe Y, 1=fence along Y→probe X)
  * branches the probe axis + the DRO read (#880 X / #881 Y); #dir is a sign var. Ported from alignmentStack.
  */
-export function alignmentSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(ALIGN_FIELDS, used, varOffset);
+export function alignmentSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(ALIGN_FIELDS, used, varOffset, decl);
     // One point: confirm prompt → read the check-axis DRO → two-pass probe of the perpendicular fence face.
     const point = (probeAx, machVar, into, prompt, descend) => {
         const L = [`#1505=1   ;${prompt}`, `${into === '#50' ? '#70' : '#71'}=${machVar}   ;check-axis machine coord`];
