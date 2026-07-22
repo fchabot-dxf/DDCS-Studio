@@ -12830,3 +12830,28 @@ decl = { key: { exposed, value } }. A key absent from decl (or exposed !== false
 - FULL GATE on the branch: 1372 passed, 4 skipped, 1 failure = blocks-mobile-drawers (a mobile-drawer UI test, UNRELATED to a pure CAM data fn) which PASSES ALONE (14.1s) — a parallel-contention flake, same class as the earlier mobile/pane pixel tests. My zero-caller pure fn cannot affect it.
 
 ### STATE: S0 landed on feat/cam-builder. allocFieldsWith is a proven byte-identical superset of allocFields (safety net for the expose/bake concept). Nothing user-visible, no release. NEXT per the plan: S1 (single-op slot + expose/bake one param + inline preview + Add-to-pack), which threads op.exposed/op.baked through generateOp/buildSlotFromOps and needs the opToSlot.js:127 hook too.
+
+---
+
+## 🔨 turn 1037 — CAM Builder S1: GROUND + DESIGN-GATE (NO UI built). Proposal + ASCII mockup + named thread points gated to the advisor. Stayed on feat/cam-builder.
+
+S1 is the first user-visible surface of a GUI-first feature, so per the dispatch: ground + propose + gate the design back (the advisor surfaces the mockup to the user); build nothing. Grounded via 3 parallel Explore agents (CAM Pack Builder UI · the generator pipeline + expose/bake threading · the selected/inserted-op params model).
+
+### GROUNDED (key facts, line numbers in the proposal doc)
+- The CAM Pack Builder (ui/macrosApp.js) ALREADY has a structured op path: slot.ops manifest [{type,variant,values}] + op cards (opCardsHtml L1075) + buildSlotFromOps (L1028) + a per-field value-override model (op.values / FIELD_OVR_COLS L1010) + an INLINE-DOCKABLE preview (createPreviewPanel, currently in a throwaway overlay at simulateSlot L1178). So S1 EXTENDS this path, it does not build new machinery.
+- The generator pipeline: generateOp L1007 -> CAM_GEN[type](used,off,variant) (9 gens) or slotFromOp (opToSlot.js:123, a bespoke inline alloc loop at L127). Baking needs ZERO generator change beyond swapping allocFields -> allocFieldsWith (S0): v[key] becomes the literal at the same interpolation site, the read line + the pendant eng line vanish (both map slot.fields). engLine (slotPack.js:60) is NUMERIC-ONLY (t0/t1) -> enums are a Studio-side concern.
+- The seed source: op = {id,type:'op',opType,label,requires,params,children} (opBuilders.makeOp L96); op.params = the single source of truth; getStack()/window.ddcsGetBlockProgram is global. Blocks-tab selection (selectedId, blocksApp.js:483) is PRIVATE (not exported). getLastOp() (opRecord.js) is global. TWO real gaps = the core of S1: (1) opType != CAM-type (surfacing->surface, middle->inside/boss, contour->none), (2) op.params keys are wizard-PREFIXED (p_w, sf_depth) vs generator keys BARE (w, depth). No such map exists yet -> it must be DECLARED.
+
+### PROPOSED (in the doc: DDCS-Studio/scratchpad/cam-builder-s1-proposal.md)
+- WHERE: an in-panel Build-CAM-slot mode inside the CAM Pack Builder (plan rec 5) — the existing per-slot table stays byte-identical; the new mode renders a SPEC-DRIVEN expose/bake table for one seeded op.
+- The expose/bake FIELD TABLE (the #1 GUI element) = a row per param: Value | Expose/Bake toggle | the resulting #11xx->#2600 slot (or "baked = literal, no pendant"). ASCII mockup in the doc.
+- Persist op.exposed{key:bool}/op.baked{key:val} as NEW siblings of op.values; Build -> a slot-confirm modal (new cam-N vs overwrite) -> push into _camPack.slots (all downstream already wired).
+- Named thread points: decl plumbing through generateOp(1007)/buildSlotFromOps(1033); swap the 9 allocFields sites -> allocFieldsWith; the opToSlot.js:127 inline hook; the NEW declared maps (OPTYPE_TO_CAM + PARAM_ALIAS + NON_BAKEABLE); the new in-panel render.
+
+### GATED to the advisor — 1 safety requirement + 2 forks
+- SAFETY (G1, non-optional): guard/branch params (surfacing IF stepover LE 0; corner sign/seq/probeZ branches) must be NON-BAKEABLE (baking bakes the branch -> wrong G-code). S1 ships a minimal declared per-spec non-bakeable set (render "Expose-only"). This is the safety floor of plan decision #2.
+- FORK 1 (seed source): (A) [rec] a "Seed from program op" picker reading getStack() filtered to CAM types — G3 one-source, matches "extrapolate from the inserted program"; (B) export getSelectedOp() from the private Blocks-tab selection (cross-tab, awkward); (C) getLastOp() only (single op). Recommend A.
+- FORK 2 (enums in S1?): (A) [rec] defer the enum dropdown + int-map to S3 (keep S1 to the numeric acceptance, bake fast); (B) fold enums in now (bigger). Recommend A but flagged (user called the table the #1 GUI element).
+- STRUCTURAL VERDICT: NOT awkward — the in-panel mode fits; seeding is a missing DECLARED map (cheap), not a structural mismatch. No structural gate; awaiting the advisor's ruling on the 2 forks + the safety requirement before any UI build.
+
+No code, no release. NEXT: implement S1 per the advisor's synthesis of the forks.
