@@ -3,7 +3,7 @@
  * surface that can identify an op: the editor (line→op), the Blocks code panel (span ancestry→op), and the
  * Blockly op blocks. Acts via the window hooks (ddcsEditOp + opSession duplicate/delete) — params stay the truth.
  */
-import { camTypeOf, isCamableType } from '../data/opCamMap.js';   // t1045 S1c — the per-op CAM action (door 1)
+import { seedFromOp, isCamableType } from '../data/opCamMap.js';   // t1045 S1c — the per-op CAM action (door 1). U2 — seedFromOp is the FINAL verdict (generator | universal | unsupported), so the universal fallback greys/enables correctly
 
 let menu = null;
 function ensure() {
@@ -45,11 +45,11 @@ export function showOpMenu(op, x, y) {
     // variant has no generator (e.g. a single-axis middle). Opens the SAME authoring modal, pre-seeded from THIS op.
     if (isCamableType(op.opType)) {
         const full = (window.ddcsGetBlockProgram && (window.ddcsGetBlockProgram() || []).find((b) => b && b.id === op.id)) || op;
-        const cam = camTypeOf(full);
-        item(m, cam.camType ? '▸ Build CAM slot' : '▸ Build CAM slot — not CAM-able', async () => {
+        const seed = seedFromOp(full);   // the FINAL verdict: a generator/universal camType, or {unsupported} (no def / no bindings)
+        item(m, seed.unsupported ? '▸ Build CAM slot — not CAM-able' : '▸ Build CAM slot', async () => {
             try { (await import('./macrosApp.js')).initMacrosApp(); } catch (_) { /* */ }   // idempotent — ensures the opener is registered
             if (window.ddcsOpenCamAuthoring) window.ddcsOpenCamAuthoring(full);
-        }, !!cam.unsupported);
+        }, !!seed.unsupported);
     }
     item(m, '🗑 Delete', async () => { try { (await import('../blocks/opSession.js')).deleteOp(op.id); } catch (_) { /* */ } });
     place(m, x, y);

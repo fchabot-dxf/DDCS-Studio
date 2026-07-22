@@ -123,17 +123,17 @@ test('S1 fix: data-op TWINS are CAM-able and seed correct values', async ({ page
     return {
       camable: { surf: isCamableType('user_surfacing_data'), pocket: isCamableType('user_pocket_data'), corner: isCamableType('user_corner_data'), bore: isCamableType('user_bore_data'), contour: isCamableType('user_contour_data') },
       camType: { surf: surf.camType, pocket: pocket.camType, corner: corner.camType, bore: bore.camType },
-      contourUnsupported: seedFromOp(op('user_contour_data', {})).unsupported,
+      contourUniversal: !!seedFromOp(op('user_contour_data', {})).universal,   // U2 — the contour twin now routes to the universal unroll path (has a def to unroll)
       surf: { stepover: byKey(surf, 'stepover').value, depth: byKey(surf, 'depth').value, w: byKey(surf, 'w').value },
       pocket: { stepover: byKey(pocket, 'stepover').value, toolDia: byKey(pocket, 'toolDia').value, depth: byKey(pocket, 'depth').value },
       corner: { corner: byKey(corner, 'corner').value, probeZ: byKey(corner, 'probeZ').value, wcs: byKey(corner, 'wcs').value, maxProbe: byKey(corner, 'maxProbe').value },
       bore: { holeDia: byKey(bore, 'holeDia').value, posX: byKey(bore, 'posX').value, camType: bore.camType },
     };
   });
-  // the FIX: twins are CAM-able; contour twin is NOT
-  expect(r.camable).toEqual({ surf: true, pocket: true, corner: true, bore: true, contour: false });
+  // the FIX: twins are CAM-able. U2 — contour (no dedicated generator) is now CAM-able too, via the universal unroll path.
+  expect(r.camable).toEqual({ surf: true, pocket: true, corner: true, bore: true, contour: true });
   expect(r.camType).toEqual({ surf: 'surface', pocket: 'pocket', corner: 'corner', bore: 'bore' });
-  expect(r.contourUnsupported, 'contour twin correctly unsupported').toContain('NO CAM generator');
+  expect(r.contourUniversal, 'contour twin now CAM-able via the universal path (no generator → unroll)').toBe(true);
   // surfacing twin: uses its FLAT stepover (no stepoverPct/toolDia to derive from)
   expect(r.surf.stepover, 'surfacing twin uses its flat stepover 9.6').toBe(9.6);
   expect(r.surf.depth).toBe(0.8); expect(r.surf.w).toBe(200);

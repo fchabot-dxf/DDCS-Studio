@@ -30,6 +30,10 @@ import { classifyExposable } from './exposeClassifier.js';   // U1 — which val
  * @param {number} varOffset  local #-var offset so vars continue across composed ops
  */
 export function stackToSlot(def, decl = {}, used = new Set(), varOffset = 0) {
+    // A saved universal slot stores its op's opType in the CAM pack (an independent store); if that op was later deleted, or
+    // the pack was shared to a machine lacking the op, getUserDef() returns null. Fail SOFT (a placeholder slot) rather than
+    // crash the rebuild — buildSlotFromOps composes a 0-field gen fine, and the operator sees a named gap instead of a throw.
+    if (!def) return { name: '(missing op)', fields: [], body: '( universal CAM op def not found — the source op was deleted or is not registered on this machine )' };
     const taken = new Set(used);
     const fields = [];
     const tokenParams = {};
@@ -41,7 +45,8 @@ export function stackToSlot(def, decl = {}, used = new Set(), varOffset = 0) {
         if (d && d.exposed === true && exposable) {                     // EXPOSED — a #11xx param + #2600 mirror + a LOCAL #var
             const idx = nextParam(taken); if (idx != null) taken.add(idx);
             const varStr = '#' + (varOffset + i + 1);
-            fields.push({ key: b.param, idx, var: varStr, label: b.label || b.param, units: b.units || '', def: b.default, min: (b.min != null ? b.min : 0), max: (b.max != null ? b.max : 0), type: (b.type === 'int') ? 0 : 1, exposable: true });
+            const seedDef = (d.value != null && d.value !== '') ? d.value : b.default;   // the pendant seeds from the op's value (decl), else the binding default
+            fields.push({ key: b.param, idx, var: varStr, label: b.label || b.param, units: b.units || '', def: seedDef, min: (b.min != null ? b.min : 0), max: (b.max != null ? b.max : 0), type: (b.type === 'int') ? 0 : 1, exposable: true });
             tokenParams[b.param] = varStr;                              // the LOCAL var lands in the socket; val() rides it through
         } else if (d && d.exposed === true && !exposable) {            // SAFETY (U1, valid-by-construction) — a bake-only param can't
             tokenParams[b.param] = String(d.value != null ? d.value : b.default);   // ride a #var; force-bake instead of emitting garbage

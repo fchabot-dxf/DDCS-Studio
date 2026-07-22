@@ -20,6 +20,8 @@ import { pocketSlot, circlePocketSlot, surfacingSlot } from './millToSlot.js';
 import { slotFromOp } from './opToSlot.js';
 import { stepoverMm } from '../wizards/ops/pocketfill.js';   // t1043 — the CANONICAL exported stepoverPct->mm: max(0.2, max(0.1,toolDia)*stepoverPct/100). surfacingWizard.js:24-27 computes the identical formula inline (its absent-param defaults differ — 12/60 vs 6/40 — but are unreachable when the op provides toolDia+pct); the seed test verifies surface stepover == the real surfacingStack value.
 import { builtinTypeForTwin } from '../blocks/wizardLibrary.js';   // t1049 — the DECLARED twin->built-in bridge (inverts opensAs->type/variant). Real programs use data-op TWINS (user_surfacing_data …), not the bare built-in optypes.
+import { getUserDef } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback
+import { classifyExposable } from './exposeClassifier.js';   // U1 — per-binding exposable/geometry classification for the universal seed
 
 // The clean 1:1 opType -> CAM generator type. pocket/drill are the DEFAULT arm; their variant arms are gated in camTypeOf.
 export const OPTYPE_TO_CAM = { surfacing: 'surface', corner: 'corner', edge: 'edge', slot: 'slot', pocket: 'pocket', drill: 'drill' };
@@ -27,8 +29,10 @@ export const OPTYPE_TO_CAM = { surfacing: 'surface', corner: 'corner', edge: 'ed
 // The op types the S1c picker should offer (each has at least one working arm). Per-op variants may still be unsupported
 // (seedFromOp returns {unsupported}): pocket polygon/ellipse, drill pattern 'single', middle single-axis. contour excluded.
 export const SUPPORTED_OPTYPES = ['pocket', 'surfacing', 'corner', 'edge', 'slot', 'drill', 'middle'];
-// Accepts a built-in opType OR a data-op twin (user_*_data) — normalized via the declared bridge (defined below).
-export const isCamableType = (opType) => SUPPORTED_OPTYPES.includes(baseOf(opType).baseType);
+// Accepts a built-in opType OR a data-op twin (user_*_data) — normalized via the declared bridge (defined below). U2 —
+// widened past the 8 premium generators: ANY op with a registered def (every user_* twin/fork) is CAM-able via the universal
+// unroll path, so the picker offers EVERY op. A generator arm stays the PREMIUM path for the 8 standard shapes (camTypeOf).
+export const isCamableType = (opType) => SUPPORTED_OPTYPES.includes(baseOf(opType).baseType) || !!getUserDef(opType);
 
 // PARAM_ALIAS[camType] = { generatorFieldKey: opParamsKey } — ONLY the renames; unlisted keys alias to themselves.
 // (Grounded from the op.params bare keys + the generator SPECs. stepover has NO op source — pocket/surface store
@@ -127,24 +131,47 @@ export function camTypeOf(op) {
             const shape = p.shape || 'rect';
             if (shape === 'rect') return { camType: 'pocket' };
             if (shape === 'circle') return { camType: 'cpocket' };   // t1043 ruling — circle -> circlePocketSlot
-            return { unsupported: `pocket shape "${shape}" has no CAM generator (only rect + circle exist)` };   // polygon/ellipse
+            return { universal: true, reason: `pocket shape "${shape}" has no CAM generator (only rect + circle) → universal` };   // polygon/ellipse → the unrolled long-tail path
         }
         case 'drill': {
             // t1043 ruling — pattern 'single' has no slotFromOp pattern (known S1 gap); otherwise it's a bore when the built-in
             // op sets method:'helical' OR the twin resolves to variant:'bore' (user_bore_data — the twin has no `method`).
-            if ((p.pattern || 'single') === 'single') return { unsupported: 'drill/bore pattern "single" has no slotFromOp pattern (circle/grid/line/rect only) — known S1 gap' };
+            if ((p.pattern || 'single') === 'single') return { universal: true, reason: 'drill/bore pattern "single" has no generator pattern (circle/grid/line/rect only) → universal' };
             return { camType: (variant === 'bore' || (p.method || 'peck') === 'helical') ? 'bore' : 'drill' };
         }
         case 'middle': {
             // t1043 ruling — the CAM inside/boss generators are FIXED BOTH-AXIS centre probes (no single-axis variant). A
             // single-axis middle would probe an axis the operator didn't intend -> mark unsupported (never emit a wrong slot).
             // `circular` is covered either way (insideCentreSlot always re-centres X; "harmless for a rectangle"). featureType picks the arm.
-            if (!(p.twoAxis || p.findBoth)) return { unsupported: 'middle single-axis probe: the CAM inside/boss slot is BOTH-AXIS only (enable Find both axes)' };
+            if (!(p.twoAxis || p.findBoth)) return { universal: true, reason: 'middle single-axis: the inside/boss generator is BOTH-AXIS only → universal (unrolls the single-axis probe as authored)' };
             return { camType: p.featureType === 'boss' ? 'boss' : 'inside' };
         }
-        case 'contour': return { unsupported: 'contour has NO CAM generator (excluded from S1)' };   // (user_contour_data resolves here too)
-        default: return { unsupported: `opType "${op && op.opType}" is not CAM-able` };
+        case 'contour': return { universal: true, reason: 'contour has NO CAM generator → universal' };   // (user_contour_data resolves here too)
+        default: return { universal: true };   // U2 — ANY unrecognized op (a forked/custom user_* op) routes to the universal unroll path (seedFromOp reads its def bindings)
     }
+}
+
+/** UNIVERSAL seed — read the def BINDINGS directly (param names are the def's own; NO PARAM_ALIAS/DERIVE). Each value binding
+ *  becomes a field seeded from op.params, with an `exposable` flag from exposeClassifier (value-role AND not under a fold).
+ *  Geometry/other params are exposable:false → the table greys Expose + bake-forces them. Returns {unsupported} if the op has
+ *  no registered def or no value bindings (the honest floor). */
+function seedUniversal(op, reason) {
+    const def = getUserDef(op && op.opType);
+    // No registered def (a bare built-in optype has none — real programs use user_*_data twins): fall back to camTypeOf's
+    // reason (why no dedicated generator) so the message stays informative, else a plain no-def note.
+    if (!def) return { unsupported: reason || `no registered def for "${op && op.opType}" — cannot build a universal slot` };
+    const valueBindings = (def.bindings || []).filter((b) => b && b.blockIndex != null);   // structural (guard) bindings have no socket
+    if (!valueBindings.length) return { unsupported: reason || `"${op && op.opType}" has no value bindings to expose or bake` };
+    const cls = classifyExposable(def);
+    const params = (op && op.params) || {};
+    const fields = valueBindings.map((b) => {
+        const raw = params[b.param];
+        const value = (raw !== undefined && raw !== '') ? raw : b.default;
+        const exposable = !!(cls[b.param] && cls[b.param].exposable);
+        return { key: b.param, label: b.label || b.param, def: b.default, value, units: b.units || '', type: b.type,
+            exposed: true, bakeable: true, exposable };   // bakeable: any universal param can be baked; exposable: only value-role, fold-free
+    });
+    return { camType: 'universal', universal: true, fields };
 }
 
 /**
@@ -155,6 +182,7 @@ export function camTypeOf(op) {
  */
 export function seedFromOp(op) {
     const r = camTypeOf(op);
+    if (r.universal) return seedUniversal(op, r.reason);   // U2 — the universal (def-bindings-derived) seed for any non-generator op
     if (r.unsupported) return { unsupported: r.unsupported };
     const camType = r.camType, params = (op && op.params) || {};
     const alias = PARAM_ALIAS[camType] || {}, nb = NON_BAKEABLE[camType] || [], derive = DERIVE[camType] || {};

@@ -18,6 +18,8 @@ import { slotFromOp } from '../data/opToSlot.js';
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from '../data/probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
 import { seedFromOp, camTypeOf, isCamableType } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op
+import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
+import { getUserDef, defVOf } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest
 import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
 import { makeZip, downloadBytes } from '../data/zip.js';
@@ -1006,7 +1008,10 @@ function homingPostIsExpert() {
     const defaultVariant = (type) => (SECOND_CTL[type] ? SECOND_CTL[type].opts[0][0] : '');
     // Generate one op into a starting point. The mill/probe ops live in CAM_GEN; drill/bore/slot go via slotFromOp.
     // S1a — a `decl` (the expose/bake declaration) threads through to allocFieldsWith / slotFromOp's inline hook.
-    const generateOp = (type, variant, used, off, decl) => (CAM_GEN[type] ? CAM_GEN[type](used, off, variant, decl) : slotFromOp(type, variant, used, off, decl));
+    const generateOp = (type, variant, used, off, decl, opType) =>
+        (type === 'universal') ? stackToSlot(getUserDef(opType), decl, used, off)   // U3 — the universal arm: unroll the op's def, expose value params, bake geometry
+        : CAM_GEN[type] ? CAM_GEN[type](used, off, variant, decl)                    // the 8 PREMIUM live-parametric generators (unchanged)
+        : slotFromOp(type, variant, used, off, decl);                                // drill/bore/slot generators (unchanged)
     // Columns the user can tune in the field table that we PERSIST per op (so a regenerate keeps them, matched by
     // field key). `var` is generator-assigned (renaming would desync the body) and `type` has no column, so neither
     // is persisted. Stored on the op as op.values[key] = {def, min, max, label, units}.
@@ -1015,8 +1020,13 @@ function homingPostIsExpert() {
     // op.exposed[key] === false, its frozen literal = op.baked[key]. Both maps are ABSENT until S1b's UI writes them,
     // so decl is empty today → allocFieldsWith / slotFromOp run all-exposed → every existing slot is byte-identical.
     const declFromOp = (op) => {
-        const ex = op.exposed || {}, bk = op.baked || {}, decl = {};
-        new Set([...Object.keys(ex), ...Object.keys(bk)]).forEach((k) => { if (ex[k] === false) decl[k] = { exposed: false, value: bk[k] }; });
+        const ex = op.exposed || {}, bk = op.baked || {}, vals = op.values || {}, decl = {};
+        new Set([...Object.keys(ex), ...Object.keys(bk)]).forEach((k) => {
+            if (ex[k] === false) decl[k] = { exposed: false, value: bk[k] };
+            // UNIVERSAL: stackToSlot exposes ONLY on decl.exposed===true (an absent entry = not-exposed), so expose must be
+            // POSITIVE here (unlike the generator path where absence = exposed). Seed the pendant field from the op's value.
+            else if (op.type === 'universal') decl[k] = { exposed: true, value: (vals[k] ? vals[k].def : undefined) };
+        });
         return decl;
     };
     // A read-line in canonical form (identical to what every generator emits) — used to re-sync the macro comment
@@ -1040,7 +1050,7 @@ function homingPostIsExpert() {
         _camPack.slots.forEach((s) => { if (s !== slot) (s.fields || []).forEach((f) => used.add(f.idx)); });
         let fields = [], parts = [], name = '';
         (slot.ops || []).forEach((op, oi) => {
-            const gen = generateOp(op.type, op.variant, used, fields.length, declFromOp(op));
+            const gen = generateOp(op.type, op.variant, used, fields.length, declFromOp(op), op.opType);   // opType → the universal arm's def lookup
             let body = gen.body;
             gen.fields.forEach((f) => {
                 used.add(f.idx);
@@ -1086,8 +1096,10 @@ function homingPostIsExpert() {
         if (!slot.ops || !slot.ops.length) return '';
         const cards = slot.ops.map((op, oi) => `<div class="cam-op-card" style="display:flex; align-items:center; gap:6px; padding:4px 6px; background:rgba(127,127,127,.05); border:1px solid var(--border); border-radius:6px;">
                 <span style="font-size:10px; color:var(--text-dim); width:14px; text-align:center;">${oi + 1}</span>
-                <select class="cam-op-type" data-oi="${oi}" title="Op type — changing it rebuilds this op's fields + macro">${opTypeOpts(op.type)}</select>
-                <select class="cam-op-var" data-oi="${oi}" title="${secondCtlTitle(op.type)}"${SECOND_CTL[op.type] ? '' : ' style="display:none"'}>${secondCtlOpts(op.type, op.variant)}</select>
+                ${op.type === 'universal'
+                    ? `<span style="font-size:11px; color:var(--text-dim); padding:2px 4px; white-space:nowrap;" title="Custom op (universal) — its type is fixed to the source op &quot;${camEsc(op.opType || '')}&quot; and cannot be swapped for a generator">⚙ Custom op</span>`
+                    : `<select class="cam-op-type" data-oi="${oi}" title="Op type — changing it rebuilds this op's fields + macro">${opTypeOpts(op.type)}</select>
+                <select class="cam-op-var" data-oi="${oi}" title="${secondCtlTitle(op.type)}"${SECOND_CTL[op.type] ? '' : ' style="display:none"'}>${secondCtlOpts(op.type, op.variant)}</select>`}
                 <span style="flex:1"></span>
                 <button class="op-btn" data-act="opup" data-oi="${oi}" title="Move up (ops run in this order)"${oi === 0 ? ' disabled' : ''}>▲</button>
                 <button class="op-btn" data-act="opdown" data-oi="${oi}" title="Move down (ops run in this order)"${oi === slot.ops.length - 1 ? ' disabled' : ''}>▼</button>
@@ -1122,11 +1134,17 @@ function homingPostIsExpert() {
     function makeAuthOp(op) {
         const seed = seedFromOp(op);
         if (seed.unsupported) return null;
-        const values = {};
-        seed.fields.forEach((f) => { if (typeof f.value === 'number') values[f.key] = { def: f.value }; });   // seed NUMERIC values (enum ints come via the field default)
-        return { opType: op.opType, camType: seed.camType, variant: variantForCam(seed.camType, op.params || {}), fields: seed.fields, values, exposed: {}, baked: {}, label: op.label || op.opType };
+        const values = {}, exposed = {}, baked = {};
+        seed.fields.forEach((f) => {
+            if (typeof f.value === 'number') values[f.key] = { def: f.value };   // seed NUMERIC values (enum ints come via the field default)
+            // UNIVERSAL default: value params (exposable) start EXPOSED (positive, not by-absence — the generator path's
+            // empty-map default means all-exposed, but stackToSlot needs an explicit expose flag); geometry params start
+            // BAKED to the op's own value (a #var can't ride through them). The generator path keeps its empty exposed/baked.
+            if (seed.universal) { if (f.exposable) exposed[f.key] = true; else { exposed[f.key] = false; baked[f.key] = f.value; } }
+        });
+        return { opType: op.opType, camType: seed.camType, variant: variantForCam(seed.camType, op.params || {}), fields: seed.fields, values, exposed, baked, label: op.label || op.opType, universal: !!seed.universal, defV: defVOf(op.opType) };
     }
-    const toManifest = (a) => ({ type: a.camType, variant: a.variant, values: a.values, exposed: a.exposed, baked: a.baked });
+    const toManifest = (a) => ({ type: a.camType, variant: a.variant, values: a.values, exposed: a.exposed, baked: a.baked, opType: a.opType, defV: a.defV });   // U3 — opType+defV let a universal slot rebuild via getUserDef; type==='universal' selects the arm
     const cbmPreviewSlot = () => { const s = { slot: nextSlotNum(), name: _authoring.name || 'New CAM slot', ops: _authoring.ops.map(toManifest) }; buildSlotFromOps(s); return s; };
     const cbmVal = (oi, key) => { const a = _authoring.ops[oi]; const ov = a.values[key]; if (ov && ov.def != null) return ov.def; const f = a.fields.find((x) => x.key === key); return f ? (typeof f.value === 'number' ? f.value : f.def) : ''; };
     function renderCbmTable() {
@@ -1142,15 +1160,20 @@ function homingPostIsExpert() {
             const rows = a.fields.map((f) => {
                 const baked = a.exposed[f.key] === false, val = cbmVal(oi, f.key), idx = idxOf(oi, f.key);
                 const enumOpt = f.enum && f.enum.find((o) => o.value === Number(val));
+                const numeric = (val === '' || val == null || !isNaN(Number(val)));   // a non-numeric value (a baked string/enum with no dropdown) must NOT be an editable number input — typing would overwrite the string bake with a number (wrong G-code)
                 const valCell = f.enum
                     ? `<select class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(f.key)}" style="min-width:118px;">${f.enum.map((o) => `<option value="${o.value}"${o.value === Number(val) ? ' selected' : ''}>${camEsc(o.label)}</option>`).join('')}</select>`
-                    : `<input class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(f.key)}" type="number" value="${val}" style="width:72px;">`;
+                    : numeric
+                        ? `<input class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(f.key)}" type="number" value="${val}" style="width:72px;">`
+                        : `<span style="color:var(--text-dim); font-size:11px;" title="baked string/enum value (read-only)">${camEsc(String(val))}</span>`;
                 const slotCell = baked ? `baked = ${f.enum ? (enumOpt ? enumOpt.label + ' (' + val + ')' : val) : val}` : (idx != null ? `#${idx} → #${slotPack.mirrorVar(idx)}` : '—');
                 const bakeTip = f.bakeable ? '' : ' title="Guard / branch param — must stay operator-set (Expose-only)"';
+                const canExpose = f.exposable !== false;   // U3 — universal GEOMETRY params (exposable===false) can't carry a #var → Expose disabled, Bake-forced (mirrors the bakeable greying)
+                const exposeTip = canExpose ? '' : ' title="Geometry / fold-driven — a #var cannot ride through the emit; bake it"';
                 return `<tr data-oi="${oi}" data-fkey="${camEsc(f.key)}">
                     <td style="padding:2px 6px;">${camEsc(f.label || f.key)}</td>
                     <td>${valCell}</td>
-                    <td style="white-space:nowrap;"><label style="margin-right:8px;"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(f.key)}" data-oi="${oi}" data-fkey="${camEsc(f.key)}" data-mode="expose"${baked ? '' : ' checked'}> Expose</label><label${bakeTip} style="${f.bakeable ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(f.key)}" data-oi="${oi}" data-fkey="${camEsc(f.key)}" data-mode="bake"${baked ? ' checked' : ''}${f.bakeable ? '' : ' disabled'}> Bake</label></td>
+                    <td style="white-space:nowrap;"><label${exposeTip} style="margin-right:8px;${canExpose ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(f.key)}" data-oi="${oi}" data-fkey="${camEsc(f.key)}" data-mode="expose"${baked ? '' : ' checked'}${canExpose ? '' : ' disabled'}> Expose</label><label${bakeTip} style="${f.bakeable ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(f.key)}" data-oi="${oi}" data-fkey="${camEsc(f.key)}" data-mode="bake"${baked ? ' checked' : ''}${f.bakeable ? '' : ' disabled'}> Bake</label></td>
                     <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">${camEsc(slotCell)}</td>
                 </tr>`;
             }).join('');
@@ -1243,7 +1266,8 @@ function homingPostIsExpert() {
     function cbmToggle(oi, key, mode) {
         const a = _authoring.ops[oi];
         if (mode === 'bake') { a.exposed[key] = false; a.baked[key] = cbmVal(oi, key); }
-        else { delete a.exposed[key]; delete a.baked[key]; }   // Expose = the default (no decl entry)
+        else if (a.universal) { a.exposed[key] = true; delete a.baked[key]; }   // universal: Expose is POSITIVE (stackToSlot exposes only on exposed===true)
+        else { delete a.exposed[key]; delete a.baked[key]; }   // generator: Expose = the default (no decl entry)
         renderCbmTable();
     }
     // t1053 (S-A / Gap 4) — a PROBE CAM slot's macro is INCREMENTAL (G31 from the operator start); with no stock/start the

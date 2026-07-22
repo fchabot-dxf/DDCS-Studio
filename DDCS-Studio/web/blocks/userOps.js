@@ -45,6 +45,14 @@ import { deriveBindings } from './dataOps/deriveBindings.js';   // re-derive bin
 const STORE_KEY = 'ddcs_user_ops';
 export const USER_OP_PREFIX = 'user_';
 
+// The LIVE def registry: opType → the registered def object (template + bindings + the LIVE fn hooks). registerUserOp is the
+// single funnel every path traverses (create/update/load forks + the code data-op-twin seed), so populating it there covers
+// forks AND twins by construction. Unlike listUserOps() (a localStorage JSON snapshot — functions stripped, absent in private
+// mode), this returns the live def. Universal CAM (stackToSlot) reads template+bindings from here. See getUserDef below.
+const USER_DEFS = new Map();
+/** The LIVE registered user-op def (template + bindings + hooks) for an opType, or null. O(1); immune to localStorage gaps. */
+export function getUserDef(opType) { return USER_DEFS.get(opType) || null; }
+
 // Param value-types a binding may carry. `type` is the VALUE kind (drives marker codec + defaults); the form
 // `widget` (separate, ui/formWidgets.js) is just how it's rendered. number stays the easy default.
 export const BINDING_TYPES = new Set(['number', 'int', 'enum', 'bool', 'string', 'list']);   // 'list' = a structured/array value (e.g. a coordinate-list positioner) — not a scalar socket
@@ -543,6 +551,7 @@ export function registerUserOp(def) {
     setUserStatusHint(def.opType, def.statusHint);   // t554 — a DECLARED in-place status HINT (homing's unset-travel warning); a LIVE fn (re-attached from the seed, like the others)
     setUserSimGcode(def.opType, def.simGcode);   // t566 — a DECLARED sim-gcode override (the ATC change choreography); a LIVE fn (re-attached from the seed, like the others)
     setUserPreviewGeometry(def.opType, def.previewGeometry);   // t712 — a DECLARED preview-geometry hook (slot/contour per-feature 2D handles); a LIVE fn (re-attached from the seed, like the others)
+    USER_DEFS.set(def.opType, def);   // the LIVE def registry (Universal CAM reads template+bindings here); overwrite on re-author/re-seed
     return def;
 }
 
@@ -603,6 +612,7 @@ export function updateUserOp(def) {
 /** Remove a user op from the registry + persistence (and the live user-layer builder/spec/label entries). */
 export function deleteUserOp(opType) {
     writeStore(readStore().filter((d) => d.opType !== opType));
+    USER_DEFS.delete(opType);         // clear the live def registry entry (register touches N tables — delete must clear them all)
     unregisterUserBuilder(opType);
     unregisterUserSpec(opType);
     removeOpLabel(opType);            // register touches 4 tables — delete must clear all 4 (was leaking OP_LABELS)
