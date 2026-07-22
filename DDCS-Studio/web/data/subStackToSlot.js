@@ -83,14 +83,14 @@ function applyFieldValues(body, fields) {
  * custom parts unroll+expose. Parts IN ORDER; #11xx/#var allocated around siblings (buildSlotFromOps contract).
  * @returns {{name:string, fields:object[], body:string}}
  */
-export function subStackToSlot(def) {
+export function subStackToSlot(def, used = new Set(), varOffset = 0) {
     const template = (def && def.template) || [];
     const root = template.find((b) => b && b.type === 'user_root') || template[0];
     const fullFlat = flattenBlocks(template);
     const bindings = (def && def.bindings) || [];
     const parts = walkParts(root ? root.children : []);
 
-    const used = new Set();
+    const usedSet = new Set(used);   // seed from the caller (collision-free when composed ALONGSIDE sibling ops in one slot)
     let fields = [], bodies = [], names = [];
     parts.forEach((part, pi) => {
         let gen = null;
@@ -110,14 +110,14 @@ export function subStackToSlot(def) {
                 const params = deriveStandardParams(stdDef, part.opunit.children);
                 const ct = camTypeOf({ type: 'op', opType, params });
                 if (ct.camType && ct.camType !== 'universal') {
-                    gen = generatePart(ct.camType, undefined, used, fields.length, {});   // decl {} = all-exposed → the generator's LIVE loop knobs
+                    gen = generatePart(ct.camType, undefined, usedSet, varOffset + fields.length, {});   // decl {} = all-exposed → the generator's LIVE loop knobs
                     const seed = seedFromOp({ type: 'op', opType, params });
                     if (gen && seed && !seed.unsupported) {
                         (gen.fields || []).forEach((f) => { const sv = (seed.fields || []).find((x) => x.key === f.key); if (sv && sv.value != null && sv.value !== '') f.def = sv.value; });
                         gen.body = applyFieldValues(gen.body, gen.fields);   // reflect the re-derived params on the pendant reads (loop still rides the #var → geometry stays LIVE)
                     }
                 } else {
-                    gen = stackToSlot(stdDef, {}, used, fields.length);   // an opunit wrapping a NON-generator op → unroll (not live, but never silently dropped)
+                    gen = stackToSlot(stdDef, {}, usedSet, varOffset + fields.length);   // an opunit wrapping a NON-generator op → unroll (not live, but never silently dropped)
                 }
             }
         } else {
@@ -130,10 +130,11 @@ export function subStackToSlot(def) {
             const subDef = { opType: ((def && def.opType) || 'user_sub') + '_p' + pi, template: subStack, bindings: subBindings };
             const decl = {};
             subBindings.forEach((b) => { decl[b.param] = { exposed: true }; });   // expose every custom value binding (stackToSlot force-bakes the non-exposable)
-            gen = stackToSlot(subDef, decl, used, fields.length);
+            gen = stackToSlot(subDef, decl, usedSet, varOffset + fields.length);
         }
         if (gen) {
-            (gen.fields || []).forEach((f) => { used.add(f.idx); f._op = pi; });
+            // tag the PART (not _op — buildSlotFromOps overwrites _op with the authoring-op index); the modal groups rows by _part
+            (gen.fields || []).forEach((f) => { usedSet.add(f.idx); f._part = pi; f._partKind = part.kind; f._partLabel = gen.name || ''; });
             fields = fields.concat(gen.fields || []);
             bodies.push(gen.body || '');
             names.push(gen.name || '');

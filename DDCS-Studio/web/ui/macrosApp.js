@@ -19,6 +19,7 @@ import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, ali
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
 import { seedFromOp, camTypeOf, isCamableType } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op
 import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
+import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
 import { getUserDef, defVOf } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest
 import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
@@ -1009,7 +1010,8 @@ function homingPostIsExpert() {
     // Generate one op into a starting point. The mill/probe ops live in CAM_GEN; drill/bore/slot go via slotFromOp.
     // S1a — a `decl` (the expose/bake declaration) threads through to allocFieldsWith / slotFromOp's inline hook.
     const generateOp = (type, variant, used, off, decl, opType) =>
-        (type === 'universal') ? stackToSlot(getUserDef(opType), decl, used, off)   // U3 — the universal arm: unroll the op's def, expose value params, bake geometry
+        (type === 'substack') ? subStackToSlot(getUserDef(opType), used, off)        // S4 — a forked op w/ an embedded opunit: subStackToSlot composes ALL parts itself (standard part LIVE via its generator loop, custom atoms exposed)
+        : (type === 'universal') ? stackToSlot(getUserDef(opType), decl, used, off)   // U3 — the universal arm: unroll the op's def, expose value params, bake geometry
         : CAM_GEN[type] ? CAM_GEN[type](used, off, variant, decl)                    // the 8 PREMIUM live-parametric generators (unchanged)
         : slotFromOp(type, variant, used, off, decl);                                // drill/bore/slot generators (unchanged)
     // Columns the user can tune in the field table that we PERSIST per op (so a regenerate keeps them, matched by
@@ -1130,8 +1132,35 @@ function homingPostIsExpert() {
     let _cbmUnsupported = []; // present-but-not-CAM-able program ops (for the empty-state reasons)
     const CAM_SUPPORTED_LABEL = 'Pocket · Surface · Probe corner / edge · Slot · Drill / Bore · Probe centre (Middle)';
     const variantForCam = (camType, params) => (camType === 'drill' || camType === 'bore') ? (params.pattern || 'circle') : defaultVariant(camType);
+    // S4 — a forked op whose def embeds an `opunit` (a standard sub-unit kept live) → the parts that walkParts sees, else null.
+    // Recognition is a READ of the declared opunit boundary (never inferred from motion). Only user_* forks are in USER_DEFS.
+    const subStackParts = (opType) => {
+        const def = getUserDef(opType); if (!def) return null;
+        const tmpl = def.template || [];
+        const root = tmpl.find((b) => b && b.type === 'user_root') || tmpl[0];
+        const parts = walkParts(root ? root.children : []);
+        return parts.some((p) => p.kind === 'standard') ? parts : null;   // has at least one live standard part → route through subStackToSlot
+    };
+    // Build a SUB-STACK authoring op: subStackToSlot composes the parts (standard = generator LIVE knobs, custom = value params).
+    // Fields carry _part/_partKind/_partLabel so renderCbmTable groups them. S4 modal-first: the build is fixed all-exposed
+    // (surfacing stays parametric independent of the toggles), so every row is Expose-only (bakeable:false) — per-part
+    // expose/bake toggling that drives the build is a flagged follow-on.
+    function makeSubStackAuthOp(op) {
+        const def = getUserDef(op.opType);
+        const sub = subStackToSlot(def);   // build once to get the composed, part-tagged fields (idx/var + _part/_partKind/_partLabel)
+        const fields = (sub.fields || []).map((f) => ({
+            ...f,
+            value: (f.def != null ? f.def : ''),
+            bakeable: false,   // standard = generator loop knob (always live); custom = exposed for now (per-part baking is a follow-on)
+            _bakeTip: f._partKind === 'standard' ? 'Generator loop knob — always live (baking would break the parametric loop)' : 'Sub-stack builds all-exposed; per-part baking is a follow-on',
+        }));
+        const exposed = {}, baked = {};
+        fields.forEach((f) => { exposed[f.key] = true; });   // fixed all-exposed (matches the subStackToSlot build)
+        return { opType: op.opType, camType: 'substack', variant: '', fields, values: {}, exposed, baked, label: op.label || op.opType, substack: true, defV: defVOf(op.opType) };
+    }
     // A program op → an authoring op (via seedFromOp). null when the op isn't CAM-able.
     function makeAuthOp(op) {
+        if (subStackParts(op.opType)) return makeSubStackAuthOp(op);   // S4 — a forked op w/ an embedded standard sub-unit routes to the sub-stack path (parts stay grouped, standard LIVE)
         const seed = seedFromOp(op);
         if (seed.unsupported) return null;
         const values = {}, exposed = {}, baked = {};
@@ -1157,17 +1186,21 @@ function homingPostIsExpert() {
         const preview = cbmPreviewSlot();   // buildSlotFromOps allocates params around siblings + tags each field's owning op (f._op)
         const idxOf = (oi, key) => { const f = (preview.fields || []).find((x) => x._op === oi && x.key === key); return f ? f.idx : null; };
         const sections = _authoring.ops.map((a, oi) => {
-            const rows = a.fields.map((f) => {
+            const rowHtml = (f) => {
                 const baked = a.exposed[f.key] === false, val = cbmVal(oi, f.key), idx = idxOf(oi, f.key);
                 const enumOpt = f.enum && f.enum.find((o) => o.value === Number(val));
                 const numeric = (val === '' || val == null || !isNaN(Number(val)));   // a non-numeric value (a baked string/enum with no dropdown) must NOT be an editable number input — typing would overwrite the string bake with a number (wrong G-code)
-                const valCell = f.enum
-                    ? `<select class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(f.key)}" style="min-width:118px;">${f.enum.map((o) => `<option value="${o.value}"${o.value === Number(val) ? ' selected' : ''}>${camEsc(o.label)}</option>`).join('')}</select>`
-                    : numeric
-                        ? `<input class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(f.key)}" type="number" value="${val}" style="width:72px;">`
-                        : `<span style="color:var(--text-dim); font-size:11px;" title="baked string/enum value (read-only)">${camEsc(String(val))}</span>`;
+                const valCell = a.substack
+                    // S4 — a sub-stack part's value is the pendant DEFAULT re-derived from the op's definition on every build; editing it here
+                    // would be a no-op (subStackToSlot re-derives from the def), so show it read-only. Modal editing of part defaults is a follow-on.
+                    ? `<span style="font-size:11.5px;" title="Pendant default, derived from the op's definition — customize the op to change it">${camEsc(String(val))}</span>`
+                    : f.enum
+                        ? `<select class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(f.key)}" style="min-width:118px;">${f.enum.map((o) => `<option value="${o.value}"${o.value === Number(val) ? ' selected' : ''}>${camEsc(o.label)}</option>`).join('')}</select>`
+                        : numeric
+                            ? `<input class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(f.key)}" type="number" value="${val}" style="width:72px;">`
+                            : `<span style="color:var(--text-dim); font-size:11px;" title="baked string/enum value (read-only)">${camEsc(String(val))}</span>`;
                 const slotCell = baked ? `baked = ${f.enum ? (enumOpt ? enumOpt.label + ' (' + val + ')' : val) : val}` : (idx != null ? `#${idx} → #${slotPack.mirrorVar(idx)}` : '—');
-                const bakeTip = f.bakeable ? '' : ' title="Guard / branch param — must stay operator-set (Expose-only)"';
+                const bakeTip = f.bakeable ? '' : ` title="${camEsc(f._bakeTip || 'Guard / branch param — must stay operator-set (Expose-only)')}"`;   // S4 — a sub-stack part carries its own reason on _bakeTip
                 const canExpose = f.exposable !== false;   // U3 — universal GEOMETRY params (exposable===false) can't carry a #var → Expose disabled, Bake-forced (mirrors the bakeable greying)
                 const exposeTip = canExpose ? '' : ' title="Geometry / fold-driven — a #var cannot ride through the emit; bake it"';
                 return `<tr data-oi="${oi}" data-fkey="${camEsc(f.key)}">
@@ -1176,8 +1209,23 @@ function homingPostIsExpert() {
                     <td style="white-space:nowrap;"><label${exposeTip} style="margin-right:8px;${canExpose ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(f.key)}" data-oi="${oi}" data-fkey="${camEsc(f.key)}" data-mode="expose"${baked ? '' : ' checked'}${canExpose ? '' : ' disabled'}> Expose</label><label${bakeTip} style="${f.bakeable ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(f.key)}" data-oi="${oi}" data-fkey="${camEsc(f.key)}" data-mode="bake"${baked ? ' checked' : ''}${f.bakeable ? '' : ' disabled'}> Bake</label></td>
                     <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">${camEsc(slotCell)}</td>
                 </tr>`;
-            }).join('');
-            return `<div class="cbm-op-group" data-oi="${oi}" style="margin-top:${oi ? 12 : 0}px;"><div style="font-size:12px; font-weight:600; color:var(--accent,#6ea8fe); border-bottom:1px solid var(--border); padding:3px 0; margin-bottom:3px;">${oi + 1}. ${camEsc(a.label)} <span style="color:var(--text-dim); font-weight:400; font-size:10px;">→ ${camEsc(a.camType)}</span></div>
+            };
+            let rows;
+            if (a.substack) {
+                // S4 — group the composed fields by PART (the opunit standard sub-unit + each custom loose-atom run); a labelled
+                // sub-header per part shows the standard part is LIVE (its generator loop) vs the custom part's exposed values.
+                const groups = [];
+                a.fields.forEach((f) => { const pi = f._part || 0; if (!groups[pi]) groups[pi] = { kind: f._partKind, label: f._partLabel, fields: [] }; groups[pi].fields.push(f); });
+                rows = groups.filter(Boolean).map((g, gi) => {
+                    const hint = g.kind === 'standard' ? 'live — generator loop knobs (geometry stays parametric)' : 'custom atoms — values exposed, geometry baked';
+                    const plabel = g.kind === 'standard' ? (g.label || ('Part ' + (gi + 1))) : 'Custom atoms';   // the custom part's _partLabel is a synthetic subDef opType (noise) → a friendly generic label
+                    return `<tr><td colspan="4" style="padding:6px 6px 2px; font-size:10.5px; font-weight:600; color:var(--text-dim); border-top:${gi ? '1px dashed var(--border)' : 'none'};">▸ ${camEsc(plabel)} <span style="font-weight:400;">— ${hint}</span></td></tr>` + g.fields.map(rowHtml).join('');
+                }).join('');
+            } else {
+                rows = a.fields.map(rowHtml).join('');
+            }
+            const camLabel = a.camType === 'substack' ? 'sub-stack — parts stay live' : a.camType;
+            return `<div class="cbm-op-group" data-oi="${oi}" style="margin-top:${oi ? 12 : 0}px;"><div style="font-size:12px; font-weight:600; color:var(--accent,#6ea8fe); border-bottom:1px solid var(--border); padding:3px 0; margin-bottom:3px;">${oi + 1}. ${camEsc(a.label)} <span style="color:var(--text-dim); font-weight:400; font-size:10px;">→ ${camEsc(camLabel)}</span></div>
                 <table style="width:100%; font-size:11.5px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th style="padding:2px 6px;">Param</th><th>Value</th><th>On the pendant?</th><th>Pendant slot</th></tr></thead><tbody>${rows}</tbody></table></div>`;
         }).join('');
         el.innerHTML = `${sections}<div class="settings-hint" style="margin-top:8px;">Expose = the operator fills it on the pendant (#11xx → #2600). Bake = frozen into the macro; the row vanishes. Enum params pick a friendly label; the pendant stores its number.</div>`;

@@ -20,6 +20,7 @@ import { installCornerGridField } from './cornerGridField.js';
 import { installRegionPickField } from './regionPickField.js';
 import { installCoordListField } from './coordListField.js';
 import { CANVAS_ROLE_WIDGETS } from '../userOps.js';   // the ONE role-encoded widget list (shared with dev-mode; consumed lazily below → cycle-safe)
+import { opLabelOf } from '../opBuilders.js';   // t1071 — the opunit chip's friendly per-instance label (opType → the twin's registered label)
 
 // Fields that render as the inline 3×3 corner-grid picker (field_cornergrid), tinted per datum so PlaceOnStock's
 // stock-attach (blue) and path-datum (amber) glyphs read apart — matching the 2D canvas pickers.
@@ -194,16 +195,18 @@ export function inlineFields(def) {
 function jsonDef(def) {
     const isSection = def.kind === 'section';
     const isStructctl = def.kind === 'structctl';   // t154 — keeps its label (e.g. "Probe Z First") but drops the field-name prefix ("value")
+    const isOpunit = def.kind === 'opunit';   // t1071 — a friendly per-instance label + the opType/defV routing key rendered READ-ONLY (editable = a corruptible foot-gun)
     const args0 = [];
     // t146 — HEADER ROW (message0): the block's label + its inline fields. Statement-input MOUTHS go on their OWN rows
     // BELOW (message1/message2 via addMouth) so the label never sits beside the mouth (which shoved nested blocks right
     // + widened the block) → the block collapses to CONTENT WIDTH, nested content starts hard-left. The item-b separator-
     // header pattern, GENERALIZED in the shared builder to EVERY C-mouth kind. Authoring layout only — emit is untouched.
     // The `section` block shows JUST its title (no "Section title" prefix): drop the label + the field-name for it.
-    let message0 = isSection ? '' : def.label, n = 0;
+    let message0 = isSection ? '' : (isOpunit ? '▨ %1 ·' : def.label), n = isOpunit ? 1 : 0;
+    if (isOpunit) args0.push({ type: 'field_label', name: 'OPUNIT_LABEL', text: def.label });   // filled per-instance from opType by ddcs_opunit; the routing key (opType/defV) follows READ-ONLY
     for (const f of fieldsOf(def)) {
         const k = fieldKind(def, f);
-        message0 += (isSection || isStructctl) ? ` %${++n}` : ` ${f} %${++n}`;
+        message0 += (isSection || isStructctl || isOpunit) ? ` %${++n}` : ` ${f} %${++n}`;   // opunit drops the "opType"/"defV" field-name prefixes (the friendly label carries the meaning)
         const desc = getDesc(f);
         if (k === 'cornergrid') args0.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
         else if (k === 'regionpick') args0.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });
@@ -238,6 +241,7 @@ function jsonDef(def) {
     else if (isWrap(def)) addMouth('DO');
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)
+    if (isOpunit) block.extensions = [...(block.extensions || []), 'ddcs_opunit'];   // t1071 — friendly label from opType + lock the routing key read-only
     if (def.kind === 'reporter') block.output = outputCheck(def);   // value block
     else { block.previousStatement = null; block.nextStatement = null; }   // statement block
     return block;
@@ -385,6 +389,35 @@ function registerSecColorExtension(Blockly) {
     } catch (e) { /* already registered */ }
 }
 
+// t1071 — the `opunit` chip: derive a FRIENDLY per-instance label from the opType it wraps (e.g. "Surface / face unit") and
+// render the routing key READ-ONLY. An opunit is a DECLARED sub-unit boundary created programmatically at fork/load time; its
+// opType is the key subStackToSlot routes on, so a hand-edit in the workspace would corrupt the routing (audit Finding 1). The
+// value still round-trips (the field is present, just non-editable). Degrades safely — if anything throws, the chip stays raw.
+function registerOpunitExtension(Blockly) {
+    try {
+        Blockly.Extensions.register('ddcs_opunit', function () {
+            const self = this;
+            // this Blockly has no Field.setEditable — editability is the EDITABLE property (isCurrentlyEditable reads it) + enabled_
+            // (isClickable gates the click-to-edit). Set both so the routing key can neither open an editor nor report editable.
+            const lock = (f) => { if (!f) return; try { f.EDITABLE = false; if (f.setEnabled) f.setEnabled(false); else if (f.updateEditable) f.updateEditable(); } catch (_) { /* keep field */ } };
+            const apply = () => {
+                try {
+                    const ot = self.getFieldValue('OPTYPE') || '';
+                    const lf = self.getField('OPUNIT_LABEL');
+                    if (lf && ot) lf.setValue(opLabelOf(ot) + ' unit');   // the twin it forks, made friendly ("Surface / face" → "Surface / face unit")
+                    lock(self.getField('OPTYPE'));   // the routing key: READ-ONLY (corruptible foot-gun otherwise)
+                    const dInp = self.getInput && self.getInput('DEFV');   // defV rides a math_number shadow → lock its NUM field too (a version stamp, not operator-set)
+                    const dTgt = dInp && dInp.connection && dInp.connection.targetBlock();
+                    lock(dTgt && dTgt.getField && dTgt.getField('NUM'));
+                } catch (_) { /* keep the raw chip */ }
+            };
+            apply();
+            setTimeout(apply, 0);           // JSON load sets fields/shadows AFTER init → re-derive the label + re-lock
+            self.setOnChange(function () { if (!self._ddcsOpunit) { self._ddcsOpunit = true; apply(); } });   // fallback until the field/shadow lands
+        });
+    } catch (e) { /* already registered */ }
+}
+
 export function installBlockly(Blockly) {
     _Blockly = Blockly;
     installCornerGridField(Blockly);   // register field_cornergrid BEFORE the blocks that reference it
@@ -392,6 +425,7 @@ export function installBlockly(Blockly) {
     installCoordListField(Blockly);    // register field_coordlist (the coordinate-list positions preview)
     registerDynExtension(Blockly);
     registerSecColorExtension(Blockly);
+    registerOpunitExtension(Blockly);   // t1071 — the opunit chip's friendly label + read-only routing key
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 

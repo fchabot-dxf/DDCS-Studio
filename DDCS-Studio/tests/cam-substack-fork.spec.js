@@ -112,12 +112,19 @@ test.describe(() => {
             let opunit = null;
             const walk = (bs) => { for (const b of (bs || [])) { if (!b) continue; if (b.type === 'opunit') opunit = b; if (b.uiChildren) walk(b.uiChildren); if (b.children) walk(b.children); } };
             walk(back);
-            return { hasOpunit: !!opunit, opunitOpType: opunit && opunit.params && opunit.params.opType, opunitChildCount: opunit ? (opunit.children || []).length : 0 };
+            // t1071 — the chip: a friendly per-instance label + the routing key rendered READ-ONLY (audit Finding 1)
+            const blk = window.__blkws.getAllBlocks(false).find((b) => b.type === 'opunit');
+            const lf = blk && blk.getField('OPUNIT_LABEL'), otf = blk && blk.getField('OPTYPE');
+            return { hasOpunit: !!opunit, opunitOpType: opunit && opunit.params && opunit.params.opType, opunitChildCount: opunit ? (opunit.children || []).length : 0,
+                chipLabel: lf ? lf.getText() : null, opTypeEditable: otf ? !!otf.EDITABLE : null };   // setEditable(false) sets field.EDITABLE=false (this Blockly has no isEditable())
         });
         await page.screenshot({ path: `${SCRATCH}/s3-opunit-chip.png` });   // VIEW how the opunit chip renders
         // the DO-mouth fix (bridge.js + stackBridge.js) — the opunit keeps its exec children through the workspace round-trip
         expect(r.hasOpunit, 'the opunit survives the workspace round-trip').toBe(true);
         expect(r.opunitOpType).toBe('user_surfacing_data');
         expect(r.opunitChildCount, 'the opunit keeps its 6 exec children through the round-trip (NOT dropped)').toBe(6);
+        // t1071 chip label (audit Finding 1): a friendly per-instance label + the routing key non-editable (round-trip STILL preserves opType above = the regression guard)
+        expect(r.chipLabel, 'the chip renders a friendly per-instance label ending in "unit" (not the raw opType)').toMatch(/unit$/i);
+        expect(r.opTypeEditable, 'the opType routing key is READ-ONLY (an editable key is a corruptible foot-gun)').toBe(false);
     });
 });
