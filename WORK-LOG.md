@@ -12980,3 +12980,21 @@ The user's #1 GUI element: enum params (corner/WCS/probe-Z/wall-order/axis/dir) 
 - FULL GATE on the branch: 1377 passed, 0 failed.
 
 ### STATE: CAM Builder v1 is FEATURE-COMPLETE on feat/cam-builder - S0 (superset) -> S1a (plumbing) -> S1b (op->CAM maps + seed) -> S1c (reusable authoring modal, 3 doors) -> S1d (enum dropdowns). All 3 entry doors live (op card, editor toolbar, CAM tab). Screenshot GATED to the advisor. Per the advisor's plan: they add .gitattributes eol=lf + MERGE v1 to main. No release from me.
+
+---
+
+## 🔨 turn 1047 (cont.) — S1d AMENDMENT incorporated (2 mid-turn amends, INCORPORATED before pass): SAFETY RULING REVERSED — CHOICE params are BAKEABLE; screenshot now demos corner EXPOSED vs BAKED.
+
+The advisor (user + advisor-verified) reversed the S1b/S1c/S1d NON_BAKEABLE ruling: CHOICE params (corner/wcs/axis/seq/probeZ/dir) ARE bakeable. Motive (user): authors bake a choice to make a single-purpose, clearly-illustrated slot (four clean FL/BL/BR/FR slots vs one ambiguous icon).
+
+### NEW SAFETY MODEL (replaces the blanket NON_BAKEABLE)
+- Every CAM choice param appears only in IF CONDITIONS, arithmetic, or #var ASSIGNMENTS — NEVER as a GOTO/label TARGET (the GOTO targets are fixed literals N1/N10/N20/…). So a baked valid literal CONSTANT-FOLDS to valid G-code (corner=1 -> `IF 1 EQ 2 THEN #90=0-1` = an always-false no-op; the signs still resolve). VERIFIED per generator.
+- Valid-by-construction: the enum dropdown / numeric min-max CONSTRAINS the baked value to valid options, AND the live preview shows the baked slot before save. So the dropdown serves BOTH expose and bake.
+- NON_BAKEABLE now = ONLY surface's numeric validity guards [stepover, stepdown, toolDia, clearance] (kept Expose-only for now per the advisor; they'd fold safely too — flagged). All probe/mill choice + numeric params are bakeable.
+
+### VERIFIED (2-method, VIEWED)
+- METHOD 1 (diff): NON_BAKEABLE reduced to surface's 4 numeric guards; the enum dropdown already served both expose+bake (S1d) so no render change needed.
+- METHOD 2: (a) NEW bake-safety test (cam-op-seed) — bakes corner/seq/wcs/probeZ (corner gen) + axis/dir (edge gen) to valid literals and asserts the read line vanishes, the literal CONSTANT-FOLDS into the IF/assignment (IF 1 EQ 2, IF 1 EQ 1 GOTO, #71=2, …), the macro still ends M30, and the GOTO-target labels survive. (b) cam-build-mode S1d: choice enums now Bake-ENABLED; BAKING corner in the modal inlines int 2 (IF 2 EQ 2), drops its read + eng row, records op.baked.corner=2. (c) VIEWED screenshot cam-s1d-enum.png — corner BAKED ("baked = Front-Right (2)", the row leaves the pendant + frees its param so WCS shifts to #2600) while WCS/Probe-Z/Wall-order stay EXPOSED dropdowns — demoing BOTH on corner exactly as the user asked.
+- FULL GATE on the branch: 1378 passed, 0 failed.
+
+### STATE: CAM Builder v1 feature-complete + the choice-param bake model corrected. Choice params bakeable (dropdown-picked literal inlines, valid-by-construction); numeric surface guards kept Expose-only for now (flagged as trivially bakeable too). Screenshot GATED to the advisor. Per plan: advisor adds .gitattributes eol=lf + MERGES v1 to main. No release from me.
