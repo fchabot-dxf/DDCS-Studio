@@ -13023,3 +13023,29 @@ ROOT CAUSE (advisor+user confirmed): camTypeOf/OPTYPE_TO_CAM keyed on the BARE b
 - FULL GATE on the branch: 1381 passed, 0 failed.
 
 ### STATE: FIX #1 done - the CAM Builder recognizes + seeds the DATA-OP TWINS real programs are built from (was the #1 blocker to fully-fledged). Built-in path preserved. NEXT (architect-scoped): multi-op / icon / table-gui / preview / empty-state. Do NOT merge v1 yet (this fix was the blocker). No release from me.
+
+---
+
+## 🔨 turn 1051 — CAM FIX #1 HARDENING (from the advisor's 4-lens adversarial verification). Test coverage for all 8 twins + the drill/bore PLACEMENT geometric fix. GROUND-FIRST (Explore agent).
+
+The advisor verified FIX #1 SOLID but flagged: (1) only 4/8 CAM-able twins driven; (2) a real geometric placement bug; (3) acceptable divergences to stop over-asserting; (4) capability gaps to surface not fix.
+
+### (2) DRILL/BORE PLACEMENT FIX (grounded, was a real geometric bug)
+- ROOT: PARAM_ALIAS drill/bore posX<-x0, posY<-y0 sourced the pattern-LOCAL origin (x0/y0, default 0). The drill/bore CAM slot runs at the WCS origin with posX/posY as the pattern anchor + has NO separate #20/#21 offset (unlike pocket), so it must carry the PLACEMENT. A twin placed at originX=100 seeded posX=0 -> holes at the WCS origin, not the op location.
+- GROUNDED (agent): the placement (originX/originY -> PlaceOnStock offX/offY) is a rigid translate; x0/y0 STRUCTURALLY CANCELS through the placement datum-corner attach (final X = originX + pattern-offset). So the correct source is originX ALONE (never originX+x0). The built-in drill force-sets x0===originX (drillView), so posX<-x0 accidentally worked there; the TWIN keeps them independent (x0=0) -> the bug is twin-specific = what real programs use.
+- FIX: PARAM_ALIAS drill/bore posX: ['originX','x0'], posY: ['originY','y0'] (readParam first-present). originX wins for BOTH built-in (===x0) + twin (the placement); falls back to x0 only if originX absent. No gate needed (posX/posY IS the placement channel).
+- CAVEAT FLAGGED (not fixed - genuinely ambiguous): a CIRCLE pattern's slot posX is the CENTRE while placement attaches the bbox min corner, so a circle MAY differ by dia/2 - BUT the built-in centres the circle at originX (cx=originX), so the dia/2 is not clearly right; the x0->originX fix is CERTAIN, the circle refinement is deferred to the advisor.
+
+### (1) TEST COVERAGE - all 8 CAM-able twins now driven through seedFromOp against REAL twin values
+NEW test seeds user_edge_data (axis Y->1, dir neg->1, wcs G56->3, maxProbe<-dist 60), user_slot_data (ax/bx/depth/feed identity), user_drill_data (PLACEMENT posX=100/posY=50, cols/depth), user_middle_data BOTH featureType pocket->inside AND boss->boss (wcs enum, maxProbe<-dist). Plus the existing surfacing/pocket/corner/bore. The bore twin fixture made realistic (grid, originX=40 -> posX=40, not x0). This closes the exact "tested-the-built-in-not-the-twin" gap that let the original bug through.
+
+### (3)+(4) ACCEPTABLE / KNOWN-LIMIT (do NOT fix, per the advisor)
+- boss safeZ 15-vs-twin-10 (vestigial + safer), blank rpm 8000, toolDia/holeDia/clearance/safeZ guard-only-or-unexposed -> the generator default (= the twin's own default). My tests assert SEEDED values only, not defaults == twin.
+- Capability gaps (slot->tool-width centreline, pocket ignores strategy, bore ignores ramp) = Universal-CAM known limits.
+
+### VERIFIED - two-method ACCEPT
+- METHOD 1 (diff): coverage for all 8 twins + the placement fix sources the real position (originX); built-in path identical.
+- METHOD 2: a drill/bore twin placed OFF-ORIGIN (originX=100/40) seeds posX/posY == the placed position, NOT 0; all 8 twins recognize + seed correct camTypes + values; the built-in S1c/S1d + FIX #1 twin tests still pass.
+- FULL GATE on the branch: 1382 passed, 0 failed.
+
+### STATE: FIX #1 hardened - all 8 CAM-able twins have real-value seed coverage + drill/bore holes now land at the op's placed position. Circle dia/2 refinement flagged to the advisor. NEXT: the finish slices per cam-builder-finish-plan.md (multi-op / icon / table-gui / preview / empty-state). No release from me.
