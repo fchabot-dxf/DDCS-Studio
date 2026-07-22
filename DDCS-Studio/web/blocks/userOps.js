@@ -425,7 +425,7 @@ export function defaultParams(def) {
 // the PRUNED stack every build. A legacy def (no guards, frozen `bindings`) is UNCHANGED: pruneGuards is a no-op with no
 // guard blocks, and without bindingSpecs the frozen `bindings` are used exactly as before → byte-identical for every
 // existing user op (drill/slot/text/…), verified by their emit specs + the guard-prune regression.
-function instantiate(def, params) {
+export function instantiate(def, params) {
     // ② B4 step 4b — fill STRUCTURAL binding defaults (guard-driving params with no block socket: bool probeZFirst, enum
     // travelApproach) for any absent param BEFORE prune. A bool guard tolerates undefined (whenOk coerces !!undefined=false),
     // but an ENUM guard needs the value (undefined === 'auto' is false → the arm would drop). Value bindings are untouched
