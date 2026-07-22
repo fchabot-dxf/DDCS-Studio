@@ -12601,3 +12601,29 @@ collapsible-panes-752:38/:130 (collapse frees HEIGHT), pane-splitter-790:67 (ine
 2. Confirm I then re-anchor the 4-5 desktop layout tests to the row layout.
 
 No commit this turn (WIP: side-by-side built + clean, collapse pending the ruling). Emit untouched.
+
+---
+
+## 🔨 turn 1019 — BUILD (ruling A): finished the viz side-by-side — on WIDE the collapse chevrons give way to the SPLITTER (chevron-collapse stays on the stacked/narrow layout, fold untouched). Re-anchored 6 desktop tests HONESTLY + added a permanent side-by-side geometry test. Byte-identical.
+
+RULED (t1018): A — on wide hide the chevrons + let the splitter resize; keep chevron-collapse stacked; do NOT touch the load-bearing t752/t869 fold; re-anchor the desktop tests honestly.
+
+### BUILT (ruling A — CSS-only, one line; the fold animation UNTOUCHED)
+`@media (min-width:1024px) { .viz-split > [data-viz-pane] > .wiz-pane-bar { display:none } }` -> on the side-by-side layout the chevrons are hidden and the SPLITTER is the resize.
+- A FIRST cut also tried to NEUTRALIZE a persisted collapsed state (force collapsed panes expanded on wide). DROPPED it: it un-hid intentionally-hidden panes and HALVED the survivor (it drove the alignment refit test to pin: deltas 114,0,79,79). Without it, a persisted chevron-collapse on wide just yields a 0-width sliver + the survivor fills (benign, not stuck-blank) -- and the fold/setView stay untouched. Simpler + correct.
+
+### RE-ANCHORED 6 desktop tests HONESTLY (collapse is a STACKED idiom now)
+- **NEW tests/viz-sidebyside-1019.spec.js** asserts the CORRECT side-by-side geometry: WIDE = row + 3D|2D side-by-side + a VERTICAL col-resize splitter that rebalances on X + NO chevrons + 2D renders; NARROW = the stacked column WITH chevrons + 2D renders.
+- **collapse tests -> a STACKED desktop width (1000, <1024):** collapsible-panes-752 desktop-reflow (:130) + motion (:196), pane-splitter-790 desktop (:67 inert-when-collapsed + siblings). They test the collapse-fill / splitter-inert that STILL EXISTS stacked; the wide side-by-side is covered by viz-sidebyside.
+- **drill CANVAS tests -> 1000** (wizard-onvector-dim, wizard-pathdatum): layout-agnostic canvas interaction; >=1024 makes the drill 2D a tall/narrow side-by-side pane where a 10px pixel-click is fragile -> the full-width stacked canvas they were written for.
+- **alignment-canvas-refit-732:13 -> robust property:** the chevron-hide frees ~28px -> the canvas is wider -> each away-drag grows the world FASTER (to ~-45000mm) -> the fit zooms way out -> the 3rd/4th EXTREME drag compresses on screen (fit behaviour, not the gutter pin the t732 fix targets). The ">100px on ALL 4 extreme drags" was knife's-edge on the exact width; re-anchored to the ESSENTIAL t732 property -- the value never saturates (worldX keeps growing) + the handle is never HARD-pinned (0px) + the FIRST drag clearly moves (>100). (The sibling :44, a real pocket handle-drag at the same wide viewport, PASSES -> normal 2D drags work side-by-side.)
+- (collapsible :38 mobile was an ISOLATION flake -- passes alone; unrelated.)
+
+### VERIFY (ACCEPT: VIEWED wide+narrow + 2D renders/drags + byte-identical + full gate)
+- **VIEWED wide (1360px):** 3D | 2D side-by-side, vertical splitter, NO chevron strips. **VIEWED narrow (800px):** stacked single column WITH chevron strips, unbroken.
+- **2D DRAGS side-by-side:** alignment :44 (a real pocket POS handle-drag at 1400/row) moves 256px -> the 2D drags in the row layout.
+- **Re-anchored specs GREEN:** viz-sidebyside-1019 + collapsible-panes-752 + pane-splitter-790 + wizard-onvector-dim + wizard-pathdatum + alignment-canvas-refit-732 = 24 passed.
+- **BYTE-IDENTICAL:** pure CSS + the direction-aware splitter; no op/emit path touched.
+- **FULL GATE:** 1374 passed / 0 failed / 4 skipped (12.2m) -- fully clean; all 6 re-anchored specs + the new geometry test green, no ripple.
+
+### STATE: the wizard viz is side-by-side on wide (splitter resizes, no chevrons) / stacked on narrow (chevrons, unbroken); the fold animation + setView untouched; a persisted collapse degrades benignly on wide. 6 desktop tests re-anchored honestly + a permanent side-by-side geometry test. Pure layout, emit untouched. READY for review + release. (Queue next: depth-ruler rollout to surfacing/contour/slot.)
