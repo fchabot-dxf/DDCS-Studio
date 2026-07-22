@@ -12627,3 +12627,26 @@ RULED (t1018): A — on wide hide the chevrons + let the splitter resize; keep c
 - **FULL GATE:** 1374 passed / 0 failed / 4 skipped (12.2m) -- fully clean; all 6 re-anchored specs + the new geometry test green, no ripple.
 
 ### STATE: the wizard viz is side-by-side on wide (splitter resizes, no chevrons) / stacked on narrow (chevrons, unbroken); the fold animation + setView untouched; a persisted collapse degrades benignly on wide. 6 desktop tests re-anchored honestly + a permanent side-by-side geometry test. Pure layout, emit untouched. READY for review + release. (Queue next: depth-ruler rollout to surfacing/contour/slot.)
+
+---
+
+## 🔨 turn 1021 — CORRECTION (advisor, user drawing): (1) REVERTED the 3D/2D side-by-side; (2) MOVED the depth ruler from the in-form widget to a vertical STRIP down the LEFT of the 2D plan canvas. Byte-identical. AWAITING the advisor's screenshot-vs-drawing confirmation before release.
+
+### PART 1 — reverted the side-by-side viz (t1017-1019)
+`git revert e03eac0` (the feat) -> restored the STACKED 3D-over-2D layout: paneAccordion.js (splitter back to Y-only), styles.css (row media query + chevron-hide removed), the 5 re-anchored desktop tests (collapsible-panes-752, pane-splitter-790, wizard-onvector-dim, wizard-pathdatum, alignment-canvas-refit-732) restored to their originals, viz-sidebyside-1019.spec.js deleted. (The V21.11 version bump in index.html/version.json is the advisor's release domain — left for them to reconcile.)
+
+### PART 2 — MOVED the depth ruler to the 2D plan's LEFT edge (no duplicate)
+- **REMOVED the in-form ruler (V21.10):** dropped zDepthWidget + its FORM_WIDGETS/MULTI_WIDGETS registration + the depthLevels import from formWidgets; removed pocket's depth/stepdown widget/group/role tags (back to plain numberWidget rows, dual-unit hint intact); removed the .zd-ruler CSS.
+- **NEW web/viz/zRulerStrip.js** — renderZRuler(container, spec, onEdit): a narrow VERTICAL depth ruler (Z axis 0->depth, one tick per depthLevels() slice, a green FLOOR grip = depth + an orange STEP grip = stepdown). A grip drag hands back a param+value. Dependency-free SVG.
+- **DECLARED per-op:** pocket sets `def.zRuler = { depthParam:'depth', stepParam:'stepdown' }`.
+- **userOpView.renderZRulerBeside(c, def, params):** docks a `.viz-zruler` strip as the LEFT sibling of the plan canvas `c` (moved into a `.viz-zruler-row`; featureCanvas UNTOUCHED / single-fit — a SIBLING beside it, not a 2nd projection inside). The drag writes the depth/stepdown FORM field via [data-param] + dispatch input -> the delegated listener re-runs mgr.update -> the plan + the ruler both redraw (the two-editor loop). Present only when def.zRuler is declared.
+- **BYTE-IDENTICAL:** display/input only — reads params, writes existing fields, no new param/emit path.
+
+### VERIFY (ACCEPT: my VIEWED screenshot vs the user drawing + stacked + drag sync + ticks==depthLevels + byte-identical + gate)
+- **MY VIEWED screenshot (scratchpad/zruler-pocket.png):** the 3D (top) + 2D "Pocket (data)" (bottom) are STACKED again; a narrow VERTICAL Z-ruler runs down the LEFT edge of the 2D plan -- Z axis, dashed pass ticks at -1.5/-3 (labeled), an orange step grip, a green floor grip at -4. The in-form ruler is gone; depth/stepdown are plain fields (TOOL & CUT).
+- **TICKS == depthLevels():** default 4/1.5 -> floor 1 + pass 2 = 3.
+- **DRAG:** dragging the floor grip DOWN deepened the depth field (4 -> 4.4) -> the two-editor sync holds.
+- **BYTE-IDENTICAL:** no ruler artifact in the G-code; cuts still emit.
+- **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.2m) -- fully clean; the revert restored the original stacked-layout tests, the ruler move breaks nothing.
+
+### STATE: side-by-side reverted (stacked restored + original tests); the depth ruler now lives as a narrow vertical strip down the LEFT of the 2D plan canvas (sibling beside featureCanvas, drag-synced to depth/stepdown, depthLevels ticks, byte-identical); the in-form ruler removed (no duplicate). AWAITING the advisor's screenshot-vs-drawing confirmation before release (per the dispatch). (Queue: depth-ruler rollout to surfacing/contour/slot once the shape is confirmed.)
