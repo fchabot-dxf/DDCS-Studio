@@ -36,7 +36,7 @@ import { entryBlock } from './entry.js';   // t726 P2b — the mill ENTRY-POINT 
 import { toolSelBlock } from './toolsel.js';   // t768 P1a — the declared TOOL-SELECTION marker (which tool the op runs; emits nothing, drives the sim cutter)
 import { xformBlock, setupBlock, flipBlock } from './transform.js';   // t736 — the DECLARED program-level ROTATION (flat sibling marker, applied once at emit); t879 — the two-sided SETUP boundary + FLIP sibling
 import { probeBlock } from './probe.js';
-import { userRootBlock, paramGroupBlock, sectionBlock } from './userRoot.js';
+import { userRootBlock, paramGroupBlock, sectionBlock, opUnitBlock } from './userRoot.js';
 import { STRUCT_CTL_BLOCKS } from './structCtl.js';   // t154 — structural-control blocks, generated from CORNER_STRUCT_BINDINGS
 import { arrayBlock, patternPoints } from './array.js';
 import { helixBlock, helixPoints } from './helix.js';
@@ -97,7 +97,7 @@ export const PALETTE = [
     mathBlock,                                                 // Math (reporter — drags into value sockets)
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)
-    paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, formFieldBlock, layoutWidgetBlock, userRootBlock, paramGroupBlock, sectionBlock, ...STRUCT_CTL_BLOCKS, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations + FORM value-field blocks + LAYOUT-2D widget blocks + titled concern-section + structural-control blocks)
+    paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, formFieldBlock, layoutWidgetBlock, userRootBlock, paramGroupBlock, sectionBlock, opUnitBlock, ...STRUCT_CTL_BLOCKS, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations + FORM value-field blocks + LAYOUT-2D widget blocks + titled concern-section + declared sub-unit boundary + structural-control blocks)
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 
