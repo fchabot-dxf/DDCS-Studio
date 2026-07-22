@@ -10,20 +10,22 @@
  *    branch selector (corner/seq/probeZ/wcs, edge axis/dir, …) or a validity-guard driver (surface stepover/stepdown/
  *    toolDia/clearance — the `IF x LE 0 GOTO error` lines) would silently freeze a path/guard the operator can't see.
  *
- * GATED (variant-dependent, non-1:1) — camTypeOf returns { unsupported } until the advisor rules the disambiguation:
- *    middle -> inside (featureType != 'boss') / boss (featureType === 'boss');  pocket shape 'circle' -> cpocket;
- *    drill method 'helical' -> bore.  Also: pocket polygon/ellipse + drill pattern 'single' have NO generator; contour
- *    has NO generator (excluded from S1). See the S1b pass note.
+ * VARIANT FORKS (t1043 rulings, ENCODED in camTypeOf): pocket shape 'circle' -> cpocket; drill method 'helical' -> bore;
+ * middle -> boss (featureType === 'boss') else inside, but ONLY when BOTH-AXIS (twoAxis||findBoth) since the CAM inside/
+ * boss generators are fixed both-axis centre probes — a single-axis middle is {unsupported} (never emit a wrong slot).
+ * UNSUPPORTED (no generator / known gap): pocket polygon/ellipse, drill pattern 'single', middle single-axis, contour.
  */
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from './probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from './millToSlot.js';
 import { slotFromOp } from './opToSlot.js';
+import { stepoverMm } from '../wizards/ops/pocketfill.js';   // t1043 — the CANONICAL exported stepoverPct->mm: max(0.2, max(0.1,toolDia)*stepoverPct/100). surfacingWizard.js:24-27 computes the identical formula inline (its absent-param defaults differ — 12/60 vs 6/40 — but are unreachable when the op provides toolDia+pct); the seed test verifies surface stepover == the real surfacingStack value.
 
 // The clean 1:1 opType -> CAM generator type. pocket/drill are the DEFAULT arm; their variant arms are gated in camTypeOf.
 export const OPTYPE_TO_CAM = { surfacing: 'surface', corner: 'corner', edge: 'edge', slot: 'slot', pocket: 'pocket', drill: 'drill' };
 
-// The op types the S1c picker should offer (each has at least one working arm today). middle is pending the gate; contour excluded.
-export const SUPPORTED_OPTYPES = ['pocket', 'surfacing', 'corner', 'edge', 'slot', 'drill'];
+// The op types the S1c picker should offer (each has at least one working arm). Per-op variants may still be unsupported
+// (seedFromOp returns {unsupported}): pocket polygon/ellipse, drill pattern 'single', middle single-axis. contour excluded.
+export const SUPPORTED_OPTYPES = ['pocket', 'surfacing', 'corner', 'edge', 'slot', 'drill', 'middle'];
 export const isCamableType = (opType) => SUPPORTED_OPTYPES.includes(opType);
 
 // PARAM_ALIAS[camType] = { generatorFieldKey: opParamsKey } — ONLY the renames; unlisted keys alias to themselves.
@@ -35,10 +37,20 @@ export const PARAM_ALIAS = {
     edge: { maxProbe: 'dist', fast: 'f_fast', slow: 'f_slow' },
     surface: {},
     pocket: {},
+    cpocket: {},
     slot: {},
     drill: { posX: 'x0', posY: 'y0' },
     bore: { posX: 'x0', posY: 'y0' },
-    cpocket: {},
+    inside: { maxProbe: 'dist', fast: 'f_fast', slow: 'f_slow' },   // middle -> inside; middle op stores dist/f_fast/f_slow
+    boss: { maxProbe: 'dist', fast: 'f_fast', slow: 'f_slow' },     // middle -> boss (op has no plain safeZ -> generator default)
+};
+
+// DERIVE[camType][fieldKey] = (op.params) -> value. For fields with NO direct op source (pocket/surface/cpocket store
+// stepoverPct %, the generator wants absolute stepover mm). Mirrors the wizard one-source via the exported stepoverMm.
+const DERIVE = {
+    pocket: { stepover: stepoverMm },
+    cpocket: { stepover: stepoverMm },
+    surface: { stepover: stepoverMm },
 };
 
 // NON_BAKEABLE[camType] = generator field keys that MUST be Expose-only (Bake greyed). The SAFETY floor.
@@ -77,15 +89,21 @@ export function camTypeOf(op) {
         case 'pocket': {
             const shape = p.shape || 'rect';
             if (shape === 'rect') return { camType: 'pocket' };
-            if (shape === 'circle') return { unsupported: 'pocket shape "circle" -> cpocket: GATED (non-1:1) pending the advisor ruling' };
-            return { unsupported: `pocket shape "${shape}" has no CAM generator (only rect + circle exist)` };
+            if (shape === 'circle') return { camType: 'cpocket' };   // t1043 ruling — circle -> circlePocketSlot
+            return { unsupported: `pocket shape "${shape}" has no CAM generator (only rect + circle exist)` };   // polygon/ellipse
         }
         case 'drill': {
-            if ((p.method || 'peck') === 'helical') return { unsupported: 'drill method "helical" -> bore: GATED (non-1:1) pending the advisor ruling' };
-            if ((p.pattern || 'single') === 'single') return { unsupported: 'drill pattern "single" has no slotFromOp pattern (circle/grid/line/rect only)' };
-            return { camType: 'drill' };
+            // t1043 ruling — pattern 'single' has no slotFromOp pattern (known S1 gap); otherwise method decides drill vs bore.
+            if ((p.pattern || 'single') === 'single') return { unsupported: 'drill/bore pattern "single" has no slotFromOp pattern (circle/grid/line/rect only) — known S1 gap' };
+            return { camType: (p.method || 'peck') === 'helical' ? 'bore' : 'drill' };
         }
-        case 'middle': return { unsupported: 'middle -> inside (featureType != boss) OR boss (featureType === boss): GATED pending the advisor ruling' };
+        case 'middle': {
+            // t1043 ruling — the CAM inside/boss generators are FIXED BOTH-AXIS centre probes (no single-axis variant). A
+            // single-axis middle would probe an axis the operator didn't intend -> mark unsupported (never emit a wrong slot).
+            // `circular` is covered either way (insideCentreSlot always re-centres X; "harmless for a rectangle"). featureType picks the arm.
+            if (!(p.twoAxis || p.findBoth)) return { unsupported: 'middle single-axis probe: the CAM inside/boss slot is BOTH-AXIS only (enable Find both axes)' };
+            return { camType: p.featureType === 'boss' ? 'boss' : 'inside' };
+        }
         case 'contour': return { unsupported: 'contour has NO CAM generator (excluded from S1)' };
         default: return { unsupported: `opType "${t}" is not CAM-able` };
     }
@@ -101,10 +119,11 @@ export function seedFromOp(op) {
     const r = camTypeOf(op);
     if (r.unsupported) return { unsupported: r.unsupported };
     const camType = r.camType, params = (op && op.params) || {};
-    const alias = PARAM_ALIAS[camType] || {}, nb = NON_BAKEABLE[camType] || [];
+    const alias = PARAM_ALIAS[camType] || {}, nb = NON_BAKEABLE[camType] || [], derive = DERIVE[camType] || {};
     const fields = genFieldsFor(camType, params).map((f) => {
-        const opKey = alias[f.key] || f.key;
-        const value = params[opKey] !== undefined ? params[opKey] : f.def;   // op value via alias, else the generator default
+        let value;
+        if (derive[f.key]) value = derive[f.key](params);   // DERIVED (e.g. stepover from stepoverPct — mirrors the wizard)
+        else { const opKey = alias[f.key] || f.key; value = params[opKey] !== undefined ? params[opKey] : f.def; }   // op value via alias, else the generator default
         return { key: f.key, value, exposed: true, bakeable: !nb.includes(f.key) };
     });
     return { camType, fields };
