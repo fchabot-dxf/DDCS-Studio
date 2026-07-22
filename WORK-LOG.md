@@ -13049,3 +13049,24 @@ NEW test seeds user_edge_data (axis Y->1, dir neg->1, wcs G56->3, maxProbe<-dist
 - FULL GATE on the branch: 1382 passed, 0 failed.
 
 ### STATE: FIX #1 hardened - all 8 CAM-able twins have real-value seed coverage + drill/bore holes now land at the op's placed position. Circle dia/2 refinement flagged to the advisor. NEXT: the finish slices per cam-builder-finish-plan.md (multi-op / icon / table-gui / preview / empty-state). No release from me.
+
+---
+
+## 🔨 turn 1053 — CAM FINISH S-A: PROBE-PREVIEW fix (Gap 4). The empty/black preview on probe CAM slots now shows the stock + probe path. GROUND-FIRST.
+
+ROOT CAUSE (advisor-diagnosed, confirmed): the two CAM preview builders (cbmSimulate, simulateSlot) call createPreviewPanel BARE (no getStock/getStart). A probe slot's macro is INCREMENTAL (G31 from the operator start) -> with no stock/start the engine clamps the first probe to zero + traces from origin = empty/black. Pocket/mill emit absolute paths that self-frame, so they were fine.
+
+### GROUNDED
+- createPreviewPanel accepts getStock/getStart callbacks (mirrored from wizardManager.js:497-518). previewStock() = opts.getStock() || the global -> a per-op override with NO settings.stock mutation (createPreviewPanel.js:155). getStartPos() reads getStart (probes test from it).
+- Stock object shape: { x, y, z, shape, datum, pin, show }. datum = a 3-char n/c/p code; the Z char 'p' = top datum (z=0 at the surface). isProbe = /\bG31\b/.
+
+### BUILT (F4a ruling)
+- probePreviewOpts(slot, macro): for a PROBE macro (G31) returns { getStock, getStart }; else {} (byte-identical). Wired into BOTH createPreviewPanel calls (cbmSimulate + simulateSlot) via a spread.
+- probePreviewStock: a CENTERED top-datum box (datum 'ccp'), size XY from the slot's maxProbe/travel field default (F4b), fallback 120, z 25 (the 120x120x25 fallback). probePreviewStart: {0,0, above the top} (the safeZ field default or 10) so the incremental probe travels toward the stock. Preview-only, NO global mutation.
+
+### VERIFIED - two-method ACCEPT (VIEWED)
+- METHOD 1 (diff): both CAM preview builders pass synthesized stock+start ONLY for probes (G31); no settings.stock mutation; non-probe passes neither (byte-identical).
+- METHOD 2 (VIEWED, tests/cam-probe-preview.spec.js): I viewed cam-s-a-probe.png - the corner/probe preview NOW renders a green stock box + the probe tool descending with a red probe path + the G31 status line + the DRO ticking (was black). cam-s-a-pocket.png - the pocket preview UNCHANGED (global stock, self-framed, "No drawable moves" same as before). The test asserts the branch fires only for G31 macros (corner has G31, pocket does not).
+- FULL GATE on the branch: 1382 passed, 0 failed.
+
+### STATE: probe CAM slot previews now show the stock + probe path instead of black; non-probe previews byte-identical. Screenshot GATED to the advisor. NEXT: S-B/S-C multi-op + the new seed model (auto-import all CAM-able ops, drop the inserted-op dropdown, op-card direct, library-add for op TYPES, group-by-op) per cam-builder-finish-plan.md. No release from me.
