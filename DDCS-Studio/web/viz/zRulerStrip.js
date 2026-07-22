@@ -10,7 +10,8 @@
 const SVGNS = 'http://www.w3.org/2000/svg';
 const r2 = (n) => Math.round(n * 100) / 100;
 
-const TOP = 14, BOT = 16, AX = 16;   // px: top/bottom padding + the axis x
+const TOP = 44, BOT = 16, AX = 16;   // px: top/bottom padding + the axis x. TOP clears the 2D panel TITLE ('Pocket (data) . N lines',
+                                     // an absolute top-left overlay) so the 0-tick + the top of the Z axis are never hidden under it (t1023).
 
 /** Render (or re-render) the ruler into container. onEdit(param, value) writes the matching form field. */
 export function renderZRuler(container, spec, onEdit) {
@@ -40,7 +41,9 @@ function _draw(st) {
 
     const depth = Math.max(0.05, spec.depth || 0);
     const passes = Array.isArray(spec.passes) ? spec.passes : [];
-    const zMax = depth * 1.12 || 1;
+    // t1023 — during a drag the axis SCALE is FROZEN (cached at drag-start), so the grip TRAVELS a fixed ruler instead of
+    // pinning (the axis re-fits to the new depth only on pointer-UP). Static/between-drags it fits to the depth.
+    const zMax = st._frozenZMax || (depth * 1.12 || 1);
     const zToY = (z) => TOP + (z / zMax) * (H - TOP - BOT);
     st._yToZ = (y) => ((y - TOP) / (H - TOP - BOT)) * zMax; st._zMax = zMax;
 
@@ -75,6 +78,6 @@ function _bind(st) {
         if (st.drag === 'depth') st.onEdit && st.onEdit(st.spec.depthParam, r2(z));
         else if (st.drag === 'step') st.onEdit && st.onEdit(st.spec.stepParam, r2(Math.min(z, st.spec.depth || z)));
     };
-    const up = () => { st.drag = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-    svg.addEventListener('pointerdown', (ev) => { const g = pick(ev); if (!g) return; ev.preventDefault(); st.drag = g; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); });
+    const up = () => { st.drag = null; st._frozenZMax = null; _draw(st); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };   // RE-FIT the axis on drop
+    svg.addEventListener('pointerdown', (ev) => { const g = pick(ev); if (!g) return; ev.preventDefault(); st.drag = g; st._frozenZMax = st._zMax; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); });   // FREEZE the current scale for the drag
 }
