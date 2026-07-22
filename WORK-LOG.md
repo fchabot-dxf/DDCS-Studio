@@ -12718,3 +12718,42 @@ bore + drill twins each declare `panel: 'form3d+2d'` (the FeatureCanvas 2D plan)
 - **FULL GATE:** 1371 passed / 4 skipped / 1 flake -- the sole red is preflight-badge-838:63 (a documented isolation flake, re-ran STANDALONE 10/10, unrelated to the ruler). Effectively 1372/0/4.
 
 ### STATE: the depth ruler is now on ALL depth ops -- pocket/surfacing/contour/slot show the FULL ruler (stepdown grip + depthLevels pass ticks), bore/drill show the DEPTH-ONLY ruler (axis + a single total-depth grip, no pass ticks). ONE zRulerStrip, declaration-driven (def.zRuler with an optional depthOnly). Byte-identical emit. AWAITING the advisor's per-op screenshot review before release.
+
+---
+
+## 🔨 turn 1029 — GROUND + PROPOSE + GATE (Pause & Confirm between passes): the emit ALREADY EXISTS + is ground-truth-confirmed (hmi.js confirm/pause/message; #1505 = the Dialog-prompt register). Proposing REUSE (not new emit) + a stepdown `confirmEvery` seam. No build — gating the emit shape + scope.
+
+GROUND-FIRST (3 parallel Explore agents). Read-only; no code.
+
+### GROUNDED — the emit EXISTS and #1505/M0 are CONFIRMED ground-truth (this is REUSE, not new invention)
+- **hmi.js already has the operator-primitives family** (web/wizards/ops/hmi.js): `confirmBlock` (type:'confirm') -> `dialect.hmiPrompt(msg,mode)` = Expert `#1505=<mode>(msg)` blocking dialog + an ESC->cancel `ifGoto(#1505,==,0,cancel)`; with `pauseOnDegrade:true` it folds OFF-HMI to `( msg )` + `M0`. `pauseBlock` (type:'pause') -> universal `M00 ( pause - press Cycle Start )`. `messageBlock` -> `dialect.hmiToast` = Expert `#1505=-5000(msg)` banner, else `( MSG: msg )`. So the WHOLE "message + halt + resume" is already a confirmed, dialect-aware atom set.
+- **#1505 CONFIRMED (ground-truth, NOT a Studio assumption):** the eng file (Variables-ENG 01-04-2025.csv) -- `1505,S,Dialog prompt message,Displays a window with a message number`. Real dumps: slib-m.nc:57 `#1505=1(...)`, appcode/communicationWizard.nc:7 `#1505=1(Continue with operation?)` + `IF #1505==0 GOTO9`, :24 `#1505=-5000(Job complete)`. The VALUE is the dialog MODE (1=OK/Cancel blocking, 3=binary, -5000=display banner); text in parens; ESC sets #1505=0. (#1504 is the ATC tool var, NOT this -- so the dispatch's #1505 is right.)
+- **M0/M00 CONFIRMED** universal program stop (dumps key-3.nc:55 `M00`, slib.nc:6 `M0`). SIM CAVEAT: GcodeExecutionEngine does NOT special-case M0 (a no-op in the sim; only M30/M02 end) -> the sim won't visibly pause. Real hardware halts.
+- **Profile split (dialect-driven, confirmed):** ONLY Expert (ddcs-expert-m350) emits #1505; V4.1/DM500/grbl have EMPTY HMI hooks -> the atoms detect the absent hook + degrade to `( msg )` comment (+ `M0` when pauseOnDegrade). Centroid = `M225`, RS274/grblHAL = `(MSG,msg)+M0` native.
+- **The pass-loop SEAM (blockEmitter.js:184-194, kind:'depth' stepdown):** `for (const L of depthLevels(to,by))` emits `( Step Down z=… )` + the per-level body. surfacing/pocket/contour ALL funnel through this ONE loop (their stepdown wraps the fill/leaf). SLOT self-loops (slot.js:44) + rest-machining (restmachining.js:129) -- they'd need a MIRROR edit. No index today (trivial to add: `.forEach((L,i)=>…)`). PRECEDENT: the stepdown atom already threads a per-pass param (`by` -> child scope, t804) -> a `confirmEvery` field on stepdown.js read in blockEmitter is the SAME pattern.
+
+### PROPOSED — reuse the confirmed atoms; two entry points; a stepdown confirmEvery seam
+```
+  ENTRY 1 — a STANDALONE 'Pause / Confirm' op (drop anywhere)     ENTRY 2 — 'confirm every N passes' on the depth op
+  a data-op twin wrapping the pause/confirm atom (msg field),     a `confirmEvery` field on the stepdown atom; the depth
+  registered via opensAs like io_step (4 wiring points).          loop injects the pause emit after every Nth pass (N=1 = each).
+
+  EMIT (both entry points, reusing hmi.js, dialect-aware):
+    Expert  (hmiToast/hmiPrompt present):  #1505=…(msg)     ( the on-screen prompt )
+                                           M00              ( program stop — resume on Cycle Start )
+    Universal (no HMI hook):               ( msg )          ( the message as a comment )
+                                           M00
+```
+- **ONE atom, two consumers:** the standalone op AND the per-N-passes injection both emit the SAME pause/confirm (I inject `<atom>.emit({msg}, dx, dy, dialect)` inline in the depth loop). No duplicate emit path.
+- **The N-passes field** surfaces on surfacing (+ pocket/contour/slot) as 'Confirm every N passes' (0 = off) -> threads to the stepdown atom's `confirmEvery`. Default 0 -> NO injection -> BYTE-IDENTICAL default (goldens unchanged); only confirmEvery>0 is new emit.
+
+### GATE QUESTIONS (it's a new emit path + you flagged a possible richer variant)
+1. **The emit SHAPE** -- which #1505 form for the between-passes pause?
+   - (A) MESSAGE-BANNER + M0 [dispatch-literal, RECOMMEND]: Expert `#1505=-5000(msg)` (display banner) + `M00`; universal `( msg )` + `M00`. Simple, no branch/abort path -- the message shows, the M0 halts, Cycle Start resumes. (Reuses messageBlock + pauseBlock.)
+   - (B) BLOCKING CONFIRM: Expert `#1505=1(msg)` OK/Cancel (stays on screen, blocks) + an ESC bail. Richer, but the cancel/bail path complicates a between-passes pause (accidental abort). (Reuses confirmBlock.) -- likely the "richer waitInput variant later" you mentioned.
+   Recommend (A) now; (B)/a waitInput variant as a follow-up.
+2. **Slot scope now?** surfacing/pocket/contour share the ONE stepdown loop (1 edit). Slot self-loops (slot.js:44) -> a mirror edit. Include slot in p1, or do surfacing/pocket/contour first + slot next?
+3. **Atom identity:** a NEW thin `pauseConfirm` atom (type:'pauseconfirm', msg field, emit = message+M0), OR compose the existing messageBlock+pauseBlock (no new type)? A new atom is cleaner for the standalone op + the round-trip marker; recommend a new `pauseConfirm` atom that internally reuses the confirmed hmiToast+M00.
+4. **N=1 semantics:** confirm every 1 pass = after EVERY pass (incl. the last?) -- pause after each pass EXCEPT the final (no point pausing when the op is done)? Recommend skip the pause after the LAST pass.
+
+No build this turn (ground + propose + gate). Emit untouched -> nothing to release.
