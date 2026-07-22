@@ -12,14 +12,16 @@
  *      NOT the raw #2600 mirror at the socket — the LOCAL #var reads the mirror, exactly like every generator's `v[key]`.
  *
  * Returns { name, fields, body } — the SAME shape every CAM generator returns, so it plugs straight into slotPack /
- * buildSlotFromOps. U0 takes a MANUAL `decl` ({ param: { exposed:true } | { exposed:false, value } }); auto-classifying
- * which params are exposable (DECLARE not infer) is U1.
+ * buildSlotFromOps. The `decl` ({ param: { exposed:true } | { exposed:false, value } }) says what the caller WANTS exposed;
+ * U1 (exposeClassifier.js) gates it — a bake-only param (geometry role, or a value socket under a coordinate-transforming
+ * fold) is force-baked even when decl asks to expose it, so a #var never lands where emit would mangle it (valid-by-construction).
  */
 import { nextParam } from './slotPack.js';
 import { readLine } from './probeToSlot.js';           // the canonical read-line (`#var=#idx+1500 ;label [units] =def [min~max]`)
 import { instantiate } from '../blocks/userOps.js';    // fill each binding's socket from tokenParams (no registration side effect)
 import { emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../wizards/previewEmit.js';
+import { classifyExposable } from './exposeClassifier.js';   // U1 — which value bindings can carry a #var (declared, not inferred)
 
 /**
  * @param {object} def   a user-op def (from userOpFromStack): { opType, label, template, bindings }
@@ -31,15 +33,19 @@ export function stackToSlot(def, decl = {}, used = new Set(), varOffset = 0) {
     const taken = new Set(used);
     const fields = [];
     const tokenParams = {};
+    const cls = classifyExposable(def);                                 // U1 — per-binding { exposable, role, reason } (declare+structure)
     // Only VALUE bindings (a real socket, blockIndex != null) can carry a #var; structural bindings drive guards, not emit.
     (def.bindings || []).filter((b) => b && b.blockIndex != null).forEach((b, i) => {
         const d = decl[b.param];
-        if (d && d.exposed === true) {                                   // EXPOSED — a #11xx param + #2600 mirror + a LOCAL #var
+        const exposable = !!(cls[b.param] && cls[b.param].exposable);   // geometry / fold-blocked params are bake-only
+        if (d && d.exposed === true && exposable) {                     // EXPOSED — a #11xx param + #2600 mirror + a LOCAL #var
             const idx = nextParam(taken); if (idx != null) taken.add(idx);
             const varStr = '#' + (varOffset + i + 1);
-            fields.push({ key: b.param, idx, var: varStr, label: b.label || b.param, units: b.units || '', def: b.default, min: (b.min != null ? b.min : 0), max: (b.max != null ? b.max : 0), type: (b.type === 'int') ? 0 : 1 });
+            fields.push({ key: b.param, idx, var: varStr, label: b.label || b.param, units: b.units || '', def: b.default, min: (b.min != null ? b.min : 0), max: (b.max != null ? b.max : 0), type: (b.type === 'int') ? 0 : 1, exposable: true });
             tokenParams[b.param] = varStr;                              // the LOCAL var lands in the socket; val() rides it through
-        } else if (d && d.exposed === false) {                          // BAKED — the literal
+        } else if (d && d.exposed === true && !exposable) {            // SAFETY (U1, valid-by-construction) — a bake-only param can't
+            tokenParams[b.param] = String(d.value != null ? d.value : b.default);   // ride a #var; force-bake instead of emitting garbage
+        } else if (d && d.exposed === false) {                         // BAKED — the literal
             tokenParams[b.param] = String(d.value);
         }
         // else — leave unset → instantiate uses the binding default
