@@ -12998,3 +12998,28 @@ The advisor (user + advisor-verified) reversed the S1b/S1c/S1d NON_BAKEABLE ruli
 - FULL GATE on the branch: 1378 passed, 0 failed.
 
 ### STATE: CAM Builder v1 feature-complete + the choice-param bake model corrected. Choice params bakeable (dropdown-picked literal inlines, valid-by-construction); numeric surface guards kept Expose-only for now (flagged as trivially bakeable too). Screenshot GATED to the advisor. Per plan: advisor adds .gitattributes eol=lf + MERGES v1 to main. No release from me.
+
+---
+
+## 🔨 turn 1049 — CAM Builder FIX #1 CRITICAL: data-op TWIN recognition + seeding. Real programs use user_*_data twins; the CAM Builder now recognizes + seeds them. GROUND-FIRST (2 Explore agents + a runtime dump).
+
+ROOT CAUSE (advisor+user confirmed): camTypeOf/OPTYPE_TO_CAM keyed on the BARE built-in optypes (surfacing/pocket/corner), but real ops are DATA-OP TWINS (op.opType = user_surfacing_data, etc.) -> every real twin fell through to unsupported. S1b-S1d tests passed only because they used BUILT-IN optypes. The Builder recognized ~nothing in a real program.
+
+### GROUNDED (do NOT guess)
+- **The declared bridge**: no twin def carries a base/CAM ref, BUT wizardLibrary.js BUILTINS declares `opensAs` (built-in -> twin) alongside each entry's `type` (+ variant). So inverting opensAs->type is the ONE-SOURCE bridge (can't drift), mirroring the existing builtinLabelForTwin. Added `builtinTypeForTwin(opType)` -> {type, variant}.
+- **Twin param shape (runtime-dumped all 8 twins)**: op.params are keyed by the binding PARAM name (originX, NOT the socket key offX) -> the offX worry doesn't bite. Verdict per twin: pocket/cpocket/edge/drill/slot/middle seed cleanly once the opType is normalized; surfacing DIVERGES (a FLAT `stepover`, no stepoverPct/toolDia/clearance); corner DIVERGES (probeZFirst not probeZ); bore resolves via the inverted variant (the twin has no `method`). NOT a wholesale rework - targeted.
+
+### BUILT (targeted, per the grounding = not the "bigger rework" that would gate)
+- **opCamMap.baseOf(opType)** normalizes a twin -> {baseType, variant} via the bridge; a built-in passes through. camTypeOf + isCamableType use it -> twins are recognized; the built-in path is unchanged.
+- **drill/bore**: camType 'bore' when variant==='bore' (twin user_bore_data) OR method==='helical' (built-in). Handles both.
+- **surfacing FLAT stepover**: DERIVE.surface.stepover uses params.stepover if present (twin), else stepoverMm (built-in) - mirrors surfacingWizard.js:27 one-source.
+- **corner probeZ**: PARAM_ALIAS supports an ARRAY of candidate keys; corner.probeZ = ['probeZ','probeZFirst'] (built-in vs twin). seedFromOp readParam() tries each.
+
+### DIVERGENCE HANDLING (surfaced for review - the twin doesn't EXPOSE these, so seeding the generator default matches the twin's actual behaviour): surfacing twin toolDia/clearance, drill twin holeDia/clearance, bore/slot twin clearance, middle twin safeZ -> the generator DEFAULT (the twin holds them at default, so this is correct, not lossy).
+
+### VERIFIED - two-method ACCEPT on TWINS (not built-ins)
+- METHOD 1 (diff): camTypeOf/seedFromOp recognize twin optypes via the DECLARED bridge; params seeded right (twin-aware surfacing/corner/bore); built-in path still works.
+- METHOD 2 (NEW twin tests): cam-op-seed 'S1 fix' - user_surfacing_data/pocket/corner/bore are CAM-able (contour twin NOT); camType surf->surface, pocket->pocket, corner->corner, bore->bore; surfacing twin uses its flat stepover 9.6; pocket twin derives 3.6; corner twin reads probeZ from probeZFirst (Yes->1) + enums->ints (FR->2, G55->2); bore twin via variant, posX<-x0. cam-build-mode 'FIX' - a real user_surfacing_data twin opens the modal SEEDED (table renders, stepover 9.6). The built-in S1c/S1d + bake-safety tests still pass (built-in path intact).
+- FULL GATE on the branch: 1381 passed, 0 failed.
+
+### STATE: FIX #1 done - the CAM Builder recognizes + seeds the DATA-OP TWINS real programs are built from (was the #1 blocker to fully-fledged). Built-in path preserved. NEXT (architect-scoped): multi-op / icon / table-gui / preview / empty-state. Do NOT merge v1 yet (this fix was the blocker). No release from me.
