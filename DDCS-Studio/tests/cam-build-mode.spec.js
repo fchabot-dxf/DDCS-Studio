@@ -124,14 +124,56 @@ test('t1049 FIX: a real data-op TWIN op opens the modal seeded (user_surfacing_d
   expect(seeded.depth).toBe('0.8');
 });
 
-test('door 2: the editor-toolbar button opens the authoring modal with the picker', async ({ page }) => {
+test('door 2 + auto-import: the editor-toolbar button auto-imports CAM-able program ops (no picker)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => typeof window.showApp === 'function');
-  // the editor-toolbar button exists + is wired to ddcsBuildCamSlot; invoking it opens the modal with the picker.
   const wired = await page.evaluate(() => { const b = document.getElementById('editor-cam-btn'); return !!b && /ddcsBuildCamSlot/.test(b.getAttribute('onclick') || '') && typeof window.ddcsBuildCamSlot === 'function'; });
   expect(wired, 'door 2 button present + wired to ddcsBuildCamSlot').toBe(true);
   await page.evaluate(() => { window.ddcsGetBlockProgram = () => ([{ id: 'p1', type: 'op', opType: 'pocket', label: 'Pocket', params: { shape: 'rect', w: 100, h: 80, depth: 4, stepdown: 1.5, toolDia: 6, feed: 1000, plunge: 100, clearance: 5, rpm: 8000, stepoverPct: 40 } }]); });
   await page.evaluate(() => window.ddcsBuildCamSlot());
-  await page.waitForSelector('.cam-auth-overlay', { timeout: 8000 });
-  expect(await page.evaluate(() => !!document.getElementById('cbm_seed')), 'door 2 shows the seed picker (no specific op)').toBe(true);
+  await page.waitForSelector('.cam-auth-overlay .cbm-eb', { timeout: 8000 });
+  expect(await page.evaluate(() => !document.getElementById('cbm_seed')), 'the seed picker is DROPPED (auto-import model)').toBe(true);
+  expect(await page.evaluate(() => document.querySelectorAll('.cbm-op-group').length), 'the pocket op auto-imported as a group').toBe(1);
+});
+
+test('S-C multi-op: a program of 3 CAM-able ops auto-imports group-by-op → Build to ONE composed slot', async ({ page }) => {
+  await openCam(page);
+  await page.evaluate(() => { window.ddcsGetBlockProgram = () => ([
+    { id: 's1', type: 'op', opType: 'surfacing', label: 'Surfacing', params: { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 16, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, rpm: 12000 } },
+    { id: 'd1', type: 'op', opType: 'drill', label: 'Drill', params: { method: 'peck', pattern: 'grid', x0: 0, y0: 0, originX: 100, originY: 50, cols: 3, rows: 2, dx: 20, dy: 20, depth: 12, peck: 3, feed: 280, rpm: 8000 } },
+    { id: 'c1', type: 'op', opType: 'corner', label: 'Probe corner', params: { corner: 'FR', wcs: 'G55', probeZ: true, probeSeq: 'XY', dist: 80, retract: 4, radius: 3, safeZ: 12, travelDist: 40, scanDepth: 6, f_fast: 250, f_slow: 60 } },
+    { id: 'x1', type: 'op', opType: 'contour', label: 'Contour', params: {} },
+  ]); });
+  await page.evaluate(() => window.ddcsBuildCamSlot());   // door 2 auto-imports
+  await page.waitForSelector('.cam-auth-overlay .cbm-eb');
+  const groups = await page.evaluate(() => [...document.querySelectorAll('.cbm-op-group')].map((g) => g.firstElementChild.textContent.trim()));
+  expect(groups.length, '3 CAM-able ops imported (contour skipped)').toBe(3);
+  expect(groups[0]).toContain('Surfacing'); expect(groups[1]).toContain('Drill'); expect(groups[2]).toContain('Probe corner');
+
+  await page.click('[data-act="cbm-sim"]');
+  await page.waitForFunction(() => { const h = document.getElementById('cbm_preview'); return h && h.querySelector('canvas'); }, null, { timeout: 8000 });
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: 'test-results/cam-s-c-multiop.png' });
+
+  await page.click('[data-act="cbm-build"]');
+  await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]');
+  await page.click('.cam-sim-overlay [data-cbm="ok"]');
+  await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
+  const slot = (await camPack(page)).slots.slice(-1)[0];
+  expect(slot.ops.length, 'ONE slot composes all 3 ops').toBe(3);
+  expect(slot.ops.map((o) => o.type)).toEqual(['surface', 'drill', 'corner']);
+  expect(new Set((slot.fields || []).map((f) => f._op)).size, 'the slot fields span all 3 ops (group-by-op)').toBe(3);
+});
+
+test('S-C empty-state: a program with NO CAM-able ops shows the empty-state, not a greyed dropdown', async ({ page }) => {
+  await openCam(page);
+  await page.evaluate(() => { window.ddcsGetBlockProgram = () => ([{ id: 'x1', type: 'op', opType: 'contour', label: 'Contour', params: {} }]); });
+  await page.evaluate(() => window.ddcsBuildCamSlot());
+  await page.waitForSelector('.cam-auth-overlay');
+  const r = await page.evaluate(() => ({ picker: !!document.getElementById('cbm_seed'), groups: document.querySelectorAll('.cbm-op-group').length, text: (document.getElementById('cbm_table') || {}).textContent || '' }));
+  expect(r.picker, 'no dropdown').toBe(false);
+  expect(r.groups, 'no op groups').toBe(0);
+  expect(r.text, 'empty-state message').toContain('No CAM-able ops');
+  expect(r.text, 'lists supported ops').toContain('Pocket');
+  expect(r.text, 'the present contour shows its unsupported reason').toMatch(/Contour.*NO CAM generator/);
 });
