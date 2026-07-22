@@ -103,6 +103,7 @@ export function boreDataDef() {
     const def = userOpFromStack('bore_data', 'Bore (data)', stack, [...toolBindingsFor(stack), ...BORE_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = (p) => drillPatternGeometry(p, true);   // t716 — bore pattern + pos + pattern handles + a draggable Ø (holeDia)
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
+    def.zRuler = { depthParam: 'depth', depthOnly: true };   // t1026 — the depth-only ruler (helical bore has no stepdown): axis + total-depth grip, no pass ticks
     def.postInstantiate = spindleHeadPatch;   // t945 — fill the blank framing progstart's rpm/dir/spin-up from the live Head → M3 (was a DEAD spindle)
     return def;
 }

@@ -51,8 +51,10 @@ function renderZRulerBeside(c, def, params) {
     const z = def && def.zRuler;
     const spec = z ? (() => {
         const depth = Math.max(0, Number((params || {})[z.depthParam]) || 0);
+        if (depth <= 0) return null;
+        if (z.depthOnly) return { depth, passes: [depth], depthParam: z.depthParam, depthOnly: true };   // t1026 — bore/drill: just the axis + the total-depth grip (no stepdown / no intermediate pass ticks)
         const stepdown = Math.max(0.05, Number((params || {})[z.stepParam]) || 0);
-        return depth > 0 ? { depth, stepdown, passes: depthLevels(depth, stepdown), depthParam: z.depthParam, stepParam: z.stepParam } : null;
+        return { depth, stepdown, passes: depthLevels(depth, stepdown), depthParam: z.depthParam, stepParam: z.stepParam };
     })() : null;
     let row = c.parentElement.classList.contains('viz-zruler-row') ? c.parentElement : null;
     if (!row) {

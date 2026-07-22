@@ -60,7 +60,8 @@ function _draw(st) {
     st._grips = {};
     const grip = (cx, cy, rr, cls) => { svg.appendChild(mk('circle', { cx, cy, r: rr, class: cls })); return { cx, cy }; };
     st._grips.depth = grip(AX, zToY(depth), 6, 'zruler-grip zruler-grip-depth');
-    if (passes.length > 1) st._grips.step = grip(AX, zToY(Math.min(spec.stepdown, depth)), 5, 'zruler-grip zruler-grip-step');
+    // t1026 — depthOnly (bore/drill): ONLY the total-depth grip. Else a step grip when there is more than one pass.
+    if (!spec.depthOnly && passes.length > 1) st._grips.step = grip(AX, zToY(Math.min(spec.stepdown, depth)), 5, 'zruler-grip zruler-grip-step');
 }
 
 // A grip drag: pick the nearest grip on pointerdown, then track on WINDOW (survives the re-render the field write triggers).
