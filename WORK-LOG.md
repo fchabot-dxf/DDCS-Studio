@@ -12650,3 +12650,28 @@ RULED (t1018): A — on wide hide the chevrons + let the splitter resize; keep c
 - **FULL GATE:** 1372 passed / 0 failed / 4 skipped (11.2m) -- fully clean; the revert restored the original stacked-layout tests, the ruler move breaks nothing.
 
 ### STATE: side-by-side reverted (stacked restored + original tests); the depth ruler now lives as a narrow vertical strip down the LEFT of the 2D plan canvas (sibling beside featureCanvas, drag-synced to depth/stepdown, depthLevels ticks, byte-identical); the in-form ruler removed (no duplicate). AWAITING the advisor's screenshot-vs-drawing confirmation before release (per the dispatch). (Queue: depth-ruler rollout to surfacing/contour/slot once the shape is confirmed.)
+
+---
+
+## 🔨 turn 1023 — UX FIX (zRulerStrip): FREEZE the axis scale during a drag so the depth grip TRAVELS a fixed ruler instead of pinning; RE-FIT on pointer-up. Byte-identical (interaction only). Flagging the drag-range vs no-teleport tradeoff (the gate condition).
+
+DISPATCH: the ruler rescaled its Z axis continuously during a drag (zMax = depth*1.12 follows depth), so the green depth marker stayed pinned near the bottom -> dragging didn't visibly move it. FIX: freeze the scale at drag-START (fixed ruler during the drag), re-fit only on pointer-UP; apply to both grips if the orange pins too. GATE if freeze-then-refit is awkward in the drag model.
+
+### FIX (zRulerStrip.js — 3 lines, interaction only)
+- `_draw`: `const zMax = st._frozenZMax || (depth * 1.12 || 1)` — the axis uses the FROZEN scale while a drag is active, else fits to the depth.
+- pointerdown: `st._frozenZMax = st._zMax` — cache the CURRENT (display) scale for the drag.
+- pointerup: `st._frozenZMax = null; _draw(st)` — clear + RE-FIT the axis to the new depth.
+Applies to BOTH grips (the floor was the one that pinned — its drag changed depth -> zMax; the step grip never pinned since depth is fixed during a step drag, but the freeze is uniform + harmless).
+
+### THE GATE CONDITION (surfaced): headroom vs no-teleport is a genuine tradeoff
+I froze at the CURRENT DISPLAY scale (depth*1.12), NOT a larger "headroom" scale, on purpose: freezing WITH headroom rescales the ruler at grab, which TELEPORTS the grip away from the finger (the floor jumps from ~89% to ~40% the instant you press) -- the exact "awkward in the drag model" the dispatch flagged. Freeze=display keeps the grip UNDER the finger + the ticks fixed + moves cleanly, at the cost of a MODEST deepen range per drag (~12%: the floor's 11% headroom below). Shallowing has the full range (grip up to 0). For a big deepen the user drags-releases-drags (each re-fits). If you want a bigger SINGLE-drag deepen range, I can add a zoom-out-headroom variant -- but it reintroduces the grab-teleport. YOUR CALL.
+
+### VERIFY (ACCEPT: drag-sim -- marker Y moves + ticks fixed during drag; re-fit on release; fields update; byte-identical; gate)
+- **DRAG-SIM (my own):** before {gripY 269, passes [110,206], depth 4} -> MID-DRAG {gripY 299 (MOVED down 30px), passes [110,206] (FIXED — frozen scale), depth 4.46 (deepened)} -> ON RELEASE {gripY 269 (axis RE-FIT), passes [100,186] (== depthLevels of 4.46 at the re-fit scale), depth 4.46 kept}. Exactly the ACCEPT: grip Y moves + ticks fixed during the drag; re-fit on release; the field updates.
+- **BYTE-IDENTICAL:** interaction/display only — the freeze changes only the ruler's own scale during a drag; no op/param/emit path touched. (The static look is unchanged from t1021 -> the pending screenshot-vs-drawing comparison still stands.)
+### AMENDMENT (same turn) — the 2D panel TITLE was hiding the ruler's TOP
+The green 'Pocket (data) . N lines' title (an absolute top-left overlay) covered the ruler's 0-tick / Z-axis top. FIX: bumped the ruler's TOP padding (14 -> 44px) so the content starts BELOW the title. VERIFIED on a FRESH mem-server (the running gate's server had cached the file at startup, so the edit only served after a restart): the 0-text top (517px) now sits BELOW the title bottom (505px) -- and my VIEWED screenshot (scratchpad/zruler-top.png) shows the '0' + the axis top clear of the title. Display-only.
+
+- **FULL GATE:** 1370 passed / 2 KNOWN-FLAKE / 4 skipped (11.4m). The 2 reds are the documented isolation flakes (collapsible-panes-752:38 + knob-persist:15) -- BOTH pass STANDALONE (re-ran green), unrelated to the ruler. Effectively 1372/0/4. (The title TOP=44 bump is display-only -> test-neutral, verified separately on a fresh server.)
+
+### STATE: the depth-ruler grip now TRAVELS a frozen-scale ruler during a drag (no pin) + the axis re-fits on release; fields drive the plan/emit unchanged (byte-identical). Deepen range per drag is modest (freeze=display, no grip-teleport) -- flagged the headroom-vs-teleport tradeoff for the advisor's call. Still AWAITING the t1021 screenshot-vs-drawing confirm before release.
