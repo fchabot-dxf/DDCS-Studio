@@ -105,9 +105,9 @@ const POCKET_BINDING_SPECS = [
     ...leafPair('wallOffset', 'wallOffset', 'number', { default: POCKET_DEFAULTS.wallOffset, label: 'Wall Offset ±', section: T, help: 'Signed wall offset (mm): + cuts OVERSIZE (walls out), − cuts UNDERSIZE / leaves stock. 0 = the exact typed size.' }),
     ...leafPair('feed', 'feed', 'number', { default: POCKET_DEFAULTS.feed, label: 'Feed', section: T }),
     // depth pass (stepdown, clearing arm) + the drill arm (tooSmall) carry the SAME params at different keys
-    { param: 'depth', type: 'number', units: 'mm', key: 'to', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.depth, label: 'Depth', section: T, widget: 'zdepth', group: 'zdepth', role: 'depth' },   // t1014 — the depth-ruler (with stepdown)
+    { param: 'depth', type: 'number', units: 'mm', key: 'to', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.depth, label: 'Depth', section: T },
     { param: 'depth', type: 'number', units: 'mm', key: 'depth', match: { type: 'drill' }, optional: true },
-    { param: 'stepdown', type: 'number', units: 'mm', key: 'by', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.stepdown, label: 'Step Down', section: T, group: 'zdepth', role: 'step' },   // t1014 — grouped into the depth-ruler
+    { param: 'stepdown', type: 'number', units: 'mm', key: 'by', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.stepdown, label: 'Step Down', section: T },
     { param: 'stepdown', type: 'number', units: 'mm', key: 'peck', match: { type: 'drill' }, optional: true },
     // plunge → both leaves + the drill's FEED (drill plunges at the plunge feed); clearance → progstart + both leaves + drill
     { param: 'plunge', type: 'number', units: 'mm/min', key: 'plunge', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.plunge, label: 'Plunge', section: T },
@@ -254,5 +254,6 @@ export function pocketDataDef() {
     };
     def.previewGeometry = pocketPreviewGeometry;   // t716 — per-feature 2D handles (shape boundary + pos/size per kind) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b — the emitting-square entry marker (replaces the sim-only ○)
+    def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1021 — DECLARE the depth ruler (a vertical strip down the LEFT of the 2D plan): depth/stepdown drive the floor + the depthLevels ticks. Display/input only.
     return def;
 }

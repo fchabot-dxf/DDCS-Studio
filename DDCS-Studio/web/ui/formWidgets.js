@@ -23,7 +23,6 @@ import { MATERIALS, suggestFeedsSpeeds } from '../wizards/materials.js';   // t8
 import { isSectionCollapsed, setSectionCollapsed } from './panePrefs.js';   // t820 — collapsible form sections (app-wide per section kind)
 import { applyState as applyFold } from './paneAccordion.js';   // t820 — REUSE the accordion motion engine (theme drawer tokens), not a duplicate
 import { toDisp, fromDisp } from './units.js';   // t1008 — the ONE mm<->inch conversion leaf (shared with the tool-library editor + catalog picker)
-import { depthLevels } from '../wizards/clearing.js';   // t1014 — the ONE slice source (== the emitter) for the depth-ruler pass ticks
 
 // t522 — SEGMENT-GATE predicates (a declarative key → a live check). A segmented binding gates one segment via
 // widgetConfig.gateSeg = { value, pred, fallback, tip }; the segment greys (+ data-op-gated) when pred() is false.
@@ -567,71 +566,6 @@ function coordListWidget(host, b) {
     return { read: () => ({ [b.param]: core.read() }) };
 }
 
-// t1014 — the Z-DEPTH RULER: a narrow in-form elevation of the cut depth. A vertical Z axis (0 at the stock top → total
-// depth at the bottom), a tick per depthLevels() pass (the SAME slices the emitter cuts → one source), a draggable FLOOR
-// = total depth and a draggable STEP handle = per-pass stepdown; the two number fields stay editable beside it (drag OR
-// type — one source). A MULTI widget bound to an op's depth+stepdown params (role: depth/step); ANY depth op inherits it
-// by tagging its two bindings `widget:'zdepth'` + a shared group. Display/input only → no new param, emit byte-identical.
-function zDepthWidget(host, primary, group) {
-    const role = rolesOf(group, primary), bd = role.depth || primary, bs = role.step || primary;
-    host.style.cssText = 'display:flex; gap:12px; align-items:stretch; margin:10px 0;';
-    const box = document.createElement('div'); box.className = 'zd-ruler';   // the slim ruler (LEFT)
-    const svg = document.createElementNS(SVGNS, 'svg'); svg.setAttribute('class', 'zd-svg');
-    svg.style.cssText = 'width:100%; height:100%; display:block; touch-action:none; overflow:visible;';
-    box.appendChild(svg);
-    const fields = document.createElement('div'); fields.className = 'zd-fields';   // the editable numbers (RIGHT)
-    // REUSE numberWidget per field → the Depth/Step rows keep EVERYTHING (label, the mm/inch dual-unit hint + shadow,
-    // socket-held). The ruler is a second editor of the SAME [data-param] inputs it stamps.
-    const dHost = document.createElement('div'), sHost = document.createElement('div');
-    dHost.style.cssText = ROW_CSS; sHost.style.cssText = ROW_CSS;   // the row layout renderOpForm normally applies (label ⟷ input + hint)
-    fields.append(dHost, sHost);
-    const depthCore = numberWidget(dHost, bd), stepCore = numberWidget(sHost, bs);
-    const depthInp = dHost.querySelector('input[data-param]'), stepInp = sHost.querySelector('input[data-param]');
-    const readout = document.createElement('span'); readout.className = 'zd-readout'; fields.appendChild(readout);
-    host.append(box, fields);
-
-    const TOP = 12, BOT = 16, AX = 15;   // px paddings; AX = the axis x
-    const S = {};   // { yToZ, zMax, grips:{depth,step}, drag }
-    const mk = (tag, at) => { const e = document.createElementNS(SVGNS, tag); for (const k in at) e.setAttribute(k, at[k]); return e; };
-    const draw = () => {
-        const r = box.getBoundingClientRect();
-        const W = Math.max(40, Math.round(r.width)) || 66, H = Math.max(56, Math.round(r.height)) || 128;
-        svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-        while (svg.firstChild) svg.removeChild(svg.firstChild);
-        const depth = Math.max(0.05, numOr(depthInp.value, 0)), step = Math.max(0.05, numOr(stepInp.value, 0));
-        const passes = depthLevels(depth, step), zMax = depth * 1.15 || 1;
-        S.zMax = zMax; S.yToZ = (y) => ((y - TOP) / (H - TOP - BOT)) * zMax;
-        const zToY = (z) => TOP + (z / zMax) * (H - TOP - BOT);
-        svg.appendChild(mk('line', { x1: AX, y1: zToY(0), x2: AX, y2: zToY(depth), class: 'zd-axis' }));   // the depth axis
-        const t0 = mk('text', { x: AX - 4, y: zToY(0) + 3, class: 'zd-z', 'text-anchor': 'end' }); t0.textContent = '0'; svg.appendChild(t0);
-        passes.forEach((z, i) => {
-            const y = zToY(z), last = i === passes.length - 1;
-            svg.appendChild(mk('line', { x1: AX, y1: y, x2: W - 3, y2: y, class: last ? 'zd-floor' : 'zd-pass' }));
-            const lab = mk('text', { x: W - 1, y: y - 2, class: 'zd-z', 'text-anchor': 'end' }); lab.textContent = '−' + r3(z); svg.appendChild(lab);
-        });
-        S.grips = {};
-        const grip = (cx, cy, rr, cls) => { svg.appendChild(mk('circle', { cx, cy, r: rr, class: cls })); return { cx, cy }; };
-        S.grips.depth = grip(AX + (W - 3 - AX) / 2, zToY(depth), 6, 'zd-grip zd-grip-depth');
-        if (passes.length > 1) S.grips.step = grip(AX + 7, zToY(Math.min(step, depth)), 5, 'zd-grip zd-grip-step');
-        readout.textContent = `${passes.length} pass${passes.length === 1 ? '' : 'es'}`;
-    };
-    const pick = (ev) => { const r = svg.getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top; let best = null, bb = 20 * 20; for (const k in (S.grips || {})) { const g = S.grips[k], d = (g.cx - x) ** 2 + (g.cy - y) ** 2; if (d < bb) { bb = d; best = k; } } return best; };
-    const move = (ev) => {
-        if (!S.drag) return;
-        const r = svg.getBoundingClientRect(), z = Math.max(0.05, Math.min(S.zMax, S.yToZ(ev.clientY - r.top)));
-        const inp = S.drag === 'depth' ? depthInp : stepInp;
-        inp.value = String(r3(S.drag === 'step' ? Math.min(z, numOr(depthInp.value, z)) : z));
-        inp.dispatchEvent(new Event('input', { bubbles: true }));   // → onField below → redraw + host 'input' (form re-reads)
-    };
-    const up = () => { S.drag = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-    svg.addEventListener('pointerdown', (ev) => { const g = pick(ev); if (!g) return; ev.preventDefault(); S.drag = g; window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); });
-    const onField = () => draw();   // a field change (type OR the ruler's own write, and the inch-shadow sync) → redraw the ruler; the form re-reads via the delegated 'input' listener numberWidget already bubbles
-    depthInp.addEventListener('input', onField); stepInp.addEventListener('input', onField);
-    try { const ro = new ResizeObserver(() => { if (S._p) return; S._p = true; requestAnimationFrame(() => { S._p = false; draw(); }); }); ro.observe(box); } catch (_) { /* no ResizeObserver */ }
-    requestAnimationFrame(draw);
-    return { read: () => ({ ...depthCore.read(), ...stepCore.read() }) };   // delegate → keep numberWidget's socket-held / dual-unit read logic
-}
-
 /** The in-block ✎ editor: the coordinate-list editor in a modal. initial = { points, z }; onSave(next) on Done.
  *  Shares buildCoordEditor with the form widget — one editing core, no divergence (blocks/devMode opens this). */
 export function openCoordEditor(initial, onSave) {
@@ -843,11 +777,10 @@ export const FORM_WIDGETS = {
     'coord-list': coordListWidget,
     'xy-pad': xyPadWidget,
     rect: rectPadWidget,
-    zdepth: zDepthWidget,
 };
 
 // widgets that bind a GROUP of params (the form renders ONE widget for the whole group, not one per binding).
-export const MULTI_WIDGETS = new Set(['xy-pad', 'rect', 'zdepth']);
+export const MULTI_WIDGETS = new Set(['xy-pad', 'rect']);
 
 const DEFAULT_BY_TYPE = { number: 'number', int: 'number', enum: 'dropdown', bool: 'toggle', string: 'text' };
 
