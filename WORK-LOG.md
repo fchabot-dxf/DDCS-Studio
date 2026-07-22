@@ -12786,3 +12786,23 @@ Per the t1030 ruling: (A) emit = messageBlock (Expert #1505=-5000 banner / off-H
 ### FOLLOW-ON (queued, NOT this turn per the t1030 ruling): slot self-loop (slot.js:44) + rest-machining (restmachining.js:129) mirror the confirmEvery seam. And the BLOCKING-CONFIRM variant B (Expert #1505=1 OK/Cancel + ESC bail) — shaped so it slots into the same atom later.
 
 ### STATE: Pause & Confirm v1 is live on surfacing/pocket/contour (Confirm every N passes) + as a standalone Setup op. Emit byte-identical at confirmEvery=0. The ONLY red in the suite is the pre-existing, unrelated collapsible-panes-752 pixel threshold (advisor's pane subsystem). SIM CAVEAT disclosed in the field help (M0 is a sim no-op).
+
+---
+
+## 🔨 turn 1033 — REVIEW-FIX (advisor caught it): the INJECTED between-pass pause emitted a BLANK banner. One-source default message → the injection now carries the default text. Gate 1372 green.
+
+The advisor caught a real correctness bug (gate-1 territory: a WRONG/empty operator message): the depth-loop injection calls `BLOCKS.pauseconfirm.emit({}, dx, dy, dialect)` with EMPTY params → p.msg undefined → messageBlock emits empty text → Expert `#1505=-5000()` BLANK banner / off-HMI `( MSG:  )` blank comment. The M00 still halted, but the operator saw no message on the PRIMARY (confirmEvery>0) path. My t1031 temp verify asserted the banner EXISTED (has1505) + counted M0 — it never asserted the banner had TEXT. Classic assert-the-change-not-the-value miss (the standalone op passed msg so it looked fine).
+
+### FIX (one-source, per the dispatch)
+- **hmi.js — hoisted `export const PAUSE_DEFAULT_MSG`** (the plain shop instruction). `pauseConfirmBlock.defaults.msg` reads it AND the emit fallback is now `messageBlock.emit({ text: p.msg || PAUSE_DEFAULT_MSG })`. So the injection (empty params) carries the SAME text as the standalone op instead of a blank banner. The standalone op is unchanged (it already passes msg → the `||` never fires for it).
+- **pauseConfirmData.js — imports PAUSE_DEFAULT_MSG** and points its local DEFAULT_MSG at it (was a duplicate literal). True one-source: the atom default, the emit fallback, the twin template param, and the twin binding default are now ONE const → they cannot drift. Byte-identical (same string).
+
+### VERIFIED (temp _pausemsg-verify, then removed) — assert the VALUE this time
+- The injected banner is `#1505=-5000(Pause — check the part, then press Cycle Start to continue)` — NOT blank (`injectedBlank=false`, `injectedHasDefaultText=true`). confirmEvery=0 still emits no pause (byte-identical). The standalone op still carries its OWN message (`#1505=-5000(Flip the part)`).
+
+### GOLDENS — nothing to re-capture
+The dispatch asked to re-capture the confirmEvery>0 goldens. There are NONE: t1031 verified the >0 case via a temp emit-dump (deleted), never committing a golden file. Searched the whole repo for a baked `1505=-5000()` blank banner or any `confirmEvery`/`pauseconfirm` golden — the only hit is my own descriptive comment in hmi.js. So no stale golden exists; nothing to re-capture.
+
+### GATE — full suite: 1372 passed, 0 failed, 4 skipped. All 4 of last turn's failures are now green: surfacing-as-data + wizard-bar (fixed t1031), and preflight-badge-838 + collapsible-panes-752 (both were knife's-edge flakes — collapsible passed this run at ≤28px, confirming the earlier 30.25px was an environmental pixel flake, not a hard regression).
+
+### STATE: Pause & Confirm v1 is correct end-to-end — the between-pass injection now shows the default operator message (no blank banner), one-sourced through PAUSE_DEFAULT_MSG. confirmEvery=0 byte-identical. Advisor releases after review. FOLLOW-ON still queued: slot self-loop + rest-machining mirror; blocking-confirm variant B.
