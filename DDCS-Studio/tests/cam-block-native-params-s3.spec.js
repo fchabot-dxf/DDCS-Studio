@@ -71,16 +71,16 @@ test('S3 — BYTE-NEUTRAL: a materialized cam_table builds the DEFAULT slot byte
     expect(r.matFields, 'and the fields are identical (same keys, vars, labels, defaults, order)').toBe(r.fbFields);
 });
 
-// The KNOWN DIVERGENCE that GATES the lazy hook to S4 — DOCUMENTED here so it is caught the moment S4 fixes it.
-// After materializing a cam_table into the built def, S2's branch drives the slot and IGNORES the modal's decl. So a modal
-// per-slot expose/bake FLIP is silently ignored by the build. This is why S3 ships ONLY the materializer (inert) and gates
-// the hook: wiring materialization into the def the modal builds would make the modal's radios silently no-op until S4
-// (modal-as-view) or a Fork-C decl-override lands. When S4 makes the modal write blocks, this test should be revisited.
-test('S3 (gated) — a modal FLIP on a materialized def is NOT honored by the build (the S4-inversion divergence)', async ({ page }) => {
+// The divergence this once GATED is now CLOSED by S4a (the modal writes the cam_field BLOCK, not a dead decl) + S4b (the hook
+// materializes a cam_table for a real op). A modal FLIP now goes through the block, and the build reflects it. MIGRATED from
+// "the flip is ignored (honored=false)" to "the flip STICKS (honored=true)". NB a RAW decl bypassing the modal is still
+// ignored while a cam_table is present — that is the correct "block is the source" invariant, not a divergence: the modal no
+// longer writes decl, so the raw-decl proxy is obsolete; the flip goes through the block (row.mode), which is what sticks.
+test('S3→S4 (closed) — a MODAL flip (block write) on a materialized def now STICKS through the build (divergence closed)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async (mk) => {
-        const { userOpFromStack } = await import('/blocks/userOps.js');
+        const { userOpFromStack, flattenBlocks } = await import('/blocks/userOps.js');
         const { stackToSlot } = await import('/data/stackToSlot.js');
         const { camTableFromBindings } = await import('/data/opCamMap.js');
         const b = new Function('return ' + mk)()();
@@ -88,11 +88,13 @@ test('S3 (gated) — a modal FLIP on a materialized def is NOT honored by the bu
         const ct = camTableFromBindings(def); const N = ct.children.length;
         const matTemplate = [{ type: 'user_root', id: 'ur', params: {}, uiChildren: [ct], children: JSON.parse(JSON.stringify(b.stack[0].children)) }];
         const matDef = { opType: 'user_s3', label: 'U S3', template: matTemplate, bindings: b.bindings.map((bd) => ({ ...bd, blockIndex: bd.blockIndex + 1 + N })) };
-        // the user bakes the exposed feed to 999 in the modal → decl says bake, but the cam_table says expose
-        const flipped = stackToSlot(matDef, { frate: { exposed: false, value: 999 } }, new Set(), 0);
-        return { honored: /F999\b/.test(flipped.body) && !/;Feed rate/.test(flipped.body), body: flipped.body };
+        // the S4a modal write: flipping the frate radio to Bake mutates the cam_field BLOCK (not a decl)
+        const row = flattenBlocks(matDef.template).find((x) => x.type === 'cam_field' && x.params.param === 'frate');
+        row.params.mode = 'bake'; row.params.baked = '200';
+        const built = stackToSlot(matDef, {}, new Set(), 0);
+        return { honored: /F200\b/.test(built.body) && !/;Feed rate/.test(built.body), keys: built.fields.map((f) => f.key), body: built.body };
     }, base.toString());
-    // DOCUMENTED current behaviour: the flip is IGNORED (feed stays exposed via #2600, not baked to 999). This is the gate.
-    expect(r.honored, 'the modal flip is NOT honored while a cam_table is present — the S4 inversion; the hook is gated until then').toBe(false);
-    expect(r.body, 'feed remains exposed from its #2600 mirror (the cam_table default won, not the modal bake)').toMatch(/F#\d/);
+    // the flip STICKS: frate is now baked (inlined F200, no #2600 mirror), because the modal writes the block and the build reads it
+    expect(r.honored, 'the modal flip (block write) is now HONORED by the build — the S3 divergence is closed').toBe(true);
+    expect(r.keys, 'frate dropped from the exposed fields (baked)').not.toContain('frate');
 });

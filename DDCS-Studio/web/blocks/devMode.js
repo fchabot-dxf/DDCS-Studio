@@ -20,7 +20,7 @@ import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
 import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, getUserDef, instantiate } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run
 import { createWizard } from './wizardLibrary.js';
-import { camTypeOf } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap
+import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
 import { openRegionEditor } from '../ui/regionEditor.js';   // the "make your own datum" authoring editor
 import { openCoordEditor } from '../ui/formWidgets.js';     // the coordinate-list ✎ editor (shares buildCoordEditor with the form)
@@ -506,9 +506,32 @@ export function wrapForkAtSave(a) {
     } catch (_) { return false; }   // any doubt → leave it universal
 }
 
+// t1103 (block-native params S4b) — is a def a UNIVERSAL-arm op whose value bindings are PILL-derivable? Only these get a
+// materialized cam_table: a generator twin's cam_table would be inert (its build never reads camFieldsFromStack — measured
+// t1101), and a LITERAL-binding universal twin (contour: hand-assembled bindings, no pills) hits a pre-existing no-pill save
+// limitation the cam_table would activate, so it is SKIPPED (gated to S6). A pill-based op's bindings re-index automatically
+// on save (extractParamBlocks over the post-injection flatten), so the injection persists correctly.
+const hasParamPills = (template) => flattenBlocks(template || []).some((b) => b && b.params && Object.values(b.params).some((v) => v && typeof v === 'object' && v.type === 'param'));
+export function maybeMaterializeCamTable(def) {
+    try {
+        if (!def || !def.opType || !Array.isArray(def.template)) return def;
+        const ct = camTypeOf({ opType: def.opType, params: defaultParams(def) });
+        if (!ct || !ct.universal) return def;                                             // universal-arm ONLY (not a generator twin)
+        if (!(def.bindings || []).some((b) => b && b.blockIndex != null)) return def;     // needs value bindings to declare
+        if (flattenBlocks(def.template).some((b) => b && b.type === 'cam_table')) return def;   // idempotent — already materialized
+        if (!hasParamPills(def.template)) return def;                                     // PILL-derivable only (literal twins → S6)
+        materializeCamTable(def);   // inject camTableFromBindings into the Presentation mouth + identity re-derive the bindings
+    } catch (_) { /* leave the op unmaterialized on any doubt — the fallback path is always correct */ }
+    return def;
+}
+
 export async function editWizardDef(opType) {
     const def = listUserOps().find((d) => d.opType === opType);
     if (!def) { alert('That wizard is no longer in your library.'); return; }
+    // t1103 (S4b) — opt-in materialize: a pill-based UNIVERSAL op gains its pendant fields as cam_field blocks when the user
+    // opens it to customize. Mutates this store-copy def (template + bindings) BEFORE the fork clone, so forkTpl carries the
+    // cam_table into the workspace and it persists on save (pill re-index automatic). A no-op for twins / literal / already-done.
+    maybeMaterializeCamTable(def);
     // t1069 — a RECOGNIZED generator twin opened here is a FORK/CUSTOMIZE: wrap its exec atoms in opunit AND treat the save as a
     // NEW op (never overwrite the twin's own def — the opunit shifts its frozen bindings +1). A custom user op is a normal re-author.
     const { template: forkTpl, recognized } = wrapRecognizedForFork(def);
