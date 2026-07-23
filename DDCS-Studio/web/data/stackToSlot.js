@@ -18,7 +18,7 @@
  */
 import { nextParam } from './slotPack.js';
 import { readLine } from './probeToSlot.js';           // the canonical read-line (`#var=#idx+1500 ;label [units] =def [min~max]`)
-import { instantiate } from '../blocks/userOps.js';    // fill each binding's socket from tokenParams (no registration side effect)
+import { instantiate, camFieldsFromStack } from '../blocks/userOps.js';    // fill each binding's socket from tokenParams (no registration side effect); t1095 — the block-native pendant-field rows (S2)
 import { emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../wizards/previewEmit.js';
 import { classifyExposable } from './exposeClassifier.js';
@@ -46,7 +46,39 @@ export function stackToSlot(def, decl = {}, used = new Set(), varOffset = 0) {
     // its own hand-written macro text) the universal arm emits through the real atoms + the real active post, so the band is
     // resolved from THEIR declarations at allocation time, per post.
     const avoid = universalBands();
-    (def.bindings || []).filter((b) => b && b.blockIndex != null).forEach((b) => {
+
+    // t1095 (block-native params S2) — ADDITIVE-BY-FALLBACK. When the def's template carries a cam_table, its cam_field ROWS
+    // are the field DECLARATION: block order = field order = #11xx/#2600 order (nextParam is a monotonic pool scan, so the Nth
+    // exposed row gets the Nth free param → the Nth mirror read); row.mode drives expose/bake; a baked row inlines its literal
+    // with NO #2600 row; label/units/range come from the row (the binding supplies the SOCKET/wiring + any inherited default).
+    // A param with no row is simply not a pendant field → baked to its binding default. When there is NO cam_table (every op
+    // today), fall through to the UNCHANGED bindings/decl path below → byte-identical, goldens green. S3 auto-materializes a
+    // cam_table byte-neutrally; until then only an op that already carries the blocks takes this branch.
+    const camRows = camFieldsFromStack(def.template);
+    if (camRows.length) {
+        const bindingByParam = {};
+        (def.bindings || []).forEach((b) => { if (b && b.blockIndex != null) bindingByParam[b.param] = b; });
+        camRows.forEach((row) => {
+            const b = bindingByParam[row.param];
+            if (!b) return;   // a row naming a param with no value binding → dangling (greyed in a later slice); contributes nothing
+            const exposable = !!(cls[b.param] && cls[b.param].exposable);
+            if (row.mode !== 'bake' && exposable) {                     // EXPOSE — a #11xx param + #2600 mirror + a LOCAL #var
+                const idx = nextParam(taken); if (idx != null) taken.add(idx);
+                cur = nextLocalVar(cur + 1, avoid);
+                const varStr = '#' + cur;
+                const seedDef = (row.dflt != null) ? row.dflt : b.default;
+                fields.push({ key: b.param, idx, var: varStr,
+                    label: row.label || b.label || b.param, units: (row.units != null) ? row.units : (b.units || ''),
+                    def: seedDef, min: (row.min != null) ? row.min : (b.min != null ? b.min : 0), max: (row.max != null) ? row.max : (b.max != null ? b.max : 0),
+                    type: (b.type === 'int') ? 0 : 1, exposable: true });
+                tokenParams[b.param] = varStr;
+            } else if (row.mode !== 'bake' && !exposable) {            // SAFETY (valid-by-construction) — the classifier says this
+                tokenParams[b.param] = String(row.dflt != null ? row.dflt : b.default);   // param can't ride a #var → force-bake regardless of the row
+            } else {                                                    // BAKE — inline the literal, no #2600 row
+                tokenParams[b.param] = String(row.baked != null ? row.baked : b.default);
+            }
+        });
+    } else (def.bindings || []).filter((b) => b && b.blockIndex != null).forEach((b) => {
         const d = decl[b.param];
         const exposable = !!(cls[b.param] && cls[b.param].exposable);   // geometry / fold-blocked params are bake-only
         if (d && d.exposed === true && exposable) {                     // EXPOSED — a #11xx param + #2600 mirror + a LOCAL #var

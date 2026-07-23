@@ -20,7 +20,7 @@ import { pocketSlot, circlePocketSlot, surfacingSlot } from './millToSlot.js';
 import { slotFromOp } from './opToSlot.js';
 import { stepoverMm } from '../wizards/ops/pocketfill.js';   // t1043 — the CANONICAL exported stepoverPct->mm: max(0.2, max(0.1,toolDia)*stepoverPct/100). surfacingWizard.js:24-27 computes the identical formula inline (its absent-param defaults differ — 12/60 vs 6/40 — but are unreachable when the op provides toolDia+pct); the seed test verifies surface stepover == the real surfacingStack value.
 import { builtinTypeForTwin } from '../blocks/wizardLibrary.js';   // t1049 — the DECLARED twin->built-in bridge (inverts opensAs->type/variant). Real programs use data-op TWINS (user_surfacing_data …), not the bare built-in optypes.
-import { getUserDef } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback
+import { getUserDef, camFieldsFromStack } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback; t1095 — the block-native pendant-field rows (S2)
 import { classifyExposable } from './exposeClassifier.js';   // U1 — per-binding exposable/geometry classification for the universal seed
 
 // The clean 1:1 opType -> CAM generator type. pocket/drill are the DEFAULT arm; their variant arms are gated in camTypeOf.
@@ -179,13 +179,26 @@ function seedUniversal(op, reason) {
     if (!valueBindings.length) return { unsupported: reason || `"${op && op.opType}" has no value bindings to expose or bake` };
     const cls = classifyExposable(def);
     const params = (op && op.params) || {};
-    const fields = valueBindings.map((b) => {
+    const fieldFor = (b, over) => {                                     // one seed field; `over` = the cam_field row overriding label/mode/value (S2)
         const raw = params[b.param];
-        const value = (raw !== undefined && raw !== '') ? raw : b.default;
+        const value = (over && over.mode === 'bake' && over.baked != null) ? over.baked
+            : (raw !== undefined && raw !== '') ? raw : (over && over.dflt != null ? over.dflt : b.default);
         const exposable = !!(cls[b.param] && cls[b.param].exposable);
-        return { key: b.param, label: b.label || b.param, def: b.default, value, units: b.units || '', type: b.type,
-            exposed: true, bakeable: true, exposable };   // bakeable: any universal param can be baked; exposable: only value-role, fold-free
-    });
+        return { key: b.param, label: (over && over.label) || b.label || b.param, def: (over && over.dflt != null) ? over.dflt : b.default,
+            value, units: (over && over.units != null) ? over.units : (b.units || ''), type: b.type,
+            exposed: over ? (over.mode !== 'bake') : true, bakeable: true, exposable };   // over-mode drives expose/bake; else exposed by default
+    };
+    // t1095 (block-native params S2) — ADDITIVE-BY-FALLBACK. A cam_table in the template makes its cam_field ROWS the field
+    // declaration: seed order = block order, expose/bake = the row mode, label/units/default from the row (binding = wiring).
+    // No cam_table (every op today) → the UNCHANGED binding-order seed → byte-identical.
+    const camRows = camFieldsFromStack(def.template);
+    let fields;
+    if (camRows.length) {
+        const bindingByParam = {}; valueBindings.forEach((b) => { bindingByParam[b.param] = b; });
+        fields = camRows.map((row) => { const b = bindingByParam[row.param]; return b ? fieldFor(b, row) : null; }).filter(Boolean);
+    } else {
+        fields = valueBindings.map((b) => fieldFor(b));
+    }
     return { camType: 'universal', universal: true, fields };
 }
 
