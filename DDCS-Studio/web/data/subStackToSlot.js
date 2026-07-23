@@ -8,15 +8,17 @@
  *     opunit.params.opType (declare, never infer); its params are RE-DERIVED from the sub-stack sockets via the standard
  *     def's bindings (the inverse of instantiate — one-source, not a snapshot). Routed to its generator (the LIVE loop).
  *   - a maximal run of loose atoms → { kind:'custom' }. Routed to stackToSlot (value params exposed as #2600, geometry baked).
- * Compose IN ORDER via the same allocation contract buildSlotFromOps uses (#11xx around siblings via `used`, local #var =
- * varOffset+i+1, tag f._op). Returns { name, fields, body } — the generator shape slotPack consumes unchanged.
+ * Compose IN ORDER via the same allocation contract buildSlotFromOps uses (#11xx around siblings via `used`; the local
+ * #var is minted around the part generator's own declared scratch band and the cursor advances by camScratch.maxLocalVar,
+ * i.e. from what was MINTED — t1083; tag f._part). Returns { name, fields, body } — the shape slotPack consumes unchanged.
  *
  * S1 is ENGINE-ONLY (a harness, no fork-UX/modal). NB (flagged): CAM_GEN + the value re-sync below MIRROR macrosApp's
  * generateOp / applyOverridesToBody — S2/S4 should extract ONE shared composer so they can't drift; and the generators emit
  * self-contained framing (progstart…M30), so concatenated parts are not yet a single EXECUTABLE program (framing-normalization
  * is a later slice — same limit the existing multi-op buildSlotFromOps has).
  */
-import { flattenBlocks, getUserDef, defVOf, defVStale } from '../blocks/userOps.js';   // t1079 — defVStale: the ONE declared staleness rule (shared with the import transparency check)
+import { flattenBlocks, getUserDef, defVOf, defVStale } from '../blocks/userOps.js';
+import { maxLocalVar } from './camScratch.js';   // t1083 — advance the local-var cursor from what was MINTED (closes the bake gap by construction)
 import { opLabelOf } from '../blocks/opBuilders.js';   // t1079 — name a stale sub-unit in the part label so the degradation is VISIBLE
 import { camTypeOf, seedFromOp } from './opCamMap.js';
 import { stackToSlot } from './stackToSlot.js';
@@ -111,7 +113,7 @@ export function subStackToSlot(def, used = new Set(), varOffset = 0) {
                 // in the modal's part header and in the slot name. Re-fork the op to get the LIVE generator back.
                 const stampV = Number((part.opunit.params || {}).defV) || 0, curV = defVOf(opType);
                 const subStack = [{ type: 'user_root', params: {}, children: part.opunit.children }];
-                gen = stackToSlot({ opType: `${opType || 'user_sub'}_stale`, template: subStack, bindings: [] }, {}, usedSet, varOffset + fields.length);
+                gen = stackToSlot({ opType: `${opType || 'user_sub'}_stale`, template: subStack, bindings: [] }, {}, usedSet, Math.max(varOffset, maxLocalVar(fields)));
                 gen.name = `${opLabelOf(opType)} (def v${stampV}→v${curV} — unrolled, no longer live)`;
                 gen.body = `( STALE SUB-UNIT: ${opLabelOf(opType)} was forked at def v${stampV}, the def is now v${curV}.\n  Its parameters are UNROLLED (frozen) instead of live — re-fork the op to restore the live generator. )\n${gen.body}`;
             } else {
@@ -123,14 +125,14 @@ export function subStackToSlot(def, used = new Set(), varOffset = 0) {
                 const params = deriveStandardParams(stdDef, part.opunit.children);
                 const ct = camTypeOf({ type: 'op', opType, params });
                 if (ct.camType && ct.camType !== 'universal') {
-                    gen = generatePart(ct.camType, undefined, usedSet, varOffset + fields.length, {});   // decl {} = all-exposed → the generator's LIVE loop knobs
+                    gen = generatePart(ct.camType, undefined, usedSet, Math.max(varOffset, maxLocalVar(fields)), {});   // decl {} = all-exposed → the generator's LIVE loop knobs
                     const seed = seedFromOp({ type: 'op', opType, params });
                     if (gen && seed && !seed.unsupported) {
                         (gen.fields || []).forEach((f) => { const sv = (seed.fields || []).find((x) => x.key === f.key); if (sv && sv.value != null && sv.value !== '') f.def = sv.value; });
                         gen.body = applyFieldValues(gen.body, gen.fields);   // reflect the re-derived params on the pendant reads (loop still rides the #var → geometry stays LIVE)
                     }
                 } else {
-                    gen = stackToSlot(stdDef, {}, usedSet, varOffset + fields.length);   // an opunit wrapping a NON-generator op → unroll (not live, but never silently dropped)
+                    gen = stackToSlot(stdDef, {}, usedSet, Math.max(varOffset, maxLocalVar(fields)));   // an opunit wrapping a NON-generator op → unroll (not live, but never silently dropped)
                 }
             }
         } else {
@@ -143,7 +145,7 @@ export function subStackToSlot(def, used = new Set(), varOffset = 0) {
             const subDef = { opType: ((def && def.opType) || 'user_sub') + '_p' + pi, template: subStack, bindings: subBindings };
             const decl = {};
             subBindings.forEach((b) => { decl[b.param] = { exposed: true }; });   // expose every custom value binding (stackToSlot force-bakes the non-exposable)
-            gen = stackToSlot(subDef, decl, usedSet, varOffset + fields.length);
+            gen = stackToSlot(subDef, decl, usedSet, Math.max(varOffset, maxLocalVar(fields)));
         }
         if (gen) {
             // tag the PART (not _op — buildSlotFromOps overwrites _op with the authoring-op index); the modal groups rows by _part

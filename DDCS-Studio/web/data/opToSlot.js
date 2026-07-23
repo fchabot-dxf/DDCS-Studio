@@ -12,6 +12,7 @@
  * See the cam-menu-architecture memory + docs/archive/CAM-MENU-RESEARCH.md.
  */
 import { nextParam, mirrorVar } from './slotPack.js';
+import { nextLocalVar, bandsFor } from './camScratch.js';   // t1083 (slice B) — mint local body vars around drill/bore/slot's own scratch band
 import { spindleOn, spindleOff } from './camMacroKit.js';
 
 // Field specs: label / units / default / min / max / type (1=decimal, 0=integer). `def` may depend on method.
@@ -129,15 +130,18 @@ export function slotFromOp(method, pattern, used = new Set(), varOffset = 0, dec
     // substitutes for the #var at every interpolation site. decl absent / all-exposed → byte-identical to the old order.map.
     const fields = [];
     const v = {};
-    order.forEach((key, i) => {
+    let cur = varOffset;
+    const avoid = bandsFor(method === 'bore' ? 'bore' : (std ? 'slot' : 'drill'));   // all three share one declared band; keyed for clarity
+    order.forEach((key) => {
         const s = SPEC[key];
         // Bore needs hole Ø > tool Ø (else the cut radius is 0); drill bores at tool Ø.
         const def = key === 'holeDia' ? (method === 'bore' ? 12 : 6) : s.def;
         const d = decl && decl[key];
         if (d && d.exposed === false) { v[key] = String(d.value); return; }   // BAKED
         const idx = nextParam(taken); if (idx != null) taken.add(idx);        // EXPOSED — identical alloc order
-        fields.push({ key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type });
-        v[key] = '#' + (varOffset + i + 1);
+        cur = nextLocalVar(cur + 1, avoid);   // t1083 — step OVER this generator's own scratch band
+        fields.push({ key, idx, var: '#' + cur, label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type });
+        v[key] = '#' + cur;
     });
     if (std) {   // standalone op (slot) — no pattern, no shared sub
         const reads = fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);

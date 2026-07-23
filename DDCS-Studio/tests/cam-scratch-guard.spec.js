@@ -2,86 +2,79 @@ import { test, expect } from '@playwright/test';
 
 const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad';
 
-// t1081 S5(3) slice A — DECLARE + DETECT. A slot's FORM FIELDS get local body vars climbing from varOffset+1, while the
-// generators HARD-CODE their scratch (mill: #20-#33). Measured: 1 part is safe (#1-#10), but a 2-part mill slot puts the
-// RPM field on #20 and the pocket then emits `#20=0 ;origin X`, so `M3 S[#20]` commands S0 — a non-rotating tool driven
-// through the toolpath. This slice does NOT renumber anything: it declares the bands and makes the build REFUSE, loudly
-// and by name, so the silent S0 cannot ship. (Collision-free allocation is slice B.)
+// t1081 slice A declared the generator scratch bands and made the build REFUSE a slot whose form values its own
+// generator would clobber. t1083 slice B then made that collision IMPOSSIBLE by minting local vars around the band.
+// So the guard is now a BACKSTOP: it must still detect + refuse correctly (proven here on SYNTHETIC fields), while the
+// REAL generators produce nothing for it to catch. If these synthetic tests ever pass with real generator output, the
+// allocator has regressed.
 
-test('S5(3)A — the collision is DETECTED and NAMED for a 2-part mill slot; a 1-part slot is clean', async ({ page }) => {
+test('S5(3) backstop — the guard still DETECTS and NAMES a collision (synthetic), while the real generators produce NONE', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
         const { surfacingSlot, pocketSlot } = await import('/data/millToSlot.js');
-        const { fieldVarCollisions, collisionMessage, bandsFor } = await import('/data/camScratch.js');
-        // compose exactly as buildSlotFromOps does: used-set for #11xx, varOffset = running field count
+        const { fieldVarCollisions, collisionMessage, bandsFor, maxLocalVar } = await import('/data/camScratch.js');
+        // SYNTHETIC: a field deliberately sitting on #20, owned by a pocket op → the guard must catch it
+        const synthetic = fieldVarCollisions(
+            [{ key: 'rpm', label: 'Spindle RPM', var: '#20', _op: 1 }, { key: 'w', label: 'Width (X)', var: '#5', _op: 1 }],
+            [{ type: 'surface' }, { type: 'pocket' }],
+        );
+        // REAL: the same 2-part mill composition slice A had to refuse now allocates clean
         const used = new Set();
-        const p1 = surfacingSlot(used, 0);
-        (p1.fields || []).forEach((f) => used.add(f.idx));
-        const p2 = pocketSlot(used, (p1.fields || []).length);
-        const tag = (fs, oi) => (fs || []).map((f) => ({ ...f, _op: oi }));
-        const twoFields = [...tag(p1.fields, 0), ...tag(p2.fields, 1)];
-        const twoOps = [{ type: 'surface' }, { type: 'pocket' }];
-        const oneCols = fieldVarCollisions(tag(p1.fields, 0), [{ type: 'surface' }]);
-        const twoCols = fieldVarCollisions(twoFields, twoOps);
-        // prove the real hazard is exactly what we detect: part 2's rpm var IS written as scratch by the pocket body
-        const rpm = (p2.fields || []).find((f) => f.key === 'rpm');
+        const p1 = surfacingSlot(used, 0); (p1.fields || []).forEach((f) => used.add(f.idx));
+        const f1 = (p1.fields || []).map((f) => ({ ...f, _op: 0 }));
+        const p2 = pocketSlot(used, maxLocalVar(f1));
+        const f2 = (p2.fields || []).map((f) => ({ ...f, _op: 1 }));
+        const real = fieldVarCollisions([...f1, ...f2], [{ type: 'surface' }, { type: 'pocket' }]);
         return {
             millBand: bandsFor('pocket'),
-            oneCount: oneCols.length,
-            twoCount: twoCols.length,
-            twoVars: twoCols.map((c) => c.varNum),
-            msg: collisionMessage(twoCols),
-            rpmVar: rpm && rpm.var,
-            pocketWritesRpmVar: rpm ? new RegExp(`^\\s*\\${rpm.var}\\s*=`, 'm').test(p2.body) : false,
-            pocketCommandsRpmVar: rpm ? p2.body.includes(`M3 S[${rpm.var}]`) : false,
+            syntheticCount: synthetic.length, syntheticVar: synthetic[0] && synthetic[0].varNum,
+            msg: collisionMessage(synthetic),
+            realCount: real.length,
         };
     });
-    // the declared band is the real one (#20-#33 — including #33, which the old prose header omitted)
+    // the declared band is the real one (#20-#33 — including the #33 the old prose header omitted)
     const inMill = (n) => r.millBand.some(([lo, hi]) => n >= lo && n <= hi);
-    expect(inMill(20) && inMill(26) && inMill(27) && inMill(33), 'the declared mill band covers #20-#33 (incl. #33, which the old prose header omitted)').toBe(true);
-    // 1 part is SAFE — no false refusal
-    expect(r.oneCount, 'a single-part mill slot has NO collision (vars #1-#10 vs scratch #20+)').toBe(0);
-    // 2 parts collide, and it is the exact var the advisor reproduced
-    expect(r.twoCount, 'a 2-part mill slot collides').toBeGreaterThan(0);
-    expect(r.twoVars, 'the collision is on #20 — the RPM field the pocket overwrites with its origin X').toContain(20);
-    // and the hazard is real in the emitted G-code, not just arithmetic
-    expect(r.rpmVar, 'part 2 rpm lands on #20').toBe('#20');
-    expect(r.pocketWritesRpmVar, 'the pocket body WRITES that same var as scratch').toBe(true);
-    expect(r.pocketCommandsRpmVar, 'and commands the spindle from it — so it would run S0').toBe(true);
-    // the refusal NAMES the var, the field and the clashing generator
+    expect(inMill(20) && inMill(26) && inMill(27) && inMill(33), 'the declared mill band covers #20-#33').toBe(true);
+    // the BACKSTOP still works, and still names everything an operator needs
+    expect(r.syntheticCount, 'a field sitting in its own generator band is detected').toBe(1);
+    expect(r.syntheticVar, 'and it is the right variable').toBe(20);
     expect(r.msg, 'the refusal names the colliding variable').toMatch(/#20/);
     expect(r.msg, 'the refusal names the field').toMatch(/Spindle RPM/i);
-    expect(r.msg, 'the refusal names the clashing generator').toMatch(/pocket/i);
+    expect(r.msg, 'the refusal names the generator that would clobber it').toMatch(/pocket/i);
     expect(r.msg, 'the refusal explains the consequence in operator terms').toMatch(/spindle speed forced to 0/i);
+    // …and after slice B the real generators give it NOTHING to catch
+    expect(r.realCount, 'the REAL 2-part mill composition no longer collides (slice B) — the guard is quiet').toBe(0);
 });
 
-test('S5(3)A — validatePack ERRORS on an already-built colliding slot, and passes a clean one', async ({ page }) => {
+test('S5(3) backstop — validatePack ERRORS on a synthetic colliding slot, and passes a real composed one', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
         const { surfacingSlot, pocketSlot } = await import('/data/millToSlot.js');
+        const { maxLocalVar } = await import('/data/camScratch.js');
         const SP = await import('/data/slotPack.js');
+        // synthetic: a hand-made slot whose pocket field sits on #20 (what a pre-guard build could have produced)
+        const bad = { slot: 22, name: 'bad', ops: [{ type: 'pocket' }], body: '', fields: [{ idx: 1100, key: 'rpm', label: 'Spindle RPM', var: '#20', _op: 0 }] };
+        // real: a 2-part composed slot built through the new allocator
         const used = new Set();
-        const p1 = surfacingSlot(used, 0);
-        (p1.fields || []).forEach((f) => used.add(f.idx));
-        const p2 = pocketSlot(used, (p1.fields || []).length);
-        const tag = (fs, oi) => (fs || []).map((f) => ({ ...f, _op: oi }));
-        const bad = { slot: 22, name: 'bad', ops: [{ type: 'surface' }, { type: 'pocket' }], fields: [...tag(p1.fields, 0), ...tag(p2.fields, 1)], body: SP.composeParts([p1.body, p2.body]) };
-        const good = { slot: 23, name: 'good', ops: [{ type: 'surface' }], fields: tag(p1.fields, 0), body: p1.body };
+        const p1 = surfacingSlot(used, 0); (p1.fields || []).forEach((f) => used.add(f.idx));
+        const f1 = (p1.fields || []).map((f) => ({ ...f, _op: 0 }));
+        const p2 = pocketSlot(used, maxLocalVar(f1));
+        const f2 = (p2.fields || []).map((f) => ({ ...f, _op: 1 }));
+        const good = { slot: 23, name: 'good', ops: [{ type: 'surface' }, { type: 'pocket' }], fields: [...f1, ...f2], body: SP.composeParts([p1.body, p2.body]) };
         return { bad: SP.validatePack({ slots: [bad] }), good: SP.validatePack({ slots: [good] }) };
     });
     expect(r.bad.ok, 'a colliding slot FAILS validation (an error, not a warning)').toBe(false);
     expect(r.bad.errors.join(' '), 'the error names the slot and the overwritten var').toMatch(/cam22.*#20/s);
-    expect(r.good.ok, 'a clean single-op slot still validates').toBe(true);
+    expect(r.good.ok, 'a REAL 2-part composed slot validates cleanly after slice B').toBe(true);
 });
 
 test.describe(() => {
     test.use({ viewport: { width: 1400, height: 1000 } });
-    test('S5(3)A — the BUILD refuses a 2-part mill slot with a named message; a 1-part slot still builds byte-identical', async ({ page }) => {
+    test('S5(3)B — the real 2-op mill build now SUCCEEDS (no refusal) and lands one composed slot', async ({ page }) => {
         await page.goto('http://localhost:3211');
         await page.waitForFunction(() => window.ddcsGetBlockProgram);
-        // a program with two mill ops → the CAM builder auto-imports both
         await page.evaluate(async () => {
             const { getUserDef, defaultParams } = await import('/blocks/userOps.js');
             const dp = (t) => defaultParams(getUserDef(t));
@@ -90,17 +83,32 @@ test.describe(() => {
                 { id: 'p1', type: 'op', opType: 'user_pocket_data', label: 'Pocket', params: dp('user_pocket_data') },
             ]);
             (await import('/ui/macrosApp.js')).initMacrosApp();
-            window.ddcsOpenCamAuthoring();          // no seed → auto-import every CAM-able op
+            window.ddcsOpenCamAuthoring();
         });
         await page.waitForSelector('.cam-auth-overlay .cbm-eb');
         await page.click('[data-act="cbm-build"]');
-        await page.waitForSelector('.ddcs-dlg, .cam-sim-overlay, [role="dialog"]', { timeout: 8000 });
-        const refusal = await page.evaluate(() => (document.body.innerText || ''));
-        await page.screenshot({ path: `${SCRATCH}/cam-s5-collision-refusal.png` });   // VIEWED (ACCEPT, gated to the advisor)
-        expect(refusal, 'the build REFUSES with a named collision (never a silent build)').toMatch(/cannot be built/i);
-        expect(refusal, 'and names the colliding variable').toMatch(/#20/);
-        // nothing was written to the pack
-        const slots = await page.evaluate(() => JSON.parse(localStorage.getItem('ddcs_campack') || '{"slots":[]}').slots.length);
-        expect(slots, 'the refused slot was NOT added to the pack').toBe(0);
+        // slice B: no refusal — we go straight to the destination prompt
+        await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]', { timeout: 8000 });
+        await page.click('.cam-sim-overlay [data-cbm="ok"]');
+        await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
+        await page.screenshot({ path: `${SCRATCH}/cam-s5b-2op-built.png` });   // VIEWED (ACCEPT, gated to the advisor)
+        const r = await page.evaluate(() => {
+            const pack = JSON.parse(localStorage.getItem('ddcs_campack') || '{"slots":[]}');
+            const s = pack.slots.slice(-1)[0] || {};
+            const spindles = (s.body || '').match(/M3 S\[(#\d+)\]/g) || [];
+            const assignsOf = (v) => ((s.body || '').match(new RegExp(`^\\s*\\${v}\\s*=`, 'gm')) || []).length;
+            const vars = (s.fields || []).map((f) => f.var);
+            return {
+                slots: pack.slots.length, ops: (s.ops || []).length,
+                collisions: (s.varCollisions || []).length,
+                spindleAssigns: spindles.map((m) => assignsOf(m.match(/#\d+/)[0])),
+                inMillBand: vars.filter((v) => { const n = +String(v).replace('#', ''); return n >= 20 && n <= 33; }),
+            };
+        });
+        expect(r.slots, 'the slot WAS built (no refusal)').toBe(1);
+        expect(r.ops, 'it composes both ops').toBe(2);
+        expect(r.collisions, 'the backstop recorded NO collision').toBe(0);
+        expect(r.inMillBand, 'no field var sits in the mill scratch band #20-#33').toEqual([]);
+        expect(r.spindleAssigns.every((n) => n === 1), 'every spindle var is assigned exactly once (its own readLine)').toBe(true);
     });
 });

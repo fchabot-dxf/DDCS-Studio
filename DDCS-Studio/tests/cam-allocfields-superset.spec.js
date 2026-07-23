@@ -4,8 +4,10 @@ import { test, expect } from '@playwright/test';
  * CAM Builder S0 — allocFieldsWith is a STRICT SUPERSET of allocFields.
  * Equivalence (my own two-method check #2): allocFieldsWith(spec, used, off) with decl OMITTED and with an ALL-EXPOSED
  * decl is BYTE-IDENTICAL (JSON deep-equal) to allocFields(spec, used, off) — across several real-shaped specs, several
- * (used, varOffset) combos, and the pool-pressure (idx=null) path. The bake branch is exercised only for a
- * present-but-unexercised sanity (drops the field + literalizes v) — S0 rewires no caller.
+ * (used, varOffset) combos, and the pool-pressure (idx=null) path. The bake branch additionally checks that baking
+ * drops the field, literalizes v, and — since t1083 — does NOT burn a var slot (the surviving vars stay contiguous;
+ * see the BAKE GAP note at the assertion). The equivalence still holds because with nothing baked the minting cursor
+ * and the old positional index advance in lockstep.
  */
 test('allocFieldsWith == allocFields when decl omitted / all-exposed (several specs, offsets, used-sets)', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -60,7 +62,12 @@ test('allocFieldsWith == allocFields when decl omitted / all-exposed (several sp
       noFastField: !baked.fields.some((f) => f.key === 'fast'),
       fastIsLiteral: baked.v.fast === '250',
       fieldCountDropsByOne: baked.fields.length === CORNER.length - 1,
-      othersStillVars: baked.v.corner === '#1' && baked.v.slow === '#7',   // #-var stays positional (varOffset+i+1) by spec index
+      // t1083 (the BAKE GAP fix): a BAKED param no longer BURNS a var slot, so the surviving vars are CONTIGUOUS.
+      // `slow` was '#7' while the #-var was positional by spec index (leaving a hole where `fast` would have been);
+      // it is now '#6'. That hole was the bug: the mint used the SPEC index while callers advanced by the EXPOSED
+      // count, so one baked param made the next composed part's vars overlap the previous part's.
+      othersStillVars: baked.v.corner === '#1' && baked.v.slow === '#6',
+      contiguousAfterBake: baked.fields.map((f) => f.var).join(',') === '#1,#2,#3,#4,#5,#6',
     };
     return { cases, fails, bakeSanity };
   });
@@ -70,4 +77,6 @@ test('allocFieldsWith == allocFields when decl omitted / all-exposed (several sp
   // the bake branch exists + behaves (present-but-unexercised by callers in S0)
   expect(r.bakeSanity.noFastField && r.bakeSanity.fastIsLiteral && r.bakeSanity.fieldCountDropsByOne && r.bakeSanity.othersStillVars,
     'baking a param drops its field + literalizes its v-entry (bake branch present)').toBe(true);
+  expect(r.bakeSanity.contiguousAfterBake,
+    't1083 — a baked param burns NO var slot: the surviving vars are contiguous (the bake gap that let composed parts overlap)').toBe(true);
 });

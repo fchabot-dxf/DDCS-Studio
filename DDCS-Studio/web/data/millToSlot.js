@@ -12,7 +12,8 @@
  * See [[cam-probing-and-simulate]], [[cam-menu-architecture]], [[priorities-friendliness-over-perf]].
  */
 import { allocFieldsWith, readLine } from './probeToSlot.js';
-import { rasterClear, ringClear, SPINDLE_FIELD, spindleOn, spindleOff, errorEnd } from './camMacroKit.js';   // t1077 — errorEnd: the declared HALT an error branch must end on (never fall through into the next composed part)
+import { rasterClear, ringClear, SPINDLE_FIELD, spindleOn, spindleOff, errorEnd } from './camMacroKit.js';
+import { bandsFor } from './camScratch.js';   // t1083 (slice B) — the DECLARED band this generator writes, so its field vars are minted around it   // t1077 — errorEnd: the declared HALT an error branch must end on (never fall through into the next composed part)
 
 const CIRCLE_POCKET_FIELDS = [
     { key: 'dia', label: 'Diameter', units: 'mm', def: 60, min: 1, max: 99999, type: 1 },
@@ -65,7 +66,7 @@ const dirLabel = (dir) => (dir === 'y' ? 'rows ∥ Y' : 'rows ∥ X');
  * pass. Parametric: rows + Z layers recompute from the form. Tool-centre region inset by the tool radius.
  */
 export function pocketSlot(used = new Set(), varOffset = 0, dir = 'x', decl) {
-    const { fields, v } = allocFieldsWith(POCKET_FIELDS, used, varOffset, decl);
+    const { fields, v } = allocFieldsWith(POCKET_FIELDS, used, varOffset, decl, bandsFor('pocket'));
     const body = [
         `( Rectangular pocket — raster clear (${dirLabel(dir)}) + wall finish, layer by layer. Runs at the WCS origin corner. )`,
         '( Spindle must already be running. Edit #20/#21 to offset the pocket within the WCS. )',
@@ -102,7 +103,7 @@ export function pocketSlot(used = new Set(), varOffset = 0, dir = 'x', decl) {
  * paths inset by the tool radius so the finished bore Ø = the form value. Runs at the WCS origin (centre).
  */
 export function circlePocketSlot(used = new Set(), varOffset = 0, arc = 'G3', decl) {
-    const { fields, v } = allocFieldsWith(CIRCLE_POCKET_FIELDS, used, varOffset, decl);
+    const { fields, v } = allocFieldsWith(CIRCLE_POCKET_FIELDS, used, varOffset, decl, bandsFor('cpocket'));
     const dirName = arc === 'G2' ? 'CW / conventional' : 'CCW / climb';
     const body = [
         `( Round pocket — concentric-ring clear (${dirName}), layer by layer. Runs at the WCS origin (pocket centre). )`,
@@ -134,7 +135,7 @@ export function circlePocketSlot(used = new Set(), varOffset = 0, arc = 'G3', de
  * and NO wall pass. Shallow Z (skim). Runs at the WCS origin corner; spindle assumed running.
  */
 export function surfacingSlot(used = new Set(), varOffset = 0, dir = 'x', decl) {
-    const { fields, v } = allocFieldsWith(SURFACE_FIELDS, used, varOffset, decl);
+    const { fields, v } = allocFieldsWith(SURFACE_FIELDS, used, varOffset, decl, bandsFor('surface'));
     const body = [
         `( Surface / face mill — raster the top flat (${dirLabel(dir)}). Tool-centre sweeps Area X x Y; the tool overhangs the edges. )`,
         '( Spindle must already be running. Edit #20/#21 to offset within the WCS. )',

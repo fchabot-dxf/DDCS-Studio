@@ -20,7 +20,7 @@ import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.
 import { seedFromOp, camTypeOf, isCamableType, isCamGeneratorTwin } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. t1073 — isCamGeneratorTwin gates the Customize-op picker
 import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
 import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';
-import { fieldVarCollisions, collisionMessage } from '../data/camScratch.js';   // t1081 — the DECLARED generator scratch bands + the build guard that refuses a slot whose form values land inside them   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
+import { fieldVarCollisions, collisionMessage, maxLocalVar, nextLocalVar, bandsFor } from '../data/camScratch.js';   // t1081 — the DECLARED generator scratch bands + the build guard that refuses a slot whose form values land inside them   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
 import { getUserDef, defVOf } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest
 import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
@@ -1053,7 +1053,10 @@ function homingPostIsExpert() {
         _camPack.slots.forEach((s) => { if (s !== slot) (s.fields || []).forEach((f) => used.add(f.idx)); });
         let fields = [], parts = [], name = '';
         (slot.ops || []).forEach((op, oi) => {
-            const gen = generateOp(op.type, op.variant, used, fields.length, declFromOp(op), op.opType);   // opType → the universal arm's def lookup
+            // t1083 — advance the local-var cursor from what the previous parts ACTUALLY MINTED, not from a parallel
+            // field COUNT. That is what closes the bake gap: a baked param mints no var, so `fields.length` drifted below
+            // the real high-water mark and the next part's vars overlapped the previous part's.
+            const gen = generateOp(op.type, op.variant, used, maxLocalVar(fields), declFromOp(op), op.opType);   // opType → the universal arm's def lookup
             let body = gen.body;
             gen.fields.forEach((f) => {
                 used.add(f.idx);
@@ -1531,7 +1534,8 @@ function homingPostIsExpert() {
         });
         camHost.addEventListener('click', (e) => {
             const card = e.target.closest('.cam-slot'); if (!card) return; const si = +card.dataset.si; const slot = _camPack.slots[si]; if (!slot) return; const a = e.target.dataset.act;
-            if (a === 'addf') { slot.fields = slot.fields || []; const idx = slotPack.nextParam(slotPack.usedParams(_camPack)); if (idx == null) { dlgNotice('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
+            // t1083 — the manual add-field door now ALLOCATES too: past the slot's local-var high-water mark and skipping every scratch band its ops write, instead of minting a bare `fields.length + 1`.
+            if (a === 'addf') { slot.fields = slot.fields || []; const idx = slotPack.nextParam(slotPack.usedParams(_camPack)); if (idx == null) { dlgNotice('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + nextLocalVar(maxLocalVar(slot.fields) + 1, (slot.ops || []).flatMap((o) => bandsFor(o && (o.type || o.camType)))) }); saveCamPack(); renderCamBuilder(); }
             else if (a === 'delf') { slot.fields.splice(+e.target.closest('tr').dataset.fi, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'edit') { openIconEditor(slot.icon || null, (bmp, model) => { slot.icon = { name: (slot.name || 'cam' + slot.slot) + '.bmp', data: bmp, w: 360, h: 180, layers: model.layers }; saveCamPack(); renderCamBuilder(); }); }

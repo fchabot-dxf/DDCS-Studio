@@ -21,7 +21,8 @@ import { readLine } from './probeToSlot.js';           // the canonical read-lin
 import { instantiate } from '../blocks/userOps.js';    // fill each binding's socket from tokenParams (no registration side effect)
 import { emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../wizards/previewEmit.js';
-import { classifyExposable } from './exposeClassifier.js';   // U1 — which value bindings can carry a #var (declared, not inferred)
+import { classifyExposable } from './exposeClassifier.js';
+import { nextLocalVar, bandsFor } from './camScratch.js';   // t1083 (slice B) — one minting helper. NB the UNIVERSAL arm has no declared band yet (slice C: emitMapped injects wizard-op/dialect scratch into this same low range), so `avoid` is empty here and the numbering is unchanged.
 
 /**
  * @param {object} def   a user-op def (from userOpFromStack): { opType, label, template, bindings }
@@ -39,12 +40,15 @@ export function stackToSlot(def, decl = {}, used = new Set(), varOffset = 0) {
     const tokenParams = {};
     const cls = classifyExposable(def);                                 // U1 — per-binding { exposable, role, reason } (declare+structure)
     // Only VALUE bindings (a real socket, blockIndex != null) can carry a #var; structural bindings drive guards, not emit.
-    (def.bindings || []).filter((b) => b && b.blockIndex != null).forEach((b, i) => {
+    let cur = varOffset;
+    const avoid = bandsFor(null);   // slice C will supply the universal arm's injected-scratch band; [] today
+    (def.bindings || []).filter((b) => b && b.blockIndex != null).forEach((b) => {
         const d = decl[b.param];
         const exposable = !!(cls[b.param] && cls[b.param].exposable);   // geometry / fold-blocked params are bake-only
         if (d && d.exposed === true && exposable) {                     // EXPOSED — a #11xx param + #2600 mirror + a LOCAL #var
             const idx = nextParam(taken); if (idx != null) taken.add(idx);
-            const varStr = '#' + (varOffset + i + 1);
+            cur = nextLocalVar(cur + 1, avoid);
+            const varStr = '#' + cur;
             const seedDef = (d.value != null && d.value !== '') ? d.value : b.default;   // the pendant seeds from the op's value (decl), else the binding default
             fields.push({ key: b.param, idx, var: varStr, label: b.label || b.param, units: b.units || '', def: seedDef, min: (b.min != null ? b.min : 0), max: (b.max != null ? b.max : 0), type: (b.type === 'int') ? 0 : 1, exposable: true });
             tokenParams[b.param] = varStr;                              // the LOCAL var lands in the socket; val() rides it through

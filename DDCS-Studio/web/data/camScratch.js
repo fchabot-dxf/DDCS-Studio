@@ -59,7 +59,32 @@ export const SCRATCH_BANDS = {
 /** The band(s) a camType owns, or [] when we have no declaration for it (universal / substack — slice C). */
 export const bandsFor = (camType) => SCRATCH_BANDS[camType] || [];
 
-const inBands = (n, bands) => bands.some(([lo, hi]) => n >= lo && n <= hi);
+const inBands = (n, bands) => (bands || []).some(([lo, hi]) => n >= lo && n <= hi);
+
+// ── slice B: the collision-FREE local-var allocation ────────────────────────────────────────────────────────────────
+/**
+ * The next LOCAL body-var number at or after `from` that is NOT inside `avoid`. This is what makes the allocation
+ * collision-free rather than merely collision-detected: a generator's field vars step OVER the band that same
+ * generator writes, so a part can never overwrite its own operator values (slice A's guard stays as the backstop).
+ */
+export function nextLocalVar(from, avoid) {
+    let n = Math.max(1, Math.trunc(from) || 1);
+    while (inBands(n, avoid)) n++;
+    return n;
+}
+
+/**
+ * The highest local var a field list ACTUALLY minted (0 for none). The composer advances its cursor from THIS.
+ *
+ * This is what closes the BAKE GAP by construction: the old code minted from the SPEC index (`varOffset + i + 1`)
+ * while callers advanced by `fields.length` (the EXPOSED count), so the moment a param was baked the two diverged and
+ * the next part's vars overlapped the previous part's. Deriving the advance from what was minted means the mint and
+ * the advance cannot disagree — there is no second counter to keep in step.
+ */
+export const maxLocalVar = (fields) => (fields || []).reduce((m, f) => {
+    const n = Number(String((f && f.var) || '').replace('#', ''));
+    return Number.isFinite(n) ? Math.max(m, n) : m;
+}, 0);
 
 /**
  * Every FIELD VAR that its OWN generator would overwrite. `fields` are the built slot's fields (each carrying `var`
