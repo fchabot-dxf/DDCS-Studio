@@ -13956,3 +13956,68 @@ whole (schemas + jsonDef + chip + round-trip + reader).
 camFieldsFromStack, with byte-identical emit proven by construction and by test. Nothing consumes the rows yet -- S2 routes
 stackToSlot to walk them (expose/bake/label/order from the rows, socket from the binding). No modal change (S4). No emit
 change. A NEW web/ file (camField.js) -- the mem-server picked it up fresh (402 files preloaded, was 401).
+
+---
+
+## turn 1095 -- BLOCK-NATIVE PARAMS S2: stackToSlot + seedUniversal CONSUME camFieldsFromStack. ADDITIVE-BY-FALLBACK. Built.
+
+### THE SAFETY RAIL: I did not touch the fallback loop AT ALL
+The advisor's rule was "when a template HAS a cam_table the rows drive; when it has NONE (every op today) fall back EXACTLY ->
+byte-identical". I implemented that as literally as possible: the existing bindings/decl loop in stackToSlot is UNCHANGED --
+I added a new `if (camRows.length) { ... } else <the original loop verbatim>`. So an op with no cam_table runs the exact same
+code it ran before S2. camFieldsFromStack(def.template) returns [] for every op today (none carry the blocks yet; S3
+materializes them), so every op takes the else branch. This is why the goldens cannot move.
+
+### THE cam_table BRANCH (the new behaviour, only for an op that carries the blocks)
+When camFieldsFromStack returns rows, they ARE the field declaration, walked in BLOCK ORDER:
+  - order: the rows drive the loop, and nextParam is a monotonic pool scan, so the Nth exposed row gets the Nth free #11xx ->
+    the Nth #2600 mirror read -> the Nth pendant slot. Reordering the blocks reorders the pendant rows for FREE (proven).
+  - mode: row.mode !== 'bake' -> EXPOSE (a #11xx param + #2600 mirror + a local #var); === 'bake' -> inline the literal with
+    NO #2600 row.
+  - label/units/range: from the row, FALLING BACK to the binding (row.label || b.label || b.param; row.units ?? b.units; etc).
+  - ONE-SOURCE: the row is the DECLARATION (order/mode/label); the BINDING is the WIRING -- I resolve each row's binding by
+    param (bindingByParam) to get the socket (blockIndex/key/type). No value lives in two editable places.
+  - valid-by-construction: a row that says EXPOSE on a param the classifier marks bake-only (geometry/fold) is FORCE-BAKED --
+    a cam_table cannot override the safety bake (the classifier still gates). This is also why the guarded-twin fail-closed
+    case does NOT tangle (GATE-IF-BALLOONS did not fire): classifyExposable fail-closes -> every row force-bakes -> honest,
+    no special handling.
+  - a row naming a param with no value binding is DANGLING -> skipped (greyed in a later slice).
+  - a binding with NO row is simply not a pendant field -> baked to its binding default.
+
+### seedUniversal TOO (the modal seed), same additive shape
+Refactored the seed field construction into fieldFor(b, over) where `over` is the optional cam_field row. With no row it is
+BYTE-IDENTICAL to the old valueBindings.map (I checked every key: value/label/def/units/type/exposed/bakeable/exposable all
+reduce to the original expression when over is undefined). With a cam_table it maps the ROWS in block order: exposed =
+mode !== 'bake', label from the row, bake value from row.baked. So the seed order/mode agrees with the emit order/mode --
+they stay in sync (the modal itself becoming a view is still S4; this only makes the seed consistent).
+
+### WHY THE FLAT-INDEX SHIFT MATTERS (a real gotcha I had to get right in the test)
+instantiate (userOps.js:471) flattens the template with flattenBlocks, which visits uiChildren BEFORE children. So a cam_table
++ its N cam_field rows in the PRESENTATION mouth SHIFT every execution atom's flat index up by (1 + N). A binding's blockIndex
+must therefore be computed WITH the cam_table present (as extractParamBlocks does at save time). The S2 test builds its
+bindings accounting for that (feed at 2+N, move at 3+N). This is not a code change -- it is inherent to how bindings are
+computed over the full template -- but it is the thing that would silently mis-wire a hand-built test, so I flagged it.
+
+### VERIFIED
+- cam-block-native-params-s2.spec.js (NEW, 4): (1) a cam_table (feed EXPOSE, movefeed EXPOSE, depth BAKE=-2) -> fields in
+  BLOCK ORDER [feed, movefeed] with the BLOCK labels + #1/#2 (#1100/#1101), the two exposed rows read #2600/#2601 IN ORDER,
+  and depth inlines Z-2 with NO #2600 row and NO ;Plunge Z mirror; (2) swapping the two cam_field blocks swaps the field
+  order AND which var/#2600 each gets (block order = pendant order); (3) a def with NO cam_table falls back to the decl path
+  byte-identically (feed exposed via decl with the BINDING label, z baked to Z-3); (4) seedUniversal orders by the rows too
+  (bake row -> exposed:false, expose row -> exposed:true + block label), block order.
+- FULL GATE: 1437 passed, 0 FAILED, 4 skipped (11.8m) -- CLEAN, and 1437+4 = 1441 = the full count reconciles. Failed-count
+  grepped, not the tail. Zero failures this run (the preflight-badge-838 / blocks-mobile-drawers flakes behaved). 1437 =
+  1431 prior + 4 new S2 tests + the 2 flakes that were red last run now green. The pre-existing universal + golden specs The pre-existing cam-universal-route / cam-universal-scratch / cam-stack-to-slot specs + every
+  passing UNCHANGED is the byte-identity guarantee. (The universal + golden specs are the real fallback proof -- they build universal slots with NO cam_table and pin
+  exact var numbering / exposure, so their passing UNCHANGED is the byte-identity guarantee.
+
+### GATE-IF-BALLOONS: did NOT trigger. Consuming the reader did NOT tangle with the seed/expose-classifier path -- the
+classifier stays the gate (an expose row on a bake-only param force-bakes), and the guarded-twin fail-closed case just makes
+every row force-bake (honest). So I did NOT stop at the universal arm / gate the generator arm to S2b: the universal arm
+(stackToSlot + seedUniversal) is done, and the generator arm (millToSlot/probeToSlot/opToSlot via PARAM_ALIAS) was never in
+scope for S2 -- it does not read camFieldsFromStack (a later slice if ever).
+
+### STATE: the block-native pendant-field declaration now DRIVES the universal-arm emit + seed when a cam_table is present
+(order/mode/label from the rows, wiring from the binding, reorder-for-free), and is byte-identically inert when absent. No op
+carries a cam_table yet -- S3 auto-materializes one byte-neutrally from the bindings so existing twins gain the blocks without
+moving a byte. The modal-as-view is the gated S4. No emit change for any current op.
