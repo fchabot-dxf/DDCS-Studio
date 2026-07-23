@@ -13450,3 +13450,50 @@ C. (separate, also needed) the UNIVERSAL-arm collision at varOffset 0 -- needs t
 - FULL GATE: 1414 passed, 0 failed, 4 skipped (12.0m) -- CLEAN. 1414 = 1413 + the new defV-staleness test.
 
 ### STATE: (4) done. (3) GATED with a measured design fork -- it is a REAL safety bug (S0 spindle at 2 parts, crash-class at 3) but a collision-FREE fix changes emitted G-code everywhere and needs an allocation-contract change plus per-post threading into post-blind generators; I did not want to half-build that on a safety path. No release from me.
+
+---
+
+## turn 1081 -- S5(3) SLICE A: DECLARE the generator scratch bands + make the build REFUSE LOUDLY. Per the advisor ruling (A now, B as its own slice, C after). NO renumbering, NO emitted-G-code change, NO release impact.
+
+### BUILT (1) the DECLARATION -- inert data, derived from the CODE
+NEW web/data/camScratch.js: `SCRATCH_BANDS` maps each camType (the CAM_GEN keys corner/edge/zprobe/inside/boss/align/pocket/cpocket/surface + the slotFromOp types drill/bore/slot) to the inclusive [lo,hi] macro-var bands that generator actually writes. Every band carries a CITATION to the assignment that proves the number (millToSlot :74-82/:111-114/:142-149 -> #20-#26; camMacroKit rasterClear :92-123 -> #27-#33; ringClear :147-168 reuses #27/#28/#29/#33; wcsBase :46-48 + writeAxis :51-55 -> #70/#71/#73; probeToSlot probe temps :223/:261/:344-359/:427-443/:501-527 -> #50-#61; signs/targets -> #90-#97; corner radius-comp :104 -> #101/#102; alignment :491/:493 re-purposes #70/#71/#72 with its OWN meaning; opToSlot :78-86 -> #40/#41 and :56-58/:95-115 -> #50-#54). The module imports NOTHING (pure data + two pure fns) so it cannot cycle.
+FIXED THE TWO MISLEADING COMMENTS in the same pass (the advisor called them out as actively dangerous):
+- camMacroKit header said the raster band was "#27-#32" -- WRONG, rasterClear also writes #33 (the ramp lead-in length). Corrected to #27-#33.
+- probeToSlot header said the probes were "clear of drill/bore's #30-#54" -- WRONG in the DANGEROUS direction: the probe slots write #50-#61, which OVERLAPS opToSlot's #50-#54 pattern-loop vars, so a probe and a drill must NOT be composed on the assumption they are disjoint. Corrected + the real bands listed.
+Both corrected comments now POINT AT camScratch.js as the authoritative source ("the prose is a pointer, never the source") so they cannot drift again.
+
+### BUILT (2) the GUARD -- a loud, named REFUSAL (never a silent skip)
+- camScratch.fieldVarCollisions(fields, ops): for each built field var, is its number inside the band its OWN generator writes? (WITHIN-part -- see the correction section below.) Returns [{varNum, field, ownerOp, ownerType, clashType}] -- empty means safe. Pure + read-only.
+- camScratch.collisionMessage(cols): the operator-facing refusal -- names the VARIABLE, the FIELD, the owning op and the clashing generator, states the consequence in operator terms ("the machine would run with the wrong numbers, e.g. spindle speed forced to 0") and gives the way out ("Build them as separate slots for now").
+- macrosApp.cbmBuild REFUSES BEFORE the destination prompt (so the user is never asked where to put a slot that cannot be built) -- nothing reaches the pack.
+- macrosApp.buildSlotFromOps records slot.varCollisions so the state is available to the table/validator.
+- slotPack.validatePack raises them as ERRORS (not warnings) so a slot BUILT BEFORE this guard existed cannot pass validation silently.
+
+### VERIFIED -- two-method (diff + VIEWED) + 3 tests
+cam-scratch-guard.spec.js (NEW, 3):
+1. DETECTION + the real hazard: the declared mill band covers #20/#26/#27/#33 (incl. the #33 the old prose omitted); a 1-PART mill slot has ZERO collisions (no false refusal); a 2-PART slot collides on #20; and the hazard is proven in the EMITTED G-CODE, not just arithmetic -- part 2's rpm field IS #20, the pocket body WRITES that same var as scratch, and it commands `M3 S[#20]`, i.e. S0.
+2. validatePack ERRORS on an already-built colliding slot (naming cam22 + #20) and still passes a clean single-op slot.
+3. THE REAL SYMPTOM through the REAL UI: a program with two mill ops -> auto-imported into the CAM builder -> pressing Build REFUSES with the named message and the pack stays EMPTY (0 slots).
+VIEWED: cam-s5-collision-refusal.png -- the dialog reads "This slot cannot be built: 1 form value would be overwritten by a generator's working variables. #20 -- Spindle RPM (op 2) is overwritten by the pocket generator's own working variables ... e.g. spindle speed forced to 0. Build them as separate slots for now."
+BYTE-IDENTITY: this slice touches NO emit path (camScratch is new and only READ by the guard; the two edits to the generators are COMMENTS), so every existing slot's G-code is unchanged by construction -- and the suite's golden / byte-diff-ZERO tests are the proof.
+FULL GATE: 1417 passed, 0 failed, 4 skipped (12.1m) -- CLEAN. 1417 = 1414 + the 3 new guard tests. NOTE: an earlier run of the SAME tree reported 11 SCATTERED failures at 16.6m across unrelated areas (carve-fidelity, comm-dwell, collapsible-panes, coord-list, corner-marker, drill-canvas, gui-param-block, homing-engine ...); ALL of them PASS IN ISOLATION. The box was concurrently running another agent's wrangler dev + an http-server + four @playwright/mcp servers -- CPU contention, not a code fault (and not my tree to reap). I re-ran on a fresh server rather than declare it green on my own say-so.
+
+
+### THE CORRECTION THE GATE FORCED -- the rule is WITHIN-PART, not cross-part (worth recording)
+My first draft flagged a field var landing in ANY part's band. The full gate caught that as a FALSE REFUSAL: the existing
+S-C multi-op test (surfacing + drill + probe-corner -> ONE composed slot) started failing, because drill's field vars
+#11-#24 fall inside SURFACING's #20-#33 band. Reasoned it through against the emitted program and it is benign: the
+composed parts run SEQUENTIALLY and each generator emits its OWN readLines at the top of its OWN part (slotMacro only
+prepends reads when a body has none, which never happens for a generator body). So part 1's scratch is already dead when
+part 2 reads its fields, and part 1's fields are dead before part 2's scratch runs -- a cross-part overlap is harmless
+re-use of a volatile var. The REAL hazard is a part whose OWN field var sits in the band its OWN generator writes DURING
+that same part -- exactly the S0 case (pocket's rpm lands on #20, then the pocket sets #20=0 as its origin X, so
+`M3 S[#20]` commands S0 mid-part). Narrowed the rule to WITHIN-PART: the S0 case is still refused, the legitimate 3-op
+composition builds again, and the message now reads "is overwritten by the <generator>'s own working variables".
+LESSON: an over-approximating safety guard is not free -- it silently disables a working feature. The gate caught it.
+
+### STILL OPEN (the advisor's sequence)
+- (B) the real COLLISION-FREE allocation: composer unions the bands, allocFieldsWith allocates local vars from a free iterator that skips them, advancing by specLen (which also closes the BAKE GAP where f.var uses the spec index while callers advance by the exposed count). WILL renumber emitted G-code for every installed slot -> its own review + a rebuild-and-reinstall release note.
+- (C) the UNIVERSAL arm, already colliding at varOffset 0 because emitMapped injects wizard-op + dialect scratch (#5 #6 #9 #10 #17-#24 #42 #43 #50 #95 #99, and #190/#191 on V4.1/DM500) into the same low band; needs those wizards/ops + dialect files to DECLARE what they inject before the CAM allocator can avoid it. NOTE: the guard added here does NOT cover that arm (no declaration to read yet) -- a universal/substack op contributes no band, so it is detected only for the generator parts.
+
+### STATE: the silent S0 is dead -- a slot whose form values would be clobbered by a generator's scratch now REFUSES by name at build time and FAILS validation if it was built earlier. Nothing was renumbered. B and C remain. No release from me.
