@@ -13733,3 +13733,72 @@ the whole (A) atom-emit change may be unnecessary. I could not settle this from 
 ### STATE: the feature gap the advisor identified is REAL and worth fixing -- a user can build a CAM slot from the ops real
 programs use and expose nothing. But it is not a missing role, and the fix lives in the ATOM EMITS (or in routing), not in
 atomRoles.js. Awaiting direction on the fork above.
+
+---
+
+## turn 1089 -- SINGLE is a declared PATTERN, routed to the GENERATOR (the fix for the all-disabled Expose radios). Built.
+
+### THE THREE PRE-BUILD CONFIRMATIONS (I was told to check rather than obey, and all three held)
+(a) IS cutLines REUSABLE AS A PATTERN BODY? YES, and it is already exactly that. opToSlot.js:75 cutLines(method, v, doN) is
+    a standalone function whose own comment reads "the inline per-hole cut at the CURRENT X/Y", and every existing pattern
+    calls it the same way -- indent(cutLines(method, v, N), pad) -- passing the DO nesting depth. So single is not a new body
+    at all: it is a G0 to the anchor plus the SAME per-hole cut, with doN=1 because there is no surrounding pattern loop.
+    Nothing was copied or re-implemented.
+(b) DOES ADDING single DISTURB THE OTHER FOUR? No. PATTERN_FIELDS/PATTERN_LABEL are keyed lookups read only for the pattern
+    in hand, and the single branch returns EARLY in loopBody, above circle/line/grid and the rect fallthrough. A test asserts
+    all 8 method x pattern combinations still build with the per-hole cut nested below the pattern loop (DO2/DO3, never DO1).
+(c) IS THE posX/posY ANCHOR RIGHT FOR ONE HOLE? Yes, and single is the CLEANEST case. opCamMap.js:66 already carries the
+    t1051 fix (posX: ['originX','x0']) and it applies regardless of pattern. Better: the CAVEAT flagged at opCamMap.js:64 --
+    that a CIRCLE pattern's centre-vs-min-corner may differ by dia/2 -- CANNOT apply here, because one hole at the anchor has
+    no centre-vs-corner ambiguity at all.
+
+### WHY THIS BEATS THE ATOM-EMIT CHANGE (the advisor's reading, confirmed)
+The universal arm cannot expose depth/peck AT ALL -- not "does not yet", cannot. drill.js peckDrill drives a JS while loop,
+so the peck sequence is UNROLLED and every Z is a baked literal computed at build time (measured t1087). Through the
+generator the same knobs are a MACRO loop over the #2600 mirrors. Measured on the real emitted slot:
+      #4=#2603  ;Depth [mm] =5        #5=#2604  ;Peck [mm] =3
+      WHILE #41 LT #4 DO1 / #41=#41+#5 / IF #41 GT #4 THEN #41=#4 / G1 Z[-#41] F#6 / G0 Z#7 / END1
+That is depth AND peck live, not just feed and rpm, with NO atom emit touched -- so no other op can regress.
+AND IT IS THE COMMON CASE, NOT AN EDGE ONE: DRILL_DEFAULTS.pattern === 'single' (drillData.js:51), so the DEFAULT drill twin
+was the one going to the worst arm.
+
+### THE RIDER (bookkeeping, explicitly not the fix)
+Declared the 7 atoms that were still falling through to DEFAULT_ROLE -- toolsel, wcs, placeonstock, array, entry, stepdown,
+contourfill. Every row read from the atom's own emit, per the module's stated ground-truth rule: array's numeric params all
+run num() into Math.round/trig inside patternPoints; contourfill's all run num() building a JS region; the rest are
+selectors or fold-internal. EVERY row is geometry/other, exactly as I predicted -- the classifier outcome does not change,
+and the test asserts NOTHING became exposable and the fail-safe default is untouched. The value is that the surface is now
+HONEST: a reader can tell "verified bake-only" from "never enumerated".
+
+### THE GATE CAUGHT TWO FAILURES, AND THE TAIL HID THEM
+First run printed "1426 passed / 4 skipped" -- but the total was 1432, so 1426+4 leaves TWO unaccounted. Grepping the failed
+count (not the tail) found "2 failed" above the summary. Exactly the trap in the check-suite-failed-count memory.
+  1. cam-op-seed.spec.js:64 -- DETERMINISTIC and legitimate. It asserted seedFromOp(drill, single).unsupported contains
+     'single' -- i.e. it PINNED THE GAP this task was dispatched to close. MIGRATED, not deleted: 'single' moved out of the
+     unsupported group into the camType group asserting drillSingle==='drill' and boreSingle==='bore', so the suite now
+     guards the FIX instead of the defect. The other three unsupported forks (middle single-axis, pocket polygon, contour)
+     are genuinely generator-less and stay. The strict toEqual on the camType map was extended with the two new keys.
+  2. preflight-badge-838.spec.js:119 -- NOT MINE and not deterministic. It expected a travel-limit dialog and got a
+     dead-spindle one; it touches nothing this turn changed (drill patterns / atom roles / routing). It PASSED in isolation
+     and PASSED in the clean re-run, so it was an ordering/state flake. I did not declare the gate green off the isolated
+     pass -- I re-ran the whole suite.
+
+### VERIFIED
+- cam-drill-single-pattern.spec.js (NEW, 5): routing (single and a pattern-less op both reach the generator, grid/circle
+  undisturbed, bore single reaches bore); the emitted slot (exact field list, every field read from its own #2600 mirror, a
+  MACRO WHILE loop stepping by the PECK var and bounded by the DEPTH var, Z as an EXPRESSION, and a positive assertion that
+  there is NO baked literal plunge Z anywhere -- that literal IS the universal-arm defect); the other four patterns intact;
+  the rider; and a REAL-SYMPTOM UI test driving the actual CAM modal on a DEFAULT drill twin.
+- MY OWN VIEWED SCREENSHOT (t1089-drill-single-modal.png), and it is the whole point of the turn:
+    BEFORE (t1087)  header "1. Drill -> universal", 34 rows, EVERY Expose radio DISABLED, pendant column all "baked = ..."
+    AFTER           header "1. Drill -> drill", 8 rows, every Expose ENABLED and selected, pendant column #1100->#2600 ...
+                    #1107->#2607, with Depth and Peck among them.
+- I also chased the empty inline-preview panel I noticed in that screenshot rather than leaving it as a hunch, because a
+  single hole is a degenerate zero-area bbox and could plausibly have broken a preview that scales to it. Measured: there is
+  no canvas element in the modal for EITHER single or grid, so the panel populates on Simulate. Pre-existing, not mine.
+- FULL GATE (clean re-run): 1428 passed, 0 FAILED, 4 skipped (11.8m). 1428+4 = 1432 = the full count, so nothing is hidden
+  this time. Failed-count grepped, arithmetic reconciled.
+
+### STATE: the default drill/bore twin now reaches the premium generator arm with depth/peck/holeDia as live pendant knobs.
+No atom emit was touched, so the deferred num->val change for drill.feed / progstart.rpm remains open and unprejudiced --
+and is now a smaller prize, since the generator route already delivers those two knobs for drill/bore.
