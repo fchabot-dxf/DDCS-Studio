@@ -13497,3 +13497,39 @@ LESSON: an over-approximating safety guard is not free -- it silently disables a
 - (C) the UNIVERSAL arm, already colliding at varOffset 0 because emitMapped injects wizard-op + dialect scratch (#5 #6 #9 #10 #17-#24 #42 #43 #50 #95 #99, and #190/#191 on V4.1/DM500) into the same low band; needs those wizards/ops + dialect files to DECLARE what they inject before the CAM allocator can avoid it. NOTE: the guard added here does NOT cover that arm (no declaration to read yet) -- a universal/substack op contributes no band, so it is detected only for the generator parts.
 
 ### STATE: the silent S0 is dead -- a slot whose form values would be clobbered by a generator's scratch now REFUSES by name at build time and FAILS validation if it was built earlier. Nothing was renumbered. B and C remain. No release from me.
+
+---
+
+## turn 1083 -- S5(3) SLICE B: the COLLISION-FREE local-var allocation. Built (no gate needed -- the composer contract did NOT have to change, because slice A proved the rule is WITHIN-part).
+
+### THE KEY SIMPLIFICATION (why no composer contract change was needed)
+The advisor GATE-IF-BALLOONS condition was "if the cross-part union turns out to be needed after all". It is NOT: slice A established (and the advisor verified on the real composed program) that the hazard is WITHIN-part -- a part can only be clobbered by its OWN generator, because composed parts run sequentially and each generator emits its own readLines inside its own part. So each generator only has to avoid ITS OWN declared band. No union, no cross-part threading, no composer contract change.
+
+### BUILT
+- camScratch.js (already the ONE source for the bands) gains the two allocation primitives -- NOT a second copy of the band data:
+  * nextLocalVar(from, avoid) -- the next local var number at/after `from` that is not inside `avoid`.
+  * maxLocalVar(fields) -- the highest var a field list ACTUALLY minted.
+- probeToSlot.allocFields / allocFieldsWith take an `avoid` band and mint `cur = nextLocalVar(cur + 1, avoid)` instead of the positional `varOffset + i + 1`. All 9 generators pass their OWN band via bandsFor(<camType>) -- reading the declaration, never re-deriving it.
+- opToSlot's inline allocator (drill/bore/slot) and stackToSlot's inline mint now use the same helper. NB stackToSlot passes an EMPTY avoid: the universal arm has no declared band yet (that is slice C), so its numbering is unchanged.
+- THE BAKE GAP, CLOSED BY CONSTRUCTION (requirement 2): the old code minted from the SPEC index while callers advanced by `fields.length` (the EXPOSED count), so the moment a param was baked the two diverged. Now (a) a BAKED param mints no var at all, and (b) the composer advances from camScratch.maxLocalVar(fields) -- i.e. FROM WHAT WAS MINTED. There is no second counter to keep in step, so they cannot disagree. Applied in buildSlotFromOps and in all four subStackToSlot call sites.
+- THE MANUAL ADD-FIELD DOOR (the 7th call site) now ALLOCATES too: it was minting a bare `'#' + (slot.fields.length + 1)`; it now mints past the slot's high-water mark, skipping every band its ops write. No UI change was needed -- everything it needs is already on the slot (slot.ops + slot.fields).
+- SLICE A'S GUARD IS RETAINED AS THE BACKSTOP (requirement 3), untouched and still loud: after B a collision should be impossible, so the guard firing means a regression.
+
+### BEFORE / AFTER for a representative slot (requirement 4) -- the diff is ONLY renumbering
+  part 1 (surfacing, single-op)  OLD #1 ... #10          NEW #1 ... #10           <- IDENTICAL
+  part 2 (pocket, composed)      OLD #11 ... #19, #20    NEW #11 ... #19, #34     <- only the var that
+                                                                                    would have landed in #20-#33 moved
+  part 2 spindle line            WAS  M3 S[#20]   (the pocket then wrote #20=0 -> S0)
+                                 NOW  M3 S[#34]   (nothing else in the part writes it)
+RELEASE-NOTE FINDING, and it is much better than we assumed: a SINGLE-OP slot is BYTE-IDENTICAL. The renumbering is surgical -- only a var that would have landed inside its own generator's band moves, and every generator's field count keeps a 1-part slot below its own band (mill 10 fields vs band #20+, corner 12 vs #70+, drill ~14 vs #40+). So installed SINGLE-OP slots do NOT need rebuilding; only MULTI-OP slots renumber -- and those were emitting wrong G-code anyway, so they must be rebuilt regardless. The suite's golden / byte-diff-ZERO tests are the proof that the single-op path did not move.
+
+### VERIFIED
+- cam-scratch-alloc.spec.js (NEW, 3): a 2-part AND a 3-part mill slot allocate with ZERO collisions and no field var in #20-#33; every spindle var is assigned EXACTLY ONCE (its own readLine) -- the S0 bug is structurally gone; the BAKE GAP is closed (baking two pocket params no longer makes the next part overlap); and a 1-part slot is renumbering-only (its program SHAPE -- the live raster loop, the spindle line, the line count -- is untouched).
+- cam-scratch-guard.spec.js MIGRATED (3): slice A's guard can no longer be triggered by real generator output, which is the point. It is now proven on SYNTHETIC fields (still detects, still names the variable/field/generator/consequence) while asserting the REAL 2-part composition gives it NOTHING to catch; validatePack still errors on a synthetic colliding slot and now PASSES a real composed one; and the UI test flips from "Build refuses" to "Build SUCCEEDS", landing one 2-op slot with zero recorded collisions, no var in the mill band, and every spindle var assigned once.
+- TEST MIGRATION (one, and it is the bake-gap fix landing): cam-allocfields-superset asserted `baked.v.slow === '#7'` with the comment "#-var stays positional (varOffset+i+1) by spec index" -- i.e. it PINNED the hole a baked param used to burn. That hole WAS the bug (mint by spec index vs advance by exposed count). Migrated to '#6' plus a NEW positive assertion `contiguousAfterBake` (the surviving vars are #1..#6 with no gap), so the suite now guards the FIX instead of the defect. The spec's main equivalence property (allocFieldsWith == allocFields when nothing is baked) still passes untouched across all 27 cases -- with nothing baked the cursor and the old positional index advance in lockstep.
+- FULL GATE: 1420 passed, 0 failed, 4 skipped (12.0m) -- CLEAN. 1420 = 1417 + the 3 new allocation tests. The golden / byte-diff-ZERO suite passing UNCHANGED is the proof that the single-op path did not renumber.
+
+### STILL OPEN
+- (C) the UNIVERSAL arm at varOffset 0: emitMapped injects wizard-op + dialect scratch (#5 #6 #9 #10 #17-#24 #42 #43 #50 #95 #99, and #190/#191 on V4.1/DM500) into the same low band a universal op's field vars start in. stackToSlot is already wired to the shared minting helper, so slice C is now just "declare what those wizards/ops + dialects inject and pass it as `avoid`" -- the allocation machinery is in place.
+
+### STATE: the collision is now IMPOSSIBLE by construction for every generator arm, not merely detected; the bake gap is closed by construction; the manual door allocates; slice A's guard remains as a loud backstop. Single-op slots are byte-identical, so the release note narrows to multi-op slots. No release from me.
