@@ -35,12 +35,20 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
         middleBoss: seedFromOp(op('middle', { featureType: 'boss', twoAxis: true, wcs: 'G54', dist: 60, retract: 3, f_fast: 200, f_slow: 50 })).camType,
         middleInside: seedFromOp(op('middle', { featureType: 'pocket', findBoth: true, dist: 30, retract: 2 })).camType,
         pocketCircle: seedFromOp(op('pocket', { shape: 'circle', dia: 50, depth: 4, stepdown: 1.5, stepoverPct: 40, toolDia: 6, feed: 600, plunge: 150, clearance: 5, rpm: 8000 })).camType,
-        drillHelical: seedFromOp(op('drill', { method: 'helical', pattern: 'circle', holeDia: 12, toolDia: 6, pitch: 0.5, depth: 10, count: 4, dia: 40, startAngle: 0, feed: 200, clearance: 5, rpm: 8000 })).camType },
+        drillHelical: seedFromOp(op('drill', { method: 'helical', pattern: 'circle', holeDia: 12, toolDia: 6, pitch: 0.5, depth: 10, count: 4, dia: 40, startAngle: 0, feed: 200, clearance: 5, rpm: 8000 })).camType,
+        // t1089 — 'single' MIGRATED from the unsupported group below. It used to have no slotFromOp pattern (the t1043 S1
+        // gap) and fell through to the universal unroll, which was the WORST arm for it: measured at t1087, the universal
+        // path cannot expose depth/peck at all (drill.js peckDrill drives a JS while loop → the pecks are unrolled and every
+        // Z baked at build). A single hole is a degenerate pattern (count 1 at the anchor), so it is now a declared pattern
+        // on the generator and depth/peck are live #2600 knobs. This is also the DEFAULT drill pattern, so it is the common
+        // case. The other three entries below stay unsupported — they are genuinely generator-less.
+        drillSingle: seedFromOp(op('drill', { method: 'peck', pattern: 'single' })).camType,
+        boreSingle: seedFromOp(op('drill', { method: 'helical', pattern: 'single' })).camType },
       unsupported: {
         middleSingle: seedFromOp(op('middle', { featureType: 'pocket', twoAxis: false })).unsupported,
         polygon: seedFromOp(op('pocket', { shape: 'polygon', dia: 50 })).unsupported,
         contour: seedFromOp(op('contour', {})).unsupported,
-        drillSingle: seedFromOp(op('drill', { method: 'peck', pattern: 'single' })).unsupported },
+      },
       val: {
         cornerMaxProbe: byKey(corner, 'maxProbe').value, cornerTravel: byKey(corner, 'travel').value, cornerFast: byKey(corner, 'fast').value,
         cornerSeq: byKey(corner, 'seq').value, cornerCorner: byKey(corner, 'corner').value, cornerRetract: byKey(corner, 'retract').value,
@@ -56,12 +64,16 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
 
   // camType incl. the encoded forks
   expect(r.camType).toEqual({ pocket: 'pocket', surface: 'surface', corner: 'corner', drill: 'drill', slot: 'slot',
-    middleBoss: 'boss', middleInside: 'inside', pocketCircle: 'cpocket', drillHelical: 'bore' });
+    middleBoss: 'boss', middleInside: 'inside', pocketCircle: 'cpocket', drillHelical: 'bore',
+    drillSingle: 'drill', boreSingle: 'bore' });   // t1089 — 'single' is a generator pattern now, not an unsupported fork
   // unsupported forks
   expect(r.unsupported.middleSingle, 'middle single-axis unsupported').toContain('BOTH-AXIS');
   expect(r.unsupported.polygon, 'pocket polygon unsupported').toContain('no CAM generator');
   expect(r.unsupported.contour, 'contour unsupported').toContain('NO CAM generator');
-  expect(r.unsupported.drillSingle, 'drill single unsupported').toContain('single');
+  // t1089 — drill/bore 'single' is NO LONGER unsupported: it is a declared generator pattern (see the note at its seed
+  // above). Asserting the POSITIVE invariant rather than deleting the case, so the suite guards the fix.
+  expect(r.camType.drillSingle, 'drill single now seeds the DRILL generator (was: unsupported/universal)').toBe('drill');
+  expect(r.camType.boreSingle, 'and a helical single seeds the BORE generator').toBe('bore');
   // aliased values
   expect(r.val.cornerMaxProbe).toBe(80); expect(r.val.cornerTravel).toBe(40); expect(r.val.cornerFast).toBe(250);
   expect(r.val.cornerSeq, 'seq enum XY -> int 1 (S1d)').toBe(1); expect(r.val.cornerCorner, 'corner enum FR -> int 2 (S1d)').toBe(2); expect(r.val.cornerRetract).toBe(4);

@@ -144,9 +144,14 @@ export function camTypeOf(op) {
             return { universal: true, reason: `pocket shape "${shape}" has no CAM generator (only rect + circle) → universal` };   // polygon/ellipse → the unrolled long-tail path
         }
         case 'drill': {
-            // t1043 ruling — pattern 'single' has no slotFromOp pattern (known S1 gap); otherwise it's a bore when the built-in
-            // op sets method:'helical' OR the twin resolves to variant:'bore' (user_bore_data — the twin has no `method`).
-            if ((p.pattern || 'single') === 'single') return { universal: true, reason: 'drill/bore pattern "single" has no generator pattern (circle/grid/line/rect only) → universal' };
+            // t1089 — pattern 'single' now routes to the GENERATOR like every other pattern. It used to fall through to the
+            // universal unroll (the t1043 S1 gap: slotFromOp had no 'single'), which was the WORST arm for it — measured at
+            // t1087, the universal path cannot expose depth/peck AT ALL, because drill.js peckDrill drives a JS `while` loop
+            // that unrolls the peck sequence and bakes every Z literal at build time. A single hole is just a degenerate
+            // pattern (count 1 at the anchor), so opToSlot declares it and depth/peck become live #2600 knobs driven by a
+            // MACRO loop instead. NB this is the DEFAULT drill pattern (DRILL_DEFAULTS.pattern === 'single'), so it is the
+            // common case, not an edge one. It's a bore when the built-in op sets method:'helical' OR the twin resolves to
+            // variant:'bore' (user_bore_data — the twin has no `method`).
             return { camType: (variant === 'bore' || (p.method || 'peck') === 'helical') ? 'bore' : 'drill' };
         }
         case 'middle': {

@@ -65,9 +65,14 @@ const STANDALONE = {
     },
 };
 
-const PATTERN_FIELDS = { circle: ['dia', 'count', 'startAngle'], grid: ['cols', 'rows', 'dx', 'dy'], line: ['count', 'spacing', 'angle'], rect: ['w', 'h', 'nx', 'ny'] };
+// `single` (t1089) is the DEGENERATE pattern: count 1, at the anchor. It adds NO pattern fields — posX/posY already ARE
+// the hole position — so the slot is posX/posY + the hole fields + feed/clearance/rpm. It exists so the DEFAULT drill twin
+// (DRILL_DEFAULTS.pattern === 'single') reaches this GENERATOR instead of the universal unroll: the universal arm cannot
+// expose depth/peck at all (drill.js peckDrill drives a JS while loop, so the peck sequence is unrolled and every Z baked
+// at BUILD), whereas here they are live #2600 knobs driven by a MACRO loop the operator can actually turn.
+const PATTERN_FIELDS = { single: [], circle: ['dia', 'count', 'startAngle'], grid: ['cols', 'rows', 'dx', 'dy'], line: ['count', 'spacing', 'angle'], rect: ['w', 'h', 'nx', 'ny'] };
 const HOLE_FIELDS = { drill: ['holeDia', 'depth', 'peck'], bore: ['holeDia', 'toolDia', 'depth', 'pitch'] };
-const PATTERN_LABEL = { circle: 'bolt circle', grid: 'grid', line: 'line', rect: 'rectangle' };
+const PATTERN_LABEL = { single: 'single hole', circle: 'bolt circle', grid: 'grid', line: 'line', rect: 'rectangle' };
 
 /** The inline per-hole cut at the CURRENT X/Y — no named sub (DDCS has no named M-codes). `doN` is the DO/END
  *  number for the cut's own inner loop; it must be deeper than the surrounding pattern loop's nesting (the cut
@@ -92,6 +97,11 @@ const indent = (lines, pad) => lines.map((l) => pad + l);
 
 /** The pattern loop body (uses the var map; positions each point + inlines the per-hole cut). */
 function loopBody(pattern, v, method) {
+    // single — no loop at all: rapid to the anchor, then the SAME per-hole cut every other pattern inlines. cutLines takes
+    // the DO nesting depth, so with no surrounding pattern loop it gets DO1 (the shallowest) rather than DO2.
+    if (pattern === 'single') {
+        return [`G0 X${v.posX} Y${v.posY}`, ...cutLines(method, v, 1)].join('\n');
+    }
     if (pattern === 'circle') {
         return ['#50=0', `WHILE #50 LT ${v.count} DO1`, `  #51=${v.startAngle}+#50*360/${v.count}`,
             `  G0 X[${v.posX}+[${v.dia}/2]*COS[#51]] Y[${v.posY}+[${v.dia}/2]*SIN[#51]]`,

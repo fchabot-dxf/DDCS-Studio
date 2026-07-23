@@ -83,6 +83,21 @@ export const ATOM_ROLES = {
     goto: { n: 'geometry' },
     ifgoto: { lhs: 'value', op: 'other', rhs: 'value', goto: 'geometry' },
 
+    // — Structural transform atoms (t1089 rider). These were the LAST atoms still falling through to DEFAULT_ROLE, so the
+    //   fail-safe was silently absorbing them; declared here so the surface is HONEST rather than accidentally complete.
+    //   Every row is still 'geometry'/'other' — the declaration changes NO classifier outcome, and that is the point: it
+    //   records that we LOOKED, so a future reader can tell "verified bake-only" from "never enumerated". None of these
+    //   atoms emits its params as a G-word: they drive JS-side folds/selectors, so a #var would be destroyed.
+    toolsel: { toolNum: 'other' },                       // a tool-table INDEX (settings.atc.tools[toolNum]), not a tuned value
+    wcs: { wcs: 'other' },                               // G54..G59 select
+    entry: { entryX: 'geometry', entryY: 'geometry' },   // a JS-compared waypoint (firstRapidXY within eps), never emitted raw
+    // placeonstock (kind 'place') / stepdown ('depth') / array ('container') are ALSO BLOCKING_FOLD_KINDS, so their CHILDREN
+    // are blocked regardless; these rows cover the folds' OWN params.
+    placeonstock: { offX: 'geometry', offY: 'geometry', offZ: 'geometry', stockW: 'geometry', stockH: 'geometry', stockZ: 'geometry', bminX: 'geometry', bmaxX: 'geometry', bminY: 'geometry', bmaxY: 'geometry', stockAttach: 'other', pathDatum: 'other', stockDatum: 'other', optIn: 'other' },
+    stepdown: { to: 'geometry', by: 'geometry', confirmEvery: 'geometry' },   // JS loop bound + step: the levels are unrolled at build
+    array: { x0: 'geometry', y0: 'geometry', cols: 'geometry', rows: 'geometry', dx: 'geometry', dy: 'geometry', count: 'geometry', spacing: 'geometry', angle: 'geometry', dia: 'geometry', startAngle: 'geometry', w: 'geometry', h: 'geometry', nx: 'geometry', ny: 'geometry', pattern: 'other', skip: 'other' },   // patternPoints() computes every point in JS (num + Math.round/trig) and STAMPS the child per point
+    contourfill: { x: 'geometry', y: 'geometry', w: 'geometry', h: 'geometry', dia: 'geometry', sides: 'geometry', tool: 'geometry', rampAngle: 'geometry', z: 'geometry', feed: 'geometry', plunge: 'geometry', clearance: 'geometry', shape: 'other', side: 'other', entry: 'other', by: 'other' },   // builds a JS contour region → every key runs num()
+
     // — measure.js: probe/DRO register targets + seek expr ride through → value; goto/eps are geometry —
     proberead: { axis: 'other', var: 'value' },
     probestart: { axis: 'other' },
