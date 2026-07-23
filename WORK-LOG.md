@@ -14137,3 +14137,68 @@ divergence FOR the S4b hook: once S4b materializes a cam_table into the def, the
 so the build and the modal agree. S4a is INERT until then. NEXT: S4b -- the materialize HOOK on Blocks-open/editWizardDef
 (inject camTableFromBindings into the Presentation mouth WITH the identity-based blockIndex re-derive, activating S2+S4a
 together atomically), which the advisor wants to review on its own.
+
+---
+
+## turn 1101 -- BLOCK-NATIVE PARAMS S4b: the inject+re-derive CORE built + proven byte-neutral; the HOOK (the WHERE) GATED with two measured findings. This is the activation slice the advisor gated for its own review.
+
+### WHAT I DELIVERED: materializeCamTable(def), the reusable inject + IDENTITY re-derive, proven byte-neutral
+data/opCamMap.js gains materializeCamTable(def): injects camTableFromBindings into the user_root PRESENTATION mouth and
+re-derives EVERY binding blockIndex BY IDENTITY over the post-injection flatten (the wrapForkAtSave pattern -- each binding
+ORIGINAL block object is found at its NEW index via indexOf, NEVER a blanket +1+N). Mutates def in place, idempotent (no-op if
+already has a cam_table or no value bindings). PURE and INERT -- nothing calls it yet (the HOOK is gated). Same shape as
+camTableFromBindings shipping in S3 before a consumer existed.
+MEASURED byte-neutral on a def with BOTH a uiChildren binding (assign under a param_group) AND exec bindings: the leading
+cam_table (1 + 3 rows = 4 blocks) shifts all three bindings 2/3/4 -> 6/7/8, re-derived by identity, and the materialized
+build (S2 branch, empty decl) is BYTE-IDENTICAL to the fallback default -- body and fields equal. The advisor feared a
+subtly-wrong reindex; the identity re-derive avoids it, proven.
+
+### WHY I GATED THE HOOK -- two GROUNDED findings, per your GATE-IF-ENTANGLED + SURFACE-the-WHERE instruction
+
+FINDING 1 -- the WHERE is a real fork AND your first candidate is the wrong scope. camFieldsFromStack has exactly TWO build
+consumers (measured -- grepped the consumer set): stackToSlot (the UNIVERSAL build) and seedUniversal (the modal seed).
+subStackToSlot and the generators do NOT read it. So a RECOGNIZED GENERATOR TWIN (surfacing/pocket/drill/... -- builds via
+its generator, or via subStackToSlot when forked) would get an INERT cam_table it never consumes -- exactly the Fork-G
+"do not clutter" violation. Your first hook candidate "editWizardDef-for-a-CAM-generator-twin" therefore targets the wrong
+ops. The hook must fire for UNIVERSAL-arm ops (camTypeOf -> universal), not generator twins.
+
+FINDING 2 -- the persistence is op-type-dependent (the save-path tangle). I grounded the save seam: authoringBody wraps the
+op as [user_root{...}], so deriveAuthoredDef -> extractParamBlocks([user_root]) flattens the FULL template -- the SAME index
+space instantiate uses. Consequence:
+  - PILL-BASED universal forks (wizard-maker): their value bindings are param PILLS, so on save extractParamBlocks
+    re-indexes the pills over the post-injection flatten AUTOMATICALLY -- correct by construction, no manual re-derive needed.
+  - LITERAL data-op twins that route universal (e.g. user_contour_data -- contour has no generator): their bindings are
+    HAND-ASSEMBLED literals, NOT pills, so extractParamBlocks finds nothing -> the save-derived bindings would DROP them.
+    That is a PRE-EXISTING editWizardDef limitation (independent of the cam_table), but the cam_table would ACTIVATE it: a
+    materialized contour, saved, would lose its bindings.
+So "materialize on Blocks-open, persist on save" is CLEAN for pill-based universal forks and BROKEN for literal universal
+twins -- the entanglement is real and op-type-dependent.
+
+### THE FORK I AM HANDING BACK (recommendation first)
+The CORE mechanism (inject + identity re-derive) is proven byte-neutral, so the block is only the WHERE + the persistence
+sequencing. My recommendation:
+  (1) SCOPE the hook to UNIVERSAL-arm ops (camTypeOf -> universal) with value bindings and no cam_table -- NOT generator
+      twins (Finding 1).
+  (2) HOOK POINT -- I recommend editWizardDef (your anchor, "opened to customize in Blocks", opt-in per Fork G), calling
+      materializeCamTable on the workspace fork template so the cam_table is visible + rides through save. For PILL-BASED
+      forks this is clean (save auto-reindexes). QUESTION FOR YOU: editWizardDef, or the CAM-authoring modal open
+      (openCamAuthoring -- the moment the op is actually CAM-ified, but it would mutate the registered def from the Macros
+      tab)? Your three candidates make this a genuine product fork; I did not guess.
+  (3) LITERAL universal twins (contour): GATE as their own step -- they hit a pre-existing no-pill save limitation that
+      needs its own fix (persist the hand-assembled bindings through save, or materialize them as pills first). Do NOT fold
+      them into the pill-fork hook.
+So: confirm the hook point (editWizardDef vs modal), and I build the pill-fork path with materializeCamTable + a full-flow
+test (open -> materialize -> save -> byte-neutral build + modal flip STICKS, closing the S3 divergence), gating the literal
+twins.
+
+### VERIFIED
+- cam-block-native-params-s4b-core.spec.js (NEW, 1): materializeCamTable injects a cam_table, re-derives 2/3/4 -> 6/7/8 by
+  identity across the non-uniform shift, the materialized build is BYTE-NEUTRAL vs the fallback default, and a second call
+  is idempotent.
+- FULL GATE: 1444 passed, 0 FAILED, 4 skipped (11.8m) -- CLEAN, 1444+4 = 1448 = full count reconciles. Failed-count grepped.
+  materializeCamTable is inert (no consumer) so nothing can regress; ran the suite anyway.
+
+### STATE: the hard technical part of S4b -- inject a cam_table + re-derive bindings by identity, byte-neutral -- is BUILT
+and PROVEN as materializeCamTable. The HOOK is gated on TWO measured findings: the WHERE is a real product fork (universal
+ops, editWizardDef vs modal -- surfaced for your call), and the persistence is clean for pill-based forks but hits a
+pre-existing no-pill save limitation for literal universal twins (contour). Awaiting your hook-point call before wiring.
