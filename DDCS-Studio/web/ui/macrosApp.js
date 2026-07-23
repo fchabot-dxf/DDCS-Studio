@@ -28,7 +28,7 @@ import { universalBands } from '../data/universalScratch.js';   // t1085 slice C
 // what emitMapped injects beneath it, every other part against its own generator's declaration. After slice C a collision
 // should be impossible on EITHER arm — so the guard firing now means a regression on whichever arm reported it.
 const camBandsOf = (t) => ((t === 'universal') ? universalBands() : bandsFor(t));
-import { getUserDef, defVOf } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest
+import { getUserDef, defVOf, flattenBlocks } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest; t1099 (S4a) — walk the template for cam_field block records
 import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
 import { makeZip, downloadBytes } from '../data/zip.js';
@@ -1195,7 +1195,13 @@ function homingPostIsExpert() {
     // radio/value would silently drive the other's. Scope it by PART. A single-part op (generator / universal) has no
     // `_part`, so the key is UNCHANGED → every existing slot + manifest stays byte-identical.
     const fkeyOf = (f) => (f && f._part != null ? f._part + ':' + f.key : (f && f.key));
-    const cbmVal = (oi, fk) => { const a = _authoring.ops[oi]; const ov = a.values[fk]; if (ov && ov.def != null) return ov.def; const f = a.fields.find((x) => fkeyOf(x) === fk); return f ? (typeof f.value === 'number' ? f.value : f.def) : ''; };
+    const cbmVal = (oi, fk) => {
+        const a = _authoring.ops[oi];
+        const row = camRowBlock(a.opType, fk);   // S4a — a cam_table op reads its value from the block (dflt when exposed, baked literal when baked); empty inherits the field default below
+        if (row) { const v = row.params.mode === 'bake' ? row.params.baked : row.params.dflt; if (v !== '' && v != null) return v; }
+        const ov = a.values[fk]; if (ov && ov.def != null) return ov.def;
+        const f = a.fields.find((x) => fkeyOf(x) === fk); return f ? (typeof f.value === 'number' ? f.value : f.def) : '';
+    };
     function renderCbmTable() {
         const el = document.getElementById('cbm_table'); if (!el) return;   // modal is on document.body, not #macros-app (q is root-scoped)
         if (!_authoring.ops.length) {   // EMPTY-STATE (subsumes S-B) — no greyed dropdown; list what CAM supports + why present ops didn't qualify
@@ -1208,7 +1214,8 @@ function homingPostIsExpert() {
         const sections = _authoring.ops.map((a, oi) => {
             const rowHtml = (f) => {
                 const fk = fkeyOf(f);   // t1077 — PART-SCOPED addressing: two parts of a sub-stack may share a param key
-                const baked = a.exposed[fk] === false, val = cbmVal(oi, fk), idx = idxOf(oi, fk);
+                const _row = camRowBlock(a.opType, fk);   // S4a — a cam_table op reads its expose/bake state from the block, not a.exposed
+                const baked = _row ? (_row.params.mode === 'bake') : (a.exposed[fk] === false), val = cbmVal(oi, fk), idx = idxOf(oi, fk);
                 const enumOpt = f.enum && f.enum.find((o) => o.value === Number(val));
                 const numeric = (val === '' || val == null || !isNaN(Number(val)));   // a non-numeric value (a baked string/enum with no dropdown) must NOT be an editable number input — typing would overwrite the string bake with a number (wrong G-code)
                 const valCell = a.substack
@@ -1269,6 +1276,8 @@ function homingPostIsExpert() {
             if (t.id === 'cbm_name') { _authoring.name = t.value; return; }
             if (t.classList.contains('cbm-val') && t.tagName !== 'SELECT') {   // numeric value (enum selects go via change → re-render)
                 const a = _authoring.ops[+t.dataset.oi], key = t.dataset.fkey, num = (t.value === '' ? '' : parseFloat(t.value));
+                const row = camRowBlock(a.opType, key);
+                if (row) { if (row.params.mode === 'bake') row.params.baked = String(num); else row.params.dflt = String(num); return; }   // S4a — write the value to the block (baked literal when baked, pendant default when exposed)
                 a.values[key] = { ...(a.values[key] || {}), def: num };
                 if (a.exposed[key] === false) a.baked[key] = num;   // keep the baked literal in sync
             }
@@ -1279,6 +1288,8 @@ function homingPostIsExpert() {
             if (t.classList.contains('cbm-eb') && t.checked) { cbmToggle(+t.dataset.oi, t.dataset.fkey, t.dataset.mode); return; }
             if (t.tagName === 'SELECT' && t.classList.contains('cbm-val')) {   // ENUM pick → store the int (+ keep any baked literal in sync)
                 const a = _authoring.ops[+t.dataset.oi], key = t.dataset.fkey, iv = parseInt(t.value, 10);
+                const row = camRowBlock(a.opType, key);
+                if (row) { if (row.params.mode === 'bake') row.params.baked = String(iv); else row.params.dflt = String(iv); renderCbmTable(); return; }   // S4a — write the enum int to the block
                 a.values[key] = { ...(a.values[key] || {}), def: iv };
                 if (a.exposed[key] === false) a.baked[key] = iv;
                 renderCbmTable();
@@ -1360,8 +1371,25 @@ function homingPostIsExpert() {
         });
     }
     const cbmExit = () => { if (_cbmPanel) { try { _cbmPanel.stop(); _cbmPanel.setActive(false); } catch (_) { /* noop */ } _cbmPanel = null; } if (_cbmOverlay) { _cbmOverlay.remove(); _cbmOverlay = null; } _authoring = null; if (q('cam_slots')) renderCamBuilder(); };
+    // S4a (block-native params) — the modal as a VIEW of the cam_field blocks. When the op's def carries a cam_table, its
+    // cam_field block RECORD (live in getUserDef's template) IS the state: the render reads mode/value from it and a
+    // radio/value edit WRITES to it, so the block is one source and the S2 build (which reads the same cam_table) reflects
+    // the edit. flattenBlocks returns the actual block objects, so mutating .params persists in the registry + the next
+    // build. null → the op has no cam_table (every op until the S4b hook) → the _authoring.ops/decl path, UNCHANGED (inert).
+    const camRowBlock = (opType, key) => {
+        const def = getUserDef(opType);
+        if (!def || !def.template) return null;
+        for (const b of flattenBlocks(def.template)) if (b && b.type === 'cam_field' && b.params && String(b.params.param) === String(key)) return b;
+        return null;
+    };
     function cbmToggle(oi, key, mode) {
         const a = _authoring.ops[oi];
+        const row = camRowBlock(a.opType, key);
+        if (row) {   // S4a — the block IS the state: flip the row mode; on bake, seed the literal from the current value
+            row.params.mode = (mode === 'bake') ? 'bake' : 'expose';
+            if (mode === 'bake' && (row.params.baked === '' || row.params.baked == null)) row.params.baked = String(cbmVal(oi, key));
+            renderCbmTable(); return;
+        }
         if (mode === 'bake') { a.exposed[key] = false; a.baked[key] = cbmVal(oi, key); }
         else if (a.universal) { a.exposed[key] = true; delete a.baked[key]; }   // universal: Expose is POSITIVE (stackToSlot exposes only on exposed===true)
         else { delete a.exposed[key]; delete a.baked[key]; }   // generator: Expose = the default (no decl entry)
