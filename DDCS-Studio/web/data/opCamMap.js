@@ -20,7 +20,7 @@ import { pocketSlot, circlePocketSlot, surfacingSlot } from './millToSlot.js';
 import { slotFromOp } from './opToSlot.js';
 import { stepoverMm } from '../wizards/ops/pocketfill.js';   // t1043 — the CANONICAL exported stepoverPct->mm: max(0.2, max(0.1,toolDia)*stepoverPct/100). surfacingWizard.js:24-27 computes the identical formula inline (its absent-param defaults differ — 12/60 vs 6/40 — but are unreachable when the op provides toolDia+pct); the seed test verifies surface stepover == the real surfacingStack value.
 import { builtinTypeForTwin } from '../blocks/wizardLibrary.js';   // t1049 — the DECLARED twin->built-in bridge (inverts opensAs->type/variant). Real programs use data-op TWINS (user_surfacing_data …), not the bare built-in optypes.
-import { getUserDef, camFieldsFromStack } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback; t1095 — the block-native pendant-field rows (S2)
+import { getUserDef, camFieldsFromStack, flattenBlocks } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback; t1095 — the block-native pendant-field rows (S2); t1101 — flatten for the S4b identity re-derive
 import { classifyExposable } from './exposeClassifier.js';   // U1 — per-binding exposable/geometry classification for the universal seed
 
 // The clean 1:1 opType -> CAM generator type. pocket/drill are the DEFAULT arm; their variant arms are gated in camTypeOf.
@@ -187,6 +187,33 @@ export function camTableFromBindings(def) {
         } };
     });
     return { type: 'cam_table', params: {}, children };
+}
+
+/**
+ * S4b core — materialize a cam_table INTO a def (the reusable, hook-agnostic step). Injects camTableFromBindings into the
+ * user_root PRESENTATION mouth and re-derives EVERY binding's blockIndex BY IDENTITY over the post-injection flatten (the
+ * wrapForkAtSave pattern): flattenBlocks visits uiChildren BEFORE children, so the shift is non-uniform and a blanket +1+N
+ * would corrupt a uiChildren binding — instead each binding's ORIGINAL block object is found at its NEW index. Mutates `def`
+ * in place (template + bindings). BYTE-NEUTRAL by construction: the materialized rows reproduce today's default field set
+ * (camTableFromBindings mirrors makeAuthOp) and the cam_table emits []. Idempotent: a no-op when the def has no value bindings
+ * or already carries a cam_table. Returns def. NOTHING calls this yet — the HOOK (the WHERE) is gated to the advisor (t1101).
+ */
+export function materializeCamTable(def) {
+    if (!def || !Array.isArray(def.template)) return def;
+    const root = def.template.find((b) => b && b.type === 'user_root');
+    if (!root) return def;
+    if (flattenBlocks(def.template).some((b) => b && b.type === 'cam_table')) return def;   // already materialized — idempotent
+    const ct = camTableFromBindings(def);
+    if (!ct) return def;   // no value bindings — nothing to declare
+    const flatBefore = flattenBlocks(def.template);
+    root.uiChildren = [ct, ...(root.uiChildren || [])];   // the cam_table leads the Presentation mouth
+    const flatAfter = flattenBlocks(def.template);
+    (def.bindings || []).forEach((b) => {
+        if (!b || b.blockIndex == null) return;
+        const ref = flatBefore[b.blockIndex]; const ni = ref ? flatAfter.indexOf(ref) : -1;   // BY IDENTITY (never a blanket shift)
+        if (ni >= 0) b.blockIndex = ni;
+    });
+    return def;
 }
 
 /** UNIVERSAL seed — read the def BINDINGS directly (param names are the def's own; NO PARAM_ALIAS/DERIVE). Each value binding
