@@ -128,6 +128,7 @@ export const hmiBeepBlock = {
 export const askNumberBlock = {
     type: 'asknumber', label: 'Ask Number', kind: 'leaf', category: 'Control',
     defaults: { var: '#100', prompt: 'enter value' }, fields: ['var', 'prompt'],
+    scratch: [[100, 100]],   // t1085 — the default var the operator entry lands in
     // Blocking numeric entry (dialect.hmiInput → Expert `#2070=<n>(prompt)`). Off-HMI (hmiInput → []) it's a BLOCKING operator
     // dialog, so it degrades to `( prompt )` + M0 + a note that the target var KEEPS ITS PRIOR VALUE (no guessed input) — the
     // operator edits the var if needed, then Cycle Start. (Contrast the probe-flow hmiconfirm, which folds comment-NO-pause.)

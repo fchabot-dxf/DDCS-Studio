@@ -22,7 +22,8 @@ import { instantiate } from '../blocks/userOps.js';    // fill each binding's so
 import { emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../wizards/previewEmit.js';
 import { classifyExposable } from './exposeClassifier.js';
-import { nextLocalVar, bandsFor } from './camScratch.js';   // t1083 (slice B) — one minting helper. NB the UNIVERSAL arm has no declared band yet (slice C: emitMapped injects wizard-op/dialect scratch into this same low range), so `avoid` is empty here and the numbering is unchanged.
+import { nextLocalVar } from './camScratch.js';             // t1083 (slice B) — the one minting helper, shared with every generator arm
+import { universalBands } from './universalScratch.js';    // t1085 (slice C) — the band emitMapped injects underneath us, aggregated from each atom's/post's OWN declaration
 
 /**
  * @param {object} def   a user-op def (from userOpFromStack): { opType, label, template, bindings }
@@ -41,7 +42,10 @@ export function stackToSlot(def, decl = {}, used = new Set(), varOffset = 0) {
     const cls = classifyExposable(def);                                 // U1 — per-binding { exposable, role, reason } (declare+structure)
     // Only VALUE bindings (a real socket, blockIndex != null) can carry a #var; structural bindings drive guards, not emit.
     let cur = varOffset;
-    const avoid = bandsFor(null);   // slice C will supply the universal arm's injected-scratch band; [] today
+    // t1085 slice C — mint AROUND everything the emit path injects beneath this slot. Unlike a generator arm (whose scratch is
+    // its own hand-written macro text) the universal arm emits through the real atoms + the real active post, so the band is
+    // resolved from THEIR declarations at allocation time, per post.
+    const avoid = universalBands();
     (def.bindings || []).filter((b) => b && b.blockIndex != null).forEach((b) => {
         const d = decl[b.param];
         const exposable = !!(cls[b.param] && cls[b.param].exposable);   // geometry / fold-blocked params are bake-only

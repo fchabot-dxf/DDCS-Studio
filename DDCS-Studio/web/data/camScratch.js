@@ -99,15 +99,21 @@ export const maxLocalVar = (fields) => (fields || []).reduce((m, f) => {
  * part 2's scratch runs — a cross-part overlap is harmless re-use of a volatile var. The hazard is a part whose OWN
  * field var sits inside the band its OWN generator writes DURING that same part: e.g. pocket's `rpm` landing on #20,
  * which the pocket then sets to 0 as its origin X, so `M3 S[#20]` commands S0 mid-part. That is what this reports.
+ *
+ * `bandsOf` (t1085 slice C) — the camType→bands resolver, defaulting to this module's own generator declarations. The
+ * UNIVERSAL arm's band is not a generator's; it is aggregated from the atoms + the active post by data/universalScratch.js,
+ * which camScratch cannot import without giving up the leaf property the whole `data/` layer relies on. So the caller that
+ * already has that module injects a resolver covering 'universal' — the guard then backstops every arm, not just the
+ * hand-written generators. Passing nothing keeps the generator-only behaviour.
  */
-export function fieldVarCollisions(fields, ops) {
+export function fieldVarCollisions(fields, ops, bandsOf = bandsFor) {
     const typeOf = (i) => { const o = (ops || [])[i]; return o && (o.type || o.camType); };
     const out = [];
     for (const f of (fields || [])) {
         const n = Number(String(f && f.var || '').replace('#', ''));
         if (!Number.isFinite(n)) continue;
         const own = typeOf(f._op);                 // the part this field belongs to — the only one that can clobber it
-        if (!own || !inBands(n, bandsFor(own))) continue;
+        if (!own || !inBands(n, bandsOf(own) || [])) continue;
         out.push({
             varNum: n,
             field: f.label || f.key,

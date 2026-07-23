@@ -21,6 +21,13 @@ import { seedFromOp, camTypeOf, isCamableType, isCamGeneratorTwin } from '../dat
 import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
 import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';
 import { fieldVarCollisions, collisionMessage, maxLocalVar, nextLocalVar, bandsFor } from '../data/camScratch.js';   // t1081 — the DECLARED generator scratch bands + the build guard that refuses a slot whose form values land inside them   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
+import { universalBands } from '../data/universalScratch.js';   // t1085 slice C — the injected band of the UNIVERSAL arm (atoms + active post), so the guard backstops that arm too
+
+// t1085 — the camType→bands resolver the guard runs with HERE. camScratch declares the generator bands and cannot import
+// universalScratch (it is a leaf by design), so this is where the two are joined: a 'universal' part is measured against
+// what emitMapped injects beneath it, every other part against its own generator's declaration. After slice C a collision
+// should be impossible on EITHER arm — so the guard firing now means a regression on whichever arm reported it.
+const camBandsOf = (t) => ((t === 'universal') ? universalBands() : bandsFor(t));
 import { getUserDef, defVOf } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest
 import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
@@ -1072,7 +1079,7 @@ function homingPostIsExpert() {
         slot.fields = fields;
         // t1081 — record any field var that lands inside a composed part's DECLARED scratch band, so the build can refuse
         // and the pack validator can flag an already-built slot. Detection only here; the build path does the refusing.
-        slot.varCollisions = fieldVarCollisions(fields, slot.ops || []);
+        slot.varCollisions = fieldVarCollisions(fields, slot.ops || [], camBandsOf);
         slot.body = slotPack.composeParts(parts);   // normalize the composed parts into ONE executable program (strip non-terminal M30s + uniquify labels) — else the controller stops after part 1
         if (name) slot.name = name;
         slot.bodyDirty = false;
@@ -1391,7 +1398,7 @@ function homingPostIsExpert() {
         // 0, so `M3 S[#20]` commands S0 — a non-rotating tool driven through the toolpath. Checked BEFORE the destination
         // prompt so the user is not asked where to put a slot that cannot be built.
         const _pv = cbmPreviewSlot();
-        const _cols = fieldVarCollisions(_pv.fields, _pv.ops);
+        const _cols = fieldVarCollisions(_pv.fields, _pv.ops, camBandsOf);
         if (_cols.length) { dlgNotice(collisionMessage(_cols)); return; }
         cbmBuildModal().then((dest) => {
             if (!dest) return;
@@ -1406,7 +1413,7 @@ function homingPostIsExpert() {
     function renderCamBuilder() {
         const host = q('cam_slots'); if (!host) return;
         const nameEl = q('cam_pack_name'); if (nameEl && document.activeElement !== nameEl) nameEl.value = (_camPack.meta && _camPack.meta.name) || '';
-        const v = slotPack.validatePack(_camPack);
+        const v = slotPack.validatePack(_camPack, { bandsOf: camBandsOf });
         const vEl = q('cam_validate');
         if (vEl) vEl.innerHTML = [...v.errors.map((e) => '⛔ ' + e), ...v.warnings.map((w) => '⚠ ' + w)].join('<br>') || ('✓ No collisions · ' + slotPack.usedParams(_camPack).size + '/400 form params used.');
         if (!_camPack.slots.length) { host.innerHTML = '<div class="settings-hint">No slots yet — “＋ Add slot”. Slots default to cam' + ((_camPack.meta && _camPack.meta.baseSlot) || 22) + '+ (cam0–21 are factory / community).</div>'; return; }
@@ -1645,7 +1652,7 @@ function homingPostIsExpert() {
     const _camExport = q('cam_export_pack');
     if (_camExport) _camExport.addEventListener('click', async () => {
         if (!_camPack.slots.length) { dlgNotice('No slots to export — add a slot first.'); return; }
-        const v = slotPack.validatePack(_camPack);
+        const v = slotPack.validatePack(_camPack, { bandsOf: camBandsOf });
         if (!v.ok && !await dlgConfirm('This pack has problems:\n\n' + v.errors.join('\n') + '\n\nExport anyway?')) return;
         const files = [], eng = [];
         _camPack.slots.forEach((slot) => {

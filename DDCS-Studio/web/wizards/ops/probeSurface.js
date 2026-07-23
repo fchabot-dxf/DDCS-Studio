@@ -19,6 +19,17 @@
 import { newBlock } from '../../blocks/blockEmitter.js';
 import { safeRetractNode, saveMachineZNode, safeZParkBlock, safeHopNode, planeLiftNodes } from './safeZframe.js';   // t826 — opt-in machine-frame safe-height lift (safeTraverseStack machineLift); t897 — the paired save/return for a machine-lift traverse; t913 — the hop/plane clearance modes
 
+/**
+ * t1085 — the scratch THIS composer injects, declared where the injection happens (it is a stack builder, not a palette
+ * def, so it has no `def.scratch` to carry it). data/universalScratch.js aggregates this with the palette defs and the
+ * active dialect so a UNIVERSAL slot's field vars can be minted AROUND it. Read off the assignments below, not prose:
+ *   #5      the default probe port (`p.port || '#5'`)
+ *   #6      the tool-radius var handed to radiuscomp (`p.radius || '#6'`)
+ *   #9/#10  the default last-retract var (`p.dir1Plus ? '#10' : '#9'`)
+ *   #22     WRITTEN outright — `push('assign', { var: '#22', … })` for the diagonal-primary travel
+ */
+export const PROBE_SURFACE_SCRATCH = [[5, 6], [9, 10], [22, 22]];
+
 export function probeSurfaceStack(p = {}) {
     const S = [];
     // REPLACE params (don't merge with the atom's defaults) — exactly like the wizards' own helpers, so e.g. a single-axis

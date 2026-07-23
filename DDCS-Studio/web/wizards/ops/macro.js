@@ -12,6 +12,7 @@ import { wrapMachineFrame } from './safeZframe.js';
 export const machineMoveBlock = {
     type: 'machinemove', label: 'Machine Move', kind: 'leaf', category: 'Move',
     defaults: { axis: 'Z', to: '#99', var: '#99' }, fields: ['axis', 'to', 'var'],
+    scratch: [[99, 99]],   // t1085 — the G53 staging var this block WRITES when `to` is a literal
     // DDCS rule: G53 needs a VARIABLE (a literal fails on M350). If `to` is already a #var (e.g. a stored #57
     // from Read Machine) → move straight to it; if it's a number → stage it in `var` first, then move.
     emit: (p, dx, dy, dialect) => {

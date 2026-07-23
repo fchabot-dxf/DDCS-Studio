@@ -17,6 +17,7 @@ export const cornerConfigBlock = {
     category: 'Control',
     defaults: { corner: 'FL', probeSeq: 'YX' },
     fields: ['corner', 'probeSeq'],
+    scratch: [[30, 31]],   // t1085 — the corner/sequence enums this block WRITES unconditionally (see emit below)
     emit: (p) => {
         const corner   = p.corner   || 'FL';
         const probeSeq = p.probeSeq || 'YX';

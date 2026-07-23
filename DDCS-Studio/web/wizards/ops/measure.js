@@ -9,6 +9,7 @@ import { num } from './util.js';
 export const probeReadBlock = {
     type: 'proberead', label: 'Probe Read', kind: 'leaf', category: 'Probing',
     defaults: { axis: 'Z', var: '#50' }, fields: ['axis', 'var'],
+    scratch: [[50, 50]],   // t1085 — the default probe-result var this block INJECTS (data/universalScratch.js aggregates)
     emit: (p, dx, dy, dialect) => dialect.probeRead(p.axis || 'Z', p.var || '#50'),
 };
 
@@ -52,6 +53,7 @@ export const probeCheckBlock = {
 export const readMachineBlock = {
     type: 'readmachine', label: 'Read Machine', kind: 'leaf', category: 'Probing',
     defaults: { axis: 'Z', var: '#57' }, fields: ['axis', 'var'],
+    scratch: [[57, 57]],   // t1085 — the default machine-read var this block INJECTS
     // `mark` (optional, t897) — a DECLARED sim marker appended as a trailing comment (safeZframe saveMachineZNode uses
     // it so the sim records the scene-Z for a paired G53 return). Unset → byte-identical for every existing caller.
     emit: (p, dx, dy, dialect) => {
@@ -72,6 +74,7 @@ export const probeGuardBlock = {
 export const toolOffsetBlock = {
     type: 'tooloffset', label: 'Tool Offset', kind: 'leaf', category: 'Coordinates',
     defaults: { tool: '#1300', value: '#102' }, fields: ['tool', 'value'],
+    scratch: [[102, 102]],   // t1085 — the default offset-value var this block READS (#1300 is a firmware reg, not scratch)
     // Write a tool-length offset into the controller's tool table. PROFILE-AWARE: the table base comes from
     // dialect.vars.toolTable (Expert/DM500 #1430, V4.1 #1560), addressed by tool number → #[base + T - 1] = value.
     emit: (p, dx, dy, dialect) => {

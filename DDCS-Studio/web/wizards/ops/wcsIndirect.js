@@ -15,6 +15,7 @@ import { num } from './util.js';
 export const wcsBaseIntoBlock = {
     type: 'wcsbaseinto', label: 'WCS Base', kind: 'leaf', category: 'Coordinates',
     defaults: { wcs: 'active', base: '#70', bare: false }, fields: ['wcs', 'base', 'bare'],
+    scratch: [[70, 70]],   // t1085 — the WCS base address var. NB the dialect that IMPLEMENTS wcsBaseInto declares the rest of its own family (Expert #70-#72)
     emit: (p, dx, dy, dialect) => {
         if (dialect && typeof dialect.wcsBaseInto === 'function') return dialect.wcsBaseInto(p.wcs || 'active', { bare: !!p.bare });
         return [];   // no WCS table on this post (G92 datum) → no base compute
@@ -25,6 +26,7 @@ export const wcsWriteBlock = {
     type: 'wcswrite', label: 'WCS Write', kind: 'leaf', category: 'Coordinates',
     defaults: { axis: 'X', wcs: '#578', offset: 0, addrVar: '', addrNote: '', value: '', note: '', rawAxis: '', radius: '#6', compDir: '-', offComment: '', direct: false },
     fields: ['axis', 'wcs', 'offset', 'addrVar', 'addrNote', 'value', 'note', 'rawAxis', 'radius', 'compDir', 'offComment', 'direct'],
+    scratch: [[6, 6], [70, 70]],   // t1085 — READS the tool-radius var (#6) and the base address (#70) the paired wcsbaseinto set
     emit: (p, dx, dy, dialect) => {
         // resolve the value: a radius-comped TRIGGER (rawAxis, per post) or the given literal
         let value = p.value;

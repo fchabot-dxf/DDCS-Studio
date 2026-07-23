@@ -160,7 +160,10 @@ export function mergeEng(existingEng, additions) {
 }
 
 /** Validate a pack → { ok, errors:[], warnings:[] } for the "simulate before publish" gate. */
-export function validatePack(pack) {
+// `bandsOf` (t1085 slice C) — an optional camType→bands resolver forwarded to fieldVarCollisions. slotPack stays LIGHT on
+// purpose (probeToSlot and the generator arms import it), so it does NOT import universalScratch itself; a caller that
+// already has that module (macrosApp) passes the resolver in and the universal arm gets validated too.
+export function validatePack(pack, { bandsOf } = {}) {
     const errors = [], warnings = [];
     const dups = collisions(pack); if (dups.length) errors.push('Parameter # used by more than one field: ' + dups.map((n) => '#' + n).join(', '));
     const oop = outOfPool(pack); if (oop.length) errors.push('Parameter # outside the 1100–1499 pool: ' + oop.map((n) => '#' + n).join(', '));
@@ -171,7 +174,7 @@ export function validatePack(pack) {
         // t1081 — a field var landing inside a composed part's DECLARED generator scratch is an ERROR, not a warning: the
         // generator overwrites the operator's value mid-program (a 2-part mill slot forces the spindle to S0). An
         // already-built slot from before the build guard must not pass validation silently.
-        const vc = fieldVarCollisions(slot.fields || [], slot.ops || []);
+        const vc = fieldVarCollisions(slot.fields || [], slot.ops || [], bandsOf || undefined);
         if (vc.length) errors.push(`Slot cam${slot.slot}: ${vc.map((c) => `#${c.varNum} ("${c.field}")`).join(', ')} overwritten by the ${[...new Set(vc.map((c) => c.clashType))].join('/')} generator's scratch — rebuild these ops as separate slots.`);
     });
     return { ok: errors.length === 0, errors, warnings };
