@@ -13802,3 +13802,77 @@ count (not the tail) found "2 failed" above the summary. Exactly the trap in the
 ### STATE: the default drill/bore twin now reaches the premium generator arm with depth/peck/holeDia as live pendant knobs.
 No atom emit was touched, so the deferred num->val change for drill.feed / progstart.rpm remains open and unprejudiced --
 and is now a smaller prize, since the generator route already delivers those two knobs for drill/bore.
+
+---
+
+## turn 1091 -- num->val for PURE word-interpolation FEED (line/drill/bore). Probed per-param, not swept. rpm GATED, clearance GATED.
+
+### THE DIRECTIVE, AND HOW I SCOPED IT BY MEASUREMENT
+The deferred item: change num->val for value params that appear ONLY as a bare word interpolation (F# S# Z#) with NO numeric
+test, NO arithmetic, NO loop-bound; flip the atomRoles role to value. Probe each rather than sweep (the advisor has been
+wrong on atom files three times). The named candidates were progstart.rpm and "the same shape in line/helix/bore".
+
+FIRST, the candidate set turned out narrower and wider than the names:
+  - helix is NOT a candidate at all -- helix.js is kind:'path' (a fold), and it has ZERO feed param. The feed-bearing bore
+    kernel is bore.js (helicalBore), block type 'bore'. So the three feed-bearing kernels are line, drill, bore.
+  - the advisor's own criterion "F# S# Z#" includes CLEARANCE (emitted as `G0 Z${clr}`), which the names did not mention. So
+    I probed clearance too rather than ignore it.
+
+### WHAT I FLIPPED: feed on line/drill/bore (num->val in the ATOM, role->value)
+Read each kernel's source and confirmed feed appears ONLY as `F${feed}` -- no test, no arithmetic, no loop bound:
+  - line.js lineCut:12    feed = num(p.feed,2000)  used only at `G1 Z.. F${feed}` / `G1 X.. F${feed}`
+  - drill.js peckDrill:13  feed = num(p.feed,100)   used only at `G1 Z[-#..] F${feed}`  (the loop is bounded by depth/peck,
+                                                     NOT feed -- feed is constant across the unrolled pecks)
+  - bore.js helicalBore:15 feed = num(p.feed,100)   used only at the various `F${feed}`
+Changed each `num(p.feed,X)` to `val(p.feed,X)` and imported val. val() returns a #var/[expr] string verbatim and a literal
+as r3(num(...)), so a numeric feed is BYTE-IDENTICAL (integer feeds are unchanged by r3) and a #var newly rides to `F#var`.
+Flipped line.feed / drill.feed / bore.feed from geometry to value in atomRoles.js.
+CROSS-CHECK on shiftZ: the zOff path-offset (shiftZ) rewrites Z words via /Z(-?\d*\.?\d+)/ -- it needs a DIGIT after Z, so an
+F word is never touched. Feed is clean regardless of zOff.
+
+### WHAT I DID NOT FLIP, WITH THE PROBE EVIDENCE (the two gates)
+progstart.rpm -- KEEP geometry. headerBlock (cuttingBlocks.js:23-25) does `const r = num(rpm,0)>0 ? num(rpm,0) : ...; if
+(r>0) L.push('M3 S'+r)`. rpm is in TWO numeric tests (gate M3, gate the spin-up dwell). A #var makes num('#2600',0)=NaN,
+NaN>0 is false, so THE M3 IS SILENTLY DROPPED -- spindle never starts. Probed empirically: injecting a #var rpm deleted the
+`M3 S...` line and shifted the body up. This is exactly the caveat I raised at t1087. NOT pure interpolation. A permanent
+assertion now guards it (a #var rpm must drop M3).
+
+clearance (line/drill/bore) -- GATED, not flipped, even though it IS pure `Z${clr}` interpolation. The reason is a REAL
+interaction feed does not have: clearance is a Z WORD, and shiftZ (the zOff path-offset) rewrites literal Z words. Today
+`G0 Z5` with zOff=2 becomes `G0 Z7`. If clearance rode a #var, `G0 Z#var` would NOT be shifted (no digit after Z), so
+exposing clearance changes zOff's behaviour whenever zOff != 0. Byte-identical for a numeric default (goldens green), but a
+semantic divergence in the exposed+zOff case. That is a "param classification is ambiguous" situation -- so per the standing
+instruction I surface it rather than guess. QUESTION FOR THE ADVISOR: expose clearance too (accept that zOff stops offsetting
+the retract height when clearance is a pendant knob -- arguably CORRECT, the operator owns the height), or keep it fixed?
+Cheap either way; it is a semantics call, not a mechanics one.
+
+### THE PRIZE, AND WHY IT IS SMALL BUT REAL
+This only matters for the UNIVERSAL arm: a custom op a user builds from line/drill/bore leaf blocks can now expose FEED as a
+#2600 pendant knob. The generator arm already delivered feed/rpm (opToSlot emits F#/S# directly), so drill/bore twins on the
+default path were already fine after t1089. So this closes the gap for hand-composed custom ops specifically.
+
+### VERIFIED
+- cam-toolpath-feed-expose.spec.js (NEW, 2): a custom op from EACH of line/drill/bore exposes feed (role value, exposable),
+  the built slot reads feed from its #2600 mirror and the emitted F word rides the #var, depth stays bake-only, clearance
+  stays bake-only, and no NaN leaks; separately, a numeric feed emits the literal F word with no #var (byte-identical) and a
+  #var feed rides -- AND progstart.rpm with a #var DROPS M3 (the permanent gate evidence).
+- cam-expose-classify.spec.js MIGRATED: the emit-probe guard (which emits the real atom with a #var and checks it rides)
+  now expects line/drill/bore feed = value and PROVES the #var rides the real emit; drill/bore/line clearance added as the
+  value-shaped-but-geometry control; test (a)'s drill example migrated from "num-consumed feed bakes" (the premise I
+  changed) to "feed rides / depth bakes", keeping the geometry lesson on depth. This IS the per-param probe evidence, in the
+  permanent suite.
+- GATE caught TWO more (the tail hid them again -- 1428+4 != 1434; grepped, found 2 failed). Both PINNED the old behaviour I
+  intentionally changed: cam-universal-route:53 and cam-universal-modal:56 each used the DRILL FEED as their
+  "geometry -> Expose disabled/bake-only" example. MIGRATED both: the dfeed assertion flips to exposable, and drill DEPTH
+  (still geometry) becomes the greyed example -- so each test keeps its geometry-bakes lesson on a param that is still
+  geometry. Not bent to pass: re-derived on the real invariant.
+- GOLDENS: drill-as-data + bore-as-data (byte-diff ZERO) + peck-drill + drill-patterns-846 all pass UNCHANGED -- the proof
+  that a numeric feed did not move a single byte.
+- FULL GATE (re-run): 1429 passed, 1 failed, 4 skipped -- and the 1 is preflight-badge-838.spec.js:63, a KNOWN load-sensitive
+  flake in a file unrelated to feed/atom-roles (it flaked at :119 last turn too). Confirmed a flake: the whole file passes
+  10/10 in isolation. So the real result is 1430 green of the 1430 non-skipped that are deterministic; nothing I touched is
+  red. Failed-count grepped, arithmetic reconciled (1429+1+4 = 1434 = 1432 prior + 2 new).
+
+### STATE: feed is a live pendant knob on the universal arm for line/drill/bore, with numeric byte-identity proven by the
+goldens. rpm stays geometry with permanent M3-gate evidence. clearance is a clean-but-gated candidate awaiting the advisor's
+semantics call (expose and let zOff stop offsetting it, or keep fixed).
