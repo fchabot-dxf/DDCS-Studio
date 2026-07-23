@@ -18,7 +18,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings } from './userOps.js';
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, getUserDef, instantiate } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap
 import { workspaceToStack } from './blockly/stackBridge.js';
@@ -454,6 +454,58 @@ export function wrapRecognizedForFork(def) {
     return { template: tpl, recognized };
 }
 
+// The pre-order atom TYPE SEQUENCE of a stack — the identity test for "is this body still the source op's exec run?".
+// A literal deep-equal is NOT usable here (measured): the workspace round-trip FILLS an absent socket with the block
+// default (progstart gains `rpm:0`) while instantiate's clone carries empty `children: []` arrays the workspace record
+// omits — benign normalization noise that would make the gate NEVER fire, silently killing the feature. The type
+// sequence catches exactly what matters: an atom ADDED, REMOVED or REORDERED — the interleaving that makes the standard
+// run un-identifiable. It deliberately TOLERATES a value edit, which is correct to wrap: subStackToSlot RE-DERIVES the
+// standard part's params from the actual sockets (deriveStandardParams), so a tuned value is read back, never lost.
+const typeSeq = (stack) => flattenBlocks(stack || []).map((b) => (b && b.type) || '?').join('|');
+
+// t1075 (Part C) — the placed-op → SAVE fork route must produce the SAME opunit sub-stack the Customize (editWizardDef)
+// route does, so fork behaviour is ONE-SOURCE regardless of how the user got into Blocks. Wrap the exec run in an opunit
+// ONLY when ALL THREE hold:
+//   (1) RECOGNIZED — a generator twin whose DEFAULT variant resolves to a generator (the SAME test wrapRecognizedForFork
+//       uses), so the save-time wrap matches the load-time wrap exactly;
+//   (2) NOT ALREADY WRAPPED — an op opened via editWizardDef already carries the opunit (it round-trips through the
+//       workspace), so re-wrapping would DOUBLE-wrap it;
+//   (3) UNTOUCHED — the body's atom TYPE SEQUENCE still equals the source op's exec run (instantiate(def, the op's own
+//       params)). If the user added/removed/reordered atoms the standard run is un-identifiable — shape-inference is
+//       FORBIDDEN — so leave it universal. (See typeSeq: a literal deep-equal can never fire; a value edit is safe.)
+// Any condition fails → return false and save UNIVERSAL exactly as today (a correct universal fork beats a corrupt sub-stack).
+// Mutates a.opRec.children IN PLACE so the block records keep their IDENTITY, then re-derives each exposure's blockIndex
+// BY IDENTITY over the wrapped flatten — NEVER a blanket +1: the shift is NON-UNIFORM (exec children shift by one, the
+// uiChildren panel/sim/param_group do NOT), so a blanket +1 would silently corrupt the saved op's emit + form.
+// NOTE (measured): for a data-op twin the body is [user_root{…}] and preorderAtoms only descends a 'DO' input, so
+// user_root's PRESENTATION/EXECUTION mouths are never walked → inline EXPOSE ticks yield NO exposures for these ops
+// (pre-existing). The live binding source is extractParamBlocks (param pills), which runs AFTER this wrap and therefore
+// indexes the WRAPPED stack correctly by construction. The exposure re-derive is kept: it is correct, and it is the
+// right behaviour the moment an exposure can exist here. Exported for test (like wrapRecognizedForFork).
+export function wrapForkAtSave(a) {
+    try {
+        const opType = a && a.opRec && a.opRec.opType;
+        if (!opType) return false;                                                     // a hand-built bare stack (opType null) — never a fork
+        const def = getUserDef(opType);
+        if (!def) return false;
+        const ct = camTypeOf({ opType, params: defaultParams(def) });
+        if (!(ct && ct.camType && !ct.universal)) return false;                        // (1) not a recognized generator twin
+        const root = (a.opRec.children || []).find((b) => b && b.type === 'user_root');
+        if (!root || !Array.isArray(root.children) || !root.children.length) return false;
+        if (root.children.length === 1 && root.children[0] && root.children[0].type === 'opunit') return false;   // (2) already wrapped (the editWizardDef route)
+        if (typeSeq(a.opRec.children) !== typeSeq(instantiate(def, a.opRec.params || {}))) return false;          // (3) atom added/removed/reordered → un-identifiable
+        const flatBefore = flattenBlocks(a.opRec.children);                            // the indices a.exposures were computed against
+        root.children = [{ type: 'opunit', params: { opType, defV: defVOf(opType) }, children: root.children }];  // IN PLACE — identity preserved
+        const flatAfter = flattenBlocks(a.opRec.children);
+        for (const e of (a.exposures || [])) {
+            const ref = flatBefore[e.blockIndex];
+            const ni = ref ? flatAfter.indexOf(ref) : -1;
+            if (ni >= 0) e.blockIndex = ni;                                            // re-derived BY IDENTITY
+        }
+        return true;
+    } catch (_) { return false; }   // any doubt → leave it universal
+}
+
 export async function editWizardDef(opType) {
     const def = listUserOps().find((d) => d.opType === opType);
     if (!def) { alert('That wizard is no longer in your library.'); return; }
@@ -595,6 +647,12 @@ function saveAsCustomOp() {
     const a = collectAuthoring(_ws);
     if (!a) { alert('No op to save — insert an op in Blocks first.'); return; }
     if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.`); return; }
+
+    // t1075 (Part C) — a placed RECOGNIZED op opened in Blocks DIRECTLY (not via Customize) and saved would fork as
+    // UNIVERSAL (its standard part baked, never live in CAM). Wrap it in the SAME opunit boundary the Customize route
+    // produces, so fork behaviour is one-source regardless of route. Gated + in place + exposure indices re-derived by
+    // identity (see wrapForkAtSave); a no-op for every other save, so all existing save paths are byte-identical.
+    wrapForkAtSave(a);
 
     const inlineBindings = buildBindings(a.exposures);
     // GUI param blocks plugged into value sockets ALSO declare knobs — extract them (mutates the template: pills → numbers).

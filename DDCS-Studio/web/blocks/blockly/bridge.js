@@ -196,17 +196,18 @@ function jsonDef(def) {
     const isSection = def.kind === 'section';
     const isStructctl = def.kind === 'structctl';   // t154 — keeps its label (e.g. "Probe Z First") but drops the field-name prefix ("value")
     const isOpunit = def.kind === 'opunit';   // t1071 — a friendly per-instance label + the opType/defV routing key rendered READ-ONLY (editable = a corruptible foot-gun)
+    const isParamGroup = def.kind === 'param_group';   // t1075 rider — the header read "Parameter Group group X" (the word twice) → "Parameter Group: X"
     const args0 = [];
     // t146 — HEADER ROW (message0): the block's label + its inline fields. Statement-input MOUTHS go on their OWN rows
     // BELOW (message1/message2 via addMouth) so the label never sits beside the mouth (which shoved nested blocks right
     // + widened the block) → the block collapses to CONTENT WIDTH, nested content starts hard-left. The item-b separator-
     // header pattern, GENERALIZED in the shared builder to EVERY C-mouth kind. Authoring layout only — emit is untouched.
     // The `section` block shows JUST its title (no "Section title" prefix): drop the label + the field-name for it.
-    let message0 = isSection ? '' : (isOpunit ? '▨ %1 ·' : def.label), n = isOpunit ? 1 : 0;
+    let message0 = isSection ? '' : (isOpunit ? '▨ %1 ·' : (isParamGroup ? def.label + ':' : def.label)), n = isOpunit ? 1 : 0;
     if (isOpunit) args0.push({ type: 'field_label', name: 'OPUNIT_LABEL', text: def.label });   // filled per-instance from opType by ddcs_opunit; the routing key (opType/defV) follows READ-ONLY
     for (const f of fieldsOf(def)) {
         const k = fieldKind(def, f);
-        message0 += (isSection || isStructctl || isOpunit) ? ` %${++n}` : ` ${f} %${++n}`;   // opunit drops the "opType"/"defV" field-name prefixes (the friendly label carries the meaning)
+        message0 += (isSection || isStructctl || isOpunit || isParamGroup) ? ` %${++n}` : ` ${f} %${++n}`;   // opunit drops the "opType"/"defV" prefixes (the friendly label carries the meaning); param_group drops the redundant "group"
         const desc = getDesc(f);
         if (k === 'cornergrid') args0.push({ type: 'field_cornergrid', name: FN(f), value: String(def.defaults[f] ?? ''), colour: CORNER_COLOUR[f], tooltip: desc });
         else if (k === 'regionpick') args0.push({ type: 'field_regionpick', name: FN(f), value: String(def.defaults[f] ?? 0), tooltip: desc });
