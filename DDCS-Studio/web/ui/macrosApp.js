@@ -19,7 +19,8 @@ import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, ali
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
 import { seedFromOp, camTypeOf, isCamableType, isCamGeneratorTwin } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. t1073 — isCamGeneratorTwin gates the Customize-op picker
 import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
-import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
+import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';
+import { fieldVarCollisions, collisionMessage } from '../data/camScratch.js';   // t1081 — the DECLARED generator scratch bands + the build guard that refuses a slot whose form values land inside them   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
 import { getUserDef, defVOf } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest
 import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
@@ -1066,6 +1067,9 @@ function homingPostIsExpert() {
             name = name ? name + ' + ' + gen.name.replace(/^(Drill|Bore) — /, '') : gen.name;
         });
         slot.fields = fields;
+        // t1081 — record any field var that lands inside a composed part's DECLARED scratch band, so the build can refuse
+        // and the pack validator can flag an already-built slot. Detection only here; the build path does the refusing.
+        slot.varCollisions = fieldVarCollisions(fields, slot.ops || []);
         slot.body = slotPack.composeParts(parts);   // normalize the composed parts into ONE executable program (strip non-terminal M30s + uniquify labels) — else the controller stops after part 1
         if (name) slot.name = name;
         slot.bodyDirty = false;
@@ -1379,6 +1383,13 @@ function homingPostIsExpert() {
     }
     function cbmBuild() {
         if (!_authoring.ops.length) { dlgNotice('Import or add an op first.'); return; }
+        // t1081 SAFETY — REFUSE, loudly and by name, a slot whose form values would be overwritten by a generator's own
+        // working variables. Measured: composing two mill ops puts the RPM field on #20, which the pocket then writes to
+        // 0, so `M3 S[#20]` commands S0 — a non-rotating tool driven through the toolpath. Checked BEFORE the destination
+        // prompt so the user is not asked where to put a slot that cannot be built.
+        const _pv = cbmPreviewSlot();
+        const _cols = fieldVarCollisions(_pv.fields, _pv.ops);
+        if (_cols.length) { dlgNotice(collisionMessage(_cols)); return; }
         cbmBuildModal().then((dest) => {
             if (!dest) return;
             const ops = _authoring.ops.map(toManifest);

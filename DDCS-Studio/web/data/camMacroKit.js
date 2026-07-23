@@ -5,7 +5,10 @@
  * proven sequence (two-pass G31, indirect WCS write, raster) and keeps the generators short. Pure string
  * builders — no DOM, no state. Output is byte-stable so the cam-slot-sim tests guard any change here.
  *
- * Scratch-var convention these helpers own: WCS #70 (base) #71 (idx) #73 (addr); raster #27-#32.
+ * Scratch-var convention these helpers own: WCS #70 (base) #71 (idx) #73 (addr); raster/ring #27-#33.
+ * (t1081 CORRECTION: this said "#27-#32" — wrong. rasterClear also writes #33, the ramp lead-in length. The
+ * authoritative, code-derived bands are DATA in data/camScratch.js, which the build guard reads; keep this line in
+ * step with that declaration — the prose is a pointer, never the source.)
  */
 
 /** Spindle RPM field to append to a cutting slot's form, + the start/stop lines that bracket the toolpath. */

@@ -11,8 +11,12 @@
  * #[805+(wcs-1)*5+ax] — G10 L2/L20 is broken on M350) is ported verbatim from the proven corner wizard
  * (wizards/cornerWizard.js) — the ground truth. See the cam-menu-architecture + ddcs-ground-truth memories.
  *
- * Scratch use: fields via their assigned vars; calc in #70/#71/#73 (WCS), #90–#99 (signs/targets), #101/#102
- * (radius-comp temps) — clear of drill/bore's #30–#54 so a probe can share a slot if ever appended.
+ * Scratch use: fields via their assigned vars; calc in #70/#71/#73 (WCS), #90–#97 (signs/targets), #101/#102
+ * (radius-comp temps) and #50–#61 (probe results/temps; alignment re-purposes #70/#71/#72 with its OWN meaning).
+ * (t1081 CORRECTION: this said the probes were "clear of drill/bore's #30–#54" — wrong, and misleading in the
+ * dangerous direction: the probe slots DO write #50–#61, which OVERLAPS opToSlot's #50–#54 pattern-loop vars, so a
+ * probe and a drill must not be composed on the assumption they are disjoint. The authoritative, code-derived bands
+ * are DATA in data/camScratch.js, which the build guard reads; this prose is a pointer, never the source.)
  */
 import { nextParam } from './slotPack.js';
 import { PROBE, wcsBase, writeAxis, twoPassProbe, probeSave, errorEnd } from './camMacroKit.js';   // t1077 — errorEnd: the declared HALT an error branch must end on (never fall through into the next composed part)

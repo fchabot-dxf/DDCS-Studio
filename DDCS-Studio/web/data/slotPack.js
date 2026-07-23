@@ -12,6 +12,8 @@
  * collision detection across a pack's slots is the genuinely-hard part this module owns.
  */
 
+import { fieldVarCollisions } from './camScratch.js';   // t1081 — the DECLARED generator scratch bands (inert data; camScratch imports nothing, so no cycle)
+
 const POOL_MIN = 1100, POOL_MAX = 1499, MIRROR = 1500;
 
 function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Number(v); }
@@ -166,6 +168,11 @@ export function validatePack(pack) {
     if (used > 350) warnings.push(`${used}/400 form fields used — the #1100–1499 pool is filling up.`);
     ((pack && pack.slots) || []).forEach((slot) => {
         if ((slot.fields || []).length > 8) warnings.push(`Slot cam${slot.slot}: ${slot.fields.length} fields — >8 rows may not fit the form.`);
+        // t1081 — a field var landing inside a composed part's DECLARED generator scratch is an ERROR, not a warning: the
+        // generator overwrites the operator's value mid-program (a 2-part mill slot forces the spindle to S0). An
+        // already-built slot from before the build guard must not pass validation silently.
+        const vc = fieldVarCollisions(slot.fields || [], slot.ops || []);
+        if (vc.length) errors.push(`Slot cam${slot.slot}: ${vc.map((c) => `#${c.varNum} ("${c.field}")`).join(', ')} overwritten by the ${[...new Set(vc.map((c) => c.clashType))].join('/')} generator's scratch — rebuild these ops as separate slots.`);
     });
     return { ok: errors.length === 0, errors, warnings };
 }
