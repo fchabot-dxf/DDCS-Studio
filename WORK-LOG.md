@@ -13656,3 +13656,80 @@ value params that ought to be exposable on a drill twin) -- flagging it, not fix
 
 ### STATE: all three arms -- generator, opToSlot and now universal -- mint collision-free by construction, and the guard
 backstops all three. The universal arm was broken at ONE part, before any composition; it no longer is.
+
+---
+
+## turn 1087 -- GATE (no build). The all-disabled Expose radios are NOT the missing-role cause. Measured, not argued.
+
+### THE DISPATCHED HYPOTHESIS, AND WHY IT DOES NOT HOLD
+The advisor's read was: exposeClassifier defaults an unknown atom to geometry (fail-safe), the toolpath/drill kernels were
+never added to atomRoles.js, so every param falls through to bake-only -- and the fix is to DECLARE those roles. I was told to
+confirm or correct that with measurement first, and to STOP if the cause is something else. It IS something else.
+
+I dumped, for the drill twin, which atom each of the 34 params resolves to and why the classifier greyed it.
+
+RULED OUT FIRST (the two alternatives worth eliminating):
+  - NOT the bindingSpecs fail-closed path (exposeClassifier.js:70, which blanket-bakes a guarded def): the drill twin has
+    bindingSpecs=false.
+  - NOT "the binding never reaches the classifier": all 34 value bindings resolve to a REAL atom (toolsel, wcs, placeonstock,
+    array, drill, progstart, entry). Nothing is dropping out.
+Every one of the 34 is greyed for the SAME stated reason -- role is geometry.
+
+THE ACTUAL SPLIT (three causes, and the dispatched one is not among them for the params that matter):
+
+(A) 4 params are DECLARED geometry ALREADY, and the declaration is CORRECT. These are exactly the four the dispatch named as
+    "value params that ought to be exposable" -- depth, peck, feed, rpm. atomRoles.js:36-44 declares them deliberately, under
+    the header "Toolpath kernels: build a JS loop -> EVERY key runs num()", and progstart carries the explicit note
+    "rpm is num() here (contrast spindle.rpm)". I verified against the EMIT, not the comment (project rule):
+      drill.depth / drill.peck -- drill.js:12-26. `depth = num(p.depth,5)`, `q = Math.max(0.1, num(p.peck, depth))`, then
+        `while (d < depth - 1e-6)` UNROLLS the peck sequence in JS and pushes a BAKED `G1 Z<literal>` per peck. These do not
+        merely get num()-coerced: they drive a JS loop bound and every Z literal is computed at build time. A #var cannot
+        drive a JS loop at all. Declaring them 'value' would emit a fixed 5mm 1-peck hole no matter what the operator dials
+        on the pendant -- silently wrong G-code, the exact hazard atomRoles' own header warns about.
+      drill.feed -- appears ONLY as `F${feed}` (drill.js:21). It COULD carry a #var mechanically. It is blocked because the
+        ATOM calls num(p.feed,100), not because a role is missing.
+      progstart.rpm -- program.js:20, `rpm: num(p.rpm, 0)` into headerBlock. Same shape as drill.feed.
+    So for (A) the role table is RIGHT and changing it is the wrong fix. Two of the four are structurally impossible to
+    expose; the other two need an ATOM EMIT change (num -> val), which is a different change in a different file.
+
+(B) 28 params belong to atoms genuinely ABSENT from ATOM_ROLES: toolsel, wcs, placeonstock, array, entry, stepdown,
+    contourfill. These DO fall through to DEFAULT_ROLE, so the dispatched mechanism is real here. But adding rows would
+    mostly declare 'geometry' ANYWAY -- they are datum corners and stock dims (placeonstock), pattern counts / pitches /
+    diameters expanded at BUILD (array), path coordinates (entry), and stepdown is a 'depth' fold that
+    BLOCKING_FOLD_KINDS blocks regardless of role. So declaring them would NOT move the radios. The advisor asked to be told
+    this rather than be handed roles that do not move anything, so: telling.
+
+(C) Nothing else. There is no third mechanism hiding.
+
+### WHY I DID NOT BUILD
+GATE-IF-BALLOONS said: if the cause is NOT the missing roles, STOP and gate back rather than build a fix for the wrong cause.
+Declaring roles for (B) is cheap inert data and I would happily do it, but it would produce a green diff, a passing gate, and
+ZERO movement in the radios -- it would LOOK like the feature was fixed while a drill twin still exposes nothing. That is
+worse than not doing it. And the fix for (A) -- flipping num() to val() inside the atoms -- changes EMIT for every existing
+consumer of those atoms including the goldens, which is not something to slip into a turn scoped as a role declaration.
+
+### THE FORK I AM HANDING BACK (my recommendation first)
+RECOMMENDED -- narrow the atom emits, param by param, verified by probe. For params that are PURE word interpolations
+(drill.feed -> `F${feed}`, progstart.rpm -> headerBlock rpm, and the same shape in bore/line/helix), change num() to val() in
+the ATOM and only then flip the role to 'value'. val() returns a number unchanged, so a numeric param stays byte-identical
+and the goldens should not move; a #var newly rides through. This gives the operator the knobs that actually matter on a
+pendant -- FEED and RPM -- which is most of the practical value of the feature. It does NOT touch depth/peck: those are
+structurally un-exposable and must stay geometry. NB progstart.rpm needs one extra check I did not do: headerBlock may test
+rpm numerically (e.g. rpm>0 to decide whether to emit M3), and a #var would break that test -- so that one is per-param
+verify, not a blanket sweep.
+ALSO WORTH DOING, independently and cheaply -- declare the 7 absent atoms (B) as inert data for honesty and so the fail-safe
+default stops silently absorbing them. Just do not expect radios to move; it is bookkeeping, not the fix.
+WORTH ASKING -- whether a toolpath data-op twin is even meant to travel the UNIVERSAL arm. drill/bore/slot already have a
+GENERATOR (opToSlot), and opCamMap only routes drill to universal when pattern==='single'. If the intended path for these ops
+is the generator, then "a drill twin exposes nothing on the universal arm" is a routing question, not a classifier bug, and
+the whole (A) atom-emit change may be unnecessary. I could not settle this from the code; it is a product call.
+
+### VERIFIED
+- The diagnostic was a throwaway spec (deleted after measuring). NO source changed this turn, so no feat commit and no gate
+  run -- there is nothing to regress. Everything above is a read of shipped code plus a runtime dump of the real classifier.
+- Confirmed once more that the all-disabled state is PRE-EXISTING: established last turn by stashing every web/ change and
+  re-running the same DOM query against HEAD (34 total, 0 enabled, identical).
+
+### STATE: the feature gap the advisor identified is REAL and worth fixing -- a user can build a CAM slot from the ops real
+programs use and expose nothing. But it is not a missing role, and the fix lives in the ATOM EMITS (or in routing), not in
+atomRoles.js. Awaiting direction on the fork above.
