@@ -3,7 +3,8 @@
  * surface that can identify an op: the editor (line→op), the Blocks code panel (span ancestry→op), and the
  * Blockly op blocks. Acts via the window hooks (ddcsEditOp + opSession duplicate/delete) — params stay the truth.
  */
-import { seedFromOp, isCamableType } from '../data/opCamMap.js';   // t1045 S1c — the per-op CAM action (door 1). U2 — seedFromOp is the FINAL verdict (generator | universal | unsupported), so the universal fallback greys/enables correctly
+import { seedFromOp, isCamableType, isCamGeneratorTwin } from '../data/opCamMap.js';   // t1045 S1c — the per-op CAM action (door 1). U2 — seedFromOp is the FINAL verdict (generator | universal | unsupported), so the universal fallback greys/enables correctly. t1073 — isCamGeneratorTwin gates the Customize action to the 8 CAM-generator twins
+import { getUserDef } from '../blocks/userOps.js';   // t1073 — the Customize action needs a registered def (else editWizardDef alerts "no longer in your library")
 
 let menu = null;
 function ensure() {
@@ -41,15 +42,23 @@ export function showOpMenu(op, x, y) {
     const editable = !window.ddcsCanEditOp || window.ddcsCanEditOp(op.opType);
     item(m, `✎ Edit ${op.label || op.opType || 'op'}`, () => window.ddcsEditOp && window.ddcsEditOp(op.id), !editable);
     item(m, '⧉ Duplicate', async () => { try { (await import('../blocks/opSession.js')).duplicateOp(op.id); } catch (_) { /* */ } });
+    // the full placed record (params = the truth) for the CAM actions below — re-hydrated from the program by id
+    const full = (window.ddcsGetBlockProgram && (window.ddcsGetBlockProgram() || []).find((b) => b && b.id === op.id)) || op;
     // t1045 S1c — the per-op CAM action (door 1): only for CAM-able op TYPES; greyed with the reason when this op's
     // variant has no generator (e.g. a single-axis middle). Opens the SAME authoring modal, pre-seeded from THIS op.
     if (isCamableType(op.opType)) {
-        const full = (window.ddcsGetBlockProgram && (window.ddcsGetBlockProgram() || []).find((b) => b && b.id === op.id)) || op;
         const seed = seedFromOp(full);   // the FINAL verdict: a generator/universal camType, or {unsupported} (no def / no bindings)
         item(m, seed.unsupported ? '▸ Build CAM slot — not CAM-able' : '▸ Build CAM slot', async () => {
             try { (await import('./macrosApp.js')).initMacrosApp(); } catch (_) { /* */ }   // idempotent — ensures the opener is registered
             if (window.ddcsOpenCamAuthoring) window.ddcsOpenCamAuthoring(full);
         }, !!seed.unsupported);
+    }
+    // t1073 S4-Part2 (A) — Customize as blocks: fork a CAM-generator twin (surfacing/pocket/corner/edge/slot/drill/bore/middle)
+    // → editWizardDef wraps a recognized-at-default op's exec atoms in an opunit boundary (the standard sub-unit stays LIVE in
+    // CAM) + opens it in Blocks to customize. Gate = isCamGeneratorTwin (params-independent, the SAME 8-twin set the wizard list
+    // + CAM builder surface) AND a registered def (editWizardDef resolves via listUserOps; else it alerts). Real placed ops are twins.
+    if (isCamGeneratorTwin(full.opType) && getUserDef(full.opType)) {
+        item(m, '🧩 Customize as blocks', () => { if (window.ddcsEditWizardDef) window.ddcsEditWizardDef(full.opType); });
     }
     item(m, '🗑 Delete', async () => { try { (await import('../blocks/opSession.js')).deleteOp(op.id); } catch (_) { /* */ } });
     place(m, x, y);

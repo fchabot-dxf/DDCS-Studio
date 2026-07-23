@@ -34,6 +34,16 @@ export const SUPPORTED_OPTYPES = ['pocket', 'surfacing', 'corner', 'edge', 'slot
 // unroll path, so the picker offers EVERY op. A generator arm stays the PREMIUM path for the 8 standard shapes (camTypeOf).
 export const isCamableType = (opType) => SUPPORTED_OPTYPES.includes(baseOf(opType).baseType) || !!getUserDef(opType);
 
+// t1073 — is this opType a data-op TWIN of one of the 8 CAM-generator ops (surfacing/pocket/corner/edge/slot/drill/bore/middle)?
+// The DECLARED "Customize as blocks" affordance-gate (op menu / wizard list / CAM builder): only these forkable-into-a-sub-unit
+// twins surface a Customize entry (not the other ~17 opensAs twins: comm/wcs/homing/atc/…). Base-type membership, so it is
+// params-INDEPENDENT (all 8 surface) — editWizardDef then wraps the ones whose DEFAULT variant is a live generator
+// (surfacing/pocket/corner/edge/slot); drill/bore/middle default to a universal variant (t1069 Finding 2) → a plain fork.
+export function isCamGeneratorTwin(opType) {
+    const t = builtinTypeForTwin(opType);   // {type, variant} for a data-op twin (opensAs target), null otherwise
+    return !!t && (SUPPORTED_OPTYPES.includes(t.type) || t.type === 'bore');
+}
+
 // PARAM_ALIAS[camType] = { generatorFieldKey: opParamsKey } — ONLY the renames; unlisted keys alias to themselves.
 // (Grounded from the op.params bare keys + the generator SPECs. stepover has NO op source — pocket/surface store
 //  stepoverPct (%) — so it is intentionally UNLISTED: it stays unseeded and shows the generator default until a

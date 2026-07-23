@@ -17,7 +17,7 @@ import { openIconEditor } from './iconEditor.js';
 import { slotFromOp } from '../data/opToSlot.js';
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from '../data/probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
-import { seedFromOp, camTypeOf, isCamableType } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op
+import { seedFromOp, camTypeOf, isCamableType, isCamGeneratorTwin } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. t1073 — isCamGeneratorTwin gates the Customize-op picker
 import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
 import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
 import { getUserDef, defVOf } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest
@@ -160,7 +160,7 @@ export function initMacrosApp() {
                     <div class="settings-section">
                         <div class="settings-section-title">CAM PACK BUILDER</div>
                         <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
-                        <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_build_slot" title="Author a CAM slot from an op in your program: seed the field table, choose which params the operator fills (Expose) vs freezes (Bake), preview, then Build to a slot.">✚ Build CAM slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
+                        <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_build_slot" title="Author a CAM slot from an op in your program: seed the field table, choose which params the operator fills (Expose) vs freezes (Bake), preview, then Build to a slot.">✚ Build CAM slot</button><button class="toolbar-btn settings-io" id="cam_customize_op" title="Fork a standard op (Surfacing / Pocket / Corner / …) from your program into editable blocks — its standard part stays LIVE in CAM. Opens in the Blocks view.">🧩 Customize op</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
                         <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
                         <div id="cam_slots" style="margin-top:6px;"></div>
                     </div>
@@ -1310,6 +1310,34 @@ function homingPostIsExpert() {
             ov.addEventListener('click', (e) => { if (e.target === ov) done(null); });
         });
     }
+    // t1073 S4-Part2 (B2) — the "Customize op" picker: which recognized CAM-generator twin in THIS program to fork into
+    // editable blocks (dedup by opType — one Customize per op TYPE). editWizardDef wraps a recognized-at-default op in an
+    // opunit sub-stack boundary + opens Blocks. Empty → a helpful notice (no picker). Mirrors cbmBuildModal's overlay shape.
+    function cbmCustomizeModal() {
+        return new Promise((resolve) => {
+            const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+            const seen = new Set(), ops = [];
+            for (const op of stack) {
+                if (!op || op.type !== 'op' || seen.has(op.opType)) continue;
+                if (isCamGeneratorTwin(op.opType) && getUserDef(op.opType)) { seen.add(op.opType); ops.push(op); }
+            }
+            if (!ops.length) { dlgNotice('No customizable standard ops in your program. Insert a Surfacing / Pocket / Corner / Edge / Slot / Drill / Bore / Middle op, then Customize it.'); resolve(null); return; }
+            const opts = ops.map((op) => `<option value="${camEsc(op.opType)}">${camEsc(op.label || op.opType)}</option>`).join('');
+            const ov = document.createElement('div'); ov.className = 'cam-sim-overlay';
+            ov.style.cssText = 'position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
+            ov.innerHTML = `<div style="background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; padding:16px; min-width:340px;">
+                <b>Customize which op?</b>
+                <div class="settings-hint" style="margin:6px 0 10px;">Fork a standard op into editable blocks — its standard part stays LIVE in CAM. Opens in the Blocks view.</div>
+                <div style="margin:8px 0;"><label>Op&nbsp;<select id="cbm_custsel" style="min-width:220px;">${opts}</select></label></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;"><button class="toolbar-btn settings-io" data-cbm="cancel">Cancel</button><button class="toolbar-btn settings-io" data-cbm="ok" style="font-weight:600;">Customize ▸</button></div>
+            </div>`;
+            document.body.appendChild(ov);
+            const done = (r) => { ov.remove(); resolve(r); };
+            ov.querySelector('[data-cbm="cancel"]').addEventListener('click', () => done(null));
+            ov.querySelector('[data-cbm="ok"]').addEventListener('click', () => done(ov.querySelector('#cbm_custsel').value));
+            ov.addEventListener('click', (e) => { if (e.target === ov) done(null); });
+        });
+    }
     const cbmExit = () => { if (_cbmPanel) { try { _cbmPanel.stop(); _cbmPanel.setActive(false); } catch (_) { /* noop */ } _cbmPanel = null; } if (_cbmOverlay) { _cbmOverlay.remove(); _cbmOverlay = null; } _authoring = null; if (q('cam_slots')) renderCamBuilder(); };
     function cbmToggle(oi, key, mode) {
         const a = _authoring.ops[oi];
@@ -1573,6 +1601,8 @@ function homingPostIsExpert() {
     if (_camAddSlot) _camAddSlot.addEventListener('click', () => { _camPack.slots.push({ slot: nextSlotNum(), name: 'New slot', fields: [], body: '' }); saveCamPack(); renderCamBuilder(); });
     const _camBuildSlot = q('cam_build_slot');   // t1045 S1c — CAM-tab door (3): open the authoring modal with the picker
     if (_camBuildSlot) _camBuildSlot.addEventListener('click', () => openCamAuthoring());
+    const _camCustomize = q('cam_customize_op');   // t1073 S4-Part2 (B2) — fork/customize a standard op right where CAM slots are built
+    if (_camCustomize) _camCustomize.addEventListener('click', async () => { const opType = await cbmCustomizeModal(); if (opType && window.ddcsEditWizardDef) window.ddcsEditWizardDef(opType); });
     // Expose the ONE opener so the editor op card (door 1) + toolbar (door 2) trigger the same modal. camTypeOf lets a
     // caller check CAM-ability before offering the action.
     window.ddcsOpenCamAuthoring = (op) => openCamAuthoring(op);
