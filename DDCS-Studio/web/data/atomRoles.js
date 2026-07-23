@@ -33,15 +33,19 @@ export const ATOM_ROLES = {
     probe: { to: 'value', feed: 'value', port: 'value', level: 'geometry', axis: 'other' },
     spindle: { rpm: 'value', dir: 'other' },
 
-    // — Toolpath kernels: build a JS loop → EVERY key runs num() (incl. feed + the X/Y coord words) → geometry —
-    line: { x0: 'geometry', y0: 'geometry', x1: 'geometry', y1: 'geometry', depth: 'geometry', stepdown: 'geometry', feed: 'geometry', clearance: 'geometry' },
-    drill: { x: 'geometry', y: 'geometry', depth: 'geometry', peck: 'geometry', feed: 'geometry', clearance: 'geometry', zOff: 'geometry' },
-    bore: { x: 'geometry', y: 'geometry', holeDia: 'geometry', toolDia: 'geometry', depth: 'geometry', pitch: 'geometry', feed: 'geometry', clearance: 'geometry', ramp: 'other', zOff: 'geometry' },
+    // — Toolpath kernels: build a JS loop → coords + depth/peck/pitch run num() (loop bounds / pre-rounded) → geometry. FEED
+    //   is the exception (t1091): it appears ONLY as a bare `F${feed}` in every kernel — no test, no arithmetic, no loop-bound
+    //   — so it rides val() and is a legit pendant knob on the universal arm. `clearance` is ALSO pure `Z${clr}` but stays
+    //   geometry: it is a Z WORD that shiftZ (the zOff path-offset) rewrites, so exposing it as a #var would change zOff's
+    //   behaviour — GATED to the advisor rather than flipped (t1091 WORK-LOG). —
+    line: { x0: 'geometry', y0: 'geometry', x1: 'geometry', y1: 'geometry', depth: 'geometry', stepdown: 'geometry', feed: 'value', clearance: 'geometry' },
+    drill: { x: 'geometry', y: 'geometry', depth: 'geometry', peck: 'geometry', feed: 'value', clearance: 'geometry', zOff: 'geometry' },
+    bore: { x: 'geometry', y: 'geometry', holeDia: 'geometry', toolDia: 'geometry', depth: 'geometry', pitch: 'geometry', feed: 'value', clearance: 'geometry', ramp: 'other', zOff: 'geometry' },
     helix: { cx: 'geometry', cy: 'geometry', radius: 'geometry', depth: 'geometry', pitch: 'geometry', startAngle: 'geometry', seg: 'geometry', clearance: 'geometry' },
     dwell: { sec: 'geometry' },
 
     // — Program framing —
-    progstart: { rpm: 'geometry', dir: 'other', spinUp: 'geometry', clearance: 'geometry', skim: 'other' },   // rpm is num() here (contrast spindle.rpm)
+    progstart: { rpm: 'geometry', dir: 'other', spinUp: 'geometry', clearance: 'geometry', skim: 'other' },   // rpm STAYS geometry (contrast spindle.rpm): headerBlock tests `num(rpm)>0` to GATE the M3 (cuttingBlocks.js:23-25), so a #var → NaN>0 false → the spindle-on line is silently DROPPED. t1091 probe confirmed: injecting a #var deletes `M3 S…`. NOT pure interpolation.
     progend: { spindleOff: 'other', coolantOff: 'other', retract: 'other', park: 'other', retractZ: 'geometry', parkX: 'geometry', parkY: 'geometry', end: 'other' },
 
     // — cnc.js (native canned cycles + I/O): drillcycle emits X/Y/Z/R/Q/P/F words but ALL via num() → geometry —

@@ -4,12 +4,12 @@
  * The line analogue of bore — same shape (rapid in, step down, retract). The one leaf op that
  * didn't already exist inside a wizard.
  */
-import { num, r3 } from './util.js';
+import { num, r3, val } from './util.js';
 
 /** Straight cut from (x0,y0) to (x1,y1): zig-zag down in `stepdown` passes, plunging at each turn. */
 export function lineCut(p) {
     const x0 = num(p.x0, 0), y0 = num(p.y0, 0), x1 = num(p.x1, 50), y1 = num(p.y1, 0);
-    const clr = num(p.clearance, 5), depth = num(p.depth, 3), feed = num(p.feed, 2000);
+    const clr = num(p.clearance, 5), depth = num(p.depth, 3), feed = val(p.feed, 2000);   // t1091 — feed rides val() (pure F# interpolation, no test/arith/loop-bound) so a #var survives; a numeric default is byte-identical
     const step = Math.max(0.05, num(p.stepdown, depth));
     const ends = [[r3(x0), r3(y0)], [r3(x1), r3(y1)]];
     const L = [`G0 X${ends[0][0]} Y${ends[0][1]}   ( line start )`, `G0 Z${clr}`];

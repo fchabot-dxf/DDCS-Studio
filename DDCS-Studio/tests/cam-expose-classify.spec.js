@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
 // from the op STACK STRUCTURE (exposeClassifier.js). NOTHING re-reads the emit output at runtime — the emit-probe below is a
 // dev-time GUARD, not the runtime oracle.
 
-test('U1 classifier: feed/coord/Z expose; a num()-consumed drill feed + an under-stepdown + an under-rotate X bake-only', async ({ page }) => {
+test('U1 classifier: feed/coord/Z expose; a drill depth (loop bound) + an under-stepdown + an under-rotate X bake-only', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
@@ -24,11 +24,13 @@ test('U1 classifier: feed/coord/Z expose; a num()-consumed drill feed + an under
             { param: 'mfeed', blockIndex: 2, key: 'feed' },
         ]);
 
-        // (b) DRILL — every key runs num() (a JS peck loop) → all bake-only. flatten: user_root(0), drill(1).
+        // (b) DRILL — depth/peck/coords run num() (a JS peck loop / pre-rounded) → bake-only; but FEED is pure `F${feed}`
+        //     interpolation (t1091 num→val) → exposable. flatten: user_root(0), drill(1).
         const drill = mk('u1_drill', [{ type: 'user_root', params: {}, children: [
             { type: 'drill', params: { x: 0, y: 0, depth: 5, peck: 5, feed: 100 } },
         ] }], [
             { param: 'dfeed', blockIndex: 1, key: 'feed' },
+            { param: 'ddepth', blockIndex: 1, key: 'depth' },
             { param: 'dx', blockIndex: 1, key: 'x' },
         ]);
 
@@ -72,8 +74,10 @@ test('U1 classifier: feed/coord/Z expose; a num()-consumed drill feed + an under
     expect(r.flat.mz).toMatchObject({ exposable: true, role: 'value' });
     expect(r.flat.mfeed).toMatchObject({ exposable: true, role: 'value' });
 
-    // (b) a drill feed is num()-consumed (geometry) → BAKE-ONLY, even though it emits an F word
-    expect(r.drill.dfeed).toMatchObject({ exposable: false, role: 'geometry' });
+    // (b) t1091 — a drill FEED now rides val() (pure F# interpolation) → EXPOSABLE; depth (a JS loop bound) and the
+    //     pre-rounded coord X stay num()-consumed → BAKE-ONLY, even though they emit real words
+    expect(r.drill.dfeed, 'drill feed rides val() now → exposable').toMatchObject({ exposable: true, role: 'value' });
+    expect(r.drill.ddepth, 'drill depth drives the peck loop → bake-only').toMatchObject({ exposable: false, role: 'geometry' });
     expect(r.drill.dx).toMatchObject({ exposable: false, role: 'geometry' });
 
     // (c) the stepdown's OWN driver is geometry; a VALUE move under it is fold-blocked (role stays 'value', exposable false)
@@ -116,9 +120,12 @@ test('U1 emit-probe (dev-time guard): each declared role matches the real emit �
             ['arc', 'x', 'value'], ['arc', 'i', 'value'],
             ['spindle', 'rpm', 'value'],
             ['probe', 'to', 'value'], ['probe', 'level', 'geometry'],
-            ['drill', 'x', 'geometry'], ['drill', 'feed', 'geometry'], ['drill', 'depth', 'geometry'],
-            ['bore', 'holeDia', 'geometry'], ['bore', 'feed', 'geometry'],
-            ['line', 'x0', 'geometry'], ['line', 'feed', 'geometry'],
+            // t1091 — feed FLIPPED to value in these three kernels (num→val): it is pure `F${feed}` interpolation, so a #var
+            // now rides. The guard below re-proves this against the REAL emit. Coords + depth stay geometry (loop bounds /
+            // pre-rounded). clearance stays geometry (a Z word shiftZ rewrites — gated, not flipped).
+            ['drill', 'x', 'geometry'], ['drill', 'feed', 'value'], ['drill', 'depth', 'geometry'], ['drill', 'clearance', 'geometry'],
+            ['bore', 'holeDia', 'geometry'], ['bore', 'feed', 'value'], ['bore', 'clearance', 'geometry'],
+            ['line', 'x0', 'geometry'], ['line', 'feed', 'value'], ['line', 'clearance', 'geometry'],
             ['dwell', 'sec', 'geometry'],
         ];
         return PROBE.map(([type, key, role]) => ({

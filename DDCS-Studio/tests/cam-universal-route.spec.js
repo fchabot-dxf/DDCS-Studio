@@ -49,9 +49,9 @@ test('U2 router: a forked custom op → {universal} seed with value params expos
     expect(r.byKey.frate, 'feed rate = value → exposable').toMatchObject({ exposable: true, value: 250 });
     expect(r.byKey.mx, 'move X = value → exposable').toMatchObject({ exposable: true, value: 15 });
     expect(r.byKey.mz, 'plunge Z = value → exposable').toMatchObject({ exposable: true, value: -4 });
-    // geometry params (num()-consumed drill) are BAKE-ONLY (Expose greyed in the table)
-    expect(r.byKey.dfeed, 'drill feed = geometry → bake-only').toMatchObject({ exposable: false });
-    expect(r.byKey.ddepth, 'drill depth = geometry → bake-only').toMatchObject({ exposable: false });
+    // t1091 — drill FEED now rides val() (pure F# interpolation) → EXPOSABLE. drill DEPTH drives the peck loop → still geometry.
+    expect(r.byKey.dfeed, 'drill feed = value (t1091 num→val) → exposable').toMatchObject({ exposable: true });
+    expect(r.byKey.ddepth, 'drill depth = geometry (loop bound) → bake-only').toMatchObject({ exposable: false });
 
     // the premium path is untouched — corner still routes to its generator
     expect(r.cornerCt, 'a standard op keeps its premium generator').toMatchObject({ camType: 'corner' });

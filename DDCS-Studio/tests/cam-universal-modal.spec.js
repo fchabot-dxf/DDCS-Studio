@@ -52,9 +52,10 @@ test('U3 modal: a forked custom op → op-card Build CAM slot → value params e
     expect(by.frate, 'feed = value → Expose enabled + checked').toMatchObject({ exposeDisabled: false, exposeChecked: true });
     expect(by.mx, 'move X = value → Expose enabled').toMatchObject({ exposeDisabled: false });
     expect(by.mz, 'plunge Z = value → Expose enabled + checked').toMatchObject({ exposeDisabled: false, exposeChecked: true });
-    // geometry params (num()-consumed drill) — Expose DISABLED (greyed), Bake forced
-    expect(by.dfeed, 'drill feed = geometry → Expose disabled, Bake forced').toMatchObject({ exposeDisabled: true, bakeChecked: true });
-    expect(by.ddepth, 'drill depth = geometry → Expose disabled, Bake forced').toMatchObject({ exposeDisabled: true, bakeChecked: true });
+    // t1091 — drill FEED now rides val() → Expose ENABLED in the modal (pure F# interpolation). drill DEPTH drives the peck
+    // loop → still geometry, Expose DISABLED + Bake forced (the greyed-geometry example this test guards).
+    expect(by.dfeed, 'drill feed = value (t1091) → Expose enabled').toMatchObject({ exposeDisabled: false });
+    expect(by.ddepth, 'drill depth = geometry (loop bound) → Expose disabled, Bake forced').toMatchObject({ exposeDisabled: true, bakeChecked: true });
     // Bug #2 fix — a baked STRING param (mode) is Expose-disabled and its value cell is a READ-ONLY span (not a corruptible number input)
     expect(by.mmode, 'string mode param → Expose disabled, baked').toMatchObject({ exposeDisabled: true, bakeChecked: true });
     expect(out.modeValTag, 'baked string value → read-only SPAN, not an editable number input').toBe('SPAN');
