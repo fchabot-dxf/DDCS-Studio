@@ -13412,3 +13412,41 @@ A sub-stack composes several parts and two parts can legitimately carry the SAME
 Reason to gate here: item (1) CHANGES THE EMITTED G-CODE of every probe/mill slot (a safety-motivated change worth its own review) and already touched 9 generators + the shared framing + the modal keying + 5 test files.
 
 ### STATE: the two highest-risk S5 items are done -- an erroring (or cancelled) part can no longer run into the next part motion, and two parts sharing a param name stay independently addressable. (3) + (4) remain. No release from me.
+
+---
+
+## turn 1079 -- S5 (4) defV STALENESS: DONE. S5 (3) SCRATCH-VAR COLLISION: **GATED with findings** -- the grounding proved the bug is REAL and WORSE than the brief, and that a collision-FREE declared allocation is materially bigger than "a declared band the allocator reads". GROUND-FIRST (1 Explore agent, exhaustive).
+
+### (4) defV STALENESS -- FIXED by declaration, one-source
+FOUND: the opunit's `defV` is WRITTEN at both wrap sites (devMode.js:451 load-wrap, :498 save-wrap) but NEVER READ -- subStackToSlot routes on `opType` alone. So the real hazard was live: deriveStandardParams reads the opunit's (older-shape) children through the CURRENT def's FROZEN bindings (blockIndex over the CURRENT template). If the user edits the twin's def after forking, a shape change makes it silently read the WRONG sockets -> wrong params -> wrong G-code, with nothing to show for it.
+REUSED THE EXISTING DECLARATION (not a new one): a defV staleness rule already existed inline in programModel.staleMarkedOps (the import transparency check, `cur > 0 && was < cur`). Extracted it as ONE exported rule `defVStale(stampedV, currentV)` next to `defVOf` in userOps.js, and pointed BOTH consumers at it (programModel's import check + the new CAM sub-stack check) so "what counts as stale" can never drift between them.
+FIX: subStackToSlot's standard route now checks the opunit stamp. On STALE it REFUSES the frozen-binding re-derivation and instead UNROLLS the atoms actually present (correct by construction -- value params exposed, geometry baked), and NAMES the degradation everywhere it is visible: the part header/slot name gets "(def vN->vM -- unrolled, no longer live)" and the macro body gets a "STALE SUB-UNIT ... re-fork the op to restore the live generator" comment. A CURRENT sub-unit is untouched -> no false degradation.
+VERIFIED (cam-substack-s5.spec.js, 3rd test): a stale stamp unrolls + names the version jump + carries the macro explanation + is NOT a live loop; a current stamp stays a LIVE generator loop.
+
+### (3) SCRATCH-VAR COLLISION -- GATED. The measured reality (all verified by RUNNING the real generators)
+THE BUG IS REAL AND WORSE THAN THE BRIEF:
+- `f.var = '#' + (varOffset + i + 1)` -- the LOCAL body var. Unlike `f.idx` (the #11xx form param, pooled via nextParam with a `used` set) the LOCAL var has NO pool, NO used-set and NO upper bound; varOffset is a running sum of field counts.
+- Mill scratch band is CONTIGUOUS #20-#33 (generator #20-#26 + camMacroKit raster/ring #27-#33). Surfacing and Pocket have 10 fields each -> the FIRST colliding offset is varOffset >= 10, i.e. ANY 2-part mill slot.
+- MEASURED, 2 parts (Surface + Pocket): part 2's `rpm` field is `#20`; the pocket then emits `#20=0 ;origin X`, so `M3 S[#20]` emits **S0 -- the spindle is commanded to ZERO RPM**.
+- MEASURED, 3 parts (Surface + Pocket + Surface, part 3 at varOffset 20): TEN vars double-written (#21,#23,#24,#25,#26,#27,#28,#29,#30,#31) -- feed/plunge/clearance/rpm become the raster row-count, depth counter and row index. An uncontrolled feed/plunge/clearance is a CRASH CLASS, not cosmetic.
+- BEYOND THE BRIEF: the UNIVERSAL arm (stackToSlot) is ALREADY BROKEN AT varOffset = 0 -- emitMapped injects wizard-op + dialect scratch defaults (#5 #6 #9 #10 #17-#24 #42 #43 #50 #52 #53 #57 #95 #99 #190 #191) into the same low band the field vars start in, so a universal op with >=5 exposed bindings over a probe/safe-Z atom collides WITHOUT any composition.
+- NO GUARD EXISTS: validatePack + slotPack.collisions check only `f.idx` (#11xx), never `f.var`. varMap deliberately declares #1-#99 "SCRATCH -- untracked by design". The only acknowledgements are PROSE header comments the allocator never reads -- and TWO OF THEM ARE FACTUALLY WRONG (camMacroKit says raster is #27-#32, it is #27-#33; probeToSlot claims it is "clear of drill/bore's #30-#54" while the probes write #50-#61). A declaration must be derived from the CODE, not those comments.
+
+WHY I GATED INSTEAD OF BUILDING (the brief assumed a smaller shape):
+1. NO POST AWARENESS TO HANG "per-post" ON. millToSlot/probeToSlot/opToSlot/camMacroKit import NOTHING from wizards/dialects -- they hard-code Expert syntax (G31 P/L/Q1, #1505, #578, #[#70], #1078/#1080). Only stackToSlot goes through activeDialectOpts. "Vet PER-POST" therefore means first threading a dialect (or a resolved band) into 4 post-blind files / 9 generator entry points that are guarded by byte-stable goldens.
+2. THERE IS NO SECOND POOL TO ALLOCATE FROM. `used` is a Set of #11xx only. A collision-free local-var allocation needs a SECOND tracked pool threaded through allocFields, allocFieldsWith, slotFromOp, stackToSlot, subStackToSlot, buildSlotFromOps AND the manual add-field door (macrosApp mints `'#' + (slot.fields.length + 1)` with no allocator at all).
+3. A BAKE GAP BREAKS THE ARITHMETIC INVARIANT: `f.var` uses the SPEC index but callers advance varOffset by `fields.length` (the EXPOSED count). Measured: baking one pocket field gives fields.length 9 but vars up to #10. Any allocator must advance by specLen -- and the moment the bake UI ships, today's offsets silently overlap.
+4. THE UNION IS CROSS-PART: part 1's field vars must avoid part 2's scratch (they coexist in one program), so the COMPOSER must compute the union of every part's declared band up-front and push it down -- the allocation contract changes, not just a constant.
+5. RELEASE IMPACT: any change to local-var numbering changes the emitted G-code of EVERY existing slot, so every installed macro_camNN.nc must be rebuilt + reinstalled (on top of the same caveat the S5(1) safety fix already carries).
+6. alignmentSlot RE-PURPOSES #70/#71/#72 with a DIFFERENT meaning from wcsBase's #70/#71/#73, so a naive "each helper owns a band" declaration would either false-conflict or mis-declare.
+
+OPTIONS I PUT TO THE ADVISOR (my recommendation = A then B):
+A. DECLARE THE BANDS + DETECT LOUDLY (small, no emitted-G-code change, no release impact): derive a per-generator scratch band FROM THE CODE as inert data (the one-source foundation the real fix needs anyway), and make the build/validate path FAIL LOUDLY when an allocated field var lands inside the union of the composed parts' bands. Turns today's silent S0/crash-class emit into a refusal the user can see. Ships this turn.
+B. THEN COLLISION-FREE ALLOCATION (the real fix, its own slice): composer computes the union, allocFieldsWith allocates local vars from a free iterator that skips it (advancing by specLen, closing the bake gap), and the band becomes dialect-keyed for the per-post vet. Changes emitted G-code everywhere -> golden churn + a rebuild-and-reinstall release note.
+C. (separate, also needed) the UNIVERSAL-arm collision at varOffset 0 -- needs the ~8 wizards/ops files + the dialects to DECLARE the scratch they inject before the CAM allocator can avoid it.
+
+### VERIFIED
+- cam-substack-s5.spec.js now 3 tests (the new defV staleness one + the S5(1) safety + S5(2) duplicate-key from last turn).
+- FULL GATE: 1414 passed, 0 failed, 4 skipped (12.0m) -- CLEAN. 1414 = 1413 + the new defV-staleness test.
+
+### STATE: (4) done. (3) GATED with a measured design fork -- it is a REAL safety bug (S0 spindle at 2 parts, crash-class at 3) but a collision-FREE fix changes emitted G-code everywhere and needs an allocation-contract change plus per-post threading into post-blind generators; I did not want to half-build that on a safety path. No release from me.
