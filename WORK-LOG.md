@@ -14202,3 +14202,59 @@ twins.
 and PROVEN as materializeCamTable. The HOOK is gated on TWO measured findings: the WHERE is a real product fork (universal
 ops, editWizardDef vs modal -- surfaced for your call), and the persistence is clean for pill-based forks but hits a
 pre-existing no-pill save limitation for literal universal twins (contour). Awaiting your hook-point call before wiring.
+
+---
+
+## turn 1103 -- BLOCK-NATIVE PARAMS S4b: the materialize HOOK at editWizardDef. This ACTIVATES S2 + S4a together. Built (with the advisor's locked rulings).
+
+### THE HOOK (rulings locked, not re-opened)
+maybeMaterializeCamTable(def) in devMode.js, called from editWizardDef right after the def lookup, BEFORE wrapRecognizedForFork
+(so the fork clone carries the cam_table into the workspace). It gates on FOUR conditions, all measured/grounded:
+  1. camTypeOf -> universal -- UNIVERSAL-arm ops only (a generator twin's cam_table is inert; measured t1101).
+  2. has value bindings -- nothing to declare otherwise.
+  3. NOT already carrying a cam_table -- idempotent (materializeCamTable is also idempotent; belt + suspenders).
+  4. hasParamPills(template) -- PILL-derivable only. A LITERAL-binding universal twin (contour: hand-assembled literals, no
+     pills) is SKIPPED because extractParamBlocks cannot re-derive its bindings on save (a PRE-EXISTING no-pill limitation the
+     cam_table would activate) -- gated to S6 per your Finding 2.
+Any doubt -> try/catch leaves the op unmaterialized (the fallback path is always correct). openCamAuthoring is NOT a hook
+(your ruling: materializing on a mere BUILD is surprising + S4a already handles the no-cam_table modal).
+
+### WHY editWizardDef IS REACHED BY UNIVERSAL OPS (your CONFIRM condition, grounded)
+Two entry points: the op-context "Customize as blocks" is gated to isCamGeneratorTwin (the 8 generator twins) -- it does NOT
+reach universal ops, but that is fine, those twins are correctly skipped by gate 1. The wizardManagerPanel "Edit" (re-author)
+is custom-op-only and DOES reach any universal CUSTOM op (a saved pill-based fork). So a pill-based universal op reaches
+editWizardDef via the wizard manager, my hook fires there, and generator twins that ALSO hit editWizardDef are skipped by the
+camTypeOf gate. Clean -- no entry-point gate needed.
+
+### listUserOps IS A STORE COPY (the persistence mechanic, grounded)
+editWizardDef reads listUserOps() = readStore() (localStorage), NOT the live USER_DEFS registry. registerUserOp only sets
+USER_DEFS. So materializing the store-copy def mutates a COPY; the live registry is untouched until SAVE (deriveAuthoredDef ->
+registerUserOp persists the workspace, cam_table + pill-re-indexed bindings). So before save the modal/build use the fallback
+(no divergence); after save they use the cam_table -- ATOMIC, no half-state. The test had to seed localStorage (not just
+registerUserOp) for editWizardDef to find the op -- flagged, because a hand-registered op is invisible to listUserOps.
+
+### THE S3 DIVERGENCE IS CLOSED (your "re-run the gated test, expect it to FLIP to honored")
+I MIGRATED the S3-gated test. It used a RAW decl flip as a proxy for "the modal flip" and asserted honored=FALSE. That proxy
+is now OBSOLETE: after S4a the modal writes the cam_field BLOCK (row.mode), not decl. So the test now flips the BLOCK (as
+cbmToggle does) and asserts honored=TRUE -- frate bakes, inlines F200, drops its #2600 mirror. The divergence is closed
+through the real path (block write), and a raw decl bypassing the modal is still ignored (the correct "block is the source"
+invariant, not a divergence). A new S4b test asserts the same closure on a hook-materialized op.
+
+### VERIFIED
+- cam-block-native-params-s4b.spec.js (NEW, 4): (1) maybeMaterializeCamTable materializes a PILL-based universal op (bindings
+  re-derived 1/2 -> 4/5 by identity), SKIPS a generator twin (surfacing -- not universal) and a LITERAL universal op (no
+  pills); (2) the materialized pill op is BYTE-NEUTRAL (default slot == fallback) + idempotent; (3) the S3 divergence is
+  CLOSED -- a block-mode flip on a materialized op sticks through the build; (4) INTEGRATION -- opening a pill-based universal
+  op via ddcsEditWizardDef materializes a cam_table (1) + a cam_field per binding (2) in the REAL Blockly workspace.
+- cam-block-native-params-s3.spec.js MIGRATED: the gated "NOT honored" test -> "now STICKS / honored=true" (divergence closed).
+- MY OWN VIEWED SCREENSHOT (s4b-editwizard-materialized.png): opening "Pill Fork" in Blocks shows the pink CAM Pendant Fields
+  container (frate/mz expose rows) in the Presentation mouth, the Feed/Move param pills in Execution, and the projected G-code
+  F200 + G1 X10 Y20 Z-3 F500 -- byte-unchanged emit (the cam_table emits []).
+- FULL GATE: 1448 passed, 0 FAILED, 4 skipped (13.1m) -- CLEAN, 1448+4 = 1452 = full count reconciles. Failed-count grepped.
+  1448 = 1444 prior + 4 new S4b tests (the S3 test was migrated in place, count unchanged).
+
+### STATE: block-native params is now END-TO-END for pill-based universal ops. Opening one to customize in Blocks materializes
+its pendant fields as cam_field blocks (byte-neutral, own emit + default slot unchanged); the build (S2) reads the cam_table,
+the modal (S4a) reads/writes it, and a modal flip STICKS -- the S3 divergence is closed. Generator twins and literal universal
+twins are correctly skipped. OPEN (per your ruling): S5 param_group-from-bindings + S6 polish (the per-mode compact layout AND
+the literal-twin no-pill save fix, the one deliberately-skipped case).
