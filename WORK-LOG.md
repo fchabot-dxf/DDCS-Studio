@@ -13533,3 +13533,126 @@ RELEASE-NOTE FINDING, and it is much better than we assumed: a SINGLE-OP slot is
 - (C) the UNIVERSAL arm at varOffset 0: emitMapped injects wizard-op + dialect scratch (#5 #6 #9 #10 #17-#24 #42 #43 #50 #95 #99, and #190/#191 on V4.1/DM500) into the same low band a universal op's field vars start in. stackToSlot is already wired to the shared minting helper, so slice C is now just "declare what those wizards/ops + dialects inject and pass it as `avoid`" -- the allocation machinery is in place.
 
 ### STATE: the collision is now IMPOSSIBLE by construction for every generator arm, not merely detected; the bake gap is closed by construction; the manual door allocates; slice A's guard remains as a loud backstop. Single-op slots are byte-identical, so the release note narrows to multi-op slots. No release from me.
+
+---
+
+## turn 1085 -- S5(3) SLICE C: the UNIVERSAL arm. Built. The GATE-IF-BALLOONS condition was measured and did NOT fire.
+
+### THE GATE CONDITION, ANSWERED BEFORE BUILDING (this was the whole risk of the slice)
+The advisor's stop condition was "if declaring the dialect-injected scratch requires touching the dialect contract for every
+post, STOP". I grounded it before writing a line, because two things could have forced the gate:
+  (a) camScratch.js is DELIBERATELY a leaf that imports nothing -- six data/ consumers plus macrosApp lean on that, and
+      probeToSlot even imports distmode "LIGHT" specifically to dodge the safeZframe -> blockEmitter -> saferetract cycle.
+      Aggregating declarations owned by wizards/ops/* and wizards/dialects/* would need camScratch to import them.
+  (b) the dialect contract itself.
+Both measured NO:
+  - NO CYCLE. The transitive ESM closure of wizards/ops/index.js (88 files) touches only two files under data/
+    (rotateProgram, simMarkers) and reaches camScratch or any of its importers by NO path. wizards/dialects/index.js is 8
+    pure leaves importing nothing under data/. And the edge already SHIPS in the other direction: data/exposeClassifier.js
+    imports wizards/ops/index.js today, and stackToSlot already imports exposeClassifier + blockEmitter + previewEmit, so
+    the universal arm ALREADY pulls the whole ops+dialects graph. Nothing new is risked on that arm.
+  - THE DIALECT CONTRACT DOES NOT CHANGE FOR EVERY POST. dialects/index.js getDialect/resolveActivePost return the dialect
+    object BY REFERENCE -- no clone, no pick, no key whitelist -- and the DEFAULT_CAPS merge is scoped to `caps` only, so a
+    new TOP-LEVEL key never enters it. There is already a live precedent for exactly this shape: `missScratch` is a
+    top-level key on V4.1 and DM500 and on NO other post, absent from the SCHEMA.md contract block, feature-detected at
+    every read site. Only 3 posts needed a `scratch` key; centroid/rs274ngc/grblHAL/grbl inject nothing and were untouched.
+
+### WHERE THE DECLARATIONS LIVE (requirement 1) -- at the injection site, never in the aggregator
+  - def.scratch on the palette atom that injects it: proberead #50, readmachine #57, tooloffset #102, machinemove #99,
+    assign #100, asknumber #100, radiuscomp #6+#50, wcsbaseinto #70, wcswrite #6+#70, setworkoffset #50, corner_config
+    #30-#31, saferetract #17, safehop #95, clearlift #17+#95.
+  - dialect.scratch on the post that injects it: Expert [[42,43],[70,72],[150,152]], V4.1 [[190,191]], DM500 [[17,17],[190,190]].
+  - PROBE_SURFACE_SCRATCH exported from wizards/ops/probeSurface.js -- that module is a STACK BUILDER, not a palette def, so
+    it has no def.scratch to carry #5/#6/#9/#10 and the outright `push('assign', { var: '#22' })` WRITE. Declaring it as a
+    module export keeps it next to the code that injects it, which was the requirement.
+  - Additive by measurement: there is no def validator, no key enumeration and no ALLOWED_KEYS anywhere in the repo outside
+    vendor Blockly; every consumer reads NAMED keys off BLOCKS. Optional keys already vary per def (hidden/help/dynamic).
+
+### THE AGGREGATOR IS A NEW MODULE, NOT MORE OF camScratch -- and that is deliberate
+data/universalScratch.js does the aggregating. It could have gone in camScratch, but that would have cost the leaf property
+camScratch's own header advertises and probeToSlot's cycle-dodge comment relies on. Only stackToSlot imports the new module,
+and stackToSlot already had both registries in its closure, so the edge costs literally nothing. camScratch stays the one
+place that aggregates GENERATOR bands; universalScratch is the one place that aggregates INJECTED bands. Neither copies the
+other's facts, and adding a post or an atom needs no edit in either.
+IT READS LAZILY, INSIDE A FUNCTION. wizards/ops/index.js sits in a live import cycle
+(ops/index -> saferetract -> safeZframe -> blockEmitter -> ops/index) which is benign ONLY because no module reads BLOCKS at
+top level -- every existing consumer reads it inside a function body. A module-top-level `const BANDS = ...` here would be a
+TDZ crash. The functions follow the existing rule.
+THE BAND IS THE UNION ACROSS ALL ATOMS, not only the atoms in one stack. A custom op is composed freely and can be edited
+after the slot is built; the union is ~14 numbers wide; being wrong-by-omission re-introduces the exact bug being fixed.
+Cheap to over-avoid, expensive to under-avoid.
+THE POST IS RESOLVED AT ALLOCATION TIME from activeDialectOpts() -- the very call stackToSlot already makes to EMIT the body
+-- so the band is per-post correct by construction and never hard-coded to Expert. No new import, no new resolution path.
+
+### THE MINT (requirement 2)
+stackToSlot's `const avoid = bandsFor(null)` (empty since slice B) becomes `universalBands()`. The minting machinery was
+already the shared helper, so this is a one-line change: slice B built the mechanism, slice C supplies the data.
+
+### THE GUARD (requirement 3) -- extended, and I checked it was actually blind first
+fieldVarCollisions gained an optional `bandsOf` resolver defaulting to camScratch's own bandsFor. macrosApp -- which already
+imports everything -- passes `camBandsOf`, mapping 'universal' to universalBands() and everything else to bandsFor. Wired at
+all three call sites (the cbmBuild pre-flight refusal, the buildSlotFromOps record, and validatePack via a new optional opts).
+validatePack itself does NOT import universalScratch: slotPack is imported by probeToSlot and every generator arm and is
+deliberately light, so the caller injects the resolver instead. The test proves the gap was real: with the default resolver a
+universal field parked on #95 returns ZERO collisions (invisible), with camBandsOf it is detected and named.
+
+### BEFORE / AFTER (requirement 4) -- the diff is ONLY renumbering, proven mechanically not by eye
+I ran the HEAD copy of stackToSlot side by side with the new one in the same page (git show HEAD:... into web/data/ as a temp
+sibling -- identical relative imports resolve from data/, so it is the REAL old code, not a re-implementation). A 12-param
+universal op:
+  OLD vars  #1 #2 #3 #4 #5 #6 #7  #8  #9  #10 #11 #12
+  NEW vars  #1 #2 #3 #4 #7 #8 #11 #12 #13 #14 #15 #16
+  skipped   #5/#6 (probe port + tool radius) and #9/#10 (last retract) -- exactly the declared band, nothing else
+  #11xx pool allocation IDENTICAL (1100..) -- only the LOCAL body var moved
+  BODY: mapping each NEW var back to its OLD var makes the two bodies BYTE-IDENTICAL. Same lines, same order, same operators,
+  same literals, same mirror reads. The only difference is the number.
+  And the OLD numbering DID collide (4 of its 12 vars sat on injected scratch) -- that is the defect, confirmed on the real
+  old code rather than argued from the new.
+The temp sibling + the temporary spec were deleted after measuring.
+RELEASE NOTE, and it narrows the same way slice B did: a universal op with 4 or fewer exposed params is BYTE-IDENTICAL
+(#1-#4 sit below everything the emit path injects). Only ops with enough exposed params to reach #5 renumber -- and those
+were emitting wrong G-code, so they must be rebuilt regardless. The existing cam-stack-to-slot spec, which PINS #1/#2, passes
+untouched -- that is the proof the small-op path did not move, and it needed no migration.
+
+### VERIFIED
+- cam-universal-scratch.spec.js (NEW, 3): (1) the band is READ from the injection sites -- each atom's def.scratch asserted
+  individually, the composer's export asserted, then the aggregate asserted to cover all 15 numbers; per-post, Expert
+  contributes #42/#43 + #70-72 + #150-152, V4.1 #190/#191, and grbl contributes NOTHING (the optional key stays optional),
+  so an Expert slot avoids strictly more than a grbl slot. (2) a universal slot mints around the band, skipping exactly
+  #5/#6/#9/#10, with the #11xx pool untouched and every renumbered var still read from its own #2600 mirror; the 4-param
+  case still gets #1-#4. (3) the guard backstops the universal arm -- silent on real output, loud + named on a synthetic
+  #95, and PROVABLY blind without the resolver.
+- NO TEST MIGRATION was needed this slice. cam-stack-to-slot pins #1/#2 and still passes.
+- FULL GATE: 1423 passed, 0 FAILED, 4 skipped (12.0m) -- CLEAN. Grepped the failed count, not just the tail. 1423 = 1420 + the
+  3 new slice-C tests. The pre-existing cam-stack-to-slot spec, which PINS #1/#2, passed with NO migration -- that is the
+  proof the small-op universal path did not renumber.
+
+### MY OWN REAL-APP CHECK -- and a WARNING about the advisor ACCEPT method
+I drove the actual CAM authoring UI (not a proxy) on a universal-routing op, twice, and BOTH produced a slot with ZERO
+fields, so neither could demonstrate the fix:
+  - contour (routes universal: no generator) -- all params are geometry, nothing exposable. Valid baked toolpath emitted.
+  - drill with pattern=single (routes universal per opCamMap) -- the modal renders 34 Expose radios and EVERY ONE OF THEM
+    IS DISABLED. Not a click that missed: I queried the DOM directly (34 total, 0 enabled).
+IMPORTANT FOR THE ADVISOR: the ACCEPT method as written -- "I will build a universal custom-op slot and check that NO field
+var collides" -- will be VACUOUS if the slot is built through the CAM modal from a DATA-OP TWIN, because the slot comes out
+with 0 fields and therefore 0 local vars and trivially 0 collisions. It proves nothing either way. To exercise the arm, the
+op must be a FORKED custom op with VALUE bindings (feed / plunge Z / cut feed), which is what cam-universal-scratch and the
+pre-existing cam-universal-route U3 use -- there the value params ARE exposable and the vars really are minted.
+I CHECKED THIS IS NOT MINE: I stashed every one of my web/ changes, re-ran the same DOM query against HEAD, and got the
+IDENTICAL 34 total / 0 enabled, then restored. So the all-disabled state is PRE-EXISTING, not a regression from this slice.
+Whether it is a defect in its own right is a separate question I did not touch (depth / peck / feed / Spindle RPM look like
+value params that ought to be exposable on a drill twin) -- flagging it, not fixing it, since it is out of this task's scope.
+
+### STILL OPEN / NOTED
+- data/varMap.js RESERVED was a FOURTH, pre-existing and stale declaration of the same class of facts (it carries
+  #520/#42/#43/#191 but not #190/#95/#17/#70-72/#150-152/#30-31/#99/#100). It has NO code consumer -- it is ownership prose.
+  I did NOT fold it in (that would make it a second copy of facts now owned at the injection sites, the exact thing the
+  requirement forbids) and I did not delete it (it records arguments -- why #520 is read-only, why V4.1 cannot use #42/#43 --
+  that live nowhere else). I DEMOTED it in place: its header now says it is not the scratch-band source, is deliberately
+  partial, and points at the three real declaration surfaces. Flagging it rather than silently reshaping someone else's doc.
+- Explicitly-parameterised vars inside a custom op's own stack (a user who types #22 into an assign block) are the AUTHOR's
+  vars, not injected defaults, and are outside this band by design. Worth a look if it ever bites, but it is a different
+  class from the defect this slice fixes.
+
+### STATE: all three arms -- generator, opToSlot and now universal -- mint collision-free by construction, and the guard
+backstops all three. The universal arm was broken at ONE part, before any composition; it no longer is.
