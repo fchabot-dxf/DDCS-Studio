@@ -14021,3 +14021,68 @@ scope for S2 -- it does not read camFieldsFromStack (a later slice if ever).
 (order/mode/label from the rows, wiring from the binding, reorder-for-free), and is byte-identically inert when absent. No op
 carries a cam_table yet -- S3 auto-materializes one byte-neutrally from the bindings so existing twins gain the blocks without
 moving a byte. The modal-as-view is the gated S4. No emit change for any current op.
+
+---
+
+## turn 1097 -- BLOCK-NATIVE PARAMS S3: the materializer BUILT + tested byte-neutral; the LAZY HOOK is GATED to S4 (measured divergence). This is the sanctioned gate, not a stop.
+
+### WHAT I DELIVERED: camTableFromBindings(def), pure + tested + byte-neutral
+data/opCamMap.js gains camTableFromBindings(def): a def's value bindings -> a cam_table block, one cam_field per binding in
+binding PRE-ORDER, mode = the classifier default (exposable -> expose, non-exposable -> bake at the binding default), label
+from the binding. It is the INVERSE of camFieldsFromStack and the exact mirror of makeAuthOp's default seed (macrosApp.js:1186:
+exposable -> exposed:true, non-exposable -> exposed:false + baked=value), so consuming it via S2's cam_table branch reproduces
+today's default field set. PURE -- no injection, no side effect, and NOTHING calls it yet, so it changes zero behaviour (the
+same shape as camFieldsFromStack shipping in S1 before S2 consumed it).
+
+### BYTE-NEUTRAL, PROVEN (the advisor's key acceptance): materialize -> build == fallback build
+Measured directly: for a def with a mix (feed EXPOSABLE, drill depth GEOMETRY, drill feed EXPOSABLE-per-t1091), the DEFAULT
+fallback build (decl = makeAuthOp's seed) and the materialized build (cam_table via S2's branch, empty decl) are BYTE-IDENTICAL
+-- same body, same fields (frate #1 -> #2600, dfeed #2 -> #2601, depth baked, byte-for-byte). The materializer reproduces the
+default. The permanent spec asserts body-equal AND fields-equal.
+
+### WHY I GATED THE LAZY HOOK (the seam grounding the advisor asked for) -- MEASURED, not argued
+The advisor's gate condition: "if materializing would make the modal's choice SILENTLY ignored by the build in a way that
+surprises the user, GATE BACK ... that is the S4 inversion leaking early and I would rather sequence it deliberately."
+I MEASURED exactly that. The modal build reads getUserDef(opType) (macrosApp.js:1022) and passes decl (declFromOp -> the
+modal's per-slot op.exposed/baked). After S2, if that def has a cam_table, stackToSlot takes the cam_table branch and IGNORES
+decl. So:
+  - a MATERIALIZED def + a modal FLIP (user bakes the exposed feed to 999) -> the build IGNORES the flip: feed stays exposed
+    via #2600 and rides F#1, NOT F999. flipHonored = FALSE, measured.
+So wiring materialization into the def the modal builds would make the modal's radios SILENTLY NO-OP for a materialized op --
+the exact "confusing half-state" the advisor said to gate. The default is byte-neutral, but any NON-default modal choice is
+silently dropped. That is the S4 inversion (modal-as-view) leaking early.
+
+### A SECOND complication I hit, worth the advisor knowing before sequencing the hook
+Injecting a cam_table into the PRESENTATION mouth SHIFTS every execution binding's blockIndex, because flattenBlocks visits
+uiChildren BEFORE children (instantiate uses that flatten). So a real lazy hook cannot just "add a cam_table" -- it must
+re-derive the bindings' blockIndex, BY IDENTITY, exactly like wrapForkAtSave does for the opunit wrap (and the shift is
+NON-UNIFORM when a twin also has uiChildren bindings -- a blanket +1+N would corrupt them). In my byte-neutral test the shift
+is uniform (all bindings are execution atoms) so a +1+N re-index sufficed, but the general hook needs the identity re-derive.
+
+### THE RECOMMENDATION (my call first)
+Land camTableFromBindings now (done -- inert, tested, byte-neutral). SEQUENCE the LAZY HOOK with S4, not before, because the
+hook's whole value ("the build consumes the materialized cam_table") is exactly what creates the modal-decl divergence, and
+S4 is the slice that makes the modal WRITE blocks (so there is no decl to ignore). Two ways to unblock the hook, in
+preference order:
+  (A) RECOMMENDED -- fold the hook INTO S4: when S4 makes renderCbmTable read/write the cam_field blocks, materialize on the
+      Blocks-load hook at the same time. Then materialize + modal-writes-blocks land together, no half-state, and the
+      identity re-derive is written once alongside the S4 seam.
+  (B) pull a MINIMAL Fork-C decl-override forward into S2's cam_table branch NOW (an explicit decl[param] overrides the row
+      mode), so the modal keeps working over a materialized def. This unblocks an eager hook but re-opens the accepted S2
+      branch and pulls S6 (Fork C) forward -- I do NOT recommend it; it muddies the "block is the declaration" story S2 just
+      established.
+The clarifying question for the advisor: do you want the hook folded into S4 (A), or the Fork-C override pulled forward (B)?
+
+### VERIFIED
+- cam-block-native-params-s3.spec.js (NEW, 3): (1) camTableFromBindings emits one row per binding in PRE-ORDER with the
+  classifier-default mode (feed->expose, drill depth->bake=5, drill feed->expose) and the binding label; (2) BYTE-NEUTRAL --
+  a materialized cam_table builds the DEFAULT slot byte-identically to the fallback (body + fields equal); (3) GATED -- the
+  modal FLIP on a materialized def is NOT honored (documents the S4-inversion divergence so it is caught the moment S4 fixes
+  it).
+- FULL GATE: 1440 passed, 0 FAILED, 4 skipped (11.7m) -- CLEAN, 1440+4 = 1444 = full count reconciles. Failed-count grepped.
+  1440 = 1437 prior + 3 new S3 tests. The materializer is inert (no consumer) so nothing could regress; ran the suite anyway. The materializer is inert (no consumer) so nothing can regress; I ran the full suite anyway.
+
+### STATE: the S3 materializer exists, is byte-neutral, and is the ready building block. The LAZY HOOK is GATED to S4 (or a
+Fork-C pull-forward) with the measured reason -- injecting the cam_table into the def the modal builds silently drops the
+modal's per-slot choice, and needs a by-identity binding re-index. Awaiting the advisor's call on (A) vs (B). No behaviour
+changed this turn.
