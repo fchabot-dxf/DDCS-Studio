@@ -39,13 +39,16 @@ test.describe(() => {
         await page.waitForSelector('.cam-auth-overlay .cbm-eb');
 
         const out = await page.evaluate(() => {
-            const cell = (key, mode) => document.querySelector(`.cbm-eb[data-fkey="${key}"][data-mode="${mode}"]`);
+            // t1077 — a sub-stack row is addressed by a PART-SCOPED key ("<part>:<param>") so two parts can share a param
+            // name; resolve a bare param name to whichever row carries it.
+            const fkOf = (key) => { const tr = [...document.querySelectorAll('#cbm_table tr[data-fkey]')].find((t) => t.getAttribute('data-fkey').replace(/^\d+:/, '') === key); return tr ? tr.getAttribute('data-fkey') : key; };
+            const cell = (key, mode) => document.querySelector(`.cbm-eb[data-fkey="${fkOf(key)}"][data-mode="${mode}"]`);
             const partHdrs = [...document.querySelectorAll('#cbm_table tbody tr')].filter((tr) => tr.querySelector('td[colspan="4"]')).map((tr) => tr.textContent.trim());
             const camLabel = (document.querySelector('.cbm-op-group > div') || {}).textContent || '';
             const rowKeys = [...document.querySelectorAll('#cbm_table tr[data-fkey]')].map((tr) => tr.getAttribute('data-fkey'));
             const ebState = (k) => ({ expose: !!(cell(k, 'expose') && cell(k, 'expose').checked), exposeDisabled: !!(cell(k, 'expose') && cell(k, 'expose').disabled), bakeDisabled: !!(cell(k, 'bake') && cell(k, 'bake').disabled) });
             // the surfacing part's value cell must be read-only (a SPAN), not an editable input (subStackToSlot re-derives from the def)
-            const valTag = (k) => { const td = document.querySelector(`#cbm_table tr[data-fkey="${k}"] td:nth-child(2)`); return td && td.firstElementChild ? td.firstElementChild.tagName : null; };
+            const valTag = (k) => { const td = document.querySelector(`#cbm_table tr[data-fkey="${fkOf(k)}"] td:nth-child(2)`); return td && td.firstElementChild ? td.firstElementChild.tagName : null; };
             return { partHdrs, camLabel, rowKeys, stepover: ebState('stepover'), cfeed: ebState('cfeed'), cz: ebState('cz'), stepoverValTag: valTag('stepover') };
         });
 
@@ -57,7 +60,8 @@ test.describe(() => {
         expect(out.partHdrs.join(' | '), 'the custom part is labelled').toMatch(/custom atoms/i);
         expect(out.camLabel, 'the op is routed as sub-stack (not whole-op universal)').toMatch(/sub-stack/i);
         // the surfacing stepover is a LIVE generator knob: Expose enabled (not greyed) + checked, Bake disabled (baking would break the loop)
-        expect(out.rowKeys, 'the surfacing stepover shows as a knob').toContain('stepover');
+        expect(out.rowKeys.map((k) => k.replace(/^\d+:/, '')), 'the surfacing stepover shows as a knob').toContain('stepover');
+        expect(out.rowKeys.every((k) => /^\d+:/.test(k)), 't1077 — every sub-stack row key is PART-SCOPED (two parts may share a param name)').toBe(true);
         expect(out.stepover, 'stepover = live knob → Expose enabled + checked, Bake disabled').toMatchObject({ expose: true, exposeDisabled: false, bakeDisabled: true });
         expect(out.stepoverValTag, 'a sub-stack part value is read-only (derived from the def), not a corruptible input').toBe('SPAN');
         // the custom feed/plunge are exposed

@@ -15,7 +15,7 @@
  * (radius-comp temps) — clear of drill/bore's #30–#54 so a probe can share a slot if ever appended.
  */
 import { nextParam } from './slotPack.js';
-import { PROBE, wcsBase, writeAxis, twoPassProbe, probeSave } from './camMacroKit.js';
+import { PROBE, wcsBase, writeAxis, twoPassProbe, probeSave, errorEnd } from './camMacroKit.js';   // t1077 — errorEnd: the declared HALT an error branch must end on (never fall through into the next composed part)
 import { distModeBlock } from '../wizards/ops/distmode.js';   // t859 — the ONE source of the G90/G91 strings (the same distModeBlock wrapMachineFrame uses). Imported LIGHT (distmode.js has no imports) so the CAM path avoids the safeZframe→blockEmitter→saferetract cycle.
 // t859 — the SAME adjacent-G90 wrap the wizard retracts use, for a single raw G53 line: these CAM-slot G53s were raw
 // G53-under-G91 (same crash class as t853, a distinct surface). One G90 immediately before the G53 (the trailing G91
@@ -181,6 +181,7 @@ export function cornerSlot(used = new Set(), varOffset = 0, _variant, decl) {
         'G0 Z#92   ;lift clear',
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
         'N2',
         'M30',
     ].join('\n');
@@ -229,6 +230,7 @@ export function probeZSlot(used = new Set(), varOffset = 0, _variant, decl) {
         'N1',
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
         'N2',
         'M30',
     ].join('\n');
@@ -293,6 +295,7 @@ export function edgeSlot(used = new Set(), varOffset = 0, _variant, decl) {
         'N1',
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
         'N2',
         'M30',
     ].join('\n');
@@ -368,6 +371,7 @@ export function insideCentreSlot(used = new Set(), varOffset = 0, _variant, decl
         `G0 Z${v.safeZ}   ;lift clear`,
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
         'N2',
         'M30',
     ].join('\n');
@@ -400,7 +404,7 @@ export function bossCentreSlot(used = new Set(), varOffset = 0, _variant, decl) 
     const reposition = (msg, recentreAx, recentreVal) => {
         const L = ['#57=#882   ;save probe-height Z (machine DRO)', `G0 Z${v.safeZ}   ;lift clear of the boss`];
         if (recentreAx) L.push(...g90Before(`G53 ${recentreAx}${recentreVal}   ;re-centre at safe Z (never cross the boss at depth)`));   // t859 — G90 before the G53
-        L.push(`#1505=1   ;REPOSITION: ${msg}, then press Enter`, 'IF #1505 EQ 0 GOTO 2', ...g90Before('G53 Z#57   ;back to probe height'), 'G91   ( incremental )');   // t859 — G90 before the G53; the trailing G91 restores
+        L.push(`#1505=1   ;REPOSITION: ${msg}, then press Enter`, 'IF #1505 EQ 0 GOTO 3', ...g90Before('G53 Z#57   ;back to probe height'), 'G91   ( incremental )');   // t859 — G90 before the G53; the trailing G91 restores
         return L;
     };
     const body = [
@@ -416,7 +420,7 @@ export function bossCentreSlot(used = new Set(), varOffset = 0, _variant, decl) 
         `#93=[0-${v.retract}]   ;-retract`,
         '',
         `#1505=1   ;Position clear of the +X face at probe depth, press Enter`,
-        'IF #1505 EQ 0 GOTO 2',
+        'IF #1505 EQ 0 GOTO 3',
         'G91   ( incremental )',
         '',
         '( +X face: approach from +X, probe -X )',
@@ -451,6 +455,12 @@ export function bossCentreSlot(used = new Set(), varOffset = 0, _variant, decl) 
         `G0 Z${v.safeZ}   ;lift clear`,
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
+        // t1077 — the operator-CANCEL at a reposition prompt used to jump to N2, the SUCCESS convergence label; in a
+        // COMPOSED slot N2's M30 is stripped, so a cancel ran on into the next part. Cancel now has its OWN halt label.
+        '( operator cancelled at a prompt )',
+        'N3',
+        errorEnd('cancelled by the operator'),
         'N2',
         'M30',
     ].join('\n');
@@ -526,6 +536,7 @@ export function alignmentSlot(used = new Set(), varOffset = 0, _variant, decl) {
         'N1',
         'G90',
         '#1505=1   ;ERROR: probe did not trigger or zero span',
+        errorEnd('probe did not trigger or zero span'),
         'N2',
         'M30',
     ].join('\n');

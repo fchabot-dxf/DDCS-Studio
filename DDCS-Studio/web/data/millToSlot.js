@@ -12,7 +12,7 @@
  * See [[cam-probing-and-simulate]], [[cam-menu-architecture]], [[priorities-friendliness-over-perf]].
  */
 import { allocFieldsWith, readLine } from './probeToSlot.js';
-import { rasterClear, ringClear, SPINDLE_FIELD, spindleOn, spindleOff } from './camMacroKit.js';
+import { rasterClear, ringClear, SPINDLE_FIELD, spindleOn, spindleOff, errorEnd } from './camMacroKit.js';   // t1077 — errorEnd: the declared HALT an error branch must end on (never fall through into the next composed part)
 
 const CIRCLE_POCKET_FIELDS = [
     { key: 'dia', label: 'Diameter', units: 'mm', def: 60, min: 1, max: 99999, type: 1 },
@@ -90,6 +90,7 @@ export function pocketSlot(used = new Set(), varOffset = 0, dir = 'x', decl) {
         '( error )',
         'N8',
         '#1505=1   ;ERROR: pocket smaller than the tool',
+        errorEnd('pocket smaller than the tool'),
         'N9',
         'M30',
     ].join('\n');
@@ -120,6 +121,7 @@ export function circlePocketSlot(used = new Set(), varOffset = 0, arc = 'G3', de
         '( error )',
         'N8',
         '#1505=1   ;ERROR: pocket smaller than the tool',
+        errorEnd('pocket smaller than the tool'),
         'N9',
         'M30',
     ].join('\n');
@@ -160,9 +162,10 @@ export function surfacingSlot(used = new Set(), varOffset = 0, dir = 'x', decl) 
         '( errors )',
         'N7',
         '#1505=1   ;ERROR: stepover / stepdown / tool / clearance must be > 0',
-        'GOTO 9',
+        errorEnd('stepover / stepdown / tool / clearance must be > 0'),
         'N8',
         '#1505=1   ;ERROR: zero area',
+        errorEnd('zero area'),
         'N9',
         'M30',
     ].join('\n');

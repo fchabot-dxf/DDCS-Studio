@@ -1037,7 +1037,7 @@ function homingPostIsExpert() {
     function applyOverridesToBody(body, fields, values) {
         let out = body;
         fields.forEach((f) => {
-            if (!values[f.key]) return;   // only fields the user actually tuned
+            if (!values[fkeyOf(f)]) return;   // only fields the user actually tuned (t1077 — part-scoped key)
             const re = new RegExp('^[ \\t]*' + f.var.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=#' + (f.idx + 1500) + '\\b.*$', 'm');
             if (re.test(out)) out = out.replace(re, canonicalRead(f));
         });
@@ -1057,7 +1057,7 @@ function homingPostIsExpert() {
             gen.fields.forEach((f) => {
                 used.add(f.idx);
                 f._op = oi;
-                const ov = op.values && op.values[f.key];
+                const ov = op.values && op.values[fkeyOf(f)];   // t1077 — part-scoped key (identical for a single-part op)
                 if (ov) FIELD_OVR_COLS.forEach((k) => { if (ov[k] !== undefined) f[k] = ov[k]; });
             });
             if (op.values) body = applyOverridesToBody(body, gen.fields, op.values);
@@ -1155,7 +1155,7 @@ function homingPostIsExpert() {
             _bakeTip: f._partKind === 'standard' ? 'Generator loop knob — always live (baking would break the parametric loop)' : 'Sub-stack builds all-exposed; per-part baking is a follow-on',
         }));
         const exposed = {}, baked = {};
-        fields.forEach((f) => { exposed[f.key] = true; });   // fixed all-exposed (matches the subStackToSlot build)
+        fields.forEach((f) => { exposed[fkeyOf(f)] = true; });   // fixed all-exposed (matches the subStackToSlot build); PART-SCOPED so two parts sharing a key stay independent
         return { opType: op.opType, camType: 'substack', variant: '', fields, values: {}, exposed, baked, label: op.label || op.opType, substack: true, defV: defVOf(op.opType) };
     }
     // A program op → an authoring op (via seedFromOp). null when the op isn't CAM-able.
@@ -1165,17 +1165,23 @@ function homingPostIsExpert() {
         if (seed.unsupported) return null;
         const values = {}, exposed = {}, baked = {};
         seed.fields.forEach((f) => {
-            if (typeof f.value === 'number') values[f.key] = { def: f.value };   // seed NUMERIC values (enum ints come via the field default)
+            if (typeof f.value === 'number') values[fkeyOf(f)] = { def: f.value };   // seed NUMERIC values (enum ints come via the field default)
             // UNIVERSAL default: value params (exposable) start EXPOSED (positive, not by-absence — the generator path's
             // empty-map default means all-exposed, but stackToSlot needs an explicit expose flag); geometry params start
             // BAKED to the op's own value (a #var can't ride through them). The generator path keeps its empty exposed/baked.
-            if (seed.universal) { if (f.exposable) exposed[f.key] = true; else { exposed[f.key] = false; baked[f.key] = f.value; } }
+            if (seed.universal) { const k = fkeyOf(f); if (f.exposable) exposed[k] = true; else { exposed[k] = false; baked[k] = f.value; } }
         });
         return { opType: op.opType, camType: seed.camType, variant: variantForCam(seed.camType, op.params || {}), fields: seed.fields, values, exposed, baked, label: op.label || op.opType, universal: !!seed.universal, defV: defVOf(op.opType) };
     }
     const toManifest = (a) => ({ type: a.camType, variant: a.variant, values: a.values, exposed: a.exposed, baked: a.baked, opType: a.opType, defV: a.defV });   // U3 — opType+defV let a universal slot rebuild via getUserDef; type==='universal' selects the arm
     const cbmPreviewSlot = () => { const s = { slot: nextSlotNum(), name: _authoring.name || 'New CAM slot', ops: _authoring.ops.map(toManifest) }; buildSlotFromOps(s); return s; };
-    const cbmVal = (oi, key) => { const a = _authoring.ops[oi]; const ov = a.values[key]; if (ov && ov.def != null) return ov.def; const f = a.fields.find((x) => x.key === key); return f ? (typeof f.value === 'number' ? f.value : f.def) : ''; };
+    // t1077 — the ONE key the modal ADDRESSES a field by (row id, radio group, value input, expose/bake + value maps, and
+    // the pendant-slot lookup). A SUB-STACK op composes SEVERAL parts, and two parts can legitimately carry the SAME param
+    // key (a custom binding named `feed` beside the surfacing generator's `feed`) — a bare key would collide, so one row's
+    // radio/value would silently drive the other's. Scope it by PART. A single-part op (generator / universal) has no
+    // `_part`, so the key is UNCHANGED → every existing slot + manifest stays byte-identical.
+    const fkeyOf = (f) => (f && f._part != null ? f._part + ':' + f.key : (f && f.key));
+    const cbmVal = (oi, fk) => { const a = _authoring.ops[oi]; const ov = a.values[fk]; if (ov && ov.def != null) return ov.def; const f = a.fields.find((x) => fkeyOf(x) === fk); return f ? (typeof f.value === 'number' ? f.value : f.def) : ''; };
     function renderCbmTable() {
         const el = document.getElementById('cbm_table'); if (!el) return;   // modal is on document.body, not #macros-app (q is root-scoped)
         if (!_authoring.ops.length) {   // EMPTY-STATE (subsumes S-B) — no greyed dropdown; list what CAM supports + why present ops didn't qualify
@@ -1184,10 +1190,11 @@ function homingPostIsExpert() {
             return;
         }
         const preview = cbmPreviewSlot();   // buildSlotFromOps allocates params around siblings + tags each field's owning op (f._op)
-        const idxOf = (oi, key) => { const f = (preview.fields || []).find((x) => x._op === oi && x.key === key); return f ? f.idx : null; };
+        const idxOf = (oi, fk) => { const f = (preview.fields || []).find((x) => x._op === oi && fkeyOf(x) === fk); return f ? f.idx : null; };   // t1077 — part-scoped: two parts may share a param key
         const sections = _authoring.ops.map((a, oi) => {
             const rowHtml = (f) => {
-                const baked = a.exposed[f.key] === false, val = cbmVal(oi, f.key), idx = idxOf(oi, f.key);
+                const fk = fkeyOf(f);   // t1077 — PART-SCOPED addressing: two parts of a sub-stack may share a param key
+                const baked = a.exposed[fk] === false, val = cbmVal(oi, fk), idx = idxOf(oi, fk);
                 const enumOpt = f.enum && f.enum.find((o) => o.value === Number(val));
                 const numeric = (val === '' || val == null || !isNaN(Number(val)));   // a non-numeric value (a baked string/enum with no dropdown) must NOT be an editable number input — typing would overwrite the string bake with a number (wrong G-code)
                 const valCell = a.substack
@@ -1195,18 +1202,18 @@ function homingPostIsExpert() {
                     // would be a no-op (subStackToSlot re-derives from the def), so show it read-only. Modal editing of part defaults is a follow-on.
                     ? `<span style="font-size:11.5px;" title="Pendant default, derived from the op's definition — customize the op to change it">${camEsc(String(val))}</span>`
                     : f.enum
-                        ? `<select class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(f.key)}" style="min-width:118px;">${f.enum.map((o) => `<option value="${o.value}"${o.value === Number(val) ? ' selected' : ''}>${camEsc(o.label)}</option>`).join('')}</select>`
+                        ? `<select class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(fk)}" style="min-width:118px;">${f.enum.map((o) => `<option value="${o.value}"${o.value === Number(val) ? ' selected' : ''}>${camEsc(o.label)}</option>`).join('')}</select>`
                         : numeric
-                            ? `<input class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(f.key)}" type="number" value="${val}" style="width:72px;">`
+                            ? `<input class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(fk)}" type="number" value="${val}" style="width:72px;">`
                             : `<span style="color:var(--text-dim); font-size:11px;" title="baked string/enum value (read-only)">${camEsc(String(val))}</span>`;
                 const slotCell = baked ? `baked = ${f.enum ? (enumOpt ? enumOpt.label + ' (' + val + ')' : val) : val}` : (idx != null ? `#${idx} → #${slotPack.mirrorVar(idx)}` : '—');
                 const bakeTip = f.bakeable ? '' : ` title="${camEsc(f._bakeTip || 'Guard / branch param — must stay operator-set (Expose-only)')}"`;   // S4 — a sub-stack part carries its own reason on _bakeTip
                 const canExpose = f.exposable !== false;   // U3 — universal GEOMETRY params (exposable===false) can't carry a #var → Expose disabled, Bake-forced (mirrors the bakeable greying)
                 const exposeTip = canExpose ? '' : ' title="Geometry / fold-driven — a #var cannot ride through the emit; bake it"';
-                return `<tr data-oi="${oi}" data-fkey="${camEsc(f.key)}">
+                return `<tr data-oi="${oi}" data-fkey="${camEsc(fk)}">
                     <td style="padding:2px 6px;">${camEsc(f.label || f.key)}</td>
                     <td>${valCell}</td>
-                    <td style="white-space:nowrap;"><label${exposeTip} style="margin-right:8px;${canExpose ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(f.key)}" data-oi="${oi}" data-fkey="${camEsc(f.key)}" data-mode="expose"${baked ? '' : ' checked'}${canExpose ? '' : ' disabled'}> Expose</label><label${bakeTip} style="${f.bakeable ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(f.key)}" data-oi="${oi}" data-fkey="${camEsc(f.key)}" data-mode="bake"${baked ? ' checked' : ''}${f.bakeable ? '' : ' disabled'}> Bake</label></td>
+                    <td style="white-space:nowrap;"><label${exposeTip} style="margin-right:8px;${canExpose ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(fk)}" data-oi="${oi}" data-fkey="${camEsc(fk)}" data-mode="expose"${baked ? '' : ' checked'}${canExpose ? '' : ' disabled'}> Expose</label><label${bakeTip} style="${f.bakeable ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(fk)}" data-oi="${oi}" data-fkey="${camEsc(fk)}" data-mode="bake"${baked ? ' checked' : ''}${f.bakeable ? '' : ' disabled'}> Bake</label></td>
                     <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">${camEsc(slotCell)}</td>
                 </tr>`;
             };

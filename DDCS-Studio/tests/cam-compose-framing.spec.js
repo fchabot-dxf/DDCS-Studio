@@ -7,7 +7,11 @@ import { test, expect } from '@playwright/test';
 // N-labels across parts, BOTH parts' motion present + reachable (part 2 not orphaned).
 
 const N_DEFS = (body) => (body.match(/^\s*N(\d+)\b/gm) || []).map((s) => Number(s.trim().slice(1)));
-const M30S = (body) => (body.match(/\bM30\b/g) || []).length;
+// t1077 — count PROGRAM TERMINATORS only (a bare M30 on its own line). An ERROR branch now carries its own declared
+// halt `M30   ( stop - <why> )` so a fault can never fall through into the next composed part; that halt is NOT a
+// terminator of the success path, so it must not be counted here. The invariant these tests guard is unchanged:
+// exactly ONE terminal end, and none in the middle of the SUCCESS flow.
+const M30S = (body) => (body.match(/^\s*M30\s*$/gm) || []).length;
 
 test('framing: composeParts(corner + surfacing) — strip non-terminal M30, uniquify labels, one terminal end, both reachable', async ({ page }) => {
     await page.goto('http://localhost:3211');
@@ -23,7 +27,7 @@ test('framing: composeParts(corner + surfacing) — strip non-terminal M30, uniq
         const composed = composeParts([a.body, b.body]);
         // reference: the raw join (the OLD broken behavior) for contrast
         const rawJoin = [a.body, b.body].join('\n\n');
-        return { composed, rawJoinM30: (rawJoin.match(/\bM30\b/g) || []).length,
+        return { composed, rawJoinM30: (rawJoin.match(/^\s*M30\s*$/gm) || []).length,
             cornerSig: composed.indexOf(';corner found'), surfSig: composed.indexOf(';raster row count') };
     });
 
@@ -34,7 +38,9 @@ test('framing: composeParts(corner + surfacing) — strip non-terminal M30, uniq
     expect(r.composed.trimEnd().endsWith('M30'), 'the single M30 is the LAST line').toBe(true);
 
     // no intermediate M30: the M30 index is AFTER both parts' motion (part 2 is reachable, not dead code)
-    const m30at = r.composed.indexOf('M30');
+    // t1077 — locate the TERMINAL end (a bare M30 on its own line). A non-terminal part's error branch now carries its
+    // own declared halt `M30   ( stop - <why> )`, which appears EARLIER in the body and is not the program terminator.
+    const m30at = r.composed.search(/^\s*M30\s*$/m);
     expect(r.cornerSig, 'part 1 (corner) motion present').toBeGreaterThan(-1);
     expect(r.surfSig, 'part 2 (surfacing) motion present').toBeGreaterThan(-1);
     expect(r.cornerSig, 'corner before surfacing (order preserved)').toBeLessThan(r.surfSig);

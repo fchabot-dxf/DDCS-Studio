@@ -79,7 +79,10 @@ export function slotMacro(slot) {
     // Macro-first: if the body already declares the mirror reads, don't prepend them again (it IS the macro).
     const hasReads = /#\d+\s*=\s*#2[6-9]\d\d/.test(body);
     const reads = hasReads ? [] : fields.map((f, i) => `${f.var || '#' + (i + 1)}=#${mirrorVar(f.idx)}   ;${esc(f.label)}`);
-    const hasEnd = /\b(M99|M30|M0?2)\b/.test(body);
+    // t1077 — a TAIL check, not a whole-body scan: error branches now carry their own M30 (the declared halt), so a
+    // body-wide scan would see one and wrongly conclude the program already terminates — leaving a trailing FRAGMENT
+    // part (slotFromOp, which ends at M5) with NO terminator at all. Only a terminator at the END ends the program.
+    const hasEnd = /\b(M99|M30|M0?2)\b[^\n]*\s*$/.test(body);
     return head.concat(reads, body ? [body] : [], hasEnd ? [] : ['M99']).join('\n') + '\n';
 }
 

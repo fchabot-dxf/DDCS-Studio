@@ -17,6 +17,24 @@ export const SPINDLE_FIELD = { key: 'rpm', label: 'Spindle RPM', units: 'rpm', d
 export const spindleOn = (rpmVar) => [`M3 S[${rpmVar}]   ( spindle on )`, 'G04 P2000   ( spin-up dwell 2000ms = 2s )'];
 export const spindleOff = () => ['M5   ( spindle off )'];
 
+/**
+ * The DECLARED halt for a CAM-slot ERROR branch. An error handler must STOP here — never fall through.
+ *
+ * WHY (t1077, safety): a COMPOSED slot strips every NON-terminal part's terminal `M30` (slotPack.composeParts),
+ * because the SUCCESS path must flow on into the next part. But every generator's error handler only set `#1505=1`
+ * and then fell through to its convergence label (N2 probes / N9 mills), relying on that same stripped `M30` — so in
+ * a composed slot a failed probe or a tripped guard ran straight into the NEXT part's motion. On a machine that is
+ * WRONG MOTION, not a clean stop.
+ *
+ * `M30` is the ONE declared program end (dialect.endProgram, ddcs-expert-m350.js). NOT `M0` — that is a PAUSE the
+ * operator resumes, which would then continue into the next part (worse than the bug). NOT the `#3000` alarm — its
+ * support is contradicted between the docs and the controller dumps, so it is not a primitive to introduce on a
+ * safety path.
+ *
+ * Emit it INSIDE the error branch, BEFORE the convergence label, so the converge target stays reachable only on success.
+ */
+export const errorEnd = (why) => `M30   ( stop — ${why || 'error'} )`;
+
 /** Per-axis DDCS probe system vars: status (2=success) + trigger position (machine coord). */
 export const PROBE = {
     X: { status: '#1920', result: '#1925' },
