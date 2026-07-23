@@ -166,6 +166,29 @@ export function camTypeOf(op) {
     }
 }
 
+/**
+ * S3 — the LAZY materializer: a def's value bindings → a cam_table block (one cam_field per binding, in binding PRE-ORDER),
+ * mode = the classifier default (exposable → expose, non-exposable → bake at the binding default), label from the binding.
+ * Consuming it via stackToSlot's cam_table branch (S2) reproduces today's DEFAULT field set exactly (makeAuthOp seeds
+ * exposable→exposed / non-exposable→baked-at-value, which the materializer mirrors) → BYTE-NEUTRAL. The inverse of
+ * camFieldsFromStack. Returns null when the def has no value bindings (nothing to declare). PURE — no injection, no side
+ * effect; the caller decides where to place it (and must re-derive binding blockIndex if it injects into a mouth).
+ */
+export function camTableFromBindings(def) {
+    const valueBindings = ((def && def.bindings) || []).filter((b) => b && b.blockIndex != null);
+    if (!valueBindings.length) return null;
+    const cls = classifyExposable(def);
+    const children = valueBindings.map((b) => {
+        const exposable = !!(cls[b.param] && cls[b.param].exposable);
+        return { type: 'cam_field', params: {
+            param: b.param, label: b.label || '', mode: exposable ? 'expose' : 'bake',
+            baked: exposable ? '' : String(b.default),   // a bake row inlines the binding default (matches makeAuthOp's baked=value)
+            units: b.units || '', dflt: '', nmin: '', nmax: '',
+        } };
+    });
+    return { type: 'cam_table', params: {}, children };
+}
+
 /** UNIVERSAL seed — read the def BINDINGS directly (param names are the def's own; NO PARAM_ALIAS/DERIVE). Each value binding
  *  becomes a field seeded from op.params, with an `exposable` flag from exposeClassifier (value-role AND not under a fold).
  *  Geometry/other params are exposable:false → the table greys Expose + bake-forces them. Returns {unsupported} if the op has
