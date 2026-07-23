@@ -57,7 +57,7 @@ function isAtom(blk) {
     // block's panel-type field and the param_group block's group-name field (t161 — both authoring labels, not values).
     // Value-bearing atoms (assign / param / move / …) are untouched → the value-knob expose path (deriveAuthoredDef / EXPOSE_) still works.
     const def = BLOCKS[blk.type];
-    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget' || def.kind === 'opunit'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring) + t1069 opunit: authoring/boundary metadata (opType/defV), not exposable values
+    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'cam_field'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring) + t1069 opunit + t1093 cam_table/cam_field: authoring/boundary/pendant-declaration metadata, not exposable values
 }
 
 // the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).

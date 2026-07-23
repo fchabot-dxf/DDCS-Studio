@@ -146,6 +146,7 @@ const optionsFor = (def, field) => {
         if (def.type === 'pathmode') return ['blend', 'exact'];
         if (def.type === 'waitinput') return ['imm', 'rise', 'fall', 'high', 'low'];
         if (def.type === 'move') return ['cut', 'rapid', 'probe'];
+        if (def.type === 'cam_field') return ['expose', 'bake'];   // block-native-params S1 — the pendant expose/bake toggle
     }
     // numeric-socket widgets (all commit a number). The role-encoded widgets fold a ROLE into the value (decoded by
     // userOps.decodeCanvasWidget) so the role is DECLARED, not inferred from pool order (audit #6-B): "XY pad / Rect"
@@ -238,11 +239,12 @@ function jsonDef(def) {
         block['message' + row] = '%1'; block['args' + row] = [{ type: 'input_statement', name }]; row++;
     };
     if (def.kind === 'user_root') { addMouth('PRESENTATION', 'Presentation (UI & Sim)'); addMouth('EXECUTION', 'Execution (G-code)'); }
-    else if (def.kind === 'param_group' || isSection || def.kind === 'opunit') addMouth('DO');   // t1069 — opunit renders as a titled transparent container (a DO mouth wrapping the standard sub-unit atoms)
+    else if (def.kind === 'param_group' || isSection || def.kind === 'opunit' || def.kind === 'cam_table') addMouth('DO');   // t1069 — opunit renders as a titled transparent container; t1093 — cam_table is a titled metadata container (a DO mouth holding cam_field rows)
     else if (isWrap(def)) addMouth('DO');
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)
     if (isOpunit) block.extensions = [...(block.extensions || []), 'ddcs_opunit'];   // t1071 — friendly label from opType + lock the routing key read-only
+    if (def.kind === 'cam_field') block.extensions = [...(block.extensions || []), 'ddcs_camfield'];   // t1093 — lock the `param` routing key read-only (a hand-edit corrupts the binding join)
     if (def.kind === 'reporter') block.output = outputCheck(def);   // value block
     else { block.previousStatement = null; block.nextStatement = null; }   // statement block
     return block;
@@ -419,6 +421,23 @@ function registerOpunitExtension(Blockly) {
     } catch (e) { /* already registered */ }
 }
 
+// t1093 — the `cam_field` chip: lock the `param` routing key READ-ONLY. `param` names the def value-binding this pendant row
+// declares (the join key camFieldsFromStack / stackToSlot address by); a hand-edit in the workspace would dangle the binding.
+// The value still round-trips (the field is present, just non-editable), mirroring the opunit routing-key lock. Degrades
+// safely — if anything throws, the chip stays editable rather than breaking the block.
+function registerCamFieldExtension(Blockly) {
+    try {
+        Blockly.Extensions.register('ddcs_camfield', function () {
+            const self = this;
+            const lock = (f) => { if (!f) return; try { f.EDITABLE = false; if (f.setEnabled) f.setEnabled(false); else if (f.updateEditable) f.updateEditable(); } catch (_) { /* keep field */ } };
+            const apply = () => { try { lock(self.getField('PARAM')); } catch (_) { /* keep the raw chip */ } };
+            apply();
+            setTimeout(apply, 0);   // JSON load / dynfields rebuild sets fields AFTER init → re-lock on the next tick
+            self.setOnChange(function () { lock(self.getField('PARAM')); });   // re-lock after a mode toggle rebuilds the fields
+        });
+    } catch (e) { /* already registered */ }
+}
+
 export function installBlockly(Blockly) {
     _Blockly = Blockly;
     installCornerGridField(Blockly);   // register field_cornergrid BEFORE the blocks that reference it
@@ -427,6 +446,7 @@ export function installBlockly(Blockly) {
     registerDynExtension(Blockly);
     registerSecColorExtension(Blockly);
     registerOpunitExtension(Blockly);   // t1071 — the opunit chip's friendly label + read-only routing key
+    registerCamFieldExtension(Blockly);   // t1093 — the cam_field chip's read-only param routing key
     Blockly.defineBlocksWithJsonArray([...PALETTE.map(jsonDef), ...OP_BLOCKS]);
 }
 

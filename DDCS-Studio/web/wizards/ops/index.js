@@ -59,6 +59,7 @@ import { layoutBlock } from './layout.js';
 import { simBlock } from './sim.js';
 import { simStartBlock } from './simStart.js';
 import { formFieldBlock } from './formField.js';
+import { camTableBlock, camFieldBlock } from './camField.js';   // block-native-params S1 — the pendant-field family (metadata, emits [])
 import { layoutWidgetBlock } from './layoutWidget.js';
 import { variableBlock } from './variable.js';
 import { paramBlock } from './param.js';
@@ -98,13 +99,14 @@ export const PALETTE = [
     setBlock, assignBlock, variableBlock,                      // Variables (compile-time Set + runtime Set # + reporter)
     mcodeBlock, rawBlock, outPinBlock, waitInputBlock,         // Signals (raw M-code/G-code escape + digital I/O M62-66)
     paramBlock, regionPickBlock, coordListBlock, panelBlock, layoutBlock, simBlock, simStartBlock, formFieldBlock, layoutWidgetBlock, userRootBlock, paramGroupBlock, sectionBlock, opUnitBlock, ...STRUCT_CTL_BLOCKS, // Wizard UI (GUI param knob + region-pick + coordinate-list + panel-type + preview-rig + per-pass sim-start declarations + FORM value-field blocks + LAYOUT-2D widget blocks + titled concern-section + declared sub-unit boundary + structural-control blocks)
+    camTableBlock, camFieldBlock,                              // CAM Pendant (block-native-params S1 — the pendant-field container + row; metadata, emits [])
     commentBlock, messageBlock,                                // Mark Up (comment + on-screen operator message)
 ];
 
 /** Canonical palette-grouping order (the toolbox category order). Categories with no blocks don't render. Each
  *  block declares its own `category` (the single source of truth — no remap); this list is just the display order.
  *  Geometry → toolpaths → patterns → machine state/setup → probing → logic/data → low-level signals → authoring. */
-export const CATEGORIES = ['Shapes', 'Move', 'Toolpaths', 'Transforms', 'Spindle & Feed', 'Coordinates', 'Program', 'Probing', 'Control', 'Math', 'Variables', 'Signals', 'Wizard UI', 'Mark Up'];
+export const CATEGORIES = ['Shapes', 'Move', 'Toolpaths', 'Transforms', 'Spindle & Feed', 'Coordinates', 'Program', 'Probing', 'Control', 'Math', 'Variables', 'Signals', 'Wizard UI', 'CAM Pendant', 'Mark Up'];
 
 /** type → definition, for emit dispatch and field lookup. (Reporters — Variable/Math — are in PALETTE too;
  *  dragging one drops it into a value socket rather than onto the canvas.) */

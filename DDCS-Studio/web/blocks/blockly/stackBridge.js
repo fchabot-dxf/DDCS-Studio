@@ -110,7 +110,7 @@ function toRecord(b) {
         const eInp = b.getInput('EXECUTION'), eBlk = eInp && eInp.connection && eInp.connection.targetBlock();
         r.uiChildren = pBlk ? chain(pBlk) : [];
         r.children = eBlk ? chain(eBlk) : [];
-    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit') {   // t130 — section round-trips its DO mouth → children, like param_group; t1069 — opunit too (its wrapped standard atoms)
+    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit' || def.kind === 'cam_table') {   // t130 — section round-trips its DO mouth → children, like param_group; t1069 — opunit too; t1093 — cam_table (its cam_field rows)
         const doInput = b.getInput('DO'), first = doInput && doInput.connection && doInput.connection.targetBlock();
         if (first) r.children = chain(first);
     } else if (isWrap(def)) {
@@ -240,7 +240,7 @@ function recToJson(rec) {
     if (def.kind === 'user_root') {
         if (rec.uiChildren && rec.uiChildren.length) inputs.PRESENTATION = { block: chainToJson(rec.uiChildren) };
         if (rec.children && rec.children.length) inputs.EXECUTION = { block: chainToJson(rec.children) };
-    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit') {   // t130 — section writes its children into the DO mouth; t1069 — opunit too
+    } else if (def.kind === 'param_group' || def.kind === 'section' || def.kind === 'opunit' || def.kind === 'cam_table') {   // t130 — section writes its children into the DO mouth; t1069 — opunit too; t1093 — cam_table (its cam_field rows)
         if (rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
     } else if (isWrap(def) && rec.children && rec.children.length) inputs.DO = { block: chainToJson(rec.children) };
     if (Object.keys(fields).length) node.fields = fields;

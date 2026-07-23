@@ -317,6 +317,29 @@ export function bindingsFromStack(children) {
     });
 }
 
+/**
+ * camFieldsFromStack — the PENDANT-FACE reader (block-native-params S1), the mirror of bindingsFromStack. Walks a def
+ * template and returns the ordered `cam_field` declarations (a `cam_table`'s rows, in mouth order — flattenBlocks pre-order
+ * visits a container's children in order). NOT yet consumed by the emit path / modal (that is S2/S4); S1 proves the reader.
+ * Each row: { param, mode:'expose'|'bake', label?, baked?, units?, dflt?, min?, max? } — empty strings inherit the binding.
+ */
+export function camFieldsFromStack(template) {
+    return flattenBlocks(template).filter((b) => b && b.type === 'cam_field').map((b) => {
+        const p = b.params || {};
+        const row = {
+            param: String(p.param || ''),
+            mode: p.mode === 'bake' ? 'bake' : 'expose',   // anything but 'bake' → expose (the default)
+        };
+        if (p.label !== '' && p.label != null) row.label = String(p.label);
+        if (row.mode === 'bake' && p.baked !== '' && p.baked != null) row.baked = String(p.baked);
+        if (p.units !== '' && p.units != null) row.units = String(p.units);
+        if (p.dflt !== '' && p.dflt != null && Number.isFinite(Number(p.dflt))) row.dflt = Number(p.dflt);   // else inherit binding.default
+        if (p.nmin !== '' && p.nmin != null && Number.isFinite(Number(p.nmin))) row.min = Number(p.nmin);
+        if (p.nmax !== '' && p.nmax != null && Number.isFinite(Number(p.nmax))) row.max = Number(p.nmax);
+        return row;
+    });
+}
+
 /** deriveBindings SPEC rows → `formfield` block records (every field set, so recToJson's fields/dropdowns stay valid).
  *  The reverse of bindingsFromStack — renders a hand-written spec set (corner/edge/middle's *_BINDING_SPECS) AS blocks in
  *  the Blockly view so a ported wizard is authorable/re-authorable. Only VALUE specs (a `match` — a value socket); a
