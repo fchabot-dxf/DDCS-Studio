@@ -8,6 +8,44 @@ const SCRATCH = 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-dd
 // The modal must address each row by a PART-SCOPED key so the two rows stay independently addressable — a bare key
 // would make one row's radio/value silently drive the other's.
 
+// (4) defV STALENESS: the opunit stamps the twin's def version at fork time. If the user later EDITS that wizard def, the
+// stamp goes behind — and deriveStandardParams would read the opunit's (older-shape) children through the CURRENT def's
+// FROZEN bindings, silently reading the wrong sockets. It must degrade LOUDLY instead, never be silently wrong.
+test('S5(4) — a STALE sub-unit (defV behind the current def) UNROLLS and says so; a current one stays LIVE', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const r = await page.evaluate(async () => {
+        const { wrapRecognizedForFork } = await import('/blocks/devMode.js');
+        const { getUserDef, defVOf } = await import('/blocks/userOps.js');
+        const { subStackToSlot } = await import('/data/subStackToSlot.js');
+        const OPT = 'user_surfacing_data';
+        const cur = defVOf(OPT);
+        const mk = (stampV) => {
+            const w = wrapRecognizedForFork(getUserDef(OPT));
+            const root = w.template.find((b) => b.type === 'user_root');
+            root.children[0].params.defV = stampV;           // the stamp recorded at fork time
+            return subStackToSlot({ opType: 'user_stale_probe', template: w.template, bindings: [] });
+        };
+        const stale = mk(Math.max(0, cur - 1));              // forked against an OLDER def version
+        const fresh = mk(cur);                               // forked against the CURRENT def version
+        const LIVE = /WHILE #\d+ LT #\d+ DO2/;
+        return {
+            cur,
+            staleName: stale.name, staleBody: stale.body, staleLive: LIVE.test(stale.body || ''),
+            freshName: fresh.name, freshLive: LIVE.test(fresh.body || ''),
+        };
+    });
+    expect(r.cur, 'the surfacing twin is versioned').toBeGreaterThan(0);
+    // STALE → degraded, and it SAYS so (visible in the part header + the slot name + the macro itself)
+    expect(r.staleName, 'the stale part names the version jump and the degradation').toMatch(/def v\d+→v\d+ — unrolled, no longer live/);
+    expect(r.staleBody, 'the macro carries a STALE SUB-UNIT explanation').toMatch(/STALE SUB-UNIT/);
+    expect(r.staleBody, 'and tells the user how to restore it').toMatch(/re-fork/i);
+    expect(r.staleLive, 'a stale sub-unit is NOT silently re-derived as a live generator loop').toBe(false);
+    // CURRENT → untouched: no false degradation
+    expect(r.freshName, 'a current sub-unit is NOT flagged').not.toMatch(/unrolled, no longer live/);
+    expect(r.freshLive, 'a current sub-unit stays a LIVE generator loop').toBe(true);
+});
+
 // build + register a forked surfacing op whose CUSTOM part binds a param named exactly `feed` (the collision)
 const registerCollidingFork = (page) => page.evaluate(async () => {
     const { wrapRecognizedForFork } = await import('/blocks/devMode.js');

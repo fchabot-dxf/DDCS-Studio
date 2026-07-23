@@ -16,7 +16,8 @@
  * self-contained framing (progstart…M30), so concatenated parts are not yet a single EXECUTABLE program (framing-normalization
  * is a later slice — same limit the existing multi-op buildSlotFromOps has).
  */
-import { flattenBlocks, getUserDef } from '../blocks/userOps.js';
+import { flattenBlocks, getUserDef, defVOf, defVStale } from '../blocks/userOps.js';   // t1079 — defVStale: the ONE declared staleness rule (shared with the import transparency check)
+import { opLabelOf } from '../blocks/opBuilders.js';   // t1079 — name a stale sub-unit in the part label so the degradation is VISIBLE
 import { camTypeOf, seedFromOp } from './opCamMap.js';
 import { stackToSlot } from './stackToSlot.js';
 import { readLine } from './probeToSlot.js';   // the SAME read-line fn the generators emit → the value re-sync stays format-identical
@@ -101,6 +102,18 @@ export function subStackToSlot(def, used = new Set(), varOffset = 0) {
                 // a stale/absent opType (deleted, or a pack shared to a machine lacking the op): fail SOFT (a named
                 // placeholder), NOT a silent drop of the sub-unit (mirrors stackToSlot's missing-def behavior).
                 gen = { name: '(missing op)', fields: [], body: `( sub-unit op def not found: ${opType || '?'} — deleted or not registered on this machine )` };
+            } else if (defVStale((part.opunit.params || {}).defV, defVOf(opType))) {
+                // t1079 — STALE SUB-UNIT: this boundary was declared when the twin was at an OLDER def version, and the def
+                // has changed since. deriveStandardParams reads THESE (older-shape) children through the CURRENT def's FROZEN
+                // bindings (blockIndex), so a shape change would make it silently read the WRONG sockets → wrong params →
+                // wrong G-code, with nothing to show for it. Never silently wrong: UNROLL the atoms that are actually here
+                // (correct by construction — value params exposed, geometry baked) and NAME the degradation so it is visible
+                // in the modal's part header and in the slot name. Re-fork the op to get the LIVE generator back.
+                const stampV = Number((part.opunit.params || {}).defV) || 0, curV = defVOf(opType);
+                const subStack = [{ type: 'user_root', params: {}, children: part.opunit.children }];
+                gen = stackToSlot({ opType: `${opType || 'user_sub'}_stale`, template: subStack, bindings: [] }, {}, usedSet, varOffset + fields.length);
+                gen.name = `${opLabelOf(opType)} (def v${stampV}→v${curV} — unrolled, no longer live)`;
+                gen.body = `( STALE SUB-UNIT: ${opLabelOf(opType)} was forked at def v${stampV}, the def is now v${curV}.\n  Its parameters are UNROLLED (frozen) instead of live — re-fork the op to restore the live generator. )\n${gen.body}`;
             } else {
                 // one-source READ: reconstruct the op's params from the sub-stack sockets (reverse of instantiate). Route on the
                 // REAL params so a VARIANT sub-unit resolves correctly (circle Pocket → cpocket, helical Drill → bore) — NOT on

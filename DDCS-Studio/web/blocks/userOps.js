@@ -577,6 +577,13 @@ export function defVOf(opType) {
     return d ? (Number(d.defV) || 1) : 0;
 }
 
+/** The ONE staleness rule for a stamped def-version (t1079): a stamp is STALE when the op IS versioned (`currentV > 0`)
+ *  and the stamp is BEHIND it. An unversioned / built-in op (defVOf 0) never flags; a stamp of 0 is a legacy pre-stamp
+ *  record and counts as behind. Read by BOTH consumers of a defV stamp — the import transparency check
+ *  (programModel.staleMarkedOps, marker.defV) and the CAM sub-stack boundary (subStackToSlot, opunit.params.defV) —
+ *  so "what counts as stale" can never drift between them. */
+export const defVStale = (stampedV, currentV) => Number(currentV) > 0 && (Number(stampedV) || 0) < Number(currentV);
+
 /** Validate → register → persist a new user op. Throws if invalid or the opType already exists. */
 export function createUserOp(def) {
     const errs = validateUserOp(def);
