@@ -14086,3 +14086,54 @@ The clarifying question for the advisor: do you want the hook folded into S4 (A)
 Fork-C pull-forward) with the measured reason -- injecting the cam_table into the def the modal builds silently drops the
 modal's per-slot choice, and needs a by-identity binding re-index. Awaiting the advisor's call on (A) vs (B). No behaviour
 changed this turn.
+
+---
+
+## turn 1099 -- BLOCK-NATIVE PARAMS S4a: the MODAL becomes a VIEW of the cam_field blocks. ADDITIVE-BY-FALLBACK, read+write as ONE unit. Built (did NOT balloon).
+
+### THE ONE SEAM (read+write together, never split -- the advisor's hard rule)
+A single helper is the whole switch: camRowBlock(opType, key) -> the cam_field BLOCK RECORD (live in getUserDef's template)
+whose param === key, or null. flattenBlocks returns the ACTUAL block objects (not clones), and getUserDef returns the live
+registry def, so mutating a row's .params persists in the registry and the very next S2 build reads it. Every read AND every
+write is gated on the SAME camRowBlock call, so a cam_table op reads and writes the block, and a non-cam_table op falls to the
+old _authoring.ops/decl path -- they can never split (a read-from-blocks / write-to-decl split is exactly the S3 divergence).
+
+### THE FOUR GATED SITES (all behind camRowBlock, all read+write on the same source)
+  READ  1. rowHtml `baked` -- a cam_table op's expose/bake state is `row.params.mode === 'bake'`, NOT a.exposed[fk] (which
+           makeAuthOp set from the classifier, not the row). So the modal DISPLAYS the block mode.
+        2. cbmVal -- a cam_table op's value is `row.params.baked` (bake) or `row.params.dflt` (expose); empty inherits the
+           field default exactly as before.
+  WRITE 3. cbmToggle -- a radio flip sets row.params.mode (and seeds row.params.baked from the current value on Bake). The
+           block is mutated in place; renderCbmTable re-reads it; the build reads it. ONE source.
+        4. the value inputs (number + enum) -- write row.params.baked (bake) / row.params.dflt (expose).
+Order + label are ALREADY block-driven from S2 (seedUniversal reads camFieldsFromStack in block order with the row label),
+so no extra read/write was needed for them -- the modal shows block order and block labels for free. The build (cbmBuild ->
+buildSlotFromOps -> stackToSlot) already reads the cam_table via S2, so the write lands in the build with no new plumbing.
+
+### WHY IT IS INERT TODAY (additive-by-fallback = the safety rail)
+No op carries a cam_table until the S4b hook, so camRowBlock returns null for every op today -> every site takes the old
+branch -> the modal is byte-for-byte unchanged. Confirmed: the 16 existing modal specs (cam-universal-modal, cam-build-mode,
+cam-drill-single-pattern, cam-scratch-guard) pass unchanged.
+
+### DID NOT BALLOON -- so I did NOT gate
+The whole slice is ONE helper + 4 one-line-guarded sites + a flattenBlocks import. It stays behind the cam_table-present
+check (read+write together, never a naive read-first split), so I did not need the gate-back sub-plan.
+
+### VERIFIED
+- cam-block-native-params-s4a.spec.js (NEW, 3): (1) the modal READS the cam_table -- frate/dfeed show Expose, ddepth (drill
+  depth = geometry) shows Bake, straight from camTableFromBindings' rows; (2) flipping frate Expose->Bake MUTATES the frate
+  cam_field block (mode='bake', dfeed/ddepth untouched) AND the built slot reflects it -- frate drops from the fields (baked,
+  inlines F200, no #2600), dfeed stays exposed (#2600, ;Cut feed); (3) editing the dfeed value writes '444' to the block's
+  dflt (the pendant default), which the build reads.
+- MY OWN VIEWED SCREENSHOT (s4a-modal-camtable.png): "1. S4a -> universal" with Feed rate EXPOSE (#1100->#2600), Depth BAKE
+  (baked = 5), Cut feed EXPOSE (#1101->#2601) -- the modal is a faithful view of the cam_field blocks.
+- FALLBACK unchanged: the 16 existing modal specs green (an op WITHOUT a cam_table is byte-for-byte the same modal).
+- FULL GATE: 1443 passed, 0 FAILED, 4 skipped (11.9m) -- CLEAN, 1443+4 = 1447 = full count reconciles. Failed-count grepped.
+  1443 = 1440 prior + 3 new S4a tests. The flakes behaved.
+
+### STATE: the modal is now a VIEW of the cam_field blocks when a cam_table is present -- read AND write on the one source
+(the block), the S2 build reflects every edit -- and byte-for-byte unchanged when absent. This closes the S3-gated
+divergence FOR the S4b hook: once S4b materializes a cam_table into the def, the modal writes the blocks (not a dead decl),
+so the build and the modal agree. S4a is INERT until then. NEXT: S4b -- the materialize HOOK on Blocks-open/editWizardDef
+(inject camTableFromBindings into the Presentation mouth WITH the identity-based blockIndex re-derive, activating S2+S4a
+together atomically), which the advisor wants to review on its own.
