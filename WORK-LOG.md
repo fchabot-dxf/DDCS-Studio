@@ -13876,3 +13876,83 @@ default path were already fine after t1089. So this closes the gap for hand-comp
 ### STATE: feed is a live pendant knob on the universal arm for line/drill/bore, with numeric byte-identity proven by the
 goldens. rpm stays geometry with permanent M3-gate evidence. clearance is a clean-but-gated candidate awaiting the advisor's
 semantics call (expose and let zOff stop offsetting it, or keep fixed).
+
+---
+
+## turn 1093 -- BLOCK-NATIVE CAM PARAMS S1: the cam_table/cam_field SCHEMAS + camFieldsFromStack reader + round-trip. ENGINE ONLY, byte-identical emit, NO modal. Built.
+
+### WHAT S1 IS (and is NOT)
+S1 = the two block defs + their round-trip wiring + the reader. It does NOT touch the emit path (stackToSlot consuming the
+rows = S2) or the modal (renderCbmTable becoming a view = the gated S4). The whole feature is "another formfield": an
+emit-nothing metadata block that is the blocks-native twin of a binding, for the PENDANT face. The advisor's fork rulings
+were baked in and I did not re-open them.
+
+### BYTE-IDENTICAL EMIT, BY CONSTRUCTION (the key correctness property)
+I proved from the emit walker (blockEmitter.js:127-152) that a cam_table needs NO blockEmitter change to be byte-neutral:
+the walker's transparent set is a HARD-CODED list (op / user_root / param_group / guard / section / setup / safetraverse /
+opunit). cam_table is DELIBERATELY not in it, and its kind is not var/loop/cond/depth/container, so the walker falls through
+to `def.emit()` = [] -- its cam_field children are NEVER walked. Both blocks emit []. So adding a cam_table with any number of
+cam_field rows to a def cannot change one byte of G-code. This is the formfield pattern exactly (a Presentation-mouth leaf
+that emits []). The spec asserts it directly: emit(template WITH cam_table) === emit(template WITHOUT), and the real atoms
+still emit (F300). NB this is why cam_table emits [] rather than transparent-passing children like opunit: its children are
+DECLARATIONS, not atoms.
+
+### THE ROUND-TRIP (three generic touch points, mirroring opunit -- minimal diff)
+A DO-mouth container round-trips through three kind-switched sites; I added cam_table to each, exactly like opunit/section:
+  - jsonDef (bridge.js): the addMouth('DO') arm -- cam_table gets a titled DO mouth holding the rows.
+  - recToJson (stackBridge.js): the DO-write branch -- children -> DO input.
+  - toRecord (stackBridge.js): the DO-read branch -- DO input -> children.
+cam_field is a LEAF (no mouth) -> needs NO round-trip branch; it serializes like formfield (fields in, fields out). The spec
+loads a cam_table + 2 cam_field via ddcsLoadBlockStack, round-trips through the REAL Blockly workspace (workspaceToStack),
+and asserts both rows survive IN ORDER with param/mode/label/baked intact.
+
+### THE READER (camFieldsFromStack) -- a literal mirror of bindingsFromStack
+blocks/userOps.js gains camFieldsFromStack(template) = flattenBlocks(template).filter(type==='cam_field').map(row). Mouth
+order falls out of flattenBlocks pre-order (a container's children are visited in order), same as bindingsFromStack gets
+formfield order. Empty strings INHERIT (dropped from the row) exactly like formfield's "empty dflt = socket-held": an empty
+label/units/default is omitted so the binding supplies it; a non-'bake' mode normalizes to 'expose'; a bake row with an empty
+baked drops the baked key. Returns { param, mode, label?, baked?, units?, dflt?, min?, max? } in order. NOT consumed by
+anything yet -- S1 proves the reader in isolation (S2 wires it into stackToSlot/seedUniversal).
+
+### cam_field: the READ-ONLY param chip + the mode toggle
+`param` is the ROUTING KEY (names the def value-binding this row declares -- the join key camFieldsFromStack/stackToSlot
+address by). A hand-edit dangles the binding, so it renders READ-ONLY via a new ddcs_camfield extension that locks the PARAM
+field (EDITABLE=false + setEnabled(false)), the exact lock ddcs_opunit uses on the opType routing key. The value still
+round-trips (present, just non-editable). `mode` is an expose|bake dropdown (one block + a toggle, per the ruling -- NOT two
+block types), wired via optionsFor. The spec confirms param is non-editable after the round-trip.
+
+### COLOUR -- the family shares one, distinct from param_group/opunit
+Declared a new category 'CAM Pendant' with hue #ec4899 (a warm pink) in the theme CAT map (which auto-derives both the
+block style and the toolbox category style). Both cam_table and cam_field carry category:'CAM Pendant', so they share ONE
+colour, and it is DISTINCT from the fuchsia #d946ef of the Wizard-UI authoring blocks (param_group/opunit/formfield). Added
+'CAM Pendant' to CATEGORIES for the toolbox order. The spec asserts cam_table.colour === cam_field.colour !== param_group.colour;
+I also VIEWED it (screenshot): the pink pendant family reads clearly apart from the fuchsia Parameter Group below it.
+
+### ONE BUG FOUND BY LOOKING (the "knob" artifact) -- fixed
+My first render showed a stray "knob" label on every cam_field row. Traced to devMode.augment (devMode.js:357): it grows
+every ATOM with an inline "knob [ ] name" expose row, and isAtom(cam_field) was wrongly TRUE -- cam_field/cam_table were
+missing from the metadata-kind exclusion list (which already excludes section/param_group/formfield/opunit). Added both kinds
+to that exclusion (devMode.js:60). A metadata declaration is not an exposable value, so it must not get the knob kit. The
+re-render is clean. (I also dropped a `dynamic:'mode'` I first tried: ddcs_dynfields toggles VALUE-socket inputs via
+getInput/setVisible, but these are inline text fields, so it was a no-op -- all fields show; a compact per-mode layout is a
+later polish slice. The mode dropdown itself works.)
+
+### VERIFIED
+- cam-block-native-params.spec.js (NEW, 3): (1) camFieldsFromStack reads 2 rows IN ORDER with param/mode/label/units/range,
+  AND emit(with)===emit(without) byte-identical while the real atoms still emit; (2) the reader normalizes a non-'bake' mode
+  to expose and drops empty inherits + an empty baked; (3) a cam_table + 2 cam_field round-trip block->stack->block IN ORDER
+  through the real workspace, param is READ-ONLY, and the family colour is distinct from param_group. My OWN VIEWED screenshot
+  (s1-cam-table.png) confirms the render: pink family, read-only param chips, distinct from the fuchsia param_group.
+- FULL GATE: 1431 passed, 2 failed, 4 skipped -- and BOTH failures are load-sensitive flakes in files I did not touch:
+  preflight-badge-838:104 (the same file that flaked at :63 and :119 the last two turns) and blocks-mobile-drawers:8 (a
+  mobile drawer toggle). Confirmed flakes: the two files pass 11/11 in isolation. Nothing I touched is red. Failed-count
+  grepped, arithmetic reconciles (1431+2+4 = 1437 = 1434 prior + 3 new).
+
+### GATE-IF-BALLOONS: did NOT trigger. The reader is ~12 lines (a literal bindingsFromStack mirror) and the round-trip is
+three one-line kind additions mirroring opunit -- neither ballooned, so I did NOT stop at the schemas + jsonDef arm; S1 is
+whole (schemas + jsonDef + chip + round-trip + reader).
+
+### STATE: the pendant-field declaration now EXISTS as blocks (cam_table + cam_field) that round-trip losslessly and read via
+camFieldsFromStack, with byte-identical emit proven by construction and by test. Nothing consumes the rows yet -- S2 routes
+stackToSlot to walk them (expose/bake/label/order from the rows, socket from the binding). No modal change (S4). No emit
+change. A NEW web/ file (camField.js) -- the mem-server picked it up fresh (402 files preloaded, was 401).
