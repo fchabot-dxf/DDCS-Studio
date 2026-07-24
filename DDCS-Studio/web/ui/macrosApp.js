@@ -13,7 +13,7 @@ import { seedBody } from '../data/controllerFileSeeds.js';                 // t6
 import { UIUtils } from './uiUtils.js';                                    // t662 (E1) — downloadFile for the no-LAN (DM500) export transport
 import * as slotPack from '../data/slotPack.js';
 import { bmpDataUrl } from '../data/bmp.js';
-import { openIconEditor } from './iconEditor.js';
+import { openIconEditor, autoIconLayers, imageTileLayer } from './iconEditor.js';   // t1135 S5b — the inline (mounted) icon editor + the layer helpers (auto default / imported-BMP tile)
 import { slotFromOp } from '../data/opToSlot.js';
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from '../data/probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
@@ -29,7 +29,6 @@ import { universalBands } from '../data/universalScratch.js';   // t1085 slice C
 // should be impossible on EITHER arm — so the guard firing now means a regression on whichever arm reported it.
 const camBandsOf = (t) => ((t === 'universal') ? universalBands() : bandsFor(t));
 import { getUserDef, defVOf, flattenBlocks } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest; t1099 (S4a) — walk the template for cam_field block records
-import { autoIconBmp } from '../data/autoIcon.js';
 import { makeZip, downloadBytes } from '../data/zip.js';
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 import { homingStack, homingRunParams } from '../wizards/homingWizard.js';   // homingRunParams = the ONE contract shape (t626) so sysstart generate matches the wizard emit (was passing the raw object → empty stub)
@@ -1106,6 +1105,7 @@ function homingPostIsExpert() {
     let _authoring = null;   // { ops:[{opType,camType,variant,fields,values,exposed,baked,label}], name, seedLocked } | null
     let _editingSlot = null; // t1127 S3 — the cam NUMBER being Edited (Update-in-place), or null = a NEW slot. The slot-level analog of devMode._editingWizard.
     let _cbmPanel = null;    // the docked inline preview panel
+    let _iconEditor = null;  // t1135 S5b — the INLINE icon editor handle ({ destroy, getLayers, rasterize, addImage }) mounted in the wizard
     let _cbmOverlay = null;  // the modal overlay element
     let _cbmUnsupported = []; // present-but-not-CAM-able program ops (for the empty-state reasons)
     const CAM_SUPPORTED_LABEL = 'Pocket · Surface · Probe corner / edge · Slot · Drill / Bore · Probe centre (Middle)';
@@ -1247,30 +1247,39 @@ function homingPostIsExpert() {
         }).join('');
         el.innerHTML = `${sections}<div class="settings-hint" style="margin-top:8px;">Expose = the operator fills it on the pendant (#11xx → #2600). Bake = frozen into the macro; the row vanishes. Enum params pick a friendly label; the pendant stores its number.</div>`;
     }
-    // t1129 S5 — the wizard ICON STEP: a LARGE 360×180 preview of _authoring.icon (never the tiny settings thumbnail) + Draw/
-    // Edit (launches openIconEditor as a modal) + Import BMP. The icon rides _authoring.icon through Build/Update (cbmBuild).
-    function iconStepHtml() {
-        const ic = _authoring && _authoring.icon;
-        const preview = (ic && ic.data)
-            ? `<img src="${ic.data}" alt="" style="width:240px; height:120px; object-fit:contain; border:1px solid var(--border); background:#000; border-radius:6px;">`
-            : `<div style="width:240px; height:120px; display:flex; align-items:center; justify-content:center; border:1px dashed var(--border); border-radius:6px; color:var(--text-dim); font-size:11px;">No icon yet</div>`;
-        const cap = ic ? `${camEsc(ic.name || '')}${ic.w ? ` · ${ic.w}×${ic.h}${(ic.w === 360 && ic.h === 180) ? '' : ' ⚠ not 360×180'}` : ''}${ic.source === 'auto' ? ' · auto' : ''}` : '';
-        return `${preview}<div style="display:flex; flex-direction:column; gap:6px;"><b style="font-size:11px; color:var(--text-dim);">Slot icon (camN.bmp)</b><div style="font-size:10px; color:var(--text-dim); min-height:12px;">${cap}</div><button class="toolbar-btn settings-io" data-act="cbm-icon-edit">🎨 ${ic ? 'Edit' : 'Draw'} icon</button><button class="toolbar-btn settings-io" data-act="cbm-icon-import">🖼 Import BMP</button></div>`;
+    // t1135 S5b — mount the INLINE icon editor (side-by-side with the expose/bake table, mirroring the controller's CAM page:
+    // camN.bmp + the operator form together = WYSIWYG). The editor edits LAYERS; onChange live-writes _authoring.icon.layers;
+    // the BMP is rasterized at build (cbmBuild). Seed from the slot's layers (Edit), a pre-S5b BMP as a tile (legacy Edit), or
+    // the auto default = the slot name as editable text (New) — so the preview is never blank AND the auto content is editable.
+    function mountIconEditor() {
+        const host = document.getElementById('cbm_iconedit'); if (!host || !_authoring) return;
+        if (_iconEditor) { try { _iconEditor.destroy(); } catch (_) { /* */ } _iconEditor = null; }
+        const ic = _authoring.icon;
+        const initLayers = (ic && Array.isArray(ic.layers) && ic.layers.length) ? ic.layers
+            : (ic && ic.data) ? [imageTileLayer(ic.data)]
+                : autoIconLayers(_authoring.name);
+        _iconEditor = openIconEditor({ layers: initLayers }, null, {
+            mount: host,
+            onChange: ({ layers }) => { _authoring.icon = { ...(_authoring.icon || {}), name: (_authoring.name || 'cam') + '.bmp', w: 360, h: 180, layers }; },   // live; .data is rasterized at build
+        });
     }
-    function renderIconStep() { const el = document.getElementById('cbm_iconstep'); if (el) el.innerHTML = iconStepHtml(); }
     function mountAuthoringSurface(body) {
         const n = _authoring.ops.length;
         const editing = _editingSlot != null;   // t1127 S3 — Edit reads "Update CAM (camN)"; New reads "Build CAM slot"
         body.innerHTML = `<div class="cam-build-mode" style="padding:14px 16px;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><b style="flex:1; font-size:14px;">${editing ? `✎ Update CAM (cam${_editingSlot})` : '✚ Build CAM slot'}${n > 1 ? ` — ${n} ops` : ''}</b><button class="toolbar-btn settings-io" data-act="cbm-cancel">✕ Cancel</button></div>
             <div class="settings-row" style="align-items:center; margin-top:2px;"><label style="font-size:11px; color:var(--text-dim);">Slot name&nbsp;<input id="cbm_name" value="${camEsc(_authoring.name || '')}" placeholder="e.g. Pocket" style="min-width:200px;"></label></div>
-            <div id="cbm_iconstep" style="display:flex; align-items:center; gap:12px; margin-top:10px;">${iconStepHtml()}</div>
-            <div id="cbm_table" style="margin-top:8px;"></div>
+            <div style="margin-top:10px;">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><b style="font-size:11px; color:var(--text-dim); flex:1;">Slot icon (camN.bmp) — draw it above the form, as the DDCS CAM page shows it</b><button class="toolbar-btn settings-io" data-act="cbm-icon-import">🖼 Import BMP</button></div>
+                <div id="cbm_iconedit"></div>
+            </div>
+            <div id="cbm_table" style="margin-top:10px;"></div>
             <div style="display:flex; align-items:center; gap:8px; margin-top:10px;"><b style="font-size:11px; color:var(--text-dim); flex:1;">Inline preview</b><button class="toolbar-btn settings-io" data-act="cbm-sim" title="Simulate this slot's composed macro, each field seeded from its value.">▶ Simulate</button></div>
             <div id="cbm_preview" style="height:280px; position:relative; border:1px solid var(--border); border-radius:6px; margin-top:6px; background:#000;"></div>
             <div class="settings-row" style="justify-content:flex-end; margin-top:12px;"><button class="toolbar-btn settings-io" data-act="cbm-build" style="font-weight:600;"${n ? '' : ' disabled'}>${editing ? `Update CAM (cam${_editingSlot}) ▸` : 'Build CAM slot ▸'}</button></div>
         </div>`;
         renderCbmTable();
+        mountIconEditor();   // t1135 S5b — the inline icon editor, beside the table
     }
     function attachCbmListeners(root) {
         root.addEventListener('input', (e) => {
@@ -1289,8 +1298,7 @@ function homingPostIsExpert() {
             if (a === 'cbm-cancel') cbmExit();
             else if (a === 'cbm-sim') cbmSimulate();
             else if (a === 'cbm-build') cbmBuild();
-            else if (a === 'cbm-icon-edit') openIconEditor(_authoring.icon || null, (bmp, model) => { _authoring.icon = { name: (_authoring.name || 'cam') + '.bmp', data: bmp, w: 360, h: 180, layers: model.layers, source: 'drawn' }; renderIconStep(); });   // t1129 S5 — LAUNCH the editor as a modal; onSave writes _authoring.icon + re-renders the preview
-            else if (a === 'cbm-icon-import') importCamIcon();
+            else if (a === 'cbm-icon-import') importCamIcon();   // t1135 S5b — Import BMP → the inline editor adds it as a movable tile layer
         });
         root.addEventListener('change', (e) => {
             const t = e.target;
@@ -1337,11 +1345,6 @@ function homingPostIsExpert() {
                 }
                 _authoring.name = _authoring.ops.length === 1 ? _authoring.ops[0].label : (_authoring.ops.length ? 'Program' : '');
             }
-            // t1129 S5 — AUTO-ICON so a fresh New slot's preview is never blank (editable/replaceable in the icon step).
-            if (!_authoring.icon && _authoring.ops.length) {
-                const first = _authoring.ops[0];
-                try { _authoring.icon = { name: (_authoring.name || 'cam') + '.bmp', data: autoIconBmp(_authoring.name, first.camType || first.type), w: 360, h: 180, source: 'auto' }; } catch (_) { /* canvas unavailable */ }
-            }
         }
         const ov = document.createElement('div'); ov.className = 'cam-auth-overlay';
         ov.style.cssText = 'position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.55); display:flex; align-items:flex-start; justify-content:center; overflow:auto; padding:22px 12px;';
@@ -1356,7 +1359,7 @@ function homingPostIsExpert() {
     // t1131 S6 (Fork B) — the settings "🧩 Customize op" picker (cbmCustomizeModal) is RETIRED: it was an AUTHORING door and
     // the settings panel is now a pure display. The op-menu "🧩 Customize as blocks" (opContextMenu.js) stays — it calls
     // ddcsEditWizardDef directly, so nothing here is needed for it.
-    const cbmExit = () => { if (_cbmPanel) { try { _cbmPanel.stop(); _cbmPanel.setActive(false); } catch (_) { /* noop */ } _cbmPanel = null; } if (_cbmOverlay) { _cbmOverlay.remove(); _cbmOverlay = null; } _authoring = null; _editingSlot = null; if (q('cam_slots')) renderCamBuilder(); };   // t1127 S3 — clear the Edit flag on close (build OR cancel)
+    const cbmExit = () => { if (_iconEditor) { try { _iconEditor.destroy(); } catch (_) { /* */ } _iconEditor = null; } if (_cbmPanel) { try { _cbmPanel.stop(); _cbmPanel.setActive(false); } catch (_) { /* noop */ } _cbmPanel = null; } if (_cbmOverlay) { _cbmOverlay.remove(); _cbmOverlay = null; } _authoring = null; _editingSlot = null; if (q('cam_slots')) renderCamBuilder(); };   // t1127 S3 — clear the Edit flag on close (build OR cancel); t1135 S5b — tear down the inline icon editor
     // S4a (block-native params) — the modal as a VIEW of the cam_field blocks. When the op's def carries a cam_table, its
     // cam_field block RECORD (live in getUserDef's template) IS the state: the render reads mode/value from it and a
     // radio/value edit WRITES to it, so the block is one source and the S2 build (which reads the same cam_table) reflects
@@ -1405,7 +1408,7 @@ function homingPostIsExpert() {
         _cbmPanel = createPreviewPanel(host, { getGcode: () => macro, createVarStore: () => new Map(seed), ...probePreviewOpts(s, macro) });
         _cbmPanel.setActive(true);
     }
-    function cbmBuild() {
+    async function cbmBuild() {
         if (!_authoring.ops.length) { dlgNotice('Import or add an op first.'); return; }
         // t1081 SAFETY — REFUSE, loudly and by name, a slot whose form values would be overwritten by a generator's own
         // working variables. Measured: composing two mill ops puts the RPM field on #20, which the pocket then writes to
@@ -1425,7 +1428,12 @@ function homingPostIsExpert() {
         } else {
             slot = { slot: nextSlotNum(), name: _authoring.name || 'New CAM slot', ops }; _camPack.slots.push(slot);
         }
-        if (_authoring.icon) slot.icon = _authoring.icon;   // t1129 S5 — carry the wizard icon to the slot on BOTH New (Build) and Edit (Update)
+        // t1135 S5b — rasterize the INLINE editor's LIVE layers → the camN.bmp, then carry the icon (layers + data) to the slot
+        // on BOTH New (Build) and Edit (Update). Rasterize is async (an SVG tile may load); a failure keeps whatever icon exists.
+        if (_iconEditor) {
+            try { const data = await _iconEditor.rasterize(); _authoring.icon = { name: (_authoring.name || 'cam') + '.bmp', data, w: 360, h: 180, layers: _iconEditor.getLayers() }; } catch (_) { /* keep the existing icon */ }
+        }
+        if (_authoring.icon) slot.icon = _authoring.icon;   // carry the wizard icon to the slot
         buildSlotFromOps(slot); saveCamPack(); cbmExit();
     }
 
@@ -1458,19 +1466,14 @@ function homingPostIsExpert() {
             </div>`;
         }).join('');
     }
-    // t1129 S5 — import a BMP into the WIZARD icon step (writes _authoring.icon + re-renders the LARGE preview). The settings
-    // second-editor icon buttons that used to call this were removed in S1; the wizard is now its only caller.
+    // t1135 S5b — Import a BMP/image into the INLINE editor as a movable/resizable TILE layer (so it composes + rasterizes
+    // like anything drawn). The settings icon buttons that used to call this were removed in S1; the wizard is the only caller.
     function importCamIcon() {
         const input = document.createElement('input'); input.type = 'file'; input.accept = '.bmp,image/bmp,image/*';
         input.addEventListener('change', () => {
-            const f = input.files && input.files[0]; if (!f || !_authoring) return;
+            const f = input.files && input.files[0]; if (!f || !_iconEditor) return;
             const r = new FileReader();
-            r.onload = () => {
-                const data = r.result; const img = new Image();
-                img.onload = () => { _authoring.icon = { name: f.name, data, w: img.naturalWidth, h: img.naturalHeight }; renderIconStep(); };
-                img.onerror = () => { _authoring.icon = { name: f.name, data }; renderIconStep(); };
-                img.src = data;
-            };
+            r.onload = () => { _iconEditor.addImage(r.result); };
             r.readAsDataURL(f);
         });
         input.click();

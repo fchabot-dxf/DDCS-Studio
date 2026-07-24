@@ -98,17 +98,26 @@ const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</
 
 // rotateVec / boxPoint / stageSvg + the gesture math now live in the shared drawing core (ui/shapeStage.js).
 
-/** Open the editor. `initial` = { layers } or null. onSave(bmpDataUrl, { layers }). */
-export function openIconEditor(initial, onSave) {
+/** Open the editor. `initial` = { layers } or null. onSave(bmpDataUrl, { layers }).
+ *  opts.mount (S5b) → render INLINE into that container (no overlay/head/foot) + call opts.onChange({layers}) on every edit;
+ *  returns { destroy, getLayers, rasterize } so the host can tear down + rasterize the live layers at build time. */
+export function openIconEditor(initial, onSave, opts = {}) {
     const layers = (initial && Array.isArray(initial.layers)) ? JSON.parse(JSON.stringify(initial.layers)) : [];
     // Ensure a real, editable background rectangle at the back (covers the 360×180 frame; recolour/resize like
     // any layer). Added to existing icons too — just behind their content, so nothing changes until recoloured.
     if (!layers.some((l) => l.bg)) layers.unshift({ type: 'rect', x: 0, y: 0, w: W, h: H, rot: 0, scale: 1, bw: W, bh: H, fill: '#000000', color: '#000000', sw: 0, bg: true });
     let sel = -1;
+    const mountEl = opts.mount || null;
+    const onChange = typeof opts.onChange === 'function' ? opts.onChange : null;
+    const inline = !!mountEl;
 
-    const m = document.createElement('div'); m.id = 'iconed-modal';
+    const m = document.createElement('div'); m.id = 'iconed-modal'; if (inline) m.classList.add('ie-inline');
     m.innerHTML = `<style>
         #iconed-modal{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);}
+        #iconed-modal.ie-inline{position:static;inset:auto;z-index:auto;background:none;display:block;}
+        #iconed-modal.ie-inline .ie-panel{width:100%;max-width:none;max-height:none;box-shadow:none;border:none;}
+        #iconed-modal.ie-inline .ie-head,#iconed-modal.ie-inline .ie-foot{display:none;}
+        #iconed-modal.ie-inline .ie-stage{flex:1 1 340px;max-width:min(560px, calc((90vh - 220px) * ${W} / ${H}));}
         #iconed-modal .ie-panel{background:var(--panel);color:var(--text-main);border:1px solid var(--border);border-radius:8px;width:min(1500px,96vw);max-width:96vw;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 14px 48px rgba(0,0,0,.5);}
         #iconed-modal .ie-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;}
         #iconed-modal .ie-head button{background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;}
@@ -152,7 +161,7 @@ export function openIconEditor(initial, onSave) {
         </div>
         <div class="ie-foot"><button class="toolbar-btn settings-io" data-ie="cancel">Cancel</button><button class="toolbar-btn settings-io primary" data-ie="save">Save icon</button></div>
     </div>`;
-    document.body.appendChild(m);
+    (mountEl || document.body).appendChild(m);
     const $ = (id) => m.querySelector('#' + id);
     const stage = $('ie_stage');
 
@@ -188,7 +197,7 @@ export function openIconEditor(initial, onSave) {
         if (L.type !== 'tile') html += `<div class="ie-row"><label>Colour<input type="color" value="${L.color || (L.type === 'text' ? '#ffd23f' : '#33ccff')}" data-p="color"></label>${L.type !== 'text' && L.type !== 'line' ? `<label>Fill<input type="color" value="${L.fill && L.fill !== 'none' ? L.fill : '#000000'}" data-p="fill"></label><label style="flex-direction:row;align-items:center;gap:4px;"><input type="checkbox" ${L.fill && L.fill !== 'none' ? 'checked' : ''} data-p="fillon">filled</label>` : ''}</div>`;
         host.innerHTML = html;
     }
-    function refresh() { renderStage(); renderLayers(); renderProps(); }
+    function refresh() { renderStage(); renderLayers(); renderProps(); if (onChange) onChange({ layers }); }
 
     function baseSize(type) {
         if (type === 'tile') return { w: 120, h: 120 };
@@ -217,7 +226,7 @@ export function openIconEditor(initial, onSave) {
             else { sel = i; refresh(); }
             return;
         }
-        if (e.target === m) m.remove();
+        if (!inline && e.target === m) m.remove();
     });
     $('ie_props').addEventListener('input', (e) => {
         const L = layers[sel]; if (!L) return; const p = e.target.dataset.p; if (!p) return;
@@ -255,17 +264,44 @@ export function openIconEditor(initial, onSave) {
     stage.addEventListener('pointerup', () => { if (gesture && gesture.type !== 'move') renderProps(); gesture = null; renderLayers(); });
 
     function saveIcon() {
+        rasterizeIconLayers(layers).then((url) => { m.remove(); if (onSave) onSave(url, { layers }); })
+            .catch((err) => dlgNotice(err === 'tile' ? 'Could not rasterize the icon (an SVG tile failed to load).' : ('Export failed: ' + (err && err.message ? err.message : err))));
+    }
+
+    // S5b — the inline host adds an image (Import BMP) as a tile layer + tears down / rasterizes the LIVE layers at build.
+    function addImage(uri) { layers.push(imageTileLayer(uri)); sel = layers.length - 1; refresh(); }
+
+    refresh();
+    return { destroy: () => m.remove(), getLayers: () => layers, rasterize: () => rasterizeIconLayers(layers), addImage };
+}
+
+/** Rasterize a layer set to a 360×180 BMP data URL (the shared export path — used by the modal Save AND the S5b inline
+ *  editor's build-time rasterize). Async (an SVG tile may need to load). Rejects with 'tile' on an image-load failure. */
+export function rasterizeIconLayers(layers) {
+    return new Promise((resolve, reject) => {
         const svg = stageSvg(layers, -1, W, H);   // no selection ring in the export
         const img = new Image();
         img.onload = () => {
             const c = document.createElement('canvas'); c.width = W; c.height = H;
             const ctx = c.getContext('2d'); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.drawImage(img, 0, 0, W, H);
-            try { const url = bmpDataUrl(W, H, ctx.getImageData(0, 0, W, H).data); m.remove(); onSave(url, { layers }); }
-            catch (err) { dlgNotice('Export failed: ' + (err && err.message ? err.message : err)); }
+            try { resolve(bmpDataUrl(W, H, ctx.getImageData(0, 0, W, H).data)); } catch (err) { reject(err); }
         };
-        img.onerror = () => dlgNotice('Could not rasterize the icon (an SVG tile failed to load).');
+        img.onerror = () => reject('tile');
         img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-    }
+    });
+}
 
-    refresh();
+/** Build the default (auto) layer set for a fresh CAM slot icon: a black background + the slot NAME as editable text.
+ *  S5b — the inline editor edits LAYERS, so the "auto icon" is layers (not a baked BMP) → it shows editably + WYSIWYG. */
+export function autoIconLayers(name) {
+    const label = String(name || 'CAM').trim().slice(0, 14) || 'CAM';
+    return [
+        { type: 'rect', x: 0, y: 0, w: W, h: H, rot: 0, scale: 1, bw: W, bh: H, fill: '#000000', color: '#000000', sw: 0, bg: true },
+        { type: 'text', text: label, x: W * 0.08, y: H * 0.34, w: W * 0.84, h: H * 0.32, size: 38, color: '#ffd23f', rot: 0, scale: 1, bw: W * 0.84, bh: H * 0.32 },
+    ];
+}
+
+/** Wrap an imported BMP/image (data URL) as a full-canvas TILE layer so the inline editor can show + move/resize it. */
+export function imageTileLayer(uri) {
+    return { type: 'tile', tile: 'imported', uri, x: 0, y: 0, w: W, h: H, scale: 1, rot: 0, bw: W, bh: H };
 }

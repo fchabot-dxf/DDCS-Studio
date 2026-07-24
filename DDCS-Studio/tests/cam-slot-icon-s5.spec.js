@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 
-// CAM-UX declare-once S5 — the icon editor INTO the wizard (LAUNCH-modal + LARGE preview). mountAuthoringSurface shows a
-// 360×180 icon preview beside the slot-name row + "🎨 Draw/Edit icon" (launches openIconEditor as a modal) + "🖼 Import BMP".
-// A fresh New slot AUTO-ICONS (never blank). The icon rides _authoring.icon through Build (New) AND Update (Edit); Edit
-// pre-loads slot.icon so the preview shows it + it is re-editable.
-test.use({ viewport: { width: 1280, height: 1000 } });
+// CAM-UX declare-once S5b — the INTEGRATED icon editor: openIconEditor mounts INLINE inside the wizard, side-by-side with
+// the expose/bake param table (mirroring the DDCS controller CAM page: camN.bmp + the operator form together = WYSIWYG). The
+// editor edits LAYERS; a fresh New slot seeds the auto default (the slot name as editable text); Import BMP adds a tile layer;
+// the icon rides _authoring.icon.layers live and is rasterized to the camN.bmp at build; Edit pre-loads + round-trips.
+test.use({ viewport: { width: 1400, height: 1000 } });
 
 async function openCam(page) {
   await page.goto('http://localhost:3211');
@@ -19,51 +19,71 @@ async function buildFromPocket(page) {
   await page.evaluate(() => { window.ddcsGetBlockProgram = () => ([{ id: 'p1', type: 'op', opType: 'pocket', label: 'Pocket', params: { shape: 'rect', w: 120, h: 90, depth: 5, stepdown: 2, toolDia: 8, feed: 1500, plunge: 120, clearance: 6, rpm: 9000, stepoverPct: 45 } }]); });
   await page.evaluate(() => window.ddcsBuildCamSlot());
   await page.waitForSelector('.cam-auth-overlay .cbm-eb', { timeout: 8000 });
+  await page.waitForSelector('#cbm_iconedit #iconed-modal.ie-inline', { timeout: 8000 });
 }
 
-test('S5: a fresh New slot AUTO-ICONS — the wizard shows a LARGE 360×180 preview + Draw/Import; the slot carries the icon', async ({ page }) => {
+test('S5b: New slot mounts the INLINE editor STACKED above the table (auto name-text); ALL tools present; interactions work; Build rasterizes + carries the icon', async ({ page }) => {
   await openCam(page);
   await buildFromPocket(page);
-  const step = await page.evaluate(() => {
-    const el = document.getElementById('cbm_iconstep');
-    const img = el && el.querySelector('img');
+  const ui = await page.evaluate(() => {
+    const host = document.getElementById('cbm_iconedit');
+    const ed = host && host.querySelector('#iconed-modal.ie-inline');
+    const table = document.getElementById('cbm_table');
+    // STACKED: the icon editor sits ABOVE the table (as the DDCS CAM page shows it), not side-by-side.
+    const stackedAbove = !!(ed && table) && (host.getBoundingClientRect().top < table.getBoundingClientRect().top);
     return {
-      hasStep: !!el,
-      hasPreview: !!(img && img.src && img.src.length > 100),
-      width: img ? Math.round(img.getBoundingClientRect().width) : 0,
-      hasDraw: !!(el && el.querySelector('[data-act="cbm-icon-edit"]')),
-      hasImport: !!(el && el.querySelector('[data-act="cbm-icon-import"]')),
+      inlineMounted: !!ed,
+      notFixed: ed ? getComputedStyle(ed).position !== 'fixed' : false,     // inline, NOT a full-screen overlay
+      stageRenders: !!(ed && ed.querySelector('.ie-stage svg')),
+      stackedAbove,
+      headHidden: ed ? getComputedStyle(ed.querySelector('.ie-head')).display === 'none' : false,   // modal chrome hidden inline
+      // AMEND 1 — tool-completeness: the REUSED editor keeps every tool (shapes + tiles + Import + layers/props come with it)
+      allShapeTools: ['text', 'rect', 'line', 'circle', 'arrow'].every((t) => !!(ed && ed.querySelector(`[data-add="${t}"]`))),
+      hasTiles: !!(ed && ed.querySelector('#ie_tiles')),
+      hasImport: !!document.querySelector('[data-act="cbm-icon-import"]'),
     };
   });
-  expect(step.hasStep, 'the wizard icon step renders').toBe(true);
-  expect(step.hasPreview, 'a fresh New slot auto-icons — the preview is NOT blank').toBe(true);
-  expect(step.width, 'the preview is LARGE (not the tiny settings thumbnail)').toBeGreaterThan(150);
-  expect(step.hasDraw && step.hasImport, 'Draw/Edit + Import BMP buttons present').toBe(true);
-  await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/cam-s5-iconstep.png' });   // VIEWED — the wizard icon step (large preview + Draw/Import), surfaced to the advisor/user
-  // Build → the built slot carries the auto-icon (360×180)
+  expect(ui.inlineMounted, 'the icon editor mounts INLINE in the wizard').toBe(true);
+  expect(ui.notFixed, 'the inline editor is not a full-screen overlay').toBe(true);
+  expect(ui.stageRenders, 'the editor stage renders the auto icon (name text)').toBe(true);
+  expect(ui.stackedAbove, 'the icon editor is STACKED ABOVE the expose/bake table (controller layout)').toBe(true);
+  expect(ui.allShapeTools, 'ALL shape tools (Text/Rect/Line/Circle/Arrow) present — reuse kept them').toBe(true);
+  expect(ui.hasTiles, 'the tileset toolbar is present').toBe(true);
+  expect(ui.hasImport, 'Import BMP is present').toBe(true);
+  expect(ui.headHidden, 'the modal head chrome is hidden inline').toBe(true);
+  // INTERACTIONS work inline (the GATE-IF concern): adding a shape grows the layer list
+  const before = await page.evaluate(() => document.querySelectorAll('#cbm_iconedit .ie-lyr').length);
+  await page.click('#cbm_iconedit [data-add="rect"]');
+  const after = await page.evaluate(() => document.querySelectorAll('#cbm_iconedit .ie-lyr').length);
+  expect(after, 'adding a shape updates the layer list — interactions work in the inline box').toBeGreaterThan(before);
+  await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/cam-s5b-inline-icon.png' });
+  // Build → the slot carries the rasterized BMP + the editable layers (360×180)
   await page.click('[data-act="cbm-build"]');
-  await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
+  await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'), null, { timeout: 8000 });
   const slot = (await camPack(page)).slots.slice(-1)[0];
-  expect(!!(slot.icon && slot.icon.data && slot.icon.data.length > 100), 'the built slot carries the icon').toBe(true);
+  expect(!!(slot.icon && slot.icon.data && slot.icon.data.length > 100), 'the built slot carries the rasterized camN.bmp').toBe(true);
+  expect(Array.isArray(slot.icon.layers) && slot.icon.layers.length >= 3, 'the slot stores the editable layers (bg + name + the added rect)').toBe(true);
   expect(slot.icon.w === 360 && slot.icon.h === 180, 'the icon is 360×180').toBe(true);
 });
 
-test('S5: Edit PRE-LOADS the slot icon into the wizard preview + it round-trips through Update', async ({ page }) => {
+test('S5b: Edit pre-loads the slot icon LAYERS into the inline editor + they round-trip through Update', async ({ page }) => {
   await openCam(page);
   await buildFromPocket(page);
+  await page.click('#cbm_iconedit [data-add="rect"]');   // a distinctive extra layer
   await page.click('[data-act="cbm-build"]');
-  await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
+  await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'), null, { timeout: 8000 });
   const before = (await camPack(page)).slots.slice(-1)[0];
-  expect(!!(before.icon && before.icon.data), 'the built slot has an icon to pre-load').toBe(true);
-  // Edit → the icon step preview shows the PRE-LOADED slot icon
+  const beforeLayers = before.icon.layers.length;
+  expect(beforeLayers, 'the built slot saved its layers').toBeGreaterThanOrEqual(3);
+  // Edit → the editor pre-loads the SAVED layers
   await page.click('#cam_slots [data-act="editslot"]');
-  await page.waitForSelector('.cam-auth-overlay .cbm-eb', { timeout: 8000 });
-  const preloaded = await page.evaluate(() => { const img = document.querySelector('#cbm_iconstep img'); return img ? img.src : ''; });
-  expect(preloaded === before.icon.data, 'Edit pre-loaded the exact slot icon into the wizard preview').toBe(true);
-  // Update → the icon round-trips (in place)
+  await page.waitForSelector('#cbm_iconedit #iconed-modal.ie-inline', { timeout: 8000 });
+  const loaded = await page.evaluate(() => document.querySelectorAll('#cbm_iconedit .ie-lyr').length);
+  expect(loaded, 'Edit pre-loaded the exact saved icon layers into the editor').toBe(beforeLayers);
+  // Update → the layers round-trip (in place)
   await page.click('[data-act="cbm-build"]');
-  await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
+  await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'), null, { timeout: 8000 });
   const after = (await camPack(page)).slots;
-  expect(after.length, 'still ONE slot — overwrote in place').toBe(1);
-  expect(after[0].icon.data === before.icon.data, 'the icon round-trips through Edit→Update').toBe(true);
+  expect(after.length, 'overwrote in place').toBe(1);
+  expect(after[0].icon.layers.length, 'the icon layers round-trip through Edit→Update').toBe(beforeLayers);
 });

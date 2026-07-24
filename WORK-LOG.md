@@ -14804,3 +14804,56 @@ ddcsPreflightCheck evaluate reads were; forcing the sync render fixes them at th
 ### VERIFIED: all 3 specs pass in ISOLATION (16/16: preflight 10 + homing 5 + mobile 1). Under the FULL GATE: 1466 passed / 4 skipped / 0 FAILED -- and all 3 previously-flaky specs
 passed under the 4-worker load that caused the flakes. A single 0-failed run is not statistical proof, but the fixes are
 DETERMINISTIC (the arbitrary-sleep races are REMOVED, not merely lucky), so the flakes are structurally gone. NO product code changed -- test-infra/spec files only.
+
+---
+
+## turn 1135 -- CAM-UX declare-once S5b: INTEGRATED icon editor, INLINE side-by-side with the param table. Built + VIEWED. No gate.
+
+USER chose integrated over the S5 launch-modal. THE WHY: the DDCS controller CAM page shows camN.bmp + the operator form
+SIDE BY SIDE, so the wizard mirrors that (WYSIWYG). SHIPPED -- the inline refactor worked cleanly, interactions intact -> NO
+gate-back.
+
+### iconEditor.js -- one-source: openIconEditor gained a MOUNT param (renders inline; no overlay/head/foot)
+ - openIconEditor(initial, onSave, opts): opts.mount -> render INTO that container (an `.ie-inline` class un-fixes the overlay
+   + hides the head/foot chrome via CSS; the addrow/tiles/stage/side/props/layers stay); opts.onChange({layers}) fires on every
+   edit; RETURNS { destroy, getLayers, rasterize, addImage }. The full-screen modal path is byte-unchanged (opts omitted).
+ - EXTRACTED rasterizeIconLayers(layers) (the Save export path, now shared) + autoIconLayers(name) (bg + the name as editable
+   text = the auto default AS LAYERS, so it shows editably) + imageTileLayer(uri) (an imported BMP -> a movable tile layer).
+
+### macrosApp.js -- the wizard mounts the editor beside the table; LAYERS are the source, BMP rasterized at build
+ - mountAuthoringSurface: a two-column flex row (icon editor | expose/bake table; wraps on narrow width). mountIconEditor()
+   opens the inline editor into #cbm_iconedit, seeded from: the slot's LAYERS (Edit), a pre-S5b BMP-only icon as a tile
+   (legacy Edit), or autoIconLayers(name) (New). onChange live-writes _authoring.icon.layers.
+ - PRESERVED the S5 wiring, adapted to layers: auto-icon on New (autoIconLayers, never blank + EDITABLE now); Edit PRE-LOADS a
+   deep copy of slot.icon (layers, or BMP->tile); Import BMP -> _iconEditor.addImage (a tile layer); the icon carries through
+   cbmBuild on BOTH New + Update. cbmBuild is now ASYNC: it rasterizes the LIVE layers -> the camN.bmp, then sets slot.icon
+   {name,data,w,h,layers}. slot.icon SHAPE UNCHANGED (data is still the BMP; layers is additive, already carried pre-S5b).
+ - cbmExit destroys the editor. Removed the S5 iconStepHtml/renderIconStep + the launch-modal handler + the autoIconBmp import
+   (now unused -> dropped).
+
+### VERIFIED
+ - cam-slot-icon-s5.spec.js (REWRITTEN for S5b, 2): (1) New -> the editor mounts INLINE (not a full-screen overlay; head
+   chrome hidden), the stage renders the auto name-text, the table is BESIDE it, the Rect/Text tools work INLINE (adding a
+   shape grows the layer list -- the GATE-IF interaction check), and Build rasterizes -> the slot carries a 360x180 BMP + the
+   editable layers; (2) Edit PRE-LOADS the exact saved layers + they round-trip through Update.
+ - VIEWED (my own screenshot, cam-s5b-inline-icon.png): the wizard shows the inline editor (canvas with the editable "Pocket"
+   name + a selected rect + handles, tools, tiles, SELECTED props, LAYERS) SIDE-BY-SIDE with the expose/bake table -- exactly
+   the controller-CAM-page WYSIWYG. Interactions (add/select/resize) work in the inline box.
+ - S3 fidelity/headline (cam-slot-edit-s3) + cam-build-mode STILL green (the async cbmBuild + rasterize does not touch
+   ops/body; the modal build works). Full gate: 1466 passed / 4 skipped / 0 failed -- fully green.
+
+### NO GATE-IF fired: the iconEditor mount refactor was clean (one-source, modal path unchanged) + the inline/side-by-side
+layout did NOT break the editor interactions (canvas sizing via getBoundingClientRect maps at any size; tools/props/layers
+work in the smaller box). Next: the advisor verifies, merges + releases, then .ddcs.
+
+### t1135 AMENDMENTS (polled BEFORE commit; both incorporated):
+ - LAYOUT CORRECTED (user): NOT side-by-side -> STACKED. The DDCS CAM page shows the icon IMAGE ON TOP, the form BELOW, so the
+   inline editor sits ON TOP of the expose/bake table (exactly where the S5 icon step already sat). mountAuthoringSurface is now
+   a stacked block (the editor + Import BMP, then #cbm_table below) -- NOT a two-column row. (Disregard the "side-by-side"
+   wording above.)
+ - TOOL-COMPLETENESS CONFIRMED (user): I REUSED openIconEditor via the mount param (NOT reimplemented), so EVERY modal tool is
+   present inline BY CONSTRUCTION -- Text/Rect/Line/Circle/Arrow + the full tileset + layer add/reorder/delete + props
+   (colour/fill/rotate/size/lock) + pointer move/resize/rotate + Import BMP. Only the modal HEAD (title+✕) + FOOT (Cancel/Save)
+   CHROME are hidden inline (not tools): Save = the wizard Build (rasterize the live layers), Cancel = the wizard Cancel. The
+   S5b test now asserts all 5 shape tools + the tileset + Import + the STACKED-above-table position. VIEWED (screenshot): the
+   full editor on top, the form below.
