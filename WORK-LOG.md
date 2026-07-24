@@ -14436,3 +14436,55 @@ default from the rows, wiring from the binding -- and is byte-identically unchan
 param_field block is the sole edit surface, no write-back). Nothing carries a param_group yet; S5.3 (the form materialize hook,
 mirror S4b) activates it, then S6 polish (incl. the canvas group/role carry + the per-mode compact layout + the literal-twin
 no-pill save fix).
+
+---
+
+## turn 1111 -- BLOCK-NATIVE PARAMS S5.3: the FORM materialize HOOK. Activates S5.1+S5.2 end-to-end, COMPOSES with S4b, and CARRIES canvas grouping (option a). Built.
+
+### THE CANVAS-WIDGET DECISION: option (a) CARRIED -- and it was CHEAP, not a balloon
+The advisor flagged: paramGroupFromBindings maps each binding to a SIMPLE param_field, so a materialized param_group for a
+canvas-widget op (xy-pad/rect) would FLATTEN the group -> not byte-neutral. I GROUNDED it and found the flatten is NOT in the
+materializer -- it is in the CONSUMER's widget override. formBindings already spreads `...b` (so it KEEPS the binding's
+group/role), and groupCanvasBindings puts the canvas widget on the FIRST group member (renderOpForm reads group[0].widget).
+So the ONLY thing that flattened was formBindings doing `widget: row.widget || b.widget` -- the row's default 'number'
+overriding the first member's canvas widget. The fix is ONE line: for a canvas binding (b.group/role present) the binding's
+widget wins, not the row's (canvas grouping is WIRING, not row presentation). No param_field schema change, no skip. Measured
+byte-neutral on a real canvas op (x0/y0 = an xy-pad + a plain feed): the materialized FORM matches today's -- same order,
+label, default, group, role, and every field resolves to the SAME rendered widget (undefined and 'number' resolve identically
+via resolveFormWidget -- a cosmetic object difference, not a render one). So ALL ops are byte-neutral; no canvas skip needed.
+GATE-IF-BALLOONS did NOT fire.
+
+### THE MATERIALIZER + HOOK (mirror S4b)
+- userOps.materializeParamGroup(def): inject paramGroupFromBindings into the user_root PRESENTATION mouth + re-derive EVERY
+  binding blockIndex BY IDENTITY over the post-injection flatten (the wrapForkAtSave pattern, never a blanket shift).
+  Idempotent (skip if a param_group exists or no value bindings).
+- devMode.maybeMaterializeParamGroup(def): the hook gate -- value bindings + PILL-derivable + no existing param_group. NO
+  universal gate (the FORM applies to ANY custom op, unlike the cam_table which is universal-build-only). Literal twins are
+  SKIPPED (no pills -- the same no-pill save limit S4b found, still gated to S6).
+- Hooked into editWizardDef right after maybeMaterializeCamTable.
+
+### THE S4b COMPOSITION (grounded + proven)
+Both maybeMaterializeCamTable (S4b) and maybeMaterializeParamGroup (S5.3) now fire at editWizardDef, each injecting into the
+PRESENTATION mouth. They COMPOSE because each runs its OWN identity re-derive over the CURRENT flatten: cam_table injects +
+re-derives, THEN param_group injects + re-derives over the new (cam_table-containing) flatten. So the combined non-uniform
+shift is handled correctly -- proven: after BOTH inject, every binding still resolves to its original socket (the spec walks
+flat[blockIndex] and checks the block type), the form stays byte-neutral, and the universal build still works.
+
+### VERIFIED
+- cam-block-native-params-s53.spec.js (NEW, 5): (1) materializeParamGroup is BYTE-NEUTRAL for the FORM incl. CANVAS grouping
+  (x0 keeps xy-pad + group/role, y0 keeps group/role, order + resolved widgets identical); (2) COMPOSES with S4b -- cam_table
+  + param_group both inject, every binding resolves by identity after the combined shift, the form stays byte-neutral, the
+  build works; (3) maybeMaterializeParamGroup materializes a pill op, SKIPS a literal op (no pills), idempotent; (4) emit is
+  BYTE-IDENTICAL through the materialized param_group; (5) INTEGRATION -- editWizardDef materializes BOTH a cam_table AND a
+  param_group (3 param_field for x0/y0/frate) in the REAL Blockly workspace, composed.
+- The S4b + S5.1 + S5.2 specs (10) all pass with the composed hook -- the editWizardDef composition regressed nothing.
+- FULL GATE: 1460 passed, 1 failed, 4 skipped -- the 1 is homing-limit-trip:109, a load-sensitive screenshot flake unrelated
+  to form materialization (I touched formWidgets/userOps/devMode/blocksApp/userOpView, none homing). Confirmed: homing-limit-trip
+  + the S5.3 spec all pass 10/10 in isolation. So the editWizardDef hook composition regressed NOTHING. Failed-count grepped,
+  1460+1+4 = 1465 reconciles.
+
+### STATE: block-native params is END-TO-END for pill-based ops on BOTH faces -- opening one to customize materializes its
+PENDANT fields (cam_table, S4b) AND its FORM fields (param_group, S5.3) as blocks, composed via sequential identity re-derives,
+byte-neutral (form + emit) incl. canvas grouping. The build (S2) reads the cam_table, the modal (S4a) writes it, the form
+(S5.2) reads the param_group. Literal twins skipped (S6). Next: S6 polish (the per-mode compact layout + the literal-twin
+no-pill save fix), then the block-native feature is DONE and we reconcile + merge.
