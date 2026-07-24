@@ -14693,3 +14693,51 @@ innocuous GETs stay SIMPLE = no preflight).
 ### THIS COMPLETES THE ENTIRE GATEWAY-CSRF HARDENING: POST guard (t1115, 5 routes) + credential GET (t1117, token+status) +
 file-read GET (t1119, file+sysfile) -- ALL via the ONE _has_local_header predicate + the ONE _GUARDED_GETS set. Bundle the
 whole feat/gateway-csrf-guard branch for one merge/release. NO RELEASE (advisor reviews, then the USER go).
+
+---
+
+## turn 1141 -- GATEWAY-SECURITY C-part-2: the do_OPTIONS ORIGIN-ALLOWLIST -- make mode (c) work WITHOUT weakening the guard. Built + real-symptom verified.
+
+### THE PROBLEM (from the t1140 investigation, advisor-reviewed): the header guard breaks the legit mode (c)
+The CSRF guard requires the non-CORS-able X-DDCS-Local header. Modes (a) exe/bridge-served and (b) LAN QR are SAME-ORIGIN
+(no preflight -> the header is sent freely -> fine). But mode (c) -- the HOSTED page (ddcs-studio.pages.dev) pointed at a
+LOCAL 127.0.0.1 bridge via the admin "Use local gateway" one-click -- is CROSS-ORIGIN, so its custom header needs a CORS
+preflight, and do_OPTIONS granted ONLY Content-Type -> the browser refuses to send the guarded POSTs + GETs -> mode (c)
+(a documented value-prop: cloud UI + local controller) was fully blocked. The fix: let a KNOWN-TRUSTED DDCS origin pass
+the preflight, WITHOUT dropping the header guard for anyone else.
+
+### THE FIX (declare-not-infer; minimal; one seam)
+- server.py: a DECLARED allowlist. TRUSTED_ORIGINS = frozenset built once at import by _load_trusted_origins(): the official
+  https://ddcs-studio.pages.dev ships IN; a self-hoster adds their OWN Studio origin via the DDCS_TRUSTED_ORIGINS env var
+  (comma-separated). This is the declared, extensible seam for "any user-configured self-host" -- NO config-field machinery
+  built (rule-of-three: no config.py origins field exists; the env var serves a self-hoster NOW without editing shipped code).
+- do_OPTIONS: reads the request Origin. TRUSTED -> Access-Control-Allow-Origin: <that origin> (reflected, not *) +
+  Access-Control-Allow-Headers: Content-Type, X-DDCS-Local (so the legit hosted page CAN set the header). ANY OTHER origin
+  (incl. no Origin) -> unchanged: Allow-Origin * + Content-Type ONLY. Added Vary: Origin (the response now depends on the
+  request Origin -> caches must not share it across origins).
+
+### WHY THE HEADER GUARD STAYS (the allowlist ALONE is NOT sufficient -- the dispatch was explicit)
+CORS only blocks READING a cross-origin response; a simple cross-origin POST still LANDS server-side. So the allowlist by
+itself would not stop a forged state change -- the X-DDCS-Local header is what stops the forgery (a cross-origin page cannot
+set a custom header without a preflight, and a NON-trusted origin is still refused X-DDCS-Local at the preflight). The
+allowlist only lets a TRUSTED origin THROUGH the preflight so IT can set the header. Both together = mode (c) works AND the
+drive-by is still blocked. Applied to the SAME do_OPTIONS that fronts both the guarded POSTs and the guarded GETs (one
+preflight handler -> covers both) -- the actual guarded responses keep Allow-Origin * (no credentials, so * is accepted).
+
+### VERIFIED (my own, two ways -- assert-the-value on the real response bytes, not a proxy)
+1. Extended test_csrf_guard.py (+2 tests, 9/9 green): a TRUSTED-origin OPTIONS grants X-DDCS-Local AND reflects the origin
+   (mode c works); an EVIL-origin OPTIONS does NOT grant X-DDCS-Local and stays * (drive-by still blocked). The pre-existing
+   test_preflight_never_grants_the_local_header (no-Origin OPTIONS) STILL passes -- backward-compatible.
+2. Independent live probe (spun the real server, sent real OPTIONS for 3 origin cases): TRUSTED -> (204, Allow-Origin
+   ddcs-studio.pages.dev, Allow-Headers "Content-Type, X-DDCS-Local", Vary Origin); EVIL and NO-ORIGIN -> (204, *,
+   "Content-Type", Origin). Env seam proven: DDCS_TRUSTED_ORIGINS="https://cnc.myshop.example,..." -> those origins JOIN the
+   allowlist alongside pages.dev.
+test_pull_geometry still green (ops untouched). Full web gate: 1461 passed / 4 skipped / 0 failed (14.0m) -- identical to the
+t1119 green on this branch (the change is bridge-Python only; it cannot touch the web suite, and the count confirms it).
+
+### COMMITTED: gateway files ONLY (server.py + test_csrf_guard.py). The pre-existing working-tree noise (test PNGs,
+HANDOFF/NEXT-SESSION, untracked scratch) is NOT mine and stays unstaged. NO RELEASE. This completes GATEWAY-SECURITY C:
+the whole feat/gateway-csrf-guard branch (POST guard t1115 + credential GET t1117 + file GET t1119 + this origin-allowlist)
+is now safe for ALL 4 modes. Merge TIMING is the advisor+user call (now vs bundled with the exe/bridge update). RESIDUAL
+(note to user): an XSS of the DDCS hosted page could then drive the local bridge -- the standard CORS-allowlist trade-off
+(pages.dev is DDCS own domain).
