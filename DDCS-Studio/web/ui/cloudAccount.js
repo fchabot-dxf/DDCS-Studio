@@ -85,7 +85,7 @@ async function connectGoogleDesktop() {
     const deadline = Date.now() + 180000;
     const tick = async () => {
         let t = {};
-        try { t = await (await fetch('/api/oauth/google/token')).json(); } catch (e) { /* keep polling */ }
+        try { t = await (await fetch('/api/oauth/google/token', { headers: { 'X-DDCS-Local': '1' } })).json(); } catch (e) { /* keep polling */ }   // X-DDCS-Local: the token GET is CSRF-guarded (a Drive credential); same-origin Studio sends it
         if (t.access_token) {
             try { localStorage.setItem(TOK, t.access_token); localStorage.setItem(PROV, 'google'); } catch (e) { /* */ }
             window.dispatchEvent(new CustomEvent('ddcs:cloud-account'));
