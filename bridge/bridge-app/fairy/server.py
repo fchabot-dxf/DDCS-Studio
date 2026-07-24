@@ -56,13 +56,16 @@ def _has_local_header(headers):
     return headers.get(LOCAL_HEADER) == LOCAL_VALUE
 
 
-# SENSITIVE GET routes — reads a cross-origin page must NOT be able to make. /api/oauth/google/token returns the user's
-# Google Drive ACCESS TOKEN (a live credential) and /api/oauth/google/status leaks their Google connection state; with
-# Access-Control-Allow-Origin: * any site the user visits could fetch these and steal/probe the credential. Guard them
-# with the SAME non-CORS-able header (a simple cross-origin GET carries no header → 403; adding it forces a preflight
-# that grants only Content-Type → blocked). Every OTHER GET is an innocuous local read and stays open. Scoped by set
-# (declared, one line to extend) rather than a blanket do_GET guard, so a legit read is never accidentally locked out.
-_GUARDED_GETS = frozenset({"/api/oauth/google/token", "/api/oauth/google/status"})
+# SENSITIVE GET routes — reads a cross-origin page must NOT be able to make. With Access-Control-Allow-Origin: * any
+# site the user visits could fetch these:
+#   /api/oauth/google/token  — the user's Google Drive ACCESS TOKEN (a live credential → account takeover)
+#   /api/oauth/google/status — their Google connection state (info disclosure)
+#   /api/file, /api/sysfile  — their CNCDISK / SYSDISK FILE CONTENTS (their G-code / macros → data disclosure)
+# Guard them with the SAME non-CORS-able header (a simple cross-origin GET carries no header → 403; adding it forces a
+# preflight that grants only Content-Type → blocked). Every OTHER GET is an innocuous local read and stays open. Scoped
+# by set (declared, one line to extend) rather than a blanket do_GET guard, so a legit read is never accidentally locked
+# out. (path is query-stripped before the check, so ?name=… on /api/file / /api/sysfile still matches.)
+_GUARDED_GETS = frozenset({"/api/oauth/google/token", "/api/oauth/google/status", "/api/file", "/api/sysfile"})
 
 _PLACEHOLDER = (
     b"<!doctype html><meta charset=utf-8><title>DDCS Bridge gateway</title>"

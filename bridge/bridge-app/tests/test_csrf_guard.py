@@ -30,6 +30,8 @@ class _MockOps:
     def write_sysfile(self, *a):       return {"ok": True, "reached": "write_sysfile"}
     def delete_sysfile(self, name):    return {"ok": True, "reached": "delete_sysfile"}
     def get_config(self):              return {"ok": True, "reached": "get_config"}
+    def read_file(self, name):         return {"ok": True, "name": name, "content": "SECRET_GCODE_G1X5"}
+    def read_sysfile(self, name):      return {"ok": True, "name": name, "content": "SECRET_MACRO_M99"}
 
 
 def _start():
@@ -133,6 +135,22 @@ def test_sensitive_get_token_is_guarded():
         httpd.shutdown()
 
 
+def test_file_reads_are_guarded():
+    """The file-content disclosure: GET /api/file + /api/sysfile return the user's CNCDISK/SYSDISK contents, so they must
+    be 403 without the header (content NOT leaked) and return the content WITH it (Studio's own read works loopback/LAN).
+    A ?name= query must still match the guard (the path is query-stripped before the set check)."""
+    httpd, port = _start()
+    try:
+        for path, secret in [("/api/file?name=a.nc", "SECRET_GCODE_G1X5"), ("/api/sysfile?name=T.nc", "SECRET_MACRO_M99")]:
+            st, _, data = _req(port, "GET", path)                         # forged cross-origin read, no header
+            assert st == 403, "%s without header must be 403, got %d (%s)" % (path, st, data)
+            assert secret not in data, "the file content must NOT leak to an unguarded GET: %s" % data
+            st, _, data = _req(port, "GET", path, {"X-DDCS-Local": "1"})  # Studio (same-origin/LAN) with the header
+            assert st == 200 and secret in data, "%s WITH header must return the content, got %d (%s)" % (path, st, data)
+    finally:
+        httpd.shutdown()
+
+
 if __name__ == "__main__":
     test_forged_post_without_header_is_403()
     test_post_with_header_reaches_ops()
@@ -140,6 +158,8 @@ if __name__ == "__main__":
     test_get_reads_stay_open()
     test_guard_is_header_only_not_loopback()
     test_sensitive_get_token_is_guarded()
+    test_file_reads_are_guarded()
     print("PASS — gateway CSRF guard: forged POST 403 (5 routes, never reaches Ops), header POST reaches Ops, "
-          "preflight withholds X-DDCS-Local, innocuous GET open, guard is header-only (LAN == loopback), and the "
-          "sensitive GETs (Drive token + status) are 403 without the header (token NOT leaked) / return with it")
+          "preflight withholds X-DDCS-Local, innocuous GET open, guard is header-only (LAN == loopback); the "
+          "sensitive GETs (Drive token + status) are 403 without the header (token NOT leaked) / return with it; and "
+          "the file reads (/api/file + /api/sysfile) are 403 without the header (content NOT leaked) / return with it")
