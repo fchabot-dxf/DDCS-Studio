@@ -47,26 +47,6 @@ test('A — op menu: a placed CAM twin shows "Customize as blocks" → routes to
 // redundant with A (STUDIO) + the MACRO-tab entry (both already take you into Blocks) and it clutters the build-a-new-wizard
 // list. The customize doors are A (op menu) + the MACRO-tab Customize-op button + C (the placed-op Save fork route wrap).
 
-test('B2 — MACRO CAM builder: the Customize-op button + picker lists recognized program ops → ddcsEditWizardDef', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.showApp);
-    await page.evaluate(async () => {
-        window.ddcsGetBlockProgram = () => [{ id: 's1', type: 'op', opType: 'user_surfacing_data', label: 'Surface', params: {} }];
-        (await import('/ui/macrosApp.js')).initMacrosApp();
-        window.showApp('macros');
-        window.__ewd = null; window.ddcsEditWizardDef = (t) => { window.__ewd = t; };
-    });
-    await page.waitForSelector('#cam_customize_op', { state: 'attached' });
-    await page.evaluate(() => document.getElementById('cam_customize_op').click());   // DOM click (bypasses sub-tab visibility)
-    await page.waitForSelector('.cam-sim-overlay #cbm_custsel');
-    await page.screenshot({ path: `${SCRATCH}/cam-customize-picker.png` });   // VIEWED — the MACRO Customize-op picker
-    const opts = await page.evaluate(() => [...document.querySelectorAll('#cbm_custsel option')].map((o) => o.value));
-    await page.click('.cam-sim-overlay [data-cbm="ok"]');
-    const ewd = await page.evaluate(() => window.__ewd);
-    expect(opts, 'the picker lists the recognized surfacing twin from the program').toContain('user_surfacing_data');
-    expect(ewd, 'selecting an op → ddcsEditWizardDef with its opType').toBe('user_surfacing_data');
-});
-
 test.describe(() => {
     test.use({ viewport: { width: 1400, height: 1000 } });
     test('VIEWED — Customize a surfacing op (via ddcsEditWizardDef, the contract A/B/B2 all trigger) opens Blocks WITH the opunit chip', async ({ page }) => {
