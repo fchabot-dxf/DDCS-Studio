@@ -14598,3 +14598,55 @@ PASS. Also ran test_pull_geometry.py (green -- ops untouched). Full web gate: 14
    sensitive, no credentials.
 
 ### NO RELEASE (advisor reviews, then merges + releases WITH the user). Branch feat/gateway-csrf-guard.
+
+---
+
+## turn 1117 -- GATEWAY-CSRF GET GUARD: the sensitive reads (the Google Drive TOKEN + status) now require X-DDCS-Local. Completes the gateway-CSRF hardening. Built + adversarially verified.
+
+### THE LEAK (advisor-confirmed, SHIPPED on main): a stolen Google credential
+GET /api/oauth/google/token returns the users Google Drive ACCESS TOKEN, unguarded, Access-Control-Allow-Origin: *, and
+a simple GET has NO preflight -> ANY website the user visited could fetch it and STEAL the Drive credential. Worse than the
+job-queue POST exposure (it steals a Google ACCOUNT credential), so it ships WITH the POST guard, not as a follow-up.
+
+### THE FIX (server.py) -- scope the guard to the SENSITIVE reads, one-source predicate
+Declared _GUARDED_GETS = { /api/oauth/google/token, /api/oauth/google/status } and guarded them at the TOP of do_GET with the
+SAME _has_local_header predicate as the POSTs (ONE source). A cross-origin simple GET carries no header -> 403; adding the
+header forces a preflight that grants only Content-Type (the NEVER-widen do_OPTIONS) -> blocked. SCOPED BY SET (declared, one
+line to extend) NOT a blanket do_GET guard, so the ~12 innocuous local reads (descriptor/profile/queue/files/config/...) stay
+OPEN and no legit read is accidentally locked out.
+ - token: DEFINITE (returns the Drive access_token). Guarded.
+ - status: {connected, configured} -- leaks the users Google connection state; guarded too (defense-in-depth). GROUNDED: it has
+   ZERO callers anywhere in the repo, so guarding it breaks nothing.
+ - /api/config: CHECKED per the dispatch -- get_config returns machine metadata only (machine_name/id, dest, com_port, host,
+   port, lan_ip); NO google_client_secret (grep of ops.py: the secret is never in get_config). So NOT a credential leak -> left
+   OPEN (innocuous).
+
+### THE CLIENT SENDS THE HEADER on the token GET (2 direct-fetch seams; status has no caller)
+GROUNDED every fetch of the guarded paths in web/: the token GET is fetched in exactly TWO places, both DIRECT fetches (not the
+client.js wrapper): googleDrive.js:71 (pull+cache the token for the pywebview api) and cloudAccount.js:88 (the post-sign-in
+poll). Added { headers: { X-DDCS-Local: 1 } } to both -- same-origin (loopback OR LAN) so they can set it. status has no
+caller so no client change. No innocuous GET touched.
+
+### VERIFIED (adversarial, my own -- extended bridge/bridge-app/tests/test_csrf_guard.py, oauth module STUBBED to a sentinel so
+it proves the GUARD not the OAuth exchange -- no network/file):
+ - forged cross-origin GET of the token, NO header -> 403 AND the token (FAKE_DRIVE_TOKEN) does NOT appear in the body (not
+   leaked).
+ - Studio own GET WITH the header -> 200 + the token (its legit read still works on loopback/LAN).
+ - status guarded the same (403 without, 200 with).
+ - the innocuous GET /api/config stays open with no header (test_get_reads_stay_open, unchanged).
+ - the preflight still withholds X-DDCS-Local (do_OPTIONS unchanged, handles all paths) -> a cross-origin page cannot set it
+   for a GET either.
+6/6 green. test_pull_geometry still green (ops untouched). Full web gate: 1459 passed / 4 skipped / 2 failed -- the 2 (homing-inplace-e3 screenshot + knob-persist:15)
+are KNOWN load-sensitive flakes that PASS 4/4 in isolation, unrelated to a server/oauth-fetch change (a DIFFERENT pair than
+last turns, confirming rotation-by-load). Effective 1461 deterministic green.
+
+### SURFACED (broader read-disclosure, NOT a credential -- for the advisor to scope): GET /api/file?name= and
+/api/sysfile?name= return the users CNCDISK / SYSDISK FILE CONTENTS (read_file/read_sysfile) and with Allow-Origin: * are
+cross-origin READABLE -- a site could read the users G-code / macro files. NOT a credential (unlike the token), and guarding
+them touches MANY client read sites + might break an intended LAN-viewer read, so I did NOT guard them this turn (out of the
+token+status scope). RECOMMEND: decide next whether file/sysfile reads are meant to be cross-origin (if not, guard them + route
+the client file-reads through a header-sending wrapper).
+
+### NO GATE-STOP: every guarded GET took the header without breaking a real (same-origin/LAN) client (status has none; token
+callers all same-origin). This + the POST guard = the COMPLETE gateway-CSRF hardening. NO RELEASE (advisor reviews, then the
+branch is ready for the USER go). Branch feat/gateway-csrf-guard.
