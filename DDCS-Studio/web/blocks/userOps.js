@@ -387,6 +387,34 @@ export function paramGroupFromBindings(def, group = 'Settings') {
     return { type: 'param_group', params: { group }, children };
 }
 
+/**
+ * block-native-params S5.3 — materialize a param_group INTO a def (the FORM analog of materializeCamTable). Injects
+ * paramGroupFromBindings into the user_root PRESENTATION mouth and re-derives EVERY binding blockIndex BY IDENTITY over the
+ * post-injection flatten (the wrapForkAtSave pattern; a blanket shift would corrupt a uiChildren binding). Mutates `def` in
+ * place; idempotent (no-op if the def has no value bindings or already carries a param_group). COMPOSES with materializeCamTable:
+ * each runs its own identity re-derive over the CURRENT flatten, so running both sequentially re-indexes correctly across the
+ * combined injection. BYTE-NEUTRAL by construction: param_field emits [] + param_group is transparent, and formBindings
+ * consuming it reproduces today's form (order/label/widget/default, and canvas group/role which it re-derives from the binding).
+ * PURE — the caller (the S5.3 hook) decides when. Returns def.
+ */
+export function materializeParamGroup(def) {
+    if (!def || !Array.isArray(def.template)) return def;
+    const root = def.template.find((b) => b && b.type === 'user_root');
+    if (!root) return def;
+    if (flattenBlocks(def.template).some((b) => b && b.type === 'param_group')) return def;   // already has one — idempotent
+    const pg = paramGroupFromBindings(def);
+    if (!pg) return def;   // no value bindings — nothing to declare
+    const flatBefore = flattenBlocks(def.template);
+    root.uiChildren = [pg, ...(root.uiChildren || [])];
+    const flatAfter = flattenBlocks(def.template);
+    (def.bindings || []).forEach((b) => {
+        if (!b || b.blockIndex == null) return;
+        const ref = flatBefore[b.blockIndex]; const ni = ref ? flatAfter.indexOf(ref) : -1;   // BY IDENTITY
+        if (ni >= 0) b.blockIndex = ni;
+    });
+    return def;
+}
+
 /** deriveBindings SPEC rows → `formfield` block records (every field set, so recToJson's fields/dropdowns stay valid).
  *  The reverse of bindingsFromStack — renders a hand-written spec set (corner/edge/middle's *_BINDING_SPECS) AS blocks in
  *  the Blockly view so a ported wizard is authorable/re-authorable. Only VALUE specs (a `match` — a value socket); a

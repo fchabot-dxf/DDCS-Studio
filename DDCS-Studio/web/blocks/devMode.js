@@ -18,7 +18,7 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, getUserDef, instantiate } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, getUserDef, instantiate, materializeParamGroup } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
@@ -525,6 +525,23 @@ export function maybeMaterializeCamTable(def) {
     return def;
 }
 
+// t1111 (block-native params S5.3) — the FORM materialize hook, the analog of maybeMaterializeCamTable. Gives an op with
+// value bindings its FORM fields as param_field blocks (a param_group) when opened to customize. NO universal gate (the form
+// applies to ANY custom op, not just the universal build arm). PILL-derivable only (the same no-pill save limit S4b found for
+// literal twins → S6). Idempotent. COMPOSES with maybeMaterializeCamTable: both run at editWizardDef, each re-derives the
+// bindings BY IDENTITY over the CURRENT (post-previous-injection) flatten, so the combined shift is correct. CANVAS ops are
+// NOT skipped — formBindings preserves a canvas binding's group/role/widget, so a materialized param_group stays byte-neutral.
+export function maybeMaterializeParamGroup(def) {
+    try {
+        if (!def || !def.opType || !Array.isArray(def.template)) return def;
+        if (!(def.bindings || []).some((b) => b && b.blockIndex != null)) return def;     // needs value bindings to declare
+        if (flattenBlocks(def.template).some((b) => b && b.type === 'param_group')) return def;   // idempotent — already has a form group
+        if (!hasParamPills(def.template)) return def;                                     // PILL-derivable only (literal twins → S6)
+        materializeParamGroup(def);
+    } catch (_) { /* leave the op unmaterialized on any doubt — the fallback path is always correct */ }
+    return def;
+}
+
 export async function editWizardDef(opType) {
     const def = listUserOps().find((d) => d.opType === opType);
     if (!def) { alert('That wizard is no longer in your library.'); return; }
@@ -532,6 +549,7 @@ export async function editWizardDef(opType) {
     // opens it to customize. Mutates this store-copy def (template + bindings) BEFORE the fork clone, so forkTpl carries the
     // cam_table into the workspace and it persists on save (pill re-index automatic). A no-op for twins / literal / already-done.
     maybeMaterializeCamTable(def);
+    maybeMaterializeParamGroup(def);   // t1111 (S5.3) — the FORM half: a pill-based op gains its form fields as param_field blocks; composes with the cam_table above (each identity-re-derives)
     // t1069 — a RECOGNIZED generator twin opened here is a FORK/CUSTOMIZE: wrap its exec atoms in opunit AND treat the save as a
     // NEW op (never overwrite the twin's own def — the opunit shifts its frozen bindings +1). A custom user op is a normal re-author.
     const { template: forkTpl, recognized } = wrapRecognizedForFork(def);

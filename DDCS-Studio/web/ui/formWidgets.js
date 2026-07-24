@@ -896,10 +896,15 @@ export function formBindings(def) {
     return rows.map((row) => {
         const b = byParam[row.param];
         if (!b) return null;   // a row naming a param with no binding → dangling, skip
+        // CANVAS GROUPING is WIRING, not presentation: a binding in a canvas group (group/role, e.g. an xy-pad's x/y) keeps
+        // its group/role (via ...b) AND its canvas `widget` (the first member's widget drives the group's render — the row's
+        // 'number' must NOT override it, or the group would flatten). So for a canvas member the binding's widget wins; only
+        // a plain binding takes the row's widget. This is why a materialized param_group is byte-neutral even for canvas ops.
+        const isCanvas = (b.group != null) || (b.role != null);
         return {
             ...b,
             label: (row.label != null) ? row.label : b.label,
-            widget: row.widget || b.widget,
+            widget: isCanvas ? b.widget : (row.widget || b.widget),
             type: row.type || b.type,
             default: (row.default != null) ? row.default : b.default,
             ...(row.widgetConfig ? { widgetConfig: row.widgetConfig } : (b.widgetConfig ? { widgetConfig: b.widgetConfig } : {})),
