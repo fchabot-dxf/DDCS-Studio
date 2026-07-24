@@ -1317,13 +1317,22 @@ function homingPostIsExpert() {
     // _editingSlot set so Build becomes "Update CAM (camN)" overwriting that slot IN PLACE. MODAL-ONLY (does not touch the
     // active program/editor — that is the gated S4). A legacy slot (no slot.ops) or one whose op-type is gone can't Edit: the
     // display only offers Edit when slot.ops has content, and this refuses a stale manifest loudly rather than opening lossy.
-    function editCamSlot(slot) {
+    // S4-2 (corrected model, t1147) — Edit opens the pendant MODAL (icon + expose/bake) for EVERY slot, AND for a single-op
+    // UNIVERSAL slot ALSO loads the reconstructed op into the editor so the Blocks tab shows its STRUCTURE. "Loading is
+    // editing": the load REUSES the editWizardDef path (getUserDef → makeOp → the S4-1 destructive-load guard →
+    // showApp('blocks') → ddcsLoadBlockStack + editing chrome), so a DIRTY editor gets ONE confirm and a clean one loads
+    // straight in. GENERATORS are modal-only (parametric — nothing to load; the editor is untouched). The modal always
+    // opens (the pendant is program-independent); only the structure-load is guarded. Substack=S4-4, multi-op=S4-5; the
+    // round-trip back to the slot rides defVStale + buildSlotFromOps (an explicit slot-Update is S4-3).
+    async function editCamSlot(slot) {
         const ops = (slot.ops || []).map(manifestToAuthOp);
         if (!ops.length || ops.some((a) => !a)) { dlgNotice('This slot can’t be edited in the wizard (a legacy hand-built macro, or an op that is no longer installed). Use ▶ Simulate / ⬇ View output / ✕.'); return; }
+        const uni = (slot.ops.length === 1 && slot.ops[0] && slot.ops[0].type === 'universal') ? slot.ops[0] : null;
+        if (uni && uni.opType && getUserDef(uni.opType) && window.ddcsEditWizardDef) await window.ddcsEditWizardDef(uni.opType);   // universal → also load the structure into Blocks (S4-1 guarded; generators skip this)
         _editingSlot = +slot.slot;
         _authoring = { ops, name: slot.name || '', icon: slot.icon ? JSON.parse(JSON.stringify(slot.icon)) : null, seedLocked: true };   // t1129 S5 — PRE-LOAD the slot icon so the wizard preview shows it + it is re-editable
         _cbmUnsupported = [];
-        openCamAuthoring();   // _editingSlot != null → skips the seed, opens on the pre-set _authoring
+        openCamAuthoring();   // _editingSlot != null → skips the seed, opens on the pre-set _authoring (the pendant, over the Blocks structure for a universal slot)
     }
     // The ONE opener — a modal over any surface. seedOp given (op-card door) → seeds THAT one op. No seedOp (toolbar / CAM-tab
     // doors) → AUTO-IMPORT every CAM-able op from the program (in order). Exposed as window.ddcsOpenCamAuthoring for the op card.
@@ -1546,7 +1555,7 @@ function homingPostIsExpert() {
             // S1 — the settings panel is read-mostly: only the DISPLAY actions live here (Delete / Duplicate the slot,
             // Simulate, View output). Authoring (fields, ops, macro, icon) moved to the wizard (S2/S3/S5).
             if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
-            else if (a === 'editslot') { editCamSlot(slot); }   // t1127 S3 — reopen the wizard pre-seeded from the manifest → Update in place
+            else if (a === 'editslot') { editCamSlot(slot); }   // t1127 S3 — reopen the wizard pre-seeded from the manifest → Update in place (+ S4-2 — a universal slot also loads into Blocks)
             else if (a === 'dupslot') {
                 const clone = JSON.parse(JSON.stringify(slot)); delete clone.bodyDirty;
                 clone.slot = nextSlotNum();
