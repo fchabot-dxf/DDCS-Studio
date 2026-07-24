@@ -16,7 +16,7 @@ import { ddcsTheme } from './blockly/theme.js';
 import { setStack, getStack, getProjection, onChange } from './programModel.js';   // blocks = a VIEW of the shared program model
 import { mountDevMode, deriveAuthoredDef, editingWizardType, writeAuthoredValue } from './devMode.js';   // authoring: derive the live def + write form values back
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
-import { renderOpForm } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view)
+import { renderOpForm, formBindings } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view); S5.2 — param_field rows when present
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
@@ -394,7 +394,7 @@ async function buildWorkspace() {
     }
     formHost.__sig = sig;                                                          // structure changed → rebuild
     formHost.innerHTML = '';
-    if (def.bindings && def.bindings.length) renderOpForm(formHost, def.bindings);
+    if (def.bindings && def.bindings.length) renderOpForm(formHost, formBindings(def));   // S5.2 — consume param_field rows when present; else byte-identical
     else formHost.innerHTML = '<div class="blk-form-empty">No knobs yet — tick a value’s “knob” on the blocks to expose one.</div>';
   }
   // form→block writeback (wired once): an edited form field writes its value back to the bound block, surgically.
