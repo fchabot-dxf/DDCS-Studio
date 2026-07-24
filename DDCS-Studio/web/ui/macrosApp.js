@@ -1247,12 +1247,24 @@ function homingPostIsExpert() {
         }).join('');
         el.innerHTML = `${sections}<div class="settings-hint" style="margin-top:8px;">Expose = the operator fills it on the pendant (#11xx → #2600). Bake = frozen into the macro; the row vanishes. Enum params pick a friendly label; the pendant stores its number.</div>`;
     }
+    // t1129 S5 — the wizard ICON STEP: a LARGE 360×180 preview of _authoring.icon (never the tiny settings thumbnail) + Draw/
+    // Edit (launches openIconEditor as a modal) + Import BMP. The icon rides _authoring.icon through Build/Update (cbmBuild).
+    function iconStepHtml() {
+        const ic = _authoring && _authoring.icon;
+        const preview = (ic && ic.data)
+            ? `<img src="${ic.data}" alt="" style="width:240px; height:120px; object-fit:contain; border:1px solid var(--border); background:#000; border-radius:6px;">`
+            : `<div style="width:240px; height:120px; display:flex; align-items:center; justify-content:center; border:1px dashed var(--border); border-radius:6px; color:var(--text-dim); font-size:11px;">No icon yet</div>`;
+        const cap = ic ? `${camEsc(ic.name || '')}${ic.w ? ` · ${ic.w}×${ic.h}${(ic.w === 360 && ic.h === 180) ? '' : ' ⚠ not 360×180'}` : ''}${ic.source === 'auto' ? ' · auto' : ''}` : '';
+        return `${preview}<div style="display:flex; flex-direction:column; gap:6px;"><b style="font-size:11px; color:var(--text-dim);">Slot icon (camN.bmp)</b><div style="font-size:10px; color:var(--text-dim); min-height:12px;">${cap}</div><button class="toolbar-btn settings-io" data-act="cbm-icon-edit">🎨 ${ic ? 'Edit' : 'Draw'} icon</button><button class="toolbar-btn settings-io" data-act="cbm-icon-import">🖼 Import BMP</button></div>`;
+    }
+    function renderIconStep() { const el = document.getElementById('cbm_iconstep'); if (el) el.innerHTML = iconStepHtml(); }
     function mountAuthoringSurface(body) {
         const n = _authoring.ops.length;
         const editing = _editingSlot != null;   // t1127 S3 — Edit reads "Update CAM (camN)"; New reads "Build CAM slot"
         body.innerHTML = `<div class="cam-build-mode" style="padding:14px 16px;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><b style="flex:1; font-size:14px;">${editing ? `✎ Update CAM (cam${_editingSlot})` : '✚ Build CAM slot'}${n > 1 ? ` — ${n} ops` : ''}</b><button class="toolbar-btn settings-io" data-act="cbm-cancel">✕ Cancel</button></div>
             <div class="settings-row" style="align-items:center; margin-top:2px;"><label style="font-size:11px; color:var(--text-dim);">Slot name&nbsp;<input id="cbm_name" value="${camEsc(_authoring.name || '')}" placeholder="e.g. Pocket" style="min-width:200px;"></label></div>
+            <div id="cbm_iconstep" style="display:flex; align-items:center; gap:12px; margin-top:10px;">${iconStepHtml()}</div>
             <div id="cbm_table" style="margin-top:8px;"></div>
             <div style="display:flex; align-items:center; gap:8px; margin-top:10px;"><b style="font-size:11px; color:var(--text-dim); flex:1;">Inline preview</b><button class="toolbar-btn settings-io" data-act="cbm-sim" title="Simulate this slot's composed macro, each field seeded from its value.">▶ Simulate</button></div>
             <div id="cbm_preview" style="height:280px; position:relative; border:1px solid var(--border); border-radius:6px; margin-top:6px; background:#000;"></div>
@@ -1272,7 +1284,14 @@ function homingPostIsExpert() {
                 if (a.exposed[key] === false) a.baked[key] = num;   // keep the baked literal in sync
             }
         });
-        root.addEventListener('click', (e) => { const a = e.target.dataset.act; if (a === 'cbm-cancel') cbmExit(); else if (a === 'cbm-sim') cbmSimulate(); else if (a === 'cbm-build') cbmBuild(); });
+        root.addEventListener('click', (e) => {
+            const a = e.target.dataset.act;
+            if (a === 'cbm-cancel') cbmExit();
+            else if (a === 'cbm-sim') cbmSimulate();
+            else if (a === 'cbm-build') cbmBuild();
+            else if (a === 'cbm-icon-edit') openIconEditor(_authoring.icon || null, (bmp, model) => { _authoring.icon = { name: (_authoring.name || 'cam') + '.bmp', data: bmp, w: 360, h: 180, layers: model.layers, source: 'drawn' }; renderIconStep(); });   // t1129 S5 — LAUNCH the editor as a modal; onSave writes _authoring.icon + re-renders the preview
+            else if (a === 'cbm-icon-import') importCamIcon();
+        });
         root.addEventListener('change', (e) => {
             const t = e.target;
             if (t.classList.contains('cbm-eb') && t.checked) { cbmToggle(+t.dataset.oi, t.dataset.fkey, t.dataset.mode); return; }
@@ -1294,7 +1313,7 @@ function homingPostIsExpert() {
         const ops = (slot.ops || []).map(manifestToAuthOp);
         if (!ops.length || ops.some((a) => !a)) { dlgNotice('This slot can’t be edited in the wizard (a legacy hand-built macro, or an op that is no longer installed). Use ▶ Simulate / ⬇ View output / ✕.'); return; }
         _editingSlot = +slot.slot;
-        _authoring = { ops, name: slot.name || '', seedLocked: true };
+        _authoring = { ops, name: slot.name || '', icon: slot.icon ? JSON.parse(JSON.stringify(slot.icon)) : null, seedLocked: true };   // t1129 S5 — PRE-LOAD the slot icon so the wizard preview shows it + it is re-editable
         _cbmUnsupported = [];
         openCamAuthoring();   // _editingSlot != null → skips the seed, opens on the pre-set _authoring
     }
@@ -1317,6 +1336,11 @@ function homingPostIsExpert() {
                     else { const r = seedFromOp(op); _cbmUnsupported.push({ label: op.label || op.opType, reason: (r && r.unsupported) || 'not CAM-able' }); }
                 }
                 _authoring.name = _authoring.ops.length === 1 ? _authoring.ops[0].label : (_authoring.ops.length ? 'Program' : '');
+            }
+            // t1129 S5 — AUTO-ICON so a fresh New slot's preview is never blank (editable/replaceable in the icon step).
+            if (!_authoring.icon && _authoring.ops.length) {
+                const first = _authoring.ops[0];
+                try { _authoring.icon = { name: (_authoring.name || 'cam') + '.bmp', data: autoIconBmp(_authoring.name, first.camType || first.type), w: 360, h: 180, source: 'auto' }; } catch (_) { /* canvas unavailable */ }
             }
         }
         const ov = document.createElement('div'); ov.className = 'cam-auth-overlay';
@@ -1426,6 +1450,7 @@ function homingPostIsExpert() {
         } else {
             slot = { slot: nextSlotNum(), name: _authoring.name || 'New CAM slot', ops }; _camPack.slots.push(slot);
         }
+        if (_authoring.icon) slot.icon = _authoring.icon;   // t1129 S5 — carry the wizard icon to the slot on BOTH New (Build) and Edit (Update)
         buildSlotFromOps(slot); saveCamPack(); cbmExit();
     }
 
@@ -1458,15 +1483,17 @@ function homingPostIsExpert() {
             </div>`;
         }).join('');
     }
-    function importCamIcon(slot) {
+    // t1129 S5 — import a BMP into the WIZARD icon step (writes _authoring.icon + re-renders the LARGE preview). The settings
+    // second-editor icon buttons that used to call this were removed in S1; the wizard is now its only caller.
+    function importCamIcon() {
         const input = document.createElement('input'); input.type = 'file'; input.accept = '.bmp,image/bmp,image/*';
         input.addEventListener('change', () => {
-            const f = input.files && input.files[0]; if (!f) return;
+            const f = input.files && input.files[0]; if (!f || !_authoring) return;
             const r = new FileReader();
             r.onload = () => {
                 const data = r.result; const img = new Image();
-                img.onload = () => { slot.icon = { name: f.name, data, w: img.naturalWidth, h: img.naturalHeight }; saveCamPack(); renderCamBuilder(); };
-                img.onerror = () => { slot.icon = { name: f.name, data }; saveCamPack(); renderCamBuilder(); };
+                img.onload = () => { _authoring.icon = { name: f.name, data, w: img.naturalWidth, h: img.naturalHeight }; renderIconStep(); };
+                img.onerror = () => { _authoring.icon = { name: f.name, data }; renderIconStep(); };
                 img.src = data;
             };
             r.readAsDataURL(f);
