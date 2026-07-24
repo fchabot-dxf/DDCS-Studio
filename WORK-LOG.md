@@ -15014,3 +15014,50 @@ beside (I lean: hand off). Q3 mixed slots now (load only block-able ops) vs defe
 
 NO code changed (design pass). Grounded in the REAL editCamSlot/manifestToAuthOp/editWizardDef/ddcsLoadBlockStack/saveStates/
 defVStale/subStackToSlot code. Advisor reviews the plan + surfaces Q1-Q3 to the user, then we slice S4-1 first.
+
+---
+
+## turn 1145 -- S4-1: the SHARED destructive-load guard (confirm before replacing the program). Built + verified. ONE FLAG: "saved to Undo" measured NOT to work -> shipped an HONEST message instead.
+
+### BUILT (the guard, as a shared reusable seam)
+- saveStates.js: confirmDestructiveLoad(incoming, {label, what}) -> Promise<bool>. If the current program is NON-EMPTY and
+  the incoming stack would actually change it (sig differs) -> snapshot(before edit) + a dlgConfirm; returns the users
+  choice. EMPTY or an IDENTICAL load -> returns true silently (no prompt). The caller does its own showApp/ddcsLoadBlockStack
+  AFTER a true, so Cancel leaves the callers surface untouched. dlgConfirm is LAZY-imported (keeps this history module free of
+  top-level UI coupling). This IS the shared seam S4-2 (the CAM-slot Edit) will reuse -- declared once, both callers route through it.
+- devMode.js: editWizardDef now calls the guard BEFORE showApp(blocks) (so Cancel leaves the program AND the current tab
+  untouched). This FIXES the latent silent-wipe editWizardDef had (it replaced the program with no confirm).
+
+### VERIFIED (real symptom, my own)
+- New spec blocks-load-guard-s41.spec.js (2 tests, green): non-empty program -> the in-app confirm (.app-dialog) appears;
+  CANCEL keeps the program (op NOT loaded) = the anti-silent-wipe protection; re-fire + OK loads the op (guard does not block
+  the legit flow). Empty program -> NO prompt, op loads directly.
+- The 26 other editWizardDef-affected specs: all green (they call editWizardDef with an EMPTY program -> guard no-ops). ONE
+  existing test needed updating: dev-mode-sim-intent.spec.js re-authors OVER a just-inserted drill (non-empty) -> now correctly
+  confirms; updated it to fire-not-await + click Open (replace). My change created that one orphan; fixed it. Green.
+- Full gate: 1469 passed / 0 failed / 4 skipped (14.1m). (+2 = my new spec; == 1467 baseline + 2.)
+
+### THE FLAG (I deviated from the exact spec, with a MEASURED cause -- advisor please rule):
+The dispatch + my S4 plan said the confirm should say "saved to Undo" and rely on saveStates.snapshot for recovery. I MEASURED
+that this recovery does NOT work: after a programmatic ddcsLoadBlockStack (which is exactly how editWizardDef loads the op),
+the REAL header Undo button (onclick window.ddcsUndo), clicked 6x, NEVER reverts to the prior program -- and in the
+editWizardDef path, 15 undos never reach the pre-edit program. The Undo button is ENABLED (history exists) but the visible
+program never changes back. This is APP-WIDE (a raw 2x ddcsLoadBlockStack also cannot be undone), not specific to my path --
+the save-state history is polluted by id-variant snapshots from the workspace reprojection, so undo walks same-content states
+without crossing back. => Promising "saved to Undo" would be a FALSE operator message (gate G1). So:
+ - The message now promises the CANCEL (the guaranteed protection): "Opening X in Blocks replaces the program currently in the
+   editor. Cancel to keep your current program." (title Open in Blocks?, buttons Open (replace) / Cancel.)
+ - I KEPT the snapshot(before edit) per the ask (a harmless best-effort recovery point), documented inline that Undo is unreliable.
+
+### OPTIONS for the advisor (message + the broader undo finding):
+ A. KEEP the honest message (Cancel = the protection) as shipped. The guards real value (no silent wipe) is fully delivered.
+    [I lean A -- it is correct + honest + the Cancel is a hard guarantee.]
+ B. Restore "saved to Undo" AND spin a SEPARATE slice to fix saveStates undo for programmatic loads (dedup snapshots by
+    content-ignoring-ids, or a content-based history). Bigger scope; makes the recovery real.
+ C. Add an explicit one-shot "restore my program" after the load -- REJECTED by the dispatch ("reuse saveStates, no second stash").
+The APP-WIDE undo-broken-for-programmatic-loads finding is worth surfacing regardless (it affects wizard-insert undo too) --
+possible dedicated slice.
+
+### Committed MY FILES ONLY: saveStates.js + devMode.js + blocks-load-guard-s41.spec.js (new) + dev-mode-sim-intent.spec.js
+(the one orphaned test). Pre-existing working-tree noise (PNGs / HANDOFF / NEXT-SESSION / scratchpad / untracked) NOT staged.
+Branch feat/ddcs-workspace. NO release.
