@@ -35,6 +35,26 @@ from . import oauth   # desktop (loopback) Google OAuth — see oauth.py
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("text/javascript", ".mjs")
 
+# ── gateway CSRF guard (t1115) ──────────────────────────────────────────────────────────────────────────────
+# The state-changing POST routes answer with Access-Control-Allow-Origin: * — so a page on ANY origin the user
+# visits could drive them from the browser (a drive-by CSRF: queue a job, rewrite config, delete a file). Guard:
+# require X-DDCS-Local: 1. It is a CUSTOM request header, so a cross-origin page can only add it by first passing a
+# CORS preflight — and do_OPTIONS grants ONLY Content-Type in Access-Control-Allow-Headers (X-DDCS-Local is
+# deliberately absent; NEVER add it there), so the browser refuses to send a cross-origin POST carrying it. A forged
+# POST therefore either omits the header (refused 403 here) or is blocked at the preflight.
+# DIFFERENT from the /api/update/* guard (loopback AND header): here the header ALONE is the guard, because LAN
+# job-queueing is an INTENDED feature (Settings > LAN ACCESS + QR) and a LAN Studio client is SAME-ORIGIN with the
+# gateway, so it CAN set the header (a same-origin request needs no preflight). ONE-SOURCE: _has_local_header is the
+# shared predicate; the update route composes it with a loopback check. (On merge, unify this LOCAL_HEADER with the
+# update branch's UPDATE_LOCAL_HEADER — same value — and let update_request_allowed call _has_local_header.)
+LOCAL_HEADER = "X-DDCS-Local"
+LOCAL_VALUE = "1"
+
+
+def _has_local_header(headers):
+    """True iff the request carries the non-CORS-able X-DDCS-Local: 1 header — the CSRF guard's shared predicate."""
+    return headers.get(LOCAL_HEADER) == LOCAL_VALUE
+
 _PLACEHOLDER = (
     b"<!doctype html><meta charset=utf-8><title>DDCS Bridge gateway</title>"
     b"<body style='font:14px system-ui;margin:3em;max-width:40em'>"
@@ -87,6 +107,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        # NEVER add X-DDCS-Local here — the CSRF guard IS "this custom header cannot be set cross-origin". Widening
+        # Allow-Headers to grant it would let any origin forge the state-changing POSTs. Content-Type only.
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
@@ -171,6 +193,10 @@ class _Handler(BaseHTTPRequestHandler):
         return self._serve_static(path)
 
     def do_POST(self):
+        # CSRF guard (fail-closed): every POST route here is state-changing, so require the non-CORS-able local
+        # header on ALL of them (see _has_local_header). Header-only — NOT loopback — so LAN Studio clients still work.
+        if not _has_local_header(self.headers):
+            return self._send_json({"error": "forbidden — this endpoint requires the X-DDCS-Local header (CSRF guard)"}, 403)
         if self.path == "/api/jobs":
             b = self._read_body()
             if not b.get("name") or "nc" not in b:

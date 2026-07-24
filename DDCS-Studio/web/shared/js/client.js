@@ -38,8 +38,11 @@ export function makeClient(opts = {}) {
     if (!r.ok) throw new Error(`${path} -> HTTP ${r.status}`);
     return r.json();
   }
+  // X-DDCS-Local: 1 satisfies the gateway CSRF guard (server.py) — a custom header a cross-origin page can't set
+  // (its preflight is refused), while this same-origin Studio client (loopback OR LAN) sets it freely. One seam for
+  // every state-changing POST (jobs/config/sysfile/deletes).
   const postJSON = (path, body) =>
-    call(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    call(path, { method: "POST", headers: { "Content-Type": "application/json", "X-DDCS-Local": "1" }, body: JSON.stringify(body) });
 
   return {
     mode: base ? "remote" : "local",

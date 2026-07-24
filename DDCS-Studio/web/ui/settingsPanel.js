@@ -1562,7 +1562,7 @@ async function renderMachineNet(mount) {
         if (!v) { msg.textContent = 'Enter a share path.'; return; }
         msg.textContent = 'Saving…';
         try {
-            const r = await (await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dest: v }) })).json();
+            const r = await (await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-DDCS-Local': '1' }, body: JSON.stringify({ dest: v }) })).json();   // X-DDCS-Local: gateway CSRF guard (same-origin, direct fetch bypasses client.postJSON)
             if (r && r.ok === false) { msg.textContent = r.error || 'Save failed.'; return; }
         } catch (e) { msg.textContent = 'Save failed (gateway unreachable).'; return; }
         renderMachineNet(mount);   // re-read status after applying
