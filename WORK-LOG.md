@@ -14649,3 +14649,51 @@ No dangling refs (grep: cam_add_slot only survives as a doc comment; "Add slot" 
 
 VERIFIED: cam-slot-sim 17/17 + cam-build-mode 7/7 green (no syntax error; the CAM panel + the seed-from-program authoring +
 the empty-state all work). Full gate: 1457 passed / 4 skipped / 0 failed -- fully green this run. Next per the plan: S3 (the manifest-Edit + update flag -- the crux).
+
+---
+
+## turn 1127 -- CAM-UX declare-once S3: the manifest-Edit CRUX. Built + fidelity PROVEN on all 4 kinds. Modal-only.
+
+### THE MECHANISM (macrosApp.js) -- promote editWizardDef/saveAsCustomOp from def to slot
+A per-slot "✎ Edit" reopens the wizard PRE-SEEDED from the slot MANIFEST; Build becomes "Update CAM (camN)" overwriting that
+slot IN PLACE (no prompt). MODAL-ONLY -- does NOT touch the active program/editor (that is the gated S4).
+ - _editingSlot flag (the slot-level analog of devMode._editingWizard): the cam NUMBER being Edited, or null = NEW.
+ - manifestToAuthOp(m) -- the faithful INVERSE of toManifest: re-hydrate `fields` from the op-type SEED (makeAuthOp ->
+   seedFromOp/subStackToSlot, the SAME call fresh authoring uses), then OVERLAY the stored variant/values/exposed/baked.
+   CAM_SEED_PARAMS: the DECLARED inverse of camTypeOf's forward map -- toManifest dropped the source op params, so re-derive
+   JUST the discriminating ones from the stored camType/variant (pocket/cpocket shape; inside/boss twoAxis+featureType;
+   drill/bore pattern) so seedFromOp re-resolves the SAME camType + fields. Universal/substack need NONE (the def IS the
+   source). Declare-never-infer: reads the manifest, NEVER re-parses slot.body.
+ - editCamSlot(slot): sets _editingSlot + _authoring = slot.ops.map(manifestToAuthOp); refuses a legacy (no ops) / stale-def
+   slot loudly (the display only offers Edit when slot.ops has content). openCamAuthoring SKIPS the seed when _editingSlot set.
+ - mountAuthoringSurface header + build button read "✎ Update CAM (camN)" / "Update CAM (camN) ▸" when editing.
+ - cbmBuild is now valid-by-construction: Edit OVERWRITES _editingSlot in place, New MINTS nextSlotNum -- the ambiguous
+   "new vs overwrite" prompt cbmBuildModal is DELETED. cbmExit clears _editingSlot (build OR cancel).
+ - The display slot card gained "✎ Edit" (only when slot.ops has content -> legacy slots keep Simulate/View output/Delete, S6).
+
+### FIDELITY -- PROVEN LOSSLESS on ALL FOUR required kinds (the gate)
+cam-slot-edit-s3.spec.js (NEW): Edit a slot then Update with NO change -> the manifest (JSON) AND the rebuilt macro body are
+BYTE-IDENTICAL. Passed for: GENERATOR (pocket), DRILL (pattern-DEPENDENT fields -- the tricky generator whose field-set the
+dropped `pattern` param drives), COMPOSED multi-op (surface+drill+corner, 3 ops), and UNIVERSAL (a registered forked custom
+op; the def-sourced exact path). So manifestToAuthOp is a faithful inverse across every kind -> NO fidelity gate-back. Plus:
+HEADLINE (Edit -> flip one Expose->Bake -> Update CAM (camN): same cam#, no prompt, the manifest exposed/baked + the rebuilt
+body reflect the bake) and a tuned-value RE-SEED check.
+
+### COVERAGE + the 5 adapted tests
+Deleting cbmBuildModal broke 5 tests that clicked its "Build to which slot?" prompt (cam-block-native-params-s4a,
+cam-build-mode, cam-scratch-guard, cam-substack-modal, cam-universal-modal) -- mechanically adapted: removed the now-obsolete
+prompt lines (.cam-sim-overlay [data-cbm=ok]), Build is DIRECT now. Coverage preserved (they still build + assert).
+cam-customize-affordance was NOT touched (it drives the Customize prompt cbmCustomizeModal, which is KEPT).
+
+### SURFACED -- the "re-add the 4 deleted op-editing tests THROUGH the wizard" contract, honestly
+The 4 deleted cam-slot-sim tests exercised the SETTINGS op-LIST editor: (1) tuned-value-persist, (2) op TYPE/variant swap,
+(3) reorder ops, (4) duplicate op. Only (1) maps to the WIZARD -- covered by the Edit round-trip fidelity + the tuned-value
+re-seed test. (2)/(3)/(4) were SETTINGS op-list manipulation that S1 removed BY DESIGN; the wizard has no op type-swap /
+reorder / dup (the op list comes fixed from the manifest -- you re-author from the program to change it). Their underlying
+op-COMPOSITION is covered at the ENGINE level by cam-compose-framing / cam-allocfields-superset / cam-build-mode multi-op +
+the new COMPOSED fidelity test. So the wizard-relevant op-editing IS re-covered; the op-list-manipulation behaviors are
+gone-by-design, not lost. RECOMMEND the advisor confirm this coverage reading (do NOT re-add the 3 op-list tests -- they test
+a removed surface with no wizard analog).
+
+### NOT TOUCHED (per the dispatch): the active program/editor (S4 gated), cam_customize_op (S6), the engine buildSlotFromOps.
+Full gate: 1463 passed / 4 skipped / 0 failed -- fully green. Reconciles 1461 baseline + 6 new S3 tests = 1467 = 1463+4. Next per the plan: S4 (GATED -- Edit -> active stack, editor/Blocks as live views) or S5 (icon into wizard).
