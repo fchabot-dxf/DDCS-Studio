@@ -408,124 +408,6 @@ test('preview panel mounts on a seeded slot macro without throwing', async ({ pa
   expect(ok, 'createPreviewPanel built its DOM + exposed stop()').toBe(true);
 });
 
-test('structured op editing: ops manifest drives the macro; edit type/variant + remove regenerates', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  const r = await page.evaluate(async () => {
-    const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
-    const root = document.getElementById('macros-app');
-    root.querySelector('#cam_add_slot').click();
-    const card = () => root.querySelector('.cam-slot');
-    const addOp = (type, variant) => {
-      const c = card(); const op = c.querySelector('.cam-op'); const v = c.querySelector('.cam-op-pat');
-      op.value = type; op.dispatchEvent(new Event('change', { bubbles: true }));
-      if (variant) v.value = variant;
-      c.querySelector('[data-act="addop"]').click();
-    };
-    const setSel = (sel, val) => { sel.value = val; sel.dispatchEvent(new Event('change', { bubbles: true })); };
-    const body = () => card().querySelector('textarea[data-f="body"]').value;
-    const types = () => Array.from(card().querySelectorAll('.cam-op-card')).map((d) => d.querySelector('.cam-op-type').value);
-    addOp('drill', 'circle'); addOp('pocket', 'y');
-    const o = { initial: types(), hasDrill: /drill bolt circle/.test(body()), hasPocketY: /rows ∥ Y/.test(body()) };
-    setSel(card().querySelectorAll('.cam-op-type')[0], 'bore');    // change op 0 drill -> bore (regenerates)
-    o.hasBore = /bore bolt circle/i.test(body());
-    setSel(card().querySelectorAll('.cam-op-var')[0], 'grid');     // change op 0 variant bolt circle -> grid
-    o.hasGrid = /grid/i.test(body().split('\n')[0]);
-    card().querySelectorAll('[data-act="delop"]')[1].click();      // remove op 1 (pocket)
-    o.remaining = types(); o.noPocket = !/rows ∥/.test(body());
-    addOp('corner');                                              // a probe op card hides its variant control
-    const cs = card().querySelectorAll('.cam-op-card');
-    o.probeVarHidden = cs[cs.length - 1].querySelector('.cam-op-var').style.display === 'none';
-    return o;
-  });
-  expect(r.initial).toEqual(['drill', 'pocket']);
-  expect(r.hasDrill).toBe(true); expect(r.hasPocketY).toBe(true);
-  expect(r.hasBore, 'changing op type regenerates the macro').toBe(true);
-  expect(r.hasGrid, 'changing op variant regenerates the macro').toBe(true);
-  expect(r.remaining).toEqual(['bore']); expect(r.noPocket, 'removing an op regenerates without it').toBe(true);
-  expect(r.probeVarHidden, 'probe op card hides the variant control').toBe(true);
-});
-
-test('structured op editing: tuned field values persist across an op edit (per-op, matched by key)', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  const r = await page.evaluate(async () => {
-    const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
-    const root = document.getElementById('macros-app');
-    root.querySelector('#cam_add_slot').click();
-    const card = () => root.querySelector('.cam-slot');
-    const op = card().querySelector('.cam-op'); op.value = 'drill'; op.dispatchEvent(new Event('change', { bubbles: true }));
-    card().querySelector('[data-act="addop"]').click();
-    const body = () => card().querySelector('textarea[data-f="body"]').value;
-    const rowFor = (label) => Array.from(card().querySelectorAll('tr[data-fi]')).find((r) => r.querySelector('.cf[data-f="label"]').value === label);
-    const defOf = (label) => { const r = rowFor(label); return r ? r.querySelector('.cf[data-f="def"]').value : null; };
-    const setDef = (label, val) => { const i = rowFor(label).querySelector('.cf[data-f="def"]'); i.value = String(val); i.dispatchEvent(new Event('input', { bubbles: true })); };
-    const setSel = (sel, v) => { sel.value = v; sel.dispatchEvent(new Event('change', { bubbles: true })); };
-    setDef('Depth', 9);
-    setSel(card().querySelectorAll('.cam-op-var')[0], 'grid');   // variant change — Depth carries over
-    const afterVariant = { def: defOf('Depth'), body: /;Depth \[mm\] =9 /.test(body()) };
-    setSel(card().querySelectorAll('.cam-op-type')[0], 'bore');  // type change — Depth carries over
-    const afterType = { def: defOf('Depth'), body: /;Depth \[mm\] =9 /.test(body()) };
-    return { afterVariant, afterType };
-  });
-  expect(r.afterVariant.def, 'tuned default survives a variant change').toBe('9');
-  expect(r.afterVariant.body, 'macro read-line re-synced to the tuned default').toBe(true);
-  expect(r.afterType.def, 'tuned default survives a type change').toBe('9');
-  expect(r.afterType.body).toBe(true);
-});
-
-test('structured op editing: ▲/▼ reorder the ops (macro run order) and tuned values travel', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  const r = await page.evaluate(async () => {
-    const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
-    const root = document.getElementById('macros-app');
-    root.querySelector('#cam_add_slot').click();
-    const card = () => root.querySelector('.cam-slot');
-    const addOp = (type) => { const o = card().querySelector('.cam-op'); o.value = type; o.dispatchEvent(new Event('change', { bubbles: true })); card().querySelector('[data-act="addop"]').click(); };
-    const body = () => card().querySelector('textarea[data-f="body"]').value;
-    const types = () => Array.from(card().querySelectorAll('.cam-op-card')).map((d) => d.querySelector('.cam-op-type').value);
-    const rowFor = (l) => Array.from(card().querySelectorAll('tr[data-fi]')).find((r) => r.querySelector('.cf[data-f="label"]').value === l);
-    const setDef = (l, v) => { const i = rowFor(l).querySelector('.cf[data-f="def"]'); i.value = String(v); i.dispatchEvent(new Event('input', { bubbles: true })); };
-    addOp('drill'); addOp('slot');
-    setDef('Depth', 9);   // first 'Depth' row = drill's
-    const drillFirst = (b) => b.indexOf('drill bolt circle') < b.indexOf('slot A->B');
-    const out = { initial: types(), initialDrillFirst: drillFirst(body()), topUpDisabled: card().querySelector('[data-act="opup"]').disabled };
-    card().querySelectorAll('[data-act="opdown"]')[0].click();   // move drill down
-    out.after = types(); out.afterDrillFirst = drillFirst(body());
-    out.depths = Array.from(card().querySelectorAll('tr[data-fi]')).filter((r) => r.querySelector('.cf[data-f="label"]').value === 'Depth').map((r) => r.querySelector('.cf[data-f="def"]').value);
-    return out;
-  });
-  expect(r.initial).toEqual(['drill', 'slot']);
-  expect(r.initialDrillFirst, 'drill macro section comes first initially').toBe(true);
-  expect(r.topUpDisabled, 'first op cannot move up').toBe(true);
-  expect(r.after).toEqual(['slot', 'drill']);
-  expect(r.afterDrillFirst, 'macro re-emitted with slot before drill').toBe(false);
-  expect(r.depths.includes('9'), 'drill tuned depth=9 travelled with the op').toBe(true);
-});
-
-test('duplicate op + structured slot: clone inherits tuned values, gets fresh params (no collision)', async ({ page }) => {
-  await page.goto('http://localhost:3211');
-  const r = await page.evaluate(async () => {
-    const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
-    const root = document.getElementById('macros-app');
-    root.querySelector('#cam_add_slot').click();
-    const slot0 = () => root.querySelector('.cam-slot');
-    const addOp = (t) => { const o = slot0().querySelector('.cam-op'); o.value = t; o.dispatchEvent(new Event('change', { bubbles: true })); slot0().querySelector('[data-act="addop"]').click(); };
-    const rowFor = (l) => Array.from(slot0().querySelectorAll('tr[data-fi]')).find((r) => r.querySelector('.cf[data-f="label"]').value === l);
-    const setDef = (l, v) => { const i = rowFor(l).querySelector('.cf[data-f="def"]'); i.value = String(v); i.dispatchEvent(new Event('input', { bubbles: true })); };
-    addOp('drill'); setDef('Depth', 9);
-    slot0().querySelector('[data-act="dupop"]').click();   // clone the op
-    const opTypes = Array.from(slot0().querySelectorAll('.cam-op-card')).map((d) => d.querySelector('.cam-op-type').value);
-    const depths = Array.from(slot0().querySelectorAll('tr[data-fi]')).filter((r) => r.querySelector('.cf[data-f="label"]').value === 'Depth').map((r) => r.querySelector('.cf[data-f="def"]').value);
-    slot0().querySelector('[data-act="dupslot"]').click();   // clone the whole slot
-    const slots = root.querySelectorAll('.cam-slot');
-    return { opTypes, depths, slotCount: slots.length, cloneHasOpCards: slots[1].querySelectorAll('.cam-op-card').length, noCollision: !/⛔/.test(root.querySelector('#cam_validate').textContent) };
-  });
-  expect(r.opTypes).toEqual(['drill', 'drill']);
-  expect(r.depths, 'the duplicated op inherits the tuned default').toEqual(['9', '9']);
-  expect(r.slotCount).toBe(2);
-  expect(r.cloneHasOpCards, 'structured clone keeps its op list').toBeGreaterThan(0);
-  expect(r.noCollision, 'duplicate allocated fresh params').toBe(true);
-});
-
 test('duplicate a legacy (hand-built) slot remaps its #params off the original — no collision', async ({ page }) => {
   await page.goto('http://localhost:3211');
   const r = await page.evaluate(async () => {
@@ -536,17 +418,24 @@ test('duplicate a legacy (hand-built) slot remaps its #params off the original �
       ], body: '#1=#2600   ;Depth [mm] =5 [0~99]\n#2=#2601   ;Feed [mm/min] =300 [1~9999]\nG1 Z[0-#1] F#2\nM30' }] }));
     const mod = await import('/ui/macrosApp.js'); mod.initMacrosApp();
     const root = document.getElementById('macros-app');
-    root.querySelector('.cam-slot [data-act="dupslot"]').click();
-    const slots = Array.from(root.querySelectorAll('.cam-slot'));
+    root.querySelector('.cam-slot [data-act="dupslot"]').click();   // dupslot is KEPT in the read-mostly display
+    // S1 — the settings field-table + macro textarea DOM is gone; assert on the persisted slot DATA instead
+    // (the duplicated slot's fields idx + its body) rather than re-reading the removed second-editor UI.
+    const pack = JSON.parse(localStorage.getItem('ddcs_campack'));
+    const orig = pack.slots[0], clone = pack.slots[1];
     return {
-      camNums: slots.map((s) => s.querySelector('.cs[data-f="slot"]').value),
-      origKeeps2600: /=#2600/.test(slots[0].querySelector('textarea[data-f="body"]').value),
-      cloneRemapped: /#1=#2602/.test(slots[1].querySelector('textarea[data-f="body"]').value),
-      calcUntouched: /G1 Z\[0-#1\] F#2/.test(slots[1].querySelector('textarea[data-f="body"]').value),
+      camNums: pack.slots.map((s) => s.slot),
+      origIdx: orig.fields.map((f) => f.idx),
+      cloneShares: clone.fields.some((f) => orig.fields.some((g) => g.idx === f.idx)),
+      origKeeps2600: /=#2600/.test(orig.body),
+      cloneRemapped: /#1=#2602/.test(clone.body),
+      calcUntouched: /G1 Z\[0-#1\] F#2/.test(clone.body),
       noCollision: !/⛔/.test(root.querySelector('#cam_validate').textContent),
     };
   });
-  expect(r.camNums).toEqual(['22', '23']);
+  expect(r.camNums, 'clone minted the next cam number').toEqual([22, 23]);
+  expect(r.origIdx, 'the original params are unchanged').toEqual([1100, 1101]);
+  expect(r.cloneShares, 'clone remapped to params disjoint from the original — no collision').toBe(false);
   expect(r.origKeeps2600).toBe(true);
   expect(r.cloneRemapped, 'clone read-line mirror remapped').toBe(true);
   expect(r.calcUntouched, 'working-var calc lines untouched by the remap').toBe(true);
