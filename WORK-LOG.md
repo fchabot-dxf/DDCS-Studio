@@ -14650,3 +14650,46 @@ the client file-reads through a header-sending wrapper).
 ### NO GATE-STOP: every guarded GET took the header without breaking a real (same-origin/LAN) client (status has none; token
 callers all same-origin). This + the POST guard = the COMPLETE gateway-CSRF hardening. NO RELEASE (advisor reviews, then the
 branch is ready for the USER go). Branch feat/gateway-csrf-guard.
+
+---
+
+## turn 1119 -- GATEWAY-CSRF part 3: guard the FILE-READ disclosure (GET /api/file + /api/sysfile). Completes the ENTIRE gateway-CSRF hardening. Built + adversarially verified.
+
+### THE DISCLOSURE (I surfaced it last turn): a website reading the users programs
+GET /api/file?name= and GET /api/sysfile?name= return the users CNCDISK / SYSDISK FILE CONTENTS (their G-code / macros) and
+with Access-Control-Allow-Origin: * are cross-origin READABLE -> any site the user visited could read their programs. Lower
+severity than the token (info disclosure, not a credential) but real.
+
+### GROUNDED EVERY READ SITE FIRST (the dispatch demanded it, GATE-IF a legit cross-origin read exists)
+Confirmed: file/sysfile are read from EXACTLY ONE seam -- client.js readFile + readSysfile (via call). NO direct fetch of
+/api/file or /api/sysfile exists anywhere in web/ (incl. the binary macrosApp.js, grepped with -a). The callers:
+ - gateway/views/files.js (the Gateway tab file viewer) -> ctx.client.readFile
+ - macrosApp.js (the Macros sync/check) -> makeClient().readSysfile (lines 396/767/877)
+ - tncInstallStatus.js (the T.nc install check) -> makeClient().readSysfile
+ALL use the DEFAULT same-origin base ("" = gateway-served). NO shipped cross-origin file-viewer: makeClient base defaults to
+"" (same-origin); only the ?api=URL override is cross-origin, and that is the DEV/future seam (not a shipped legit viewer). A
+LAN Studio client is SAME-ORIGIN with the gateway (served by it) so it sets the header fine. => NO gate-back; the guard is safe.
+
+### THE FIX -- one-source, minimal
+- server.py: added /api/file + /api/sysfile to the SAME declared _GUARDED_GETS set, guarded at do_GET top via the ONE
+  _has_local_header predicate (the path is query-stripped before the set check, so ?name= still matches -- noted in the comment).
+- client.js: added { headers: { X-DDCS-Local: 1 } } to readFile + readSysfile (inline, matching postJSONs existing style).
+  ONE seam -> covers ALL callers (files.js, macrosApp, tncInstallStatus) automatically. No unrelated read touched.
+
+### VERIFIED (adversarial, my own -- extended test_csrf_guard.py, mock Ops read_file/read_sysfile return sentinel content):
+ - forged cross-origin GET /api/file?name= and /api/sysfile?name=, NO header -> 403 AND the content (SECRET_GCODE.../SECRET_
+   MACRO...) does NOT appear in the body (NOT leaked).
+ - Studio own read WITH the header -> 200 + the content (its legit read still works loopback/LAN).
+ - the ?name= query still matches the guard (query-stripped path).
+ - (unchanged, still asserted) innocuous GET /api/config stays open with no header; the preflight still withholds X-DDCS-Local.
+7/7 green. test_pull_geometry still green (ops untouched). Full web gate: 1461 passed / 4 skipped / 0 failed -- fully green this run (the rotating load-flakes
+all passed). The client header adds are additive (mem-server ignores the extra header).
+
+### SURFACED (the same accepted tradeoff, not new): the ?api=URL cross-origin seam (cloud/dev Studio -> gateway) cannot read
+files under the guard (cross-origin cannot set the header) -- consistent with the POST + token guards already accepted. GETs
+that are NOT guarded (descriptor/queue/etc.) still work cross-origin (I scoped the header to the guarded reads only, so
+innocuous GETs stay SIMPLE = no preflight).
+
+### THIS COMPLETES THE ENTIRE GATEWAY-CSRF HARDENING: POST guard (t1115, 5 routes) + credential GET (t1117, token+status) +
+file-read GET (t1119, file+sysfile) -- ALL via the ONE _has_local_header predicate + the ONE _GUARDED_GETS set. Bundle the
+whole feat/gateway-csrf-guard branch for one merge/release. NO RELEASE (advisor reviews, then the USER go).
