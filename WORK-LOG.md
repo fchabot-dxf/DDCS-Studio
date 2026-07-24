@@ -14258,3 +14258,66 @@ its pendant fields as cam_field blocks (byte-neutral, own emit + default slot un
 the modal (S4a) reads/writes it, and a modal flip STICKS -- the S3 divergence is closed. Generator twins and literal universal
 twins are correctly skipped. OPEN (per your ruling): S5 param_group-from-bindings + S6 polish (the per-mode compact layout AND
 the literal-twin no-pill save fix, the one deliberately-skipped case).
+
+---
+
+## turn 1105 -- BLOCK-NATIVE PARAMS S5.1: the FORM half (schema + reader + materializer), mirroring the pendant S1+S3. INERT, byte-neutral. Built.
+
+### FORK B GROUNDED AND DECIDED: a DEDICATED param_field (formfield does NOT fit)
+I read formField.js + the value-binding shape. formfield's socket link is var-identity `match: { type:'assign', var }`
+(formField.js:7) plus a key -- it finds an ASSIGN block by its macro var. A def VALUE binding is `{ param, blockIndex, key }`
+(cleanBinding, userOps.js:111) -- a (blockIndex,key) socket into flattenBlocks(template). These are DIFFERENT addressing
+schemes: formfield cannot address a (blockIndex,key) value socket, only an assign-var. So the FORM face of a value binding
+needs its OWN block keyed by `param`, symmetric with cam_field. FORK B IS REAL -> param_field, NOT a formfield reuse (the
+architect's ruling holds; I did not build a duplicate of something formfield already addresses, because it does not).
+
+### THE SCHEMA: param_field (the FORM analog of cam_field)
+wizards/ops/paramField.js -- references a value binding by `param` (READ-ONLY chip, reusing the ddcs_camfield lock), carries
+the FORM label + widget + type + default + (number-widget) min/max/step/units + section/help + dropdown options. emit: () => []
+(metadata, like formfield/cam_field). Shares formfield's widget/type dropdown vocab via optionsFor (one `|| def.type ===
+'param_field'` each). A leaf (no mouth) -> serializes generically, no round-trip branch needed. NB no dynamic toggle (learned
+S1: ddcs_dynfields only hides value-socket inputs, not inline text fields) -- a compact per-widget layout is S6 polish.
+
+### THE READER + MATERIALIZER (mirrors camFieldsFromStack / camTableFromBindings)
+- paramFieldsFromStack(template) (userOps.js) -- flattenBlocks filter param_field, in mouth order -> a form-binding-spec row
+  { param, widget, type, label?, default?, section?, help?, widgetConfig? } (min/max/step/units/options folded into
+  widgetConfig, exactly like bindingsFromStack does for formfield). Empty strings inherit the binding.
+- paramGroupFromBindings(def, group) (userOps.js) -- one param_field per value binding in binding PRE-ORDER, label/default/
+  widget/type/widgetConfig from the binding. NO classifier (the form shows every param; expose/bake is the pendant's concern,
+  not the form's -- a key difference from camTableFromBindings). PURE + INERT: nothing consumes it yet.
+
+### BYTE-NEUTRAL, verified
+param_group is ALREADY transparent-emit and param_field emits [] -> adding the FORM blocks changes ZERO bytes. The spec
+asserts emit(with the param_group) === emit(without), and the real atoms still emit (F300). No goldens moved (full gate).
+
+### COLOUR: a THIRD family, distinct from cam pink AND opunit
+The FORM family (param_group + param_field) now shares ONE colour via a NEW category 'Wizard Form' (hue #6366f1 indigo). I
+RECOLOURED param_group from 'Wizard UI' (fuchsia #d946ef -- shared with opunit/section/formfield) to 'Wizard Form', so the
+three families read apart: FORM indigo, PENDANT pink (#ec4899), Wizard-UI/opunit fuchsia. Grounded the recolour risk first: no
+pixel-snapshot tests (no toHaveScreenshot/toMatchSnapshot), no test asserts param_group's category, and the one colour
+assertion (my S1 test: cam != param_group) STILL holds (pink != indigo). Verified by the gate.
+
+### THE CONSUMER, GROUNDED (not built): ui/formWidgets.js is the FORM-side widget registry -- a binding declares a `widget`
+(a registry key) + widgetConfig and the form picks that widget (or a default per binding.type). A later slice wires the form
+renderer to read paramFieldsFromStack (the form-as-view, S5.2+), exactly as S4a made the CAM modal read camFieldsFromStack.
+Not touched this slice.
+
+### VERIFIED
+- cam-block-native-params-s5.spec.js (NEW, 3): (1) paramFieldsFromStack reads 2 rows IN ORDER (feed number+range, shape
+  dropdown with parsed options) AND emit(with)===emit(without) byte-identical while the atoms still emit; (2)
+  paramGroupFromBindings emits one param_field per binding in pre-order with label/default/widget from the binding, and the
+  reader round-trips its output; (3) a param_group + 2 param_field round-trip block->stack->block, param is READ-ONLY, and the
+  FORM colour is distinct from BOTH the cam pink and the opunit fuchsia. My OWN VIEWED screenshot (s5-param-group.png) shows
+  the three families apart: indigo Parameter Group, pink CAM Pendant Fields, fuchsia Surfacing unit; new Wizard Form + CAM
+  Pendant toolbox categories.
+- FULL GATE: 1451 passed, 0 FAILED, 4 skipped (14.1m) -- CLEAN, 1451+4 = 1455 = full count reconciles. Failed-count grepped.
+  1451 = 1448 prior + 3 new S5.1 tests. The param_group recolour caused NO regression (the whole suite green).
+
+### GATE-IF-BALLOONS: did NOT trigger. S5.1 is schema + reader + materializer only (all inert), as scoped. The rest of the S5
+arc is follow-on slices: S5.2 the form renderer CONSUMES paramFieldsFromStack (form-as-view, mirror S4a); S5.3 the materialize
+HOOK for the form (mirror S4b); plus S6 polish. Proposed, not built.
+
+### STATE: the FORM half now has its block-native substrate -- a dedicated param_field, a paramFieldsFromStack reader, a
+paramGroupFromBindings materializer -- all inert + byte-neutral, with the FORM family its own indigo colour distinct from the
+pendant pink and the Wizard-UI fuchsia. Nothing consumes it yet; the form-as-view + hook are the next S5 slices. This mirrors
+exactly how the pendant half went S1(schema/reader) -> S3(materializer) -> S4a(view) -> S4b(hook).
