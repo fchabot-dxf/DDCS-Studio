@@ -40,7 +40,8 @@ test('dev mode: tick "4th-axis rotary" → def.sim declared → opSimContext sho
   expect(r.ctx.showRotaryRig, 'opSimContext reflects the declared rig').toBe(true);
 
   // re-author → opening the Save dialog prefills the checkbox from def.sim (round-trips via the def)
-  await page.evaluate(() => window.ddcsEditWizardDef('user_rotary_custom'));
+  await page.evaluate(() => { window.ddcsEditWizardDef('user_rotary_custom'); });   // fire; re-authoring over the non-empty program raises the S4-1 destructive-load guard
+  await page.click('.app-dialog button:has-text("Open (replace)")');               // accept the guard (this test intends to replace the program with the re-authored op)
   await page.waitForTimeout(300);   // let the template load + dev mode engage
   await page.evaluate(() => window.ddcsSaveAsWizard());
   await expect(page.locator('.blk-dev-savedlg .blk-dev-sim-rotary')).toBeChecked();

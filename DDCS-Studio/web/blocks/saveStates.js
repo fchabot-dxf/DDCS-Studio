@@ -50,6 +50,32 @@ export const redoLabel = () => (canRedo() ? history[ptr + 1].label : '');
 /** Subscribe to history changes (button enable/disable). Returns an unsubscribe fn. */
 export function onChange(cb) { subs.add(cb); return () => subs.delete(cb); }
 
+/**
+ * S4-1 — the SHARED destructive-load guard. Loading a stack into the Blocks tab REPLACES the current program
+ * (`ddcsLoadBlockStack`). When the program is NON-EMPTY and the incoming stack would actually change it, CONFIRM
+ * before it is replaced — so the user never loses visible work silently. An empty program, or a load of the identical
+ * stack, proceeds with NO prompt. Returns true if the caller should load, false on Cancel — the caller does its own
+ * showApp / ddcsLoadBlockStack after a true, so a Cancel leaves the caller's surface untouched.
+ *
+ * The CANCEL is the guaranteed protection, and the message promises THAT (not Undo). We STILL snapshot the current
+ * program first (the advisor's ask, a best-effort recovery point) — BUT t1145 MEASURED that the program-level Undo
+ * does NOT reliably restore a programmatically-loaded prior program (the real header Undo button, clicked repeatedly,
+ * never reverts past a `ddcsLoadBlockStack` — app-wide, not just this path), so the message deliberately does NOT
+ * claim "saved to Undo". (`what` names the thing being opened; `label` is the snapshot entry.) Async — dlgConfirm is
+ * lazy-imported to keep this history module free of any top-level UI coupling.
+ */
+export async function confirmDestructiveLoad(incoming, opts = {}) {
+    const cur = getProg();
+    const willReplace = Array.isArray(cur) && cur.length > 0 && sig(cur) !== sig(incoming);
+    if (!willReplace) return true;                       // empty program or an identical load → nothing to lose → silent
+    snapshot(opts.label || 'before edit');               // best-effort recovery point (see the note above re: Undo)
+    const { dlgConfirm } = await import('../ui/dialog.js');
+    return dlgConfirm(
+        `Opening ${opts.what || 'this'} in Blocks replaces the program currently in the editor. Cancel to keep your current program.`,
+        { title: 'Open in Blocks?', okLabel: 'Open (replace)', cancelLabel: 'Cancel' }
+    );
+}
+
 // Origin → friendly history label (programModel tags each setStack with its origin).
 const LABELS = { load: 'insert', blockly: 'block edit', editor: 'edit', refresh: '' };
 

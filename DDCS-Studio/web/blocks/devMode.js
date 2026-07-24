@@ -22,6 +22,7 @@ import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractPar
 import { createWizard } from './wizardLibrary.js';
 import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
+import { confirmDestructiveLoad } from './saveStates.js';   // S4-1 — the shared destructive-load guard (snapshot + confirm before replacing the program)
 import { openRegionEditor } from '../ui/regionEditor.js';   // the "make your own datum" authoring editor
 import { openCoordEditor } from '../ui/formWidgets.js';     // the coordinate-list ✎ editor (shares buildCoordEditor with the form)
 
@@ -558,6 +559,10 @@ export async function editWizardDef(opType) {
         const { makeOp } = await import('./opBuilders.js');
         opC = makeOp(opType, defaultParams(def), forkTpl);   // wrap template → an op (pills round-trip)
     } catch (e) { console.warn('edit wizard: build failed', e); return; }
+    // S4-1 — the shared destructive-load guard: opening this op in Blocks REPLACES the current program. Snapshot +
+    // confirm BEFORE switching surfaces, so a Cancel leaves the program AND the current tab untouched (empty / identical
+    // program → no prompt). Fixes the latent silent-wipe this path had.
+    if (!(await confirmDestructiveLoad([opC], { label: 'before edit', what: def.label || opType }))) return;
     if (window.showApp) window.showApp('blocks');
     for (let i = 0; i < 80 && !(window.ddcsLoadBlockStack && window.__blkws); i++) await new Promise((r) => setTimeout(r, 50));   // wait for the Blocks app
     // recognized fork → a FRESH op (no destructive in-place Update of the twin, which the opunit +1 shift would corrupt).
