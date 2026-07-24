@@ -14488,3 +14488,59 @@ PENDANT fields (cam_table, S4b) AND its FORM fields (param_group, S5.3) as block
 byte-neutral (form + emit) incl. canvas grouping. The build (S2) reads the cam_table, the modal (S4a) writes it, the form
 (S5.2) reads the param_group. Literal twins skipped (S6). Next: S6 polish (the per-mode compact layout + the literal-twin
 no-pill save fix), then the block-native feature is DONE and we reconcile + merge.
+
+---
+
+## turn 1113 -- S6 polish: GROUNDED all 3 items; item (3) premise DISPROVEN empirically (the knob is NOT vestigial). Triple-GATE with findings. No code ships.
+
+### ITEM (3) -- REMOVE/HIDE THE "VESTIGIAL" INLINE KNOB: PREMISE INCORRECT (empirically proven). DO NOT REMOVE/HIDE.
+The dispatch: the inline expose-as-knob checkbox is the OLD param-CREATION mechanism, dead for data-op twins, remove it if
+pills cover creation else hide-for-twins. I VERIFIED BEFORE REMOVING (the dispatch mandated it) and the premise does not hold.
+
+TWO empirical findings:
+ (A) PROBE (25 registered wizards): ZERO carry _expose. So the pill migration IS complete for the stored DATA -- no
+     knob-authored wizard exists to strand. This part of the premise (pills cover creation) holds for the data.
+ (B) BUT THE KNOB IS NOT VESTIGIAL -- it is a LOAD-BEARING, USER-REQUESTED, HEAVILY-TESTED subsystem serving TWO roles via
+     the SAME UI element (the EXPOSE_ checkbox):
+     1. LIVE param-CREATION for hand-built + group authoring (collectAuthoring reads live EXPOSE_ -> buildBindings; the
+        writer of _expose; deriveGroupDef reads stored _expose for the editor hover-chip). Tested: knob-persist, dev-mode,
+        group-auto/edit/framing/canvas-knob.
+     2. t391 PROVENANCE DISPLAY (user-requested: "do knob, it helps me troubleshoot to use Blocks") -- a data-op twins
+        FORM-BOUND params show as PRE-TICKED knobs when opened in Blocks (a binding IS a knob, same record; emit
+        byte-identical). Tested: blocks-knob-binding (opens user_corner_data, asserts dist/f_fast/... pre-ticked).
+     ~10 specs cover the knob total.
+
+PROOF the hide is unsafe: I built the NARROWEST possible hide -- gate augment knob rows to collectAuthoring's SCAN set
+(preorderAtoms of the authoring bodys first), which removes ONLY the "dead" twin knobs (a data-op body is [user_root{...}]
+whose exec atoms live in mouths preorderAtoms never descends -- the wrapForkAtSave NOTE at devMode:480). This is a principled
+one-source alignment (augment paints knobs off getAllBlocks, a set that DIVERGES from the scan set). It PASSED knob-persist +
+dev-mode (hand-built, DO-chain, scanned) but FAILED blocks-knob-binding: dist.EXPOSE_VALUE undefined -- the "dead" twin knobs
+ARE the t391 provenance display. So even the narrowest hide breaks a user-requested feature. REVERTED (devMode.js byte-identical
+to HEAD).
+
+RECOMMENDATION: do NOT remove or hide the knob. The t1112 "remove the vestigial checkbox" request conflicts with the t391
+"show bound params as knobs" request -- SAME UI element. This is a USER fork to re-confirm: (a) KEEP the knob (it is not
+vestigial); (b) if the goal is purely a VISUAL declutter of UNTICKED create-affordances while KEEPING pre-ticked provenance +
+the create-path, that is a DISTINCT, non-trivial ask (still risks the create-path + specs) -- specify it and I will scope it.
+Per confirm-premise-before-regression-blocker + confirm-the-referent-before-dropping: removal is destructive; the invariant
+(t391) is still required, so I did not proceed.
+
+### ITEM (1) -- PER-MODE/WIDGET COMPACT BLOCK LAYOUT: GATE. Needs NEW field-hide machinery; surface the mechanism.
+Grounded the mechanism (the dispatch asked me to). The vendored Blockly has NO Field.setVisible (grep: none). jsonDef renders
+ALL of a blocks fields INLINE on message0 (field_input/field_dropdown), not on named inputs. ddcs_dynfields hides fields by
+getInput(name).setVisible -- which only works for VALUE-SOCKET inputs (input_value: Number/Region/Boolean), a NO-OP for inline
+text fields (getInput returns null). So the array/formfield dynamic works ONLY because their toggle-able fields are numeric
+SOCKETS; cam_field/param_field toggle-able fields (baked/units/nmin/nmax/options) are inline text -> no existing mechanism
+hides them. THE FIX NEEDS ONE OF: (a) jsonDef renders each toggle-able field on its OWN named dummy input for a flagged block,
+then ddcs_dynfields hides per mode/widget (a layout change: one-field-per-row; round-trip/emit unchanged since fields
+serialize by NAME not input); or (b) a re-render-on-change EXTENSION that rebuilds the blocks fields with fieldsFor(mode) on a
+mode/widget change (mutator-lite). Both are DISPLAY-ONLY + byte-neutral (reader reads the SAME rows). RECOMMEND (a) -- it
+reuses the proven ddcs_dynfields and keeps the change in jsonDef. Provisional until the advisor picks the mechanism; it is real
+new machinery, so GATED (a mechanism decision + a layout change, not a quick polish).
+
+### ITEM (2) -- LITERAL-TWIN NO-PILL SAVE FIX: GATE (secondary + entangled, advisor pre-authorized). Untouched this turn.
+
+### NET: no code ships (the one attempt was reverted after empirically disproving item 3s premise). The value is the MEASURED
+gate: item 3 would have broken a user-requested feature (t391) + ~10 specs; item 1 needs a mechanism decision; item 2 is
+entangled. Baseline green (devMode.js unchanged). NEXT: the advisor re-confirms the item-3 premise with the user, picks the
+item-1 mechanism, and directs S6b.
