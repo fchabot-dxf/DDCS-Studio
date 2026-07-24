@@ -17,7 +17,7 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': 
 function pickFileText() {
     return new Promise((resolve) => {
         const input = document.createElement('input');
-        input.type = 'file'; input.accept = '.json,application/json';
+        input.type = 'file'; input.accept = '.ddcs,.json,application/json';   // t1137 — .ddcs workspace + legacy .json (same JSON shape)
         input.addEventListener('change', () => {
             const f = input.files && input.files[0];
             if (!f) { resolve(null); return; }
@@ -36,10 +36,10 @@ export async function openBackupRestore(preloaded) {
     if (!obj) {
         const text = await pickFileText();
         if (text == null) return;
-        try { obj = JSON.parse(text); } catch (_) { dlgNotice('That file is not valid JSON — pick a DDCS backup file.'); return; }
+        try { obj = JSON.parse(text); } catch (_) { dlgNotice('That file is not a valid workspace — pick a .ddcs file.'); return; }
     }
     const pv = previewBackup(obj);
-    if (!pv.valid) { dlgNotice('That file is not a DDCS backup (the backup marker is missing).'); return; }
+    if (!pv.valid) { dlgNotice('That file is not a DDCS workspace (the marker is missing).'); return; }
     return renderRestoreModal(obj, pv);
 }
 
@@ -53,8 +53,8 @@ function renderRestoreModal(obj, pv) {
         + `<span class="bk-lbl">${esc(r.label)}</span>`
         + `<span class="bk-count">${r.present ? (r.count != null ? esc(r.count + ' ' + (r.unit || '')) : 'included') : 'not in this backup'}</span>`
         + `</label>`).join('');
-    ov.innerHTML = `<div class="backup-restore-modal" role="dialog" aria-label="Restore from backup">`
-        + `<div class="bk-head"><span class="bk-title">Restore from backup</span><button type="button" class="bk-x" aria-label="Close">✕</button></div>`
+    ov.innerHTML = `<div class="backup-restore-modal" role="dialog" aria-label="Open workspace">`
+        + `<div class="bk-head"><span class="bk-title">Open workspace</span><button type="button" class="bk-x" aria-label="Close">✕</button></div>`
         + `<div class="bk-body">`
         + `<div class="bk-meta">From app <b>${esc(pv.app)}</b>${pv.date ? ' · ' + esc(String(pv.date).slice(0, 10)) : ''}`
         + (pv.newer ? ` · <span class="bk-warn">⚠ newer backup format — some data may not import</span>` : '') + `</div>`

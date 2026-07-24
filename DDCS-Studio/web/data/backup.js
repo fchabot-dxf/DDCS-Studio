@@ -52,6 +52,9 @@ export const BACKUP_STORES = [
         // re-register into the live federated layer after writing the key (so restored wizards appear without a reload).
         write: (val) => { ls('ddcs_user_ops').write(val); try { loadUserOps(); } catch (_) {} },
     },
+    // t1137 — the CAM pack (ddcs_campack = macrosApp CAMPACK_KEY) rides inside the workspace. No live-reload hook: the
+    // restore flow reloads the page (backupModal.js), so macrosApp re-reads _camPack = loadCamPack() on boot and re-renders.
+    { id: 'campack', label: 'CAM pack', ...ls('ddcs_campack'), count: (v) => len(v && v.slots), unit: 'slots' },
     { id: 'wizardLayout', label: 'Wizard bar layout', ...ls('ddcs_wizard_layout'), count: (v) => (v ? (len(v.customGroups) + Object.keys(v.entries || {}).length) : 0), unit: 'overrides' },
     { id: 'presets', label: 'Wizard presets', ...lsPrefix('ddcs_tpl_'), count: (v) => (v ? Object.values(v).reduce((n, list) => n + len(list), 0) : 0), unit: 'presets' },
     { id: 'variables', label: 'Variables', ...ls('ddcs_vars_persistent'), count: (v) => (Array.isArray(v) ? v.filter((x) => x && !x.isSys).length : 0), unit: 'user vars' },
@@ -94,17 +97,17 @@ export async function restoreBackup(obj, selectedIds) {
     return { restored, skipped };
 }
 
-/** Export everything → download one json file. */
+/** Save the whole workspace → download one .ddcs file (t1137; the JSON shape is unchanged, so it opens on any build). */
 export async function exportEverything() {
     const obj = await buildBackup();
-    UIUtils.downloadFile('ddcs-backup-' + fileStamp() + '.json', JSON.stringify(obj, null, 2));
+    UIUtils.downloadFile('ddcs-workspace-' + fileStamp() + '.ddcs', JSON.stringify(obj, null, 2));
     return obj;
 }
 
-/** The pre-restore safety auto-export (the undo path): download the current state + stash it for verification. */
+/** The pre-open safety auto-export (the undo path): download the current workspace + stash it for verification. */
 export async function safetyExport() {
     const obj = await buildBackup();
-    const name = 'ddcs-backup-before-restore-' + fileStamp() + '.json';
+    const name = 'ddcs-workspace-before-open-' + fileStamp() + '.ddcs';
     UIUtils.downloadFile(name, JSON.stringify(obj, null, 2));
     if (typeof window !== 'undefined') window.__ddcsSafetyExport = { name, at: nowISO() };
     return { name, obj };

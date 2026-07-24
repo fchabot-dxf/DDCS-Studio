@@ -120,3 +120,38 @@ test('the Settings Backup tab exposes Export + Restore; the restore modal previe
         await ov.screenshot({ path: testInfo.outputPath(`backup-restore-${theme}.png`) });
     }
 });
+
+test('t1137 workspace: the CAM pack rides inside the .ddcs; Save downloads a .ddcs; the UI reframes to Save/Open workspace', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.openSettings, null, { timeout: 15000 });
+    const r = await page.evaluate(async () => {
+        const backup = await import('/data/backup.js');
+        const uiu = await import('/ui/uiUtils.js');
+        window.__ddcsNoReload = true;
+        let fname = '';
+        uiu.UIUtils.downloadFile = (name) => { fname = name; };
+        const pack = { meta: { name: 'My Pack', baseSlot: 22 }, slots: [
+            { slot: 22, name: 'Pocket', ops: [{ type: 'pocket', variant: 'x', opType: 'pocket' }], body: 'G0\nM30' },
+            { slot: 23, name: 'Drill', ops: [{ type: 'drill', variant: 'grid', opType: 'drill' }], body: 'G0\nM30' },
+        ] };
+        localStorage.setItem('ddcs_campack', JSON.stringify(pack));
+        const obj = await backup.buildBackup();
+        const row = backup.previewBackup(obj).rows.find((x) => x.id === 'campack');
+        await backup.exportEverything();   // → sets fname (the .ddcs)
+        localStorage.removeItem('ddcs_campack');
+        await backup.restoreBackup(obj);   // open the workspace back
+        return { inStores: 'campack' in obj.stores, count: row && row.count, unit: row && row.unit, fname, restored: JSON.parse(localStorage.getItem('ddcs_campack')), orig: pack };
+    });
+    expect(r.inStores, 'the CAM pack is captured in the workspace').toBe(true);
+    expect(r.count, 'the preview counts the CAM slots').toBe(2);
+    expect(r.unit).toBe('slots');
+    expect(r.fname, 'Save workspace downloads a .ddcs file').toMatch(/\.ddcs$/);
+    expect(r.restored, 'the CAM pack round-trips through Save→wipe→Open').toEqual(r.orig);
+
+    // UI reframe: the Workspace tab exposes Save workspace / Open workspace (same button IDs, reframed labels)
+    await page.evaluate(() => window.openSettings());
+    await page.waitForSelector('#set_tab_backup', { state: 'attached', timeout: 6000 });
+    await page.evaluate(() => { const b = document.querySelector('.settings-tab[data-target="set_tab_backup"]'); if (b) b.click(); });
+    expect(await page.evaluate(() => document.getElementById('set_backup_export').textContent), 'Export everything → Save workspace').toContain('Save workspace');
+    expect(await page.evaluate(() => document.getElementById('set_backup_restore').textContent), 'Restore → Open workspace').toContain('Open workspace');
+});

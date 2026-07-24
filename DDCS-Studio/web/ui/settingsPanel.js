@@ -957,7 +957,7 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_wizards">Wizards</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_backup">Backup</button>
+                    <button class="settings-tab" data-group="general" data-target="set_tab_backup">Workspace</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_faq">FAQ</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
                     <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
@@ -1218,11 +1218,11 @@ function buildSettingsOverlay() {
                 <!-- GENERAL: BACKUP (t852) — export/restore ALL user state as one file -->
                 <div id="set_tab_backup" style="display:none">
                     <div class="settings-section">
-                        <div class="settings-section-title">ONE-FILE BACKUP</div>
-                        <div class="settings-hint">Export everything you have set up — profiles, projects, settings, the tool table, custom wizards, presets, prefs — as a single file, and restore it on another machine or after a reset. Tokens and cloud credentials are never included.</div>
+                        <div class="settings-section-title">WORKSPACE (.ddcs)</div>
+                        <div class="settings-hint">Save your whole workspace — profiles, projects, settings, the tool table, custom wizards, your <b>CAM pack</b>, presets, prefs — as one <b>.ddcs</b> file, and open it on another machine or after a reset. (One job is a <b>.mjson</b>; the whole workspace is a <b>.ddcs</b>.) Tokens and cloud credentials are never included.</div>
                         <div class="settings-row" style="margin-top:10px; gap:8px;">
-                            <button type="button" class="toolbar-btn settings-io" id="set_backup_export" title="Download one .json holding all your data">⭳ Export everything</button>
-                            <button type="button" class="toolbar-btn settings-io" id="set_backup_restore" title="Load a backup file — you'll pick what to restore, and a safety copy of your current state is saved first">⭱ Restore from file…</button>
+                            <button type="button" class="toolbar-btn settings-io" id="set_backup_export" title="Save your whole workspace as one .ddcs file">💾 Save workspace</button>
+                            <button type="button" class="toolbar-btn settings-io" id="set_backup_restore" title="Open a .ddcs workspace (or a legacy .json backup) — you'll pick what to restore, and a safety copy of your current state is saved first">📂 Open workspace…</button>
                         </div>
                     </div>
                 </div>
