@@ -14957,3 +14957,60 @@ against random drive-by (evil.com is not on the allowlist). Apply to do_OPTIONS 
 NO code changed, NO merge (investigation only). Read client.js (feat/ddcs-workspace) + server.py (feat/gateway-csrf-guard).
 This finding refines the t1115 surfaced note (the "?api= cross-origin dev seam breaks for POSTs") -- it is NOT just a dev seam;
 it is the SUPPORTED hosted->local "exe experience" flow, and the fix is the do_OPTIONS origin-allowlist.
+
+---
+
+## turn 1143 -- S4 LIVE-BLOCKS VIEW (loop step D): a DESIGN pass -- sliced plan + forks. NO build, read-only. (gateway t1141 done on its own branch.)
+
+### DELIVERABLE: DDCS-Studio/scratchpad/S4-live-blocks-view-plan.md (untracked scratchpad doc, with ASCII diagrams). This
+WORK-LOG entry is the standalone summary for the diff-review.
+
+### BRANCH NOTE: t1141 (do_OPTIONS origin-allowlist) shipped + verified on feat/gateway-csrf-guard (feat 97e9ab0 + docs
+3e443ff; full gate 1461/0/4). GATEWAY-SECURITY is COMPLETE for all 4 modes; advisor merge-rec = BUNDLE with the exe/bridge
+(no standalone merge). To keep that branch CLEAN/ready-to-bundle I did NOT commit this S4 note onto it -- I switched back to
+the loop-home branch feat/ddcs-workspace (where the S4 code + the t1140-pattern design notes live) for this note. Grounding
+was done READ-ONLY via git-show from feat/ddcs-workspace (the S4 code is absent on the parked gateway branch). "no branch
+switch NEEDED" (NEXT-SESSION) read as permissive; the switch keeps gateway pristine + this note coherent. Flag if you wanted
+me to stay on gateway.
+
+### GROUNDING CONCLUSION: S4 is NOT new machinery -- it is the EXISTING editWizardDef path pointed at a CAM slot.
+editWizardDef (devMode.js) already does the whole thing for a placed op: getUserDef(opType) -> makeOp(opType, defaultParams,
+template) -> showApp(blocks) -> ddcsLoadBlockStack([opC]) + the editing glow/chip. A UNIVERSAL slot manifest is already
+{type:universal, opType, defV, values, exposed, baked} -- it REFERENCES the def (declare-not-infer), and manifestToAuthOp
+re-hydrates from getUserDef. A SUBSTACK walks walkParts(def.children) (opunit stays LIVE). So the "reconstructed op" is the
+same makeOp call. GENERATORS (camTypeOf -> {camType}, the 8 twins) STAY parametric in the modal -- reconstructing a
+generator-at-defaults is lossy (a generator is a JS routine, not a block stack).
+
+### THE 4 FORKS -- resolved (recommendation + deciding decision-sieve gate):
+ - (C) DESTRUCTIVE ACTIVE-PROGRAM LOAD [the one real safety item]: ddcsLoadBlockStack REPLACES the current program (today
+   editWizardDef does this with NO confirm, only the saveStates undo net). REC: a shared dirty/non-empty guard --
+   saveStates.snapshot('before-cam-edit') + a confirm -- routed through BOTH editWizardDef (fixes its latent wipe) AND the
+   new CAM path. GATE G1 (data-loss, no trade-off). Reuse saveStates, do not hand-roll a stash.
+ - (COEXISTENCE) modal (expose/bake pendant) vs Blocks (structural deep-edit): both are views of the SAME cam_field block
+   source (S4a). REC: Blocks = the deep-edit surface; on Editing universal/substack, CLOSE the modal + open Blocks (one
+   active surface; expose/bake lives on the cam_field blocks IN Blocks, nothing lost). GATE G3 (one source, no two live
+   editors). RESIDUE for user: fully hand off vs keep modal open beside Blocks (Q2).
+ - (MULTI-OP) composed slot -> concat: editWizardDef loads [opC]; generalize to ddcsLoadBlockStack([opC1,opC2,...]) via the
+   same makeOp per op. GATE G4 (valid-by-construction, reuse one path). Mixed generator+universal slot -> load only the
+   block-able ops, generator stays in the modal (surface if it occurs, Q3). The slot-BODY framing-normalization is a
+   SEPARATE known limit (composeParts) -- NOT the Blocks view (concatenating op blocks is unaffected).
+ - (ROUND-TRIP) Blocks -> slot.ops on Update: ALREADY one-source. Slot points at the def by opType+defV; a def edit bumps
+   defV and defVStale (the ONE declared rule, userOps.js:683, already used by programModel + subStackToSlot) flags the
+   slot. REC: do NOT add a Blocks->slot converter -- on Update, save the def (defV++) then call the EXISTING
+   buildSlotFromOps(slot) (re-derives fields/body from getUserDef via subStackToSlot/stackToSlot). GATE G2+G3. Open detail:
+   intersect the stored exposed/baked overlay with the new field set (drop orphans) when structure changes.
+
+### SLICES (smallest-first, each independently verifiable):
+ 1. S4-1 the shared destructive-load guard (also fixes editWizardDef's latent wipe -- value on its own).
+ 2. S4-2 Edit a single-op UNIVERSAL slot -> Blocks (route editCamSlot to the editWizardDef-style load; modal does not also open).
+ 3. S4-3 round-trip on Update (save def defV++ -> buildSlotFromOps).
+ 4. S4-4 SUBSTACK slots (walkParts path; standard sub-unit stays a LIVE loop).
+ 5. S4-5 multi-op concat (load [opC1,opC2,...]; mixed slots load only block-able ops).
+Generators untouched throughout (modal stays their only surface).
+
+### GENUINE USER FORKS TO SURFACE (not gate-decided): Q1 one smart "Edit" that routes universal/substack -> Blocks, vs a
+separate "Edit in Blocks" action beside the modal Edit (I lean: one smart Edit). Q2 fully hand off to Blocks vs modal-open-
+beside (I lean: hand off). Q3 mixed slots now (load only block-able ops) vs defer to S4-5 (I lean: defer mixed to S4-5).
+
+NO code changed (design pass). Grounded in the REAL editCamSlot/manifestToAuthOp/editWizardDef/ddcsLoadBlockStack/saveStates/
+defVStale/subStackToSlot code. Advisor reviews the plan + surfaces Q1-Q3 to the user, then we slice S4-1 first.
