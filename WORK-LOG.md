@@ -14736,3 +14736,38 @@ as its own modal (openIconEditor already did). openIconEditor / slot.icon UNCHAN
 
 ### NOT TOUCHED: openIconEditor internals, the slot.icon shape, the engine, the active program. Next per the plan: S6
 (migration + hand-edited-macro honesty + polish), or the make-it-with-blocks reframe / deferred S4.
+
+---
+
+## turn 1131 -- CAM-UX declare-once S6: settings becomes a PURE display. COMPLETES the redesign (S1-3 + S5 + S6; S4 deferred).
+
+### FORK B -- RETIRE the settings "🧩 Customize op" button (an authoring door has no place in a display)
+Removed the cam_customize_op button (markup), its handler binding (_camCustomize -> cbmCustomizeModal -> ddcsEditWizardDef),
+and the cbmCustomizeModal picker function itself (grep-confirmed settings-only). The OP-MENU "🧩 Customize as blocks"
+(opContextMenu.js:61) STAYS -- it calls window.ddcsEditWizardDef DIRECTLY, so nothing here served it. Dropped the now-orphaned
+isCamGeneratorTwin import (cbmCustomizeModal was its only user in macrosApp; opContextMenu still imports its own).
+
+### FORK F -- legacy no-ops slots: confirmed + explained
+CONFIRMED (S3 already gated it): the ✎ Edit button renders ONLY when slot.ops has content, so a legacy hand-built slot (no
+slot.ops) shows NO Edit and keeps ▶ Simulate / ⬇ View output / ✕ Delete. ADDED a small why-hint in its place: "ⓘ hand-built --
+no wizard Edit" with a tooltip (no declared ops -> re-author via ＋ New CAM slot; View output/Simulate/Delete still work).
+CONFIRMED bodyDirty can no longer be NEWLY set: S1 removed the macro textarea (its only setter); grep shows bodyDirty is now
+only read (regenGuard) / set-false (buildSlotFromOps) / deleted (dupslot clone). regenGuard itself is dead now (no callers) --
+KEPT for the DEFERRED Fork E (the raw-block escape-hatch warn), per the dispatch.
+
+### SLOT REORDER (optional) -- SKIPPED: it adds reorder UI (arrows + splice) to what is now a pure display, and the dispatch
+gated it to "only if trivial". The slot order = cam-number order (renumber via the header cam# field already reorders the
+effective sequence). Left out to keep S6 a clean finish; trivially addable later if the user wants drag-reorder.
+
+### VERIFIED
+ - cam-slot-display-s6.spec.js (NEW, 2): Fork B (the settings Customize-op button is GONE; New/Export/Merge-eng remain); Fork F
+   (a legacy no-ops slot shows NO editslot + the hand-built hint + keeps Simulate/View output/Delete; a manifest slot shows
+   ✎ Edit).
+ - cam-customize-affordance: DELETED the obsolete "B2 -- the Customize-op BUTTON + picker" test (it drove the retired settings
+   button); the op-menu tests (A + the VIEWED ddcsEditWizardDef path) STAY green -- the Customize-as-blocks route is intact.
+ - Full gate: 1466 passed / 4 skipped / 0 failed -- fully green (1465 S5 baseline + 2 new S6 - 1 deleted obsolete B2 test).
+
+### THE REDESIGN IS COMPLETE: settings is now a PURE display (icon preview + read-only op summary + Simulate / View output /
+Duplicate / Delete + the pack doors New/Export/Merge); ALL authoring is in the wizard (New composes from the program; Edit
+reopens pre-seeded from the manifest -> Update in place; the icon step draws/imports). S4 (the live editor/Blocks view) remains
+deferred; the launch-vs-integrated icon-editor call is with the user.
