@@ -97,6 +97,11 @@ export function setGroupOverride(id, patch) {
     l.groups[id] = { ...(l.groups[id] || {}), ...patch };
     writeLayout(l);
 }
+/** Whether an entry carries ANY layout override (label/group/order/icon/visible) — used to show a per-wizard Restore action. */
+export function entryHasOverride(id) { const e = (readLayout().entries || {})[id]; return !!(e && Object.keys(e).length); }
+/** t1107 — clear ONE entry's layout override (label/group/order/icon/visible) back to the shipped catalog. Per-wizard, unlike
+ *  the blanket resetLayout. Leaves every other entry + group untouched. */
+export function clearEntryOverride(id) { const l = readLayout(); if (l.entries && l.entries[id]) { delete l.entries[id]; writeLayout(l); } }
 /** Reset ALL bar customization back to the shipped catalog (does NOT delete user ops). */
 export function resetLayout() { writeLayout({}); }
 
