@@ -131,7 +131,9 @@ test('DRIVE THE APP: the io pin LIGHTS when the axis reaches its home/limit swit
         c.textContent = 'HOMING H3 — the tool at its Z home edge (machine-0): the home switch (wired to input pin 7) is TRIPPED, so its Virtual I/O LED is lit.';
         document.body.appendChild(c);
     });
-    await page.waitForTimeout(350);
+    // t1133 flake-harden — await the LED actually rendering LIT (the real condition), not a fixed 350ms that samples before
+    // the io panel repaints under 4-worker gate contention. If the LED never lights, this times out = a real bug, not masked.
+    await page.waitForFunction(() => { const b = document.querySelector('#io-panel .io-input[data-pin="7"]'); return !!(b && b.classList.contains('active')); }, null, { timeout: 6000 });
     const ledLit = await page.evaluate(() => { const b = document.querySelector('#io-panel .io-input[data-pin="7"]'); return b ? b.classList.contains('active') : null; });
     expect(ledLit, 'the pin-7 input LED renders LIT (.active) in the live I/O panel').toBe(true);
     await page.screenshot({ path: 'scratchpad/homing_h3_switch_lit.png' });

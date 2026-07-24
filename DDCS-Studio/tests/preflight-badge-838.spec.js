@@ -9,19 +9,24 @@ import { test, expect } from '@playwright/test';
 // UX under test); M3 is not a move so the trace/annotations are byte-identical and no line numbers shift. The G0-only
 // snippet (RED annotations test) needs none (no feed cut → the guard never fires). See spindle-guard-947.spec.js.
 async function configure(page, { declared, program }) {
-    await page.evaluate(({ declared }) => {
+    await page.evaluate(({ declared, program }) => {
         const s = window.ddcsGetSettings();
         s.machine = s.machine || {};
         Object.assign(s.machine, { x: 300, y: 300, z: -120 });
         s.machine.wcs = { active: 1, table: declared ? [{ x: 0, y: 0, z: 0 }] : null };
-        window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
-    }, { declared });
-    await page.evaluate((program) => {
         const ed = document.getElementById('editor');
         ed.value = program;
-        ed.dispatchEvent(new Event('input', { bubbles: true }));
-    }, program);
-    await page.waitForTimeout(340);   // let the debounced render() (250ms) settle + re-inject annotations
+        ed.dispatchEvent(new Event('input', { bubbles: true }));   // the real live-typing path (schedules the debounced highlight + preflight render)
+    }, { declared, program });
+    // t1133 flake-harden — the old `waitForTimeout(340)` (debounced 250ms render + slack) SAMPLED BEFORE the render under
+    // 4-worker gate load, leaving the NON-retrying ddcsPreflightCheck() reads (+ the .g-line annotations) stale → :63/:104/:119
+    // flaked. Replace with a DETERMINISTIC two-step: (1) wait for the editor HIGHLIGHT to render the program's LAST line (the
+    // .g-line overlay the RED annotations attach to), then (2) fire ddcs:settings-changed → preflightBadge.render() runs
+    // SYNCHRONOUSLY (badge + lastResult + annotations, one source). Not masking: if the render never reflects the program the
+    // waits time out = a real bug, surfaced.
+    const lastLine = program.trim().split('\n').pop().trim().replace(/\s+/g, ' ');
+    await page.waitForFunction((t) => { const o = document.getElementById('editor-highlight'); return !!(o && o.textContent.replace(/\s+/g, ' ').includes(t)); }, lastLine, { timeout: 8000 });
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 }
 
 test.beforeEach(async ({ page }) => {

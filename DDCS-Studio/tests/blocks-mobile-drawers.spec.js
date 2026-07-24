@@ -15,7 +15,9 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
-  await page.waitForTimeout(500);
+  // t1133 flake-harden — wait for the mobile layout to COLLAPSE the palette (the real condition the block below asserts),
+  // not a fixed 500ms that samples mid-layout under 4-worker gate contention.
+  await page.waitForFunction(() => { const tb = window.__blkws && window.__blkws.getToolbox(); return tb && tb.getWidth() === 0; }, null, { timeout: 15000 });
 
   const initial = await page.evaluate(() => {
     const tb = window.__blkws.getToolbox();
@@ -34,24 +36,27 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   expect(initial.drawerHandleShown, 'bottom preview handle visible').toBeTruthy();
   expect(initial.rightOpen, 'preview drawer starts closed').toBeFalsy();
 
-  // open preview drawer
+  // open preview drawer — t1133: await the real `open` class (JS-toggled on click), not a fixed 300ms
   await page.click('#blkDrawerHandle');
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => document.querySelector('#blocks-app .right').classList.contains('open'), null, { timeout: 5000 });
   expect(await page.evaluate(() => document.querySelector('#blocks-app .right').classList.contains('open'))).toBeTruthy();
 
-  // toggle to G-code, back to Preview
+  // toggle to G-code, back to Preview — await each class flip (deterministic, no implicit settle)
   await page.click('#blkSegCode');
+  await page.waitForFunction(() => document.querySelector('#blocks-app .right').classList.contains('show-code'), null, { timeout: 5000 });
   expect(await page.evaluate(() => document.querySelector('#blocks-app .right').classList.contains('show-code'))).toBeTruthy();
   await page.click('#blkSegPv');
+  await page.waitForFunction(() => !document.querySelector('#blocks-app .right').classList.contains('show-code'), null, { timeout: 5000 });
   expect(await page.evaluate(() => document.querySelector('#blocks-app .right').classList.contains('show-code'))).toBeFalsy();
 
   // close preview drawer
   await page.click('#blkDrawerClose');
+  await page.waitForFunction(() => !document.querySelector('#blocks-app .right').classList.contains('open'), null, { timeout: 5000 });
   expect(await page.evaluate(() => document.querySelector('#blocks-app .right').classList.contains('open'))).toBeFalsy();
 
-  // open palette drawer → toolbox shows + width > 0
+  // open palette drawer → toolbox shows + width > 0 (t1133: await the real width, not 300ms)
   await page.click('#blkToolsHandle');
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => window.__blkws.getToolbox().getWidth() > 0, null, { timeout: 5000 });
   const opened = await page.evaluate(() => ({
     toolsOpen: document.getElementById('blocks-app').classList.contains('tools-open'),
     toolboxWidth: window.__blkws.getToolbox().getWidth(),
@@ -109,9 +114,9 @@ test('mobile: palette collapses (canvas reclaims width), preview + palette drawe
   const after = await page.evaluate(() => document.querySelector('#blocks-app .right').getBoundingClientRect().height);
   expect(after, `drawer resized taller (${before} → ${after})`).toBeGreaterThan(before + 30);
 
-  // close palette drawer → collapses again
+  // close palette drawer → collapses again (t1133: await the real collapse, not 300ms)
   await page.click('#blkToolsHandle');
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => window.__blkws.getToolbox().getWidth() === 0, null, { timeout: 5000 });
   expect(await page.evaluate(() => window.__blkws.getToolbox().getWidth())).toBe(0);
 
   await page.screenshot({ path: 'tests/_blocks-mobile-drawers.png' });
