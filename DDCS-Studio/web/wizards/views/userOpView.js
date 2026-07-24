@@ -9,7 +9,7 @@
  * The manager routes any `user_*` type to this single view + panel (see wizardManager._userView / open()).
  */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { renderOpForm } from '../../ui/formWidgets.js';
+import { renderOpForm, formBindings } from '../../ui/formWidgets.js';   // S5.2 — formBindings consumes the def's param_field rows when present
 import { recordOp } from '../../blocks/opRecord.js';
 import { builderOf } from '../../blocks/opBuilders.js';
 import { emitMapped } from '../../blocks/blockEmitter.js';
@@ -241,8 +241,10 @@ function render() {
     const host = el('wiz_user_form');
     if (!host || !_def) return;
     host.innerHTML = '';
-    // seed: override each binding's default with the op's param when editing (so the widgets show its values)
-    const binds = (_def.bindings || []).map((b) => (_seed && (b.param in _seed)) ? { ...b, default: _seed[b.param] } : b);
+    // seed: override each binding's default with the op's param when editing (so the widgets show its values). S5.2 —
+    // formBindings supplies the param_field-driven order/presentation when a param_group is present (else the bindings,
+    // unchanged); the seed value then wins for the shown default, exactly as before.
+    const binds = formBindings(_def).map((b) => (_seed && (b.param in _seed)) ? { ...b, default: _seed[b.param] } : b);
     _readers = _def.bindings && _def.bindings.length
         ? renderOpForm(host, binds)
         : (host.appendChild(Object.assign(document.createElement('div'), { textContent: 'No parameters — inserts as-is.', style: 'opacity:.6;margin:8px 0;' })), []);

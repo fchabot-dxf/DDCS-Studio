@@ -5,7 +5,10 @@
  * proven sequence (two-pass G31, indirect WCS write, raster) and keeps the generators short. Pure string
  * builders — no DOM, no state. Output is byte-stable so the cam-slot-sim tests guard any change here.
  *
- * Scratch-var convention these helpers own: WCS #70 (base) #71 (idx) #73 (addr); raster #27-#32.
+ * Scratch-var convention these helpers own: WCS #70 (base) #71 (idx) #73 (addr); raster/ring #27-#33.
+ * (t1081 CORRECTION: this said "#27-#32" — wrong. rasterClear also writes #33, the ramp lead-in length. The
+ * authoritative, code-derived bands are DATA in data/camScratch.js, which the build guard reads; keep this line in
+ * step with that declaration — the prose is a pointer, never the source.)
  */
 
 /** Spindle RPM field to append to a cutting slot's form, + the start/stop lines that bracket the toolpath. */
@@ -16,6 +19,24 @@ export const SPINDLE_FIELD = { key: 'rpm', label: 'Spindle RPM', units: 'rpm', d
 /** Spindle on CW at the form RPM, with a ~2-second spin-up dwell (integer P2000 = 2000 ms). */
 export const spindleOn = (rpmVar) => [`M3 S[${rpmVar}]   ( spindle on )`, 'G04 P2000   ( spin-up dwell 2000ms = 2s )'];
 export const spindleOff = () => ['M5   ( spindle off )'];
+
+/**
+ * The DECLARED halt for a CAM-slot ERROR branch. An error handler must STOP here — never fall through.
+ *
+ * WHY (t1077, safety): a COMPOSED slot strips every NON-terminal part's terminal `M30` (slotPack.composeParts),
+ * because the SUCCESS path must flow on into the next part. But every generator's error handler only set `#1505=1`
+ * and then fell through to its convergence label (N2 probes / N9 mills), relying on that same stripped `M30` — so in
+ * a composed slot a failed probe or a tripped guard ran straight into the NEXT part's motion. On a machine that is
+ * WRONG MOTION, not a clean stop.
+ *
+ * `M30` is the ONE declared program end (dialect.endProgram, ddcs-expert-m350.js). NOT `M0` — that is a PAUSE the
+ * operator resumes, which would then continue into the next part (worse than the bug). NOT the `#3000` alarm — its
+ * support is contradicted between the docs and the controller dumps, so it is not a primitive to introduce on a
+ * safety path.
+ *
+ * Emit it INSIDE the error branch, BEFORE the convergence label, so the converge target stays reachable only on success.
+ */
+export const errorEnd = (why) => `M30   ( stop — ${why || 'error'} )`;
 
 /** Per-axis DDCS probe system vars: status (2=success) + trigger position (machine coord). */
 export const PROBE = {

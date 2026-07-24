@@ -18,6 +18,7 @@ import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inl
 import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';   // t522 declared-I/O picker; t768 P1b the tool-library modal opener (pickable from a wizard)
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
 import { getToolLibrary, getTool } from '../wizards/toolPicker.js';   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
+import { paramFieldsFromStack } from '../blocks/userOps.js';   // block-native-params S5.2 — the FORM-field declaration (param_field rows), when present
 import { THREAD_PRESETS, threadPreset } from '../wizards/threads.js';   // t778 — the thread preset table for the tapping wizard's pitch picker
 import { MATERIALS, suggestFeedsSpeeds } from '../wizards/materials.js';   // t867 — feeds & speeds: the material table + the classic RPM/feed math
 import { isSectionCollapsed, setSectionCollapsed } from './panePrefs.js';   // t820 — collapsible form sections (app-wide per section kind)
@@ -878,6 +879,40 @@ export const FIELD_HELP = {
 export const HELP_EXEMPT = new Set(['cols', 'rows', 'dx', 'dy', 'nx', 'ny', 'count', 'spacing', 'angle', 'startAngle', 'x0', 'y0', 'x', 'y', 'ax', 'ay', 'bx', 'by', 'w', 'h', 'dia', 'align', 'cross1_x', 'cross1_y', 'startX', 'startY']);
 // A readonly canvas-set field (e.g. a drag-handle target) uses its readonlyHint as the help — the hint IS the declared explanation.
 export function helpFor(b) { return (b && b.help) || (b && FIELD_HELP[b.param]) || (b && b.readonlyHint) || null; }
+
+/**
+ * block-native-params S5.2 — the FORM binding list a renderer should use for a def. ADDITIVE-BY-FALLBACK: when the def's
+ * template carries a param_group, its param_field ROWS drive the form (order = row order; label/widget/type/default/
+ * widgetConfig from the row; the BINDING supplies the wiring — param/blockIndex/key — and any inherited presentation). When
+ * there is NO param_group (every op today until the S5.3 hook) the def's bindings are returned UNCHANGED → byte-identical form.
+ * The wizard FORM is a pure FILL surface (renders the declaration, the operator enters values; the param_field block is the
+ * SOLE edit surface for the declaration), so this is a clean ONE-WAY consume — no write-back.
+ */
+export function formBindings(def) {
+    const rows = paramFieldsFromStack(def && def.template);   // [] when no param_group
+    const valueBindings = (def && def.bindings) || [];
+    if (!rows.length) return valueBindings;                   // FALLBACK — unchanged, byte-identical to today
+    const byParam = {}; valueBindings.forEach((b) => { if (b && b.param != null) byParam[b.param] = b; });
+    return rows.map((row) => {
+        const b = byParam[row.param];
+        if (!b) return null;   // a row naming a param with no binding → dangling, skip
+        // CANVAS GROUPING is WIRING, not presentation: a binding in a canvas group (group/role, e.g. an xy-pad's x/y) keeps
+        // its group/role (via ...b) AND its canvas `widget` (the first member's widget drives the group's render — the row's
+        // 'number' must NOT override it, or the group would flatten). So for a canvas member the binding's widget wins; only
+        // a plain binding takes the row's widget. This is why a materialized param_group is byte-neutral even for canvas ops.
+        const isCanvas = (b.group != null) || (b.role != null);
+        return {
+            ...b,
+            label: (row.label != null) ? row.label : b.label,
+            widget: isCanvas ? b.widget : (row.widget || b.widget),
+            type: row.type || b.type,
+            default: (row.default != null) ? row.default : b.default,
+            ...(row.widgetConfig ? { widgetConfig: row.widgetConfig } : (b.widgetConfig ? { widgetConfig: b.widgetConfig } : {})),
+            ...(row.help != null ? { help: row.help } : {}),
+            ...(row.section != null ? { section: row.section } : {}),
+        };
+    }).filter(Boolean);
+}
 
 export function renderOpForm(host, bindings) {
     const readers = [], units = [], byGroup = {};

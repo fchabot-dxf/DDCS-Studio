@@ -17,6 +17,18 @@ import { openIconEditor } from './iconEditor.js';
 import { slotFromOp } from '../data/opToSlot.js';
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from '../data/probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
+import { seedFromOp, camTypeOf, isCamableType, isCamGeneratorTwin } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. t1073 — isCamGeneratorTwin gates the Customize-op picker
+import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
+import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';
+import { fieldVarCollisions, collisionMessage, maxLocalVar, nextLocalVar, bandsFor } from '../data/camScratch.js';   // t1081 — the DECLARED generator scratch bands + the build guard that refuses a slot whose form values land inside them   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
+import { universalBands } from '../data/universalScratch.js';   // t1085 slice C — the injected band of the UNIVERSAL arm (atoms + active post), so the guard backstops that arm too
+
+// t1085 — the camType→bands resolver the guard runs with HERE. camScratch declares the generator bands and cannot import
+// universalScratch (it is a leaf by design), so this is where the two are joined: a 'universal' part is measured against
+// what emitMapped injects beneath it, every other part against its own generator's declaration. After slice C a collision
+// should be impossible on EITHER arm — so the guard firing now means a regression on whichever arm reported it.
+const camBandsOf = (t) => ((t === 'universal') ? universalBands() : bandsFor(t));
+import { getUserDef, defVOf, flattenBlocks } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest; t1099 (S4a) — walk the template for cam_field block records
 import { autoIconBmp } from '../data/autoIcon.js';
 import { auditMacroVars } from '../data/varMap.js';
 import { makeZip, downloadBytes } from '../data/zip.js';
@@ -156,7 +168,7 @@ export function initMacrosApp() {
                     <div class="settings-section">
                         <div class="settings-section-title">CAM PACK BUILDER</div>
                         <div class="settings-hint">Author a DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's CAM page — to share with the community. Each slot = a <b>form</b> + a <b>macro</b> that reads the form live (the <code>#2600+</code> mirrors). Studio auto-allocates the shared <code>#1100–1499</code> form params and flags collisions. <i>Phase 1: form designer + macro + plain export. Icons + eng-merge install come next.</i></div>
-                        <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
+                        <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_add_slot">＋ Add slot</button><button class="toolbar-btn settings-io" id="cam_build_slot" title="Author a CAM slot from an op in your program: seed the field table, choose which params the operator fills (Expose) vs freezes (Bake), preview, then Build to a slot.">✚ Build CAM slot</button><button class="toolbar-btn settings-io" id="cam_customize_op" title="Fork a standard op (Surfacing / Pocket / Corner / …) from your program into editable blocks — its standard part stays LIVE in CAM. Opens in the Blocks view.">🧩 Customize op</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
                         <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
                         <div id="cam_slots" style="margin-top:6px;"></div>
                     </div>
@@ -1004,18 +1016,36 @@ function homingPostIsExpert() {
     const opTypeOpts = (sel) => Object.entries(OP_LABEL).map(([v, l]) => `<option value="${v}"${sel === v ? ' selected' : ''}>${l}</option>`).join('');
     const defaultVariant = (type) => (SECOND_CTL[type] ? SECOND_CTL[type].opts[0][0] : '');
     // Generate one op into a starting point. The mill/probe ops live in CAM_GEN; drill/bore/slot go via slotFromOp.
-    const generateOp = (type, variant, used, off) => (CAM_GEN[type] ? CAM_GEN[type](used, off, variant) : slotFromOp(type, variant, used, off));
+    // S1a — a `decl` (the expose/bake declaration) threads through to allocFieldsWith / slotFromOp's inline hook.
+    const generateOp = (type, variant, used, off, decl, opType) =>
+        (type === 'substack') ? subStackToSlot(getUserDef(opType), used, off)        // S4 — a forked op w/ an embedded opunit: subStackToSlot composes ALL parts itself (standard part LIVE via its generator loop, custom atoms exposed)
+        : (type === 'universal') ? stackToSlot(getUserDef(opType), decl, used, off)   // U3 — the universal arm: unroll the op's def, expose value params, bake geometry
+        : CAM_GEN[type] ? CAM_GEN[type](used, off, variant, decl)                    // the 8 PREMIUM live-parametric generators (unchanged)
+        : slotFromOp(type, variant, used, off, decl);                                // drill/bore/slot generators (unchanged)
     // Columns the user can tune in the field table that we PERSIST per op (so a regenerate keeps them, matched by
     // field key). `var` is generator-assigned (renaming would desync the body) and `type` has no column, so neither
     // is persisted. Stored on the op as op.values[key] = {def, min, max, label, units}.
     const FIELD_OVR_COLS = ['label', 'units', 'def', 'min', 'max'];
+    // S1a — the expose/bake declaration for a manifest op (siblings of op.values): a param is BAKED when
+    // op.exposed[key] === false, its frozen literal = op.baked[key]. Both maps are ABSENT until S1b's UI writes them,
+    // so decl is empty today → allocFieldsWith / slotFromOp run all-exposed → every existing slot is byte-identical.
+    const declFromOp = (op) => {
+        const ex = op.exposed || {}, bk = op.baked || {}, vals = op.values || {}, decl = {};
+        new Set([...Object.keys(ex), ...Object.keys(bk)]).forEach((k) => {
+            if (ex[k] === false) decl[k] = { exposed: false, value: bk[k] };
+            // UNIVERSAL: stackToSlot exposes ONLY on decl.exposed===true (an absent entry = not-exposed), so expose must be
+            // POSITIVE here (unlike the generator path where absence = exposed). Seed the pendant field from the op's value.
+            else if (op.type === 'universal') decl[k] = { exposed: true, value: (vals[k] ? vals[k].def : undefined) };
+        });
+        return decl;
+    };
     // A read-line in canonical form (identical to what every generator emits) — used to re-sync the macro comment
     // to a tuned field so the table, the macro, Simulate and "Refresh fields" all agree.
     const canonicalRead = (f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`;
     function applyOverridesToBody(body, fields, values) {
         let out = body;
         fields.forEach((f) => {
-            if (!values[f.key]) return;   // only fields the user actually tuned
+            if (!values[fkeyOf(f)]) return;   // only fields the user actually tuned (t1077 — part-scoped key)
             const re = new RegExp('^[ \\t]*' + f.var.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '=#' + (f.idx + 1500) + '\\b.*$', 'm');
             if (re.test(out)) out = out.replace(re, canonicalRead(f));
         });
@@ -1030,12 +1060,15 @@ function homingPostIsExpert() {
         _camPack.slots.forEach((s) => { if (s !== slot) (s.fields || []).forEach((f) => used.add(f.idx)); });
         let fields = [], parts = [], name = '';
         (slot.ops || []).forEach((op, oi) => {
-            const gen = generateOp(op.type, op.variant, used, fields.length);
+            // t1083 — advance the local-var cursor from what the previous parts ACTUALLY MINTED, not from a parallel
+            // field COUNT. That is what closes the bake gap: a baked param mints no var, so `fields.length` drifted below
+            // the real high-water mark and the next part's vars overlapped the previous part's.
+            const gen = generateOp(op.type, op.variant, used, maxLocalVar(fields), declFromOp(op), op.opType);   // opType → the universal arm's def lookup
             let body = gen.body;
             gen.fields.forEach((f) => {
                 used.add(f.idx);
                 f._op = oi;
-                const ov = op.values && op.values[f.key];
+                const ov = op.values && op.values[fkeyOf(f)];   // t1077 — part-scoped key (identical for a single-part op)
                 if (ov) FIELD_OVR_COLS.forEach((k) => { if (ov[k] !== undefined) f[k] = ov[k]; });
             });
             if (op.values) body = applyOverridesToBody(body, gen.fields, op.values);
@@ -1044,7 +1077,10 @@ function homingPostIsExpert() {
             name = name ? name + ' + ' + gen.name.replace(/^(Drill|Bore) — /, '') : gen.name;
         });
         slot.fields = fields;
-        slot.body = parts.join('\n\n');
+        // t1081 — record any field var that lands inside a composed part's DECLARED scratch band, so the build can refuse
+        // and the pack validator can flag an already-built slot. Detection only here; the build path does the refusing.
+        slot.varCollisions = fieldVarCollisions(fields, slot.ops || [], camBandsOf);
+        slot.body = slotPack.composeParts(parts);   // normalize the composed parts into ONE executable program (strip non-terminal M30s + uniquify labels) — else the controller stops after part 1
         if (name) slot.name = name;
         slot.bodyDirty = false;
     }
@@ -1076,8 +1112,10 @@ function homingPostIsExpert() {
         if (!slot.ops || !slot.ops.length) return '';
         const cards = slot.ops.map((op, oi) => `<div class="cam-op-card" style="display:flex; align-items:center; gap:6px; padding:4px 6px; background:rgba(127,127,127,.05); border:1px solid var(--border); border-radius:6px;">
                 <span style="font-size:10px; color:var(--text-dim); width:14px; text-align:center;">${oi + 1}</span>
-                <select class="cam-op-type" data-oi="${oi}" title="Op type — changing it rebuilds this op's fields + macro">${opTypeOpts(op.type)}</select>
-                <select class="cam-op-var" data-oi="${oi}" title="${secondCtlTitle(op.type)}"${SECOND_CTL[op.type] ? '' : ' style="display:none"'}>${secondCtlOpts(op.type, op.variant)}</select>
+                ${op.type === 'universal'
+                    ? `<span style="font-size:11px; color:var(--text-dim); padding:2px 4px; white-space:nowrap;" title="Custom op (universal) — its type is fixed to the source op &quot;${camEsc(op.opType || '')}&quot; and cannot be swapped for a generator">⚙ Custom op</span>`
+                    : `<select class="cam-op-type" data-oi="${oi}" title="Op type — changing it rebuilds this op's fields + macro">${opTypeOpts(op.type)}</select>
+                <select class="cam-op-var" data-oi="${oi}" title="${secondCtlTitle(op.type)}"${SECOND_CTL[op.type] ? '' : ' style="display:none"'}>${secondCtlOpts(op.type, op.variant)}</select>`}
                 <span style="flex:1"></span>
                 <button class="op-btn" data-act="opup" data-oi="${oi}" title="Move up (ops run in this order)"${oi === 0 ? ' disabled' : ''}>▲</button>
                 <button class="op-btn" data-act="opdown" data-oi="${oi}" title="Move down (ops run in this order)"${oi === slot.ops.length - 1 ? ' disabled' : ''}>▼</button>
@@ -1095,10 +1133,315 @@ function homingPostIsExpert() {
     function addOpClusterHtml() {
         return `<span style="display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px dashed var(--border); border-radius:6px; background:rgba(127,127,127,.06);"><span style="font-size:10px; color:var(--text-dim); white-space:nowrap;" title="Pick a NEW op to generate into this slot. These do NOT edit the macro above — the macro body is the editable source of truth.">＋ Add op:</span><select class="cam-op"><option value="drill">Drill</option><option value="bore">Bore</option><option value="slot">Slot</option><option value="pocket">Pocket (rect)</option><option value="cpocket">Pocket (circle)</option><option value="surface">Surface / face</option><option value="corner">Probe corner</option><option value="edge">Probe edge</option><option value="zprobe">Probe Z surface</option><option value="inside">Probe inside centre</option><option value="boss">Probe boss centre</option><option value="align">Probe alignment</option></select><select class="cam-op-pat" title="${secondCtlTitle('drill')}">${secondCtlOpts('drill')}</select><button class="toolbar-btn settings-io" data-act="addop" title="Generate the selected op into the slot — fills a blank slot, or APPENDS it to the existing macro (multi-op). It does NOT rewrite code you've already edited; the macro body above is the editable source of truth.">Generate ▸</button></span>`;
     }
+    // ── S1c — Build CAM slot: a REUSABLE authoring surface (one component, three triggers — DRY). It opens as a MODAL
+    // over any surface via window.ddcsOpenCamAuthoring(op?). Seed a slot's expose/bake field table from a program op,
+    // preview it, and Build it into the pack (_camPack). Triggers: (1) a per-op CAM action on the op card (pre-seeded,
+    // picker hidden); (2) the editor toolbar; (3) the CAM Pack Builder button — (2)+(3) show the seed picker. ──
+    // t1055 (S-C) — MULTI-OP: _authoring holds an ARRAY of ops (each a seeded expose/bake group), so one slot can compose a
+    // whole program. The global doors AUTO-IMPORT all CAM-able program ops; the op-card door seeds that ONE op. buildSlotFromOps
+    // already composes multi-op (allocates params around siblings, tags f._op) — no generator/slotPack change.
+    let _authoring = null;   // { ops:[{opType,camType,variant,fields,values,exposed,baked,label}], name, seedLocked } | null
+    let _cbmPanel = null;    // the docked inline preview panel
+    let _cbmOverlay = null;  // the modal overlay element
+    let _cbmUnsupported = []; // present-but-not-CAM-able program ops (for the empty-state reasons)
+    const CAM_SUPPORTED_LABEL = 'Pocket · Surface · Probe corner / edge · Slot · Drill / Bore · Probe centre (Middle)';
+    const variantForCam = (camType, params) => (camType === 'drill' || camType === 'bore') ? (params.pattern || 'circle') : defaultVariant(camType);
+    // S4 — a forked op whose def embeds an `opunit` (a standard sub-unit kept live) → the parts that walkParts sees, else null.
+    // Recognition is a READ of the declared opunit boundary (never inferred from motion). Only user_* forks are in USER_DEFS.
+    const subStackParts = (opType) => {
+        const def = getUserDef(opType); if (!def) return null;
+        const tmpl = def.template || [];
+        const root = tmpl.find((b) => b && b.type === 'user_root') || tmpl[0];
+        const parts = walkParts(root ? root.children : []);
+        return parts.some((p) => p.kind === 'standard') ? parts : null;   // has at least one live standard part → route through subStackToSlot
+    };
+    // Build a SUB-STACK authoring op: subStackToSlot composes the parts (standard = generator LIVE knobs, custom = value params).
+    // Fields carry _part/_partKind/_partLabel so renderCbmTable groups them. S4 modal-first: the build is fixed all-exposed
+    // (surfacing stays parametric independent of the toggles), so every row is Expose-only (bakeable:false) — per-part
+    // expose/bake toggling that drives the build is a flagged follow-on.
+    function makeSubStackAuthOp(op) {
+        const def = getUserDef(op.opType);
+        const sub = subStackToSlot(def);   // build once to get the composed, part-tagged fields (idx/var + _part/_partKind/_partLabel)
+        const fields = (sub.fields || []).map((f) => ({
+            ...f,
+            value: (f.def != null ? f.def : ''),
+            bakeable: false,   // standard = generator loop knob (always live); custom = exposed for now (per-part baking is a follow-on)
+            _bakeTip: f._partKind === 'standard' ? 'Generator loop knob — always live (baking would break the parametric loop)' : 'Sub-stack builds all-exposed; per-part baking is a follow-on',
+        }));
+        const exposed = {}, baked = {};
+        fields.forEach((f) => { exposed[fkeyOf(f)] = true; });   // fixed all-exposed (matches the subStackToSlot build); PART-SCOPED so two parts sharing a key stay independent
+        return { opType: op.opType, camType: 'substack', variant: '', fields, values: {}, exposed, baked, label: op.label || op.opType, substack: true, defV: defVOf(op.opType) };
+    }
+    // A program op → an authoring op (via seedFromOp). null when the op isn't CAM-able.
+    function makeAuthOp(op) {
+        if (subStackParts(op.opType)) return makeSubStackAuthOp(op);   // S4 — a forked op w/ an embedded standard sub-unit routes to the sub-stack path (parts stay grouped, standard LIVE)
+        const seed = seedFromOp(op);
+        if (seed.unsupported) return null;
+        const values = {}, exposed = {}, baked = {};
+        seed.fields.forEach((f) => {
+            if (typeof f.value === 'number') values[fkeyOf(f)] = { def: f.value };   // seed NUMERIC values (enum ints come via the field default)
+            // UNIVERSAL default: value params (exposable) start EXPOSED (positive, not by-absence — the generator path's
+            // empty-map default means all-exposed, but stackToSlot needs an explicit expose flag); geometry params start
+            // BAKED to the op's own value (a #var can't ride through them). The generator path keeps its empty exposed/baked.
+            if (seed.universal) { const k = fkeyOf(f); if (f.exposable) exposed[k] = true; else { exposed[k] = false; baked[k] = f.value; } }
+        });
+        return { opType: op.opType, camType: seed.camType, variant: variantForCam(seed.camType, op.params || {}), fields: seed.fields, values, exposed, baked, label: op.label || op.opType, universal: !!seed.universal, defV: defVOf(op.opType) };
+    }
+    const toManifest = (a) => ({ type: a.camType, variant: a.variant, values: a.values, exposed: a.exposed, baked: a.baked, opType: a.opType, defV: a.defV });   // U3 — opType+defV let a universal slot rebuild via getUserDef; type==='universal' selects the arm
+    const cbmPreviewSlot = () => { const s = { slot: nextSlotNum(), name: _authoring.name || 'New CAM slot', ops: _authoring.ops.map(toManifest) }; buildSlotFromOps(s); return s; };
+    // t1077 — the ONE key the modal ADDRESSES a field by (row id, radio group, value input, expose/bake + value maps, and
+    // the pendant-slot lookup). A SUB-STACK op composes SEVERAL parts, and two parts can legitimately carry the SAME param
+    // key (a custom binding named `feed` beside the surfacing generator's `feed`) — a bare key would collide, so one row's
+    // radio/value would silently drive the other's. Scope it by PART. A single-part op (generator / universal) has no
+    // `_part`, so the key is UNCHANGED → every existing slot + manifest stays byte-identical.
+    const fkeyOf = (f) => (f && f._part != null ? f._part + ':' + f.key : (f && f.key));
+    const cbmVal = (oi, fk) => {
+        const a = _authoring.ops[oi];
+        const row = camRowBlock(a.opType, fk);   // S4a — a cam_table op reads its value from the block (dflt when exposed, baked literal when baked); empty inherits the field default below
+        if (row) { const v = row.params.mode === 'bake' ? row.params.baked : row.params.dflt; if (v !== '' && v != null) return v; }
+        const ov = a.values[fk]; if (ov && ov.def != null) return ov.def;
+        const f = a.fields.find((x) => fkeyOf(x) === fk); return f ? (typeof f.value === 'number' ? f.value : f.def) : '';
+    };
+    function renderCbmTable() {
+        const el = document.getElementById('cbm_table'); if (!el) return;   // modal is on document.body, not #macros-app (q is root-scoped)
+        if (!_authoring.ops.length) {   // EMPTY-STATE (subsumes S-B) — no greyed dropdown; list what CAM supports + why present ops didn't qualify
+            const reasons = _cbmUnsupported.length ? '<div style="margin-top:8px;">' + _cbmUnsupported.map((u) => `<div style="font-size:11px; color:var(--text-dim);">• ${camEsc(u.label)} — ${camEsc(u.reason)}</div>`).join('') + '</div>' : '';
+            el.innerHTML = `<div class="settings-hint" style="padding:12px 2px;">No CAM-able ops to import. The CAM Builder supports: <b>${CAM_SUPPORTED_LABEL}</b>. Insert one of those into your program, then reopen — or use an op's ▸ Build CAM slot action.${reasons}</div>`;
+            return;
+        }
+        const preview = cbmPreviewSlot();   // buildSlotFromOps allocates params around siblings + tags each field's owning op (f._op)
+        const idxOf = (oi, fk) => { const f = (preview.fields || []).find((x) => x._op === oi && fkeyOf(x) === fk); return f ? f.idx : null; };   // t1077 — part-scoped: two parts may share a param key
+        const sections = _authoring.ops.map((a, oi) => {
+            const rowHtml = (f) => {
+                const fk = fkeyOf(f);   // t1077 — PART-SCOPED addressing: two parts of a sub-stack may share a param key
+                const _row = camRowBlock(a.opType, fk);   // S4a — a cam_table op reads its expose/bake state from the block, not a.exposed
+                const baked = _row ? (_row.params.mode === 'bake') : (a.exposed[fk] === false), val = cbmVal(oi, fk), idx = idxOf(oi, fk);
+                const enumOpt = f.enum && f.enum.find((o) => o.value === Number(val));
+                const numeric = (val === '' || val == null || !isNaN(Number(val)));   // a non-numeric value (a baked string/enum with no dropdown) must NOT be an editable number input — typing would overwrite the string bake with a number (wrong G-code)
+                const valCell = a.substack
+                    // S4 — a sub-stack part's value is the pendant DEFAULT re-derived from the op's definition on every build; editing it here
+                    // would be a no-op (subStackToSlot re-derives from the def), so show it read-only. Modal editing of part defaults is a follow-on.
+                    ? `<span style="font-size:11.5px;" title="Pendant default, derived from the op's definition — customize the op to change it">${camEsc(String(val))}</span>`
+                    : f.enum
+                        ? `<select class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(fk)}" style="min-width:118px;">${f.enum.map((o) => `<option value="${o.value}"${o.value === Number(val) ? ' selected' : ''}>${camEsc(o.label)}</option>`).join('')}</select>`
+                        : numeric
+                            ? `<input class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(fk)}" type="number" value="${val}" style="width:72px;">`
+                            : `<span style="color:var(--text-dim); font-size:11px;" title="baked string/enum value (read-only)">${camEsc(String(val))}</span>`;
+                const slotCell = baked ? `baked = ${f.enum ? (enumOpt ? enumOpt.label + ' (' + val + ')' : val) : val}` : (idx != null ? `#${idx} → #${slotPack.mirrorVar(idx)}` : '—');
+                const bakeTip = f.bakeable ? '' : ` title="${camEsc(f._bakeTip || 'Guard / branch param — must stay operator-set (Expose-only)')}"`;   // S4 — a sub-stack part carries its own reason on _bakeTip
+                const canExpose = f.exposable !== false;   // U3 — universal GEOMETRY params (exposable===false) can't carry a #var → Expose disabled, Bake-forced (mirrors the bakeable greying)
+                const exposeTip = canExpose ? '' : ' title="Geometry / fold-driven — a #var cannot ride through the emit; bake it"';
+                return `<tr data-oi="${oi}" data-fkey="${camEsc(fk)}">
+                    <td style="padding:2px 6px;">${camEsc(f.label || f.key)}</td>
+                    <td>${valCell}</td>
+                    <td style="white-space:nowrap;"><label${exposeTip} style="margin-right:8px;${canExpose ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(fk)}" data-oi="${oi}" data-fkey="${camEsc(fk)}" data-mode="expose"${baked ? '' : ' checked'}${canExpose ? '' : ' disabled'}> Expose</label><label${bakeTip} style="${f.bakeable ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(fk)}" data-oi="${oi}" data-fkey="${camEsc(fk)}" data-mode="bake"${baked ? ' checked' : ''}${f.bakeable ? '' : ' disabled'}> Bake</label></td>
+                    <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">${camEsc(slotCell)}</td>
+                </tr>`;
+            };
+            let rows;
+            if (a.substack) {
+                // S4 — group the composed fields by PART (the opunit standard sub-unit + each custom loose-atom run); a labelled
+                // sub-header per part shows the standard part is LIVE (its generator loop) vs the custom part's exposed values.
+                const groups = [];
+                a.fields.forEach((f) => { const pi = f._part || 0; if (!groups[pi]) groups[pi] = { kind: f._partKind, label: f._partLabel, fields: [] }; groups[pi].fields.push(f); });
+                rows = groups.filter(Boolean).map((g, gi) => {
+                    const hint = g.kind === 'standard' ? 'live — generator loop knobs (geometry stays parametric)' : 'custom atoms — values exposed, geometry baked';
+                    const plabel = g.kind === 'standard' ? (g.label || ('Part ' + (gi + 1))) : 'Custom atoms';   // the custom part's _partLabel is a synthetic subDef opType (noise) → a friendly generic label
+                    return `<tr><td colspan="4" style="padding:6px 6px 2px; font-size:10.5px; font-weight:600; color:var(--text-dim); border-top:${gi ? '1px dashed var(--border)' : 'none'};">▸ ${camEsc(plabel)} <span style="font-weight:400;">— ${hint}</span></td></tr>` + g.fields.map(rowHtml).join('');
+                }).join('');
+            } else {
+                rows = a.fields.map(rowHtml).join('');
+            }
+            const camLabel = a.camType === 'substack' ? 'sub-stack — parts stay live' : a.camType;
+            return `<div class="cbm-op-group" data-oi="${oi}" style="margin-top:${oi ? 12 : 0}px;"><div style="font-size:12px; font-weight:600; color:var(--accent,#6ea8fe); border-bottom:1px solid var(--border); padding:3px 0; margin-bottom:3px;">${oi + 1}. ${camEsc(a.label)} <span style="color:var(--text-dim); font-weight:400; font-size:10px;">→ ${camEsc(camLabel)}</span></div>
+                <table style="width:100%; font-size:11.5px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th style="padding:2px 6px;">Param</th><th>Value</th><th>On the pendant?</th><th>Pendant slot</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        }).join('');
+        el.innerHTML = `${sections}<div class="settings-hint" style="margin-top:8px;">Expose = the operator fills it on the pendant (#11xx → #2600). Bake = frozen into the macro; the row vanishes. Enum params pick a friendly label; the pendant stores its number.</div>`;
+    }
+    function mountAuthoringSurface(body) {
+        const n = _authoring.ops.length;
+        body.innerHTML = `<div class="cam-build-mode" style="padding:14px 16px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><b style="flex:1; font-size:14px;">✚ Build CAM slot${n > 1 ? ` — ${n} ops` : ''}</b><button class="toolbar-btn settings-io" data-act="cbm-cancel">✕ Cancel</button></div>
+            <div class="settings-row" style="align-items:center; margin-top:2px;"><label style="font-size:11px; color:var(--text-dim);">Slot name&nbsp;<input id="cbm_name" value="${camEsc(_authoring.name || '')}" placeholder="e.g. Pocket" style="min-width:200px;"></label></div>
+            <div id="cbm_table" style="margin-top:8px;"></div>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:10px;"><b style="font-size:11px; color:var(--text-dim); flex:1;">Inline preview</b><button class="toolbar-btn settings-io" data-act="cbm-sim" title="Simulate this slot's composed macro, each field seeded from its value.">▶ Simulate</button></div>
+            <div id="cbm_preview" style="height:280px; position:relative; border:1px solid var(--border); border-radius:6px; margin-top:6px; background:#000;"></div>
+            <div class="settings-row" style="justify-content:flex-end; margin-top:12px;"><button class="toolbar-btn settings-io" data-act="cbm-build" style="font-weight:600;"${n ? '' : ' disabled'}>Build CAM slot ▸</button></div>
+        </div>`;
+        renderCbmTable();
+    }
+    function attachCbmListeners(root) {
+        root.addEventListener('input', (e) => {
+            const t = e.target;
+            if (t.id === 'cbm_name') { _authoring.name = t.value; return; }
+            if (t.classList.contains('cbm-val') && t.tagName !== 'SELECT') {   // numeric value (enum selects go via change → re-render)
+                const a = _authoring.ops[+t.dataset.oi], key = t.dataset.fkey, num = (t.value === '' ? '' : parseFloat(t.value));
+                const row = camRowBlock(a.opType, key);
+                if (row) { if (row.params.mode === 'bake') row.params.baked = String(num); else row.params.dflt = String(num); return; }   // S4a — write the value to the block (baked literal when baked, pendant default when exposed)
+                a.values[key] = { ...(a.values[key] || {}), def: num };
+                if (a.exposed[key] === false) a.baked[key] = num;   // keep the baked literal in sync
+            }
+        });
+        root.addEventListener('click', (e) => { const a = e.target.dataset.act; if (a === 'cbm-cancel') cbmExit(); else if (a === 'cbm-sim') cbmSimulate(); else if (a === 'cbm-build') cbmBuild(); });
+        root.addEventListener('change', (e) => {
+            const t = e.target;
+            if (t.classList.contains('cbm-eb') && t.checked) { cbmToggle(+t.dataset.oi, t.dataset.fkey, t.dataset.mode); return; }
+            if (t.tagName === 'SELECT' && t.classList.contains('cbm-val')) {   // ENUM pick → store the int (+ keep any baked literal in sync)
+                const a = _authoring.ops[+t.dataset.oi], key = t.dataset.fkey, iv = parseInt(t.value, 10);
+                const row = camRowBlock(a.opType, key);
+                if (row) { if (row.params.mode === 'bake') row.params.baked = String(iv); else row.params.dflt = String(iv); renderCbmTable(); return; }   // S4a — write the enum int to the block
+                a.values[key] = { ...(a.values[key] || {}), def: iv };
+                if (a.exposed[key] === false) a.baked[key] = iv;
+                renderCbmTable();
+            }
+        });
+    }
+    // The ONE opener — a modal over any surface. seedOp given (op-card door) → seeds THAT one op. No seedOp (toolbar / CAM-tab
+    // doors) → AUTO-IMPORT every CAM-able op from the program (in order). Exposed as window.ddcsOpenCamAuthoring for the op card.
+    function openCamAuthoring(seedOp) {
+        if (_cbmOverlay) return;   // one at a time
+        _authoring = { ops: [], name: '', seedLocked: !!seedOp };
+        _cbmUnsupported = [];
+        if (seedOp) {   // op-card door — this ONE op
+            const a = makeAuthOp(seedOp);
+            if (!a) { const r = seedFromOp(seedOp); dlgNotice((r && r.unsupported) || 'This op is not CAM-able.'); _authoring = null; return; }
+            _authoring.ops = [a]; _authoring.name = a.label;
+        } else {        // global doors — auto-import all CAM-able program ops (program order)
+            const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+            for (const op of stack.filter((b) => b && b.type === 'op')) {
+                const a = makeAuthOp(op);
+                if (a) _authoring.ops.push(a);
+                else { const r = seedFromOp(op); _cbmUnsupported.push({ label: op.label || op.opType, reason: (r && r.unsupported) || 'not CAM-able' }); }
+            }
+            _authoring.name = _authoring.ops.length === 1 ? _authoring.ops[0].label : (_authoring.ops.length ? 'Program' : '');
+        }
+        const ov = document.createElement('div'); ov.className = 'cam-auth-overlay';
+        ov.style.cssText = 'position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.55); display:flex; align-items:flex-start; justify-content:center; overflow:auto; padding:22px 12px;';
+        const body = document.createElement('div'); body.style.cssText = 'width:min(1000px,97vw); background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px;';
+        ov.appendChild(body); document.body.appendChild(ov); _cbmOverlay = ov;
+        attachCbmListeners(body);
+        mountAuthoringSurface(body);          // builds the shell + renders the group-by-op table (or the empty-state)
+        ov.addEventListener('mousedown', (e) => { if (e.target === ov) cbmExit(); });
+    }
+    function cbmBuildModal() {
+        return new Promise((resolve) => {
+            const newNum = nextSlotNum();
+            const existing = _camPack.slots.map((s) => `<option value="${s.slot}">cam${s.slot} — ${camEsc(s.name || '')}</option>`).join('');
+            const ov = document.createElement('div'); ov.className = 'cam-sim-overlay';
+            ov.style.cssText = 'position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
+            ov.innerHTML = `<div style="background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; padding:16px; min-width:320px;">
+                <b>Build to which slot?</b>
+                <div style="margin:12px 0 8px;"><label><input type="radio" name="cbm_dest" value="new" checked> New slot <b>cam${newNum}</b></label></div>
+                <div style="margin:8px 0;"><label><input type="radio" name="cbm_dest" value="ov"${existing ? '' : ' disabled'}> Overwrite <select id="cbm_ovsel"${existing ? '' : ' disabled'}>${existing}</select></label></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;"><button class="toolbar-btn settings-io" data-cbm="cancel">Cancel</button><button class="toolbar-btn settings-io" data-cbm="ok" style="font-weight:600;">Build</button></div>
+            </div>`;
+            document.body.appendChild(ov);
+            const done = (r) => { ov.remove(); resolve(r); };
+            ov.querySelector('[data-cbm="cancel"]').addEventListener('click', () => done(null));
+            ov.querySelector('[data-cbm="ok"]').addEventListener('click', () => { const dest = ov.querySelector('input[name="cbm_dest"]:checked').value; done(dest === 'new' ? { slot: newNum, isNew: true } : { slot: +ov.querySelector('#cbm_ovsel').value, isNew: false }); });
+            ov.addEventListener('click', (e) => { if (e.target === ov) done(null); });
+        });
+    }
+    // t1073 S4-Part2 (B2) — the "Customize op" picker: which recognized CAM-generator twin in THIS program to fork into
+    // editable blocks (dedup by opType — one Customize per op TYPE). editWizardDef wraps a recognized-at-default op in an
+    // opunit sub-stack boundary + opens Blocks. Empty → a helpful notice (no picker). Mirrors cbmBuildModal's overlay shape.
+    function cbmCustomizeModal() {
+        return new Promise((resolve) => {
+            const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+            const seen = new Set(), ops = [];
+            for (const op of stack) {
+                if (!op || op.type !== 'op' || seen.has(op.opType)) continue;
+                if (isCamGeneratorTwin(op.opType) && getUserDef(op.opType)) { seen.add(op.opType); ops.push(op); }
+            }
+            if (!ops.length) { dlgNotice('No customizable standard ops in your program. Insert a Surfacing / Pocket / Corner / Edge / Slot / Drill / Bore / Middle op, then Customize it.'); resolve(null); return; }
+            const opts = ops.map((op) => `<option value="${camEsc(op.opType)}">${camEsc(op.label || op.opType)}</option>`).join('');
+            const ov = document.createElement('div'); ov.className = 'cam-sim-overlay';
+            ov.style.cssText = 'position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
+            ov.innerHTML = `<div style="background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; padding:16px; min-width:340px;">
+                <b>Customize which op?</b>
+                <div class="settings-hint" style="margin:6px 0 10px;">Fork a standard op into editable blocks — its standard part stays LIVE in CAM. Opens in the Blocks view.</div>
+                <div style="margin:8px 0;"><label>Op&nbsp;<select id="cbm_custsel" style="min-width:220px;">${opts}</select></label></div>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;"><button class="toolbar-btn settings-io" data-cbm="cancel">Cancel</button><button class="toolbar-btn settings-io" data-cbm="ok" style="font-weight:600;">Customize ▸</button></div>
+            </div>`;
+            document.body.appendChild(ov);
+            const done = (r) => { ov.remove(); resolve(r); };
+            ov.querySelector('[data-cbm="cancel"]').addEventListener('click', () => done(null));
+            ov.querySelector('[data-cbm="ok"]').addEventListener('click', () => done(ov.querySelector('#cbm_custsel').value));
+            ov.addEventListener('click', (e) => { if (e.target === ov) done(null); });
+        });
+    }
+    const cbmExit = () => { if (_cbmPanel) { try { _cbmPanel.stop(); _cbmPanel.setActive(false); } catch (_) { /* noop */ } _cbmPanel = null; } if (_cbmOverlay) { _cbmOverlay.remove(); _cbmOverlay = null; } _authoring = null; if (q('cam_slots')) renderCamBuilder(); };
+    // S4a (block-native params) — the modal as a VIEW of the cam_field blocks. When the op's def carries a cam_table, its
+    // cam_field block RECORD (live in getUserDef's template) IS the state: the render reads mode/value from it and a
+    // radio/value edit WRITES to it, so the block is one source and the S2 build (which reads the same cam_table) reflects
+    // the edit. flattenBlocks returns the actual block objects, so mutating .params persists in the registry + the next
+    // build. null → the op has no cam_table (every op until the S4b hook) → the _authoring.ops/decl path, UNCHANGED (inert).
+    const camRowBlock = (opType, key) => {
+        const def = getUserDef(opType);
+        if (!def || !def.template) return null;
+        for (const b of flattenBlocks(def.template)) if (b && b.type === 'cam_field' && b.params && String(b.params.param) === String(key)) return b;
+        return null;
+    };
+    function cbmToggle(oi, key, mode) {
+        const a = _authoring.ops[oi];
+        const row = camRowBlock(a.opType, key);
+        if (row) {   // S4a — the block IS the state: flip the row mode; on bake, seed the literal from the current value
+            row.params.mode = (mode === 'bake') ? 'bake' : 'expose';
+            if (mode === 'bake' && (row.params.baked === '' || row.params.baked == null)) row.params.baked = String(cbmVal(oi, key));
+            renderCbmTable(); return;
+        }
+        if (mode === 'bake') { a.exposed[key] = false; a.baked[key] = cbmVal(oi, key); }
+        else if (a.universal) { a.exposed[key] = true; delete a.baked[key]; }   // universal: Expose is POSITIVE (stackToSlot exposes only on exposed===true)
+        else { delete a.exposed[key]; delete a.baked[key]; }   // generator: Expose = the default (no decl entry)
+        renderCbmTable();
+    }
+    // t1053 (S-A / Gap 4) — a PROBE CAM slot's macro is INCREMENTAL (G31 from the operator start); with no stock/start the
+    // preview clamps the first probe to zero and traces from origin = empty/black. For a probe slot (G31) synthesize a
+    // CENTERED TOP-DATUM stock box (size from the probe's reach) + a start ABOVE it, so the incremental probe travels toward
+    // the stock. Preview-only (getStock/getStart) — NO settings.stock mutation; a non-probe slot passes NEITHER = byte-identical
+    // to today (previewStock falls back to the global). Mirrors the wizardManager getStock/getStart wiring.
+    const probePreviewStock = (slot) => {
+        const f = (k) => { const x = (slot.fields || []).find((y) => y.key === k); return x ? Number(x.def) : undefined; };
+        const xy = Math.max(40, f('maxProbe') || f('travel') || 120);   // F4b — size from maxProbe/travel; fallback 120×120×25
+        return { x: xy, y: xy, z: 25, shape: 'box', datum: 'ccp', show: true };   // centered, top datum (z=0 at the surface)
+    };
+    const probePreviewStart = (slot) => { const s = (slot.fields || []).find((y) => y.key === 'safeZ'); return { x: 0, y: 0, z: s ? Math.max(2, Number(s.def)) : 10 }; };
+    const probePreviewOpts = (slot, macro) => (/\bG31\b/.test(macro) ? { getStock: () => probePreviewStock(slot), getStart: () => probePreviewStart(slot) } : {});
+
+    function cbmSimulate() {
+        if (!_authoring.ops.length) { dlgNotice('Import or add an op first.'); return; }
+        const host = document.getElementById('cbm_preview'); if (!host) return;
+        if (window.ddcsStopPreview) window.ddcsStopPreview();
+        if (_cbmPanel) { try { _cbmPanel.stop(); _cbmPanel.setActive(false); } catch (_) { /* noop */ } _cbmPanel = null; }
+        host.innerHTML = '';
+        const s = cbmPreviewSlot(), macro = slotPack.slotMacro(s), seed = new Map();
+        (s.fields || []).forEach((f) => seed.set(slotPack.mirrorVar(f.idx), Number(f.def)));
+        _cbmPanel = createPreviewPanel(host, { getGcode: () => macro, createVarStore: () => new Map(seed), ...probePreviewOpts(s, macro) });
+        _cbmPanel.setActive(true);
+    }
+    function cbmBuild() {
+        if (!_authoring.ops.length) { dlgNotice('Import or add an op first.'); return; }
+        // t1081 SAFETY — REFUSE, loudly and by name, a slot whose form values would be overwritten by a generator's own
+        // working variables. Measured: composing two mill ops puts the RPM field on #20, which the pocket then writes to
+        // 0, so `M3 S[#20]` commands S0 — a non-rotating tool driven through the toolpath. Checked BEFORE the destination
+        // prompt so the user is not asked where to put a slot that cannot be built.
+        const _pv = cbmPreviewSlot();
+        const _cols = fieldVarCollisions(_pv.fields, _pv.ops, camBandsOf);
+        if (_cols.length) { dlgNotice(collisionMessage(_cols)); return; }
+        cbmBuildModal().then((dest) => {
+            if (!dest) return;
+            const ops = _authoring.ops.map(toManifest);
+            let slot;
+            if (dest.isNew) { slot = { slot: dest.slot, name: _authoring.name || 'New CAM slot', ops }; _camPack.slots.push(slot); }
+            else { slot = _camPack.slots.find((s) => +s.slot === dest.slot); if (!slot) return; slot.ops = ops; if (_authoring.name) slot.name = _authoring.name; }
+            buildSlotFromOps(slot); saveCamPack(); cbmExit();
+        });
+    }
+
     function renderCamBuilder() {
         const host = q('cam_slots'); if (!host) return;
         const nameEl = q('cam_pack_name'); if (nameEl && document.activeElement !== nameEl) nameEl.value = (_camPack.meta && _camPack.meta.name) || '';
-        const v = slotPack.validatePack(_camPack);
+        const v = slotPack.validatePack(_camPack, { bandsOf: camBandsOf });
         const vEl = q('cam_validate');
         if (vEl) vEl.innerHTML = [...v.errors.map((e) => '⛔ ' + e), ...v.warnings.map((w) => '⚠ ' + w)].join('<br>') || ('✓ No collisions · ' + slotPack.usedParams(_camPack).size + '/400 form params used.');
         if (!_camPack.slots.length) { host.innerHTML = '<div class="settings-hint">No slots yet — “＋ Add slot”. Slots default to cam' + ((_camPack.meta && _camPack.meta.baseSlot) || 22) + '+ (cam0–21 are factory / community).</div>'; return; }
@@ -1196,7 +1539,7 @@ function homingPostIsExpert() {
             <div class="cam-sim-host" style="flex:1; position:relative; min-height:0;"></div>
         </div>`;
         document.body.appendChild(overlay);
-        const panel = createPreviewPanel(overlay.querySelector('.cam-sim-host'), { getGcode: () => macro, createVarStore: () => new Map(seed) });
+        const panel = createPreviewPanel(overlay.querySelector('.cam-sim-host'), { getGcode: () => macro, createVarStore: () => new Map(seed), ...probePreviewOpts(slot, macro) });
         panel.setActive(true);
         const close = () => { try { panel.stop(); panel.setActive(false); } catch (_) { /* noop */ } overlay.remove(); document.removeEventListener('keydown', onKey); };
         const onKey = (e) => { if (e.key === 'Escape') close(); };
@@ -1226,7 +1569,8 @@ function homingPostIsExpert() {
         });
         camHost.addEventListener('click', (e) => {
             const card = e.target.closest('.cam-slot'); if (!card) return; const si = +card.dataset.si; const slot = _camPack.slots[si]; if (!slot) return; const a = e.target.dataset.act;
-            if (a === 'addf') { slot.fields = slot.fields || []; const idx = slotPack.nextParam(slotPack.usedParams(_camPack)); if (idx == null) { dlgNotice('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + (slot.fields.length + 1) }); saveCamPack(); renderCamBuilder(); }
+            // t1083 — the manual add-field door now ALLOCATES too: past the slot's local-var high-water mark and skipping every scratch band its ops write, instead of minting a bare `fields.length + 1`.
+            if (a === 'addf') { slot.fields = slot.fields || []; const idx = slotPack.nextParam(slotPack.usedParams(_camPack)); if (idx == null) { dlgNotice('The #1100–1499 form-param pool is full.'); return; } slot.fields.push({ idx, label: '', units: '', def: 0, min: 0, max: 0, type: 1, var: '#' + nextLocalVar(maxLocalVar(slot.fields) + 1, (slot.ops || []).flatMap((o) => bandsFor(o && (o.type || o.camType)))) }); saveCamPack(); renderCamBuilder(); }
             else if (a === 'delf') { slot.fields.splice(+e.target.closest('tr').dataset.fi, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
             else if (a === 'edit') { openIconEditor(slot.icon || null, (bmp, model) => { slot.icon = { name: (slot.name || 'cam' + slot.slot) + '.bmp', data: bmp, w: 360, h: 180, layers: model.layers }; saveCamPack(); renderCamBuilder(); }); }
@@ -1312,6 +1656,14 @@ function homingPostIsExpert() {
     const nextSlotNum = () => { const base = (_camPack.meta && _camPack.meta.baseSlot) || 22; const used = new Set(_camPack.slots.map((s) => +s.slot)); let n = base; while (used.has(n)) n++; return n; };
     const _camAddSlot = q('cam_add_slot');
     if (_camAddSlot) _camAddSlot.addEventListener('click', () => { _camPack.slots.push({ slot: nextSlotNum(), name: 'New slot', fields: [], body: '' }); saveCamPack(); renderCamBuilder(); });
+    const _camBuildSlot = q('cam_build_slot');   // t1045 S1c — CAM-tab door (3): open the authoring modal with the picker
+    if (_camBuildSlot) _camBuildSlot.addEventListener('click', () => openCamAuthoring());
+    const _camCustomize = q('cam_customize_op');   // t1073 S4-Part2 (B2) — fork/customize a standard op right where CAM slots are built
+    if (_camCustomize) _camCustomize.addEventListener('click', async () => { const opType = await cbmCustomizeModal(); if (opType && window.ddcsEditWizardDef) window.ddcsEditWizardDef(opType); });
+    // Expose the ONE opener so the editor op card (door 1) + toolbar (door 2) trigger the same modal. camTypeOf lets a
+    // caller check CAM-ability before offering the action.
+    window.ddcsOpenCamAuthoring = (op) => openCamAuthoring(op);
+    window.ddcsCamTypeOf = (op) => camTypeOf(op);
     // Pack export: bundle the whole pack into a USB-ready .zip (CAM/ folder + eng-merge + README).
     const packBytes = (dataUrl) => { const bin = atob(String(dataUrl || '').split(',')[1] || ''); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; };
     const readmeText = (name) => [name, '',
@@ -1328,7 +1680,7 @@ function homingPostIsExpert() {
     const _camExport = q('cam_export_pack');
     if (_camExport) _camExport.addEventListener('click', async () => {
         if (!_camPack.slots.length) { dlgNotice('No slots to export — add a slot first.'); return; }
-        const v = slotPack.validatePack(_camPack);
+        const v = slotPack.validatePack(_camPack, { bandsOf: camBandsOf });
         if (!v.ok && !await dlgConfirm('This pack has problems:\n\n' + v.errors.join('\n') + '\n\nExport anyway?')) return;
         const files = [], eng = [];
         _camPack.slots.forEach((slot) => {

@@ -15,6 +15,7 @@
 export const radiuscompBlock = {
     type: 'radiuscomp', label: 'Radius comp', kind: 'leaf', category: 'Probing',
     defaults: { raw: '#1925', result: '#50', radius: '#6', dir: '+', enable: true, note: '' },
+    scratch: [[6, 6], [50, 50]],   // t1085 — WRITES the comped result (#50) and READS the tool-radius var (#6); #1925 is a firmware probe-trigger reg
     fields: ['raw', 'rawAxis', 'result', 'radius', 'dir', 'enable', 'note'],
     emit: (p, dx, dy, dialect) => {
         const result = p.result || '#50';

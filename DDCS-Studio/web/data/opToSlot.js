@@ -12,6 +12,7 @@
  * See the cam-menu-architecture memory + docs/archive/CAM-MENU-RESEARCH.md.
  */
 import { nextParam, mirrorVar } from './slotPack.js';
+import { nextLocalVar, bandsFor } from './camScratch.js';   // t1083 (slice B) — mint local body vars around drill/bore/slot's own scratch band
 import { spindleOn, spindleOff } from './camMacroKit.js';
 
 // Field specs: label / units / default / min / max / type (1=decimal, 0=integer). `def` may depend on method.
@@ -64,9 +65,14 @@ const STANDALONE = {
     },
 };
 
-const PATTERN_FIELDS = { circle: ['dia', 'count', 'startAngle'], grid: ['cols', 'rows', 'dx', 'dy'], line: ['count', 'spacing', 'angle'], rect: ['w', 'h', 'nx', 'ny'] };
+// `single` (t1089) is the DEGENERATE pattern: count 1, at the anchor. It adds NO pattern fields — posX/posY already ARE
+// the hole position — so the slot is posX/posY + the hole fields + feed/clearance/rpm. It exists so the DEFAULT drill twin
+// (DRILL_DEFAULTS.pattern === 'single') reaches this GENERATOR instead of the universal unroll: the universal arm cannot
+// expose depth/peck at all (drill.js peckDrill drives a JS while loop, so the peck sequence is unrolled and every Z baked
+// at BUILD), whereas here they are live #2600 knobs driven by a MACRO loop the operator can actually turn.
+const PATTERN_FIELDS = { single: [], circle: ['dia', 'count', 'startAngle'], grid: ['cols', 'rows', 'dx', 'dy'], line: ['count', 'spacing', 'angle'], rect: ['w', 'h', 'nx', 'ny'] };
 const HOLE_FIELDS = { drill: ['holeDia', 'depth', 'peck'], bore: ['holeDia', 'toolDia', 'depth', 'pitch'] };
-const PATTERN_LABEL = { circle: 'bolt circle', grid: 'grid', line: 'line', rect: 'rectangle' };
+const PATTERN_LABEL = { single: 'single hole', circle: 'bolt circle', grid: 'grid', line: 'line', rect: 'rectangle' };
 
 /** The inline per-hole cut at the CURRENT X/Y — no named sub (DDCS has no named M-codes). `doN` is the DO/END
  *  number for the cut's own inner loop; it must be deeper than the surrounding pattern loop's nesting (the cut
@@ -91,6 +97,11 @@ const indent = (lines, pad) => lines.map((l) => pad + l);
 
 /** The pattern loop body (uses the var map; positions each point + inlines the per-hole cut). */
 function loopBody(pattern, v, method) {
+    // single — no loop at all: rapid to the anchor, then the SAME per-hole cut every other pattern inlines. cutLines takes
+    // the DO nesting depth, so with no surrounding pattern loop it gets DO1 (the shallowest) rather than DO2.
+    if (pattern === 'single') {
+        return [`G0 X${v.posX} Y${v.posY}`, ...cutLines(method, v, 1)].join('\n');
+    }
     if (pattern === 'circle') {
         return ['#50=0', `WHILE #50 LT ${v.count} DO1`, `  #51=${v.startAngle}+#50*360/${v.count}`,
             `  G0 X[${v.posX}+[${v.dia}/2]*COS[#51]] Y[${v.posY}+[${v.dia}/2]*SIN[#51]]`,
@@ -120,18 +131,28 @@ function loopBody(pattern, v, method) {
  * `used` = Set of #11xx already taken in the pack (for collision-free allocation).
  * Returns { name, fields:[{idx,label,units,def,min,max,type,var}], body }  — plugs straight into slotPack.
  */
-export function slotFromOp(method, pattern, used = new Set(), varOffset = 0) {
+export function slotFromOp(method, pattern, used = new Set(), varOffset = 0, decl) {
     const std = STANDALONE[method];
     const order = std ? std.fields : ['posX', 'posY', ...PATTERN_FIELDS[pattern], ...HOLE_FIELDS[method], 'feed', 'clearance', 'rpm'];
     const taken = new Set(used);
-    const fields = order.map((key, i) => {
-        const idx = nextParam(taken); if (idx != null) taken.add(idx);
+    // S1a — the expose/bake hook (the inline twin of allocFieldsWith), preserving the `order` composition + the holeDia
+    // default override. A BAKED param (decl[key].exposed === false) takes no #11xx param and pushes no field; its literal
+    // substitutes for the #var at every interpolation site. decl absent / all-exposed → byte-identical to the old order.map.
+    const fields = [];
+    const v = {};
+    let cur = varOffset;
+    const avoid = bandsFor(method === 'bore' ? 'bore' : (std ? 'slot' : 'drill'));   // all three share one declared band; keyed for clarity
+    order.forEach((key) => {
         const s = SPEC[key];
         // Bore needs hole Ø > tool Ø (else the cut radius is 0); drill bores at tool Ø.
         const def = key === 'holeDia' ? (method === 'bore' ? 12 : 6) : s.def;
-        return { key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type };
+        const d = decl && decl[key];
+        if (d && d.exposed === false) { v[key] = String(d.value); return; }   // BAKED
+        const idx = nextParam(taken); if (idx != null) taken.add(idx);        // EXPOSED — identical alloc order
+        cur = nextLocalVar(cur + 1, avoid);   // t1083 — step OVER this generator's own scratch band
+        fields.push({ key, idx, var: '#' + cur, label: s.label, units: s.units, def, min: s.min, max: s.max, type: s.type });
+        v[key] = '#' + cur;
     });
-    const v = {}; fields.forEach((f) => { v[f.key] = f.var; });
     if (std) {   // standalone op (slot) — no pattern, no shared sub
         const reads = fields.map((f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units ? ' [' + f.units + ']' : ''} =${f.def} [${f.min}~${f.max}]`);
         const body = [`( ${std.label} )`, ...reads, '', ...spindleOn(v.rpm), '', std.body(v), ...spindleOff()].join('\n');

@@ -12,6 +12,7 @@ export const assignBlock = {
     type: 'assign', label: 'Set #', kind: 'leaf', category: 'Variables',
     defaults: { var: '#100', value: '0', note: '' },
     fields: ['var', 'value', 'note'],
+    scratch: [[100, 100]],   // t1085 — the default target this block WRITES
     emit: (p) => {
         const v = (p.var || '#100');
         const expr = (p.value === '' || p.value == null) ? '0' : p.value;

@@ -31,6 +31,9 @@ export const dialect = {
     // #190 is verified FREE — outside Studio's #1-74/#101/#102/#578 AND the DM500 firmware macro locals (executable macros write
     // #1-33/#104-108/#402-404) — a general-purpose macro var, not a system reg.
     missScratch: '#190',
+    // t1085 — the low macro vars THIS POST injects: the miss scratch #190 (above) and the work-frame clearance #17 its
+    // safeRetract degrade reads (:41,:45). Aggregated by data/universalScratch.js.
+    scratch: [[17, 17], [190, 190]],
     readMachine: (axis, varName) => [`${varName}=#${864 + AX[axis]}`],  // DRO X#864/Y#865/Z#866/A#867
     machineMove: (axis, ref) => [`G53 ${axis}${ref}`],      // G53 gated by config #395; dump safe-Z is M98 P101 — TO CONFIRM
     // safeRetract (t822) — CONSERVATIVE degrade. Direct G53 is NOT dump-grounded on DM500 (no factory macro LINE emits

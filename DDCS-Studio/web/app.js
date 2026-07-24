@@ -14,7 +14,7 @@ import { el } from './ui/uiUtils.js';
 import { setupGlobalFunctions } from './ui/globalFunctions.js';
 import { setupNumericInputGuards as setupNumericInputGuardsImpl } from './ui/numericInputGuards.js';
 import { playClick } from './ui/sound.js';  // click feedback sound
-import { loadUserOps, listUserOps, createUserOp, updateUserOp } from './blocks/userOps.js';   // wizard-maker: register + seed/upgrade user-defined ops
+import { loadUserOps, listUserOps, createUserOp, updateUserOp, deleteUserOp, getUserDef } from './blocks/userOps.js';   // wizard-maker: register + seed/upgrade user-defined ops; t1107 — per-wizard Restore-to-factory reseed
 import { insertUserOp } from './ui/userOpForm.js';   // wizard-maker: generic param form (→ window.ddcsInsertUserOp)
 import { atcWarmupDataDef } from './blocks/dataOps/atcWarmupData.js';
 import { atcLengthDataDef } from './blocks/dataOps/atcLengthData.js';   // t409 — ATC Tool Length light port (new twin, opened IN-PLACE from the ATC Tool Length slot)
@@ -74,6 +74,34 @@ import './ui/analytics.js';
 
 import { initProgramModel } from './blocks/programModel.js';
 import { initSaveStates } from './blocks/saveStates.js';
+
+// t1107 — the factory data-twin builders, the ONE source shared by the boot seed (seedDefaultPortedUserOps) AND the per-wizard
+// Restore-to-factory action (wizardManagerPanel). A built-in wizard's opensAs twin is reset to factory by re-running its builder.
+const SEED_BUILDERS = [
+    atcWarmupDataDef, atcLengthDataDef, atcCheckDataDef, atcTestDataDef, atcChangeDataDef, atcTableDataDef,
+    drillDataDef, tapDataDef, boreDataDef, slotDataDef, surfacingDataDef, contourDataDef, pocketDataDef, wcsDataDef, textDataDef,
+    cornerDataDef, edgeDataDef, middleDataDef, rotaryCenterDataDef, rotaryClockDataDef, alignmentDataDef,
+    commDataDef, ioStepDataDef, pauseConfirmDataDef, homingDataDef,
+];
+const seedBuilderFor = (opType) => SEED_BUILDERS.find((fn) => { try { return fn().opType === opType; } catch (_) { return false; } }) || null;
+
+// A built-in's opensAs twin diverges from factory when a re-author (updateUserOp with an undeclared defV) bumped its defV
+// PAST the factory seed's declared version. The blanket reset stays resetLayout; this is the per-wizard twin signal.
+window.ddcsUserOpDivergedFromFactory = (opType) => {
+    const fn = seedBuilderFor(opType); if (!fn) return false;
+    const cur = getUserDef(opType); if (!cur) return false;
+    let factory; try { factory = fn(); } catch (_) { return false; }
+    return (Number(cur.defV) || 1) > (Number(factory.defV) || 1);
+};
+// Restore ONE built-in's opensAs twin to factory IMMEDIATELY (no reboot): delete the customized store copy + re-create it from
+// the factory builder. deleteUserOp clears every registered table; createUserOp re-registers the pristine def. Returns bool.
+window.ddcsReseedUserOp = (opType) => {
+    const fn = seedBuilderFor(opType); if (!fn) return false;
+    let def; try { def = fn(); } catch (_) { return false; }
+    if (def.defV == null) def.defV = 1;
+    try { deleteUserOp(opType); } catch (_) { /* not registered — fall through to create */ }
+    try { createUserOp(def); return true; } catch (_) { try { updateUserOp(def); return true; } catch (__) { return false; } }
+};
 
 class DDCSStudio {
     constructor() {
@@ -163,33 +191,7 @@ class DDCSStudio {
     // domain grouping) appears for users who already had earlier versions in localStorage.
     seedDefaultPortedUserOps() {
         const have = new Set(listUserOps().map((d) => d.opType));
-        const seeds = [
-            atcWarmupDataDef(),
-            atcLengthDataDef(),   // t409 — ATC Tool Length twin (in-place from the ATC Tool Length slot)
-            atcCheckDataDef(),   // t411 — ATC Tool Check twin (in-place from the ATC Tool Check slot)
-            atcTestDataDef(),   // t560 E2 — seed the ATC Test twin so its in-place ATC Test slot (opensAs) opens a registered op on boot (mode superset + pockets unroll + declared-I/O one-source + machine-frame/magazine sim)
-            atcChangeDataDef(),   // t566 E2 — seed the Tool Change twin so its in-place Tool Change slot (opensAs) opens a registered op on boot (5-method _arm superset + M2 static-arm graft + inlineTnc live-view + per-method gating + choreography sim)
-            atcTableDataDef(),   // t568 — seed the Tool Table twin (THE LAST WIZARD) so its in-place Tool Table slot (opensAs) opens a registered op on boot (include-toggle superset + live-view rows from Settings → Tool table)
-            drillDataDef(),
-            tapDataDef(),   // t778 — the Tapping twin (NEW wizard, no built-in slot): floating-holder pitch-locked cycle + gated rigid; opens from its Mill menu entry
-            boreDataDef(),   // fan-out — seed the Bore twin so its in-place Bore slot (opensAs) opens a registered op on boot
-            slotDataDef(),
-            surfacingDataDef(),
-            contourDataDef(),   // E1 — seed the contour twin so its in-place Contour slot (opensAs) opens a registered op on boot
-            pocketDataDef(),   // t469 E1 — seed the pocket twin (FIRST coarse SUPERSET: strategy + tooSmall guards, derive-guards hook) so its in-place Pocket slot (opensAs) opens a registered op on boot
-            wcsDataDef(),   // t477 E1 — seed the WCS twin (static-shape over the dialect-aware wcszero atom) so its in-place WCS slot (opensAs) opens a registered op on boot
-            textDataDef(),
-            cornerDataDef(),
-            edgeDataDef(),   // t339 E4 — seed the edge twin so its in-place Probe slot (opensAs) opens a registered op on boot
-            middleDataDef(),   // middle E4 — seed the middle twin so its in-place Probe slot (opensAs) opens a registered op on boot
-            rotaryCenterDataDef(),   // t421 E5 — seed the rotary centreline twin so its in-place Centreline slot (opensAs) opens a registered op on boot
-            rotaryClockDataDef(),   // t429 E3 — seed the rotary clock twin so its in-place Clock A0 slot (opensAs) opens a registered op on boot
-            alignmentDataDef(),   // t437 E3 — seed the alignment twin so its in-place Align slot (opensAs) opens a registered op on boot (completes the probe fan-out)
-            commDataDef(),   // t518 1b-ii — seed the Comm/MDI twin so its in-place Comm slot (opensAs) opens a registered op on boot (completes the Setup/IO Comm port)
-            ioStepDataDef(),   // t522 E2 — seed the grouped I/O-step twin so its in-place I/O Step slot (opensAs) opens a registered op on boot
-            pauseConfirmDataDef(),   // t1031 — seed the Pause/Confirm twin so its in-place setup slot (opensAs) opens a registered op on boot
-            homingDataDef(),   // t552 E2 — seed the Homing twin so its in-place Homing slot (opensAs) opens a registered op on boot (machine-frame preview: forced envelope + draggable Start + plays the real emit)
-        ];
+        const seeds = SEED_BUILDERS.map((fn) => fn());   // t1107 — SEED_BUILDERS is the ONE source (module-level), shared with the per-wizard Restore-to-factory reseed
         for (const def of seeds) {
             try {
                 if (def.defV == null) def.defV = 1;   // N1 — declare the seed's version (author bumps it in the def-builder when its emit changes); a DECLARED defV means updateUserOp respects it (no boot auto-inc)

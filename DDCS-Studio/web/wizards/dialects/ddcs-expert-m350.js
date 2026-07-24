@@ -16,6 +16,12 @@ export const dialect = {
         // targetTool #1504 is a runtime var (M6 Txx). Param meanings from default_vars.js (#1300/#1330/#1350/#1370).
         atc: { currentTool: 1300, capacity: 1301, targetTool: 1504, pocketX: 1330, pocketY: 1350, pocketZ: 1370 }, ax: AX },
     caps: { vars: true, flow: 'goto', probeStatusCheck: true, hmi: true, toolTable: true, probePort: true, inputRead: true, atc: true },   // the fullest profile (inputRead = generic live-input poll #[1520+N], slib O10300; atc = full pick&place model)
+    // t1085 — the low macro vars THIS POST injects on its own, declared beside the methods that write them so the two cannot
+    // drift. Read off the assignments, not prose: safeRetract/safeHop #42 read-scratch + #43 hop-target (:43,:60-61); the
+    // wcsBaseInto family #70 base / #71 active index / #72 zero-based (:83,:87,:97-99); wcsZeroAtCurrent #150/#151/#152
+    // (:111,:113). #95 comes from the safehop/clearlift BLOCK defaults, which declare it themselves. OPTIONAL top-level key
+    // (same shape as missScratch): a post that injects nothing simply omits it. data/universalScratch.js aggregates it.
+    scratch: [[42, 43], [70, 72], [150, 152]],
 
     // G31 Z-10 F100 P3 L0 Q1   (snippets.nc:9 · words.nc:6 "G31 Z#7 F#3 P#5 L0 Q1")
     probeMove: (axis, dist, { feed = 100, port = 3, level = 0 } = {}) => [`G31 ${axis}${dist} F${feed} P${port} L${level} Q1`],

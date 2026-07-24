@@ -4,7 +4,7 @@
  * Confirmed on the Expert/4.1 dumps: no helical-arc / canned-cycle assumption. Kernel shared
  * with the STUDIO drill preset; block definition drives the Blocks tab.
  */
-import { num, r3, shiftZ } from './util.js';
+import { num, r3, shiftZ, val } from './util.js';
 
 /** Bore a hole (Ø ≥ tool) by ring-stepping in Z, then a finishing pass. Two ramp modes:
  *    'step'  (default) — plunge `pitch`, flat full G3 circle, repeat. The proven Expert form.
@@ -12,7 +12,7 @@ import { num, r3, shiftZ } from './util.js';
  *                        helical G2/G3 (its CAM posts linearize every arc), so we never emit G3-with-Z.
  *  If hole Ø ≤ tool Ø it falls back to a straight plunge. */
 export function helicalBore(pt, p) {
-    const clr = num(p.clearance, 5), depth = num(p.depth, 5), feed = num(p.feed, 100);
+    const clr = num(p.clearance, 5), depth = num(p.depth, 5), feed = val(p.feed, 100);   // t1091 — feed rides val() (pure F# interpolation) so a #var survives; depth/pitch/dia stay num() (loop bounds + cut-radius math)
     const r = (num(p.holeDia, 12) - num(p.toolDia, 6)) / 2, pitch = Math.max(0.05, num(p.pitch, 0.5));
     const ramp = p.ramp === 'helix' ? 'helix' : 'step';
     const zb = num(p.zOff, 0);

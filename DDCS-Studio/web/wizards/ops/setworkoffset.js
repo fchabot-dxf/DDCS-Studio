@@ -24,6 +24,7 @@ export function resolveWcsIndex(wcs) {
 export const setWorkOffsetBlock = {
     type: 'setworkoffset', label: 'Set WCS Offset', kind: 'leaf', category: 'Coordinates',
     defaults: { wcs: '#578', axis: 'X', value: '#50' }, fields: ['wcs', 'axis', 'value'],
+    scratch: [[50, 50]],   // t1085 — the default value var it READS (#578 is the firmware active-WCS reg)
     emit: (p, dx, dy, dialect) => dialect.setWorkOffset(resolveWcsIndex(p.wcs || '#578'), p.axis || 'X',
         (p.value === '' || p.value == null) ? 0 : (typeof p.value === 'number' ? num(p.value, 0) : p.value)),
 };

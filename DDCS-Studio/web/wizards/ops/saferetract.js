@@ -33,6 +33,7 @@ export const safeHopBlock = {
     type: 'safehop', label: 'Clearance Hop', kind: 'leaf', category: 'Move', hidden: true,
     defaults: { hopDist: 15, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, guardLabel: 82, capLabel: 83 },
     fields: ['hopDist', 'saveVar', 'margin', 'guardLabel', 'capLabel'],
+    scratch: [[95, 95]],   // t1085 — the saved-machine-Z var. The DIALECT's safeHop declares its own extra scratch (Expert #42/#43, V4.1 #190/#191)
     emit: (p, dx, dy, dialect) => {
         const opts = {
             hopDist: r3(num(p.hopDist, 15)), saveVar: p.saveVar || '#95',
@@ -66,6 +67,7 @@ export const safeRetractBlock = {
     // margin = the machine-frame margin as a NEGATIVE machine Z (below home); workClear = the work-frame clearance var
     // for the DM500 degrade (the wizard's own safe-Z); label = the Expert unset-guard's forward-jump label.
     defaults: { margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', label: 91 }, fields: ['margin', 'workClear', 'label'],
+    scratch: [[17, 17]],   // t1085 — the work-frame clearance var read on the DM500 degrade
     emit: (p, dx, dy, dialect) => {
         const opts = { margin: r3(num(p.margin, -SAFEZ_MARGIN_DEFAULT)), workClear: p.workClear || '#17', label: num(p.label, 91) };
         const core = (dialect && typeof dialect.safeRetract === 'function')
@@ -90,6 +92,7 @@ export const clearLiftBlock = {
     type: 'clearlift', label: 'Clearance Lift', kind: 'leaf', category: 'Move', hidden: true,
     defaults: { clearMode: 'hop', hopDist: 15, planeZ: 10, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', guardLabel: 91, capLabel: 92 },   // t941 B2b-4 — default hop (a bare clearlift block; the callers pass clearMode explicitly)
     fields: ['clearMode', 'hopDist', 'planeZ', 'saveVar', 'margin', 'workClear', 'guardLabel', 'capLabel', 'planeFellBack'],
+    scratch: [[17, 17], [95, 95]],   // t1085 — it resolves to the retract (#17) or the hop (#95) depending on clearMode, so it owns both
     emit: (p, dx, dy, dialect) => {
         const mode = clearModeOf(p.clearMode);
         // t961 — the plane-guarantee backstop: when Plane was requested but not guaranteed (WCS!=Active or no Z-datum-first), the

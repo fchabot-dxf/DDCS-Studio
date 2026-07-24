@@ -15,6 +15,7 @@ import {
     getLibrary, setEntryOverride, setGroupOverride, resetLayout,
     deleteWizard, exportWizard, importWizard,
     createGroup, deleteGroup, SECTIONS,
+    entryHasOverride, clearEntryOverride,   // t1107 — per-wizard Restore to factory
 } from '../blocks/wizardLibrary.js';
 import { ICON_REGISTRY, entryIconHtml } from './wizIcons.js';
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
@@ -308,6 +309,21 @@ function renderRow(entry, group, ei, allGroups, apply) {
         row.appendChild(mkBtn('Delete', async () => {
             if (await dlgConfirm(`Delete the custom wizard “${entry.label}”? This removes it from your library.`, { danger: true, okLabel: 'Delete' })) { deleteWizard(entry.type); apply(); }
         }, { danger: true, title: 'Remove this custom op' }));
+    } else {
+        // t1107 — a per-BUILT-IN "Restore default": shown ONLY when THIS built-in is actually customized — a layout override
+        // (rename/reorder/regroup/re-icon/hide) OR a diverged opensAs twin (its form/pendant param blocks were edited). Reverts
+        // JUST this one to factory (its layout override + its factory twin), leaving every other wizard + custom op untouched.
+        // Distinct from the blanket ↺ Reset to factory (whole-bar). A pristine built-in shows nothing.
+        const twinDiverged = !!(entry.opensAs && window.ddcsUserOpDivergedFromFactory && window.ddcsUserOpDivergedFromFactory(entry.opensAs));
+        if (entryHasOverride(entry.id) || twinDiverged) {
+            row.appendChild(mkBtn('↺ Restore default', async () => {
+                if (await dlgConfirm(`Restore “${entry.label}” to its factory default?\nThis reverts its name / order / icon and its edited form + pendant fields for this one wizard. Other wizards and your custom ops are untouched.`, { danger: true, okLabel: 'Restore' })) {
+                    clearEntryOverride(entry.id);                                             // (a) its layout override
+                    if (entry.opensAs && window.ddcsReseedUserOp) window.ddcsReseedUserOp(entry.opensAs);   // (b) its factory twin, immediately
+                    apply();                                                                  // (c) re-render manager + bar
+                }
+            }, { danger: true, title: 'Revert this one built-in wizard to factory (layout + twin); leaves others untouched' }));
+        }
     }
     return row;
 }

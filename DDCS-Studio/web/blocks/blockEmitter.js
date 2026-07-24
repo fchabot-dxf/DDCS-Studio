@@ -145,7 +145,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;
     }
-    if (block.type === 'param_group' || block.type === 'guard' || block.type === 'section' || block.type === 'setup' || block.type === 'safetraverse') {   // t130 — section is transparent (emit its children in order); guard is normally pruned pre-emit; t879 — setup is the two-sided section derivative; t901 — safetraverse is a transparent BUNDLE (emits its composed children: lift + shaped travel + return) → byte-identical to the inline safeTraverseStack it wraps
+    if (block.type === 'param_group' || block.type === 'guard' || block.type === 'section' || block.type === 'setup' || block.type === 'safetraverse' || block.type === 'opunit') {   // t130 — section is transparent (emit its children in order); guard is normally pruned pre-emit; t879 — setup is the two-sided section derivative; t901 — safetraverse is a transparent BUNDLE (emits its composed children: lift + shaped travel + return) → byte-identical to the inline safeTraverseStack it wraps; t1063 — opunit is a DECLARED sub-unit boundary (transparent → byte-identical to the standard atoms loose)
         const out = [];
         (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
         return out;

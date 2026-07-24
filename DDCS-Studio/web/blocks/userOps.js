@@ -45,6 +45,14 @@ import { deriveBindings } from './dataOps/deriveBindings.js';   // re-derive bin
 const STORE_KEY = 'ddcs_user_ops';
 export const USER_OP_PREFIX = 'user_';
 
+// The LIVE def registry: opType → the registered def object (template + bindings + the LIVE fn hooks). registerUserOp is the
+// single funnel every path traverses (create/update/load forks + the code data-op-twin seed), so populating it there covers
+// forks AND twins by construction. Unlike listUserOps() (a localStorage JSON snapshot — functions stripped, absent in private
+// mode), this returns the live def. Universal CAM (stackToSlot) reads template+bindings from here. See getUserDef below.
+const USER_DEFS = new Map();
+/** The LIVE registered user-op def (template + bindings + hooks) for an opType, or null. O(1); immune to localStorage gaps. */
+export function getUserDef(opType) { return USER_DEFS.get(opType) || null; }
+
 // Param value-types a binding may carry. `type` is the VALUE kind (drives marker codec + defaults); the form
 // `widget` (separate, ui/formWidgets.js) is just how it's rendered. number stays the easy default.
 export const BINDING_TYPES = new Set(['number', 'int', 'enum', 'bool', 'string', 'list']);   // 'list' = a structured/array value (e.g. a coordinate-list positioner) — not a scalar socket
@@ -309,6 +317,104 @@ export function bindingsFromStack(children) {
     });
 }
 
+/**
+ * camFieldsFromStack — the PENDANT-FACE reader (block-native-params S1), the mirror of bindingsFromStack. Walks a def
+ * template and returns the ordered `cam_field` declarations (a `cam_table`'s rows, in mouth order — flattenBlocks pre-order
+ * visits a container's children in order). NOT yet consumed by the emit path / modal (that is S2/S4); S1 proves the reader.
+ * Each row: { param, mode:'expose'|'bake', label?, baked?, units?, dflt?, min?, max? } — empty strings inherit the binding.
+ */
+export function camFieldsFromStack(template) {
+    return flattenBlocks(template).filter((b) => b && b.type === 'cam_field').map((b) => {
+        const p = b.params || {};
+        const row = {
+            param: String(p.param || ''),
+            mode: p.mode === 'bake' ? 'bake' : 'expose',   // anything but 'bake' → expose (the default)
+        };
+        if (p.label !== '' && p.label != null) row.label = String(p.label);
+        if (row.mode === 'bake' && p.baked !== '' && p.baked != null) row.baked = String(p.baked);
+        if (p.units !== '' && p.units != null) row.units = String(p.units);
+        if (p.dflt !== '' && p.dflt != null && Number.isFinite(Number(p.dflt))) row.dflt = Number(p.dflt);   // else inherit binding.default
+        if (p.nmin !== '' && p.nmin != null && Number.isFinite(Number(p.nmin))) row.min = Number(p.nmin);
+        if (p.nmax !== '' && p.nmax != null && Number.isFinite(Number(p.nmax))) row.max = Number(p.nmax);
+        return row;
+    });
+}
+
+/**
+ * paramFieldsFromStack — the FORM-FACE reader (block-native-params S5.1), the mirror of camFieldsFromStack / bindingsFromStack.
+ * Walks a def template and returns the ordered `param_field` declarations (a param_group's rows, in mouth order). NOT yet
+ * consumed (the form renderer is a later slice). Each row: { param, widget, type, label?, default?, section?, help?, widgetConfig? }
+ * — a form-binding-spec shape; empty strings inherit the binding.
+ */
+export function paramFieldsFromStack(template) {
+    return flattenBlocks(template).filter((b) => b && b.type === 'param_field').map((b) => {
+        const p = b.params || {};
+        const row = { param: String(p.param || ''), widget: String(p.widget || 'number'), type: BINDING_TYPES.has(p.type) ? String(p.type) : 'number' };
+        if (p.label !== '' && p.label != null) row.label = String(p.label);
+        if (p.dflt !== '' && p.dflt != null && Number.isFinite(Number(p.dflt))) row.default = Number(p.dflt);   // else inherit binding.default
+        if (p.section) row.section = String(p.section);
+        if (p.help) row.help = String(p.help);
+        const wc = {};
+        if ((p.widget === 'dropdown' || p.widget === 'segmented') && p.options) { const o = parseParamOptions(p.options); if (o.length) wc.options = o; }
+        if (p.widget === 'number' || p.widget === 'slider') {
+            for (const [k, fk] of [['min', 'nmin'], ['max', 'nmax'], ['step', 'nstep']]) if (p[fk] !== '' && p[fk] != null && Number.isFinite(Number(p[fk]))) wc[k] = Number(p[fk]);
+            if (p.units) wc.units = String(p.units);
+        }
+        if (Object.keys(wc).length) row.widgetConfig = wc;
+        return row;
+    });
+}
+
+/**
+ * paramGroupFromBindings — the FORM materializer (block-native-params S5.1), the mirror of camTableFromBindings. A def's value
+ * bindings → a param_group block, one param_field per binding in binding PRE-ORDER, label/default/widget/type from the binding
+ * (NO classifier — the form shows every param; expose/bake is the pendant's concern, not the form's). PURE + INERT (nothing
+ * consumes it yet). Returns null when the def has no value bindings.
+ */
+export function paramGroupFromBindings(def, group = 'Settings') {
+    const valueBindings = ((def && def.bindings) || []).filter((b) => b && b.blockIndex != null);
+    if (!valueBindings.length) return null;
+    const children = valueBindings.map((b) => {
+        const wc = b.widgetConfig || {};
+        return { type: 'param_field', params: {
+            param: b.param, label: b.label || '', widget: b.widget || 'number', type: BINDING_TYPES.has(b.type) ? b.type : 'number',
+            dflt: (b.default != null ? String(b.default) : ''), section: b.section || '', help: b.help || '',
+            options: (wc.options ? wc.options.map(([l, v]) => (String(l) === String(v) ? String(v) : `${l}=${v}`)).join(', ') : ''),
+            nmin: (wc.min != null ? String(wc.min) : ''), nmax: (wc.max != null ? String(wc.max) : ''), nstep: (wc.step != null ? String(wc.step) : ''),
+            units: wc.units || b.units || '',
+        } };
+    });
+    return { type: 'param_group', params: { group }, children };
+}
+
+/**
+ * block-native-params S5.3 — materialize a param_group INTO a def (the FORM analog of materializeCamTable). Injects
+ * paramGroupFromBindings into the user_root PRESENTATION mouth and re-derives EVERY binding blockIndex BY IDENTITY over the
+ * post-injection flatten (the wrapForkAtSave pattern; a blanket shift would corrupt a uiChildren binding). Mutates `def` in
+ * place; idempotent (no-op if the def has no value bindings or already carries a param_group). COMPOSES with materializeCamTable:
+ * each runs its own identity re-derive over the CURRENT flatten, so running both sequentially re-indexes correctly across the
+ * combined injection. BYTE-NEUTRAL by construction: param_field emits [] + param_group is transparent, and formBindings
+ * consuming it reproduces today's form (order/label/widget/default, and canvas group/role which it re-derives from the binding).
+ * PURE — the caller (the S5.3 hook) decides when. Returns def.
+ */
+export function materializeParamGroup(def) {
+    if (!def || !Array.isArray(def.template)) return def;
+    const root = def.template.find((b) => b && b.type === 'user_root');
+    if (!root) return def;
+    if (flattenBlocks(def.template).some((b) => b && b.type === 'param_group')) return def;   // already has one — idempotent
+    const pg = paramGroupFromBindings(def);
+    if (!pg) return def;   // no value bindings — nothing to declare
+    const flatBefore = flattenBlocks(def.template);
+    root.uiChildren = [pg, ...(root.uiChildren || [])];
+    const flatAfter = flattenBlocks(def.template);
+    (def.bindings || []).forEach((b) => {
+        if (!b || b.blockIndex == null) return;
+        const ref = flatBefore[b.blockIndex]; const ni = ref ? flatAfter.indexOf(ref) : -1;   // BY IDENTITY
+        if (ni >= 0) b.blockIndex = ni;
+    });
+    return def;
+}
+
 /** deriveBindings SPEC rows → `formfield` block records (every field set, so recToJson's fields/dropdowns stay valid).
  *  The reverse of bindingsFromStack — renders a hand-written spec set (corner/edge/middle's *_BINDING_SPECS) AS blocks in
  *  the Blockly view so a ported wizard is authorable/re-authorable. Only VALUE specs (a `match` — a value socket); a
@@ -425,7 +531,7 @@ export function defaultParams(def) {
 // the PRUNED stack every build. A legacy def (no guards, frozen `bindings`) is UNCHANGED: pruneGuards is a no-op with no
 // guard blocks, and without bindingSpecs the frozen `bindings` are used exactly as before → byte-identical for every
 // existing user op (drill/slot/text/…), verified by their emit specs + the guard-prune regression.
-function instantiate(def, params) {
+export function instantiate(def, params) {
     // ② B4 step 4b — fill STRUCTURAL binding defaults (guard-driving params with no block socket: bool probeZFirst, enum
     // travelApproach) for any absent param BEFORE prune. A bool guard tolerates undefined (whenOk coerces !!undefined=false),
     // but an ENUM guard needs the value (undefined === 'auto' is false → the arm would drop). Value bindings are untouched
@@ -543,6 +649,7 @@ export function registerUserOp(def) {
     setUserStatusHint(def.opType, def.statusHint);   // t554 — a DECLARED in-place status HINT (homing's unset-travel warning); a LIVE fn (re-attached from the seed, like the others)
     setUserSimGcode(def.opType, def.simGcode);   // t566 — a DECLARED sim-gcode override (the ATC change choreography); a LIVE fn (re-attached from the seed, like the others)
     setUserPreviewGeometry(def.opType, def.previewGeometry);   // t712 — a DECLARED preview-geometry hook (slot/contour per-feature 2D handles); a LIVE fn (re-attached from the seed, like the others)
+    USER_DEFS.set(def.opType, def);   // the LIVE def registry (Universal CAM reads template+bindings here); overwrite on re-author/re-seed
     return def;
 }
 
@@ -567,6 +674,13 @@ export function defVOf(opType) {
     const d = readStore().find((x) => x.opType === opType);
     return d ? (Number(d.defV) || 1) : 0;
 }
+
+/** The ONE staleness rule for a stamped def-version (t1079): a stamp is STALE when the op IS versioned (`currentV > 0`)
+ *  and the stamp is BEHIND it. An unversioned / built-in op (defVOf 0) never flags; a stamp of 0 is a legacy pre-stamp
+ *  record and counts as behind. Read by BOTH consumers of a defV stamp — the import transparency check
+ *  (programModel.staleMarkedOps, marker.defV) and the CAM sub-stack boundary (subStackToSlot, opunit.params.defV) —
+ *  so "what counts as stale" can never drift between them. */
+export const defVStale = (stampedV, currentV) => Number(currentV) > 0 && (Number(stampedV) || 0) < Number(currentV);
 
 /** Validate → register → persist a new user op. Throws if invalid or the opType already exists. */
 export function createUserOp(def) {
@@ -603,6 +717,7 @@ export function updateUserOp(def) {
 /** Remove a user op from the registry + persistence (and the live user-layer builder/spec/label entries). */
 export function deleteUserOp(opType) {
     writeStore(readStore().filter((d) => d.opType !== opType));
+    USER_DEFS.delete(opType);         // clear the live def registry entry (register touches N tables — delete must clear them all)
     unregisterUserBuilder(opType);
     unregisterUserSpec(opType);
     removeOpLabel(opType);            // register touches 4 tables — delete must clear all 4 (was leaking OP_LABELS)

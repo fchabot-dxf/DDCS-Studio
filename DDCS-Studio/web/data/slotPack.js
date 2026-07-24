@@ -12,6 +12,8 @@
  * collision detection across a pack's slots is the genuinely-hard part this module owns.
  */
 
+import { fieldVarCollisions } from './camScratch.js';   // t1081 — the DECLARED generator scratch bands (inert data; camScratch imports nothing, so no cycle)
+
 const POOL_MIN = 1100, POOL_MAX = 1499, MIRROR = 1500;
 
 function num(v, d) { return (v === '' || v == null || isNaN(Number(v))) ? d : Number(v); }
@@ -79,8 +81,60 @@ export function slotMacro(slot) {
     // Macro-first: if the body already declares the mirror reads, don't prepend them again (it IS the macro).
     const hasReads = /#\d+\s*=\s*#2[6-9]\d\d/.test(body);
     const reads = hasReads ? [] : fields.map((f, i) => `${f.var || '#' + (i + 1)}=#${mirrorVar(f.idx)}   ;${esc(f.label)}`);
-    const hasEnd = /\b(M99|M30|M0?2)\b/.test(body);
+    // t1077 — a TAIL check, not a whole-body scan: error branches now carry their own M30 (the declared halt), so a
+    // body-wide scan would see one and wrongly conclude the program already terminates — leaving a trailing FRAGMENT
+    // part (slotFromOp, which ends at M5) with NO terminator at all. Only a terminator at the END ends the program.
+    const hasEnd = /\b(M99|M30|M0?2)\b[^\n]*\s*$/.test(body);
     return head.concat(reads, body ? [body] : [], hasEnd ? [] : ['M99']).join('\n') + '\n';
+}
+
+// ── compose N parts into ONE executable program ─────────────────────────────────────────────────────────────
+// Each CAM-slot generator emits a SELF-CONTAINED program: probe/mill bodies converge (success + error paths) on a label
+// then M30 (corner `…GOTO 2 / N2 / M30`, surfacing `…GOTO 9 / N7 N8 N9 / M30`); opToSlot/stackToSlot are fragments (end M5 /
+// raw atom emit, no M30 — the wrapper appends M99). Concatenating them raw put an M30 in the MIDDLE → the controller stopped
+// after part 1 and every later part was dead code (the shipped multi-op + sub-stack bug). composeParts normalizes:
+//   1. UNIQUIFY each part's labels (N-defs + GOTO / IF..GOTO targets) into a band strictly above the previous part's max, so
+//      a GOTO in part 2 can never resolve to part 1's identically-numbered label (the generators reuse N1/N2/N8/N9 per part).
+//   2. STRIP the terminal program-end (M30 / M2 / M02) from every part EXCEPT the last — keeping the convergence label above
+//      it as the fall-through into the next part. A fragment part (no M30) is untouched.
+// The last part keeps its own end; slotMacro's hasEnd then leaves it (or appends the single M99). One terminal end, in order.
+// (Loop DO/END labels are sequential+balanced across parts → not rewritten. Spindle M5→M3 brackets are KEPT — safe teardown.)
+
+// Max N-label / GOTO-target number in a body (mirrors opSession.js maxLabelNum, but over raw macro TEXT). GOTO spacing
+// varies by controller — the hand-written generators emit `GOTO 2` (space) but the DDCS Expert dialect emits `GOTO2` (no
+// space) for flow/saferetract atoms (ddcs-expert-m350.js) — so `\s*` matches BOTH, else a no-space GOTO is missed.
+function maxLabelIn(body) {
+    let max = 0, m;
+    const nre = /^\s*N(\d+)\b/gm; while ((m = nre.exec(body)) !== null) max = Math.max(max, Number(m[1]));
+    const gre = /\bGOTO\s*(\d+)\b/gi; while ((m = gre.exec(body)) !== null) max = Math.max(max, Number(m[1]));
+    return max;
+}
+// Shift every N-label DEFINITION (line-start `N<n>`) + every GOTO / IF..GOTO TARGET by `off` (both, so they stay consistent).
+// The GOTO replacement PRESERVES the original spacing (space or no-space) so the emitted dialect form is unchanged.
+function offsetBodyLabels(body, off) {
+    if (!off) return body;
+    return String(body)
+        .replace(/^(\s*)N(\d+)\b/gm, (_, sp, n) => `${sp}N${Number(n) + off}`)
+        .replace(/\bGOTO(\s*)(\d+)\b/gi, (_, sp, n) => `GOTO${sp}${Number(n) + off}`);
+}
+// Strip a TERMINAL program-end (M30 / M2 / M02) at the very end of a body — so control flows into the next part. Keeps the
+// convergence label above it; a fragment body (ends M5 / atom emit, no M30) is unaffected.
+function stripTerminalEnd(body) {
+    return String(body).replace(/(\r?\n)?[ \t]*M(30|0?2)\b[^\n]*[ \t]*$/i, '');
+}
+/**
+ * Normalize N composed part-bodies into ONE executable program: uniquify labels per part (running max, so no cross-part
+ * collision) + strip the terminal end from all but the last. Returns the joined body. Shared by buildSlotFromOps (multi-op)
+ * and subStackToSlot (sub-stack); a single part is returned unchanged (offset 0, last part → no strip).
+ */
+export function composeParts(parts) {
+    const clean = (parts || []).map((p) => String(p == null ? '' : p).replace(/\r/g, '')).filter((p) => p.trim() !== '');
+    let base = 0;
+    return clean.map((body, i) => {
+        const uni = offsetBodyLabels(body, base);
+        base = maxLabelIn(uni) + 1;                                 // the next part's labels start strictly above this part's max
+        return (i < clean.length - 1) ? stripTerminalEnd(uni) : uni;   // strip the program-end from every part EXCEPT the last
+    }).join('\n\n');
 }
 
 /**
@@ -106,7 +160,10 @@ export function mergeEng(existingEng, additions) {
 }
 
 /** Validate a pack → { ok, errors:[], warnings:[] } for the "simulate before publish" gate. */
-export function validatePack(pack) {
+// `bandsOf` (t1085 slice C) — an optional camType→bands resolver forwarded to fieldVarCollisions. slotPack stays LIGHT on
+// purpose (probeToSlot and the generator arms import it), so it does NOT import universalScratch itself; a caller that
+// already has that module (macrosApp) passes the resolver in and the universal arm gets validated too.
+export function validatePack(pack, { bandsOf } = {}) {
     const errors = [], warnings = [];
     const dups = collisions(pack); if (dups.length) errors.push('Parameter # used by more than one field: ' + dups.map((n) => '#' + n).join(', '));
     const oop = outOfPool(pack); if (oop.length) errors.push('Parameter # outside the 1100–1499 pool: ' + oop.map((n) => '#' + n).join(', '));
@@ -114,6 +171,11 @@ export function validatePack(pack) {
     if (used > 350) warnings.push(`${used}/400 form fields used — the #1100–1499 pool is filling up.`);
     ((pack && pack.slots) || []).forEach((slot) => {
         if ((slot.fields || []).length > 8) warnings.push(`Slot cam${slot.slot}: ${slot.fields.length} fields — >8 rows may not fit the form.`);
+        // t1081 — a field var landing inside a composed part's DECLARED generator scratch is an ERROR, not a warning: the
+        // generator overwrites the operator's value mid-program (a 2-part mill slot forces the spindle to S0). An
+        // already-built slot from before the build guard must not pass validation silently.
+        const vc = fieldVarCollisions(slot.fields || [], slot.ops || [], bandsOf || undefined);
+        if (vc.length) errors.push(`Slot cam${slot.slot}: ${vc.map((c) => `#${c.varNum} ("${c.field}")`).join(', ')} overwritten by the ${[...new Set(vc.map((c) => c.clashType))].join('/')} generator's scratch — rebuild these ops as separate slots.`);
     });
     return { ok: errors.length === 0, errors, warnings };
 }

@@ -27,6 +27,9 @@ export const dialect = {
     // (= no contact). #190 is verified FREE — outside Studio's emitted #1-74/#101/#102/#578 AND the V4.1 firmware macro locals
     // (executable macros write #0-148 + #490-536; read #101-148) — a general-purpose macro var, not a system #1400+/#1500+ reg.
     missScratch: '#190',
+    // t1085 — the low macro vars THIS POST injects: the miss/margin scratch #190 (above, and safeRetract :36) plus the
+    // safeHop pair #190 margin / #191 hop-target (:46-48). Aggregated by data/universalScratch.js.
+    scratch: [[190, 191]],
     readMachine: (axis, varName) => [`${varName}=#${1500 + AX[axis]}`], // DRO X#1500/Y#1501/Z#1502/A#1503 (safez.nc)
     machineMove: (axis, ref) => [`G0 G53 ${axis}${ref}`],   // CONFIRMED live: probe-fix.nc "G0G53Z#102" (G0 + G53)
     // safeRetract (t822) — machine-frame safe-height retract. V4.1 has NO Studio boot macro that seeds a register

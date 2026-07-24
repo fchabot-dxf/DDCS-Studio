@@ -18,8 +18,9 @@
  */
 import { BLOCKS } from '../wizards/ops/index.js';
 import { fieldKind, fieldsOf, FN, inlineFields, fieldOptions } from './blockly/bridge.js';
-import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings } from './userOps.js';
+import { userOpFromStack, listUserOps, USER_OP_PREFIX, flattenBlocks, extractParamBlocks, updateUserOp, defaultParams, defVOf, decodeCanvasWidget, groupCanvasBindings, CANVAS_ROLE_WIDGETS, simIntentFromStack, simStartsFromStack, bindingsFromStack, authoredExtraBindings, getUserDef, instantiate, materializeParamGroup } from './userOps.js';   // t1075 — getUserDef + instantiate: the save-time fork wrap compares the body against the source op's exact exec run; t1111 (S5.3) — the FORM materializer
 import { createWizard } from './wizardLibrary.js';
+import { camTypeOf, materializeCamTable } from '../data/opCamMap.js';   // t1069 — the "recognized generator twin" test for the fork-time opunit wrap; t1103 (S4b) — the pendant-field materializer
 import { workspaceToStack } from './blockly/stackBridge.js';
 import { openRegionEditor } from '../ui/regionEditor.js';   // the "make your own datum" authoring editor
 import { openCoordEditor } from '../ui/formWidgets.js';     // the coordinate-list ✎ editor (shares buildCoordEditor with the form)
@@ -56,7 +57,7 @@ function isAtom(blk) {
     // block's panel-type field and the param_group block's group-name field (t161 — both authoring labels, not values).
     // Value-bearing atoms (assign / param / move / …) are untouched → the value-knob expose path (deriveAuthoredDef / EXPOSE_) still works.
     const def = BLOCKS[blk.type];
-    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring): authoring metadata / guard drivers, not exposable values
+    return !(def && (def.kind === 'section' || def.kind === 'structctl' || def.kind === 'panel' || def.kind === 'param_group' || def.kind === 'formfield' || def.kind === 'layoutwidget' || def.kind === 'opunit' || def.kind === 'cam_table' || def.kind === 'cam_field'));   // t148 section + t154 structural-control + t161 panel/param_group + formfield/layoutwidget (composable-authoring) + t1069 opunit + t1093 cam_table/cam_field: authoring/boundary/pendant-declaration metadata, not exposable values
 }
 
 // the widget a numeric exposure renders as in the form (the form-widget registry keys; numeric-compatible only).
@@ -433,17 +434,138 @@ export function openCoordAuthor(blk) {   // exported so the pencil onClick AND t
 
 // RE-AUTHOR a saved wizard: load its template (with its param pills) back into the Blocks tab + dev mode, so the
 // GUI blocks round-trip and you can tweak them. Saving then UPDATES that wizard (same opType) instead of duplicating.
+// t1069 (SUB-STACK S3) — when opening a RECOGNIZED generator twin (surfacing/corner/…) to CUSTOMIZE, WRAP its exec atoms in an
+// opunit(opType, defV) at LOAD time. This is the RELIABLE moment (user_root.children still EQUALS the source exec run exactly);
+// save-time is unreliable (the run can be interleaved by free-form Blockly editing, and the standard atoms carry no identity —
+// north-star forbids inferring them). subStackToSlot then routes the opunit to its generator (the standard part stays LIVE) and
+// the added loose atoms unroll+expose. A genuine custom user op (camTypeOf → universal) is NOT wrapped. PURE + exported for test:
+// returns { template (possibly opunit-wrapped), recognized }.
+export function wrapRecognizedForFork(def) {
+    const opType = def && def.opType;
+    const ct = camTypeOf({ opType, params: defaultParams(def) });
+    const recognized = !!(ct && ct.camType && !ct.universal);
+    const tpl = JSON.parse(JSON.stringify((def && def.template) || []));
+    if (recognized) {
+        const root = tpl.find((b) => b && b.type === 'user_root') || tpl[0];
+        if (root && Array.isArray(root.children) && root.children.length) {
+            root.children = [{ type: 'opunit', params: { opType, defV: defVOf(opType) }, children: root.children }];   // the exec run → one opunit boundary
+        }
+    }
+    return { template: tpl, recognized };
+}
+
+// The pre-order atom TYPE SEQUENCE of a stack — the identity test for "is this body still the source op's exec run?".
+// A literal deep-equal is NOT usable here (measured): the workspace round-trip FILLS an absent socket with the block
+// default (progstart gains `rpm:0`) while instantiate's clone carries empty `children: []` arrays the workspace record
+// omits — benign normalization noise that would make the gate NEVER fire, silently killing the feature. The type
+// sequence catches exactly what matters: an atom ADDED, REMOVED or REORDERED — the interleaving that makes the standard
+// run un-identifiable. It deliberately TOLERATES a value edit, which is correct to wrap: subStackToSlot RE-DERIVES the
+// standard part's params from the actual sockets (deriveStandardParams), so a tuned value is read back, never lost.
+const typeSeq = (stack) => flattenBlocks(stack || []).map((b) => (b && b.type) || '?').join('|');
+
+// t1075 (Part C) — the placed-op → SAVE fork route must produce the SAME opunit sub-stack the Customize (editWizardDef)
+// route does, so fork behaviour is ONE-SOURCE regardless of how the user got into Blocks. Wrap the exec run in an opunit
+// ONLY when ALL THREE hold:
+//   (1) RECOGNIZED — a generator twin whose DEFAULT variant resolves to a generator (the SAME test wrapRecognizedForFork
+//       uses), so the save-time wrap matches the load-time wrap exactly;
+//   (2) NOT ALREADY WRAPPED — an op opened via editWizardDef already carries the opunit (it round-trips through the
+//       workspace), so re-wrapping would DOUBLE-wrap it;
+//   (3) UNTOUCHED — the body's atom TYPE SEQUENCE still equals the source op's exec run (instantiate(def, the op's own
+//       params)). If the user added/removed/reordered atoms the standard run is un-identifiable — shape-inference is
+//       FORBIDDEN — so leave it universal. (See typeSeq: a literal deep-equal can never fire; a value edit is safe.)
+// Any condition fails → return false and save UNIVERSAL exactly as today (a correct universal fork beats a corrupt sub-stack).
+// Mutates a.opRec.children IN PLACE so the block records keep their IDENTITY, then re-derives each exposure's blockIndex
+// BY IDENTITY over the wrapped flatten — NEVER a blanket +1: the shift is NON-UNIFORM (exec children shift by one, the
+// uiChildren panel/sim/param_group do NOT), so a blanket +1 would silently corrupt the saved op's emit + form.
+// NOTE (measured): for a data-op twin the body is [user_root{…}] and preorderAtoms only descends a 'DO' input, so
+// user_root's PRESENTATION/EXECUTION mouths are never walked → inline EXPOSE ticks yield NO exposures for these ops
+// (pre-existing). The live binding source is extractParamBlocks (param pills), which runs AFTER this wrap and therefore
+// indexes the WRAPPED stack correctly by construction. The exposure re-derive is kept: it is correct, and it is the
+// right behaviour the moment an exposure can exist here. Exported for test (like wrapRecognizedForFork).
+export function wrapForkAtSave(a) {
+    try {
+        const opType = a && a.opRec && a.opRec.opType;
+        if (!opType) return false;                                                     // a hand-built bare stack (opType null) — never a fork
+        const def = getUserDef(opType);
+        if (!def) return false;
+        const ct = camTypeOf({ opType, params: defaultParams(def) });
+        if (!(ct && ct.camType && !ct.universal)) return false;                        // (1) not a recognized generator twin
+        const root = (a.opRec.children || []).find((b) => b && b.type === 'user_root');
+        if (!root || !Array.isArray(root.children) || !root.children.length) return false;
+        if (root.children.length === 1 && root.children[0] && root.children[0].type === 'opunit') return false;   // (2) already wrapped (the editWizardDef route)
+        if (typeSeq(a.opRec.children) !== typeSeq(instantiate(def, a.opRec.params || {}))) return false;          // (3) atom added/removed/reordered → un-identifiable
+        const flatBefore = flattenBlocks(a.opRec.children);                            // the indices a.exposures were computed against
+        root.children = [{ type: 'opunit', params: { opType, defV: defVOf(opType) }, children: root.children }];  // IN PLACE — identity preserved
+        const flatAfter = flattenBlocks(a.opRec.children);
+        for (const e of (a.exposures || [])) {
+            const ref = flatBefore[e.blockIndex];
+            const ni = ref ? flatAfter.indexOf(ref) : -1;
+            if (ni >= 0) e.blockIndex = ni;                                            // re-derived BY IDENTITY
+        }
+        return true;
+    } catch (_) { return false; }   // any doubt → leave it universal
+}
+
+// t1103 (block-native params S4b) — is a def a UNIVERSAL-arm op whose value bindings are PILL-derivable? Only these get a
+// materialized cam_table: a generator twin's cam_table would be inert (its build never reads camFieldsFromStack — measured
+// t1101), and a LITERAL-binding universal twin (contour: hand-assembled bindings, no pills) hits a pre-existing no-pill save
+// limitation the cam_table would activate, so it is SKIPPED (gated to S6). A pill-based op's bindings re-index automatically
+// on save (extractParamBlocks over the post-injection flatten), so the injection persists correctly.
+const hasParamPills = (template) => flattenBlocks(template || []).some((b) => b && b.params && Object.values(b.params).some((v) => v && typeof v === 'object' && v.type === 'param'));
+export function maybeMaterializeCamTable(def) {
+    try {
+        if (!def || !def.opType || !Array.isArray(def.template)) return def;
+        const ct = camTypeOf({ opType: def.opType, params: defaultParams(def) });
+        if (!ct || !ct.universal) return def;                                             // universal-arm ONLY (not a generator twin)
+        if (!(def.bindings || []).some((b) => b && b.blockIndex != null)) return def;     // needs value bindings to declare
+        if (flattenBlocks(def.template).some((b) => b && b.type === 'cam_table')) return def;   // idempotent — already materialized
+        if (!hasParamPills(def.template)) return def;                                     // PILL-derivable only (literal twins → S6)
+        materializeCamTable(def);   // inject camTableFromBindings into the Presentation mouth + identity re-derive the bindings
+    } catch (_) { /* leave the op unmaterialized on any doubt — the fallback path is always correct */ }
+    return def;
+}
+
+// t1111 (block-native params S5.3) — the FORM materialize hook, the analog of maybeMaterializeCamTable. Gives an op with
+// value bindings its FORM fields as param_field blocks (a param_group) when opened to customize. NO universal gate (the form
+// applies to ANY custom op, not just the universal build arm). PILL-derivable only (the same no-pill save limit S4b found for
+// literal twins → S6). Idempotent. COMPOSES with maybeMaterializeCamTable: both run at editWizardDef, each re-derives the
+// bindings BY IDENTITY over the CURRENT (post-previous-injection) flatten, so the combined shift is correct. CANVAS ops are
+// NOT skipped — formBindings preserves a canvas binding's group/role/widget, so a materialized param_group stays byte-neutral.
+export function maybeMaterializeParamGroup(def) {
+    try {
+        if (!def || !def.opType || !Array.isArray(def.template)) return def;
+        if (!(def.bindings || []).some((b) => b && b.blockIndex != null)) return def;     // needs value bindings to declare
+        if (flattenBlocks(def.template).some((b) => b && b.type === 'param_group')) return def;   // idempotent — already has a form group
+        if (!hasParamPills(def.template)) return def;                                     // PILL-derivable only (literal twins → S6)
+        materializeParamGroup(def);
+    } catch (_) { /* leave the op unmaterialized on any doubt — the fallback path is always correct */ }
+    return def;
+}
+
 export async function editWizardDef(opType) {
     const def = listUserOps().find((d) => d.opType === opType);
     if (!def) { alert('That wizard is no longer in your library.'); return; }
+    // t1103 (S4b) — opt-in materialize: a pill-based UNIVERSAL op gains its pendant fields as cam_field blocks when the user
+    // opens it to customize. Mutates this store-copy def (template + bindings) BEFORE the fork clone, so forkTpl carries the
+    // cam_table into the workspace and it persists on save (pill re-index automatic). A no-op for twins / literal / already-done.
+    maybeMaterializeCamTable(def);
+    maybeMaterializeParamGroup(def);   // t1111 (S5.3) — the FORM half: a pill-based op gains its form fields as param_field blocks; composes with the cam_table above (each identity-re-derives)
+    // t1069 — a RECOGNIZED generator twin opened here is a FORK/CUSTOMIZE: wrap its exec atoms in opunit AND treat the save as a
+    // NEW op (never overwrite the twin's own def — the opunit shifts its frozen bindings +1). A custom user op is a normal re-author.
+    const { template: forkTpl, recognized } = wrapRecognizedForFork(def);
     let opC;
     try {
         const { makeOp } = await import('./opBuilders.js');
-        opC = makeOp(opType, defaultParams(def), JSON.parse(JSON.stringify(def.template || [])));   // wrap template → an op (pills round-trip)
+        opC = makeOp(opType, defaultParams(def), forkTpl);   // wrap template → an op (pills round-trip)
     } catch (e) { console.warn('edit wizard: build failed', e); return; }
     if (window.showApp) window.showApp('blocks');
     for (let i = 0; i < 80 && !(window.ddcsLoadBlockStack && window.__blkws); i++) await new Promise((r) => setTimeout(r, 50));   // wait for the Blocks app
-    _editingWizard = opType; _editingLabel = def.label || opType;   // saving UPDATES this wizard; the dialog prefills from its def
+    // recognized fork → a FRESH op (no destructive in-place Update of the twin, which the opunit +1 shift would corrupt).
+    // EXCEPT a maintained-as-data twin (corner/edge/pocket/middle, bindingSpecs): lockUpdate ALREADY blocks its Update, so keep
+    // _editingWizard → its "maintained as data" guard + Save-as-new UX is unchanged. Only the NON-bindingSpecs recognized twins
+    // (surfacing/slot/drill/bore, previously Updatable) need the new fork-only protection.
+    const forkOnly = recognized && !isMaintainedAsData(def);
+    _editingWizard = forkOnly ? null : opType; _editingLabel = forkOnly ? null : (def.label || opType);
     refreshEditingChrome();   // glow + "✎ Editing: <name>" chip (the editing-context UI)
     if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack([opC]);
     await new Promise((r) => setTimeout(r, 150));   // let it project + render (authoring affordances grow automatically)
@@ -566,6 +688,12 @@ function saveAsCustomOp() {
     const a = collectAuthoring(_ws);
     if (!a) { alert('No op to save — insert an op in Blocks first.'); return; }
     if (a.varErr) { alert(`The exposed value “${a.varErr}” has a variable or expression plugged in — a knob must be a plain number. Restore a number on that block, then save again.`); return; }
+
+    // t1075 (Part C) — a placed RECOGNIZED op opened in Blocks DIRECTLY (not via Customize) and saved would fork as
+    // UNIVERSAL (its standard part baked, never live in CAM). Wrap it in the SAME opunit boundary the Customize route
+    // produces, so fork behaviour is one-source regardless of route. Gated + in place + exposure indices re-derived by
+    // identity (see wrapForkAtSave); a no-op for every other save, so all existing save paths are byte-identical.
+    wrapForkAtSave(a);
 
     const inlineBindings = buildBindings(a.exposures);
     // GUI param blocks plugged into value sockets ALSO declare knobs — extract them (mutates the template: pills → numbers).

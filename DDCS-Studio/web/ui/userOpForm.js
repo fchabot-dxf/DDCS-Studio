@@ -8,7 +8,7 @@
  */
 import { recordOp } from '../blocks/opRecord.js';
 import { listUserOps } from '../blocks/userOps.js';
-import { renderOpForm } from './formWidgets.js';
+import { renderOpForm, formBindings } from './formWidgets.js';   // S5.2 — formBindings consumes the def's param_field rows when present (else the bindings, unchanged)
 
 let _overlay = null;   // one form at a time
 
@@ -41,7 +41,7 @@ export function openUserOpForm(def) {
     // one WIDGET per UNIT (the form half of the widget library) — shared with the panel view via renderOpForm.
     let readers = [];
     if (def.bindings.length) {
-        readers = renderOpForm(box, def.bindings);
+        readers = renderOpForm(box, formBindings(def));   // S5.2 — param_field rows drive the form when present; else byte-identical
     } else {
         const none = document.createElement('div');
         none.style.cssText = 'opacity:.6; margin:8px 0;';

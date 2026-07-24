@@ -12806,3 +12806,1741 @@ The dispatch asked to re-capture the confirmEvery>0 goldens. There are NONE: t10
 ### GATE — full suite: 1372 passed, 0 failed, 4 skipped. All 4 of last turn's failures are now green: surfacing-as-data + wizard-bar (fixed t1031), and preflight-badge-838 + collapsible-panes-752 (both were knife's-edge flakes — collapsible passed this run at ≤28px, confirming the earlier 30.25px was an environmental pixel flake, not a hard regression).
 
 ### STATE: Pause & Confirm v1 is correct end-to-end — the between-pass injection now shows the default operator message (no blank banner), one-sourced through PAUSE_DEFAULT_MSG. confirmEvery=0 byte-identical. Advisor releases after review. FOLLOW-ON still queued: slot self-loop + rest-machining mirror; blocking-confirm variant B.
+
+---
+
+## 🔨 turn 1035 — CAM BUILDER kickoff, SLICE S0 (branch feat/cam-builder, GROUND-FIRST): allocFieldsWith — a STRICT, byte-identical SUPERSET of allocFields. Additive only; ships nothing user-visible.
+
+Read scratchpad/cam-builder-plan.md (the t1028 architect pass). S0 = the pure-fn, no-UI, byte-identical safety net for the expose/bake concept before any UI/caller work.
+
+### STEP 1 — branch
+Created + checked out feat/cam-builder off the current tip (3b10b49, the V2026.07.21.16 Pause-and-Confirm release). Isolated from main per the ruling.
+
+### STEP 2 — GROUND allocFields (probeToSlot.js:50) + GATE check
+- Signature allocFields(spec, used, varOffset) -> { fields, v }. Per spec entry: idx = nextParam(taken) (the #11xx pool param, added to a LOCAL taken Set), var = '#' + (varOffset + i + 1) (the #-var mirror, POSITIONAL by the spec index i — NOT by idx), field = {key, idx, var, label, units, def, min, max, type}; v[key] = var.
+- 9 callers, all the SAME shape (const { fields, v } = allocFields(SPEC, used, varOffset)): millToSlot.js (POCKET/CIRCLE_POCKET/SURFACE) + probeToSlot.js (CORNER/ZPROBE/EDGE/INSIDE/BOSS/ALIGN). None need rewiring for S0.
+- HIDDEN-STATE GATE: nextParam(used) (slotPack.js:33) is PURE — scans the constant POOL_MIN..POOL_MAX avoiding the passed-in Set, no module-level mutable counter. So allocFields is a pure fn of (spec, used, varOffset). NO gate — a pure superset is clean (matches the plan exactly; no divergence to flag).
+
+### STEP 3 — BUILT allocFieldsWith(spec, used, varOffset, decl) — ADDITIVE, allocFields UNTOUCHED
+decl = { key: { exposed, value } }. A key absent from decl (or exposed !== false) is EXPOSED and allocated EXACTLY as allocFields (same nextParam order, same positional #-var, same field shape, same v[key]='#n'). A BAKED param (exposed === false): NO nextParam, NO field pushed, v[key] = String(value) (the generators interpolate v[key] as a string, so the read + eng lines vanish with the field). Placed it directly after allocFields; allocFields is byte-for-byte unchanged (git diff: probeToSlot.js +29/-0). The bake branch is PRESENT-BUT-UNEXERCISED (no caller uses allocFieldsWith yet) — plan decisions #1 (#2600 re-expose stability) + #2 (exposable/bakeable allow-list) are later slices.
+
+### VERIFIED — my own two-method ACCEPT
+- METHOD 1 (diff): probeToSlot.js +29/-0 (one new fn, allocFields untouched, no caller rewired, no UI) + one new test file. Purely additive.
+- METHOD 2 (equivalence, tests/cam-allocfields-superset.spec.js — a KEEPER): allocFieldsWith deep-equals (JSON) allocFields across 3 real-shaped specs (CORNER/POCKET/ONE) x 3 used-sets (empty, partial, pool-exhausted idx=null) x 3 varOffsets = 27 cases, for BOTH decl-omitted AND all-exposed decl. Result: 27 cases, 0 fails. Plus a present-but-unexercised bake sanity: baking 'fast' drops its field, sets v.fast='250', field count -1, other fields keep their positional #-vars.
+- FULL GATE on the branch: 1372 passed, 4 skipped, 1 failure = blocks-mobile-drawers (a mobile-drawer UI test, UNRELATED to a pure CAM data fn) which PASSES ALONE (14.1s) — a parallel-contention flake, same class as the earlier mobile/pane pixel tests. My zero-caller pure fn cannot affect it.
+
+### STATE: S0 landed on feat/cam-builder. allocFieldsWith is a proven byte-identical superset of allocFields (safety net for the expose/bake concept). Nothing user-visible, no release. NEXT per the plan: S1 (single-op slot + expose/bake one param + inline preview + Add-to-pack), which threads op.exposed/op.baked through generateOp/buildSlotFromOps and needs the opToSlot.js:127 hook too.
+
+---
+
+## 🔨 turn 1037 — CAM Builder S1: GROUND + DESIGN-GATE (NO UI built). Proposal + ASCII mockup + named thread points gated to the advisor. Stayed on feat/cam-builder.
+
+S1 is the first user-visible surface of a GUI-first feature, so per the dispatch: ground + propose + gate the design back (the advisor surfaces the mockup to the user); build nothing. Grounded via 3 parallel Explore agents (CAM Pack Builder UI · the generator pipeline + expose/bake threading · the selected/inserted-op params model).
+
+### GROUNDED (key facts, line numbers in the proposal doc)
+- The CAM Pack Builder (ui/macrosApp.js) ALREADY has a structured op path: slot.ops manifest [{type,variant,values}] + op cards (opCardsHtml L1075) + buildSlotFromOps (L1028) + a per-field value-override model (op.values / FIELD_OVR_COLS L1010) + an INLINE-DOCKABLE preview (createPreviewPanel, currently in a throwaway overlay at simulateSlot L1178). So S1 EXTENDS this path, it does not build new machinery.
+- The generator pipeline: generateOp L1007 -> CAM_GEN[type](used,off,variant) (9 gens) or slotFromOp (opToSlot.js:123, a bespoke inline alloc loop at L127). Baking needs ZERO generator change beyond swapping allocFields -> allocFieldsWith (S0): v[key] becomes the literal at the same interpolation site, the read line + the pendant eng line vanish (both map slot.fields). engLine (slotPack.js:60) is NUMERIC-ONLY (t0/t1) -> enums are a Studio-side concern.
+- The seed source: op = {id,type:'op',opType,label,requires,params,children} (opBuilders.makeOp L96); op.params = the single source of truth; getStack()/window.ddcsGetBlockProgram is global. Blocks-tab selection (selectedId, blocksApp.js:483) is PRIVATE (not exported). getLastOp() (opRecord.js) is global. TWO real gaps = the core of S1: (1) opType != CAM-type (surfacing->surface, middle->inside/boss, contour->none), (2) op.params keys are wizard-PREFIXED (p_w, sf_depth) vs generator keys BARE (w, depth). No such map exists yet -> it must be DECLARED.
+
+### PROPOSED (in the doc: DDCS-Studio/scratchpad/cam-builder-s1-proposal.md)
+- WHERE: an in-panel Build-CAM-slot mode inside the CAM Pack Builder (plan rec 5) — the existing per-slot table stays byte-identical; the new mode renders a SPEC-DRIVEN expose/bake table for one seeded op.
+- The expose/bake FIELD TABLE (the #1 GUI element) = a row per param: Value | Expose/Bake toggle | the resulting #11xx->#2600 slot (or "baked = literal, no pendant"). ASCII mockup in the doc.
+- Persist op.exposed{key:bool}/op.baked{key:val} as NEW siblings of op.values; Build -> a slot-confirm modal (new cam-N vs overwrite) -> push into _camPack.slots (all downstream already wired).
+- Named thread points: decl plumbing through generateOp(1007)/buildSlotFromOps(1033); swap the 9 allocFields sites -> allocFieldsWith; the opToSlot.js:127 inline hook; the NEW declared maps (OPTYPE_TO_CAM + PARAM_ALIAS + NON_BAKEABLE); the new in-panel render.
+
+### GATED to the advisor — 1 safety requirement + 2 forks
+- SAFETY (G1, non-optional): guard/branch params (surfacing IF stepover LE 0; corner sign/seq/probeZ branches) must be NON-BAKEABLE (baking bakes the branch -> wrong G-code). S1 ships a minimal declared per-spec non-bakeable set (render "Expose-only"). This is the safety floor of plan decision #2.
+- FORK 1 (seed source): (A) [rec] a "Seed from program op" picker reading getStack() filtered to CAM types — G3 one-source, matches "extrapolate from the inserted program"; (B) export getSelectedOp() from the private Blocks-tab selection (cross-tab, awkward); (C) getLastOp() only (single op). Recommend A.
+- FORK 2 (enums in S1?): (A) [rec] defer the enum dropdown + int-map to S3 (keep S1 to the numeric acceptance, bake fast); (B) fold enums in now (bigger). Recommend A but flagged (user called the table the #1 GUI element).
+- STRUCTURAL VERDICT: NOT awkward — the in-panel mode fits; seeding is a missing DECLARED map (cheap), not a structural mismatch. No structural gate; awaiting the advisor's ruling on the 2 forks + the safety requirement before any UI build.
+
+No code, no release. NEXT: implement S1 per the advisor's synthesis of the forks.
+
+---
+
+## 🔨 turn 1039 — CAM Builder S1a (branch feat/cam-builder): decl PLUMBING through the slot-gen pipeline. allocFieldsWith is now USED but output is BYTE-IDENTICAL (decl empty = all-exposed). NO UI.
+
+User ruled the S1 forks: seed = pick-op-from-program, guards NON-BAKEABLE, enums folded in. S1 builds in 3 increments — S1a plumbing (this turn), S1b UI, S1c enums. S1a threads a `decl` arg so allocFieldsWith replaces allocFields everywhere, changing NOTHING yet.
+
+### BUILT (all BYTE-IDENTICAL at decl-empty)
+- **generateOp (macrosApp.js:1007)** gains a `decl` arg -> `CAM_GEN[type](used,off,variant,decl)` / `slotFromOp(type,variant,used,off,decl)`.
+- **declFromOp (new helper, macrosApp.js near FIELD_OVR_COLS)**: builds decl={key:{exposed:false,value}} from op.exposed[key]===false + op.baked[key]. BOTH maps are ABSENT until S1b's UI writes them -> decl is {} today -> all-exposed. buildSlotFromOps (L1033) now passes declFromOp(op).
+- **9 generator call sites swapped** allocFields -> allocFieldsWith(SPEC,used,varOffset,decl): probeToSlot {96,208,256,321,395,478} (6 probe gens gained a `_variant, decl` tail — probes ignore the CAM_GEN variant slot), millToSlot {68,104,135} (import switched to allocFieldsWith; the 3 gens gained `, decl` after their dir/arc variant).
+- **opToSlot.js:127** (the GATE-flagged inline loop): converted order.map -> order.forEach with the SAME bake branch, PRESERVING the `order` composition + the holeDia default-override (def = key==='holeDia' ? (bore?12:6) : s.def). slotFromOp signature gained `, decl`. All-exposed reproduces the old order.map exactly (same nextParam order, same positional #var, same field shape, v built inline == v built after). NO gate needed — the holeDia/order preserved cleanly.
+
+### VERIFIED — two-method ACCEPT
+- METHOD 1 (diff): decl threaded through generateOp + buildSlotFromOps; 9 allocFields sites -> allocFieldsWith; opToSlot:127 inline hook added; NO UI, no seed picker, no enum, no new maps.
+- METHOD 2 (before/after byte-identity): a temp capture spec dumped {name,fields,body} for EVERY generator across variants x 3 (used,off) combos — the 9 CAM_GEN gens (mill x dir/arc variants) + slotFromOp drill/bore x 4 patterns + the standalone slot. Ran POST-S1a (185727 bytes) -> stashed the 4 web files -> ran on HEAD (185727 bytes) -> diff = IDENTICAL byte-for-byte. So every existing slot + pack is unchanged. Temp spec removed.
+- FULL GATE on the branch: 1373 passed, 0 failed. (S0's cam-allocfields-superset keeper still green.)
+
+### STATE: the expose/bake declaration now flows end-to-end (op.exposed/op.baked -> declFromOp -> generateOp -> allocFieldsWith / slotFromOp's inline hook) but is INERT (empty today) -> byte-identical. Ready for S1b to write op.exposed/op.baked from the UI. NEXT: S1b — the in-panel Build-CAM-slot mode (seed-from-program-op picker + the expose/bake field table + non-bakeable guard params + inline preview + Build-to-slot modal). No code user-visible yet, no release.
+
+---
+
+## 🔨 turn 1041 — CAM Builder S1b (branch feat/cam-builder): the DECLARED op-to-CAM-spec maps + pure seedFromOp. DATA layer, no UI. Clean 1:1 core BUILT + tested; the variant forks GATED.
+
+Grounded via an Explore agent (the crux: op.params key names — do NOT invent). NEW FILE web/data/opCamMap.js: OPTYPE_TO_CAM, PARAM_ALIAS, NON_BAKEABLE, camTypeOf, seedFromOp, isCamableType.
+
+### GROUNDED (the correctness-critical facts)
+- **op.params keys are BARE** (depth, toolDia, w, ax, dist, f_fast, probeSeq, travelDist, scanDepth, x0/y0…) — the p_/sf_/c_/m_/d_ prefixes are DOM field ids + reconciler RETURNS only, NOT the stored params. So PARAM_ALIAS shrank to just the genuine RENAMES per CAM type (grounded from op.params bare keys + the generator SPECs): corner {seq<-probeSeq, maxProbe<-dist, travel<-travelDist, scan<-scanDepth, fast<-f_fast, slow<-f_slow}; edge {maxProbe<-dist, fast<-f_fast, slow<-f_slow}; drill/bore {posX<-x0, posY<-y0}; pocket/surface/slot = identity.
+- **NON_BAKEABLE (the SAFETY floor)** from grepping every IF line: corner [corner,seq,probeZ,wcs], edge [axis,dir,wcs], surface [stepover,stepdown,toolDia,clearance] (the IF x LE 0 GOTO-error guards), + wcs on every probe (wcsBase branches). Branch SELECTORS + validity-guard drivers are Expose-only; loop bounds (depth/count in WHILE/IF-THEN) stay bakeable (a fixed count still loops). pocket/cpocket guards are on COMPUTED #vars (geometry) -> left [] with a flag (baking geometry is safe: the guard still fires on the literals).
+
+### BUILT (clean 1:1 core, tested)
+- seedFromOp(op) PURE: camTypeOf -> genFieldsFor (reads the generator's OWN field keys, one-source, no SPEC duplication) -> per field {key, value (op.params via alias, else the generator default), exposed:true, bakeable (not NON_BAKEABLE)}. Enum values (corner/wcs/axis/dir/seq) pulled RAW (strings) -> the enum<->int conversion is S1d.
+- The clean 1:1: surfacing->surface, corner->corner, edge->edge, slot->slot, pocket(shape=rect)->pocket, drill(method=peck, pattern in circle/grid/line/rect)->drill.
+
+### GATED (variant-dependent / non-1:1 -> camTypeOf returns {unsupported}, no guess) — these need the advisor's ruling
+1. middle -> inside (featureType != 'boss') OR boss (featureType === 'boss'). GROUNDED disambiguation: middleWizard.js:41 `featureType === 'boss' ? 'boss' : 'pocket'`; every boss-only arm gated by featBossOnly === featureType==='boss'. (Also: middle has circular/twoAxis/findBoth modifiers that may affect the seed.)
+2. pocket shape 'circle' -> cpocket (circlePocketSlot). shape polygon/ellipse -> NO generator (unsupported).
+3. drill method 'helical' -> bore (slotFromOp 'bore'); drill pattern 'single' -> NO slotFromOp pattern (only circle/grid/line/rect). NB there is NO standalone 'bore' opType — bore is drill+method:helical.
+4. contour -> excluded (NO CAM generator).
+
+### VALUE-SEMANTIC notes for the advisor (surfaced, not guessed)
+- ENUM values seeded RAW (op corner='FR', wcs='G55', axis='X') — S1d converts to the pendant ints (FR->2, etc.). S1b asserts the raw aliased value.
+- pocket/surface `stepover` (absolute mm) has NO op source — the op stores stepoverPct (%). So stepover is intentionally UNSEEDED (shows the generator default) until a toolDia*%/100 derivation lands. Flag: fold the derivation into a later slice or S1c.
+
+### VERIFIED — two-method ACCEPT
+- METHOD 1 (diff): 3 declared maps + camTypeOf + pure seedFromOp in ONE new data file; grounded keys; no UI, no caller wired.
+- METHOD 2 (assertion, tests/cam-op-seed.spec.js KEEPER): seed pocket(rect)/surfacing/corner/drill(peck,circle)/slot -> right camType; aliased values (maxProbe<-dist=80, travel<-travelDist=40, fast<-f_fast=250, posX<-x0=10, identities); stepover unseeded -> default 2.4; all exposed; guard params non-bakeable (corner/seq false, retract true; surface stepdown false, depth true); contour/middle/pocket-circle/drill-helical all {unsupported} with the reason.
+- FULL GATE on the branch: 1374 passed, 0 failed.
+
+### STATE: the DATA layer maps a program op -> a CAM seed, verified by assertion BEFORE any UI. Clean 1:1 works; the 3 variant forks + contour + the 2 value-semantic gaps are surfaced/gated for the advisor. NEXT (pending the ruling): wire the gated arms, then S1c (the in-panel authoring UI consuming seedFromOp), then S1d (enums). No UI, no release.
+
+---
+
+## 🔨 turn 1043 — CAM Builder S1b-wire (branch feat/cam-builder): finalized opCamMap.js per the advisor's rulings. The 4 variant forks ENCODED, stepover DERIVED one-source, NON_BAKEABLE unchanged. DATA layer, no UI.
+
+Applied the t1042 rulings; grounded the 2 things flagged "do not assume" (the middle modifiers + the real stepover formula).
+
+### GROUNDED (do not guess)
+- **CAM inside/boss generators are FIXED BOTH-AXIS centre probes** (insideCentreSlot probes ±X, re-centres X via G53, probes ±Y, writes both centres + reports spans/roundness; bossCentreSlot the same with repositions). NO single-axis variant. The middle op (middleWizard.js:40-49) has featureType (boss/pocket, default pocket), axis (single primary), twoAxis||findBoth (default FALSE), circular (default false, adds re-centre + diameter — which the CAM slot ALREADY does, "harmless for a rectangle"). So the covered config = BOTH-AXIS; a single-axis middle would probe an axis the operator didn't intend -> unsupported.
+- **The real stepoverPct->mm formula** = pocketfill.js:40 `stepoverMm(p) = max(0.2, max(0.1, toolDia) * stepoverPct / 100)` (EXPORTED — one-source). surfacingWizard.js:24-27 computes the identical formula inline (absent-param defaults differ, 12/60 vs 6/40, but unreachable when the op provides toolDia+pct). Imported stepoverMm; the test verifies surface stepover == the ACTUAL surfacingStack value (not just the formula).
+
+### ENCODED (rulings 1-4) in camTypeOf
+- pocket shape circle -> cpocket; polygon/ellipse unsupported.
+- drill pattern single -> unsupported (known S1 gap, flagged); else method helical -> bore / peck -> drill.
+- middle -> boss (featureType==boss) else inside, ONLY when twoAxis||findBoth; single-axis -> unsupported (never a wrong slot). PARAM_ALIAS inside/boss {maxProbe<-dist, fast<-f_fast, slow<-f_slow}.
+- contour unsupported. SUPPORTED_OPTYPES now includes middle.
+
+### DERIVED (ruling 6) + CONFIRMED (5,7)
+- DERIVE[pocket|cpocket|surface].stepover = stepoverMm(op.params) — mirrors the wizard one-source; the seed now fills stepover instead of falling to the generator default.
+- Enum values still seeded RAW (ruling 5). NON_BAKEABLE UNCHANGED (ruling 7 — pocket/cpocket geometry stays bakeable, the operand-vs-selector refinement deferred to S3; safety not loosened).
+
+### VERIFIED — two-method ACCEPT
+- METHOD 1 (diff): 4 forks encoded, unsupported flagged, stepover imported+derived, NON_BAKEABLE unchanged.
+- METHOD 2 (assertion, cam-op-seed.spec.js): camType map == {pocket,surface,corner,drill,slot, middleBoss:boss, middleInside:inside, pocketCircle:cpocket, drillHelical:bore}; unsupported (middle single-axis / polygon / contour / drill single); aliased values; DERIVED surface stepover == the real surfacingStack value (9.6 = 16*60/100) AND pocket stepover == stepoverMm(op); guards non-bakeable.
+- FULL GATE on the branch: 1374 passed, 0 failed.
+
+### STATE: opCamMap.js is the finalized DATA bridge (op -> CAM seed), all forks resolved + the stepover derivation one-source-verified against the wizard. NEXT: S1c — the in-panel authoring UI consuming seedFromOp (seed-from-program-op picker + the expose/bake field table + inline preview + Build-to-slot modal). No UI, no release this turn.
+
+---
+
+## 🔨 turn 1045 — CAM Builder S1c (branch feat/cam-builder): the AUTHORING UI, first visible surface. Reworked mid-turn per a user amendment: ONE reusable modal surface, THREE triggers (op-card door + CAM-tab door shipped; toolbar door gated). VIEWED screenshot matches.
+
+USER (mid-turn, "where do we put the button" → "as you [wish], we might move it later"): placed +Build CAM slot beside +Add slot (A), movable later.
+
+AMENDMENT (advisor, 2 msgs, the 2nd superseded): the entry point moved from a CAM-tab in-panel picker to ONE reusable authoring surface opened as a MODAL, with THREE triggers (DRY — one component): (1) a per-op CAM action on each OP CARD (pre-seeded from THAT op, picker hidden) — the PRIMARY; (2) an editor-toolbar button (picker shown); (3) the CAM-Pack-Builder button (picker shown). Escape hatch: if it balloons, ship the surface + the op-card door, gate the toolbar/CAM-tab triggers.
+
+### RECONCILED (built the surface first door-3-in-panel, then MOVED per the amendment — reused the table/preview/build)
+- **Reusable MODAL surface**: openCamAuthoring(seedOp?) opens an overlay (document.body) with the same expose/bake table + toggles + inline preview + Build-to-confirm-modal. seedOp given → pre-seed via cbmSeedFromOp + hide the picker (seedLocked "From op X → camType"); no seedOp → show the seed picker (getStack CAM-able ops). Exposed as window.ddcsOpenCamAuthoring; window.ddcsCamTypeOf for the ability check.
+- **Door 1 (op card)** — opContextMenu.showOpMenu (the shared Edit/Duplicate/Delete menu, reused by the editor/Blocks/Blockly): added "▸ Build CAM slot" for CAM-able op TYPES (isCamableType), greyed with the reason when the op's variant is unsupported (e.g. middle single-axis), absent for non-CAM types. Resolves the full op (params) via getStack by id; ensures macrosApp init (idempotent _wired) then opens the modal seeded from THAT op.
+- **Door 3 (CAM tab)** — #cam_build_slot now opens the SAME modal (picker). Legacy pack list / per-slot table / blank op picker UNTOUCHED.
+- **Door 2 (editor toolbar)** — GATED as the trivial follow-on (once the global exists it's a one-line toolbar button); not built this turn per the escape hatch.
+
+### KEY DETAILS
+- Build reuses buildSlotFromOps (op manifest {type:camType, variant, values, exposed, baked}) so all-exposed == the generator (byte-safe); Bake sets op.exposed[key]=false + op.baked[key]=value → declFromOp → allocFieldsWith drops the read + eng line + inlines the literal. Numeric values seeded (enum strings are S1d); stepover DERIVED via pocketfill.stepoverMm (shows 3.6 = 8*45/100 live in the table). Preview docks createPreviewPanel inline (not the throwaway overlay). Build-to-slot confirm modal (new camN / overwrite).
+- BUG fixed: the modal is on document.body but `q` is #macros-app-root-scoped → q('cbm_table') returned null → empty table. Switched the modal's element lookups to document.getElementById.
+
+### VERIFIED — two-method ACCEPT (VIEWED)
+- METHOD 1 (diff): one reusable modal surface consuming seedFromOp; op-card door in the shared menu; exposed/baked persisted; legacy pack view untouched.
+- METHOD 2 (VIEWED screenshot + driven flow, tests/cam-build-mode.spec.js): (a) the op-card action is enabled for pocket, greyed for a single-axis middle, ABSENT for contour; (b) the op-card door opens the modal pre-seeded ("From op Pocket → pocket", no picker), feed=1500, stepover=3.6; (c) Simulate docks + renders the 3D; (d) all-exposed Build keeps the Feed read line + the manifest is all-exposed; (e) baking Feed drops its read + eng line, inlines 1500, records op.baked.feed=1500. I VIEWED the screenshot: it matches the blessed mockup as a MODAL over the app (op-card door). 
+- FULL GATE on the branch: 1376 passed, 0 failed (legacy + editor + all CAM tests).
+
+### STATE: S1c shipped doors 1+3 of the reusable CAM authoring modal; door 2 (editor toolbar) gated as a trivial follow-on. Screenshot GATED to the advisor (no release). NEXT: door 2 (toolbar), then S1d (enum dropdowns + the enum<->int mapping).
+
+---
+
+## 🔨 turn 1047 — CAM Builder S1d (branch feat/cam-builder): ENUM DROPDOWNS + enum-to-int pendant mapping, one-sourced + grounded. + door 2 (editor toolbar). VIEWED screenshot matches.
+
+The user's #1 GUI element: enum params (corner/WCS/probe-Z/wall-order/axis/dir) rendered as plain numbers in S1c; S1d makes them friendly DROPDOWNS with a clean enum<->int mapping.
+
+### GROUNDED (one-source, do NOT invent — via an Explore agent)
+- The friendly LABELS + program-op VALUES come from the wizard defs: cornerData.js:186/190/191 (corner Front-Left/Front-Right/Back-Left/Back-Right = FL/FR/BL/BR; probeSeq "Y then X"/"X then Y" = YX/XY; wcs Active/G54..G59), wizardOptions.WCS_OPTIONS, index.html p_axis (X/Y) / p_dir (pos/neg). probeZ is a BOOL (No/Yes).
+- The CAM INT comes from the macro branch convention: probeToSlot.js field legends ("1FL 2FR 3BL 4BR", "0act 1G54.."), CONFIRMED against the macro bodies (IF corner EQ 2 THEN #90=0-1 = FR flips X; IF seq EQ 1 GOTO = XY; IF axis EQ 1 = Y; IF dir EQ 1 = neg). KEY: the wizard value ORDER matches the CAM int order positionally in every case (corner 1-based, the rest 0-based).
+
+### BUILT
+- opCamMap.ENUM_OPTIONS (keyed by field key, shared): {label, value:int, op:opString}. seedFromOp maps the op's string/bool value -> the CAM int (op match, else value match, else the generator default int) and attaches type:'enum' + enum:options to the seed field. FIXES the S1c "enum seeded as a raw string" gap (now an int).
+- renderCbmTable: enum fields render a <select> of friendly labels (selected = the int); numeric fields stay number inputs. The baked slot cell shows "baked = <label> (<int>)". attachCbmListeners: a SELECT.cbm-val change stores the int (+ syncs any baked literal) + re-renders. Enum guards (all current enums are in NON_BAKEABLE) show the dropdown but Bake greyed. The eng label already DOCUMENTS the options (the CAM field label carries "1FL 2FR 3BL 4BR") -> engLine unchanged.
+- NOTE: strategy/direction (pocket/surfacing) are VARIANTS, not CAM fields -> not table enums (correctly excluded).
+- DOOR 2 (editor toolbar): a floating "+ CAM slot" button (#editor-cam-btn, index.html near the Transform button) -> window.ddcsBuildCamSlot (globalFunctions.js) which ensures macrosApp init (idempotent) then opens the authoring modal with the picker.
+
+### VERIFIED — two-method ACCEPT (VIEWED)
+- METHOD 1 (diff): ENUM_OPTIONS + seedFromOp enum-int (one-sourced/grounded) + the dropdown render + door 2; macrosApp diff clean (22/5 - last turn's LF normalization prevented recurrence).
+- METHOD 2 (VIEWED screenshot cam-s1d-enum.png + tests/cam-build-mode.spec.js): I viewed it - a seeded CORNER op shows dropdowns Corner=Front-Right(2), WCS=G55(2), Probe-Z=Yes(1), Wall-order=X then Y(1); the guard enums have Bake GREYED; numeric fields (Max probe 80, etc.) stay inputs; the explainer notes the pendant stores the number. Tests assert: enum dropdowns + int mapping + guard-Bake-disabled + numeric-unchanged; the built slot seeds corner=2 (behaves identically to the wizard's FR); door 2 opens the modal with the picker; the pocket-numeric flow + Feed bake still pass. Updated cam-op-seed: corner/seq now assert the ints (2/1), not raw strings.
+- FULL GATE on the branch: 1377 passed, 0 failed.
+
+### STATE: CAM Builder v1 is FEATURE-COMPLETE on feat/cam-builder - S0 (superset) -> S1a (plumbing) -> S1b (op->CAM maps + seed) -> S1c (reusable authoring modal, 3 doors) -> S1d (enum dropdowns). All 3 entry doors live (op card, editor toolbar, CAM tab). Screenshot GATED to the advisor. Per the advisor's plan: they add .gitattributes eol=lf + MERGE v1 to main. No release from me.
+
+---
+
+## 🔨 turn 1047 (cont.) — S1d AMENDMENT incorporated (2 mid-turn amends, INCORPORATED before pass): SAFETY RULING REVERSED — CHOICE params are BAKEABLE; screenshot now demos corner EXPOSED vs BAKED.
+
+The advisor (user + advisor-verified) reversed the S1b/S1c/S1d NON_BAKEABLE ruling: CHOICE params (corner/wcs/axis/seq/probeZ/dir) ARE bakeable. Motive (user): authors bake a choice to make a single-purpose, clearly-illustrated slot (four clean FL/BL/BR/FR slots vs one ambiguous icon).
+
+### NEW SAFETY MODEL (replaces the blanket NON_BAKEABLE)
+- Every CAM choice param appears only in IF CONDITIONS, arithmetic, or #var ASSIGNMENTS — NEVER as a GOTO/label TARGET (the GOTO targets are fixed literals N1/N10/N20/…). So a baked valid literal CONSTANT-FOLDS to valid G-code (corner=1 -> `IF 1 EQ 2 THEN #90=0-1` = an always-false no-op; the signs still resolve). VERIFIED per generator.
+- Valid-by-construction: the enum dropdown / numeric min-max CONSTRAINS the baked value to valid options, AND the live preview shows the baked slot before save. So the dropdown serves BOTH expose and bake.
+- NON_BAKEABLE now = ONLY surface's numeric validity guards [stepover, stepdown, toolDia, clearance] (kept Expose-only for now per the advisor; they'd fold safely too — flagged). All probe/mill choice + numeric params are bakeable.
+
+### VERIFIED (2-method, VIEWED)
+- METHOD 1 (diff): NON_BAKEABLE reduced to surface's 4 numeric guards; the enum dropdown already served both expose+bake (S1d) so no render change needed.
+- METHOD 2: (a) NEW bake-safety test (cam-op-seed) — bakes corner/seq/wcs/probeZ (corner gen) + axis/dir (edge gen) to valid literals and asserts the read line vanishes, the literal CONSTANT-FOLDS into the IF/assignment (IF 1 EQ 2, IF 1 EQ 1 GOTO, #71=2, …), the macro still ends M30, and the GOTO-target labels survive. (b) cam-build-mode S1d: choice enums now Bake-ENABLED; BAKING corner in the modal inlines int 2 (IF 2 EQ 2), drops its read + eng row, records op.baked.corner=2. (c) VIEWED screenshot cam-s1d-enum.png — corner BAKED ("baked = Front-Right (2)", the row leaves the pendant + frees its param so WCS shifts to #2600) while WCS/Probe-Z/Wall-order stay EXPOSED dropdowns — demoing BOTH on corner exactly as the user asked.
+- FULL GATE on the branch: 1378 passed, 0 failed.
+
+### STATE: CAM Builder v1 feature-complete + the choice-param bake model corrected. Choice params bakeable (dropdown-picked literal inlines, valid-by-construction); numeric surface guards kept Expose-only for now (flagged as trivially bakeable too). Screenshot GATED to the advisor. Per plan: advisor adds .gitattributes eol=lf + MERGES v1 to main. No release from me.
+
+---
+
+## 🔨 turn 1049 — CAM Builder FIX #1 CRITICAL: data-op TWIN recognition + seeding. Real programs use user_*_data twins; the CAM Builder now recognizes + seeds them. GROUND-FIRST (2 Explore agents + a runtime dump).
+
+ROOT CAUSE (advisor+user confirmed): camTypeOf/OPTYPE_TO_CAM keyed on the BARE built-in optypes (surfacing/pocket/corner), but real ops are DATA-OP TWINS (op.opType = user_surfacing_data, etc.) -> every real twin fell through to unsupported. S1b-S1d tests passed only because they used BUILT-IN optypes. The Builder recognized ~nothing in a real program.
+
+### GROUNDED (do NOT guess)
+- **The declared bridge**: no twin def carries a base/CAM ref, BUT wizardLibrary.js BUILTINS declares `opensAs` (built-in -> twin) alongside each entry's `type` (+ variant). So inverting opensAs->type is the ONE-SOURCE bridge (can't drift), mirroring the existing builtinLabelForTwin. Added `builtinTypeForTwin(opType)` -> {type, variant}.
+- **Twin param shape (runtime-dumped all 8 twins)**: op.params are keyed by the binding PARAM name (originX, NOT the socket key offX) -> the offX worry doesn't bite. Verdict per twin: pocket/cpocket/edge/drill/slot/middle seed cleanly once the opType is normalized; surfacing DIVERGES (a FLAT `stepover`, no stepoverPct/toolDia/clearance); corner DIVERGES (probeZFirst not probeZ); bore resolves via the inverted variant (the twin has no `method`). NOT a wholesale rework - targeted.
+
+### BUILT (targeted, per the grounding = not the "bigger rework" that would gate)
+- **opCamMap.baseOf(opType)** normalizes a twin -> {baseType, variant} via the bridge; a built-in passes through. camTypeOf + isCamableType use it -> twins are recognized; the built-in path is unchanged.
+- **drill/bore**: camType 'bore' when variant==='bore' (twin user_bore_data) OR method==='helical' (built-in). Handles both.
+- **surfacing FLAT stepover**: DERIVE.surface.stepover uses params.stepover if present (twin), else stepoverMm (built-in) - mirrors surfacingWizard.js:27 one-source.
+- **corner probeZ**: PARAM_ALIAS supports an ARRAY of candidate keys; corner.probeZ = ['probeZ','probeZFirst'] (built-in vs twin). seedFromOp readParam() tries each.
+
+### DIVERGENCE HANDLING (surfaced for review - the twin doesn't EXPOSE these, so seeding the generator default matches the twin's actual behaviour): surfacing twin toolDia/clearance, drill twin holeDia/clearance, bore/slot twin clearance, middle twin safeZ -> the generator DEFAULT (the twin holds them at default, so this is correct, not lossy).
+
+### VERIFIED - two-method ACCEPT on TWINS (not built-ins)
+- METHOD 1 (diff): camTypeOf/seedFromOp recognize twin optypes via the DECLARED bridge; params seeded right (twin-aware surfacing/corner/bore); built-in path still works.
+- METHOD 2 (NEW twin tests): cam-op-seed 'S1 fix' - user_surfacing_data/pocket/corner/bore are CAM-able (contour twin NOT); camType surf->surface, pocket->pocket, corner->corner, bore->bore; surfacing twin uses its flat stepover 9.6; pocket twin derives 3.6; corner twin reads probeZ from probeZFirst (Yes->1) + enums->ints (FR->2, G55->2); bore twin via variant, posX<-x0. cam-build-mode 'FIX' - a real user_surfacing_data twin opens the modal SEEDED (table renders, stepover 9.6). The built-in S1c/S1d + bake-safety tests still pass (built-in path intact).
+- FULL GATE on the branch: 1381 passed, 0 failed.
+
+### STATE: FIX #1 done - the CAM Builder recognizes + seeds the DATA-OP TWINS real programs are built from (was the #1 blocker to fully-fledged). Built-in path preserved. NEXT (architect-scoped): multi-op / icon / table-gui / preview / empty-state. Do NOT merge v1 yet (this fix was the blocker). No release from me.
+
+---
+
+## 🔨 turn 1051 — CAM FIX #1 HARDENING (from the advisor's 4-lens adversarial verification). Test coverage for all 8 twins + the drill/bore PLACEMENT geometric fix. GROUND-FIRST (Explore agent).
+
+The advisor verified FIX #1 SOLID but flagged: (1) only 4/8 CAM-able twins driven; (2) a real geometric placement bug; (3) acceptable divergences to stop over-asserting; (4) capability gaps to surface not fix.
+
+### (2) DRILL/BORE PLACEMENT FIX (grounded, was a real geometric bug)
+- ROOT: PARAM_ALIAS drill/bore posX<-x0, posY<-y0 sourced the pattern-LOCAL origin (x0/y0, default 0). The drill/bore CAM slot runs at the WCS origin with posX/posY as the pattern anchor + has NO separate #20/#21 offset (unlike pocket), so it must carry the PLACEMENT. A twin placed at originX=100 seeded posX=0 -> holes at the WCS origin, not the op location.
+- GROUNDED (agent): the placement (originX/originY -> PlaceOnStock offX/offY) is a rigid translate; x0/y0 STRUCTURALLY CANCELS through the placement datum-corner attach (final X = originX + pattern-offset). So the correct source is originX ALONE (never originX+x0). The built-in drill force-sets x0===originX (drillView), so posX<-x0 accidentally worked there; the TWIN keeps them independent (x0=0) -> the bug is twin-specific = what real programs use.
+- FIX: PARAM_ALIAS drill/bore posX: ['originX','x0'], posY: ['originY','y0'] (readParam first-present). originX wins for BOTH built-in (===x0) + twin (the placement); falls back to x0 only if originX absent. No gate needed (posX/posY IS the placement channel).
+- CAVEAT FLAGGED (not fixed - genuinely ambiguous): a CIRCLE pattern's slot posX is the CENTRE while placement attaches the bbox min corner, so a circle MAY differ by dia/2 - BUT the built-in centres the circle at originX (cx=originX), so the dia/2 is not clearly right; the x0->originX fix is CERTAIN, the circle refinement is deferred to the advisor.
+
+### (1) TEST COVERAGE - all 8 CAM-able twins now driven through seedFromOp against REAL twin values
+NEW test seeds user_edge_data (axis Y->1, dir neg->1, wcs G56->3, maxProbe<-dist 60), user_slot_data (ax/bx/depth/feed identity), user_drill_data (PLACEMENT posX=100/posY=50, cols/depth), user_middle_data BOTH featureType pocket->inside AND boss->boss (wcs enum, maxProbe<-dist). Plus the existing surfacing/pocket/corner/bore. The bore twin fixture made realistic (grid, originX=40 -> posX=40, not x0). This closes the exact "tested-the-built-in-not-the-twin" gap that let the original bug through.
+
+### (3)+(4) ACCEPTABLE / KNOWN-LIMIT (do NOT fix, per the advisor)
+- boss safeZ 15-vs-twin-10 (vestigial + safer), blank rpm 8000, toolDia/holeDia/clearance/safeZ guard-only-or-unexposed -> the generator default (= the twin's own default). My tests assert SEEDED values only, not defaults == twin.
+- Capability gaps (slot->tool-width centreline, pocket ignores strategy, bore ignores ramp) = Universal-CAM known limits.
+
+### VERIFIED - two-method ACCEPT
+- METHOD 1 (diff): coverage for all 8 twins + the placement fix sources the real position (originX); built-in path identical.
+- METHOD 2: a drill/bore twin placed OFF-ORIGIN (originX=100/40) seeds posX/posY == the placed position, NOT 0; all 8 twins recognize + seed correct camTypes + values; the built-in S1c/S1d + FIX #1 twin tests still pass.
+- FULL GATE on the branch: 1382 passed, 0 failed.
+
+### STATE: FIX #1 hardened - all 8 CAM-able twins have real-value seed coverage + drill/bore holes now land at the op's placed position. Circle dia/2 refinement flagged to the advisor. NEXT: the finish slices per cam-builder-finish-plan.md (multi-op / icon / table-gui / preview / empty-state). No release from me.
+
+---
+
+## 🔨 turn 1053 — CAM FINISH S-A: PROBE-PREVIEW fix (Gap 4). The empty/black preview on probe CAM slots now shows the stock + probe path. GROUND-FIRST.
+
+ROOT CAUSE (advisor-diagnosed, confirmed): the two CAM preview builders (cbmSimulate, simulateSlot) call createPreviewPanel BARE (no getStock/getStart). A probe slot's macro is INCREMENTAL (G31 from the operator start) -> with no stock/start the engine clamps the first probe to zero + traces from origin = empty/black. Pocket/mill emit absolute paths that self-frame, so they were fine.
+
+### GROUNDED
+- createPreviewPanel accepts getStock/getStart callbacks (mirrored from wizardManager.js:497-518). previewStock() = opts.getStock() || the global -> a per-op override with NO settings.stock mutation (createPreviewPanel.js:155). getStartPos() reads getStart (probes test from it).
+- Stock object shape: { x, y, z, shape, datum, pin, show }. datum = a 3-char n/c/p code; the Z char 'p' = top datum (z=0 at the surface). isProbe = /\bG31\b/.
+
+### BUILT (F4a ruling)
+- probePreviewOpts(slot, macro): for a PROBE macro (G31) returns { getStock, getStart }; else {} (byte-identical). Wired into BOTH createPreviewPanel calls (cbmSimulate + simulateSlot) via a spread.
+- probePreviewStock: a CENTERED top-datum box (datum 'ccp'), size XY from the slot's maxProbe/travel field default (F4b), fallback 120, z 25 (the 120x120x25 fallback). probePreviewStart: {0,0, above the top} (the safeZ field default or 10) so the incremental probe travels toward the stock. Preview-only, NO global mutation.
+
+### VERIFIED - two-method ACCEPT (VIEWED)
+- METHOD 1 (diff): both CAM preview builders pass synthesized stock+start ONLY for probes (G31); no settings.stock mutation; non-probe passes neither (byte-identical).
+- METHOD 2 (VIEWED, tests/cam-probe-preview.spec.js): I viewed cam-s-a-probe.png - the corner/probe preview NOW renders a green stock box + the probe tool descending with a red probe path + the G31 status line + the DRO ticking (was black). cam-s-a-pocket.png - the pocket preview UNCHANGED (global stock, self-framed, "No drawable moves" same as before). The test asserts the branch fires only for G31 macros (corner has G31, pocket does not).
+- FULL GATE on the branch: 1382 passed, 0 failed.
+
+### STATE: probe CAM slot previews now show the stock + probe path instead of black; non-probe previews byte-identical. Screenshot GATED to the advisor. NEXT: S-B/S-C multi-op + the new seed model (auto-import all CAM-able ops, drop the inserted-op dropdown, op-card direct, library-add for op TYPES, group-by-op) per cam-builder-finish-plan.md. No release from me.
+
+---
+
+## 🔨 turn 1055 — CAM FINISH S-C: MULTI-OP + the NEW SEED MODEL + group-by-op (the headline: import a whole program into ONE slot). Shipped the core; library-add + reorder/remove GATED as a follow-on (escape hatch).
+
+Per cam-builder-finish-plan.md Gap 1 + Gap 3.
+
+### BUILT
+- **DATA MODEL**: _authoring.ops = an ARRAY of {opType, camType, variant, fields, values, exposed, baked, label} (was a single-op flat shape). makeAuthOp(op) = seedFromOp -> an authoring op (null if unsupported). toManifest(a) -> the op-manifest entry. cbmPreviewSlot/cbmBuild map _authoring.ops. buildSlotFromOps already composes multi-op (allocates params around siblings, tags f._op) - NO generator/slotPack change.
+- **NEW SEED MODEL - the dropdown is DROPPED**. The GLOBAL doors (editor-toolbar / CAM-tab) AUTO-IMPORT every CAM-able op from ddcsGetBlockProgram (filtered by camTypeOf.camType, in program order) into _authoring.ops; the OP-CARD door seeds that ONE op (single). No re-select-of-inserted-ops dropdown.
+- **GROUP-BY-OP table**: renderCbmTable renders a SECTION per op (a header "N. label -> camType" + that op's field table). The row + eb + val controls carry data-oi + data-fkey; the value/toggle handlers key by (oi, key). Pendant slots are allocated UNIQUELY across ops (buildSlotFromOps).
+- **EMPTY-STATE** (subsumes S-B): 0 CAM-able ops -> a clear message ("No CAM-able ops ... supports Pocket / Surface / Probe corner-edge / Slot / Drill-Bore / Probe centre") + each present-but-unsupported op's reason. NO greyed dropdown, Build disabled.
+
+### GATED as a follow-on (per the escape hatch - too much for one turn otherwise): library/catalog add-more-op-TYPES + per-op reorder/remove. Shipped: the multi-op data model + auto-import + group-by-op + build + empty-state.
+
+### VERIFIED - two-method ACCEPT (VIEWED)
+- METHOD 1 (diff): _authoring.ops[], cbmBuild maps toManifest, the dropdown REMOVED, auto-import wired, group-by-op render, empty-state; the single-op op-card S1c/S1d path intact (op-card door -> 1 op).
+- METHOD 2 (VIEWED cam-s-c-multiop.png + tests): I viewed it - a program of Surfacing+Drill+Probe-corner (+ a contour skipped) AUTO-IMPORTED as a group-by-op table, EACH op a section (Drill #1111-1121, Probe-corner #1122-1133 - params allocated around siblings), the inline preview renders the probe stock, one Build -> ONE slot composing all 3. Tests assert: 3 groups (contour skipped), slot.ops == [surface,drill,corner], slot.fields span all 3 ops (group-by-op), door-2 auto-imports with NO picker, empty-state names the supported ops + the contour reason, the op-card door still seeds a single op, all the S1c/S1d/S1d-bake/probe-preview tests still pass.
+- FULL GATE on the branch: 1384 passed; the lone red (blocks-live-form form-writeback, a STUDIO-editor subsystem unrelated to CAM) PASSES ALONE (6/6) - a parallel-contention flake.
+
+### STATE: the headline works - import a whole program into ONE composed CAM slot (auto-import, group-by-op, empty-state). Screenshot GATED to the advisor. GATED follow-on: library-add op TYPES + per-op reorder/remove. NEXT: S-D table polish + S-E icon. No release from me.
+
+---
+
+## 🔨 turn 1057 — UNIVERSAL CAM U0: prove stackToSlot end-to-end (ENGINE ONLY, zero UI). A user-op block stack → a CAM slot via the existing emit path. GROUND-FIRST (Explore agent).
+
+Per cam-universal-plan.md (sub-stack composition builds on this). THE CRUX is ~90% pre-built: wizards/ops/util.js val() passes a #var/[expr] string THROUGH to G-code verbatim. Mechanism (ruled): bind-to-locate + val()-to-survive, NO emitter rewrite.
+
+### GROUNDED (Explore agent, exhaustive)
+- val() (util.js:17): a string with #/[ returns verbatim, else rounded. CRITICAL: the #var SURVIVES resolveParams -> evalExpr('#31') THROWS -> the catch keeps '#31' -> reaches val() -> '#31'. Confirmed end-to-end.
+- feedBlock (feed.js): socket `rate` -> F{val(rate)}. moveBlock (move.js): sockets x/y/z/feed/mode; cut -> G1 ...Z{val(z)} F{val(feed)}. Z is a SINGLE val (no depth loop).
+- Minimal wrap: [user_root{ uiChildren:[param_group], children:[feed, move] }] -> flatten 0 root/1 group/2 feed/3 move. NO base (progstart/progend) needed - emitMapped does no auto-framing; user_root/param_group are transparent at emit.
+- instantiate(def, params) (userOps.js:428, now EXPORTED) returns the pruned stack with blk.params[b.key] = params[b.param]; emitMapped(stack, activeDialectOpts()).text.
+
+### BUILT
+- EXPORTED instantiate from userOps.js (the ruled path; additive, no behaviour change).
+- NEW web/data/stackToSlot.js: stackToSlot(def, decl, used, varOffset): (1) per EXPOSED binding (decl.exposed===true) allocate a 11xx param (slotPack.nextParam) + a #2600 mirror + a field (same shape/contract as allocFieldsWith, so multi-op used/varOffset composition is unchanged) + set the op param to its LOCAL #var; (2) per BAKED binding the literal; others -> the binding default; (3) instantiate(def, tokenParams) lands each token at its socket; (4) emitMapped -> the #var rides val() to F#/Z#; (5) PREPEND one canonical readLine per field (probeToSlot.readLine, generator parity - the LOCAL #var reads the #2600 mirror, not the raw mirror at the socket). Returns {name, fields, body} - the SAME shape every generator returns. NO UI, NO generateOp change.
+
+### VERIFIED - two-method ACCEPT
+- METHOD 1 (diff): a new PURE stackToSlot.js injecting a local #var at the bound socket via instantiate, prepending readLines, returning {name,fields,body}, reusing slotPack.nextParam; no UI; no generateOp change.
+- METHOD 2 (tests/cam-stack-to-slot.spec.js): built a minimal custom op = a Feed atom + a Move cut. Case A (expose FEED + a single-plunge Z, bake X/Y + the cut feed): 2 fields (feed #1100->#2600 var #1, z #1101->#2601 var #2); the body has F#1 + Z#2 (the #vars ride val), X10/Y20/F500 (baked literals), and the PREPENDED reads #1=#2600 ;Feed + #2=#2601 ;Plunge Z; the #2600->#1->F#1 chain is asserted (the pendant's #2600 controls the feed); slotMacro renders. Case B (bake everything): 0 fields, the body is all literals (F250, Z-3, NO # anywhere).
+- FULL GATE on the branch: 1386 passed, 0 failed.
+
+### STATE: stackToSlot is proven - ANY user-op stack -> a CAM slot, reusing the emit path (val rides the #var), the allocation contract, and the {name,fields,body} generator shape. This is the S0 prereq for sub-stack composition. U0 takes a MANUAL decl; auto-classification (DECLARE not infer) is U1. NEXT: U1 classification + sub-stack per the plans. No release from me.
+
+---
+
+## 🔨 turn 1059 — UNIVERSAL CAM U1: the DECLARE classifier (which op params expose as pendant knobs vs geometry/bake-only). Per the FLIPPED F2 ruling: DECLARE, never infer. GROUND-FIRST (2 Explore agents) + ADVERSARIALLY AUDITED (a 6-agent workflow + a logic-audit agent).
+
+The atom author ALREADY chose each param's role via val() (a #var/[expr] rides through emit verbatim -> exposable) or num() (coerces -> a #var becomes NaN -> the default -> bake-only). U1 makes that IMPLICIT choice EXPLICIT DATA + reads the op STACK STRUCTURE for transform-blocking folds, so the classifier is a PURE fn of declaration+structure. NOTHING re-reads the emit output at runtime; the emit-PROBE is DEMOTED to a dev-time test that GUARDS the declaration against the real emit.
+
+### GROUNDED (2 Explore agents, exhaustive)
+- Agent A (atom param roles): read every leaf atom emit. value = val()/raw-#var-interpolation (move x/y/z/a/b/feed, feed rate, arc x/y/i/j/feed, probe to/feed/port, spindle rpm, assign var/value, radiuscomp raw/result/radius, machinemove to/var, raw text, hmiline/asknumber var, ifgoto lhs/rhs, measure register-vars, tooloffset tool/value, probeguard *Var). geometry = num()/JS-math (line/drill/bore/helix/dwell ALL keys; count/math/compare; label/goto n; AND notably cnc.drillcycle X/Y/Z/R/Q/P/F, progstart rpm, mcode code, outpin/waitinput pin - these emit real G-words but via num() so a #var breaks). other = mode/enum/dir/bool/label-name/comment/selector.
+- Agent B (blocking folds): the emitter transforms child output by KIND - place->translateProgram (bE 225), rotate->rotateProgram (234), skim->relativizeProgram (242); depth/fill/loop re-emit per level/pass/iter; container(array)/path(helix) offset per stamp. The numeric regex needs a digit after the letter, so X#n NEVER matches -> the transform is SILENTLY DROPPED -> the exposed coord is wrong. Registry kinds confirmed: placeonstock=place, rotate=rotate, skim=skim, stepdown=depth, stepover/fill*/surfacefill/pocketfill/filltext=fill, array=container, helix=path. Transparent: user_root/param_group/section/guard/cond + all leaf/reporter. flattenBlocks order = pre-order (block, uiChildren, children); binding.blockIndex indexes it.
+
+### BUILT
+- NEW web/data/atomRoles.js: the DECLARED { atomType: { key: value|geometry|other } } table (~45 atoms, 155 roles) + paramRole(). Default (unlisted atom/key) = geometry (SAFE: never expose an unverified ride-through; an un-enumerated atom is entirely bake-only until a row is added). 'other' NB documented: a few selectors (machinemove.axis, hmistatus.color) raw-interpolate so a #var MECHANICALLY rides through, but they stay 'other' (a discrete selector is not a tunable value; non-'value' keeps them un-exposable = safe). Only 'value' exposes.
+- NEW web/data/exposeClassifier.js: the PURE classifier. blockedIndices(template) walks the template in flattenBlocks pre-order tracking a fold-ancestor flag (a block's own fold-ness blocks its DESCENDANTS, never itself). classifyExposable(def) -> { param: {exposable, role, reason} } where exposable = role==='value' AND not-under-a-blocking-fold AND no-program-xform. BLOCKING_FOLD_KINDS = {place,rotate,skim,loop,depth,fill,container,path} (loop included per F2 - a socket under a loop may reference the index a #var can't carry; SAFE call is bake). cond NOT blocking (re-emits once, no transform); xform/flip transform by LINE RANGE -> a program-level backstop (conservatively blocks ALL exposure if present). FAIL-CLOSED for guarded/bindingSpecs defs (see AUDIT #5).
+- EDIT web/data/stackToSlot.js: classifyExposable gates the decl - each field carries exposable, AND the SAFETY (valid-by-construction): a bake-only param requested as exposed is FORCE-BAKED (its value/default) instead of injecting a #var emit would mangle. Last line of defense; the UI greying (future) prevents the request upstream.
+
+### VERIFIED - two-method ACCEPT (numeric + emit-probe) + ADVERSARIAL AUDIT (ultracode)
+- METHOD 1 (diff): a DECLARED atom param-role map + the classifier as a PURE fn reading declaration+structure; NO infer-from-output at runtime; the probe is ONLY in a test.
+- METHOD 2 (tests/cam-expose-classify.spec.js, 2 tests):
+  * classifier (my-own): (a) a flat Feed+Move -> feed rate + X + plunge Z + cut feed all EXPOSABLE (value, no fold); (b) a drill -> feed + X BAKE-ONLY (geometry, num()-consumed); (c) a Move under a stepdown -> the fold's own `to` bake-only + move.x/move.feed value-but-fold-BLOCKED (reason names the fold); (d) a Move.x under a rotate -> value-but-BLOCKED. SAME move.x is exposable flat, bake-only under rotate - structure decides; (e) a guarded/bindingSpecs def -> exposes NOTHING (fail-closed).
+  * emit-probe (dev-time guard, 17 points): inject a distinctive #var at each key, emit via the real path; assert paramRole==expected AND value-keys RIDE the #var into the emit / geometry-keys COERCE it away. move/feed/arc/spindle/probe.to ride; drill/bore/line/dwell/probe.level coerce. GUARDS the declaration against the actual emit.
+- ADVERSARIAL AUDIT (ultracode, 2 background verifications):
+  * a 6-agent workflow independently RE-DERIVED every role from the emit source (incl. the 5 dialect probeMove impls): 155/155 confirmed correct, NO missing exposables. One borderline surfaced - hmistatus.color raw-interpolates (the #2039 write passes the Number(c)!==-1 guard so a #var rides through) - RESOLVED: keep 'other' (a discrete colour selector, consistent with machinemove.axis; non-'value' = safe/not-exposable), doc clarified.
+  * a logic-audit agent confirmed claims 1-4: blockedIndices order == flattenBlocks (provably identical, no divergent shape); BLOCKING_FOLD_KINDS has NO dangerous false-negative (every child-transforming kind is covered; loop/depth/fill are over-conservative only in the safe bake direction); the {xform,flip} program-backstop is complete (applyModalFeed preserves F#var/F[expr], the other whole-program passes don't transform coords); a fold's own socket is correctly left unblocked. It found ONE real hazard - claim #5.
+- FULL GATE on the branch (post-audit tree): 1388 passed, 0 failed, 4 skipped. (An earlier run had 1 red = custom-op-form2d-drag, a STUDIO form-drag real-drag test unrelated to CAM - passes 2/2 ALONE - a parallel-contention flake; did not recur.)
+
+### AUDIT FIX (claim #5, the one real hazard) — fail-closed for guarded defs
+The logic-audit found: a def with def.bindingSpecs (a guarded hand-authored port: corner/pocket/edge/middle) has FROZEN blockIndex computed over a CANONICAL-PRUNED stack, NOT over def.template (the guarded superset the classifier flattens). So flat[blockIndex] MISALIGNS -> could misread fold-membership in the DANGEROUS direction (mis-expose a #var actually under a fold). validateUserOp skips the same lookup for exactly this reason (userOps.js:488-495). It is OUT of the current contract (stackToSlot only gets userOpFromStack frozen-binding defs), but a future caller passing a corner def would silently mis-expose. FIX: classifyExposable detects def.bindingSpecs and FAILS CLOSED - exposes nothing (bake-only) with a clear reason - until the classifier mirrors instantiate's prune + deriveBindings (exposability of a guarded def is guard-STATE-dependent, a proper follow-on). This makes stackToSlot safe automatically (all force-baked). Tested (case e).
+
+### FLAGGED to the advisor
+- The live CAM authoring modal (macrosApp.js buildSlotFromOps) renders camType-GENERATOR fields (opToSlot/probeToSlot GEN), NOT stackToSlot atom-binding fields - so the classifier's exposable flag attaches to the UNIVERSAL stackToSlot path. Wiring the Expose-DISABLED greying (mirror of the bakeable greying at macrosApp.js:1149/1153, using an f.exposable flag) into the LIVE modal requires the modal to move onto stackToSlot (a follow-on U-step). I did NOT build a camType->atom bridge (it would infer/duplicate the roles - violates declare-never-infer + one-source). The greying is a ~1-line mirror once the modal renders stackToSlot fields.
+- FOLLOW-ON: prune-aware classification for guarded/bindingSpecs defs (currently fail-closed). Mirror instantiate: prune guards + deriveBindings over the pruned clone, classify over THAT flat + derived indices. Needed before the modal exposes corner-class ops via stackToSlot.
+- macrosApp.js:587 has a RAW NUL byte (an intentional join delimiter for a composite settings key: String(programRunParams(...)) + NUL + String(getSettings()...)) -> ripgrep treats the WHOLE file as BINARY -> Grep returns nothing for it (hit this repeatedly this turn; buildSlotFromOps was un-greppable). Works at runtime; a byte-IDENTICAL fix = replacing the raw NUL with a backslash-u-0000 escape sequence (both are a 1-char NUL string at runtime, but the escape keeps the file plain-ASCII/greppable). Pre-existing + deliberate -> flagged, not touched.
+
+### STATE: the DECLARE classifier is proven + adversarially audited - atom roles as DATA (155/155 verified) + a pure structural classifier (tree-walk == flattenBlocks, blocking-kinds complete) + the stackToSlot safety + a fail-closed guard for guarded defs, guarded by a dev-time emit-probe. exposable = value-role AND not-under-a-fold. NEXT (advisor's call): wire the Expose-greying into the modal once it moves to stackToSlot; prune-aware classification for guarded defs; the t1055 gated follow-on (op TYPES + reorder/remove). No release from me.
+
+---
+
+## turn 1061 -- UNIVERSAL CAM U2+U3: the ROUTER + wire stackToSlot into the modal (custom ops become CAM-able IN THE UI -- the visible milestone). GROUND-FIRST (2 Explore agents) + ADVERSARIALLY AUDITED (1 agent, 3 bugs found + FIXED).
+
+Builds on U0 (stackToSlot) + U1 (the DECLARE classifier). A forked/custom op (user_* with no dedicated CAM generator) now routes to a UNIVERSAL path: unroll the op's emit, expose value-role params (feed/coord/Z ride val()) as pendant #vars, bake geometry (num()-consumed) as literals. The 8 premium generators stay the LIVE-parametric path for the standard shapes (hybrid).
+
+### GROUNDED (2 Explore agents)
+- Agent A (def getter): NO live def getter existed (builderOf returns a closure; listUserOps is a localStorage snapshot). Code data-op twins ARE persisted (app.js seedDefaultPortedUserOps -> create/updateUserOp), but the clean path is a live USER_DEFS Map + getUserDef in userOps.js (one funnel, O(1), functions intact, immune to localStorage gaps). Twins have PLAIN frozen bindings (blockIndex resolves against def.template); corner-class bindingSpecs defs misalign -> the U1 fail-closed guard handles them.
+- Agent B (modal flow): generateOp has 3 call sites (buildSlotFromOps decl-aware :1043; a legacy raw-append :1429 no-decl; the def :1009). The interception seam is seedFromOp/makeAuthOp (a universal op returns unsupported -> makeAuthOp null -> door bails). cbmToggle Expose DELETES the entry (absence=exposed for generators) -> universal needs a POSITIVE exposed[key]=true. toManifest drops opType.
+
+### BUILT
+- NEW getUserDef (userOps.js): a live USER_DEFS Map set in registerUserOp, cleared in deleteUserOp.
+- U2 ROUTER (opCamMap.js): camTypeOf returns {universal:true, reason} for every non-generator op (default + the gated variants pocket-polygon/drill-single/middle-single/contour), KEEPING the 8 generator arms. isCamableType widened to `|| !!getUserDef(opType)` (the picker offers every op with a def). seedUniversal(op, reason) reads def.bindings directly (NO PARAM_ALIAS/DERIVE) -> fields {key,label,def,value=op.params, units, type, exposed:true, bakeable:true, exposable} with exposeClassifier setting each exposable flag; returns {unsupported: reason} on no-def / no value-bindings (the honest floor -- a bare built-in optype has no def, so the built-in unsupported-fork tests keep their reasons).
+- U3 MODAL WIRE (macrosApp.js): generateOp 3rd arm (type==='universal' -> stackToSlot(getUserDef(opType), decl, used, off)); declFromOp emits POSITIVE {exposed:true, value} for universal exposed params (stackToSlot exposes only on exposed===true); makeAuthOp inits exposed/baked for universal (exposable -> exposed:true; geometry -> exposed:false + baked=op-value) + a universal flag + defV; toManifest carries opType+defV; cbmToggle universal Expose writes exposed[key]=true; renderCbmTable GREYS the Expose radio when f.exposable===false (mirrors the bakeable greying, reason "geometry -- bake it"). stackToSlot: an exposed field seeds its pendant default from decl.value (the op's value).
+- opContextMenu.js: the op-card CAM action greys via seedFromOp (the FINAL verdict: generator | universal | unsupported), not camTypeOf (which no longer returns unsupported).
+
+### VERIFIED -- two-method ACCEPT (diff + VIEWED) + ADVERSARIAL AUDIT (ultracode)
+- METHOD 1 (diff): camTypeOf {universal} fallback + seedUniversal bindings branch + generateOp 3rd arm + the exposable greying; the 8-generator premium path + legacy untouched (18 pre-existing CAM tests green).
+- METHOD 2 (VIEWED, 2 screenshots, gated to the advisor): a FORKED op (user_u3_modal_data = Feed+Move+Drill) -> op-card Build CAM slot -> the modal opens labelled "1. Custom Cut -> universal"; the table shows Feed/X/Plunge-Z EXPOSABLE + exposed with pendant slots (#1100->#2600 ...), Drill-feed/Drill-depth Expose-GREYED + Bake-forced (baked=120 / baked=6); Build -> a slot with F#var + Z#var; the inline preview SIMULATES (tool + stock + a live G1 cut move in machine frame, G54 DRO). A standard op still routes to its generator.
+- Tests: cam-universal-route (U2 router: value exposable + geometry bake-only + standard->generator; U3 build: exposed #var + readLine, geometry baked; robustness: null-def fails soft) + cam-universal-modal (the real modal: value exposable, geometry greyed, string param read-only, Build -> F#/Z#, saved op type=universal). cam-op-seed migration: the contour TWIN is now CAM-able via universal (intended).
+- ADVERSARIAL AUDIT (1 agent, 7 high-risk edges): found 3 real BUGS, all FIXED (below) + 3 findings deferred. Verified CORRECT: re-render stability, value-edit round-trip, bindingSpecs fail-closed, multi-op compose, blockIndex alignment for twins, getUserDef lifecycle at author time.
+- FULL GATE (post-audit tree): 1391 passed, 0 real failed, 4 skipped. (The lone red -- blocks-mobile-drawers, a STUDIO mobile-drawer test unrelated to CAM -- passes 1/1 ALONE: a parallel-contention flake.)
+
+### AUDIT BUGS FIXED
+- BUG 1 (CRASH): stackToSlot(null) threw on null.bindings when a saved universal slot's op def was deleted / the pack shared to a machine lacking the op. FIX: a null-def guard returns a placeholder slot {name:'(missing op)', fields:[], body:comment} -> the rebuild fails SOFT (a named gap, not a throw). Tested.
+- BUG 2 (CORRUPTION): a baked STRING/enum universal param rendered as a blank number input; editing it overwrote the string bake with a number -> wrong G-code. FIX: renderCbmTable renders a non-numeric baked value as a READ-ONLY span (uneditable). Tested (a move.mode='cut' param -> read-only span; numeric stays an input).
+- BUG 3 (FOOT-GUN): a universal op showed "Drill" in the saved-slot op-card type dropdown (opTypeOpts has no 'universal'); changing it silently converted the op to a generator. FIX: opCardsHtml renders a universal op's type as a read-only "Custom op" label (its type is fixed to the source op). Tested (the saved op carries type=universal).
+
+### FLAGGED to the advisor (follow-ons -- GATE-IF-BALLOONS)
+- FINDING 4: an op built on atoms NOT in ATOM_ROLES (contourfill/stepdown/placeonstock/wcs -> contour) exposes NOTHING (all default to geometry -> baked). SAFE (a valid 0-knob slot, no crash) but the "expose feed/coord" value is limited to ops on enumerated atoms (move/feed/arc/probe/spindle/...). Follow-on: expand ATOM_ROLES to the toolpath atoms (ground each val vs num) so their value params expose.
+- FINDING 5 (latent): stackToSlot allocates local #1,#2,... and never scans the op's own emitted body for used registers -- a forked op whose body writes low registers (assign/math/count/asknumber/raw #1,#2) could collide -> wrong G-code, undetected. Same contract as the generators (which don't use low scratch), so pre-existing for those; new risk for arbitrary forked bodies. Follow-on: body-aware allocation (skip registers the body uses).
+- FINDING 6: toManifest stamps defV but buildSlotFromOps never checks it on rebuild (silent staleness -- a re-authored op rebuilds saved slots against the new def). No crash; the stamp is dead weight today. Follow-on: wire a defV staleness check/warning.
+
+### STATE: the visible milestone is LIVE -- a custom/forked op becomes a CAM slot in the UI (value params exposed as pendant #vars, geometry greyed bake-only), and it simulates. The 8 generators + legacy are untouched (hybrid). Adversarially audited: 3 bugs fixed, 3 follow-ons flagged. NEXT (advisor's call): expand ATOM_ROLES (Finding 4) so more ops expose knobs; body-aware var allocation (Finding 5); defV staleness (Finding 6); the sub-stack (S1+) upgrade -- gated on the user's opunit yes -- to keep a standard part inside a custom op LIVE. No release from me.
+
+---
+
+## turn 1063 -- SUB-STACK CAM S1: prove the opunit composition (ENGINE ONLY, a harness). Keep the STANDARD part LIVE inside a custom op (make it USABLE, not baked). GROUND-FIRST (2 Explore agents) + ADVERSARIALLY AUDITED (1 agent, 2 wrong-G-code bugs FIXED + 3 flagged).
+
+User (t1062): "not fixed, make it usable" -- a slot with baked geometry is not usable; keep the standard parts LIVE. opunit GREENLIT. Builds on U0-U3 (custom ops CAM-able, pure-universal). The PREMIUM: a custom op = declared standard sub-unit(s) (-> their PARAMETRIC generator, geometry LIVE #2600 loop) + custom atoms (-> stackToSlot, values exposed). Per cam-substack-plan.md S1.
+
+### GROUNDED (2 Explore agents)
+- Agent A (surfacing structure): surfacing template[0] = user_root{ uiChildren:[panel,sim,param_group], children:[progstart,wcs,placeonstock{stepdown{surfacefill}},progend,entry,toolsel] }. WRAP_PREFIX_COUNT=4; binding.blockIndex = 4 + exec position. stepover -> blockIndex 8 (surfacefill.stepover). PLAIN FROZEN bindings, no guards -> the reverse-instantiate read is EXACT (no prune). getUserDef('user_surfacing_data') returns template+bindings live. CAVEAT: keep the trailing entry/toolsel markers (toolNum/entryX/Y bind to them); zMode (structural) + clearance (unbound) stay at defaults.
+- Agent B (surface generator LIVE loop): surfacingSlot emits a runtime WHILE raster (NOT unrolled): #27=FUP[[#26-#25]/#5] ;raster row count; WHILE #28 LT #3 DO1 (Z) / WHILE #30 LT #27 DO2 (rows). stepover = field #4, var #5, drives the loop bound + per-row step -> seeding #2604 changes pass spacing at RUNTIME. Contrast the universal unroll (stackToSlot) which bakes the passes to literal G1 lines. Assert: /WHILE #\d+ LT #\d+ DO2/ + ;raster row count + NOT /G1 [XY]-?\d/.
+
+### BUILT
+- opunit block (wizards/ops/userRoot.js): a DECLARED, emit-TRANSPARENT sub-unit boundary carrying params.opType + params.defV, wrapping the standard atoms as children. Added to the transparent set (blockEmitter.js:148, beside section/param_group) -> BYTE-IDENTICAL to the atoms loose. Registered in the PALETTE (index.js). In the same declare-transparent family as sim/panel/simstart/section. Recognition = a READ of opunit.params.opType (declare, never infer).
+- NEW web/data/subStackToSlot.js: walkParts(user_root.children) -> ordered parts (opunit -> {standard}; a maximal run of loose atoms -> {custom}). Standard: deriveStandardParams (reverse of instantiate -- clone the std def's template, swap in the opunit's children, flatten, read flat[blockIndex].params[key] via the frozen bindings; one-source, not a snapshot) -> camTypeOf(REAL params) -> the parametric generator (geometry LIVE loop) + re-sync the pendant reads to the re-derived values via the generator's OWN readLine. Custom: wrap the loose atoms, filter+reindex the def's bindings that point into them BY IDENTITY (subFlat.includes(fullFlat[blockIndex]) -> robust to nesting) -> stackToSlot(subDef, decl) (values exposed). Compose IN ORDER with the buildSlotFromOps allocation (#11xx around siblings via `used`, local #var = varOffset+i+1, tag f._op). Returns {name, fields, body}.
+- TARGET (hand-built, no fork-UX): user_root{ opunit(user_surfacing_data){surfacing atoms}, feed{rate}, move{z} }.
+
+### VERIFIED -- two-method ACCEPT + ADVERSARIAL AUDIT (ultracode)
+- METHOD 1 (diff): opunit transparent (byte-identical) + subStackToSlot walk/route/compose reusing the buildSlotFromOps allocation.
+- METHOD 2 (tests/cam-substack.spec.js, 3 tests): S1a -- opunit wrapping = BYTE-IDENTICAL emit to the atoms loose. S1b -- subStackToSlot(target): the re-derivation recovers stepover=7.2 + depth=0.5 from the sub-stack sockets; the surfacing raster stays a LIVE WHILE #.. DO2 loop (NOT unrolled -- no literal G1 X/Y passes); the custom feed + plunge Z are EXPOSED as #vars (allocated past the surfacing 1100-1109, no collision); surfacing-then-move EXECUTION ORDER preserved; slotMacro renders. S1c -- a missing/unregistered opunit opType fails SOFT (a placeholder), not a silent drop.
+- ADVERSARIAL AUDIT (1 agent, 7 edges): found 2 wrong-G-code BUGS (FIXED) + 1 silent-drop (FIXED) + flagged 3. Verified CORRECT: #11xx idx threading, binding re-index by identity, walkParts N-part interleaving, applyFieldValues regex safety+idempotence, opunit transparency (line-148 special-case runs before def.emit -> byte-identical), deriveStandardParams for surfacing-class (plain frozen).
+- FULL GATE (post-audit tree): 1395 passed, 0 failed, 4 skipped (clean, no flakes this run). The opunit PALETTE + transparent-set additions caused NO regressions.
+
+### AUDIT FIXES
+- BUG A (worst, wrong G-code): the standard route called camTypeOf with EMPTY params -> a circle Pocket sub-unit always routed to the RECT generator (camTypeOf branches pocket on shape||'rect'). FIX: re-derive the params FIRST, then camTypeOf(REAL params) -> a variant sub-unit resolves correctly (circle Pocket -> cpocket, helical Drill -> bore). Surfacing (no variant) unchanged -> still routes to surface.
+- BUG D (silent-drop): an opunit with an unregistered opType (deleted / pack shared to a machine lacking the op) silently vanished from the composed slot (gen stayed null, skipped). FIX: fail SOFT -- a named '(missing op)' placeholder (mirrors stackToSlot's missing-def behavior). Tested (S1c).
+
+### FLAGGED to the advisor (follow-ons)
+- GAP C (the KEY usability gap, pre-existing + DECLARED): every premium generator emits SELF-CONTAINED framing ending in M30 (+ hard-coded error labels N1/N2/N7/N8/N9). Concatenated parts -> only the FIRST part runs (later parts are dead code after M30); and if framing were normalized, the duplicate N-labels would mis-route a GOTO (not run through uniquifySafeRetractLabels). SAME limit the existing multi-op buildSlotFromOps has. Making the composed slot a single EXECUTABLE program (framing-normalization: strip the non-terminal parts' program-end + uniquify labels, one shared frame) is the next usability slice (S4/S5). S1 proves the mechanism; the ACCEPT is structural (live loop + exposed + order + slotMacro renders).
+- BUG B (latent wrong-G-code, pre-existing + shared): a generator part's local #var is #(varOffset+i+1) but the mill generators' scratch registers are HARD-CODED #20-#33 (NOT offset). When a preceding part contributes >=10 fields, the next mill-generator part's field vars land in #20+ and collide (M3 S[0], garbage geometry). Present identically in buildSlotFromOps (also passes fields.length as varOffset). S1's target (surfacing FIRST=10 fields, then a stackToSlot custom part=no fixed scratch) does NOT hit it. Fix = offset the generators' scratch base or reserve a #var band above #33 (a shared-allocation-contract fix).
+- BUG E (latent, FORK 2): deriveStandardParams reads flat[blockIndex] over the RAW template with the frozen bindings -- exact for surfacing-class (plain frozen, no guards) but best-effort for guarded/bindingSpecs std defs (corner/pocket/middle: frozen blockIndex is over a canonical-PRUNED stack). Degrades to wrong f.def only (geometry stays LIVE via the #var), no crash. A prune-aware re-derivation (mirror instantiate's pruneGuards + deriveBindings) is the follow-on; also needed for BUG A's variant routing on bindingSpecs pocket.
+
+### STATE: S1 proves the opunit composition -- a STANDARD sub-unit (surfacing) stays LIVE (its generator WHILE loop, NOT unrolled) INSIDE a custom op, composed IN ORDER with exposed custom atoms. opunit is a byte-identical declared boundary. 2 wrong-G-code bugs fixed, 3 follow-ons flagged (framing-normalization = the key usability gap; scratch-var collision; prune-aware re-derivation). NEXT (per the plan): S2 (walk/router as a pure fn), S3 (the FORK PATH declares opunit -- saveAsCustomOp wraps + a Blocks boundary chip), S4 (wire the modal -- a forked op's PARTS in the table, standard part's loop knobs LIVE), S5 (framing-normalization + honesty/polish). No release from me.
+
+---
+
+## turn 1065 -- FRAMING-NORMALIZATION (pulled forward, the KEY usability gap): compose N CAM parts into ONE EXECUTABLE program. GROUND-FIRST (1 exhaustive Explore survey) + ADVERSARIALLY AUDITED (1 agent).
+
+THE BUG (my S1 audit + advisor confirm): buildSlotFromOps did parts.join with NO stripping + slotMacro.hasEnd only avoids a DOUBLE terminator, so a composed slot = part1...M30 then part2 -> the controller STOPS after part1, only the FIRST part runs. Affects the SHIPPED multi-op S-C (a 3-op slot ran only op 1) AND the sub-stack. Fix in the SHARED compose path.
+
+### GROUNDED (1 Explore agent, exhaustive framing survey)
+- Every generator emits a SELF-CONTAINED program. Probe (corner/edge/zprobe/inside/boss/align): success path -> #1505=-5000 -> GOTO 2 -> N1 error handler -> N2 -> M30. Mill (pocket/cpocket): M5 -> GOTO 9 -> N8 -> N9 -> M30. surfacing: M5 -> GOTO 9 -> N7/N8 -> N9 -> M30. opToSlot (drill/bore/slot): ends M5, NO M30/N-labels (a fragment, wrapper adds M99). stackToSlot (custom): raw atom emit, no M30 (fragment; may carry N91+ safe-retract labels).
+- LABEL collision set (all literal small ints, reused PER PART): probe {1,2,10,11,20,21,30}, mill {7,8,9}, custom possibly {91+}. Loop DO1/DO2/END1/END2 are sequential+balanced -> NOT labels, don't touch.
+- The M30 is the SHARED convergence of success + error paths (GOTO 2 -> N2 -> M30). So strip ONLY the terminal M30, KEEP the N2/N9 convergence label as the fall-through into the next part.
+- NO GATE: no generator emits its own WCS (the wrapper adds the single G54) / G28 / plane; the only entanglement is the shared-M30 convergence label + the per-part spindle bracket (M5->M3, KEPT -- safe teardown). Existing label rewriter to mirror: opSession.js maxLabelNum + offsetLabels (but block-model; I need a TEXT-level version).
+
+### BUILT (fix in the SHARED compose path)
+- NEW web/data/slotPack.js composeParts(parts) + maxLabelIn / offsetBodyLabels / stripTerminalEnd. Per part (running max, so each part's label band sits STRICTLY above the previous part's max): (1) UNIQUIFY N-def (^N<n>) + GOTO / IF..GOTO targets by the running offset so a GOTO in part 2 can never resolve to part 1's identically-numbered label; (2) STRIP the terminal program-end (M30/M2/M02) from every part EXCEPT the last, keeping the convergence label as the fall-through. A fragment part (no M30) is untouched; a SINGLE part is byte-identical (offset 0, last part = no strip). The last part keeps its end; slotMacro's hasEnd leaves it (or appends the single M99).
+- WIRED into BOTH compose sites: buildSlotFromOps (macrosApp.js -- multi-op + universal) and subStackToSlot (sub-stack) now call composeParts instead of parts.join.
+
+### VERIFIED -- two-method ACCEPT (REAL SYMPTOM, not just structure) + ADVERSARIAL AUDIT
+- METHOD 1 (diff): composeParts strips non-terminal ends + uniquifies labels + one terminal end; wired into both compose sites; single-op byte-identical.
+- METHOD 2 (tests/cam-compose-framing.spec.js, 3 tests, REAL generator bodies): (a) composeParts(corner + surfacing) -- the RAW join has 2 M30s (the bug -> stops after part 1); composed = exactly ONE terminal M30 (the last line), the corner's M30 STRIPPED; corner before surfacing (order); the surfacing (part 2) runs BEFORE the terminal M30 (reachable); NO duplicate N-labels across parts (corner {1,2,10,11,20,21,30} + surfacing shifted -> all unique); every GOTO resolves to a defined label. (b) composeParts(surfacing + drill, the dispatch example) -- 0 intermediate M30, the fragment drill (part 2) reachable after the surfacing. (c) sub-stack subStackToSlot(opunit surfacing + custom) -- the surfacing M30 gone, the custom plunge Z (part 2) present + reachable, no M30 between them.
+- RE-RAN: the S-C multi-op (cam-build-mode:139, now composed via composeParts) + all 20 CAM tests green; single-op byte-safe (cam-build-mode:39) byte-identical (composeParts no-op for one part). + the 3 sub-stack S1 tests.
+- ADVERSARIAL AUDIT (1 agent, 8 edges): found 1 CRITICAL bug (FIXED) + 1 hazard (flagged) + 6 correct. BUG (critical, wrong G-code on the LIVE sub-stack path): the GOTO regex required whitespace (GOTO<space><n>) but the DDCS Expert dialect (the DEFAULT CAM controller) emits NO-SPACE GOTO<n> for flow (goto/ifgoto/label/probecheck) + saferetract/safehop/clearlift atoms in a custom part -> offsetBodyLabels renumbered the N-def (^N<n> matched) but NOT the GOTO ref -> a dangling jump / cross-part backward collision (the exact thing composeParts prevents). FIX: match \s* (space OR no-space) in BOTH maxLabelIn + offsetBodyLabels, PRESERVING the original spacing in the replacement. Tested (a no-space GOTO1 two-part compose renumbers def+ref in lockstep, no collision). Space-form generators unaffected (backward-compatible). 6 CORRECT: N-def regex (only line-start labels; no false match), no GOTO N<n> / computed-GOTO forms, def/ref consistency + DO/END untouched, stripTerminalEnd (terminal-only, fragment no-op, no over-consume), running-max collision-proofness, single-op byte-identical, WHILE-loop scratch integrity.
+- FULL GATE (post-fix tree): 1399 passed, 0 failed, 4 skipped (clean, no flakes). composeParts is a no-op for a single part so every single-op slot is byte-identical; no regressions.
+
+### FLAGGED
+- ERROR-PATH fall-through (minor): stripping a non-terminal part's M30 means an ERROR in part 1 (which sets #1505=1 then hits the convergence label) now falls THROUGH into part 2 instead of ending the program. The SUCCESS path is correct (the fix). An error-guard that stops the whole program on #1505 (a leading `IF #1505 GT 0 GOTO <end>` per part, or one shared error tail) is a hardening follow-on -- flagged, not this slice (the ACCEPT is success-path reachability).
+- The standalone `slot` op (opToSlot) sets no G90/G91 -- relies on the prior part ending in G90 (all do today, incl. error paths). Latent; flag.
+
+### STATE: the KEY usability gap is CLOSED -- a composed multi-part slot (multi-op OR sub-stack OR universal) is now ONE executable program: non-terminal M30s stripped, labels uniquified per part, one terminal end, every part reachable. The shipped multi-op S-C is FIXED (was running only op 1). Verified on real generator bodies. NEXT (per the plan): resume S2 (walk/router pure fn), S3 (fork declares opunit), S4 (wire modal), S5 (polish + the error-path hardening). No release from me.
+
+---
+
+## turn 1067 -- SUB-STACK S3 (fork declares opunit): GROUND-FIRST -> GATE. The standard atoms are NOT reliably identifiable at SAVE time (interleaving unguarded); the reliable moment is FORK/LOAD time. Surfacing the structure + options; no code built (gate).
+
+### GROUNDED (1 Explore agent, exhaustive fork-path survey)
+- STRUCTURE (a two-level transparent nest): editWizardDef(opType) (devMode.js:436) -> makeOp(opType, defaultParams, def.template) -> op{ opType, children:[ user_root{ uiChildren:[panel,sim,param_group], children:[progstart,wcs,placeonstock{stepdown{surfacefill}},progend,entry,toolsel] } ] }. makeOp does NOT unwrap user_root (opBuilders.js:96-101). workspaceToStack round-trips it INTACT (stackBridge.js user_root split into PRESENTATION/EXECUTION mouths). So collectAuthoring's a.opRec.children = [user_root{...}] -- a SINGLE user_root; the exec atoms are at a.opRec.children[0].children. userOpFromStack sets template = stripIds(a.opRec.children) (NO wrapping) -> a fresh fork's saved template round-trips to the SAME shape as the source surfacing def.
+- IDENTITY known BEFORE save: a.opRec.opType rides the op block data + round-trips (stackBridge.js), and _editingWizard = opType (devMode.js:446). camTypeOf({opType:'user_surfacing_data'}) -> builtinTypeForTwin -> {camType:'surface'} (a generator, NOT universal) -- so the recognized fork IS positively detectable. CAVEAT: once SAVED, saveAsCustomOp mints a NEW user_<slug> opType that is NOT an opensAs target -> camTypeOf -> {universal} -> the recognized identity exists ONLY before save (must be captured at fork/save time).
+- THE GATE -- the standard run is NOT reliably identifiable at SAVE time: (a) NO per-block marker/id (stripIds drops ids; block.data carries only _expose + param snapshots, no source-op link -> after the round-trip the surfacing atoms are indistinguishable {type,params} records). (b) POSITION invariant (first N children = the source exec, N=getUserDef(opType).template[0].children.length) holds ONLY if the user appended strictly at the END -- Blockly statement connections SPLICE ANYWHERE (drop a move between progstart and wcs -> [progstart,move,wcs,...] interleaved), and nothing keeps [progstart..toolsel] contiguous. (c) TYPE-matching is fragile (duplicate types, reorder, edits). (d) Inferring the standard part from block shape is FORBIDDEN by the north-star ([[custom-op-sim-intent-infer-vs-declare]]). So a clean boundary exists ONLY in the fresh/append(+value-edit) case; the general (interleaved/structure-edited) case has NO clean save-time boundary.
+- KEY INSIGHT (the agent + cam-substack-plan.md FORK 4): the RELIABLE moment to establish the boundary is at FORK/LOAD time (editWizardDef), when user_root.children STILL EQUALS the source exec run exactly and the source opType is readable -- NOT at save time.
+
+### GATE -- options for the advisor (RECOMMEND A now + B follow-on)
+- OPTION A (SAVE-TIME conditional wrap; the dispatch's location, minimal): in saveAsCustomOp, when a.opRec.opType is CAM-recognized (camTypeOf -> a generator) AND the source exec run (getUserDef(opType).template[0].children) is a clean CONTIGUOUS PREFIX of user_root.children by TYPE+STRUCTURE (a READ/positive-match against the declared source -- NOT shape-inference; params may differ, they re-derive), wrap that prefix in opunit(opType, defV); the remaining children stay loose. If the run is interleaved/structure-edited (no clean match) -> DON'T wrap (fall back to pure-universal unroll, the standard part baked). SAFE, declare-aligned, covers the common append case + the ACCEPT scenario (fork+append+save -> opunit). LIMIT: an interleaved/structure-edited fork loses the LIVE benefit (baked). No live "boundary chip" during first authoring (the opunit is in the saved template; the chip shows only on RE-edit).
+- OPTION B (FORK/LOAD-TIME wrap; robust + the live chip): editWizardDef wraps the exec atoms in opunit BEFORE loading (the run is known-contiguous + opType known); the user then adds atoms AROUND the opunit boundary. Robust to interleaving (the boundary is established while valid; valid-by-construction). Requires: the load path + ALL fork entry points (editWizardDef + any placed-op-open-in-Blocks path) + a BLOCKLY RENDERING of the opunit as a visible boundary chip (a new Blockly block def -- needed for the dispatch's "visible boundary chip" regardless). Bigger change; the opunit becomes a user-manipulable boundary.
+- OPTION C (hybrid): ship A now (save-time, covers append + the ACCEPT), B as a follow-on (fork-time robustness + the live chip).
+- Cross-cutting: the dispatch's "Blocks-tab renders a visible boundary chip" needs the opunit to RENDER in Blockly (a block def) -- currently opunit has NO Blockly rendering (t1063 added it to the ops registry + the transparent EMIT set only). That Blockly block def is needed for the chip in EITHER approach.
+
+### DECISION SIEVE: gates 1-3 (safety/declare/one-source) pass for A and B (both READ a.opRec.opType, no inference, no wrong G-code). Gate 4 (valid-by-construction) favors B (the boundary can't be broken by later edits) over A (best-effort prefix match). Residue = VALUE/COST (is the interleaved case + the live chip worth B's cost?) -- the advisor's call. RECOMMEND A now (smallest, at the dispatched location, satisfies the ACCEPT's append scenario, safe), B as the follow-on for full robustness + the live chip.
+
+### STATE: GATED (per the dispatch's explicit invite). No code built -- grounding only. Awaiting the advisor's synthesis (A / B / C, + whether the interleaved-fallback-to-baked + the deferred live-chip are acceptable). The opunit + subStackToSlot engine (S1) + framing-normalization already exist to consume whichever boundary the chosen approach writes.
+
+---
+
+## turn 1069 -- SUB-STACK S3 = OPTION B (user ruled B): FORK/LOAD-TIME opunit wrap + the Blockly chip. Declare the boundary at the RELIABLE moment. GROUND-FIRST (2 Explore agents) + ADVERSARIALLY AUDITED (1 agent).
+
+Per the t1067 gate (the standard atoms are un-identifiable at SAVE time -- interleaving unguarded; the reliable moment is fork/LOAD time), the user ruled OPTION B. BUILD: wrap at load, a visible chip, save preserves it, transparent emit.
+
+### GROUNDED (2 Explore agents)
+- Agent A (fork entry points + gate): editWizardDef (devMode.js:442, makeOp(opType, defaultParams, def.template)) is the path that loads a recognized twin TEMPLATE (user_root) into Blocks. a.opRec.children = [user_root{...}] (makeOp does NOT unwrap; workspaceToStack round-trips user_root intact). THE GATE FINDING: surfacing/slot/drill/bore are NOT bindingSpecs (not maintained-as-data) so the Update button is ENABLED -- a wrap+Update would OVERWRITE the twin own def with an opunit-shifted (+1) template, corrupting its frozen bindings. So a recognized fork MUST be fork-only (fresh op, never Update the twin). Bindings re-compute over the wrapped flatten (collectAuthoring/extractParamBlocks); subStackToSlot filters CUSTOM bindings by IDENTITY so the opunit in the flatten does not misalign them; a standard-atom knob is filtered out (harmless, the standard part re-derives). camTypeOf({opType, defaultParams}) is the right recognized test. FLAGGED: the placed-op -> Save route bypasses editWizardDef (a follow-on).
+- Agent B (Blockly block-def): opunit ALREADY has an auto-generated Blockly def (it is in PALETTE -> jsonDef), BUT kind 'opunit' is NOT in the container (DO-mouth) branch -> it had NO child mouth -> its exec children were DROPPED on the workspace round-trip (the blocker). Fix = add 'opunit' beside section/param_group in jsonDef (bridge.js) + toRecord + recToJson (stackBridge.js) -> a DO mouth + full children round-trip. The friendly per-opType chip label ("Surfacing unit") = an isOpunit header branch + a ddcs_opunitlabel extension (a follow-on).
+
+### BUILT
+- Blockly ROUND-TRIP (the blocker, 3 edits): 'opunit' added to the container branch in bridge.js:237 (DO mouth) + stackBridge.js:113 (toRecord) + :243 (recToJson) -> opunit renders as a titled transparent container wrapping its children + round-trips losslessly. opUnitBlock hidden:true (created programmatically at fork-wrap, never dragged). isAtom excludes opunit (so no 'expose knob' rows grow on its opType/defV fields).
+- LOAD-TIME WRAP (devMode.js): NEW wrapRecognizedForFork(def) -- gated on camTypeOf({opType, defaultParams(def)}) being a generator (camType && !universal); wraps template[0].children (the exec run, contiguous at load) in [opunit{opType, defV: defVOf(opType), children: exec}]. Returns {template, recognized}. A genuine custom op (universal) is NOT wrapped. editWizardDef calls it + for a recognized op sets _editingWizard=null -> the save is a FRESH op (the FORK-ONLY guard -- never a destructive in-place Update of the twin, which the opunit +1 shift would corrupt). saveAsCustomOp preserves the opunit (it is in a.opRec.children -> the saved template) with NO change.
+
+### VERIFIED -- two-method ACCEPT (diff + VIEWED) + ADVERSARIAL AUDIT (ultracode)
+- METHOD 1 (diff): editWizardDef wraps a recognized-op exec atoms in opunit + fork-only; the Blockly opunit DO-mouth + round-trip; saveAsCustomOp preserves it; opunit transparent at emit.
+- METHOD 2 (tests/cam-substack-fork.spec.js, 3 tests + VIEWED): (a) wrapRecognizedForFork wraps surfacing (its 6 top-level exec atoms -> ONE opunit(user_surfacing_data, defV) child of user_root); a CUSTOM op is NOT wrapped; the wrapped template EMITS BYTE-IDENTICAL (opunit transparent). (b) end-to-end: wrapped surfacing + added loose feed/move -> subStackToSlot keeps the surfacing a LIVE WHILE loop + the added feed/z EXPOSED as #vars. (c) Blockly round-trip: the wrapped op loads into the real workspace, the opunit RENDERS on the canvas + keeps its 6 exec children through workspaceToStack (the DO-mouth fix). VIEWED (s3-opunit-chip.png): the opunit renders as a visible boundary container ("Op Unit opType user_surfacing_data defV 1") wrapping the surfacing exec atoms, projected G-code shows the live raster.
+- ADVERSARIAL AUDIT (1 agent, 8 edges): NO wrong-G-code / broken-twin / broken-round-trip bug -- the wrap/emit/round-trip/fork-guard machinery is correct (opunit transparent, round-trip lossless, fork-only genuinely blocks twin corruption, custom re-author still Updates, no double-wrap reachable, defVOf write-only, isAtom/hidden clean, the placed-op route degrades gracefully). Found 2: FINDING 1 (MEDIUM, LATENT -- not live-reachable, CAM sub-stack not wired to emit yet): the opunit renders opType/defV as EDITABLE workspace fields (a user could corrupt the routing key). FLAGGED with the chip-label polish (an isOpunit header branch dropping/locking the fields = the same work). FINDING 2 (scope gap, defensible): drill/bore/middle twins default to a variant camTypeOf routes to universal (drill/bore pattern 'single', middle single-axis) -> never wrapped at fork -> universal unroll (baked, not LIVE). Consistent (their DEFAULT variant genuinely has no generator) + NOT wrong G-code; FLAGGED. Findings 3/4 (guarded-twin re-derive best-effort; a stale keepPills comment) are known/low.
+- GATE REGRESSION FIXED (found by the gate, not the audit): my first fork-only guard (recognized -> _editingWizard=null) was TOO BROAD -- it fired for corner too, bypassing the lockUpdate mechanism the rich-def-update-guard spec checks. NARROWED: forkOnly = recognized AND NOT isMaintainedAsData(def). corner/edge/pocket/middle (bindingSpecs) keep lockUpdate (unchanged, the spec passes); only surfacing/slot/drill/bore (recognized, NOT bindingSpecs -- previously Updatable, the actual gap) get the new fork-only guard.
+- FULL GATE (post-fix tree): 1402 passed, 0 failed, 4 skipped (clean). The bridge.js/stackBridge.js opunit round-trip edits caused no regression to any other block.
+
+### FLAGGED (follow-ons, GATE-IF-BALLOONS)
+- The friendly per-opType chip LABEL ("Surfacing unit" instead of the generic "Op Unit opType=... defV=..."): an isOpunit header branch in jsonDef + a ddcs_opunitlabel extension (per Agent B). The chip RENDERS + wraps correctly now; the friendly label is Blockly-visual polish (the dispatch: "the Blockly chip can follow").
+- The PLACED-OP -> Save fork route bypasses editWizardDef (a recognized op inserted in the program then saved via saveAsCustomOp forks as universal, standard part NOT live). The primary Customize/Fork route (editWizardDef) is covered; the placed-op route needs its own load-wrap or a conditional save-time wrap.
+- A UI "Customize/Fork" affordance that calls window.ddcsEditWizardDef(recognized_twin): today the recognized twins are hidden from the user wizard list, so there is no button yet (the wrap engine is verified by driving editWizardDef). Wiring the affordance is S4/UI.
+
+### STATE: S3 Option B -- the boundary is DECLARED at the reliable moment (fork/load-time wrap of a recognized op exec atoms in opunit), rendered as a visible Blockly chip, preserved at save, transparent at emit; subStackToSlot keeps the standard part LIVE. The fork-only guard prevents twin corruption. NEXT: the friendly chip label + the placed-op route + the Customize affordance (S4 wire modal). No release from me.
+
+---
+
+## turn 1071 -- SUB-STACK S4: wire the END-TO-END usable flow. Parts 1 (modal) + 3 (chip) built + VIEWED; Part 2 (affordance) FLAGGED. GROUND-FIRST (1 Explore agent, 7 Qs on the modal<->subStackToSlot seam).
+
+Per the dispatch (GATE-IF-BALLOONS, modal wiring first), built the two ACCEPT deliverables -- (1) the modal routes a forked op that CONTAINS an opunit through subStackToSlot (was: whole-op universal, geometry baked) and shows the PARTS grouped; (3) the opunit chip renders a friendly read-only label (audit Finding 1). Part 2 (the Customize affordance + placed-op save route) is a separate larger UI surface with a placement fork -- FLAGGED for the advisor, not built (avoid ballooning a 3rd concern + the save flow).
+
+### GROUNDED (1 Explore agent, the modal<->subStackToSlot integration seam)
+The universal-op modal is a SINGLE build path: openCamAuthoring -> makeAuthOp -> seedFromOp/camTypeOf (a forked user_* op hits the {universal:true} default arm) -> toManifest -> buildSlotFromOps -> generateOp. camTypeOf does NOT inspect the template, so an opunit is invisible to the modal today. subStackToSlot already returns the generator triple {name, fields, body} (composes ALL parts itself) so it plugs into buildSlotFromOps as ONE op -- a new generateOp arm, NOT a buildSlotFromOps rewrite. Fields carry only _op (part index), which buildSlotFromOps OVERWRITES with the authoring-op index -> the part tag must be a DIFFERENT key. renderCbmTable is one section per authoring op -> sub-group by part. Verdict: a small-to-medium ADD (build side small; the modal renderCbmTable sub-grouping is the only real complexity), NOT a restructure.
+
+### BUILT -- Part 1 (modal wiring)
+- subStackToSlot.js: signature (def) -> (def, used=new Set(), varOffset=0) -- seed the internal allocation from the caller so a sub-stack composed ALONGSIDE sibling ops in one slot stays collision-free; the compose loop now tags each field _part (part index), _partKind (standard/custom), _partLabel (the gen name) -- NOT _op (buildSlotFromOps overwrites _op with the authoring-op index). Single-op/existing callers unchanged (defaults).
+- macrosApp.js: imported subStackToSlot + walkParts. generateOp NEW arm: type===substack -> subStackToSlot(getUserDef(opType), used, off) (composes all parts itself; plugs into buildSlotFromOps like any op). subStackParts(opType) = walkParts(getUserDef(opType) user_root.children).some(kind===standard) -- a READ of the DECLARED opunit boundary (never inferred). makeAuthOp branches: subStackParts -> makeSubStackAuthOp (a camType=substack authoring op; fields = subStackToSlot(def).fields stamped value + bakeable:false + _bakeTip per part; all exposed). renderCbmTable: a substack op sub-groups a.fields by _part -- a labelled sub-header per part (standard = live generator loop knobs geometry stays parametric; custom = values exposed geometry baked); the value cell is READ-ONLY for a substack part (subStackToSlot re-derives from the def -> an editable input would be a no-op foot-gun); the custom part label is a friendly Custom atoms (its _partLabel is a synthetic subDef opType = noise); the op header shows -> sub-stack -- parts stay live.
+- S4 modal-first slice: subStackToSlot uses a FIXED decl (standard part {} = all-exposed LIVE loop; custom part all-exposed). The expose/bake radios reflect that default (standard bakeable:false = Bake greyed, always-live; custom exposed). Decl-driven per-part expose/bake toggling that DRIVES the build is a flagged follow-on (per the grounding Q6 modal-first recommendation).
+- VIEWED (cam-substack-modal.png, gated to advisor): a forked surfacing op (opunit + loose feed/move) -> Build CAM slot -> the modal shows 1. Forked Surface -> sub-stack -- parts stay live, Part 1 Surface / face -- live -- generator loop knobs (Area X/Y, Depth, Stepdown, Stepover 7.2, Tool O, Feed, Plunge feed, Clearance Z, Spindle RPM -- ALL Expose-selected, Bake greyed, values read-only), Part 2 Custom atoms (Cut feed 300, Plunge Z -2, exposed). Build -> a slot whose body keeps the surfacing a LIVE WHILE loop + the custom feed/Z ride #vars.
+
+### BUILT -- Part 3 (chip label, audit Finding 1)
+- bridge.js: an isOpunit branch in jsonDef renders a friendly per-instance label (a field_label OPUNIT_LABEL, filled by a NEW ddcs_opunit extension from opLabelOf(opType) +  unit) + drops the opType/defV field-name prefixes (the label carries the meaning). The ddcs_opunit extension LOCKS the OPTYPE field + the defV math_number shadow READ-ONLY -- this Blockly (vendored) has NO Field.setEditable (my first guard silently skipped it); editability is the EDITABLE property (isCurrentlyEditable reads it) + enabled_ (isClickable gates the click-to-edit) -> set EDITABLE=false AND setEnabled(false). The value still round-trips (the field is present, just non-editable). Imported opLabelOf (cycle-safe -- opBuilders does not import bridge/blockly). Degrades safely (a throw keeps the raw chip).
+- WHY read-only: the opType is the key subStackToSlot ROUTES on; a hand-edit in the workspace would corrupt the routing (the audit rated it MEDIUM/LATENT -- now that S4 wires the sub-stack to the modal build it is more reachable, so worth closing).
+- VIEWED (s3-opunit-chip.png): the chip renders BOX Surfacing (data) unit . user_surfacing_data 1 wrapping its exec children (the t1069 DO-mouth), the projected G-code shows the live raster. Test: OPTYPE EDITABLE=false; the chip label ends in  unit; the round-trip STILL preserves opType=user_surfacing_data (the regression guard).
+
+### VERIFIED -- REAL SYMPTOM (two VIEWED screenshots) + tests
+- cam-substack-modal.spec.js (NEW): drives the REAL modal (window.ddcsOpenCamAuthoring) on a registered forked surfacing op -> asserts TWO part sub-headers, the op routes as sub-stack, stepover is a live knob (Expose enabled+checked, Bake disabled, value a read-only SPAN), cfeed/cz exposed; Build -> the slot body has the surfacing WHILE loop + F#var + Z#var.
+- cam-substack-fork.spec.js (EXTENDED, 3rd test): + chip label ends in  unit + OPTYPE EDITABLE=false; the round-trip opType preserved = the regression guard that the chip changes did NOT break the DO-mouth round-trip.
+- FULL GATE: 1403 passed, 0 failed, 4 skipped (11.7m; t1069 was 1402 + the 1 new modal spec = 1403; the bridge.js jsonDef opunit branch caused NO regression to any other block).
+
+### FLAGGED (follow-ons, for the advisor)
+- PART 2 (NOT built -- separate larger UI surface, a placement fork): (a) a user-facing CUSTOMIZE/FORK affordance calling window.ddcsEditWizardDef(recognized_twin) -- today the recognized twins are HIDDEN from the wizard list, so there is NO button (the wrap engine is verified by driving editWizardDef directly). WHERE the affordance lives (op card? a Fork button on a placed recognized op? the wizard list?) is a UI decision worth the advisor/user call. (b) the placed-op -> Save fork route bypasses editWizardDef -> a recognized op inserted then saved forks as UNIVERSAL (standard part NOT live) -- needs its own load-wrap or a conditional save-time wrap.
+- DECL-driven per-part expose/bake toggling (S4 uses a fixed decl; the toggles are display-first). Modal editing of sub-stack part DEFAULTS (read-only for S4 -- customize the op to change them). DUPLICATE param keys across parts (the modal keys on field.key; the distinct-key case works; a collision -- e.g. a custom binding named feed vs the surfacing feed -- needs part-scoped row/radio/lookup keys). Carried from S3: error-path fall-through (a non-terminal composed part errors into the next); varOffset>=10 mill-generator scratch-var collision.
+
+### STATE: S4 -- the modal now DETECTS an opunit-containing forked op and routes it through subStackToSlot, showing the PARTS grouped (standard sub-unit LIVE, custom exposed); Build keeps the standard part parametric. The opunit chip is a friendly read-only label (routing key locked). The end-to-end flow is usable EXCEPT the user-facing Customize affordance (Part 2, flagged) that creates the fork. No release from me.
+
+---
+
+## turn 1073 -- SUB-STACK S4-PART2: the CUSTOMIZE AFFORDANCE. GROUND-FIRST (4 parallel Explore agents). Delivered A (op menu) + B2 (MACRO CAM builder); DROPPED B (user amendment); GATED C. TWO mid-task amendments incorporated.
+
+Make the fork flow user-drivable (today the opunit wrap only fires via internal editWizardDef). Built the customize doors -- all routing through the SAME verified contract window.ddcsEditWizardDef(opType) (wraps a recognized-at-default op in an opunit sub-stack + opens Blocks, from t1069).
+
+### MID-TASK AMENDMENTS (polled before commit, 2 -- INCORPORATED, one a reversal)
+- (user t1072) ADD a MACRO-tab door BESIDE the CAM table -> BUILT as B2.
+- (user t1073) DROP door B (unhide the twins in the Blocks wizard list): REDUNDANT with A + the Macro-tab entry (both already take you into Blocks) + it clutters the build-a-new-wizard list. I had ALREADY BUILT B (unhide + slim rows + migrated 4 twin-hide tests); per the worker rule (an amendment that contradicts what you built = reconcile, do not half-apply) I fully REVERTED B: wizardLibrary.userEntries + listEntries back to baseline, wizardManagerPanel slim-row removed, the 4 in-place test migrations reverted, my Test B removed. So the doors are A + Macro-tab + C, no B.
+
+### GROUNDED (4 parallel Explore agents -- one per surface + the shared contract)
+- SHARED + A: editWizardDef(opType STRING) resolves the def via listUserOps().find, wrapRecognizedForFork (wraps IFF camTypeOf(defaultParams) recognized), showApp(blocks) ITSELF, loads the wrapped op. The 8 twins ARE seeded to listUserOps at boot (app.js:164 -> createUserOp, persisted). The per-op surface is the shared right-click op menu (opContextMenu.js). SURPRISE: editWizardDef DISCARDS the placed op params (opens at DEFAULTS).
+- B2 (MACRO): the CAM Pack Builder toolbar is STATIC HTML (macrosApp.js:163) wired by ID; mirror cbmBuildModal for a picker.
+- C (save route): saveAsCustomOp (devMode.js:589) builds the template from a.opRec.children (live workspace) -> userOpFromStack, NO wrap. Case (a) opened-via-editWizardDef = opunit ALREADY present (round-trips, save preserves) -- NOT a gap; must NOT double-wrap it (corner/rich-def-update-guard). Case (b) a placed op previewed WITHOUT editWizardDef -> saves universal -- THE gap. Safe fix = CONDITIONAL wrap gated on recognized + not-already-opunit + body-deep-equals-instantiate(getUserDef(opType),params) (else GATE). NEW subtlety I found: the opunit-wrap +1 index shift is NON-UNIFORM (exec children shift, uiChildren panel/sim/param_group do NOT) -> the bindings (inlineBindings from a.exposures computed PRE-wrap + paramBindings) must be RE-DERIVED over the wrapped stack by identity, else the saved op emit/form corrupts -- needs buildBindings/a.exposures grounding.
+
+### BUILT (delivered) -- ONE shared predicate + A + B2
+- opCamMap.js: NEW isCamGeneratorTwin(opType) = builtinTypeForTwin(opType) is a twin AND base-type in SUPPORTED_OPTYPES (or bore). PARAMS-INDEPENDENT (all 8 CAM twins); excludes the ~17 other opensAs twins. The ONE affordance gate for A + B2.
+- (A) opContextMenu.js: a "Customize as blocks" item in showOpMenu (after Build CAM slot), gated on isCamGeneratorTwin(full.opType) AND getUserDef -> window.ddcsEditWizardDef(full.opType). Hoisted `full` (shared with Build CAM slot).
+- (B2) macrosApp.js: a "Customize op" toolbar button (id=cam_customize_op) beside +Add-slot/Build-CAM-slot + a cbmCustomizeModal picker (recognized program ops, dedup by opType; empty -> a helpful notice) -> window.ddcsEditWizardDef. Mirrors cbmBuildModal.
+
+### VERIFIED -- two-method (diff + 3 VIEWED) + tests
+- cam-customize-affordance.spec.js (NEW, 3 tests): (A) a placed surfacing twin op menu shows Customize as blocks + routes to ddcsEditWizardDef; a universal custom op does NOT. (B2) the Customize-op button + picker lists the recognized surfacing twin -> ddcsEditWizardDef. (VIEWED) ddcsEditWizardDef(user_surfacing_data) switches to Blocks + loads the op WITH the opunit chip.
+- 3 VIEWED (gated to advisor): cam-customize-opmenu.png (the op-menu Customize item), cam-customize-picker.png (the MACRO Customize-which-op picker), cam-customize-blocks.png (Customize -> Blocks with the opunit chip + live raster).
+- FULL GATE (post-revert, final A+B2 state): 1406 passed, 0 failed, 4 skipped (11.6m, CLEAN). 1406 = 1403 (t1071 baseline) + the 3 new affordance tests; the reverted files (wizardLibrary/wizardManagerPanel + the 4 in-place tests) are byte-clean vs baseline (git diff empty).
+
+### FLAGGED (for the advisor)
+- PART C (GATED, grounded, NOT built): the placed-op -> Save fork route (saveAsCustomOp) saves universal today. The safe fix is a CONDITIONAL save-time wrap gated on recognized + not-already-opunit + body-deep-equals-source-exec-run (else GATE -- interleaved atoms are un-identifiable); reuse the devMode.js:451 opunit shape; MUST NOT double-wrap case (a). THE KEY subtlety to ground first: the +1 index shift is NON-UNIFORM (exec shifts, uiChildren do not) -> RE-DERIVE bindings by identity over the wrapped stack (buildBindings/a.exposures/collectAuthoring). NOTE: now that A + B2 route through editWizardDef (which WRAPS), the primary customize flow already produces the opunit -- C covers the secondary "open a placed op in Blocks directly then Save" path.
+- DRILL/BORE/MIDDLE default to a UNIVERSAL variant (t1069 Finding 2): they surface a Customize entry (per the 8-twin set) but editWizardDef PLAIN-forks them (no opunit, standard part NOT live) -- Customize still works (fork into editable blocks) but "stays LIVE in CAM" applies only to surfacing/pocket/corner/edge/slot. Keep all 8 or caveat/hide drill/bore/middle? (Your call.)
+- editWizardDef opens at the def DEFAULTS (discards the placed op params) -- a Customize forgets the user's tuned values. Acceptable for "customize the wizard def" but worth noting.
+
+### STATE: S4-Part2 -- the fork flow is USER-DRIVABLE from A (STUDIO op menu) + B2 (MACRO CAM builder), both through the verified editWizardDef opunit wrap. Customize a surfacing op -> Blocks with the opunit chip -> the standard part stays LIVE in CAM (the modal parts, t1071). Door B dropped (user amendment). C (the placed-op save route) is GATED, grounded, ready (with the non-uniform-shift binding-reindex caveat). No release from me.
+
+---
+
+## turn 1075 -- SUB-STACK PART C: the placed-op SAVE fork route also wraps in opunit (fork behaviour is ONE-SOURCE regardless of route) + the Parameter Group relabel rider. BUILT (not gated) -- the binding re-derive turned out tractable.
+
+Per the dispatch: saveAsCustomOp must produce the SAME opunit sub-stack the Customize (editWizardDef) path does. Built it with the 3 gate conditions + honoured the non-uniform-shift trap. GATE-IF-ENTANGLED was offered; the re-derive was NOT entangled (see below) so I built it.
+
+### GROUNDED (the decisive read -- it made the trap tractable)
+collectAuthoring (devMode.js:107) computes each exposure blockIndex as an index into flattenBlocks(opRec.children), and flat[i] is a block-record OBJECT REFERENCE. So wrapping IN PLACE (mutating user_root.children, NOT cloning like wrapRecognizedForFork does) PRESERVES those references -> newIndex = flatAfter.indexOf(flatBefore[oldIndex]) is an exact IDENTITY re-derive, never arithmetic. That is the whole trap, solved.
+
+### BUILT
+- devMode.js NEW wrapForkAtSave(a) (exported for test, beside wrapRecognizedForFork), called in saveAsCustomOp right after collectAuthoring and BEFORE the bindings are built. Wraps ONLY when ALL THREE hold: (1) RECOGNIZED -- camTypeOf({opType, defaultParams(def)}) is a generator (the SAME test wrapRecognizedForFork uses, so save-time == load-time); (2) NOT ALREADY OPUNIT -- the editWizardDef route already carries it (it round-trips) so re-wrapping would DOUBLE-wrap; (3) UNTOUCHED -- the body atom TYPE SEQUENCE still equals instantiate(def, the op own params). Any condition fails -> return false, save universal exactly as today. Wraps IN PLACE (identity preserved) then re-derives every exposure blockIndex BY IDENTITY.
+- bridge.js RIDER: the param_group header read "Parameter Group group Surfacing" (the word twice) -> isParamGroup drops the redundant field-name prefix + adds a colon -> "Parameter Group: Surfacing".
+
+### THE DEEP-EQUAL REFINEMENT (a deliberate, measured deviation -- flagging it)
+The dispatch said gate (3) = body DEEP-EQUALS instantiate(def, params). I implemented that first and MEASURED it: it can NEVER fire. Two benign normalization differences (diagnostic run, then deleted):
+  - the workspace round-trip FILLS an absent socket with the block default (progstart gains rpm:0) while the template omits the key;
+  - instantiate carries empty children:[] arrays the workspace record omits.
+A literal deep-equal would therefore silently kill the feature (always universal). So gate (3) is the pre-order atom TYPE SEQUENCE equality instead. It catches EXACTLY the stated risk -- an atom ADDED / REMOVED / REORDERED (the interleaving that makes the standard run un-identifiable) -- and deliberately TOLERATES a value edit, which is CORRECT to wrap: subStackToSlot RE-DERIVES the standard part params from the actual sockets (deriveStandardParams), so a tuned value is read back, never lost. Shape-inference is still forbidden; nothing is guessed.
+
+### FINDING (pre-existing, worth knowing -- NOT introduced here)
+For a data-op twin the body is [user_root{...}] and preorderAtoms only descends a 'DO' input, but user_root mouths are PRESENTATION/EXECUTION -> atomBlocks = [user_root] while flat has 13 entries, so INLINE EXPOSE ticks yield NO exposures for these ops at all (measured: BINDINGS []). The live binding source for a twin fork is extractParamBlocks (param pills), which runs AFTER the wrap and therefore indexes the WRAPPED stack correctly BY CONSTRUCTION. The exposure re-derive is kept anyway: it is correct, unit-proven, and is the right behaviour the moment an exposure can exist here.
+
+### VERIFIED -- two-method (diff + VIEWED) + 5 tests
+- cam-substack-save-fork.spec.js (NEW, 5): (1) UNIT, THE TRAP -- proves the shift is NON-UNIFORM (an exec atom shifts +1, a param_group uiChild shifts 0) AND both exposures still resolve to the SAME block RECORDS (identity); a blanket +1 would corrupt the uiChild. (2) UNIT gates -- universal op / already-opunit / atom-added / bare-stack all correctly NOT wrapped, exactly ONE opunit ever. (3) END-TO-END -- a placed surfacing op loaded into Blocks the DIRECT way (makeOp over instantiate, like opSession, NOT Customize) then Saved: the saved def carries the opunit, the flatten reads [user_root, panel, sim, param_group, opunit, ...exec] (uiChildren unshifted), EVERY saved binding still resolves to an existing socket, the saved op emits BYTE-IDENTICAL to the source twin (opunit transparent), and it builds a CAM slot with the surfacing WHILE loop LIVE. (4) END-TO-END gates -- the Customize route saves with exactly ONE opunit (not double-wrapped); a genuine universal custom op saves with NO opunit. (5) the rider label.
+- VIEWED (gated to advisor): cam-savefork-modal.png -- the SAVED placed-op fork opens the CAM modal as "Saved Surface Fork -> sub-stack -- parts stay live" with the "Surface / face -- live -- generator loop knobs" part (Area X/Y, Depth, Stepdown, Stepover 7.2, Tool O, Feed, Plunge, Clearance, RPM) all Expose-only on #1100-#1109 -> #2600-#2609. cam-savefork-blocks.png -- the Blocks view at save time.
+- FULL GATE: 1410 passed, 1 flaked, 4 skipped (12.0m). The flake = homing-config-machine-tab.spec.js:69 (its 5s boot waitForFunction under parallel load); CONFIRMED 2/2 in ISOLATION; unrelated (this change touches the Blocks SAVE path + one param_group block label). Effective 1411 pass / 0 real fail / 4 skip. NOTE: a FIRST gate attempt aborted at 1248 with 163 ERR_CONNECTION_REFUSED -- the mem-server process DIED mid-run (infrastructure, not code); the clean re-run above is the real result.
+
+### STATE: Part C done -- the fork produces the same opunit sub-stack from BOTH routes (Customize and a direct placed-op Save), gated so an interleaved/edited body stays universal and the Customize route is never double-wrapped. The Parameter Group header no longer says "group" twice. NEXT per the advisor: S5 polish (error-path fall-through, ATOM_ROLES to toolpath atoms, scratch-var collision varOffset>=10, defV staleness, drill/bore/middle tooltip honesty). No release from me.
+
+---
+
+## turn 1077 -- SUB-STACK S5 correctness punch-list: (1) ERROR-PATH FALL-THROUGH (the SAFETY item) + (2) DUPLICATE PARAM KEYS. Items (3) scratch-var collision + (4) defV staleness GATED per GATE-IF-BALLOONS. GROUND-FIRST (1 Explore agent on the composed error framing).
+
+### (1) ERROR-PATH FALL-THROUGH -- the safety item. GROUNDED then FIXED.
+GROUNDING (the decisive finding): EVERY generator error handler was `#1505=1 ;<msg>` and then FELL THROUGH to its convergence label (N2 probes / N9 mills), relying on the body terminal M30 -- the EXACT line composeParts strips from every NON-terminal part (it must strip it, because the SUCCESS path has to flow on into the next part). So in a composed slot a failed probe or a tripped guard ran straight into the NEXT part motion. NOTHING at any error label ended the program -- no M30, no M0, no alarm -- uniform across all 9 framed generators (6 probe + 3 mill). slotFromOp has no error path at all (correctly untouched).
+THE HALT CHOICE (declared, not invented): M30 is the ONE declared program end (dialect.endProgram, ddcs-expert-m350.js). NOT M0 -- that is a PAUSE the operator RESUMES, which would then continue into the next part (worse than the bug). NOT the #3000 alarm -- its support is contradicted between the docs and the controller dumps, so it is not a primitive to introduce on a safety path.
+BUILT: NEW declared `errorEnd(why)` in camMacroKit.js (the declared home for shared CAM-slot emitters) -- ONE source for the halt string, used by all 9 error branches; NOT 9 hand-rolled one-off patches. Each error branch now HALTS immediately after flagging the fault, BEFORE the convergence label, so the converge target stays reachable ONLY on success (the success path still flows into the next part -- unchanged).
+ALSO FIXED (found in grounding, would have been missed): bossCentreSlot's operator-CANCEL (`IF #1505 EQ 0 GOTO 2`, twice) jumped to N2 -- the SUCCESS convergence label -- so a CANCEL also fell through in a composed slot. Cancel now has its OWN halt label (N3) with its own errorEnd.
+ALSO FIXED (the caveat the grounding flagged): slotMacro's `hasEnd` was a WHOLE-BODY substring scan; now that error branches carry their own M30 it would have seen one, concluded the program already terminates, and stopped appending the wrapper M99 -- leaving a trailing FRAGMENT part (slotFromOp ends at M5) with NO terminator at all. Changed to a TAIL check (only a terminator at the END ends the program), which is the correct semantic anyway.
+
+### (2) DUPLICATE PARAM KEYS across parts -- FIXED, one-source
+A sub-stack composes several parts and two parts can legitimately carry the SAME param key (a custom binding named `feed` beside the surfacing generator's own `feed`). The modal addressed every row by the bare field.key, so the two rows collided -- one row radio/value silently drove the other. Introduced ONE declared addressing key `fkeyOf(f)` = part-scoped when the field belongs to a part, else the plain key, and used it at EVERY addressing site: the row id, the radio GROUP name, the value input, the expose/baked/values maps, the pendant-slot lookup (idxOf), cbmVal, and the per-field override lookups in buildSlotFromOps/applyOverridesToBody. A single-part op (generator / universal) has no _part, so the key is UNCHANGED -> every existing slot + manifest stays byte-identical.
+
+### VERIFIED -- two-method + tests
+- cam-substack-s5.spec.js (NEW, 2): (1) SAFETY -- in a composed corner+surfacing slot the error branch HALTS immediately after flagging the fault; the SUCCESS convergence label is NOT halted (part 2 still reachable); the composed program ends with exactly one terminal end; and a FRAGMENT-tailed composition still gets the wrapper M99 (the hasEnd tail-check). (2) two parts both carrying `feed` render as TWO rows with DISTINCT part-scoped keys, SEPARATE radio groups, and DIFFERENT pendant slots.
+- VIEWED: cam-s5-dupkey.png -- the modal showing the surfacing part Feed 2000 (#1106->#2606) AND the custom part Custom feed 321 (#1110->#2610) as independent rows.
+- TEST MIGRATION (an intentional invariant change, NOT a regression): the safety fix means a composed body now legitimately CONTAINS M30s (the error halts). 3 framing assertions counted raw M30s and 1 index-based check found the first M30. Migrated them to count/locate the PROGRAM TERMINATOR only (a BARE `M30` on its own line) -- the guarded invariant is unchanged (exactly ONE terminal end, none in the middle of the SUCCESS flow), it is just now expressed precisely. My own cam-substack-modal test was updated for the new part-scoped row keys.
+- FULL GATE: 1413 passed, 0 failed, 4 skipped (12.1m) -- CLEAN, no flake, no infrastructure issue. 1413 = 1411 baseline + the 2 new S5 tests.
+
+### GATED (per GATE-IF-BALLOONS, after the two highest-risk items)
+- (3) SCRATCH-VAR COLLISION (varOffset >= 10 vs the mill generators' hard-coded scratch #20-#33) -- needs a per-post vet + a collision-free allocation; not started.
+- (4) defV STALENESS (the opunit carries defV as the routing/version key) -- needs the "can a stale defV silently route a changed def to the wrong generator shape" question answered; not started.
+Reason to gate here: item (1) CHANGES THE EMITTED G-CODE of every probe/mill slot (a safety-motivated change worth its own review) and already touched 9 generators + the shared framing + the modal keying + 5 test files.
+
+### STATE: the two highest-risk S5 items are done -- an erroring (or cancelled) part can no longer run into the next part motion, and two parts sharing a param name stay independently addressable. (3) + (4) remain. No release from me.
+
+---
+
+## turn 1079 -- S5 (4) defV STALENESS: DONE. S5 (3) SCRATCH-VAR COLLISION: **GATED with findings** -- the grounding proved the bug is REAL and WORSE than the brief, and that a collision-FREE declared allocation is materially bigger than "a declared band the allocator reads". GROUND-FIRST (1 Explore agent, exhaustive).
+
+### (4) defV STALENESS -- FIXED by declaration, one-source
+FOUND: the opunit's `defV` is WRITTEN at both wrap sites (devMode.js:451 load-wrap, :498 save-wrap) but NEVER READ -- subStackToSlot routes on `opType` alone. So the real hazard was live: deriveStandardParams reads the opunit's (older-shape) children through the CURRENT def's FROZEN bindings (blockIndex over the CURRENT template). If the user edits the twin's def after forking, a shape change makes it silently read the WRONG sockets -> wrong params -> wrong G-code, with nothing to show for it.
+REUSED THE EXISTING DECLARATION (not a new one): a defV staleness rule already existed inline in programModel.staleMarkedOps (the import transparency check, `cur > 0 && was < cur`). Extracted it as ONE exported rule `defVStale(stampedV, currentV)` next to `defVOf` in userOps.js, and pointed BOTH consumers at it (programModel's import check + the new CAM sub-stack check) so "what counts as stale" can never drift between them.
+FIX: subStackToSlot's standard route now checks the opunit stamp. On STALE it REFUSES the frozen-binding re-derivation and instead UNROLLS the atoms actually present (correct by construction -- value params exposed, geometry baked), and NAMES the degradation everywhere it is visible: the part header/slot name gets "(def vN->vM -- unrolled, no longer live)" and the macro body gets a "STALE SUB-UNIT ... re-fork the op to restore the live generator" comment. A CURRENT sub-unit is untouched -> no false degradation.
+VERIFIED (cam-substack-s5.spec.js, 3rd test): a stale stamp unrolls + names the version jump + carries the macro explanation + is NOT a live loop; a current stamp stays a LIVE generator loop.
+
+### (3) SCRATCH-VAR COLLISION -- GATED. The measured reality (all verified by RUNNING the real generators)
+THE BUG IS REAL AND WORSE THAN THE BRIEF:
+- `f.var = '#' + (varOffset + i + 1)` -- the LOCAL body var. Unlike `f.idx` (the #11xx form param, pooled via nextParam with a `used` set) the LOCAL var has NO pool, NO used-set and NO upper bound; varOffset is a running sum of field counts.
+- Mill scratch band is CONTIGUOUS #20-#33 (generator #20-#26 + camMacroKit raster/ring #27-#33). Surfacing and Pocket have 10 fields each -> the FIRST colliding offset is varOffset >= 10, i.e. ANY 2-part mill slot.
+- MEASURED, 2 parts (Surface + Pocket): part 2's `rpm` field is `#20`; the pocket then emits `#20=0 ;origin X`, so `M3 S[#20]` emits **S0 -- the spindle is commanded to ZERO RPM**.
+- MEASURED, 3 parts (Surface + Pocket + Surface, part 3 at varOffset 20): TEN vars double-written (#21,#23,#24,#25,#26,#27,#28,#29,#30,#31) -- feed/plunge/clearance/rpm become the raster row-count, depth counter and row index. An uncontrolled feed/plunge/clearance is a CRASH CLASS, not cosmetic.
+- BEYOND THE BRIEF: the UNIVERSAL arm (stackToSlot) is ALREADY BROKEN AT varOffset = 0 -- emitMapped injects wizard-op + dialect scratch defaults (#5 #6 #9 #10 #17-#24 #42 #43 #50 #52 #53 #57 #95 #99 #190 #191) into the same low band the field vars start in, so a universal op with >=5 exposed bindings over a probe/safe-Z atom collides WITHOUT any composition.
+- NO GUARD EXISTS: validatePack + slotPack.collisions check only `f.idx` (#11xx), never `f.var`. varMap deliberately declares #1-#99 "SCRATCH -- untracked by design". The only acknowledgements are PROSE header comments the allocator never reads -- and TWO OF THEM ARE FACTUALLY WRONG (camMacroKit says raster is #27-#32, it is #27-#33; probeToSlot claims it is "clear of drill/bore's #30-#54" while the probes write #50-#61). A declaration must be derived from the CODE, not those comments.
+
+WHY I GATED INSTEAD OF BUILDING (the brief assumed a smaller shape):
+1. NO POST AWARENESS TO HANG "per-post" ON. millToSlot/probeToSlot/opToSlot/camMacroKit import NOTHING from wizards/dialects -- they hard-code Expert syntax (G31 P/L/Q1, #1505, #578, #[#70], #1078/#1080). Only stackToSlot goes through activeDialectOpts. "Vet PER-POST" therefore means first threading a dialect (or a resolved band) into 4 post-blind files / 9 generator entry points that are guarded by byte-stable goldens.
+2. THERE IS NO SECOND POOL TO ALLOCATE FROM. `used` is a Set of #11xx only. A collision-free local-var allocation needs a SECOND tracked pool threaded through allocFields, allocFieldsWith, slotFromOp, stackToSlot, subStackToSlot, buildSlotFromOps AND the manual add-field door (macrosApp mints `'#' + (slot.fields.length + 1)` with no allocator at all).
+3. A BAKE GAP BREAKS THE ARITHMETIC INVARIANT: `f.var` uses the SPEC index but callers advance varOffset by `fields.length` (the EXPOSED count). Measured: baking one pocket field gives fields.length 9 but vars up to #10. Any allocator must advance by specLen -- and the moment the bake UI ships, today's offsets silently overlap.
+4. THE UNION IS CROSS-PART: part 1's field vars must avoid part 2's scratch (they coexist in one program), so the COMPOSER must compute the union of every part's declared band up-front and push it down -- the allocation contract changes, not just a constant.
+5. RELEASE IMPACT: any change to local-var numbering changes the emitted G-code of EVERY existing slot, so every installed macro_camNN.nc must be rebuilt + reinstalled (on top of the same caveat the S5(1) safety fix already carries).
+6. alignmentSlot RE-PURPOSES #70/#71/#72 with a DIFFERENT meaning from wcsBase's #70/#71/#73, so a naive "each helper owns a band" declaration would either false-conflict or mis-declare.
+
+OPTIONS I PUT TO THE ADVISOR (my recommendation = A then B):
+A. DECLARE THE BANDS + DETECT LOUDLY (small, no emitted-G-code change, no release impact): derive a per-generator scratch band FROM THE CODE as inert data (the one-source foundation the real fix needs anyway), and make the build/validate path FAIL LOUDLY when an allocated field var lands inside the union of the composed parts' bands. Turns today's silent S0/crash-class emit into a refusal the user can see. Ships this turn.
+B. THEN COLLISION-FREE ALLOCATION (the real fix, its own slice): composer computes the union, allocFieldsWith allocates local vars from a free iterator that skips it (advancing by specLen, closing the bake gap), and the band becomes dialect-keyed for the per-post vet. Changes emitted G-code everywhere -> golden churn + a rebuild-and-reinstall release note.
+C. (separate, also needed) the UNIVERSAL-arm collision at varOffset 0 -- needs the ~8 wizards/ops files + the dialects to DECLARE the scratch they inject before the CAM allocator can avoid it.
+
+### VERIFIED
+- cam-substack-s5.spec.js now 3 tests (the new defV staleness one + the S5(1) safety + S5(2) duplicate-key from last turn).
+- FULL GATE: 1414 passed, 0 failed, 4 skipped (12.0m) -- CLEAN. 1414 = 1413 + the new defV-staleness test.
+
+### STATE: (4) done. (3) GATED with a measured design fork -- it is a REAL safety bug (S0 spindle at 2 parts, crash-class at 3) but a collision-FREE fix changes emitted G-code everywhere and needs an allocation-contract change plus per-post threading into post-blind generators; I did not want to half-build that on a safety path. No release from me.
+
+---
+
+## turn 1081 -- S5(3) SLICE A: DECLARE the generator scratch bands + make the build REFUSE LOUDLY. Per the advisor ruling (A now, B as its own slice, C after). NO renumbering, NO emitted-G-code change, NO release impact.
+
+### BUILT (1) the DECLARATION -- inert data, derived from the CODE
+NEW web/data/camScratch.js: `SCRATCH_BANDS` maps each camType (the CAM_GEN keys corner/edge/zprobe/inside/boss/align/pocket/cpocket/surface + the slotFromOp types drill/bore/slot) to the inclusive [lo,hi] macro-var bands that generator actually writes. Every band carries a CITATION to the assignment that proves the number (millToSlot :74-82/:111-114/:142-149 -> #20-#26; camMacroKit rasterClear :92-123 -> #27-#33; ringClear :147-168 reuses #27/#28/#29/#33; wcsBase :46-48 + writeAxis :51-55 -> #70/#71/#73; probeToSlot probe temps :223/:261/:344-359/:427-443/:501-527 -> #50-#61; signs/targets -> #90-#97; corner radius-comp :104 -> #101/#102; alignment :491/:493 re-purposes #70/#71/#72 with its OWN meaning; opToSlot :78-86 -> #40/#41 and :56-58/:95-115 -> #50-#54). The module imports NOTHING (pure data + two pure fns) so it cannot cycle.
+FIXED THE TWO MISLEADING COMMENTS in the same pass (the advisor called them out as actively dangerous):
+- camMacroKit header said the raster band was "#27-#32" -- WRONG, rasterClear also writes #33 (the ramp lead-in length). Corrected to #27-#33.
+- probeToSlot header said the probes were "clear of drill/bore's #30-#54" -- WRONG in the DANGEROUS direction: the probe slots write #50-#61, which OVERLAPS opToSlot's #50-#54 pattern-loop vars, so a probe and a drill must NOT be composed on the assumption they are disjoint. Corrected + the real bands listed.
+Both corrected comments now POINT AT camScratch.js as the authoritative source ("the prose is a pointer, never the source") so they cannot drift again.
+
+### BUILT (2) the GUARD -- a loud, named REFUSAL (never a silent skip)
+- camScratch.fieldVarCollisions(fields, ops): for each built field var, is its number inside the band its OWN generator writes? (WITHIN-part -- see the correction section below.) Returns [{varNum, field, ownerOp, ownerType, clashType}] -- empty means safe. Pure + read-only.
+- camScratch.collisionMessage(cols): the operator-facing refusal -- names the VARIABLE, the FIELD, the owning op and the clashing generator, states the consequence in operator terms ("the machine would run with the wrong numbers, e.g. spindle speed forced to 0") and gives the way out ("Build them as separate slots for now").
+- macrosApp.cbmBuild REFUSES BEFORE the destination prompt (so the user is never asked where to put a slot that cannot be built) -- nothing reaches the pack.
+- macrosApp.buildSlotFromOps records slot.varCollisions so the state is available to the table/validator.
+- slotPack.validatePack raises them as ERRORS (not warnings) so a slot BUILT BEFORE this guard existed cannot pass validation silently.
+
+### VERIFIED -- two-method (diff + VIEWED) + 3 tests
+cam-scratch-guard.spec.js (NEW, 3):
+1. DETECTION + the real hazard: the declared mill band covers #20/#26/#27/#33 (incl. the #33 the old prose omitted); a 1-PART mill slot has ZERO collisions (no false refusal); a 2-PART slot collides on #20; and the hazard is proven in the EMITTED G-CODE, not just arithmetic -- part 2's rpm field IS #20, the pocket body WRITES that same var as scratch, and it commands `M3 S[#20]`, i.e. S0.
+2. validatePack ERRORS on an already-built colliding slot (naming cam22 + #20) and still passes a clean single-op slot.
+3. THE REAL SYMPTOM through the REAL UI: a program with two mill ops -> auto-imported into the CAM builder -> pressing Build REFUSES with the named message and the pack stays EMPTY (0 slots).
+VIEWED: cam-s5-collision-refusal.png -- the dialog reads "This slot cannot be built: 1 form value would be overwritten by a generator's working variables. #20 -- Spindle RPM (op 2) is overwritten by the pocket generator's own working variables ... e.g. spindle speed forced to 0. Build them as separate slots for now."
+BYTE-IDENTITY: this slice touches NO emit path (camScratch is new and only READ by the guard; the two edits to the generators are COMMENTS), so every existing slot's G-code is unchanged by construction -- and the suite's golden / byte-diff-ZERO tests are the proof.
+FULL GATE: 1417 passed, 0 failed, 4 skipped (12.1m) -- CLEAN. 1417 = 1414 + the 3 new guard tests. NOTE: an earlier run of the SAME tree reported 11 SCATTERED failures at 16.6m across unrelated areas (carve-fidelity, comm-dwell, collapsible-panes, coord-list, corner-marker, drill-canvas, gui-param-block, homing-engine ...); ALL of them PASS IN ISOLATION. The box was concurrently running another agent's wrangler dev + an http-server + four @playwright/mcp servers -- CPU contention, not a code fault (and not my tree to reap). I re-ran on a fresh server rather than declare it green on my own say-so.
+
+
+### THE CORRECTION THE GATE FORCED -- the rule is WITHIN-PART, not cross-part (worth recording)
+My first draft flagged a field var landing in ANY part's band. The full gate caught that as a FALSE REFUSAL: the existing
+S-C multi-op test (surfacing + drill + probe-corner -> ONE composed slot) started failing, because drill's field vars
+#11-#24 fall inside SURFACING's #20-#33 band. Reasoned it through against the emitted program and it is benign: the
+composed parts run SEQUENTIALLY and each generator emits its OWN readLines at the top of its OWN part (slotMacro only
+prepends reads when a body has none, which never happens for a generator body). So part 1's scratch is already dead when
+part 2 reads its fields, and part 1's fields are dead before part 2's scratch runs -- a cross-part overlap is harmless
+re-use of a volatile var. The REAL hazard is a part whose OWN field var sits in the band its OWN generator writes DURING
+that same part -- exactly the S0 case (pocket's rpm lands on #20, then the pocket sets #20=0 as its origin X, so
+`M3 S[#20]` commands S0 mid-part). Narrowed the rule to WITHIN-PART: the S0 case is still refused, the legitimate 3-op
+composition builds again, and the message now reads "is overwritten by the <generator>'s own working variables".
+LESSON: an over-approximating safety guard is not free -- it silently disables a working feature. The gate caught it.
+
+### STILL OPEN (the advisor's sequence)
+- (B) the real COLLISION-FREE allocation: composer unions the bands, allocFieldsWith allocates local vars from a free iterator that skips them, advancing by specLen (which also closes the BAKE GAP where f.var uses the spec index while callers advance by the exposed count). WILL renumber emitted G-code for every installed slot -> its own review + a rebuild-and-reinstall release note.
+- (C) the UNIVERSAL arm, already colliding at varOffset 0 because emitMapped injects wizard-op + dialect scratch (#5 #6 #9 #10 #17-#24 #42 #43 #50 #95 #99, and #190/#191 on V4.1/DM500) into the same low band; needs those wizards/ops + dialect files to DECLARE what they inject before the CAM allocator can avoid it. NOTE: the guard added here does NOT cover that arm (no declaration to read yet) -- a universal/substack op contributes no band, so it is detected only for the generator parts.
+
+### STATE: the silent S0 is dead -- a slot whose form values would be clobbered by a generator's scratch now REFUSES by name at build time and FAILS validation if it was built earlier. Nothing was renumbered. B and C remain. No release from me.
+
+---
+
+## turn 1083 -- S5(3) SLICE B: the COLLISION-FREE local-var allocation. Built (no gate needed -- the composer contract did NOT have to change, because slice A proved the rule is WITHIN-part).
+
+### THE KEY SIMPLIFICATION (why no composer contract change was needed)
+The advisor GATE-IF-BALLOONS condition was "if the cross-part union turns out to be needed after all". It is NOT: slice A established (and the advisor verified on the real composed program) that the hazard is WITHIN-part -- a part can only be clobbered by its OWN generator, because composed parts run sequentially and each generator emits its own readLines inside its own part. So each generator only has to avoid ITS OWN declared band. No union, no cross-part threading, no composer contract change.
+
+### BUILT
+- camScratch.js (already the ONE source for the bands) gains the two allocation primitives -- NOT a second copy of the band data:
+  * nextLocalVar(from, avoid) -- the next local var number at/after `from` that is not inside `avoid`.
+  * maxLocalVar(fields) -- the highest var a field list ACTUALLY minted.
+- probeToSlot.allocFields / allocFieldsWith take an `avoid` band and mint `cur = nextLocalVar(cur + 1, avoid)` instead of the positional `varOffset + i + 1`. All 9 generators pass their OWN band via bandsFor(<camType>) -- reading the declaration, never re-deriving it.
+- opToSlot's inline allocator (drill/bore/slot) and stackToSlot's inline mint now use the same helper. NB stackToSlot passes an EMPTY avoid: the universal arm has no declared band yet (that is slice C), so its numbering is unchanged.
+- THE BAKE GAP, CLOSED BY CONSTRUCTION (requirement 2): the old code minted from the SPEC index while callers advanced by `fields.length` (the EXPOSED count), so the moment a param was baked the two diverged. Now (a) a BAKED param mints no var at all, and (b) the composer advances from camScratch.maxLocalVar(fields) -- i.e. FROM WHAT WAS MINTED. There is no second counter to keep in step, so they cannot disagree. Applied in buildSlotFromOps and in all four subStackToSlot call sites.
+- THE MANUAL ADD-FIELD DOOR (the 7th call site) now ALLOCATES too: it was minting a bare `'#' + (slot.fields.length + 1)`; it now mints past the slot's high-water mark, skipping every band its ops write. No UI change was needed -- everything it needs is already on the slot (slot.ops + slot.fields).
+- SLICE A'S GUARD IS RETAINED AS THE BACKSTOP (requirement 3), untouched and still loud: after B a collision should be impossible, so the guard firing means a regression.
+
+### BEFORE / AFTER for a representative slot (requirement 4) -- the diff is ONLY renumbering
+  part 1 (surfacing, single-op)  OLD #1 ... #10          NEW #1 ... #10           <- IDENTICAL
+  part 2 (pocket, composed)      OLD #11 ... #19, #20    NEW #11 ... #19, #34     <- only the var that
+                                                                                    would have landed in #20-#33 moved
+  part 2 spindle line            WAS  M3 S[#20]   (the pocket then wrote #20=0 -> S0)
+                                 NOW  M3 S[#34]   (nothing else in the part writes it)
+RELEASE-NOTE FINDING, and it is much better than we assumed: a SINGLE-OP slot is BYTE-IDENTICAL. The renumbering is surgical -- only a var that would have landed inside its own generator's band moves, and every generator's field count keeps a 1-part slot below its own band (mill 10 fields vs band #20+, corner 12 vs #70+, drill ~14 vs #40+). So installed SINGLE-OP slots do NOT need rebuilding; only MULTI-OP slots renumber -- and those were emitting wrong G-code anyway, so they must be rebuilt regardless. The suite's golden / byte-diff-ZERO tests are the proof that the single-op path did not move.
+
+### VERIFIED
+- cam-scratch-alloc.spec.js (NEW, 3): a 2-part AND a 3-part mill slot allocate with ZERO collisions and no field var in #20-#33; every spindle var is assigned EXACTLY ONCE (its own readLine) -- the S0 bug is structurally gone; the BAKE GAP is closed (baking two pocket params no longer makes the next part overlap); and a 1-part slot is renumbering-only (its program SHAPE -- the live raster loop, the spindle line, the line count -- is untouched).
+- cam-scratch-guard.spec.js MIGRATED (3): slice A's guard can no longer be triggered by real generator output, which is the point. It is now proven on SYNTHETIC fields (still detects, still names the variable/field/generator/consequence) while asserting the REAL 2-part composition gives it NOTHING to catch; validatePack still errors on a synthetic colliding slot and now PASSES a real composed one; and the UI test flips from "Build refuses" to "Build SUCCEEDS", landing one 2-op slot with zero recorded collisions, no var in the mill band, and every spindle var assigned once.
+- TEST MIGRATION (one, and it is the bake-gap fix landing): cam-allocfields-superset asserted `baked.v.slow === '#7'` with the comment "#-var stays positional (varOffset+i+1) by spec index" -- i.e. it PINNED the hole a baked param used to burn. That hole WAS the bug (mint by spec index vs advance by exposed count). Migrated to '#6' plus a NEW positive assertion `contiguousAfterBake` (the surviving vars are #1..#6 with no gap), so the suite now guards the FIX instead of the defect. The spec's main equivalence property (allocFieldsWith == allocFields when nothing is baked) still passes untouched across all 27 cases -- with nothing baked the cursor and the old positional index advance in lockstep.
+- FULL GATE: 1420 passed, 0 failed, 4 skipped (12.0m) -- CLEAN. 1420 = 1417 + the 3 new allocation tests. The golden / byte-diff-ZERO suite passing UNCHANGED is the proof that the single-op path did not renumber.
+
+### STILL OPEN
+- (C) the UNIVERSAL arm at varOffset 0: emitMapped injects wizard-op + dialect scratch (#5 #6 #9 #10 #17-#24 #42 #43 #50 #95 #99, and #190/#191 on V4.1/DM500) into the same low band a universal op's field vars start in. stackToSlot is already wired to the shared minting helper, so slice C is now just "declare what those wizards/ops + dialects inject and pass it as `avoid`" -- the allocation machinery is in place.
+
+### STATE: the collision is now IMPOSSIBLE by construction for every generator arm, not merely detected; the bake gap is closed by construction; the manual door allocates; slice A's guard remains as a loud backstop. Single-op slots are byte-identical, so the release note narrows to multi-op slots. No release from me.
+
+---
+
+## turn 1085 -- S5(3) SLICE C: the UNIVERSAL arm. Built. The GATE-IF-BALLOONS condition was measured and did NOT fire.
+
+### THE GATE CONDITION, ANSWERED BEFORE BUILDING (this was the whole risk of the slice)
+The advisor's stop condition was "if declaring the dialect-injected scratch requires touching the dialect contract for every
+post, STOP". I grounded it before writing a line, because two things could have forced the gate:
+  (a) camScratch.js is DELIBERATELY a leaf that imports nothing -- six data/ consumers plus macrosApp lean on that, and
+      probeToSlot even imports distmode "LIGHT" specifically to dodge the safeZframe -> blockEmitter -> saferetract cycle.
+      Aggregating declarations owned by wizards/ops/* and wizards/dialects/* would need camScratch to import them.
+  (b) the dialect contract itself.
+Both measured NO:
+  - NO CYCLE. The transitive ESM closure of wizards/ops/index.js (88 files) touches only two files under data/
+    (rotateProgram, simMarkers) and reaches camScratch or any of its importers by NO path. wizards/dialects/index.js is 8
+    pure leaves importing nothing under data/. And the edge already SHIPS in the other direction: data/exposeClassifier.js
+    imports wizards/ops/index.js today, and stackToSlot already imports exposeClassifier + blockEmitter + previewEmit, so
+    the universal arm ALREADY pulls the whole ops+dialects graph. Nothing new is risked on that arm.
+  - THE DIALECT CONTRACT DOES NOT CHANGE FOR EVERY POST. dialects/index.js getDialect/resolveActivePost return the dialect
+    object BY REFERENCE -- no clone, no pick, no key whitelist -- and the DEFAULT_CAPS merge is scoped to `caps` only, so a
+    new TOP-LEVEL key never enters it. There is already a live precedent for exactly this shape: `missScratch` is a
+    top-level key on V4.1 and DM500 and on NO other post, absent from the SCHEMA.md contract block, feature-detected at
+    every read site. Only 3 posts needed a `scratch` key; centroid/rs274ngc/grblHAL/grbl inject nothing and were untouched.
+
+### WHERE THE DECLARATIONS LIVE (requirement 1) -- at the injection site, never in the aggregator
+  - def.scratch on the palette atom that injects it: proberead #50, readmachine #57, tooloffset #102, machinemove #99,
+    assign #100, asknumber #100, radiuscomp #6+#50, wcsbaseinto #70, wcswrite #6+#70, setworkoffset #50, corner_config
+    #30-#31, saferetract #17, safehop #95, clearlift #17+#95.
+  - dialect.scratch on the post that injects it: Expert [[42,43],[70,72],[150,152]], V4.1 [[190,191]], DM500 [[17,17],[190,190]].
+  - PROBE_SURFACE_SCRATCH exported from wizards/ops/probeSurface.js -- that module is a STACK BUILDER, not a palette def, so
+    it has no def.scratch to carry #5/#6/#9/#10 and the outright `push('assign', { var: '#22' })` WRITE. Declaring it as a
+    module export keeps it next to the code that injects it, which was the requirement.
+  - Additive by measurement: there is no def validator, no key enumeration and no ALLOWED_KEYS anywhere in the repo outside
+    vendor Blockly; every consumer reads NAMED keys off BLOCKS. Optional keys already vary per def (hidden/help/dynamic).
+
+### THE AGGREGATOR IS A NEW MODULE, NOT MORE OF camScratch -- and that is deliberate
+data/universalScratch.js does the aggregating. It could have gone in camScratch, but that would have cost the leaf property
+camScratch's own header advertises and probeToSlot's cycle-dodge comment relies on. Only stackToSlot imports the new module,
+and stackToSlot already had both registries in its closure, so the edge costs literally nothing. camScratch stays the one
+place that aggregates GENERATOR bands; universalScratch is the one place that aggregates INJECTED bands. Neither copies the
+other's facts, and adding a post or an atom needs no edit in either.
+IT READS LAZILY, INSIDE A FUNCTION. wizards/ops/index.js sits in a live import cycle
+(ops/index -> saferetract -> safeZframe -> blockEmitter -> ops/index) which is benign ONLY because no module reads BLOCKS at
+top level -- every existing consumer reads it inside a function body. A module-top-level `const BANDS = ...` here would be a
+TDZ crash. The functions follow the existing rule.
+THE BAND IS THE UNION ACROSS ALL ATOMS, not only the atoms in one stack. A custom op is composed freely and can be edited
+after the slot is built; the union is ~14 numbers wide; being wrong-by-omission re-introduces the exact bug being fixed.
+Cheap to over-avoid, expensive to under-avoid.
+THE POST IS RESOLVED AT ALLOCATION TIME from activeDialectOpts() -- the very call stackToSlot already makes to EMIT the body
+-- so the band is per-post correct by construction and never hard-coded to Expert. No new import, no new resolution path.
+
+### THE MINT (requirement 2)
+stackToSlot's `const avoid = bandsFor(null)` (empty since slice B) becomes `universalBands()`. The minting machinery was
+already the shared helper, so this is a one-line change: slice B built the mechanism, slice C supplies the data.
+
+### THE GUARD (requirement 3) -- extended, and I checked it was actually blind first
+fieldVarCollisions gained an optional `bandsOf` resolver defaulting to camScratch's own bandsFor. macrosApp -- which already
+imports everything -- passes `camBandsOf`, mapping 'universal' to universalBands() and everything else to bandsFor. Wired at
+all three call sites (the cbmBuild pre-flight refusal, the buildSlotFromOps record, and validatePack via a new optional opts).
+validatePack itself does NOT import universalScratch: slotPack is imported by probeToSlot and every generator arm and is
+deliberately light, so the caller injects the resolver instead. The test proves the gap was real: with the default resolver a
+universal field parked on #95 returns ZERO collisions (invisible), with camBandsOf it is detected and named.
+
+### BEFORE / AFTER (requirement 4) -- the diff is ONLY renumbering, proven mechanically not by eye
+I ran the HEAD copy of stackToSlot side by side with the new one in the same page (git show HEAD:... into web/data/ as a temp
+sibling -- identical relative imports resolve from data/, so it is the REAL old code, not a re-implementation). A 12-param
+universal op:
+  OLD vars  #1 #2 #3 #4 #5 #6 #7  #8  #9  #10 #11 #12
+  NEW vars  #1 #2 #3 #4 #7 #8 #11 #12 #13 #14 #15 #16
+  skipped   #5/#6 (probe port + tool radius) and #9/#10 (last retract) -- exactly the declared band, nothing else
+  #11xx pool allocation IDENTICAL (1100..) -- only the LOCAL body var moved
+  BODY: mapping each NEW var back to its OLD var makes the two bodies BYTE-IDENTICAL. Same lines, same order, same operators,
+  same literals, same mirror reads. The only difference is the number.
+  And the OLD numbering DID collide (4 of its 12 vars sat on injected scratch) -- that is the defect, confirmed on the real
+  old code rather than argued from the new.
+The temp sibling + the temporary spec were deleted after measuring.
+RELEASE NOTE, and it narrows the same way slice B did: a universal op with 4 or fewer exposed params is BYTE-IDENTICAL
+(#1-#4 sit below everything the emit path injects). Only ops with enough exposed params to reach #5 renumber -- and those
+were emitting wrong G-code, so they must be rebuilt regardless. The existing cam-stack-to-slot spec, which PINS #1/#2, passes
+untouched -- that is the proof the small-op path did not move, and it needed no migration.
+
+### VERIFIED
+- cam-universal-scratch.spec.js (NEW, 3): (1) the band is READ from the injection sites -- each atom's def.scratch asserted
+  individually, the composer's export asserted, then the aggregate asserted to cover all 15 numbers; per-post, Expert
+  contributes #42/#43 + #70-72 + #150-152, V4.1 #190/#191, and grbl contributes NOTHING (the optional key stays optional),
+  so an Expert slot avoids strictly more than a grbl slot. (2) a universal slot mints around the band, skipping exactly
+  #5/#6/#9/#10, with the #11xx pool untouched and every renumbered var still read from its own #2600 mirror; the 4-param
+  case still gets #1-#4. (3) the guard backstops the universal arm -- silent on real output, loud + named on a synthetic
+  #95, and PROVABLY blind without the resolver.
+- NO TEST MIGRATION was needed this slice. cam-stack-to-slot pins #1/#2 and still passes.
+- FULL GATE: 1423 passed, 0 FAILED, 4 skipped (12.0m) -- CLEAN. Grepped the failed count, not just the tail. 1423 = 1420 + the
+  3 new slice-C tests. The pre-existing cam-stack-to-slot spec, which PINS #1/#2, passed with NO migration -- that is the
+  proof the small-op universal path did not renumber.
+
+### MY OWN REAL-APP CHECK -- and a WARNING about the advisor ACCEPT method
+I drove the actual CAM authoring UI (not a proxy) on a universal-routing op, twice, and BOTH produced a slot with ZERO
+fields, so neither could demonstrate the fix:
+  - contour (routes universal: no generator) -- all params are geometry, nothing exposable. Valid baked toolpath emitted.
+  - drill with pattern=single (routes universal per opCamMap) -- the modal renders 34 Expose radios and EVERY ONE OF THEM
+    IS DISABLED. Not a click that missed: I queried the DOM directly (34 total, 0 enabled).
+IMPORTANT FOR THE ADVISOR: the ACCEPT method as written -- "I will build a universal custom-op slot and check that NO field
+var collides" -- will be VACUOUS if the slot is built through the CAM modal from a DATA-OP TWIN, because the slot comes out
+with 0 fields and therefore 0 local vars and trivially 0 collisions. It proves nothing either way. To exercise the arm, the
+op must be a FORKED custom op with VALUE bindings (feed / plunge Z / cut feed), which is what cam-universal-scratch and the
+pre-existing cam-universal-route U3 use -- there the value params ARE exposable and the vars really are minted.
+I CHECKED THIS IS NOT MINE: I stashed every one of my web/ changes, re-ran the same DOM query against HEAD, and got the
+IDENTICAL 34 total / 0 enabled, then restored. So the all-disabled state is PRE-EXISTING, not a regression from this slice.
+Whether it is a defect in its own right is a separate question I did not touch (depth / peck / feed / Spindle RPM look like
+value params that ought to be exposable on a drill twin) -- flagging it, not fixing it, since it is out of this task's scope.
+
+### STILL OPEN / NOTED
+- data/varMap.js RESERVED was a FOURTH, pre-existing and stale declaration of the same class of facts (it carries
+  #520/#42/#43/#191 but not #190/#95/#17/#70-72/#150-152/#30-31/#99/#100). It has NO code consumer -- it is ownership prose.
+  I did NOT fold it in (that would make it a second copy of facts now owned at the injection sites, the exact thing the
+  requirement forbids) and I did not delete it (it records arguments -- why #520 is read-only, why V4.1 cannot use #42/#43 --
+  that live nowhere else). I DEMOTED it in place: its header now says it is not the scratch-band source, is deliberately
+  partial, and points at the three real declaration surfaces. Flagging it rather than silently reshaping someone else's doc.
+- Explicitly-parameterised vars inside a custom op's own stack (a user who types #22 into an assign block) are the AUTHOR's
+  vars, not injected defaults, and are outside this band by design. Worth a look if it ever bites, but it is a different
+  class from the defect this slice fixes.
+
+### STATE: all three arms -- generator, opToSlot and now universal -- mint collision-free by construction, and the guard
+backstops all three. The universal arm was broken at ONE part, before any composition; it no longer is.
+
+---
+
+## turn 1087 -- GATE (no build). The all-disabled Expose radios are NOT the missing-role cause. Measured, not argued.
+
+### THE DISPATCHED HYPOTHESIS, AND WHY IT DOES NOT HOLD
+The advisor's read was: exposeClassifier defaults an unknown atom to geometry (fail-safe), the toolpath/drill kernels were
+never added to atomRoles.js, so every param falls through to bake-only -- and the fix is to DECLARE those roles. I was told to
+confirm or correct that with measurement first, and to STOP if the cause is something else. It IS something else.
+
+I dumped, for the drill twin, which atom each of the 34 params resolves to and why the classifier greyed it.
+
+RULED OUT FIRST (the two alternatives worth eliminating):
+  - NOT the bindingSpecs fail-closed path (exposeClassifier.js:70, which blanket-bakes a guarded def): the drill twin has
+    bindingSpecs=false.
+  - NOT "the binding never reaches the classifier": all 34 value bindings resolve to a REAL atom (toolsel, wcs, placeonstock,
+    array, drill, progstart, entry). Nothing is dropping out.
+Every one of the 34 is greyed for the SAME stated reason -- role is geometry.
+
+THE ACTUAL SPLIT (three causes, and the dispatched one is not among them for the params that matter):
+
+(A) 4 params are DECLARED geometry ALREADY, and the declaration is CORRECT. These are exactly the four the dispatch named as
+    "value params that ought to be exposable" -- depth, peck, feed, rpm. atomRoles.js:36-44 declares them deliberately, under
+    the header "Toolpath kernels: build a JS loop -> EVERY key runs num()", and progstart carries the explicit note
+    "rpm is num() here (contrast spindle.rpm)". I verified against the EMIT, not the comment (project rule):
+      drill.depth / drill.peck -- drill.js:12-26. `depth = num(p.depth,5)`, `q = Math.max(0.1, num(p.peck, depth))`, then
+        `while (d < depth - 1e-6)` UNROLLS the peck sequence in JS and pushes a BAKED `G1 Z<literal>` per peck. These do not
+        merely get num()-coerced: they drive a JS loop bound and every Z literal is computed at build time. A #var cannot
+        drive a JS loop at all. Declaring them 'value' would emit a fixed 5mm 1-peck hole no matter what the operator dials
+        on the pendant -- silently wrong G-code, the exact hazard atomRoles' own header warns about.
+      drill.feed -- appears ONLY as `F${feed}` (drill.js:21). It COULD carry a #var mechanically. It is blocked because the
+        ATOM calls num(p.feed,100), not because a role is missing.
+      progstart.rpm -- program.js:20, `rpm: num(p.rpm, 0)` into headerBlock. Same shape as drill.feed.
+    So for (A) the role table is RIGHT and changing it is the wrong fix. Two of the four are structurally impossible to
+    expose; the other two need an ATOM EMIT change (num -> val), which is a different change in a different file.
+
+(B) 28 params belong to atoms genuinely ABSENT from ATOM_ROLES: toolsel, wcs, placeonstock, array, entry, stepdown,
+    contourfill. These DO fall through to DEFAULT_ROLE, so the dispatched mechanism is real here. But adding rows would
+    mostly declare 'geometry' ANYWAY -- they are datum corners and stock dims (placeonstock), pattern counts / pitches /
+    diameters expanded at BUILD (array), path coordinates (entry), and stepdown is a 'depth' fold that
+    BLOCKING_FOLD_KINDS blocks regardless of role. So declaring them would NOT move the radios. The advisor asked to be told
+    this rather than be handed roles that do not move anything, so: telling.
+
+(C) Nothing else. There is no third mechanism hiding.
+
+### WHY I DID NOT BUILD
+GATE-IF-BALLOONS said: if the cause is NOT the missing roles, STOP and gate back rather than build a fix for the wrong cause.
+Declaring roles for (B) is cheap inert data and I would happily do it, but it would produce a green diff, a passing gate, and
+ZERO movement in the radios -- it would LOOK like the feature was fixed while a drill twin still exposes nothing. That is
+worse than not doing it. And the fix for (A) -- flipping num() to val() inside the atoms -- changes EMIT for every existing
+consumer of those atoms including the goldens, which is not something to slip into a turn scoped as a role declaration.
+
+### THE FORK I AM HANDING BACK (my recommendation first)
+RECOMMENDED -- narrow the atom emits, param by param, verified by probe. For params that are PURE word interpolations
+(drill.feed -> `F${feed}`, progstart.rpm -> headerBlock rpm, and the same shape in bore/line/helix), change num() to val() in
+the ATOM and only then flip the role to 'value'. val() returns a number unchanged, so a numeric param stays byte-identical
+and the goldens should not move; a #var newly rides through. This gives the operator the knobs that actually matter on a
+pendant -- FEED and RPM -- which is most of the practical value of the feature. It does NOT touch depth/peck: those are
+structurally un-exposable and must stay geometry. NB progstart.rpm needs one extra check I did not do: headerBlock may test
+rpm numerically (e.g. rpm>0 to decide whether to emit M3), and a #var would break that test -- so that one is per-param
+verify, not a blanket sweep.
+ALSO WORTH DOING, independently and cheaply -- declare the 7 absent atoms (B) as inert data for honesty and so the fail-safe
+default stops silently absorbing them. Just do not expect radios to move; it is bookkeeping, not the fix.
+WORTH ASKING -- whether a toolpath data-op twin is even meant to travel the UNIVERSAL arm. drill/bore/slot already have a
+GENERATOR (opToSlot), and opCamMap only routes drill to universal when pattern==='single'. If the intended path for these ops
+is the generator, then "a drill twin exposes nothing on the universal arm" is a routing question, not a classifier bug, and
+the whole (A) atom-emit change may be unnecessary. I could not settle this from the code; it is a product call.
+
+### VERIFIED
+- The diagnostic was a throwaway spec (deleted after measuring). NO source changed this turn, so no feat commit and no gate
+  run -- there is nothing to regress. Everything above is a read of shipped code plus a runtime dump of the real classifier.
+- Confirmed once more that the all-disabled state is PRE-EXISTING: established last turn by stashing every web/ change and
+  re-running the same DOM query against HEAD (34 total, 0 enabled, identical).
+
+### STATE: the feature gap the advisor identified is REAL and worth fixing -- a user can build a CAM slot from the ops real
+programs use and expose nothing. But it is not a missing role, and the fix lives in the ATOM EMITS (or in routing), not in
+atomRoles.js. Awaiting direction on the fork above.
+
+---
+
+## turn 1089 -- SINGLE is a declared PATTERN, routed to the GENERATOR (the fix for the all-disabled Expose radios). Built.
+
+### THE THREE PRE-BUILD CONFIRMATIONS (I was told to check rather than obey, and all three held)
+(a) IS cutLines REUSABLE AS A PATTERN BODY? YES, and it is already exactly that. opToSlot.js:75 cutLines(method, v, doN) is
+    a standalone function whose own comment reads "the inline per-hole cut at the CURRENT X/Y", and every existing pattern
+    calls it the same way -- indent(cutLines(method, v, N), pad) -- passing the DO nesting depth. So single is not a new body
+    at all: it is a G0 to the anchor plus the SAME per-hole cut, with doN=1 because there is no surrounding pattern loop.
+    Nothing was copied or re-implemented.
+(b) DOES ADDING single DISTURB THE OTHER FOUR? No. PATTERN_FIELDS/PATTERN_LABEL are keyed lookups read only for the pattern
+    in hand, and the single branch returns EARLY in loopBody, above circle/line/grid and the rect fallthrough. A test asserts
+    all 8 method x pattern combinations still build with the per-hole cut nested below the pattern loop (DO2/DO3, never DO1).
+(c) IS THE posX/posY ANCHOR RIGHT FOR ONE HOLE? Yes, and single is the CLEANEST case. opCamMap.js:66 already carries the
+    t1051 fix (posX: ['originX','x0']) and it applies regardless of pattern. Better: the CAVEAT flagged at opCamMap.js:64 --
+    that a CIRCLE pattern's centre-vs-min-corner may differ by dia/2 -- CANNOT apply here, because one hole at the anchor has
+    no centre-vs-corner ambiguity at all.
+
+### WHY THIS BEATS THE ATOM-EMIT CHANGE (the advisor's reading, confirmed)
+The universal arm cannot expose depth/peck AT ALL -- not "does not yet", cannot. drill.js peckDrill drives a JS while loop,
+so the peck sequence is UNROLLED and every Z is a baked literal computed at build time (measured t1087). Through the
+generator the same knobs are a MACRO loop over the #2600 mirrors. Measured on the real emitted slot:
+      #4=#2603  ;Depth [mm] =5        #5=#2604  ;Peck [mm] =3
+      WHILE #41 LT #4 DO1 / #41=#41+#5 / IF #41 GT #4 THEN #41=#4 / G1 Z[-#41] F#6 / G0 Z#7 / END1
+That is depth AND peck live, not just feed and rpm, with NO atom emit touched -- so no other op can regress.
+AND IT IS THE COMMON CASE, NOT AN EDGE ONE: DRILL_DEFAULTS.pattern === 'single' (drillData.js:51), so the DEFAULT drill twin
+was the one going to the worst arm.
+
+### THE RIDER (bookkeeping, explicitly not the fix)
+Declared the 7 atoms that were still falling through to DEFAULT_ROLE -- toolsel, wcs, placeonstock, array, entry, stepdown,
+contourfill. Every row read from the atom's own emit, per the module's stated ground-truth rule: array's numeric params all
+run num() into Math.round/trig inside patternPoints; contourfill's all run num() building a JS region; the rest are
+selectors or fold-internal. EVERY row is geometry/other, exactly as I predicted -- the classifier outcome does not change,
+and the test asserts NOTHING became exposable and the fail-safe default is untouched. The value is that the surface is now
+HONEST: a reader can tell "verified bake-only" from "never enumerated".
+
+### THE GATE CAUGHT TWO FAILURES, AND THE TAIL HID THEM
+First run printed "1426 passed / 4 skipped" -- but the total was 1432, so 1426+4 leaves TWO unaccounted. Grepping the failed
+count (not the tail) found "2 failed" above the summary. Exactly the trap in the check-suite-failed-count memory.
+  1. cam-op-seed.spec.js:64 -- DETERMINISTIC and legitimate. It asserted seedFromOp(drill, single).unsupported contains
+     'single' -- i.e. it PINNED THE GAP this task was dispatched to close. MIGRATED, not deleted: 'single' moved out of the
+     unsupported group into the camType group asserting drillSingle==='drill' and boreSingle==='bore', so the suite now
+     guards the FIX instead of the defect. The other three unsupported forks (middle single-axis, pocket polygon, contour)
+     are genuinely generator-less and stay. The strict toEqual on the camType map was extended with the two new keys.
+  2. preflight-badge-838.spec.js:119 -- NOT MINE and not deterministic. It expected a travel-limit dialog and got a
+     dead-spindle one; it touches nothing this turn changed (drill patterns / atom roles / routing). It PASSED in isolation
+     and PASSED in the clean re-run, so it was an ordering/state flake. I did not declare the gate green off the isolated
+     pass -- I re-ran the whole suite.
+
+### VERIFIED
+- cam-drill-single-pattern.spec.js (NEW, 5): routing (single and a pattern-less op both reach the generator, grid/circle
+  undisturbed, bore single reaches bore); the emitted slot (exact field list, every field read from its own #2600 mirror, a
+  MACRO WHILE loop stepping by the PECK var and bounded by the DEPTH var, Z as an EXPRESSION, and a positive assertion that
+  there is NO baked literal plunge Z anywhere -- that literal IS the universal-arm defect); the other four patterns intact;
+  the rider; and a REAL-SYMPTOM UI test driving the actual CAM modal on a DEFAULT drill twin.
+- MY OWN VIEWED SCREENSHOT (t1089-drill-single-modal.png), and it is the whole point of the turn:
+    BEFORE (t1087)  header "1. Drill -> universal", 34 rows, EVERY Expose radio DISABLED, pendant column all "baked = ..."
+    AFTER           header "1. Drill -> drill", 8 rows, every Expose ENABLED and selected, pendant column #1100->#2600 ...
+                    #1107->#2607, with Depth and Peck among them.
+- I also chased the empty inline-preview panel I noticed in that screenshot rather than leaving it as a hunch, because a
+  single hole is a degenerate zero-area bbox and could plausibly have broken a preview that scales to it. Measured: there is
+  no canvas element in the modal for EITHER single or grid, so the panel populates on Simulate. Pre-existing, not mine.
+- FULL GATE (clean re-run): 1428 passed, 0 FAILED, 4 skipped (11.8m). 1428+4 = 1432 = the full count, so nothing is hidden
+  this time. Failed-count grepped, arithmetic reconciled.
+
+### STATE: the default drill/bore twin now reaches the premium generator arm with depth/peck/holeDia as live pendant knobs.
+No atom emit was touched, so the deferred num->val change for drill.feed / progstart.rpm remains open and unprejudiced --
+and is now a smaller prize, since the generator route already delivers those two knobs for drill/bore.
+
+---
+
+## turn 1091 -- num->val for PURE word-interpolation FEED (line/drill/bore). Probed per-param, not swept. rpm GATED, clearance GATED.
+
+### THE DIRECTIVE, AND HOW I SCOPED IT BY MEASUREMENT
+The deferred item: change num->val for value params that appear ONLY as a bare word interpolation (F# S# Z#) with NO numeric
+test, NO arithmetic, NO loop-bound; flip the atomRoles role to value. Probe each rather than sweep (the advisor has been
+wrong on atom files three times). The named candidates were progstart.rpm and "the same shape in line/helix/bore".
+
+FIRST, the candidate set turned out narrower and wider than the names:
+  - helix is NOT a candidate at all -- helix.js is kind:'path' (a fold), and it has ZERO feed param. The feed-bearing bore
+    kernel is bore.js (helicalBore), block type 'bore'. So the three feed-bearing kernels are line, drill, bore.
+  - the advisor's own criterion "F# S# Z#" includes CLEARANCE (emitted as `G0 Z${clr}`), which the names did not mention. So
+    I probed clearance too rather than ignore it.
+
+### WHAT I FLIPPED: feed on line/drill/bore (num->val in the ATOM, role->value)
+Read each kernel's source and confirmed feed appears ONLY as `F${feed}` -- no test, no arithmetic, no loop bound:
+  - line.js lineCut:12    feed = num(p.feed,2000)  used only at `G1 Z.. F${feed}` / `G1 X.. F${feed}`
+  - drill.js peckDrill:13  feed = num(p.feed,100)   used only at `G1 Z[-#..] F${feed}`  (the loop is bounded by depth/peck,
+                                                     NOT feed -- feed is constant across the unrolled pecks)
+  - bore.js helicalBore:15 feed = num(p.feed,100)   used only at the various `F${feed}`
+Changed each `num(p.feed,X)` to `val(p.feed,X)` and imported val. val() returns a #var/[expr] string verbatim and a literal
+as r3(num(...)), so a numeric feed is BYTE-IDENTICAL (integer feeds are unchanged by r3) and a #var newly rides to `F#var`.
+Flipped line.feed / drill.feed / bore.feed from geometry to value in atomRoles.js.
+CROSS-CHECK on shiftZ: the zOff path-offset (shiftZ) rewrites Z words via /Z(-?\d*\.?\d+)/ -- it needs a DIGIT after Z, so an
+F word is never touched. Feed is clean regardless of zOff.
+
+### WHAT I DID NOT FLIP, WITH THE PROBE EVIDENCE (the two gates)
+progstart.rpm -- KEEP geometry. headerBlock (cuttingBlocks.js:23-25) does `const r = num(rpm,0)>0 ? num(rpm,0) : ...; if
+(r>0) L.push('M3 S'+r)`. rpm is in TWO numeric tests (gate M3, gate the spin-up dwell). A #var makes num('#2600',0)=NaN,
+NaN>0 is false, so THE M3 IS SILENTLY DROPPED -- spindle never starts. Probed empirically: injecting a #var rpm deleted the
+`M3 S...` line and shifted the body up. This is exactly the caveat I raised at t1087. NOT pure interpolation. A permanent
+assertion now guards it (a #var rpm must drop M3).
+
+clearance (line/drill/bore) -- GATED, not flipped, even though it IS pure `Z${clr}` interpolation. The reason is a REAL
+interaction feed does not have: clearance is a Z WORD, and shiftZ (the zOff path-offset) rewrites literal Z words. Today
+`G0 Z5` with zOff=2 becomes `G0 Z7`. If clearance rode a #var, `G0 Z#var` would NOT be shifted (no digit after Z), so
+exposing clearance changes zOff's behaviour whenever zOff != 0. Byte-identical for a numeric default (goldens green), but a
+semantic divergence in the exposed+zOff case. That is a "param classification is ambiguous" situation -- so per the standing
+instruction I surface it rather than guess. QUESTION FOR THE ADVISOR: expose clearance too (accept that zOff stops offsetting
+the retract height when clearance is a pendant knob -- arguably CORRECT, the operator owns the height), or keep it fixed?
+Cheap either way; it is a semantics call, not a mechanics one.
+
+### THE PRIZE, AND WHY IT IS SMALL BUT REAL
+This only matters for the UNIVERSAL arm: a custom op a user builds from line/drill/bore leaf blocks can now expose FEED as a
+#2600 pendant knob. The generator arm already delivered feed/rpm (opToSlot emits F#/S# directly), so drill/bore twins on the
+default path were already fine after t1089. So this closes the gap for hand-composed custom ops specifically.
+
+### VERIFIED
+- cam-toolpath-feed-expose.spec.js (NEW, 2): a custom op from EACH of line/drill/bore exposes feed (role value, exposable),
+  the built slot reads feed from its #2600 mirror and the emitted F word rides the #var, depth stays bake-only, clearance
+  stays bake-only, and no NaN leaks; separately, a numeric feed emits the literal F word with no #var (byte-identical) and a
+  #var feed rides -- AND progstart.rpm with a #var DROPS M3 (the permanent gate evidence).
+- cam-expose-classify.spec.js MIGRATED: the emit-probe guard (which emits the real atom with a #var and checks it rides)
+  now expects line/drill/bore feed = value and PROVES the #var rides the real emit; drill/bore/line clearance added as the
+  value-shaped-but-geometry control; test (a)'s drill example migrated from "num-consumed feed bakes" (the premise I
+  changed) to "feed rides / depth bakes", keeping the geometry lesson on depth. This IS the per-param probe evidence, in the
+  permanent suite.
+- GATE caught TWO more (the tail hid them again -- 1428+4 != 1434; grepped, found 2 failed). Both PINNED the old behaviour I
+  intentionally changed: cam-universal-route:53 and cam-universal-modal:56 each used the DRILL FEED as their
+  "geometry -> Expose disabled/bake-only" example. MIGRATED both: the dfeed assertion flips to exposable, and drill DEPTH
+  (still geometry) becomes the greyed example -- so each test keeps its geometry-bakes lesson on a param that is still
+  geometry. Not bent to pass: re-derived on the real invariant.
+- GOLDENS: drill-as-data + bore-as-data (byte-diff ZERO) + peck-drill + drill-patterns-846 all pass UNCHANGED -- the proof
+  that a numeric feed did not move a single byte.
+- FULL GATE (re-run): 1429 passed, 1 failed, 4 skipped -- and the 1 is preflight-badge-838.spec.js:63, a KNOWN load-sensitive
+  flake in a file unrelated to feed/atom-roles (it flaked at :119 last turn too). Confirmed a flake: the whole file passes
+  10/10 in isolation. So the real result is 1430 green of the 1430 non-skipped that are deterministic; nothing I touched is
+  red. Failed-count grepped, arithmetic reconciled (1429+1+4 = 1434 = 1432 prior + 2 new).
+
+### STATE: feed is a live pendant knob on the universal arm for line/drill/bore, with numeric byte-identity proven by the
+goldens. rpm stays geometry with permanent M3-gate evidence. clearance is a clean-but-gated candidate awaiting the advisor's
+semantics call (expose and let zOff stop offsetting it, or keep fixed).
+
+---
+
+## turn 1093 -- BLOCK-NATIVE CAM PARAMS S1: the cam_table/cam_field SCHEMAS + camFieldsFromStack reader + round-trip. ENGINE ONLY, byte-identical emit, NO modal. Built.
+
+### WHAT S1 IS (and is NOT)
+S1 = the two block defs + their round-trip wiring + the reader. It does NOT touch the emit path (stackToSlot consuming the
+rows = S2) or the modal (renderCbmTable becoming a view = the gated S4). The whole feature is "another formfield": an
+emit-nothing metadata block that is the blocks-native twin of a binding, for the PENDANT face. The advisor's fork rulings
+were baked in and I did not re-open them.
+
+### BYTE-IDENTICAL EMIT, BY CONSTRUCTION (the key correctness property)
+I proved from the emit walker (blockEmitter.js:127-152) that a cam_table needs NO blockEmitter change to be byte-neutral:
+the walker's transparent set is a HARD-CODED list (op / user_root / param_group / guard / section / setup / safetraverse /
+opunit). cam_table is DELIBERATELY not in it, and its kind is not var/loop/cond/depth/container, so the walker falls through
+to `def.emit()` = [] -- its cam_field children are NEVER walked. Both blocks emit []. So adding a cam_table with any number of
+cam_field rows to a def cannot change one byte of G-code. This is the formfield pattern exactly (a Presentation-mouth leaf
+that emits []). The spec asserts it directly: emit(template WITH cam_table) === emit(template WITHOUT), and the real atoms
+still emit (F300). NB this is why cam_table emits [] rather than transparent-passing children like opunit: its children are
+DECLARATIONS, not atoms.
+
+### THE ROUND-TRIP (three generic touch points, mirroring opunit -- minimal diff)
+A DO-mouth container round-trips through three kind-switched sites; I added cam_table to each, exactly like opunit/section:
+  - jsonDef (bridge.js): the addMouth('DO') arm -- cam_table gets a titled DO mouth holding the rows.
+  - recToJson (stackBridge.js): the DO-write branch -- children -> DO input.
+  - toRecord (stackBridge.js): the DO-read branch -- DO input -> children.
+cam_field is a LEAF (no mouth) -> needs NO round-trip branch; it serializes like formfield (fields in, fields out). The spec
+loads a cam_table + 2 cam_field via ddcsLoadBlockStack, round-trips through the REAL Blockly workspace (workspaceToStack),
+and asserts both rows survive IN ORDER with param/mode/label/baked intact.
+
+### THE READER (camFieldsFromStack) -- a literal mirror of bindingsFromStack
+blocks/userOps.js gains camFieldsFromStack(template) = flattenBlocks(template).filter(type==='cam_field').map(row). Mouth
+order falls out of flattenBlocks pre-order (a container's children are visited in order), same as bindingsFromStack gets
+formfield order. Empty strings INHERIT (dropped from the row) exactly like formfield's "empty dflt = socket-held": an empty
+label/units/default is omitted so the binding supplies it; a non-'bake' mode normalizes to 'expose'; a bake row with an empty
+baked drops the baked key. Returns { param, mode, label?, baked?, units?, dflt?, min?, max? } in order. NOT consumed by
+anything yet -- S1 proves the reader in isolation (S2 wires it into stackToSlot/seedUniversal).
+
+### cam_field: the READ-ONLY param chip + the mode toggle
+`param` is the ROUTING KEY (names the def value-binding this row declares -- the join key camFieldsFromStack/stackToSlot
+address by). A hand-edit dangles the binding, so it renders READ-ONLY via a new ddcs_camfield extension that locks the PARAM
+field (EDITABLE=false + setEnabled(false)), the exact lock ddcs_opunit uses on the opType routing key. The value still
+round-trips (present, just non-editable). `mode` is an expose|bake dropdown (one block + a toggle, per the ruling -- NOT two
+block types), wired via optionsFor. The spec confirms param is non-editable after the round-trip.
+
+### COLOUR -- the family shares one, distinct from param_group/opunit
+Declared a new category 'CAM Pendant' with hue #ec4899 (a warm pink) in the theme CAT map (which auto-derives both the
+block style and the toolbox category style). Both cam_table and cam_field carry category:'CAM Pendant', so they share ONE
+colour, and it is DISTINCT from the fuchsia #d946ef of the Wizard-UI authoring blocks (param_group/opunit/formfield). Added
+'CAM Pendant' to CATEGORIES for the toolbox order. The spec asserts cam_table.colour === cam_field.colour !== param_group.colour;
+I also VIEWED it (screenshot): the pink pendant family reads clearly apart from the fuchsia Parameter Group below it.
+
+### ONE BUG FOUND BY LOOKING (the "knob" artifact) -- fixed
+My first render showed a stray "knob" label on every cam_field row. Traced to devMode.augment (devMode.js:357): it grows
+every ATOM with an inline "knob [ ] name" expose row, and isAtom(cam_field) was wrongly TRUE -- cam_field/cam_table were
+missing from the metadata-kind exclusion list (which already excludes section/param_group/formfield/opunit). Added both kinds
+to that exclusion (devMode.js:60). A metadata declaration is not an exposable value, so it must not get the knob kit. The
+re-render is clean. (I also dropped a `dynamic:'mode'` I first tried: ddcs_dynfields toggles VALUE-socket inputs via
+getInput/setVisible, but these are inline text fields, so it was a no-op -- all fields show; a compact per-mode layout is a
+later polish slice. The mode dropdown itself works.)
+
+### VERIFIED
+- cam-block-native-params.spec.js (NEW, 3): (1) camFieldsFromStack reads 2 rows IN ORDER with param/mode/label/units/range,
+  AND emit(with)===emit(without) byte-identical while the real atoms still emit; (2) the reader normalizes a non-'bake' mode
+  to expose and drops empty inherits + an empty baked; (3) a cam_table + 2 cam_field round-trip block->stack->block IN ORDER
+  through the real workspace, param is READ-ONLY, and the family colour is distinct from param_group. My OWN VIEWED screenshot
+  (s1-cam-table.png) confirms the render: pink family, read-only param chips, distinct from the fuchsia param_group.
+- FULL GATE: 1431 passed, 2 failed, 4 skipped -- and BOTH failures are load-sensitive flakes in files I did not touch:
+  preflight-badge-838:104 (the same file that flaked at :63 and :119 the last two turns) and blocks-mobile-drawers:8 (a
+  mobile drawer toggle). Confirmed flakes: the two files pass 11/11 in isolation. Nothing I touched is red. Failed-count
+  grepped, arithmetic reconciles (1431+2+4 = 1437 = 1434 prior + 3 new).
+
+### GATE-IF-BALLOONS: did NOT trigger. The reader is ~12 lines (a literal bindingsFromStack mirror) and the round-trip is
+three one-line kind additions mirroring opunit -- neither ballooned, so I did NOT stop at the schemas + jsonDef arm; S1 is
+whole (schemas + jsonDef + chip + round-trip + reader).
+
+### STATE: the pendant-field declaration now EXISTS as blocks (cam_table + cam_field) that round-trip losslessly and read via
+camFieldsFromStack, with byte-identical emit proven by construction and by test. Nothing consumes the rows yet -- S2 routes
+stackToSlot to walk them (expose/bake/label/order from the rows, socket from the binding). No modal change (S4). No emit
+change. A NEW web/ file (camField.js) -- the mem-server picked it up fresh (402 files preloaded, was 401).
+
+---
+
+## turn 1095 -- BLOCK-NATIVE PARAMS S2: stackToSlot + seedUniversal CONSUME camFieldsFromStack. ADDITIVE-BY-FALLBACK. Built.
+
+### THE SAFETY RAIL: I did not touch the fallback loop AT ALL
+The advisor's rule was "when a template HAS a cam_table the rows drive; when it has NONE (every op today) fall back EXACTLY ->
+byte-identical". I implemented that as literally as possible: the existing bindings/decl loop in stackToSlot is UNCHANGED --
+I added a new `if (camRows.length) { ... } else <the original loop verbatim>`. So an op with no cam_table runs the exact same
+code it ran before S2. camFieldsFromStack(def.template) returns [] for every op today (none carry the blocks yet; S3
+materializes them), so every op takes the else branch. This is why the goldens cannot move.
+
+### THE cam_table BRANCH (the new behaviour, only for an op that carries the blocks)
+When camFieldsFromStack returns rows, they ARE the field declaration, walked in BLOCK ORDER:
+  - order: the rows drive the loop, and nextParam is a monotonic pool scan, so the Nth exposed row gets the Nth free #11xx ->
+    the Nth #2600 mirror read -> the Nth pendant slot. Reordering the blocks reorders the pendant rows for FREE (proven).
+  - mode: row.mode !== 'bake' -> EXPOSE (a #11xx param + #2600 mirror + a local #var); === 'bake' -> inline the literal with
+    NO #2600 row.
+  - label/units/range: from the row, FALLING BACK to the binding (row.label || b.label || b.param; row.units ?? b.units; etc).
+  - ONE-SOURCE: the row is the DECLARATION (order/mode/label); the BINDING is the WIRING -- I resolve each row's binding by
+    param (bindingByParam) to get the socket (blockIndex/key/type). No value lives in two editable places.
+  - valid-by-construction: a row that says EXPOSE on a param the classifier marks bake-only (geometry/fold) is FORCE-BAKED --
+    a cam_table cannot override the safety bake (the classifier still gates). This is also why the guarded-twin fail-closed
+    case does NOT tangle (GATE-IF-BALLOONS did not fire): classifyExposable fail-closes -> every row force-bakes -> honest,
+    no special handling.
+  - a row naming a param with no value binding is DANGLING -> skipped (greyed in a later slice).
+  - a binding with NO row is simply not a pendant field -> baked to its binding default.
+
+### seedUniversal TOO (the modal seed), same additive shape
+Refactored the seed field construction into fieldFor(b, over) where `over` is the optional cam_field row. With no row it is
+BYTE-IDENTICAL to the old valueBindings.map (I checked every key: value/label/def/units/type/exposed/bakeable/exposable all
+reduce to the original expression when over is undefined). With a cam_table it maps the ROWS in block order: exposed =
+mode !== 'bake', label from the row, bake value from row.baked. So the seed order/mode agrees with the emit order/mode --
+they stay in sync (the modal itself becoming a view is still S4; this only makes the seed consistent).
+
+### WHY THE FLAT-INDEX SHIFT MATTERS (a real gotcha I had to get right in the test)
+instantiate (userOps.js:471) flattens the template with flattenBlocks, which visits uiChildren BEFORE children. So a cam_table
++ its N cam_field rows in the PRESENTATION mouth SHIFT every execution atom's flat index up by (1 + N). A binding's blockIndex
+must therefore be computed WITH the cam_table present (as extractParamBlocks does at save time). The S2 test builds its
+bindings accounting for that (feed at 2+N, move at 3+N). This is not a code change -- it is inherent to how bindings are
+computed over the full template -- but it is the thing that would silently mis-wire a hand-built test, so I flagged it.
+
+### VERIFIED
+- cam-block-native-params-s2.spec.js (NEW, 4): (1) a cam_table (feed EXPOSE, movefeed EXPOSE, depth BAKE=-2) -> fields in
+  BLOCK ORDER [feed, movefeed] with the BLOCK labels + #1/#2 (#1100/#1101), the two exposed rows read #2600/#2601 IN ORDER,
+  and depth inlines Z-2 with NO #2600 row and NO ;Plunge Z mirror; (2) swapping the two cam_field blocks swaps the field
+  order AND which var/#2600 each gets (block order = pendant order); (3) a def with NO cam_table falls back to the decl path
+  byte-identically (feed exposed via decl with the BINDING label, z baked to Z-3); (4) seedUniversal orders by the rows too
+  (bake row -> exposed:false, expose row -> exposed:true + block label), block order.
+- FULL GATE: 1437 passed, 0 FAILED, 4 skipped (11.8m) -- CLEAN, and 1437+4 = 1441 = the full count reconciles. Failed-count
+  grepped, not the tail. Zero failures this run (the preflight-badge-838 / blocks-mobile-drawers flakes behaved). 1437 =
+  1431 prior + 4 new S2 tests + the 2 flakes that were red last run now green. The pre-existing universal + golden specs The pre-existing cam-universal-route / cam-universal-scratch / cam-stack-to-slot specs + every
+  passing UNCHANGED is the byte-identity guarantee. (The universal + golden specs are the real fallback proof -- they build universal slots with NO cam_table and pin
+  exact var numbering / exposure, so their passing UNCHANGED is the byte-identity guarantee.
+
+### GATE-IF-BALLOONS: did NOT trigger. Consuming the reader did NOT tangle with the seed/expose-classifier path -- the
+classifier stays the gate (an expose row on a bake-only param force-bakes), and the guarded-twin fail-closed case just makes
+every row force-bake (honest). So I did NOT stop at the universal arm / gate the generator arm to S2b: the universal arm
+(stackToSlot + seedUniversal) is done, and the generator arm (millToSlot/probeToSlot/opToSlot via PARAM_ALIAS) was never in
+scope for S2 -- it does not read camFieldsFromStack (a later slice if ever).
+
+### STATE: the block-native pendant-field declaration now DRIVES the universal-arm emit + seed when a cam_table is present
+(order/mode/label from the rows, wiring from the binding, reorder-for-free), and is byte-identically inert when absent. No op
+carries a cam_table yet -- S3 auto-materializes one byte-neutrally from the bindings so existing twins gain the blocks without
+moving a byte. The modal-as-view is the gated S4. No emit change for any current op.
+
+---
+
+## turn 1097 -- BLOCK-NATIVE PARAMS S3: the materializer BUILT + tested byte-neutral; the LAZY HOOK is GATED to S4 (measured divergence). This is the sanctioned gate, not a stop.
+
+### WHAT I DELIVERED: camTableFromBindings(def), pure + tested + byte-neutral
+data/opCamMap.js gains camTableFromBindings(def): a def's value bindings -> a cam_table block, one cam_field per binding in
+binding PRE-ORDER, mode = the classifier default (exposable -> expose, non-exposable -> bake at the binding default), label
+from the binding. It is the INVERSE of camFieldsFromStack and the exact mirror of makeAuthOp's default seed (macrosApp.js:1186:
+exposable -> exposed:true, non-exposable -> exposed:false + baked=value), so consuming it via S2's cam_table branch reproduces
+today's default field set. PURE -- no injection, no side effect, and NOTHING calls it yet, so it changes zero behaviour (the
+same shape as camFieldsFromStack shipping in S1 before S2 consumed it).
+
+### BYTE-NEUTRAL, PROVEN (the advisor's key acceptance): materialize -> build == fallback build
+Measured directly: for a def with a mix (feed EXPOSABLE, drill depth GEOMETRY, drill feed EXPOSABLE-per-t1091), the DEFAULT
+fallback build (decl = makeAuthOp's seed) and the materialized build (cam_table via S2's branch, empty decl) are BYTE-IDENTICAL
+-- same body, same fields (frate #1 -> #2600, dfeed #2 -> #2601, depth baked, byte-for-byte). The materializer reproduces the
+default. The permanent spec asserts body-equal AND fields-equal.
+
+### WHY I GATED THE LAZY HOOK (the seam grounding the advisor asked for) -- MEASURED, not argued
+The advisor's gate condition: "if materializing would make the modal's choice SILENTLY ignored by the build in a way that
+surprises the user, GATE BACK ... that is the S4 inversion leaking early and I would rather sequence it deliberately."
+I MEASURED exactly that. The modal build reads getUserDef(opType) (macrosApp.js:1022) and passes decl (declFromOp -> the
+modal's per-slot op.exposed/baked). After S2, if that def has a cam_table, stackToSlot takes the cam_table branch and IGNORES
+decl. So:
+  - a MATERIALIZED def + a modal FLIP (user bakes the exposed feed to 999) -> the build IGNORES the flip: feed stays exposed
+    via #2600 and rides F#1, NOT F999. flipHonored = FALSE, measured.
+So wiring materialization into the def the modal builds would make the modal's radios SILENTLY NO-OP for a materialized op --
+the exact "confusing half-state" the advisor said to gate. The default is byte-neutral, but any NON-default modal choice is
+silently dropped. That is the S4 inversion (modal-as-view) leaking early.
+
+### A SECOND complication I hit, worth the advisor knowing before sequencing the hook
+Injecting a cam_table into the PRESENTATION mouth SHIFTS every execution binding's blockIndex, because flattenBlocks visits
+uiChildren BEFORE children (instantiate uses that flatten). So a real lazy hook cannot just "add a cam_table" -- it must
+re-derive the bindings' blockIndex, BY IDENTITY, exactly like wrapForkAtSave does for the opunit wrap (and the shift is
+NON-UNIFORM when a twin also has uiChildren bindings -- a blanket +1+N would corrupt them). In my byte-neutral test the shift
+is uniform (all bindings are execution atoms) so a +1+N re-index sufficed, but the general hook needs the identity re-derive.
+
+### THE RECOMMENDATION (my call first)
+Land camTableFromBindings now (done -- inert, tested, byte-neutral). SEQUENCE the LAZY HOOK with S4, not before, because the
+hook's whole value ("the build consumes the materialized cam_table") is exactly what creates the modal-decl divergence, and
+S4 is the slice that makes the modal WRITE blocks (so there is no decl to ignore). Two ways to unblock the hook, in
+preference order:
+  (A) RECOMMENDED -- fold the hook INTO S4: when S4 makes renderCbmTable read/write the cam_field blocks, materialize on the
+      Blocks-load hook at the same time. Then materialize + modal-writes-blocks land together, no half-state, and the
+      identity re-derive is written once alongside the S4 seam.
+  (B) pull a MINIMAL Fork-C decl-override forward into S2's cam_table branch NOW (an explicit decl[param] overrides the row
+      mode), so the modal keeps working over a materialized def. This unblocks an eager hook but re-opens the accepted S2
+      branch and pulls S6 (Fork C) forward -- I do NOT recommend it; it muddies the "block is the declaration" story S2 just
+      established.
+The clarifying question for the advisor: do you want the hook folded into S4 (A), or the Fork-C override pulled forward (B)?
+
+### VERIFIED
+- cam-block-native-params-s3.spec.js (NEW, 3): (1) camTableFromBindings emits one row per binding in PRE-ORDER with the
+  classifier-default mode (feed->expose, drill depth->bake=5, drill feed->expose) and the binding label; (2) BYTE-NEUTRAL --
+  a materialized cam_table builds the DEFAULT slot byte-identically to the fallback (body + fields equal); (3) GATED -- the
+  modal FLIP on a materialized def is NOT honored (documents the S4-inversion divergence so it is caught the moment S4 fixes
+  it).
+- FULL GATE: 1440 passed, 0 FAILED, 4 skipped (11.7m) -- CLEAN, 1440+4 = 1444 = full count reconciles. Failed-count grepped.
+  1440 = 1437 prior + 3 new S3 tests. The materializer is inert (no consumer) so nothing could regress; ran the suite anyway. The materializer is inert (no consumer) so nothing can regress; I ran the full suite anyway.
+
+### STATE: the S3 materializer exists, is byte-neutral, and is the ready building block. The LAZY HOOK is GATED to S4 (or a
+Fork-C pull-forward) with the measured reason -- injecting the cam_table into the def the modal builds silently drops the
+modal's per-slot choice, and needs a by-identity binding re-index. Awaiting the advisor's call on (A) vs (B). No behaviour
+changed this turn.
+
+---
+
+## turn 1099 -- BLOCK-NATIVE PARAMS S4a: the MODAL becomes a VIEW of the cam_field blocks. ADDITIVE-BY-FALLBACK, read+write as ONE unit. Built (did NOT balloon).
+
+### THE ONE SEAM (read+write together, never split -- the advisor's hard rule)
+A single helper is the whole switch: camRowBlock(opType, key) -> the cam_field BLOCK RECORD (live in getUserDef's template)
+whose param === key, or null. flattenBlocks returns the ACTUAL block objects (not clones), and getUserDef returns the live
+registry def, so mutating a row's .params persists in the registry and the very next S2 build reads it. Every read AND every
+write is gated on the SAME camRowBlock call, so a cam_table op reads and writes the block, and a non-cam_table op falls to the
+old _authoring.ops/decl path -- they can never split (a read-from-blocks / write-to-decl split is exactly the S3 divergence).
+
+### THE FOUR GATED SITES (all behind camRowBlock, all read+write on the same source)
+  READ  1. rowHtml `baked` -- a cam_table op's expose/bake state is `row.params.mode === 'bake'`, NOT a.exposed[fk] (which
+           makeAuthOp set from the classifier, not the row). So the modal DISPLAYS the block mode.
+        2. cbmVal -- a cam_table op's value is `row.params.baked` (bake) or `row.params.dflt` (expose); empty inherits the
+           field default exactly as before.
+  WRITE 3. cbmToggle -- a radio flip sets row.params.mode (and seeds row.params.baked from the current value on Bake). The
+           block is mutated in place; renderCbmTable re-reads it; the build reads it. ONE source.
+        4. the value inputs (number + enum) -- write row.params.baked (bake) / row.params.dflt (expose).
+Order + label are ALREADY block-driven from S2 (seedUniversal reads camFieldsFromStack in block order with the row label),
+so no extra read/write was needed for them -- the modal shows block order and block labels for free. The build (cbmBuild ->
+buildSlotFromOps -> stackToSlot) already reads the cam_table via S2, so the write lands in the build with no new plumbing.
+
+### WHY IT IS INERT TODAY (additive-by-fallback = the safety rail)
+No op carries a cam_table until the S4b hook, so camRowBlock returns null for every op today -> every site takes the old
+branch -> the modal is byte-for-byte unchanged. Confirmed: the 16 existing modal specs (cam-universal-modal, cam-build-mode,
+cam-drill-single-pattern, cam-scratch-guard) pass unchanged.
+
+### DID NOT BALLOON -- so I did NOT gate
+The whole slice is ONE helper + 4 one-line-guarded sites + a flattenBlocks import. It stays behind the cam_table-present
+check (read+write together, never a naive read-first split), so I did not need the gate-back sub-plan.
+
+### VERIFIED
+- cam-block-native-params-s4a.spec.js (NEW, 3): (1) the modal READS the cam_table -- frate/dfeed show Expose, ddepth (drill
+  depth = geometry) shows Bake, straight from camTableFromBindings' rows; (2) flipping frate Expose->Bake MUTATES the frate
+  cam_field block (mode='bake', dfeed/ddepth untouched) AND the built slot reflects it -- frate drops from the fields (baked,
+  inlines F200, no #2600), dfeed stays exposed (#2600, ;Cut feed); (3) editing the dfeed value writes '444' to the block's
+  dflt (the pendant default), which the build reads.
+- MY OWN VIEWED SCREENSHOT (s4a-modal-camtable.png): "1. S4a -> universal" with Feed rate EXPOSE (#1100->#2600), Depth BAKE
+  (baked = 5), Cut feed EXPOSE (#1101->#2601) -- the modal is a faithful view of the cam_field blocks.
+- FALLBACK unchanged: the 16 existing modal specs green (an op WITHOUT a cam_table is byte-for-byte the same modal).
+- FULL GATE: 1443 passed, 0 FAILED, 4 skipped (11.9m) -- CLEAN, 1443+4 = 1447 = full count reconciles. Failed-count grepped.
+  1443 = 1440 prior + 3 new S4a tests. The flakes behaved.
+
+### STATE: the modal is now a VIEW of the cam_field blocks when a cam_table is present -- read AND write on the one source
+(the block), the S2 build reflects every edit -- and byte-for-byte unchanged when absent. This closes the S3-gated
+divergence FOR the S4b hook: once S4b materializes a cam_table into the def, the modal writes the blocks (not a dead decl),
+so the build and the modal agree. S4a is INERT until then. NEXT: S4b -- the materialize HOOK on Blocks-open/editWizardDef
+(inject camTableFromBindings into the Presentation mouth WITH the identity-based blockIndex re-derive, activating S2+S4a
+together atomically), which the advisor wants to review on its own.
+
+---
+
+## turn 1101 -- BLOCK-NATIVE PARAMS S4b: the inject+re-derive CORE built + proven byte-neutral; the HOOK (the WHERE) GATED with two measured findings. This is the activation slice the advisor gated for its own review.
+
+### WHAT I DELIVERED: materializeCamTable(def), the reusable inject + IDENTITY re-derive, proven byte-neutral
+data/opCamMap.js gains materializeCamTable(def): injects camTableFromBindings into the user_root PRESENTATION mouth and
+re-derives EVERY binding blockIndex BY IDENTITY over the post-injection flatten (the wrapForkAtSave pattern -- each binding
+ORIGINAL block object is found at its NEW index via indexOf, NEVER a blanket +1+N). Mutates def in place, idempotent (no-op if
+already has a cam_table or no value bindings). PURE and INERT -- nothing calls it yet (the HOOK is gated). Same shape as
+camTableFromBindings shipping in S3 before a consumer existed.
+MEASURED byte-neutral on a def with BOTH a uiChildren binding (assign under a param_group) AND exec bindings: the leading
+cam_table (1 + 3 rows = 4 blocks) shifts all three bindings 2/3/4 -> 6/7/8, re-derived by identity, and the materialized
+build (S2 branch, empty decl) is BYTE-IDENTICAL to the fallback default -- body and fields equal. The advisor feared a
+subtly-wrong reindex; the identity re-derive avoids it, proven.
+
+### WHY I GATED THE HOOK -- two GROUNDED findings, per your GATE-IF-ENTANGLED + SURFACE-the-WHERE instruction
+
+FINDING 1 -- the WHERE is a real fork AND your first candidate is the wrong scope. camFieldsFromStack has exactly TWO build
+consumers (measured -- grepped the consumer set): stackToSlot (the UNIVERSAL build) and seedUniversal (the modal seed).
+subStackToSlot and the generators do NOT read it. So a RECOGNIZED GENERATOR TWIN (surfacing/pocket/drill/... -- builds via
+its generator, or via subStackToSlot when forked) would get an INERT cam_table it never consumes -- exactly the Fork-G
+"do not clutter" violation. Your first hook candidate "editWizardDef-for-a-CAM-generator-twin" therefore targets the wrong
+ops. The hook must fire for UNIVERSAL-arm ops (camTypeOf -> universal), not generator twins.
+
+FINDING 2 -- the persistence is op-type-dependent (the save-path tangle). I grounded the save seam: authoringBody wraps the
+op as [user_root{...}], so deriveAuthoredDef -> extractParamBlocks([user_root]) flattens the FULL template -- the SAME index
+space instantiate uses. Consequence:
+  - PILL-BASED universal forks (wizard-maker): their value bindings are param PILLS, so on save extractParamBlocks
+    re-indexes the pills over the post-injection flatten AUTOMATICALLY -- correct by construction, no manual re-derive needed.
+  - LITERAL data-op twins that route universal (e.g. user_contour_data -- contour has no generator): their bindings are
+    HAND-ASSEMBLED literals, NOT pills, so extractParamBlocks finds nothing -> the save-derived bindings would DROP them.
+    That is a PRE-EXISTING editWizardDef limitation (independent of the cam_table), but the cam_table would ACTIVATE it: a
+    materialized contour, saved, would lose its bindings.
+So "materialize on Blocks-open, persist on save" is CLEAN for pill-based universal forks and BROKEN for literal universal
+twins -- the entanglement is real and op-type-dependent.
+
+### THE FORK I AM HANDING BACK (recommendation first)
+The CORE mechanism (inject + identity re-derive) is proven byte-neutral, so the block is only the WHERE + the persistence
+sequencing. My recommendation:
+  (1) SCOPE the hook to UNIVERSAL-arm ops (camTypeOf -> universal) with value bindings and no cam_table -- NOT generator
+      twins (Finding 1).
+  (2) HOOK POINT -- I recommend editWizardDef (your anchor, "opened to customize in Blocks", opt-in per Fork G), calling
+      materializeCamTable on the workspace fork template so the cam_table is visible + rides through save. For PILL-BASED
+      forks this is clean (save auto-reindexes). QUESTION FOR YOU: editWizardDef, or the CAM-authoring modal open
+      (openCamAuthoring -- the moment the op is actually CAM-ified, but it would mutate the registered def from the Macros
+      tab)? Your three candidates make this a genuine product fork; I did not guess.
+  (3) LITERAL universal twins (contour): GATE as their own step -- they hit a pre-existing no-pill save limitation that
+      needs its own fix (persist the hand-assembled bindings through save, or materialize them as pills first). Do NOT fold
+      them into the pill-fork hook.
+So: confirm the hook point (editWizardDef vs modal), and I build the pill-fork path with materializeCamTable + a full-flow
+test (open -> materialize -> save -> byte-neutral build + modal flip STICKS, closing the S3 divergence), gating the literal
+twins.
+
+### VERIFIED
+- cam-block-native-params-s4b-core.spec.js (NEW, 1): materializeCamTable injects a cam_table, re-derives 2/3/4 -> 6/7/8 by
+  identity across the non-uniform shift, the materialized build is BYTE-NEUTRAL vs the fallback default, and a second call
+  is idempotent.
+- FULL GATE: 1444 passed, 0 FAILED, 4 skipped (11.8m) -- CLEAN, 1444+4 = 1448 = full count reconciles. Failed-count grepped.
+  materializeCamTable is inert (no consumer) so nothing can regress; ran the suite anyway.
+
+### STATE: the hard technical part of S4b -- inject a cam_table + re-derive bindings by identity, byte-neutral -- is BUILT
+and PROVEN as materializeCamTable. The HOOK is gated on TWO measured findings: the WHERE is a real product fork (universal
+ops, editWizardDef vs modal -- surfaced for your call), and the persistence is clean for pill-based forks but hits a
+pre-existing no-pill save limitation for literal universal twins (contour). Awaiting your hook-point call before wiring.
+
+---
+
+## turn 1103 -- BLOCK-NATIVE PARAMS S4b: the materialize HOOK at editWizardDef. This ACTIVATES S2 + S4a together. Built (with the advisor's locked rulings).
+
+### THE HOOK (rulings locked, not re-opened)
+maybeMaterializeCamTable(def) in devMode.js, called from editWizardDef right after the def lookup, BEFORE wrapRecognizedForFork
+(so the fork clone carries the cam_table into the workspace). It gates on FOUR conditions, all measured/grounded:
+  1. camTypeOf -> universal -- UNIVERSAL-arm ops only (a generator twin's cam_table is inert; measured t1101).
+  2. has value bindings -- nothing to declare otherwise.
+  3. NOT already carrying a cam_table -- idempotent (materializeCamTable is also idempotent; belt + suspenders).
+  4. hasParamPills(template) -- PILL-derivable only. A LITERAL-binding universal twin (contour: hand-assembled literals, no
+     pills) is SKIPPED because extractParamBlocks cannot re-derive its bindings on save (a PRE-EXISTING no-pill limitation the
+     cam_table would activate) -- gated to S6 per your Finding 2.
+Any doubt -> try/catch leaves the op unmaterialized (the fallback path is always correct). openCamAuthoring is NOT a hook
+(your ruling: materializing on a mere BUILD is surprising + S4a already handles the no-cam_table modal).
+
+### WHY editWizardDef IS REACHED BY UNIVERSAL OPS (your CONFIRM condition, grounded)
+Two entry points: the op-context "Customize as blocks" is gated to isCamGeneratorTwin (the 8 generator twins) -- it does NOT
+reach universal ops, but that is fine, those twins are correctly skipped by gate 1. The wizardManagerPanel "Edit" (re-author)
+is custom-op-only and DOES reach any universal CUSTOM op (a saved pill-based fork). So a pill-based universal op reaches
+editWizardDef via the wizard manager, my hook fires there, and generator twins that ALSO hit editWizardDef are skipped by the
+camTypeOf gate. Clean -- no entry-point gate needed.
+
+### listUserOps IS A STORE COPY (the persistence mechanic, grounded)
+editWizardDef reads listUserOps() = readStore() (localStorage), NOT the live USER_DEFS registry. registerUserOp only sets
+USER_DEFS. So materializing the store-copy def mutates a COPY; the live registry is untouched until SAVE (deriveAuthoredDef ->
+registerUserOp persists the workspace, cam_table + pill-re-indexed bindings). So before save the modal/build use the fallback
+(no divergence); after save they use the cam_table -- ATOMIC, no half-state. The test had to seed localStorage (not just
+registerUserOp) for editWizardDef to find the op -- flagged, because a hand-registered op is invisible to listUserOps.
+
+### THE S3 DIVERGENCE IS CLOSED (your "re-run the gated test, expect it to FLIP to honored")
+I MIGRATED the S3-gated test. It used a RAW decl flip as a proxy for "the modal flip" and asserted honored=FALSE. That proxy
+is now OBSOLETE: after S4a the modal writes the cam_field BLOCK (row.mode), not decl. So the test now flips the BLOCK (as
+cbmToggle does) and asserts honored=TRUE -- frate bakes, inlines F200, drops its #2600 mirror. The divergence is closed
+through the real path (block write), and a raw decl bypassing the modal is still ignored (the correct "block is the source"
+invariant, not a divergence). A new S4b test asserts the same closure on a hook-materialized op.
+
+### VERIFIED
+- cam-block-native-params-s4b.spec.js (NEW, 4): (1) maybeMaterializeCamTable materializes a PILL-based universal op (bindings
+  re-derived 1/2 -> 4/5 by identity), SKIPS a generator twin (surfacing -- not universal) and a LITERAL universal op (no
+  pills); (2) the materialized pill op is BYTE-NEUTRAL (default slot == fallback) + idempotent; (3) the S3 divergence is
+  CLOSED -- a block-mode flip on a materialized op sticks through the build; (4) INTEGRATION -- opening a pill-based universal
+  op via ddcsEditWizardDef materializes a cam_table (1) + a cam_field per binding (2) in the REAL Blockly workspace.
+- cam-block-native-params-s3.spec.js MIGRATED: the gated "NOT honored" test -> "now STICKS / honored=true" (divergence closed).
+- MY OWN VIEWED SCREENSHOT (s4b-editwizard-materialized.png): opening "Pill Fork" in Blocks shows the pink CAM Pendant Fields
+  container (frate/mz expose rows) in the Presentation mouth, the Feed/Move param pills in Execution, and the projected G-code
+  F200 + G1 X10 Y20 Z-3 F500 -- byte-unchanged emit (the cam_table emits []).
+- FULL GATE: 1448 passed, 0 FAILED, 4 skipped (13.1m) -- CLEAN, 1448+4 = 1452 = full count reconciles. Failed-count grepped.
+  1448 = 1444 prior + 4 new S4b tests (the S3 test was migrated in place, count unchanged).
+
+### STATE: block-native params is now END-TO-END for pill-based universal ops. Opening one to customize in Blocks materializes
+its pendant fields as cam_field blocks (byte-neutral, own emit + default slot unchanged); the build (S2) reads the cam_table,
+the modal (S4a) reads/writes it, and a modal flip STICKS -- the S3 divergence is closed. Generator twins and literal universal
+twins are correctly skipped. OPEN (per your ruling): S5 param_group-from-bindings + S6 polish (the per-mode compact layout AND
+the literal-twin no-pill save fix, the one deliberately-skipped case).
+
+---
+
+## turn 1105 -- BLOCK-NATIVE PARAMS S5.1: the FORM half (schema + reader + materializer), mirroring the pendant S1+S3. INERT, byte-neutral. Built.
+
+### FORK B GROUNDED AND DECIDED: a DEDICATED param_field (formfield does NOT fit)
+I read formField.js + the value-binding shape. formfield's socket link is var-identity `match: { type:'assign', var }`
+(formField.js:7) plus a key -- it finds an ASSIGN block by its macro var. A def VALUE binding is `{ param, blockIndex, key }`
+(cleanBinding, userOps.js:111) -- a (blockIndex,key) socket into flattenBlocks(template). These are DIFFERENT addressing
+schemes: formfield cannot address a (blockIndex,key) value socket, only an assign-var. So the FORM face of a value binding
+needs its OWN block keyed by `param`, symmetric with cam_field. FORK B IS REAL -> param_field, NOT a formfield reuse (the
+architect's ruling holds; I did not build a duplicate of something formfield already addresses, because it does not).
+
+### THE SCHEMA: param_field (the FORM analog of cam_field)
+wizards/ops/paramField.js -- references a value binding by `param` (READ-ONLY chip, reusing the ddcs_camfield lock), carries
+the FORM label + widget + type + default + (number-widget) min/max/step/units + section/help + dropdown options. emit: () => []
+(metadata, like formfield/cam_field). Shares formfield's widget/type dropdown vocab via optionsFor (one `|| def.type ===
+'param_field'` each). A leaf (no mouth) -> serializes generically, no round-trip branch needed. NB no dynamic toggle (learned
+S1: ddcs_dynfields only hides value-socket inputs, not inline text fields) -- a compact per-widget layout is S6 polish.
+
+### THE READER + MATERIALIZER (mirrors camFieldsFromStack / camTableFromBindings)
+- paramFieldsFromStack(template) (userOps.js) -- flattenBlocks filter param_field, in mouth order -> a form-binding-spec row
+  { param, widget, type, label?, default?, section?, help?, widgetConfig? } (min/max/step/units/options folded into
+  widgetConfig, exactly like bindingsFromStack does for formfield). Empty strings inherit the binding.
+- paramGroupFromBindings(def, group) (userOps.js) -- one param_field per value binding in binding PRE-ORDER, label/default/
+  widget/type/widgetConfig from the binding. NO classifier (the form shows every param; expose/bake is the pendant's concern,
+  not the form's -- a key difference from camTableFromBindings). PURE + INERT: nothing consumes it yet.
+
+### BYTE-NEUTRAL, verified
+param_group is ALREADY transparent-emit and param_field emits [] -> adding the FORM blocks changes ZERO bytes. The spec
+asserts emit(with the param_group) === emit(without), and the real atoms still emit (F300). No goldens moved (full gate).
+
+### COLOUR: a THIRD family, distinct from cam pink AND opunit
+The FORM family (param_group + param_field) now shares ONE colour via a NEW category 'Wizard Form' (hue #6366f1 indigo). I
+RECOLOURED param_group from 'Wizard UI' (fuchsia #d946ef -- shared with opunit/section/formfield) to 'Wizard Form', so the
+three families read apart: FORM indigo, PENDANT pink (#ec4899), Wizard-UI/opunit fuchsia. Grounded the recolour risk first: no
+pixel-snapshot tests (no toHaveScreenshot/toMatchSnapshot), no test asserts param_group's category, and the one colour
+assertion (my S1 test: cam != param_group) STILL holds (pink != indigo). Verified by the gate.
+
+### THE CONSUMER, GROUNDED (not built): ui/formWidgets.js is the FORM-side widget registry -- a binding declares a `widget`
+(a registry key) + widgetConfig and the form picks that widget (or a default per binding.type). A later slice wires the form
+renderer to read paramFieldsFromStack (the form-as-view, S5.2+), exactly as S4a made the CAM modal read camFieldsFromStack.
+Not touched this slice.
+
+### VERIFIED
+- cam-block-native-params-s5.spec.js (NEW, 3): (1) paramFieldsFromStack reads 2 rows IN ORDER (feed number+range, shape
+  dropdown with parsed options) AND emit(with)===emit(without) byte-identical while the atoms still emit; (2)
+  paramGroupFromBindings emits one param_field per binding in pre-order with label/default/widget from the binding, and the
+  reader round-trips its output; (3) a param_group + 2 param_field round-trip block->stack->block, param is READ-ONLY, and the
+  FORM colour is distinct from BOTH the cam pink and the opunit fuchsia. My OWN VIEWED screenshot (s5-param-group.png) shows
+  the three families apart: indigo Parameter Group, pink CAM Pendant Fields, fuchsia Surfacing unit; new Wizard Form + CAM
+  Pendant toolbox categories.
+- FULL GATE: 1451 passed, 0 FAILED, 4 skipped (14.1m) -- CLEAN, 1451+4 = 1455 = full count reconciles. Failed-count grepped.
+  1451 = 1448 prior + 3 new S5.1 tests. The param_group recolour caused NO regression (the whole suite green).
+
+### GATE-IF-BALLOONS: did NOT trigger. S5.1 is schema + reader + materializer only (all inert), as scoped. The rest of the S5
+arc is follow-on slices: S5.2 the form renderer CONSUMES paramFieldsFromStack (form-as-view, mirror S4a); S5.3 the materialize
+HOOK for the form (mirror S4b); plus S6 polish. Proposed, not built.
+
+### STATE: the FORM half now has its block-native substrate -- a dedicated param_field, a paramFieldsFromStack reader, a
+paramGroupFromBindings materializer -- all inert + byte-neutral, with the FORM family its own indigo colour distinct from the
+pendant pink and the Wizard-UI fuchsia. Nothing consumes it yet; the form-as-view + hook are the next S5 slices. This mirrors
+exactly how the pendant half went S1(schema/reader) -> S3(materializer) -> S4a(view) -> S4b(hook).
+
+---
+
+## turn 1107 -- USER REQUEST: per-wizard "Restore to default" in the Wizard manager (the safety net now built-ins are becoming editable). Built.
+
+### THE GATE QUESTION ANSWERED (twin-reset persist-vs-re-seed): re-seed restores factory IMMEDIATELY, no reboot
+The advisor flagged GATE-IF the twin-reset cannot restore factory immediately. I grounded it: it CAN. A built-in's opensAs
+twin is a registered user def (createUserOp at boot from its factory def-builder, e.g. drillDataDef). To restore ONE twin:
+deleteUserOp(opType) clears every registered table + the store copy, then createUserOp(factoryBuilder()) re-registers the
+pristine def. Immediate, no reboot, and the customized store copy does NOT persist (deleteUserOp removed it). So no gate --
+built the hook.
+
+### THE ONE-SOURCE FACTORY BUILDERS (the enabling refactor)
+app.js seedDefaultPortedUserOps hard-listed the 25 builder CALLS inline. I extracted them to a module-level `SEED_BUILDERS`
+(function refs) that the boot seed maps over (`seeds = SEED_BUILDERS.map(fn => fn())`) AND the restore reuses -- ONE source,
+no drift. Two globals exposed from app.js (co-located with the builders, like ddcsEditWizardDef):
+  - window.ddcsReseedUserOp(opType) -- deleteUserOp + createUserOp(factoryBuilder()), the immediate factory reset.
+  - window.ddcsUserOpDivergedFromFactory(opType) -- the twin diverged when a re-author bumped its defV PAST the factory
+    seed's declared version (updateUserOp bumps an undeclared-defV re-author, userOps.js:682). A clean, robust signal (no
+    fragile deep-compare against a registerUserOp-mutated def).
+
+### THE LAYOUT HALF (per-entry, not the blanket reset)
+wizardLibrary gains entryHasOverride(id) (does l.entries[id] carry any label/group/order/icon/visible override?) and
+clearEntryOverride(id) (delete l.entries[id] + writeLayout). Distinct from resetLayout() which wipes the WHOLE layout
+({}) -- the per-wizard clear leaves every other entry + group untouched.
+
+### THE UI (wizardManagerPanel)
+A per-BUILT-IN "↺ Restore default" button, added in the else branch of the user-vs-builtin split (built-ins had no per-row
+action before). Shown ONLY when THAT built-in is actually customized: entryHasOverride(id) OR the opensAs twin diverged. On
+click: dlgConfirm (destructive) -> clearEntryOverride(id) (its layout) + ddcsReseedUserOp(opensAs) (its factory twin,
+immediately) + apply() (re-render manager + bar). A pristine built-in shows nothing; a custom op keeps its Edit/Export/Delete
+(no Restore). Per-wizard, so a NEIGHBOURING customized wizard + every custom op are untouched.
+
+### VERIFIED
+- wizard-restore-default.spec.js (NEW, 2): (1) a PRISTINE built-in shows NO Restore + a custom op shows Delete not Restore;
+  customize TWO built-ins (rename) -> both show Restore; Restore ONE -> its override CLEARS + it reverts to the factory label,
+  while the NEIGHBOUR stays customized (still has Restore) AND the custom op survives untouched. (2) a DIVERGED TWIN (defV
+  bumped, NO layout override) shows Restore on its own, and Restore re-seeds it to factory (no longer diverged) IMMEDIATELY,
+  and the action then disappears (pristine again).
+- MY OWN VIEWED (wizard-restore-default.png): the Wizard manager renders every built-in row (toggle/rename/BUILT-IN
+  badge/regroup/reorder/icon); the customized drill/surfacing rows carry the Restore action (Mill section).
+- FULL GATE: 1452 passed, 1 failed, 4 skipped -- the 1 is preflight-badge-838:119, the SAME load-sensitive flake recurring
+  across turns (63/119/104), unrelated to boot-seed/wizard-manager. Confirmed: preflight-badge-838 + wizard-restore-default +
+  wizard-manager all pass 14/14 in isolation. So the app.js boot-seed refactor to SEED_BUILDERS regressed NOTHING; every
+  boot-dependent test is green. Failed-count grepped, 1452+1+4 = 1457 reconciles.
+
+### NOTE for a later slice (block-native params): the defV signal catches a PERSISTED re-author (editWizardDef save bumps
+defV). An IN-MEMORY modal edit (S4a writes a cam_field block in getUserDef's template without persisting/bumping) would not
+yet register as diverged -- but that edit does not survive a reboot either, and recognized twins do not get cam_tables
+(S4b skips them), so it is out of scope here. When the FORM half (S5.2/S5.3) persists param_field edits on a twin, the same
+defV bump on save will make them detectable -- one-source with this.
+
+### STATE: a per-wizard Restore-to-factory now reverts JUST one built-in (its layout override + its factory twin, immediately,
+no reboot), shown only when customized, leaving all other wizards + custom ops untouched -- the safety net the user asked for
+as built-ins become editable. The blanket Reset-to-factory (whole bar) is untouched. Back to the S5 arc next (S5.2 form-as-view,
+S5.3 form hook, S6 polish).
+
+---
+
+## turn 1109 -- BLOCK-NATIVE PARAMS S5.2: the wizard FORM renderer CONSUMES paramFieldsFromStack. ADDITIVE-BY-FALLBACK. Built.
+
+### THE READ/WRITE QUESTION ANSWERED (the advisor asked me to SAY which I found): PURE ONE-WAY CONSUME
+I read the form renderer and traced every consumer. The wizard FORM (renderOpForm, formWidgets.js:882) is a FILL surface:
+openUserOpForm renders one WIDGET per binding, the operator enters VALUES, Insert reads each widget's read() -> params ->
+recordOp + commit (userOpForm.js:61-67). It NEVER edits the field DECLARATION (label/widget/default) -- I grepped userOpForm
++ formWidgets for setEntryOverride/updateUserOp/registerUserOp/bindingSpecs and found NONE. The declaration's SOLE edit
+surface is the param_field BLOCK (in Blocks). So there is NO write-back surface to unify -- a clean ONE-WAY CONSUME is correct
+(unlike S4a, where the modal both read AND wrote the pendant blocks). Stated, per the advisor's ask.
+
+### THE CONSUMER: formBindings(def), one helper feeding all THREE renderOpForm callers
+renderOpForm(host, bindings) takes bindings (not a def), so the param_field merge lives in the CALLER. I added formBindings(def)
+in formWidgets.js (next to renderOpForm) and routed all three callers through it:
+  - ui/userOpForm.js:44 (the insert form)
+  - blocks/blocksApp.js:397 (the Blocks-tab live block->form pane)
+  - wizards/views/userOpView.js:247 (the panel view; its seed-override layers ON TOP of formBindings, so an op's current
+    values still win for the shown default -- unchanged behaviour).
+formBindings(def): when def.template carries a param_group, the param_field ROWS drive the form -- order = row order,
+label/widget/type/default/widgetConfig from the row, the BINDING supplies the wiring (param/blockIndex/key) + any inherited
+presentation (empty row field -> the binding's). ONE-SOURCE: param_field = the FORM-field declaration, the binding = the wiring.
+
+### BYTE-NEUTRAL FALLBACK (the safety rail)
+When there is NO param_group, formBindings returns `def.bindings` UNCHANGED -- the SAME array reference, so renderOpForm gets
+byte-identical input and every existing form is byte-identical. No op carries a param_group until the S5.3 hook, so S5.2 is
+INERT today. The spec asserts fbNo === noPg.bindings AND fbDrill === drill.bindings (a real registered twin) -- identity, not
+just equality.
+
+### VERIFIED
+- cam-block-native-params-s52.spec.js (NEW, 3): (1) a param_group drives order + label/widget/default (mz reordered FIRST
+  with a custom slider + default -5; frate inherits its binding default 200 from an empty row dflt; the wiring `key` comes
+  from the binding) AND a def with NO param_group returns the bindings UNCHANGED (same reference) -- proven on a constructed
+  def AND a real registered twin (user_drill_data); (2) editing a param_field's label + widget is reflected by formBindings,
+  and reversing the param_field rows reorders the form fields; (3) renderOpForm renders the block-driven custom labels for a
+  def WITH a param_group.
+- MY OWN VIEWED SCREENSHOT (s52-form-from-blocks.png): the form rendered from the param_field blocks -- "Depth (custom)" first
+  (row order), "Feed (custom)" (mm/min, with the = 7.874 IPM conversion), values from the rows/binding. The form is driven by
+  the blocks.
+- FULL GATE: 1456 passed, 0 FAILED, 4 skipped (14.1m) -- CLEAN, 1456+4 = 1460 = full count reconciles. Failed-count grepped.
+  1456 = 1452 prior + 3 new S5.2 tests + the preflight flake now green. Every existing form/wizard test passed through the
+  byte-identical fallback -- the three form-caller changes regressed NOTHING.
+
+### GATE-IF-BALLOONS: did NOT trigger. The form renderer is ONE function (renderOpForm) with three callers; a single
+formBindings helper covers all three, and there is NO write-back to unify (pure consume), so S5.2 is whole -- I did not need
+to split the write-back to S5.2b.
+
+### KNOWN LIMIT for S5.3 (materializer completeness, NOT a consumer issue): paramGroupFromBindings (S5.1) maps each binding
+to a simple param_field and does NOT carry a canvas widget's GROUP/ROLE (the multi-param xy-pad/rect grouping renderOpForm
+does). So a materialized param_group for a canvas-widget op would flatten its groups. That is an S5.3 byte-neutrality concern
+(the hook must reproduce today's form) + an S6 polish, NOT an S5.2 consumer bug -- S5.2 consumes whatever rows exist correctly.
+Flagged.
+
+### STATE: the wizard FORM now renders from the param_field blocks when a def carries a param_group -- order/label/widget/
+default from the rows, wiring from the binding -- and is byte-identically unchanged when absent (a pure one-way consume; the
+param_field block is the sole edit surface, no write-back). Nothing carries a param_group yet; S5.3 (the form materialize hook,
+mirror S4b) activates it, then S6 polish (incl. the canvas group/role carry + the per-mode compact layout + the literal-twin
+no-pill save fix).
+
+---
+
+## turn 1111 -- BLOCK-NATIVE PARAMS S5.3: the FORM materialize HOOK. Activates S5.1+S5.2 end-to-end, COMPOSES with S4b, and CARRIES canvas grouping (option a). Built.
+
+### THE CANVAS-WIDGET DECISION: option (a) CARRIED -- and it was CHEAP, not a balloon
+The advisor flagged: paramGroupFromBindings maps each binding to a SIMPLE param_field, so a materialized param_group for a
+canvas-widget op (xy-pad/rect) would FLATTEN the group -> not byte-neutral. I GROUNDED it and found the flatten is NOT in the
+materializer -- it is in the CONSUMER's widget override. formBindings already spreads `...b` (so it KEEPS the binding's
+group/role), and groupCanvasBindings puts the canvas widget on the FIRST group member (renderOpForm reads group[0].widget).
+So the ONLY thing that flattened was formBindings doing `widget: row.widget || b.widget` -- the row's default 'number'
+overriding the first member's canvas widget. The fix is ONE line: for a canvas binding (b.group/role present) the binding's
+widget wins, not the row's (canvas grouping is WIRING, not row presentation). No param_field schema change, no skip. Measured
+byte-neutral on a real canvas op (x0/y0 = an xy-pad + a plain feed): the materialized FORM matches today's -- same order,
+label, default, group, role, and every field resolves to the SAME rendered widget (undefined and 'number' resolve identically
+via resolveFormWidget -- a cosmetic object difference, not a render one). So ALL ops are byte-neutral; no canvas skip needed.
+GATE-IF-BALLOONS did NOT fire.
+
+### THE MATERIALIZER + HOOK (mirror S4b)
+- userOps.materializeParamGroup(def): inject paramGroupFromBindings into the user_root PRESENTATION mouth + re-derive EVERY
+  binding blockIndex BY IDENTITY over the post-injection flatten (the wrapForkAtSave pattern, never a blanket shift).
+  Idempotent (skip if a param_group exists or no value bindings).
+- devMode.maybeMaterializeParamGroup(def): the hook gate -- value bindings + PILL-derivable + no existing param_group. NO
+  universal gate (the FORM applies to ANY custom op, unlike the cam_table which is universal-build-only). Literal twins are
+  SKIPPED (no pills -- the same no-pill save limit S4b found, still gated to S6).
+- Hooked into editWizardDef right after maybeMaterializeCamTable.
+
+### THE S4b COMPOSITION (grounded + proven)
+Both maybeMaterializeCamTable (S4b) and maybeMaterializeParamGroup (S5.3) now fire at editWizardDef, each injecting into the
+PRESENTATION mouth. They COMPOSE because each runs its OWN identity re-derive over the CURRENT flatten: cam_table injects +
+re-derives, THEN param_group injects + re-derives over the new (cam_table-containing) flatten. So the combined non-uniform
+shift is handled correctly -- proven: after BOTH inject, every binding still resolves to its original socket (the spec walks
+flat[blockIndex] and checks the block type), the form stays byte-neutral, and the universal build still works.
+
+### VERIFIED
+- cam-block-native-params-s53.spec.js (NEW, 5): (1) materializeParamGroup is BYTE-NEUTRAL for the FORM incl. CANVAS grouping
+  (x0 keeps xy-pad + group/role, y0 keeps group/role, order + resolved widgets identical); (2) COMPOSES with S4b -- cam_table
+  + param_group both inject, every binding resolves by identity after the combined shift, the form stays byte-neutral, the
+  build works; (3) maybeMaterializeParamGroup materializes a pill op, SKIPS a literal op (no pills), idempotent; (4) emit is
+  BYTE-IDENTICAL through the materialized param_group; (5) INTEGRATION -- editWizardDef materializes BOTH a cam_table AND a
+  param_group (3 param_field for x0/y0/frate) in the REAL Blockly workspace, composed.
+- The S4b + S5.1 + S5.2 specs (10) all pass with the composed hook -- the editWizardDef composition regressed nothing.
+- FULL GATE: 1460 passed, 1 failed, 4 skipped -- the 1 is homing-limit-trip:109, a load-sensitive screenshot flake unrelated
+  to form materialization (I touched formWidgets/userOps/devMode/blocksApp/userOpView, none homing). Confirmed: homing-limit-trip
+  + the S5.3 spec all pass 10/10 in isolation. So the editWizardDef hook composition regressed NOTHING. Failed-count grepped,
+  1460+1+4 = 1465 reconciles.
+
+### STATE: block-native params is END-TO-END for pill-based ops on BOTH faces -- opening one to customize materializes its
+PENDANT fields (cam_table, S4b) AND its FORM fields (param_group, S5.3) as blocks, composed via sequential identity re-derives,
+byte-neutral (form + emit) incl. canvas grouping. The build (S2) reads the cam_table, the modal (S4a) writes it, the form
+(S5.2) reads the param_group. Literal twins skipped (S6). Next: S6 polish (the per-mode compact layout + the literal-twin
+no-pill save fix), then the block-native feature is DONE and we reconcile + merge.
+
+---
+
+## turn 1113 -- S6 polish: GROUNDED all 3 items; item (3) premise DISPROVEN empirically (the knob is NOT vestigial). Triple-GATE with findings. No code ships.
+
+### ITEM (3) -- REMOVE/HIDE THE "VESTIGIAL" INLINE KNOB: PREMISE INCORRECT (empirically proven). DO NOT REMOVE/HIDE.
+The dispatch: the inline expose-as-knob checkbox is the OLD param-CREATION mechanism, dead for data-op twins, remove it if
+pills cover creation else hide-for-twins. I VERIFIED BEFORE REMOVING (the dispatch mandated it) and the premise does not hold.
+
+TWO empirical findings:
+ (A) PROBE (25 registered wizards): ZERO carry _expose. So the pill migration IS complete for the stored DATA -- no
+     knob-authored wizard exists to strand. This part of the premise (pills cover creation) holds for the data.
+ (B) BUT THE KNOB IS NOT VESTIGIAL -- it is a LOAD-BEARING, USER-REQUESTED, HEAVILY-TESTED subsystem serving TWO roles via
+     the SAME UI element (the EXPOSE_ checkbox):
+     1. LIVE param-CREATION for hand-built + group authoring (collectAuthoring reads live EXPOSE_ -> buildBindings; the
+        writer of _expose; deriveGroupDef reads stored _expose for the editor hover-chip). Tested: knob-persist, dev-mode,
+        group-auto/edit/framing/canvas-knob.
+     2. t391 PROVENANCE DISPLAY (user-requested: "do knob, it helps me troubleshoot to use Blocks") -- a data-op twins
+        FORM-BOUND params show as PRE-TICKED knobs when opened in Blocks (a binding IS a knob, same record; emit
+        byte-identical). Tested: blocks-knob-binding (opens user_corner_data, asserts dist/f_fast/... pre-ticked).
+     ~10 specs cover the knob total.
+
+PROOF the hide is unsafe: I built the NARROWEST possible hide -- gate augment knob rows to collectAuthoring's SCAN set
+(preorderAtoms of the authoring bodys first), which removes ONLY the "dead" twin knobs (a data-op body is [user_root{...}]
+whose exec atoms live in mouths preorderAtoms never descends -- the wrapForkAtSave NOTE at devMode:480). This is a principled
+one-source alignment (augment paints knobs off getAllBlocks, a set that DIVERGES from the scan set). It PASSED knob-persist +
+dev-mode (hand-built, DO-chain, scanned) but FAILED blocks-knob-binding: dist.EXPOSE_VALUE undefined -- the "dead" twin knobs
+ARE the t391 provenance display. So even the narrowest hide breaks a user-requested feature. REVERTED (devMode.js byte-identical
+to HEAD).
+
+RECOMMENDATION: do NOT remove or hide the knob. The t1112 "remove the vestigial checkbox" request conflicts with the t391
+"show bound params as knobs" request -- SAME UI element. This is a USER fork to re-confirm: (a) KEEP the knob (it is not
+vestigial); (b) if the goal is purely a VISUAL declutter of UNTICKED create-affordances while KEEPING pre-ticked provenance +
+the create-path, that is a DISTINCT, non-trivial ask (still risks the create-path + specs) -- specify it and I will scope it.
+Per confirm-premise-before-regression-blocker + confirm-the-referent-before-dropping: removal is destructive; the invariant
+(t391) is still required, so I did not proceed.
+
+### ITEM (1) -- PER-MODE/WIDGET COMPACT BLOCK LAYOUT: GATE. Needs NEW field-hide machinery; surface the mechanism.
+Grounded the mechanism (the dispatch asked me to). The vendored Blockly has NO Field.setVisible (grep: none). jsonDef renders
+ALL of a blocks fields INLINE on message0 (field_input/field_dropdown), not on named inputs. ddcs_dynfields hides fields by
+getInput(name).setVisible -- which only works for VALUE-SOCKET inputs (input_value: Number/Region/Boolean), a NO-OP for inline
+text fields (getInput returns null). So the array/formfield dynamic works ONLY because their toggle-able fields are numeric
+SOCKETS; cam_field/param_field toggle-able fields (baked/units/nmin/nmax/options) are inline text -> no existing mechanism
+hides them. THE FIX NEEDS ONE OF: (a) jsonDef renders each toggle-able field on its OWN named dummy input for a flagged block,
+then ddcs_dynfields hides per mode/widget (a layout change: one-field-per-row; round-trip/emit unchanged since fields
+serialize by NAME not input); or (b) a re-render-on-change EXTENSION that rebuilds the blocks fields with fieldsFor(mode) on a
+mode/widget change (mutator-lite). Both are DISPLAY-ONLY + byte-neutral (reader reads the SAME rows). RECOMMEND (a) -- it
+reuses the proven ddcs_dynfields and keeps the change in jsonDef. Provisional until the advisor picks the mechanism; it is real
+new machinery, so GATED (a mechanism decision + a layout change, not a quick polish).
+
+### ITEM (2) -- LITERAL-TWIN NO-PILL SAVE FIX: GATE (secondary + entangled, advisor pre-authorized). Untouched this turn.
+
+### NET: no code ships (the one attempt was reverted after empirically disproving item 3s premise). The value is the MEASURED
+gate: item 3 would have broken a user-requested feature (t391) + ~10 specs; item 1 needs a mechanism decision; item 2 is
+entangled. Baseline green (devMode.js unchanged). NEXT: the advisor re-confirms the item-3 premise with the user, picks the
+item-1 mechanism, and directs S6b.

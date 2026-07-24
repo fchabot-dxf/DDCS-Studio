@@ -14,7 +14,7 @@ import { reconcileGcodeToStack, parseGcodeToStack } from './gcodeToStack.js';
 import { markerLine, isMarker, parseMarker } from './opSchema.js';
 import { builderOf, makeOp, _builderAtoms, opLabelOf } from './opBuilders.js';   // codec: rebuild ops from markers (declare, never infer)
 import { makeXform, makeEntry, makeFlip } from './programFraming.js';   // t812 — reconstruct the program-level declarations from the prog marker; t879 — the two-sided flip
-import { defVOf } from './userOps.js';   // N1 — the declared per-def version stamp (marker stamp + import staleness lookup)
+import { defVOf, defVStale } from './userOps.js';   // N1 — the declared per-def version stamp (marker stamp + import staleness lookup); t1079 — defVStale is the ONE staleness rule, shared with the CAM sub-stack boundary
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
 
@@ -189,7 +189,7 @@ export function staleMarkedOps(text) {
         if (!rec) continue;
         const cur = defVOf(rec.opType);
         const was = rec.defV || 0;
-        if (cur > 0 && was < cur) out.push({ opType: rec.opType, label: opLabelOf(rec.opType), fromV: was, toV: cur });
+        if (defVStale(was, cur)) out.push({ opType: rec.opType, label: opLabelOf(rec.opType), fromV: was, toV: cur });   // t1079 — the ONE declared rule (userOps.defVStale)
     }
     return out;
 }

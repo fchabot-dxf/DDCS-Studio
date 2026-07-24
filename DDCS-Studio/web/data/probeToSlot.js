@@ -11,11 +11,16 @@
  * #[805+(wcs-1)*5+ax] — G10 L2/L20 is broken on M350) is ported verbatim from the proven corner wizard
  * (wizards/cornerWizard.js) — the ground truth. See the cam-menu-architecture + ddcs-ground-truth memories.
  *
- * Scratch use: fields via their assigned vars; calc in #70/#71/#73 (WCS), #90–#99 (signs/targets), #101/#102
- * (radius-comp temps) — clear of drill/bore's #30–#54 so a probe can share a slot if ever appended.
+ * Scratch use: fields via their assigned vars; calc in #70/#71/#73 (WCS), #90–#97 (signs/targets), #101/#102
+ * (radius-comp temps) and #50–#61 (probe results/temps; alignment re-purposes #70/#71/#72 with its OWN meaning).
+ * (t1081 CORRECTION: this said the probes were "clear of drill/bore's #30–#54" — wrong, and misleading in the
+ * dangerous direction: the probe slots DO write #50–#61, which OVERLAPS opToSlot's #50–#54 pattern-loop vars, so a
+ * probe and a drill must not be composed on the assumption they are disjoint. The authoritative, code-derived bands
+ * are DATA in data/camScratch.js, which the build guard reads; this prose is a pointer, never the source.)
  */
 import { nextParam } from './slotPack.js';
-import { PROBE, wcsBase, writeAxis, twoPassProbe, probeSave } from './camMacroKit.js';
+import { nextLocalVar, bandsFor } from './camScratch.js';   // t1083 (slice B) — mint local body vars AROUND the band this generator writes; camScratch is the ONE source for the bands (a leaf module, so no cycle)
+import { PROBE, wcsBase, writeAxis, twoPassProbe, probeSave, errorEnd } from './camMacroKit.js';   // t1077 — errorEnd: the declared HALT an error branch must end on (never fall through into the next composed part)
 import { distModeBlock } from '../wizards/ops/distmode.js';   // t859 — the ONE source of the G90/G91 strings (the same distModeBlock wrapMachineFrame uses). Imported LIGHT (distmode.js has no imports) so the CAM path avoids the safeZframe→blockEmitter→saferetract cycle.
 // t859 — the SAME adjacent-G90 wrap the wizard retracts use, for a single raw G53 line: these CAM-slot G53s were raw
 // G53-under-G91 (same crash class as t853, a distinct surface). One G90 immediately before the G53 (the trailing G91
@@ -47,13 +52,48 @@ const CORNER_FIELDS = [
 ];
 
 /** Allocate #11xx params + #-vars for a field list. Returns {fields, v} where v maps key → its #var. */
-export function allocFields(spec, used, varOffset) {
+export function allocFields(spec, used, varOffset, avoid) {
     const taken = new Set(used);
-    const fields = spec.map((s, i) => {
+    let cur = varOffset;
+    const fields = spec.map((s) => {
         const idx = nextParam(taken); if (idx != null) taken.add(idx);
-        return { key: s.key, idx, var: '#' + (varOffset + i + 1), label: s.label, units: s.units, def: s.def, min: s.min, max: s.max, type: s.type };
+        cur = nextLocalVar(cur + 1, avoid);   // t1083 — step OVER this generator's own scratch band
+        return { key: s.key, idx, var: '#' + cur, label: s.label, units: s.units, def: s.def, min: s.min, max: s.max, type: s.type };
     });
     const v = {}; fields.forEach((f) => { v[f.key] = f.var; });
+    return { fields, v };
+}
+
+/**
+ * CAM Builder S0 — the expose/bake SUPERSET of allocFields. `decl` = { key: { exposed, value } } declares per-param
+ * intent; a key absent from decl (or exposed !== false) is EXPOSED. Exposed params are allocated EXACTLY as allocFields
+ * (same nextParam order, same field shape, same v[key]='#n'). t1083: the #-var is no longer positional — it is minted
+ * from a cursor that SKIPS this generator's own declared scratch band (camScratch), and a BAKED param mints no var at
+ * all, so the caller must advance by camScratch.maxLocalVar(fields) rather than by a field count. A BAKED param
+ * (exposed === false) allocates NO #11xx param and pushes NO field — v[key] becomes the literal string, which the
+ * generators interpolate directly (so the read + eng lines vanish with the field). By construction, `decl` omitted or
+ * all-exposed makes this BYTE-IDENTICAL to allocFields.
+ *
+ * S0 SCOPE: additive only — no caller is rewired, so the bake branch is PRESENT-BUT-UNEXERCISED here; #2600-index
+ * stability under re-expose (plan decision #1) and the exposable/bakeable allow-list (decision #2) are later slices.
+ */
+export function allocFieldsWith(spec, used, varOffset, decl, avoid) {
+    const taken = new Set(used);
+    const fields = [];
+    const v = {};
+    let cur = varOffset;
+    spec.forEach((s) => {
+        const d = decl && decl[s.key];
+        if (d && d.exposed === false) {                 // BAKED — no param, no field, and NO VAR (t1083: it no longer burns a
+            v[s.key] = String(d.value);                 // slot, which is half of closing the bake gap — see camScratch.maxLocalVar)
+            return;
+        }
+        const idx = nextParam(taken); if (idx != null) taken.add(idx);   // EXPOSED — identical to allocFields
+        cur = nextLocalVar(cur + 1, avoid);   // t1083 — step OVER this generator's own scratch band
+        const f = { key: s.key, idx, var: '#' + cur, label: s.label, units: s.units, def: s.def, min: s.min, max: s.max, type: s.type };
+        fields.push(f);
+        v[s.key] = f.var;
+    });
     return { fields, v };
 }
 
@@ -63,8 +103,8 @@ export const readLine = (f) => `${f.var}=#${f.idx + 1500}   ;${f.label}${f.units
  * Build the "Probe outside corner" CAM slot. One branching macro: #corner→signs, #wcs→base address,
  * #probeZ→optional Z surface, #seq→wall order. Returns { name, fields, body } (plugs into slotPack).
  */
-export function cornerSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(CORNER_FIELDS, used, varOffset);
+export function cornerSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(CORNER_FIELDS, used, varOffset, decl, bandsFor('corner'));
 
     // One wall: fast touch → check → retract → slow touch → check → radius-comp → WCS write → back off + lift.
     // sgn = ±1 sign var for this axis; the wall is at trigger + sgn*radius (outside/boss corner).
@@ -152,6 +192,7 @@ export function cornerSlot(used = new Set(), varOffset = 0) {
         'G0 Z#92   ;lift clear',
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
         'N2',
         'M30',
     ].join('\n');
@@ -175,8 +216,8 @@ const ZPROBE_FIELDS = [
  * WCS Z datum. Two-pass G31 down; WCS Z = trigger − (trigger − surfaceZ), i.e. the touched point reads as the
  * `Surface = Z` value (default 0 → touch is Z0). Position the probe over the surface, press Enter.
  */
-export function probeZSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(ZPROBE_FIELDS, used, varOffset);
+export function probeZSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(ZPROBE_FIELDS, used, varOffset, decl, bandsFor('zprobe'));
     const body = [
         '( Probe Z down to a surface → set the WCS Z datum. Position the probe over the surface, press Enter. )',
         ...fields.map(readLine),
@@ -200,6 +241,7 @@ export function probeZSlot(used = new Set(), varOffset = 0) {
         'N1',
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
         'N2',
         'M30',
     ].join('\n');
@@ -223,8 +265,8 @@ const EDGE_FIELDS = [
  * edge (trigger + sign*radius). #axis branches X/Y (the G31 letter is fixed), #dir is a sign var. No Z motion
  * (probes at the current height) — position the tool clear of the wall at probing depth, press Enter.
  */
-export function edgeSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(EDGE_FIELDS, used, varOffset);
+export function edgeSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(EDGE_FIELDS, used, varOffset, decl, bandsFor('edge'));
     const wallProbe = (ax) => [
         ...twoPassProbe(ax, { tgt: '#93', ret: '#95', fast: v.fast, slow: v.slow, port: PORT, level: LEVEL }),
         `#50=[${PROBE[ax].result}+#90*${v.radius}]   ;edge = trigger + sign*radius`,
@@ -264,6 +306,7 @@ export function edgeSlot(used = new Set(), varOffset = 0) {
         'N1',
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
         'N2',
         'M30',
     ].join('\n');
@@ -288,8 +331,8 @@ const INSIDE_FIELDS = [
  * Position the probe INSIDE the feature at probe depth, press Enter. Ported from circularStack (bore). Inside
  * only: the tool crosses the open cavity. (Outside/boss needs operator repositions — a separate slot.)
  */
-export function insideCentreSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(INSIDE_FIELDS, used, varOffset);
+export function insideCentreSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(INSIDE_FIELDS, used, varOffset, decl, bandsFor('inside'));
     // Two-pass probe (fast→slow) in one direction, saving the trigger; retract after each pass.
     const twoPass = (ax, tgt, ret, into) =>
         probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: PORT, level: LEVEL });
@@ -339,6 +382,7 @@ export function insideCentreSlot(used = new Set(), varOffset = 0) {
         `G0 Z${v.safeZ}   ;lift clear`,
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
         'N2',
         'M30',
     ].join('\n');
@@ -362,8 +406,8 @@ const BOSS_FIELDS = [
  * DRO (#882) + G53, and re-centres X at safe Z before the Y faces (never cross the boss at depth). Writes the
  * centre to WCS X/Y; reports span/roundness. Ported from circularStack (boss).
  */
-export function bossCentreSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(BOSS_FIELDS, used, varOffset);
+export function bossCentreSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(BOSS_FIELDS, used, varOffset, decl, bandsFor('boss'));
     // Two-pass probe of one face: approach (tgt), retract (ret = away from the face), save trigger.
     const face = (ax, tgt, ret, into) =>
         probeSave(ax, { tgt, ret, into, fast: v.fast, slow: v.slow, port: PORT, level: LEVEL });
@@ -371,7 +415,7 @@ export function bossCentreSlot(used = new Set(), varOffset = 0) {
     const reposition = (msg, recentreAx, recentreVal) => {
         const L = ['#57=#882   ;save probe-height Z (machine DRO)', `G0 Z${v.safeZ}   ;lift clear of the boss`];
         if (recentreAx) L.push(...g90Before(`G53 ${recentreAx}${recentreVal}   ;re-centre at safe Z (never cross the boss at depth)`));   // t859 — G90 before the G53
-        L.push(`#1505=1   ;REPOSITION: ${msg}, then press Enter`, 'IF #1505 EQ 0 GOTO 2', ...g90Before('G53 Z#57   ;back to probe height'), 'G91   ( incremental )');   // t859 — G90 before the G53; the trailing G91 restores
+        L.push(`#1505=1   ;REPOSITION: ${msg}, then press Enter`, 'IF #1505 EQ 0 GOTO 3', ...g90Before('G53 Z#57   ;back to probe height'), 'G91   ( incremental )');   // t859 — G90 before the G53; the trailing G91 restores
         return L;
     };
     const body = [
@@ -387,7 +431,7 @@ export function bossCentreSlot(used = new Set(), varOffset = 0) {
         `#93=[0-${v.retract}]   ;-retract`,
         '',
         `#1505=1   ;Position clear of the +X face at probe depth, press Enter`,
-        'IF #1505 EQ 0 GOTO 2',
+        'IF #1505 EQ 0 GOTO 3',
         'G91   ( incremental )',
         '',
         '( +X face: approach from +X, probe -X )',
@@ -422,6 +466,12 @@ export function bossCentreSlot(used = new Set(), varOffset = 0) {
         `G0 Z${v.safeZ}   ;lift clear`,
         'G90',
         '#1505=1   ;ERROR: probe did not trigger',
+        errorEnd('probe did not trigger'),
+        // t1077 — the operator-CANCEL at a reposition prompt used to jump to N2, the SUCCESS convergence label; in a
+        // COMPOSED slot N2's M30 is stripped, so a cancel ran on into the next part. Cancel now has its OWN halt label.
+        '( operator cancelled at a prompt )',
+        'N3',
+        errorEnd('cancelled by the operator'),
         'N2',
         'M30',
     ].join('\n');
@@ -445,8 +495,8 @@ const ALIGN_FIELDS = [
  * #1510-1512 popups; it does NOT write a WCS. #checkAxis (0=fence along X→probe Y, 1=fence along Y→probe X)
  * branches the probe axis + the DRO read (#880 X / #881 Y); #dir is a sign var. Ported from alignmentStack.
  */
-export function alignmentSlot(used = new Set(), varOffset = 0) {
-    const { fields, v } = allocFields(ALIGN_FIELDS, used, varOffset);
+export function alignmentSlot(used = new Set(), varOffset = 0, _variant, decl) {
+    const { fields, v } = allocFieldsWith(ALIGN_FIELDS, used, varOffset, decl, bandsFor('align'));
     // One point: confirm prompt → read the check-axis DRO → two-pass probe of the perpendicular fence face.
     const point = (probeAx, machVar, into, prompt, descend) => {
         const L = [`#1505=1   ;${prompt}`, `${into === '#50' ? '#70' : '#71'}=${machVar}   ;check-axis machine coord`];
@@ -497,6 +547,7 @@ export function alignmentSlot(used = new Set(), varOffset = 0) {
         'N1',
         'G90',
         '#1505=1   ;ERROR: probe did not trigger or zero span',
+        errorEnd('probe did not trigger or zero span'),
         'N2',
         'M30',
     ].join('\n');

@@ -24,7 +24,7 @@ export const userRootBlock = {
 export const paramGroupBlock = {
     type: 'param_group',
     label: 'Parameter Group',
-    category: 'Wizard UI',
+    category: 'Wizard Form',   // t1105 (S5.1) — the FORM family (param_group + param_field) shares ONE colour, distinct from the cam-pendant pink AND the Wizard-UI fuchsia (opunit/section/formfield)
     kind: 'param_group',
     defaults: { group: 'Settings' },
     fields: ['group'],
@@ -44,4 +44,21 @@ export const sectionBlock = {
     defaults: { title: 'Section' },
     fields: ['title'],
     emit: (params, children) => children || [],   // transparent — the label is authoring-only; emit order = children order
+};
+
+// `opunit`: a DECLARED, transparent sub-unit boundary (t1063, cam-substack-plan). It marks a run of `children` as a STANDARD
+// op (params.opType = the forked-from twin, e.g. user_surfacing_data; params.defV = the sub-unit's def version at wrap time)
+// so subStackToSlot can route that part to its PARAMETRIC generator (geometry stays a LIVE #2600 loop) while loose sibling
+// atoms unroll+expose. Recognition is a READ of opunit.params.opType — never inferred from block shape ([[declare-not-infer]]).
+// TRANSPARENT at emit (added to the transparent set in blockEmitter.js) → emits its standard atoms in order → BYTE-IDENTICAL
+// to the same atoms loose. In the same emit-transparent family as sim/panel/simstart/section/param_group.
+export const opUnitBlock = {
+    type: 'opunit',
+    label: 'Op Unit',
+    category: 'Wizard UI',
+    kind: 'opunit',
+    hidden: true,   // created PROGRAMMATICALLY at fork/load-wrap (a boundary around a recognized op's atoms), never dragged from the palette — a bare opunit has no opType
+    defaults: { opType: '', defV: 0 },
+    fields: ['opType', 'defV'],
+    emit: (params, children) => children || [],   // transparent — the boundary is authoring/routing-only; emit order = children order
 };

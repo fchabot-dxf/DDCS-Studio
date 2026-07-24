@@ -4,13 +4,13 @@
  * A primitive op-block: the kernel (peckDrill) is shared with the STUDIO drill preset; the
  * block definition (defaults/fields/emit) drives the Blocks-tab palette and the emit engine.
  */
-import { num, r3, shiftZ } from './util.js';
+import { num, r3, shiftZ, val } from './util.js';
 
 /** Peck drill at a point: G83 incremental stepdown. Each peck rapids down to just above the last depth, then
  *  FEEDS only the new `peck` increment, then full-retracts to clearance to clear chips — so the hole deepens a
  *  step at a time (not a full-depth feed re-cutting the whole hole every peck). `zOff` shifts every Z (path offset). */
 export function peckDrill(pt, p) {
-    const clr = num(p.clearance, 5), depth = num(p.depth, 5), feed = num(p.feed, 100);
+    const clr = num(p.clearance, 5), depth = num(p.depth, 5), feed = val(p.feed, 100);   // t1091 — feed rides val() (pure F# interpolation) so a #var survives; depth/peck stay num() (they DRIVE the JS peck loop)
     const q = Math.max(0.1, num(p.peck, depth));
     const reentry = 0.5;                              // rapid back to this far above the last peck before feeding on
     const L = [`G0 X${pt.x} Y${pt.y}`];

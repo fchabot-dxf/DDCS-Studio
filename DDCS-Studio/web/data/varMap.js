@@ -35,7 +35,14 @@ export const FORM = { min: 1100, max: 1499 };   // CAM form params (a sub-pool o
 export const WCS = { min: 805, max: 834 };       // G54..G59 offset table (base 805, stride 5)
 
 /** RESERVED persistent uservar slots — a Studio meaning is pinned to the # so nothing else allocates it. Grounded CLEAN
- *  in the M350 dump (macro-free; a FINDINGS persistence test that touched a slot only PROVES it is a live persistent cell). */
+ *  in the M350 dump (macro-free; a FINDINGS persistence test that touched a slot only PROVES it is a live persistent cell).
+ *
+ *  NOT THE SCRATCH-BAND SOURCE (t1085). This map is human-readable OWNERSHIP prose with no code consumer, and it is
+ *  deliberately partial — it records the few #s whose meaning had to be argued (#520 read-only, the #42/#43/#191 hop
+ *  peers), not every var the emit path touches. The ALLOCATOR reads declarations instead, each next to the code that
+ *  injects it: `def.scratch` on a palette atom, `dialect.scratch` on a post, camScratch.SCRATCH_BANDS per CAM generator —
+ *  aggregated by data/camScratch.js (generator arms) and data/universalScratch.js (the universal arm). Do not treat the
+ *  list below as complete, and do not grow it into a second copy of those. */
 export const RESERVED = {
     520: 'safe-Z margin (t822) — machine-frame retract height as a NEGATIVE machine Z (below home). t899 READ-ONLY to every '
         + 'emitted program: the safeRetract guard READS #520 into scratch #42 with a baked-margin fallback (never assigns it); '
