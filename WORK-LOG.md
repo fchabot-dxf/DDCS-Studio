@@ -14771,3 +14771,36 @@ effective sequence). Left out to keep S6 a clean finish; trivially addable later
 Duplicate / Delete + the pack doors New/Export/Merge); ALL authoring is in the wizard (New composes from the program; Edit
 reopens pre-seeded from the manifest -> Update in place; the icon step draws/imports). S4 (the live editor/Blocks view) remains
 deferred; the launch-vs-integrated icon-editor call is with the user.
+
+---
+
+## turn 1133 -- FLAKE-HARDENING: the 3 documented load-sensitive flakes made DETERMINISTIC (test-infra only; no product bug found).
+
+Each flaked ONLY under the 4-worker full-gate contention (green in isolation) because an arbitrary sleep sampled a shared
+transition/render BEFORE it completed. Fixed each by awaiting the REAL condition (no product change needed -- no flake masked
+a real bug; every wait times out on a genuine failure, surfacing it).
+
+### 1. blocks-mobile-drawers -- 4 arbitrary sleeps -> waitForFunction on the real DOM state
+Replaced waitForTimeout(500 / 300 x3) + the click-then-immediate class reads with deterministic waits: the palette COLLAPSE
+(toolbox.getWidth()===0), the preview `.right.open` class, the show-code toggle both ways, the drawer close, the palette OPEN
+(width>0) and close (width===0). (The earlier t710 drawer-settle + resize waits already used the real condition -- kept.) The
+sleeps sampled mid-CSS-transition / before the JS class toggle under load.
+
+### 2. homing-limit-trip:109 -- waitForTimeout(350) -> await the LED actually LIT
+The DRIVE screenshot read `#io-panel .io-input[data-pin=7].active` 350ms after showing the panel; under load the io panel had
+not repainted. Now waitForFunction the `.active` class (timeout 6s) -- the exact condition the assert checks.
+
+### 3. preflight-badge-838 (:63/:104/:119) -- the shared `configure()` 340ms sleep -> deterministic render
+ROOT CAUSE: `configure` set the editor value (input -> the 250ms DEBOUNCED preflightBadge render) then slept 340ms. Under
+4-worker load the debounce fired LATE, so the NON-retrying `page.evaluate(() => ddcsPreflightCheck())` reads (:63 amber reason,
+:119 the send CHECK) + the .g-line annotations sampled STALE lastResult. GROUNDED preflightBadge.js: render() is FULLY
+SYNCHRONOUS and is called directly on `ddcs:settings-changed` (only the editor-`input` path is debounced), and the RED
+annotations attach to the editor-HIGHLIGHT `.g-line` overlay (also debounced). FIX (two deterministic steps in configure):
+(1) wait for the highlight to render the program's LAST line (the .g-line overlay), then (2) fire ddcs:settings-changed ->
+render() runs SYNCHRONOUSLY, refreshing lastResult + the badge + re-injecting annotations onto the present spans. No fixed
+sleep. (Playwright's expect(locator) auto-retries, so the toHaveCount/toBeHidden asserts were never the flake -- the
+ddcsPreflightCheck evaluate reads were; forcing the sync render fixes them at the source.)
+
+### VERIFIED: all 3 specs pass in ISOLATION (16/16: preflight 10 + homing 5 + mobile 1). Under the FULL GATE: 1466 passed / 4 skipped / 0 FAILED -- and all 3 previously-flaky specs
+passed under the 4-worker load that caused the flakes. A single 0-failed run is not statistical proof, but the fixes are
+DETERMINISTIC (the arbitrary-sleep races are REMOVED, not merely lucky), so the flakes are structurally gone. NO product code changed -- test-infra/spec files only.
