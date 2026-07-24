@@ -77,8 +77,6 @@ test('S4a — flipping a radio MUTATES the cam_field block AND the built slot re
     expect(afterFlip.ddepthMode, 'ddepth is untouched (still bake)').toBe('bake');
     // now BUILD and confirm the slot reflects the block: frate baked (no #2600), dfeed still exposed (#2600)
     await page.click('[data-act="cbm-build"]');
-    await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]', { timeout: 8000 });
-    await page.click('.cam-sim-overlay [data-cbm="ok"]');
     await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
     const slot = await page.evaluate(() => {
         const pack = JSON.parse(localStorage.getItem('ddcs_campack') || '{"slots":[]}');

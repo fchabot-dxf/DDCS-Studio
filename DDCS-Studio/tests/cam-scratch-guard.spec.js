@@ -88,8 +88,6 @@ test.describe(() => {
         await page.waitForSelector('.cam-auth-overlay .cbm-eb');
         await page.click('[data-act="cbm-build"]');
         // slice B: no refusal — we go straight to the destination prompt
-        await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]', { timeout: 8000 });
-        await page.click('.cam-sim-overlay [data-cbm="ok"]');
         await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
         await page.screenshot({ path: `${SCRATCH}/cam-s5b-2op-built.png` });   // VIEWED (ACCEPT, gated to the advisor)
         const r = await page.evaluate(() => {

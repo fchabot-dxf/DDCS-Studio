@@ -70,8 +70,6 @@ test('U3 modal: a forked custom op → op-card Build CAM slot → value params e
 
     // Build → a slot whose body carries the exposed #vars (feed + plunge Z) and bakes the geometry
     await page.click('[data-act="cbm-build"]');
-    await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]');
-    await page.click('.cam-sim-overlay [data-cbm="ok"]');
     await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
     const slotBody = await page.evaluate(() => {
         const pack = JSON.parse(localStorage.getItem('ddcs_campack') || '{"slots":[]}');

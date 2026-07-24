@@ -70,8 +70,6 @@ test.describe(() => {
 
         // Build → a slot where the surfacing stays a LIVE loop + the custom feed/Z ride #vars
         await page.click('[data-act="cbm-build"]');
-        await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]');
-        await page.click('.cam-sim-overlay [data-cbm="ok"]');
         await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
         const slotBody = await page.evaluate(() => {
             const pack = JSON.parse(localStorage.getItem('ddcs_campack') || '{"slots":[]}');

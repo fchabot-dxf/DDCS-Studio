@@ -1104,6 +1104,7 @@ function homingPostIsExpert() {
     // whole program. The global doors AUTO-IMPORT all CAM-able program ops; the op-card door seeds that ONE op. buildSlotFromOps
     // already composes multi-op (allocates params around siblings, tags f._op) — no generator/slotPack change.
     let _authoring = null;   // { ops:[{opType,camType,variant,fields,values,exposed,baked,label}], name, seedLocked } | null
+    let _editingSlot = null; // t1127 S3 — the cam NUMBER being Edited (Update-in-place), or null = a NEW slot. The slot-level analog of devMode._editingWizard.
     let _cbmPanel = null;    // the docked inline preview panel
     let _cbmOverlay = null;  // the modal overlay element
     let _cbmUnsupported = []; // present-but-not-CAM-able program ops (for the empty-state reasons)
@@ -1151,6 +1152,31 @@ function homingPostIsExpert() {
         return { opType: op.opType, camType: seed.camType, variant: variantForCam(seed.camType, op.params || {}), fields: seed.fields, values, exposed, baked, label: op.label || op.opType, universal: !!seed.universal, defV: defVOf(op.opType) };
     }
     const toManifest = (a) => ({ type: a.camType, variant: a.variant, values: a.values, exposed: a.exposed, baked: a.baked, opType: a.opType, defV: a.defV });   // U3 — opType+defV let a universal slot rebuild via getUserDef; type==='universal' selects the arm
+    // t1127 S3 — the DECLARED inverse of camTypeOf's forward map: the discriminating params it reads to resolve a generator's
+    // camType/field-set. toManifest dropped the source op's params, so re-derive JUST these from the stored camType/variant
+    // → seedFromOp re-resolves the SAME camType + re-hydrates the SAME fields. Universal/substack need none (the def IS the
+    // source). Declare-never-infer: the manifest is read, slot.body is NEVER re-parsed.
+    const CAM_SEED_PARAMS = {
+        pocket: () => ({ shape: 'rect' }), cpocket: () => ({ shape: 'circle' }),
+        inside: () => ({ twoAxis: true, featureType: 'inside' }), boss: () => ({ twoAxis: true, featureType: 'boss' }),
+        drill: (v) => ({ pattern: v || 'circle' }), bore: (v) => ({ pattern: v || 'circle', method: 'helical' }),
+    };
+    // The faithful INVERSE of toManifest: a stored manifest op → an authoring op (the shape makeAuthOp produces). Re-hydrate
+    // `fields` from the op-type SEED (makeAuthOp → seedFromOp/subStackToSlot, the SAME call the fresh-authoring path uses),
+    // then OVERLAY the stored variant/values/exposed/baked (the declared customization). Returns null if the op-type is no
+    // longer CAM-able (a stale/removed def).
+    function manifestToAuthOp(m) {
+        if (!m || !m.opType) return null;
+        const seedParams = CAM_SEED_PARAMS[m.type] ? CAM_SEED_PARAMS[m.type](m.variant) : {};
+        const a = makeAuthOp({ opType: m.opType, params: seedParams });
+        if (!a) return null;
+        if (m.variant != null && m.variant !== '') a.variant = m.variant;
+        a.values = { ...(a.values || {}), ...(m.values || {}) };
+        a.exposed = { ...(a.exposed || {}), ...(m.exposed || {}) };
+        a.baked = { ...(a.baked || {}), ...(m.baked || {}) };
+        a.fields.forEach((f) => { const ov = a.values[fkeyOf(f)]; if (ov && ov.def != null) f.value = ov.def; });   // reflect tuned values onto the re-seeded table
+        return a;
+    }
     const cbmPreviewSlot = () => { const s = { slot: nextSlotNum(), name: _authoring.name || 'New CAM slot', ops: _authoring.ops.map(toManifest) }; buildSlotFromOps(s); return s; };
     // t1077 — the ONE key the modal ADDRESSES a field by (row id, radio group, value input, expose/bake + value maps, and
     // the pendant-slot lookup). A SUB-STACK op composes SEVERAL parts, and two parts can legitimately carry the SAME param
@@ -1223,13 +1249,14 @@ function homingPostIsExpert() {
     }
     function mountAuthoringSurface(body) {
         const n = _authoring.ops.length;
+        const editing = _editingSlot != null;   // t1127 S3 — Edit reads "Update CAM (camN)"; New reads "Build CAM slot"
         body.innerHTML = `<div class="cam-build-mode" style="padding:14px 16px;">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><b style="flex:1; font-size:14px;">✚ Build CAM slot${n > 1 ? ` — ${n} ops` : ''}</b><button class="toolbar-btn settings-io" data-act="cbm-cancel">✕ Cancel</button></div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><b style="flex:1; font-size:14px;">${editing ? `✎ Update CAM (cam${_editingSlot})` : '✚ Build CAM slot'}${n > 1 ? ` — ${n} ops` : ''}</b><button class="toolbar-btn settings-io" data-act="cbm-cancel">✕ Cancel</button></div>
             <div class="settings-row" style="align-items:center; margin-top:2px;"><label style="font-size:11px; color:var(--text-dim);">Slot name&nbsp;<input id="cbm_name" value="${camEsc(_authoring.name || '')}" placeholder="e.g. Pocket" style="min-width:200px;"></label></div>
             <div id="cbm_table" style="margin-top:8px;"></div>
             <div style="display:flex; align-items:center; gap:8px; margin-top:10px;"><b style="font-size:11px; color:var(--text-dim); flex:1;">Inline preview</b><button class="toolbar-btn settings-io" data-act="cbm-sim" title="Simulate this slot's composed macro, each field seeded from its value.">▶ Simulate</button></div>
             <div id="cbm_preview" style="height:280px; position:relative; border:1px solid var(--border); border-radius:6px; margin-top:6px; background:#000;"></div>
-            <div class="settings-row" style="justify-content:flex-end; margin-top:12px;"><button class="toolbar-btn settings-io" data-act="cbm-build" style="font-weight:600;"${n ? '' : ' disabled'}>Build CAM slot ▸</button></div>
+            <div class="settings-row" style="justify-content:flex-end; margin-top:12px;"><button class="toolbar-btn settings-io" data-act="cbm-build" style="font-weight:600;"${n ? '' : ' disabled'}>${editing ? `Update CAM (cam${_editingSlot}) ▸` : 'Build CAM slot ▸'}</button></div>
         </div>`;
         renderCbmTable();
     }
@@ -1259,24 +1286,38 @@ function homingPostIsExpert() {
             }
         });
     }
+    // t1127 S3 — the per-slot "Edit ▸" entry: reopen the wizard PRE-SEEDED from the slot MANIFEST (manifestToAuthOp), with
+    // _editingSlot set so Build becomes "Update CAM (camN)" overwriting that slot IN PLACE. MODAL-ONLY (does not touch the
+    // active program/editor — that is the gated S4). A legacy slot (no slot.ops) or one whose op-type is gone can't Edit: the
+    // display only offers Edit when slot.ops has content, and this refuses a stale manifest loudly rather than opening lossy.
+    function editCamSlot(slot) {
+        const ops = (slot.ops || []).map(manifestToAuthOp);
+        if (!ops.length || ops.some((a) => !a)) { dlgNotice('This slot can’t be edited in the wizard (a legacy hand-built macro, or an op that is no longer installed). Use ▶ Simulate / ⬇ View output / ✕.'); return; }
+        _editingSlot = +slot.slot;
+        _authoring = { ops, name: slot.name || '', seedLocked: true };
+        _cbmUnsupported = [];
+        openCamAuthoring();   // _editingSlot != null → skips the seed, opens on the pre-set _authoring
+    }
     // The ONE opener — a modal over any surface. seedOp given (op-card door) → seeds THAT one op. No seedOp (toolbar / CAM-tab
     // doors) → AUTO-IMPORT every CAM-able op from the program (in order). Exposed as window.ddcsOpenCamAuthoring for the op card.
     function openCamAuthoring(seedOp) {
         if (_cbmOverlay) return;   // one at a time
-        _authoring = { ops: [], name: '', seedLocked: !!seedOp };
-        _cbmUnsupported = [];
-        if (seedOp) {   // op-card door — this ONE op
-            const a = makeAuthOp(seedOp);
-            if (!a) { const r = seedFromOp(seedOp); dlgNotice((r && r.unsupported) || 'This op is not CAM-able.'); _authoring = null; return; }
-            _authoring.ops = [a]; _authoring.name = a.label;
-        } else {        // global doors — auto-import all CAM-able program ops (program order)
-            const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
-            for (const op of stack.filter((b) => b && b.type === 'op')) {
-                const a = makeAuthOp(op);
-                if (a) _authoring.ops.push(a);
-                else { const r = seedFromOp(op); _cbmUnsupported.push({ label: op.label || op.opType, reason: (r && r.unsupported) || 'not CAM-able' }); }
+        if (_editingSlot == null) {   // NEW authoring — seed from the op / program. (Edit pre-sets _authoring in editCamSlot; skip the seed.)
+            _authoring = { ops: [], name: '', seedLocked: !!seedOp };
+            _cbmUnsupported = [];
+            if (seedOp) {   // op-card door — this ONE op
+                const a = makeAuthOp(seedOp);
+                if (!a) { const r = seedFromOp(seedOp); dlgNotice((r && r.unsupported) || 'This op is not CAM-able.'); _authoring = null; return; }
+                _authoring.ops = [a]; _authoring.name = a.label;
+            } else {        // global doors — auto-import all CAM-able program ops (program order)
+                const stack = (window.ddcsGetBlockProgram && window.ddcsGetBlockProgram()) || [];
+                for (const op of stack.filter((b) => b && b.type === 'op')) {
+                    const a = makeAuthOp(op);
+                    if (a) _authoring.ops.push(a);
+                    else { const r = seedFromOp(op); _cbmUnsupported.push({ label: op.label || op.opType, reason: (r && r.unsupported) || 'not CAM-able' }); }
+                }
+                _authoring.name = _authoring.ops.length === 1 ? _authoring.ops[0].label : (_authoring.ops.length ? 'Program' : '');
             }
-            _authoring.name = _authoring.ops.length === 1 ? _authoring.ops[0].label : (_authoring.ops.length ? 'Program' : '');
         }
         const ov = document.createElement('div'); ov.className = 'cam-auth-overlay';
         ov.style.cssText = 'position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.55); display:flex; align-items:flex-start; justify-content:center; overflow:auto; padding:22px 12px;';
@@ -1286,25 +1327,8 @@ function homingPostIsExpert() {
         mountAuthoringSurface(body);          // builds the shell + renders the group-by-op table (or the empty-state)
         ov.addEventListener('mousedown', (e) => { if (e.target === ov) cbmExit(); });
     }
-    function cbmBuildModal() {
-        return new Promise((resolve) => {
-            const newNum = nextSlotNum();
-            const existing = _camPack.slots.map((s) => `<option value="${s.slot}">cam${s.slot} — ${camEsc(s.name || '')}</option>`).join('');
-            const ov = document.createElement('div'); ov.className = 'cam-sim-overlay';
-            ov.style.cssText = 'position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center;';
-            ov.innerHTML = `<div style="background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px; padding:16px; min-width:320px;">
-                <b>Build to which slot?</b>
-                <div style="margin:12px 0 8px;"><label><input type="radio" name="cbm_dest" value="new" checked> New slot <b>cam${newNum}</b></label></div>
-                <div style="margin:8px 0;"><label><input type="radio" name="cbm_dest" value="ov"${existing ? '' : ' disabled'}> Overwrite <select id="cbm_ovsel"${existing ? '' : ' disabled'}>${existing}</select></label></div>
-                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;"><button class="toolbar-btn settings-io" data-cbm="cancel">Cancel</button><button class="toolbar-btn settings-io" data-cbm="ok" style="font-weight:600;">Build</button></div>
-            </div>`;
-            document.body.appendChild(ov);
-            const done = (r) => { ov.remove(); resolve(r); };
-            ov.querySelector('[data-cbm="cancel"]').addEventListener('click', () => done(null));
-            ov.querySelector('[data-cbm="ok"]').addEventListener('click', () => { const dest = ov.querySelector('input[name="cbm_dest"]:checked').value; done(dest === 'new' ? { slot: newNum, isNew: true } : { slot: +ov.querySelector('#cbm_ovsel').value, isNew: false }); });
-            ov.addEventListener('click', (e) => { if (e.target === ov) done(null); });
-        });
-    }
+    // t1127 S3 — cbmBuildModal (the "Build to which slot? New vs Overwrite" prompt) is DELETED: the destination is now
+    // valid-by-construction (New always mints nextSlotNum, Edit always overwrites _editingSlot), so the prompt is dead.
     // t1073 S4-Part2 (B2) — the "Customize op" picker: which recognized CAM-generator twin in THIS program to fork into
     // editable blocks (dedup by opType — one Customize per op TYPE). editWizardDef wraps a recognized-at-default op in an
     // opunit sub-stack boundary + opens Blocks. Empty → a helpful notice (no picker). Mirrors cbmBuildModal's overlay shape.
@@ -1333,7 +1357,7 @@ function homingPostIsExpert() {
             ov.addEventListener('click', (e) => { if (e.target === ov) done(null); });
         });
     }
-    const cbmExit = () => { if (_cbmPanel) { try { _cbmPanel.stop(); _cbmPanel.setActive(false); } catch (_) { /* noop */ } _cbmPanel = null; } if (_cbmOverlay) { _cbmOverlay.remove(); _cbmOverlay = null; } _authoring = null; if (q('cam_slots')) renderCamBuilder(); };
+    const cbmExit = () => { if (_cbmPanel) { try { _cbmPanel.stop(); _cbmPanel.setActive(false); } catch (_) { /* noop */ } _cbmPanel = null; } if (_cbmOverlay) { _cbmOverlay.remove(); _cbmOverlay = null; } _authoring = null; _editingSlot = null; if (q('cam_slots')) renderCamBuilder(); };   // t1127 S3 — clear the Edit flag on close (build OR cancel)
     // S4a (block-native params) — the modal as a VIEW of the cam_field blocks. When the op's def carries a cam_table, its
     // cam_field block RECORD (live in getUserDef's template) IS the state: the render reads mode/value from it and a
     // radio/value edit WRITES to it, so the block is one source and the S2 build (which reads the same cam_table) reflects
@@ -1391,14 +1415,18 @@ function homingPostIsExpert() {
         const _pv = cbmPreviewSlot();
         const _cols = fieldVarCollisions(_pv.fields, _pv.ops, camBandsOf);
         if (_cols.length) { dlgNotice(collisionMessage(_cols)); return; }
-        cbmBuildModal().then((dest) => {
-            if (!dest) return;
-            const ops = _authoring.ops.map(toManifest);
-            let slot;
-            if (dest.isNew) { slot = { slot: dest.slot, name: _authoring.name || 'New CAM slot', ops }; _camPack.slots.push(slot); }
-            else { slot = _camPack.slots.find((s) => +s.slot === dest.slot); if (!slot) return; slot.ops = ops; if (_authoring.name) slot.name = _authoring.name; }
-            buildSlotFromOps(slot); saveCamPack(); cbmExit();
-        });
+        // t1127 S3 — the destination is now UNAMBIGUOUS (valid-by-construction): Edit OVERWRITES _editingSlot in place, New
+        // always MINTS the next cam number. The old "new vs overwrite" prompt (cbmBuildModal) is eliminated.
+        const ops = _authoring.ops.map(toManifest);
+        let slot;
+        if (_editingSlot != null) {
+            slot = _camPack.slots.find((s) => +s.slot === _editingSlot);
+            if (!slot) { cbmExit(); return; }           // the slot vanished under us — bail (cbmExit clears _editingSlot)
+            slot.ops = ops; if (_authoring.name) slot.name = _authoring.name;
+        } else {
+            slot = { slot: nextSlotNum(), name: _authoring.name || 'New CAM slot', ops }; _camPack.slots.push(slot);
+        }
+        buildSlotFromOps(slot); saveCamPack(); cbmExit();
     }
 
     function renderCamBuilder() {
@@ -1426,7 +1454,7 @@ function homingPostIsExpert() {
                     ${slot.icon ? `<img src="${slot.icon.data}" alt="" style="width:72px; height:36px; object-fit:contain; border:1px solid var(--border); background:#000;"><span style="font-size:10px; color:var(--text-dim);">${camEsc(slot.icon.name)}${slot.icon.w ? ' · ' + slot.icon.w + '×' + slot.icon.h + (slot.icon.w === 360 && slot.icon.h === 180 ? '' : ' ⚠ not 360×180') : ''}</span>` : '<span style="font-size:11px; color:var(--text-dim);">No icon (camN.bmp)</span>'}
                 </div>
                 ${opSummary ? `<div style="font-size:11px; color:var(--text-dim); margin-top:6px;"><span style="opacity:.65;">ops:</span> ${camEsc(opSummary)}</div>` : ''}
-                <div class="settings-row" style="margin-top:6px; flex-wrap:wrap;"><span style="flex:1"></span><button class="toolbar-btn settings-io" data-act="sim" title="Run this slot's macro in the simulator with each field seeded from its default — verify the toolpath before publishing.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
+                <div class="settings-row" style="margin-top:6px; flex-wrap:wrap;">${(slot.ops && slot.ops.length) ? '<button class="toolbar-btn settings-io" data-act="editslot" title="Reopen this slot in the wizard, pre-seeded from its ops — tune expose/bake + values, then Update it in place.">✎ Edit</button>' : ''}<span style="flex:1"></span><button class="toolbar-btn settings-io" data-act="sim" title="Run this slot's macro in the simulator with each field seeded from its default — verify the toolpath before publishing.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
             </div>`;
         }).join('');
     }
@@ -1513,6 +1541,7 @@ function homingPostIsExpert() {
             // S1 — the settings panel is read-mostly: only the DISPLAY actions live here (Delete / Duplicate the slot,
             // Simulate, View output). Authoring (fields, ops, macro, icon) moved to the wizard (S2/S3/S5).
             if (a === 'dels') { _camPack.slots.splice(si, 1); saveCamPack(); renderCamBuilder(); }
+            else if (a === 'editslot') { editCamSlot(slot); }   // t1127 S3 — reopen the wizard pre-seeded from the manifest → Update in place
             else if (a === 'dupslot') {
                 const clone = JSON.parse(JSON.stringify(slot)); delete clone.bodyDirty;
                 clone.slot = nextSlotNum();

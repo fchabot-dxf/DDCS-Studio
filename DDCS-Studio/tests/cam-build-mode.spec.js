@@ -45,8 +45,6 @@ test('modal (op-card door): seed pocket numeric, bake Feed, Build byte-safe', as
 
   // all-exposed Build keeps every read (byte-safe)
   await page.click('[data-act="cbm-build"]');
-  await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]');
-  await page.click('.cam-sim-overlay [data-cbm="ok"]');
   await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
   let slot = (await camPack(page)).slots.slice(-1)[0];
   expect(slot.body, 'all-exposed: Feed read line present').toMatch(/=#\d+\s+;Feed/);
@@ -56,8 +54,6 @@ test('modal (op-card door): seed pocket numeric, bake Feed, Build byte-safe', as
   await page.waitForSelector('.cam-auth-overlay .cbm-eb');
   await page.check('.cbm-eb[data-fkey="feed"][data-mode="bake"]');
   await page.click('[data-act="cbm-build"]');
-  await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]');
-  await page.click('.cam-sim-overlay [data-cbm="ok"]');
   await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
   slot = (await camPack(page)).slots.slice(-1)[0];
   expect(slot.body, 'baked: NO Feed read line').not.toMatch(/=#\d+\s+;Feed/);
@@ -95,8 +91,6 @@ test('S1d ENUM: a corner op shows friendly dropdowns mapping to ints; choice par
 
   // Build → corner is inlined as the literal 2 (valid G-code), its read + eng line vanish
   await page.click('[data-act="cbm-build"]');
-  await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]');
-  await page.click('.cam-sim-overlay [data-cbm="ok"]');
   await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
   const slot = (await camPack(page)).slots.slice(-1)[0];
   expect(slot.ops[0].baked.corner, 'corner baked = int 2 (FR)').toBe(2);
@@ -156,8 +150,6 @@ test('S-C multi-op: a program of 3 CAM-able ops auto-imports group-by-op → Bui
   await page.screenshot({ path: 'test-results/cam-s-c-multiop.png' });
 
   await page.click('[data-act="cbm-build"]');
-  await page.waitForSelector('.cam-sim-overlay [data-cbm="ok"]');
-  await page.click('.cam-sim-overlay [data-cbm="ok"]');
   await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
   const slot = (await camPack(page)).slots.slice(-1)[0];
   expect(slot.ops.length, 'ONE slot composes all 3 ops').toBe(3);
