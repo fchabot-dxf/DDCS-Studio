@@ -15061,3 +15061,42 @@ possible dedicated slice.
 ### Committed MY FILES ONLY: saveStates.js + devMode.js + blocks-load-guard-s41.spec.js (new) + dev-mode-sim-intent.spec.js
 (the one orphaned test). Pre-existing working-tree noise (PNGs / HANDOFF / NEXT-SESSION / scratchpad / untracked) NOT staged.
 Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1147 -- S4-2 (corrected model): Edit a UNIVERSAL slot ALSO loads its op into the editor (Blocks = the structure view). Built + verified. NO separate button.
+
+### MID-TASK AMENDMENT (polled before commit) SUPERSEDED the two-button design I first built. Two amendments arrived:
+ (1) HOLD the separate Edit-in-Blocks button -- the user was re-examining the entry (Blocks is a VIEW of the editor program,
+     so a second button seemed redundant). (2) FINAL corrected model: NO separate button. EXTEND the existing editCamSlot
+     (the ✎ Edit door) so a UNIVERSAL slot ALSO loads the reconstructed op into the editor; generators stay modal-only.
+ I had NOT committed the button, so I pivoted cleanly (reverted it; the guarded-load CORE from S4-1 is reused unchanged).
+
+### BUILT (macrosApp.js only, +12/-3 -- just the editCamSlot extension)
+ - editCamSlot is now async. After the existing manifest->authOp validation, if the slot is a SINGLE-op UNIVERSAL
+   (slot.ops.length===1 && slot.ops[0].type===universal) AND getUserDef(opType) resolves, it awaits
+   window.ddcsEditWizardDef(opType) -- the EXISTING path (getUserDef -> makeOp -> the S4-1 destructive-load guard ->
+   showApp(blocks) -> ddcsLoadBlockStack + editing chrome) -- THEN opens the pendant modal (openCamAuthoring) as before.
+ - GENERATORS: uni===null -> the load is SKIPPED -> modal-only, the editor is UNTOUCHED (parametric; nothing to load).
+ - The modal ALWAYS opens (the pendant is program-independent); only the structure-LOAD is guarded. "Loading is editing":
+   a clean editor loads straight in (no confirm); a dirty one gets ONE confirm (Cancel keeps the program, modal still opens).
+   NO new load/guard code -- it is the S4-1 seam + editWizardDef, composed. Substack=S4-4, multi-op=S4-5; round-trip back to
+   the slot rides defVStale + buildSlotFromOps (explicit slot-Update is S4-3).
+
+### VERIFIED (real symptom, new spec cam-edit-in-blocks-s42.spec.js, 3 tests green -- drive the real ✎ Edit button)
+ 1. Edit a UNIVERSAL slot (clean editor): the pendant modal opens AND the op loads into the editor (an op block appears in
+    ddcsGetBlockProgram); NO confirm.
+ 2. Edit a GENERATOR (pocket) slot (non-empty editor): the modal opens ONLY; the editor program is UNCHANGED (no load) + no confirm.
+ 3. Edit a UNIVERSAL slot (DIRTY editor): the S4-1 guard CONFIRMS first; Cancel keeps the editor program (no wipe) AND the
+    pendant modal still opens.
+ (Test gotcha fixed: the test op needs an EXPOSED param -- a bare op has "no value bindings to expose", so seedFromOp is
+ unsupported + manifestToAuthOp null. A real universal CAM op has bindings.)
+
+### Full gate: 1471 passed / 1 failed / 4 skipped (14.2m). The 1 failure = transform-declared-736.spec.js:101 (a Blocks-
+workspace reprojection flake, 0 references to macrosApp/editCamSlot/editWizardDef) -- RE-RAN ISOLATED: 3/3 PASS. Pre-existing
+load flake, not this change. Effective 1472 real pass = t1145 baseline 1469 + my 3 new tests. The 41-test CAM suite + the
+existing editslot tests (incl. "Edit a UNIVERSAL slot") stay green -- my editCamSlot change is backward-compatible (a
+universal slot whose op is registered now ALSO loads Blocks; every other path unchanged).
+
+### Committed MY 2 FILES ONLY: macrosApp.js + cam-edit-in-blocks-s42.spec.js (new). Pre-existing working-tree noise NOT staged.
+Branch feat/ddcs-workspace. NO release. NEXT per the plan: S4-3 (explicit slot-Update round-trip), then S4-4 (substack), S4-5 (multi-op).
