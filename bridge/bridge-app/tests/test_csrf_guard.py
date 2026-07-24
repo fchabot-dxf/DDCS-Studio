@@ -151,6 +151,38 @@ def test_file_reads_are_guarded():
         httpd.shutdown()
 
 
+def test_trusted_origin_preflight_grants_the_local_header():
+    """MODE C works: the hosted page (a TRUSTED DDCS origin) pointed at a local/LAN gateway is cross-origin, so its
+    custom X-DDCS-Local header needs a preflight — and a trusted origin's preflight IS granted X-DDCS-Local + gets its
+    origin reflected (not *), so it CAN set the header and the guarded POSTs/GETs work for the hosted-then-local flow."""
+    httpd, port = _start()
+    try:
+        origin = "https://ddcs-studio.pages.dev"
+        st, hdrs, _ = _req(port, "OPTIONS", "/api/config", {"Origin": origin})
+        allow_hdr = hdrs.get("Access-Control-Allow-Headers") or ""
+        allow_origin = hdrs.get("Access-Control-Allow-Origin") or ""
+        assert "x-ddcs-local" in allow_hdr.lower(), "a TRUSTED origin's preflight MUST grant X-DDCS-Local (mode c): %r" % allow_hdr
+        assert allow_origin == origin, "a trusted origin must be REFLECTED (not *) so it can set the header, got %r" % allow_origin
+    finally:
+        httpd.shutdown()
+
+
+def test_evil_origin_preflight_does_not_grant_the_local_header():
+    """The drive-by is STILL blocked: a preflight from a NON-allowlisted (evil) origin is NOT granted X-DDCS-Local and
+    is NOT origin-reflected (stays *), so an attacker page still cannot set the header → the guarded routes hold. The
+    allowlist only lets a KNOWN origin through; it does not weaken the header guard for anyone else."""
+    httpd, port = _start()
+    try:
+        st, hdrs, _ = _req(port, "OPTIONS", "/api/config", {"Origin": "https://evil.example"})
+        allow_hdr = hdrs.get("Access-Control-Allow-Headers") or ""
+        allow_origin = hdrs.get("Access-Control-Allow-Origin") or ""
+        assert "x-ddcs-local" not in allow_hdr.lower(), "an EVIL origin's preflight must NOT grant X-DDCS-Local: %r" % allow_hdr
+        assert "content-type" in allow_hdr.lower(), "the evil-origin preflight should still grant Content-Type: %r" % allow_hdr
+        assert allow_origin == "*", "a non-trusted origin must NOT be reflected (stays *), got %r" % allow_origin
+    finally:
+        httpd.shutdown()
+
+
 if __name__ == "__main__":
     test_forged_post_without_header_is_403()
     test_post_with_header_reaches_ops()
@@ -159,7 +191,11 @@ if __name__ == "__main__":
     test_guard_is_header_only_not_loopback()
     test_sensitive_get_token_is_guarded()
     test_file_reads_are_guarded()
+    test_trusted_origin_preflight_grants_the_local_header()
+    test_evil_origin_preflight_does_not_grant_the_local_header()
     print("PASS — gateway CSRF guard: forged POST 403 (5 routes, never reaches Ops), header POST reaches Ops, "
-          "preflight withholds X-DDCS-Local, innocuous GET open, guard is header-only (LAN == loopback); the "
-          "sensitive GETs (Drive token + status) are 403 without the header (token NOT leaked) / return with it; and "
-          "the file reads (/api/file + /api/sysfile) are 403 without the header (content NOT leaked) / return with it")
+          "preflight withholds X-DDCS-Local from untrusted/no-origin, innocuous GET open, guard is header-only (LAN == "
+          "loopback); the sensitive GETs (Drive token + status) are 403 without the header (token NOT leaked) / return "
+          "with it; the file reads (/api/file + /api/sysfile) are 403 without the header (content NOT leaked) / return "
+          "with it; and the ORIGIN ALLOWLIST grants X-DDCS-Local to a TRUSTED origin's preflight (mode c works) but NOT "
+          "to an evil origin's (drive-by still blocked)")

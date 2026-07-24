@@ -56,6 +56,26 @@ def _has_local_header(headers):
     return headers.get(LOCAL_HEADER) == LOCAL_VALUE
 
 
+# ── the ORIGIN ALLOWLIST — which cross-origin pages may pass the guarded-route preflight (t1141) ─────────────────
+# The header guard alone makes mode (c) UNUSABLE: the HOSTED page (https://ddcs-studio.pages.dev) pointed at a local/LAN
+# gateway is CROSS-ORIGIN, so its custom X-DDCS-Local header needs a CORS preflight — which do_OPTIONS refuses for every
+# origin. So a KNOWN-TRUSTED DDCS origin is allowlisted: its preflight IS granted X-DDCS-Local (see do_OPTIONS), so it
+# CAN set the header. This does NOT weaken the guard — the header stays REQUIRED (a simple cross-origin POST still lands
+# but cannot READ the reply, and forging the state change needs the header); the allowlist only lets a trusted origin
+# THROUGH the preflight. The official hosted origin ships in; a self-hoster adds their own Studio origin via the
+# DDCS_TRUSTED_ORIGINS env var (comma-separated). A NON-allowlisted origin is unchanged: Content-Type only → no header.
+def _load_trusted_origins():
+    origins = {"https://ddcs-studio.pages.dev"}
+    for o in os.environ.get("DDCS_TRUSTED_ORIGINS", "").split(","):
+        o = o.strip()
+        if o:
+            origins.add(o)
+    return frozenset(origins)
+
+
+TRUSTED_ORIGINS = _load_trusted_origins()
+
+
 # SENSITIVE GET routes — reads a cross-origin page must NOT be able to make. With Access-Control-Allow-Origin: * any
 # site the user visits could fetch these:
 #   /api/oauth/google/token  — the user's Google Drive ACCESS TOKEN (a live credential → account takeover)
@@ -116,12 +136,19 @@ class _Handler(BaseHTTPRequestHandler):
 
     # -- routing --------------------------------------------------------------
     def do_OPTIONS(self):
+        # A TRUSTED DDCS origin (mode c: the hosted page pointed at this gateway) gets its origin reflected + X-DDCS-Local
+        # granted, so its preflight passes and it CAN set the guard header. EVERY other origin keeps the old answer —
+        # Allow-Origin * + Content-Type ONLY — so it still cannot set X-DDCS-Local and the CSRF guard holds. NEVER grant
+        # X-DDCS-Local to * / an unknown origin: that would let any site forge the guarded POSTs/GETs. The header is NOT
+        # dropped; the allowlist only lets a KNOWN origin through the preflight (a simple cross-origin POST still lands
+        # but cannot read the reply, and forgery needs the header, which a non-trusted origin still cannot set).
+        origin = self.headers.get("Origin", "")
+        trusted = origin in TRUSTED_ORIGINS
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", origin if trusted else "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        # NEVER add X-DDCS-Local here — the CSRF guard IS "this custom header cannot be set cross-origin". Widening
-        # Allow-Headers to grant it would let any origin forge the state-changing POSTs. Content-Type only.
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-DDCS-Local" if trusted else "Content-Type")
+        self.send_header("Vary", "Origin")   # the response depends on the request Origin → caches must not share it
         self.end_headers()
 
     def do_GET(self):
