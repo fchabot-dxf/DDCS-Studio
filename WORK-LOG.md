@@ -14377,3 +14377,62 @@ defV bump on save will make them detectable -- one-source with this.
 no reboot), shown only when customized, leaving all other wizards + custom ops untouched -- the safety net the user asked for
 as built-ins become editable. The blanket Reset-to-factory (whole bar) is untouched. Back to the S5 arc next (S5.2 form-as-view,
 S5.3 form hook, S6 polish).
+
+---
+
+## turn 1109 -- BLOCK-NATIVE PARAMS S5.2: the wizard FORM renderer CONSUMES paramFieldsFromStack. ADDITIVE-BY-FALLBACK. Built.
+
+### THE READ/WRITE QUESTION ANSWERED (the advisor asked me to SAY which I found): PURE ONE-WAY CONSUME
+I read the form renderer and traced every consumer. The wizard FORM (renderOpForm, formWidgets.js:882) is a FILL surface:
+openUserOpForm renders one WIDGET per binding, the operator enters VALUES, Insert reads each widget's read() -> params ->
+recordOp + commit (userOpForm.js:61-67). It NEVER edits the field DECLARATION (label/widget/default) -- I grepped userOpForm
++ formWidgets for setEntryOverride/updateUserOp/registerUserOp/bindingSpecs and found NONE. The declaration's SOLE edit
+surface is the param_field BLOCK (in Blocks). So there is NO write-back surface to unify -- a clean ONE-WAY CONSUME is correct
+(unlike S4a, where the modal both read AND wrote the pendant blocks). Stated, per the advisor's ask.
+
+### THE CONSUMER: formBindings(def), one helper feeding all THREE renderOpForm callers
+renderOpForm(host, bindings) takes bindings (not a def), so the param_field merge lives in the CALLER. I added formBindings(def)
+in formWidgets.js (next to renderOpForm) and routed all three callers through it:
+  - ui/userOpForm.js:44 (the insert form)
+  - blocks/blocksApp.js:397 (the Blocks-tab live block->form pane)
+  - wizards/views/userOpView.js:247 (the panel view; its seed-override layers ON TOP of formBindings, so an op's current
+    values still win for the shown default -- unchanged behaviour).
+formBindings(def): when def.template carries a param_group, the param_field ROWS drive the form -- order = row order,
+label/widget/type/default/widgetConfig from the row, the BINDING supplies the wiring (param/blockIndex/key) + any inherited
+presentation (empty row field -> the binding's). ONE-SOURCE: param_field = the FORM-field declaration, the binding = the wiring.
+
+### BYTE-NEUTRAL FALLBACK (the safety rail)
+When there is NO param_group, formBindings returns `def.bindings` UNCHANGED -- the SAME array reference, so renderOpForm gets
+byte-identical input and every existing form is byte-identical. No op carries a param_group until the S5.3 hook, so S5.2 is
+INERT today. The spec asserts fbNo === noPg.bindings AND fbDrill === drill.bindings (a real registered twin) -- identity, not
+just equality.
+
+### VERIFIED
+- cam-block-native-params-s52.spec.js (NEW, 3): (1) a param_group drives order + label/widget/default (mz reordered FIRST
+  with a custom slider + default -5; frate inherits its binding default 200 from an empty row dflt; the wiring `key` comes
+  from the binding) AND a def with NO param_group returns the bindings UNCHANGED (same reference) -- proven on a constructed
+  def AND a real registered twin (user_drill_data); (2) editing a param_field's label + widget is reflected by formBindings,
+  and reversing the param_field rows reorders the form fields; (3) renderOpForm renders the block-driven custom labels for a
+  def WITH a param_group.
+- MY OWN VIEWED SCREENSHOT (s52-form-from-blocks.png): the form rendered from the param_field blocks -- "Depth (custom)" first
+  (row order), "Feed (custom)" (mm/min, with the = 7.874 IPM conversion), values from the rows/binding. The form is driven by
+  the blocks.
+- FULL GATE: 1456 passed, 0 FAILED, 4 skipped (14.1m) -- CLEAN, 1456+4 = 1460 = full count reconciles. Failed-count grepped.
+  1456 = 1452 prior + 3 new S5.2 tests + the preflight flake now green. Every existing form/wizard test passed through the
+  byte-identical fallback -- the three form-caller changes regressed NOTHING.
+
+### GATE-IF-BALLOONS: did NOT trigger. The form renderer is ONE function (renderOpForm) with three callers; a single
+formBindings helper covers all three, and there is NO write-back to unify (pure consume), so S5.2 is whole -- I did not need
+to split the write-back to S5.2b.
+
+### KNOWN LIMIT for S5.3 (materializer completeness, NOT a consumer issue): paramGroupFromBindings (S5.1) maps each binding
+to a simple param_field and does NOT carry a canvas widget's GROUP/ROLE (the multi-param xy-pad/rect grouping renderOpForm
+does). So a materialized param_group for a canvas-widget op would flatten its groups. That is an S5.3 byte-neutrality concern
+(the hook must reproduce today's form) + an S6 polish, NOT an S5.2 consumer bug -- S5.2 consumes whatever rows exist correctly.
+Flagged.
+
+### STATE: the wizard FORM now renders from the param_field blocks when a def carries a param_group -- order/label/widget/
+default from the rows, wiring from the binding -- and is byte-identically unchanged when absent (a pure one-way consume; the
+param_field block is the sole edit surface, no write-back). Nothing carries a param_group yet; S5.3 (the form materialize hook,
+mirror S4b) activates it, then S6 polish (incl. the canvas group/role carry + the per-mode compact layout + the literal-twin
+no-pill save fix).
