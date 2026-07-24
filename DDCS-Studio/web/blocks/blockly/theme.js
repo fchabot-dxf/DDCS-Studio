@@ -13,7 +13,8 @@ const CAT = {
   // machine state/setup, split into granular semantic groups (each block declares its own category)
   spindlefeed: '#f97316', coordinates: '#0ea5e9', program: '#64748b', probing: '#e11d48', signals: '#8b5cf6',
   control: '#f59e0b', math: '#84cc16', variables: '#06b6d4', wizardui: '#d946ef', markup: '#94a3b8',
-  campendant: '#ec4899',   // block-native-params: the CAM pendant-field family (cam_table/cam_field) — a warm pink, ONE family colour, distinct from the fuchsia Wizard-UI authoring blocks (param_group/opunit/formfield)
+  campendant: '#ec4899',   // block-native-params: the CAM pendant-field family (cam_table/cam_field) — a warm pink, ONE family colour, distinct from the fuchsia Wizard-UI authoring blocks (opunit/section/formfield)
+  wizardform: '#6366f1',   // block-native-params S5.1: the FORM-field family (param_group/param_field) — indigo, distinct from the pendant pink AND the Wizard-UI fuchsia
 };
 
 /** Read a CSS custom property off <body> (where data-theme lives), with a fallback. */

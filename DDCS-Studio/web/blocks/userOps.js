@@ -340,6 +340,53 @@ export function camFieldsFromStack(template) {
     });
 }
 
+/**
+ * paramFieldsFromStack — the FORM-FACE reader (block-native-params S5.1), the mirror of camFieldsFromStack / bindingsFromStack.
+ * Walks a def template and returns the ordered `param_field` declarations (a param_group's rows, in mouth order). NOT yet
+ * consumed (the form renderer is a later slice). Each row: { param, widget, type, label?, default?, section?, help?, widgetConfig? }
+ * — a form-binding-spec shape; empty strings inherit the binding.
+ */
+export function paramFieldsFromStack(template) {
+    return flattenBlocks(template).filter((b) => b && b.type === 'param_field').map((b) => {
+        const p = b.params || {};
+        const row = { param: String(p.param || ''), widget: String(p.widget || 'number'), type: BINDING_TYPES.has(p.type) ? String(p.type) : 'number' };
+        if (p.label !== '' && p.label != null) row.label = String(p.label);
+        if (p.dflt !== '' && p.dflt != null && Number.isFinite(Number(p.dflt))) row.default = Number(p.dflt);   // else inherit binding.default
+        if (p.section) row.section = String(p.section);
+        if (p.help) row.help = String(p.help);
+        const wc = {};
+        if ((p.widget === 'dropdown' || p.widget === 'segmented') && p.options) { const o = parseParamOptions(p.options); if (o.length) wc.options = o; }
+        if (p.widget === 'number' || p.widget === 'slider') {
+            for (const [k, fk] of [['min', 'nmin'], ['max', 'nmax'], ['step', 'nstep']]) if (p[fk] !== '' && p[fk] != null && Number.isFinite(Number(p[fk]))) wc[k] = Number(p[fk]);
+            if (p.units) wc.units = String(p.units);
+        }
+        if (Object.keys(wc).length) row.widgetConfig = wc;
+        return row;
+    });
+}
+
+/**
+ * paramGroupFromBindings — the FORM materializer (block-native-params S5.1), the mirror of camTableFromBindings. A def's value
+ * bindings → a param_group block, one param_field per binding in binding PRE-ORDER, label/default/widget/type from the binding
+ * (NO classifier — the form shows every param; expose/bake is the pendant's concern, not the form's). PURE + INERT (nothing
+ * consumes it yet). Returns null when the def has no value bindings.
+ */
+export function paramGroupFromBindings(def, group = 'Settings') {
+    const valueBindings = ((def && def.bindings) || []).filter((b) => b && b.blockIndex != null);
+    if (!valueBindings.length) return null;
+    const children = valueBindings.map((b) => {
+        const wc = b.widgetConfig || {};
+        return { type: 'param_field', params: {
+            param: b.param, label: b.label || '', widget: b.widget || 'number', type: BINDING_TYPES.has(b.type) ? b.type : 'number',
+            dflt: (b.default != null ? String(b.default) : ''), section: b.section || '', help: b.help || '',
+            options: (wc.options ? wc.options.map(([l, v]) => (String(l) === String(v) ? String(v) : `${l}=${v}`)).join(', ') : ''),
+            nmin: (wc.min != null ? String(wc.min) : ''), nmax: (wc.max != null ? String(wc.max) : ''), nstep: (wc.step != null ? String(wc.step) : ''),
+            units: wc.units || b.units || '',
+        } };
+    });
+    return { type: 'param_group', params: { group }, children };
+}
+
 /** deriveBindings SPEC rows → `formfield` block records (every field set, so recToJson's fields/dropdowns stay valid).
  *  The reverse of bindingsFromStack — renders a hand-written spec set (corner/edge/middle's *_BINDING_SPECS) AS blocks in
  *  the Blockly view so a ported wizard is authorable/re-authorable. Only VALUE specs (a `match` — a value socket); a

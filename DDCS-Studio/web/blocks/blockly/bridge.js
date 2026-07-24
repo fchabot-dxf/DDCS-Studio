@@ -155,8 +155,8 @@ const optionsFor = (def, field) => {
     // surfaces can't drift. (The import closes a benign cycle — this list is read lazily here, never at module-eval.)
     if (field === 'widget' && def.type === 'param') return ['number', 'slider', 'dropdown', 'toggle', ...CANVAS_ROLE_WIDGETS];
     // FORM value-field block (composable-authoring): the form-widget + the binding value-type dropdowns.
-    if (field === 'widget' && def.type === 'formfield') return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list'];
-    if (field === 'type' && def.type === 'formfield') return ['number', 'int', 'enum', 'bool', 'string', 'list'];
+    if (field === 'widget' && (def.type === 'formfield' || def.type === 'param_field')) return ['number', 'slider', 'dropdown', 'segmented', 'toggle', 'text', 'corner-grid', 'region-pick', 'coord-list'];   // t1105 — param_field shares formfield's widget/type vocab
+    if (field === 'type' && (def.type === 'formfield' || def.type === 'param_field')) return ['number', 'int', 'enum', 'bool', 'string', 'list'];
     // LAYOUT-2D widget block (composable GUI): the anchor KIND + the coordinate FRAME (v1 = point / stock-min).
     if (field === 'anchor' && def.type === 'layoutwidget') return ['point'];
     if (field === 'frame' && def.type === 'layoutwidget') return ['stock-min', 'datum'];
@@ -244,7 +244,7 @@ function jsonDef(def) {
     if (def.dynamic) block.extensions = ['ddcs_dynfields'];   // toggle pattern-specific inputs per the `dynamic` field
     if (isSection) block.extensions = [...(block.extensions || []), 'ddcs_seccolor'];   // t132 — per-instance concern colour from data.color (authoring-only, never emitted)
     if (isOpunit) block.extensions = [...(block.extensions || []), 'ddcs_opunit'];   // t1071 — friendly label from opType + lock the routing key read-only
-    if (def.kind === 'cam_field') block.extensions = [...(block.extensions || []), 'ddcs_camfield'];   // t1093 — lock the `param` routing key read-only (a hand-edit corrupts the binding join)
+    if (def.kind === 'cam_field' || def.kind === 'param_field') block.extensions = [...(block.extensions || []), 'ddcs_camfield'];   // t1093/t1105 — lock the `param` routing key read-only (a hand-edit corrupts the binding join); param_field shares the lock
     if (def.kind === 'reporter') block.output = outputCheck(def);   // value block
     else { block.previousStatement = null; block.nextStatement = null; }   // statement block
     return block;

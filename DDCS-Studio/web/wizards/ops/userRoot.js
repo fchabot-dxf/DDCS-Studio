@@ -24,7 +24,7 @@ export const userRootBlock = {
 export const paramGroupBlock = {
     type: 'param_group',
     label: 'Parameter Group',
-    category: 'Wizard UI',
+    category: 'Wizard Form',   // t1105 (S5.1) — the FORM family (param_group + param_field) shares ONE colour, distinct from the cam-pendant pink AND the Wizard-UI fuchsia (opunit/section/formfield)
     kind: 'param_group',
     defaults: { group: 'Settings' },
     fields: ['group'],
