@@ -14544,3 +14544,79 @@ new machinery, so GATED (a mechanism decision + a layout change, not a quick pol
 gate: item 3 would have broken a user-requested feature (t391) + ~10 specs; item 1 needs a mechanism decision; item 2 is
 entangled. Baseline green (devMode.js unchanged). NEXT: the advisor re-confirms the item-3 premise with the user, picks the
 item-1 mechanism, and directs S6b.
+
+---
+
+## turn 1121 -- CAM-UX declare-once S1 (settings to display): renderCamBuilder refactored to a read-mostly DISPLAY. Source DONE + verified; GATE on 5 obsolete cam-slot-sim tests (commit HELD).
+
+### THE REFACTOR (macrosApp.js) -- settings becomes a display, authoring stays in the wizard
+renderCamBuilder now renders per slot: the header (cam# / name / WCS light-edits + Duplicate + Delete), the icon PREVIEW
+(no editor buttons), a READ-ONLY op summary, and the read-only actions (Simulate + View output). STRIPPED the whole
+"second editor": the field table (+ .cf inputs), the icon editor buttons (edit/import/delicon), Add-field + Refresh-fields,
+the op cards, the macro textarea + its persistent-var audit hint, and the Add-op cluster.
+
+READ-ONLY OP SUMMARY (declare-never-infer): built from the slot.ops MANIFEST via the DECLARED OP_LABEL map (reused, one-source),
+NEVER by re-parsing the compiled slot.body. `OP_LABEL[o.type]` else '⚙ Custom op' for universal else the raw camType, joined
+with ' + '. A legacy slot (no slot.ops) shows no summary. Example: "ops: Pocket (rect) + Drill".
+
+HANDLERS: input listener keeps only the `cs` header light-edits (cam#/name/WCS); dropped the `cf` field-table branch. Click
+listener keeps only dels / dupslot / sim / exp; dropped addf/delf/edit/icon/delicon/addop/delop/opup/opdown/dupop/refresh. The
+entire `change` listener (cam-op / cam-op-type / cam-op-var) removed.
+
+REMOVED (grep-verified fully orphaned, the second-editor render machinery the dispatch named to strip): opCardsHtml,
+addOpClusterHtml, applySecondCtl, secondCtlOpts, secondCtlTitle, opTypeOpts + the now-orphaned imports auditMacroVars (its only
+user was the macro audit hint) and nextLocalVar (its only user was Add-field). SHARED helpers KEPT (still used by the engine /
+wizard / defaultVariant): SECOND_CTL, OP_LABEL, CAM_GEN, defaultVariant, FIELD_OVR_COLS, generateOp, reallocSlotParams.
+
+KEPT-FOR-LATER-SLICES (orphaned by S1s strip but reused by the plans later slices -- NOT removed, to avoid remove-then-readd
+churn across the sliced build; noted for the advisor): regenGuard (S3/S6 Fork E reuse), importCamIcon + the autoIconBmp +
+openIconEditor imports (S5 icon-editor-into-wizard reuses import + auto-icon + openIconEditor). Also LEFT: svgToCamIcon --
+PRE-EXISTING dead code (0 callers in HEAD, not orphaned by me; per CLAUDE.md dont delete unrelated dead code).
+
+### VERIFIED -- the refactor is CORRECT (behavior intact; NOT byte-affecting to built slots)
+cam-slot-sim.spec.js: 16 of 21 PASS -- every engine/sim/generator test green (bore/corner/edge/inside/boss/alignment/pocket/
+circle-pocket/surfacing/mill-variants/cutting/probe-Z + rotateProgram + mergeEng + auto-icon + preview-mounts). So
+buildSlotFromOps / the generators / slot.body / slot.fields are UNTOUCHED -> export macro+eng byte-identical (the S1 invariant).
+fills.spec.js green (its `.cf` grep hit was a result property `r.cf`, not the DOM class -- unaffected). Breakage is CONTAINED.
+
+### THE GATE -- 5 cam-slot-sim tests drive/verify the REMOVED settings op-editor (a coverage decision the plan did not address)
+Failing (exactly, contained): 411 "structured op editing: edit type/variant + remove regenerates", 448 "tuned values persist
+across an op edit", 475 "reorder ops", 504 "duplicate op inherits tuned values" -- these DRIVE the removed op-cards + field
+table; and 529 "duplicate a legacy slot remaps #params" -- dupslot is KEPT (works), but the test VERIFIES the remap via the
+removed field-table DOM (tr[data-fi]/.cf). The BEHAVIOR is intact in ALL 5 (buildSlotFromOps + dupslot unchanged); only the
+settings-UI surface they poke is gone.
+
+OPTIONS (my recommendation, for your synthesis):
+ - 411/448/475/504 (op-editing via the removed settings UI): DELETE. They test a removed surface; the op-COMPOSE is already
+   covered by cam-compose-framing / cam-allocfields-superset / cam-op-seed, and the op-EDITING (type/variant swap, reorder,
+   dup, tuned-value carry) will be re-tested through the WIZARD in S3 (which drives the SAME buildSlotFromOps). ALTERNATIVE:
+   migrate to drive buildSlotFromOps via a window test-hook -- preserves engine-level op-editing coverage NOW (pre-S3), at the
+   cost of a hook + rewrite.
+ - 529 (legacy-dup remap): REWRITE its assertion to read the slot DATA (the persisted pack / slot.fields) instead of the
+   field-table DOM -- dupslot is KEPT so its coverage should STAY; only the assertion targets a removed surface.
+RECOMMEND: delete 411/448/475/504 + rewrite 529. Then a full gate + commit (CAM files only). COMMIT HELD pending your call
+(per the gate protocol -- deletion of test coverage is advisor-flagged). The source refactor is on disk (review via git diff).
+
+---
+
+## turn 1123 -- CAM-UX declare-once S1 COMPLETE (gate resolved t1122). Applied the coverage decision + full gate + commit.
+
+The advisor reviewed the t1121 diff (byte-invariant holds, only macrosApp source changed, op summary from the manifest) and
+resolved the gate exactly as recommended. Applied:
+ - DELETED cam-slot-sim tests 411/448/475/504 (they drove the REMOVED settings op-editor + orchestration; the op-EDITING is
+   re-covered through the WIZARD in S3 per the transfer contract, and the engine stays covered by
+   cam-compose-framing / cam-allocfields-superset / cam-op-seed). NOT the window-hook. Anchor-based splice (unique titles);
+   the blank before the next test remains the separator.
+ - REWROTE 529 "duplicate a legacy slot remaps its #params" to assert on slot DATA (the persisted pack: the duplicated slots
+   fields idx + its body) instead of the removed field-table / macro-textarea DOM. dupslot is KEPT so its coverage STAYS. New
+   asserts: camNums [22,23]; origIdx [1100,1101] unchanged; clone fields idx DISJOINT from the original (no collision); the
+   clone body read-line mirror remapped (#1=#2602); the working-var calc line untouched (G1 Z[0-#1] F#2); no ⛔ in cam_validate.
+   The persisted key is CAMPACK_KEY = ddcs_campack (saveCamPack writes it on dupslot).
+
+VERIFIED: cam-slot-sim.spec.js 17 of 17 PASS (was 21; -4 deleted; the rewritten 529 green asserting on data). Full gate: see
+below. The S1 source refactor is unchanged from t1121 (renderCamBuilder = read-mostly display; second editor stripped; op
+summary from slot.ops via OP_LABEL; byte-neutral to built slots -- every generator/sim/engine test green).
+
+COMMITTED CAM files ONLY (macrosApp.js + cam-slot-sim.spec.js + WORK-LOG); the stray untracked files (ANALYTICS-BOT-DETECTION.md,
+scratchpad/, V12_ifthen.nc, snippets.js) + the pre-existing PNG/doc changes were NOT staged. This COMPLETES S1. Next per the
+plan: S2 (collapse the New/Add-slot doors), then S3 (the manifest-Edit + update flag -- the crux).
