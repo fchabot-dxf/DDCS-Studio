@@ -14857,3 +14857,41 @@ work in the smaller box). Next: the advisor verifies, merges + releases, then .d
    CHROME are hidden inline (not tools): Save = the wizard Build (rasterize the live layers), Cancel = the wizard Cancel. The
    S5b test now asserts all 5 shape tools + the tileset + Import + the STACKED-above-table position. VIEWED (screenshot): the
    full editor on top, the form below.
+
+---
+
+## turn 1137 -- .ddcs WORKSPACE slice 1: the save-everything file becomes a first-class .ddcs workspace + includes the CAM pack. Built. No gate.
+
+New branch feat/ddcs-workspace off the released main (CAM redesign shipped V2026.07.24.2). GROUNDED data/backup.js: the
+DECLARED registry BACKUP_STORES (each row = { id, label, read/write over the store's OWN persisted form, count }), buildBackup/
+previewBackup/restoreBackup, kind 'ddcs.backup', + the UI (settingsPanel.js buttons + backupModal.js restore flow).
+
+### (1) CAM PACK rides inside the workspace -- one declared row, no live-reload hook needed
+Added to BACKUP_STORES: { id:'campack', label:'CAM pack', ...ls('ddcs_campack'), count: slots, unit:'slots' }. ddcs_campack =
+macrosApp CAMPACK_KEY. CHECKED the live-restore-reload question (the advisor flagged it): the restore flow RELOADS the page
+(backupModal.js: location.reload() after restore), so macrosApp re-reads _camPack = loadCamPack() on boot + re-renders -> a
+plain ls row suffices, NO write-override reload hook (unlike userOps, which re-registers live because nothing else reloads it).
+
+### (2) UX REFRAMED to the .ddcs workspace (JSON shape UNCHANGED -> backward-compatible)
+ - backup.js: exportEverything downloads ddcs-workspace-<stamp>.ddcs (was ddcs-backup-<stamp>.json); safetyExport ->
+   ddcs-workspace-before-open-<stamp>.ddcs. The kind STAYS 'ddcs.backup' (the shape is unchanged), so a NEW .ddcs and a LEGACY
+   .json both validate -- backward-compat is automatic.
+ - backupModal.js: the file picker accepts .ddcs,.json,application/json (both); the modal title -> "Open workspace"; the
+   invalid-file notices -> "workspace" wording.
+ - settingsPanel.js: the sidebar tab "Backup" -> "Workspace"; the section title "ONE-FILE BACKUP" -> "WORKSPACE (.ddcs)"; the
+   blurb reframed (mentions the CAM pack + the .ddcs/.mjson two-grain); "⭳ Export everything" -> "💾 Save workspace",
+   "⭱ Restore from file…" -> "📂 Open workspace…". Button IDs (set_backup_export/set_backup_restore) + the handlers UNCHANGED.
+
+### (3) TWO-GRAIN stays (stated in the blurb): .ddcs = the WHOLE workspace; .mjson = ONE job. No code change (the .mjson job
+files already exist via the projects volume).
+
+### VERIFIED
+ - backup-852.spec.js (+1 NEW test, 3 total): the CAM pack rides IN the workspace (in obj.stores), the preview counts 2 slots,
+   Save downloads a .ddcs (filename asserted), the pack ROUND-TRIPS through Save->wipe->Open (deep-equal), and the Workspace tab
+   exposes "Save workspace" / "Open workspace" (reframed labels, same IDs). The two PRE-EXISTING backup tests stay green (they
+   select by ID / data-target / the unchanged kind, so labels/filenames don't break them; the campack row is additive + not
+   asserted there).
+ - Full gate: 1467 passed / 4 skipped / 0 failed -- fully green (1466 baseline + 1 new backup test).
+
+### NO GATE-IF: the rename did NOT sprawl (3 files: backup.js + backupModal.js + settingsPanel.js), and the live-campack
+restore needs NO hook (the restore reload covers it). Next per the loop: further .ddcs workspace slices.
