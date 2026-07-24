@@ -14697,3 +14697,42 @@ a removed surface with no wizard analog).
 
 ### NOT TOUCHED (per the dispatch): the active program/editor (S4 gated), cam_customize_op (S6), the engine buildSlotFromOps.
 Full gate: 1463 passed / 4 skipped / 0 failed -- fully green. Reconciles 1461 baseline + 6 new S3 tests = 1467 = 1463+4. Next per the plan: S4 (GATED -- Edit -> active stack, editor/Blocks as live views) or S5 (icon into wizard).
+
+---
+
+## turn 1129 -- CAM-UX declare-once S5: the icon editor INTO the wizard (LAUNCH-modal + LARGE preview). Built + VIEWED.
+
+### THE ICON STEP (macrosApp.js, mountAuthoringSurface) -- beside the slot-name row
+A LARGE 360x180 icon preview (240px img, NOT the tiny settings thumbnail) + "🎨 Draw/Edit icon" + "🖼 Import BMP".
+ - iconStepHtml()/renderIconStep(): render the preview of _authoring.icon + the two buttons; re-render #cbm_iconstep after an
+   edit/import. Placeholder ("No icon yet") only if the icon is somehow null.
+ - 🎨 Draw/Edit -> openIconEditor(_authoring.icon, onSave) -- LAUNCHES the editor AS A MODAL (the user-requested launch version,
+   NOT embedded); onSave writes _authoring.icon {name,data,w:360,h:180,layers,source:'drawn'} + re-renders the preview.
+   openIconEditor signature + the slot.icon shape are UNCHANGED -- only the call site moved from the (S1-removed) settings
+   buttons to the wizard.
+ - 🖼 Import BMP -> importCamIcon() ADAPTED to write _authoring.icon (+ re-render) instead of a slot; the wizard is now its
+   only caller (the settings icon buttons were removed in S1).
+
+### AUTO-ICON on New, PRE-LOAD on Edit, CARRY on Build/Update
+ - NEW: openCamAuthoring seeds _authoring.icon via autoIconBmp(name, first-op-camType) after the ops import -> a fresh slot's
+   preview is NEVER blank (source:'auto'; guarded try/catch if canvas is unavailable).
+ - EDIT: editCamSlot PRE-LOADS a deep copy of slot.icon into _authoring.icon -> the preview shows the existing icon + it is
+   re-editable.
+ - cbmBuild carries `if (_authoring.icon) slot.icon = _authoring.icon` on BOTH New (Build) and Edit (Update).
+
+### VERIFIED
+ - cam-slot-icon-s5.spec.js (NEW, 2): (1) a fresh New slot AUTO-ICONS -- the icon step renders a LARGE preview (>150px, img
+   src non-empty) + Draw/Import buttons, and the built slot carries a 360x180 icon; (2) Edit PRE-LOADS the exact slot icon into
+   the wizard preview + the icon ROUND-TRIPS through Update (in place).
+ - VIEWED (my own screenshot, cam-s5-iconstep.png): the wizard shows the large auto-icon preview ("Pocket" + blue rect, caption
+   "Pocket.bmp · 360x180 · auto") + Edit icon / Import BMP beside the slot name, above the expose/bake table. Renders cleanly.
+ - S3 fidelity/headline (cam-slot-edit-s3) + cam-build-mode STILL green -- the icon is orthogonal to ops/body, so the manifest
+   round-trip is unaffected.
+ - Full gate: 1465 passed / 4 skipped / 0 failed -- fully green (1463 S3 baseline + 2 new S5 tests).
+
+### NO BALLOON (the GATE-IF): the LARGE preview is a plain <img> of the 360x180 icon -- no canvas rework; the editor LAUNCHES
+as its own modal (openIconEditor already did). openIconEditor / slot.icon UNCHANGED. The advisor will screenshot the icon step
++ surface it to the USER for the launch-vs-integrated call.
+
+### NOT TOUCHED: openIconEditor internals, the slot.icon shape, the engine, the active program. Next per the plan: S6
+(migration + hand-edited-macro honesty + polish), or the make-it-with-blocks reframe / deferred S4.
