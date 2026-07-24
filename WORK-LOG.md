@@ -14895,3 +14895,65 @@ files already exist via the projects volume).
 
 ### NO GATE-IF: the rename did NOT sprawl (3 files: backup.js + backupModal.js + settingsPanel.js), and the live-campack
 restore needs NO hook (the restore reload covers it). Next per the loop: further .ddcs workspace slices.
+
+---
+
+## turn 1139 -- GATEWAY-CSRF ORIGIN-MODEL INVESTIGATION (read-only; report + recommend; NO code, NO merge).
+
+QUESTION: the feat/gateway-csrf-guard guard requires X-DDCS-Local + do_OPTIONS grants only Content-Type, so a CROSS-ORIGIN
+page cannot set it -> blocked (the CSRF protection). Does it ALSO break a LEGIT flow?
+
+### THE ORIGIN MODEL (client.js resolveBase -- shared/js/client.js)
+Studio resolves the /api base ONCE: default "" = SAME-ORIGIN (the gateway-served page); OR an ABSOLUTE base from
+ddcs_api / ?api= = CROSS-ORIGIN. fetch = base + path. So same-vs-cross-origin is decided entirely by resolveBase.
+
+### THE FOUR MODES x BREAK-OR-NOT (against the guard: do_POST all-5 + _GUARDED_GETS {token,status,file,sysfile} require
+X-DDCS-Local; do_OPTIONS = Allow-Origin:* but Allow-Headers: Content-Type ONLY, origin-agnostic)
+ (a) EXE / BRIDGE-SERVED -- the pywebview exe, OR a browser on http://127.0.0.1:<port>/ served BY the bridge: base "" ->
+     SAME-ORIGIN -> no preflight, the client sets X-DDCS-Local freely -> guard OK. NO BREAK.
+ (b) LAN QR -- the QR opens http://<LAN-IP>:<port>/ served BY the bridge: base "" -> SAME-ORIGIN -> guard OK. NO BREAK.
+ (c) HOSTED web-Studio -> LOCAL bridge -- ddcs-studio.pages.dev with ddcs_api=http://127.0.0.1:8765 (the admin "↩ Use local
+     gateway (127.0.0.1:8765)" ONE-CLICK; admin.js:26-29 "point the HOSTED (HTTPS) page at a gateway on THIS PC -- gives the
+     EXE EXPERIENCE (cloud UI + local controller). Browsers allow HTTPS->http://localhost, and the gateway already sends
+     CORS."): base ABSOLUTE -> CROSS-ORIGIN -> the guarded requests need X-DDCS-Local -> cross-origin PREFLIGHT -> do_OPTIONS
+     grants only Content-Type -> the browser BLOCKS the header -> ALL 5 guarded POSTs (jobs/config/sysfile/deletes) + the 4
+     guarded GETs (token/status/file/sysfile) FAIL. **BREAKS.** (Unguarded reads -- descriptor/queue/profile/vars/files-index
+     -- still work via CORS *.)
+ (d) VS CODE WEBVIEW -> gateway (the experimental 3rd shell; base via a client seam, __ddcsApiBase -- NOT in the shipped web/,
+     lives in the extension): if the webview origin != the gateway origin it breaks the SAME way as (c). Experimental.
+
+SUPPORTED? Mode (c) is NOT a dev-only path -- it is a DOCUMENTED, one-click, value-prop flow ("gives the EXE EXPERIENCE:
+cloud UI + local controller"). So the guard would silently disable the "hosted UI + your own local controller" story.
+
+### VERDICT
+ - (a) exe + (b) LAN -- the PRIMARY flows -- are SAME-ORIGIN -> the guard breaks NOTHING. Safe.
+ - (c) hosted->local (the "Use local gateway" value-prop) is CROSS-ORIGIN -> the guard BREAKS it (every state-changing op +
+   the guarded reads). So the guard is NOT drop-in-safe to merge: it silently kills mode (c).
+
+### THE FIX (recommended -- the advisor's option 1, "OPTIONS grants X-DDCS-Local for a proven origin")
+do_OPTIONS ALLOWLISTS the KNOWN DDCS hosted origin(s): if the request Origin is a trusted DDCS origin (https://
+ddcs-studio.pages.dev + any self-host the user configures), respond Access-Control-Allow-Origin: <that origin> +
+Access-Control-Allow-Headers: Content-Type, X-DDCS-Local (so the LEGIT hosted page's preflight IS granted -> it CAN set the
+header). ANY OTHER origin gets today's Content-Type-only -> still blocked. This UNBLOCKS mode (c) while keeping the CSRF guard
+against random drive-by (evil.com is not on the allowlist). Apply to do_OPTIONS for BOTH the guarded POSTs + the guarded GETs.
+  IMPORTANT: an origin allowlist ALONE (Allow-Origin:<list>, no header guard) is NOT sufficient -- a SIMPLE cross-origin POST
+  still LANDS server-side (CORS only blocks READING the response, not simple requests). The X-DDCS-Local preflight-forcing
+  header is what actually stops the forgery; the allowlist only lets the TRUSTED origin PASS the preflight. So KEEP the header
+  guard; ADD the allowlist to the preflight. The hosted origin is FIXED + KNOWN, so the allowlist is a small DECLARED constant
+  (a bridge-side config), not per-request inference.
+  RESIDUAL: an XSS/compromise of the DDCS hosted page could then drive the LOCAL bridge -- a far higher bar than a random
+  drive-by, and pages.dev is DDCS's OWN domain (the standard CORS-allowlist trade-off).
+
+### MERGE RECOMMENDATION
+ - If mode (c) is part of the product story (it reads as CORE -- "cloud UI + local controller"): DO NOT merge the guard as-is;
+   add the do_OPTIONS origin-allowlist FIRST (a small, targeted server.py change), then merge. Guard + allowlist = safe for
+   ALL modes.
+ - If mode (c) is deemed niche/deprecated (exe + LAN cover the need): the guard is safe to merge as-is, BUT update admin.js --
+   the "Use local gateway" button would lose all state-changing ops + guarded reads, so remove/disable it or add a "hosted->
+   local needs the exe or LAN for jobs/config/files" note (else a silent break).
+ - I LEAN: ADD THE ALLOWLIST + merge (preserves the flow AND the security; it is a one-branch change in do_OPTIONS). CONFIRM
+   with the user whether the hosted->local flow is actively used before choosing.
+
+NO code changed, NO merge (investigation only). Read client.js (feat/ddcs-workspace) + server.py (feat/gateway-csrf-guard).
+This finding refines the t1115 surfaced note (the "?api= cross-origin dev seam breaks for POSTs") -- it is NOT just a dev seam;
+it is the SUPPORTED hosted->local "exe experience" flow, and the fix is the do_OPTIONS origin-allowlist.
