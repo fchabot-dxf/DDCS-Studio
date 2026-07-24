@@ -14544,3 +14544,57 @@ new machinery, so GATED (a mechanism decision + a layout change, not a quick pol
 gate: item 3 would have broken a user-requested feature (t391) + ~10 specs; item 1 needs a mechanism decision; item 2 is
 entangled. Baseline green (devMode.js unchanged). NEXT: the advisor re-confirms the item-3 premise with the user, picks the
 item-1 mechanism, and directs S6b.
+
+---
+
+## turn 1115 -- GATEWAY-CSRF GUARD: the 5 state-changing gateway POSTs now require the non-CORS-able X-DDCS-Local header (header-only, LAN-allowed). Built + adversarially verified.
+
+### THE GUARD (server.py) -- header-only, fail-closed, one predicate
+The 5 state-changing POSTs (/api/jobs, /api/config, /api/sysfile, /api/sysfiles/delete, /api/files/delete) answered with
+Access-Control-Allow-Origin: * and NO auth -> any website the user visited could drive them (drive-by CSRF: queue a job,
+rewrite config, delete a file). GUARD: do_POST now requires X-DDCS-Local: 1 on ALL of it (every POST route here is
+state-changing, so fail-closed on the whole method + a comment; a future public POST would consciously opt out). A cross-origin
+page can only add a CUSTOM header by first passing a CORS preflight, and do_OPTIONS grants ONLY Content-Type in
+Access-Control-Allow-Headers (I added a NEVER-widen comment there) -> a forged POST either omits the header (403 here) or is
+blocked at the preflight. CRUCIAL vs the /api/update/* guard (loopback AND header): here the header ALONE guards, because LAN
+job-queueing is INTENDED (Settings LAN ACCESS + QR) and a LAN Studio client is SAME-ORIGIN with the gateway (a same-origin
+request needs no preflight) so it CAN set the header. So loopback is NOT required -- LAN keeps working.
+
+### ONE-SOURCE (declared, reconcile-ready): TWO clear helpers, not a boolean-flag helper
+Declared LOCAL_HEADER/LOCAL_VALUE + _has_local_header(headers) as the SHARED predicate. The update route (other branch,
+fix/exe-autoupdate-security) already has _is_loopback + update_request_allowed = loopback AND header. The two guards DIVERGE
+(updates loopback+header; gateway header-only) so I chose TWO explicit helpers composed per-route over a parameterized
+require_loopback flag (explicit composition beats a hidden mode). RECONCILE ON MERGE: unify this LOCAL_HEADER with the update
+branch UPDATE_LOCAL_HEADER (same value X-DDCS-Local/1) and refactor update_request_allowed to `_is_loopback(ip) and
+_has_local_header(headers)` so both guards share the ONE header predicate. I did NOT touch the other branch (per dispatch).
+
+### THE CLIENT MUST SEND THE HEADER -- two seams
+1. client.js postJSON (THE seam): all 5 state-changing calls (submitJob/setConfig/writeSysfile/deleteFile/deleteSysfile) funnel
+   through this ONE helper -> added X-DDCS-Local: 1 to its headers. One place covers all five.
+2. settingsPanel.js:1565 -- a DIRECT fetch('/api/config', POST) that BYPASSES client.postJSON (the machine-net dest save).
+   Added the header there too (same-origin, so it can). GROUNDED: this was the ONLY direct-fetch bypass of the 5 routes in web/
+   (grep of all POST/DELETE fetches to /api/*); every other state-changing call goes through postJSON.
+
+### VERIFIED (adversarial, my own -- bridge/bridge-app/tests/test_csrf_guard.py, NEW, plain-assert repo style)
+Spins up the REAL server (start_server + a mock Ops) and drives real http.client requests:
+ - forged POST with NO header -> 403 on ALL 5 routes AND never reaches Ops (asserts no "reached" sentinel).
+ - POST WITH the header -> 200 + reaches Ops on all 5 (the same-origin/LAN success path).
+ - OPTIONS preflight -> Access-Control-Allow-Headers has Content-Type but NOT x-ddcs-local (the OTHER half: a cross-origin page
+   cannot set the header) -- proves the header cannot survive a cross-origin preflight.
+ - GET /api/config -> 200 with NO header (reads stay open -- scoped to state-changing POSTs).
+ - _has_local_header inspects ONLY the header (not the peer IP) -> a LAN client with the header == a loopback client (header-only).
+PASS. Also ran test_pull_geometry.py (green -- ops untouched). Full web gate: 1459 passed / 4 skipped / 2 failed, the 2 being KNOWN load-sensitive flakes
+(blocks-mobile-drawers + preflight-badge-838) that PASS 11/11 in isolation -- unrelated to a server/header change. Effective
+1461 deterministic green.
+
+### SURFACED (scope + follow-ups, NOT fixed this turn)
+ - The ?api=URL cross-origin DEV seam (client.js: Live Server on :5500 -> gateway on :8799) will FAIL for POSTs under the guard
+   (a dev origin is cross-origin -> cannot set X-DDCS-Local, same as an attacker). BY DESIGN. Not a production client (prod
+   Studio is gateway-served = same-origin). Dev should use the gateway-served app or loopback. GETs still work in that seam.
+ - GET LEAK (advisor asked to note): GET /api/oauth/google/token (server.py ~160) returns a Google OAuth ACCESS TOKEN and, with
+   Access-Control-Allow-Origin: *, is CROSS-ORIGIN READABLE -> a malicious site could read the users Drive token. A REAL
+   credential leak, but a GET (out of this turns state-changing-POST scope). RECOMMEND a follow-up: guard that token GET (same
+   header) or drop Allow-Origin:* for it. GET /api/config leaks only machine metadata (dest path, lan_ip, machine_id) -- mildly
+   sensitive, no credentials.
+
+### NO RELEASE (advisor reviews, then merges + releases WITH the user). Branch feat/gateway-csrf-guard.
