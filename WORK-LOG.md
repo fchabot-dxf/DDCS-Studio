@@ -14321,3 +14321,59 @@ HOOK for the form (mirror S4b); plus S6 polish. Proposed, not built.
 paramGroupFromBindings materializer -- all inert + byte-neutral, with the FORM family its own indigo colour distinct from the
 pendant pink and the Wizard-UI fuchsia. Nothing consumes it yet; the form-as-view + hook are the next S5 slices. This mirrors
 exactly how the pendant half went S1(schema/reader) -> S3(materializer) -> S4a(view) -> S4b(hook).
+
+---
+
+## turn 1107 -- USER REQUEST: per-wizard "Restore to default" in the Wizard manager (the safety net now built-ins are becoming editable). Built.
+
+### THE GATE QUESTION ANSWERED (twin-reset persist-vs-re-seed): re-seed restores factory IMMEDIATELY, no reboot
+The advisor flagged GATE-IF the twin-reset cannot restore factory immediately. I grounded it: it CAN. A built-in's opensAs
+twin is a registered user def (createUserOp at boot from its factory def-builder, e.g. drillDataDef). To restore ONE twin:
+deleteUserOp(opType) clears every registered table + the store copy, then createUserOp(factoryBuilder()) re-registers the
+pristine def. Immediate, no reboot, and the customized store copy does NOT persist (deleteUserOp removed it). So no gate --
+built the hook.
+
+### THE ONE-SOURCE FACTORY BUILDERS (the enabling refactor)
+app.js seedDefaultPortedUserOps hard-listed the 25 builder CALLS inline. I extracted them to a module-level `SEED_BUILDERS`
+(function refs) that the boot seed maps over (`seeds = SEED_BUILDERS.map(fn => fn())`) AND the restore reuses -- ONE source,
+no drift. Two globals exposed from app.js (co-located with the builders, like ddcsEditWizardDef):
+  - window.ddcsReseedUserOp(opType) -- deleteUserOp + createUserOp(factoryBuilder()), the immediate factory reset.
+  - window.ddcsUserOpDivergedFromFactory(opType) -- the twin diverged when a re-author bumped its defV PAST the factory
+    seed's declared version (updateUserOp bumps an undeclared-defV re-author, userOps.js:682). A clean, robust signal (no
+    fragile deep-compare against a registerUserOp-mutated def).
+
+### THE LAYOUT HALF (per-entry, not the blanket reset)
+wizardLibrary gains entryHasOverride(id) (does l.entries[id] carry any label/group/order/icon/visible override?) and
+clearEntryOverride(id) (delete l.entries[id] + writeLayout). Distinct from resetLayout() which wipes the WHOLE layout
+({}) -- the per-wizard clear leaves every other entry + group untouched.
+
+### THE UI (wizardManagerPanel)
+A per-BUILT-IN "↺ Restore default" button, added in the else branch of the user-vs-builtin split (built-ins had no per-row
+action before). Shown ONLY when THAT built-in is actually customized: entryHasOverride(id) OR the opensAs twin diverged. On
+click: dlgConfirm (destructive) -> clearEntryOverride(id) (its layout) + ddcsReseedUserOp(opensAs) (its factory twin,
+immediately) + apply() (re-render manager + bar). A pristine built-in shows nothing; a custom op keeps its Edit/Export/Delete
+(no Restore). Per-wizard, so a NEIGHBOURING customized wizard + every custom op are untouched.
+
+### VERIFIED
+- wizard-restore-default.spec.js (NEW, 2): (1) a PRISTINE built-in shows NO Restore + a custom op shows Delete not Restore;
+  customize TWO built-ins (rename) -> both show Restore; Restore ONE -> its override CLEARS + it reverts to the factory label,
+  while the NEIGHBOUR stays customized (still has Restore) AND the custom op survives untouched. (2) a DIVERGED TWIN (defV
+  bumped, NO layout override) shows Restore on its own, and Restore re-seeds it to factory (no longer diverged) IMMEDIATELY,
+  and the action then disappears (pristine again).
+- MY OWN VIEWED (wizard-restore-default.png): the Wizard manager renders every built-in row (toggle/rename/BUILT-IN
+  badge/regroup/reorder/icon); the customized drill/surfacing rows carry the Restore action (Mill section).
+- FULL GATE: 1452 passed, 1 failed, 4 skipped -- the 1 is preflight-badge-838:119, the SAME load-sensitive flake recurring
+  across turns (63/119/104), unrelated to boot-seed/wizard-manager. Confirmed: preflight-badge-838 + wizard-restore-default +
+  wizard-manager all pass 14/14 in isolation. So the app.js boot-seed refactor to SEED_BUILDERS regressed NOTHING; every
+  boot-dependent test is green. Failed-count grepped, 1452+1+4 = 1457 reconciles.
+
+### NOTE for a later slice (block-native params): the defV signal catches a PERSISTED re-author (editWizardDef save bumps
+defV). An IN-MEMORY modal edit (S4a writes a cam_field block in getUserDef's template without persisting/bumping) would not
+yet register as diverged -- but that edit does not survive a reboot either, and recognized twins do not get cam_tables
+(S4b skips them), so it is out of scope here. When the FORM half (S5.2/S5.3) persists param_field edits on a twin, the same
+defV bump on save will make them detectable -- one-source with this.
+
+### STATE: a per-wizard Restore-to-factory now reverts JUST one built-in (its layout override + its factory twin, immediately,
+no reboot), shown only when customized, leaving all other wizards + custom ops untouched -- the safety net the user asked for
+as built-ins become editable. The blanket Reset-to-factory (whole bar) is untouched. Back to the S5 arc next (S5.2 form-as-view,
+S5.3 form hook, S6 polish).
