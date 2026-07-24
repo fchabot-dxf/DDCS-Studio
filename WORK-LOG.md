@@ -14620,3 +14620,32 @@ summary from slot.ops via OP_LABEL; byte-neutral to built slots -- every generat
 COMMITTED CAM files ONLY (macrosApp.js + cam-slot-sim.spec.js + WORK-LOG); the stray untracked files (ANALYTICS-BOT-DETECTION.md,
 scratchpad/, V12_ifthen.nc, snippets.js) + the pre-existing PNG/doc changes were NOT staged. This COMPLETES S1. Next per the
 plan: S2 (collapse the New/Add-slot doors), then S3 (the manifest-Edit + update flag -- the crux).
+
+---
+
+## turn 1125 -- CAM-UX declare-once S2: collapse the redundant doors. Built.
+
+Three surgical changes to the CAM PACK BUILDER header (macrosApp.js), no logic beyond the button removal:
+ (1) REMOVED the cam_add_slot "＋ Add slot" button (markup :170) + its blank-slot handler (:1533-1534, pushed an empty
+     {fields:[], body:''} slot). Blank-canvas authoring is gone by design (S1 removed the settings second editor that made a
+     blank slot editable) -- the orphaned handler removed with it. GROUNDED: NO test references the settings cam_add_slot
+     (the 4 cam-slot-sim tests that clicked #cam_add_slot were deleted in S1); removing it breaks nothing.
+ (2) RELABELED cam_build_slot "✚ Build CAM slot" -> "＋ New CAM slot" (:170). Its handler is UNCHANGED -- it already calls
+     openCamAuthoring() which seeds-from-program + shows the empty-state -- so this is now the ONLY new-slot door. Also lightly
+     de-staled its title ("seed the field table" -> "seed the expose/bake table", since the settings field table is gone; the
+     modal seeds the expose/bake table). GROUNDED: the 3 specs matching "Build CAM slot" (cam-build-mode/substack-modal/
+     universal-modal) reference the OP-CARD menu door + window.ddcsOpenCamAuthoring, NOT the settings button text -> the relabel
+     breaks none.
+ (3) FIXED the stale CAM PACK BUILDER blurb (:169): dropped "Phase 1: form designer + macro + plain export. Icons + eng-merge
+     install come next." (the form designer moved to the wizard in S1; icons + eng-merge already shipped) -> "Author each slot
+     in the wizard -- ＋ New CAM slot composes it from your program's ops; this panel displays the pack and exports it." Honest
+     to the S1 display+wizard split.
+ (+) NECESSARY stale-door-reference fix: the renderCamBuilder EMPTY-STATE hint (:1410) said 'No slots yet — "＋ Add slot"',
+     naming the removed button -> retargeted to '"＋ New CAM slot" composes one from your program.' (This is the no-slots door
+     hint, not the per-slot card render; it HAD to change since the button it named is gone.)
+
+DID NOT TOUCH (per the dispatch): cam_customize_op (Fork B, S6), the per-slot card display (S1 done), the modal/engine (S3+).
+No dangling refs (grep: cam_add_slot only survives as a doc comment; "Add slot" 0; nextSlotNum still used by dupslot/cbmBuild).
+
+VERIFIED: cam-slot-sim 17/17 + cam-build-mode 7/7 green (no syntax error; the CAM panel + the seed-from-program authoring +
+the empty-state all work). Full gate: 1457 passed / 4 skipped / 0 failed -- fully green this run. Next per the plan: S3 (the manifest-Edit + update flag -- the crux).
