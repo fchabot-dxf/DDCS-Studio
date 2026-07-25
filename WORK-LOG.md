@@ -15268,3 +15268,41 @@ specs, so the new tests are the only guard -- write them first + reproduce the r
 
 NO code changed (investigation only). Grounded in saveStates.js (snapshot/sig/apply), programModel.setStack (origins +
 projectToEditor), blocksApp (renderFromModel/reproject/muteChanges), stackBridge (per-block id). Advisor reviews + we pick the fix.
+
+---
+
+## turn 1159 -- UNDO FIX slice 1 (content-based sig) -- GATE: the approved fix is INSUFFICIENT (my t1157 investigation was incomplete). Root cause is BIGGER than ids.
+
+### WHAT I DID (TDD): wrote the undo tests FIRST (undo-content-based-s1.spec.js -- kept UNCOMMITTED, ready for the real fix),
+drove the REAL Undo button: load A->load B->Undo==A + Redo==B; load->Undo==empty; block-value edit->Undo reverts. All THREE
+FAIL before any fix (bug reproduced). Then I implemented option A (strip each block's OWN id in saveStates.sig) -- and the
+tests STILL FAILED. Reverted the sig change (insufficient; kept saveStates pristine for the re-decision).
+
+### THE FULLER ROOT CAUSE (MEASURED -- I logged FULL params this time, not just ids like t1157): the reproject echo differs
+from the raw load by TWO things, not one:
+  load    : {type:move, params:{mode:cut, x:11, y:0, z:0}}                      -- NO id, NO feed
+  blockly : {id:"TU+...", type:move, params:{mode:cut, x:11, y:0, z:0, feed:0}} -- id AND feed:0
+The workspace round-trip (workspaceToStack, stackBridge `Number(v)||0`) FILLS DEFAULT params (feed:0). So the raw 'load'
+snapshot and the settled 'blockly' echo differ by CONTENT (feed:0), not just id -> stripping ids does NOT dedup them.
+Slice 1 (sig id-strip only) therefore CANNOT fix Undo -- my t1157 report missed this because I logged ids, not full params.
+(Also: even a settled-only approach still needs id-handling, because Undo's OWN apply->reproject re-ids the reloaded block.)
+
+### THE COMPLETE FIX needs to kill BOTH the id churn AND the raw-vs-normalized difference. Options (advisor to pick):
+ (1) ★ SOURCE FIX (recommend) -- in blocksApp, SUPPRESS the redundant reproject echo after a MODEL-origin render. The
+     workspace was just built FROM the model (renderFromModel), so reading it back (reproject -> setStack('blockly')) +
+     re-snapshotting is pure churn. Kill it -> NO id-variant, NO feed:0 echo -> the 'load' snapshot is the ONLY one per load
+     -> Undo walks cleanly. (This is the "slice 2" you flagged optional -- my finding PROMOTES it to primary; slice-1 sig
+     alone cannot complete the fix.) RISK: distinguish the ASYNC echo from a real block edit (a "just-rendered-from-model"
+     guard, or content-compare workspace vs model before echoing); the program stays RAW (no feed:0) until a real edit ->
+     verify the emit is unaffected (feed:0 vs absent-feed).
+ (2) saveStates FIX -- content-based sig (strip ids) AND snapshot only the SETTLED state (skip the raw 'load' origin; keep
+     'blockly'). BOTH are needed (skip-'load' kills raw-vs-norm; id-strip kills the undo-apply re-id). RISK: the skip-'load'
+     NO-WORKSPACE gap (a wizard insert while the Blocks tab is CLOSED gets no 'blockly' echo -> not snapshotted until Blocks
+     opens) + the undo label shifts insert->block-edit.
+ (3) debounced/settled snapshot + id-strip -- capture the settled state after a change burst. RISK: a timing redesign, app-wide.
+
+RECOMMEND (1): it removes the pollution at its ORIGIN (the redundant echo) so BOTH the id-variant and the normalization
+vanish, and it stays in ONE place (blocksApp) with no saveStates history redesign and no no-workspace gap. The undo tests
+(uncommitted) are the ready TDD spec for whichever option you pick. NO code shipped this turn (reverted the insufficient
+slice-1). Grounded in the reproject chain: setStack('load') -> blocksApp onChange -> renderFromModel(muted) -> post-render
+workspace change -> reproject -> setStack(workspaceToStack,'blockly') with a NEW id + filled defaults. I await your call.
