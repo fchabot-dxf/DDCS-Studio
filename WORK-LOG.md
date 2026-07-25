@@ -15114,3 +15114,38 @@ No test asserts the caption text (the only reference is a COMMENT in cam-slot-ic
 2/2 (the icon step mounts + round-trips). Full gate: 1472 passed / 0 failed / 4 skipped (14.5m) -- fully green.
 
 Committed MY 1 FILE ONLY: macrosApp.js. Branch feat/ddcs-workspace. NO release. NEXT: S4-3 (the explicit slot-Update round-trip).
+
+---
+
+## turn 1151 -- S4-3: the explicit slot-Update ROUND-TRIP (edit a universal op in Blocks -> Save -> the referencing slot rebuilds). Built + verified.
+
+### THE ROUND-TRIP (the def is the ONE source; NO Blocks->slot converter)
+After S4-2, Editing a universal slot loads its op into Blocks (dev-mode re-author). When the user edits the op there and
+SAVES the def, updateUserOp bumps defV -> every CAM slot referencing that op is defVStale -> it rebuilds from the NEW def:
+buildSlotFromOps re-reads getUserDef so fields/body/emit are re-derived, the manifest exposed/baked/values OVERLAY is
+preserved, orphaned overlay keys (a field the new def no longer has) are DROPPED, and the op's defV is re-stamped.
+
+### BUILT (2 files, +36/-1)
+ - userOps.js (+8): updateUserOp now fires a DECOUPLED window CustomEvent ddcs:userops-changed { opType } AFTER the store
+   write (so a listener re-reads the fresh def). Declare-not-handroll: the event is the reusable def-changed SIGNAL; userOps
+   stays ignorant of who consumes it. No-op off-browser. (createUserOp does NOT fire -- a brand-new op has no placed slots.)
+ - macrosApp.js (+29/-1): imported defVStale. Added rebuildStaleCamSlots(opType) + reconcileSlotOpOverlay + a
+   window.addEventListener('ddcs:userops-changed') (registered once in the _wired initMacrosApp). On the event: for each
+   _camPack slot with an op referencing opType where defVStale(op.defV, defVOf(opType)) -> buildSlotFromOps(slot) (rebuild
+   from the new def) -> reconcile the op's exposed/baked/values overlay against the NEW field set (intersect by f._op +
+   fkeyOf, drop orphans) -> op.defV = curV -> saveCamPack + renderCamBuilder (renderCamBuilder no-ops if the tab is not
+   mounted). The event dispatch is SYNC, so the slot is rebuilt + persisted before updateUserOp returns.
+
+### VERIFIED (real symptom, new spec cam-slot-roundtrip-s43.spec.js, 2 tests green -- updateUserOp IS what the Blocks Save calls)
+ 1. Register a universal op v1 (a move at z=depth-knob) + a slot referencing it (placeholder body, op.defV 1). SAVE a
+    CHANGED def v2 that adds a move to X88.5 (updateUserOp) -> defV -> 2 -> the slot REBUILT: op.defV re-stamped to 2, the
+    body is no longer the placeholder AND contains 88.5 (the emit reflects the new def / the change persisted).
+ 2. A slot whose overlay carries a BOGUS orphan key (op.defV 0 = stale) -> on the next def-save the rebuild DROPS the orphan
+    from values + exposed (intersect + drop) and re-stamps op.defV. 
+ The 22-test re-author/CAM subset (gui-blocks-reauthor, rich-def-update-guard, cam-slot-edit-s3, cam-edit-in-blocks-s42,
+ cam-substack-save-fork, dev-mode-sim-intent, user-ops) stays green -- the event is a no-op when no slot references the op.
+
+### Full gate: 1474 passed / 0 failed / 4 skipped (14.1m) -- fully green (= t1149 1472 + my 2 new tests).
+
+### Committed MY 3 FILES ONLY: userOps.js + macrosApp.js + cam-slot-roundtrip-s43.spec.js (new). Pre-existing working-tree
+noise NOT staged. Branch feat/ddcs-workspace. NO release. NEXT per the plan: S4-4 (substack), then S4-5 (multi-op).
