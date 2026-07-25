@@ -86,7 +86,7 @@ const LABELS = { load: 'insert', blockly: 'block edit', editor: 'edit', refresh:
 let _wired = false;
 export function initSaveStates() {
     if (_wired) return; _wired = true;
-    onProgramChange(({ origin }) => { if (origin !== 'refresh') snapshot(LABELS[origin] || origin); });
+    onProgramChange(({ origin }) => { if (origin !== 'refresh' && origin !== 'reproject') snapshot(LABELS[origin] || origin); });   // t1161 — 'reproject' = the post-render echo (blocksApp) that re-syncs ids/defaults, NOT a user edit → no Undo state
     snapshot('open');   // baseline so the first edit has somewhere to undo back to
     // Keep the header Undo/Redo buttons' enabled state in sync with the history. Re-find them each tick (the
     // header may render before or after this runs), so it's robust to ordering. onChange fires on every snapshot

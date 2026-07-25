@@ -434,7 +434,7 @@ async function buildWorkspace() {
   }
   function reproject() {
     const t0 = performance.now();
-    setStack(workspaceToStack(ws), 'blockly');             // model + emit + editor text — SYNC (glow / form writeback read it)
+    setStack(workspaceToStack(ws), 'blockly');             // model + emit + editor text — SYNC (glow / form writeback read it); a REAL edit (t1161 — the render's own echo is disabled)
     renderViewsPrompt(getProjection());                    // code panel + selection + live form — SYNC (the edit reflects now)
     _modelMs = performance.now() - t0; _lastEditAt = performance.now();
     schedulePreview();                                     // the heavy 2D/3D preview — DEFERRED to ~RECOMPUTE_MS of quiescence
@@ -447,12 +447,20 @@ async function buildWorkspace() {
   // workspace (muted so the rebuild doesn't echo back through the change listener), reframe, refresh the pane.
   function renderFromModel(p) {
     muteChanges = true;
-    try { stackToWorkspace(getStack(), ws); applyOpGating(ws); } finally { muteChanges = false; }   // gate gated ops (muted: no echo)
+    // t1161 — DISABLE Blockly event generation during the rebuild so the batched (FIRE_QUEUE / setTimeout 0) block events
+    // never dispatch a reproject ECHO (which re-ids + re-defaults + would add a stray Undo state). The echo did ONE needed
+    // thing — re-sync the model's block ids to the freshly-rendered workspace ids (the code↔block linking reads them) — so
+    // we do THAT explicitly below, deterministically, via the 'reproject' origin (saveStates skips it → no Undo state; the
+    // onChange re-render guard skips it → no loop). Deferred to a microtask so it runs AFTER this onChange settles (no
+    // re-entrant setStack). A REAL user edit fires later (events enabled) → reproject() with 'blockly' → it still snapshots.
+    B.Events.disable();
+    try { stackToWorkspace(getStack(), ws); applyOpGating(ws); } finally { B.Events.enable(); muteChanges = false; }   // gate gated ops
+    queueMicrotask(() => { try { setStack(workspaceToStack(ws), 'reproject'); } catch (_) { /* ws torn down */ } });   // sync ids, no Undo state, no re-render
     if (_dev) _dev.onModelRender();   // re-grow the always-on "expose as knob" affordances after a clean rebuild
     requestAnimationFrame(place); setTimeout(place, 120); setTimeout(place, 400);
     renderViews(p);
   }
-  onChange(({ proj, origin }) => { if (origin !== 'blockly') renderFromModel(proj); });
+  onChange(({ proj, origin }) => { if (origin !== 'blockly' && origin !== 'reproject') renderFromModel(proj); });   // 'reproject' = our own post-render echo (t1161) — already rendered; do NOT re-render (would loop)
 
   // ---- code view + linked selection (click a code line ⇄ its Blockly block) ----
   // EXECUTION GLOW: the sim's active line lights on the projected G-code with a fading comet-tail — the SAME read-out
