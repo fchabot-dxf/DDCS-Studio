@@ -746,6 +746,7 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
    already handled — keyboard-active pins the editor to a top strip, carrying the button with it.) */
 @media (orientation: portrait) {
     .editor-container:has(.viz3d-drawer.open) #align-rotate-btn { bottom: calc(var(--viz3d-size, 50%) + 12px) !important; }
+    .editor-container:has(.viz3d-drawer.open) #editor-cam-btn { bottom: calc(var(--viz3d-size, 50%) + 44px) !important; }   /* stack ✚ CAM slot 32px above ⟳ Transform here too */
 }
 .op-edit-chip[hidden] { display: none; }
 
@@ -4435,6 +4436,9 @@ svg [id$="_wcs"] { display: none; }
     .editor-container .viz3d-handle { top: calc((100% - var(--kbd-clear, 0px)) / 2) !important; }
     /* the ⟳ Align editor-overlay control is pinned bottom:8px (inline) → lift it just above the keys */
     #align-rotate-btn { bottom: calc(var(--kbd-clear, 42px) + 8px) !important; }
+    /* ✚ CAM slot stacks ABOVE ⟳ Transform on the SAME --kbd-clear signal (btn 24px + 8px gap = 32px more) → the pair
+       never overlaps and neither is ever occluded by the keyboard, whether it is collapsed (42px) or expanded (dock-h+42). */
+    #editor-cam-btn { bottom: calc(var(--kbd-clear, 42px) + 40px) !important; }
 }
 
 /* Variables tab — search row + Filters button */
