@@ -135,7 +135,7 @@ class DDCSStudio {
         window.ddcsInsertUserOp = insertUserOp;     // open the generic param form for a user op (menu / dev panel)
         // Re-author a saved wizard (load its template into Blocks). Exposed early — the Settings manager triggers it
         // from Studio, before the Blocks app (which would otherwise set it) has mounted.
-        import('./blocks/devMode.js').then((m) => { window.ddcsEditWizardDef = (opType) => m.editWizardDef(opType); }).catch(() => {});
+        import('./blocks/devMode.js').then((m) => { window.ddcsEditWizardDef = (opType) => m.editWizardDef(opType); window.ddcsEditWizardDefs = (opTypes) => m.editWizardDefs(opTypes); }).catch(() => {});
 
         // Ensure the wizard bar reflects any newly seeded user ops on first load.
         if (window.ddcsRefreshWizardBar) window.ddcsRefreshWizardBar();

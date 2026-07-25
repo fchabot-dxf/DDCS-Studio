@@ -283,6 +283,7 @@ export function mountDevMode(ws, B, hostEl) {
     if (typeof window !== 'undefined') {
         window.ddcsSaveAsWizard = () => saveAsCustomOp();
         window.ddcsEditWizardDef = (opType) => editWizardDef(opType);   // re-author a saved wizard (load its template)
+        window.ddcsEditWizardDefs = (opTypes) => editWizardDefs(opTypes);   // S4-5 — load a MULTI-op concat into Blocks (composed CAM slot)
     }
 
     // Light up a field's marker the moment its EXPOSE checkbox is ticked (the only dynamic emphasis — the dim base
@@ -543,22 +544,47 @@ export function maybeMaterializeParamGroup(def) {
     return def;
 }
 
-export async function editWizardDef(opType) {
+// S4-5 — reconstruct a user op into a Blocks op (the shared step editWizardDef + the multi-op editWizardDefs both use):
+// resolve the def, opt-in MATERIALIZE its pendant fields (a pill-based op gains its cam_field/param_field blocks so they
+// are editable in Blocks — t1103/t1111, a no-op for twins/literal/already-done), wrap a RECOGNIZED generator twin's exec
+// atoms in an opunit (t1069 — keeps the standard sub-unit live), then makeOp the template. Returns { opC, def, recognized }
+// or null (def gone / build failed). NO surface side effects (no guard / showApp / load).
+export async function reconstructUserOpBlock(opType) {
     const def = listUserOps().find((d) => d.opType === opType);
-    if (!def) { alert('That wizard is no longer in your library.'); return; }
-    // t1103 (S4b) — opt-in materialize: a pill-based UNIVERSAL op gains its pendant fields as cam_field blocks when the user
-    // opens it to customize. Mutates this store-copy def (template + bindings) BEFORE the fork clone, so forkTpl carries the
-    // cam_table into the workspace and it persists on save (pill re-index automatic). A no-op for twins / literal / already-done.
+    if (!def) return null;
     maybeMaterializeCamTable(def);
-    maybeMaterializeParamGroup(def);   // t1111 (S5.3) — the FORM half: a pill-based op gains its form fields as param_field blocks; composes with the cam_table above (each identity-re-derives)
-    // t1069 — a RECOGNIZED generator twin opened here is a FORK/CUSTOMIZE: wrap its exec atoms in opunit AND treat the save as a
-    // NEW op (never overwrite the twin's own def — the opunit shifts its frozen bindings +1). A custom user op is a normal re-author.
+    maybeMaterializeParamGroup(def);
     const { template: forkTpl, recognized } = wrapRecognizedForFork(def);
-    let opC;
     try {
         const { makeOp } = await import('./opBuilders.js');
-        opC = makeOp(opType, defaultParams(def), forkTpl);   // wrap template → an op (pills round-trip)
-    } catch (e) { console.warn('edit wizard: build failed', e); return; }
+        return { opC: makeOp(opType, defaultParams(def), forkTpl), def, recognized };   // wrap template → an op (pills round-trip)
+    } catch (e) { console.warn('reconstruct op block: build failed', e); return null; }
+}
+
+// S4-5 — the MULTI-OP analog of editWizardDef: reconstruct EACH op + load the CONCAT into Blocks as ONE program (the
+// composed CAM slot, seen as blocks). ONE destructive-load guard for the whole concat. Deliberately NO single-op editing
+// chrome: there is no single wizard being re-authored, so _editingWizard is cleared — per-op editing is via each op's own
+// op-menu "Customize as blocks" (which sets the single-op chrome + fires the S4-3 defVStale round-trip that rebuilds the
+// slot). A dedicated slot-level "Editing camN" chip + an in-Blocks per-op Save selector are a flagged follow-on (t1155).
+// One op reaching here (e.g. a mixed slot with a single block-able op) delegates to the normal single-op editWizardDef.
+export async function editWizardDefs(opTypes) {
+    const recs = [];
+    for (const t of (opTypes || [])) { const r = await reconstructUserOpBlock(t); if (r) recs.push(r); }
+    if (!recs.length) return;
+    if (recs.length === 1) return editWizardDef(recs[0].def.opType);
+    const opCs = recs.map((r) => r.opC);
+    if (!(await confirmDestructiveLoad(opCs, { label: 'before edit', what: recs.length + ' ops' }))) return;
+    if (window.showApp) window.showApp('blocks');
+    for (let i = 0; i < 80 && !(window.ddcsLoadBlockStack && window.__blkws); i++) await new Promise((r) => setTimeout(r, 50));
+    _editingWizard = null; _editingLabel = null; refreshEditingChrome();   // multi-op: no single-op re-author chrome
+    if (window.ddcsLoadBlockStack) window.ddcsLoadBlockStack(opCs);
+    await new Promise((r) => setTimeout(r, 150));
+}
+
+export async function editWizardDef(opType) {
+    const r = await reconstructUserOpBlock(opType);
+    if (!r) { alert('That wizard is no longer in your library.'); return; }
+    const { opC, def, recognized } = r;
     // S4-1 — the shared destructive-load guard: opening this op in Blocks REPLACES the current program. Snapshot +
     // confirm BEFORE switching surfaces, so a Cancel leaves the program AND the current tab untouched (empty / identical
     // program → no prompt). Fixes the latent silent-wipe this path had.
