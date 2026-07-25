@@ -1344,18 +1344,20 @@ function homingPostIsExpert() {
     // _editingSlot set so Build becomes "Update CAM (camN)" overwriting that slot IN PLACE. MODAL-ONLY (does not touch the
     // active program/editor — that is the gated S4). A legacy slot (no slot.ops) or one whose op-type is gone can't Edit: the
     // display only offers Edit when slot.ops has content, and this refuses a stale manifest loudly rather than opening lossy.
-    // S4-2 (corrected model, t1147) — Edit opens the pendant MODAL (icon + expose/bake) for EVERY slot, AND for a single-op
-    // UNIVERSAL slot ALSO loads the reconstructed op into the editor so the Blocks tab shows its STRUCTURE. "Loading is
-    // editing": the load REUSES the editWizardDef path (getUserDef → makeOp → the S4-1 destructive-load guard →
-    // showApp('blocks') → ddcsLoadBlockStack + editing chrome), so a DIRTY editor gets ONE confirm and a clean one loads
-    // straight in. GENERATORS are modal-only (parametric — nothing to load; the editor is untouched). The modal always
-    // opens (the pendant is program-independent); only the structure-load is guarded. Substack=S4-4, multi-op=S4-5; the
-    // round-trip back to the slot rides defVStale + buildSlotFromOps (an explicit slot-Update is S4-3).
+    // S4-2/S4-4 (corrected model, t1147/t1153) — Edit opens the pendant MODAL (icon + expose/bake) for EVERY slot, AND for
+    // a single-op UNIVERSAL or SUBSTACK slot ALSO loads the reconstructed op into the editor so the Blocks tab shows its
+    // STRUCTURE. "Loading is editing": the load REUSES the editWizardDef path (getUserDef → makeOp → the S4-1 destructive-
+    // load guard → showApp('blocks') → ddcsLoadBlockStack + editing chrome), so a DIRTY editor gets ONE confirm and a clean
+    // one loads straight in. A SUBSTACK's makeOp reconstructs the opunit boundary, so the standard sub-unit stays LIVE
+    // (parametric) while the custom atoms are editable. GENERATORS are modal-only (parametric — nothing to load; the editor
+    // is untouched). The modal always opens (the pendant is program-independent); only the structure-load is guarded. The
+    // round-trip back to the slot rides defVStale + buildSlotFromOps (S4-3). multi-op = S4-5.
     async function editCamSlot(slot) {
         const ops = (slot.ops || []).map(manifestToAuthOp);
         if (!ops.length || ops.some((a) => !a)) { dlgNotice('This slot can’t be edited in the wizard (a legacy hand-built macro, or an op that is no longer installed). Use ▶ Simulate / ⬇ View output / ✕.'); return; }
-        const uni = (slot.ops.length === 1 && slot.ops[0] && slot.ops[0].type === 'universal') ? slot.ops[0] : null;
-        if (uni && uni.opType && getUserDef(uni.opType) && window.ddcsEditWizardDef) await window.ddcsEditWizardDef(uni.opType);   // universal → also load the structure into Blocks (S4-1 guarded; generators skip this)
+        const op0 = slot.ops[0];
+        const loadable = (slot.ops.length === 1 && op0 && (op0.type === 'universal' || op0.type === 'substack')) ? op0 : null;   // S4-4 — substack too (opunit keeps the standard part LIVE)
+        if (loadable && loadable.opType && getUserDef(loadable.opType) && window.ddcsEditWizardDef) await window.ddcsEditWizardDef(loadable.opType);   // universal/substack → also load the structure into Blocks (S4-1 guarded; generators skip this)
         _editingSlot = +slot.slot;
         _authoring = { ops, name: slot.name || '', icon: slot.icon ? JSON.parse(JSON.stringify(slot.icon)) : null, seedLocked: true };   // t1129 S5 — PRE-LOAD the slot icon so the wizard preview shows it + it is re-editable
         _cbmUnsupported = [];
