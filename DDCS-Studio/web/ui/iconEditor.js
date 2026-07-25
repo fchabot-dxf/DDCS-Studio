@@ -124,11 +124,15 @@ export function openIconEditor(initial, onSave, opts = {}) {
         #iconed-modal .ie-head button[data-ie="x"]{background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;}
         /* WORKING AREA: left TOOL RAIL · center CANVAS · right TABBED DOCK */
         #iconed-modal .ie-work{display:flex;flex-wrap:wrap;gap:12px;padding:12px 14px;overflow:auto;align-items:flex-start;}
-        /* stage + dock share an inner row so the dock matches the STAGE height (not the taller left rail — align-self:stretch
-           would otherwise size the dock to the tallest sibling on the line, which is the rail when the canvas is short). */
+        /* rail + stage + dock share an inner row so the RAIL and the DOCK both match the STAGE height. align-self:stretch sizes
+           each to the flex-line height; the line is driven by the STAGE because the rail (6 small buttons) and the dock (its
+           panels are out of flow) both have a SHORTER intrinsic height than the canvas. */
         #iconed-modal .ie-canvasrow{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;}
-        #iconed-modal .ie-rail{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;}
-        #iconed-modal .ie-rail button{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text-main);cursor:pointer;}
+        /* the rail matches the canvas height: stretch to the stage + space the 6 buttons top-to-bottom (top flush with the
+           canvas top, bottom flush with the canvas bottom). 40px buttons → 6×40=240 < the ~260px inline canvas, so the rail
+           never spills below it; on the taller standalone canvas space-between just spreads them further apart. */
+        #iconed-modal .ie-rail{flex:0 0 auto;align-self:stretch;display:flex;flex-direction:column;justify-content:space-between;gap:0;}
+        #iconed-modal .ie-rail button{box-sizing:border-box;flex:0 0 auto;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text-main);cursor:pointer;}
         #iconed-modal .ie-rail button:hover{border-color:#0ea5e9;}
         #iconed-modal .ie-rail button.active{border-color:#0ea5e9;background:rgba(14,165,233,.15);}
         #iconed-modal .ie-stage{flex:1 1 460px;min-width:220px;max-width:min(760px, calc((94vh - 170px) * ${W} / ${H}));aspect-ratio:${W} / ${H};border:1px solid var(--border);background:#000;touch-action:none;}
@@ -158,6 +162,7 @@ export function openIconEditor(initial, onSave, opts = {}) {
     <div class="ie-panel">
         <div class="ie-head"><span class="ie-title">🖼 Icon editor — 360×180</span><button class="toolbar-btn settings-io" data-ie="import" title="Import a BMP / image as a layer">🖼 Import BMP</button><button data-ie="x" title="Close">✕</button></div>
         <div class="ie-work">
+            <div class="ie-canvasrow">
             <div class="ie-rail" title="Tools — Select, or add a shape">
                 <button data-tool="select" class="active" title="Select / move (click a shape on the canvas)">▧</button>
                 <button data-add="text" title="Add text">T</button>
@@ -166,7 +171,6 @@ export function openIconEditor(initial, onSave, opts = {}) {
                 <button data-add="circle" title="Add circle">◯</button>
                 <button data-add="arrow" title="Add arrow">→</button>
             </div>
-            <div class="ie-canvasrow">
             <div class="ie-stage" id="ie_stage"></div>
             <div class="ie-dock">
                 <div class="ie-tabs">
