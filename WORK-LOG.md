@@ -15178,3 +15178,40 @@ cam-edit-in-blocks-s42, cam-substack-edit-blocks-s44, cam-slot-roundtrip-s43) st
 
 ### Committed MY 2 FILES ONLY: macrosApp.js + cam-substack-edit-blocks-s44.spec.js (new). Pre-existing working-tree noise NOT
 staged. Branch feat/ddcs-workspace. NO release. NEXT per the plan: S4-5 (multi-op).
+
+---
+
+## turn 1155 -- S4-5 (the LAST S4 slice): MULTI-OP composed slots load the CONCAT into Blocks. Built + verified. Chrome/per-op-Save GATED (flagged) per GATE-IF-BALLOONS.
+
+### BUILT (3 code files + 1 test)
+ - devMode.js (+48): EXTRACTED reconstructUserOpBlock(opType) -- the shared getUserDef->materialize->wrapRecognizedForFork->
+   makeOp step, returning { opC, def, recognized } or null (one source; editWizardDef now calls it -- behavior-preserving).
+   ADDED editWizardDefs(opTypes) -- the MULTI-OP analog: reconstruct EACH op + ONE confirmDestructiveLoad guard for the
+   whole concat + showApp(blocks) + ddcsLoadBlockStack([opC1,opC2,...]). One op reaching it delegates to editWizardDef.
+ - app.js (+2/-1): expose window.ddcsEditWizardDefs at boot (alongside ddcsEditWizardDef; the boot exposure, not just the
+   devMode block -- that was the test-fail fix: ddcsEditWizardDefs was only on the devMode setup, not at boot).
+ - macrosApp.js (+27): editCamSlot now filters the BLOCK-ABLE ops (universal/substack with a live def): 1 -> ddcsEditWizardDef
+   (single-op, chrome + round-trip); >1 -> ddcsEditWizardDefs (the concat). A MIXED slot loads only the block-able ops + an
+   awaited "Loaded N of M ops ... generator parts stay parametric" dlgNotice hint, THEN the modal. Pure-generator -> modal only.
+
+### THE CHROME/SAVE -- GATED (flagged) per the advisor's GATE-IF-BALLOONS
+The multi-op CONCAT loads with NO single-op editing chrome: there is no single wizard being re-authored, so _editingWizard is
+CLEARED. Per-op EDITING is via each op's own op-menu "Customize as blocks" (single-op editWizardDef -> sets the chrome ->
+def-save -> the S4-3 defVStale round-trip rebuilds the slot). So the round-trip WORKS per referenced def unchanged; only the
+in-Blocks multi-op affordances are deferred. FLAGGED FOLLOW-ON (advisor + user): a slot-level "Editing camN" chip (or per-op
+glow) + an in-Blocks per-op Save selector (today the dev Save with _editingWizard=null would save the WHOLE concat as a new
+op -- the same pre-existing behavior any multi-block program has, NOT a new footgun, but a per-op Save is the nicer UX).
+
+### VERIFIED (real symptom, new spec cam-multiop-edit-blocks-s45.spec.js, 2 tests green)
+ 1. A 2-op UNIVERSAL slot -> Edit -> BOTH ops load into Blocks (2 op blocks in ddcsGetBlockProgram) + the pendant modal opens.
+ 2. A MIXED slot (universal + pocket generator) -> Edit -> ONLY the universal loads (1 op block); the "Loaded 1 of 2 ops" hint
+    appears (the generator stays parametric).
+The 41-test editWizardDef/CAM subset (gui-blocks-reauthor, blocks-live-form, cam-customize-affordance, cam-substack-save-fork,
+dev-mode-sim-intent, rich-def-update-guard, cam-block-native-params-s4b/s53, cam-edit-in-blocks-s42, cam-substack-edit-blocks-s44,
+cam-slot-roundtrip-s43, cam-slot-edit-s3, blocks-load-guard-s41) stays green -- the reconstructUserOpBlock refactor is behavior-preserving.
+
+### Full gate: 1477 passed / 0 failed / 4 skipped (14.2m) -- fully green (= t1153 1475 + my 2 new tests).
+
+### Committed MY 4 FILES ONLY: app.js + devMode.js + macrosApp.js + cam-multiop-edit-blocks-s45.spec.js (new). Pre-existing
+working-tree noise NOT staged. Branch feat/ddcs-workspace. NO release. ★ THIS COMPLETES THE S4 LIVE-BLOCKS VIEW (S4-1 guard,
+S4-2 universal, S4-3 round-trip, S4-4 substack, S4-5 multi-op). Open follow-on: the multi-op editing chrome + per-op Save (flagged above).
