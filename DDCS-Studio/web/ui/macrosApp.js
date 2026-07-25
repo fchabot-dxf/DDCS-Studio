@@ -1222,7 +1222,7 @@ function homingPostIsExpert() {
         const el = document.getElementById('cbm_table'); if (!el) return;   // modal is on document.body, not #macros-app (q is root-scoped)
         if (!_authoring.ops.length) {   // EMPTY-STATE (subsumes S-B) — no greyed dropdown; list what CAM supports + why present ops didn't qualify
             const reasons = _cbmUnsupported.length ? '<div style="margin-top:8px;">' + _cbmUnsupported.map((u) => `<div style="font-size:11px; color:var(--text-dim);">• ${camEsc(u.label)} — ${camEsc(u.reason)}</div>`).join('') + '</div>' : '';
-            el.innerHTML = `<div class="settings-hint" style="padding:12px 2px;">No CAM-able ops to import. The CAM Builder supports: <b>${CAM_SUPPORTED_LABEL}</b>. Insert one of those into your program, then reopen — or use an op's ▸ Build CAM slot action.${reasons}</div>`;
+            el.innerHTML = `<div class="settings-hint" style="padding:12px 2px;">No CAM-able ops yet. Add a Pocket, Surface, Slot, Drill, or Probe op then reopen, or use an op's ▸ Build CAM slot.${reasons}</div>`;
             return;
         }
         const preview = cbmPreviewSlot();   // buildSlotFromOps allocates params around siblings + tags each field's owning op (f._op)
@@ -1294,10 +1294,9 @@ function homingPostIsExpert() {
         const n = _authoring.ops.length;
         const editing = _editingSlot != null;   // t1127 S3 — Edit reads "Update CAM (camN)"; New reads "Build CAM slot"
         body.innerHTML = `<div class="cam-build-mode" style="padding:14px 16px;">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><b style="flex:1; font-size:14px;">${editing ? `✎ Update CAM (cam${_editingSlot})` : '✚ Build CAM slot'}${n > 1 ? ` — ${n} ops` : ''}</b><button class="toolbar-btn settings-io" data-act="cbm-cancel">✕ Cancel</button></div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><b style="flex:1; font-size:14px;">${editing ? `✎ Update CAM (cam${_editingSlot})` : '✚ Build CAM slot'}${n > 1 ? ` — ${n} ops` : ''}</b><button class="toolbar-btn settings-io" data-act="cbm-icon-import" title="Import a BMP / image as an icon layer">🖼 Import BMP</button><button class="toolbar-btn settings-io" data-act="cbm-cancel">✕ Cancel</button></div>
             <div class="settings-row" style="align-items:center; margin-top:2px;"><label style="font-size:11px; color:var(--text-dim);">Slot name&nbsp;<input id="cbm_name" value="${camEsc(_authoring.name || '')}" placeholder="e.g. Pocket" style="min-width:200px;"></label></div>
             <div style="margin-top:10px;">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="flex:1"></span><button class="toolbar-btn settings-io" data-act="cbm-icon-import">🖼 Import BMP</button></div>
                 <div id="cbm_iconedit"></div>
             </div>
             <div id="cbm_table" style="margin-top:10px;"></div>
