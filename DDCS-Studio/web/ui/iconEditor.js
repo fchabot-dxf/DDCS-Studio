@@ -124,17 +124,23 @@ export function openIconEditor(initial, onSave, opts = {}) {
         #iconed-modal .ie-head button[data-ie="x"]{background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;}
         /* WORKING AREA: left TOOL RAIL · center CANVAS · right TABBED DOCK */
         #iconed-modal .ie-work{display:flex;flex-wrap:wrap;gap:12px;padding:12px 14px;overflow:auto;align-items:flex-start;}
+        /* stage + dock share an inner row so the dock matches the STAGE height (not the taller left rail — align-self:stretch
+           would otherwise size the dock to the tallest sibling on the line, which is the rail when the canvas is short). */
+        #iconed-modal .ie-canvasrow{flex:1 1 auto;min-width:0;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start;}
         #iconed-modal .ie-rail{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;}
         #iconed-modal .ie-rail button{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text-main);cursor:pointer;}
         #iconed-modal .ie-rail button:hover{border-color:#0ea5e9;}
         #iconed-modal .ie-rail button.active{border-color:#0ea5e9;background:rgba(14,165,233,.15);}
         #iconed-modal .ie-stage{flex:1 1 460px;min-width:220px;max-width:min(760px, calc((94vh - 170px) * ${W} / ${H}));aspect-ratio:${W} / ${H};border:1px solid var(--border);background:#000;touch-action:none;}
         #iconed-modal .ie-stage svg{width:100%;height:100%;display:block;}
-        #iconed-modal .ie-dock{flex:0 0 250px;width:250px;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+        /* the dock matches the CANVAS height (align-self:stretch → the stage sets the flex-line height, since the dock's own
+           intrinsic height is collapsed: the tab panels live in .ie-dockbody OUT of flow, so only the tabs count). */
+        #iconed-modal .ie-dock{flex:0 0 250px;width:250px;align-self:stretch;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+        #iconed-modal .ie-dockbody{flex:1 1 0;min-height:150px;position:relative;overflow:hidden;}
         #iconed-modal .ie-tabs{display:flex;border-bottom:1px solid var(--border);}
         #iconed-modal .ie-tabs button{flex:1;padding:7px 4px;font-size:11px;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-dim);cursor:pointer;}
         #iconed-modal .ie-tabs button.active{color:var(--text-main);border-bottom-color:#0ea5e9;}
-        #iconed-modal .ie-tabpanel{display:none;padding:10px;overflow:auto;max-height:min(58vh,440px);}
+        #iconed-modal .ie-tabpanel{display:none;padding:10px;position:absolute;inset:0;overflow-y:auto;}   /* out of flow → fills the dockbody + SCROLLS (the Shapes grid no longer drives the dock height) */
         #iconed-modal .ie-tabpanel.active{display:block;}
         #iconed-modal .ie-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:6px;}
         #iconed-modal .ie-tile{width:100%;aspect-ratio:1;padding:3px;border:1px solid var(--border);border-radius:5px;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center;}
@@ -160,6 +166,7 @@ export function openIconEditor(initial, onSave, opts = {}) {
                 <button data-add="circle" title="Add circle">◯</button>
                 <button data-add="arrow" title="Add arrow">→</button>
             </div>
+            <div class="ie-canvasrow">
             <div class="ie-stage" id="ie_stage"></div>
             <div class="ie-dock">
                 <div class="ie-tabs">
@@ -167,9 +174,12 @@ export function openIconEditor(initial, onSave, opts = {}) {
                     <button data-tab="layers">Layers</button>
                     <button data-tab="props">Properties</button>
                 </div>
-                <div class="ie-tabpanel active" data-panel="shapes"><div class="ie-tiles" id="ie_tiles" title="Tileset — click a tile to drop it on the canvas"><span style="font-size:11px;color:var(--text-dim);">Loading tiles…</span></div></div>
-                <div class="ie-tabpanel" data-panel="layers"><div class="ie-layers" id="ie_layers"></div></div>
-                <div class="ie-tabpanel" data-panel="props"><div id="ie_props"></div></div>
+                <div class="ie-dockbody">
+                    <div class="ie-tabpanel active" data-panel="shapes"><div class="ie-tiles" id="ie_tiles" title="Tileset — click a tile to drop it on the canvas"><span style="font-size:11px;color:var(--text-dim);">Loading tiles…</span></div></div>
+                    <div class="ie-tabpanel" data-panel="layers"><div class="ie-layers" id="ie_layers"></div></div>
+                    <div class="ie-tabpanel" data-panel="props"><div id="ie_props"></div></div>
+                </div>
+            </div>
             </div>
         </div>
         <div class="ie-foot"><button class="toolbar-btn settings-io" data-ie="cancel">Cancel</button><button class="toolbar-btn settings-io primary" data-ie="save">Save icon</button></div>
