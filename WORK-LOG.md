@@ -15377,3 +15377,42 @@ happening). VERIFIED: both isolated with --repeat-each 3 -> 27/27 green; FULL GA
 -- fully green (both formerly-flaking tests pass under load). Committed MY 2 FILES (test-infra ONLY, no product change):
 transform-declared-736.spec.js + blocks-live-form.spec.js. Branch feat/ddcs-workspace. NO release. Clears the last queued
 autonomous maintenance item.
+
+---
+
+## turn 1167 -- ICON-BUILDER REDESIGN: iconEditor.js relaid out to canvas-center + a left tool rail + a tabbed right dock.
+
+Relaid out the icon editor (ui/iconEditor.js) to the reviewed target layout. RELAYOUT, not rewrite -- every tool + control
+kept, ALL interaction logic REUSED (the IDs #ie_stage / #ie_tiles / #ie_layers / #ie_props + every delegated data-* handler
+are UNCHANGED); only the DOM was restructured + restyled, plus 2 tiny view helpers.
+
+NEW STRUCTURE (was: a horizontal add-row + a horizontal-scroll tile strip + a stacked side panel):
+ - .ie-head (standalone chrome only): title + Import BMP (data-ie="import") + close X.
+ - .ie-work: [.ie-rail vertical tools -- Select / Text / Rect / Line / Circle / Arrow] + [.ie-stage#ie_stage BIG center
+   canvas] + [.ie-dock tabbed right panel].
+ - .ie-dock tabs (data-tab): SHAPES (#ie_tiles is now a CSS GRID of the ~42 stamp tiles -- no more horizontal-scroll strip)
+   / LAYERS (#ie_layers -- z-order up/down/delete) / PROPERTIES (#ie_props -- the selected element's controls).
+ - .ie-foot (standalone chrome only): Cancel / Save icon.
+
+INLINE (the S5b wizard mount) vs STANDALONE: inline still hides .ie-head + .ie-foot (the wizard supplies its own Import BMP =
+cbm-icon-import + its own Build); standalone shows the full chrome. Both share the identical rail / canvas / dock body.
+
+3 tiny additions (NO logic moved, all existing functions reused as-is):
+ - showTab(name): toggles .active on the .ie-tabs buttons + the .ie-tabpanel panels (a pure view-switch over the 3 reused
+   panels -- the tool/tile/layer/selection logic is untouched).
+ - pickImage(): the standalone Import BMP -> a file input -> FileReader -> addImage() (the SAME path the wizard Import uses).
+ - a small UX touch: add() / selecting a layer row / a canvas click-select now jump to the Properties tab (showTab('props'))
+   so the just-added / just-selected element's controls are immediately visible.
+
+VERIFIED (real symptom, both surfaces): cam-slot-icon-s5 (the S5b inline test -- mounts inline, ALL shape tools present,
+tiles present, Import present, add rect -> a layer, Build rasterizes, Edit round-trips the layers) -> 2/2 PASS, unchanged. 4
+screenshots (a temp spec, since removed) confirmed the LOOK at runtime: inline Shapes-grid / Layers-list / Properties (with
+the live drag handles) + the standalone full-chrome modal (head Import BMP + X, foot Cancel / Save). Self-contained: no other
+web JS references the removed classes OR the internal IDs (grep clean).
+
+FLAG (surfaced to the advisor): the dispatch REFERENCE file scratchpad/icon-builder-mockup.html was MISSING -- not in the
+tree, git history, any branch, or either scratchpad dir (only an unrelated mockup-buttons.html exists). I built from the
+dispatch's complete written layout spec instead. The advisor screenshots the result for the user to confirm the intended look.
+
+Full gate: 1480 passed / 0 failed / 4 skipped (14.3m) -- fully green, identical to the t1165 baseline (the relayout broke
+nothing). Committed MY 1 FILE: ui/iconEditor.js. Branch feat/ddcs-workspace. NO release.
