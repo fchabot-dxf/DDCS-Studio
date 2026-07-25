@@ -28,7 +28,7 @@ import { universalBands } from '../data/universalScratch.js';   // t1085 slice C
 // what emitMapped injects beneath it, every other part against its own generator's declaration. After slice C a collision
 // should be impossible on EITHER arm — so the guard firing now means a regression on whichever arm reported it.
 const camBandsOf = (t) => ((t === 'universal') ? universalBands() : bandsFor(t));
-import { getUserDef, defVOf, flattenBlocks } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest; t1099 (S4a) — walk the template for cam_field block records
+import { getUserDef, defVOf, defVStale, flattenBlocks } from '../blocks/userOps.js';   // U3 — the live def (template+bindings) for stackToSlot + the def-version stamp for the manifest; t1099 (S4a) — walk the template for cam_field block records
 import { makeZip, downloadBytes } from '../data/zip.js';
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';
 import { homingStack, homingRunParams } from '../wizards/homingWizard.js';   // homingRunParams = the ONE contract shape (t626) so sysstart generate matches the wizard emit (was passing the raw object → empty stub)
@@ -1072,6 +1072,33 @@ function homingPostIsExpert() {
         if (name) slot.name = name;
         slot.bodyDirty = false;
     }
+    // S4-3 — the ROUND-TRIP. When a user-op def is SAVED (in Blocks, via updateUserOp → the ddcs:userops-changed event),
+    // every CAM slot that references that op is defVStale → rebuild it from the NEW def: buildSlotFromOps re-reads
+    // getUserDef so fields / body / emit are re-derived, and the manifest exposed/baked/values OVERLAY is preserved.
+    // The def is the ONE source — there is NO Blocks→slot converter. After the rebuild, drop any overlay key the new
+    // field set no longer has (intersect + drop orphans), re-stamp the op's defV, then persist + re-render.
+    function reconcileSlotOpOverlay(slot, oi) {
+        const op = slot.ops[oi]; if (!op) return;
+        const live = new Set((slot.fields || []).filter((f) => f._op === oi).map((f) => fkeyOf(f)));
+        ['exposed', 'baked', 'values'].forEach((m) => {
+            const map = op[m];
+            if (map && typeof map === 'object') for (const k of Object.keys(map)) if (!live.has(k)) delete map[k];
+        });
+    }
+    function rebuildStaleCamSlots(opType) {
+        if (!opType || !_camPack || !Array.isArray(_camPack.slots)) return;
+        const curV = defVOf(opType);
+        if (!(curV > 0)) return;   // an unversioned / removed op never flags stale
+        let changed = false;
+        _camPack.slots.forEach((slot) => {
+            if (!(slot.ops || []).some((op) => op.opType === opType && defVStale(op.defV, curV))) return;
+            buildSlotFromOps(slot);   // re-derive fields/body/emit from the NEW def (getUserDef re-read inside)
+            (slot.ops || []).forEach((op, oi) => { if (op.opType === opType) { reconcileSlotOpOverlay(slot, oi); op.defV = curV; } });
+            changed = true;
+        });
+        if (changed) { saveCamPack(); if (q('cam_slots')) renderCamBuilder(); }
+    }
+    window.addEventListener('ddcs:userops-changed', (e) => { try { rebuildStaleCamSlots(e && e.detail && e.detail.opType); } catch (_) { /* noop */ } });
     // A structural edit rebuilds the macro. If the body was hand-edited since the last build, confirm first.
     // Guard a from-ops rebuild behind the clobber-confirm, but ONLY async when there's a hand-edit to clobber — a clean
     // slot proceeds SYNCHRONOUSLY (so the cam handlers stay sync + the op edit lands immediately). callback style.

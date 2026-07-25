@@ -695,6 +695,13 @@ export function createUserOp(def) {
     return def;
 }
 
+// S4-3 — a decoupled signal that a user-op def CHANGED (defV may have bumped). Consumers that hold placed references to
+// the op — e.g. a CAM slot built from it — listen for this to rebuild themselves from the NEW def (the def is the one
+// source; no reverse converter). Fired AFTER the store write so a listener re-reads the fresh def. No-op off-browser.
+function notifyUserOpChanged(opType) {
+    try { if (typeof window !== 'undefined' && window.dispatchEvent) window.dispatchEvent(new CustomEvent('ddcs:userops-changed', { detail: { opType } })); } catch (_) { /* non-browser */ }
+}
+
 /** Replace an existing user op's def IN PLACE (re-register + persist), keeping its opType identity. The re-author
  *  flow uses this so editing a saved wizard updates it instead of spawning a duplicate. Falls back to create. */
 export function updateUserOp(def) {
@@ -711,6 +718,7 @@ export function updateUserOp(def) {
     registerUserOp(def);            // overwrite the live user-layer builder/spec/label
     defs[i] = def;
     writeStore(defs);
+    notifyUserOpChanged(def.opType);   // S4-3 — a slot built from this op is now defVStale → it rebuilds from the new def
     return def;
 }
 
