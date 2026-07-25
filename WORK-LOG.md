@@ -15338,3 +15338,20 @@ The op-declared-edits pair (no-false-glow + real-edit-declared) is GREEN -- the 
 ### Committed MY 3 FILES: blocksApp.js + saveStates.js + undo-reproject-echo.spec.js (new). Branch feat/ddcs-workspace. NO
 release. This FIXES the app-wide Undo bug I surfaced in S4-1 (Undo now walks past a programmatic ddcsLoadBlockStack). Slice 2
 (the earlier-flagged extra reproject-echo cleanup) is now SUBSUMED -- the echo is gone at its source.
+
+---
+
+## turn 1163 -- quick polish (Undo-fix follow-up): the S4-1 guard message PROMISES Undo again.
+
+Now that t1161 fixed the app-wide Undo (a proceed IS recoverable) + confirmDestructiveLoad already snapshots first, restored the
+Undo promise in the message (t1145 had removed it because Undo was broken). New: "Opening X in Blocks replaces the program in
+the editor -- it's saved to Undo, or Cancel to keep it." (title "Open in Blocks?", buttons "Open (replace)" / "Cancel"
+UNCHANGED). Updated the stale doc comment (t1145->t1161). 1 file: saveStates.js. The 2 tests that touch the guard dialog
+(blocks-load-guard-s41, dev-mode-sim-intent) click by BUTTON label (unchanged) -> no test change; both green.
+
+Full gate: 1479 passed / 1 failed / 4 skipped (14.1m). The 1 failure = blocks-live-form.spec.js:89 (editing-context chrome) --
+0 references to the message, GREEN in the t1161 gate; RE-RAN ISOLATED: 6/6 PASS. Pre-existing load flake, not this change
+(effective 1480, same as t1161). NOTE for the next task: blocks-live-form:89 is ANOTHER load-sensitive flake alongside
+transform-declared-736:101 -- candidates for the flake-hardening pass.
+
+Committed MY 1 FILE: saveStates.js. Branch feat/ddcs-workspace. NO release.
