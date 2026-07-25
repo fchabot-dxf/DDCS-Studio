@@ -8,7 +8,7 @@
     to compose 360×180 CAM-menu icons. These are STARTERS — edit the geometry/colours to your liking.
 
   RULES (so each object extracts as a clean tile)
-    • Keep the root as-is: viewBox="0 0 880 560". The extractor mounts at the viewBox size (1 unit = 1px),
+    • Keep the root as-is: viewBox="0 0 880 660". The extractor mounts at the viewBox size (1 unit = 1px),
       so any canvas size works — just keep width/height matching the viewBox aspect (or use 100%).
     • One object = ONE <g id="name"> of plain shapes (path/rect/circle/line/text). NO nested <g id> inside
       an object (a group containing another id-group is treated as a container outline, not a primitive).
@@ -19,7 +19,7 @@
     • Self-contained: no shared <defs>/gradients/clipPaths.
     • <text> rasterizes fine (default sans-serif). NOTE: edit this file then RELOAD the page to see changes.
 -->
-<svg width="100%" height="100%" viewBox="0 0 880 560" version="1.1"
+<svg width="100%" height="100%" viewBox="0 0 880 660" version="1.1"
      xmlns="http://www.w3.org/2000/svg" style="stroke-linejoin:round;stroke-linecap:round;">
 
     <!-- ===================== ROW 1 — stock / features (top view) ===================== -->
@@ -73,5 +73,19 @@
     <g id="badge_7" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="825" cy="435" r="20"/><text x="825" y="444" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">7</text></g>
     <g id="badge_8" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="55" cy="510" r="20"/><text x="55" y="519" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">8</text></g>
     <g id="badge_9" style="fill:none;stroke:#ffffff;stroke-width:3;"><circle cx="165" cy="510" r="20"/><text x="165" y="519" style="fill:#ffffff;stroke:none;font:bold 26px sans-serif;text-anchor:middle;">9</text></g>
+
+    <!-- ===================== ROW 6 (cont., cols 3-8) & ROW 7 — OP-TYPE glyph stamps (t1171, ADDITIVE) ===================== -->
+    <g id="drill" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M259,493 L275,506 L291,493 M259,508 L275,521 L291,508 M251,533 L266,533 M284,533 L299,533"/><ellipse cx="275" cy="533" rx="9" ry="4"/></g>
+    <g id="contour" style="fill:none;stroke:#ffffff;stroke-width:4;"><rect x="372" y="496" width="26" height="28" rx="5"/><rect x="361" y="485" width="48" height="50" rx="13" style="stroke-dasharray:6 5;stroke-width:3;"/></g>
+    <g id="face" style="fill:none;stroke:#ffffff;stroke-width:4;"><rect x="467" y="489" width="56" height="42"/><path d="M473,498 L517,498 L517,507 L473,507 L473,516 L517,516 L517,525 L473,525" style="stroke-width:2.5;"/></g>
+    <g id="chamfer" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M585,531 L585,499 L599,485 L627,485"/><path d="M585,513 L603,495" style="stroke-width:2;stroke-dasharray:4 4;"/></g>
+    <g id="thread" style="fill:none;stroke:#ffffff;stroke-width:4;"><circle cx="715" cy="510" r="24"/><path d="M697,499 L706,499 M697,510 L706,510 M697,521 L706,521 M724,499 L733,499 M724,510 L733,510 M724,521 L733,521" style="stroke-width:2.5;"/></g>
+    <g id="helix" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M810,490 C810,482 840,482 840,490 C840,498 810,498 810,506 C810,514 840,514 840,522 C840,530 810,530 810,532"/></g>
+    <g id="ramp" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M31,583 L79,583 M31,617 L79,617 M37,587 L73,614 M73,614 L64,612 M73,614 L69,605" style="stroke-width:3.5;"/></g>
+    <g id="trochoid" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M138,600 L192,600" style="stroke-width:2;stroke-dasharray:5 4;"/><circle cx="150" cy="600" r="11"/><circle cx="165" cy="600" r="11"/><circle cx="180" cy="600" r="11"/></g>
+    <g id="engrave" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M266,578 L275,592 L284,578 Z"/><path d="M251,610 Q263,602 275,610 Q287,618 299,610" style="stroke-width:2.5;"/></g>
+    <g id="spiral" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M377,600 A8,8 0 0 1 393,600 A12,12 0 0 1 369,600 A16,16 0 0 1 401,600 A20,20 0 0 1 361,600"/></g>
+    <g id="groove" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M468,588 L484,588 L484,614 L506,614 L506,588 L522,588"/></g>
+    <g id="tap" style="fill:none;stroke:#ffffff;stroke-width:4;"><rect x="600" y="575" width="10" height="8"/><path d="M605,583 L605,620 M597,589 L613,593 M597,597 L613,601 M597,605 L613,609 M597,613 L613,617" style="stroke-width:2.5;"/></g>
 
 </svg>
