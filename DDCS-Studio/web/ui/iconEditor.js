@@ -117,46 +117,59 @@ export function openIconEditor(initial, onSave, opts = {}) {
         #iconed-modal.ie-inline{position:static;inset:auto;z-index:auto;background:none;display:block;}
         #iconed-modal.ie-inline .ie-panel{width:100%;max-width:none;max-height:none;box-shadow:none;border:none;}
         #iconed-modal.ie-inline .ie-head,#iconed-modal.ie-inline .ie-foot{display:none;}
-        #iconed-modal.ie-inline .ie-stage{flex:1 1 340px;max-width:min(560px, calc((90vh - 220px) * ${W} / ${H}));}
-        #iconed-modal .ie-panel{background:var(--panel);color:var(--text-main);border:1px solid var(--border);border-radius:8px;width:min(1500px,96vw);max-width:96vw;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 14px 48px rgba(0,0,0,.5);}
-        #iconed-modal .ie-head{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;}
-        #iconed-modal .ie-head button{background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;}
-        #iconed-modal .ie-toolbar{display:flex;gap:6px;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);overflow-x:auto;overflow-y:hidden;min-height:58px;}
-        #iconed-modal .ie-tile{flex:0 0 auto;width:48px;height:48px;padding:3px;border:1px solid var(--border);border-radius:5px;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+        #iconed-modal.ie-inline .ie-stage{flex:1 1 300px;max-width:min(520px, calc((90vh - 150px) * ${W} / ${H}));}
+        #iconed-modal .ie-panel{background:var(--panel);color:var(--text-main);border:1px solid var(--border);border-radius:8px;width:min(1100px,96vw);max-width:96vw;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 14px 48px rgba(0,0,0,.5);}
+        #iconed-modal .ie-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;}
+        #iconed-modal .ie-head .ie-title{flex:1;}
+        #iconed-modal .ie-head button[data-ie="x"]{background:transparent;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;}
+        /* WORKING AREA: left TOOL RAIL · center CANVAS · right TABBED DOCK */
+        #iconed-modal .ie-work{display:flex;flex-wrap:wrap;gap:12px;padding:12px 14px;overflow:auto;align-items:flex-start;}
+        #iconed-modal .ie-rail{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;}
+        #iconed-modal .ie-rail button{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text-main);cursor:pointer;}
+        #iconed-modal .ie-rail button:hover{border-color:#0ea5e9;}
+        #iconed-modal .ie-rail button.active{border-color:#0ea5e9;background:rgba(14,165,233,.15);}
+        #iconed-modal .ie-stage{flex:1 1 460px;min-width:220px;max-width:min(760px, calc((94vh - 170px) * ${W} / ${H}));aspect-ratio:${W} / ${H};border:1px solid var(--border);background:#000;touch-action:none;}
+        #iconed-modal .ie-stage svg{width:100%;height:100%;display:block;}
+        #iconed-modal .ie-dock{flex:0 0 250px;width:250px;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+        #iconed-modal .ie-tabs{display:flex;border-bottom:1px solid var(--border);}
+        #iconed-modal .ie-tabs button{flex:1;padding:7px 4px;font-size:11px;font-weight:600;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-dim);cursor:pointer;}
+        #iconed-modal .ie-tabs button.active{color:var(--text-main);border-bottom-color:#0ea5e9;}
+        #iconed-modal .ie-tabpanel{display:none;padding:10px;overflow:auto;max-height:min(58vh,440px);}
+        #iconed-modal .ie-tabpanel.active{display:block;}
+        #iconed-modal .ie-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:6px;}
+        #iconed-modal .ie-tile{width:100%;aspect-ratio:1;padding:3px;border:1px solid var(--border);border-radius:5px;background:#000;cursor:pointer;display:flex;align-items:center;justify-content:center;}
         #iconed-modal .ie-tile:hover{border-color:#0ea5e9;}
         #iconed-modal .ie-tile img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;}
-        #iconed-modal .ie-addrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--border);}
-        #iconed-modal .ie-body{display:flex;flex-wrap:wrap;gap:12px;padding:12px 14px;overflow:auto;}
-        #iconed-modal .ie-stage{flex:1 1 520px;min-width:0;max-width:min(1180px, calc((94vh - 250px) * ${W} / ${H}));aspect-ratio:${W} / ${H};border:1px solid var(--border);background:#000;touch-action:none;}
-        #iconed-modal .ie-stage svg{width:100%;height:100%;display:block;}
-        #iconed-modal .ie-side{flex:1 1 240px;min-width:180px;display:flex;flex-direction:column;gap:10px;}
-        #iconed-modal .ie-grp{border:1px solid var(--border);border-radius:6px;padding:8px;}
-        #iconed-modal .ie-grp h4{margin:0 0 6px;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim);}
-        #iconed-modal .ie-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
-        #iconed-modal .ie-layers{max-height:140px;overflow:auto;font-size:12px;}
+        #iconed-modal .ie-layers{font-size:12px;}
         #iconed-modal .ie-lyr{display:flex;align-items:center;gap:6px;padding:3px 4px;border-bottom:1px solid var(--border);cursor:pointer;}
         #iconed-modal .ie-lyr.sel{background:rgba(14,165,233,.15);}
-        #iconed-modal .ie-lyr span{flex:1;}
+        #iconed-modal .ie-lyr span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        #iconed-modal .ie-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px;}
         #iconed-modal label{font-size:11px;color:var(--text-dim);display:flex;flex-direction:column;gap:2px;}
         #iconed-modal .ie-foot{padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
         #iconed-modal input[type=range]{width:120px;}
     </style>
     <div class="ie-panel">
-        <div class="ie-head"><span>🖼 Icon editor — 360×180</span><button data-ie="x">✕</button></div>
-        <div class="ie-addrow">
-            <button class="toolbar-btn settings-io" data-add="text">＋ Text</button>
-            <button class="toolbar-btn settings-io" data-add="rect">▭ Rect</button>
-            <button class="toolbar-btn settings-io" data-add="line">／ Line</button>
-            <button class="toolbar-btn settings-io" data-add="circle">◯ Circle</button>
-            <button class="toolbar-btn settings-io" data-add="arrow">→ Arrow</button>
-            <span style="flex:1"></span><span style="font-size:10px;color:var(--text-dim);">click a tile below to drop it on the canvas ↓</span>
-        </div>
-        <div class="ie-toolbar" id="ie_tiles" title="Tileset — click a tile to drop it on the canvas"><span style="font-size:11px;color:var(--text-dim);">Loading tiles…</span></div>
-        <div class="ie-body">
+        <div class="ie-head"><span class="ie-title">🖼 Icon editor — 360×180</span><button class="toolbar-btn settings-io" data-ie="import" title="Import a BMP / image as a layer">🖼 Import BMP</button><button data-ie="x" title="Close">✕</button></div>
+        <div class="ie-work">
+            <div class="ie-rail" title="Tools — Select, or add a shape">
+                <button data-tool="select" class="active" title="Select / move (click a shape on the canvas)">▧</button>
+                <button data-add="text" title="Add text">T</button>
+                <button data-add="rect" title="Add rectangle">▭</button>
+                <button data-add="line" title="Add line">／</button>
+                <button data-add="circle" title="Add circle">◯</button>
+                <button data-add="arrow" title="Add arrow">→</button>
+            </div>
             <div class="ie-stage" id="ie_stage"></div>
-            <div class="ie-side">
-                <div class="ie-grp"><h4>Selected</h4><div id="ie_props"></div></div>
-                <div class="ie-grp"><h4>Layers (top = front)</h4><div class="ie-layers" id="ie_layers"></div></div>
+            <div class="ie-dock">
+                <div class="ie-tabs">
+                    <button data-tab="shapes" class="active">Shapes</button>
+                    <button data-tab="layers">Layers</button>
+                    <button data-tab="props">Properties</button>
+                </div>
+                <div class="ie-tabpanel active" data-panel="shapes"><div class="ie-tiles" id="ie_tiles" title="Tileset — click a tile to drop it on the canvas"><span style="font-size:11px;color:var(--text-dim);">Loading tiles…</span></div></div>
+                <div class="ie-tabpanel" data-panel="layers"><div class="ie-layers" id="ie_layers"></div></div>
+                <div class="ie-tabpanel" data-panel="props"><div id="ie_props"></div></div>
             </div>
         </div>
         <div class="ie-foot"><button class="toolbar-btn settings-io" data-ie="cancel">Cancel</button><button class="toolbar-btn settings-io primary" data-ie="save">Save icon</button></div>
@@ -209,7 +222,19 @@ export function openIconEditor(initial, onSave, opts = {}) {
         const s = baseSize(type); const L = { type, x: (W - s.w) / 2, y: (H - s.h) / 2, w: s.w, h: s.h, scale: 1, rot: 0, bw: s.w, bh: s.h };
         if (type === 'text') { L.text = 'TEXT'; L.size = 20; L.color = '#ffd23f'; }
         else { L.color = '#33ccff'; L.sw = 3; L.fill = 'none'; }
-        layers.push(L); sel = layers.length - 1; refresh();
+        layers.push(L); sel = layers.length - 1; refresh(); showTab('props');
+    }
+    // The right dock is TABBED (Shapes / Layers / Properties) — the tool/tile/layer/selection logic is UNCHANGED; the tabs
+    // just choose which reused panel (#ie_tiles / #ie_layers / #ie_props) is visible. Selecting or adding jumps to Properties.
+    function showTab(name) {
+        m.querySelectorAll('.ie-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+        m.querySelectorAll('.ie-tabpanel').forEach((p) => p.classList.toggle('active', p.dataset.panel === name));
+    }
+    // Import BMP (top bar) → pick a file → add it as a movable tile layer (reuses addImage — the SAME path the wizard's Import uses).
+    function pickImage() {
+        const input = document.createElement('input'); input.type = 'file'; input.accept = '.bmp,image/bmp,image/*';
+        input.addEventListener('change', () => { const f = input.files && input.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => addImage(r.result); r.readAsDataURL(f); });
+        input.click();
     }
 
     // --- interactions ---
@@ -217,13 +242,16 @@ export function openIconEditor(initial, onSave, opts = {}) {
         const ie = e.target.dataset.ie;
         if (ie === 'x' || ie === 'cancel') { m.remove(); return; }
         if (ie === 'save') { saveIcon(); return; }
+        if (ie === 'import') { pickImage(); return; }
+        const tab = e.target.dataset.tab; if (tab) { showTab(tab); return; }              // right-dock tabs
+        if (e.target.dataset.tool === 'select') { sel = -1; refresh(); return; }            // left-rail Select = pointer mode (deselect)
         const addT = e.target.dataset.add; if (addT) { add(addT); return; }
         if (e.target.dataset.act === 'lock' && sel >= 0) { layers[sel].lock = !layers[sel].lock; renderProps(); return; }
         const li = e.target.closest('.ie-lyr'); if (li) { const i = +li.dataset.li; const mv = e.target.dataset.mv;
             if (mv === 'del') { layers.splice(i, 1); sel = Math.min(sel, layers.length - 1); refresh(); }
             else if (mv === 'up') { if (i < layers.length - 1) { [layers[i], layers[i + 1]] = [layers[i + 1], layers[i]]; sel = i + 1; refresh(); } }
             else if (mv === 'dn') { if (i > 0) { [layers[i], layers[i - 1]] = [layers[i - 1], layers[i]]; sel = i - 1; refresh(); } }
-            else { sel = i; refresh(); }
+            else { sel = i; refresh(); showTab('props'); }
             return;
         }
         if (!inline && e.target === m) m.remove();
@@ -254,7 +282,7 @@ export function openIconEditor(initial, onSave, opts = {}) {
         const hEl = e.target.closest('[data-h]');
         if (hEl && sel >= 0) { gesture = startGesture(hEl.dataset.h, layers[sel], ptStage(e)); stage.setPointerCapture(e.pointerId); return; }
         const g = e.target.closest('g[data-li]'); if (!g) return;
-        sel = +g.dataset.li; gesture = startGesture(null, layers[sel], ptStage(e)); stage.setPointerCapture(e.pointerId); refresh();
+        sel = +g.dataset.li; gesture = startGesture(null, layers[sel], ptStage(e)); stage.setPointerCapture(e.pointerId); refresh(); showTab('props');
     });
     stage.addEventListener('pointermove', (e) => {
         if (!gesture || sel < 0) return;
