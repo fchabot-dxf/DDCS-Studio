@@ -57,21 +57,20 @@ export function onChange(cb) { subs.add(cb); return () => subs.delete(cb); }
  * stack, proceeds with NO prompt. Returns true if the caller should load, false on Cancel — the caller does its own
  * showApp / ddcsLoadBlockStack after a true, so a Cancel leaves the caller's surface untouched.
  *
- * The CANCEL is the guaranteed protection, and the message promises THAT (not Undo). We STILL snapshot the current
- * program first (the advisor's ask, a best-effort recovery point) — BUT t1145 MEASURED that the program-level Undo
- * does NOT reliably restore a programmatically-loaded prior program (the real header Undo button, clicked repeatedly,
- * never reverts past a `ddcsLoadBlockStack` — app-wide, not just this path), so the message deliberately does NOT
- * claim "saved to Undo". (`what` names the thing being opened; `label` is the snapshot entry.) Async — dlgConfirm is
- * lazy-imported to keep this history module free of any top-level UI coupling.
+ * The current program is SNAPSHOTTED into the save-state history first, and the message promises Undo. (t1145 found the
+ * program-level Undo could NOT restore a programmatically-loaded prior program; t1161 FIXED that at the source — the
+ * reproject echo no longer pollutes the history — so a proceed IS recoverable via Undo now.) Cancel remains the instant
+ * protection. (`what` names the thing being opened; `label` is the snapshot entry.) Async — dlgConfirm is lazy-imported
+ * to keep this history module free of any top-level UI coupling.
  */
 export async function confirmDestructiveLoad(incoming, opts = {}) {
     const cur = getProg();
     const willReplace = Array.isArray(cur) && cur.length > 0 && sig(cur) !== sig(incoming);
     if (!willReplace) return true;                       // empty program or an identical load → nothing to lose → silent
-    snapshot(opts.label || 'before edit');               // best-effort recovery point (see the note above re: Undo)
+    snapshot(opts.label || 'before edit');               // the recovery point → the message promises Undo (t1161 made it work)
     const { dlgConfirm } = await import('../ui/dialog.js');
     return dlgConfirm(
-        `Opening ${opts.what || 'this'} in Blocks replaces the program currently in the editor. Cancel to keep your current program.`,
+        `Opening ${opts.what || 'this'} in Blocks replaces the program in the editor — it's saved to Undo, or Cancel to keep it.`,
         { title: 'Open in Blocks?', okLabel: 'Open (replace)', cancelLabel: 'Cancel' }
     );
 }
