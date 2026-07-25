@@ -15100,3 +15100,17 @@ universal slot whose op is registered now ALSO loads Blocks; every other path un
 
 ### Committed MY 2 FILES ONLY: macrosApp.js + cam-edit-in-blocks-s42.spec.js (new). Pre-existing working-tree noise NOT staged.
 Branch feat/ddcs-workspace. NO release. NEXT per the plan: S4-3 (explicit slot-Update round-trip), then S4-4 (substack), S4-5 (multi-op).
+
+---
+
+## turn 1149 -- quick UI polish (user ask): remove the icon-step caption in the CAM authoring modal.
+
+Removed the caption line "Slot icon (camN.bmp) -- draw it above the form, as the DDCS CAM page shows it" (the user finds it
+unnecessary clutter) from the icon step in mountAuthoringSurface (macrosApp.js:1273). Replaced the caption <b> with a
+<span style="flex:1"></span> spacer so the icon step keeps its layout -- the 🖼 Import BMP button stays right-aligned, and
+the inline icon editor (#cbm_iconedit) + the preview + everything else are UNTOUCHED. 1-line change.
+
+No test asserts the caption text (the only reference is a COMMENT in cam-slot-icon-s5.spec.js:32) -- that spec still passes
+2/2 (the icon step mounts + round-trips). Full gate: 1472 passed / 0 failed / 4 skipped (14.5m) -- fully green.
+
+Committed MY 1 FILE ONLY: macrosApp.js. Branch feat/ddcs-workspace. NO release. NEXT: S4-3 (the explicit slot-Update round-trip).
