@@ -15355,3 +15355,25 @@ Full gate: 1479 passed / 1 failed / 4 skipped (14.1m). The 1 failure = blocks-li
 transform-declared-736:101 -- candidates for the flake-hardening pass.
 
 Committed MY 1 FILE: saveStates.js. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1165 -- flake-hardening pass: 2 load-sensitive flakes made DETERMINISTIC (test-infra only, no product change).
+
+Both flakes were an arbitrary waitForTimeout waiting for an async settle that exceeds the fixed delay under full-gate load
+(same class as the t1133 flake work). Replaced each with a DETERMINISTIC waitForFunction on the REAL condition -- no
+assertion weakened; if the condition never happens, the wait now TIMES OUT + surfaces a real bug rather than flaking.
+ 1. transform-declared-736:101 ("the xform renders + round-trips through the Blocks workspace"): had a meaningless
+    getAllBlocks().length>=0 wait + waitForTimeout(250) for the render. Blockly LAZY-inits + renders async, so 250ms
+    under-waited under load -> the xform was not yet in the workspace -> workspaceToStack found nothing -> null. FIX: wait
+    for the xform block to be PRESENT in the workspace (getAllBlocks(false).some(type==='xform')).
+ 2. blocks-live-form:89 ("editing-context chrome: ... saving clears it"): had waitForTimeout(250) after Save for the editing
+    context to clear. Save -> refreshEditingChrome is async -> under load the glow class + chip had not cleared yet -> the
+    "clears after save" asserts failed. FIX: wait for the context to be CLEARED (#blocks-app lacks .editing-wizard AND the
+    .blk-edit-chip is hidden), then assert.
+
+Neither reveals a product bug (both pass in isolation; the deterministic wait would surface one if the render/clear stopped
+happening). VERIFIED: both isolated with --repeat-each 3 -> 27/27 green; FULL GATE 1480 passed / 0 failed / 4 skipped (14.1m)
+-- fully green (both formerly-flaking tests pass under load). Committed MY 2 FILES (test-infra ONLY, no product change):
+transform-declared-736.spec.js + blocks-live-form.spec.js. Branch feat/ddcs-workspace. NO release. Clears the last queued
+autonomous maintenance item.
