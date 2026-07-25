@@ -15416,3 +15416,55 @@ dispatch's complete written layout spec instead. The advisor screenshots the res
 
 Full gate: 1480 passed / 0 failed / 4 skipped (14.3m) -- fully green, identical to the t1165 baseline (the relayout broke
 nothing). Committed MY 1 FILE: ui/iconEditor.js. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1169 -- icon-builder layout tweak (user): the right dock now matches the CANVAS height, the grid scrolls inside.
+
+The Shapes / Layers / Properties dock was TALLER than the icon canvas (the Shapes grid ran well past the canvas bottom) because
+the tab panel carried its OWN content-driven max-height (min(58vh,440px)), independent of the canvas. Made the dock exactly the
+same height as the .ie-stage, top-aligned (shared top AND bottom), with the active panel SCROLLING within -- WITHOUT shrinking
+the canvas.
+
+Mechanism (pure CSS + 2 wrappers, no JS / ResizeObserver):
+ - align-self:stretch on .ie-dock -> the dock takes the flex-LINE height. For that line height to BE the stage height, two
+   things were needed:
+   1. Collapse the dock's OWN intrinsic height so it never drives the line: the 3 tab panels moved into a new .ie-dockbody
+      (flex:1;position:relative;overflow:hidden) and each .ie-tabpanel is now position:absolute;inset:0;overflow-y:auto -- OUT
+      of flow, so the tall Shapes grid contributes 0 to the dock height and SCROLLS instead. (Dropped the panel max-height.)
+   2. Exclude the LEFT RAIL from the dock's flex line: the rail is ~294px tall (6 x 44px buttons + gaps), TALLER than the
+      ~260px inline canvas, so a plain align-self:stretch sized the dock to the RAIL, not the stage (measured 294 vs 260 on the
+      first pass). Wrapped .ie-stage + .ie-dock in a new .ie-canvasrow (an inner flex row) so the dock stretches to the STAGE
+      only; the rail stays a sibling of that row under .ie-work at its own natural height, top-aligned (unchanged).
+ - .ie-dockbody min-height:150px is a floor so the dock never collapses to just-the-tabs if the inner row wraps on a very
+   narrow viewport (the panels are out of flow, so without a floor a wrapped dock would have a ~0 body).
+
+VERIFIED (real symptom, MEASURED + screenshot, BOTH surfaces): a temp spec measured .ie-stage vs .ie-dock
+getBoundingClientRect -> INLINE 260 / 260, STANDALONE 376 / 376, shared top AND bottom to the pixel, and the active Shapes
+panel SCROLLS (scrollHeight > clientHeight) in both. 2 screenshots (temp spec, since removed) confirmed the LOOK: the grid is
+clipped to the canvas height + scrolls. cam-slot-icon-s5 2/2 unchanged (the .ie-canvasrow / .ie-dockbody wrappers do not touch
+its selectors -- .ie-stage svg / [data-add] / #ie_tiles / .ie-lyr / .ie-head are all intact).
+
+Full gate: 1479 passed / 1 failed / 4 skipped (14.3m). The 1 failure = knob-persist:15 (a ticked knob surviving a reprojection) -- a reprojection-LOAD flake, UNRELATED to iconEditor (a different surface; my change is icon-editor CSS+DOM only); re-ran ISOLATED --repeat-each 3 -> 3/3 PASS. Effective 1480/0/4, same as the t1165/t1167 baseline. NOTE for a future hardening pass: knob-persist:15 joins blocks-live-form:89 + transform-declared-736:101 as reprojection-load flake candidates. Committed MY 1 FILE: ui/iconEditor.js. Branch feat/ddcs-workspace. NO release.
+
+### t1169 AMENDMENTS (mid-turn, 2 from the advisor relaying the user) -- 2 more small layout changes, same pass, macrosApp.js.
+ 1. MOVED the Import BMP button UP into the CAM-authoring HEADER row. It was FLOATING right-aligned in its own div below the
+    header (above the icon-editor mount), visually unaligned. Now it sits in the top bar BETWEEN the title (Build CAM slot /
+    Update CAM) and Cancel -- header order is now [title | Import BMP | Cancel]. data-act="cbm-icon-import" is UNCHANGED (same
+    importCamIcon handler; the click still fires via the overlay delegation) so no logic moved + no test change
+    (cam-slot-icon-s5 hasImport still finds it). Removed the now-empty floating row.
+ 2. SIMPLIFIED the CAM-builder empty-state hint (renderCbmTable no-ops branch). Was "No CAM-able ops to import. The CAM Builder
+    supports: <b>Pocket / Surface / Probe corner-edge / Slot / Drill-Bore / Probe centre (Middle)</b>. Insert one ... reopen --
+    or use an op's arrow Build CAM slot action." Now the tighter "No CAM-able ops yet. Add a Pocket, Surface, Slot, Drill, or
+    Probe op then reopen, or use an op's arrow Build CAM slot." -- dropped the sub-labels + the "CAM Builder supports:" framing;
+    KEPT both entry paths, the arrow glyph, the settings-hint styling, AND the dynamic reasons block (per-op "why not CAM-able"
+    lines still append after the sentence). CAM_SUPPORTED_LABEL (line 1138) is now unused but LEFT in place per the amendment
+    (do not chase other uses).
+
+VERIFIED (real symptom, both surfaces): a temp spec asserted the header child order == [b, button#cbm-icon-import,
+button#cbm-cancel] with exactly ONE import button (the floating one gone) + a header screenshot; and the empty-state
+textContent == the tightened sentence WITH the reasons line appended (opened with a non-cam-able op) + an element-screenshot of
+the hint. cam-slot-icon-s5 2/2 unchanged.
+
+FINAL full gate (all 3 changes -- iconEditor height cap + the 2 macrosApp amendments): 1480 passed / 0 failed / 4 skipped (14.4m) -- fully green (the t1169 knob-persist flake did NOT recur). Committed: iconEditor.js
+(feat height-cap 338e577) + macrosApp.js (feat, the 2 amendments) + this WORK-LOG (docs). Branch feat/ddcs-workspace. NO release.
