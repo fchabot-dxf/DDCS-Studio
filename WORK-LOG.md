@@ -15499,3 +15499,26 @@ tiles (tile total 42 -> 54, missing:[] checked by id). cam-slot-icon-s5 2/2 (the
 asserts an exact tile count (only #ie_tiles presence).
 
 Full gate: 1480 passed / 0 failed / 4 skipped (15.3m) -- fully green (an asset-only change; broke nothing). Committed MY 1 FILE: assets/svg/tileset.svg. Branch feat/ddcs-workspace. NO release.
+
+### t1171 AMENDMENT (mid-turn, from the advisor relaying the user + screenshot) -- the LEFT TOOL RAIL now matches the canvas height too.
+
+The 6-button tool rail (.ie-rail) was TALLER than the icon canvas -- the bottom (arrow) button spilled below the canvas bottom
+edge. Capped the rail to the .ie-stage height, exactly like the t1169 dock cap:
+ - MOVED .ie-rail INSIDE .ie-canvasrow (it was a sibling under .ie-work) so it shares the inner row with the stage + dock, and
+   gave it align-self:stretch -> it takes the flex-line height, which the STAGE drives (the rail intrinsic is now shorter than
+   the canvas, see below).
+ - SHRANK the buttons 44 -> 40px (box-sizing:border-box, flex:0 0 auto) so 6 x 40 = 240px < the ~260px inline canvas -> the rail
+   never spills; and justify-content:space-between (gap 0) spreads the 6 buttons over the stretched height: TOP button flush with
+   the canvas top, BOTTOM button flush with the canvas bottom. On the taller standalone canvas (~376px) space-between just
+   spreads them further apart.
+
+Why it now matches the STAGE (not the tallest sibling): inside .ie-canvasrow the flex-line height = max(rail 240, stage 260,
+dock-intrinsic 182) = the STAGE (260); rail + dock both align-self:stretch DOWN to it. (Before, the rail sat under .ie-work with
+a ~294px intrinsic and drove its own line height -> it spilled below the canvas.)
+
+VERIFIED (real symptom, MEASURED + screenshot, BOTH surfaces): rail vs stage getBoundingClientRect -> INLINE 260/260,
+STANDALONE 378/378, shared top AND bottom to the pixel, all 6 buttons present, NO overflow/scroll, top+bottom buttons flush
+(0px). cam-slot-icon-s5 2/2 (the rail buttons kept their data-tool/data-add selectors; the DOM move did not touch them).
+
+FINAL full gate (tileset 12 glyphs already committed f8bdf90 + this rail cap): the FIRST rail-gate run came back INCOMPLETE (1366/1484 -- a transient worker hiccup dropped ~114 tests, exit 0, no hard fail; the 4 atc tests it listed pass isolated 12/12), so I RE-RAN clean: 1479 passed / 1 FLAKY / 4 skipped (15.9m), exit 0. The 1 flaky = pocket-canvas:22 (2D-canvas size handles) -- a PARALLEL-LOAD flake UNRELATED to iconEditor/tileset (a different surface): passes single (1/1) AND serial --repeat-each 5 --workers 1 (5/5); only fails under heavy parallel contention. Effective 1480/0/4 (exit 0, Playwright retried it green). NOTE: pocket-canvas:22 joins knob-persist:15 + blocks-live-form:89 + transform-declared-736:101 as parallel-load flake candidates. Committed: tileset.svg (feat
+f8bdf90) + iconEditor.js (feat, the rail cap) + WORK-LOG (docs). Branch feat/ddcs-workspace. NO release.
