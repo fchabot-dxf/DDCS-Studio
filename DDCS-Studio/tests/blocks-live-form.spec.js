@@ -114,7 +114,12 @@ test('editing-context chrome: re-authoring shows the glow class + named chip; sa
   await page.evaluate(() => window.ddcsSaveAsWizard());
   await page.fill('.blk-dev-savedlg .blk-dev-opname', 'Chrome Op');
   await page.click('.blk-dev-savedlg .blk-dev-save');
-  await page.waitForTimeout(250);
+  // DETERMINISTIC: wait for the editing context to actually CLEAR (save → refreshEditingChrome is async; an arbitrary
+  // sleep flaked under full-gate load). If it never clears, this times out → the real bug surfaces.
+  await page.waitForFunction(() => {
+    const app = document.getElementById('blocks-app'), chip = document.querySelector('.blk-edit-chip');
+    return app && !app.classList.contains('editing-wizard') && chip && chip.hidden;
+  }, { timeout: 8000 });
   const after = await page.evaluate(() => ({
     hasClass: document.getElementById('blocks-app').classList.contains('editing-wizard'),
     chipShown: !document.querySelector('.blk-edit-chip').hidden,

@@ -105,8 +105,9 @@ test('the xform renders + round-trips through the Blocks workspace (Blocks-edita
     await seedProgram(page);
     await page.evaluate(async () => { const { makeXform } = await import('/blocks/programFraming.js'); window.ddcsLoadBlockStack([makeXform({ angle: 15, pivotX: 3, pivotY: 7 }), ...window.ddcsGetBlockProgram()]); });
     await page.evaluate(() => window.showApp('blocks'));   // open the Blocks tab → renderFromModel puts the model (incl. the xform) into the workspace
-    await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length >= 0);
-    await page.waitForTimeout(250);
+    // DETERMINISTIC: wait for the xform block to actually RENDER into the workspace (Blockly lazy-inits + renders async;
+    // an arbitrary sleep flaked under full-gate load). If it never renders, this times out → the real bug surfaces.
+    await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).some((b) => b.type === 'xform'), { timeout: 8000 });
     // read the LIVE Blockly workspace back to a stack — the xform must be present with its fields (it renders + is
     // editable via the generic fields path; if it were dropped/uneditable it would vanish from workspaceToStack)
     const rt = await page.evaluate(async () => {
