@@ -15306,3 +15306,35 @@ vanish, and it stays in ONE place (blocksApp) with no saveStates history redesig
 (uncommitted) are the ready TDD spec for whichever option you pick. NO code shipped this turn (reverted the insufficient
 slice-1). Grounded in the reproject chain: setStack('load') -> blocksApp onChange -> renderFromModel(muted) -> post-render
 workspace change -> reproject -> setStack(workspaceToStack,'blockly') with a NEW id + filled defaults. I await your call.
+
+---
+
+## turn 1161 -- UNDO FIX (Option 1, source fix): kill the redundant reproject-echo SNAPSHOT. FIXED + full gate GREEN 1480/0.
+
+### THE FIX (blocksApp.renderFromModel + a dedicated 'reproject' origin)
+The reproject echo did TWO things: (bad) pollute Undo with id + feed:0 variant snapshots; (GOOD) re-sync the model's block
+ids to the freshly-rendered workspace ids -- the code<->block linking (data-src) reads them. So I keep the GOOD, drop the BAD:
+ - renderFromModel now wraps stackToWorkspace in B.Events.disable()/enable() (the devMode.augment pattern) so Blockly's
+   BATCHED (FIRE_QUEUE/setTimeout 0) block events never dispatch the async echo -> no id-variant, no stray snapshot.
+ - Then it does ONE deterministic id-sync via queueMicrotask: setStack(workspaceToStack(ws), 'reproject'). The microtask
+   runs AFTER the current onChange settles (no re-entrant setStack). The NEW 'reproject' origin is skipped by saveStates
+   (no Undo state) AND by the onChange re-render guard (origin !== 'blockly' && !== 'reproject' -> no render loop).
+ - reproject() (real workspace edits) stays 'blockly' -> it still snapshots. The model still NORMALIZES (feed:0 via the
+   sync) so the EMIT is unchanged (risk-2 clear -- full gate emit tests green).
+
+### WHY NOT the simpler variants (measured, each failed a real check):
+ - Option (a) B.Events.disable ALONE (suppress the echo, no explicit sync): my undo tests passed BUT op-declared-edits:35
+   regressed -- the model ids diverged from the workspace ids (the echo used to sync them), breaking the data-src linking.
+ - Option (b) flag + 'reproject' origin on the ASYNC echo: op-declared-edits + block-edit passed BUT the load-undo tests
+   failed -- a render fires MULTIPLE batched echoes; the flag suppressed only the FIRST, the 2nd re-snapshotted the
+   normalized state. The microtask (single, deterministic, events disabled) is what makes it clean.
+
+### VERIFIED (TDD -- tests written FIRST at t1159, drive the REAL Undo button; spec renamed undo-reproject-echo.spec.js, 3 green)
+ 1. load A -> load B -> Undo == A (content) + Redo == B.   2. load -> Undo == empty baseline.   3. a REAL block-value edit
+ (set the X math_number child's NUM field) -> Undo reverts THAT edit (the RISK-1 guard: the fix does NOT swallow real edits).
+The op-declared-edits pair (no-false-glow + real-edit-declared) is GREEN -- the id-sync is preserved. Full gate: 1480 passed
+/ 0 failed / 4 skipped (14.0m) -- app-wide, no emit/blocks/undo regression (= t1155 1477 + my 3 new tests).
+
+### Committed MY 3 FILES: blocksApp.js + saveStates.js + undo-reproject-echo.spec.js (new). Branch feat/ddcs-workspace. NO
+release. This FIXES the app-wide Undo bug I surfaced in S4-1 (Undo now walks past a programmatic ddcsLoadBlockStack). Slice 2
+(the earlier-flagged extra reproject-echo cleanup) is now SUBSUMED -- the echo is gone at its source.
