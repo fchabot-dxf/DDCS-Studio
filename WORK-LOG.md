@@ -15149,3 +15149,32 @@ preserved, orphaned overlay keys (a field the new def no longer has) are DROPPED
 
 ### Committed MY 3 FILES ONLY: userOps.js + macrosApp.js + cam-slot-roundtrip-s43.spec.js (new). Pre-existing working-tree
 noise NOT staged. Branch feat/ddcs-workspace. NO release. NEXT per the plan: S4-4 (substack), then S4-5 (multi-op).
+
+---
+
+## turn 1153 -- S4-4: extend Edit-loads-into-Blocks (S4-2) to a single-op SUBSTACK slot. Built + verified.
+
+### THE CHANGE (macrosApp.js only, +11/-9 -- mostly the comment; the functional change is ONE condition)
+editCamSlot's load condition went from `slot.ops[0].type === 'universal'` to `(op0.type === 'universal' || op0.type ===
+'substack')`. So a single-op SUBSTACK slot now ALSO loads its reconstructed op into the editor, via the SAME
+ddcsEditWizardDef path (getUserDef -> makeOp) already used for universal. A substack op's makeOp reconstructs the OPUNIT
+boundary, so the standard sub-unit stays LIVE (parametric) while the custom atoms are editable. The S4-1 destructive-load
+guard + the S4-3 round-trip (defVStale -> buildSlotFromOps, which already routes substack via subStackToSlot at the
+generateOp switch) apply UNCHANGED. Generators are still modal-only; multi-op is S4-5.
+
+### VERIFIED (real symptom, new spec cam-substack-edit-blocks-s44.spec.js, 1 test green)
+Built a SUBSTACK user op: wrapRecognizedForFork(getUserDef('user_surfacing_data')) wraps the surfacing twin's exec atoms in
+an opunit; userOpFromStack('mysub', ..., w.template, []) -> the wrapped template (user_root -> opunit) IS the new op's
+template -> createUserOp. A slot referencing it (type 'substack'). RELOAD (fresh boot reads the persisted op + campack so
+initMacrosApp renders from the campack) -> navigate to CAM -> Edit the slot -> the opunit LOADS in the Blocks workspace
+(__blkws has a block of type 'opunit' = the standard sub-unit kept LIVE) + the substack op is in the program + the pendant
+modal opens too. (Gotcha fixed mid-build: userOpFromStack takes the template AS-IS -- pass the whole w.template WITH the
+user_root, not root.children, else there is no user_root for subStackParts/walkParts to recognize.)
+
+The 20-test substack/edit/round-trip subset (cam-substack-fork, cam-substack-save-fork, cam-slot-edit-s3,
+cam-edit-in-blocks-s42, cam-substack-edit-blocks-s44, cam-slot-roundtrip-s43) stays green.
+
+### Full gate: 1475 passed / 0 failed / 4 skipped (14.1m) -- fully green (= t1151 1474 + my 1 new test).
+
+### Committed MY 2 FILES ONLY: macrosApp.js + cam-substack-edit-blocks-s44.spec.js (new). Pre-existing working-tree noise NOT
+staged. Branch feat/ddcs-workspace. NO release. NEXT per the plan: S4-5 (multi-op).
