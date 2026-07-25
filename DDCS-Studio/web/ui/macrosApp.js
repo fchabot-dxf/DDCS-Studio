@@ -1270,7 +1270,7 @@ function homingPostIsExpert() {
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><b style="flex:1; font-size:14px;">${editing ? `✎ Update CAM (cam${_editingSlot})` : '✚ Build CAM slot'}${n > 1 ? ` — ${n} ops` : ''}</b><button class="toolbar-btn settings-io" data-act="cbm-cancel">✕ Cancel</button></div>
             <div class="settings-row" style="align-items:center; margin-top:2px;"><label style="font-size:11px; color:var(--text-dim);">Slot name&nbsp;<input id="cbm_name" value="${camEsc(_authoring.name || '')}" placeholder="e.g. Pocket" style="min-width:200px;"></label></div>
             <div style="margin-top:10px;">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><b style="font-size:11px; color:var(--text-dim); flex:1;">Slot icon (camN.bmp) — draw it above the form, as the DDCS CAM page shows it</b><button class="toolbar-btn settings-io" data-act="cbm-icon-import">🖼 Import BMP</button></div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;"><span style="flex:1"></span><button class="toolbar-btn settings-io" data-act="cbm-icon-import">🖼 Import BMP</button></div>
                 <div id="cbm_iconedit"></div>
             </div>
             <div id="cbm_table" style="margin-top:10px;"></div>
