@@ -15215,3 +15215,56 @@ cam-slot-roundtrip-s43, cam-slot-edit-s3, blocks-load-guard-s41) stays green -- 
 ### Committed MY 4 FILES ONLY: app.js + devMode.js + macrosApp.js + cam-multiop-edit-blocks-s45.spec.js (new). Pre-existing
 working-tree noise NOT staged. Branch feat/ddcs-workspace. NO release. ★ THIS COMPLETES THE S4 LIVE-BLOCKS VIEW (S4-1 guard,
 S4-2 universal, S4-3 round-trip, S4-4 substack, S4-5 multi-op). Open follow-on: the multi-op editing chrome + per-op Save (flagged above).
+
+---
+
+## turn 1157 -- UNDO-BUG INVESTIGATION (read-only; the app-wide bug surfaced in S4-1). Root cause MEASURED + a fix plan. NO code change.
+
+### THE BUG (confirmed t1145 + here): the header Undo (window.ddcsUndo, saveStates) CANNOT revert past a programmatic
+ddcsLoadBlockStack -- clicking Undo repeatedly leaves the program at its current content (never reaches the pre-load state).
+Affects the whole app (wizard inserts + Studio-op loads all use ddcsLoadBlockStack), not just the CAM Edit path.
+
+### ROOT CAUSE (MEASURED with a read-only diagnostic -- instrument programModel.onChange, load one move):
+ONE ddcsLoadBlockStack([move]) fires THREE programModel onChange events:
+  1. origin=load    ids=[null]        (the caller's stack -- no Blockly id yet)
+  2. origin=blockly ids=["BYF}..."]   (the REPROJECT ECHO -- see the chain below; the workspace assigned an id)
+  3. origin=blockly ids=["BYF}..."]   (a 2nd echo, same id -> deduped)
+THE CHAIN: setStack(s,'load') (programModel) -> blocksApp onChange (origin != 'blockly') -> renderFromModel ->
+stackToWorkspace(getStack(), ws) rebuilds the Blockly workspace, which ASSIGNS FRESH ids -> a post-render workspace change
+fires -> reproject() -> setStack(workspaceToStack(ws), 'blockly') carrying the NEW ids. saveStates snapshots on EVERY
+onChange (origin != 'refresh'), and its dedup is `sig = JSON.stringify(stack)` -- ids INCLUDED. So snapshot#1 (id=null) and
+snapshot#2 (id="BYF}...") have DIFFERENT sigs -> NOT deduped -> TWO id-variant snapshots per load. Undo then can't cross to
+the pre-load content: undo -> apply(prev) reloads via ddcsLoadBlockStack -> that load's async reproject echo fires AFTER
+apply's `applying=false` -> a NEW id-variant snapshot is appended + the pointer can't stably walk back (the history near the
+top is same-content id-variants). Net: Undo oscillates among id-variants of the current content; the pre-load state is
+unreachable. (Verified behaviorally at t1145: the real Undo BUTTON, 6-15 clicks, never reverts a prior programmatic load.)
+
+### THE FIX -- recommended: CONTENT-BASED sig (ignore block ids in the dedup hash)
+saveStates.sig() should hash the stack with the per-block `id` field STRIPPED (content + order preserved). Then:
+ - snapshot#1 (id=null) and snapshot#2 (id=X) have the SAME content-sig -> the reproject echo is DEDUPED -> ONE snapshot per
+   load. History = [open, A, B] for load-A-then-B -> Undo -> A cleanly.
+ - undo -> apply(prev) -> the echo's snapshot deduped (same content as the just-applied state) -> pointer STABLE -> Undo
+   walks real content changes. Smallest, most robust change (a few lines in one function); directly kills the id-variant
+   pollution at the dedup boundary. The STORED stack still carries ids (for the reload); only the COMPARISON ignores them.
+ALTERNATIVES (weaker / complementary): (B) suppress the spurious 'blockly' reproject echo after a model-origin render in
+blocksApp (the workspace was just built FROM the model -> reading it back is redundant; extend the muteChanges window to
+cover the async echo) -- reduces churn at the SOURCE, but distinguishing a real block-edit from an echo + the async timing
+is fiddlier. (C) preserve the model's block ids through stackToWorkspace/workspaceToStack so the echo carries the same ids
+(the current sig would then dedup) -- bigger, touches the Blockly bridge. Recommend A now; B as an optional follow-on cleanup.
+
+### SLICED PLAN
+ 1. Content-based sig in saveStates (strip the block `id` before hashing; keep `clone` storing the full stack). NEW undo
+    tests (there are NONE today): load A -> load B -> Undo reverts to A; wizard-insert -> Undo -> empty; a real block edit ->
+    Undo reverts it; Redo re-applies. Full gate.
+ 2. (Optional) suppress the redundant 'blockly' reproject echo after a 'load'/'refresh' render -- reduces snapshot churn.
+
+### RISK (app-wide -- tread carefully, per the advisor)
+saveStates.sig gates EVERY snapshot dedup, so slice 1 touches ALL Undo (wizard inserts, block edits, editor edits). It only
+dedups id-ONLY variants -- content + order + field values + `data` snapshots are all preserved in the hash, so no real user
+change is ever collapsed; the change IMPROVES Undo generally (it is currently broken for every programmatic load). Two things
+to VERIFY in slice 1: (a) NO block param references ANOTHER block's id (a quick grep of stackBridge found only the per-block
+`id` field, no param id-references -- confirm, else the reference must be normalized too); (b) there are NO existing undo/redo
+specs, so the new tests are the only guard -- write them first + reproduce the real symptom (the Undo BUTTON reverts).
+
+NO code changed (investigation only). Grounded in saveStates.js (snapshot/sig/apply), programModel.setStack (origins +
+projectToEditor), blocksApp (renderFromModel/reproject/muteChanges), stackBridge (per-block id). Advisor reviews + we pick the fix.
