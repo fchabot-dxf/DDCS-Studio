@@ -15468,3 +15468,34 @@ the hint. cam-slot-icon-s5 2/2 unchanged.
 
 FINAL full gate (all 3 changes -- iconEditor height cap + the 2 macrosApp amendments): 1480 passed / 0 failed / 4 skipped (14.4m) -- fully green (the t1169 knob-persist flake did NOT recur). Committed: iconEditor.js
 (feat height-cap 338e577) + macrosApp.js (feat, the 2 amendments) + this WORK-LOG (docs). Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1171 -- tileset.svg: 12 NEW op-type glyph stamps (ADDITIVE, style-matched).
+
+Extended web/assets/svg/tileset.svg with 12 new op-type glyph stamps (starter objects for composing CAM-menu icons). ADDITIVE
+ONLY -- no existing stamp removed or renamed (the cull is the user separate later review). Each is one self-contained
+<g id="..."> of plain shapes (NO nested id-group), so the editor per-group extractor (ui/iconEditor.js extractTiles)
+auto-surfaces each as a cropped tile.
+
+THE 12 (picked from the Studio op registry -- real op types that lacked a glyph; the existing feature row already covers
+pocket / bore / boss / slot / step / corner / edge / surface):
+  drill (peck -- down-chevrons + a hole), contour (a part + a dashed offset toolpath), face (facing raster passes in a rect),
+  chamfer (a 45-degree beveled corner), thread (a tapped hole with side thread ticks), helix (a descending coil), ramp (a
+  down-ramp entry arrow), trochoid (overlapping loops along a feed line), engrave (a V-graver over a traced curve), spiral (an
+  expanding Archimedean spiral), groove (a channel cross-section), tap (a tap tool -- drive + shaft + angled threads).
+
+STYLE MATCH (per the dispatch): all white #ffffff, fill:none, stroke-width 4 (2.5-3 for internal detail), round caps/joins --
+the SAME treatment as pocket_rect / slot / bore / surface. NB the dispatch mentioned a ~465 viewBox scale, but that is the
+extractor FALLBACK; tileset.svg root is viewBox 880x560 (8 cols x 6 rows, cells ~110x93) -- I matched the EXISTING stamps at
+THAT scale (~50-64px bbox each) so tiles stay uniform. Placed in the 6 free cells of row 6 (cols 3-8, cy 510) + a new row 7
+(cols 1-6, cy 600); EXTENDED the root viewBox height 560 -> 660 to fit the new row (the extractor crops per-group bbox, so the
+sheet size is cosmetic + existing tiles are unmoved). Updated the header-comment viewBox note to match.
+
+VERIFIED (real symptom -- screenshot + extraction, both): rendered the whole sheet on a BLACK bg (the white strokes only show
+on black) + eyeballed all 12 -- each reads as its op. The FIRST spiral used large-arc arcs that rendered as an overlapping
+blob; REDRAWN as 4 growing semicircles (r 8/12/16/20) -> a clean expanding spiral. The editor extractor surfaced all 12 as
+tiles (tile total 42 -> 54, missing:[] checked by id). cam-slot-icon-s5 2/2 (the icon editor + tile grid still fine). No test
+asserts an exact tile count (only #ie_tiles presence).
+
+Full gate: 1480 passed / 0 failed / 4 skipped (15.3m) -- fully green (an asset-only change; broke nothing). Committed MY 1 FILE: assets/svg/tileset.svg. Branch feat/ddcs-workspace. NO release.
