@@ -15712,3 +15712,35 @@ de-dup baseId), the manual palette goes 25 -> 31 with all 6 present (missing:[])
 
 Full gate: 1480 passed / 0 failed / 4 skipped (14.2m) -- fully green, all 1484 ran. Committed MY 1 FILE: tileset.svg. Branch feat/ddcs-workspace. NO release. This COMPLETES the
 SHAPE-LIBRARY REVAMP (Pass 1 t1177/t1179 + Pass 2 t1181).
+
+---
+
+## turn 1183 -- ICON-BUILDER GESTURE POLISH: Shift/Ctrl/Shift+Ctrl resize modifiers + snap-to-canvas-centre + Center buttons.
+
+Polished the icon-composer direct manipulation (the shared drawing core shapeStage.js + the iconEditor caller):
+
+PART 1 -- SCALE MODIFIERS (applyGesture gained a ctrlKey param; the pointermove caller passes e.ctrlKey + W/H):
+ - SHIFT while resizing = UNIFORM (aspect-locked LIVE): the uniform branch is now (L.lock || shiftKey), so holding Shift
+   scales uniformly during the drag (before, only a lock-toggled layer did).
+ - CTRL while resizing = FROM CENTRE: the layer CENTRE stays fixed + the resize is symmetric (instead of anchoring the
+   opposite corner). startGesture stores the start centre (cx0,cy0) on the resize gesture; when ctrlKey, nW/nH =
+   2*|pointer-to-centre| in the layer rotated frame, centred at (cx0,cy0).
+ - SHIFT+CTRL = uniform from centre (composes). Rotate keeps its Shift 15deg snap (unchanged).
+
+PART 2 -- SNAP-TO-CANVAS-CENTRE (move): a MOVE snaps the layer CENTRE to the canvas centre INDEPENDENTLY per axis (x->W/2,
+y->H/2) within 8px, no modifier; a subtle dashed cyan centre guide line shows on the SVG stage per snapped axis while snapped
+(applyGesture returns {snap:{x,y}}; the caller threads it to stageSvg via a new `guide` param, cleared on pointerup). Canvas
+centre ONLY. PLUS Center-H / Center-V buttons in the Properties panel (data-act cenH/cenV -> centre the layer on the canvas).
+
+SEAM / BACKWARD-COMPAT: applyGesture(gesture, L, P, shiftKey, ctrlKey, W, H) + stageSvg(..., guide) added OPTIONAL params, so
+the OTHER consumer (regionEditor.js, which calls with 4/5 args) is unaffected -- no ctrlKey/W-H means no from-centre/snap; it
+does inherit Shift-uniform (it already passes shiftKey -- harmless + consistent) and ignores applyGesture's return.
+
+VERIFIED (real symptom -- pure math + UI drive + screenshots): applyGesture direct: default resize anchors the opposite corner;
+SHIFT keeps aspect 2 + anchor fixed; CTRL keeps the centre (140,120) + symmetric; SHIFT+CTRL centre-fixed + aspect; a MOVE
+landing the centre within 8px of (180,90) snaps to exactly (180,90) {x:true,y:true}, far = no snap. UI drive: a Shift-resize
+keeps the rect aspect (1.5); a Ctrl-resize keeps the centre (180,90) while growing; the centre guide renders mid-snap
+(gest-snap.png = a horizontal dashed line); Center H+V centres a layer to (180,90). Screenshots gest-shift / gest-ctrl /
+gest-snap.png. cam-slot-icon-s5 2/2.
+
+Full gate: 1480 passed / 0 failed / 4 skipped (14.5m) -- fully green, all 1484 ran (region editor via the shared core unaffected). Committed MY 2 FILES: shapeStage.js + iconEditor.js. Branch feat/ddcs-workspace. NO release.
