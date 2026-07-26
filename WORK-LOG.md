@@ -15691,3 +15691,24 @@ VERIFIED (real symptom -- direct resolver + palette + a UI build):
    [align_two, background]. Confirms the advisor's "build it, confirm".
 
 Full gate: 1479 passed / 1 FLAKY (carve-live-crisp-816:27, a heavy live-carve mesh test UNRELATED to tileset/glyph; isolated 1/1; exit 0 retried green) / 4 skipped = 1484 (14.1m). Effective 1480/0/4. Committed MY 3 FILES: tileset.svg + opCamMap.js + macrosApp.js. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1181 -- SHAPE-LIBRARY PASS 2: +6 basic primitive shapes in the tileset + the stale badge-comment tidy.
+
+Added 6 pure-white geometry primitives to web/assets/svg/tileset.svg (user-approved), placed in the now-empty ROW 5 (the old
+badge row, cy 435, cols 1-6), matching the kept stamps (white #ffffff, stroke-width 4, fill:none, round caps, ~50-56px bbox on
+the 880x560 grid):
+  triangle (an upright triangle), diamond (a rhombus / square-at-45), star (a 5-point star), hexagon (a flat-top regular
+  hexagon), ellipse (a wide oval), chevron (a bold roof/^ angle mark, stroke-width 5). Each is one self-contained <g id> the
+  extractor auto-surfaces.
+
+OPTIONAL TIDY (my t1179 flag, done): removed the 2 now-stale badge comments -- the header "EXCEPTION: badge_0..9 kept distinct"
+note + the empty "ROW 5 & 6 -- number badges" row comment (replaced by the ROW 5 primitives comment).
+
+VERIFIED (real symptom -- sheet render + extraction + screenshot): the full sheet on black shows all 6 primitives clean +
+legible at tile size (prim-sheet.png); the editor extracts all 6 as their OWN tiles (unique families -- none collide with the
+de-dup baseId), the manual palette goes 25 -> 31 with all 6 present (missing:[]). cam-slot-icon-s5 2/2.
+
+Full gate: 1480 passed / 0 failed / 4 skipped (14.2m) -- fully green, all 1484 ran. Committed MY 1 FILE: tileset.svg. Branch feat/ddcs-workspace. NO release. This COMPLETES the
+SHAPE-LIBRARY REVAMP (Pass 1 t1177/t1179 + Pass 2 t1181).
