@@ -1304,7 +1304,7 @@ function homingPostIsExpert() {
                 <div id="cbm_iconedit"></div>
             </div>
             <div id="cbm_table" style="margin-top:10px;"></div>
-            <div style="display:flex; align-items:center; gap:8px; margin-top:10px;"><b style="font-size:11px; color:var(--text-dim); flex:1;">Inline preview</b><button class="toolbar-btn settings-io" data-act="cbm-sim" title="Simulate this slot's composed macro, each field seeded from its value.">▶ Simulate</button></div>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:10px;"><b style="font-size:11px; color:var(--text-dim); flex:1;">Inline preview</b><button class="toolbar-btn settings-io" data-act="cbm-sim" title="Simulate this slot's composed macro, each field seeded from its value.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="cbm-use-icon" title="Snapshot the simulated toolpath as an editable icon layer (Simulate first).">🖼 Use in icon</button></div>
             <div id="cbm_preview" style="height:280px; position:relative; border:1px solid var(--border); border-radius:6px; margin-top:6px; background:#000;"></div>
             <div class="settings-row" style="justify-content:flex-end; margin-top:12px;"><button class="toolbar-btn settings-io" data-act="cbm-build" style="font-weight:600;"${n ? '' : ' disabled'}>${editing ? `Update CAM (cam${_editingSlot}) ▸` : 'Build CAM slot ▸'}</button></div>
         </div>`;
@@ -1327,6 +1327,7 @@ function homingPostIsExpert() {
             const a = e.target.dataset.act;
             if (a === 'cbm-cancel') cbmExit();
             else if (a === 'cbm-sim') cbmSimulate();
+            else if (a === 'cbm-use-icon') cbmUseIcon();
             else if (a === 'cbm-build') cbmBuild();
             else if (a === 'cbm-icon-import') importCamIcon();   // t1135 S5b — Import BMP → the inline editor adds it as a movable tile layer
         });
@@ -1443,6 +1444,13 @@ function homingPostIsExpert() {
     const probePreviewStart = (slot) => { const s = (slot.fields || []).find((y) => y.key === 'safeZ'); return { x: 0, y: 0, z: s ? Math.max(2, Number(s.def)) : 10 }; };
     const probePreviewOpts = (slot, macro) => (/\bG31\b/.test(macro) ? { getStock: () => probePreviewStock(slot), getStart: () => probePreviewStart(slot) } : {});
 
+    // t1187 — snapshot the CURRENT sim render (clean, geometry-only) and drop it in as a movable, editable icon TILE layer.
+    function cbmUseIcon() {
+        const url = (_cbmPanel && _cbmPanel.snapshot) ? _cbmPanel.snapshot() : null;
+        if (!url) { dlgNotice('Simulate first — press ▶ Simulate, then Use in icon.'); return; }
+        if (_iconEditor && _iconEditor.addImage) _iconEditor.addImage(url);   // adds an imageTileLayer + fires the editor onChange → rides _authoring.icon.layers, selected + on top
+        else dlgNotice('The icon editor is not open.');
+    }
     function cbmSimulate() {
         if (!_authoring.ops.length) { dlgNotice('Import or add an op first.'); return; }
         const host = document.getElementById('cbm_preview'); if (!host) return;

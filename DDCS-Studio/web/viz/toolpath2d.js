@@ -168,7 +168,7 @@ export function createToolpath2d(canvas, opts = {}) {
     }
 
     // ---- drawing ----
-    function paint() {
+    function paint(clean) {   // t1187 — clean=true draws GEOMETRY ONLY (stock + toolpath), no grid/envelope/axes/handles/labels/cursor (for a snapshot)
         const dpr = window.devicePixelRatio || 1, w = W(), h = H();
         const nw = Math.round(w * dpr), nh = Math.round(h * dpr);
         if (canvas.width !== nw || canvas.height !== nh) { canvas.width = nw; canvas.height = nh; }   // resize only on real size change
@@ -179,25 +179,34 @@ export function createToolpath2d(canvas, opts = {}) {
         const foot = footprint(), step = stepFor(foot);
         // t744 — every 2D element reads the ONE visibility registry (visible + composed alpha), same source as the 3D.
         const dv = (id) => displayOf(id).visible, da = (id) => displayOf(id).alpha, wa = (rgba, a) => rgba.replace(/,\s*([0-9.]+)\)$/, (m, v) => ',' + (parseFloat(v) * a).toFixed(3) + ')');
-        if (dv('grid')) drawGrid(ctx, foot, step);
-        const env = envelopeRect(); if (env && dv('envelope')) drawRect(ctx, env, wa('rgba(108,122,140,0.55)', da('envelope') / 0.4), null);   // the 3D box default alpha is 0.4 → scale the 2D literal by the registry alpha relative to it
+        if (!clean && dv('grid')) drawGrid(ctx, foot, step);
+        const env = envelopeRect(); if (!clean && env && dv('envelope')) drawRect(ctx, env, wa('rgba(108,122,140,0.55)', da('envelope') / 0.4), null);   // the 3D box default alpha is 0.4 → scale the 2D literal by the registry alpha relative to it
         const st = stockRect();
         if (st && dv('stock')) {
             const isPk = st.shape === 'pocket', sa = da('stock') / 0.72;   // scale the 2D stock literals by the registry alpha relative to the 3D default 0.72
             drawRect(ctx, st, wa(isPk ? 'rgba(134,182,255,0.65)' : 'rgba(166,215,124,0.65)', sa), wa(isPk ? 'rgba(106,143,190,0.10)' : 'rgba(143,174,106,0.10)', sa));
             if (isPk) drawPocketCavity(ctx, st);   // #15: the inner cavity so a pocket READS as a pocket (mirrors the 3D square-donut)
         }
-        if (dv('axes')) drawOriginAxes(ctx, foot);
-        drawPath(ctx, anim.playing ? Math.floor(anim.k) : null);
-        drawPulses(ctx);   // t319 — the on-touch pulses over the path
-        drawPosChip(ctx);   // t746 — the position readout riding the head
-        drawLabels(ctx, foot, step, w, h);
-        if (starts.length && dv('markers')) drawStartHandles(ctx);
+        if (!clean && dv('axes')) drawOriginAxes(ctx, foot);
+        drawPath(ctx, clean ? null : (anim.playing ? Math.floor(anim.k) : null));
+        if (!clean) drawPulses(ctx);   // t319 — the on-touch pulses over the path
+        if (!clean) drawPosChip(ctx);   // t746 — the position readout riding the head
+        if (!clean) drawLabels(ctx, foot, step, w, h);
+        if (!clean && starts.length && dv('markers')) drawStartHandles(ctx);
         canvas.__t2starts = starts.map((s, i) => ({ i, sx: sptx(s.x), sy: spty(s.y), x: s.x, y: s.y, source: startSources[i] || 'auto', emits: !!startEmits[i] }));   // debug + tests: the drawn per-pass start handles + colour source + SHAPE (emits)
         { const e = dv('envelope') ? envelopeRect() : null; canvas.__t2env = e ? { minX: e.minX, minY: e.minY, maxX: e.maxX, maxY: e.maxY } : null; }   // t652/t744 — the DRAWN envelope's MACHINE bounds (null when the registry hides it) — the marker's machine coord must fall inside
         canvas.__t2disp = { stock: dv('stock'), envelope: dv('envelope'), grid: dv('grid'), axes: dv('axes'), markers: dv('markers'), cut: dv('cut'), rapid: dv('rapid'), probe: dv('probe'), envAlpha: da('envelope'), stockAlpha: da('stock') };   // t744 — debug + tests: what the registry drew (value asserts for the 2D toggles/alphas)
         canvas.__t2cursor = cursor;   // debug + tests
-        if (cursor) { if (cursor.snapped) drawSnap(ctx, cursor); drawReadout(ctx, cursor, w, h); }
+        if (!clean && cursor) { if (cursor.snapped) drawSnap(ctx, cursor); drawReadout(ctx, cursor, w, h); }
+    }
+    // t1187 — a CLEAN geometry-only PNG data-URL (stock + toolpath, no chrome/handles) of the current 2D view; null if nothing
+    // is drawn yet. Paints clean, captures, then repaints the normal interactive scene. (The caller ensures the canvas is sized.)
+    function snapshot() {
+        if (!view || !segs.length || !W() || !H()) return null;
+        let url = null;
+        try { paint(true); url = canvas.toDataURL('image/png'); } catch (_) { url = null; }
+        paint(false);
+        return url;
     }
     function drawSnap(ctx, c) {   // snapped-to-geometry marker (cyan square) at the exact point
         const hx = tx(c.x), hy = ty(c.y);
@@ -451,7 +460,7 @@ export function createToolpath2d(canvas, opts = {}) {
 
     const applyDisplay = () => { if (view) paint(); };   // t744 — the registry changed → re-paint (paint reads displayOf per element)
     return {
-        setGcode, setSegments, setMachine, setStock, setMachineFrame, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, setViewTransform, pulse, redraw, fit, play, stop, toggle, seek, applyDisplay,
+        setGcode, setSegments, setMachine, setStock, setMachineFrame, setWcs, setGridStep, setStart, setStarts, setStartSources, setStartEmits, setPassEnds, setAnchor, setToolPosition, setViewTransform, pulse, redraw, fit, play, stop, toggle, seek, applyDisplay, snapshot,
         get playing() { return anim.playing; },
         get count() { return segs.length; },
     };

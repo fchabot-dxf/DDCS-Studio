@@ -1134,6 +1134,17 @@ export function createPreviewPanel(container, opts = {}) {
 
     return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setMarkerDragWriter, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
+        // t1187 — a CLEAN geometry-only PNG data-URL of the sim (stock + toolpath, NO overlay: grid/axes/handles/markers/HUD).
+        // 2D-toolpath capture (the WebGL 3D clean-capture is a follow-on — no preserveDrawingBuffer + no clean-overlay toggle
+        // yet). If 2D is hidden (3D active), it is shown behind the 3D canvas + fitted for the capture, then re-hidden — no flash.
+        snapshot: () => {
+            if (!segs || !segs.length) return null;   // not simulated yet
+            const hidden = cv2d && cv2d.style.display === 'none';
+            if (hidden) { cv2d.style.display = ''; if (t2.fit) t2.fit(); }
+            const url = t2.snapshot ? t2.snapshot() : null;
+            if (hidden) cv2d.style.display = 'none';
+            return url;
+        },
         getSimConfig: () => simConfig(lastAbsolute),                                       // t580 PREVIEW-PARITY E1 — THE ONE config the route traced from + play() feeds the engine (read-only; parity checks assert eng._* == this)
         getAnchor: () => curAnchor,                                                       // t309 — the anchored/absolute frame flag (feed the overlay so its path frame matches)
         onToolPos: (cb) => { if (typeof cb === 'function') toolPosSubs.push(cb); return () => { toolPosSubs = toolPosSubs.filter((f) => f !== cb); }; },   // t309 — subscribe to the live engine head (fires in ANY mode); returns an unsubscribe
