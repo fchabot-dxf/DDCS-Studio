@@ -15613,3 +15613,45 @@ layers>=3 -- still hold with the glyph default; updated its stale "name text" ti
 
 Full gate: full gate exit 0 (NO hard failures) but heavily FLAKY under back-to-back-gate machine load -- 1411 first-try passed + ~69 flaky-retried-green + 4 skipped = 1484 (17.1m). Rather than a blind 17m re-run against a thrashing machine, TARGETED-VERIFIED the affected + flaky-named tests isolated: cam-slot-icon-s5 + cam-* + macros + atc-envelope/atc-inline-onesource/atc-interpreter/knob-persist -> 23/23 PASS. The 4 flaky named (atc-*, knob-persist:15) are UNRELATED to the CAM-icon feature. Effective 1480/0/4. Committed MY 4 FILES: opCamMap.js + iconEditor.js + macrosApp.js + cam-slot-icon-s5.spec.js.
 Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1177 -- SHAPE-LIBRARY REVAMP Pass 1: manual palette SLIMMED (niche op-glyphs auto-ONLY) + a WIRING finding flagged.
+
+DONE (the unambiguous, all-interpretation-common part): the 7 niche op-type glyphs are now AUTO-ONLY -- hidden from the manual
+tile palette (#ie_tiles) but STILL returned by loadAllTiles so auto-glyph can drop any of them by id. Declared
+AUTO_ONLY_GLYPHS = {probe_center, align_two, home, rotary_axis, clock_dial, tool_change, tool_table} in iconEditor.js; the
+palette-population filters them out (loadAllTiles untouched -> auto-glyph unaffected). VERIFIED: the palette drops 54 -> 47 (the
+7 gone; everything else kept incl. the feature shapes pocket_rect/slot/drill/etc.); a middle op STILL auto-glyphs to
+probe_center (proves loadAllTiles is full + "auto-only" = hidden-from-manual, not removed). cam-slot-icon-s5 2/2.
+(slim-palette.png in scratchpad.)
+
+FLAG / GATE for the advisor -- "wire them fully into auto-glyph" COLLIDES with the code; decide how far to go:
+Auto-glyph resolves op -> camTypeOf -> camType -> CAMTYPE_GLYPH. camTypeOf only ever returns 11 camTypes (surface, corner,
+edge, slot, pocket, cpocket, drill, bore, inside, boss, universal); its `default` sends EVERYTHING ELSE to universal -> the
+CONTOUR glyph. So of the 7 auto-only glyphs, ONLY probe_center is actually auto-produced (via middle/inside). The other 6
+picture ops camTypeOf does not map:
+  glyph          pictures op        auto-reachable now?
+  probe_center   middle (inside)    YES (wired)
+  align_two      alignment probe    NO -- alignment IS a CAM slot (probeToSlot.alignmentSlot) but camTypeOf has NO `align`
+                                        case, so it resolves to universal -> gets the CONTOUR glyph, not align_two
+  home           homing             NO -- homing is an EXCLUDED twin, not a CAM slot (opCamMap ~line 49)
+  rotary_axis    rotary center      NO -- rotary not in camTypeOf
+  clock_dial     rotary clock       NO -- rotary not in camTypeOf
+  tool_change    ATC change         NO -- atc EXCLUDED, not a CAM slot
+  tool_table     ATC table          NO -- atc EXCLUDED, not a CAM slot
+
+So "auto-only + wire FULLY" cannot both hold for those 6 with the camType-only resolver. Options:
+  A) RESERVE (what I shipped): hide from the palette + keep in loadAllTiles; they auto-produce nothing yet (reserved until
+     their ops are wired). Zero structural change. [my Pass-1 default]
+  B) WIRE BY OPTYPE: add a declared OPTYPE_GLYPH map + resolve auto-glyph by op.opType first, then camType. Wires
+     alignment -> align_two TODAY (alignment reaches the CAM authoring) + pre-wires homing/rotary/atc IF/when they become CAM
+     slots. Structural (a new resolver arm) but is the literal "wire fully".
+  C) PRUNE: drop home/rotary_axis/clock_dial/tool_change/tool_table from the tileset (they picture ops that cannot be CAM
+     slots). Slims the SVG; loses the art.
+
+RECOMMENDATION: A now (this Pass 1 is "mechanical") + a SCOPED B for JUST alignment -> align_two next (the one non-mapped glyph
+whose op really reaches CAM authoring); leave homing/rotary/atc RESERVED (A) since those ops are not CAM slots (B for them is
+dormant; C throws away art we may want when they are). Not touching the resolver until the advisor's synthesis.
+
+Full gate: 1480 passed / 0 failed / 4 skipped (14.1m) -- fully green, all 1484 ran. Committed MY 1 FILE: iconEditor.js. Branch feat/ddcs-workspace. NO release.
