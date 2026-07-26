@@ -16626,3 +16626,91 @@ additive once the machine record exists, since the manifest's controller must co
 
 GATE: FULL unfiltered suite (persistence-class): 1512 passed / 0 failed / 4 skipped (14.9m, EXIT=0) -- includes backup-852, persistence-file-indicator, persistence-intentional-save and the new workspace-roundtrip 4/4. Branch feat/ddcs-workspace. NO release. Reserve-the-word-save honoured: nothing new calls itself
 Saved except the .ddcs write.
+
+---
+
+## turn 1217 -- WORKSPACE PIVOT (1)+(2)+(3)+(4): the profile LIBRARY is RETIRED; a workspace is ONE machine.
+
+Executed the t1215 map under the advisor's ruling (OPEN/RESTORE ADOPTS THE FILE'S CONTROLLER). (1)+(2) landed as the one
+indivisible change they had to be; (3) and (4) landed with them. (6) Duplicate-workspace and (7) the summary card are
+deferred -- the deferrable tail, per the dispatch.
+
+### THE MACHINE RECORD (1) -- data/workspaceMachine.js.
+
+`{ name, controllerId }` under `ddcs_machine`, and that is the WHOLE record. FINDING A from t1215 held up: the library's
+`settings` / `userVars` were duplicates of stores that already persist themselves and already ride the .ddcs as their own
+BACKUP_STORES rows, and that duplication WAS the stale-snapshot bug surface. So the migration adopts only the two bytes
+the library uniquely owned and lets the machine's real config stay where it already lives.
+Declared as a BACKUP_STORES row whose `write` calls `setMachine(val, true)` -- that IS the ruling, expressed as data
+rather than as a special case in the restore path: restoring a .ddcs retargets this browser to the FILE's controller.
+`migrateProfileLibrary()` runs at boot (app.js init) and inside restoreBackup; it is idempotent, adopts the ACTIVE
+profile's name+controllerId, and LEAVES non-active profiles in place so `legacyMachineConfigs()` can still surface them
+as one-time exports -- a migration must never lose a machine the user configured.
+
+### THE RETIRE (2) -- and the half-retire I walked into and had to finish.
+
+`getLibrary()`'s auto-create branch is replaced (FINDING B: an emptied library RE-SEEDS itself, so deleting the key
+retires nothing). But replacing it while consumers still existed put the app in exactly the half state t1215 warned
+about, and the full suite is what caught it: 14 failures. Triaging them was the real work of this turn, and two were NOT
+stale specs:
+  - the header IDENTITY ROW (always visible) read `ProfLib.activeProfile()`, which now returns null -> the machine
+    degraded to "(unnamed)". It reads the machine record now.
+  - Settings still hosted delete / duplicate / new-baseline / rename / a rendered library line + a dead cloud block --
+    I had removed only two buttons in the earlier pass. All of it is gone; the section is a machine NAME field.
+Deleted: `ui/profileModal.js` (unreachable once its doors went) and `data/profileLibrary.js`. `data/profileStore.js`
+SURVIVES -- it owns the bundle/Drive plumbing, which is not library machinery.
+NO DATA-LOSS PATH, checked before deleting anything: nothing is keyed by profile id; user files ride INSIDE `settings`
+and the "profile switch swaps them" behaviour was just `replaceSettings` swapping the whole object. Retiring switching
+leaves the live stores exactly where they are.
+
+### TWO REAL BEHAVIOUR FIXES THAT FELL OUT OF THE RETIRE (neither was in the dispatch).
+
+  (a) `setMachine(rec, true)` now does the FULL retarget the retired `setActiveControllerId` did -- setActiveProfile, the
+      variable family that follows it, `ddcsRefreshControllerUI`, and the settings-changed broadcast. Without this the
+      restore/import paths set the controller but left the variable list and UI on the old one. One declared way to
+      retarget, so restore + import + the Settings dropdown all land in the same state.
+  (b) IMPORT NO LONGER MERGES. `landImportedProfile` used `applyProfile` -> `applySettings`, which merges a WHITELIST
+      that contains no `workspace` / `workspaceFiles` at all: an imported machine bundle silently dropped the user's
+      files AND kept the previous machine's values in every key the bundle omitted -- two machines blended into an
+      incoherent third. It full-swaps via `replaceSettings` now, which is what the library path did via switchProfile.
+      I found this only because I refused to let the rewritten test assert the weaker thing; the spec now pins that the
+      previous machine's file is GONE after an import.
+CAPABILITY GAP, flagged not hidden: retiring profileModal removed the only UI ENTRY POINT to cloud profile save/load.
+The plumbing is intact and still on `window` (and now applies to this workspace), the user's Drive files are untouched,
+and re-exposing it is a button rather than a rebuild -- but as shipped there is no way to reach it. Its natural
+successor is the .ddcs workspace going to Drive, which is (6)/(7) territory. ADVISOR: this is the one thing in this turn
+that removes a reachable capability; say whether it gets a button now or waits for the workspace-cloud path.
+
+### (3) THE REFRAME + (4) THE CONFIRM SEAM.
+
+Settings is now "THIS WORKSPACE'S MACHINE" (name + Import-from-dump + the one-machine hint) then "CONTROLLER" (the
+dropdown + pull). Two sections both titled for the machine read as a bug, so the framing lives in the first and the
+controller is what it always was -- a property of the machine. renderMachineGui's EMPTY-Z fallback is -120, matching the
+stored default (it was +120, so an emptied Z drew the box inverted).
+(4) `confirmSetupRow(row)` in setupChecklist.js: the Controller row could never be satisfied by the common case "open
+Settings, see the correct controller, close", because its only writer was a `change` listener that cannot fire when the
+value is already right. Confirmation is now a DECLARATION the user makes (touching the control / Stock's Done), not a
+value diff.
+
+### SPECS -- what was retired vs migrated, honestly.
+
+DELETED `tests/profile-library.spec.js` (3 tests, all switching/save-as/duplicate machinery) and the two profile tests
+inside `select-load-805` + the unified-rows test in `profile-cloud-library`. Each deletion left a comment saying what
+went and why.
+MIGRATED rather than dropped, because they still describe the shipped app: the cloud ROUND-TRIP (rewritten to the new
+landing -- it still guards the real Save->List->Load through the Drive mock), the file-edit PERSISTENCE half of
+controller-file-tree, the baseline-IMMUTABILITY + import half of workspace-user-files, and the Library/identity-row
+shape in library-854 + header-profile-menu.
+NEW GUARD in workspace-roundtrip: "the profile-library surface is GONE from Settings and the machine surface is
+present", seeded WITH a legacy library first -- because the thing that made this library unkillable was a reader that
+rebuilt it from live state, so the test that matters asserts the whole surface stays absent, and asserts the machine
+surface is present in the same breath so "all gone" cannot pass by the panel simply failing to render.
+
+GATE: FULL unfiltered suite -- 1509 passed / 1 failed / 4 skipped (15.1m). The one failure is
+transform-declared-736:101, a 5s `waitForFunction` BOOT-WAIT timeout under parallel load (not an assertion); it passes
+3/3 in isolation, same class as the blocks-mobile-drawers flake in the run before it, which also passes isolated.
+Test-count arithmetic checks out: 1515 -> 1510 = 6 retired tests removed + 1 new guard added.
+The FIRST full run this turn is the one that earned its keep -- 14 failures, and triaging them (rather than assuming
+"stale specs, bulk-update") is what surfaced the broken header identity row, the Settings library UI I had missed, and
+the silent import merge. Branch feat/ddcs-workspace. NO release. Reserve-the-word-save honoured -- nothing new calls
+itself Saved except the .ddcs write.
