@@ -121,8 +121,10 @@ test('t1049 FIX: a real data-op TWIN op opens the modal seeded (user_surfacing_d
 test('door 2 + auto-import: the editor-toolbar button auto-imports CAM-able program ops (no picker)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => typeof window.showApp === 'function');
-  const wired = await page.evaluate(() => { const b = document.getElementById('editor-cam-btn'); return !!b && /ddcsBuildCamSlot/.test(b.getAttribute('onclick') || '') && typeof window.ddcsBuildCamSlot === 'function'; });
-  expect(wired, 'door 2 button present + wired to ddcsBuildCamSlot').toBe(true);
+  // t1191 — the door-2 button is now the '＋ Make ▾' menu (onclick ddcsEditorMakeMenu); its CAM slot item reaches
+  // ddcsBuildCamSlot, whose auto-import behaviour (exercised below) is unchanged.
+  const wired = await page.evaluate(() => { const b = document.getElementById('editor-cam-btn'); return !!b && /ddcsEditorMakeMenu/.test(b.getAttribute('onclick') || '') && typeof window.ddcsBuildCamSlot === 'function'; });
+  expect(wired, 'door 2 button present (＋ Make ▾ menu) + ddcsBuildCamSlot reachable').toBe(true);
   await page.evaluate(() => { window.ddcsGetBlockProgram = () => ([{ id: 'p1', type: 'op', opType: 'pocket', label: 'Pocket', params: { shape: 'rect', w: 100, h: 80, depth: 4, stepdown: 1.5, toolDia: 6, feed: 1000, plunge: 100, clearance: 5, rpm: 8000, stepoverPct: 40 } }]); });
   await page.evaluate(() => window.ddcsBuildCamSlot());
   await page.waitForSelector('.cam-auth-overlay .cbm-eb', { timeout: 8000 });

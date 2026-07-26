@@ -158,7 +158,7 @@ export function initMacrosApp() {
                 <div id="macros_panel_kbtn" style="display:none;">
                     <div class="settings-section">
                         <div class="settings-section-title">K-BUTTONS (K1–K7)</div>
-                        <div class="settings-hint">The 7 panel buttons — each runs <b>key-<i>N</i>.nc</b> when pressed. Type/paste a body or <b>⇪ From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
+                        <div class="settings-hint">The 16 K-buttons — each runs <b>key-<i>N</i>.nc</b> when pressed (Expert/M3K has 16; base panels 7). Type/paste a body or <b>⇪ From editor</b>, then <b>Generate</b> for the install file. Empty = unused.</div>
                         <div id="kbuttons_list"></div>
                     </div>
                 </div>
@@ -373,6 +373,7 @@ export function initMacrosApp() {
     });
 
     // --- Macros: author controller macros (M-code O100nn / K-button key-N); saved in the profile. ---
+    const K_BUTTON_COUNT = 16;   // t1191 — the Expert/M3K keyboard exposes 16 K-keys (base panels have 7); we show all 16 and unused ones stay empty.
     const macrosArr = () => (getSettings().macros || (getSettings().macros = []));
     const editorText = () => { const e = document.getElementById('editor'); return e ? e.value : ''; };
     function macroFileText(m) {
@@ -381,7 +382,7 @@ export function initMacrosApp() {
         const t = m.trigger || {};
         const hasEnd = /\b(M99|M30|M0?2)\b/.test(body);
         if (t.kind === 'mcode') { const n = Math.max(0, parseInt(t.code, 10) || 0); return `O${10000 + n} ( ${name} — M${n} )\n${body}${hasEnd ? '' : '\nM99'}\n`; }
-        if (t.kind === 'kbutton') { const k = Math.min(7, Math.max(1, parseInt(t.key, 10) || 1)); return `( save as key-${k}.nc on SYSDISK — K${k} button )\n${body}${hasEnd ? '' : '\nM30'}\n`; }
+        if (t.kind === 'kbutton') { const k = Math.min(K_BUTTON_COUNT, Math.max(1, parseInt(t.key, 10) || 1)); return `( save as key-${k}.nc on SYSDISK — K${k} button )\n${body}${hasEnd ? '' : '\nM30'}\n`; }
         return `( save as ${(name || 'macro').replace(/[^\w-]+/g, '_')}.nc )\n${body}${hasEnd ? '' : '\nM30'}\n`;
     }
     const insertToEditor = (txt) => { const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager; if (em && typeof em.insert === 'function') em.insert(txt); else dlgNotice('Editor not available.'); };
@@ -437,7 +438,7 @@ export function initMacrosApp() {
     function renderKbuttons() {
         const host = q('kbuttons_list'); if (!host) return;
         let html = '';
-        for (let k = 1; k <= 7; k++) {
+        for (let k = 1; k <= K_BUTTON_COUNT; k++) {
             const m = findKbtn(k);
             html += `<div class="kbtn-row" data-k="${k}" style="border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px;">
                 <div style="display:flex; gap:8px; align-items:center;">
@@ -451,6 +452,50 @@ export function initMacrosApp() {
         }
         host.innerHTML = html;
     }
+    // t1191 PART 3 — 'Make → K-button': turn the CURRENT editor program into a K-key macro. Reuses the SAME machinery the
+    // K-buttons panel uses (ensureKbtn store, editorText body, macroFileText/insertToEditor Generate, pushKbutton Push,
+    // renderKbuttons refresh) — no duplicated macro logic. Exposed as window.ddcsMakeKButton for the editor '＋ Make ▾' menu.
+    function makeKButtonModal() {
+        const prog = editorText().trim();
+        if (!prog) { dlgNotice('The editor program is empty — write or load a program first, then Make → K-button.'); return; }
+        if (document.getElementById('mkb-overlay')) return;   // one at a time
+        let firstEmpty = 0;
+        const opts = [];
+        for (let k = 1; k <= K_BUTTON_COUNT; k++) {
+            const m = findKbtn(k), used = m && String(m.body || '').trim();
+            if (!used && !firstEmpty) firstEmpty = k;
+            opts.push(`<option value="${k}">K${k}${used ? ' — ' + camEsc(m.name || 'used') : ' (empty)'}</option>`);
+        }
+        if (!firstEmpty) firstEmpty = 1;
+        const ov = document.createElement('div'); ov.id = 'mkb-overlay';
+        ov.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:22px;';
+        ov.innerHTML = `<div style="background:var(--panel); color:var(--text-main); border:1px solid var(--border); border-radius:8px; padding:16px; width:min(480px,94vw); max-height:90vh; overflow:auto; box-shadow:0 14px 48px rgba(0,0,0,.5);">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;"><b style="flex:1; font-size:14px;">⌨ Make K-button from the program</b><button class="toolbar-btn settings-io" data-mk="x" title="Close">✕</button></div>
+            <div class="settings-row" style="align-items:center; gap:12px; margin-bottom:10px;"><label style="font-size:12px;">Key&nbsp;<select id="mkb_key" style="min-width:150px;">${opts.join('')}</select></label></div>
+            <div class="settings-row" style="align-items:center; margin-bottom:8px;"><label style="flex:1; font-size:12px;">Name&nbsp;<input id="mkb_name" placeholder="e.g. Park + spindle off" style="width:100%;"></label></div>
+            <div style="font-size:11px; color:var(--text-dim); margin:2px 0 6px;">Body = the current editor program (${prog.split('\n').length} lines) → written to <b>key-<i>N</i>.nc</b>.</div>
+            <textarea readonly style="width:100%; height:120px; font:12px/1.4 monospace; box-sizing:border-box; opacity:.85;">${camEsc(prog).slice(0, 4000)}</textarea>
+            <div class="settings-row" style="justify-content:flex-end; gap:8px; margin-top:12px; flex-wrap:wrap;"><button class="toolbar-btn settings-io" data-mk="cancel">Cancel</button><button class="toolbar-btn settings-io" data-mk="gen">⬇ Save + Generate</button><button class="toolbar-btn settings-io" data-mk="push">⬆ Save + Push</button><button class="toolbar-btn settings-io primary" data-mk="save" style="font-weight:600;">Save</button></div>
+        </div>`;
+        document.body.appendChild(ov);
+        const keySel = ov.querySelector('#mkb_key'), nameIn = ov.querySelector('#mkb_name');
+        keySel.value = String(firstEmpty);
+        const syncName = () => { const m = findKbtn(+keySel.value); nameIn.value = m ? (m.name || '') : ''; };
+        syncName(); keySel.addEventListener('change', syncName);
+        ov.addEventListener('click', (e) => {
+            const mk = e.target.dataset.mk;
+            if (mk === 'x' || mk === 'cancel' || e.target === ov) { ov.remove(); return; }
+            if (mk === 'save' || mk === 'gen' || mk === 'push') {
+                const k = +keySel.value, m = ensureKbtn(k);
+                m.body = prog; m.name = nameIn.value.trim(); saveSettings(); renderKbuttons();
+                ov.remove();
+                if (mk === 'gen') insertToEditor(macroFileText(m));               // REUSE the panel Generate
+                else if (mk === 'push') pushKbutton(k, m);                        // REUSE the panel Push (its own confirm)
+                else dlgNotice(`Saved to K${k}${m.name ? ' — "' + m.name + '"' : ''}. Generate / Push it from Settings → Macros → K-buttons.`);
+            }
+        });
+    }
+    if (typeof window !== 'undefined') window.ddcsMakeKButton = makeKButtonModal;   // the editor '＋ Make ▾' menu → K-button
     const mch = q('mcodes_list');
     if (mch) {
         mch.addEventListener('input', (e) => {
@@ -638,7 +683,7 @@ export function initMacrosApp() {
     }
 
     // --- Global Sync Logic ---
-    const SYNC_FILES = ['slib-m.nc', 'sysstart.nc', 'advstart.nc', 'T.nc', 'error.nc', 'probe.nc', 'key-1.nc', 'key-2.nc', 'key-3.nc', 'key-4.nc', 'key-5.nc', 'key-6.nc', 'key-7.nc'];
+    const SYNC_FILES = ['slib-m.nc', 'sysstart.nc', 'advstart.nc', 'T.nc', 'error.nc', 'probe.nc', ...Array.from({ length: K_BUTTON_COUNT }, (_, i) => 'key-' + (i + 1) + '.nc')];   // t1191 — key-1..16.nc
     
     let currentSyncFiles = {};
     let syncMode = 'pull';
@@ -867,7 +912,7 @@ export function initMacrosApp() {
                 return;
             }
             
-            const DELETABLE = ['key-1.nc', 'key-2.nc', 'key-3.nc', 'key-4.nc', 'key-5.nc', 'key-6.nc', 'key-7.nc', 'T.nc', 'error.nc', 'probe.nc', 'mulprobe.nc'];
+            const DELETABLE = [...Array.from({ length: K_BUTTON_COUNT }, (_, i) => 'key-' + (i + 1) + '.nc'), 'T.nc', 'error.nc', 'probe.nc', 'mulprobe.nc'];   // t1191 — key-1..16.nc
             const toCheck = DELETABLE.filter(f => !currentSyncFiles[f]);
             
             if (toCheck.length > 0) {
