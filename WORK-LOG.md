@@ -16559,3 +16559,70 @@ TOOL & CUT (identity -> geometry -> tool/cut). Declared ordering only -- no per-
 axisOrder, featureType, inAxis, transAxis, travelShape, twoAxis with the probe scalars below (middle-form-order.png).
 Scoped to MIDDLE as instructed; the all-wizards sweep stays queued for the UI-polish batch. Gate: middle seam 47 passed
 + smoke 60/60 + corner-structctl/gui-sim-block/traverse-lands 9 passed.
+
+---
+
+## turn 1215 -- WORKSPACE PIVOT: the REQUIRED regression + (5) typed-0 landed; (1)-(4)+(6)-(7) DEFERRED with the full map captured.
+
+Read the ruling memory first (one-workspace-one-machine), then mapped all five seams with a 5-agent parallel pass. Two
+map findings CHANGE the shape of the remaining work, so they are recorded here before anything else:
+
+FINDING A -- THE LIBRARY'S UNIQUE BYTES ARE JUST `name` + `controllerId`. The active profile's `settings` and `userVars`
+are DUPLICATES of stores that already persist themselves and already ride the .ddcs as their own BACKUP_STORES rows
+(ddcs_studio_settings, ddcs_vars_persistent). That duplication IS the bug surface the advisor measured -- and it means
+the migration is far smaller than it looks: adopt name+controllerId into a single declared machine record, and the
+machine's actual CONFIG is already in the workspace.
+FINDING B -- TWO TRAPS the retire must not walk into:
+  - `readLib()` treats `{profiles:[]}` as "no library" and RE-SEEDS one from live state, so deleting the key does NOT
+    retire the library: any surviving getLibrary() call resurrects it. The auto-create branch (profileLibrary.js:32-36)
+    must be replaced, not emptied.
+  - `ddcs_controller_profile` (the live controller/dialect) is NOT in BACKUP_STORES, so a restored .ddcs today keeps the
+    RECEIVING browser's controller. The pivot's machine record fixes that, but it CHANGES what a restore does (it would
+    start switching the controller) -- a deliberate call, not something to fold in silently.
+ALSO MAPPED (so the next turn does not re-derive): item (3) is already ~90% true -- the Settings controller dropdown
+retargets IN PLACE today (writes one key, no library switch, no reload), so (3) is mostly reframing/wording, not
+mechanism. Item (4)'s exact defect: the checklist's Controller row is `!!localStorage.getItem('ddcs_controller_profile')`
+and its ONLY writer is the select's `change` listener -- which CANNOT fire when the default is already correct, hence
+"unsilenceable"; it needs a visit/confirm flag, not a value diff. A second, UNREPORTED bug of the measured class also
+exists: deleteProfile on the ACTIVE profile persists activeId=profiles[0] BEFORE switching, so switchProfile's own
+snapshot writes the DELETED profile's settings into profiles[0] -- deleting the active profile silently overwrites the
+fallback's config. Retire, do not patch.
+
+### LANDED (1/2): THE REQUIRED REGRESSION -- tests/workspace-roundtrip.spec.js (4 tests).
+
+Edit envelope + WCS -> save the workspace -> reopen -> assert EXACT. Values chosen so a falsy/abs bug cannot hide: a
+NEGATIVE z (-77), fractional negative WCS numbers, and a typed 0. Plus the pivot invariant (exactly one machine record
+in the payload) and the field-level typed-0 case.
+IT IMMEDIATELY EARNED ITS KEEP by measuring something the pivot INHERITS: `restoreBackup` writes each store's bytes back
+to localStorage but does NOT re-read the LIVE in-memory settings object -- the shipped flow RELOADS THE PAGE after a
+restore, which is what makes values take. My first draft asserted without the reload and failed on all three tests; that
+was the test being wrong, not the app. The spec now reloads (mirroring the real flow) and its header states the seam, so
+any "reopen a workspace" affordance the pivot adds either reloads or needs a live-apply hook -- this is the net under it.
+
+### LANDED (2/2): ITEM (5) -- THE TYPED-0 ENVELOPE FIELD.
+
+`_gvs` (settingsPanel.js:573) read `Number.isFinite(n) && n !== 0 ? n : d`, so a typed 0 was silently swapped for the
+previous value -- the field appeared to reject the keystroke with no explanation. Now the fallback means ABSENT or EMPTY
+(or non-numeric), never ZERO. Measured: typing 0 commits 0; a normal value still commits; EMPTYING the field falls back
+to the current value (not 0, not NaN). A 0 travel is not USEFUL -- the envelope draws degenerate and envelopeCheck flags
+that axis -- but it is the user's input and the app should show the consequence rather than swallow it.
+TWO RESIDUALS SURFACED, deliberately NOT "improved" (surgical-change rule): (a) renderMachineGui's EMPTY-Z fallback is
++120 while the stored default is -120, so an emptied Z field draws the box inverted relative to the real default -- pre-
+existing, only reachable via an empty field; (b) safeZMargin is now 0-committable, which means an error-handler retract
+to exactly machine home. That is the MAXIMALLY safe retract (home is the top), so I allowed it rather than special-case
+the getter -- flagging it since it changes emitted safety G-code shape.
+
+### DEFERRED, honestly, with the map above so the next turn executes rather than re-derives.
+
+(1) MIGRATE, (2) RETIRE the library UI/machinery, (3) the Controller reframe, (4) the checklist confirm semantics,
+(6) Duplicate-workspace, (7) the summary manifest + browser card.
+WHY: (1)+(2) are one indivisible persistence-class change -- adopting the machine record while REPLACING
+profileLibrary's auto-create branch (per FINDING B, a half-retire resurrects the library) and deciding whether a restore
+now switches the controller. That decision plus a full-suite gate does not fit what remained of this turn after the
+mapping, and a half-landed persistence migration is the worst possible outcome for a file format users own. (6) depends
+on (1)-(3) being settled; (7) is fully specified in the map (buildSummary(stores) pure over the same stores, beside
+buildBackup, reusing the DECLARED count fns; cached under a second IDB key beside the existing handle) and is safely
+additive once the machine record exists, since the manifest's controller must come from the FILE, not the live key.
+
+GATE: FULL unfiltered suite (persistence-class): 1512 passed / 0 failed / 4 skipped (14.9m, EXIT=0) -- includes backup-852, persistence-file-indicator, persistence-intentional-save and the new workspace-roundtrip 4/4. Branch feat/ddcs-workspace. NO release. Reserve-the-word-save honoured: nothing new calls itself
+Saved except the .ddcs write.
