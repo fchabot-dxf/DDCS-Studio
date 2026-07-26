@@ -60,7 +60,7 @@ export const BACKUP_STORES = [
     { id: 'variables', label: 'Variables', ...ls('ddcs_vars_persistent'), count: (v) => (Array.isArray(v) ? v.filter((x) => x && !x.isSys).length : 0), unit: 'user vars' },
     { id: 'displayPrefs', label: 'Preview display prefs', ...ls('ddcs_display'), count: (v) => (v ? Object.keys(v).length : 0), unit: 'elements' },
     { id: 'panePrefs', label: 'Panel layout', ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_follow_exec', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },
-    { id: 'projects', label: 'Projects (local)', count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects', read: () => exportAllEntries(), write: (val) => importAllEntries(val) },
+    { id: 'projects', label: 'Projects (local)', async: true, count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects', read: () => exportAllEntries(), write: (val) => importAllEntries(val) },
 ];
 
 /** Build the full backup object (reads every store's own persisted value; async for the IDB project volume). */
@@ -94,6 +94,7 @@ export async function restoreBackup(obj, selectedIds) {
         if (!Object.prototype.hasOwnProperty.call(stores, s.id)) { skipped.push(s.id); continue; }   // not in this backup → leave untouched
         try { await s.write(stores[s.id]); restored.push(s.id); } catch (_) { skipped.push(s.id); }
     }
+    markWorkspaceSavedToFile();   // the workspace now MATCHES the just-opened .ddcs → clean (persists across the restore reload)
     return { restored, skipped };
 }
 
@@ -101,7 +102,62 @@ export async function restoreBackup(obj, selectedIds) {
 export async function exportEverything() {
     const obj = await buildBackup();
     UIUtils.downloadFile('ddcs-workspace-' + fileStamp() + '.ddcs', JSON.stringify(obj, null, 2));
+    markWorkspaceSavedToFile();   // this state is now IN a portable file → clear the "unsaved to file" signal
     return obj;
+}
+
+// ── "unsaved to file" watermark (PERSISTENCE-A) ─────────────────────────────────────────────────────────────────
+// The workspace auto-persists to localStorage; a .ddcs is the only PORTABLE copy. We surface an "unsaved to file"
+// signal so the user knows their work lives only in this browser until they Save workspace. ONE SOURCE: the signal is
+// a content SIGNATURE over the SAME BACKUP_STORES registry a .ddcs writes — it changes iff a fresh .ddcs would differ,
+// so a new store is covered automatically and there is no second, divergeable definition of "the workspace state".
+const WATERMARK_KEY = 'ddcs_file_watermark';
+const SAVED_AT_KEY = 'ddcs_file_saved_at';   // epoch-ms of the last REAL .ddcs save/open — set ONLY by a file save, never the boot baseline
+const hash32 = (str) => { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; };
+
+/** A cheap SYNCHRONOUS content signature of the localStorage-backed workspace stores. Skips the async IDB projects
+ *  store (it has its own .mjson save grain); never written into a backup. Synchronous so beforeunload can use it. */
+export function workspaceSignature() {
+    let acc = '';
+    for (const s of BACKUP_STORES) {
+        if (s.async) continue;   // async (projects/IDB) — has its own .mjson grain; never call its read on the poll
+        let v; try { v = s.read(); } catch (_) { continue; }
+        if (v && typeof v.then === 'function') continue;   // defensive: any other async store
+        if (v === undefined) continue;
+        try { acc += s.id + '=' + JSON.stringify(v) + ';'; } catch (_) { /* unserializable — skip */ }
+    }
+    return hash32(acc);
+}
+
+/** Record the current workspace as "saved to file" — called after a .ddcs is written OR opened. Stamps the time so the
+ *  indicator can honestly read "Saved to file · Nm ago" (the ONLY thing that counts as saved; localStorage is temporary). */
+export function markWorkspaceSavedToFile() {
+    try { localStorage.setItem(WATERMARK_KEY, String(workspaceSignature())); } catch (_) {}
+    try { localStorage.setItem(SAVED_AT_KEY, String(Date.now())); } catch (_) {}
+    try { window.dispatchEvent(new Event('ddcs:file-state')); } catch (_) {}
+}
+
+/** Epoch-ms of the last real .ddcs save/open, or null if this workspace has NEVER been saved to a portable file. */
+export function fileSavedAt() {
+    try { const v = localStorage.getItem(SAVED_AT_KEY); return v == null ? null : (Number(v) || null); } catch (_) { return null; }
+}
+
+/** First-run baseline: adopt the current (seeded / restored) state as clean so the indicator only lights up on a real
+ *  user CHANGE, not on boot's idempotent re-seed writes. No-op once a watermark exists. */
+export function ensureWorkspaceWatermark() {
+    try { if (localStorage.getItem(WATERMARK_KEY) == null) localStorage.setItem(WATERMARK_KEY, String(workspaceSignature())); } catch (_) {}
+}
+
+/** Whether a file-save baseline exists yet (false on a brand-new browser until the boot state settles). */
+export function hasWorkspaceWatermark() {
+    try { return localStorage.getItem(WATERMARK_KEY) != null; } catch (_) { return false; }
+}
+
+/** True when the workspace differs from the last .ddcs saved/opened — i.e. there is work not in a portable file. */
+export function isWorkspaceDirtyToFile() {
+    let mark; try { mark = localStorage.getItem(WATERMARK_KEY); } catch (_) { mark = null; }
+    if (mark == null) return false;   // no baseline yet (ensureWorkspaceWatermark sets it once boot settles)
+    return mark !== String(workspaceSignature());
 }
 
 /** The pre-open safety auto-export (the undo path): download the current workspace + stash it for verification. */
@@ -119,4 +175,7 @@ if (typeof window !== 'undefined') {
     window.ddcsRestoreBackup = restoreBackup;
     window.ddcsExportBackup = exportEverything;
     window.ddcsSafetyExport = safetyExport;
+    window.ddcsWorkspaceDirtyToFile = isWorkspaceDirtyToFile;
+    window.ddcsMarkWorkspaceSaved = markWorkspaceSavedToFile;
+    window.ddcsFileSavedAt = fileSavedAt;
 }

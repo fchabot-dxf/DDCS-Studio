@@ -104,6 +104,11 @@
             <div id="hdrPostMenu" class="scale-pop hdr-quick-menu" role="menu" hidden></div>
         </div>
         <span id="hdrPostWarn" class="hdr-post-warn" hidden title="">⚠</span>
+        <!-- PERSISTENCE-A: shown only when the workspace has changes not yet saved to a portable .ddcs file. Click = Save workspace. -->
+        <button type="button" id="fileSaveChip" class="file-save-chip" hidden
+                title="You have changes that aren't saved to a portable .ddcs workspace file — click to Save workspace.">
+            <span class="fsc-dot" aria-hidden="true"></span><span class="fsc-tx">Unsaved</span>
+        </button>
         <!-- Project Manager: 📂 Open (drawer) / ⤓ Save (modal). Wired by ui/macroBar.js -->
         <div class="macro-bar" id="macroBar">
             <button class="op-btn" id="projOpenBtn" title="Open / manage projects (.mjson)"><span class="op-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span></button>

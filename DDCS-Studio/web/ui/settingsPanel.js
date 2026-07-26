@@ -428,8 +428,8 @@ function showSavedToast() {
         t.id = 'ddcs-settings-toast';
         Object.assign(t.style, {
             position: 'absolute', top: '16px', right: '48px',
-            background: 'var(--accent, #0ea5e9)', color: '#fff',
-            padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: 'bold',
+            background: 'rgba(60,60,60,.92)', color: '#e8e8e8',
+            padding: '4px 10px', borderRadius: '4px', fontSize: '11px', fontWeight: '600',
             opacity: '0', transition: 'opacity 0.2s', zIndex: '9999', pointerEvents: 'none',
             boxShadow: '0 2px 5px rgba(0,0,0,0.2)'
         });
@@ -444,7 +444,9 @@ function showSavedToast() {
         if (ap && ap.name) name = ap.name;
     }
     
-    t.textContent = `Saved to: ${name} ✓`;   // textContent — a profile name must never inject markup
+    // The word SAVED is reserved strictly for a .ddcs FILE save (persistence-A principle: localStorage is a TEMPORARY
+    // buffer). A settings write only auto-persists to localStorage → announce it honestly, never as "Saved".
+    t.textContent = `Auto-saved (temporary) · ${name}`;   // textContent — a profile name must never inject markup
     t.style.opacity = '1';
     clearTimeout(t._timer);
     t._timer = setTimeout(() => { t.style.opacity = '0'; }, 1200);
