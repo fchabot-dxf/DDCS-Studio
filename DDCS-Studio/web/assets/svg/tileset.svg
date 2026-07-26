@@ -12,8 +12,7 @@
       so any canvas size works — just keep width/height matching the viewBox aspect (or use 100%).
     • One object = ONE <g id="name"> of plain shapes (path/rect/circle/line/text). NO nested <g id> inside
       an object (a group containing another id-group is treated as a container outline, not a primitive).
-    • Make each object ONCE. No _BL/_BR or X+/Y- copies — the editor rotates/flips. EXCEPTION: badge_0..9
-      are kept distinct (the de-dup exempts badge_/num_/digit_ ids).
+    • Make each object ONCE. No _BL/_BR or X+/Y- copies — the editor rotates/flips.
     • Style on the <g> (children inherit): fill:none; stroke; stroke-width; round caps/joins. Objects sit on
       a BLACK icon background → use light/coloured strokes, never black.
     • Self-contained: no shared <defs>/gradients/clipPaths.
@@ -50,7 +49,13 @@
     <g id="surface" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M580,346 L630,346 M605,312 L605,344 M598,334 L605,345 L612,334"/></g>
     <g id="ring" style="fill:none;stroke:#ffffff;stroke-width:4;"><circle cx="825" cy="330" r="26"/><circle cx="825" cy="330" r="6" style="fill:#ffffff;stroke:none;"/></g>
 
-    <!-- ===================== ROW 5 & 6 — number badges (kept distinct from de-dup) ===================== -->
+    <!-- ===================== ROW 5 — basic primitive SHAPES (t1181 Pass 2): pure-white geometry outlines ===================== -->
+    <g id="triangle" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M55,410 L79,458 L31,458 Z"/></g>
+    <g id="diamond" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M165,409 L191,435 L165,461 L139,435 Z"/></g>
+    <g id="star" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M275,409 L282,426 L300,427 L286,438 L290,456 L275,446 L260,456 L264,438 L250,427 L268,426 Z"/></g>
+    <g id="hexagon" style="fill:none;stroke:#ffffff;stroke-width:4;"><path d="M411,435 L398,458 L372,458 L359,435 L372,412 L398,412 Z"/></g>
+    <g id="ellipse" style="fill:none;stroke:#ffffff;stroke-width:4;"><ellipse cx="495" cy="435" rx="28" ry="18"/></g>
+    <g id="chevron" style="fill:none;stroke:#ffffff;stroke-width:5;"><path d="M580,451 L605,419 L630,451"/></g>
 
     <!-- ============ ROW 6 (cont., cols 3-8) & ROW 7 — OP-TYPE glyph stamps (t1171): drill/contour/pocket_round/probe_center/
          align_two/home · rotary_axis/clock_dial/engrave/tool_change/tool_table/tap ============ -->
