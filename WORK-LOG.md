@@ -16411,3 +16411,92 @@ without risking a probe that misses the part.
 GATE: middle seam 45 passed / 0 failed / 2 skipped (incl. repos-landing, manual-markers, marker-parity, the new
 traverse-lands-on-marker) + corner-step-redescend + smoke 60/60. No emit was changed this turn, so no byte-diff was
 required. Branch feat/ddcs-workspace. NO release. Hardening batch NOT started, as instructed.
+
+---
+
+## turn 1211 -- MIDDLE AXIS-ORDER BUILT (the user's original report closed). B closed by the user's ruling with NO emit fork.
+
+### (B) CLOSED BY THE RULING -- and it needed no change.
+
+The user's ruling (now memory `traverse-targets-are-marker-derived`): the trans-axial travel is NOT a form constant, it is
+LINKED to the next probe position's MARKER. So the at-rest behaviour IS the marker's default position and today's emit
+FALLS OUT of that default -- there was never an at-rest re-centre POLICY to change. That matches exactly what I argued in
+t1209 (dropping the re-centre would emit a probe that misses the boss) and confirms t1201 already satisfied it. No emit
+fork, no change. STANDING CONSTRAINT honoured in this build: every traverse target stays MARKER-DERIVED (#21/#22 and
+crossX/crossY come from the marker seam); the order fork swaps ORDER only, never the travel model.
+
+### (A) AXIS-ORDER -- BUILT, in the blessed two-step shape.
+
+STEP 1 -- THE ONE RESOLVER. `middleAxes(params)` (exported from middleWizard, corner's `axesOf` counterpart) returns
+{order, fA, sA, dir1, dir2, dir1Plus, dir2Plus, primaryX}. It replaced SEVEN independent re-derivations of
+`second = axis==='X'?'Y':'X'` / `primaryX = axis!=='Y'`: opSimStarts middleReposLanding + BUILT_IN.middle, the twin's
+middleSimStartsProvider, both panelTypes decl sites (diagAim + crossAim), middleView's tieDiagTravel, middleVizUtils, and
+the emit. Back-compat is IN the resolver: with no `axisOrder` the order falls out of the legacy `axis`, so every stored op
+resolves exactly as before. This ALSO fixes the already-wrong-today incoherence I found in t1209 -- the twin's providers
+read p.axis live while the twin's emit ignored it, so changing the axis moved the markers but not one byte of G-code;
+both now resolve through the same expression, so they can only move together. It also fixes the middleView read that went
+through the BUILT-IN DOM (`el('m_axis')`), which the twin's form does not have -- there it silently defaulted to X, so the
+(2) drag wrote #21/#22 for the wrong axis.
+
+STEP 2 -- THE 2-WAY FORK. `orderFork` guards on `axisOrder` and emits BOTH arms into the superset (concrete mode builds
+one). The order-dependent region (the primary seq, the trans traverse, the secondary seq, the per-axis WCS writes) is now
+a function of the resolved order. dir1/dir2 stay BAKED, as ruled. Two subtleties handled:
+  - The guard reads the REAL param, and the twin's `def.deriveGuards` fills `axisOrder` in from `middleAxes(p).order` when
+    an op stored only the legacy `axis` -- whenOk is a strict === so an absent key would have dropped BOTH arms.
+  - syncA used to bake `axis === 'Y'` at TEMPLATE-BUILD time (one of the four latent issues I listed in t1209). It is now
+    guarded on the order, so the twin can't diverge from the built-in for order=YX + syncA + !twoAxis.
+DECLARATIONS: MIDDLE_DEFAULTS `axisOrder:'XY'` (mirrors the historical bake); a `Probe Order` enum row in
+MIDDLE_STRUCT_BINDINGS with Corner's exact wording/options; CANONICAL_BIND pins the order (the fork duplicates every bound
+socket per arm, so the binding derive must see ONE arm -- mirrors cornerData pinning corner/probeSeq); a structCtl mirror
+row (sc_axisorder) for the Blocks round-trip.
+
+BYTE-DIFF PROOF (the gate's requirement), measured:
+  - DEFAULT IS BYTE-IDENTICAL: an op with no `axisOrder` emits EXACTLY today's program; and the 3584-combo superset sweep
+    (the old 1792 x both orders) shows prune(superset) == the concrete build for every structural combo in BOTH arms.
+  - LEGACY `axis:'Y'` == the new YX order, byte-for-byte -- so the old "primary axis" field keeps working.
+  - THE SWAP DIFFERS ONLY IN AXIS-BOUND TOKENS: same LINE COUNT (143 both), 44 differing lines, every one of them a
+    G31/G0 axis letter, a per-axis register (#1920/1921 probe status, #1925/1926 trigger, #1905/1906 stop mode,
+    #1915/1916 limit protect), a per-axis cross-over word (#19/#20), a per-axis WCS offset write ([#70+0] vs [#70+1]), or
+    comment prose naming the axis. The spec NORMALISES exactly those token classes and asserts ZERO unexplained diffs, so
+    a stray structural difference anywhere else fails the test.
+
+VERIFIED END-TO-END in the real twin: the Probe Order dropdown renders ('Y then X' / 'X then Y'); selecting XY emits
+`G31 X#8` first and YX emits `G31 Y#8` first; and the 2D preview RE-ORIENTS with it -- screenshots order-XY.png /
+order-YX.png show Start moving from the left (X approached first) to the bottom (Y first) and (2) from the top to the
+right, i.e. the marker numbering follows the declared probe sequence.
+
+NEW SPEC middle-axis-order.spec.js (3 tests: back-compat/resolver precedence; the normalised byte-diff; the preview
+order incl. built-in == twin in BOTH orders).
+
+SPECS UPDATED (each a shape/scope change, not a bend): middle-data-emit (9 -> 10 structural toggles); middle-superset
+(the sweep now covers both orders -- 1792 -> 3584 combos, which IS half the byte-diff proof); corner-structctl (its
+`count === bindCount` assert assumed the SHARED registry was corner-only; the invariant that matters, every corner
+binding has a matching control, is what the existing `mism` check proves, so it became >=).
+
+STILL SURFACED, not scope-crept (the other two of the four t1209 latents): panelTypes' positional `panelStarts[0]` /
+`[last]` and middleView's positional `secStart` index passes by position and are latently wrong under Probe-Z-First;
+opSimStarts already ships `resolveRelToIndex` + named rows (corner uses them) -- middle's rows need ids to adopt it.
+
+### (C-LIVE) THE REAL SYMPTOM — REPRODUCED + LOCALISED, deliberately NOT fixed this turn.
+
+The user's clarification (mid-turn amendment) is a DIFFERENT thing from the t1209 static-geometry question I closed, and
+it is real. REPRO (middle boss two-axis, 2D canvas, drag the Start marker down-left): the horizontal probe line follows
+the Start correctly, but the VERTICAL traverse that connects the chain up to (2) DISAPPEARS — (2) is left stranded at the
+top with only a two-dash stub under it. Screenshots drag-before.png / drag-after.png.
+WHAT I MEASURED (so the next pass starts with facts, not a hunt):
+  - The DATA chain is COHERENT after the drag: (2) marker = (50,90) and the traced first-probe WORLD start = (50,90) —
+    still exactly equal, before AND after. So this is NOT the geometry, and NOT the marker semantics.
+  - (1) moves with the drag ((-15,40) -> (-57,16)); (2) correctly does NOT (it is the next PROBE position, a function of
+    the feature, per the user's marker-derived ruling).
+  - The pass-0 runtime END moves with the drag ((-2,90) -> (-2,66)), i.e. the ANCHOR the pass-1 traverse hangs off DOES
+    update, and the traverse's pass-LOCAL coords re-derive ([13,0->11,0] becomes [55,0->53,0]).
+  - So the panel's numbers are right while the DRAWN overlay is not → it is the RENDER seam, exactly as the user said.
+WHICH RENDERER: the dashes are the `.fc-anim-overlay` canvas (a toolpath2d instance created + fed by
+userOpView.wireAnimOverlay, NOT the SVG FeatureCanvas and NOT the legacy middleViz SVG animator). It is re-fed on every
+renderLayoutWithSim with setStarts/setPassEnds/setSegments + a re-pin, so the suspicion is an ORDERING/staleness issue
+between the drag's re-trace and that feed (the anchor the overlay draws with vs the anchor the panel now holds) rather
+than a missing feed. Fixing it blind at the tail of this turn is exactly the half-landing that cost t1203->t1205, so I
+stopped at the localisation. Next turn: instrument the overlay's own draw anchor across the drag and compare it with
+panel.getPassEnds() at paint time.
+
+GATE: FULL suite unfiltered (this is emit-class and touches SHARED files -- structCtl + panelTypes -- so a name-filtered run was not enough): 1508 passed / 0 failed / 4 skipped (15.1m, EXIT=0). Plus the 3584-combo superset sweep and both-order screenshots above. Branch feat/ddcs-workspace. NO release. Hardening batch NOT started, as instructed.
