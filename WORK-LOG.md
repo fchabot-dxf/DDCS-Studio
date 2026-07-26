@@ -16026,3 +16026,69 @@ the persistence canary; smoke tracks subsystems not features) -- add it if you w
 
 Committed MY 6 FILES: data/backup.js + ui/workspaceSave.js (new) + ui/fileSaveState.js + ui/settingsPanel.js + app.js +
 tests/persistence-intentional-save.spec.js (new). Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1201 -- SIM-FIX BATCH -- USER TOOK OVER LIVE mid-turn; the dispatched premise DISSOLVED, the real bugs were found + fixed WITH the user.
+
+DISPATCH vs REALITY (important for future briefs): the dispatched PART 1 ("the default machine frame is bogus at +500")
+was WRONG -- the default machine.z is -120 (correct negative-space; envelope spans -120..0 home-at-top; verified
+empirically across machine.z signs: the +500 render needs a POSITIVE machine.z (+1000 -> box centre +500)). The user's
+actual +500 was their TYPED G54 Z=+500 (impossible above a -120 machine); they fixed the value and confirmed. The
+corner "Z DRO never changes" report also dissolved on measurement: with a declared WCS the DRO shows G54 at rest and
+tracks the safe-lift during play (Work 0<->70 / Mach -75<->-5 measured at 20x); the user watched and confirmed it works.
+LESSON (both directions): the relayed 3-part brief did not match what the user was actually seeing; the real items only
+surfaced by asking the user directly + measuring each claim.
+
+REAL BUG 1 (user live: "move the marker in the second probe -> the marker moves but the sim path is not"; then "right
+it recenter the probe, that is unwanted logic"): middleReposLanding (viz/opSimStarts.js) ALWAYS re-centred the primary
+coordinate -- it never read a numeric diagPrimary (#22) -- while the EMIT lands the primary AT #22 on BOTH routes
+(dogleg + diagonal go through safeTraverseStack 'center') and the (2) handle renders at parseFloat(diagPrimary). So a
+dragged (2) moved the marker + the emit but the second probe's traced start stayed at centre. FIX (sim-only, no emit
+change): the landing parses diagPrimary the SAME way the handle does ('#53'/unset -> NaN -> the centre re-centre
+approximation, byte-identical at rest). Measured end-to-end: drag (2) -> diagTravel 40 / diagPrimary 70 -> #21=40 #22=70
+in the emit AND passStarts[1] = {70,80} = the marker. Regression test added to middle-repos-landing-963.spec.js (the
+PLACED-(2) case, emit-as-ground-truth, both routes, built-in + twin providers).
+
+REAL FEATURE 2 (user live: "first marker needs a gui ... i mean the traverse target position" + "one in the second
+probe sequence too, when find both axis is toggled" + a circled screenshot of the far-wall landing): the boss in-axis
+AUTO crossover (#19/#20 = crossX/crossY) was numeric-fields-only -- no draggable target. Added the crossAim canvas
+gesture (viz/canvasWidgets.js, mirrors diagAim: place at wallFace + sign*cross riding the probe line; drag ->
+|along - wallFace| min 1, perpendicular ignored -- a handle drives a PARAM) + two declared handles in
+layoutSpecFromOp (wizards/ops/panelTypes.js), opt-in by the crossX/crossY bindings (middle twin only): X<-> on the
+first-axis probe line (always, boss+auto) and Y<-> on the (2) line (when twoAxis; rides panelStarts[last], which after
+FIX 1 follows a placed (2)). Verified: drag X<-> -> crossX 80->94 + #19=94 in the emit; Find Both on -> 4 GUIs (Start,
+X<->, (2), Y<->) -- screenshot cross-handles.png. The BUILT-IN middleView canvas is untouched (its hand-rolled spec;
+the twin is the north-star surface).
+
+REAL FEATURE 3 (user live, iterated to a DECLARED VISUAL LANGUAGE): "the markers need to reflect manual vs auto" +
+"in manual mode we need to be able to use the position markers too -- but that only affects the sim not the code" +
+"manual positioning is amber / teal is for automatic / shape define type (of travel)". THE LANGUAGE: COLOUR = who
+drives the travel (AMBER = manual jog, TEAL = automatic/coded); SHAPE = the type of travel (SQUARE = a travel-END
+POSITION (the trans-axial (2)); CIRCLE = an in-axis DISTANCE (X<->/Y<-> with the mm value, click-to-edit) or a jog
+position). Implemented: (a) crossAim renders kind 'size' teal circles with the value; (b) MANUAL-mode jog landings --
+a NEW manualMarkers branch in userOpView's layout wiring: any pass whose DECLARED source is 'manual' gets an amber
+draggable marker routed through the panel's SIM-ONLY userStarts seam (panel.onStartDrag) -- measured: the drag moves
+passStarts[p] while the EMIT stays BYTE-IDENTICAL; (c) panelTypes markerHandles honours per-marker manual/simOnly/
+color. In manual the coded X<->/Y<-> circles correctly DISAPPEAR (no coded traverse to drag) and the amber jog markers
+appear; the (2) square stays while the trans travel remains coded. New spec middle-manual-markers.spec.js pins the
+whole language + the sim-only invariant.
+
+ADVISOR AMENDMENT (layer steer) ANSWERED: everything landed at the SHARED layer -- the landing fix in the shared
+opSimStarts provider (middleReposLanding, which the built-in provider ALSO routes through); the traverse handles as a
+canvasWidgets GESTURE (crossAim) + declared decls in layoutSpecFromOp; the manual markers via the generic panel
+sources/userStarts seam. middleView.js and featureCanvas.js are UNTOUCHED (the existing t293 glyph language already
+carried amber-circle/teal-square); NOTHING is a Middle-only bespoke drawing.
+
+DEFERRED (user-ruled, "we can pass the ball before doing the axis order edit"): (a) the MIDDLE AXIS-ORDER control
+(pick Y-then-X) -- the twin bakes axis/dir1/dir2 at X-primary (middleData BAKED note; the declared later-slice); the
+axis threads through every G31 letter + register so restoring it = both order arms in the superset template + emit
+byte-verification = a MACRO-CLASS edit, its own pass. (b) the at-rest re-centre default (#22='#53') the user called
+unwanted logic -- also emit-side, same pass. (c) NOT built: an impossible-WCS guard (G54-Z above machine home) -- the
+user declined ("Do PARTS 2 & 3").
+
+GATES: middle seam specs 22/22 (manual-markers + repos-landing + diag-aim + aim-canvas + aim-tie + trans-traverse +
+crossover + data-emit x2 + sim-starts + probe-z-first) + smoke 60/60 (the t1195 fast tier; full at merge per the
+tiering). Committed MY 6 FILES: viz/opSimStarts.js + viz/canvasWidgets.js + wizards/ops/panelTypes.js +
+wizards/views/userOpView.js + tests/middle-repos-landing-963.spec.js + tests/middle-manual-markers.spec.js (new).
+Branch feat/ddcs-workspace. NO release.
