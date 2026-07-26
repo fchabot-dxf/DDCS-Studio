@@ -30,7 +30,10 @@ test('(1) the structural-control blocks reflect CORNER_STRUCT_BINDINGS (param, k
     }
     return { count: STRUCT_CTL_BLOCKS.length, bindCount: CORNER_STRUCT_BINDINGS.length, mism };
   });
-  expect(r.count, 'one control per structural binding').toBe(r.bindCount);
+  // t1211 — STRUCT_CTL_BLOCKS is SHARED infrastructure (SC_PARAM maps sc_<param> → the op param generically), and middle's
+  // own 'Probe Order' (axisOrder) now lives there too. The count equality only held while corner was its sole consumer; the
+  // invariant that actually matters — EVERY corner struct binding has a matching control — is what `mism` above proves.
+  expect(r.count, 'the registry covers at least every corner structural binding').toBeGreaterThanOrEqual(r.bindCount);
   expect(r.mism, 'every control matches its binding (param/kind/options/label/help)').toEqual([]);
 });
 

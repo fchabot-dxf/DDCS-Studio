@@ -36,6 +36,29 @@ const sgn = (plus) => (plus ? 'pos' : 'neg');
 /** Middle params → its probe-macro block stack. The one source of truth for both displays.
  *  `opts.superset` (E0) seeds the TWIN with every structural arm present (each guarded) so pruneGuards can
  *  collapse it to any concrete shape. OFF is byte-identical to today (the built-in + all existing callers). */
+/**
+ * t1211 — THE ONE MIDDLE AXIS-ORDER RESOLVER (corner's `axesOf` counterpart).
+ *
+ * Which axis probes FIRST used to be re-derived, verbatim, at SEVEN sites — both sim providers, the two 2D handle
+ * declarations, the built-in view, the legacy SVG animator, and the emit — each recomputing
+ * `second = axis === 'X' ? 'Y' : 'X'` / `primaryX = axis !== 'Y'` from `params.axis`. Corner re-derives its order ZERO
+ * times because it has one resolver; middle now does too, so the emit and the markers CANNOT disagree (the t1201
+ * marker↔path symptom) and a declared order reaches every surface through a single expression.
+ *
+ * `axisOrder` ('XY' | 'YX') is the DECLARED param. Back-compat: when it is absent the order falls out of the legacy
+ * `axis` (the old "primary axis" field), so every stored op and every existing caller resolves exactly as before —
+ * the default is byte-identical. dir1 stays the first wall's direction; dir2 keeps its DERIVED default (the opposite
+ * of dir1) rather than becoming a second stored constant.
+ */
+export const middleAxes = (p = {}) => {
+    const order = ({ XY: 'XY', YX: 'YX' }[p.axisOrder]) || ((p.axis === 'Y') ? 'YX' : 'XY');
+    const fA = order === 'YX' ? 'Y' : 'X';          // the FIRST-probed (primary) axis
+    const sA = fA === 'X' ? 'Y' : 'X';              // the second-probed axis
+    const dir1 = (p.dir1 || 'pos');
+    const dir2 = (typeof p.dir2 === 'string') ? p.dir2 : (dir1 === 'pos' ? 'neg' : 'pos');
+    return { order, fA, sA, dir1, dir2, dir1Plus: dir1 === 'pos', dir2Plus: dir2 === 'pos', primaryX: fA === 'X' };
+};
+
 export function middleStack(params = {}, opts = {}) {
     const featureType = params.featureType === 'boss' ? 'boss' : 'pocket';
     const approach = params.approach === 'manual' ? 'manual' : 'auto';   // LEGACY single toggle — the per-traverse default (back-compat)
@@ -43,14 +66,15 @@ export function middleStack(params = {}, opts = {}) {
     const inAxis = oneMode(params.inAxis);        // INC3: wall1→wall2 WITHIN an axis — auto cross-over (#19/#20) vs manual jog
     const transAxis = oneMode(params.transAxis);   // INC3: X→Y BETWEEN axes — auto traverse (#21) vs manual jog
     const travelShape = params.travelShape === 'diagonal' ? 'diagonal' : 'dogleg';   // t383 (human) — the TRANS-axis AUTO route: dogleg (DEFAULT, routes AROUND the boss like corner) vs a single straight diagonal
-    const axis = params.axis === 'Y' ? 'Y' : 'X';
-    const dir1Plus = (params.dir1 || 'pos') === 'pos';
+    const _ax = middleAxes(params);   // t1211 — the ONE order source (emit + every sim/2D site read this)
+    const axis = _ax.fA;
+    const dir1Plus = _ax.dir1Plus;
     const twoAxis = !!params.twoAxis || !!params.findBoth;
     const circular = !!params.circular;   // round bore/boss: report the diameter (opposite-touch span) + re-centre between axes
     const probeZ = !!params.probeZ;   // probe-Z-first: two-pass the TOP surface + set Z0 BEFORE the XY centre-finding (its own declared sim pass)
-    const second = axis === 'X' ? 'Y' : 'X';
-    const resolvedDir2 = (typeof params.dir2 === 'string') ? params.dir2 : (dir1Plus ? 'neg' : 'pos');
-    const dir2Plus = resolvedDir2 === 'pos';
+    const second = _ax.sA;
+    const resolvedDir2 = _ax.dir2;
+    const dir2Plus = _ax.dir2Plus;
     const wcs = params.wcs || 'active', wcsLabel = wcs === 'active' ? 'Active WCS' : wcs;
     const dist = num(params.dist, 200), retract = num(params.retract, 2);   // MAX PROBE default 200 (t381 — 20 was too small to reach the wall → the probe fired short + retracted → "retract-only")
     // t919 B2b-2a — RETIRED params.safeZ + params.safeZFrame: the end PARK now ALWAYS takes Max safe height (the ratified reading —
@@ -110,6 +134,16 @@ export function middleStack(params = {}, opts = {}) {
     // ── SUPERSET fork helpers (E0) — each RETURNS the arm block(s): superset → guarded arms; concrete → the selected arm.
     // The GUARD wraps one fork arm gated by { param, is }; pruneGuards drops the false arms + unwraps the true one at build.
     const GUARD = (when, kids) => { const b = newBlock('guard'); b.params = { when }; b.children = kids; return b; };
+    // t1211 — THE AXIS-ORDER FORK (corner's csFork counterpart). Which axis probes FIRST is a VALUE/ORDER swap: it changes
+    // the G31 axis letters, the #51-#56 register order and the per-axis WCS writes. instantiate() prunes a STATIC template
+    // and never rewrites params — a `move` block's x/y sockets are NAMED, so no binding can rename x→y — therefore BOTH
+    // orders must be pre-built as guarded arms, exactly as corner does for corner×probeSeq. 2-WAY only: dir1/dir2 stay
+    // baked (the user asked for the ORDER, not the directions). The guard reads `axisOrder`; a LEGACY op that stored only
+    // the old `axis` gets it filled in by the twin's deriveGuards (middleAxes normalises axis→order), because whenOk is a
+    // strict === and an absent key would drop BOTH arms.
+    const orderFork = (fn) => superset
+        ? ['XY', 'YX'].map((o) => GUARD({ param: 'axisOrder', is: o }, fn(middleAxes({ ...params, axisOrder: o }))))
+        : fn(_ax);
     const featBossOnly = (kids) => superset ? [GUARD({ param: 'featureType', is: 'boss' }, kids)] : (featureType === 'boss' ? kids : []);
     const inAxisFork = (autoKids, manualKids) => superset ? [GUARD({ param: 'inAxis', is: 'auto' }, autoKids), GUARD({ param: 'inAxis', is: 'manual' }, manualKids)] : (inAxis === 'manual' ? manualKids : autoKids);
     const inAxisAutoOnly = (kids) => superset ? [GUARD({ param: 'inAxis', is: 'auto' }, kids)] : (inAxis === 'auto' ? kids : []);
@@ -183,12 +217,12 @@ export function middleStack(params = {}, opts = {}) {
     // already use) — so the trans-axis traverse clears the boss by the SAME margin as everything else (higher = safer), and the
     // drop-back is honest by construction (never lift-to-margin + a relative drop = an arbitrary Z). Emit DELIBERATELY changes
     // (row-4 golden regenerates — byte-identity was what held the divergence). t923 — the in-axis traverse-OVER now reads it too.
-    const transTraverseR = (shape) => {   // t901 — the safetraverse BUNDLE (auto trans-axis connect: lift + shaped re-centre/travel + honest return)
+    const transTraverseR = (shape, ax = _ax) => {   // t901 — the safetraverse BUNDLE (auto trans-axis connect: lift + shaped re-centre/travel + honest return); t1211 — per resolved order
         const b = newBlock('safetraverse');
         b.params = { to: 'perp-walls', shape };
         b.children = safeTraverseStack({
-            mode: 'center', axis, second,
-            dir1Plus, dir2Plus, diagPrimary, diagTravel: '#21', wall2Var: '#52', radiusVar: '#6',
+            mode: 'center', axis: ax.fA, second: ax.sA,
+            dir1Plus: ax.dir1Plus, dir2Plus: ax.dir2Plus, diagPrimary, diagTravel: '#21', wall2Var: '#52', radiusVar: '#6',
             ...clearTraverseParams(clearMode, { hopDist, planeZ }),   // t909 B2 — UNIFY to the declared clearance (max = the #520 machine margin + honest save/return, like corner); t913 — hop/plane read their fields
             comment: 'REPOSITION: auto-traverse to the perpendicular walls',
             dogleg: shape === 'dogleg',   // t383 — DOGLEG (default): secondary out first, then re-centre primary; diagonal: one straight move
@@ -254,25 +288,28 @@ export function middleStack(params = {}, opts = {}) {
         ...repositionR('jog clear, to the first wall'),      // Z pass done → reposition to the XY start (existing helper)
     ]));
 
-    S.push(...seqR(axis, dir1Plus, 51));
-    // ── Two axes (optional) ── a BOSS moves the probe to the perpendicular walls (a pocket stays at the centre); the TRANS-axis
-    // toggle MANUAL jogs / AUTO diagonals there. CIRCULAR re-centres to the found primary centre (#53) first so the secondary
-    // touches cross the true diameter. The 2-axis path writes BOTH centres to their axes' WCS offsets; the single-axis writes one.
-    const twoAxisOn = [
-        ...featBossOnly(transAxisFork(tsPair(transTraverseR('dogleg'), transTraverseR('diagonal')), repositionR('jog clear, around to the perpendicular walls'))),
-        ...circularOnly([mkMM(axis, '#53')]),
-        mkC(`2axis_${axis === 'X' ? 'XtoY' : 'YtoX'}_${resolvedDir2}`),
-        ...seqR(second, dir2Plus, 54),
-        safeRetractNode({ restore: 'inc' }),   // t919 B2b-2a — the end PARK always takes MAX safe height (per-post: G53 posts → #520 machine margin; DM500 → work-frame degrade). Retired the rel|mach frame toggle (the relative park was the crash cause). t856 — inside the G91 body → G90-wrap, restore G91
-        // #53 = centre of the PRIMARY axis, #56 = centre of the SECONDARY — write each to ITS axis's WCS offset
-        // (not hardcoded X=0/Y=1, which swapped them when the primary axis was Y).
-        mkWcsWrite({ axis, wcs: wcsArgOf(wcs), offset: AX[axis].off, value: '#53', direct: true }), mkWcsWrite({ axis: second, wcs: wcsArgOf(wcs), offset: AX[second].off, value: '#56', direct: true }),
-    ];
-    const twoAxisOff = [
-        safeRetractNode({ restore: 'inc' }),   // t919 B2b-2a — the end PARK always takes MAX safe height (per-post: G53 posts → #520 machine margin; DM500 → work-frame degrade). Retired the rel|mach frame toggle (the relative park was the crash cause). t856 — inside the G91 body → G90-wrap, restore G91
-        mkWcsWrite({ axis, wcs: wcsArgOf(wcs), offset: AX[axis].off, value: '#53', direct: true }),
-    ];
-    S.push(...twoAxisFork(twoAxisOn, twoAxisOff));
+    // t1211 — THE ORDER-DEPENDENT REGION, built per axis order. Everything below reads the RESOLVED order (ax) instead of
+    // the outer `axis`/`second`, so `orderFork` can emit both arms into the superset and pruneGuards keeps the declared one.
+    // In concrete mode this runs exactly once with the resolved order → byte-identical to before.
+    const orderRegion = (ax) => {
+        const a1 = ax.fA, a2 = ax.sA;
+        const twoAxisOn = [
+            ...featBossOnly(transAxisFork(tsPair(transTraverseR('dogleg', ax), transTraverseR('diagonal', ax)), repositionR('jog clear, around to the perpendicular walls'))),
+            ...circularOnly([mkMM(a1, '#53')]),
+            mkC(`2axis_${a1 === 'X' ? 'XtoY' : 'YtoX'}_${ax.dir2}`),
+            ...seqR(a2, ax.dir2Plus, 54),
+            safeRetractNode({ restore: 'inc' }),   // t919 B2b-2a — the end PARK always takes MAX safe height (per-post: G53 posts → #520 machine margin; DM500 → work-frame degrade). Retired the rel|mach frame toggle (the relative park was the crash cause). t856 — inside the G91 body → G90-wrap, restore G91
+            // #53 = centre of the PRIMARY axis, #56 = centre of the SECONDARY — write each to ITS axis's WCS offset
+            // (not hardcoded X=0/Y=1, which swapped them when the primary axis was Y).
+            mkWcsWrite({ axis: a1, wcs: wcsArgOf(wcs), offset: AX[a1].off, value: '#53', direct: true }), mkWcsWrite({ axis: a2, wcs: wcsArgOf(wcs), offset: AX[a2].off, value: '#56', direct: true }),
+        ];
+        const twoAxisOff = [
+            safeRetractNode({ restore: 'inc' }),
+            mkWcsWrite({ axis: a1, wcs: wcsArgOf(wcs), offset: AX[a1].off, value: '#53', direct: true }),
+        ];
+        return [...seqR(a1, ax.dir1Plus, 51), ...twoAxisFork(twoAxisOn, twoAxisOff)];
+    };
+    S.push(...orderFork(orderRegion));
 
     // ── Circular (optional) ── round feature: the opposite-touch span IS the diameter (walls already radius-comped, so the old
     // ∓2#6 EVAPORATES). #58 = primary Ø; with 2-axis, #59 = perpendicular Ø, #60 the mean, #61 out-of-round. ABS → dir-agnostic.
@@ -293,7 +330,13 @@ export function middleStack(params = {}, opts = {}) {
     // Expert `#74=[#70+slave]`+`#[#74]=#883` (byte-identical); #883 has no cross-post equivalent → honest comment off-Expert.
     const syncKids = [mkWcsWrite({ axis: 'A', wcs: wcsArgOf(wcs), offset: Number(slave), addrVar: '#74', value: '#883', offComment: 'Dual-gantry A sync skipped — no #883 slave-DRO equivalent on this controller' })];
     if (superset) {
-        const gated = (axis === 'Y') ? syncKids : [GUARD({ param: 'twoAxis', is: true }, syncKids)];
+        // t1211 — the A-sync applies when the Y axis is probed at all: as the PRIMARY (order YX) or as the secondary
+        // (twoAxis). This used to bake `axis === 'Y'` at TEMPLATE-BUILD time, so with a declared order the twin would
+        // silently diverge from the built-in for order=YX ∧ syncA ∧ !twoAxis. Guard it on the derived order instead.
+        const gated = [
+            GUARD({ param: 'axisOrder', is: 'YX' }, syncKids),
+            GUARD({ param: 'axisOrder', is: 'XY' }, [GUARD({ param: 'twoAxis', is: true }, syncKids)]),
+        ];
         S.push(GUARD({ param: 'syncA', is: true }, gated));
     } else if (params.syncA && (axis === 'Y' || twoAxis)) {
         S.push(...syncKids);

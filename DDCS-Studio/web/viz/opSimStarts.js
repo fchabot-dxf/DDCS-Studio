@@ -19,6 +19,7 @@
  */
 
 import { num } from '../wizards/ops/util.js';
+import { middleAxes } from '../wizards/middleWizard.js';   // t1211 — the ONE middle axis-order resolver (emit + sim read the same expression)
 import { alignMarkersXY } from '../wizards/ops/alignPoints.js';   // t544 — the ONE source of the 2 alignment markers: A (sim-only anchor) + B (A + the declared span along checkAxis)
 import { barRadius } from '../engine/probeGeometry.js';   // SPATIAL-MODEL inc2: the declared bar radius (stock.diameter ?? min(cross)/2)
 import { whenOk } from '../blocks/whenGuard.js';   // the ONE guard evaluator (shared with the emit-side prune) — declare-never-infer
@@ -41,10 +42,7 @@ export function middleReposLanding(params, stock) {
     const p = params || {};
     const sx = n(stock && stock.x, 100), sy = n(stock && stock.y, 80), sz = n(stock && stock.z, 20);
     const cx = sx / 2, cy = sy / 2, probeZ = -Math.min(5, sz * 0.5);   // a boss centre-finds the STOCK centre (insideCentre is a pocket-only concept)
-    const axis = (p.axis || 'X') === 'Y' ? 'Y' : 'X';
-    const second = axis === 'X' ? 'Y' : 'X';
-    const dir1Plus = (p.dir1 || 'pos') === 'pos';
-    const dir2Plus = (typeof p.dir2 === 'string' ? p.dir2 : (dir1Plus ? 'neg' : 'pos')) === 'pos';
+    const { sA: second, dir2Plus } = middleAxes(p);   // t1211 — one order source (was a local re-derivation)
     const diagTravel = n(p.diagTravel, 50);
     const secOff = dir2Plus ? -diagTravel : diagTravel;   // emit: dir2:pos -> Y[0-#21] (-), dir2:neg -> Y#21 (+)
     // t1201 — honour a PLACED ② (a numeric diagPrimary): the emit's trans-traverse lands the PRIMARY at #22 on BOTH routes
@@ -73,10 +71,9 @@ const BUILT_IN = {
         const boss = (params.featureType || 'pocket') === 'boss';
         const twoAxis = !!params.twoAxis || !!params.findBoth;
         const inAxisManual = (params.inAxis || params.approach) === 'manual';   // the IN-axis toggle drives the per-axis pass count
-        const axis = (params.axis || 'X') === 'Y' ? 'Y' : 'X';
-        const second = axis === 'X' ? 'Y' : 'X';
-        const dir1Plus = (params.dir1 || 'pos') === 'pos';
-        const dir2Plus = (typeof params.dir2 === 'string' ? params.dir2 : (dir1Plus ? 'neg' : 'pos')) === 'pos';
+        // t1211 — the ONE order source. The pass ORDER below (and therefore the marker NUMBERING ①②③④) follows the
+        // DECLARED axis order, so flipping it re-numbers the markers in lock-step with the emit's probe sequence.
+        const { fA: axis, sA: second, dir1Plus, dir2Plus } = middleAxes(params);
         const outset = Math.max(6, Math.min(n(params.dist, 20) * 0.6, 15));
         const outside = (ax, plus) => ax === 'X'
             ? { x: plus ? -outset : sx + outset, y: cy, z: probeZ }

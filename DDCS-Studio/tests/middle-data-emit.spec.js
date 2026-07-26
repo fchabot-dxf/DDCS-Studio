@@ -88,7 +88,7 @@ test('middle-data-emit: data-op == built-in middleStack byte-identical across th
   expect(r.independentPath, 'data builder is NOT middleStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
   expect(r.bindingCount, 'the 10 bound scalars: 6 always-present (#1-6) + 4 prune-gated (#19,#20,#21,#22) — t919 retired safeZ→#17 (park always Max), t923 retired clearOver→#18 (in-axis cross-over follows the clearance mode)').toBe(10);
-  expect(r.structBindingCount, 'the 9 structural toggles (+ travelShape, t383)').toBe(9);
+  expect(r.structBindingCount, 'the 10 structural toggles (+ travelShape t383, + axisOrder t1211)').toBe(10);
   expect(r.sourcesActive, 'no probe sources resolve in this env (studio profile) → applyProbeSources is a no-op → the byte-test is meaningful').toBe(false);
   expect(r.wiringFails, 'every DERIVED binding routes to the same assign var middleStack writes').toEqual([]);
   if (!r.struct.pass) console.log('STRUCT FIRST DIFF @ ' + JSON.stringify(r.struct.firstDiff && r.struct.firstDiff.params) + '\n--- middleStack ---\n' + (r.struct.firstDiff && r.struct.firstDiff.a) + '\n--- data def ---\n' + (r.struct.firstDiff && r.struct.firstDiff.b));

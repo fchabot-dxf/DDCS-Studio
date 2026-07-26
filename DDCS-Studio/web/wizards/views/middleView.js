@@ -1,6 +1,6 @@
 /** views/middleView.js — Middle (pocket/boss centre) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
-import { MiddleWizard } from '../middleWizard.js';
+import { MiddleWizard, middleAxes } from '../middleWizard.js';   // t1211 — middleAxes: the ONE declared axis-order resolver
 import { applyPreviewIntent } from './atcViews.js';   // t1203 — the ONE declared-intent apply (built-in view + twin agree by construction)
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
@@ -23,7 +23,10 @@ function tieDiagTravel(pass, world) {
     const secStart = (el('m_inaxis')?.value === 'manual') ? 2 : 1;   // the first secondary-axis start = the trans-axial target
     if (pass !== secStart) return;
     const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
-    const primaryX = (el('m_axis')?.value || 'X') !== 'Y';           // primary X → secondary Y (and vice-versa)
+    // t1211 — resolve the order through the ONE resolver instead of re-reading the built-in <select>. The wizard the
+    // user actually opens is the TWIN (wizardLibrary opensAs:'user_middle_data'), whose form has no m_axis element —
+    // so this read silently defaulted to X there and the ② drag wrote #21/#22 for the wrong axis.
+    const { primaryX } = middleAxes({ axisOrder: el('m_axisorder')?.value, axis: el('m_axis')?.value });
     const centreSec = primaryX ? num(stock.y, 80) / 2 : num(stock.x, 100) / 2;
     const draggedSec = primaryX ? world.y : world.x;
     const draggedPrim = primaryX ? world.x : world.y;                 // ②'s PRIMARY-axis coord = the diagonal's X target (#22)

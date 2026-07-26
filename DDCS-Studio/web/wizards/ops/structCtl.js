@@ -33,6 +33,9 @@ export const STRUCT_CTL_BLOCKS = [
     bool('syncA', 'Dual-Gantry Sync A', false, 'Dual-gantry: also write the found corner to the slave A-axis WCS, keeping a twin-motor gantry squared. A WCS write only — no extra motion.'),
     enu('corner', 'Corner', 'FL', [['Front-Left', 'FL'], ['Front-Right', 'FR'], ['Back-Left', 'BL'], ['Back-Right', 'BR']], 'Which corner of the stock you are probing — sets the two walls and their approach directions (Front-Left / Front-Right / Back-Left / Back-Right).'),
     enu('probeSeq', 'Probe Order', 'YX', [['Y then X', 'YX'], ['X then Y', 'XY']], 'Which wall to probe first — Y-wall then X-wall, or X then Y.'),
+    // t1211 — MIDDLE's Probe Order (which AXIS probes first). Deliberately the same UX wording as corner's probeSeq; it is a
+    // DISTINCT param (so a distinct sc_axisorder block) because middle orders AXES while corner orders the two corner WALLS.
+    enu('axisOrder', 'Probe Order', 'XY', [['Y then X', 'YX'], ['X then Y', 'XY']], 'Which axis to probe first — Y then X, or X then Y.'),
 ];
 
 /** `sc_<param>` block type → the op param it drives (postInstantiate value-sync + the live-reprune gather). */

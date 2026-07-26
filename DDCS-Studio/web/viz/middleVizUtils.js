@@ -1,9 +1,10 @@
 // Utilities for mapping wizard params to middleViz SVG IDs
+import { middleAxes } from '../wizards/middleWizard.js';   // t1211 — the ONE middle axis-order resolver (the SVG group ids follow the declared order)
 
 export function getVizIds({ featureType = 'pocket', axis = 'X', dir1 = 'pos', twoAxis = false } = {}) {
   const root = `middle_probe_${featureType}`;
   const axisGroupId = `${root}_${axis}_${dir1}`; // e.g. middle_probe_pocket_X_pos
-  const oppositeAxis = axis === 'X' ? 'Y' : 'X';
+  const oppositeAxis = middleAxes({ axis }).sA;   // t1211 — one order source (the SVG group ids follow the declared order)
   const oppositeAxisGroup = `${root}_${oppositeAxis}_${dir1}`;
   const axisDirKey = `${oppositeAxis}to${axis}`; // e.g. YtoX
 

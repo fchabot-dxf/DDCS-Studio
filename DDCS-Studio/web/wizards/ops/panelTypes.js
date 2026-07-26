@@ -7,6 +7,7 @@
  */
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { buildCanvasWidgets } from '../../viz/canvasWidgets.js';
+import { middleAxes } from '../middleWizard.js';   // t1211 — the ONE middle axis-order resolver (the handle decls must agree with the emit)
 import { opSimStarts, resolveRelToIndex } from '../../viz/opSimStarts.js';   // a `relTo` point anchors to the op's declared sim-start (incremental socket); resolveRelToIndex maps a SEMANTIC {row} → the surviving pass
 import { markerWorldOf } from '../../viz/markerWorld.js';   // t301 Seam C — the ONE per-pass marker-world fn the 3D preview ALSO reads, so the Layout handle + the 3D ruby can't diverge
 import { whenOk } from '../../blocks/whenGuard.js';   // a `when`-gated binding-group's handle shows only when its guard passes (③ — the prune-gated start handle)
@@ -324,7 +325,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     const diagTBind = (def.bindings || []).find((b) => b && b.param === 'diagTravel');
     const diagPBind = (def.bindings || []).find((b) => b && b.param === 'diagPrimary');
     if (diagTBind && diagPBind && params.featureType === 'boss' && (params.twoAxis || params.findBoth) && (params.transAxis || 'auto') === 'auto' && _writable('diagTravel') && _writable('diagPrimary')) {
-        const primaryX = (params.axis || 'X') !== 'Y';
+        const { primaryX } = middleAxes(params);   // t1211 — one order source
         const centreSec = primaryX ? stock.h / 2 : stock.w / 2;
         const centrePrim = primaryX ? stock.w / 2 : stock.h / 2;
         const dir1Plus = (params.dir1 || 'pos') === 'pos';
@@ -344,8 +345,7 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     const crossXBind = (def.bindings || []).find((b) => b && b.param === 'crossX');
     const crossYBind = (def.bindings || []).find((b) => b && b.param === 'crossY');
     if (crossXBind && crossYBind && params.featureType === 'boss' && (params.inAxis || 'auto') === 'auto') {
-        const primaryX = (params.axis || 'X') !== 'Y';
-        const dir1Plus = (params.dir1 || 'pos') === 'pos';
+        const { primaryX, dir1Plus } = middleAxes(params);   // t1211 — one order source
         const pField = primaryX ? 'crossX' : 'crossY';
         if (_writable(pField)) {
             // wall 1 = the face the first probe TOUCHES: probing toward + touches the LOW face (0), toward − the HIGH face.

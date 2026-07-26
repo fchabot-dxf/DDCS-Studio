@@ -23,7 +23,7 @@
  * built-in emits the literal). Whether the built-in middle SHOULD source #5/#3/#2 like corner (a probe-param harmonisation)
  * is a SEPARATE question deferred to the human — if yes, add it to BOTH the built-in + the twin together (keeping byte-identical).
  */
-import { middleStack } from '../../wizards/middleWizard.js';
+import { middleStack, middleAxes } from '../../wizards/middleWizard.js';   // t1211 — middleAxes: the ONE declared axis-order resolver
 import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { pruneGuards } from '../whenGuard.js';   // derive MIDDLE_BINDINGS over a CANONICAL-pruned stack (the boss/twoAxis sockets are prune-gated in the superset)
@@ -34,7 +34,10 @@ import { makeProvider, middleReposLanding } from '../../viz/opSimStarts.js';   /
 export const MIDDLE_DEFAULTS = {
     // structural (STRING enums / bools — the guards match by value-equality / !! coercion)
     featureType: 'boss', inAxis: 'auto', transAxis: 'auto', travelShape: 'dogleg', twoAxis: false, circular: false, probeZ: 0, wcs: 'active', syncA: 0,
-    // baked value/order swaps (NOT bound in E1)
+    // t1211 — axisOrder is now DECLARED (which axis probes first). dir1/dir2 stay baked (the user asked for the ORDER).
+    // 'XY' mirrors the historical X-primary bake, so the default emit is byte-identical.
+    axisOrder: 'XY',
+    // baked value swaps (NOT bound)
     axis: 'X', dir1: 'pos', slave: '3',
     // scalars — dist default 200 (t381: 20 was too small to reach the wall on a typical stock → "retract-only"; matches middleStack's fallback + the m_dist form default)
     dist: 200, retract: 2, f_fast: 200, f_slow: 50, port: 3, radius: 2, safeZ: 10, clearOver: 15,
@@ -73,6 +76,9 @@ export const MIDDLE_BINDING_SPECS = [
 /** The STRUCTURAL toggle bindings — params that drive the guard prune (NO value socket → no blockIndex/match). Each flips
  *  the emit (and later the preview) between shapes; instantiate prunes the superset to the chosen shape by these params. */
 export const MIDDLE_STRUCT_BINDINGS = [
+    // t1211 — PROBE ORDER: which axis probes FIRST. Corner's exact wording/pattern (cornerData 'Probe Order'), driving a
+    // 2-way guard fork in middleStack's superset. Structural (no value socket) → it belongs here, not in the value specs.
+    { param: 'axisOrder', type: 'enum', default: MIDDLE_DEFAULTS.axisOrder, label: 'Probe Order', help: 'Which axis to probe first — Y then X, or X then Y.', section: 'GEOMETRY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
     { param: 'featureType', type: 'enum', default: MIDDLE_DEFAULTS.featureType, label: 'Feature', help: 'Pocket (find the centre from INSIDE two walls) or Boss (find the centre from OUTSIDE, crossing over the part).', section: 'GEOMETRY', widgetConfig: { options: [['Pocket', 'pocket'], ['Boss', 'boss']] } },
     { param: 'inAxis', type: 'enum', widget: 'segmented', default: MIDDLE_DEFAULTS.inAxis, label: 'In-Axis Travel', help: 'Boss: how to reach wall 2 within an axis — Auto crosses over hands-free (the cross-over distance), Manual pauses for you to jog around.', section: 'GEOMETRY', widgetConfig: { options: [['Manual', 'manual'], ['Auto', 'auto']] } },
     { param: 'transAxis', type: 'enum', widget: 'segmented', default: MIDDLE_DEFAULTS.transAxis, label: 'Trans-Axis Travel', help: 'Boss two-axis: how to reach the perpendicular walls — Auto crosses hands-free, Manual pauses for you to jog.', section: 'GEOMETRY', widgetConfig: { options: [['Manual', 'manual'], ['Auto', 'auto']] } },
@@ -106,7 +112,7 @@ export function middleDataStack(params = MIDDLE_DEFAULTS) {
 /** Bindings for the value sockets — DERIVED (not hand-counted) over a CANONICAL-pruned stack that makes ALL bound sockets
  *  present exactly once: boss + inAxis-auto (→ #19/#20) + transAxis-auto + twoAxis (→ #21/#22). EMIT re-derives BY IDENTITY
  *  over the actual PRUNED stack each build (via def.bindingSpecs), so the frozen indices below never desync. */
-const CANONICAL_BIND = { ...MIDDLE_DEFAULTS, featureType: 'boss', inAxis: 'auto', transAxis: 'auto', twoAxis: true };
+const CANONICAL_BIND = { ...MIDDLE_DEFAULTS, axisOrder: 'XY', featureType: 'boss', inAxis: 'auto', transAxis: 'auto', twoAxis: true };   // t1211 — PIN the order too: the fork duplicates every bound socket per arm, so the derive must see ONE arm (mirrors cornerData pinning corner/probeSeq)
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(middleDataStack(MIDDLE_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const MIDDLE_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), MIDDLE_BINDING_SPECS);
 
@@ -126,10 +132,10 @@ export function middleSimStartsProvider(params, stock) {
     const boss = (p.featureType || 'pocket') === 'boss';
     const twoAxis = !!p.twoAxis || !!p.findBoth;
     const inAxisManual = (p.inAxis || p.approach) === 'manual';
-    const axis = (p.axis || 'X') === 'Y' ? 'Y' : 'X';
-    const second = axis === 'X' ? 'Y' : 'X';
-    const dir1 = (p.dir1 || 'pos');
-    const dir2 = (typeof p.dir2 === 'string') ? p.dir2 : (dir1 === 'pos' ? 'neg' : 'pos');
+    // t1211 — the ONE order source, shared with the emit. Before this the twin's provider read p.axis LIVE while the
+    // twin's EMIT ignored it, so changing the axis moved the preview markers but not one byte of G-code; both now
+    // resolve through middleAxes, so the markers and the program can only move together.
+    const { fA: axis, sA: second, dir1, dir2 } = middleAxes(p);
     const opp = (d) => (d === 'pos' ? 'neg' : 'pos');
     // ONE row per potential pass; the DERIVED `when` gate = the exact BUILT_IN.middle pass structure (order preserved).
     const rows = [
@@ -159,6 +165,9 @@ export function middleDataDef() {
     const bindings = [...MIDDLE_BINDINGS, ...MIDDLE_STRUCT_BINDINGS];
     const def = userOpFromStack('middle_data', 'Middle (data)', middleDataStack(MIDDLE_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true });
     def.bindingSpecs = MIDDLE_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
+    // t1211 — fill in `axisOrder` for the guard when an op stored only the legacy `axis` (middleAxes normalises), so a
+    // pre-existing saved op still prunes to exactly one order arm instead of losing both.
+    def.deriveGuards = (p) => ({ axisOrder: middleAxes(p || {}).order });
     def.simStartsProvider = middleSimStartsProvider;   // E2 — the per-pass preview markers, byte-faithful to BUILT_IN.middle (sim-only)
     return def;
 }
