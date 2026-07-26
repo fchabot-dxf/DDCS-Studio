@@ -16714,3 +16714,85 @@ The FIRST full run this turn is the one that earned its keep -- 14 failures, and
 "stale specs, bulk-update") is what surfaced the broken header identity row, the Settings library UI I had missed, and
 the silent import merge. Branch feat/ddcs-workspace. NO release. Reserve-the-word-save honoured -- nothing new calls
 itself Saved except the .ddcs write.
+
+---
+
+## turn 1219 -- PIVOT FIX-BACK: the legacy-restore BLOCKER, plus two regressions my own review found in the fix.
+
+All five dispatched items landed. Then a 4-lens adversarial review of the fix itself found two REAL defects I had just
+introduced, both reproduced live against the running app; those are fixed too, with tests proved against the broken
+code. That second pass is the part of this turn worth reading.
+
+### (1) THE BLOCKER -- a legacy .ddcs applied its settings but discarded its MACHINE.
+
+Confirmed exactly as reported. `migrateProfileLibrary` adopted only when `!hadRecord`, and with `applyController=false`.
+So opening a legacy file on any browser that already had a machine record (i.e. any post-t1217 browser) applied the
+file's settings / WCS / macros while IGNORING its identity: the header named the file's machine, the emit kept the
+receiving browser's dialect. That is a SAFETY class of bug -- the G-code targets the wrong controller -- and it is the
+precise split-brain the pivot exists to kill.
+FIX: the two migration contexts are not the same migration, so they are now different calls.
+  - BOOT migrates THIS BROWSER'S OWN legacy library: an existing record is already the workspace's truth and wins
+    (`hadRecord` kept), and the controller is not re-applied (the library kept `ddcs_controller_profile` in sync).
+  - RESTORE migrates a file the user just OPENED: the ruling is unconditional, so the identity is adopted even when a
+    record exists, and `setMachine(..., true)` RETARGETS the live controller.
+The single-profile sub-case is fixed by ordering: adoption now happens before the `pending === 0` cleanup that used to
+delete the library, so a one-profile legacy file no longer has its identity discarded before anything read it.
+
+### (2) THE MASKING SPEC -- it deleted the very state that would have caught the bug.
+
+The old legacy test did `localStorage.removeItem('ddcs_machine')` first -- exactly the condition that let `!hadRecord`
+pass -- and asserted only `ddcsGetMachine()`, never the live controller. It could not have failed. Rewritten into three
+cases (no record / EXISTING record / single-profile + existing record), and every case now asserts
+`getActiveProfile().id`, which is what actually decides the emitted G-code, not just the stored record.
+PROVED: with the old guard restored, case B fails ("Shop Mill" vs "Old Bee" in the later one; "Other" vs "Bee" here).
+A test written against a bug I had already fixed is worth nothing until I have watched it fail.
+
+### (3) MIXED EXPORT IDENTITY + (4) IMPORT SAFETY.
+
+buildProfile stamped the NAME from the machine record but the CONTROLLER from getActiveProfile(). After (1) those
+cannot diverge, but a bundle's identity is exactly the thing that must not be assembled from two sources, so both now
+come from the record and a test forces them apart to prove it. `saveProfileToCloud` had the same shape (its `machine`
+stamp re-read getActiveProfile) and now derives from the same bundle.
+(4) An import full-swaps, so it now carries what the .ddcs restore has always had: an explicit confirm, then
+`safetyExport()` as the undo path. Declared ONCE as `allowDestructiveLanding`, so every landing site is covered by
+construction rather than by remembering; both sites (file import, cloud load) route through it. It FAILS CLOSED -- if
+the confirm cannot be shown the swap does not happen, because an operation this destructive that cannot ask must not
+proceed.
+
+### (5) THE LEGACY-EXPORTS DOOR -- and why it needed a reader before it was worth shipping.
+
+Settings shows one row per leftover machine (hidden when there are none), each Save-as-file / Dismiss, wired to
+machineConfigFile + dropLegacyProfile; resolving the last clears the zombie key so it stops riding inside every future
+.ddcs. `dropLegacyProfile`'s `profiles.length <= 1` rule became "nothing left to resolve": the old proxy assumed the
+survivor was always the adopted active profile, which is false when `activeId` matches nothing, and would have deleted
+the last machine before the user saved it.
+
+### THE ADVERSARIAL REVIEW OF MY OWN FIX -- 2 confirmed of 9 findings (7 refuted).
+
+A -- PARTIAL RESTORE BROKE THE OPT-OUT. I derived "is this a legacy file?" from `restored.includes('machine')`, which
+conflates "the file has no machine row" with "the user UN-TICKED Machine in the restore modal". So declining the file's
+machine adopted one anyway out of the legacy row, retargeting the live controller -- the user's refusal producing the
+exact wrong-dialect outcome this turn exists to prevent. A second variant: the library is read from localStorage, not
+from the file, so ANY restore could adopt the receiving browser's own unresolved leftovers and silently revert a rename
+made after boot migration. FIX: both signals now describe the FILE, never the selection and never local state --
+`hasOwnProperty(stores,'machine')` plus a new `legacyFromFile` (was the `profiles` row actually restored from THIS
+file). Verified by reverting: case D fails "Shop Mill" -> "Old Bee".
+B -- THE EXPORT HAD NO READER. `machineConfigFile` wrote the identity only as a nested `machine:{name,controllerId}`,
+which nothing reads: the sole importer takes `name`/`controllerId` from the TOP LEVEL. So the door exported a
+perfect-looking file, DELETED the in-app record, and that file re-imported as an unnamed machine on whatever controller
+the receiving workspace happened to be -- an unrecoverable identity loss caused by the feature meant to preserve it.
+FIX: emit the shape the existing reader already understands rather than invent a second reader (top-level fields are
+the contract; `kind`/`machine` stay as self-description). Verified by reverting: the round-trip test fails.
+CONSEQUENCE I THEN HAD TO ADD: with B fixed the file is readable, but nothing in the UI could open it, so "save it and
+open it in a new workspace" was still untrue. Added ONE button -- Open machine config... -- next to Import-from-dump,
+routed through the same safety gate. FLAGGING IT: this is slightly beyond the dispatched five items, and I judged the
+dispatched item hollow without it (an export whose file cannot be opened is not an export). It also partially closes
+the doorless-import gap flagged in t1217; the CLOUD door remains absent, as accepted.
+The 7 refuted findings were mostly unreachable-path or wrong-anchor claims (two were about `setMachine`, which this
+diff does not touch). Recording that the refuters did real work -- several drove the running app rather than reading.
+
+GATE: FULL unfiltered suite -- 1517 passed / 0 failed / 4 skipped (15.1m, EXIT=0). Clean, including the two specs that
+flaked in the previous runs (transform-declared-736:101 and blocks-mobile-drawers, both boot-wait timeouts under
+parallel load). Counts reconcile: 1515 -> 1517 = the two new regression tests. An intermediate gate this turn ran 1514
+passed / 1 flake before the review's two findings were fixed. Branch feat/ddcs-workspace. NO release.
+Reserve-the-word-save honoured.
