@@ -16,6 +16,7 @@
  * rather than the DDCS default of milliseconds.
  */
 import { BLOCKS } from '../wizards/ops/index.js';   // op kinds → detect high-level vs leaf programs
+import { SAVE_PROBE_Z_MARK, RETURN_PROBE_Z_MARK } from '../data/simMarkers.js';   // t1207 — the DECLARED sim markers must SURVIVE the round-trip (see the machinemove branch)
 
 // A token value: a #var (#99 / #base), a [bracket expr], or a signed/decimal number. #vars and [exprs] stay
 // strings (they emit verbatim); plain numbers become numbers so they round-trip through val()/r3().
@@ -33,6 +34,10 @@ function pick(o) { const r = {}; for (const k in o) if (o[k] !== undefined) r[k]
 
 /** Parse one physical line → a leaf record, or null for a blank/seam line. `opts.dialect` (active controller)
  *  decodes the dialect-specific ops via dialect.recognize; `opts.dialect.dwellUnits` sets the dwell P unit. */
+// t1207 — is this trailing comment one of the DECLARED sim markers? Gated so every OTHER comment keeps today's
+// byte-identical emit; only a declared marker is carried onto the block (and re-emitted) to close the round-trip.
+const mark = (comment) => (comment === SAVE_PROBE_Z_MARK || comment === RETURN_PROBE_Z_MARK) ? comment : null;
+
 export function parseLine(line, opts = {}) {
     const raw = String(line);
     const trimmed = raw.trim();
@@ -48,7 +53,18 @@ export function parseLine(line, opts = {}) {
     // 1) dialect-specific forms first — the active controller's parse inverse (IF/GOTO/label/probe/HMI/WCS…),
     //    co-located with its emit. Some forms even look like comments (RS274 "(MSG,…)"), so this precedes the
     //    full-line-comment rule. Must also precede the generic assign/ifgoto/core below.
-    if (dialect && typeof dialect.recognize === 'function') { const r = dialect.recognize(code, comment); if (r) return r; }
+    if (dialect && typeof dialect.recognize === 'function') {
+        const r = dialect.recognize(code, comment);
+        // t1207 — a DECLARED sim marker must survive whatever the dialect recognises the line as. The save line
+        // `#95=#882 ( @saveProbeZ )` is claimed HERE (the Expert dialect reads it as a `readmachine`), and the
+        // recognizer drops the trailing comment — so the editor's re-projection re-emitted a bare `#95=#882` and the
+        // sim lost the save half of the declared save/return pair. Attaching it once, here, covers EVERY dialect
+        // recognizer instead of patching each one (readmachine + machinemove both already emit `mark`).
+        if (r) {
+            if (mark(comment) && r.params && r.params.mark === undefined) r.params.mark = comment;
+            return r;
+        }
+    }
     // 2) a full-line ( comment )
     if (/^\([^)]*\)$/.test(code)) return { type: 'comment', params: { text: code.slice(1, -1).trim() } };
     // 3) Pause — the universal program stop (M00) across all controllers
@@ -60,7 +76,18 @@ export function parseLine(line, opts = {}) {
 
     // Machine-coordinate move (G53; may carry G0 on some dialects) — one axis.
     if (G(53)) {
-        for (const ax of ['X', 'Y', 'Z', 'A']) { const v = w(ax); if (v !== undefined) return { type: 'machinemove', params: { axis: ax, to: v } }; }
+        // t1207 — CARRY A DECLARED SIM MARKER through the round-trip. The trailing "( @returnProbeZ )" was stripped to the
+        // side-channel `comment` and dropped here, so a re-emit (the editor is re-projected from the block model via
+        // programModel setValue) produced a BARE `G53 Z#95`. The sim reads that marker off the raw line to restore the
+        // saved probe depth, so losing it silently disabled the declared save/return pairing IN THE EDITOR HOST — the
+        // G53 return degraded to the raw machine map and the next wall probed at the wrong height. The block already
+        // emits `mark` (wizards/ops/macro.js), so preserving it here closes the loop. Gated to the DECLARED markers so
+        // every other G53 comment keeps today's byte-identical emit.
+        const mk = mark(comment);
+        for (const ax of ['X', 'Y', 'Z', 'A']) {
+            const v = w(ax);
+            if (v !== undefined) return { type: 'machinemove', params: mk ? { axis: ax, to: v, mark: mk } : { axis: ax, to: v } };
+        }
         return { type: 'raw', params: { text: raw } };
     }
 

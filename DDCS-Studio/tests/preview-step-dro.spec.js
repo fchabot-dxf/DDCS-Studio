@@ -79,3 +79,49 @@ test('the static scrub (click a code line) also moves the DRO, not just the tool
   expect(after.wy, 'and Work Y at 40').toBe(40);
   expect(after.mx, 'Mach tracks the scrub too (one DRO writer derives both columns)').toBe(60 + WCS.x);
 });
+
+/**
+ * t1207 — PLAY-then-STEP: one press = one LINE, and the readout holds across NON-MOTION lines.
+ *
+ * Reported as "the DRO updates on the first next-line press only, then freezes". It does not. Measured on the corner
+ * macro: after the wall-1 slow probe the program runs a stretch of probe-result math (`IF #1921!=2 GOTO1`,
+ * `#101=[#1926+#6]`, `#73=[#70+1]`, `#[#73]=#101`) — four lines that move nothing — so the position legitimately holds
+ * while the executing-line chip keeps advancing; motion resumes on the next `G0`. This pins BOTH halves of the contract
+ * so the correct behaviour can't be re-reported as a freeze, and a REAL freeze (the line stops advancing) still fails.
+ */
+test('play → step: every press advances exactly one line; the DRO holds only where the program has no motion', async ({ page }) => {
+  test.setTimeout(120000);
+  await mount(page, 'G90\nG0 X10 Y10\nG0 X20\nM30');   // mount just to reach the panel; the corner macro is loaded below
+  const program = await page.evaluate(async () => {
+    const CD = await import('/blocks/dataOps/cornerData.js');
+    const { cornerStack } = await import('/wizards/cornerWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    return emitMapped(cornerStack({ ...CD.CORNER_DEFAULTS })).text;
+  });
+  await page.locator('#editor').fill(program);
+  await page.evaluate(() => window.setGcodeView('3d'));
+  await page.waitForSelector(STEP, { state: 'attached', timeout: 8000 });
+  await page.click('#viz3d-panel-host .pp-run');     // PLAY first — the reported sequence (a fresh stepped run differs)
+  await page.waitForTimeout(1500);
+
+  const sample = async () => page.evaluate(() => {
+    const g = (ax) => { const r = document.querySelector(`#viz3d-panel-host .pp-dro-tbl tr[data-ax="${ax}"]`); return r ? parseFloat(r.querySelector('.pp-dro-w').textContent) : NaN; };
+    const chip = document.querySelector('#viz3d-panel-host .pp-status');
+    const m = (chip ? chip.textContent : '').trim().match(/^(\d+)/);
+    return { y: g('y'), line: m ? Number(m[1]) : null };
+  });
+
+  const seen = [];
+  for (let i = 0; i < 16; i++) { await page.locator(STEP).click(); await page.waitForTimeout(120); seen.push(await sample()); }
+
+  // (a) THE LINE ALWAYS ADVANCES — this is what a real freeze would break.
+  const lines = seen.map((s) => s.line).filter((n) => Number.isFinite(n));
+  expect(lines.length, 'the executing-line chip reports a line number').toBeGreaterThan(10);
+  for (let i = 1; i < lines.length; i++) {
+    expect(lines[i], `press ${i + 1} advanced past line ${lines[i - 1]} (a freeze would repeat it)`).toBeGreaterThan(lines[i - 1]);
+  }
+  // (b) the position is NOT stuck forever: over this window the tool moves more than once, so the holds are the
+  //     program's own non-motion runs, not a stalled readout.
+  const moves = seen.filter((s, i) => i > 0 && Math.abs(s.y - seen[i - 1].y) > 0.001).length;
+  expect(moves, 'the DRO changes on the motion lines in this window (it is not frozen)').toBeGreaterThan(1);
+});
