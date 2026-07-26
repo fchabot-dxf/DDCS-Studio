@@ -16275,3 +16275,62 @@ REVIEW FINDINGS:
 
 GATE: full suite unfiltered (the amendment's requirement -- t1203's name-filtered run is exactly what let the
 traverse-* straggler through): 1501 passed / 0 failed / 4 skipped (15.1m, EXIT=0). Three specs surfaced and were re-encoded: op-sim-context + sim-intent-fold (the additive probesForWcs shape, incl. the rotary ops being PROBES and the mill+rotary union folding true), and boss-probe-collision -- whose AUTO arm is a deliberately-degraded CONTROL asserting the no-passStarts path still MISSES; the passAnchor fallback makes that failure mode unreachable, so the control was restated (the MANUAL arm still discriminates, since its reposition is an operator jog with no programmed move). Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1207 -- SIM-FIX BATCH 3. Item (1) FIXED + proven in the editor host. Item (2) IS NOT A BUG (premise dissolved by measurement). Item (3) measured, not fixed.
+
+### (1) THE MARKER ROUND-TRIP -- FIXED, and the required stepped evidence delivered.
+
+The root I identified in t1205 is closed. It was TWO losses, not one -- found by measuring the round-trip directly
+(parseGcodeToStack -> emitMapped) instead of reasoning about it:
+  - `G53 Z#95 ( @returnProbeZ )` -> `G53 Z#95`. The G53 branch built its machinemove params from the axis word only,
+    dropping the side-channel comment.
+  - `#95=#882 ( @saveProbeZ )` -> `#95=#882`, but ONLY with a dialect active. With no dialect the line parses to an
+    `assign` whose `note` already round-trips (which is why my first isolated round-trip test showed it surviving and
+    the live editor did not). The Expert dialect's `recognize()` claims the line FIRST -- as a `readmachine` -- and
+    recognizers drop the trailing comment.
+FIX (one declared predicate, two sites, gated to the DECLARED markers so every other comment keeps today's
+byte-identical emit): `mark(comment)` in gcodeToStack; the G53/machinemove branch carries it; and -- the general one --
+it is attached to WHATEVER the dialect recognizer returns, right after `dialect.recognize()`. That covers every dialect
+at once instead of patching each recognizer, and both target blocks (readmachine, machinemove) already EMIT `mark`.
+MEASURED IN THE EDITOR HOST (machine z-120, G54 z-75, corner defaults, stepped line-by-line -- the advisor's scenario):
+    ln41 @saveProbeZ   Wz=0   Mz=-75    <- saves machine -75
+    ln52 G53 Z#43      Wz=70  Mz=-5     <- the safe lift
+    ln58 @returnProbeZ Wz=0   Mz=-75    <- RESTORES Mach -75  (was Wz=145 / Mz=70)
+    ln61 wall-2 G31    Wz=0   Mz=-75    <- wall-2 probes at wall-1's height
+NEW SPEC tests/corner-step-redescend.spec.js (the (H) regression that was blocked): steps the real corner emit in the
+EDITOR host and asserts (a) both markers survive the re-projection, (b) the marked return restores the SAVED machine Z,
+(c) wall-2 == wall-1 in BOTH Work and Mach -- against wall-1's OWN measured height, never a literal -- and (d) Mach ==
+Work + the declared G54 Z. It is deliberately an EDITOR-level test: a trace-level one stays green because the trace
+never round-trips through the editor, which is exactly how this hid.
+
+### (2) STEP-FREEZE -- NOT A BUG. The premise dissolved under measurement.
+
+The advisor's repro reproduces (presses 4-6 hold at y=82), but instrumenting `step()` shows the engine advancing on
+EVERY press -- ip 32->33->34->35->36->37->38 -- and the executing-line chip advancing with it. The position holds
+because those presses execute lines that MOVE NOTHING: after the wall-1 slow probe the corner macro runs its
+probe-result math -- `IF #1921!=2 GOTO1`, `#101=[#1926+#6]`, `#73=[#70+1]`, `#[#73]=#101`. Motion resumes on the very
+next `G0` (press 8: y 82 -> 77), which I verified by continuing to 16 presses. So "one press = one line" is honoured and
+the readout is correct; there is no swallowed commit and no paused-animator bug.
+FOLDED INTO A REAL GUARD rather than deleted: preview-step-dro gains a play-then-step test that pins BOTH halves --
+every press advances the line (a REAL freeze would repeat it) and the DRO does change on the motion lines in the window.
+That way the correct behaviour cannot be re-reported as a freeze, and an actual freeze still fails. The advisor's
+scratch repro is removed, its finding captured here.
+NOTE for the user-facing side (NOT built -- it is a UX call, not a defect): stepping through a run of pure math lines
+LOOKS like nothing happens even though the line chip advances. If that ambiguity is worth removing, the honest fix is an
+affordance (e.g. the chip marking a non-motion line), not a change to the step semantics.
+
+### (3) MIDDLE TRAVERSE-DASH CONNECTION -- MEASURED, NOT FIXED (deliberate).
+
+Measured on a boss two-axis dogleg (stock 100x80): the declared markers are (1)=(-12,40) and (2)=(50,90), and
+middleReposLanding agrees with (2) exactly -- so the MARKER and the declared LANDING are coherent (the t1201 work
+holds). The TRACED path does not reach it: passEnds[1] = (50,80) -- x matches, y is 10mm short. That 10mm is the
+visible gap the user circled at the teal (2). I did NOT guess a fix: the candidates (a retract/stylus-radius term in the
+landing vs the traced end, or the marker being the pre-retract wall point) change probe geometry, and picking wrong here
+puts the drawn path somewhere the tool does not go. It needs its own measured pass with the emit as ground truth --
+exactly the discipline that turned t1205 around. Carried to the next dispatch with the numbers above.
+
+GATE (per the dispatch): smoke 60/60; corner-* + middle-* + preview-step-dro + lift-drop-pairing + probe-never-reads-wcs
++ check-console + gcode-to-stack + blocks-roundtrip = 168 passed / 0 failed / 2 skipped. Branch feat/ddcs-workspace. NO
+release. The 19-site HARDENING BATCH was NOT started, as instructed.
