@@ -103,7 +103,7 @@ test('3D manual jog BOWS UP in +Z (rainbow arc), not a straight line', async ({ 
   expect(r.jogHex, 'the 3D jog line renders the ORANGE-RED token (t331 #ff4500 — reads PATH_TYPES.jog.color, one edit both previews)').toBe(0xff4500);
 });
 
-test('2D path colours a HORIZONTAL rapid as LIFTED safe-travel (dimmed grey-blue) — an AUTO trans-axis traverse + an in-axis rapid are BOTH lifted; only a MANUAL trans-axis jog is amber (t893)', async ({ page }) => {
+test('2D path colours a HORIZONTAL rapid as LIFTED safe-travel (the rapid hue, dashed) — an AUTO trans-axis traverse + an in-axis rapid are BOTH lifted; only a MANUAL trans-axis jog is amber', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
   const r = await page.evaluate(async () => {
@@ -129,13 +129,20 @@ test('2D path colours a HORIZONTAL rapid as LIFTED safe-travel (dimmed grey-blue
     return {
       diagColor: segColor(diagSeg, 0, 1, 0), inColor: segColor(inSeg, 0, 1, 0),   // the render TYPE colour (motion-type, source-independent) — robust
       liftedHex: hexCss(PATH_TYPES.lifted.color), rapidHex: hexCss(PATH_TYPES.rapid.color),
+      liftedDash: PATH_TYPES.lifted.dash, rapidDash: PATH_TYPES.rapid.dash, jogHex: hexCss(PATH_TYPES.jog.color),
       manualDiag: mk('manual'),   // the MANUAL arc paints amber (bright, samplable)
     };
   });
-  // t893 — a horizontal rapid is LIFTED SAFE-TRAVEL: segColor paints the AUTO trans-axis traverse + the in-axis rapid the dimmed lifted grey-blue (motion-type, source-independent), NOT rapid-yellow
-  expect(r.diagColor, 'AUTO trans-axis traverse → the dimmed lifted safe-travel colour (was rapid-yellow)').toBe(r.liftedHex);
+  // A horizontal rapid is LIFTED SAFE-TRAVEL: segColor paints the AUTO trans-axis traverse + the in-axis rapid through the
+  // `lifted` TYPE (motion-type, source-independent) — never the probe/feed colours.
+  expect(r.diagColor, 'AUTO trans-axis traverse → the lifted safe-travel colour').toBe(r.liftedHex);
   expect(r.inColor, 'in-axis horizontal rapid → lifted too (same motion-type colour)').toBe(r.liftedHex);
-  expect(r.diagColor, 'the lifted safe-travel is DISTINCT from rapid-yellow').not.toBe(r.rapidHex);
+  // t1203 (USER, supersedes t893's grey): a traverse IS a rapid, so it now renders the RAPID HUE — the 3D always did, and the
+  // 2D-only grey was the divergence. The DASH (not a second colour) is what keeps it distinct from a solid positioning rapid.
+  expect(r.liftedHex, 'safe-travel shares the rapid hue → the 2D matches the 3D convention').toBe(r.rapidHex);
+  expect(r.liftedDash.length, 'safe-travel is DASHED').toBeGreaterThan(0);
+  expect(r.rapidDash, 'a positioning rapid is SOLID → still distinguishable at a glance').toEqual([]);
+  expect(r.jogHex, 'a MANUAL jog keeps its OWN colour token, distinct from the traverse').not.toBe(r.liftedHex);
   // only the MANUAL trans-axis jog stays orange-red (its jog colour + the rainbow arc override the lifted style) — red > blue
   expect(r.manualDiag[0], 'MANUAL trans-axis jog is orange-red: red > blue (NOT the lifted grey-blue)').toBeGreaterThan(r.manualDiag[2]);
 });

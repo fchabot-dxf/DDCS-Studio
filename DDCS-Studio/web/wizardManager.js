@@ -562,6 +562,15 @@ export class WizardManager {
         if (panel && panel.setSeatAtStart) panel.setSeatAtStart(on !== false);
     }
 
+    // t1203 — this op PROBES FOR the WCS ([[probes-never-read-wcs]]): render its machine-frame G53 excursions via the
+    // honest safe-Z margin even when a WCS table is declared. Call AFTER preview3D (the panel must exist).
+    previewProbesForWcs(containerId, on) {
+        const svgCont = document.getElementById(containerId);
+        const host = svgCont && svgCont.parentElement && svgCont.parentElement.querySelector('.wiz-viz3d');
+        const panel = host && host.__panel;
+        if (panel && panel.setProbesForWcs) panel.setProbesForWcs(on !== false);
+    }
+
     // Draw the ATC magazine (pockets + tool stubs) in the 3D preview on the machine envelope. Opt-in (ATC wizards
     // only) — call AFTER preview3D so the panel/viz exists. pockets = [{x,y,z,dia,length,pocket,tool,color}].
     previewMagazine(containerId, pockets) {

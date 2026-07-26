@@ -7,7 +7,9 @@
  */
 export const simBlock = {
     type: 'sim', label: 'preview rig', category: 'Wizard UI',
-    defaults: { rotary: false, machine: false, magazine: false },
-    fields: ['rotary', 'machine', 'magazine'],
+    // t1203 — probeWcs: this op PROBES FOR the WCS, so its preview must never map through the declared WCS table
+    // (its G53 excursions render as the honest safe-Z margin). See [[probes-never-read-wcs]] / opSimContext.
+    defaults: { rotary: false, machine: false, magazine: false, probeWcs: false },
+    fields: ['rotary', 'machine', 'magazine', 'probeWcs'],
     emit: () => [],   // metadata only — produces no G-code
 };

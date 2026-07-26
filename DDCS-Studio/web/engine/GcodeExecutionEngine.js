@@ -454,11 +454,15 @@ export class GcodeExecutionEngine {
             clearTimeout(this.timer);
             this.timer = null;
         }
-        if (this._move) {
-            this._finishMove();
-            return;
-        }
+        // t1203 — HONOUR THE DECLARED CONTRACT ABOVE ("one step = one whole line"). Previously an in-flight move
+        // RETURNED here, so a step alternated: click 1 executed the line but left the move in flight (no position
+        // commit, no onPositionChange → the DRO kept the PREVIOUS line's numbers), click 2 only landed it. The readout
+        // was therefore always one click behind the highlighted line. Land the in-flight move FIRST (the previous
+        // line completes instantly), then execute this line and land ITS move too, so one click == one whole line
+        // and the position event always fires for the line just executed.
+        if (this._move) this._finishMove();
         this._tick();
+        if (this._move) this._finishMove();   // the line just executed ends where the DRO must now read
     }
 
     // Resume continuous execution after a pause/step.
@@ -578,6 +582,16 @@ export class GcodeExecutionEngine {
             this._updateLimitSwitches(p);   // H3 (t485) — trip home/limit switches LIVE as the axis travels toward the edge
         }
         this._nextDelayMs = 16;   // ~60 fps while travelling
+    }
+
+    // t1203 — the CURRENT pass's world/scene origin Z. Pass-local coords are a SIM-ONLY artifact (each `( REPOSITION: )`
+    // resets this.pos to the pass origin), so any value that CROSSES a pass boundary must be stored in the ONE world frame
+    // — exactly like the real controller, where #882 is an ABSOLUTE machine Z with no concept of a pass. Same anchor
+    // expression as the probe collision (_executeStep O) and _updateDro, so all three read one frame definition.
+    _anchorZ() {
+        if (this._initialPos) return 0;
+        const O = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
+        return O.z || 0;
     }
 
     // Land the in-flight move: snap to the target, fire any deferred probe touch.
@@ -832,7 +846,10 @@ export class GcodeExecutionEngine {
             // t897 — a DECLARED save-Z marker (saveMachineZNode → `#95=#882 ( @saveProbeZ )`): RECORD the current scene-Z so the
             // paired G53 @returnProbeZ move can restore it EXACTLY. Read off the RAW line (same pattern as the REPOSITION: marker).
             // The #95=#882 assignment still runs (harmless) — the sim uses this recorded scene-Z, not the mapped register value.
-            if (step.raw.includes(SAVE_PROBE_Z_MARK)) this._savedReturnZ.push(this.pos.z);
+            // t1203 — record it in the WORLD frame (+_anchorZ). A save and its return that sit in the SAME pass cancel
+            // exactly (byte-identical); when a REPOSITION intervenes, the pass-anchor Z delta (the safe lift the new
+            // anchor absorbed) is given back on restore instead of being silently swallowed — the corner re-descend.
+            if (step.raw.includes(SAVE_PROBE_Z_MARK)) this._savedReturnZ.push(this._anchorZ() + this.pos.z);
             this.ip += 1;
             return false;
         }
@@ -1090,7 +1107,7 @@ export class GcodeExecutionEngine {
             // t897 — the declared machine-RETURN restores the saved scene-Z EXACTLY (pop the LIFO save stack). Guarded to a
             // non-empty stack so an orphaned return (e.g. a round-tripped program that dropped the save comment) safely falls
             // through to the normal G53 path instead of throwing / undefined.
-            if (field === 'z' && machineReturn && this._savedReturnZ.length) { target[field] = this._savedReturnZ.pop(); return; }
+            if (field === 'z' && machineReturn && this._savedReturnZ.length) { target[field] = this._savedReturnZ.pop() - this._anchorZ(); return; }   // t1203 — world-Z back into THIS pass's local frame (see _anchorZ)
             // t826 — UNDECLARED placement (no WCS row backs the work origin): a machine-frame G53 Z retract has no true
             // scene position, so instead of collapsing onto raw machine coords (a G53 Z-5 would draw BELOW a top-datum part),
             // render it as the DECLARED safe-Z margin above the work origin — the honest approximation the user ruled good for

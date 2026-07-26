@@ -102,6 +102,7 @@ export function applyPreviewIntent(mgr, containerId, opType) {
         if (ctx.forceMachine && mgr.previewMachine) mgr.previewMachine(containerId, true);            // R-B #7 — honor plain forceMachine, not only tmf
         if (ctx.toolMachineFrame && mgr.previewToolMachineFrame) mgr.previewToolMachineFrame(containerId, true);
         if (mgr.previewSeatAtStart) mgr.previewSeatAtStart(containerId, !!ctx.seatAtStart);
+        if (mgr.previewProbesForWcs) mgr.previewProbesForWcs(containerId, !!ctx.probesForWcs);   // t1203 — a probe op never renders through the declared WCS table
         if (ctx.showMagazine && mgr.previewMagazine) {
             const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings()) || {};
             mgr.previewMagazine(containerId, magazinePockets(s.atc || {}));

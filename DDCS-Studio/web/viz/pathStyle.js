@@ -15,12 +15,21 @@ export const hexCss = (n) => '#' + (((n >>> 0) & 0xffffff)).toString(16).padStar
  *  the STATE width (rapid/jog draw thinner). `shape` = 'line' | 'arc' (a manual jog bows). t331 (human t330) — the legend
  *  rescheme: rapid solid-yellow · jog orange-red dashed · probeFast cyan · probeSlow white · feed/cut FLAT blue (the Z-depth
  *  gradient was removed) · retract green. (PENDING split: a FEED with z1≠z2 [plunge/ramp] renders red 0xef4444 — not yet.) */
+/** t1203 — the ONE rapid/traverse hue. A safe-height traverse IS a rapid, so `rapid` and `lifted` share it by
+ *  construction (they differ by DASH, not colour) and the 2D can no longer drift from the 3D. */
+const RAPID = 0xffcc00;
+
 export const PATH_TYPES = {
-    rapid:     { color: 0xffcc00, dash: [],     widthScale: 0.6, shape: 'line', label: 'Rapid' },   // t331 — SOLID (was dashed); rapid solid + jog dashed → distinct by line-style AND colour
-    // t893 — SAFE-HEIGHT TRAVEL: a horizontal rapid traverse (z1≈z2, an XY move at constant height) reads as a DIMMED DASHED
-    // line so a TOP-DOWN view can never mistake a LIFTED cross-over (e.g. the corner diagonal traverse crossing the corner in
-    // XY, but safe in Z) for a cutting move. Distinct from `rapid` (positioning/plunge, solid) + `feed` (cutting, solid blue).
-    lifted:    { color: 0x8a97ad, dash: [6, 5], widthScale: 0.6, shape: 'line', label: 'Safe travel', dim: 0.7 },
+    rapid:     { color: RAPID,    dash: [],     widthScale: 0.6, shape: 'line', label: 'Rapid' },   // t331 — SOLID (was dashed); rapid solid + jog dashed → distinct by line-style AND colour
+    // t893 — SAFE-HEIGHT TRAVEL: a horizontal rapid traverse (z1≈z2, an XY move at constant height) reads as a DASHED line
+    // so a TOP-DOWN view can never mistake a LIFTED cross-over (e.g. the middle dogleg/diagonal trans-axis traverse, or the
+    // corner diagonal, crossing in XY but safe in Z) for a cutting move. Distinct from `rapid` (positioning/plunge, solid)
+    // + `feed` (cutting, solid blue).
+    // t1203 (USER): the COLOUR is now the RAPID hue. A traverse IS a rapid, and the 3D has always painted it yellow — only
+    // the 2D reclassified it to a grey `lifted`, so the SAME move read yellow in 3D and grey in 2D. That divergence was the
+    // bug; the DASH (not a second colour) carries the "moving over" distinction, and the two views now agree by construction.
+    // `dim` dropped for the same reason — a dimmed 2D traverse could never match the 3D's alpha.
+    lifted:    { color: RAPID,    dash: [6, 5], widthScale: 0.6, shape: 'line', label: 'Safe travel' },
     feed:      { color: 0x3b82f6, dash: [],    widthScale: 1,   shape: 'line', label: 'Cut' },       // t331 — FLAT blue (was the FEED_HIGH teal gradient top); the Z-depth gradient was removed
     probeFast: { color: 0x22d3ee, dash: [5, 4], widthScale: 1,   shape: 'line', label: 'Probe' },     // t331 — CYAN (was #3b82f6 blue), stepped off the new blue feed; DASHED (was dotted [2,3], human t330)
     probeSlow: { color: 0xffffff, dash: [5, 4], widthScale: 1,   shape: 'line', label: 'Probe slow' },   // t319 — WHITE; drawn ON TOP of the fast at the collinear re-probe overlap; t331 DASHED (was dotted)
@@ -64,6 +73,9 @@ export const LEGEND_ROWS = [
     { key: 'retract',   label: PATH_TYPES.retract.label,   color: hexCss(PATH_TYPES.retract.color) },
     { key: 'jog',       label: PATH_TYPES.jog.label,       color: hexCss(PATH_TYPES.jog.color) },
     { key: 'rapid',     label: PATH_TYPES.rapid.label,     color: hexCss(PATH_TYPES.rapid.color) },
+    // t1203 — the safe-height traverse now has a legend row. It shares the rapid hue (dashed, not a second colour), so the
+    // legend no longer claims "yellow = Rapid" while the 2D painted most rapids a grey the legend never mentioned.
+    { key: 'lifted',    label: PATH_TYPES.lifted.label,    color: hexCss(PATH_TYPES.lifted.color) },
 ];
 
 /** Publish the palette as CSS custom properties so the (legacy) `.viz-legend-line` CSS also reads this ONE source.

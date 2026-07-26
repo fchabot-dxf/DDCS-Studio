@@ -17,13 +17,15 @@ import { test, expect } from '@playwright/test';
 const stock = { x: 100, y: 80, z: 20, shape: 'box', show: true };
 const R = (n) => Math.round(n * 1e4) / 1e4;
 
-// the lateral WALL probes only: a G31 that MOVES in XY at a CONSTANT Z (excludes a Z-surface probe, which moves in Z).
+// The lateral WALL probes only: a G31 that MOVES in XY at a CONSTANT Z (excludes a Z-surface probe, which moves in Z).
 // Every one must fire from the SAME Z — that is the whole point of the honest return.
-function lateralProbeZs(segments) {
-  return (segments || [])
-    .filter((s) => s.type === 'probe' && Math.abs(s.z1 - s.z2) < 1e-6 && (Math.abs(s.x1 - s.x2) > 1e-6 || Math.abs(s.y1 - s.y2) > 1e-6))
-    .map((s) => R(s.z1));
-}
+//
+// t1203 FRAME HARDENING (the test was measuring the wrong frame): these Zs used to be read as the RAW `s.z1`, which is
+// PASS-LOCAL. Every pass resets its local origin, so a pass-local read shows [0,0,0,0] — identical — even when the
+// walls sit at DIFFERENT world heights. That is exactly how the corner re-descend bug stayed green here: pre-fix the
+// WORLD Zs were [-5,-5,0,0] (wall-2 one safe-Z margin TOO HIGH) while the locals read [0,0,0,0]. Each trace now stitches
+// its probe segments through passAnchorFor IN-PAGE (the fn is a module import, so it can't cross the evaluate boundary)
+// and returns `lateralWorldZs` — the height the tool ACTUALLY probes at, which is the property that matters.
 
 test('(1) primitive: a MARKED save/return round-trip nets zero (restores the saved Z); the marker is what drives it', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -51,6 +53,7 @@ async function traceCorner(page, { probeZFirst, declared: declaredPlacement }) {
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { GcodeExecutionEngine } = await import('/engine/index.js');
     const { traceToolpath } = await import('/engine/trace.js');
+    const { passAnchorFor } = await import('/engine/passAnchor.js');   // t1203 — world-stitch the pass-local segment Zs
     registerUserOp(CD.cornerDataDef());
     const def = CD.cornerDataDef();
     const build = builderOf(CD.CORNER_DATA_OPTYPE);
@@ -65,7 +68,17 @@ async function traceCorner(page, { probeZFirst, declared: declaredPlacement }) {
     const eng = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: declared[0], ...opts });
     eng._passStarts = declared;
     eng.trace(gcode);
-    return { segments: parsed.segments, x1925: eng.vars.get(1925), hasMarks: /@saveProbeZ/.test(gcode) && /@returnProbeZ/.test(gcode) };
+    // t1203 — hand back the world-stitched probe Zs + the @returnProbeZ segment, computed IN-PAGE (passAnchorFor is a
+    // module import, so it cannot cross the evaluate boundary). The return segment is located by its emitted line.
+    const segs = parsed.segments || [], pes = parsed.passEnds || [];
+    const worldZ = (s) => { const o = passAnchorFor(declared, pes, s.pass) || { z: 0 }; return s.z1 + (o.z || 0); };
+    const lateral = segs.filter((s) => s.type === 'probe' && Math.abs(s.z1 - s.z2) < 1e-6 && (Math.abs(s.x1 - s.x2) > 1e-6 || Math.abs(s.y1 - s.y2) > 1e-6));
+    const retLines = gcode.split('\n').map((t, i) => (/@returnProbeZ/.test(t) ? i : -1)).filter((i) => i >= 0);
+    const retSegs = segs.filter((s) => retLines.includes(s.line)).map((s) => ({ dz: Math.abs(s.z2 - s.z1), pass: s.pass }));
+    return {
+      segments: segs, x1925: eng.vars.get(1925), hasMarks: /@saveProbeZ/.test(gcode) && /@returnProbeZ/.test(gcode),
+      lateralWorldZs: lateral.map((s) => Math.round(worldZ(s) * 1e4) / 1e4), retSegs,
+    };
   }, { stock, probeZFirst, declaredPlacement });
 }
 
@@ -74,10 +87,15 @@ for (const probeZFirst of [0, 1]) {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await traceCorner(page, { probeZFirst, declared: false });
-    const zs = lateralProbeZs(r.segments);
+    const zs = r.lateralWorldZs;   // t1203 — WORLD Zs (pass-anchor stitched); the old pass-local read hid the defect
     expect(r.hasMarks, 'the corner emit carries the declared save+return markers').toBe(true);
     expect(zs.length, 'there are lateral wall probes to check (both walls)').toBeGreaterThanOrEqual(2);
-    expect(new Set(zs).size, `every wall probe fires from ONE Z (the honest return) — got ${JSON.stringify(zs)}`).toBe(1);
+    expect(new Set(zs).size, `every wall probe fires from ONE WORLD Z (the honest, frame-independent return) — got ${JSON.stringify(zs)}`).toBe(1);
+    // t1203 ANTI-REGRESSION (the corner re-descend): when a REPOSITION moved the pass anchor between the save and the
+    // return, the @returnProbeZ G53 must render a REAL descent. Pre-fix it was ZERO-LENGTH (the saved Z was stored
+    // pass-local, so it restored to the new pass's origin) and wall-2 silently probed one safe-Z margin too high.
+    const crossPass = r.retSegs.filter((s) => s.pass > 0);
+    if (crossPass.length) expect(Math.min(...crossPass.map((s) => s.dz)), 'the @returnProbeZ G53 is NOT zero-length after a reposition (it re-descends to the scan depth)').toBeGreaterThan(1e-6);
     // the real symptom: the wall-2 X-probe CONTACTS the front face at 0 - tipR(2) = -2. Pre-fix (absolute lift + relative
     // drop, or the emit fix WITHOUT the sim marker) it fired too high and MISSED → #1925 = the full probe travel (952).
     expect(R(r.x1925), 'wall-2 HITS the stock face at -2 (NOT the g53Approx miss 952)').toBe(-2);
@@ -110,6 +128,7 @@ test('(4) middle boss (manual in-axis): every wall probes from ONE Z (the reposi
   const r = await page.evaluate(async ({ stock }) => {
     const { MiddleWizard } = await import('/wizards/middleWizard.js');
     const { traceToolpath } = await import('/engine/trace.js');
+    const { passAnchorFor } = await import('/engine/passAnchor.js');   // t1203 — world-stitch (see the header note)
     const w = new MiddleWizard();
     const mstock = { x: 100, y: 80, z: 20, shape: 'boss', show: true };
     // inAxis 'manual' → the wall1->wall2 within-axis reposition is the MANUAL jog (repositionR — the fixed machine-lift path);
@@ -119,10 +138,13 @@ test('(4) middle boss (manual in-axis): every wall probes from ONE Z (the reposi
     const starts = (typeof w.inferStarts === 'function') ? w.inferStarts(cfg, { stock: mstock }) : [{ x: 0, y: 0, z: 0 }];
     const g53ApproxZ = Math.abs(Number((window.ddcsGetSettings().machine || {}).safeZMargin)) || 5;
     const parsed = traceToolpath(gcode, { stock: mstock, start: starts[0], passStarts: starts, g53ApproxZ });
-    return { segments: parsed.segments, hasMarks: /@saveProbeZ/.test(gcode) && /@returnProbeZ/.test(gcode) };
+    const segs = parsed.segments || [], pes = parsed.passEnds || [];
+    const lateral = segs.filter((s) => s.type === 'probe' && Math.abs(s.z1 - s.z2) < 1e-6 && (Math.abs(s.x1 - s.x2) > 1e-6 || Math.abs(s.y1 - s.y2) > 1e-6));
+    const worldZ = (s) => { const o = passAnchorFor(starts, pes, s.pass) || { z: 0 }; return s.z1 + (o.z || 0); };
+    return { segments: segs, hasMarks: /@saveProbeZ/.test(gcode) && /@returnProbeZ/.test(gcode), lateralWorldZs: lateral.map((s) => Math.round(worldZ(s) * 1e4) / 1e4) };
   }, { stock });
-  const zs = lateralProbeZs(r.segments);
+  const zs = r.lateralWorldZs;   // t1203 — WORLD Zs (see the header note); a pass-local read cannot see a cross-pass drift
   expect(r.hasMarks, 'the middle emit carries the declared save+return markers (repositionR returnZ)').toBe(true);
   expect(zs.length, 'there are lateral wall probes to check').toBeGreaterThanOrEqual(2);
-  expect(new Set(zs).size, `middle: every wall probe fires from ONE Z (the reposition returns to the probe depth) — got ${JSON.stringify(zs)}`).toBe(1);
+  expect(new Set(zs).size, `middle: every wall probe fires from ONE WORLD Z (the reposition returns to the probe depth) — got ${JSON.stringify(zs)}`).toBe(1);
 });

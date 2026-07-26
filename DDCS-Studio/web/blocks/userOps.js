@@ -188,8 +188,8 @@ export function extractParamBlocks(template, seen = new Set(), keepPills = true)
 export function simIntentFromStack(children) {
     const blk = flattenBlocks(children).find((b) => b && b.type === 'sim');
     if (!blk || !blk.params) return undefined;
-    const s = blk.params, sim = { showRotaryRig: !!s.rotary, forceMachine: !!s.machine, showMagazine: !!s.magazine, toolMachineFrame: !!s.toolMachine, seatAtStart: !!s.seatStart };   // t552 — toolMachine: render the live tool in RAW machine coords (homing — no stock-floor shift, t497); t570 — seatStart: seat the trace/engine initial pos at marker A (alignment) WITHOUT the machine-frame render
-    return (sim.showRotaryRig || sim.forceMachine || sim.showMagazine || sim.toolMachineFrame || sim.seatAtStart) ? sim : null;
+    const s = blk.params, sim = { showRotaryRig: !!s.rotary, forceMachine: !!s.machine, showMagazine: !!s.magazine, toolMachineFrame: !!s.toolMachine, seatAtStart: !!s.seatStart, probesForWcs: !!s.probeWcs };   // t552 — toolMachine: render the live tool in RAW machine coords (homing — no stock-floor shift, t497); t570 — seatStart: seat the trace/engine initial pos at marker A (alignment) WITHOUT the machine-frame render; t1203 — probeWcs: this op probes FOR the WCS, so never render it through the declared WCS table
+    return (sim.showRotaryRig || sim.forceMachine || sim.showMagazine || sim.toolMachineFrame || sim.seatAtStart || sim.probesForWcs) ? sim : null;
 }
 
 // ── def.sim.starts ⇄ `simstart` blocks (B3) — the DECLARATION round-trip (NOT the macro: a sim-start emits no line) ──

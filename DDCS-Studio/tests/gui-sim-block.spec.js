@@ -35,12 +35,12 @@ test('gui sim block: registered, checkbox fields, emits nothing, declares def.si
   });
 
   expect(r.has).toBe(true);
-  expect(r.fields).toEqual(['rotary', 'machine', 'magazine']);
+  expect(r.fields).toEqual(['rotary', 'machine', 'magazine', 'probeWcs']);   // t1203 — probeWcs: declares that this op probes FOR the WCS (so its preview never maps through the declared table)
   expect(r.rotaryKind, 'boolean fields render as checkboxes').toBe('checkbox');
   expect(r.emitted.toLowerCase(), 'sim block emits no G-code').not.toContain('sim');
   expect(r.emitted.length, 'the move still emitted').toBeGreaterThan(0);
   // precedence helper
-  expect(r.declares).toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false });
+  expect(r.declares).toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false, probesForWcs: false });   // t1203 — probesForWcs joined the declared intent; an op that doesn't tick probeWcs stays false
   expect(r.empty, 'a sim block declaring nothing → null intent').toBeNull();
   expect(r.none, 'no sim block → undefined (caller falls back to the dev-panel checkboxes)').toBeUndefined();
 

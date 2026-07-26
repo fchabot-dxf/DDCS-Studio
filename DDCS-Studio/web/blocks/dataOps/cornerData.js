@@ -204,7 +204,7 @@ export function cornerDataStack(params = CORNER_DEFAULTS) {
     // STRUCTURAL / VARIABLES / FORM / G-CODE each a distinct hue. Palette is easily tweaked (the human can adjust).
     const sec = (title, color, children) => ({ type: 'section', params: { title, color }, children });
     const panel = { type: 'panel', params: { panel: 'form3d+2d' } };   // B3d: the 3D probe sim + per-pass markers AND the 2D reposition drag canvas
-    const sim = { type: 'sim', params: { rotary: false, machine: false, magazine: false } };   // t714 — corner is a PART-FRAME probe (lands on the physical corner of the datum-placed stock); machine:true was a latent-dead forceMachine (the old applySimIntent ignored plain forceMachine, so corner always rendered part-frame — its shipped behavior). Honest intent = no forceMachine.
+    const sim = { type: 'sim', params: { rotary: false, machine: false, magazine: false, probeWcs: true } };   // t714 — corner is a PART-FRAME probe (lands on the physical corner of the datum-placed stock); machine:true was a latent-dead forceMachine (the old applySimIntent ignored plain forceMachine, so corner always rendered part-frame — its shipped behavior). Honest intent = no forceMachine.
     const paramGroup = { type: 'param_group', params: { group: 'Corner' }, children: [] };
     const simstarts = simStartsToBlocks(CORNER_SIM_STARTS);   // per-pass preview markers (canonical; SIM only, emit nothing)
 

@@ -1,6 +1,7 @@
 /** views/edgeView.js — Edge probing wizard view (DOM glue + SVG animator + the feature-canvas START-marker editor). */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { EdgeWizard } from '../edgeWizard.js';
+import { applyPreviewIntent } from './atcViews.js';   // t1203 — the ONE declared-intent apply (built-in view + twin agree by construction)
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { workpieceFeatureItems } from '../../engine/workpiece.js';
@@ -104,6 +105,7 @@ export const edgeView = {
         const gcode = wizard.generate(params);
         const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
         ctx.preview3D(gcode, 'probeVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
+        applyPreviewIntent(ctx, 'probeVizContainer', 'edge');   // t1203 — the ONE declared-intent apply (this view previously applied none, so a new flag would never reach the panel)
         // TRAVEL-START inc1: the START marker IS the source — render it on the feature canvas (the panel exists after
         // preview3D); dragging it derives the reach (#1). Replaces the old probe-vector/reach arrow.
         renderEdgeStartCanvas(ctx._activePanel, params, stock);

@@ -213,6 +213,10 @@ export function createPreviewPanel(container, opts = {}) {
     let machineFrameTool = false;   // t497 host hint: render the live tool in the MACHINE frame (homing — no stock shift). Re-applied on lazy viz create.
     let seatAtStart = false;   // t570 host hint: SEAT the trace/engine INITIAL POSITION at the draggable Start (marker A) — the homing initialPos seam WITHOUT the machine-frame tool render (alignment: an in-place probe on the WCS/part frame; the drawn path must begin at A, not origin).
     const startSeated = () => machineFrameTool || seatAtStart;   // either hint seats the initial position at the Start (homing's machine-frame tool implies it; alignment opts in without the machine-frame render)
+    // t1203 host hint ([[probes-never-read-wcs]]): this program PROBES FOR the WCS, so its machine-frame G53 excursions must
+    // render via the honest safe-Z margin approximation EVEN WHEN a WCS table is declared (that table describes a DIFFERENT,
+    // previously-measured setup — not the one being probed). Declared per-op in opSimContext; applied via setProbesForWcs.
+    let probesForWcs = false;
     // P-C.1b: the FIRMWARE ATC tool-swap context. atcChoreo (the push choreography) + atcStation (its region) are armed
     // by the atc_change firmware view; during play we watch #1300 and, on a REAL tool change (a program T#/M6), retire
     // the OLD tool to the station + put the NEW tool on the spindle. lastTool tracks the previous #1300 (the FIRST value
@@ -598,7 +602,9 @@ export function createPreviewPanel(container, opts = {}) {
     function g53ApproxForViz() {
         if (machineFrameTool) return null;
         const m = machineForViz();
-        const declared = m && m.wcs && Array.isArray(m.wcs.table) && m.wcs.table.length > 0;
+        // t1203 — PROBES NEVER READ THE WCS: a probe op PRODUCES the WCS, so a declared table describes a different
+        // (previously measured, possibly stale) setup. Ignore it here and keep the honest margin approximation.
+        const declared = !probesForWcs && m && m.wcs && Array.isArray(m.wcs.table) && m.wcs.table.length > 0;
         if (declared) return null;
         return Math.abs(Number(m && m.safeZMargin) || 5);   // mm above the work origin (approx: the run's top work-Z ≈ 0)
     }
@@ -899,6 +905,10 @@ export function createPreviewPanel(container, opts = {}) {
         const pos = best ? { x: best.x2, y: best.y2, z: best.z2 } : { x: segs[0].x1, y: segs[0].y1, z: segs[0].z1 };
         if (mode === '3d') { const v = ensureViz(); if (v && v.setToolPosition) v.setToolPosition(pos); }
         else t2.seek(nearest2d(pos));
+        // t1203 — the DRO follows the scrub too: these are traced positions in the SAME work frame onPositionChange
+        // reports, so the one DRO writer derives Work AND Mach from them. Without this, clicking a code line moved the
+        // tool while the readout kept the last RUN's numbers (the same staleness class as the stepped run).
+        updateDro(pos);
     }
 
     // ---- stock: a button that opens the rich Stock modal (ui/stockEditor.js). The modal persists to the shared
@@ -929,7 +939,22 @@ export function createPreviewPanel(container, opts = {}) {
         else if (eng.running && eng.paused) { eng.resume(); updateRunBtn(); }
         else play();
     });
-    q('.pp-step').addEventListener('click', () => { const eng = ensureEngine(); if (viz && !eng.running) viz.setAnimate(false); eng.step(get('getGcode') || ''); updateRunBtn(); });
+    // t1203 — STEP must land in the SAME configured frame a run does, and must show where the tool actually is. A fresh
+    // stepped run previously skipped play()'s setup entirely: no applySimConfig (so _stockOffset/_passStarts/_wcsOffset/
+    // _g53ApproxZ were stale or defaults) and no DRO seed (so the readout still showed the PREVIOUS run's numbers until
+    // the first committed move). Seed on the first click only; the engine now commits each stepped line's end position,
+    // which fires onPositionChange → updateDro (Work AND Mach from the one writer).
+    q('.pp-step').addEventListener('click', () => {
+        const eng = ensureEngine();
+        if (!eng.running) {
+            applySimConfig(eng, lastAbsolute);                        // the ONE sim config (same source as the drawn route + play)
+            updateDro(getStartPos() || { x: 0, y: 0, z: 0 });         // honest baseline before the first line executes
+            if (droWcsEl) droWcsEl.textContent = activeWcsName();
+            if (viz) viz.setAnimate(false);
+        }
+        eng.step(get('getGcode') || '');
+        updateRunBtn();
+    });
     q('.pp-loop').addEventListener('click', () => { loopOn = !loopOn; q('.pp-loop').classList.toggle('on', loopOn); if (!loopOn && loopTimer) { clearTimeout(loopTimer); loopTimer = null; } });
     q('.pp-speed').addEventListener('click', () => {   // cycle 1× → 2× → 5× → 10× → 20× → 1×
         speedIx = (speedIx + 1) % SPEEDS.length;
@@ -1002,6 +1027,15 @@ export function createPreviewPanel(container, opts = {}) {
         if (on === forceMachine) return;
         forceMachine = on;
         lastAnchor = null;   // force the anchor/envelope block in setGcode to re-evaluate
+        if (active) setGcode();
+    }
+
+    // t1203 — Host hint: this program probes FOR the WCS (see `probesForWcs`). Changes g53ApproxForViz's answer, which
+    // rides in simConfig, so a change must re-trace. Symmetric with setForceMachine (early-return when unchanged).
+    function setProbesForWcs(on) {
+        on = !!on;
+        if (on === probesForWcs) return;
+        probesForWcs = on;
         if (active) setGcode();
     }
 
@@ -1133,7 +1167,7 @@ export function createPreviewPanel(container, opts = {}) {
         }
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setMarkerDragWriter, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setProbesForWcs, setMarkerDragWriter, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
         // t1187 — a CLEAN geometry-only PNG data-URL of the sim (stock + toolpath, NO overlay: grid/axes/handles/markers/HUD).
         // 2D-toolpath capture (the WebGL 3D clean-capture is a follow-on — no preserveDrawingBuffer + no clean-overlay toggle

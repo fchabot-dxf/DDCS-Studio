@@ -37,7 +37,7 @@ test('custom-op sim intent is DECLARED, never inferred from motion', async ({ pa
   });
 
   expect(r.amove.showRotaryRig, 'an A-move alone is NOT inferred as rotary (open-world op)').toBe(false);
-  expect(r.declared, 'declared intent is honoured').toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false });
+  expect(r.declared, 'declared intent is honoured').toEqual({ showRotaryRig: true, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false, probesForWcs: false });   // t1203 — probesForWcs joined the declared intent (a probe op never renders through the WCS table); an op that doesn't declare it stays false
   expect(r.prog.showRotaryRig, 'program union picks up the DECLARED rotary op, not the A-move one').toBe(true);
   expect(r.afterDel.showRotaryRig, 'delete clears the declared intent').toBe(false);
 });

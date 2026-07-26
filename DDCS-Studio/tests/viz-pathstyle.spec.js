@@ -90,3 +90,42 @@ test('INC-5 draw-order: the WHITE slow probe renders ON TOP of the fast blue at 
   expect(r.white, `the WHITE slow probe rendered (${r.white} px)`).toBeGreaterThan(0);
   expect(r.white, `white (slow, on top: ${r.white}px) dominates cyan (fast, covered: ${r.cyan}px) — the slow probe drew LAST`).toBeGreaterThan(r.cyan);
 });
+
+/**
+ * t1203 (b) — SAFE-HEIGHT TRAVERSE = THE RAPID HUE. A dogleg/diagonal trans-axis traverse IS a rapid, and the 3D has
+ * always painted rapids yellow (PATH_TYPES.rapid) — but the 2D reclassified any horizontal rapid to a grey `lifted`,
+ * so the SAME move read yellow in 3D and grey in 2D. That divergence was the defect (the user: the traverse moves must
+ * render yellow, matching the 3D convention). `lifted` now shares the rapid COLOUR and keeps its DASH, so the two views
+ * agree by construction while "moving over" is still visually distinct from a solid positioning rapid.
+ * Non-circular: the traverse segments come from a REAL emitted middle-boss program, traced by the engine.
+ */
+test('a real dogleg + diagonal traverse renders the RAPID hue in 2D (matching 3D), while cuts stay blue', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const r = await page.evaluate(async () => {
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { traceToolpath } = await import('/engine/trace.js');
+    const { segColor } = await import('/viz/toolpath2d.js');
+    const P = await import('/viz/pathStyle.js');
+    const stock = { x: 100, y: 80, z: 20 };
+    const out = { rapidHex: P.hexCss(P.PATH_TYPES.rapid.color), liftedDash: P.PATH_TYPES.lifted.dash, rapidDash: P.PATH_TYPES.rapid.dash };
+    for (const shape of ['dogleg', 'diagonal']) {
+      const g = emitMapped(middleStack({ featureType: 'boss', twoAxis: true, inAxis: 'auto', transAxis: 'auto', axis: 'X', dir1: 'pos', dir2: 'neg', travelShape: shape })).text;
+      const segs = (traceToolpath(g, { stock, g53ApproxZ: 5 }).segments) || [];
+      const trav = segs.filter((s) => s.type === 'rapid' && Math.abs((s.z1 || 0) - (s.z2 || 0)) < 1e-6 && (Math.abs(s.x1 - s.x2) > 0.02 || Math.abs(s.y1 - s.y2) > 0.02));
+      out[shape] = { n: trav.length, colors: [...new Set(trav.map((s) => segColor(s, -10, 20, 400)))] };
+    }
+    const ctl = (traceToolpath('G90\nG1 X10 Y10 F300\nG0 Z5\n', { stock, g53ApproxZ: 5 }).segments) || [];
+    out.control = ctl.map((s) => ({ t: s.type, c: segColor(s, -10, 20, 400) }));
+    return out;
+  });
+  for (const shape of ['dogleg', 'diagonal']) {
+    expect(r[shape].n, `${shape}: the emitted program really contains horizontal traverse moves`).toBeGreaterThan(0);
+    expect(r[shape].colors, `${shape}: EVERY traverse segment renders the rapid hue (2D == 3D)`).toEqual([r.rapidHex]);
+  }
+  expect(r.liftedDash.length, 'the traverse stays DASHED — "moving over" is carried by the dash, not a second colour').toBeGreaterThan(0);
+  expect(r.rapidDash, 'a positioning rapid stays SOLID, so the two remain distinguishable').toEqual([]);
+  const feed = r.control.find((s) => s.t === 'feed');
+  expect(feed && feed.c, 'no over-reach: a CUT is still blue').toBe('#3b82f6');
+});

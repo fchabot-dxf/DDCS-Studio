@@ -97,6 +97,7 @@ test('(1) engine-frame: the wall-2 probe trigger #1926 == the RELOCATED ②.y (f
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { GcodeExecutionEngine } = await import('/engine/index.js');
     const { traceToolpath } = await import('/engine/trace.js');
+    const { passAnchorFor } = await import('/engine/passAnchor.js');
     registerUserOp(CD.cornerDataDef());
     const def = CD.cornerDataDef();
     const build = builderOf(CD.CORNER_DATA_OPTYPE);
@@ -112,7 +113,12 @@ test('(1) engine-frame: the wall-2 probe trigger #1926 == the RELOCATED ②.y (f
     const eng = new GcodeExecutionEngine({ autoAnswer: true, stock, stockOffset: declared[0], g53ApproxZ });
     eng._passStarts = declared;
     eng.trace(gcode);
-    return { y1926: eng.vars.get(1926), x1925: eng.vars.get(1925), z1927: eng.vars.get(1927), relY, staticY: m1.y };
+    // t1203 — INDEPENDENT truth for the probe height: wall-1's probe world-Z, stitched from the TRACE segments
+    // (a different path than the engine's #1927 register). The first probe segment belongs to wall 1.
+    const p1 = (parsed.segments || []).find((s) => s.type === 'probe');
+    const a1 = p1 ? (passAnchorFor(declared, parsed.passEnds || [], p1.pass) || { z: 0 }) : { z: 0 };
+    const wall1ProbeWorldZ = p1 ? (p1.z1 + (a1.z || 0)) : null;
+    return { y1926: eng.vars.get(1926), x1925: eng.vars.get(1925), z1927: eng.vars.get(1927), relY, staticY: m1.y, wall1ProbeWorldZ };
   }, { stock });
   // #1926 (wall-2 X-probe holds Y) == the RELOCATED ②.y = passEnds[0].y + off.wall2.y = 43 — machine-faithful, from a
   // different path (the trace's runtime end). NOT the static ②.y = 7 (the t94 start-based frame the old test codified).
@@ -122,9 +128,13 @@ test('(1) engine-frame: the wall-2 probe trigger #1926 == the RELOCATED ②.y (f
   // #1925 (contact X) contacts the X face at -tipR = -2 (reachable from the relocated ②). #1927 (probe height): t897 MIGRATION
   // — the old -10 CODIFIED THE BUG (an absolute G53 margin lift + a relative -#19 drop landed an arbitrary Z). The honest
   // lift/drop pairing (probeWallR saveMachineZNode ↔ repoTraverse returnZ '#95') now RETURNS the tool to the SAVED probe depth,
-  // so wall-2 fires from the SAME Z as wall-1 (= 0 here, the consistent scan depth) — proven independently by lift-drop-pairing-897.
+  // so wall-2 fires from the SAME Z as wall-1 — the CONSISTENT scan depth.
   expect(R1(r.x1925), 'the wall-2 contact X = front-face 0 − tipR 2 = -2 (on-stock, reachable from the relocated ②)').toBe(-2);
-  expect(R1(r.z1927), 'the wall-2 probe fires at the RETURNED probe depth z = 0 (the honest saved-Z return, NOT the buggy -10 margin-drop)').toBe(0);
+  // t1203 — assert the RELATION against an INDEPENDENT truth (wall-1's traced probe world-Z), not a literal. The old
+  // literal `0` CODIFIED the re-descend bug: wall-1 fires at world −5, so a wall-2 at 0 was exactly one safe-Z margin
+  // TOO HIGH (the @returnProbeZ G53 rendered zero-length across the pass boundary — engine _savedReturnZ frame mismatch).
+  expect(R1(r.z1927), 'the wall-2 probe fires at the SAME world Z as wall-1 (the saved-Z return is frame-independent)').toBe(R1(r.wall1ProbeWorldZ));
+  expect(R1(r.wall1ProbeWorldZ), 'sanity: wall-1 scans at the declared probe depth −5 (not 0 — 0 was the bug value)').toBe(-5);
 });
 
 // (2) FALLBACK — the #1 all-ops-regression guard. drawAnchorFor with NO flag resolves to SELF (never undefined/NaN),

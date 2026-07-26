@@ -1,6 +1,7 @@
 /** views/middleView.js — Middle (pocket/boss centre) wizard view. */
 import { el, UIUtils } from '../../ui/uiUtils.js';
 import { MiddleWizard } from '../middleWizard.js';
+import { applyPreviewIntent } from './atcViews.js';   // t1203 — the ONE declared-intent apply (built-in view + twin agree by construction)
 import { restoreBoxStock } from './rotaryCenterView.js';
 import { FeatureCanvas } from '../../viz/featureCanvas.js';
 import { getWorkpiece, workpieceBackdrop, stockTopWorkZ, suggestedPlaneZ } from '../../engine/workpiece.js';   // flatten-migration: draw the DECLARED workpiece cavity at its OFFSET; t933 — the shared Plane assists (one source with the corner widget)
@@ -251,6 +252,7 @@ export const middleView = {
         // Infer the spindle start (pocket → centre; boss → outside the first side) so the preview begins right.
         const stock = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || {};
         ctx.preview3D(gcode, 'middleVizContainer', wizard.inferStart(params, stock), wizard.inferStarts(params, stock));
+        applyPreviewIntent(ctx, 'middleVizContainer', 'middle');   // t1203 — the ONE declared-intent apply (this view previously applied none, so a new flag would never reach the panel)
         // ②-aim feature canvas: render the per-pass start markers as draggable handles (panel exists after preview3D).
         renderStartCanvas(ctx._activePanel, stock);
 

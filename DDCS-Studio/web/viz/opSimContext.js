@@ -38,6 +38,12 @@ const WITH_MAGAZINE = new Set(['atc_change', 'atc_table', 'atc_test', 'atc_warmu
 // SEAT the trace/engine initial position at the Start (marker A) WITHOUT the machine-frame tool render — an in-place probe
 // on the part frame whose drawn path must begin at A, not origin (alignment; the twin declares sim{seatStart:true}, t570).
 const SEAT_AT_START = new Set(['alignment']);
+// t1203 (USER RULING — [[probes-never-read-wcs]]): a PROBE op probes FOR the WCS, so it must NEVER map its picture through
+// the DECLARED WCS table — that table describes a DIFFERENT (previously measured, possibly stale) setup, not the one being
+// previewed. Its machine-frame G53 excursions render via the honest margin approximation (g53ApproxForViz) EVEN WHEN a WCS
+// row is declared. Declared per-type here (never inferred from probe ATOMS: atc_length/atc_check push raw probe atoms but
+// are machine-frame tool-setter ops, and inference would contradict this module's own doctrine below).
+const PROBES_FOR_WCS = new Set(['corner', 'edge', 'middle', 'alignment', 'rotary_clock', 'rotary_center']);
 
 // Custom ops (user_*) DECLARE their full preview intent — NOTHING is inferred from their motion. userOps registers
 // whatever `def.sim` declares (the same way the panel block declares panel type). The axis letter doesn't carry
@@ -73,6 +79,7 @@ export function opSimContext(opType) {
         showMagazine: u ? !!u.showMagazine : WITH_MAGAZINE.has(opType),
         toolMachineFrame: tmf,
         seatAtStart: tmf || SEAT_AT_START.has(opType) || (u ? !!u.seatAtStart : false),   // machine-frame tool ⟹ seat; alignment seats WITHOUT tmf
+        probesForWcs: u ? !!u.probesForWcs : PROBES_FOR_WCS.has(opType),   // t1203 — this op PRODUCES the WCS → never render through the declared table
     };
 }
 
@@ -90,8 +97,9 @@ export function programSimContext(opTypes) {
             showMagazine: acc.showMagazine || c.showMagazine,
             toolMachineFrame: acc.toolMachineFrame || c.toolMachineFrame,   // t714 (R-B #6) — keep the full intent in the union so a whole-program consumer (editor/Blocks) can seat + machine-frame the tool
             seatAtStart: acc.seatAtStart || c.seatAtStart,
+            probesForWcs: acc.probesForWcs || c.probesForWcs,   // t1203 — ANY probe op in the program ⟹ don't render through the declared WCS table
         };
-    }, { showRotaryRig: false, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false });
+    }, { showRotaryRig: false, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false, probesForWcs: false });
 }
 
 /**
@@ -110,5 +118,6 @@ export function applyProgramIntent(panel, opTypes) {
         if (panel.setForceMachine) panel.setForceMachine(!!ctx.forceMachine);            // envelope/machine frame (ATC/homing)
         if (panel.setToolMachineFrame) panel.setToolMachineFrame(!!ctx.toolMachineFrame);  // raw-machine-coords tool (G53)
         if (panel.setSeatAtStart) panel.setSeatAtStart(!!ctx.seatAtStart);               // seat the initial pos at the Start (alignment)
+        if (panel.setProbesForWcs) panel.setProbesForWcs(!!ctx.probesForWcs);            // t1203 — a probe program never renders through the declared WCS table
     } catch (_) { /* a panel may lack a setter — harmless */ }
 }
