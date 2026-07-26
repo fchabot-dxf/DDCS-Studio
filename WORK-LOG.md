@@ -16500,3 +16500,52 @@ stopped at the localisation. Next turn: instrument the overlay's own draw anchor
 panel.getPassEnds() at paint time.
 
 GATE: FULL suite unfiltered (this is emit-class and touches SHARED files -- structCtl + panelTypes -- so a name-filtered run was not enough): 1508 passed / 0 failed / 4 skipped (15.1m, EXIT=0). Plus the 3584-combo superset sweep and both-order screenshots above. Branch feat/ddcs-workspace. NO release. Hardening batch NOT started, as instructed.
+
+---
+
+## turn 1213 -- C-LIVE ROOT-CAUSED (both my hypothesis AND the advisor's disproven by measurement). Directions NOT started.
+
+### THE C-LIVE TRAVERSE GAP -- FOUND, and it is neither a stale feed nor a re-anchor failure.
+
+The dispatch (echoing my own t1211 plan) said to find "the stale feed ordering in wireAnimOverlay". I instrumented it and
+that hypothesis is WRONG. On EVERY paint during a Start drag the overlay's fed values are IDENTICAL to the panel's live
+values:
+    fedStarts == liveStarts, fedEnds == liveEnds   (sampled every frame through the drag)
+So there is no ordering/staleness bug: `onStartDrag` re-traces SYNCHRONOUSLY (setGcode + replayFromStart) before
+renderLayoutWithSim re-feeds, and the overlay always paints the current chain. I also disproved a second candidate
+(that `tp.seek(k)` truncates the drawn path to the replay's progress): the painted-yellow pixel count is stable and
+actually HIGHER after the drag (637 -> ~735), and it does not change between 0.8s and 8s.
+
+THE ACTUAL CAUSE (measured, unambiguous):
+    pass 0 ENDS at world        (-2, 90)
+    pass 1's FIRST segment is   (50, 90)  -- and its type is already `probe`
+There is NO DRAWN SEGMENT bridging those two points. The tool genuinely travels that 52mm (it is the trans-axis
+traverse), but the engine consumes that move AS THE PASS BOUNDARY (the `( REPOSITION: )` marker resets pos and increments
+_pass), so it never appears in `segments` and nothing can draw it. Every consumer downstream is therefore correct and the
+line is still missing — which is exactly why re-anchoring, re-feeding and waiting all failed to change it, and why my
+t1209 static check passed (marker == landing == probe-start is TRUE; the connector between passes is simply absent).
+This also explains the user's phrasing precisely: the dashes look like "a hardcoded distance" that does not "connect to
+the live marker chain", because what is drawn is only the WITHIN-pass motion — the BETWEEN-pass leg is never drawn at
+all, at rest or after a drag.
+
+RECOMMENDED FIX (one seam, marker-derived by construction, NOT started): synthesise the inter-pass CONNECTOR into the
+drawn route — from `passEnds[n-1]` to `starts[n]` — classified as a traverse so it renders as the dashed rapid-hue safe
+travel. It is honest by construction: both endpoints are the tool's real runtime positions (the previous pass's measured
+END and the next pass's declared marker), so this DRAWS A MOVE THE TOOL ACTUALLY MAKES rather than bending geometry to
+close a gap, and it satisfies `traverse-targets-are-marker-derived` for the RENDER (the connector ends ON the marker by
+definition, so it re-anchors with any drag for free). Open choice for the advisor: whether the connector is synthesised
+in the shared route feed (so the 3D gets it too, which I would recommend for one-source) or only in the 2D overlay.
+I did NOT implement it: it changes what the preview DRAWS for every multi-pass probe op (corner/edge/middle/alignment/
+rotary), and the last two turns proved that a render change made at the tail of a long turn is how a half-landing
+happens. It is a small, well-defined change with the numbers above; it deserves a clean pass with its own regression
+(drag the Start, assert a drawn segment connects passEnds[n-1] to (2)).
+
+### (1) DIRECTION DROPDOWNS -- NOT STARTED, deliberately.
+
+The direction unbake is the same class of work as t1211's axisOrder (resolver extension + guard-fork arms + defaults +
+CANONICAL_BIND + structCtl + full round-trip + a byte-diff sweep that must now cover order x dir1 x dir2). t1211's
+equivalent took a full turn on its own and had to be byte-proven across 3584 combos; starting it after the diagnosis
+above would mean landing an EMIT-CLASS fork without room to verify it to that bar. Carried whole to the next dispatch.
+
+GATE: no code changed this turn (all instrumentation reverted; `git status` clean apart from HANDOFF.md), so no gate was
+owed. Branch feat/ddcs-workspace. NO release. Hardening batch NOT started.
