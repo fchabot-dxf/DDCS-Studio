@@ -15972,3 +15972,18 @@ loads, since the smoke config imports it) + the existence guard fires + --only-c
 
 Committed MY 4 FILES: tests/smoke.manifest.mjs (new) + playwright.smoke.config.js (new) + TESTING.md (new) +
 package.json (2 scripts). Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1197 -- GATE-SPEEDUP Part 1 (finish the skipped piece): base per-test timeout 30_000 -> 60_000.
+
+The base DDCS-Studio/playwright.config.js per-test `timeout` was bumped 30s -> 60s. Strictly MORE LENIENT: it can only
+give a slow test more time before the harness kills it -- it can NEVER turn a passing test red -- so it cannot regress.
+Rationale (advisor): the w4 load-sensitive specs (knob-persist, pocket/contour-canvas, blocks-mobile-drawers, etc.)
+occasionally brush the 30s cap under gate contention; 60s gives them headroom without weakening any assertion.
+
+GATED WITH THE NEW FAST TIER (first pass under the tiering): `npm run test:smoke` = 60 passed / 25.6s. This confirms
+the base config still LOADS with the new value (the smoke config imports it) and smoke is green. Did NOT run the full
+1489 suite -- the advisor runs the full gate at merge, and a lenient-timeout change cannot regress anyway.
+
+Committed MY 1 FILE: DDCS-Studio/playwright.config.js. Branch feat/ddcs-workspace. NO release.
