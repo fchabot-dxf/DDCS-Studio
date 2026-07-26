@@ -15842,3 +15842,43 @@ route<->play PARITY fix (one config source), isolated to the route trace, valida
 
 Full gate: 1485 passed / 0 failed / 4 skipped (14.6m) -- fully green, all 1489 ran (+2 = cam-sim-seed). The shared-core simConfig createVarStore add broke NO sim-preview test across wizard/editor/blocks/CAM -> the route<->play parity fix is validated. Committed MY 3 FILES: macrosApp.js + createPreviewPanel.js + cam-sim-seed.spec.js. Branch
 feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1191 -- FEATURE: K-BUTTON AUTHORING (3 parts, REUSING the existing K-button plumbing).
+
+PART 1 -- count to 16: declared K_BUTTON_COUNT = 16 (the Expert/M3K keyboard has 16 K-keys; base panels 7). renderKbuttons()
+loops 1..K_BUTTON_COUNT (was 1..7); macroFileText key clamp Math.min(7,..) -> Math.min(K_BUTTON_COUNT,..) (so K8-16 key-N.nc
+headers read right); the panel hint updated to 16; SYNC_FILES + DELETABLE now GENERATE key-1..16.nc from K_BUTTON_COUNT (so
+K8-16 sync/deploy/delete too). findKbtn/ensureKbtn/pushKbutton/kgen/kpush already take k with no 7-cap -> verified generalize.
+
+PART 2 -- editor '＋ Make ▾' menu (consolidate, NO 3rd floating button): #editor-cam-btn (index.html) KEEPS its id + class +
+--kbd-clear STYLE (the t1173 keyboard-clearance + no-Transform-overlap); ONLY its label (✚ CAM slot -> ＋ Make ▾) + onclick
+(ddcsBuildCamSlot -> ddcsEditorMakeMenu(this)) change. ddcsEditorMakeMenu (globalFunctions.js) pops a small inline-styled menu
+ABOVE the button with TWO items: CAM slot -> the unchanged ddcsBuildCamSlot; K-button -> ddcsMakeKButton. Each item idempotently
+wires the Macros app first; outside-click / re-click dismisses. (Did NOT reuse .scale-pop/.hdr-quick-menu -- they are collapsed
+until an activation class is added; a self-contained inline style is simpler + always visible.)
+
+PART 3 -- 'Make → K-button' modal (macrosApp.js, window.ddcsMakeKButton): turns the CURRENT editor program into a K-key macro,
+REUSING the panel machinery -- editorText() body, a K1-16 picker showing used/(empty) + prefilling the existing name, the store
+via ensureKbtn(k) (the SAME store the panel edits via findKbtn) + saveSettings() + renderKbuttons() so the panel reflects it,
+and Generate/Push that REUSE macroFileText+insertToEditor (kgen) and pushKbutton (kpush). Footer: Cancel / Save+Generate /
+Save+Push / Save. NO duplicated macro logic.
+
+VERIFIED (real symptom, screenshots): (1) the K-buttons panel shows 16 rows K1..K16. (2) the editor shows '＋ Make ▾' (NOT a 3rd
+button) above Transform + above the keyboard; the menu lists CAM slot + K-button (make-menu.png). (3) Make → K-button -> pick K3
++ name 'Test K3' -> Save+Generate: K3 stores the program body + name, key-3.nc is inserted to the editor, the K-buttons panel
+reflects K3='Test K3' (make-kbtn.png); the CAM slot item still opens the CAM authoring (unchanged). New test
+kbutton-authoring.spec.js (2 tests). macros-tabs + autostart-stored-macro + cam-slot-icon-s5 all green (no regression).
+
+REGRESSION caught by the gate + fixed: cam-build-mode.spec.js:121 (door-2 auto-import) had a PRE-CHECK asserting the
+editor-toolbar button onclick matches /ddcsBuildCamSlot/. Part 2 intentionally re-wired that button to ddcsEditorMakeMenu (the
+Make menu), so the pre-check went stale. The CAM-slot BEHAVIOUR is unchanged -- ddcsBuildCamSlot still auto-imports, and the
+rest of that test (which drives ddcsBuildCamSlot() directly) still passes. Updated the pre-check to assert the new wiring
+(/ddcsEditorMakeMenu/ + ddcsBuildCamSlot reachable as a function); re-ran cam-build-mode = 7/7. This is a test-matches-feature
+update, NOT masking a bug (the menu->CAM path is separately covered by kbutton-authoring.spec.js).
+
+Full gate (first pass): 1485 passed / 4 skipped / 2 flagged -> cam-build-mode:121 (real, now fixed above) +
+blocks-mobile-drawers:8 (load-flake: a Blockly drag/resize spec I never touched; PASSES in isolation). Re-ran the full gate
+after the fix: 1487 passed / 4 skipped / 0 failed (PLAYWRIGHT_EXIT=0, 14.6m) -- fully green. Committed MY 5 FILES: macrosApp.js + globalFunctions.js + index.html + kbutton-authoring.spec.js
++ cam-build-mode.spec.js. Branch feat/ddcs-workspace. NO release.
