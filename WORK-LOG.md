@@ -16194,3 +16194,84 @@ pattern, full round-trip) and (B) the at-rest re-centre default. Both EMIT-class
 Committed MY FILES: engine/GcodeExecutionEngine.js + viz/opSimContext.js + viz/createPreviewPanel.js + viz/pathStyle.js
 + wizardManager.js + wizards/ops/sim.js + wizards/views/atcViews.js + edgeView.js + middleView.js + blocks/userOps.js +
 the 6 probe twins + 7 updated specs + 2 new specs (- the removed scratch spec). Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1205 -- FIX-BACK on t1203 + the 4 review findings. THE DISPATCHED DIAGNOSIS WAS WRONG -- root cause found + evidenced.
+
+### THE HEADLINE: the corner re-descend cannot work in the EDITOR HOST because the DECLARED SIM MARKERS ARE STRIPPED.
+
+The dispatch's direction was "_savedReturnZ is world-frame for the TRACE but the play engine consumes it as a MACHINE
+coordinate (or double-converts through the WCS map)". I reproduced the symptom exactly (ln58 return landing Mach 0 /
+Work +75 instead of the saved Mach -75), then MEASURED the mechanism -- and it is neither of those.
+
+EVIDENCE (each measured, not inferred):
+1. Instrumented the return site and filtered to the LIVE (step/play) path only -- `trace()` nulls its callbacks, so
+   `!!this.onPositionChange` separates the two cleanly. LIVE at the return: `{mret:false, len:0}`. The marked-return
+   branch NEVER FIRES live; it falls through to the exact map (`0 - (-75)` = +75, exactly the reported number). In the
+   TRACE the same line fires `{mret:true, len:1}`.
+2. Logged the RAW line the live engine executes: `#95=#882` -- the `( @saveProbeZ )` comment is GONE.
+3. Diffed the editor before/after 5 step clicks: EXACTLY 3 lines differ, and they are exactly the three marker lines
+   (ln41 + ln69 `#95=#882 ( @saveProbeZ )` -> `#95=#882`; ln58 `G53 Z#95 ( @returnProbeZ )` -> `G53 Z#95`). Nothing
+   else in 92 lines changes. Markers SURVIVE a plain load; they vanish only once a run starts.
+MECHANISM (now traced end-to-end): the editor is periodically re-projected from the block model --
+programModel.js:224/264 `e.setValue(proj.text)` -- and `proj.text` is a RE-EMIT of the parsed stack. gcodeToStack's
+`parseLine` (:36-45) strips a whitespace-separated trailing `( ... )` into a side-channel `comment`; nothing carries a
+DECLARED marker back onto the block, so the re-emit drops it. simMarkers.js's own header even documents the strip
+("parseLine strips them to a side-channel") -- the round-trip was never made lossless for the marker.
+So the sim's declared save/return pairing is silently disabled in the editor host, and the G53 return degrades to the
+raw machine map. This is PRE-EXISTING (the markers have always been stripped); t1203 did not cause it -- t1203 made the
+TRACE correct, which is why the two hosts now disagree so visibly.
+THE FIX SITE IS IDENTIFIED (not yet applied -- see DEFERRED): the blocks already SUPPORT the marker as a param
+(safeZframe.js:75/192 set `params.mark`), so `parseLine` must carry a recognised declared marker into `params.mark` on
+the readmachine/machinemove it produces; the existing emit then restores it and the round-trip becomes lossless.
+
+### WHAT I DID LAND (all measured)
+
+FRAME WORK (sound, and needed regardless of the marker fix):
+- `passAnchorFor` (engine/passAnchor.js): when a pass has NO declared start row, fall back to the runtime END of the
+  previous pass instead of returning undefined. Without this the caller's constant `_stockOffset` fallback let the
+  pass-local origin reset TELEPORT the tool back to the pass origin -- measured as the dispatch's item (2) ("a PURE-XY
+  line snaps Wz 70 to 0 and teleports XY") and as the zero-length return in every no-passStarts config. Pass 0 and any
+  consumer without `ends` are unchanged, so single-pass + pre-trace behaviour is byte-identical.
+- The ENGINE now stamps the WORLD position on every position event (`_worldOf`, from its OWN live `_pass`/`_passStarts`/
+  `_passEnds`). This kills the route-vs-play drift by construction: I measured the SAME corner run reporting pass-1
+  anchors of -5 / 70 / 20 / 90 across re-traces, so any consumer stitching with the PANEL's route copy is guessing.
+- The DRO now quotes that world position (`worldOf`, preferring the engine stamp; the panel-side stitch remains only for
+  the static seekLine scrub, which reads the same traced segs as `lastPassEnds`, so those two agree). The 3D tool keeps
+  consuming the LOCAL position because it applies the anchor itself -- unchanged.
+  NOTE this was a REAL pre-existing readout bug the t1203 geometry fix exposed: the engine reports pass-local coords and
+  the consumer anchors; the 3D tool did, the readout never did. In the wcs-declared corner case the tool was at world -5
+  while the DRO quoted "Work -70" -- the advisor's "too LOW" reading was the readout, not the tool.
+- `seekLine` now carries the segment's `pass`, so a scrub into a later pass anchors correctly in BOTH consumers.
+
+REVIEW FINDINGS:
+(1) RED SPEC traverse-clarity-893 -- GREEN, and re-encoded HUE-INDEPENDENTLY as instructed. Since `lifted.color ===
+    rapid.color`, colour can no longer prove a traverse was CLASSIFIED, so I exported the classification seam
+    (`typeOf`) + `dashFor` from toolpath2d and now assert the classification and the APPLIED dash (diagonal + dog-leg ->
+    'lifted' dashed; a Z-changing plunge -> 'rapid' SOLID; a cut -> 'feed'). Dropped the `liftedDim` assert (dim was
+    removed with the grey). ALSO the vacuous discriminator in marker-colour-by-source: `red > blue` passed for yellow
+    too -- but the deeper problem was that the pixel sample was CONTAMINATED (the band included the chord, so the
+    "brightest pixel" was the now-yellow traverse, not the jog arc). Fixed by sampling only well ABOVE the chord, where
+    only the bowed manual arc reaches, and discriminating on GREEN (jog G/R ~0.27 vs traverse-yellow ~0.8).
+(2) FIRST-OPEN STALENESS -- `setProbesForWcs` now stops+replays the RUNNING engine like `setSeatAtStart` (t674) instead
+    of only re-tracing, and the auto-loop replay now re-applies the ONE `applySimConfig` (it bypassed it entirely).
+(3) DEAD LEGEND ROW -- `renderLegend` built its present-set from RAW trace types, so `lifted` could never appear. It now
+    classifies through the SAME `typeOf` the paint uses, so the legend cannot drift from what is drawn.
+(4a) STEP-SEED ONE-SOURCE -- extracted `seedFreshRun(eng)`, used by BOTH `play()` and the step handler. It includes the
+    `simActiveWcs = null` the copy-pasted step seed omitted (stale G55 label/Mach after playing a G55 program), plus the
+    probe/datum/comp resets and the DRO baseline. A future per-run reset can no longer be added to play() alone.
+
+### NOT DONE -- flagged honestly rather than half-landed
+
+(4b) "DRO updates on the FIRST next-line press ONLY, frozen after": I could NOT reproduce it either. My instrumented
+     capture of every updateDro call through a 60-step corner run shows it tracking continuously. Needs the user's exact
+     host/sequence.
+(H) The required stepped-corner regression (wall-2 DRO == wall-1 in Work AND Mach) is BLOCKED on the marker fix above:
+    in the editor host the markers are stripped, so such a spec cannot pass until the round-trip is lossless. Writing it
+    now would mean committing a red test. I removed the advisor's assertion-free scratch repro as authorised, having
+    extracted its finding here.
+(G) The middle 2D traverse dashes not meeting their markers -- not started.
+
+GATE: full suite unfiltered (the amendment's requirement -- t1203's name-filtered run is exactly what let the
+traverse-* straggler through): 1501 passed / 0 failed / 4 skipped (15.1m, EXIT=0). Three specs surfaced and were re-encoded: op-sim-context + sim-intent-fold (the additive probesForWcs shape, incl. the rotary ops being PROBES and the mill+rotary union folding true), and boss-probe-collision -- whose AUTO arm is a deliberately-degraded CONTROL asserting the no-passStarts path still MISSES; the passAnchor fallback makes that failure mode unreachable, so the control was restated (the MANUAL arm still discriminates, since its reposition is an operator jog with no programmed move). Branch feat/ddcs-workspace. NO release.
