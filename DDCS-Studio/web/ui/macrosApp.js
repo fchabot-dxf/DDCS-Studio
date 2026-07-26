@@ -13,11 +13,11 @@ import { seedBody } from '../data/controllerFileSeeds.js';                 // t6
 import { UIUtils } from './uiUtils.js';                                    // t662 (E1) — downloadFile for the no-LAN (DM500) export transport
 import * as slotPack from '../data/slotPack.js';
 import { bmpDataUrl } from '../data/bmp.js';
-import { openIconEditor, autoIconLayers, imageTileLayer } from './iconEditor.js';   // t1135 S5b — the inline (mounted) icon editor + the layer helpers (auto default / imported-BMP tile)
+import { openIconEditor, autoIconLayers, autoGlyphLayers, imageTileLayer } from './iconEditor.js';   // t1135 S5b — the inline (mounted) icon editor + the layer helpers (auto default / op-glyph default / imported-BMP tile)
 import { slotFromOp } from '../data/opToSlot.js';
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from '../data/probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
-import { seedFromOp, camTypeOf, isCamableType } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. (t1131 S6 — isCamGeneratorTwin dropped with the settings Customize-op picker; the op-menu Customize still uses it in opContextMenu.js)
+import { seedFromOp, camTypeOf, isCamableType, glyphForCamType } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. (t1131 S6 — isCamGeneratorTwin dropped with the settings Customize-op picker; the op-menu Customize still uses it in opContextMenu.js). t1175 — glyphForCamType for the auto-glyph default icon.
 import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
 import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';
 import { fieldVarCollisions, collisionMessage, maxLocalVar, bandsFor } from '../data/camScratch.js';   // t1081 — the DECLARED generator scratch bands + the build guard that refuses a slot whose form values land inside them   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
@@ -1278,13 +1278,17 @@ function homingPostIsExpert() {
     // camN.bmp + the operator form together = WYSIWYG). The editor edits LAYERS; onChange live-writes _authoring.icon.layers;
     // the BMP is rasterized at build (cbmBuild). Seed from the slot's layers (Edit), a pre-S5b BMP as a tile (legacy Edit), or
     // the auto default = the slot name as editable text (New) — so the preview is never blank AND the auto content is editable.
-    function mountIconEditor() {
+    async function mountIconEditor() {
         const host = document.getElementById('cbm_iconedit'); if (!host || !_authoring) return;
         if (_iconEditor) { try { _iconEditor.destroy(); } catch (_) { /* */ } _iconEditor = null; }
         const ic = _authoring.icon;
+        // t1175 AUTO-GLYPH — a fresh (New) slot with no pre-set icon defaults to the OP's glyph (from its camType), centred,
+        // no name text; an Edit pre-loads its saved layers; an imported BMP shows as a tile. (autoGlyphLayers is async — it
+        // loads the glyph tile URI — and falls back to the slot-name text if the op has no mapped glyph.)
         const initLayers = (ic && Array.isArray(ic.layers) && ic.layers.length) ? ic.layers
             : (ic && ic.data) ? [imageTileLayer(ic.data)]
-                : autoIconLayers(_authoring.name);
+                : await autoGlyphLayers(glyphForCamType(_authoring.ops[0] && _authoring.ops[0].camType), _authoring.name);
+        if (!_authoring || document.getElementById('cbm_iconedit') !== host) return;   // guard: the surface changed while the tiles loaded
         _iconEditor = openIconEditor({ layers: initLayers }, null, {
             mount: host,
             onChange: ({ layers }) => { _authoring.icon = { ...(_authoring.icon || {}), name: (_authoring.name || 'cam') + '.bmp', w: 360, h: 180, layers }; },   // live; .data is rasterized at build

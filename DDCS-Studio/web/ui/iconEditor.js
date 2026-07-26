@@ -347,3 +347,23 @@ export function autoIconLayers(name) {
 export function imageTileLayer(uri) {
     return { type: 'tile', tile: 'imported', uri, x: 0, y: 0, w: W, h: H, scale: 1, rot: 0, bw: W, bh: H };
 }
+
+/** t1175 AUTO-GLYPH — the default fresh-slot icon: a black bg + the op's GLYPH tile centred, LARGE, with NO name text (the
+ *  glyph replaces the name). Async (loads the tile URI from the tileset). If `glyphId` is absent or the tile can't be found,
+ *  falls back to autoIconLayers(name) (the name text) so a fresh slot never ends up blank. */
+export async function autoGlyphLayers(glyphId, fallbackName) {
+    if (glyphId) {
+        try {
+            const t = (await loadAllTiles()).find((x) => x.id === glyphId);
+            if (t) {
+                const aspect = (t.w && t.h) ? t.w / t.h : 1;
+                const gh = 120, gw = Math.max(8, Math.round(gh * aspect));   // centred + large on the 360×180 canvas
+                return [
+                    { type: 'rect', x: 0, y: 0, w: W, h: H, rot: 0, scale: 1, bw: W, bh: H, fill: '#000000', color: '#000000', sw: 0, bg: true },
+                    { type: 'tile', tile: t.id, uri: t.uri, x: (W - gw) / 2, y: (H - gh) / 2, w: gw, h: gh, scale: 1, rot: 0, bw: gw, bh: gh },
+                ];
+            }
+        } catch (_) { /* fall through to the name text */ }
+    }
+    return autoIconLayers(fallbackName);
+}

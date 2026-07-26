@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // CAM-UX declare-once S5b — the INTEGRATED icon editor: openIconEditor mounts INLINE inside the wizard, side-by-side with
 // the expose/bake param table (mirroring the DDCS controller CAM page: camN.bmp + the operator form together = WYSIWYG). The
-// editor edits LAYERS; a fresh New slot seeds the auto default (the slot name as editable text); Import BMP adds a tile layer;
+// editor edits LAYERS; a fresh New slot seeds the auto default (t1175: the op's glyph, centred, no name text); Import BMP adds a tile layer;
 // the icon rides _authoring.icon.layers live and is rasterized to the camN.bmp at build; Edit pre-loads + round-trips.
 test.use({ viewport: { width: 1400, height: 1000 } });
 
@@ -22,7 +22,7 @@ async function buildFromPocket(page) {
   await page.waitForSelector('#cbm_iconedit #iconed-modal.ie-inline', { timeout: 8000 });
 }
 
-test('S5b: New slot mounts the INLINE editor STACKED above the table (auto name-text); ALL tools present; interactions work; Build rasterizes + carries the icon', async ({ page }) => {
+test('S5b: New slot mounts the INLINE editor STACKED above the table (t1175 auto op-glyph); ALL tools present; interactions work; Build rasterizes + carries the icon', async ({ page }) => {
   await openCam(page);
   await buildFromPocket(page);
   const ui = await page.evaluate(() => {
@@ -45,7 +45,7 @@ test('S5b: New slot mounts the INLINE editor STACKED above the table (auto name-
   });
   expect(ui.inlineMounted, 'the icon editor mounts INLINE in the wizard').toBe(true);
   expect(ui.notFixed, 'the inline editor is not a full-screen overlay').toBe(true);
-  expect(ui.stageRenders, 'the editor stage renders the auto icon (name text)').toBe(true);
+  expect(ui.stageRenders, 'the editor stage renders the auto icon (t1175: the op glyph, centred, no name text)').toBe(true);
   expect(ui.stackedAbove, 'the icon editor is STACKED ABOVE the expose/bake table (controller layout)').toBe(true);
   expect(ui.allShapeTools, 'ALL shape tools (Text/Rect/Line/Circle/Arrow) present — reuse kept them').toBe(true);
   expect(ui.hasTiles, 'the tileset toolbar is present').toBe(true);
@@ -62,7 +62,7 @@ test('S5b: New slot mounts the INLINE editor STACKED above the table (auto name-
   await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'), null, { timeout: 8000 });
   const slot = (await camPack(page)).slots.slice(-1)[0];
   expect(!!(slot.icon && slot.icon.data && slot.icon.data.length > 100), 'the built slot carries the rasterized camN.bmp').toBe(true);
-  expect(Array.isArray(slot.icon.layers) && slot.icon.layers.length >= 3, 'the slot stores the editable layers (bg + name + the added rect)').toBe(true);
+  expect(Array.isArray(slot.icon.layers) && slot.icon.layers.length >= 3, 'the slot stores the editable layers (bg + op-glyph + the added rect)').toBe(true);
   expect(slot.icon.w === 360 && slot.icon.h === 180, 'the icon is 360×180').toBe(true);
 });
 

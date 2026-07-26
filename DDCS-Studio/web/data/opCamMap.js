@@ -26,6 +26,16 @@ import { classifyExposable } from './exposeClassifier.js';   // U1 — per-bindi
 // The clean 1:1 opType -> CAM generator type. pocket/drill are the DEFAULT arm; their variant arms are gated in camTypeOf.
 export const OPTYPE_TO_CAM = { surfacing: 'surface', corner: 'corner', edge: 'edge', slot: 'slot', pocket: 'pocket', drill: 'drill' };
 
+// t1175 AUTO-GLYPH — camType (camTypeOf) -> the tileset glyph id (web/assets/svg/tileset.svg) that pictures that op. A fresh
+// CAM slot's default icon is this glyph, centred, with no name text. An unmapped camType (e.g. substack) resolves to null →
+// the icon editor falls back to the slot-name text, so it never breaks.
+export const CAMTYPE_GLYPH = {
+    surface: 'surface', corner: 'corner', edge: 'edge', slot: 'slot',
+    pocket: 'pocket_rect', cpocket: 'pocket_round', drill: 'drill', bore: 'bore',
+    inside: 'probe_center', boss: 'boss_round', universal: 'contour',
+};
+export const glyphForCamType = (camType) => CAMTYPE_GLYPH[camType] || null;
+
 // The op types the S1c picker should offer (each has at least one working arm). Per-op variants may still be unsupported
 // (seedFromOp returns {unsupported}): pocket polygon/ellipse, drill pattern 'single', middle single-axis. contour excluded.
 export const SUPPORTED_OPTYPES = ['pocket', 'surfacing', 'corner', 'edge', 'slot', 'drill', 'middle'];
