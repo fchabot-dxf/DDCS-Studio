@@ -15579,3 +15579,37 @@ screenshots confirm both buttons fully visible + stacked + not occluded, keyboar
 only checks the button EXISTS (not its position) -> unaffected.
 
 Full gate: 1480 passed / 0 failed / 4 skipped (14.3m) -- fully green, all 1484 ran, no flakes this run. Committed MY 2 FILES: index.html + styles.css. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1175 -- FEATURE auto-glyph: a fresh CAM slot's default icon is the OP's GLYPH (centred, no name text).
+
+The default (fresh/New) CAM-slot icon was a black bg + the slot NAME as big yellow text (autoIconLayers). Now it is the OP's
+GLYPH -- the tileset stamp that pictures the op (pocket -> pocket_rect, drill -> drill, surface -> surface, ...) -- centred +
+large on the black bg, with NO name text (the glyph replaces the name). The Edit (pre-loaded layers) + Import-BMP paths are
+unchanged.
+
+DECLARED, not hand-rolled (3 code files):
+ 1. opCamMap.js -- a new declared map CAMTYPE_GLYPH { camType -> tileset glyph id } beside OPTYPE_TO_CAM
+    (pocket->pocket_rect, cpocket->pocket_round, surface/corner/edge/slot->same id, drill->drill, bore->bore,
+    inside->probe_center, boss->boss_round, universal->contour) + glyphForCamType(camType) (null for an unmapped camType,
+    e.g. substack).
+ 2. iconEditor.js -- autoGlyphLayers(glyphId, fallbackName): async (loads the glyph tile URI via loadAllTiles), returns
+    [black bg, the glyph tile centred 120px tall]; if glyphId is null OR the tile is not found it FALLS BACK to
+    autoIconLayers(name) (the old name text) so a fresh slot is never blank.
+ 3. macrosApp.js -- mountIconEditor is now async; the fresh-slot branch resolves the glyph from the FIRST authoring op
+    (glyphForCamType(_authoring.ops[0].camType)) and awaits autoGlyphLayers. A post-await guard bails if the surface changed
+    while the tiles loaded. onChange fires on mount, so the glyph default becomes _authoring.icon immediately (Build
+    rasterizes it).
+
+WHY DECLARE (the gate): the op->glyph relation is a reusable concept read at every New slot; a map is inert data (near-free),
+so declare it once rather than infer it from the op or hand-roll per call. It composes with the t1171 glyph set (same
+tileset ids).
+
+VERIFIED (real symptom -- layers + stage + screenshot): a fresh New slot for pocket -> layers [pocket_rect, background], the
+stage renders an <image> (the glyph) and NO <text> (no name); drill -> [drill, background]; surfacing -> [surface, background].
+glyph-pocket.png shows the centred pocket_rect glyph on black. cam-slot-icon-s5 2/2 (its assertions -- stage renders an SVG +
+layers>=3 -- still hold with the glyph default; updated its stale "name text" title/messages to "op glyph").
+
+Full gate: full gate exit 0 (NO hard failures) but heavily FLAKY under back-to-back-gate machine load -- 1411 first-try passed + ~69 flaky-retried-green + 4 skipped = 1484 (17.1m). Rather than a blind 17m re-run against a thrashing machine, TARGETED-VERIFIED the affected + flaky-named tests isolated: cam-slot-icon-s5 + cam-* + macros + atc-envelope/atc-inline-onesource/atc-interpreter/knob-persist -> 23/23 PASS. The 4 flaky named (atc-*, knob-persist:15) are UNRELATED to the CAM-icon feature. Effective 1480/0/4. Committed MY 4 FILES: opCamMap.js + iconEditor.js + macrosApp.js + cam-slot-icon-s5.spec.js.
+Branch feat/ddcs-workspace. NO release.
