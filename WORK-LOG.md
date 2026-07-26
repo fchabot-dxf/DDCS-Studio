@@ -15987,3 +15987,42 @@ the base config still LOADS with the new value (the smoke config imports it) and
 1489 suite -- the advisor runs the full gate at merge, and a lenient-timeout change cannot regress anyway.
 
 Committed MY 1 FILE: DDCS-Studio/playwright.config.js. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1199 -- FEATURE: INTENTIONAL SAVE -- Ctrl+S writes the whole workspace to a user-owned .ddcs via the File System Access API.
+
+WHY: persistence-A made localStorage the TEMPORARY buffer and told the user when work is not in a file. This is the
+deliberate SAVE act that puts it in one: Ctrl+S / a Save button writes the WHOLE workspace (.ddcs) to a file the USER
+owns + picks, and re-saves the SAME file after that (a real "Save", not "Save As every time"). Works on web AND the exe
+(pywebview -> WebView2 exposes Chromium FSA); falls back to the download where FSA is absent (Firefox / older Safari).
+
+NEW MODULE ui/workspaceSave.js (window.ddcsSaveWorkspace):
+  - FSA-first: showSaveFilePicker -> handle; createWritable(JSON of buildBackup) -> the user file. The handle is
+    REMEMBERED in-session AND persisted to IDB (ddcs_fs/kv) so a later Ctrl+S re-saves the same file with no re-pick.
+    Permission is re-checked on the save GESTURE (queryPermission/requestPermission -- must be inside a user gesture).
+  - hasFSA() is a CALL-TIME check (not a load-time const) -> robust + testable (headless has no picker at load).
+  - Ctrl+S = Save (reuse the handle), Ctrl+Shift+S = Save As (force the picker). preventDefault stops the browser Save-Page.
+  - AbortError (user cancels the picker) => no-op, do NOT fall back. Any other FSA error => the download fallback.
+  - Fallback = exportEverything() (builds + downloads a timestamped .ddcs + marks saved) -- ONE source for the download.
+
+TIE-IN to persistence-A: markWorkspaceSavedToFile(name) now records the FILE NAME (ddcs_file_saved_name); the indicator
+chip reads "Saved to <name> . Nm ago" (fileSavedName()). The persistence-A chip click + the Settings "Save workspace"
+button + Ctrl+S now ALL route through window.ddcsSaveWorkspace (the FSA save), with window.ddcsExportBackup as the
+fallback. Settings button title gains the Ctrl+S hint.
+
+VERIFIED (real symptom + screenshot): FSA save writes the workspace backup to the file, REUSES the handle on a 2nd save
+(no re-pick), records the filename; Ctrl+S triggers it, Ctrl+Shift+S forces a re-pick; without FSA it downloads a .ddcs
+and still marks saved. Screenshot: the green chip reads "Saved to my-shop-setup.ddcs . just now". New spec
+persistence-intentional-save.spec.js (3 tests, FSA mocked + fallback). persistence-file-indicator + backup-852 green
+(the markWorkspaceSavedToFile(name) signature change is backward-safe -- no-arg calls clear the name).
+
+GATE (first feature under the new TIERING): per-pass = smoke + the touched-feature specs -> smoke 60/60 in ~31s +
+intentional-save 3/3 + persistence + backup green. Did NOT run the full 1489 suite (the advisor runs it at the merge
+boundary; my changes are additive to backup.js + a new module + a one-line settings/app wire).
+
+NOTE to advisor: I left persistence-intentional-save OUT of the smoke manifest (persistence-file-indicator is already
+the persistence canary; smoke tracks subsystems not features) -- add it if you want the FSA save in the fast tier.
+
+Committed MY 6 FILES: data/backup.js + ui/workspaceSave.js (new) + ui/fileSaveState.js + ui/settingsPanel.js + app.js +
+tests/persistence-intentional-save.spec.js (new). Branch feat/ddcs-workspace. NO release.
