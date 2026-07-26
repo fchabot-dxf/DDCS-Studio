@@ -17,7 +17,7 @@ import { openIconEditor, autoIconLayers, autoGlyphLayers, imageTileLayer } from 
 import { slotFromOp } from '../data/opToSlot.js';
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from '../data/probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
-import { seedFromOp, camTypeOf, isCamableType, glyphForCamType } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. (t1131 S6 — isCamGeneratorTwin dropped with the settings Customize-op picker; the op-menu Customize still uses it in opContextMenu.js). t1175 — glyphForCamType for the auto-glyph default icon.
+import { seedFromOp, camTypeOf, isCamableType, glyphForOp } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. (t1131 S6 — isCamGeneratorTwin dropped with the settings Customize-op picker; the op-menu Customize still uses it in opContextMenu.js). t1175/t1177 — glyphForOp resolves the auto-glyph default icon (camType-first, opType for universal).
 import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
 import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';
 import { fieldVarCollisions, collisionMessage, maxLocalVar, bandsFor } from '../data/camScratch.js';   // t1081 — the DECLARED generator scratch bands + the build guard that refuses a slot whose form values land inside them   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
@@ -1287,7 +1287,7 @@ function homingPostIsExpert() {
         // loads the glyph tile URI — and falls back to the slot-name text if the op has no mapped glyph.)
         const initLayers = (ic && Array.isArray(ic.layers) && ic.layers.length) ? ic.layers
             : (ic && ic.data) ? [imageTileLayer(ic.data)]
-                : await autoGlyphLayers(glyphForCamType(_authoring.ops[0] && _authoring.ops[0].camType), _authoring.name);
+                : await autoGlyphLayers(glyphForOp(_authoring.ops[0]), _authoring.name);
         if (!_authoring || document.getElementById('cbm_iconedit') !== host) return;   // guard: the surface changed while the tiles loaded
         _iconEditor = openIconEditor({ layers: initLayers }, null, {
             mount: host,

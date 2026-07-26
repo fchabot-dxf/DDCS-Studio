@@ -34,7 +34,20 @@ export const CAMTYPE_GLYPH = {
     pocket: 'pocket_rect', cpocket: 'pocket_round', drill: 'drill', bore: 'bore',
     inside: 'probe_center', boss: 'boss_round', universal: 'contour',
 };
-export const glyphForCamType = (camType) => CAMTYPE_GLYPH[camType] || null;
+// t1177 Part D — the FULL op -> glyph resolver (advisor synthesis, "wire by opType"): camType WINS for the 8 generators +
+// inside/boss (a BOSS middle stays boss_round — opType never overrides it); a UNIVERSAL op falls to its specific opType glyph,
+// else contour. OPTYPE_GLYPH is free inert data, so every auto-only glyph is wired — alignment works today, the rest
+// auto-produce once their op becomes a CAM slot.
+export const OPTYPE_GLYPH = { alignment: 'align_two', homing: 'home', rotary_center: 'rotary_axis', rotary_clock: 'clock_dial', atc_change: 'tool_change', atc_table: 'tool_table', tap: 'tap', text: 'engrave', contour: 'contour', middle: 'probe_center' };
+export function glyphForOp(op) {
+    if (!op) return null;
+    // An AUTHORING op carries its already-resolved camType/universal but NOT params (a fresh camTypeOf would misresolve
+    // pocket-shape / drill-method → regress cpocket→pocket_round, bore→bore), so use the stored values when present; else
+    // derive from a raw program op.
+    const r = (op.camType != null || op.universal != null) ? { camType: op.camType, universal: !!op.universal } : camTypeOf(op);
+    if (!r.universal && r.camType) return CAMTYPE_GLYPH[r.camType] || null;
+    return OPTYPE_GLYPH[baseOf(op.opType).baseType] || CAMTYPE_GLYPH.universal || null;
+}
 
 // The op types the S1c picker should offer (each has at least one working arm). Per-op variants may still be unsupported
 // (seedFromOp returns {unsupported}): pocket polygon/ellipse, drill pattern 'single', middle single-axis. contour excluded.
