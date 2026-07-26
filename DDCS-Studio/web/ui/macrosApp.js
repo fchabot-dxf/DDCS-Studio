@@ -1458,9 +1458,16 @@ function homingPostIsExpert() {
         if (_cbmPanel) { try { _cbmPanel.stop(); _cbmPanel.setActive(false); } catch (_) { /* noop */ } _cbmPanel = null; }
         host.innerHTML = '';
         const s = cbmPreviewSlot(), macro = slotPack.slotMacro(s), seed = new Map();
-        (s.fields || []).forEach((f) => seed.set(slotPack.mirrorVar(f.idx), Number(f.def)));
+        // t1189 — seed each field's DISPLAYED/programmed value (what the param table shows via cbmVal(op, key) — the SAME
+        // expression renderCbmTable uses), NOT the generator DEFAULT; fall back to f.def only when the displayed value is blank
+        // or non-numeric. (Was Number(f.def) → a slot with real values simulated as 'No drawable moves'.)
+        (s.fields || []).forEach((f) => {
+            const dv = cbmVal(f._op, fkeyOf(f)), n = Number(dv);
+            seed.set(slotPack.mirrorVar(f.idx), (dv !== '' && dv != null && Number.isFinite(n)) ? n : Number(f.def));
+        });
         _cbmPanel = createPreviewPanel(host, { getGcode: () => macro, createVarStore: () => new Map(seed), ...probePreviewOpts(s, macro) });
         _cbmPanel.setActive(true);
+        try { window.ddcsCbmSimPanel = _cbmPanel; } catch (_) { /* debug/test handle for the inline CAM sim panel (getSegments/snapshot) */ }
     }
     async function cbmBuild() {
         if (!_authoring.ops.length) { dlgNotice('Import or add an op first.'); return; }

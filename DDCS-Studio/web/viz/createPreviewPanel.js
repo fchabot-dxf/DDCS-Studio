@@ -612,6 +612,7 @@ export function createPreviewPanel(container, opts = {}) {
             passStarts,                                        // per-pass starts (multi-point probe collision fires from each)
             wcsOffset: simWcsOffset(absolute, stk),
             g53ApproxZ: g53ApproxForViz(),                     // t826 — undeclared: render machine-frame G53 Z retracts as a margin-clearance above the work
+            createVarStore: opts.createVarStore || null,       // t1189 — the STATIC route trace must seed the SAME #vars as play (the engine already gets this at creation). Without it a CAM-slot macro reads its #2600+ mirrors as 0 → e.g. a Pocket's size guard trips → 'No drawable moves'. Route↔play parity; applySimConfig ignores this field so play is unchanged.
         };
     }
     // Apply the ONE config to the LIVE animation engine (the trace consumes it via traceToolpath opts).
