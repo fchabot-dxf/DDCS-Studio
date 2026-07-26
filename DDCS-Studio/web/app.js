@@ -69,6 +69,12 @@ import './data/profileLibrary.js';   // t658 — the local named-profile library
 // IO Settings & Diagnostics
 import './ui/ioTab.js';
 
+// PERSISTENCE-A — the "unsaved to file" header chip + exit warning (localStorage-only work vs a portable .ddcs)
+import './ui/fileSaveState.js';
+
+// INTENTIONAL SAVE — Ctrl+S / Save writes the whole workspace to a user-owned .ddcs via the File System Access API
+import './ui/workspaceSave.js';
+
 // Anonymous, opt-out usage analytics — fires a `visit` on load; see ui/analytics.js
 import './ui/analytics.js';
 

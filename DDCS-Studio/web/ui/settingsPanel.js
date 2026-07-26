@@ -1223,7 +1223,7 @@ function buildSettingsOverlay() {
                         <div class="settings-section-title">WORKSPACE (.ddcs)</div>
                         <div class="settings-hint">Save your whole workspace — profiles, projects, settings, the tool table, custom wizards, your <b>CAM pack</b>, presets, prefs — as one <b>.ddcs</b> file, and open it on another machine or after a reset. (One job is a <b>.mjson</b>; the whole workspace is a <b>.ddcs</b>.) Tokens and cloud credentials are never included.</div>
                         <div class="settings-row" style="margin-top:10px; gap:8px;">
-                            <button type="button" class="toolbar-btn settings-io" id="set_backup_export" title="Save your whole workspace as one .ddcs file">💾 Save workspace</button>
+                            <button type="button" class="toolbar-btn settings-io" id="set_backup_export" title="Save your whole workspace to a .ddcs file you own (Ctrl+S). Pick the location once; later saves overwrite it.">💾 Save workspace</button>
                             <button type="button" class="toolbar-btn settings-io" id="set_backup_restore" title="Open a .ddcs workspace (or a legacy .json backup) — you'll pick what to restore, and a safety copy of your current state is saved first">📂 Open workspace…</button>
                         </div>
                     </div>
@@ -2977,7 +2977,8 @@ function wireSettingsOverlay(ov) {
     mainTabs.forEach(t => t.addEventListener('click', () => showGroup(t.dataset.group)));
     sideTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
     // t852 — the one-file backup buttons (the module registered the globals on import).
-    ov.querySelector('#set_backup_export')?.addEventListener('click', () => window.ddcsExportBackup && window.ddcsExportBackup());
+    // t1199 — the intentional save: a user-owned .ddcs via the File System Access API (falls back to the download).
+    ov.querySelector('#set_backup_export')?.addEventListener('click', () => (window.ddcsSaveWorkspace || window.ddcsExportBackup)?.());
     ov.querySelector('#set_backup_restore')?.addEventListener('click', () => window.openBackupRestore && window.openBackupRestore());
     // Expose group+panel navigation so callers (e.g. the Homing wizard's "⚙ Homing setup" link) can deep-link
     // to Settings → Hardware → Machine where the homing section now lives.

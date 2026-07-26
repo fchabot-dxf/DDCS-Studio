@@ -13,7 +13,7 @@
  * localStorage-vs-.ddcs AWARENESS layer only. The workspace .ddcs is the config/library grain (settings, wizards, CAM
  * pack, presets, layout); the current PROGRAM is the separate .mjson job grain and is not part of this signal.
  */
-import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedAt } from '../data/backup.js';
+import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedAt, fileSavedName } from '../data/backup.js';
 
 let chip = null;
 
@@ -43,8 +43,9 @@ function refresh() {
     } else if (savedAt) {
         chip.hidden = false;
         chip.classList.add('saved'); chip.classList.remove('dirty');
-        if (tx) tx.textContent = 'Saved to file · ' + agoText(savedAt);
-        chip.title = 'This workspace was saved to a .ddcs file ' + agoText(savedAt) + '. Click to save again.';
+        const name = fileSavedName();
+        if (tx) tx.textContent = (name ? 'Saved to ' + name : 'Saved to file') + ' · ' + agoText(savedAt);
+        chip.title = 'This workspace was saved to ' + (name || 'a .ddcs file') + ' ' + agoText(savedAt) + '. Click to save again.';
     } else {
         chip.hidden = true;   // clean but never saved to a file (fresh default state) — nothing to announce yet
         chip.classList.remove('dirty', 'saved');
@@ -53,8 +54,10 @@ function refresh() {
 }
 
 function saveWorkspace() {
-    if (window.ddcsExportBackup) { Promise.resolve(window.ddcsExportBackup()).then(refresh).catch(() => {}); }
-    else if (window.openSettings) { window.openSettings(); }   // fallback: the Save-workspace button also lives in Settings
+    // the deliberate save — a user-owned .ddcs via the File System Access API (t1199); falls back to the download.
+    const save = window.ddcsSaveWorkspace || window.ddcsExportBackup;
+    if (save) { Promise.resolve(save()).then(refresh).catch(() => {}); }
+    else if (window.openSettings) { window.openSettings(); }
 }
 
 function install() {

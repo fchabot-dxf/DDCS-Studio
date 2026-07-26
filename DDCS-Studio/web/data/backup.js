@@ -113,6 +113,7 @@ export async function exportEverything() {
 // so a new store is covered automatically and there is no second, divergeable definition of "the workspace state".
 const WATERMARK_KEY = 'ddcs_file_watermark';
 const SAVED_AT_KEY = 'ddcs_file_saved_at';   // epoch-ms of the last REAL .ddcs save/open — set ONLY by a file save, never the boot baseline
+const SAVED_NAME_KEY = 'ddcs_file_saved_name';   // the last .ddcs file NAME (for the indicator's "Saved to <name>"); optional
 const hash32 = (str) => { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; };
 
 /** A cheap SYNCHRONOUS content signature of the localStorage-backed workspace stores. Skips the async IDB projects
@@ -130,16 +131,23 @@ export function workspaceSignature() {
 }
 
 /** Record the current workspace as "saved to file" — called after a .ddcs is written OR opened. Stamps the time so the
- *  indicator can honestly read "Saved to file · Nm ago" (the ONLY thing that counts as saved; localStorage is temporary). */
-export function markWorkspaceSavedToFile() {
+ *  indicator can honestly read "Saved to file · Nm ago" (the ONLY thing that counts as saved; localStorage is temporary).
+ *  An optional file NAME (from the intentional FSA save) lets the indicator read "Saved to <name>". */
+export function markWorkspaceSavedToFile(name) {
     try { localStorage.setItem(WATERMARK_KEY, String(workspaceSignature())); } catch (_) {}
     try { localStorage.setItem(SAVED_AT_KEY, String(Date.now())); } catch (_) {}
+    try { if (name) localStorage.setItem(SAVED_NAME_KEY, String(name)); else localStorage.removeItem(SAVED_NAME_KEY); } catch (_) {}
     try { window.dispatchEvent(new Event('ddcs:file-state')); } catch (_) {}
 }
 
 /** Epoch-ms of the last real .ddcs save/open, or null if this workspace has NEVER been saved to a portable file. */
 export function fileSavedAt() {
     try { const v = localStorage.getItem(SAVED_AT_KEY); return v == null ? null : (Number(v) || null); } catch (_) { return null; }
+}
+
+/** The last saved .ddcs file NAME, or null (a download / restore that carried no name). */
+export function fileSavedName() {
+    try { return localStorage.getItem(SAVED_NAME_KEY) || null; } catch (_) { return null; }
 }
 
 /** First-run baseline: adopt the current (seeded / restored) state as clean so the indicator only lights up on a real
@@ -178,4 +186,5 @@ if (typeof window !== 'undefined') {
     window.ddcsWorkspaceDirtyToFile = isWorkspaceDirtyToFile;
     window.ddcsMarkWorkspaceSaved = markWorkspaceSavedToFile;
     window.ddcsFileSavedAt = fileSavedAt;
+    window.ddcsFileSavedName = fileSavedName;
 }
