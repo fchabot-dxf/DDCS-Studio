@@ -16549,3 +16549,13 @@ above would mean landing an EMIT-CLASS fork without room to verify it to that ba
 
 GATE: no code changed this turn (all instrumentation reverted; `git status` clean apart from HANDOFF.md), so no gate was
 owed. Branch feat/ddcs-workspace. NO release. Hardening batch NOT started.
+
+### t1213 rider — OP-DEFINING FIELDS FIRST (user ruling, amended mid-turn).
+
+[[op-defining-fields-at-top]]: the fields that say what the op IS lead the form. The twin renders in BINDING ORDER and
+buckets by `section`, so `middleDataDef` now concatenates the STRUCT rows BEFORE the scalars, which puts GEOMETRY above
+TOOL & CUT (identity -> geometry -> tool/cut). Declared ordering only -- no per-wizard CSS -- and the emit is untouched
+(bindings drive the FORM; the value-socket derive reads MIDDLE_BINDING_SPECS, unchanged). Verified: the form now leads
+axisOrder, featureType, inAxis, transAxis, travelShape, twoAxis with the probe scalars below (middle-form-order.png).
+Scoped to MIDDLE as instructed; the all-wizards sweep stays queued for the UI-polish batch. Gate: middle seam 47 passed
++ smoke 60/60 + corner-structctl/gui-sim-block/traverse-lands 9 passed.
