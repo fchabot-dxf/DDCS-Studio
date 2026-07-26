@@ -570,7 +570,17 @@ function commitProbeDims() {
 }
 
 // Signed field getter — travel can be negative (the sign is the home direction).
-const _gvs = (id, d) => { const el = document.getElementById(id); const n = Number(el && el.value); return Number.isFinite(n) && n !== 0 ? n : d; };
+// t1215 — READ A NUMERIC SETTINGS FIELD. The fallback `d` applies when the field is ABSENT or EMPTY (or holds
+// non-numeric text) — NOT when it holds a real 0. The old form was `Number.isFinite(n) && n !== 0 ? n : d`, which
+// silently swapped a typed 0 for the previous value: the user types 0 into an envelope travel, the field snaps back,
+// and nothing explains why. 0 is a legitimate thing to TYPE (the app then honestly shows a degenerate envelope) — it is
+// the user's input, not an error to swallow. Empty still means "leave it alone", which is what `d` is for.
+const _gvs = (id, d) => {
+    const el = document.getElementById(id);
+    if (!el || String(el.value).trim() === '') return d;
+    const n = Number(el.value);
+    return Number.isFinite(n) ? n : d;
+};
 // Interactive MACHINE ENVELOPE: an isometric box drawn from the SIGNED travels, so home (machine 0) sits at the
 // corner the signs dictate and each axis edge points the travel direction. The travel inputs sit on their axis edge.
 function renderMachineGui() {
