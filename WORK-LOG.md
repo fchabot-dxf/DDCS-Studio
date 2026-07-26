@@ -15655,3 +15655,39 @@ whose op really reaches CAM authoring); leave homing/rotary/atc RESERVED (A) sin
 dormant; C throws away art we may want when they are). Not touching the resolver until the advisor's synthesis.
 
 Full gate: 1480 passed / 0 failed / 4 skipped (14.1m) -- fully green, all 1484 ran. Committed MY 1 FILE: iconEditor.js. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1179 -- SHAPE-LIBRARY Pass 1 FINISHED: pruned 22 tileset groups (Part A) + FULL op->glyph wire-by-opType (Part D).
+
+The advisor synthesized my t1177 gate: KEEP Part C (the AUTO_ONLY palette filter, already committed) + do Part A (prune 22
+groups) + Part D (the FULL option B -- wire EVERY auto-only glyph by opType, not just alignment).
+
+PART A -- removed 22 id'd groups from web/assets/svg/tileset.svg ENTIRELY (user-approved): the 10 badges (badge_0..9) + 12
+filler (hatch, dim_line, centerline, angle_arc, jogpath, touch_spark, axis_arrow, arrow, arrow_double, bolt_circle,
+stylus_side, minus). Line-based removal (each stamp is one <g>) -> 92 -> 70 lines; the extractor crops per-group so the sheet
+gaps are harmless (did NOT re-flow, per the dispatch); SVG stays well-formed. (The now-empty ROW 5-6 badge comment + the header
+"badge_0..9 kept distinct" note are now stale -- left in place, optional tidy.)
+
+PART D -- opCamMap.js: added the declared OPTYPE_GLYPH map (alignment->align_two, homing->home, rotary_center->rotary_axis,
+rotary_clock->clock_dial, atc_change->tool_change, atc_table->tool_table, tap->tap, text->engrave, contour->contour,
+middle->probe_center) + glyphForOp(op): camType WINS for the 8 generators + inside/boss (a BOSS middle stays boss_round --
+opType never overrides), a UNIVERSAL op falls to its specific opType glyph else contour. macrosApp.js mountIconEditor now calls
+glyphForOp(_authoring.ops[0]) (was glyphForCamType(camType)); the now-orphaned glyphForCamType export was REMOVED (only
+macrosApp imported it).
+
+DEVIATION from the literal spec (correctness, flagged): the advisor's glyphForOp called camTypeOf(op) unconditionally, but the
+AUTHORING op mountIconEditor passes carries its RESOLVED camType/universal but NOT params -- a fresh camTypeOf would misresolve
+pocket-shape/drill-method and REGRESS cpocket->pocket_round + bore->bore. So glyphForOp uses the op's STORED camType/universal
+when present (the authoring case) and falls back to camTypeOf only for a raw program op. Same logic, no regression.
+
+VERIFIED (real symptom -- direct resolver + palette + a UI build):
+ - glyphForOp on authoring-op-shaped inputs: pocket->pocket_rect, cpocket->pocket_round, bore->bore, drill->drill,
+   surface->surface, corner->corner, edge->edge, slot->slot, inside->probe_center, BOSS->boss_round (regression check PASS),
+   contour->contour, alignment(user_alignment_data)->align_two, homing->home, rotary_clock->clock_dial. 14/14.
+ - manual palette = EXACTLY 25 (32 tiles after the prune, minus the 7 auto-only); NONE of the 22 removed, NONE of the 7
+   auto-only (wire-palette.png). cam-slot-icon-s5 2/2 (names no removed id).
+ - UI: a fresh Alignment op (the user_alignment_data twin, what real programs use) -> the CAM slot default icon layers =
+   [align_two, background]. Confirms the advisor's "build it, confirm".
+
+Full gate: 1479 passed / 1 FLAKY (carve-live-crisp-816:27, a heavy live-carve mesh test UNRELATED to tileset/glyph; isolated 1/1; exit 0 retried green) / 4 skipped = 1484 (14.1m). Effective 1480/0/4. Committed MY 3 FILES: tileset.svg + opCamMap.js + macrosApp.js. Branch feat/ddcs-workspace. NO release.
