@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { autoAppDialog } from './_appDialog.js';   // t1219 — a cloud load is a destructive swap and now ASKS first
 
 /**
  * CLOUD MACHINE ROUND-TRIP (t660 E2, rewritten t1217). Save-to-cloud / Load-from-cloud are views over THIS WORKSPACE'S
@@ -92,6 +93,7 @@ test('cloud round-trip: Save pushes THIS WORKSPACE\'S MACHINE under its name; Lo
     await installDriveMock(page);
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsSetMachine && window.ddcsSaveProfileToCloud && window.ddcsListCloudProfiles && window.ddcsLoadCloudProfile && window.ddcsGetSettings);
+    await autoAppDialog(page, { accept: true });   // t1219 — the load asks before replacing this workspace's machine
 
     // name THIS workspace's machine + give it a distinctive envelope, then push to cloud under that name
     const afterPush = await page.evaluate(async () => {
@@ -113,6 +115,43 @@ test('cloud round-trip: Save pushes THIS WORKSPACE\'S MACHINE under its name; Lo
     });
     expect(afterLoad.machineName, 'the workspace now identifies as the loaded machine').toBe('Rig Alpha');
     expect(afterLoad.envX, 'the loaded machine carried its own envelope (642), full-swapped in — not the 111 it replaced').toBe(642);
+});
+
+/**
+ * t1219 — a cloud load is a FULL SWAP of this workspace's machine, so it routes through the same declared safety gate
+ * as a file import. Declining must leave the workspace untouched: the remote copy is the one thing a user cannot undo
+ * by re-typing, and a mis-click here would replace a whole machine configuration.
+ */
+test('DECLINING a cloud load leaves this workspace untouched (the same gate as a file import)', async ({ page }) => {
+    await installDriveMock(page);
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsSetMachine && window.ddcsSaveProfileToCloud && window.ddcsListCloudProfiles && window.ddcsLoadCloudProfile && window.ddcsGetSettings);
+
+    // put a machine on the cloud, then make this workspace a DIFFERENT one
+    await autoAppDialog(page, { accept: true });
+    await page.evaluate(async () => {
+        window.ddcsSetMachine({ name: 'Rig Alpha', controllerId: 'ddcs-v41' }, true);
+        window.ddcsGetSettings().machine = { x: 642, y: 400, z: 300, show: true };
+        await window.ddcsSaveProfileToCloud('Rig Alpha');
+        window.ddcsSetMachine({ name: 'Keep Me', controllerId: 'ddcs-expert-m350' }, true);
+        window.ddcsGetSettings().machine = { x: 111, y: 1, z: 1, show: true };
+    });
+
+    await autoAppDialog(page, { accept: false });   // now the user DECLINES the load
+    const after = await page.evaluate(async () => {
+        const { getActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
+        const alpha = (await window.ddcsListCloudProfiles()).find((c) => c.name === 'Rig Alpha');
+        const ret = await window.ddcsLoadCloudProfile(alpha.id);
+        return {
+            ret, machine: window.ddcsGetMachine(),
+            controller: (getActiveProfile() || {}).id, envX: window.ddcsGetSettings().machine.x,
+        };
+    });
+
+    expect(after.ret, 'a declined load reports that nothing landed').toBeNull();
+    expect(after.machine.name, 'the workspace keeps its own machine').toBe('Keep Me');
+    expect(after.controller, 'and its own controller — no wrong-dialect swap slipped through').toBe('ddcs-expert-m350');
+    expect(after.envX, 'and its own envelope').toBe(111);
 });
 
 // t1217 — the second test here ('the unified library renders local + cloud + both rows') is RETIRED with the

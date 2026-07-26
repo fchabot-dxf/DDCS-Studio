@@ -8,8 +8,10 @@
  */
 import { getSettings, applySettings, replaceSettings } from '../ui/settingsPanel.js';
 import { getAccessToken, ensureRoot, list as driveList, read as driveRead, write as driveWrite, mkdir as driveMkdir, del as driveDel } from '../ui/cloud/googleDrive.js';
-import { getActiveProfile, setActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { getActiveProfile, setActiveProfile, CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { getMachine, setMachine } from './workspaceMachine.js';   // t1217 — the bundle's name/controller ARE this workspace's machine
+import { safetyExport } from './backup.js';   // t1219 — an import full-swaps: same undo path the .ddcs restore uses
+import { dlgConfirm } from '../ui/dialog.js';   // t1219 — an explicit confirm before a destructive swap
 
 const PROFILE_VERSION = 1;
 const CLOUD_EXT = '.ddcsprofile.json';   // distinguishes profiles from .mjson projects in the user's Drive
@@ -19,13 +21,19 @@ function isPywebview() { return !!(window.pywebview && window.pywebview.api); }
 
 export function buildProfile() {
     const db = getDB();
-    const ap = (() => { try { return getActiveProfile(); } catch (e) { return null; } })();
-    const name = (() => { try { return getMachine().name || ''; } catch (e) { return ''; } })();   // t1217 — the MACHINE's name rides the export JSON (was the active library profile's)
+    // t1219 — ONE SOURCE for the exported identity: BOTH the name and the controller come from the machine record.
+    // This used to take the name from the machine record but the controllerId from getActiveProfile(), so an export
+    // could stamp one machine's name onto another machine's controller. After the restore fix those two cannot
+    // diverge, but a bundle's identity is exactly the thing that must not be assembled from two sources — an export
+    // that mislabels its controller is a wrong-dialect import waiting to happen. Make it true by construction.
+    const machine = (() => { try { return getMachine(); } catch (e) { return { name: '', controllerId: '' }; } })();
+    const cid = machine.controllerId || '';
+    const ctrlName = (() => { try { return (CONTROLLER_PROFILES[cid] || {}).name || ''; } catch (e) { return ''; } })();
     return {
         version: PROFILE_VERSION,
-        name,                                 // t658 — the user's profile name (import lands it as a named library profile)
-        controllerId: ap ? ap.id : '',        // which controller this profile is for → load restores the dialect/post
-        controllerName: ap ? ap.name : '',
+        name: machine.name || '',             // this workspace's machine name
+        controllerId: cid,                    // which controller this machine is → load restores the dialect/post
+        controllerName: ctrlName,
         settings: getSettings(),
         userVars: db ? db.getAll().filter(v => !v.isSys) : [],
     };
@@ -92,12 +100,43 @@ export function landImportedProfile(obj) {
     try { setMachine({ name: obj.name || obj.controllerName || '', controllerId: obj.controllerId || (obj.machine && obj.machine.id) || '' }, true); } catch (e) { /* */ }
 }
 
+/**
+ * THE PRE-IMPORT SAFETY GATE (t1219). Landing a bundle FULL-SWAPS this workspace's machine — the same blast radius as
+ * opening a .ddcs over your work — so it gets the same two protections the .ddcs restore path already has: an EXPLICIT
+ * confirm, then an automatic safety export as the undo path (ui/backupModal.js does exactly this: its preview modal is
+ * the confirm, then `await safetyExport()` before the restore).
+ *
+ * Declared ONCE, so every landing site is covered by construction rather than by remembering. Both of today's sites
+ * are currently reachable only via the console or the pywebview bridge — the UI door retired with the profile library
+ * — but "no door today" is not a reason to leave a destructive path unguarded; a door is one button away.
+ *
+ * FAILS CLOSED: if the confirm cannot be shown, the swap does NOT happen. A destructive operation that cannot ask is
+ * one that must not proceed.
+ * @returns {Promise<boolean>} may the caller land the bundle
+ */
+export async function allowDestructiveLanding(what) {
+    let ok = false;
+    try {
+        ok = await dlgConfirm(
+            `Import ${what}? This REPLACES this workspace's machine — its envelope, WCS, macros, variables and`
+            + ' controller are all swapped for the imported ones. Your current workspace is exported first so you can undo.',
+            { danger: true, okLabel: 'Replace this machine' },
+        );
+    } catch (e) { return false; }   // cannot ask → do not swap
+    if (!ok) return false;
+    try { await safetyExport(); } catch (e) { /* the export is best-effort; the user already confirmed */ }
+    return true;
+}
+
 export async function importProfile() {
     // Desktop (.exe): read the local file via the Python bridge
     if (isPywebview() && window.pywebview.api.loadProfile) {
         try {
             const json = await window.pywebview.api.loadProfile();
-            if (json) landImportedProfile(JSON.parse(json));
+            if (json) {
+                const obj = JSON.parse(json);
+                if (await allowDestructiveLanding('this machine configuration')) landImportedProfile(obj);
+            }
             return;
         } catch (e) { /* fall back to file picker */ }
     }
@@ -109,9 +148,12 @@ export async function importProfile() {
         const f = input.files && input.files[0];
         if (!f) return;
         const r = new FileReader();
-        r.onload = (e) => {
-            try { landImportedProfile(JSON.parse(e.target.result)); }
-            catch (err) { console.error('Invalid profile JSON', err); }
+        r.onload = async (e) => {
+            let obj;
+            try { obj = JSON.parse(e.target.result); }
+            catch (err) { console.error('Invalid profile JSON', err); return; }
+            // parse BEFORE asking — never prompt for a swap that a malformed file can't perform anyway
+            if (await allowDestructiveLanding('“' + (obj && obj.name ? obj.name : 'this machine configuration') + '”')) landImportedProfile(obj);
         };
         r.readAsText(f);
     });
@@ -144,10 +186,12 @@ const safeName = (s) => (String(s || 'profile').replace(/[\\/:*?"<>|]+/g, '_').t
 /** Save the current profile (settings + user vars) to Drive under `name`, stamped with machine + savedAt. */
 export async function saveProfileToCloud(name) {
     if (!cloudConnected()) throw new Error('Not signed in — connect your cloud account in Settings → Cloud.');
-    const ap = (() => { try { return getActiveProfile(); } catch (e) { return null; } })();
+    // t1219 — the `machine` stamp is derived from the SAME bundle identity, not re-read from getActiveProfile(). Two
+    // reads of "which controller is this" in one document is how a cloud copy ends up labelled for the wrong dialect.
+    const base = buildProfile();
     const profile = sanitizeForCloud({
-        ...buildProfile(),
-        machine: { id: ap ? ap.id : '', name: ap ? ap.name : '' },   // bind to a machine so a remote load picks the right frame
+        ...base,
+        machine: { id: base.controllerId, name: base.controllerName },   // bind to a machine so a remote load picks the right frame
         savedAt: new Date().toISOString(),
     });
     await driveWrite(safeName(name) + CLOUD_EXT, profile, await profilesFolderId());   // upserts by name
@@ -163,10 +207,12 @@ export async function listCloudProfiles() {
 }
 
 /** Load a cloud profile by Drive file id → APPLY it to this workspace's machine (t1217: the same landing as a file
- *  import, since the library it used to land in is retired). Keeps the Drive plumbing (driveRead) unchanged. */
+ *  import, since the library it used to land in is retired). Keeps the Drive plumbing (driveRead) unchanged.
+ *  t1219 — gated by the same confirm + safety export as a file import; returns null if the user declines. */
 export async function loadCloudProfile(fileId) {
     if (!cloudConnected()) throw new Error('Not signed in to cloud.');
     const obj = await driveRead(fileId);
+    if (!(await allowDestructiveLanding('“' + ((obj && obj.name) || 'this cloud machine') + '” from your cloud'))) return null;
     landImportedProfile(obj);   // t1217 — same landing as a file import: apply to THIS workspace's machine
     return obj;
 }

@@ -29,7 +29,7 @@ import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 �
 import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
-import { getMachine, setMachine } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine (replaces the profile library)
+import { getMachine, setMachine, legacyMachineConfigs, machineConfigFile, dropLegacyProfile } from '../data/workspaceMachine.js';   // t1217/t1219 — the workspace's ONE machine (replaces the profile library) + the legacy-machines door
 import { confirmSetupRow } from './setupChecklist.js';   // t1217 — a visit+confirm satisfies a checklist row even when the value is unchanged   // t684 b — the profile browser (save-as / browse)
 import './backupModal.js';   // t852 — registers window.ddcsExportBackup + window.openBackupRestore (the one-file backup)
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
@@ -1072,8 +1072,24 @@ function buildSettingsOverlay() {
                                  switch between — a second machine is a second .ddcs (Duplicate workspace). Retiring the
                                  switching machinery also retires the stale-snapshot bug class it created. -->
                             <button class="toolbar-btn settings-io" id="set_profile_import_dump" title="No LAN link? Copy the controller's disk to a USB stick and drop the whole folder here — Studio reads its setting / eng / coord files and derives the machine geometry + WCS (read-only), then you review before applying.">📁 Import from dump</button>
+                            <!-- t1219 — the READ side of the machine-config file the legacy door below writes. Without
+                                 it that export is a file nothing can open, which would make "save it and open it in a
+                                 new workspace" untrue. It REPLACES this workspace's machine, so it asks first and
+                                 exports an undo copy (data/profileStore.js allowDestructiveLanding). -->
+                            <button class="toolbar-btn settings-io" id="set_machine_open" title="Open a machine-config file (.ddcsmachine.json) — REPLACES this workspace's machine with it. Your current workspace is exported first so you can undo.">📂 Open machine config…</button>
                         </div>
                         <div class="settings-hint">This workspace has <b>one machine</b>. Everything below — controller, envelope, WCS, boot macro, variables — describes it, and it all travels inside this workspace's <b>.ddcs</b> file. A second machine is a second workspace: use <b>Duplicate workspace…</b>, then change the controller on the copy.</div>
+                        <!-- t1219 — LEGACY MACHINES: hidden unless this browser still carries pre-t1217 profiles that were
+                             never adopted. They are the OTHER machines from the retired library; the migration refuses to
+                             delete them, so this is where the user resolves each one — export it as a machine-config file
+                             (which seeds a new workspace) or dismiss it. When the last one is resolved the zombie library
+                             key clears, so it stops riding along inside every future .ddcs. -->
+                        <div id="set_legacy_machines" style="display:none; margin-top:10px;">
+                            <div class="settings-hint" style="border-left:3px solid #d6a11c; padding-left:8px;">
+                                <b>Machines from the old profile library</b> — this workspace kept only the one it was using. Save each of the others as a machine-config file (open it in a new workspace), or dismiss it. Nothing is deleted until you say so.
+                            </div>
+                            <div id="set_legacy_list"></div>
+                        </div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">CONTROLLER</div>
@@ -1885,6 +1901,58 @@ function wireSettingsOverlay(ov) {
     });
     renderMachineLine();
     window.addEventListener('ddcs:settings-changed', () => { try { renderMachineLine(); } catch (e) { /* */ } });
+
+    // ── t1219 — THE LEGACY-MACHINES DOOR ──────────────────────────────────────────────────────────────
+    // migrateProfileLibrary deliberately REFUSES to delete the non-active profiles from the retired library — losing a
+    // machine the user configured is not an acceptable migration cost. That promise only means something if there is a
+    // way to act on them, so this is it: one row per leftover machine, each exportable as a standalone machine-config
+    // file (which seeds a new workspace) or dismissable. Resolving the last one clears the zombie library key, which is
+    // also what stops it riding along inside every future .ddcs as a legacy `profiles` row.
+    // the READ side of machineConfigFile — window.ddcsImportProfile carries its own confirm + undo export
+    const openMachineBtn = q('set_machine_open');
+    if (openMachineBtn) openMachineBtn.addEventListener('click', () => { try { if (window.ddcsImportProfile) window.ddcsImportProfile(); } catch (e) { /* */ } });
+
+    const legacyWrap = q('set_legacy_machines');
+    const legacyList = q('set_legacy_list');
+    // a machine NAME is user text going into innerHTML / a filename — escape it, never trust it
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const safeFileName = (s) => (String(s || 'machine').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'machine');
+    function renderLegacyMachines() {
+        if (!legacyWrap || !legacyList) return;
+        let rows = [];
+        try { rows = legacyMachineConfigs(); } catch (e) { rows = []; }
+        legacyWrap.style.display = rows.length ? '' : 'none';
+        if (!rows.length) return;
+        legacyList.innerHTML = rows.map((p) => {
+            const ctrl = (CONTROLLER_PROFILES[p.controllerId] || {}).name || p.controllerId || 'unknown controller';
+            return '<div class="settings-row" style="align-items:center; margin-top:6px;">'
+                + '<span style="flex:1; font-size:13px;">' + esc(p.name || '(unnamed machine)') + '<span style="opacity:.7;"> · ' + esc(ctrl) + '</span></span>'
+                + '<button class="toolbar-btn settings-io" data-legacy-save="' + esc(p.id) + '" title="Save this machine as a .ddcsmachine file — open it in a new workspace to keep using it">💾 Save as file</button>'
+                + '<button class="toolbar-btn settings-io" data-legacy-drop="' + esc(p.id) + '" title="Forget this machine (it is not used by this workspace)">Dismiss</button>'
+                + '</div>';
+        }).join('');
+    }
+    if (legacyList) legacyList.addEventListener('click', async (e) => {
+        const saveBtn = e.target.closest('[data-legacy-save]');
+        const dropBtn = e.target.closest('[data-legacy-drop]');
+        if (!saveBtn && !dropBtn) return;
+        const id = (saveBtn || dropBtn).getAttribute(saveBtn ? 'data-legacy-save' : 'data-legacy-drop');
+        let rec = null;
+        try { rec = legacyMachineConfigs().find((p) => p && p.id === id) || null; } catch (err) { rec = null; }
+        if (!rec) { renderLegacyMachines(); return; }
+        if (saveBtn) {
+            // EXPORTING resolves it: the config now exists as a file the user owns, so it need not linger here.
+            try { UIUtils.downloadFile(safeFileName(rec.name || 'machine') + '.ddcsmachine.json', machineConfigFile(rec)); }
+            catch (err) { dlgNotice('Could not save that machine: ' + ((err && err.message) || err)); return; }
+            dropLegacyProfile(id);
+            dlgNotice('Saved “' + (rec.name || 'unnamed machine') + '”. Open that file in a new workspace to use it.');
+        } else {
+            if (!(await dlgConfirm('Dismiss “' + (rec.name || 'unnamed machine') + '”? This workspace does not use it, and it will be forgotten.', { danger: true, okLabel: 'Dismiss' }))) return;
+            dropLegacyProfile(id);
+        }
+        renderLegacyMachines();
+    });
+    renderLegacyMachines();
         // When a gateway answers (same-origin in the gateway-served/exe face, or via the ?api= dev
         // override), fetch the controller's own profile and offer it in the list (shown as
         // "… (from controller)"). Silently ignored if offline / not bridged (hosted Studio).

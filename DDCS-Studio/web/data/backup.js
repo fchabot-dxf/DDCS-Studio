@@ -108,7 +108,21 @@ export async function restoreBackup(obj, selectedIds) {
     }
     // t1217 — a LEGACY file (profile library, no machine row) collapses to the single machine record on open, so the
     // pivot's invariant holds for old workspaces too. Idempotent: a file that already carries `machine` no-ops here.
-    try { migrateProfileLibrary(); } catch (_) {}
+    // t1219 — and it ADOPTS that legacy file's machine identity unconditionally (the file IS the machine), retargeting
+    // the live controller. `fileHasMachineRecord` tells it when the newer explicit row already did that job, so a
+    // legacy library riding in the same file can't override it.
+    // Both flags describe the FILE, never the user's SELECTION — that distinction is the whole correctness of this call.
+    //  · fileHasMachineRecord: does the file CARRY a machine row? `machine.read` never returns undefined, so every
+    //    post-t1217 file has one and its absence is exactly what identifies a legacy file. Deriving this from what was
+    //    RESTORED instead would conflate "legacy file" with "the user un-ticked Machine in the restore modal" — and
+    //    then declining the machine would adopt one anyway, from the legacy row, retargeting the live controller.
+    //  · legacyFromFile: did the legacy library come from THIS FILE? migrateProfileLibrary reads the library out of
+    //    localStorage, so without this a restore would adopt the RECEIVING browser's own unresolved leftovers, silently
+    //    reverting a machine rename the user made after boot migration.
+    const fileHasMachine = Object.prototype.hasOwnProperty.call(stores, 'machine') && !!stores.machine;
+    try {
+        migrateProfileLibrary({ fromRestore: true, fileHasMachineRecord: fileHasMachine, legacyFromFile: restored.includes('profiles') });
+    } catch (_) {}
     markWorkspaceSavedToFile();   // the workspace now MATCHES the just-opened .ddcs → clean (persists across the restore reload)
     return { restored, skipped };
 }
