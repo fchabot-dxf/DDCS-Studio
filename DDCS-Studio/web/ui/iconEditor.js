@@ -215,7 +215,7 @@ export function openIconEditor(initial, onSave, opts = {}) {
         layers.push(L); sel = layers.length - 1; refresh();
     }
 
-    function renderStage() { stage.innerHTML = stageSvg(layers, sel, W, H); }
+    function renderStage() { stage.innerHTML = stageSvg(layers, sel, W, H, '#000', snapGuide); }
     function renderLayers() {
         $('ie_layers').innerHTML = layers.map((L, i) => `<div class="ie-lyr ${i === sel ? 'sel' : ''}" data-li="${i}"><span>${L.bg ? '▪ background' : L.type === 'text' ? '“' + esc(L.text).slice(0, 16) + '”' : L.type === 'tile' ? L.tile : L.type}</span><button class="op-btn" data-mv="up" title="Forward">▲</button><button class="op-btn" data-mv="dn" title="Back">▼</button><button class="op-btn" data-mv="del" title="Delete">✕</button></div>`).reverse().join('');
     }
@@ -229,6 +229,7 @@ export function openIconEditor(initial, onSave, opts = {}) {
             <label>H<input type="number" min="6" value="${Math.round(L.h)}" data-p="h" style="width:56px;"></label>
             <label>Rotate<input type="number" value="${Math.round(L.rot || 0)}" data-p="rot" style="width:56px;"></label>
         </div>`;
+        html += `<div class="ie-row"><button class="op-btn" data-act="cenH" title="Centre this layer on the canvas horizontally">↔ Center H</button><button class="op-btn" data-act="cenV" title="Centre this layer on the canvas vertically">↕ Center V</button></div>`;
         if (L.type === 'text') html += `<div class="ie-row"><label style="flex:1;">Text<input type="text" value="${esc(L.text)}" data-p="text" style="width:100%;"></label><label>Size<input type="number" min="6" max="80" value="${L.size || 20}" data-p="size" style="width:54px;"></label></div>`;
         if (L.type !== 'tile') html += `<div class="ie-row"><label>Colour<input type="color" value="${L.color || (L.type === 'text' ? '#ffd23f' : '#33ccff')}" data-p="color"></label>${L.type !== 'text' && L.type !== 'line' ? `<label>Fill<input type="color" value="${L.fill && L.fill !== 'none' ? L.fill : '#000000'}" data-p="fill"></label><label style="flex-direction:row;align-items:center;gap:4px;"><input type="checkbox" ${L.fill && L.fill !== 'none' ? 'checked' : ''} data-p="fillon">filled</label>` : ''}</div>`;
         host.innerHTML = html;
@@ -270,6 +271,8 @@ export function openIconEditor(initial, onSave, opts = {}) {
         if (e.target.dataset.tool === 'select') { sel = -1; refresh(); return; }            // left-rail Select = pointer mode (deselect)
         const addT = e.target.dataset.add; if (addT) { add(addT); return; }
         if (e.target.dataset.act === 'lock' && sel >= 0) { layers[sel].lock = !layers[sel].lock; renderProps(); return; }
+        if (e.target.dataset.act === 'cenH' && sel >= 0) { layers[sel].x = Math.round((W - layers[sel].w) / 2); refresh(); return; }   // t1183 — centre on the canvas
+        if (e.target.dataset.act === 'cenV' && sel >= 0) { layers[sel].y = Math.round((H - layers[sel].h) / 2); refresh(); return; }
         const li = e.target.closest('.ie-lyr'); if (li) { const i = +li.dataset.li; const mv = e.target.dataset.mv;
             if (mv === 'del') { layers.splice(i, 1); sel = Math.min(sel, layers.length - 1); refresh(); }
             else if (mv === 'up') { if (i < layers.length - 1) { [layers[i], layers[i + 1]] = [layers[i + 1], layers[i]]; sel = i + 1; refresh(); } }
@@ -300,6 +303,7 @@ export function openIconEditor(initial, onSave, opts = {}) {
     // Figma-style direct manipulation: drag the body to move, a corner/edge handle to resize (keeping the
     // opposite point anchored, in the layer's own rotated frame), or the top handle to rotate about centre.
     let gesture = null;   // gesture math lives in the shared core (shapeStage.startGesture / applyGesture)
+    let snapGuide = null;   // t1183 — the active move-snap {x,y} → the centre guide line; cleared on pointerup
     const ptStage = (e) => { const r = stage.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; };
     stage.addEventListener('pointerdown', (e) => {
         const hEl = e.target.closest('[data-h]');
@@ -309,10 +313,11 @@ export function openIconEditor(initial, onSave, opts = {}) {
     });
     stage.addEventListener('pointermove', (e) => {
         if (!gesture || sel < 0) return;
-        applyGesture(gesture, layers[sel], ptStage(e), e.shiftKey);
+        const res = applyGesture(gesture, layers[sel], ptStage(e), e.shiftKey, e.ctrlKey, W, H);   // t1183 — ctrl=from-centre, shift=uniform; W/H enable the move centre-snap
+        snapGuide = (res && res.snap && (res.snap.x || res.snap.y)) ? res.snap : null;
         renderStage();
     });
-    stage.addEventListener('pointerup', () => { if (gesture && gesture.type !== 'move') renderProps(); gesture = null; renderLayers(); });
+    stage.addEventListener('pointerup', () => { if (gesture && gesture.type !== 'move') renderProps(); gesture = null; if (snapGuide) { snapGuide = null; renderStage(); } renderLayers(); });
 
     function saveIcon() {
         rasterizeIconLayers(layers).then((url) => { m.remove(); if (onSave) onSave(url, { layers }); })

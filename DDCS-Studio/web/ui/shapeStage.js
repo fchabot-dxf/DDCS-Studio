@@ -10,6 +10,7 @@
  * constants), so the icon editor is unchanged.
  */
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+const SNAP_PX = 8;   // t1183 — a MOVE snaps the layer centre to the canvas centre within this stage-px threshold (per axis)
 
 export function rotateVec(v, deg) { const a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); return { x: v.x * c - v.y * s, y: v.x * s + v.y * c }; }
 
@@ -25,7 +26,7 @@ export const HANDLE_XY = { nw: [0, 0], n: [0.5, 0], ne: [1, 0], e: [1, 0.5], se:
 /** Render the stage SVG markup from the layer list (the selected layer gets a Figma-style handle frame). `bg` is the
  *  stage background fill (default black for the icon composer; the region editor passes 'transparent' to overlay a
  *  backdrop). */
-export function stageSvg(layers, sel, W, H, bg = '#000') {
+export function stageSvg(layers, sel, W, H, bg = '#000', guide = null) {
     const body = layers.map((L, i) => {
         const t = `translate(${L.x} ${L.y}) rotate(${L.rot || 0} ${L.w / 2} ${L.h / 2})`;
         let el = '';
@@ -48,7 +49,10 @@ export function stageSvg(layers, sel, W, H, bg = '#000') {
         }
         return `<g data-li="${i}" transform="${t}" style="cursor:move;">${el}${deco}</g>`;
     }).join('');
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="${bg}"/>${body}</svg>`;
+    // t1183 — subtle centre guide line(s) drawn ON TOP while a move-snap is active (guide.x → vertical, guide.y → horizontal).
+    const guideM = guide ? ((guide.x ? `<line x1="${W / 2}" y1="0" x2="${W / 2}" y2="${H}" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="6 4" opacity=".85" vector-effect="non-scaling-stroke"/>` : '')
+        + (guide.y ? `<line x1="0" y1="${H / 2}" x2="${W}" y2="${H / 2}" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="6 4" opacity=".85" vector-effect="non-scaling-stroke"/>` : '')) : '';
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="${bg}"/>${body}${guideM}</svg>`;
 }
 
 /** pointerdown → the gesture for the picked handle ('rot' / a corner-edge key) or, with no handle, a body MOVE
@@ -56,26 +60,48 @@ export function stageSvg(layers, sel, W, H, bg = '#000') {
 export function startGesture(handle, layer, P) {
     const b0 = { x: layer.x, y: layer.y, w: layer.w, h: layer.h, rot: layer.rot || 0 };
     if (handle === 'rot') return { type: 'rotate', cx: b0.x + b0.w / 2, cy: b0.y + b0.h / 2 };
-    if (handle && HANDLE_XY[handle]) { const [hx, hy] = HANDLE_XY[handle]; return { type: 'resize', hx, hy, rot: b0.rot, w0: b0.w, h0: b0.h, anchor: boxPoint(1 - hx, 1 - hy, b0) }; }
+    if (handle && HANDLE_XY[handle]) { const [hx, hy] = HANDLE_XY[handle]; return { type: 'resize', hx, hy, rot: b0.rot, w0: b0.w, h0: b0.h, anchor: boxPoint(1 - hx, 1 - hy, b0), cx0: b0.x + b0.w / 2, cy0: b0.y + b0.h / 2 }; }   // cx0/cy0 = the start centre (t1183 Ctrl = resize-from-centre)
     return { type: 'move', ox: P.x - layer.x, oy: P.y - layer.y };
 }
 
-/** pointermove → mutate the layer per the gesture (move / rotate about centre / resize with the opposite point
- *  anchored, in the layer's rotated frame; aspect-locked layers scale uniformly). Verbatim from iconEditor. */
-export function applyGesture(gesture, L, P, shiftKey) {
-    if (gesture.type === 'move') { L.x = Math.round(P.x - gesture.ox); L.y = Math.round(P.y - gesture.oy); }
-    else if (gesture.type === 'rotate') { let a = Math.atan2(P.y - gesture.cy, P.x - gesture.cx) * 180 / Math.PI + 90; if (shiftKey) a = Math.round(a / 15) * 15; L.rot = Math.round(a); }
-    else if (gesture.type === 'resize') {
-        const d = { x: P.x - gesture.anchor.x, y: P.y - gesture.anchor.y }, ld = rotateVec(d, -gesture.rot);
-        let nW = gesture.hx === 0.5 ? gesture.w0 : Math.max(6, Math.abs(ld.x));
-        let nH = gesture.hy === 0.5 ? gesture.h0 : Math.max(6, Math.abs(ld.y));
-        if (L.lock) {   // aspect-locked → uniform: the dragged axis drives the other
-            const ar = gesture.w0 / gesture.h0 || 1;
-            if (gesture.hx === 0.5) nW = nH * ar; else if (gesture.hy === 0.5) nH = nW / ar;
-            else if (nW / gesture.w0 >= nH / gesture.h0) nH = nW / ar; else nW = nH * ar;
+/** pointermove → mutate the layer per the gesture. Returns { snap:{x,y} } for a MOVE (which axes snapped to the canvas
+ *  centre — the caller draws the guide), else null. MODIFIERS (t1183): SHIFT while resizing = uniform (aspect-locked live);
+ *  CTRL while resizing = symmetric from the layer's own centre (the start centre stays fixed); SHIFT+CTRL composes.
+ *  W/H (the canvas size) enable the MOVE centre-snap; omit them (the region editor) and there is no snap. Rotate keeps its
+ *  SHIFT 15deg snap. */
+export function applyGesture(gesture, L, P, shiftKey, ctrlKey, W, H) {
+    if (gesture.type === 'move') {
+        L.x = Math.round(P.x - gesture.ox); L.y = Math.round(P.y - gesture.oy);
+        const snap = { x: false, y: false };
+        if (W != null && H != null) {   // snap the layer CENTRE to the canvas centre, INDEPENDENTLY per axis, within SNAP_PX
+            const cx = L.x + L.w / 2, cy = L.y + L.h / 2;
+            if (Math.abs(cx - W / 2) <= SNAP_PX) { L.x = Math.round(W / 2 - L.w / 2); snap.x = true; }
+            if (Math.abs(cy - H / 2) <= SNAP_PX) { L.y = Math.round(H / 2 - L.h / 2); snap.y = true; }
         }
-        const off = rotateVec({ x: (gesture.hx - 0.5) * nW, y: (gesture.hy - 0.5) * nH }, gesture.rot);
-        const cx = gesture.anchor.x + off.x, cy = gesture.anchor.y + off.y;
-        L.w = nW; L.h = nH; L.x = cx - nW / 2; L.y = cy - nH / 2; L.bw = nW; L.bh = nH; L.scale = 1;
+        return { snap };
     }
+    if (gesture.type === 'rotate') { let a = Math.atan2(P.y - gesture.cy, P.x - gesture.cx) * 180 / Math.PI + 90; if (shiftKey) a = Math.round(a / 15) * 15; L.rot = Math.round(a); return null; }
+    if (gesture.type === 'resize') {
+        const ar = gesture.w0 / gesture.h0 || 1, uniform = L.lock || shiftKey;
+        // aspect-lock: the driving axis sets the other (an edge handle drives the free axis; a corner drives the larger ratio).
+        const lockAxes = (nW, nH) => gesture.hx === 0.5 ? [nH * ar, nH] : gesture.hy === 0.5 ? [nW, nW / ar]
+            : (nW / gesture.w0 >= nH / gesture.h0 ? [nW, nW / ar] : [nH * ar, nH]);
+        if (ctrlKey) {   // FROM CENTRE: symmetric — the start centre (cx0,cy0) stays fixed; half-extents from the pointer.
+            const ld = rotateVec({ x: P.x - gesture.cx0, y: P.y - gesture.cy0 }, -gesture.rot);
+            let nW = gesture.hx === 0.5 ? gesture.w0 : Math.max(6, 2 * Math.abs(ld.x));
+            let nH = gesture.hy === 0.5 ? gesture.h0 : Math.max(6, 2 * Math.abs(ld.y));
+            if (uniform) [nW, nH] = lockAxes(nW, nH);
+            L.w = nW; L.h = nH; L.x = gesture.cx0 - nW / 2; L.y = gesture.cy0 - nH / 2; L.bw = nW; L.bh = nH; L.scale = 1;
+        } else {   // default: the OPPOSITE point (anchor) stays fixed, in the layer's rotated frame.
+            const ld = rotateVec({ x: P.x - gesture.anchor.x, y: P.y - gesture.anchor.y }, -gesture.rot);
+            let nW = gesture.hx === 0.5 ? gesture.w0 : Math.max(6, Math.abs(ld.x));
+            let nH = gesture.hy === 0.5 ? gesture.h0 : Math.max(6, Math.abs(ld.y));
+            if (uniform) [nW, nH] = lockAxes(nW, nH);
+            const off = rotateVec({ x: (gesture.hx - 0.5) * nW, y: (gesture.hy - 0.5) * nH }, gesture.rot);
+            const cx = gesture.anchor.x + off.x, cy = gesture.anchor.y + off.y;
+            L.w = nW; L.h = nH; L.x = cx - nW / 2; L.y = cy - nH / 2; L.bw = nW; L.bh = nH; L.scale = 1;
+        }
+        return null;
+    }
+    return null;
 }
