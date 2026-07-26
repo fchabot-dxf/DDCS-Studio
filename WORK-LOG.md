@@ -16334,3 +16334,80 @@ exactly the discipline that turned t1205 around. Carried to the next dispatch wi
 GATE (per the dispatch): smoke 60/60; corner-* + middle-* + preview-step-dro + lift-drop-pairing + probe-never-reads-wcs
 + check-console + gcode-to-stack + blocks-roundtrip = 168 passed / 0 failed / 2 skipped. Branch feat/ddcs-workspace. NO
 release. The 19-site HARDENING BATCH was NOT started, as instructed.
+
+---
+
+## turn 1209 -- MIDDLE BATCH. (C) RESOLVED by measurement (no gap; my own t1207 number was wrong). (A) SCOPED with decisive numbers -- GATED, not half-built. (B) SURFACED, not guessed.
+
+### (C) TRAVERSE-DASH GAP -- THERE IS NO GEOMETRIC GAP. My t1207 measurement was the error.
+
+Measured against the emit (boss two-axis, stock 100x80, dogleg AND diagonal):
+    marker (2)          = (50, 90)
+    middleReposLanding  = (50, 90)
+    FIRST PROBE START   = (50, 90)   <- the traverse really ends exactly on the marker
+    passEnds[1]         = (50, 80)   <- the end of the whole PASS, i.e. AFTER the probe stroked inward to the wall
+So the answer to the advisor's fork ("does the tool END at the marker or 10mm shy?") is: IT ENDS EXACTLY AT THE MARKER.
+The trace is NOT dropping a segment and the marker semantics are NOT wrong. In t1207 I compared the marker (a pass
+START) against passEnds[1] (the pass END, post-probe) -- two different things -- and reported a 10mm shortfall that does
+not exist. Correcting my own bad number is the finding; no geometry was touched, exactly as instructed ("never bend the
+geometry to close a visual gap").
+NEW SPEC middle-traverse-lands-on-marker.spec.js pins the real invariant on BOTH travel shapes -- marker == declared
+landing == where probing begins, via three independent paths (traced program / sim-start provider / declared helper) --
+and explicitly asserts the pass END is NOT the marker, so the t1207 trap can't be re-walked. Rendering: at the captured
+zoom the dashes DO reach their markers; any residual visual gap is presentation-only (dash phase / two stacked layers),
+never geometry.
+
+### (A) AXIS-ORDER -- GATED. Not a hand-roll away from Corner's pattern; Corner's pattern is a STRUCTURAL FORK.
+
+Grounded with a 5-agent parallel map of every seam. The decisive facts:
+1. Corner's "Probe Order" is ONE declared enum row (cornerData.js:191) that only WORKS because cornerWizard's superset
+   carries an 8-way corner x probeSeq GUARD (csFork, :194-196) which pruneGuards collapses at build.
+2. Middle's superset has NO axis fork -- middleWizard.js:289-291 says so outright ("a value swap, not a structural
+   fork"), and middleData.js:14-18 declares axis/dir1/dir2 deliberately BAKED as a LATER slice.
+3. THE HARD CONSTRAINT: instantiate() prunes a STATIC template and never rewrites params; a `move` block's x/y sockets
+   are NAMED, so no binding can rename x->y. The axis swap therefore MUST be pre-built as guarded arms -- it cannot be
+   done as a param mapping. (The only alternative is re-shaping the `move` atom to axis+value: engine-wide, touching
+   blockEmitter + the gcodeToStack round-trip + the Blockly blocks.)
+4. COST, MEASURED (block counts, superset vs concrete): corner 1119 / 67; middle 211 / 59. So Corner ALREADY ships an
+   1119-block template. A 2-WAY order fork (Corner's probeSeq is exactly 2-way; the 8 comes from corner(4) x seq(2))
+   puts middle at roughly 420 -- comfortably inside the accepted precedent. The scope is therefore REASONABLE; it is the
+   FRONTIER decision, not the size, that needs the ruling.
+5. It is NOT one change: the order is re-derived at SEVEN sites (both sim providers, two panelTypes decl sites, the
+   built-in view, the legacy SVG animator, the emit). Corner re-derives it ZERO times because it has ONE resolver
+   (axesOf). Middle needs the same resolver first, or the markers and the emit drift apart again -- the exact t1201
+   symptom the user already reported once.
+6. LATENT ISSUES the fork would UNMASK (each measured by the map, all pre-existing): syncA is a compile-time constant
+   reading axis==='Y' (twin would silently diverge for axis=Y + syncA + !twoAxis); dir2 is DERIVED not a param, so
+   guarding on it directly drops BOTH arms; #22/#21 would appear 8x in the raw superset, so CANONICAL_BIND must pin the
+   order the way cornerData.js:255 pins corner/probeSeq; middleView reads the BUILT-IN DOM (el('m_axis')) which the twin
+   does not have, so the twin's canvas would silently default to X.
+7. ALREADY WRONG TODAY (worth the advisor knowing): the twin's providers read p.axis LIVE while the twin's emit ignores
+   it -- so on Middle (data) today, changing axis moves the preview markers but not one byte of G-code. Going live fixes
+   that, but the parity spec must assert emit AND markers across the combos, not emit alone.
+RECOMMENDED SHAPE (for the advisor to bless, so I build the right thing once): (a) `middleAxes(params)` resolver in the
+middle builder, exported and read by the emit + all 7 sim/2D sites (byte-identical, provable, and it kills the drift
+class); (b) a 2-WAY `axisOrder` guard fork in middleStack's superset ONLY (leave dir1/dir2 baked -- the user asked for
+the ORDER, not the directions); (c) an `axisOrder` row in MIDDLE_STRUCT_BINDINGS with Corner's exact wording ('Probe
+Order' / 'Y then X' / 'X then Y'); (d) default 'XY' so at-rest emit is byte-identical to today; (e) CANONICAL_BIND pin;
+(f) the structCtl mirror row for the Blocks round-trip; (g) byte-diff proof: XY identical across the structural sweep,
+YX differing ONLY in the G31 axis letters, the #51-#56 register order and the per-axis WCS writes.
+
+### (B) THE AT-REST RE-CENTRE -- SURFACED, deliberately NOT guessed (emit-class probe G-code).
+
+The user's live words were "right it recenter the probe, that is unwanted logic", said immediately after I showed them
+that the SIM's middleReposLanding re-centred the primary coordinate REGARDLESS of a placed (2). I fixed exactly that in
+t1201 (the landing now honours a numeric diagPrimary). So on my reading the ruling is ALREADY SATISFIED, and there is no
+outstanding emit change.
+The advisor is treating (B) as a pending EMIT change to the at-rest `#22 = '#53'` default (re-centre to the MEASURED
+centre before the trans-axis traverse). I will not make that change on a guess, because dropping the re-centre is not
+cosmetic: for a BOSS, after the primary walls the tool sits OUTSIDE the boss on the primary axis. The traverse re-centres
+the primary precisely so the secondary probe approaches ALONG the boss; without it the secondary probe would run down a
+line that misses the boss entirely. Removing it would emit a probe that misses the part.
+NEEDED FROM THE USER, one question: at rest (no (2) placed), should the trans-axis traverse (i) keep re-centring the
+primary to the measured centre #53 (today's behaviour, geometrically required as argued above), or (ii) do something
+else they have in mind -- and if (ii), what should the primary target be? Until that is answered (B) is not buildable
+without risking a probe that misses the part.
+
+GATE: middle seam 45 passed / 0 failed / 2 skipped (incl. repos-landing, manual-markers, marker-parity, the new
+traverse-lands-on-marker) + corner-step-redescend + smoke 60/60. No emit was changed this turn, so no byte-diff was
+required. Branch feat/ddcs-workspace. NO release. Hardening batch NOT started, as instructed.
