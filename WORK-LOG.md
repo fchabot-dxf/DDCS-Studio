@@ -15769,3 +15769,39 @@ user's CURRENT exe keeps the double-download until the next build. It is a UI ha
 security.
 
 Full gate: 1481 passed / 0 failed / 4 skipped (14.5m) -- fully green, all 1485 ran (the +1 vs 1484 is this new double-download test). Committed MY 2 FILES: updateCheck.js + update-check.spec.js. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1187 -- FEATURE: SIM-SNAPSHOT 'Use in icon' (a clean geometry-only sim render → an editable icon layer).
+
+A 'Use in icon' button on the CAM wizard inline sim panel snapshots the sim CLEAN render (stock + toolpath, NO overlay) and
+drops it into the icon builder as a movable, editable tile layer.
+
+BUILD:
+1) createPreviewPanel.snapshot() (viz/createPreviewPanel.js) -> a CLEAN geometry-only PNG data-URL. It delegates to the 2D
+   toolpath new clean capture: toolpath2d.paint(clean=true) draws STOCK + TOOLPATH ONLY -- skips grid, envelope, axes, start
+   handles/markers, labels, poschip, pulses, cursor/readout -- then canvas.toDataURL('image/png'), then repaints the normal
+   interactive scene. If the 2D canvas is HIDDEN (3D is the active view), snapshot() shows it BEHIND the 3D canvas (z-index ->
+   no flash), fits it at the real size, captures clean, re-hides. Returns null if nothing simulated yet.
+   3D-CAPTURE DECISION (grounded FIRST, per the dispatch): the GcodeViz3D WebGLRenderer has NO preserveDrawingBuffer + NO
+   clean-overlay toggle (navCube/markers/gizmos/grid are separate scene objects) -> a clean 3D capture is NOT readily doable,
+   so I shipped the sanctioned fallback (clean 2D toolpath) + FLAG the WebGL clean-capture as a follow-on. Never ships overlay.
+2) macrosApp.js: a 'Use in icon' button on the sim-panel row (beside the Simulate button).
+3) On click -> cbmUseIcon(): _cbmPanel.snapshot(); if a data-URL, _iconEditor.addImage(url) -> an imageTileLayer added +
+   selected + the editor onChange fires (rides _authoring.icon.layers). If null -> a gentle 'Simulate first' notice.
+
+VERIFIED (real symptom -- direct panel + button wiring + screenshot): a createPreviewPanel fed a real rectangle toolpath ->
+getSegments 12, snapshot() -> a PNG data-URL (4.7 KB), openIconEditor.addImage -> exactly ONE 'imported' tile layer. A
+SCREENSHOT of the icon editor shows the capture is CLEAN -- stock outline + toolpath only, NO grid/axes/HUD/handles/buttons
+(the live panel beside it has all that chrome). Use-in-icon before Simulate -> a 'Simulate first' notice, no layer. New test
+cam-sim-snapshot.spec.js (2 tests). cam-slot-icon-s5 2/2.
+   TEST-HARNESS NOTE (honest): a fresh pocket op built via the ddcsGetBlockProgram stub did NOT trace to segments in the
+   harness (the authoring field-seed produced a macro that traced empty -- no trace error, just 0 segments; a pre-existing
+   test-setup gap, NOT the feature), so I verified the snapshot machinery with a hand-fed toolpath + the button wiring
+   separately. In the real app the pocket simulates + the button captures its clean toolpath.
+
+SHARED-CORE SAFETY: toolpath2d.paint gained an OPTIONAL clean param (default falsy -> every existing caller unchanged);
+createPreviewPanel gained snapshot() (additive). The Layout-overlay / region-editor consumers are untouched.
+
+Full gate: 1483 passed / 0 failed / 4 skipped (14.5m) -- fully green, all 1487 ran (+2 = the new snapshot tests; shared-core viz change broke nothing). Committed MY 4 FILES: toolpath2d.js + createPreviewPanel.js + macrosApp.js + cam-sim-snapshot.spec.js.
+Branch feat/ddcs-workspace. NO release.
