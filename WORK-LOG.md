@@ -15546,3 +15546,36 @@ removed ids are absent from the file.
 FINAL full gate (all t1171 work -- the corrected 12 glyphs + the rail cap): 1471 passed / 9 FLAKY (all retried GREEN, exit 0) / 4 skipped = 1484 total (16.3m). The flaky are heavy PARALLEL-LOAD tests UNRELATED to the tileset/rail change (shown: alignment-correction-840:92, alignment-data-emit:11, alignment-envelope-unclamp:9, contour-canvas:21 -- the 2D-canvas + alignment tests); contour-canvas:21 re-ran ISOLATED -> 1/1 pass (20s heavy). Effective 1480/0/4 (exit 0, NO hard failures). Committed: tileset.svg
 first-wrong-set (f8bdf90) then this CORRECTED set (feat) + iconEditor.js rail cap (65cdb50) + WORK-LOG (docs). Branch
 feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1173 -- bug fix: the two floating editor buttons no longer overlap OR hide behind the keyboard.
+
+The editor-overlay pair -- #align-rotate-btn (Transform) + #editor-cam-btn (CAM slot), both position:absolute in
+.editor-container -- had two bugs: (1) they were 26px apart while each is 24px tall -> an 8px OVERLAP; (2) the CAM button sat at
+a fixed bottom:34px, so the on-screen keyboard (#controller-dock) buried it (measured: cam bottom 866 > dock top 854, and
+deeply under the expanded dock at 557).
+
+ROOT CAUSE (a MISSING DECLARATION, not a magic-number patch): #align-rotate-btn ALREADY rides the dock declared clearance
+signal -- styles.css defines --kbd-clear on .app-shell (42px collapsed; calc(var(--dock-h,320px)+42px) when
+#controller-dock.is-expanded), and "#align-rotate-btn { bottom: calc(var(--kbd-clear,42px)+8px) }" lifts Transform above the
+keyboard. The CAM button was simply NEVER given the same rule -> it stayed at its inline bottom:34px, below Transform (once
+Transform lifted) AND below the dock. So the fix = make CAM ride the SAME signal, stacked one button above Transform.
+
+FIX (position/stacking only -- 3 tiny edits; ids/onclick/labels/titles/classes untouched):
+ 1. index.html: CAM inline bottom 34px -> 40px (the no-override base: Transform inline 8 + btn 24 + gap 8 = 40) so the pair has
+    a clean 8px gap even where no --kbd-clear rule applies (e.g. portrait, keyboard handled by moving the whole editor).
+ 2. styles.css (the desktop-landscape --kbd-clear block, beside the Transform rule): add
+    "#editor-cam-btn { bottom: calc(var(--kbd-clear,42px)+40px) !important; }" -> CAM rides --kbd-clear exactly like Transform
+    but 32px higher (btn 24 + gap 8), so the pair NEVER overlaps and NEITHER is occluded, keyboard collapsed OR expanded.
+ 3. styles.css (the portrait viz3d-open block, beside the Transform rule): mirror it for CAM
+    ("bottom: calc(var(--viz3d-size,50%)+44px)") so the pair also stays stacked when the 3D bottom-sheet lifts Transform.
+Dispatch priority (i) -- reuse the signal the dock ALREADY exposes (--kbd-clear), no magic number, no relocation.
+
+VERIFIED (real symptom, MEASURED + screenshot, keyboard CLOSED and OPEN): a temp spec measured both buttons vs the dock ->
+CLOSED cam 794/818 + transform 826/850 (8px gap, both above dock top 854); OPEN cam 474/498 + transform 506/530 (8px gap, both
+above the expanded dock top 557). overlapAC=false, camOccluded=false, xformOccluded=false in BOTH states. 2 full-viewport
+screenshots confirm both buttons fully visible + stacked + not occluded, keyboard open and closed. editor-position-translate:18
+only checks the button EXISTS (not its position) -> unaffected.
+
+Full gate: 1480 passed / 0 failed / 4 skipped (14.3m) -- fully green, all 1484 ran, no flakes this run. Committed MY 2 FILES: index.html + styles.css. Branch feat/ddcs-workspace. NO release.
