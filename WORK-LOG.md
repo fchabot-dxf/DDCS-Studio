@@ -16092,3 +16092,105 @@ crossover + data-emit x2 + sim-starts + probe-z-first) + smoke 60/60 (the t1195 
 tiering). Committed MY 6 FILES: viz/opSimStarts.js + viz/canvasWidgets.js + wizards/ops/panelTypes.js +
 wizards/views/userOpView.js + tests/middle-repos-landing-963.spec.js + tests/middle-manual-markers.spec.js (new).
 Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1203 -- SIM-FIX BATCH 2 (four preview-side items). Middle macro pair stays DEFERRED per the amendment.
+
+Grounded with a 5-agent parallel map (one reader per seam + a spec inventory) before touching code; every fix landed at
+a SHARED seam, and every claim below was MEASURED, not assumed.
+
+(c) CORNER RE-DESCEND -- the advisor's measurement REPRODUCED exactly, then root-caused + fixed.
+BEFORE (world-Z, default FL/YX, stock 100x80x20, safeZMargin 5): wall-1 probes at -5; the lift ln51 -5 -> 0; the
+@returnProbeZ G53 ln57 rendered (-43,43,0) -> (-43,43,0) = ZERO-LENGTH; wall-2 probed at 0 -- one safe-Z margin ABOVE
+wall-1. pz1: passEnds z climbed 2/7/12 (+5 per pass, never given back).
+ROOT: `_savedReturnZ` was PUSHED as a PASS-LOCAL z (GcodeExecutionEngine ~835) and POPPED as a pass-local z in the NEXT
+pass's frame (~1093). Between them a `( REPOSITION: )` resets this.pos and passAnchorFor swaps the anchor, so the
+anchor's Z delta -- exactly the safe lift -- was silently swallowed. Pass-local frames are a SIM-ONLY artifact: on the
+real M350 #882 is an ABSOLUTE machine Z with no concept of a pass (the factory dumps use `#120=#882` / `G53 Z#120`).
+FIX (3 small edits, engine only): a new private `_anchorZ()` (the SAME anchor expression the probe collision + _updateDro
+already use -- one frame definition), then SAVE `_anchorZ() + pos.z` (world) and RESTORE `pop() - _anchorZ()` (back to
+this pass's local frame). Save+return inside ONE pass cancel exactly -> byte-identical for middle's center/in-axis
+traverses, _continuous ops, single-pass primitives and null-_passStarts callers; across a reposition the delta is given
+back for ANY number of intervening passes.
+AFTER (measured): ln57 now (-43,43,0) -> (-43,43,-5) -- a REAL 5mm descent; wall-2 probes at -5 == wall-1. pz1: ln70
+7 -> -3, wall-2 -3 == wall-1 -3. passEnds BIT-IDENTICAL before/after (pz0 [0,5]; pz1 [2,7,12]) -> no marker, route-anchor
+or live-head shift.
+TWO SPECS CODIFIED THE BUG and were HARDENED (memory: a green test can assert the wrong property):
+  - corner-draw-anchor.spec.js:127 asserted `z1927 == 0` -- literally the bug value (wall-1 fires at -5). Its own comment
+    already said "wall-2 fires from the SAME Z as wall-1", so the INTENT was right and the literal was wrong. Restated
+    against an INDEPENDENT truth: wall-1's probe world-Z stitched from the TRACE segments (a different path than the
+    engine's #1927 register), plus a sanity assert that wall-1 scans at -5.
+  - lift-drop-pairing-897.spec.js measured `s.z1` -- the RAW PASS-LOCAL segment Z, the one frame where the defect is
+    INVISIBLE (pre-fix locals [0,0,0,0] = green while world was [-5,-5,0,0]). Hardened to WORLD via passAnchorFor for
+    BOTH the corner tests (2) and the middle test (4), and ADDED the direct anti-regression: the @returnProbeZ G53 must
+    NOT be zero-length once the pass anchor moved.
+  - the advisor's tests/_advisor-corner-redescend.spec.js had 0 expect() calls (a dump that could never go red). Its
+    purpose is now FOLDED into those two real asserts, so the scratch file was removed (the advisor authorised
+    "harden ... or fold into an existing corner spec").
+
+(d) PROBES NEVER READ THE WCS -- DESIGN B (declare), justified. The class is now the 6th flag on the EXISTING sim-intent
+seam: `PROBES_FOR_WCS` Set + `opSimContext().probesForWcs` + the programSimContext fold + applyProgramIntent/
+applyPreviewIntent + a `setProbesForWcs` panel setter, and the ONE-LINE gate in g53ApproxForViz
+(`!probesForWcs && ...declared table`). I did NOT derive it from probe ATOMS (Design A) because: atc_length/atc_check
+push raw `probe` atoms but are machine-frame TOOL-SETTER ops that must keep the exact map (an atom rule needs a
+hand-added exception); `probesurface` is a sub-builder whose products need a recursive scan; `move{mode:'probe'}` is a
+second G31 surface; and inference contradicts opSimContext's own written doctrine ("custom ops never guess from atoms").
+Round-trip completed so a USER-authored probe op can declare it too: `probeWcs` added to the sim BLOCK
+(defaults+fields) and to simIntentFromStack -> probesForWcs; the six probe TWINS each declare `probeWcs: true`.
+ALSO CLOSED two silent gaps the map found: edgeView + middleView called preview3D but applied NO declared intent at all,
+so any new flag would never have reached their panels (the exact drift class t714 was written to retire).
+DELIBERATELY NOT TOUCHED: simWcsOffset. `_wcsOffset` also feeds _updateLimitSwitches + the homing-seek envelope clamp,
+so zeroing it would move modelled limit-switch trip points; probe machine-frame excursions are Z-only, so the
+g53ApproxZ gate is sufficient. envelopeCheck's placementDeclared() mirror is INTENTIONALLY left alone -- a probe program
+must still be checked against the real machine envelope (that is a safety layer, not a render).
+VERIFIED: all 6 probe types true; pocket/contour/surfacing/drill/slot/text/bore/wcs/homing/atc_* all false (incl. the
+atc_length/atc_check trap); twins true via the block round-trip; union folds correctly. REAL SYMPTOM: with a declared
+G54 z=-50 the corner preview's traced Zs stay in the +-5 margin band (honest approximation), never the machine map.
+
+(a) PAUSED STEP -> THE DRO FOLLOWS. Root: engine.step() DECLARED "one step = one whole line" but an in-flight move
+RETURNED early, so clicks alternated -- click 1 executed the line yet left its move in flight (no position commit, no
+onPositionChange), click 2 only landed it -> the readout was ALWAYS ONE CLICK BEHIND the highlighted line. A fresh
+stepped run also skipped play()'s setup entirely (no applySimConfig, no DRO seed), so it showed the PREVIOUS run's
+numbers. FIX: step() now lands any in-flight move, ticks, and lands THIS line's move (honouring its own contract); the
+.pp-step handler seeds a fresh stepped run exactly like play() (applySimConfig + updateDro(start) + the WCS label); and
+seekLine (the click-a-code-line scrub) pushes its computed position to the DRO too. Work AND Mach come from the ONE
+updateDro writer -- Mach is never computed at a call site. MEASURED with G54={10,20}: step1 G90 -> Work 0,0 / Mach 10,20;
+step2 G0X30Y40 -> Work 30,40 / Mach 40,60; step3 G0X60 -> Work 60,40; step4 G1Z-10 -> Work z -10. One click, one line.
+
+(b) TRAVERSE = THE RAPID HUE. The dogleg/diagonal traverse is NOT drawn by featureCanvas (it is the toolpath2d overlay
+behind the SVG), and the divergence was the actual defect: toolpath2d reclassifies any horizontal rapid to a synthetic
+`lifted` type painted GREY #8a97ad, while the 3D paints the SAME segment rapid-yellow #ffcc00 -- one move, two colours.
+FIX = one data edit in the DECLARED palette (pathStyle.js): a named RAPID constant shared by `rapid` and `lifted`, the
+DASH kept (so "moving over" stays distinct from a solid positioning rapid), `dim` dropped (a dimmed 2D traverse could
+never match the 3D alpha), plus a legend row for Safe travel (the legend used to claim yellow=Rapid while the 2D painted
+most rapids a grey it never mentioned). Every consumer follows automatically (segColor, strokeSegs, legend, CSS vars).
+I did NOT plumb blockMap/seg.blockTypes (the narrower "only a DECLARED traverse turns yellow" variant): it adds a new
+data channel for a distinction the user did not ask for, and 2D<->3D parity is the property that was broken.
+MEASURED on REAL emitted middle-boss programs: dogleg 12/12 and diagonal 11/11 traverse segments now #ffcc00; a cut
+stays #3b82f6 and a Z-changing rapid stays rapid -- no over-reach.
+
+TWO MORE SPECS ENCODED THE SUPERSEDED RULING (surfaced by the gate, updated to the user's new one, not bent to pass):
+corner-travel-shape.spec.js pixel-sniffed for the grey-blue band and marker-colour-by-source.spec.js asserted
+`lifted != rapid-yellow` -- that WAS t893's rule and the user has now reversed it. Both re-encoded: they still prove the
+traverse is really painted and is never probe-cyan, and now additionally assert lifted==rapid hue + lifted dashed +
+rapid solid (the new declared language). custom-op-sim-intent + gui-sim-block asserted the intent/field shape and gained
+the additive probesForWcs/probeWcs entry.
+
+NEW SPECS: preview-step-dro.spec.js (2 tests -- per-line Work+Mach against the program's own coords + the declared WCS;
+the scrub) and probe-never-reads-wcs.spec.js (3 tests -- the declared classification incl. the ATC trap, the twin
+round-trip, and the real symptom under a declared table). viz-pathstyle gained the real dogleg/diagonal traverse-hue
+test.
+
+GATE: 308 passed / 0 failed / 2 skipped across corner-* + lift-drop-pairing + viz-pathstyle + toolpath2d* + probe-* +
+preview-* + middle-* + wcs-* + g53 + sim-machine-frame + homing-preview + zfirst + op-sim-starts + custom-op-sim +
+dev-mode-sim + gui-sim-block + envelope-check + atc-preview/envelope + trail-* + marker-colour; smoke 60/60 (~25s).
+Full suite remains the advisor's merge gate. Corner evidence captured: the world-Z profile shows probe -5, the LIFT
+(ln51 -5->0), the traverse, the RE-DESCEND (ln57 0->-5) and wall-2 back at -5 -- plus corner-after-3d.png.
+
+DEFERRED (unchanged, next dispatch): the MIDDLE MACRO PAIR -- (A) the axis-order control (Corner's declared Probe Order
+pattern, full round-trip) and (B) the at-rest re-centre default. Both EMIT-class.
+
+Committed MY FILES: engine/GcodeExecutionEngine.js + viz/opSimContext.js + viz/createPreviewPanel.js + viz/pathStyle.js
++ wizardManager.js + wizards/ops/sim.js + wizards/views/atcViews.js + edgeView.js + middleView.js + blocks/userOps.js +
+the 6 probe twins + 7 updated specs + 2 new specs (- the removed scratch spec). Branch feat/ddcs-workspace. NO release.
