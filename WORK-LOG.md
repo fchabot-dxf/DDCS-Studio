@@ -15882,3 +15882,58 @@ Full gate (first pass): 1485 passed / 4 skipped / 2 flagged -> cam-build-mode:12
 blocks-mobile-drawers:8 (load-flake: a Blockly drag/resize spec I never touched; PASSES in isolation). Re-ran the full gate
 after the fix: 1487 passed / 4 skipped / 0 failed (PLAYWRIGHT_EXIT=0, 14.6m) -- fully green. Committed MY 5 FILES: macrosApp.js + globalFunctions.js + index.html + kbutton-authoring.spec.js
 + cam-build-mode.spec.js. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1193 -- FEATURE: PERSISTENCE-A -- the "unsaved to file" indicator + exit warning (part A only; b/c deferred).
+
+WHY: the workspace auto-saves to localStorage ONLY; a .ddcs is the sole PORTABLE copy. The user needs to KNOW when
+their work lives only in this browser. USER PRINCIPLE (amendment): unsaved data is TEMPORARY even when auto-saved to
+localStorage -- localStorage is a working buffer, only a .ddcs FILE counts as SAVED.
+
+ONE-SOURCE DIRTY SIGNAL (data/backup.js). Rather than intercept writes or hand-roll a dirty flag, the signal is a
+content SIGNATURE (workspaceSignature) over the SAME BACKUP_STORES registry a .ddcs writes -- it changes iff a fresh
+.ddcs would differ from the last one saved/opened. So a new backup store is covered automatically, there is no second
+divergeable definition of "the workspace", and it is SYNCHRONOUS (beforeunload can use it). The async IDB 'projects'
+store is skipped (marked async:true) -- it has its own .mjson grain and would fire an IDB read on every poll.
+  - markWorkspaceSavedToFile(): stamps the watermark = current sig AND ddcs_file_saved_at = Date.now(); called at the
+    end of exportEverything() (save) AND restoreBackup() (open) so saving OR opening a .ddcs reads clean. The saved-at
+    persists across the restore reload.
+  - ensureWorkspaceWatermark(): first-run baseline ONLY (no timestamp -- a baseline is not a file save).
+  - isWorkspaceDirtyToFile() = watermark exists AND != current sig; null watermark => not dirty (during boot).
+
+BOOT BASELINE (the subtle part, debugged). A fresh browser has no watermark. Capturing it at a fixed lifecycle moment
+was WRONG: boot seeds/writes backup stores at various times (init on DOMContentLoaded, lazy settings, gateway status),
+LATER than 'load' -- my first attempt snapshotted an EMPTY localStorage (watermark = hash of '') so the app read
+permanently dirty. FIX: a SETTLE detector -- poll the sig every ~400ms, adopt it as the clean baseline once it is
+unchanged for two ticks (8s safety cap). Until the watermark is set, dirty=false => no chip / no exit-warning during
+boot. Returning users already have a watermark => the settle loop never runs.
+
+UI (ui/fileSaveState.js, NEW). A header chip near the .ver / file menu with TWO honest states:
+  - dirty  -> amber  "Temporary -- not saved to a file"  (.dirty)
+  - clean + a prior file save -> green "Saved to file . Nm ago" (.saved; ago from ddcs_file_saved_at, refreshed on the poll)
+  - clean + NEVER file-saved (fresh default) -> hidden (nothing to announce)
+Click = Save workspace (reuses window.ddcsExportBackup). A beforeunload guard fires the browser leave-prompt ONLY when
+dirty. A visibility-gated 1.5s poll keeps the chip + the "Nm ago" live. index.html adds the chip; styles.css a themed
+rule (--warn amber vs --success green, via a --fsc accent var).
+
+AMENDMENT part 2 -- the misleading toast. settingsPanel.js showSavedToast fired "Saved to: <profile>" on EVERY
+saveSettings() localStorage write -- which falsely claims a save and contradicts the principle. Reframed to a quiet
+"Auto-saved (temporary) . <profile>" (neutral grey, no checkmark). The word SAVED is now reserved strictly for the
+.ddcs FILE save.
+
+SCOPE (deliberate): the .ddcs WORKSPACE is the config/library grain (settings, wizards, CAM pack, presets, layout);
+the current PROGRAM is the separate .mjson job grain and is NOT part of this signal (nor is it in BACKUP_STORES). Parts
+b (exe disk file) + c (web File-System-Access) are the advisor's deferred follow-ons.
+
+VERIFIED (real symptom, screenshots): the amber "Temporary -- not saved to a file" chip on a workspace change; the
+green "Saved to file . just now" chip after a .ddcs save; the chip hidden on a fresh clean never-saved workspace. New
+spec persistence-file-indicator.spec.js (3 tests: never-saved-hidden -> temporary -> saved-to-file states + the
+timestamp; beforeunload guards only when dirty; the state survives a reload). backup-852 + workspace-user-files +
+wizard-restore-default all green (backup.js change safe).
+
+Full gate: 1489 passed / 4 skipped / 1 flagged (blocks-mobile-drawers:8 -- the SAME t1191 load-flake, a Blockly
+drag/resize page.click timeout on a surface persistence-A never touches; PASSES 1/1 in isolation). PLAYWRIGHT_EXIT=1 is
+due solely to that flake; my 3 new persistence tests are in the 1489. Committed MY 6 FILES: data/backup.js +
+ui/fileSaveState.js (new) + index.html + styles.css + ui/settingsPanel.js + tests/persistence-file-indicator.spec.js
+(new). Branch feat/ddcs-workspace. NO release.
