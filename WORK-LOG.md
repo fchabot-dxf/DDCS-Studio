@@ -15744,3 +15744,28 @@ keeps the rect aspect (1.5); a Ctrl-resize keeps the centre (180,90) while growi
 gest-snap.png. cam-slot-icon-s5 2/2.
 
 Full gate: 1480 passed / 0 failed / 4 skipped (14.5m) -- fully green, all 1484 ran (region editor via the shared core unaffected). Committed MY 2 FILES: shapeStage.js + iconEditor.js. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1185 -- BUG FIX (user-reported): the exe update-banner Download button downloaded TWICE.
+
+The update banner (ui/updateCheck.js showBanner) Download control is an anchor <a href=dl target=_blank>; a click handler ALSO
+called window.open(dl, '_blank'), and neither stopped the other -> ONE click fired BOTH the anchor navigation AND window.open =
+2 downloads. (window.open was a pywebview fallback since target=_blank is sometimes ignored there, but it never
+preventDefaulted.)
+
+FIX (the click handler ONLY; nothing else in the banner touched): e.preventDefault() to stop the anchor default, then a SINGLE
+window.open(dl, '_blank', 'noopener') in try/catch; ONLY if it returns null/falsy (popup blocked) fall back to
+location.href = dl. Net = exactly ONE download on both a normal browser AND pywebview (the exe).
+
+VERIFIED (real symptom, focused test): a new update-check.spec test simulates the exe (pywebview) + a newer release -> the
+banner renders, then spies window.open + dispatches a cancelable click on the Download anchor: window.open fires EXACTLY ONCE
+with ('...DDCS-Studio.exe','_blank','noopener'), the anchor default is PREVENTED (defaultPrevented true), and location does not
+navigate. The existing banner-render test (silent-on-web / version-compare / render / dismiss) stays GREEN (the render markup
+is unchanged).
+
+NOTE (from the dispatch): updateCheck.js is baked into the exe at build time, so this fixes the WEB + every FUTURE exe; the
+user's CURRENT exe keeps the double-download until the next build. It is a UI handler -- unrelated to the exe auto-update
+security.
+
+Full gate: 1481 passed / 0 failed / 4 skipped (14.5m) -- fully green, all 1485 ran (the +1 vs 1484 is this new double-download test). Committed MY 2 FILES: updateCheck.js + update-check.spec.js. Branch feat/ddcs-workspace. NO release.
