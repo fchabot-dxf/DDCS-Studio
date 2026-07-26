@@ -55,8 +55,14 @@ function showBanner(tag, dl, body, commits) {
   const notes = bar.querySelector('.upd-notes');
   const list = (commits && commits.length) ? commits : (body || '').split('\n').filter(Boolean);
   notes.innerHTML = list.slice(0, 10).map((l) => `<div>• ${escapeHtml(l)}</div>`).join('') || '<div>See the release notes.</div>';
-  // pywebview may not honour target=_blank → also try window.open (routes to the system browser on most setups)
-  bar.querySelector('.upd-btn[href]').addEventListener('click', (e) => { try { window.open(dl, '_blank'); } catch (_) { /* anchor href is the fallback */ } });
+  // ONE download path (t1185 — the anchor's target=_blank AND window.open BOTH firing = the double-download bug): preventDefault
+  // the anchor, then a SINGLE window.open (routes to the system browser under pywebview, which may ignore target=_blank). Only
+  // if the popup is blocked (window.open → null) fall back to location.href. Net = exactly one download in a browser AND the exe.
+  bar.querySelector('.upd-btn[href]').addEventListener('click', (e) => {
+    e.preventDefault();
+    let w = null; try { w = window.open(dl, '_blank', 'noopener'); } catch (_) { w = null; }
+    if (!w) location.href = dl;
+  });
   bar.querySelector('.upd-what').addEventListener('click', () => { notes.hidden = !notes.hidden; });
   bar.querySelector('.upd-x').addEventListener('click', () => { try { localStorage.setItem('ddcs_update_dismissed', tag); } catch (_) { /* */ } bar.remove(); });
   document.body.appendChild(bar);

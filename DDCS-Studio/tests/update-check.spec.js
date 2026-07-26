@@ -57,3 +57,36 @@ test('update banner: silent on web, version compare correct, shows in (simulated
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => !!document.querySelector('.ddcs-update-bar')), 'dismissed version does not re-nag').toBeFalsy();
 });
+
+// t1185 — the Download button used to fire TWICE (the anchor's target=_blank navigation AND a window.open in the click
+// listener). The fix: preventDefault + a SINGLE window.open (location.href only if the popup is blocked). Exactly one download.
+test('Download button triggers exactly ONE download: window.open once + anchor default prevented', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.__ddcsUpd);
+  await page.evaluate(() => {
+    window.pywebview = {};   // simulate the exe
+    const real = window.fetch;
+    window.fetch = async (url, opts) => {
+      const s = String(url);
+      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'DDCS-Studio.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
+      if (s.includes('/commits')) return { ok: true, json: async () => ([]) };
+      return real(url, opts);
+    };
+  });
+  await page.evaluate(() => window.__ddcsUpd.initUpdateCheck());
+  await page.waitForSelector('.ddcs-update-bar a.upd-btn');
+
+  const r = await page.evaluate(() => {
+    const opens = [];
+    window.open = (...a) => { opens.push(a); return { focus() {} }; };   // truthy → the location.href fallback stays untaken
+    const before = location.href;
+    const a = document.querySelector('.ddcs-update-bar a.upd-btn');
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+    a.dispatchEvent(ev);
+    return { opens, defaultPrevented: ev.defaultPrevented, navigated: location.href !== before };
+  });
+  expect(r.opens.length, 'window.open fires exactly ONCE (not twice)').toBe(1);
+  expect(r.opens[0], 'opens the download URL in a new tab, noopener').toEqual(['https://example/DDCS-Studio.exe', '_blank', 'noopener']);
+  expect(r.defaultPrevented, 'the anchor navigation default is prevented → no second download').toBe(true);
+  expect(r.navigated, 'no page navigation on click').toBe(false);
+});
