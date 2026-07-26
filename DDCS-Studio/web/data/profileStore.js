@@ -6,9 +6,10 @@
  * pywebview .exe, the same calls read/write a local `ddcs-profile.json` through
  * window.pywebview.api, so persistence carries over with no rework.
  */
-import { getSettings, applySettings } from '../ui/settingsPanel.js';
+import { getSettings, applySettings, replaceSettings } from '../ui/settingsPanel.js';
 import { getAccessToken, ensureRoot, list as driveList, read as driveRead, write as driveWrite, mkdir as driveMkdir, del as driveDel } from '../ui/cloud/googleDrive.js';
 import { getActiveProfile, setActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
+import { getMachine, setMachine } from './workspaceMachine.js';   // t1217 — the bundle's name/controller ARE this workspace's machine
 
 const PROFILE_VERSION = 1;
 const CLOUD_EXT = '.ddcsprofile.json';   // distinguishes profiles from .mjson projects in the user's Drive
@@ -19,8 +20,7 @@ function isPywebview() { return !!(window.pywebview && window.pywebview.api); }
 export function buildProfile() {
     const db = getDB();
     const ap = (() => { try { return getActiveProfile(); } catch (e) { return null; } })();
-    const lib = window.ddcsProfileLib;   // t658 — the named-profile library: the active profile's NAME rides the export JSON
-    const name = (() => { try { return lib ? (lib.activeProfile() || {}).name || '' : ''; } catch (e) { return ''; } })();
+    const name = (() => { try { return getMachine().name || ''; } catch (e) { return ''; } })();   // t1217 — the MACHINE's name rides the export JSON (was the active library profile's)
     return {
         version: PROFILE_VERSION,
         name,                                 // t658 — the user's profile name (import lands it as a named library profile)
@@ -72,18 +72,24 @@ export async function exportProfile() {
     setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-// t658 — a loaded/imported profile becomes a NAMED entry in the local library (a FULL swap, not a merge); prompt for a
-// name (prefilled from the export's own name). Falls back to applyProfile (merge) only if the library isn't loaded.
-function landImportedProfile(obj) {
+// t1217 — an imported bundle is applied to THIS WORKSPACE'S MACHINE ([[one-workspace-one-machine]]). It used to land as
+// a NEW named entry in the profile library; with the library retired there is nowhere else for it to go, and "apply it
+// to this machine" is the honest reading of importing a machine configuration into a workspace. The bundle's own name
+// and controller are adopted too, so the workspace identifies as what was imported.
+export function landImportedProfile(obj) {
     if (!obj || typeof obj !== 'object') return;
-    if (window.ddcsProfileLib && window.ddcsProfileLib.importAsProfile) {
-        const suggested = obj.name || obj.controllerName || '';
-        const name = (typeof window.prompt === 'function') ? window.prompt('Name this imported profile:', suggested) : suggested;
-        if (name == null) return;   // cancelled
-        window.ddcsProfileLib.importAsProfile(obj, name.trim());
-    } else {
-        applyProfile(obj);
+    // FULL SWAP, never a merge. The retired library landed an import through switchProfile → replaceSettings, and that
+    // is the semantic to keep: this workspace must BECOME the imported machine. applySettings (what applyProfile uses)
+    // merges a WHITELIST — it carries no workspace/workspaceFiles at all, and leaves the previous machine's values in
+    // every key the bundle omits, blending two machines into an incoherent third.
+    if (obj.settings) replaceSettings(obj.settings);
+    const db = getDB();
+    if (Array.isArray(obj.userVars) && db && db.importUserVars) {
+        db.importUserVars(obj.userVars);
+        if (window.refreshDeckVariables) window.refreshDeckVariables();
     }
+    // the bundle's identity IS this workspace's machine now (true → retarget the controller + refresh the UI)
+    try { setMachine({ name: obj.name || obj.controllerName || '', controllerId: obj.controllerId || (obj.machine && obj.machine.id) || '' }, true); } catch (e) { /* */ }
 }
 
 export async function importProfile() {
@@ -156,17 +162,12 @@ export async function listCloudProfiles() {
         .map((e) => ({ id: e.id, name: e.name.slice(0, -CLOUD_EXT.length), savedAt: e.savedAt }));
 }
 
-/** Load a cloud profile by Drive file id → LAND it as a NEW named library profile (E2: the cloud name IS the library
- *  entry's name — the same importAsProfile path as file Import). Falls back to applyProfile (merge) if the library
- *  isn't loaded. Keeps the Drive plumbing (driveRead) unchanged. */
+/** Load a cloud profile by Drive file id → APPLY it to this workspace's machine (t1217: the same landing as a file
+ *  import, since the library it used to land in is retired). Keeps the Drive plumbing (driveRead) unchanged. */
 export async function loadCloudProfile(fileId) {
     if (!cloudConnected()) throw new Error('Not signed in to cloud.');
     const obj = await driveRead(fileId);
-    if (window.ddcsProfileLib && window.ddcsProfileLib.importAsProfile) {
-        window.ddcsProfileLib.importAsProfile(obj, obj.name || obj.controllerName || 'Cloud profile');
-    } else {
-        applyProfile(obj);
-    }
+    landImportedProfile(obj);   // t1217 — same landing as a file import: apply to THIS workspace's machine
     return obj;
 }
 

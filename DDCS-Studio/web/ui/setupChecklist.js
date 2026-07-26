@@ -35,10 +35,28 @@ function wcsSet() {
     const w = m.wcs || {}, row = Array.isArray(w.table) ? w.table[(w.active || 1) - 1] : null;
     return !!(row && (Number(row.x) || Number(row.y) || Number(row.z)));    // a populated active WCS row
 }
+// t1217 (user ruling) — CONFIRMATION IS AN ACT, NOT A DIFF. These rows used to be pure VALUE checks, so a row whose
+// default was ALREADY correct could never be satisfied: the controller row read "did the id key get written", and its
+// only writer is the <select>'s `change` event — which cannot fire when you open Settings, see the right controller,
+// and close. The row nagged forever with nothing to do. The user's explicit acknowledgment IS the declaration, so a
+// VISIT+CONFIRM is recorded here and counts even when the value never changed. A real value still satisfies the row on
+// its own, so nothing that already passes starts failing.
+const CONFIRM_KEY = 'ddcs_setup_confirmed';
+const readConfirmed = () => { try { return JSON.parse(localStorage.getItem(CONFIRM_KEY)) || {}; } catch (_) { return {}; } };
+/** Record that the user VISITED a setup surface and accepted what it showed (Done / confirm / an explicit pick). */
+export function confirmSetupRow(row) {
+    if (!row) return;
+    try { const c = readConfirmed(); c[row] = Date.now(); localStorage.setItem(CONFIRM_KEY, JSON.stringify(c)); } catch (_) {}
+    try { window.dispatchEvent(new CustomEvent('ddcs:setup-confirmed', { detail: { row } })); } catch (_) {}
+}
+const confirmed = (row) => !!readConfirmed()[row];
+
 function profileSet() {
-    try { return !!localStorage.getItem(PROFILE_KEY); } catch (_) { return false; }   // explicitly chosen (not the silent default)
+    if (confirmed('controller')) return true;   // visited + confirmed — the same value counts
+    try { return !!localStorage.getItem(PROFILE_KEY); } catch (_) { return false; }
 }
 function stockSet() {
+    if (confirmed('stock')) return true;        // visited + Done — the user's Done IS the declaration
     const s = getSettings().stock || {}, d = SETTINGS_DEFAULTS.stock;
     return !(Number(s.x) === d.x && Number(s.y) === d.y && Number(s.z) === d.z && (s.shape || 'boss') === d.shape);
 }

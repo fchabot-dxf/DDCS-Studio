@@ -15,6 +15,7 @@
 import { UIUtils } from '../ui/uiUtils.js';
 import { exportAllEntries, importAllEntries } from '../ui/projects/projectStore.js';
 import { loadUserOps } from '../blocks/userOps.js';
+import { getMachine, setMachine, migrateProfileLibrary } from './workspaceMachine.js';   // t1217 — the workspace's ONE machine record (replaces the profile library)
 
 export const BACKUP_VERSION = 1;
 const MACRO_KIND = 'ddcs.backup';
@@ -45,7 +46,18 @@ const lsPrefix = (prefix) => ({
 // ── THE DECLARED REGISTRY — the single source of truth for what a backup contains ───────────────────────────────
 export const BACKUP_STORES = [
     { id: 'settings', label: 'Settings + tool table', ...ls('ddcs_studio_settings'), count: (v) => len(v && v.atc && v.atc.tools), unit: 'tools' },
-    { id: 'profiles', label: 'Profile library', ...ls('ddcs_profile_library'), count: (v) => len(v && v.profiles), unit: 'profiles' },
+    // t1217 — THE WORKSPACE'S ONE MACHINE ([[one-workspace-one-machine]]): the .ddcs IS the machine, so it carries the
+    // machine's IDENTITY (name + controllerId). Its CONFIG is not duplicated here — the envelope/WCS/motors/homing ride
+    // the `settings` row and the user vars ride `variables`, exactly as before. USER RULING: opening/restoring a
+    // workspace ADOPTS the file's controller, so this row's write RETARGETS the live controller/dialect (the old
+    // keep-the-local-controller behaviour contradicted "the file is the machine").
+    { id: 'machine', label: 'Machine (this workspace)', unit: 'machine',
+      read: () => { try { return getMachine(); } catch (_) { return undefined; } },
+      write: (val) => { try { if (val) setMachine(val, true); } catch (_) {} },
+      count: (v) => (v && (v.name || v.controllerId) ? 1 : 0) },
+    // LEGACY: pre-t1217 files carry a profile LIBRARY. Kept readable so an old .ddcs still restores — migrateProfileLibrary
+    // adopts its active profile as the machine record and surfaces the rest as one-time machine-config exports.
+    { id: 'profiles', label: 'Profile library (legacy)', ...ls('ddcs_profile_library'), count: (v) => len(v && v.profiles), unit: 'profiles' },
     {
         id: 'userOps', label: 'Custom wizards', count: (v) => len(v), unit: 'wizards',
         read: ls('ddcs_user_ops').read,
@@ -94,6 +106,9 @@ export async function restoreBackup(obj, selectedIds) {
         if (!Object.prototype.hasOwnProperty.call(stores, s.id)) { skipped.push(s.id); continue; }   // not in this backup → leave untouched
         try { await s.write(stores[s.id]); restored.push(s.id); } catch (_) { skipped.push(s.id); }
     }
+    // t1217 — a LEGACY file (profile library, no machine row) collapses to the single machine record on open, so the
+    // pivot's invariant holds for old workspaces too. Idempotent: a file that already carries `machine` no-ops here.
+    try { migrateProfileLibrary(); } catch (_) {}
     markWorkspaceSavedToFile();   // the workspace now MATCHES the just-opened .ddcs → clean (persists across the restore reload)
     return { restored, skipped };
 }

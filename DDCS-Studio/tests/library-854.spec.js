@@ -1,10 +1,13 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * t854 part 1 — THE LIBRARY. One tabbed modal (Profiles · Projects · Wizards) opened from the header quick-menu
- * "Library…" on the last-used tab; the old entry points DEEP-LINK into their tab (the quick-menu "Open project" →
- * Projects, "Profiles…" → Profiles). Profiles + Projects speak the t805 select-then-load language; the Wizards tab
- * embeds the bar-designer + New-from-current. 390px reachability.
+ * t854 part 1 — THE LIBRARY. One tabbed modal opened from the header quick-menu "Library…" on the last-used tab.
+ * Projects speaks the t805 select-then-load language; the Wizards tab embeds the bar-designer + New-from-current.
+ * 390px reachability.
+ *
+ * t1217 — the PROFILES tab is RETIRED ([[one-workspace-one-machine]]): a workspace holds exactly one machine, so there
+ * is no library of machines to browse or switch between (a second machine is a second .ddcs). The Library is now two
+ * tabs, and the quick-menu identity row opens the machine's SETTINGS instead of deep-linking to a Profiles tab.
  */
 test.use({ viewport: { width: 1300, height: 980 } });
 
@@ -27,11 +30,13 @@ async function openViaMenu(page) {
     await expect(page.locator('#libraryOverlay')).toBeVisible();
 }
 
-test('the quick-menu Library opens three tabs; each tab speaks its language', async ({ page }, testInfo) => {
+test('the quick-menu Library opens two tabs; each tab speaks its language; Profiles is GONE', async ({ page }, testInfo) => {
     await seed(page);
     await openViaMenu(page);
     const ov = page.locator('#libraryOverlay');
-    for (const t of ['profiles', 'projects', 'wizards']) await expect(ov.locator(`.library-tab[data-lib-tab="${t}"]`)).toBeVisible();
+    for (const t of ['projects', 'wizards']) await expect(ov.locator(`.library-tab[data-lib-tab="${t}"]`)).toBeVisible();
+    // t1217 — retired, and it must not come back: a seeded legacy library (see seed()) must NOT resurrect the tab.
+    await expect(ov.locator('.library-tab[data-lib-tab="profiles"]')).toHaveCount(0);
 
     // PROJECTS tab — select-then-load over the seeded project + the save-as door lives here
     await ov.locator('.library-tab[data-lib-tab="projects"]').click();
@@ -44,16 +49,6 @@ test('the quick-menu Library opens three tabs; each tab speaks its language', as
     await expect(openBtn).toBeEnabled();
     await expect(ov.locator('[data-pa="save"]')).toBeVisible();
 
-    // PROFILES tab — the Active badge (distinct from selection) + select-then-load
-    await ov.locator('.library-tab[data-lib-tab="profiles"]').click();
-    await expect(ov.locator('.sl-row', { hasText: 'Shop Expert' })).toBeVisible();
-    await expect(ov.locator('[data-sl-active]')).toHaveCount(1);
-    await expect(ov.locator('.sl-active-badge')).toHaveText('Active');
-    const loadBtn = ov.locator('[data-sl-primary]');
-    await expect(loadBtn).toBeDisabled();
-    await ov.locator('.sl-row', { hasText: 'Bench Router' }).click();
-    await expect(loadBtn).toBeEnabled();
-
     // WIZARDS tab — the bar-designer embeds + New-from-current
     await ov.locator('.library-tab[data-lib-tab="wizards"]').click();
     await expect(ov.locator('[data-newwiz]')).toBeVisible();
@@ -61,23 +56,24 @@ test('the quick-menu Library opens three tabs; each tab speaks its language', as
     await ov.screenshot({ path: testInfo.outputPath('library-wizards.png') });
 });
 
-test('last-used tab is remembered; the old entry points deep-link to their tab', async ({ page }) => {
+test('last-used tab is remembered; the identity row opens the MACHINE settings (t1217, was a Profiles deep-link)', async ({ page }) => {
     await seed(page);
-    // switch to Profiles, close → reopening lands on Profiles (last-used, persisted)
+    // switch to Wizards, close → reopening lands on Wizards (last-used, persisted)
     await openViaMenu(page);
-    await page.locator('#libraryOverlay .library-tab[data-lib-tab="profiles"]').click();
+    await page.locator('#libraryOverlay .library-tab[data-lib-tab="wizards"]').click();
     await page.locator('#libraryOverlay .library-x').click();
     await expect(page.locator('#libraryOverlay')).toHaveCount(0);
     await page.evaluate(() => window.openLibrary());
-    await expect(page.locator('#libraryOverlay .library-tab[data-lib-tab="profiles"]')).toHaveClass(/active/);
+    await expect(page.locator('#libraryOverlay .library-tab[data-lib-tab="wizards"]')).toHaveClass(/active/);
     await page.locator('#libraryOverlay .library-x').click();
 
-    // DEEP-LINK: the quick-menu "Profiles…" opens the Library on the Profiles tab (Projects stays on the drawer for now —
-    // it carries the cloud volume the local Projects tab does not yet host; projects consolidation is the follow-up).
+    // t1217 — the quick-menu identity row used to deep-link into a Profiles tab. With one machine per workspace the
+    // row names THAT machine, so it opens the machine's own settings instead. Assert the real destination.
     await page.click('#hdrPostBtn');
     await page.click('#hdrPostMenu [data-profact="browse"]');
-    await expect(page.locator('#libraryOverlay')).toBeVisible();
-    await expect(page.locator('#libraryOverlay .library-tab[data-lib-tab="profiles"]')).toHaveClass(/active/);
+    await expect(page.locator('#settings-app')).toBeVisible({ timeout: 6000 });
+    await expect(page.locator('#set_machine_name')).toBeVisible();
+    await expect(page.locator('#libraryOverlay')).toHaveCount(0);
 });
 
 test('reachable + legible at 390px, both themes', async ({ page }, testInfo) => {

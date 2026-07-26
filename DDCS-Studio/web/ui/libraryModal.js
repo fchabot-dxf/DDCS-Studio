@@ -1,17 +1,16 @@
 /**
- * ui/libraryModal.js — THE LIBRARY (t854, part 1). ONE tabbed modal for the user's stuff: Profiles · Projects · Wizards.
+ * ui/libraryModal.js — THE LIBRARY (t854, part 1). ONE tabbed modal for the user's stuff: Projects · Wizards.
+ * (t1217 — the Profiles tab retired with the profile library; the workspace's ONE machine lives in Settings.)
  *
  * ONE DOOR: `openLibrary(tab)` opens a single modal on the last-used tab (persisted). Every old entry point (the
  * projects drawer button, Profiles…, the wizard manager) becomes a DEEP-LINK into its tab — nothing breaks on landing
  * day; the old surfaces stay reachable and are retired later.
  *
  * REUSE, not rebuild: each tab hosts the EXISTING surface's own logic —
- *   Profiles → profileModal.renderProfilesInto (one source; select-then-load with the Active badge + 💾/☁ tags)
  *   Projects → the projectStore API + the shared selectLoad contract + projectModal.openSaveModal (save-as-into-folders)
  *   Wizards  → wizardManagerPanel.renderWizardLibrary (the bar-designer) + a New-from-current door
  * The three tabs are a DECLARED registry (TABS) so adding one is a row, not new machinery.
  */
-import { renderProfilesInto } from './profileModal.js';
 import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { installSelectLoad, syncPrimary } from './selectLoad.js';
 import * as store from './projects/projectStore.js';
@@ -27,7 +26,10 @@ const rememberTab = (id) => { try { localStorage.setItem(TAB_KEY, id); } catch (
 
 // The declared tab registry — each mounts its surface into the shared body.
 const TABS = [
-    { id: 'profiles', label: 'Profiles', mount: (body, ctx) => renderProfilesInto(body, { onClose: ctx.close, showDone: false }) },
+    // t1217 RETIRED ([[one-workspace-one-machine]]): the Profiles tab is gone — a workspace holds exactly ONE machine,
+    // so there is no library to browse. The machine lives in Settings ("This workspace's machine"); a second machine is
+    // a second .ddcs. A deep-link to 'profiles' now lands on the first surviving tab rather than 404-ing.
+
     { id: 'projects', label: 'Projects', mount: (body, ctx) => renderProjectsTab(body, ctx) },
     { id: 'wizards', label: 'Wizards', mount: (body, ctx) => renderWizardsTab(body, ctx) },
 ];

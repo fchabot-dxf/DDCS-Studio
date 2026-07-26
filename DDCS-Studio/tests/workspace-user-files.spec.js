@@ -11,12 +11,13 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 const openMacros = async (page, fresh = true) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => typeof window.showApp === 'function' && window.ddcsProfileLib && window.ddcsGetSettings);
+    await page.waitForFunction(() => typeof window.showApp === 'function' && window.ddcsSetMachine && window.ddcsGetSettings);
     if (fresh) await page.evaluate(() => localStorage.removeItem('ddcs_profile_library'));
     await page.evaluate(() => window.showApp('macros'));
     await page.waitForFunction(() => document.querySelector('#macros_tree .settings-tab'));
 };
-const setController = (page, id) => page.evaluate((cid) => window.ddcsProfileLib.setActiveControllerId(cid), id);
+// t1217 — retargeting the workspace's controller is setMachine (was profileLibrary.setActiveControllerId)
+const setController = (page, id) => page.evaluate((cid) => window.ddcsSetMachine({ controllerId: cid }, true), id);
 const clickTreeFile = (page, name) => page.evaluate((f) => [...document.querySelectorAll('#macros_tree .settings-tab')].find((b) => b.dataset.file === f)?.click(), name);
 const myFiles = (page) => page.evaluate(() => {
     const grp = [...document.querySelectorAll('#macros_tree details')].find((d) => /My files/.test(d.querySelector('summary')?.textContent || ''));
@@ -65,7 +66,11 @@ test('add → edit → reload persists (under My files, push present) → rename
     expect(await page.evaluate(() => window.ddcsGetSettings().workspace['renamed.nc']), 'body removed').toBeUndefined();
 });
 
-test('baseline files are IMMUTABLE (Revert-to-default, never rename/delete); profile switch SWAPS user files; import carries them', async ({ page }) => {
+// t1217 — the "profile switch SWAPS user files" third of this test is RETIRED with the profile library
+// ([[one-workspace-one-machine]]): one workspace = one machine, so there is no switch. The IMPORT half survives and
+// gets MORE important, because importing a machine bundle now APPLIES it to this workspace (it used to mint a new
+// library entry) — so this is the test that pins the new landing.
+test('baseline files are IMMUTABLE (Revert-to-default, never rename/delete); an imported bundle carries user files INTO this workspace', async ({ page }) => {
     await openMacros(page);
     await setController(page, 'ddcs-v41');
     // a BASELINE file → Revert-to-default, NO rename/delete
@@ -75,26 +80,27 @@ test('baseline files are IMMUTABLE (Revert-to-default, never rename/delete); pro
     expect(baseline.revert, 'baseline file offers Revert-to-default').toBe(true);
     expect(baseline.rename || baseline.del, 'baseline file is NOT renamable/deletable (immutable structure)').toBe(false);
 
-    // PROFILE SWAP — profile A has a user file, B does not (workspaceFiles rides the profile full-swap)
-    const swap = await page.evaluate(() => {
-        const lib = window.ddcsProfileLib, s = window.ddcsGetSettings();
+    // this workspace has a user file of its own
+    await page.evaluate(() => {
+        const s = window.ddcsGetSettings();
         s.workspaceFiles = [{ path: 'mine.nc', title: 'mine.nc', sub: 'Your file' }]; s.workspace['mine.nc'] = 'G0 Z1';
-        lib.renameProfile(lib.activeProfileId(), 'Rig A'); lib.saveActiveSnapshot();
-        lib.createProfile({ from: 'baseline', controllerId: 'ddcs-v41', name: 'Rig B' });   // fresh → no user files
-        const onB = window.ddcsGetSettings().workspaceFiles.map((f) => f.path);
-        const a = lib.listProfiles().find((p) => p.name === 'Rig A').id;
-        lib.switchProfile(a, true);
-        const onA = window.ddcsGetSettings().workspaceFiles.map((f) => f.path);
-        return { onA, onB };
     });
-    expect(swap.onB, 'profile B (fresh) has NO user files').toEqual([]);
-    expect(swap.onA, 'profile A keeps its own user file — the workspace swapped with the profile').toContain('mine.nc');
 
-    // IMPORT round-trip — a bundle carrying workspaceFiles lands them (export is symmetric: buildProfile.settings = getSettings)
-    const imported = await page.evaluate(() => {
-        window.ddcsProfileLib.importAsProfile({ name: 'Imported', controllerId: 'ddcs-v41', settings: { workspaceFiles: [{ path: 'fromimport.nc', title: 'fromimport.nc', sub: 'Your file' }], workspace: { 'fromimport.nc': 'G0 Y2' } }, userVars: [] }, 'Imported');
-        return { files: window.ddcsGetSettings().workspaceFiles.map((f) => f.path), body: window.ddcsGetSettings().workspace['fromimport.nc'] };
+    // IMPORT — a bundle carrying workspaceFiles is APPLIED to THIS workspace (t1217; export is symmetric:
+    // buildProfile.settings = getSettings). It also adopts the bundle's identity, since the file IS the machine.
+    const imported = await page.evaluate(async () => {
+        const store = await import('/data/profileStore.js');
+        store.landImportedProfile({
+            name: 'Imported', controllerId: 'ddcs-v41',
+            settings: { workspaceFiles: [{ path: 'fromimport.nc', title: 'fromimport.nc', sub: 'Your file' }], workspace: { 'fromimport.nc': 'G0 Y2' } },
+            userVars: [],
+        });
+        const s = window.ddcsGetSettings();
+        return { files: s.workspaceFiles.map((f) => f.path), body: s.workspace['fromimport.nc'], machine: window.ddcsGetMachine() };
     });
-    expect(imported.files, 'an imported profile carries its user files').toContain('fromimport.nc');
+    expect(imported.files, 'an imported bundle carries its user files into this workspace').toContain('fromimport.nc');
     expect(imported.body, 'and their bodies').toBe('G0 Y2');
+    // FULL SWAP, not a merge — this workspace's own user file is GONE, because it now IS the imported machine
+    expect(imported.files, 'the previous machine\'s user file did NOT survive the import (a swap, not a blend)').not.toContain('mine.nc');
+    expect(imported.machine.name, 'and the workspace identifies as the imported machine').toBe('Imported');
 });

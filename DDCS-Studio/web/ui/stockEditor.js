@@ -8,6 +8,7 @@
  * Pick a template, tweak dims/shape/show, and save/delete your own templates here.
  */
 import { getSettings, applySettings, STOCK_TEMPLATES } from './settingsPanel.js';
+import { confirmSetupRow } from './setupChecklist.js';   // t1217 — Done = the user's explicit declaration
 import { openFieldLink, WCS_LINK } from './formWidgets.js';   // t796 P4 — the shared field deep-link (the "Sits at WCS" ⚙ → the WCS table)
 import { makeDraggable } from './uiUtils.js';
 import { CG, buildCornerCells, paintCornerGrid } from './cornerGridSvg.js';
@@ -416,7 +417,9 @@ export function openStockEditor(anchor, opts) {
     });
 
     q('se_close').addEventListener('click', closeAndReturn);
-    if (q('se_done')) q('se_done').addEventListener('click', closeAndReturn);   // t692 b5 — [Done] footer: X is never the only exit (edits already apply live)
+    // t1217 — the user's [Done] IS the declaration: confirm the setup-checklist Stock row even when the numbers
+    // still equal the defaults (a correct default was previously unconfirmable, so the row nagged forever).
+    if (q('se_done')) q('se_done').addEventListener('click', () => { try { confirmSetupRow('stock'); } catch (_) {} closeAndReturn(); });   // t692 b5 — [Done] footer: X is never the only exit (edits already apply live)
     const backBtn = q('se_back'); if (backBtn) backBtn.addEventListener('click', closeAndReturn);   // "‹ origin" → walk back
     // keep pointer events on the popover from reaching the 3D orbit handler
     pop.addEventListener('pointerdown', (e) => e.stopPropagation());

@@ -59,7 +59,9 @@ import './ui/settingsPanel.js';
 
 // Profile store (one JSON = settings + user variables; pywebview file-I/O ready)
 import './data/profileStore.js';
-import './data/profileLibrary.js';   // t658 — the local named-profile library (window.ddcsProfileLib)
+// t1217 — THE WORKSPACE'S ONE MACHINE ([[one-workspace-one-machine]]): the .ddcs IS the machine. Importing this also
+// registers the migration; the boot call below collapses a legacy profile library to the single machine record.
+import { migrateProfileLibrary } from './data/workspaceMachine.js';
 
 // Virtual I/O simulation — browser-only mock of hardware handshakes (ATC, drawbar, etc.)
 // Used by the Studio's G-code simulation/preview engine to animate full macro cycles
@@ -132,6 +134,11 @@ class DDCSStudio {
 
     init() {
         console.debug('DDCSStudio.init() start');
+        // t1217 — collapse a legacy profile LIBRARY to this workspace's single machine record. Idempotent, and it does
+        // NOT retarget the controller at boot (the live one already IS this browser's); a RESTORE adopts the file's
+        // controller through the declared `machine` store instead. Non-active legacy profiles are LEFT for one-time
+        // export, so migrating can never lose a machine the user configured.
+        try { migrateProfileLibrary(); } catch (_) { /* a corrupt legacy blob must never block boot */ }
         
         // Initialize the global program model and history (undo/redo)
         initProgramModel();

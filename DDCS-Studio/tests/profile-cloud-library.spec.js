@@ -1,14 +1,13 @@
 import { test, expect } from '@playwright/test';
-import { autoAppDialog } from './_appDialog.js';   // t684 b/d — the profile modal + in-app dialogs
 
 /**
- * CLOUD LIBRARY UNIFICATION (t660, E2). Save-to-cloud / Load-from-cloud are views over the SAME named-profile concept:
- *  - Save pushes the ACTIVE named profile; the profile's NAME is the cloud name.
- *  - Load lands the cloud copy as a NEW named LIBRARY profile (the importAsProfile path — full swap, becomes active).
- *  - The local list + cloud list render as ONE library UI, rows tagged local / cloud / both.
- *  - No silent overwrite: pushing a name that already exists on cloud asks first.
- * Test 1 exercises the REAL round-trip through data/profileStore + googleDrive with an in-memory Drive (page.route
- * intercepts googleapis.com — "mock the Drive client"). Test 2 drives the unified UI with a stubbed cloud client.
+ * CLOUD MACHINE ROUND-TRIP (t660 E2, rewritten t1217). Save-to-cloud / Load-from-cloud are views over THIS WORKSPACE'S
+ * MACHINE ([[one-workspace-one-machine]]):
+ *  - Save pushes this workspace's machine; the machine's NAME is the cloud name.
+ *  - Load APPLIES the cloud copy to this workspace (a full swap — the workspace becomes that machine). It used to land
+ *    as a new named LIBRARY entry; the library is retired, so there is nowhere else for it to go.
+ * This exercises the REAL round-trip through data/profileStore + googleDrive with an in-memory Drive (page.route
+ * intercepts googleapis.com — "mock the Drive client").
  */
 
 // An in-memory Google Drive behind page.route — implements just the v3 endpoints googleDrive.js uses.
@@ -86,96 +85,37 @@ async function installDriveMock(page) {
     });
 }
 
-test('cloud round-trip: Save pushes the ACTIVE profile under its name; Load lands it as a named library profile (real Drive mock)', async ({ page }) => {
+// t1217 — the cloud ROUND-TRIP survives the library retire, with a new landing: a cloud copy no longer becomes a new
+// named library entry (there is no library), it is APPLIED to this workspace's machine ([[one-workspace-one-machine]]).
+// The Drive plumbing is untouched, so this test still guards the real Save→List→Load path end to end.
+test('cloud round-trip: Save pushes THIS WORKSPACE\'S MACHINE under its name; Load applies it back over the workspace (real Drive mock)', async ({ page }) => {
     await installDriveMock(page);
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsProfileLib && window.ddcsSaveProfileToCloud && window.ddcsListCloudProfiles && window.ddcsLoadCloudProfile && window.ddcsGetSettings);
+    await page.waitForFunction(() => window.ddcsSetMachine && window.ddcsSaveProfileToCloud && window.ddcsListCloudProfiles && window.ddcsLoadCloudProfile && window.ddcsGetSettings);
 
-    // name the active profile + a distinctive envelope, snapshot, push to cloud under its name
+    // name THIS workspace's machine + give it a distinctive envelope, then push to cloud under that name
     const afterPush = await page.evaluate(async () => {
-        const lib = window.ddcsProfileLib;
-        lib.renameProfile(lib.activeProfileId(), 'Rig Alpha');
+        window.ddcsSetMachine({ name: 'Rig Alpha' }, false);
         window.ddcsGetSettings().machine = { x: 642, y: 400, z: 300, show: true };
-        lib.saveActiveSnapshot();
         await window.ddcsSaveProfileToCloud('Rig Alpha');
         const list = await window.ddcsListCloudProfiles();
         return { names: list.map((c) => c.name) };
     });
-    expect(afterPush.names, 'the pushed profile appears on cloud under its own name').toContain('Rig Alpha');
+    expect(afterPush.names, 'the pushed machine appears on cloud under its own name').toContain('Rig Alpha');
 
-    // switch to a DIFFERENT local baseline (active ≠ Rig Alpha), then LOAD the cloud copy back
+    // make this workspace a DIFFERENT machine, then LOAD the cloud copy back over it
     const afterLoad = await page.evaluate(async () => {
-        const lib = window.ddcsProfileLib;
-        lib.createProfile({ from: 'baseline', controllerId: 'ddcs-expert-m350', name: 'Other rig' });
+        window.ddcsSetMachine({ name: 'Other rig' }, false);
         window.ddcsGetSettings().machine = { x: 111, y: 1, z: 1, show: true };
-        lib.saveActiveSnapshot();
         const alpha = (await window.ddcsListCloudProfiles()).find((c) => c.name === 'Rig Alpha');
-        await window.ddcsLoadCloudProfile(alpha.id);   // → importAsProfile → NEW named profile, becomes active
-        return {
-            activeName: lib.activeProfile().name,
-            envX: window.ddcsGetSettings().machine.x,
-            hasAlpha: lib.listProfiles().some((p) => p.name === 'Rig Alpha'),
-        };
+        await window.ddcsLoadCloudProfile(alpha.id);   // t1217 → landImportedProfile → applied to THIS workspace
+        return { machineName: window.ddcsGetMachine().name, envX: window.ddcsGetSettings().machine.x };
     });
-    expect(afterLoad.activeName, 'the loaded cloud profile is now the active LIBRARY profile, named = the cloud name').toBe('Rig Alpha');
-    expect(afterLoad.envX, 'the loaded profile carried its own envelope (642), full-swapped in — not the 111 baseline').toBe(642);
-    expect(afterLoad.hasAlpha, 'a named "Rig Alpha" library entry now exists locally (importAsProfile landing)').toBe(true);
+    expect(afterLoad.machineName, 'the workspace now identifies as the loaded machine').toBe('Rig Alpha');
+    expect(afterLoad.envX, 'the loaded machine carried its own envelope (642), full-swapped in — not the 111 it replaced').toBe(642);
 });
 
-test('the unified library renders local + cloud + both rows; Save pushes the active name and asks before overwrite', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openSettings && window.ddcsProfileLib && window.ddcsGetSettings);
-    // fresh library with 2 local profiles; stub the cloud client: one name matches a local (→ both), one is cloud-only
-    await page.evaluate(() => {
-        localStorage.removeItem('ddcs_profile_library');
-        const lib = window.ddcsProfileLib;
-        lib.renameProfile(lib.activeProfileId(), 'Shared rig');       // will be tagged 'both' (matches a cloud name)
-        lib.saveActiveSnapshot();
-        lib.createProfile({ from: 'baseline', controllerId: 'ddcs-expert-m350', name: 'Local only' });   // active, tagged 'local'
-        window.ddcsListCloudProfiles = async () => ([
-            { id: 'c1', name: 'Shared rig', savedAt: '2024-06-01T00:00:00Z' },
-            { id: 'c2', name: 'Cloud only', savedAt: '2024-06-02T00:00:00Z' },
-        ]);
-        window.__savedName = null;
-        window.ddcsSaveProfileToCloud = async (n) => { window.__savedName = n; return n; };
-    });
-    await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
-    await page.waitForSelector('#set_profile_browse');
-    await page.click('#set_profile_browse');   // the PROFILE BROWSER MODAL auto-syncs the cloud on open
-    await page.waitForSelector('.profile-modal .prof-row');
-    await page.waitForTimeout(200);
-
-    const rows = await page.evaluate(() => {
-        const list = document.querySelector('.profile-modal [data-plist]');
-        return {
-            localCount: list.querySelectorAll('.prof-row[data-pid]').length,
-            // t805 SELECT-THEN-LOAD: the cloud-only profile is a selectable sl-row (loaded via the dedicated [Load]),
-            // not a per-row Load button; a matched-local name collapses to ONE synced local row (no cloud-only row).
-            cloudOnlyRow: !!list.querySelector('.sl-row[data-sl-kind="cloud"][data-sl-id="c2"]'),
-            sharedIsNotACloudRow: !list.querySelector('.sl-row[data-sl-kind="cloud"][data-sl-id="c1"]'),
-            synced: /☁ synced/.test(list.innerHTML),                           // the matched local shows the synced tag
-            text: list.textContent,
-        };
-    });
-    expect(rows.localCount, 'two local rows (Shared rig + Local only)').toBe(2);
-    expect(rows.cloudOnlyRow, 'the cloud-only profile is a selectable cloud row').toBe(true);
-    expect(rows.sharedIsNotACloudRow, 'a cloud name that exists locally is one "synced" row, not duplicated').toBe(true);
-    expect(rows.synced, 'the matched local carries a ☁ synced tag').toBe(true);
-    expect(rows.text, 'the cloud-only profile is visible in the one list').toContain('Cloud only');
-
-    // Save-to-cloud pushes the ACTIVE profile under ITS name. Active = 'Local only' (not on cloud) → saves; dismiss the "saved" notice.
-    await autoAppDialog(page, { accept: true });
-    await page.click('.profile-modal [data-pa="cloudsave"]');
-    await page.waitForTimeout(200);
-    expect(await page.evaluate(() => window.__savedName), 'Save pushes the active profile under its own name').toBe('Local only');
-
-    // switch active to 'Shared rig' (name IS on cloud) → Save must ASK before overwriting; cancel → no push (no silent overwrite)
-    // t805 SELECT-THEN-LOAD: select the row, then the dedicated [Load]
-    await page.evaluate(() => { window.__savedName = null; const r = [...document.querySelectorAll('.profile-modal .prof-row[data-pid]')].find((x) => /Shared rig/.test(x.textContent)); r.querySelector('.sl-name').click(); });
-    await page.click('.profile-modal [data-sl-primary]');
-    await page.waitForTimeout(150);
-    await autoAppDialog(page, { accept: false });   // the overwrite confirm → Cancel
-    await page.click('.profile-modal [data-pa="cloudsave"]');
-    await page.waitForTimeout(200);
-    expect(await page.evaluate(() => window.__savedName), 'cancelling the overwrite confirm does NOT push — no silent overwrite').toBeNull();
-});
+// t1217 — the second test here ('the unified library renders local + cloud + both rows') is RETIRED with the
+// profile library ([[one-workspace-one-machine]]): there is no local-profile list to merge cloud rows into, so the
+// unified-row rendering it asserted no longer exists. The cloud Save/List/Load plumbing it shared is still covered
+// by the round-trip above.

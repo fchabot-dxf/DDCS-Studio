@@ -143,3 +143,138 @@ test('an envelope field accepts a typed 0, keeps real values, and still falls ba
   expect(r.real, 'a normal value still commits').toBe(321);
   expect(r.emptied, 'EMPTYING the field falls back to the current value — it must not become 0 or NaN').toBe(321);
 });
+
+/**
+ * t1217 — OPEN/RESTORE ADOPTS THE FILE'S CONTROLLER (user ruling, [[one-workspace-one-machine]]).
+ *
+ * The .ddcs IS the machine, so restoring a workspace must switch this browser to the FILE's controller. The old
+ * behaviour kept the receiving browser's controller — which contradicts the model: you would open someone's Expert M350
+ * workspace on a V4.1 machine and silently emit for the wrong dialect. The machine record (name + controllerId) is a
+ * declared BACKUP_STORES row whose write retargets the live controller, so adoption happens through the SAME one-source
+ * path every other store restores by — not a special case bolted onto the open flow.
+ */
+test('restoring a workspace ADOPTS the file\'s controller (the file is the machine)', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsBuildBackup && window.ddcsRestoreBackup && window.ddcsSetMachine && window.ddcsGetMachine);
+
+  const r = await page.evaluate(async () => {
+    const { getActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
+    // author a workspace whose machine is a DIFFERENT controller than the one this browser is on
+    window.ddcsSetMachine({ name: 'Shop Bee', controllerId: 'ddcs-v41' }, true);
+    window.ddcsSaveSettings && window.ddcsSaveSettings();
+    const payload = JSON.parse(JSON.stringify(await window.ddcsBuildBackup()));
+    const inFile = payload.stores.machine;
+
+    // now put the browser on a DIFFERENT controller, as a second machine's workspace would
+    window.ddcsSetMachine({ name: 'Other', controllerId: 'ddcs-expert-m350' }, true);
+    const before = { controller: (getActiveProfile() || {}).id, machine: window.ddcsGetMachine() };
+
+    await window.ddcsRestoreBackup(payload);
+    return { inFile, before, after: { controller: (getActiveProfile() || {}).id, machine: window.ddcsGetMachine() } };
+  });
+
+  expect(r.inFile, 'the .ddcs carries the machine record as a declared store').toEqual({ name: 'Shop Bee', controllerId: 'ddcs-v41' });
+  expect(r.before.controller, 'the browser really was on a different controller first').toBe('ddcs-expert-m350');
+  expect(r.after.machine, 'the restored machine record is the FILE\'s').toEqual({ name: 'Shop Bee', controllerId: 'ddcs-v41' });
+  expect(r.after.controller, 'and the LIVE controller was retargeted to it — the file is the machine').toBe('ddcs-v41');
+});
+
+/**
+ * t1217 — a LEGACY .ddcs (profile library, no machine row) still opens, and collapses to the single machine record.
+ * Nothing is lost: the ACTIVE profile becomes the workspace's machine, and non-active profiles stay available as
+ * one-time machine-config exports rather than being silently dropped.
+ */
+test('a legacy workspace (profile library) restores and collapses to ONE machine, keeping the others exportable', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsRestoreBackup && window.ddcsGetMachine && window.ddcsLegacyMachineConfigs);
+  const r = await page.evaluate(async () => {
+    localStorage.removeItem('ddcs_machine');
+    const legacy = {
+      kind: 'ddcs.backup', v: 1, app: 'test', date: new Date().toISOString(),
+      stores: { profiles: { activeId: 'p1', profiles: [
+        { id: 'p1', name: 'Bee', controllerId: 'ddcs-v41', settings: {}, userVars: [] },
+        { id: 'p2', name: 'Router 2', controllerId: 'ddcs-expert-m350', settings: {}, userVars: [] },
+      ] } },
+    };
+    await window.ddcsRestoreBackup(legacy);
+    return { machine: window.ddcsGetMachine(), pending: window.ddcsLegacyMachineConfigs().map((p) => p.name) };
+  });
+  expect(r.machine.name, 'the ACTIVE legacy profile became this workspace\'s machine').toBe('Bee');
+  expect(r.machine.controllerId, 'with its controller').toBe('ddcs-v41');
+  expect(r.pending, 'the non-active profile is NOT dropped — it stays available as a machine-config export').toEqual(['Router 2']);
+});
+
+/**
+ * t1217 (4) — A CHECKLIST ROW IS SATISFIED BY CONFIRMATION, NOT ONLY BY A DIFF.
+ *
+ * The Controller row read "was the id key ever written", whose only writer is the select's `change` event — so the very
+ * common case (open Settings, see the CORRECT controller, close) could never satisfy it and the row nagged forever with
+ * nothing to do. Same shape for Stock: a correct default was indistinguishable from "never looked at it". The user's
+ * explicit acknowledgment is now recorded and counts. A genuine value still satisfies the row on its own, so nothing
+ * that already passed starts failing.
+ */
+test('a confirmed row counts even when the value never changed (and a real value still counts)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetSettings);
+  const r = await page.evaluate(async () => {
+    const CL = await import('/ui/setupChecklist.js');
+    localStorage.removeItem('ddcs_setup_confirmed');
+    localStorage.removeItem('ddcs_controller_profile');   // never explicitly chosen → the old predicate says "not set"
+    const key = () => JSON.parse(localStorage.getItem('ddcs_setup_confirmed') || '{}');
+    const hadBefore = !!key().controller;
+    CL.confirmSetupRow('controller');
+    const hasAfter = !!key().controller;
+    CL.confirmSetupRow('stock');
+    return { hadBefore, hasAfter, stock: !!key().stock, exported: typeof CL.confirmSetupRow === 'function' };
+  });
+  expect(r.exported, 'confirmSetupRow is the declared confirm seam').toBe(true);
+  expect(r.hadBefore, 'nothing was confirmed to begin with').toBe(false);
+  expect(r.hasAfter, 'confirming the Controller row records it — with no value change at all').toBe(true);
+  expect(r.stock, 'the Stock row records the same way (its Done IS the declaration)').toBe(true);
+});
+
+/**
+ * t1217 — THE RETIRE MUST STAY RETIRED (migrated from the deleted tests/profile-library.spec.js).
+ *
+ * The library was UNKILLABLE by construction: readLib() treated an empty library as "none" and re-seeded one from live
+ * state, so any surviving caller resurrected the store. That is why this asserts the ABSENCE of the whole surface, not
+ * just that one button is gone — a half-retire is what this guards against. The machine surface must be present in the
+ * same breath, so "it's all gone" can never pass by the panel failing to render at all.
+ */
+test('the profile-library surface is GONE from Settings and the machine surface is present', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings && window.ddcsGetMachine);
+  // seed a legacy library, THEN open Settings — a resurrecting reader would rebuild the retired UI from it
+  await page.evaluate(() => localStorage.setItem('ddcs_profile_library', JSON.stringify({
+    activeId: 'p1', profiles: [{ id: 'p1', name: 'Legacy Rig', controllerId: 'ddcs-v41', settings: {}, userVars: [] }],
+  })));
+  await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
+  await page.waitForSelector('#set_tab_profile', { state: 'visible', timeout: 8000 });
+
+  const s = await page.evaluate(() => ({
+    // RETIRED — every door into the library
+    saveas: !!document.getElementById('set_profile_saveas'),
+    browse: !!document.getElementById('set_profile_browse'),
+    list: !!document.getElementById('set_profile_list'),
+    newDup: !!document.getElementById('set_profile_new_dup'),
+    newBase: !!document.getElementById('set_profile_new_base'),
+    del: !!document.getElementById('set_profile_delete'),
+    legacyName: !!document.getElementById('set_profile_name'),
+    globalLib: !!window.ddcsProfileLib,
+    // PRESENT — the machine surface that replaced it
+    machineName: !!document.getElementById('set_machine_name'),
+    controllerDropdown: !!document.getElementById('set_profile'),
+    dump: !!document.getElementById('set_profile_import_dump'),
+    titles: [...document.querySelectorAll('#set_tab_profile .settings-section-title')].map((e) => e.textContent).join(' '),
+  }));
+
+  expect(s.saveas || s.browse || s.list || s.newDup || s.newBase || s.del || s.legacyName,
+    'no profile-library control survives in Settings').toBe(false);
+  expect(s.globalLib, 'window.ddcsProfileLib is gone (the module that auto-created the library is deleted)').toBe(false);
+  expect(s.machineName, 'the machine NAME field is the identity control now').toBe(true);
+  expect(s.controllerDropdown, 'the CONTROLLER dropdown stays — it retargets THIS workspace').toBe(true);
+  expect(s.dump, 'Import-from-dump stays').toBe(true);
+  expect(s.titles, 'the section is framed as this workspace\'s machine').toMatch(/THIS WORKSPACE'S MACHINE/);
+});

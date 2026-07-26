@@ -29,7 +29,8 @@ import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 �
 import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
-import { openProfileModal, setProfileChangeHook } from './profileModal.js';   // t684 b — the profile browser (save-as / browse)
+import { getMachine, setMachine } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine (replaces the profile library)
+import { confirmSetupRow } from './setupChecklist.js';   // t1217 — a visit+confirm satisfies a checklist row even when the value is unchanged   // t684 b — the profile browser (save-as / browse)
 import './backupModal.js';   // t852 — registers window.ddcsExportBackup + window.openBackupRestore (the one-file backup)
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
@@ -438,12 +439,8 @@ function showSavedToast() {
     }
     
     let name = 'unnamed';
-    const L = window.ddcsProfileLib;
-    if (L) {
-        const ap = L.activeProfile();
-        if (ap && ap.name) name = ap.name;
-    }
-    
+    try { name = getMachine().name || 'unnamed'; } catch (e) { /* pre-migration boot — keep 'unnamed' */ }
+
     // The word SAVED is reserved strictly for a .ddcs FILE save (persistence-A principle: localStorage is a TEMPORARY
     // buffer). A settings write only auto-persists to localStorage → announce it honestly, never as "Saved".
     t.textContent = `Auto-saved (temporary) · ${name}`;   // textContent — a profile name must never inject markup
@@ -585,7 +582,11 @@ const _gvs = (id, d) => {
 // corner the signs dictate and each axis edge points the travel direction. The travel inputs sit on their axis edge.
 function renderMachineGui() {
     const svgBox = document.getElementById('set_mach_env_svg'); if (!svgBox) return;
-    const X = _gvs('set_mach_x', 300), Y = _gvs('set_mach_y', 300), Z = _gvs('set_mach_z', 120);
+    // t1217 — the Z fallback is NEGATIVE, matching the stored default (-120: Z homes at the TOP and travels down).
+    // It was +120, so an EMPTY Z field drew the envelope inverted relative to the real default — the picture
+    // disagreed with the machine. Only reachable via an empty field, but the fallback should never contradict
+    // the value it stands in for.
+    const X = _gvs('set_mach_x', 300), Y = _gvs('set_mach_y', 300), Z = _gvs('set_mach_z', -120);
     const W = 200, H = 200, c = Math.cos(Math.PI / 6), s = Math.sin(Math.PI / 6);   // t540 — square box (fits the 200px cell); the travel fields moved OUT to the column beside it
     const P = (x, y, z) => [(x - y) * c, (x + y) * s - z];          // iso: +X right-down, +Y left-down, +Z up
     const all = []; for (const x of [0, X]) for (const y of [0, Y]) for (const z of [0, Z]) all.push(P(x, y, z));
@@ -1061,24 +1062,26 @@ function buildSettingsOverlay() {
                 <!-- GENERAL: PROFILE (t658 — profile-first: a named profile is the unit; the controller is a property, in its own section) -->
                 <div id="set_tab_profile">
                     <div class="settings-section">
-                        <div class="settings-section-title">PROFILE</div>
+                        <div class="settings-section-title">THIS WORKSPACE'S MACHINE</div>
                         <div class="settings-row" style="align-items:center;">
-                            <span id="set_profile_current" style="flex:1; font-weight:600; font-size:14px;"></span>
+                            <input type="text" id="set_machine_name" placeholder="Name this machine (e.g. Rig B)" title="What to call the machine this workspace describes. The name travels in the .ddcs file and labels the workspace in the header." style="flex:1; background:#222; color:#ddd; border:1px solid #888; font-size:14px; font-weight:600; padding:4px 8px;">
                         </div>
                         <div class="settings-row" style="margin-top:8px;">
-                            <button class="toolbar-btn settings-io" id="set_profile_saveas" title="Save the current configuration as a named profile">＋ Save as profile…</button>
-                            <button class="toolbar-btn settings-io" id="set_profile_browse" title="Browse, load, delete, export or sync your profiles">🗂 Profiles…</button>
+                            <!-- t1217 RETIRED ([[one-workspace-one-machine]]): "Save as profile…" + "Profiles…" are gone.
+                                 A workspace holds exactly ONE machine, so there is no library to browse and nothing to
+                                 switch between — a second machine is a second .ddcs (Duplicate workspace). Retiring the
+                                 switching machinery also retires the stale-snapshot bug class it created. -->
                             <button class="toolbar-btn settings-io" id="set_profile_import_dump" title="No LAN link? Copy the controller's disk to a USB stick and drop the whole folder here — Studio reads its setting / eng / coord files and derives the machine geometry + WCS (read-only), then you review before applying.">📁 Import from dump</button>
                         </div>
-                        <div class="settings-hint">A named profile is one saved machine config — switching one swaps EVERYTHING (envelope, WCS, boot macro, variables). <b>Profiles…</b> opens the browser to load / delete / export / sync the cloud.</div>
+                        <div class="settings-hint">This workspace has <b>one machine</b>. Everything below — controller, envelope, WCS, boot macro, variables — describes it, and it all travels inside this workspace's <b>.ddcs</b> file. A second machine is a second workspace: use <b>Duplicate workspace…</b>, then change the controller on the copy.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">CONTROLLER</div>
                         <div class="settings-row" style="align-items:center;">
-                            <select id="set_profile" title="The working controller — this profile's G-code dialect, envelope, WCS and boot macro are all generated for it. Change it to retarget this profile." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
+                            <select id="set_profile" title="THIS WORKSPACE'S CONTROLLER — its G-code dialect, envelope, WCS and boot macro are all generated for it. Changing it retargets this workspace (and travels in the .ddcs, so opening this workspace elsewhere adopts it)." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
                             <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins + WCS) from the bridged controller. Offline controllers: use Import profile.">↧ Pull from controller</button>
                         </div>
-                        <div class="settings-hint" id="set_controller_hint">The controller this profile targets — dialect, envelope, WCS and the boot macro are all generated for it. Changing it retargets THIS profile (to generate for another controller temporarily, duplicate the profile instead).</div>
+                        <div class="settings-hint" id="set_controller_hint">The controller this machine runs — dialect, envelope, WCS and the boot macro are all generated for it. Changing it retargets this workspace, and the choice travels in the .ddcs (opening this workspace on another device adopts it). To generate for a different controller, duplicate the workspace and change the copy.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">EDITOR</div>
@@ -1142,7 +1145,7 @@ function buildSettingsOverlay() {
                 <!-- GENERAL: NETWORK (cloud account + machine network) -->
                 <div id="set_tab_gateway" style="display:none">
                     <div class="settings-section">
-                        <div class="settings-section-title">CONTROLLER</div>
+                        <div class="settings-section-title">THIS WORKSPACE'S MACHINE</div>
                         <div class="settings-hint">Point the gateway at your controller's CNCDISK share — or scan the LAN to find it. Needs the gateway (the desktop app); the hosted page can't reach a machine on your network.</div>
                         <div id="set_machinenet_mount" style="margin-top:8px"></div>
                     </div>
@@ -1831,6 +1834,13 @@ function wireSettingsOverlay(ov) {
     }
     if (profileSel) {
         fillProfileOptions();
+        // t1217 — CONFIRM ON INTERACTION, not only on a value CHANGE. A `change` event cannot fire when the shown
+        // controller is already the right one, so the setup-checklist row could never be satisfied by the very common
+        // case "open Settings, see the correct controller, close". Touching the control at all is the user confirming
+        // it; the row then passes even though nothing changed. (The `change` handler below still does the real work.)
+        const confirmController = () => { try { confirmSetupRow('controller'); } catch (_) {} };
+        profileSel.addEventListener('click', confirmController);
+        profileSel.addEventListener('change', confirmController);
         profileSel.addEventListener('change', () => {
             const p = setActiveProfile(profileSel.value);   // a profile just PRESETS the toggles
             // Switch the variable list to match the controller (Expert / V4.1 / V3-DM500).
@@ -1853,76 +1863,28 @@ function wireSettingsOverlay(ov) {
             fill();
             applyHardwareTabs();
             fillPostOptions();
-            if (window.ddcsProfileLib) window.ddcsProfileLib.saveActiveSnapshot();   // t658 — the controller is THIS profile's property; record the change
-            renderProfileLibrary();
+            setMachine({ controllerId: profileSel.value }, false);   // t1217 — the controller is THIS machine's property (false: setActiveProfile already ran above)
+            renderMachineLine();
         });
 
-    // ── t658 — the NAMED-PROFILE LIBRARY UI (profile-first). window.ddcsProfileLib is loaded in app.js. ──
-    // t660 (E2) — ONE unified library: local profiles + cloud profiles render as ONE list, rows tagged
-    // local / cloud / both. cloudProfiles is a cached snapshot of the Drive list (refreshed by syncCloud, best-effort).
-    const profLib = () => window.ddcsProfileLib || null;
-    let cloudProfiles = [];
-    const normName = (s) => String(s || '').trim().toLowerCase();
-    // The Settings PROFILE section is now a read-only current line + [Save as…] [Profiles…] (the browse/list/cloud UI
-    // moved to the profile modal, t684 b). This refreshes the current-profile label.
-    function renderProfileLibrary() {
-        const L = profLib(); if (!L) return;
-        const active = L.activeProfile() || {};
-        const cur = q('set_profile_current');
-        if (cur) { const ctrl = (CONTROLLER_PROFILES[active.controllerId] || {}).name || active.controllerId || ''; cur.textContent = (active.name ? active.name : '(unnamed configuration)') + (ctrl ? '  ·  ' + ctrl : ''); }
+    // ── t1217 — THIS WORKSPACE'S ONE MACHINE ([[one-workspace-one-machine]]) ──────────────────────────
+    // The named-profile LIBRARY (t658) and its unified local+cloud browser are RETIRED. A workspace holds exactly one
+    // machine, so there is nothing here to browse, switch, duplicate or delete. The only bytes the library uniquely
+    // owned — the NAME and the CONTROLLER — are now the machine record (data/workspaceMachine.js); the machine's actual
+    // configuration (envelope, WCS, motors, macros, variables) already lives in the live stores that ride the .ddcs.
+    // Retiring the switching machinery retires the stale-snapshot bug class it created: an active profile held a COPY of
+    // settings the live stores also held, and every switch/create/delete had to re-sync that copy.
+    const machineNameEl = q('set_machine_name');
+    function renderMachineLine() {
+        // never clobber what the user is mid-typing (this also runs on the ddcs:settings-changed broadcast)
+        if (machineNameEl && document.activeElement !== machineNameEl) machineNameEl.value = getMachine().name || '';
     }
-    // Refresh the cached cloud list (best-effort; returns [] fast when not signed in — no Drive call), then re-render.
-    async function syncCloud() {
-        try { cloudProfiles = (window.ddcsListCloudProfiles ? (await window.ddcsListCloudProfiles()) : []) || []; }
-        catch (e) { cloudProfiles = []; }
-        renderProfileLibrary();
-    }
-    async function loadCloudRow(fileId) {
-        if (!window.ddcsLoadCloudProfile) return;
-        if (!(await dlgConfirm('Load this cloud profile onto this device? It lands as a new named profile and becomes active.', { okLabel: 'Load' }))) return;
-        try { await window.ddcsLoadCloudProfile(fileId); afterProfileChange(); syncCloud(); }
-        catch (e) { dlgNotice('Load failed: ' + (e && e.message ? e.message : e)); }
-    }
-    function afterProfileChange() { fillProfileOptions(); fillPostOptions(); fill(); applyHardwareTabs(); renderProfileLibrary(); }
-    // t684 b — the PROFILE section is buttons only; the browser modal does load/delete/export/cloud and calls back here.
-    setProfileChangeHook(afterProfileChange);
-    if (q('set_profile_saveas')) q('set_profile_saveas').addEventListener('click', () => openProfileModal('save'));
-    if (q('set_profile_browse')) q('set_profile_browse').addEventListener('click', () => openProfileModal('browse'));
-    // profiles are ONLY ever USER-NAMED (t658 amend): New + Duplicate always prompt; an empty name cancels (no auto-names).
-    const promptName = async (msg, def) => { const n = await dlgPrompt(msg, def || ''); if (n == null) return null; const t = String(n).trim(); return t || null; };
-    if (q('set_profile_name')) q('set_profile_name').addEventListener('change', (e) => { const L = profLib(); if (!L) return; L.renameProfile(L.activeProfileId(), e.target.value); renderProfileLibrary(); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); });
-    if (q('set_profile_delete')) q('set_profile_delete').addEventListener('click', async () => { const L = profLib(); if (!L) return; const a = L.activeProfile(); if (L.listProfiles().length <= 1) { dlgNotice('The last profile can\'t be deleted.'); return; } if (!(await dlgConfirm('Delete the profile “' + (a.name || 'unnamed') + '”? This can\'t be undone.', { danger: true, okLabel: 'Delete' }))) return; L.deleteProfile(a.id); afterProfileChange(); });
-    if (q('set_profile_new_dup')) q('set_profile_new_dup').addEventListener('click', async () => { const L = profLib(); if (!L) return; const name = await promptName('Name the duplicate profile:'); if (name == null) return; L.createProfile({ from: 'dup', name }); afterProfileChange(); });
-    if (q('set_profile_new_base')) q('set_profile_new_base').addEventListener('click', async () => { const L = profLib(); if (!L) return; const name = await promptName('Name the new profile:'); if (name == null) return; L.createProfile({ from: 'baseline', controllerId: getActiveProfile().id, name }); afterProfileChange(); });
-    // Cloud (E2) — the SAME named-profile concept, viewed in the unified library above. "Save to cloud" pushes the
-    // ACTIVE profile under ITS name (the name IS the cloud name; no silent overwrite — a same-name copy asks first).
-    // "Sync cloud" refreshes the ☁ rows in the library above, where each offers Load / delete. (Wired here so it shares
-    // the cloudProfiles / syncCloud state with renderProfileLibrary — one source of the cloud snapshot.)
-    const cloudSaveBtn = q('set_profile_cloud_save');
-    if (cloudSaveBtn) cloudSaveBtn.addEventListener('click', async () => {
-        if (!window.ddcsSaveProfileToCloud) return;
-        const L = profLib(); const ap = L && L.activeProfile();
-        const name = ((ap && ap.name) || '').trim();
-        if (!name) { dlgNotice('Name this profile first (at the top of the panel) — the cloud copy uses the profile name.'); const nEl = q('set_profile_name'); if (nEl) nEl.focus(); return; }
-        let existing = null;
-        try { const list = (window.ddcsListCloudProfiles ? (await window.ddcsListCloudProfiles()) : []) || []; existing = list.find((c) => normName(c.name) === normName(name)); }
-        catch (e) { dlgNotice('Could not reach your cloud: ' + (e && e.message ? e.message : e)); return; }
-        if (existing && !(await dlgConfirm('A cloud profile named “' + name + '” already exists — overwrite it?', { okLabel: 'Overwrite' }))) return;
-        const orig = cloudSaveBtn.textContent; cloudSaveBtn.disabled = true; cloudSaveBtn.textContent = 'Saving…';
-        try { const n = await window.ddcsSaveProfileToCloud(name); await syncCloud(); dlgNotice('Saved “' + n + '” to your cloud.'); }
-        catch (e) { dlgNotice('Cloud save failed: ' + (e && e.message ? e.message : e)); }
-        finally { cloudSaveBtn.disabled = false; cloudSaveBtn.textContent = orig; }
+    if (machineNameEl) machineNameEl.addEventListener('change', () => {
+        setMachine({ name: machineNameEl.value }, false);   // false — renaming the machine must not re-apply the controller
+        window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
     });
-    const cloudSyncBtn = q('set_profile_cloud_load');
-    if (cloudSyncBtn) cloudSyncBtn.addEventListener('click', async () => {
-        const orig = cloudSyncBtn.textContent; cloudSyncBtn.disabled = true; cloudSyncBtn.textContent = 'Syncing…';
-        await syncCloud();
-        cloudSyncBtn.disabled = false; cloudSyncBtn.textContent = orig;
-        if (!cloudProfiles.length) dlgNotice('No cloud profiles found. Sign in (Settings → Cloud), then use “Save to cloud” to push this profile.');
-    });
-    renderProfileLibrary();
-    try { syncCloud(); } catch (e) { /* not signed in / no cloud — the library still shows local rows */ }
-    window.addEventListener('ddcs:settings-changed', () => { try { renderProfileLibrary(); } catch (e) { /* */ } });
+    renderMachineLine();
+    window.addEventListener('ddcs:settings-changed', () => { try { renderMachineLine(); } catch (e) { /* */ } });
         // When a gateway answers (same-origin in the gateway-served/exe face, or via the ?api= dev
         // override), fetch the controller's own profile and offer it in the list (shown as
         // "… (from controller)"). Silently ignored if offline / not bridged (hosted Studio).
@@ -2939,7 +2901,10 @@ function wireSettingsOverlay(ov) {
         window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
     });
 
-    // Profile import/export + cloud save/sync moved to the PROFILE BROWSER MODAL (t684 b — profileModal.js).
+    // t1217 — machine-config import/export + cloud save/load live on data/profileStore.js (window.ddcsImportProfile /
+    // ddcsExportProfile / ddcsSaveProfileToCloud / ddcsLoadCloudProfile). They now APPLY to this workspace's machine;
+    // the browser modal that used to surface them retired with the profile library, so there is no cloud ENTRY POINT in
+    // the UI right now — re-exposing one is a button, not a rebuild.
 
     // ATC: generate a T.nc tool-change macro from the magazine table (client-side; review before running).
     const genTnc = q('atc_gen_tnc');

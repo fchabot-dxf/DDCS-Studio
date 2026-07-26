@@ -10,7 +10,7 @@
  *   time       → window.ddcsTimeEstimate() (t844) — total + secondsForLines(perLine, ddcsLinesForOp(id)) per op
  *   pre-flight → checkEnvelope(gcode, settings) (t838) — the verdict badge state
  *   safe-Z     → settings.machine.safeZMargin
- *   profile    → ProfLib.activeProfile() + CONTROLLER_PROFILES[controllerId].name
+ *   machine    → getMachine() (this workspace's ONE machine) + CONTROLLER_PROFILES[controllerId].name
  *
  * HONESTY: a tool with no library row shows its TYPED Ø + "typed Ø (no tool-table entry)", never an invented
  * name. Undeclared stock / WCS render an explicit "not declared" row — never a silent omission.
@@ -23,7 +23,7 @@ import { getTool } from '../wizards/toolPicker.js';
 import { estimateProgram, secondsForLines, fmtDuration } from '../engine/timeEstimate.js';
 import { checkEnvelope, placementDeclared } from '../engine/envelopeCheck.js';
 import { wcsOffsetAt } from '../viz/sceneFrame.js';
-import * as ProfLib from '../data/profileLibrary.js';
+import { getMachine } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine record (the profile library is retired)
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { flipForSetup } from '../wizards/ops/transform.js';   // t879 — the two-sided FLIP declaration (per-setup page + instruction)
 
@@ -187,7 +187,7 @@ export function buildSheetHTML() {
     if (!est) { try { est = estimateProgram(prog, { rapidRate: machine.rapidRate || 6000, toolChangeSec: machine.toolChangeSec }); } catch (_) { est = null; } }
     let verdict = null;
     try { verdict = checkEnvelope(prog, S); } catch (_) { verdict = null; }
-    const ap = (ProfLib.activeProfile && ProfLib.activeProfile()) || {};
+    const ap = getMachine();   // t1217 — { name, controllerId } for THIS workspace
     const ctrl = (CONTROLLER_PROFILES[ap.controllerId] || {}).name || ap.controllerId || '';
     const jobName = (window.ddcsProjectName && window.ddcsProjectName()) || 'Untitled job';
     let dateStr; try { dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); } catch (_) { dateStr = ''; }

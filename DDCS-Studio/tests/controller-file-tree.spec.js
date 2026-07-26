@@ -11,12 +11,13 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 const openMacros = async (page) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => typeof window.showApp === 'function' && window.ddcsProfileLib && window.ddcsGetSettings);
+    await page.waitForFunction(() => typeof window.showApp === 'function' && window.ddcsSetMachine && window.ddcsGetSettings);
     await page.evaluate(() => { localStorage.removeItem('ddcs_profile_library'); });
     await page.evaluate(() => window.showApp('macros'));
     await page.waitForFunction(() => document.querySelector('#macros_tree .settings-tab'));
 };
-const setController = (page, id) => page.evaluate((cid) => window.ddcsProfileLib.setActiveControllerId(cid), id);
+// t1217 — retargeting the workspace's controller is setMachine (was profileLibrary.setActiveControllerId)
+const setController = (page, id) => page.evaluate((cid) => window.ddcsSetMachine({ controllerId: cid }, true), id);
 const treeFiles = (page) => page.evaluate(() => [...document.querySelectorAll('#macros_tree .settings-tab')]
     .map((b) => b.querySelector('div')?.textContent || ''));
 
@@ -65,11 +66,15 @@ test('the tree renders the ACTIVE controller declaration: Expert wraps panels, V
     await page.screenshot({ path: 'C:/Users/danse/AppData/Local/Temp/claude/c--Users-danse-APPS-ddcs-studio-project/8818e1f1-6091-4aad-9d2e-690622a39424/scratchpad/macros-dm500-tree.png' });
 });
 
-test('editing a plain file persists in the profile (survives reload); switching profiles SWAPS the workspace', async ({ page }) => {
+// t1217 — the second half of this test ("switching profiles SWAPS the workspace") is RETIRED with the profile library
+// ([[one-workspace-one-machine]]): a workspace holds exactly one machine, so there is nothing to switch between and no
+// swap to assert. What remains is the part that still describes the shipped app — an edited file body persists into the
+// workspace's own settings and survives a reload. The cross-workspace equivalent (each .ddcs carries its own file
+// bodies) is covered by tests/workspace-roundtrip.spec.js.
+test('editing a plain file persists in the workspace (survives reload)', async ({ page }) => {
     await openMacros(page);
-    // profile A on V4.1: edit probe-fix.nc
     await setController(page, 'ddcs-v41');
-    await page.evaluate(() => window.ddcsProfileLib.renameProfile(window.ddcsProfileLib.activeProfileId(), 'Rig A'));
+    await page.evaluate(() => window.ddcsSetMachine({ name: 'Rig A' }, false));
     await page.waitForFunction(() => [...document.querySelectorAll('#macros_tree .settings-tab')].some((b) => /probe-fix\.nc/.test(b.textContent)));
     await page.evaluate(() => [...document.querySelectorAll('#macros_tree .settings-tab')].find((b) => /probe-fix\.nc/.test(b.textContent)).click());
     await page.waitForFunction(() => document.getElementById('macfile_body'));
@@ -84,24 +89,8 @@ test('editing a plain file persists in the profile (survives reload); switching 
     await page.waitForFunction(() => document.querySelector('#macros_tree .settings-tab'));
     await page.evaluate(() => [...document.querySelectorAll('#macros_tree .settings-tab')].find((b) => /probe-fix\.nc/.test(b.textContent)).click());
     await page.waitForFunction(() => document.getElementById('macfile_body'));
-    expect(await page.evaluate(() => document.getElementById('macfile_body').value), 'the edit survives reload (stored in the profile)').toBe('G0 X1 ( A EDIT )');
+    expect(await page.evaluate(() => document.getElementById('macfile_body').value), 'the edit survives reload (stored in the workspace)').toBe('G0 X1 ( A EDIT )');
 
-    // a 2nd profile (also V4.1) with a DIFFERENT edit → switching profiles SWAPS the workspace body
-    await page.evaluate(() => {
-        const lib = window.ddcsProfileLib;
-        lib.createProfile({ from: 'baseline', controllerId: 'ddcs-v41', name: 'Rig B' });   // fresh → empty workspace
-        window.ddcsGetSettings().workspace['probe-fix.nc'] = 'G0 X2 ( B EDIT )';
-        lib.saveActiveSnapshot();   // capture the live workspace edit into Rig B's slot
-    });
-    // now switch A → B and read the editor body (re-open the file after the switch)
-    const swapped = await page.evaluate(() => {
-        const lib = window.ddcsProfileLib;
-        const ids = lib.listProfiles();
-        const a = ids.find((p) => p.name === 'Rig A').id, b = ids.find((p) => p.name === 'Rig B').id;
-        lib.switchProfile(a, true); const onA = window.ddcsGetSettings().workspace['probe-fix.nc'];
-        lib.switchProfile(b, true); const onB = window.ddcsGetSettings().workspace['probe-fix.nc'];
-        return { onA, onB };
-    });
-    expect(swapped.onA, 'profile A keeps its own file body').toBe('G0 X1 ( A EDIT )');
-    expect(swapped.onB, 'profile B has its OWN file body — the workspace swapped with the profile').toBe('G0 X2 ( B EDIT )');
+    // …and the machine record survived the reload with it (the workspace still identifies as Rig A)
+    expect(await page.evaluate(() => window.ddcsGetMachine().name), 'the machine name persists across the reload').toBe('Rig A');
 });

@@ -4,18 +4,20 @@ import { test, expect } from '@playwright/test';
  * t688 b2 — the header quick-menu's "Generate for" (dialect) section is REPLACED by a PROFILE section: a read-only
  * current profile+controller line, up to 3 recents (one-click full-swap), and [Profiles…] [Save as…] [Pull from
  * controller]. NO dialect/controller switching in the menu (that stays on the Settings controller dropdown).
+ *
+ * t1217 — the identity row now names THIS WORKSPACE'S MACHINE ([[one-workspace-one-machine]]). Recents / Save-as /
+ * profile switching are retired with the library, and the row's tap opens the machine's settings.
  */
 const openMenu = async (page) => { await page.click('#hdrPostBtn'); await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 4000 }); };
 
 // t859 — REWRITTEN for the t851 MENU DIET. The retired "Profile section (head + recents + [Profiles…][Save as…][Pull])"
 // is GONE; profile lives in the ONE compound IDENTITY row (name · controller · ☁ cloud state, with the ↧ pull icon).
 // Recents + Save-as moved to the Library; Save/Open moved to the Library; dialect list already gone.
+// t1217 — the name now comes from THIS WORKSPACE'S MACHINE record, not the retired profile library.
 const seedProfile = async (page) => {
-    await page.waitForFunction(() => window.ddcsProfileLib && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
-    await page.evaluate(() => {
-        const L = window.ddcsProfileLib;
-        L.renameProfile(L.activeProfileId(), 'Rig B'); L.saveActiveSnapshot();
-    });
+    await page.waitForFunction(() => window.ddcsSetMachine && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+    await page.evaluate(() => { window.ddcsSetMachine({ name: 'Rig B' }, false); });
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };
 
 test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library + one gcode row; retired profile section GONE, ≤9 rows', async ({ page }) => {
@@ -56,8 +58,8 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library
     });
     // The ONE compound identity row + its three affordances
     expect(m.hasIdentity, 'the compound identity row').toBe(true);
-    expect(m.identityIsBrowse, 'the identity row opens the Library (data-profact=browse)').toBe(true);
-    expect(m.identityName, 'identity shows the profile name').toMatch(/Rig B/);
+    expect(m.identityIsBrowse, 'the identity row opens the machine settings (data-profact=browse)').toBe(true);
+    expect(m.identityName, 'identity shows the MACHINE name (t1217 — from the machine record)').toMatch(/Rig B/);
     expect(m.identityCtrl, 'identity shows the controller').toMatch(/·/);
     expect(m.hasCloud, 'the ☁ cloud-state tap target').toBe(true);
     expect(m.hasPull, 'the ↧ pull tap target').toBe(true);
@@ -84,21 +86,23 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library
     expect(Math.min(pullB.width, pullB.height), 'the ↧ target is ≥44px').toBeGreaterThanOrEqual(44);
 });
 
-test('the identity row taps: row → Library Profiles, ☁ → connect, ↧ → pull flow', async ({ page }) => {
+test('the identity row taps: row → the MACHINE settings, ☁ → connect, ↧ → pull flow', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
 
-    // ROW tap → the Library on the Profiles tab
+    // ROW tap → this workspace's MACHINE settings (t1217 — was the Library's Profiles tab, retired with the library)
     await openMenu(page);
     await page.click('.hq-identity');
-    await expect(page.locator('#libraryOverlay')).toBeVisible();
-    await expect(page.locator('#libraryOverlay .library-tab[data-lib-tab="profiles"]')).toHaveClass(/active/);
-    await page.click('#libraryOverlay .library-x');
+    await expect(page.locator('#settings-app')).toBeVisible({ timeout: 6000 });
+    await expect(page.locator('#set_machine_name')).toBeVisible();
+    await page.evaluate(() => window.closeSettings && window.closeSettings());
+    await expect(page.locator('#settings-app')).toBeHidden();
 
     // ☁ CLOUD tap → the cloud connect flow (not connected → the login/connect UI)
     await openMenu(page);
     await page.click('.hq-identity [data-cloud]');
-    await expect(page.locator('.cloud-login, .cloud-connect').first()).toBeVisible({ timeout: 6000 });
+    // scope to the MODAL's own mount — Settings hosts a second, hidden .cloud-login (the shared component)
+    await expect(page.locator('.cloud-account-ov .cloud-login, .cloud-account-ov .cloud-connect').first()).toBeVisible({ timeout: 6000 });
     await page.keyboard.press('Escape');
 
     // ↧ PULL tap → the pull flow (Settings → Controller → Profile, where the pull lives)

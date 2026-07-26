@@ -125,65 +125,8 @@ test('projects LOCAL: single-click selects one at a time (not load); folders sti
     expect(await page.locator('#projList .proj-row:not(.sl-row) [data-act="cd"]').count(), 'the folder navigates (not selectable)').toBeGreaterThanOrEqual(1);
 });
 
-test('profiles: [Load] disabled until selected; ACTIVE badged distinct; select→Load full-swaps; tags unambiguous', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openSettings && window.ddcsProfileLib);
-    await page.evaluate(() => {
-        localStorage.removeItem('ddcs_profile_library');
-        const lib = window.ddcsProfileLib;
-        lib.renameProfile(lib.activeProfileId(), 'Rig A'); lib.saveActiveSnapshot();
-        lib.createProfile({ from: 'baseline', controllerId: 'ddcs-expert-m350', name: 'Rig B' });   // becomes active
-        window.ddcsListCloudProfiles = async () => ([{ id: 'c9', name: 'Cloud rig', savedAt: '2024-06-02T00:00:00Z' }]);
-    });
-    await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
-    await page.waitForSelector('#set_profile_browse');
-    await page.click('#set_profile_browse');
-    await page.waitForSelector('.profile-modal .prof-row', { timeout: 8000 });
 
-    const load = page.locator('.profile-modal [data-sl-primary]');
-    await expect(load, 'a dedicated Load button exists').toHaveCount(1);
-    expect(await load.isDisabled(), 'Load disabled with nothing selected').toBe(true);
-
-    // the ACTIVE profile (Rig B) carries a distinct Active badge (not the selection ring)
-    const activeRow = page.locator('.profile-modal .sl-row[data-sl-active]');
-    await expect(activeRow, 'exactly one active row is badged').toHaveCount(1);
-    expect(await activeRow.locator('.sl-active-badge').count(), 'the active row shows the Active badge').toBe(1);
-    expect(await activeRow.textContent(), 'the active row is Rig B').toContain('Rig B');
-    // local vs cloud tags present + unambiguous
-    expect(await page.locator('.profile-modal .sl-tag').count(), 'every row carries a local/cloud tag').toBeGreaterThanOrEqual(2);
-    expect(await page.locator('.profile-modal .sl-row[data-sl-kind="cloud"] .sl-tag').first().textContent()).toContain('cloud');
-
-    // select Rig A (not active) → Load enables → click → full-swap makes Rig A active + badged
-    const rigA = page.locator('.profile-modal .sl-row[data-sl-kind="local"]', { hasText: 'Rig A' });
-    await rigA.locator('.sl-name').click();
-    await expect(page.locator('.profile-modal .sl-row.sl-selected')).toHaveCount(1);
-    expect(await load.isDisabled(), 'Load enables once a profile is selected').toBe(false);
-    await load.click();
-    await page.waitForTimeout(150);
-    const nowActive = page.locator('.profile-modal .sl-row[data-sl-active]');
-    expect(await nowActive.textContent(), 'Load full-swapped: Rig A is now the active/badged profile').toContain('Rig A');
-    expect(await load.isDisabled(), 'after load the list re-rendered → Load disabled again (no stale selection)').toBe(true);
-});
-
-test('profiles CLOUD row: selectable + loads via [Load] (download-then-activate, confirmed)', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openSettings && window.ddcsProfileLib);
-    await page.evaluate(() => {
-        localStorage.removeItem('ddcs_profile_library');
-        window.__cloudLoaded = null;
-        window.ddcsListCloudProfiles = async () => ([{ id: 'c9', name: 'Cloud rig', savedAt: '2024-06-02T00:00:00Z' }]);
-        window.ddcsLoadCloudProfile = async (id) => { window.__cloudLoaded = id; };
-    });
-    await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
-    await page.waitForSelector('#set_profile_browse');
-    await page.click('#set_profile_browse');
-    await page.waitForSelector('.profile-modal .sl-row[data-sl-kind="cloud"]', { timeout: 8000 });
-
-    await page.locator('.profile-modal .sl-row[data-sl-kind="cloud"] .sl-name').click();
-    const load = page.locator('.profile-modal [data-sl-primary]');
-    expect(await load.isDisabled(), 'selecting the cloud row enables Load').toBe(false);
-    await autoAppDialog(page, { accept: true });   // the "load onto this device?" confirm
-    await load.click();
-    await page.waitForTimeout(200);
-    expect(await page.evaluate(() => window.__cloudLoaded), 'the cloud profile loads via the dedicated Load (its id)').toBe('c9');
-});
+// t1217 — the two PROFILES tests that lived here are RETIRED with the profile library
+// ([[one-workspace-one-machine]]): a workspace holds exactly one machine, so there is no list of profiles to
+// select from and no [Load] full-swap to assert. The select-then-load LANGUAGE these tests also covered is still
+// exercised above by the projects rows, which is where it now lives exclusively.

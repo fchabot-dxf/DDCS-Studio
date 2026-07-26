@@ -16,13 +16,12 @@ import { listPosts, getActivePostId, setActivePostId, getDialect, resolveActiveP
 import { getActiveProfile, CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { validate, summarize } from '../shared/js/validate/validate.js';
 import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare alert)
-import { openProfileModal, recentProfileIds, pushRecentProfile } from './profileModal.js';   // t688 b2 — the header PROFILE section
-import * as ProfLib from '../data/profileLibrary.js';
+import { getMachine } from '../data/workspaceMachine.js';   // t1217 — the identity row names THIS WORKSPACE'S MACHINE
 import { THEMES } from './themes.js';
 import { getAccount, renderCloudLogin } from './cloudAccount.js';   // t742 — the header ACCOUNT row consumes the ONE shared cloud-account API (no second connect impl)
 import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
 import { openSetupSheet } from './setupSheet.js';   // t850 — the print-ready job page (reads every value from its declared source)
-import { openLibrary } from './libraryModal.js';   // t854 — the Library (Profiles · Projects · Wizards)
+import { openLibrary } from './libraryModal.js';   // t854 — the Library (Projects · Wizards; Profiles retired t1217)
 
 // Quick-menu glyphs (24×24 stroke grid) — mirror the dock toolbar icons so the menu reads consistently.
 const HQ_ICONS = {
@@ -136,9 +135,10 @@ export function initHeaderPost() {
         };
 
         // ── IDENTITY ROW ──────────────────────────────────────────────────────────────────────────────
-        // Menu diet (t851): ONE compound row — profile name · controller · ☁ state · ↧ pull.
-        // Tap main area → Library Profiles tab. ☁ span → cloud connect. ↧ span → Pull from controller.
-        const ap = ProfLib.activeProfile() || {};
+        // Menu diet (t851): ONE compound row — machine name · controller · ☁ state · ↧ pull.
+        // t1217 — the name/controller now come from THIS WORKSPACE'S MACHINE record, not the retired profile library.
+        // Tap main area → the machine's settings. ☁ span → cloud connect. ↧ span → Pull from controller.
+        const ap = getMachine();
         const apCtrl = (CONTROLLER_PROFILES[ap.controllerId] || {}).name || ap.controllerId || '';
         const acc = getAccount();
         const cloudCls = acc.connected ? 'hq-cloud-badge connected' : 'hq-cloud-badge';
@@ -146,9 +146,9 @@ export function initHeaderPost() {
             ? `Cloud: ${esc(acc.email || acc.name || 'connected')} — tap to manage`
             : 'Connect cloud account';
         const identityRow =
-            `<button type="button" class="hdr-quick-item hq-identity" data-profact="browse" title="Open Library — Profiles · Projects · Wizards">`
+            `<button type="button" class="hdr-quick-item hq-identity" data-profact="browse" title="This workspace's machine — open its settings">`
             + `<span class="hdr-quick-check" aria-hidden="true"></span>`
-            + `<span class="hdr-quick-lbl"><b>${esc(ap.name || '(unnamed)')}</b><span class="hq-cur"> · ${esc(apCtrl)}</span></span>`
+            + `<span class="hdr-quick-lbl"><b>${esc(ap.name || '(unnamed machine)')}</b><span class="hq-cur"> · ${esc(apCtrl)}</span></span>`
             + `<span class="${cloudCls}" data-cloud="1" title="${cloudTitle}">☁</span>`
             + `<span class="hq-pull-btn" data-profact="pull" title="Pull from controller">↧</span>`
             + `</button>`;
@@ -340,12 +340,11 @@ export function initHeaderPost() {
         closeMenu();
         if (it.dataset.cloud) { openCloudModal(); return; }   // t742 — the account row → the shared cloud-connect flow
         if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
-        // t688 b2 — PROFILE section: a recent switches (full-swap); the doors open the modal / the pull flow.
-        if (it.dataset.profswitch) { ProfLib.switchProfile(it.dataset.profswitch); pushRecentProfile(it.dataset.profswitch); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); return; }
+        // t1217 — the identity row names THIS WORKSPACE'S MACHINE. Profile switching / Save-as are retired with the
+        // library (a second machine is a second .ddcs), so the row's only door is the machine's own settings.
         if (it.dataset.profact) {
             const a = it.dataset.profact;
-            if (a === 'browse') openLibrary('profiles');   // t854 — the Profiles… door DEEP-LINKS into the Library
-            else if (a === 'saveas') openProfileModal('save');
+            if (a === 'browse') { if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' }); }
             else if (a === 'pull') { if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' }); setTimeout(() => { const b = document.getElementById('set_profile_pull'); if (b) b.click(); }, 60); }
             return;
         }
