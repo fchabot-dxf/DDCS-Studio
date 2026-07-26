@@ -14,7 +14,9 @@
     "build:exe": "pwsh ../build_fairy.ps1",
     "build:standalone": "npm run bump-version && npm run generate-vars && npm run bundle",
     "bump-version": "node scripts/bump-version.cjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:smoke": "playwright test -c playwright.smoke.config.js",
+    "test:changed": "playwright test --only-changed"
   },
   "keywords": [
     "cnc",
