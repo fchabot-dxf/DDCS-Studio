@@ -15937,3 +15937,38 @@ drag/resize page.click timeout on a surface persistence-A never touches; PASSES 
 due solely to that flake; my 3 new persistence tests are in the 1489. Committed MY 6 FILES: data/backup.js +
 ui/fileSaveState.js (new) + index.html + styles.css + ui/settingsPanel.js + tests/persistence-file-indicator.spec.js
 (new). Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1195 -- GATE-SPEEDUP (user-approved): TIER the test gate so per-pass is fast; the full suite moves to merge.
+
+PROBLEM: the full suite is 603 spec files / ~1489 tests / ~15 min -- too slow to run on every worker pass.
+
+DESIGN (declare, valid-by-construction). Split the ONE forked concern in two: the MECHANISM (objective) vs the SMOKE
+COMPOSITION (a subjective coverage/speed tradeoff -- flagged to the advisor, below). Three tiers, all reusing the SAME
+base config (mem-server, w4, timeouts) so there is no divergeable second setup:
+  - SMOKE (fast, per-pass) -- `npm run test:smoke` -> playwright.smoke.config.js, which spreads the base config and
+    narrows testMatch to a DECLARED list, tests/smoke.manifest.mjs (SMOKE_SPECS). VALID-BY-CONSTRUCTION: the config
+    fs-checks every listed spec EXISTS and throws if not, so a rename/removal fails LOUDLY instead of silently dropping
+    coverage (verified: the guard fires on a bogus entry).
+  - CHANGED -- `npm run test:changed` -> playwright --only-changed (runs spec files changed vs HEAD; flag confirmed
+    present in @playwright/test 1.58).
+  - FULL -- `npm run test:e2e` (unchanged) = the merge-boundary backstop.
+  - TESTING.md documents the tiers + the intended protocol (per-pass = smoke + the touched feature's specs; full at merge).
+
+THE SMOKE SET (18 specs -> 60 tests, ran 27s / 60 pass). Chosen as ONE canonical BROAD-BREAKAGE canary per SUBSYSTEM
+(app shell / blocks round-trip / macros / theme / layout / CAM build+slot+sim / backup + persistence / wizard emit /
+data-op / parser / editor-sim / sim-registry / probe / wizard library). It tracks SUBSYSTEMS not FEATURES, so it stays
+small + rarely changes: a new feature does NOT need a smoke entry (its own specs + the full merge gate cover it).
+>> FLAG to advisor (the subjective residue): the smoke COMPOSITION is a candidate -- it is inert DATA in
+smoke.manifest.mjs, trivial to tune (add/drop a line). I did NOT hard-gate on it because the FULL suite at the merge
+boundary is the safety backstop (a thin smoke only delays detection to merge, it cannot ship a regression). Please
+review/tune the list.
+
+WHY NO FULL GATE THIS PASS: my change is additive-only (two new config/manifest files + TESTING.md + 2 package.json
+scripts); it touches NO web/ source and NO existing spec, so it cannot change any test outcome. Running the full 15-min
+gate here would contradict the very task. Verified instead: smoke 60/60 green (which also proves the base config still
+loads, since the smoke config imports it) + the existence guard fires + --only-changed is a real flag.
+
+Committed MY 4 FILES: tests/smoke.manifest.mjs (new) + playwright.smoke.config.js (new) + TESTING.md (new) +
+package.json (2 scripts). Branch feat/ddcs-workspace. NO release.
