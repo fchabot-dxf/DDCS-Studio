@@ -47,7 +47,15 @@ export function middleReposLanding(params, stock) {
     const dir2Plus = (typeof p.dir2 === 'string' ? p.dir2 : (dir1Plus ? 'neg' : 'pos')) === 'pos';
     const diagTravel = n(p.diagTravel, 50);
     const secOff = dir2Plus ? -diagTravel : diagTravel;   // emit: dir2:pos -> Y[0-#21] (-), dir2:neg -> Y#21 (+)
-    return second === 'Y' ? { x: cx, y: cy + secOff, z: probeZ } : { x: cx + secOff, y: cy, z: probeZ };
+    // t1201 — honour a PLACED ② (a numeric diagPrimary): the emit's trans-traverse lands the PRIMARY at #22 on BOTH routes
+    // (dogleg + diagonal go through safeTraverseStack 'center', which moves the primary to #22), so the sim landing reads it
+    // the SAME way the ② handle renders (parseFloat: '#53'/unset → NaN → the centre re-centre approximation). Before this,
+    // the landing always re-centred → dragging ② moved the marker + the emit but the second probe's traced start stayed at
+    // the centre — the marker↔path mis-alignment (the user's live report).
+    const pp = parseFloat(p.diagPrimary);
+    return second === 'Y'
+        ? { x: Number.isFinite(pp) ? pp : cx, y: cy + secOff, z: probeZ }
+        : { x: cx + secOff, y: Number.isFinite(pp) ? pp : cy, z: probeZ };
 }
 /** t963 — the derivation applies only to the AUTO trans-traverse (#21/#22); a MANUAL trans jog is operator-placed. */
 const transAxisAuto = (params) => ((params && params.transAxis) || 'auto') === 'auto';

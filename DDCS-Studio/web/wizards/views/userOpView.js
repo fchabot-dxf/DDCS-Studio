@@ -479,14 +479,30 @@ export const userOpView = {
                             mgr.update();
                         } }];
                     }
+                    // t1201 (user) — MANUAL-mode jog landings are draggable POSITION markers on the Layout too: a pass whose
+                    // declared source is 'manual' (the operator jogs there — NO coded traverse) gets a marker routed through the
+                    // panel's sim-only userStarts seam (panel.onStartDrag) — it moves the SIM, never the emit. AMBER = manual
+                    // positioning, teal = automatic (the user's declared colour language); the sim-only Start (pass 0) rides
+                    // along as the first marker since the simMarkers branch replaces the single-◇ path.
+                    let manualMarkers = null;
+                    if (!spb && !epb && panel && Array.isArray(ps) && ps.length && typeof panel.onStartDrag === 'function') {
+                        const srcs = Array.isArray(sources) ? sources : [];
+                        const mkManual = (p, label) => ({
+                            pos: ps[p], label, manual: true, simOnly: true, color: '#ffb300',
+                            onDrag: (world) => { const z = (ps[p] && ps[p].z) || 0; panel.onStartDrag({ x: world.x, y: world.y, z }, p); renderLayoutWithSim(); },
+                        });
+                        const manuals = [];
+                        for (let p = 1; p < ps.length; p++) if (srcs[p] === 'manual') manuals.push(mkManual(p, String(p + 1)));
+                        if (manuals.length && pos0) manualMarkers = [mkManual(0, 'Start'), ...manuals];
+                    }
                     const simMarkers = (spb && Array.isArray(starts))
                         ? spb.map((_m, i) => (starts[i] && Number.isFinite(+starts[i].x)) ? {
                             pos: starts[i], label: String.fromCharCode(65 + i),   // A, B, …
                             onDrag: (world) => { if (writeSimStartFrac(_def, i, world, stkNow, starts)) mgr.update(); },
                         } : null).filter(Boolean)
-                        : entryMarkers;
-                    const simStart = (spb || epb || !(panel && pos0 && typeof panel.onStartDrag === 'function'))
-                        ? ((pos0 && !spb && !epb) ? { pos: pos0 } : null)
+                        : (entryMarkers || manualMarkers);
+                    const simStart = (spb || epb || manualMarkers || !(panel && pos0 && typeof panel.onStartDrag === 'function'))
+                        ? ((pos0 && !spb && !epb && !manualMarkers) ? { pos: pos0 } : null)
                         : { pos: pos0, onDrag: (dp) => { panel.onStartDrag(dp, 0); renderLayoutWithSim(); } };
                     const fc = renderLayout2D(c, _def, params, simStart, sources, passEnds, _layoutSpots, setSpots, ps, simMarkers);   // t301 Seam C + t508 simMarkers (declared marker→param handles)
                     wireAnimOverlay(c, fc, panel, ps, passEnds, sources);   // t309 — the 2D-animation overlay under the SVG (created once, fed the shared trace each render; driven by the panel's engine via onToolPos)

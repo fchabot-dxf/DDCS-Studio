@@ -45,3 +45,43 @@ test('middle wall-2 sim marker == the emit-declared #21/#22 landing (both shapes
     expect(c.twW2, `${c.shape}/${c.dir2}: TWIN sim wall-2 == the emit-declared #21/#22 landing`).toEqual(c.parsed);
   }
 });
+
+/**
+ * t1201 — a PLACED ② (a numeric diagPrimary) must move the sim landing WITH the marker. The emit's trans-traverse lands the
+ * PRIMARY at #22 (both routes go through safeTraverseStack 'center'), and the ② handle renders at parseFloat(diagPrimary) —
+ * before this fix the sim landing ALWAYS re-centred the primary, so the dragged marker and the second probe's traced start
+ * mis-aligned (user live report: "the marker moves but the sim path is not"). At rest ('#53'/unset) the centre approximation
+ * is unchanged (covered by the test above).
+ */
+test('a PLACED ② (numeric diagPrimary) moves the sim wall-2 landing with the marker — the second probe respects it', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+  const r = await page.evaluate(async ({ STOCK }) => {
+    const { middleStack } = await import('/wizards/middleWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { opSimStarts, middleReposLanding } = await import('/viz/opSimStarts.js');
+    const { middleDataDef } = await import('/blocks/dataOps/middleData.js');
+    const { registerUserOp } = await import('/blocks/userOps.js');
+    const def = middleDataDef(); registerUserOp(def);
+    const cases = [];
+    for (const shape of ['dogleg', 'diagonal']) {
+      // a placed ②: primary target 70 (off-centre), travel 40 — as if dragged there
+      const params = { featureType: 'boss', twoAxis: true, inAxis: 'auto', transAxis: 'auto', axis: 'X', dir1: 'pos', dir2: 'neg', travelShape: shape, diagPrimary: '70', diagTravel: '40' };
+      const t = emitMapped(middleStack(params)).text;
+      const p22 = parseFloat((t.match(/#22=(-?\d+(?:\.\d+)?)/) || [])[1]);   // the emit assigns the placed primary
+      const bi = opSimStarts('middle', params, STOCK); const biW2 = bi[bi.length - 1];
+      const tw = def.simStartsProvider(params, STOCK); const twW2 = tw[tw.length - 1];
+      const land = middleReposLanding(params, STOCK);
+      cases.push({ shape, p22, biW2: { x: Math.round(biW2.x), y: Math.round(biW2.y) }, twW2: { x: Math.round(twW2.x), y: Math.round(twW2.y) }, land: { x: Math.round(land.x), y: Math.round(land.y) } });
+    }
+    return { cases };
+  }, { STOCK });
+
+  for (const c of r.cases) {
+    expect(c.p22, `${c.shape}: the emit assigns the PLACED #22`).toBe(70);
+    const want = { x: 70, y: STOCK.y / 2 + 40 };   // primary = the placed ② (70); secondary = centre + #21 (dir2 neg → +)
+    expect(c.land, `${c.shape}: middleReposLanding lands the primary AT the placed ②`).toEqual(want);
+    expect(c.biW2, `${c.shape}: BUILT-IN wall-2 marker rides the placed ②`).toEqual(want);
+    expect(c.twW2, `${c.shape}: TWIN wall-2 marker rides the placed ②`).toEqual(want);
+  }
+});

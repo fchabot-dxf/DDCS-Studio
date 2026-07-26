@@ -89,6 +89,17 @@ export const CANVAS_GESTURES = {
         place: (d) => { const sec = d.centreSec + d.sign * d.travel; return { x: d.primaryX ? d.prim : sec, y: d.primaryX ? sec : d.prim, kind: 'move', label: d.label }; },
         drag: (d, w) => { const sec = d.primaryX ? w.y : w.x, prim = d.primaryX ? w.x : w.y; return { [d.fieldTravel]: Math.max(1, Math.round(Math.abs(sec - d.centreSec))), [d.fieldPrimary]: Math.round(prim) }; },
     },
+    // t1201 — MIDDLE in-axis CROSS-OVER AIM (user: the traverse target needs a GUI): a boss in-axis AUTO crossover
+    // traverses wall1→wall2 by the cross-over distance (#19/#20 = crossX/crossY — numeric-only fields until now). The
+    // handle rides the FIRST-axis probe line at wallFace + sign·cross (the traverse TARGET past the far wall); a drag
+    // re-derives the distance = |along − wallFace| (min 1). The perpendicular component is ignored — the traverse rides
+    // the probe line (a handle drives a PARAM, never freeform geometry).
+    // GUI DIFFERENTIATION (user): the trans-axial end (②) is a POSITION marker (square, 2 params); an in-axis traverse end
+    // is a DISTANCE handle → kind 'size' (circle) + the mm value shown (click-to-edit via onEdit → the cross field).
+    crossAim: {
+        place: (d) => { const along = d.wallFace + d.sign * d.cross; return { x: d.axisX ? along : d.lineAt, y: d.axisX ? d.lineAt : along, kind: 'size', label: d.label, value: d.cross }; },
+        drag: (d, w) => ({ [d.field]: Math.max(1, Math.round(Math.abs((d.axisX ? w.x : w.y) - d.wallFace))) }),
+    },
     // PROBE-VECTOR about an anchor → an axis ENUM + a dir ENUM + a reach scalar (ONE drag = three controls). The handle is
     // the arrow TIP: a probe is AXIS-ALIGNED, so the drag angle SNAPS to the nearest cardinal (|dx|≥|dy| → X else Y; the
     // sign → pos/neg), and the length sets the reach (`d.field`). Anchor (cx,cy) = the probe start; the view draws the

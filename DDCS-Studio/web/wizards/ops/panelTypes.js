@@ -335,6 +335,39 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
         const prim = Number.isFinite(pp) ? pp : centrePrim;   // '#53' (re-centre, at rest) → the stock centre; a placed ② → its numeric primary coord
         decls.push({ type: 'diagAim', id: 'diagAim', primaryX, centreSec, sign, travel, prim, fieldTravel: 'diagTravel', fieldPrimary: 'diagPrimary', label: '②' });
     }
+    // t1201 — MIDDLE in-axis CROSS-OVER AIM (user: "the traverse target position needs a GUI"): a boss with the in-axis
+    // traverse on AUTO emits the hands-free wall1→wall2 cross-over (#19/#20 = crossX/crossY — numeric-only fields until
+    // now). Each emitted crossover gets a draggable TARGET handle riding its probe line at wallFace + sign·cross; a drag
+    // writes that axis's cross-over field, so the traverse lands where the handle is. PRIMARY always (boss+auto); the
+    // SECONDARY when Find Both Axes is on (its crossover runs along the second axis, riding the ② line — the wall-2 pass
+    // start, which since the t1201 landing fix follows a placed ②). Opt-in by bindings (middle only), like diagAim.
+    const crossXBind = (def.bindings || []).find((b) => b && b.param === 'crossX');
+    const crossYBind = (def.bindings || []).find((b) => b && b.param === 'crossY');
+    if (crossXBind && crossYBind && params.featureType === 'boss' && (params.inAxis || 'auto') === 'auto') {
+        const primaryX = (params.axis || 'X') !== 'Y';
+        const dir1Plus = (params.dir1 || 'pos') === 'pos';
+        const pField = primaryX ? 'crossX' : 'crossY';
+        if (_writable(pField)) {
+            // wall 1 = the face the first probe TOUCHES: probing toward + touches the LOW face (0), toward − the HIGH face.
+            const span = primaryX ? stock.w : stock.h;
+            const wallFace = dir1Plus ? 0 : span, sign = dir1Plus ? 1 : -1;
+            const cross = Math.max(1, num(primaryX ? params.crossX : params.crossY, 80));
+            const p0 = (Array.isArray(panelStarts) && panelStarts[0]) || null;   // ride the LIVE first-probe line (follows a dragged Start)
+            const lineAt = p0 ? num(primaryX ? p0.y : p0.x, primaryX ? stock.h / 2 : stock.w / 2) : (primaryX ? stock.h / 2 : stock.w / 2);
+            decls.push({ type: 'crossAim', id: 'crossAimP', axisX: primaryX, wallFace, sign, cross, lineAt, field: pField, label: (primaryX ? 'X' : 'Y') + '↔', color: '#39c0d8' });   // TEAL circle: colour=automatic, shape=travel type (circle=in-axis distance vs the ② square=trans-axial end) — the user's declared language
+        }
+        const sField = primaryX ? 'crossY' : 'crossX';
+        if ((params.twoAxis || params.findBoth) && _writable(sField)) {
+            const dir1PlusB = dir1Plus;
+            const dir2Plus = ((typeof params.dir2 === 'string') ? params.dir2 : (dir1PlusB ? 'neg' : 'pos')) === 'pos';
+            const span2 = primaryX ? stock.h : stock.w;
+            const wallFace2 = dir2Plus ? 0 : span2, sign2 = dir2Plus ? 1 : -1;
+            const cross2 = Math.max(1, num(primaryX ? params.crossY : params.crossX, 80));
+            const pw = (Array.isArray(panelStarts) && panelStarts.length > 1) ? panelStarts[panelStarts.length - 1] : null;   // the wall-2 pass start = the ② line
+            const lineAt2 = pw ? num(primaryX ? pw.x : pw.y, primaryX ? stock.w / 2 : stock.h / 2) : (primaryX ? stock.w / 2 : stock.h / 2);
+            decls.push({ type: 'crossAim', id: 'crossAimS', axisX: !primaryX, wallFace: wallFace2, sign: sign2, cross: cross2, lineAt: lineAt2, field: sField, label: (primaryX ? 'Y' : 'X') + '↔', color: '#39c0d8' });   // teal in-axis distance circle (see crossAimP)
+        }
+    }
     // Drag a handle → write the bound param FIELDS (their 'input' bubbles → userOpView.update() redraws). The gesture
     // math (corner/radius) lives in the registry; here `setFields` just routes each {param: value} to its form field.
     const setFields = (m) => { for (const k in m) _writeParam(k, m[k]); };
@@ -440,7 +473,9 @@ export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots
     if (Array.isArray(simMarkers) && simMarkers.length) {
         // t532 — noSnap: a sim-start probe point is a FREE position (anywhere in reach), NOT a feature to seat on the stock —
         // so it must NOT snap to stock corners/edges (the snap CAUGHT it at the perimeter → "can't exit the stock", the human's bug).
-        const markerHandles = simMarkers.map((m, i) => ({ id: '__simstart' + i, x: +m.pos.x, y: +m.pos.y, kind: 'move', noSnap: true, label: m.label || String(i + 1), color: '#39c0d8', yieldCoincident: !!m.yieldCoincident }));   // t726 P2b — the entry marker yields to a coincident feature handle
+        // t1201 (user) — a marker may declare manual/simOnly/color (a MANUAL jog landing renders amber = the established
+        // manual language, and drags sim-only); the spb param-markers keep the cyan default.
+        const markerHandles = simMarkers.map((m, i) => ({ id: '__simstart' + i, x: +m.pos.x, y: +m.pos.y, kind: 'move', noSnap: true, label: m.label || String(i + 1), color: m.color || '#39c0d8', manual: !!m.manual, simOnly: !!m.simOnly, yieldCoincident: !!m.yieldCoincident }));   // t726 P2b — the entry marker yields to a coincident feature handle
         const onDragMarkers = (id, world) => {
             const mi = markerHandles.findIndex((h) => h.id === id);
             if (mi >= 0 && typeof simMarkers[mi].onDrag === 'function') simMarkers[mi].onDrag({ x: world.x, y: world.y });
