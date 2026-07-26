@@ -162,7 +162,12 @@ export function middleSimStartsProvider(params, stock) {
  *  NO postInstantiate: the built-in middle bakes no scalar-interpolated comment text (no header recompose needed) and does NOT
  *  source #5/#3/#2 (no source-chips — a hook here would DIVERGE on an Expert profile; see the header NOTE) → byte-identical on ALL profiles. */
 export function middleDataDef() {
-    const bindings = [...MIDDLE_BINDINGS, ...MIDDLE_STRUCT_BINDINGS];
+    // t1213 (USER RULING — [[op-defining-fields-at-top]]): the op-DEFINING fields come FIRST. Probe Order / Feature /
+    // travel mode are what the op IS; the scalars (probe distance, feeds, retract) are how it is tuned. The form renders
+    // in BINDING ORDER and buckets by `section`, so putting the STRUCT rows first makes GEOMETRY render above TOOL & CUT —
+    // identity → geometry → tool/cut. Declared ordering only: no per-wizard CSS, and the emit is untouched (bindings drive
+    // the FORM; the value-socket derivation reads MIDDLE_BINDING_SPECS, which is unchanged).
+    const bindings = [...MIDDLE_STRUCT_BINDINGS, ...MIDDLE_BINDINGS];
     const def = userOpFromStack('middle_data', 'Middle (data)', middleDataStack(MIDDLE_DEFAULTS), bindings, 'form3d+2d', { forceMachine: true });
     def.bindingSpecs = MIDDLE_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     // t1211 — fill in `axisOrder` for the guard when an op stored only the legacy `axis` (middleAxes normalises), so a
