@@ -15805,3 +15805,40 @@ createPreviewPanel gained snapshot() (additive). The Layout-overlay / region-edi
 
 Full gate: 1483 passed / 0 failed / 4 skipped (14.5m) -- fully green, all 1487 ran (+2 = the new snapshot tests; shared-core viz change broke nothing). Committed MY 4 FILES: toolpath2d.js + createPreviewPanel.js + macrosApp.js + cam-sim-snapshot.spec.js.
 Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1189 -- FIX: CAM authoring Simulate showed 'No drawable moves' for a slot with real values. TWO fixes (seed value + route-trace var seed).
+
+The user symptom: build a CAM slot (e.g. Pocket) with real values -> Simulate -> the preview + Use-in-icon show 'No drawable
+moves' instead of the toolpath. The advisor diagnosed the SEED (cbmSimulate seeds Number(f.def), the generator default). I
+applied that AND, grounding the fresh-Pocket case, found the DEEPER root cause + fixed it too.
+
+FIX 1 (the advisor's, macrosApp.js cbmSimulate) -- seed each field's DISPLAYED value, not the generator default: was
+seed.set(mirrorVar(f.idx), Number(f.def)); now cbmVal(f._op, fkeyOf(f)) (the SAME expression renderCbmTable renders as the
+value cell -> the seed EQUALS the param table by construction, correct for every field kind incl. part-scoped multi-part ops),
+falling back to Number(f.def) only when the displayed value is blank/non-numeric. This is the fix for an EDITED slot
+(displayed != default).
+
+FIX 2 (the actual root cause of the fresh-Pocket symptom, createPreviewPanel.simConfig) -- the STATIC ROUTE trace was NOT
+seeding the #vars. GROUNDED: for a fresh Pocket the seed was ALREADY correct (cv==def; #2600+=120/90/5/... matching the macro
+reads) yet it traced to 0 segments, while corner/boss traced fine. The Pocket macro reads #2600+ mirrors and GUARDS on them
+(IF #24 LE #23 GOTO 8 -- pocket-must-be-bigger-than-the-tool); with the mirrors unseeded in the route trace they read 0 -> the
+guard trips -> 0 cutting moves. simConfig (the config traceToolpath consumes) OMITTED createVarStore, while the PLAY engine
+gets it (createPreviewPanel line ~432). So route + play DIVERGED. Added createVarStore: opts.createVarStore || null to
+simConfig -> the route trace seeds the SAME #vars as play (parity). applySimConfig reads only specific fields, so PLAY is
+unchanged; only the route trace now seeds -> a shared-viz change ISOLATED to route rendering.
+
+VERIFIED (real symptom, screenshot + segments): a fresh Pocket (120x90x5 + feed etc.) -> Simulate -> 176 route segments (a real
+raster toolpath in the preview, NOT 'No drawable moves' -- seed-preview.png shows the blue raster on the stock) -> Use in icon
+-> the clean toolpath drops in as an 'imported' layer (over the pocket_rect glyph). REGRESSION: a corner probe (13 segs) + a
+boss middle (24 segs) still simulate. New test cam-sim-seed.spec.js (2 tests); it uses a small debug/test handle
+window.ddcsCbmSimPanel = _cbmPanel set in cbmSimulate (getSegments/snapshot). cam-slot-icon-s5 2/2. (This also retro-explains
+the t1187 'pocket traced empty in the harness' note -- SAME cause; the pocket now simulates in the harness too.)
+
+SHARED-CORE NOTE: the simConfig createVarStore add is BEYOND the advisor's specified seam (cbmSimulate) -- I went to the real
+root cause because the seed ALONE did not resolve the fresh-Pocket symptom (the seed was already correct). It is a
+route<->play PARITY fix (one config source), isolated to the route trace, validated by the FULL GATE.
+
+Full gate: 1485 passed / 0 failed / 4 skipped (14.6m) -- fully green, all 1489 ran (+2 = cam-sim-seed). The shared-core simConfig createVarStore add broke NO sim-preview test across wizard/editor/blocks/CAM -> the route<->play parity fix is validated. Committed MY 3 FILES: macrosApp.js + createPreviewPanel.js + cam-sim-seed.spec.js. Branch
+feat/ddcs-workspace. NO release.
