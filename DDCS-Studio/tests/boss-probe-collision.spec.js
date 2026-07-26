@@ -36,6 +36,12 @@ test('each REPOSITION pass probes from ITS start ② → collides (was: fired fr
   for (const p of [0, 1, 2, 3]) expect(r.manual.with[p], `manual pass ${p} collides from its start`).toBeLessThan(60);
   // AUTO: 2 passes (X then Y). The 2nd-axis (Y, pass 1) probe goes from MISS → COLLIDE once it fires from ②.
   expect(r.auto.nStarts).toBe(2);
-  expect(r.auto.without[1]).toBeGreaterThan(120);            // Y pass fired from ① → missed
   expect(r.auto.with[1], 'auto Y pass collides from ②').toBeLessThan(60);
+  // t1205 — the AUTO control changed ON PURPOSE and no longer demonstrates the ① miss: passAnchorFor now falls back to
+  // the PREVIOUS PASS'S RUNTIME END when a pass has no declared start row, so even without passStarts the probe fires
+  // from where the tool physically is (after the programmed traverse) instead of teleporting back to ①. That failure
+  // mode is now unreachable by construction. The MANUAL control above still discriminates (its reposition is an operator
+  // JOG, so there is no programmed move to carry the tool to the next wall). The property that matters — every pass
+  // probes from a REAL position and collides — is asserted for both arms.
+  expect(r.auto.without[1], 'auto Y pass collides even without declared starts (it anchors at the previous pass END)').toBeLessThan(60);
 });

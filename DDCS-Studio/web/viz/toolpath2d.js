@@ -26,10 +26,13 @@ import { displayOf } from './displayPrefs.js';   // t744 — the ONE declared pr
 // (the corner-diagonal misread this fix answers). A rapid with a Z change (plunge/retract) stays `rapid`; feeds stay `feed`.
 const isRawRapid = (s) => s.type === 'rapid' || (!s.type && s.rapid);
 const isLifted = (s) => isRawRapid(s) && Math.abs((s.z1 || 0) - (s.z2 || 0)) < 1e-6 && (Math.abs((s.x1 || 0) - (s.x2 || 0)) > 0.02 || Math.abs((s.y1 || 0) - (s.y2 || 0)) > 0.02);
-const typeOf = (s) => isLifted(s) ? 'lifted' : (s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed'));
+// t1205 — EXPORTED: this is the render-time CLASSIFICATION seam (a horizontal rapid becomes `lifted` safe-travel).
+// Since t1203 gave `lifted` the rapid HUE, colour alone can no longer prove a traverse was classified — so the
+// classifier itself must be assertable (and the legend reads it too, so its present-set can't drift from the paint).
+export const typeOf = (s) => isLifted(s) ? 'lifted' : (s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed'));
 // t331 — the 2D now READS the token dash (was hardcoded): rapid.dash=[] → solid, probe/jog [5,4] → dashed. 'probe' maps to
 // probeFast (both probe types share a dash). The 3D still hardcodes its dash (advisor-flagged future task) — kept in sync.
-const dashFor = (t) => (t === 'probe' ? PATH_TYPES.probeFast.dash : (PATH_TYPES[t] && PATH_TYPES[t].dash)) || [];
+export const dashFor = (t) => (t === 'probe' ? PATH_TYPES.probeFast.dash : (PATH_TYPES[t] && PATH_TYPES[t].dash)) || [];   // t1205 — exported with typeOf: dash is what distinguishes a traverse now that the hue is shared
 export function segColor(s, zMin, zRange, maxPF) {
     const t = typeOf(s);
     if (t === 'lifted') return hexCss(PATH_TYPES.lifted.color);   // t893 — dimmed safe-travel

@@ -29,7 +29,7 @@ test('opSimContext: toolMachineFrame IMPLIES forceMachine + seatAtStart (one int
         return out;
     });
     // the fold: declaring toolMachineFrame alone yields all three
-    expect(r.mfOnly).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: false, toolMachineFrame: true, seatAtStart: true });
+    expect(r.mfOnly).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: false, toolMachineFrame: true, seatAtStart: true, probesForWcs: false });
     // the standalone intents survive as declared exceptions
     expect(r.forceOnly.forceMachine, 'ATC-style: forceMachine without the machine-frame tool').toBe(true);
     expect(r.forceOnly.toolMachineFrame).toBe(false);
@@ -38,11 +38,11 @@ test('opSimContext: toolMachineFrame IMPLIES forceMachine + seatAtStart (one int
     expect(r.seatOnly.forceMachine).toBe(false);
     expect(r.seatOnly.toolMachineFrame).toBe(false);
     // built-in homing — the machine-frame op, all three derive from the one intent
-    expect(r.homing).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: false, toolMachineFrame: true, seatAtStart: true });
+    expect(r.homing).toEqual({ showRotaryRig: false, forceMachine: true, showMagazine: false, toolMachineFrame: true, seatAtStart: true, probesForWcs: false });
     // built-in ATC length — forceMachine only (a G53 op, but not a machine-frame TOOL render)
     expect(r.atcLength.forceMachine).toBe(true);
     expect(r.atcLength.toolMachineFrame).toBe(false);
     expect(r.atcLength.seatAtStart).toBe(false);
     // a plain op — nothing forced
-    expect(r.mill).toEqual({ showRotaryRig: false, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false });
+    expect(r.mill).toEqual({ showRotaryRig: false, forceMachine: false, showMagazine: false, toolMachineFrame: false, seatAtStart: false, probesForWcs: false });
 });

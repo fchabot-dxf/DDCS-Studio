@@ -14,7 +14,7 @@ test('the 2D distinguishes a LIFTED safe-travel traverse (dimmed/dashed) from cu
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
     const r = await page.evaluate(async () => {
-        const { segColor } = await import('/viz/toolpath2d.js');
+        const { segColor, typeOf, dashFor } = await import('/viz/toolpath2d.js');
         const { PATH_TYPES, hexCss } = await import('/viz/pathStyle.js');
         const horizRapid = { rapid: true, x1: 0, y1: 0, z1: 5, x2: 20, y2: 20, z2: 5 };   // a lifted diagonal traverse (z constant, XY moves)
         const doglegLeg = { rapid: true, x1: 0, y1: 0, z1: 5, x2: 20, y2: 0, z2: 5 };       // a lifted single-axis dog-leg leg
@@ -29,16 +29,29 @@ test('the 2D distinguishes a LIFTED safe-travel traverse (dimmed/dashed) from cu
             cPlunge: segColor(plunge, 0, 1, 60),
             cCut: segColor(cut, 0, 1, 60),
             liftedDashed: (PATH_TYPES.lifted.dash || []).length > 0,
-            liftedDim: PATH_TYPES.lifted.dim < 1,
+            // t1205 — HUE-INDEPENDENT proof. t1203 gave `lifted` the rapid colour (2D<->3D parity, user ruling), so a
+            // colour compare can no longer show a traverse was CLASSIFIED as safe-travel. Assert the classifier + the
+            // applied dash instead: those are what still carry the distinction.
+            tDiag: typeOf(horizRapid), tLeg: typeOf(doglegLeg), tPlunge: typeOf(plunge), tCut: typeOf(cut),
+            dashDiag: dashFor(typeOf(horizRapid)), dashPlunge: dashFor(typeOf(plunge)),
         };
     });
-    expect(r.cDiag, 'a horizontal diagonal traverse → the dimmed lifted colour').toBe(r.lifted);
+    expect(r.cDiag, 'a horizontal diagonal traverse → the lifted safe-travel colour').toBe(r.lifted);
     expect(r.cLeg, 'a horizontal dog-leg leg → lifted too').toBe(r.lifted);
+    // the CLASSIFICATION (hue-independent — this is what proves safe-travel is still a distinct render decision)
+    expect(r.tDiag, 'the diagonal traverse CLASSIFIES as lifted safe-travel').toBe('lifted');
+    expect(r.tLeg, 'the dog-leg leg classifies as lifted too').toBe('lifted');
+    expect(r.tPlunge, 'a Z-changing rapid (plunge) is NOT lifted — it stays a positioning rapid').toBe('rapid');
+    expect(r.tCut, 'a cutting feed is never lifted').toBe('feed');
     expect(r.cPlunge, 'a Z-changing rapid (plunge) stays `rapid`, not lifted').toBe(r.rapid);
     expect(r.cCut, 'a cutting feed stays the solid cut colour').toBe(r.feed);
     expect(r.liftedDashed, 'the lifted travel is DASHED').toBe(true);
-    expect(r.liftedDim, 'the lifted travel is DIMMED (dim < 1)').toBe(true);
-    expect(r.lifted === r.rapid || r.lifted === r.feed, 'lifted is a DISTINCT colour from rapid + feed').toBe(false);
+    // t1205 — the traverse is distinguished by its APPLIED DASH, not by a second hue: it shares the rapid colour
+    // (so the 2D matches the 3D) while a positioning rapid draws SOLID. `dim` was dropped with the grey.
+    expect(r.dashDiag.length, 'the traverse renders DASHED (the distinction that survives the shared hue)').toBeGreaterThan(0);
+    expect(r.dashPlunge, 'a positioning rapid renders SOLID → still tellable apart at a glance').toEqual([]);
+    expect(r.lifted, 'safe-travel shares the RAPID hue (2D == 3D convention, t1203 user ruling)').toBe(r.rapid);
+    expect(r.lifted === r.feed, 'but it is never the CUT colour').toBe(false);
 });
 
 test('the op-edit chip never overlaps the pre-flight badge (declared collision rule); screenshot', async ({ page }, testInfo) => {

@@ -30,7 +30,16 @@
  */
 export function passAnchorFor(starts, ends, pass) {
     const row = starts && starts[pass];
-    if (!row) return row;   // absent pass → let the caller's own fallback take over
+    // t1205 — NO DECLARED ROW for this pass (a raw .nc / CAM macro pasted in the editor declares no per-pass markers).
+    // The pass-local frame still exists (every `( REPOSITION: )` resets pos to the pass origin), so without an anchor the
+    // caller's constant fallback (_stockOffset / {0,0,0}) makes the tool TELEPORT back to that origin — the safe lift and
+    // any XY the previous pass reached are silently dropped. The runtime END of the previous pass IS where the tool
+    // physically is, so it is the honest anchor: use it whenever the trace has published one. Pass 0 (no ends[-1]) and
+    // any consumer with no `ends` are UNCHANGED, so single-pass + pre-trace behaviour is byte-identical.
+    if (!row) {
+        const prevEnd = (pass > 0 && ends) ? ends[pass - 1] : null;
+        return prevEnd || row;   // else let the caller's own fallback take over (unchanged)
+    }
     if (row.anchorsAtPrev && pass > 0) {
         const end = ends && ends[pass - 1];
         if (end) return end;                             // t107 — runtime END of the previous pass (machine-faithful)

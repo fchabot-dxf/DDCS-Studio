@@ -17,9 +17,10 @@
  *     → { setGcode, refresh, setActive, stop, viz, engine, el }
  */
 import { GcodeViz3D } from './gcodeViz3d.js';
-import { createToolpath2d } from './toolpath2d.js';
+import { createToolpath2d, typeOf } from './toolpath2d.js';   // t1205 — typeOf: the ONE render-time classification the legend must share with the paint
 import { LEGEND_ROWS } from './pathStyle.js';   // t317 — the ONE declared path-visual palette (the legend reads it, can't drift from the renderers)
 import { traceToolpath } from '../engine/trace.js';
+import { passAnchorFor } from '../engine/passAnchor.js';   // t1205 — the ONE pass→world anchor the 3D tool + the engine DRO registers already read; the readout must use it too
 import { carveTipForToolType } from '../engine/stockRemoval.js';   // t682 — the carve tip PROFILE from the tool `type` (ball-nose etc.), one source
 import { wcsOffsetAt, declaredWcsOffset } from './sceneFrame.js';   // t588 — wcsOffsetAt = the ONE WCS read for RENDERING (engine G53 + 2D frame; keeps the workOrigin fallback). t861 — declaredWcsOffset = the HONEST Mach source (null when no declared WCS row, no scene-placement fallback).
 import { toggleVisibilityModal } from '../ui/visibilityModal.js';   // t738 — the preview-visibility modal (opens from the toolbar 👁)
@@ -289,8 +290,24 @@ export function createPreviewPanel(container, opts = {}) {
         droAxes = rotaryFixture ? ['x', 'y', 'z', 'a', 'b'] : ['x', 'y', 'z'];
         if (droBody) droBody.innerHTML = droAxes.map((ax) => `<tr data-ax="${ax}"><th>${ax.toUpperCase()}</th><td class="pp-dro-w">0.000</td><td class="pp-dro-m">0.000</td></tr>`).join('');
     }
-    function updateDro(pos) {
+    // t1205 — PASS-LOCAL → WORLD. The engine runs a multi-pass probe macro in PASS-LOCAL coords (every `( REPOSITION: )`
+    // resets pos to the pass origin) and reports that local position plus `pass`; the CONSUMER anchors it. The 3D tool
+    // already does (gcodeViz3d.setToolPosition → passAnchorFor) and so do the engine's own DRO registers — but the READOUT
+    // did not, so after any reposition it quoted the pass-local number as Work (e.g. Work −70 while the tool was correctly
+    // at world −5). ONE conversion, every consumer: same helper, same arrays.
+    function worldOf(pos) {
+        if (!pos) return pos;
+        // PREFER the engine's OWN stamp: it resolved the anchor from its LIVE pass state. Stitching here with the panel's
+        // route-trace copy drifts whenever the two were traced under different configs (measured: the same corner run
+        // reported anchors -5 / 70 / 20 / 90 across re-traces). The local stitch remains for positions the engine never
+        // produced — the static seekLine scrub, which reads the SAME traced segs as lastPassEnds, so those two agree.
+        if (pos.world) return { ...pos, ...pos.world };
+        const o = passAnchorFor(passStarts, lastPassEnds, (pos.pass != null ? pos.pass : 0)) || { x: 0, y: 0, z: 0 };
+        return { ...pos, x: (+pos.x || 0) + (+o.x || 0), y: (+pos.y || 0) + (+o.y || 0), z: (+pos.z || 0) + (+o.z || 0) };
+    }
+    function updateDro(rawPos) {
         if (!droBody) return;
+        const pos = worldOf(rawPos);   // quote the WORLD position the tool is actually at, not the pass-local one
         // t861 — HONEST Mach: quote Mach = Work + the DECLARED WCS offset ONLY. No declared WCS row (typed or pulled) →
         // we cannot know the machine offset, so the Mach column shows "—" rather than a scene-placement placeholder dressed
         // as controller truth (the +40 Mach-Z leak). The engine G53 rendering keeps activeWcsOffset() (workOrigin fallback).
@@ -500,7 +517,10 @@ export function createPreviewPanel(container, opts = {}) {
                 const machineOp = !!(viz && (viz._toolMachineFrame || viz._forceMachineBox));
                 const off = activeWcsOffset();
                 pos.frame = (machineOp || probeSeg) ? 'mach' : 'work';
-                pos.mach = { x: (+pos.x || 0) + (+off.x || 0), y: (+pos.y || 0) + (+off.y || 0), z: (+pos.z || 0) + (+off.z || 0) };
+                // t1205 — the quoted machine coords are WORLD + the WCS offset. `pos` itself stays PASS-LOCAL because
+                // setToolPosition/t2 anchor it themselves; only the quoted numbers get the pass→world stitch.
+                const posW = worldOf(pos);
+                pos.mach = { x: (+posW.x || 0) + (+off.x || 0), y: (+posW.y || 0) + (+off.y || 0), z: (+posW.z || 0) + (+off.z || 0) };
                 pos.wcs = (droWcsEl && droWcsEl.textContent) || '';
                 if (viz && viz.setToolPosition) viz.setToolPosition(pos); updateDro(pos); checkToolSwap(); if (mode === '2d' && segs.length) { t2.seek(kSeg); t2.setToolPosition(pos); } if (toolPosSubs.length) { for (const cb of toolPosSubs) cb(pos, kSeg); }
                 // t680 — LIVE progressive carve: remove material along the swept sub-step (feed class handled inside carveStep), re-mesh throttled.
@@ -524,7 +544,7 @@ export function createPreviewPanel(container, opts = {}) {
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
                 setProgress(null);   // t865 — run finished → hide the progress bar (a looped run re-shows it on its next line)
-                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); pendingProbe = null; pendingDatum = null; compMap = readEnabledComps(compOps()); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
+                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); pendingProbe = null; pendingDatum = null; compMap = readEnabledComps(compOps()); applySimConfig(engine, lastAbsolute); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // t1205 — re-apply THE ONE simConfig on a loop replay too (it bypassed it, so a config change mid-session only took effect after a manual re-run)   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
             },
         });
         return engine;
@@ -804,8 +824,13 @@ export function createPreviewPanel(container, opts = {}) {
         for (const s of ss) { if ((s.type === 'probe' || s.probe) && (s.feed || 0) > maxProbeFeed) maxProbeFeed = s.feed; }
         const present = new Set();
         for (const s of ss) {
-            const type = s.type || (s.probe ? 'probe' : s.rapid ? 'rapid' : 'feed');
-            if (type === 'rapid') present.add('rapid');
+            // t1205 — classify through the SAME seam the 2D paint uses (toolpath2d.typeOf), so a horizontal rapid is
+            // recognised as `lifted` safe-travel here too. Building the set from RAW trace types could never produce
+            // `lifted` (that reclassification lives only in the renderer), so its legend row was unreachable — the
+            // legend claimed "yellow = Rapid" while most rapids actually drew as the dashed safe-travel variant.
+            const type = typeOf(s);
+            if (type === 'lifted') present.add('lifted');
+            else if (type === 'rapid') present.add('rapid');
             else if (type === 'retract') present.add('retract');
             else if (type === 'probe') present.add(((s.feed || 0) > 0 && (s.feed || 0) < maxProbeFeed) ? 'probeSlow' : 'probe');
             else present.add('feed');   // G1 cut/plunge — the basic feed move
@@ -843,8 +868,11 @@ export function createPreviewPanel(container, opts = {}) {
         const b = q('.pp-io'); if (b) b.classList.toggle('on', window.ioPanel.isVisible());
     }
 
-    function play() {
-        const eng = ensureEngine();
+    // t1205 — THE ONE FRESH-RUN SEED. play() and the STEP button both begin a run, so both must start from the same
+    // state; the step handler used to copy four of these lines and silently OMIT simActiveWcs (after playing a G55
+    // program a fresh stepped run kept the stale G55 label + Mach offset) as well as the probe/datum resets. One helper,
+    // one source — a new per-run reset can never again be added to play() alone.
+    function seedFreshRun(eng) {
         simActiveWcs = null;   // #4: each run reverts to the settings active WCS; the program's G54-G59 lines re-drive it (display only)
         eng.simSpeed = simSpeed();
         eng.autoAnswer = window.ioPanel ? window.ioPanel.isAutoSensors() : true;
@@ -852,12 +880,18 @@ export function createPreviewPanel(container, opts = {}) {
         // traced from), so the played tool can't diverge: the homing switch-seek stock-ignore, the machine-coords/mill-part-Z
         // wcsOffset (lastAbsolute, from the route's final trace), the seat, continuous, and the per-pass starts — all one source.
         applySimConfig(eng, lastAbsolute);
+        pendingProbe = null; pendingDatum = null;                 // fresh deferred probe/datum state
+        compMap = readEnabledComps(compOps());                    // the active op's declared comp surfaces
+        if (viz && viz.resetProbe) viz.resetProbe();              // fresh probe overlay
+        updateDro(getStartPos() || { x: 0, y: 0, z: 0 });         // honest baseline before the first line executes
+        if (droWcsEl) droWcsEl.textContent = activeWcsName();     // label follows the reset active WCS
+    }
+
+    function play() {
+        const eng = ensureEngine();
+        seedFreshRun(eng);
         if (mode === '3d') ensureViz();
         if (viz && viz.setSimSpeed) viz.setSimSpeed(simSpeed());   // probe discs fade in SIM time (track the speed button)
-        if (viz && viz.resetProbe) viz.resetProbe();    // SLICE 3: fresh probe-WCS each run (superimposed on the stock-WCS)
-        pendingProbe = null; pendingDatum = null; compMap = readEnabledComps(compOps());   // fresh deferred state + the active op's declared surfaces, each run
-        updateDro(getStartPos() || { x: 0, y: 0, z: 0 });   // DRO: reset to the start position for the fresh run
-        if (droWcsEl) droWcsEl.textContent = activeWcsName();   // refresh the label to the active WCS (catches a settings switch)
         if (viz) viz.setAnimate(false);                 // engine drives the tool/trail, not the geometric sweep
         lastTool = null; if (viz && viz.showRetiredTool) viz.showRetiredTool(null);   // P-C.1b: fresh run re-arms the tool-swap watch + clears any retired tool
         if (viz && viz.setStationDevice) { viz.setStationDevice('pusher', false); viz.setStationDevice('pin', false); viz.setStationDevice('collet', false); }   // P-C.2b/3a: devices to rest before the sequence re-animates them
@@ -902,7 +936,9 @@ export function createPreviewPanel(container, opts = {}) {
         if (!segs.length || i == null) return;
         let best = null;
         for (const s of segs) { if (s.line != null && s.line <= i) best = s; }
-        const pos = best ? { x: best.x2, y: best.y2, z: best.z2 } : { x: segs[0].x1, y: segs[0].y1, z: segs[0].z1 };
+        // t1205 — carry the segment's PASS so both consumers anchor it: the 3D tool offsets by passAnchorFor, and the DRO
+        // (worldOf) quotes the world position. Without the pass a scrub into a later pass rendered at pass 0's anchor.
+        const pos = best ? { x: best.x2, y: best.y2, z: best.z2, pass: best.pass } : { x: segs[0].x1, y: segs[0].y1, z: segs[0].z1, pass: segs[0].pass };
         if (mode === '3d') { const v = ensureViz(); if (v && v.setToolPosition) v.setToolPosition(pos); }
         else t2.seek(nearest2d(pos));
         // t1203 — the DRO follows the scrub too: these are traced positions in the SAME work frame onPositionChange
@@ -946,12 +982,7 @@ export function createPreviewPanel(container, opts = {}) {
     // which fires onPositionChange → updateDro (Work AND Mach from the one writer).
     q('.pp-step').addEventListener('click', () => {
         const eng = ensureEngine();
-        if (!eng.running) {
-            applySimConfig(eng, lastAbsolute);                        // the ONE sim config (same source as the drawn route + play)
-            updateDro(getStartPos() || { x: 0, y: 0, z: 0 });         // honest baseline before the first line executes
-            if (droWcsEl) droWcsEl.textContent = activeWcsName();
-            if (viz) viz.setAnimate(false);
-        }
+        if (!eng.running) { seedFreshRun(eng); if (viz) viz.setAnimate(false); }   // a stepped run IS a fresh run — same seed as play()
         eng.step(get('getGcode') || '');
         updateRunBtn();
     });
@@ -1036,7 +1067,11 @@ export function createPreviewPanel(container, opts = {}) {
         on = !!on;
         if (on === probesForWcs) return;
         probesForWcs = on;
-        if (active) setGcode();
+        // t1205 — RE-SEED THE RUNNING PLAY, not just the drawn route (same class t674 fixed for setSeatAtStart). A wizard
+        // view calls preview3D FIRST and applies the declared intent AFTER, so the on-open auto-play has already captured
+        // _g53ApproxZ while this flag was still false — the animation would keep mapping G53 through the declared WCS table
+        // for the whole first run. scheduleLiveRestart bails on unchanged G-code, so only a forced restart re-seeds it.
+        if (active) { setGcode(); if (engine && engine.running) { stopPlay(); play(); } }
     }
 
     // Host hint: show/hide the 4th-axis rotary rig (rotary probe ops). Symmetric with setForceMachine — stores the

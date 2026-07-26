@@ -121,7 +121,10 @@ test('2D path colours a HORIZONTAL rapid as LIFTED safe-travel (the rapid hue, d
       t2.setSegments([diagSeg, inSeg]);
       t2.fit();
       const v = cv.__t2view, ctx = cv.getContext('2d'), dpr = window.devicePixelRatio || 1;
-      const scan = (x1, y1, x2, y2) => { let best = [0, 0, 0]; for (let k = 0; k <= 40; k++) { const u = k / 40, wx = x1 + (x2 - x1) * u, wy = y1 + (y2 - y1) * u; for (let up = 0; up <= 40; up += 4) { const d = ctx.getImageData(Math.round((v.ox + wx * v.scale) * dpr), Math.round((v.oy - wy * v.scale) * dpr) - up, 1, 1).data; if (d[3] > 40 && d[0] + d[1] + d[2] > best[0] + best[1] + best[2]) best = [d[0], d[1], d[2]]; } } return best; };
+      const scan = (x1, y1, x2, y2) => { let best = [0, 0, 0]; for (let k = 0; k <= 40; k++) { const u = k / 40, wx = x1 + (x2 - x1) * u, wy = y1 + (y2 - y1) * u; for (let up = 14; up <= 44; up += 2) { const d = ctx.getImageData(Math.round((v.ox + wx * v.scale) * dpr), Math.round((v.oy - wy * v.scale) * dpr) - up, 1, 1).data; if (d[3] > 40 && d[0] + d[1] + d[2] > best[0] + best[1] + best[2]) best = [d[0], d[1], d[2]]; } } return best; };
+      // t1205 — sample ONLY well ABOVE the straight chord: since the traverse became a bright yellow, a band that
+      // includes the chord itself returns the TRAVERSE as "brightest" and the jog test measured the wrong line.
+      // The manual jog is the only thing that BOWS up here, so this isolates it.
       const out = scan(-40, -40, 40, 40);
       cv.remove();
       return out;
@@ -143,8 +146,11 @@ test('2D path colours a HORIZONTAL rapid as LIFTED safe-travel (the rapid hue, d
   expect(r.liftedDash.length, 'safe-travel is DASHED').toBeGreaterThan(0);
   expect(r.rapidDash, 'a positioning rapid is SOLID → still distinguishable at a glance').toEqual([]);
   expect(r.jogHex, 'a MANUAL jog keeps its OWN colour token, distinct from the traverse').not.toBe(r.liftedHex);
-  // only the MANUAL trans-axis jog stays orange-red (its jog colour + the rainbow arc override the lifted style) — red > blue
-  expect(r.manualDiag[0], 'MANUAL trans-axis jog is orange-red: red > blue (NOT the lifted grey-blue)').toBeGreaterThan(r.manualDiag[2]);
+  // Only the MANUAL trans-axis jog stays ORANGE-RED (its jog colour + the rainbow arc override the lifted style).
+  // t1205 — the old discriminator was `red > blue`, which went VACUOUS when the traverse became yellow (#ffcc00 passes
+  // it just as well as #ff4500). GREEN is what actually separates them: jog G/R ~= 0.27, traverse-yellow G/R ~= 0.8.
+  expect(r.manualDiag[0], 'the sampled manual-jog pixel is red-dominant').toBeGreaterThan(r.manualDiag[2]);
+  expect(r.manualDiag[1], 'MANUAL trans-axis jog is ORANGE-RED (green well below red) — NOT the yellow traverse hue').toBeLessThan(r.manualDiag[0] * 0.6);
 });
 
 test('2D start markers carry the per-pass source (auto / manual)', async ({ page }) => {

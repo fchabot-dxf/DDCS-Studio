@@ -577,6 +577,7 @@ export class GcodeExecutionEngine {
                 p = { x: mv.from.x + (mv.to.x - mv.from.x) * t, y: mv.from.y + (mv.to.y - mv.from.y) * t, z: mv.from.z + (mv.to.z - mv.from.z) * t };
             }
             p.pass = this._pass;   // INC4: report the current REPOSITION pass so the live tool anchors to starts[_pass] (not always ①)
+            p.world = this._worldOf(p);   // t1205 — the engine-authoritative WORLD position (see _worldOf); readouts quote this, the 3D tool keeps the local one
             p.g53 = !!mv.g53; p.probing = !!mv.probe;   // t780 (user) — the MOVE's frame semantics ride the event (G53 = a machine-coord move; probe = rewriting the WCS)
             this.onPositionChange(p);
             this._updateLimitSwitches(p);   // H3 (t485) — trip home/limit switches LIVE as the axis travels toward the edge
@@ -588,10 +589,22 @@ export class GcodeExecutionEngine {
     // resets this.pos to the pass origin), so any value that CROSSES a pass boundary must be stored in the ONE world frame
     // — exactly like the real controller, where #882 is an ABSOLUTE machine Z with no concept of a pass. Same anchor
     // expression as the probe collision (_executeStep O) and _updateDro, so all three read one frame definition.
-    _anchorZ() {
-        if (this._initialPos) return 0;
-        const O = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
-        return O.z || 0;
+    _anchor() {
+        if (this._initialPos) return { x: 0, y: 0, z: 0 };
+        return passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
+    }
+
+    _anchorZ() { return this._anchor().z || 0; }
+
+    // t1205 — the WORLD position of a pass-local point, stamped onto every position event. The engine is the ONLY
+    // authority here: it knows its own live _pass/_passStarts/_passEnds, whereas a consumer stitching with the PANEL's
+    // route-trace copy silently drifts whenever the two were traced under different configs (the measured route-vs-play
+    // one-config drift: the same corner run reported anchors -5 / 70 / 20 / 90 across re-traces). Consumers that need a
+    // work-frame number (the DRO readout, the quoted machine coords) read `world`; the 3D tool keeps consuming the LOCAL
+    // position because it applies this same anchor itself.
+    _worldOf(p) {
+        const O = this._anchor();
+        return { x: (+p.x || 0) + (+O.x || 0), y: (+p.y || 0) + (+O.y || 0), z: (+p.z || 0) + (+O.z || 0) };
     }
 
     // Land the in-flight move: snap to the target, fire any deferred probe touch.
@@ -626,7 +639,7 @@ export class GcodeExecutionEngine {
         this._move = null;
         this.pos = { ...mv.to };
         if (typeof this.onPositionChange === 'function') {
-            this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z, pass: this._pass });   // INC4: per-pass anchor
+            this.onPositionChange({ x: this.pos.x, y: this.pos.y, z: this.pos.z, pass: this._pass, world: this._worldOf(this.pos) });   // INC4: per-pass anchor; t1205: + the engine-authoritative world position
         }
         this._updateLimitSwitches();   // H3 (t485) — the move LANDED: trip/release the home/limit switches at the final position
         if (mv.touchName) this._touchPulse(mv.touchName);
