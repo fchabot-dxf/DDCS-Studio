@@ -15,6 +15,13 @@ const W = 360, H = 180, ZOOM = 2;
 const TILESET_FILES = ['tileset'];
 let _tileCache = null;
 
+// t1177 SHAPE-LIBRARY REVAMP (Pass 1) — the NICHE op-type glyphs are AUTO-ONLY: hidden from the manual tile palette (a user
+// composing an icon by hand would not place a "tool table" or a "rotary clock"), but STILL returned by loadAllTiles so
+// auto-glyph can drop them by id. probe_center is already produced by auto-glyph (the middle/inside camType); the rest picture
+// ops (alignment/homing/rotary/ATC) that camTypeOf does not yet map to a camType — see the t1177 WORK-LOG flag — so they are
+// RESERVED here (present for auto use, absent from the manual grid) until their ops are wired.
+const AUTO_ONLY_GLYPHS = new Set(['probe_center', 'align_two', 'home', 'rotary_axis', 'clock_dial', 'tool_change', 'tool_table']);
+
 // Family key for de-dup: strip the direction / axis / position / index tokens *anywhere* in the id (each must
 // be a whole _token, so plain words aren't truncated) so repeated variants collapse to one. e.g. all of
 // middle_probe_pocket_{X_pos,Y_pos,X_neg,…}_miniprobe → middle_probe_pocket_miniprobe; corner_BL → corner.
@@ -192,9 +199,11 @@ export function openIconEditor(initial, onSave, opts = {}) {
     const $ = (id) => m.querySelector('#' + id);
     const stage = $('ie_stage');
 
-    // Tile toolbar: extract the tileset's id-groups and preview each as a clickable thumbnail.
-    loadAllTiles().then((tiles) => {
+    // Tile toolbar: extract the tileset's id-groups and preview each as a clickable thumbnail. The AUTO-ONLY glyphs
+    // (t1177) are filtered OUT of the manual grid here — loadAllTiles still returns them so auto-glyph resolves any id.
+    loadAllTiles().then((all) => {
         const bar = $('ie_tiles'); if (!bar) return;
+        const tiles = all.filter((t) => !AUTO_ONLY_GLYPHS.has(t.id));
         if (!tiles.length) { bar.innerHTML = '<span style="font-size:11px;color:var(--text-dim);">No tiles found in the current tileset.</span>'; return; }
         bar.innerHTML = tiles.map((t, i) => `<div class="ie-tile" data-ti="${i}" title="${esc(t.id)}  ·  ${esc(t.source)}"><img src="${t.uri}" alt=""></div>`).join('');
         bar.querySelectorAll('[data-ti]').forEach((b) => b.addEventListener('click', () => addTile(tiles[+b.dataset.ti])));
