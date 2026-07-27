@@ -214,11 +214,17 @@ export function mapCoordWcs(coord1, activeEnum) {
     return { active, workOrigin: { x: wo[0], y: wo[1], z: wo[2] }, table };
 }
 
-/** Classify a dropped file by NAME (the disk convention). Read-only; never trusts extension over the known set. */
+/**
+ * Classify a dropped file by NAME (the disk convention). Read-only; the BASENAME set is the authority — an extension
+ * never overrides it.
+ * t1221 — a trailing `.eng` is also accepted. On the controller's own disk the file is named `eng` with no extension,
+ * but Studio's import option is now labelled "From a USB file (.eng)", so a user who saves or renames it the way the
+ * UI names it must still be recognized. This widens WHICH NAMES are accepted; it decodes nothing differently.
+ */
 export function classifyFile(name) {
     const base = String(name).split(/[\\/]/).pop().toLowerCase();
     if (base === 'setting') return 'setting';
-    if (base === 'eng') return 'eng';
+    if (base === 'eng' || base.endsWith('.eng')) return 'eng';
     if (base === 'coord1' || base === 'coordinate') return 'coord';
     return null;
 }

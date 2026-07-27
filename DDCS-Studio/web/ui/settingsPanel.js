@@ -25,7 +25,8 @@ import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { TOOL_CATALOG, TOOL_CATALOG_GROUPS } from '../data/toolCatalog.js';   // the declared catalog the "＋ Add from catalog" picker adds individual tools from
 import { toDisp, fromDisp } from './units.js';   // t1008 — the ONE shared mm<->inch conversion (tool-library editor + catalog picker; same leaf as the op-form widget)
-import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 — no-LAN machine-truth: drop the controller's dump folder → derive geometry → the review modal
+import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 — no-LAN machine-truth: a USB copy of the controller's parameters → derive geometry → the review modal
+import { safetyExport } from '../data/backup.js';   // t1221 — applying a parameter import writes machine config: same automatic undo copy the .ddcs restore takes
 import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
@@ -1071,7 +1072,10 @@ function buildSettingsOverlay() {
                                  A workspace holds exactly ONE machine, so there is no library to browse and nothing to
                                  switch between — a second machine is a second .ddcs (Duplicate workspace). Retiring the
                                  switching machinery also retires the stale-snapshot bug class it created. -->
-                            <button class="toolbar-btn settings-io" id="set_profile_import_dump" title="No LAN link? Copy the controller's disk to a USB stick and drop the whole folder here — Studio reads its setting / eng / coord files and derives the machine geometry + WCS (read-only), then you review before applying.">📁 Import from dump</button>
+                            <!-- t1221 RETIRED: "Import from dump" was a SECOND door doing the same act as
+                                 "Pull from controller" — read this machine's parameters, review, apply. It is now a
+                                 TRANSPORT inside that one modal ("From a USB file (.eng)"), which is also where the
+                                 review already lived, so both ways in converge on the same review + apply. -->
                             <!-- t1219 — the READ side of the machine-config file the legacy door below writes. Without
                                  it that export is a file nothing can open, which would make "save it and open it in a
                                  new workspace" untrue. It REPLACES this workspace's machine, so it asks first and
@@ -1095,7 +1099,7 @@ function buildSettingsOverlay() {
                         <div class="settings-section-title">CONTROLLER</div>
                         <div class="settings-row" style="align-items:center;">
                             <select id="set_profile" title="THIS WORKSPACE'S CONTROLLER — its G-code dialect, envelope, WCS and boot macro are all generated for it. Changing it retargets this workspace (and travels in the .ddcs, so opening this workspace elsewhere adopts it)." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;"></select>
-                            <button class="toolbar-btn settings-io" id="set_profile_pull" title="Fetch this machine's profile (tabs + pins + WCS) from the bridged controller. Offline controllers: use Import profile.">↧ Pull from controller</button>
+                            <button class="toolbar-btn settings-io" id="set_profile_pull" title="Read this machine's parameters (tabs + pins + envelope + WCS) and review them before applying. Two ways in: live via the Gateway, or from a USB file (.eng) — no LAN needed.">↧ Pull from controller</button>
                         </div>
                         <div class="settings-hint" id="set_controller_hint">The controller this machine runs — dialect, envelope, WCS and the boot macro are all generated for it. Changing it retargets this workspace, and the choice travels in the .ddcs (opening this workspace on another device adopts it). To generate for a different controller, duplicate the workspace and change the copy.</div>
                     </div>
@@ -2264,15 +2268,28 @@ function wireSettingsOverlay(ov) {
                 #import-modal .im-darr { color: var(--text-dim); }
                 #import-modal .im-dder { font-family: monospace; color: #3cb24f; white-space: nowrap; font-size: 11px; }
                 #import-modal .im-foot { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
-                #import-modal .im-only { font-size: 11.5px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; cursor: pointer; }
+                #import-modal .im-only { font-size: 11.5px; color: var(--text-dim); display: flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap; }
+                /* t1221 — the TRANSPORT row: one door, two ways in. Always visible, so the other way is discoverable
+                   from inside the review instead of being a separate button elsewhere in Settings. */
+                #import-modal .im-transport { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 9px 16px; border-bottom: 1px solid var(--border); }
+                #import-modal .im-transport .im-tlbl { font-size: 11.5px; color: var(--text-dim); }
+                #import-modal .im-tbtn.is-active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+                #import-modal .im-safe { font-size: 11px; color: var(--text-dim); }
+                #import-modal .im-drop { margin: 10px 2px 2px; padding: 10px; border: 1px dashed var(--border); border-radius: 4px; text-align: center; font-size: 11.5px; color: var(--text-dim); }
+                #import-modal .im-drop.is-over { border-color: var(--accent); color: var(--text-main); }
             </style>
             <div class="im-panel">
-                <div class="im-head"><span>↧ Pull from controller</span><button id="import-close" title="Close">✕</button></div>
+                <div class="im-head"><span>↧ Import controller parameters</span><button id="import-close" title="Close">✕</button></div>
+                <div class="im-transport">
+                    <span class="im-tlbl">Read from:</span>
+                    <button class="toolbar-btn settings-io im-tbtn" id="import-src-live" title="The bridged controller, over the Gateway (LAN)">↧ Live via the Gateway</button>
+                    <button class="toolbar-btn settings-io im-tbtn" id="import-src-file" title="The parameter file the controller saves to USB — or a copy of its whole disk (e.g. a DM500, which has no LAN)">📁 From a USB copy (.eng file or disk folder)</button>
+                </div>
                 <div class="im-body" id="import-body"></div>
                 <div class="im-foot">
                     <label class="im-only"><input type="checkbox" id="import-only" checked> Show only changed</label>
+                    <span class="im-safe" id="import-safenote">A safety copy of your workspace is saved automatically before applying.</span>
                     <span style="flex:1"></span>
-                    <button class="toolbar-btn settings-io" id="import-backup" title="Save your current profile before applying changes" style="border-color:var(--accent);">Backup Profile</button>
                     <button class="toolbar-btn settings-io" id="import-cancel">Cancel</button>
                     <button class="toolbar-btn settings-io" id="import-apply" disabled>Apply</button>
                 </div>
@@ -2296,7 +2313,7 @@ function wireSettingsOverlay(ov) {
         shown.forEach((c) => { (groups[c.group] = groups[c.group] || []).push(c); });
         let html = '';
         if (_importController && _importController.id && _importController.id !== getActiveProfile().id) {   // pulling will change the dialect
-            html += `<div class="im-banner">Connected controller: <b>${_importController.name}</b> — applying <b>Hardware &amp; I/O</b> switches your machine profile + post from <b>${getActiveProfile().name}</b> to it.</div>`;
+            html += `<div class="im-banner">Connected controller: <b>${_importController.name}</b> — applying <b>Hardware &amp; I/O</b> retargets this machine + its post from <b>${getActiveProfile().name}</b> to it.</div>`;
         }
         // DETAIL sub-rows (t622) — the RAW value read AND the derivation per row, always visible (the user came to REVIEW).
         const detailHtml = (c) => (c.detail && c.detail.length)
@@ -2333,9 +2350,27 @@ function wireSettingsOverlay(ov) {
         const m = document.getElementById('import-modal');
         const body = m.querySelector('#import-body');
         _importCands = [];
-        body.innerHTML = '<div class="im-empty">' + (scanOverride ? 'Reading the dump…' : 'Reading the controller…') + '</div>';
+        body.innerHTML = '<div class="im-empty">' + (scanOverride ? 'Reading the parameter file…' : 'Reading the controller…') + '</div>';
         m.querySelector('#import-apply').disabled = true;
         m.classList.add('active');
+        // t1221 — ONE DOOR, TWO TRANSPORTS. The row is always present and the LIVE read still starts on open, so the
+        // common path is unchanged (and the review renders without an extra click). Switching transport re-enters here.
+        const live = m.querySelector('#import-src-live');
+        const fromFile = m.querySelector('#import-src-file');
+        if (live && fromFile) {
+            live.classList.toggle('is-active', !scanOverride);
+            fromFile.classList.toggle('is-active', !!scanOverride);
+            live.onclick = () => openImportModal();
+            fromFile.onclick = () => openDumpImport();
+        }
+        // the FOLDER half of "USB copy": drop a copied controller disk anywhere on the modal
+        m.ondragover = (e) => { e.preventDefault(); const z = m.querySelector('.im-drop'); if (z) z.classList.add('is-over'); };
+        m.ondragleave = () => { const z = m.querySelector('.im-drop'); if (z) z.classList.remove('is-over'); };
+        m.ondrop = async (e) => {
+            e.preventDefault();
+            const files = await filesFromDrop(e.dataTransfer);
+            if (files.length) await openDumpImport(files);
+        };
         let scan;
         if (scanOverride) scan = scanOverride;
         else { try { scan = await scanController(); } catch (e) { scan = { connected: false, candidates: [], reason: 'no-gateway' }; } }
@@ -2345,21 +2380,25 @@ function wireSettingsOverlay(ov) {
             const msg = scan.reason === 'no-controller'
                 ? 'The gateway is running, but the controller didn’t respond — check the machine is powered on and connected.'
                 : 'Gateway not reachable — is the bridge / desktop app running?';
-            // t666 — no LAN? Offer the dump-folder import right here (the natural no-controller moment): copy the disk to USB, drop the folder.
-            body.innerHTML = '<div class="im-empty">' + msg + '<br><br>No LAN link (e.g. a DM500)? Copy the controller’s disk to a USB stick and import the folder — Studio derives the machine truth read-only.<br><br>'
-                + '<button class="toolbar-btn settings-io" id="import-fromdump">📁 Import from a dump folder</button></div>';
-            const fd = m.querySelector('#import-fromdump');
-            if (fd) fd.onclick = () => openDumpImport();
+            // t666 — no LAN? The other transport is the answer. t1221: it is already in the row above, so this points
+            // AT that row rather than rendering its own button. Screenshotting the modal is what caught it: an
+            // identical "From a USB file (.eng)" button twice over is precisely the duplicate door being consolidated.
+            body.innerHTML = '<div class="im-empty">' + msg + '<br><br>No LAN link (e.g. a DM500)? Use <b>From a USB copy</b> above — the <b>.eng</b> parameter file the controller saves to USB, or a copy of its whole disk. Studio derives the machine truth read-only.</div>'
+                + '<div class="im-drop">…or drop the <b>.eng</b> file or the copied disk folder here</div>';
             return;
         }
         _importController = scan.controller || null;
         _importCands = scan.candidates.map((c) => ({ ...c, checked: !!c.changed }));   // pre-tick what the operator changed
         renderImportReview();
         m.querySelector('#import-only').onchange = renderImportReview;
-        m.querySelector('#import-backup').onclick = () => { if (window.ddcsExportProfile) window.ddcsExportProfile(); };
         m.querySelector('#import-apply').onclick = async () => {
             const checked = _importCands.filter((c) => c.checked);
             const btn = m.querySelector('#import-apply'); btn.disabled = true; btn.textContent = 'Applying…';
+            // t1221 — the undo copy is AUTOMATIC now, so the manual "Backup Profile" button is gone. Applying rewrites
+            // this machine's envelope / WCS / homing / spindle, so it earns the same protection opening a .ddcs has:
+            // safetyExport() first (ui/backupModal.js does exactly this before a restore). Best-effort — a failed
+            // export must not block the apply the user asked for, but it is attempted every time.
+            try { await safetyExport(); } catch (e) { /* the apply still proceeds */ }
             try { await applyCandidates(checked); m.classList.remove('active'); }
             catch (e) { body.innerHTML = '<div class="im-empty">Apply failed: ' + (e && e.message ? e.message : e) + '</div>'; }
         };
@@ -2383,9 +2422,9 @@ function wireSettingsOverlay(ov) {
     function dumpToScan(rec) {
         const cands = [], notes = [];
         const prof = CONTROLLER_PROFILES[rec.controllerId] || {};
-        notes.push({ group: 'Dump files', label: 'Recognized', value: rec.recognized.map((r) => r.name + ' (' + r.role + ')').join(', ') || 'none',
+        notes.push({ group: 'Parameter files', label: 'Recognized', value: rec.recognized.map((r) => r.name + ' (' + r.role + ')').join(', ') || 'none',
             kind: 'note', detail: rec.recognized.map((r) => ({ label: r.name, raw: r.role, derived: '' })).concat(rec.unrecognized.map((n) => ({ label: n, raw: 'not a setting/eng/coord file', derived: '—' }))) });
-        if (rec.note) notes.push({ group: 'Dump files', label: 'Note', value: rec.note, kind: 'note' });
+        if (rec.note) notes.push({ group: 'Parameter files', label: 'Note', value: rec.note, kind: 'note' });
         const geo = rec.geometry;
         if (geo && rec.grounded) {
             const tv = geo.travel, hd = geo.homeDir || {}, he = geo.homeEdge || {}, hec = geo.homeEdgeConflict || {}, sl = geo.softLimits || {};
@@ -2438,14 +2477,34 @@ function wireSettingsOverlay(ov) {
             await openImportModal(dumpToScan(rec));
         };
         if (fileList) { await run(fileList); return; }
+        // t1221 — the picker takes FILES (one `.eng`, or setting + eng + coord1 from a copied disk). Deliberately NO
+        // `accept` filter: on the controller's own disk the file has NO extension, so accept=".eng" would hide the very
+        // file this option is named after. A whole FOLDER can't be chosen through the same input as a single file, so
+        // the folder half of "USB copy" is served by DROPPING it on the modal (see wireDumpDrop) — one option, both
+        // shapes, rather than a second button.
         const input = document.createElement('input');
         input.type = 'file'; input.multiple = true;
-        try { input.webkitdirectory = true; } catch (e) { /* older browsers → multi-file pick */ }
         input.addEventListener('change', () => run(input.files));
         input.click();
     }
-    window.ddcsOpenDumpImport = openDumpImport;   // so the Gateway tab's no-LAN path can offer it too
-    if (q('set_profile_import_dump')) q('set_profile_import_dump').addEventListener('click', () => openDumpImport());
+
+    /** Files out of a drop, walking a dropped DIRECTORY (a copied controller disk) as well as plain files. */
+    async function filesFromDrop(dt) {
+        const items = [...(dt.items || [])];
+        const entries = items.map((i) => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null)).filter(Boolean);
+        if (!entries.length) return [...(dt.files || [])];
+        const out = [];
+        const readDir = (dir) => new Promise((res) => dir.createReader().readEntries((e) => res(e || []), () => res([])));
+        const walk = async (entry, depth) => {
+            if (entry.isFile) { await new Promise((res) => entry.file((f) => { out.push(f); res(); }, res)); return; }
+            if (entry.isDirectory && depth < 3) for (const child of await readDir(entry)) await walk(child, depth + 1);
+        };
+        for (const e of entries) await walk(e, 0);
+        return out;
+    }
+    // MUST stay at wiring scope (not inside the modal builder): the Gateway tab's no-LAN path calls it, and it is the
+    // injection seam the dump specs use before any modal exists.
+    window.ddcsOpenDumpImport = openDumpImport;
 
     // --- Tool library: a sparse list of the tools you own. Length offset → #[base + num − 1].
     //     The tab shows a summary; the modal is the editor; the Mill wizards + magazine pick from it. ---

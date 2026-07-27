@@ -1,12 +1,13 @@
 /**
- * ui/fileSaveState.js — PERSISTENCE-A: the file-save status indicator + exit warning.
+ * ui/fileSaveState.js — PERSISTENCE-A: the file-save status indicator.
  *
  * PRINCIPLE (user): unsaved data is TEMPORARY, even when auto-saved to localStorage — localStorage is a working buffer,
  * only a .ddcs FILE counts as saved. The workspace auto-saves to localStorage ONLY; a .ddcs is its sole PORTABLE copy.
  * This surfaces that state so the user KNOWS when their work lives only in this browser:
  *   - a header chip with TWO honest states — dirty = "Temporary — not saved to a file"; clean-with-a-prior-file-save =
  *     "Saved to file · Nm ago" (a never-file-saved clean workspace stays hidden). Click = Save workspace.
- *   - a beforeunload guard so closing / reloading the tab with unsaved-to-file work triggers the browser's leave prompt.
+ *   (t1221 — there is deliberately NO exit warning. The buffer survives a reload/close, so a leave prompt would warn
+ *   about a loss that does not happen; the chip tells the truth without blocking the gesture.)
  *
  * The dirty signal is ONE SOURCE (data/backup.js workspaceSignature over the BACKUP_STORES registry) — this module only
  * reflects it in the UI. Parts (b) exe disk-file + (c) web File-System-Access are a separate concern; this is the
@@ -64,13 +65,10 @@ function install() {
     chip = document.getElementById('fileSaveChip');
     if (chip) chip.addEventListener('click', saveWorkspace);
 
-    // exit warning — the browser's generic "Leave site?" prompt when there is unsaved-to-file work. (After a Save or
-    // Open, the watermark is clean, so a save-then-close / the restore reload does NOT prompt.)
-    window.addEventListener('beforeunload', (e) => {
-        if (!isWorkspaceDirtyToFile()) return undefined;
-        e.preventDefault(); e.returnValue = '';   // modern browsers show a fixed message; the value only needs to be set
-        return '';
-    });
+    // t1221 — the beforeunload exit warning is REMOVED (user ruling). It warned about a loss that does not happen:
+    // the localStorage buffer SURVIVES a reload or a tab close, so the browser's "Reload site?" prompt was crying
+    // wolf on every refresh. Being interrupted by a false alarm teaches people to click through real ones. The CHIP
+    // is the only truth-teller about not-saved-to-a-file, and it says so without blocking anything.
 
     window.addEventListener('ddcs:file-state', refresh);   // fired by markWorkspaceSavedToFile (save / open)
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });

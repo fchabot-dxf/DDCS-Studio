@@ -40,11 +40,18 @@ test('the review renders the V4.1 WCS table from coord1 (G54 taught) when /api/v
 
     // APPLY lands it in settings.machine.wcs (+ syncWorkOrigin) — the same path as the Expert WCS
     await page.evaluate(() => { const cb = [...document.querySelectorAll('#import-modal [data-cand]')].find((c) => /WCS/.test(c.closest('.im-row')?.parentElement?.textContent || '') || true); });
-    const applied = await page.evaluate(() => {
+    await page.evaluate(() => {
         const boxes = [...document.querySelectorAll('#import-modal [data-cand]')];
         // tick the WCS candidate then apply
         for (const b of boxes) { const lbl = b.parentElement.querySelector('.im-lbl')?.textContent || ''; if (/active/.test(lbl)) b.checked = true; b.dispatchEvent(new Event('change', { bubbles: true })); }
         const apply = document.querySelector('#import-apply'); if (apply) apply.click();
+    });
+    // t1221 — WAIT for the apply to finish instead of reading in the same tick. This used to read the settings
+    // synchronously right after the click and pass only because the WCS write happened to sit in applyCandidates'
+    // synchronous prefix; the apply now takes an automatic safety copy first, so nothing lands before the first await.
+    // The modal closing is the real completion signal.
+    await page.waitForFunction(() => !document.getElementById('import-modal').classList.contains('active'), null, { timeout: 8000 });
+    const applied = await page.evaluate(() => {
         const m = window.ddcsGetSettings().machine || {};
         return { table: m.wcs && m.wcs.table, active: m.wcs && m.wcs.active };
     });

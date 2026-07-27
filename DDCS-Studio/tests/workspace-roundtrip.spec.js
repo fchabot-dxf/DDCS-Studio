@@ -367,7 +367,10 @@ test('the profile-library surface is GONE from Settings and the machine surface 
     // PRESENT — the machine surface that replaced it
     machineName: !!document.getElementById('set_machine_name'),
     controllerDropdown: !!document.getElementById('set_profile'),
-    dump: !!document.getElementById('set_profile_import_dump'),
+    // t1221 — "Import from dump" retired: reading this machine's parameters is ONE door (Pull from controller),
+    // with the USB file as a transport inside its modal. Assert the door, not the retired second button.
+    pull: !!document.getElementById('set_profile_pull'),
+    dumpGone: !document.getElementById('set_profile_import_dump'),
     titles: [...document.querySelectorAll('#set_tab_profile .settings-section-title')].map((e) => e.textContent).join(' '),
   }));
 
@@ -376,6 +379,7 @@ test('the profile-library surface is GONE from Settings and the machine surface 
   expect(s.globalLib, 'window.ddcsProfileLib is gone (the module that auto-created the library is deleted)').toBe(false);
   expect(s.machineName, 'the machine NAME field is the identity control now').toBe(true);
   expect(s.controllerDropdown, 'the CONTROLLER dropdown stays — it retargets THIS workspace').toBe(true);
-  expect(s.dump, 'Import-from-dump stays').toBe(true);
+  expect(s.pull, 'the ONE controller-parameter door stays').toBe(true);
+  expect(s.dumpGone, 'the second door (Import from dump) is retired — it folded into that modal as a transport').toBe(true);
   expect(s.titles, 'the section is framed as this workspace\'s machine').toMatch(/THIS WORKSPACE'S MACHINE/);
 });

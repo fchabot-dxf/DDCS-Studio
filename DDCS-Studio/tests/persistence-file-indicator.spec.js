@@ -49,23 +49,41 @@ test('never-saved clean = hidden → a change reads TEMPORARY → a .ddcs save r
   expect(saved.text, 'and reads "Saved to file · <ago>" — SAVED reserved for the file').toMatch(/Saved to file/);
 });
 
-test('beforeunload guards only when there is unsaved-to-file work', async ({ page }) => {
+/**
+ * t1221 — NO EXIT WARNING (user ruling). This test used to assert that unsaved-to-file work triggered the browser's
+ * leave prompt. It is inverted now, because the warning was about a loss that does not happen: the localStorage buffer
+ * SURVIVES a reload and a tab close, so the prompt fired on every refresh over work that was never at risk. A false
+ * alarm on every refresh is worse than none — it trains people to click through the real ones. The chip carries the
+ * not-saved-to-a-file truth without blocking the gesture.
+ */
+test('closing or reloading is NEVER blocked — the buffer survives, so there is nothing to warn about', async ({ page }) => {
   await ready(page);
   const whenClean = await page.evaluate(() => {
     const ev = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(ev);
     return ev.defaultPrevented;
   });
-  expect(whenClean, 'a clean workspace does NOT block exit').toBe(false);
+  expect(whenClean, 'a clean workspace does not block exit').toBe(false);
 
-  const whenDirty = await page.evaluate((k) => {
+  const dirty = await page.evaluate((k) => {
     localStorage.setItem(k, JSON.stringify([{ n: 2 }]));
     window.ddcsFileSaveState.refresh();
     const ev = new Event('beforeunload', { cancelable: true });
     window.dispatchEvent(ev);
-    return ev.defaultPrevented;
+    const chip = document.getElementById('fileSaveChip');
+    return { prevented: ev.defaultPrevented, chipText: chip ? chip.textContent : '', chipShown: !!(chip && chip.offsetParent !== null) };
   }, KEY);
-  expect(whenDirty, 'an unsaved-to-file workspace triggers the exit warning').toBe(true);
+  expect(dirty.prevented, 'and NEITHER does unsaved-to-file work — the warning is gone').toBe(false);
+
+  // the state is still told, just not by a popup
+  expect(dirty.chipShown, 'the chip is the one that speaks').toBe(true);
+  expect(dirty.chipText, 'and it still says the work is only temporary').toMatch(/Temporary/i);
+
+  // the real reason the warning was wrong: the buffer is still there afterwards
+  await page.reload();
+  await page.waitForFunction(() => window.ddcsFileSaveState);
+  const survived = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || 'null'), KEY);
+  expect(survived, 'the buffer survives the reload the prompt used to warn about').toEqual([{ n: 2 }]);
 });
 
 test('the dirty state persists across a reload (watermark is stored), and Save survives too', async ({ page }) => {
