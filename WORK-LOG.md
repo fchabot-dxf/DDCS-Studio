@@ -16796,3 +16796,125 @@ flaked in the previous runs (transform-declared-736:101 and blocks-mobile-drawer
 parallel load). Counts reconcile: 1515 -> 1517 = the two new regression tests. An intermediate gate this turn ran 1514
 passed / 1 flake before the review's two findings were fixed. Branch feat/ddcs-workspace. NO release.
 Reserve-the-word-save honoured.
+
+---
+
+## turn 1221 -- ONE DOOR for controller parameters: "Import from dump" folds into the Pull modal as a TRANSPORT.
+
+Settings carried two buttons performing the same act -- read THIS machine's parameters, review them, apply what you
+tick -- differing only in how the bytes arrive. They are now one door.
+
+### WHAT THE MAP CHANGED ABOUT THE PLAN (worth recording, because it made the change much smaller).
+
+The two paths ALREADY converged: `openDumpImport` -> `recognizeDump` -> `dumpToScan` -> `openImportModal(scan)`, the
+same modal, the same `applyCandidates`. So the dispatch's "if the .eng path applies without review, it gains the
+review; never the reverse" was already satisfied -- there was no apply-without-review to fix. The duplication was
+purely the DOOR. That left the work as: surface the transport inside the modal, and retire the second button.
+
+Two constraints came out of the same mapping and shaped the design:
+  - the existing pull specs wait on `#import-modal.active #import-body .im-row` immediately after clicking Pull, so a
+    transport CHOOSER STEP before the review would have timed them out. The transport is therefore a persistent ROW
+    that is always visible while the LIVE read still starts on open -- the common path costs no extra click, and the
+    row is what makes the other way in discoverable from inside the review.
+  - `window.ddcsOpenDumpImport` must stay assigned at wiring scope; it is the Gateway tab's no-LAN entry AND the seam
+    the dump specs wait on before any modal exists. Moving it into the modal builder would have broken both.
+
+### THE WORDING TRAP -- the file is named `eng`, with NO extension.
+
+The option is labelled "From a USB file (.eng)" as dispatched, but `classifyFile` matches BASENAMES and the real file
+the controller writes is literally `eng`. Two consequences, both handled:
+  - the picker sets NO `accept` filter. An `accept=".eng"` would have hidden the very file the option is named after.
+  - `classifyFile` now also accepts a trailing `.eng`. Once the UI calls it a .eng file, users will have files named
+    that way, and refusing them would be the app contradicting its own label. This widens WHICH NAMES are recognized
+    and decodes nothing differently -- the parser itself is untouched, as dispatched.
+The picker also became a FILE pick rather than a folder pick (`webkitdirectory` dropped), which is what "from a USB
+file" means; `multiple` stays, so a user who copied the whole disk still selects setting + eng + coord1 together and
+gets the fully grounded derivation.
+
+### THE SCREENSHOT EARNED ITS PLACE IN THE GATE.
+
+Looking at the modal is what caught it: with the transport row added, "From a USB file (.eng)" rendered TWICE -- once
+in the row, and again as the old `#import-fromdump` button in the no-gateway empty state. An identical duplicate
+button inside the very modal built to remove a duplicate door. The empty state now points AT the row instead of
+repeating it, and the spec pins exactly one of each. No test asserted that button, so nothing else moved. The
+no-gateway string two other specs DO assert is untouched.
+Also renamed the review's `Dump files` note group to `Parameter files` -- the retired door's vocabulary was still
+showing inside the surface that replaced it.
+
+### WHAT I FLAGGED RATHER THAN "FIXED".
+
+An eng-ONLY import is assumed to be a DM500 (`recognizeDump`: no `setting` file -> `controllerId='ddcs-v3-dm500'`,
+values honest-N/A). That inference predates this turn, but naming the option ".eng" invites users to pick exactly one
+file, which makes it far MORE reachable -- an Expert eng alone would be labelled a DM500. I did not touch it: it is
+inside the parser the dispatch said to reuse, and guessing a controller from eng text would be inference of the kind
+the north star rejects. ADVISOR: this wants either a declared controller pick on the file transport, or the modal
+stating which controller it assumed. Not started.
+One cosmetic pre-existing wart visible in the review screenshot: the "Soft limits DISABLED on the controller" note
+wraps into a narrow column. Left alone (surgical-change rule).
+
+### SPECS.
+
+New tests/controller-import-one-door-1221.spec.js (3): the one door + the retired button + the reserved word; both
+transports visible with LIVE active on open, no duplicate USB button, no-gateway message intact, screenshot; and a
+real V4.1 parameter set fed in as `machine.eng` (deliberately extension-named, so recognition cannot depend on the
+bare name) going through the REVIEW -- asserting settings are UNCHANGED at the review step, then Apply landing the
+by-name goldens 3830/3900. workspace-roundtrip's `Import-from-dump stays` assertion (mine, t1217) became `the ONE
+door stays` + `the second door is retired`.
+
+GATE (as dispatched): smoke 60/60 + the whole pull/dump/import set 38/38 + BOTH screenshots eyeballed by me + one .eng
+going through the review step. The screenshots are in the gate for a reason and proved it this turn -- see above.
+Full unfiltered suite as the backstop: 1518 passed / 2 failed / 4 skipped (15.8m). Both failures are the boot-wait
+flake class (`page.waitForFunction` 5s, not an assertion) -- import-safety-1219:47 and trail-color:7 -- and both pass
+in isolation (6/6). Counts reconcile: 1517 -> 1520 = the 3 new tests. Branch feat/ddcs-workspace. NO release.
+The A-F plan stays HELD -- not started.
+
+### turn 1221 ADDENDUM -- the mid-task amendment (polled before commit), and the premise in it that was not true yet.
+
+(1) REMOVE "Backup Profile" -- THE PREMISE NEEDED FIXING FIRST. The amendment called the button "a manual duplicate of
+the now-AUTOMATIC safety export (the t1219 allowDestructiveLanding gate)". It was not a duplicate: `safetyExport`
+appears NOWHERE in settingsPanel -- t1219's automatic gate sits on the IMPORT/cloud-load LANDING in profileStore, not
+on this modal's Apply. Deleting the button and printing "a safety copy is saved automatically" would therefore have
+removed the ONLY undo affordance on this surface and replaced it with a false statement, on a surface that rewrites
+envelope / WCS / homing / spindle.
+So I made the claim TRUE before making it: Apply now takes `safetyExport()` first (exactly what ui/backupModal.js does
+before a .ddcs restore), and only then is the manual button gone, with the footer stating it. Best-effort on the export
+so a failed download cannot block the apply the user asked for. This also matches the no-legacy-burden memory's own
+carve-out -- data-SAFETY on a live destructive operation is not burden and stays.
+THAT CHANGE BROKE A TEST FOR A GOOD REASON, and the failure is worth recording: pull-v41-wcs clicked Apply and read
+`ddcsGetSettings()` in the SAME evaluate. It only ever passed because the WCS write sits in `applyCandidates`'
+synchronous prefix, so it landed before the first await. With a safety export in front, nothing lands synchronously.
+The spec now waits for the modal to close -- the real completion signal -- instead of racing an async apply.
+
+(2) WORDING SWEEP + BOTH SHAPES OF A USB COPY. "profile" is gone from the modal (the footer button, and the banner,
+which now says the apply "retargets this machine + its post"). A spec asserts the whole panel contains no /profile/i so
+it cannot creep back. "workspace" DOES appear once -- "A safety copy of your workspace is saved automatically before
+applying" -- which is the reserved word used correctly: that copy IS a .ddcs. My own earlier assertion banned the word
+outright on this surface and had to go; the reservation is about MEANING, not absence.
+The transport is now "From a USB copy (.eng file or disk folder)". Earlier in this turn I had made the picker
+file-only, which would have made the "disk folder" half a lie -- a single `<input>` cannot offer both a file pick and a
+folder pick. Rather than add a second button (the duplicate door this turn exists to remove), the folder half is served
+by DROPPING it: `filesFromDrop` walks a dropped directory (depth-capped) and feeds the same recognizeDump. One option,
+both shapes.
+
+(3) NO-LEGACY-BURDEN. The memory already existed -- the advisor wrote it at t1220, and it is more complete than what I
+would have written (it records that the t1217-t1219 legacy doors are themselves scheduled for removal). Not duplicated.
+Nothing legacy was added this turn: the `.eng` name widening is forward-looking (it matches the label we now show), and
+the DM500 disk copy is a current supported controller, not a legacy format.
+
+GATE after the amendment: smoke 60/60 + the pull/dump/import set 39/39 + the modal re-screenshotted and eyeballed
+(transport row, drop zone, the safety-copy footer, no Backup Profile). Full unfiltered suite as the backstop: 1520 passed / 0 FAILED / 4 skipped (15.1m, EXIT=0) -- clean, flakes included.
+
+### turn 1221 ADDENDUM 2 -- the second amendment: the exit warning is GONE.
+
+Removed the `beforeunload` guard in ui/fileSaveState.js. It warned about a loss that does not happen: the localStorage
+buffer SURVIVES a reload and a tab close, so the browser's "Reload site?" prompt fired over work that was never at
+risk. A false alarm on every refresh is worse than no alarm -- it teaches people to click through the real ones. The
+chip stays as the one truth-teller ("Temporary -- not saved to a file"), which says the same thing without blocking the
+gesture. `isWorkspaceDirtyToFile` is still used by the chip, so no orphaned import; the module docblock lost its
+exit-warning clause.
+The spec was INVERTED rather than deleted, and given the reason it exists: it now asserts exit is never blocked, that
+the chip still shows Temporary, and -- the actual point -- that the buffer is still intact after the reload the prompt
+used to warn about. Asserting the absence alone would have recorded the removal without recording WHY it was safe.
+
+GATE after BOTH amendments: FULL unfiltered suite 1520 passed / 0 FAILED / 4 skipped (15.2m, EXIT=0) -- clean, flakes
+included. Branch feat/ddcs-workspace. NO release.
