@@ -208,14 +208,24 @@ export function deleteWizard(opType) { deleteUserOp(opType); const l = readLayou
 export const WIZARD_FILE_KIND = 'ddcs.wizard';
 export const WIZARD_FILE_VERSION = 1;
 
-/** Serialize a user-op def → `.wizard` file text (portable, shareable). Carries the view-only metadata `panel`
- *  (layout) + `sim` (DECLARED preview intent: rotary rig / machine / magazine) so a shared wizard keeps its panel
- *  and rig on import — otherwise the recipient loses them. Both are optional (omitted when absent → clean files,
- *  backward-compatible with v1 files that predate them). */
+/** Serialize a user-op def → `.wizard` / `.wiz` file text (portable, shareable). Carries the view-only metadata
+ *  `panel` (layout) + `sim` (DECLARED preview intent: rotary rig / machine / magazine) so a shared wizard keeps its
+ *  panel and rig on import — otherwise the recipient loses them. Every field is optional (omitted when absent →
+ *  clean files, backward-compatible with v1 files that predate them).
+ *
+ *  t1247 — `group` and `defV` ride too, and the reason is worth stating because it is the whole point of a SOURCE
+ *  share. `group` is the bar dropdown the op belongs in: it is authored, not derived, so dropping it landed every
+ *  shared wizard in the wrong place. `defV` is the author's version stamp, which the staleness rule (defVStale) and
+ *  the CAM sub-stack boundary both read — a share that reset it to 1 would tell the recipient's placed instances they
+ *  are current when they are not. What is NOT written is what registerUserOp RE-DERIVES on import — `layout` (from
+ *  the template's layout rows) and `bindingSpecs` (from its formfield blocks). Storing a derived value would be a
+ *  second copy that can disagree with the template it came from; the file carries the SOURCE and the import re-derives. */
 export function wizardToFile(def) {
     const op = { opType: def.opType, label: def.label, template: def.template, bindings: def.bindings };
     if (def.panel) op.panel = def.panel;
     if (def.sim) op.sim = def.sim;
+    if (def.group) op.group = def.group;
+    if (def.defV != null) op.defV = def.defV;
     return JSON.stringify({ kind: WIZARD_FILE_KIND, v: WIZARD_FILE_VERSION, op }, null, 2);
 }
 /** Parse `.wizard` file text → a user-op def (or null if it isn't a valid wizard file). Returns o.op verbatim, so

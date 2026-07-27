@@ -19,6 +19,9 @@ import {
 } from '../blocks/wizardLibrary.js';
 import { ICON_REGISTRY, entryIconHtml } from './wizIcons.js';
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
+// t1247 — THE LIBRARY FOLDER: one granted folder holds the shareable sources (.wiz here, .cam on the CAM surface)
+import { writeLibraryFile, hasFSA } from '../data/libraryFolder.js';
+import { renderLibraryShelf } from './libraryShelf.js';
 // Authoring custom ops lives in Blocks → Dev mode (the one authoring path); this panel only DESIGNS the bar.
 
 const SECTION_LABEL = { left: 'LEFT', center: 'CENTRE', right: 'RIGHT' };
@@ -102,11 +105,27 @@ function regroup(entry, newGroup) {
     setEntryOverride(entry.id, { group: newGroup, order: maxOrder + 1 });   // append to the end of the target dropdown
 }
 
-function exportEntry(entry) {
+/**
+ * t1247 — EXPORT WRITES A `.wiz` INTO THE LIBRARY FOLDER, not into Downloads. A download is a one-way door: the file
+ * lands where the app can never read it back, so the shelf below could never list what you just exported. ONE-NAME —
+ * the file is named after the wizard, so what you see on the bar and what you see in the folder are one string.
+ * The download stays as the TRUE fallback: an environment with no File System Access at all.
+ */
+async function exportEntry(entry, onDone) {
     const text = exportWizard(entry.type);
     if (!text) return;
-    const safe = (entry.label || entry.type).replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
-    UIUtils.downloadFile(`${safe}.wizard`, text);
+    const stem = (entry.label || entry.type).trim() || 'wizard';
+    if (!hasFSA()) {
+        const safe = stem.replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^_+|_+$/g, '') || 'wizard';
+        UIUtils.downloadFile(`${safe}.wiz`, text);
+        dlgNotice(`This browser cannot grant a folder, so “${safe}.wiz” was downloaded instead. The desktop app keeps it in your library folder.`);
+        return;
+    }
+    const r = await writeLibraryFile(stem, 'wiz', text, {
+        confirmReplace: (name, where) => dlgConfirm(`“${name}” already exists in ${where}. Replace it?`, { okLabel: 'Replace' }),
+    });
+    if (r.ok) { dlgNotice(`Saved “${r.name}” to your library folder — it is on the shelf below, and anyone you send it to can import it.`); if (onDone) onDone(); }
+    else if (!r.aborted) dlgNotice(`Could not write the .wiz file: ${r.error}`);
 }
 
 let _importInput = null;
@@ -152,7 +171,7 @@ export function renderWizardLibrary(container) {
     head.innerHTML = `<div class="settings-section-title">WIZARD LIBRARY — DESIGN THE BAR</div>
         <div class="settings-hint">The bar has three sections (left · centre · right), each holding dropdowns, each holding wizards.
         Add or delete a dropdown, move it between sections, and show/hide · rename · re-group · re-order any wizard (built-ins too).
-        Fork a built-in into an editable copy, or import a custom <code>.wizard</code>. Changes apply to the bar instantly.</div>`;
+        Fork a built-in into an editable copy, or import a shared <code>.wiz</code> from your library folder below. Changes apply to the bar instantly.</div>`;
 
     const nd = document.createElement('div');
     nd.className = 'settings-row'; nd.style.marginTop = '10px';
@@ -170,12 +189,36 @@ export function renderWizardLibrary(container) {
 
     const actions = document.createElement('div');
     actions.className = 'settings-row'; actions.style.marginTop = '8px';
-    actions.appendChild(mkBtn('⬆ Import .wizard', () => importWizardFile(apply), { title: 'Load a shared .wizard file into your library' }));
+    actions.appendChild(mkBtn('⬆ Import a file…', () => importWizardFile(apply), { title: 'Load a .wiz / .wizard file from anywhere on disk (the shelf below is the folder you keep them in)' }));
     actions.appendChild(mkBtn('↺ Reset to factory', async () => {
         if (await dlgConfirm('Reset the whole bar layout (sections, dropdowns, names, visibility, order, icons) to factory defaults?\nYour custom .wizard ops are kept.', { danger: true, okLabel: 'Reset' })) { resetLayout(); apply(); }
     }, { title: 'Discard all bar customisation (keeps your custom ops)' }));
     head.appendChild(actions);
     container.appendChild(head);
+
+    // t1247 — THE .wiz SHELF. The user ruled that the wizard library IS the wizard surface, so the shared-source shelf
+    // lives here rather than in a separate importer screen: your ops and the ones you can import are one page.
+    const shelf = document.createElement('div');
+    shelf.className = 'settings-section';
+    shelf.innerHTML = '<div class="settings-section-title">SHARED WIZARDS (.wiz) — YOUR LIBRARY FOLDER</div>'
+        + '<div class="settings-hint">A <code>.wiz</code> is a wizard&rsquo;s SOURCE, not a baked copy: importing one installs it live on your bar, editable in Blocks like any op you wrote. Export writes here too.</div>'
+        + '<div id="wiz_library_shelf" style="margin-top:10px"></div>';
+    container.appendChild(shelf);
+    renderLibraryShelf(shelf.querySelector('#wiz_library_shelf'), {
+        kindKey: 'wiz',
+        describe: (e) => {
+            const op = (e.obj && e.obj.op) || {};
+            const n = ((op.bindings || []).length);
+            return `${op.opType ? 'op' : 'wizard'} · ${n} field${n === 1 ? '' : 's'}`;
+        },
+        emptyHint: 'Export one of your own ops above and it will appear here.',
+        onImport: async (e) => {
+            const def = importWizard(e.text);   // parse → createUserOp → registerUserOp: LIVE, exactly like a local op
+            if (!def) { dlgNotice(`“${e.name}” is not a wizard file this version understands.`); return; }
+            dlgNotice(`“${def.label || def.opType}” is on your bar now — open it, or edit it in Blocks like any op you authored.`);
+            apply();
+        },
+    });
 
     // one block per SECTION → its dropdowns → their wizards
     for (const section of SECTIONS) {
@@ -305,7 +348,7 @@ function renderRow(entry, group, ei, allGroups, apply) {
     if (entry.kind === 'user') {
         row.appendChild(mkBtn('✎ Edit', () => { if (window.ddcsEditWizardDef) { window.ddcsEditWizardDef(entry.type); if (window.closeSettings) window.closeSettings(); } },
             { title: 'Re-author this wizard — opens its blocks (knobs + all) in Dev mode to tweak and re-save' }));
-        row.appendChild(mkBtn('Export', () => exportEntry(entry), { title: 'Save this op as a shareable .wizard file' }));
+        row.appendChild(mkBtn('Export .wiz', () => exportEntry(entry, apply), { title: 'Write this op to your library folder as a shareable .wiz source — it imports live and editable, not baked' }));
         row.appendChild(mkBtn('Delete', async () => {
             if (await dlgConfirm(`Delete the custom wizard “${entry.label}”? This removes it from your library.`, { danger: true, okLabel: 'Delete' })) { deleteWizard(entry.type); apply(); }
         }, { danger: true, title: 'Remove this custom op' }));

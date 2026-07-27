@@ -169,6 +169,12 @@ export function initMacrosApp() {
                         <div class="settings-row"><label>Pack name<input type="text" id="cam_pack_name"></label><button class="toolbar-btn settings-io" id="cam_build_slot" title="Author a CAM slot from an op in your program: seed the expose/bake table, choose which params the operator fills (Expose) vs freezes (Bake), preview, then Build to a slot.">＋ New CAM slot</button><button class="toolbar-btn settings-io" id="cam_export_pack" title="Bundle every slot (macro_camN.nc + camN.bmp) + the eng lines to merge + an install README into a USB-ready .zip.">📦 Export pack (.zip)</button><button class="toolbar-btn settings-io" id="cam_merge_eng" title="Paste the controller's CURRENT eng file → get a safely-merged eng (your pack appended, #param / -m group collisions flagged). Avoids the community full-replace mistake.">🔗 Merge eng</button></div>
                         <div id="cam_validate" class="settings-hint" style="margin-top:6px;"></div>
                         <div id="cam_slots" style="margin-top:6px;"></div>
+                        <!-- t1247 — SHARED CAM RECIPES (.cam): the same granted library folder the .wiz shelf uses. A
+                             recipe carries a slot's declared OPS, so importing rebuilds it through buildSlotFromOps and
+                             it lands editable — never a baked macro_camN.nc, which nobody could change. -->
+                        <div class="settings-section-title" style="margin-top:14px;">SHARED CAM RECIPES (.cam) — YOUR LIBRARY FOLDER</div>
+                        <div class="settings-hint">A <code>.cam</code> is a slot's SOURCE — its ops, not its generated macro — so an imported recipe rebuilds into a slot you can edit like your own.</div>
+                        <div id="cam_library_shelf" style="margin-top:8px;"></div>
                     </div>
                 </div>
                 <!-- t662 (E1) — the GENERALIZED simple editor (the autostart stored-editor pattern, per file). Rendered by
@@ -1543,7 +1549,56 @@ function homingPostIsExpert() {
         buildSlotFromOps(slot); saveCamPack(); cbmExit();
     }
 
+    /**
+     * t1247 — write this slot to the library folder as a `.cam` recipe. ONE-NAME: the file is named after the slot.
+     * A slot with no declared ops has no source to share (camToFile returns null) and says so rather than writing a
+     * file that claims to be a recipe while carrying a bake.
+     */
+    async function exportSlotRecipe(slot) {
+        const { camToFile } = await import('../data/camRecipe.js');
+        const { writeLibraryFile, hasFSA } = await import('../data/libraryFolder.js');
+        const text = camToFile(slot);
+        if (!text) { dlgNotice('This slot was hand-built, so it has no declared ops to share. Re-author it via ＋ New CAM slot and it becomes shareable.'); return; }
+        const stem = (slot.name || ('cam' + slot.slot)).trim();
+        if (!hasFSA()) { UIUtils.downloadFile(stem.replace(/[^A-Za-z0-9_.-]+/g, '_') + '.cam', text); return; }
+        const r = await writeLibraryFile(stem, 'cam', text, {
+            confirmReplace: (name, where) => dlgConfirm(`“${name}” already exists in ${where}. Replace it?`, { okLabel: 'Replace' }),
+        });
+        if (r.ok) { dlgNotice(`Saved “${r.name}” to your library folder — it is on the shelf below.`); renderCamShelf(); }
+        else if (!r.aborted) dlgNotice(`Could not write the .cam file: ${r.error}`);
+    }
+
+    /** The `.cam` half of the library shelf — the same component the wizard surface uses for `.wiz`. */
+    async function renderCamShelf() {
+        const host = q('cam_library_shelf'); if (!host) return;
+        const [{ renderLibraryShelf }, { camFromFile, camSummary }] = await Promise.all([
+            import('./libraryShelf.js'), import('../data/camRecipe.js'),
+        ]);
+        renderLibraryShelf(host, {
+            kindKey: 'cam',
+            describe: (e) => camSummary(e.obj),
+            emptyHint: 'Export one of your slots above and it will appear here.',
+            onImport: async (e) => {
+                const recipe = camFromFile(e.text);
+                if (!recipe) { dlgNotice(`“${e.name}” is not a CAM recipe this version understands.`); return; }
+                // IMPORT = REBUILD, never a paste of someone's macro text: the ops go through the ordinary build path,
+                // so the slot allocates ITS OWN form params in THIS pack and cannot collide with what is already here.
+                const slot = { slot: nextSlotNum(), name: recipe.name, ops: JSON.parse(JSON.stringify(recipe.ops)) };
+                _camPack.slots.push(slot);
+                buildSlotFromOps(slot);
+                // buildSlotFromOps names the slot after the ops it generated; a RECIPE carries the name its author
+                // gave it, and the file is named after that (one-name). Restore it, exactly as Duplicate does — else
+                // "Two-hole plate.cam" imports as a slot called "Drill + Bore" and the file no longer names the thing.
+                slot.name = recipe.name;
+                saveCamPack();
+                renderCamBuilder();
+                dlgNotice(`“${slot.name}” is now cam${slot.slot} in your pack — edit it like any slot you authored.`);
+            },
+        });
+    }
+
     function renderCamBuilder() {
+        renderCamShelf();
         const host = q('cam_slots'); if (!host) return;
         const nameEl = q('cam_pack_name'); if (nameEl && document.activeElement !== nameEl) nameEl.value = (_camPack.meta && _camPack.meta.name) || '';
         const v = slotPack.validatePack(_camPack, { bandsOf: camBandsOf });
@@ -1568,7 +1623,7 @@ function homingPostIsExpert() {
                     ${slot.icon ? `<img src="${slot.icon.data}" alt="" style="width:72px; height:36px; object-fit:contain; border:1px solid var(--border); background:#000;"><span style="font-size:10px; color:var(--text-dim);">${camEsc(slot.icon.name)}${slot.icon.w ? ' · ' + slot.icon.w + '×' + slot.icon.h + (slot.icon.w === 360 && slot.icon.h === 180 ? '' : ' ⚠ not 360×180') : ''}</span>` : '<span style="font-size:11px; color:var(--text-dim);">No icon (camN.bmp)</span>'}
                 </div>
                 ${opSummary ? `<div style="font-size:11px; color:var(--text-dim); margin-top:6px;"><span style="opacity:.65;">ops:</span> ${camEsc(opSummary)}</div>` : ''}
-                <div class="settings-row" style="margin-top:6px; flex-wrap:wrap;">${(slot.ops && slot.ops.length) ? '<button class="toolbar-btn settings-io" data-act="editslot" title="Reopen this slot in the wizard, pre-seeded from its ops — tune expose/bake + values, then Update it in place.">✎ Edit</button>' : '<span title="This slot has no declared ops (a legacy hand-built macro), so it can’t be edited in the wizard — re-author it via ＋ New CAM slot. View output / Simulate / Delete still work." style="font-size:10px; color:var(--text-dim); cursor:help; align-self:center;">ⓘ hand-built — no wizard Edit</span>'}<span style="flex:1"></span><button class="toolbar-btn settings-io" data-act="sim" title="Run this slot's macro in the simulator with each field seeded from its default — verify the toolpath before publishing.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button></div>
+                <div class="settings-row" style="margin-top:6px; flex-wrap:wrap;">${(slot.ops && slot.ops.length) ? '<button class="toolbar-btn settings-io" data-act="editslot" title="Reopen this slot in the wizard, pre-seeded from its ops — tune expose/bake + values, then Update it in place.">✎ Edit</button>' : '<span title="This slot has no declared ops (a legacy hand-built macro), so it can’t be edited in the wizard — re-author it via ＋ New CAM slot. View output / Simulate / Delete still work." style="font-size:10px; color:var(--text-dim); cursor:help; align-self:center;">ⓘ hand-built — no wizard Edit</span>'}<span style="flex:1"></span><button class="toolbar-btn settings-io" data-act="sim" title="Run this slot's macro in the simulator with each field seeded from its default — verify the toolpath before publishing.">▶ Simulate</button><button class="toolbar-btn settings-io" data-act="exp">⬇ Export macro + eng to editor</button>${(slot.ops && slot.ops.length) ? '<button class="toolbar-btn settings-io" data-act="expcam" title="Write this slot to your library folder as a shareable .cam recipe — its declared OPS, not the baked macro, so it imports editable">⬆ Export .cam</button>' : ''}</div>
             </div>`;
         }).join('');
     }
@@ -1665,6 +1720,9 @@ function homingPostIsExpert() {
             }
             else if (a === 'sim') { simulateSlot(slot); }
             else if (a === 'exp') { insertToEditor('( ===== eng form lines — MERGE into the controller eng language file ===== )\n' + slotPack.slotEng(slot) + '\n\n' + slotPack.slotMacro(slot)); }
+            // t1247 — SHARE THE RECIPE, NOT THE BAKE. camToFile writes slot.ops (the buildSlotFromOps input); the macro
+            // text stays derived. A recipient rebuilds it and can edit every value, which a shared .nc could never offer.
+            else if (a === 'expcam') { exportSlotRecipe(slot); }
         });
     }
     const _camName = q('cam_pack_name');
