@@ -17467,3 +17467,54 @@ openFromFolder now waits on the LAST effect (the save handle being armed). Third
 
 GATE (fast tier): smoke 59/59 + 73 manager/cloud/workspace/gateway specs. Screenshots: both tabs, the cloud table with
 signed envelopes, a cloud open, the signed-out state, the cloud delete confirm. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1235 -- TURN B: the inter-pass CONNECTOR. The traverse that never connected now does, from one feed.
+
+### THE ROOT, re-measured before touching anything.
+
+A `REPOSITION:` comment is the pass DELIMITER: the engine records the finishing pass's runtime end, increments `_pass`
+and RESETS the local position. The traverse between the two passes is consumed by that boundary -- it is never traced
+-- so the drawn route was a set of disconnected within-pass fragments. I dumped the corner route before building
+anything: 2 passes, 14 segments, and NO segment whose endpoints were passEnds[0] -> the pass-1 marker. That is the
+"traverse that never connects" the user reported, in numbers.
+
+### THE FIX: synthesise it into the ONE feed, from two positions the tool actually occupies.
+
+  FROM  passEnds[p-1]                     the previous pass's RUNTIME end (post probe + retract + lift, clamped)
+  TO    markerWorldOf(starts, ends, p)    where pass p's marker actually renders -- the SAME one source the 3D sprite
+                                          and the Layout handle read
+expressed in pass p's own frame (world - passAnchorFor), because that is the frame every segment of that pass is drawn
+in. Nothing is invented: both ends are real, and because the far end IS the marker world, the connector re-anchors on
+every drag with NO drag-time bookkeeping -- proven by dragging the Start and re-reading the route, not by argument.
+ONE FEED, both surfaces: the connectors go into the same array the 2D panel keeps, the Layout overlay is handed
+(`panel.getSegments()`), and the 3D reads (`parsed.segments` -- I assign the same array object, not a copy). The spec
+asserts the 3D group holds the same connectors and the overlay got the same count, so "one source" is checked, not
+claimed.
+CLASSIFICATION IS INHERITED, NOT HARDCODED. The connector is a plain rapid; the renderers then decide what that MEANS
+through the language they already declare -- `typeOf` promotes a horizontal rapid to `lifted` (dimmed, dashed
+safe-travel), and a pass whose declared source is MANUAL draws its traverse in the amber jog arc because the 2D reads
+`startSources[s.pass]`. So the operator-jog case needed no second code path: the connector picks up the jog language
+from the marker language that already exists.
+Insertion is ORDERED (each connector immediately before its pass's first segment) so the animation's traveled/future
+split reads it as what it is: the move that gets you to that pass.
+
+### SCOPE: every multi-pass probe op inherits it, and middle proved that honestly.
+
+Corner: one connector per boundary, endpoints exact. Middle: its DEFAULT is single-axis -- ONE pass, no boundary,
+nothing to bridge -- so the test turns on the two-axis boss probe first and says why. A test that asserted "middle has
+connectors" against a single-pass default would have been asserting nothing.
+
+### ONE EXISTING TEST WAS MEASURING IN THE WRONG FRAME (and my change exposed it).
+
+alignment-sim-starts-at-a asserts no segment endpoint sits at the machine origin -- the stray-origin-probe guard. It
+read RAW segment coords, which are PASS-LOCAL. Local {0,0} is not the machine origin: it is wherever that pass is
+anchored, and the connector legitimately starts at local zero (for an anchorsAtPrev pass, the previous runtime end IS
+the anchor). The assertion now maps through passAnchorFor and measures in WORLD -- which is what "the machine origin"
+means -- and reports 90.2mm clearance instead of a false 0. The guard got STRONGER, not looser; this is the same
+over-broad-proxy trap as t1231's /Browse/i and t1233's Drive matcher, one frame lower.
+
+GATE (fast tier): smoke 59/59 + the full corner suite (108) + middle/edge/alignment (96) + every spec that counts
+segments (38). Screenshots: corner + middle connectors, and the drag-before/drag-after pair where the traverse follows
+the chain instead of vanishing. Branch feat/ddcs-workspace. NO release.
