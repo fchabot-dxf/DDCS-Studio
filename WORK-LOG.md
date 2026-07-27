@@ -17704,3 +17704,108 @@ contract) matched no per-family filter and were not in smoke. Both are in the ma
 
 GATE (fast tier): smoke 61/61 + 106 corner/viz/engine/sim specs + the 8 new tripwires. Screenshot: the legend, where
 Rapid now draws solid and Safe travel dashed under the same hue. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1243 -- SMALL TURN: the header cloud badge is retired. One door for cloud, not two.
+
+The user ruled that the quick-menu identity line's cloud icon goes. The whole job was to make that a MOVE, not a
+deletion: the badge was the ONLY cloud affordance on a phone (that was t742's entire reason for existing), so
+removing it without a receiving surface would have re-opened the bug the badge was added to close.
+
+### What the badge actually carried, and where each piece landed.
+
+Three things, and I checked each against the Cloud tab before deleting anything:
+
+  - SIGN IN            -> already there (the A3 signed-out panel, one button, `#wsmCloudSignIn`).
+  - WHO you are        -> was NOT there. The badge said it in a tooltip and its green tint. Added: `cloudAccountBar()`
+                          renders "Signed in as <email>" at the top of the cloud card list, read from the SAME
+                          `getAccount()` the badge read -- not a second copy of the identity.
+  - THE WAY BACK OUT   -> was NOT there. The badge's modal hosted the shared `renderCloudLogin`, which carries
+                          disconnect. Added `#wsmCloudOut` next to the identity, calling the shared `disconnect()`
+                          and re-rendering the tab (so it falls back to the one sign-in button in place).
+
+`openCloudModal()` is deleted with the badge that opened it. The shared `renderCloudLogin` it hosted is untouched --
+Settings and the projects drawer still use it, so this removed a CONSUMER, not the component. The `.hq-cloud-badge`
+CSS block went too (my change orphaned it); `.hq-pull-btn` inherits the rule alone now, and the comment says why.
+
+The DOWN-ARROW STAYS. It sits beside the badge and looks like its sibling, but a pull-from-controller is a serial
+read from the machine on the bench -- it has nothing to do with a cloud account. The user ruled one icon, not two.
+
+### Re-encoding t742 rather than deleting it -- the part I want the reviewer to check.
+
+`header-account-row-742.spec.js` asserted a BADGE. The requirement underneath it was never "a badge in the header",
+it was "a person holding a phone can find and use the cloud". So the file is rewritten around that requirement:
+
+  1. the badge is gone from the header (`[data-cloud]` count 0) and the pull span is still there;
+  2. DESKTOP: sign-in is one click from the Cloud tab, and there is exactly ONE button on it;
+  3. MOBILE 390px: the real route -- quick menu -> Open -> Cloud -> Sign in -- with the sign-in ON SCREEN, >80px wide
+     and fully inside the 390px viewport (the original t742 symptom was that no cloud affordance was reachable at all);
+  4. CONNECTED: the bar names the account, the sign-out is beside it, and clicking it really clears the token.
+
+That is the honest move: a spec that only checked "the badge is gone" would let the phone regress silently.
+`header-profile-menu.spec.js` had the same badge baked in twice (a `hasCloud -> true` assert and a >=44px tap-target
+measurement); both are repointed, and its cloud-tap step is replaced by a pointer to the spec above rather than a
+quiet deletion.
+
+### GATE + screenshots.
+
+Fast tier: smoke 61 + the header/manager/cloud specs = 86/86. Screenshots (scratchpad/s1243-*): the identity line
+with no badge (Rig B - DDCS Expert M350, envelope, and the lone down-arrow), the Cloud tab signed out, the Cloud tab
+connected showing "Signed in as maker@example.com [Sign out]" above the Drive rows, and the manager at 390px with
+the tab pair and sign-in fully on screen.
+
+One honesty note on the gate: the first batched run reported 5 failures (3 Blockly specs, cam-build-mode, and my own
+t742). Each passed alone and the clean re-run was 86/86 -- it was load flake from the screenshot run still winding
+down, not a regression. I am recording it rather than only reporting the green number.
+
+### AMENDMENTS absorbed mid-turn (two), plus a real race the gate flushed out.
+
+**(1) THE STALE-MODULE GHOST — killed as a class, and I measured the culprit rather than guessing.**
+`npm start` is `http-server ./web`, and http-server's DEFAULT is `Cache-Control: max-age=3600`. I started it on a
+spare port and read the header off a real module response: every one of Studio's raw ES modules was cacheable for an
+hour, so for an hour after a fix a NORMAL reload re-ran the OLD file. That is the whole ghost -- and it explains all
+five reports in one day (Browse, the backup copies, Untitled+Saved, the beforeunload popup), each of which sent
+somebody hunting through code that had already been deleted. `-c-1` on the start script turns it into `no-cache`.
+
+Every other path that serves Studio to a browser, checked rather than assumed:
+  - the mem-server (the suite's transport) -- already `no-cache`. Nothing to do.
+  - `fairy/server.py` (the bridge / desktop exe) -- sent NO Cache-Control at all, which is not "no caching": a browser
+    then applies HEURISTIC freshness off Last-Modified and re-serves the module anyway. Now sends `no-cache`.
+  - Cloudflare Pages -- MEASURED live (curl, 2026-07-27): `public, max-age=0, must-revalidate`. It already
+    revalidates, so I did NOT add a `_headers` file. The amendment said "if cacheable without revalidation" -- it is
+    not, and an unnecessary file would be one more thing claiming to do something it isn't doing. The measurement is
+    recorded in the spec's docstring so the next person doesn't re-derive it.
+
+DIAGNOSABILITY: the t538 build stamp reported what the SERVER has, which cannot see the ghost -- the ghost is what the
+BROWSER KEPT. It now fetches app.js twice, `force-cache` (what the module loader would be handed) against `no-store`
+(what the server has now), and when they differ it says so in one console warning naming both dates and Ctrl+Shift+R,
+and the .ver chip's tooltip stops claiming a healthy build. `window.__ddcsStale` carries the fact.
+The regression spec asserts the header on a REAL module response, the two other serving paths at their source, and --
+the part that matters -- it STAGES a stale cache (old Last-Modified for the cache probe, new for the server) and
+proves the warning actually fires. A detector only ever observed saying "fine" proves nothing. It joins smoke: the
+failure it catches makes every other green meaningless in a browser.
+
+**(2) THE ENVELOPE GAINS ITS AXIS LETTERS.** One line changed in `envelopeSummary` and all three surfaces moved
+together -- the manager rows, the Settings identity band, the quick-menu line -- which is the entire argument for
+there being one formatter. `X 850 Y -850 Z -120`; the letters make the x separators redundant so they went, and the
+line is no longer than it was. ONE space between groups, not two: HTML collapses the second, so declaring a wider gap
+would have been a declaration no surface honours.
+
+**(3) THE STALE-RENDER RACE -- not asked for, but the gate kept pointing at it and it was real.**
+Two specs failed intermittently under load and I nearly wrote it off as flake. They were pointing at a live bug:
+`renderPlace` awaits (IDB + the folder walk locally, the Drive listing in the cloud) with NO guard, so switching tabs
+while one render is in flight lets the SLOWER, OLDER one land last and paint over the newer one. Not merely a wrong
+picture -- the render also writes `ov.__cards`, the model a row click opens or deletes from, so a Cloud-looking list
+could be holding local rows (and the flaky SAVE-AS was exactly that: the save went to the place the stale render had
+restored). One monotonic token, checked after every await, in `renderPlace` and carried into `renderFolder`'s walk.
+The test stages the race deterministically by holding the Drive listing open, switching back to Local, then releasing
+it. I disabled the guard and watched the test fail (the cloud account bar leaked onto the local half), then restored
+it and watched it pass.
+
+One of the two intermittent failures WAS mine, though: the t742 badge test clicked `#hdrPostBtn` after waiting only
+for `#hdrPostMenu` to EXIST -- and that element is in index.html from the first byte, so under load the click landed
+before initHeaderPost had attached anything and the menu never opened. It now waits for a row of the menu's own
+MARKUP, which the same call builds. 24/24 across a repeat-each=6 stress.
+
+GATE after the amendments: 99/99 (smoke 21 files + the header/manager/cloud/hardening specs), clean on the re-run.
