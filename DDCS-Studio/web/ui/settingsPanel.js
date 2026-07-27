@@ -1,9 +1,11 @@
 /**
  * DDCS Studio — Settings panel (a sibling header tab to STUDIO and GATEWAY).
  *
- * A header ⚙ button opens an overlay with two L1 groups:
- *   - General:  Profile · Appearance · Variables · Program · Feedback · Network · About
- *   - Hardware: Machine · Spindle · Input · Output · ATC  (subsystems added via "+ Add")
+ * A header ⚙ button opens an overlay with three L1 groups (t1245 — after THE SHRINK, which took Workspace, Cloud,
+ * FAQ, Feedback and About out of Settings entirely: none of them was a setting):
+ *   - Look and feel: Appearance · Preview · Editor · Wizard bar
+ *   - Controller:    Profile · WCS · Variables · Program · Gateway
+ *   - Hardware:      Machine · Head · Input · Output · Tool table  (subsystems added via "+ Add")
  *
  * Settings persist to localStorage and broadcast `ddcs:settings-changed` so the
  * 3D preview can redraw. The viewer reads them via window.ddcsGetSettings().
@@ -20,7 +22,6 @@ import { renderWizardLibrary } from './wizardManagerPanel.js';
 import { toolProfileSvg } from '../viz/toolProfile.js';
 import { THEMES } from './themes.js';
 import { tncProgram } from '../wizards/atcModel.js';   // INC-B2: the ONE shared T.nc emitter (was the inline atcCombo/motionToTnc/generateToolChangeNc routing)
-import { renderCloudLogin } from './cloudAccount.js';
 import { popReturn, dropReturn, pushReturn } from './navReturn.js';   // central back-navigation: return to wherever we were deep-linked from
 import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { TOOL_CATALOG, TOOL_CATALOG_GROUPS } from '../data/toolCatalog.js';   // the declared catalog the "＋ Add from catalog" picker adds individual tools from
@@ -973,8 +974,13 @@ function buildSettingsOverlay() {
             <div class="settings-identity" id="set_identity_band"></div>
             <div class="settings-head">
                 <div style="display: flex; align-items: center; gap: 16px;">
-                    <div class="settings-tabs" style="display: flex; gap: 8px;">
-                        <button class="settings-main-tab active" data-group="general">General</button>
+                    <!-- t1245 (user ruling — THE SHRINK, chosen over a 3-way split of the same nine subtabs). "General"
+                         was a catch-all of nine, and the honest answer turned out to be that most of them did not belong
+                         in Settings at all: Workspace duplicated the manager's Save/Open, Cloud duplicated the manager's
+                         Cloud tab, FAQ + About are not settings, and Feedback was a second door to the Rate toast. What
+                         REMAINS is the one thing General actually was — how the app looks and behaves for you. -->
+                    <div class="settings-tabs" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="settings-main-tab active" data-group="lookfeel">Look and feel</button>
                         <button class="settings-main-tab" data-group="controller">Controller</button>
                         <button class="settings-main-tab" data-group="hardware">Hardware</button>
                     </div>
@@ -983,16 +989,13 @@ function buildSettingsOverlay() {
             </div>
             <div class="settings-body">
                 <div class="settings-sidebar">
-                    <div class="sidebar-group-label" data-group-label="general">General</div>
-                    <button class="settings-tab active" data-group="general" data-target="set_tab_appearance">Appearance</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_preview">Preview</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_compose">Editor</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_wizards">Wizards</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_cloud">Cloud</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_backup">Workspace</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_faq">FAQ</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_feedback">Feedback</button>
-                    <button class="settings-tab" data-group="general" data-target="set_tab_about">About</button>
+                    <div class="sidebar-group-label" data-group-label="lookfeel">Look and feel</div>
+                    <button class="settings-tab active" data-group="lookfeel" data-target="set_tab_appearance">Appearance</button>
+                    <button class="settings-tab" data-group="lookfeel" data-target="set_tab_preview">Preview</button>
+                    <button class="settings-tab" data-group="lookfeel" data-target="set_tab_compose">Editor</button>
+                    <!-- "Wizards" said WHICH wizards exist; this tab configures the WIZARD BAR (what shows, in what
+                         order). Renamed to what it edits (t1245). -->
+                    <button class="settings-tab" data-group="lookfeel" data-target="set_tab_wizards">Wizard bar</button>
                     <div class="sidebar-group-label" data-group-label="controller" style="display:none;">Controller</div>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_profile">Profile</button>
                     <button class="settings-tab" data-group="controller" data-target="set_tab_wcs">WCS</button>
@@ -1007,11 +1010,11 @@ function buildSettingsOverlay() {
                     <button class="settings-tab" data-group="hardware" data-target="set_tab_atc" style="display:none;">Tool table</button>
                 </div>
                 <div class="settings-content">
-                <!-- GENERAL: WIZARDS (the wizard-bar library manager — rendered by wizardManagerPanel.js) -->
+                <!-- LOOK AND FEEL: WIZARD BAR (the wizard-bar library manager — rendered by wizardManagerPanel.js) -->
                 <div id="set_tab_wizards" style="display:none;">
                     <div id="wizard_library_manager"></div>
                 </div>
-                <!-- GENERAL: PREVIEW (3D/2D toolpath view + simulation) -->
+                <!-- LOOK AND FEEL: PREVIEW (3D/2D toolpath view + simulation) -->
                 <div id="set_tab_preview" style="display:none;">
                     <div class="settings-section">
                         <div class="settings-section-title">TOOLPATH PREVIEW</div>
@@ -1068,7 +1071,7 @@ function buildSettingsOverlay() {
                         </div>
                     </div>
                 </div>
-                <!-- GENERAL: COMPOSING (authoring assists — Blocks suggestions + Studio editor autocomplete) -->
+                <!-- LOOK AND FEEL: EDITOR (authoring assists — Blocks suggestions + Studio editor autocomplete) -->
                 <div id="set_tab_compose" style="display:none;">
                     <div class="settings-section">
                         <div class="settings-section-title">EDITOR ASSISTS</div>
@@ -1078,7 +1081,7 @@ function buildSettingsOverlay() {
                         <label class="settings-check"><input type="checkbox" id="set_cp_ghost"> Suggestion box — a floating box of likely next blocks on the canvas (click, or Tab takes the first)</label>
                     </div>
                 </div>
-                <!-- GENERAL: THIS WORKSPACE'S MACHINE -->
+                <!-- CONTROLLER: THIS WORKSPACE'S MACHINE -->
                 <div id="set_tab_profile">
                     <div class="settings-section">
                         <div class="settings-section-title">THIS WORKSPACE'S MACHINE</div>
@@ -1108,7 +1111,7 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- GENERAL: VARIABLES -->
+                <!-- CONTROLLER: VARIABLES -->
                 <div id="set_tab_variables" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">VARIABLES (CSV)</div>
@@ -1123,40 +1126,7 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- GENERAL: FAQ -->
-                <div id="set_tab_faq" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">FREQUENTLY ASKED</div>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is DDCS Studio?</summary><div class="settings-hint" style="margin-top:6px;">A companion app for DDCS Expert / M350 controllers: wizards that generate G-code, a CAM-pack builder, a full toolpath simulator, and a gateway to send programs to the machine.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Do I need the desktop app?</summary><div class="settings-hint" style="margin-top:6px;">To talk to a real controller, yes — the desktop app is the <b>gateway</b> (it reaches your machine's CNCDISK share on the LAN). The hosted web page can design + simulate offline, but can't reach a machine.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I send a program to the controller?</summary><div class="settings-hint" style="margin-top:6px;">Open the <b>Gateway</b> tab, point it at your controller share (Settings → Gateway), then Send. System macros (T.nc, key-<i>N</i>.nc, slib-m.nc) are written to SYSDISK and backed up first.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Which controllers are supported?</summary><div class="settings-hint" style="margin-top:6px;">DDCS <b>Expert / M350</b> is the primary, fully-mapped target. V4.1 and a few others have partial support — the post/dialect switches with the selected profile.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I add a probe, ATC, or spindle?</summary><div class="settings-hint" style="margin-top:6px;">Settings → <b>Hardware</b> → use <b>+ Add</b> on the relevant tab. Adding an ATC also seeds the essential drawbar + sensor I/O.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I simulate a program before running it?</summary><div class="settings-hint" style="margin-top:6px;">Press <b>▶</b> in the preview bar. The simulator runs the full G-code through the execution engine — resolving #vars, IF/GOTO loops and probes — so parametric/probe macros play correctly, not just straight moves.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Can I edit a wizard op after inserting it?</summary><div class="settings-hint" style="margin-top:6px;">Yes — every wizard op you insert becomes an editable <b>block stack</b>. Open the <b>Blocks</b> tab to see its individual steps, reorder or tweak them, and even extend it (e.g. add an extra probe). Your changes round-trip back to the wizard form — the form and the blocks are two views of the same op, so nothing is a dead end.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What does "Pull from controller" do?</summary><div class="settings-hint" style="margin-top:6px;">Reads your machine's live settings — WCS table, tool lengths, ATC magazine, travel/soft-limits — into a review modal so you can adopt them. Needs the gateway + a connected controller. It never writes the firmware-owned <code>camsetting</code>.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is a CAM pack?</summary><div class="settings-hint" style="margin-top:6px;">A DDCS Expert <b>CAM-menu pack</b> — parameterized macro slots for the controller's on-board CAM page. Build, simulate and export one (USB-ready .zip) in the <b>Macros</b> tab → CAM Pack Builder.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Can I use Studio on my phone?</summary><div class="settings-hint" style="margin-top:6px;">Yes — the UI is responsive. Your desktop app serves Studio on your LAN; open the URL shown in Settings → Gateway from a phone/laptop on the same wifi.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I update Studio?</summary><div class="settings-hint" style="margin-top:6px;">The desktop app shows an in-app banner when a new release is published, with a one-click update. The web version updates automatically on load.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Cloud vs Gateway — what's the difference?</summary><div class="settings-hint" style="margin-top:6px;">The <b>Gateway</b> is the local desktop app that talks to <i>your machine</i> over the LAN (send programs, read settings, write macros). <b>Cloud</b> is optional <i>project storage</i> (e.g. Google Drive), separate from the machine — it syncs your profiles and programs across devices. You can use the Gateway with no Cloud, and Cloud with no machine connected.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is the virtual I/O panel?</summary><div class="settings-hint" style="margin-top:6px;">The <b>I/O</b> button in the preview bar opens a floating panel showing the controller's inputs/outputs. During a simulation it <b>auto-answers sensors</b> so probe / M-code wait loops terminate hands-free; you can also flip inputs manually to test your logic.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Why does a probe in the sim run to the limit?</summary><div class="settings-hint" style="margin-top:6px;">A probe (G31) traces its full travel until it has <b>stock</b> to stop on. Set the Stock (the 📦 button) so the probe contacts the surface — then it stops at the real face instead of the soft-limit.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Why do some ops need me to jog the start position first?</summary><div class="settings-hint" style="margin-top:6px;">Some ops — especially <b>incremental / relative probes</b> — run <i>from the tool's current position</i>, not an absolute coordinate. Set where it begins by jogging the machine there (or dragging the <b>①</b> start handle in the preview) before running; otherwise the op traces from zero and can probe the wrong spot.</div></details>
-                        <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Found a bug or have an idea?</summary><div class="settings-hint" style="margin-top:6px;">Settings → <b>Feedback</b> → <b>🐛 Report a bug</b>. Tell us what you did and what you expected.</div></details>
-                    </div>
-                </div>
-
-                <!-- GENERAL: FEEDBACK -->
-                <div id="set_tab_feedback" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">FEEDBACK</div>
-                        <div class="settings-row">
-                            <button class="toolbar-btn settings-io" id="set_report">🐛 Report a bug</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GENERAL: NETWORK (cloud account + machine network) -->
+                <!-- CONTROLLER: GATEWAY (machine network) -->
                 <div id="set_tab_gateway" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">THIS WORKSPACE'S MACHINE</div>
@@ -1170,24 +1140,7 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- GENERAL: CLOUD (project storage — separate from the machine) -->
-                <div id="set_tab_cloud" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">CLOUD STORAGE</div>
-                        <div class="settings-hint">Sign in to save &amp; sync your projects to your own Google Drive — files go straight to your account, we never see them.</div>
-                        <div id="set_cloud_mount" style="margin-top:8px"></div>
-                        <div class="settings-row" style="align-items:center; margin-top:12px;">
-                            <label class="label" for="set_save_location" style="flex:1">Default save location</label>
-                            <select id="set_save_location" title="Where a NEW project save or profile save-as lands first. The other option is always one click away in the save dialog; existing saves never move." style="background:#222; color:#ddd; border:1px solid #888; font-size:13px; padding:4px 8px;">
-                                <option value="cloud-when-connected">Cloud when connected</option>
-                                <option value="always-local">Always local</option>
-                            </select>
-                        </div>
-                        <div class="settings-hint">New saves pre-target the cloud when you're signed in (local is one click away). Signed out or offline, they land locally with a quiet sync note — a save never fails.</div>
-                    </div>
-                </div>
-
-                <!-- GENERAL: APPEARANCE -->
+                <!-- LOOK AND FEEL: APPEARANCE -->
                 <div id="set_tab_appearance" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">THEME</div>
@@ -1203,7 +1156,7 @@ function buildSettingsOverlay() {
                     </div>
                 </div>
 
-                <!-- GENERAL: PROGRAM (end-of-program routine) -->
+                <!-- CONTROLLER: PROGRAM (end-of-program routine) -->
                 <div id="set_tab_program" style="display:none">
                     <div class="settings-section">
                         <div class="settings-section-title">END OF PROGRAM</div>
@@ -1230,31 +1183,6 @@ function buildSettingsOverlay() {
                 </div>
 
                 <!-- (Macros + CAM Builder promoted to the MACROS main tab — see ui/macrosApp.js) -->
-
-                <!-- GENERAL: ABOUT -->
-                <div id="set_tab_about" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">DDCS STUDIO</div>
-                        <div class="settings-hint">Version <b id="set_about_ver">—</b></div>
-                        <div class="settings-hint">Modular G-code generator &amp; 3D simulator for the DDCS Expert / FOINNC M350 controller.</div>
-                    </div>
-                    <div class="settings-section">
-                        <div class="settings-section-title">CREDITS</div>
-                        <div class="settings-hint">Built by Frédéric Chabot · MIT License</div>
-                    </div>
-                </div>
-
-                <!-- GENERAL: BACKUP (t852) — export/restore ALL user state as one file -->
-                <div id="set_tab_backup" style="display:none">
-                    <div class="settings-section">
-                        <div class="settings-section-title">WORKSPACE (.ddcs)</div>
-                        <div class="settings-hint">Save your whole workspace — profiles, projects, settings, the tool table, custom wizards, your <b>CAM pack</b>, presets, prefs — as one <b>.ddcs</b> file, and open it on another machine or after a reset. (One job is a <b>.mjson</b>; the whole workspace is a <b>.ddcs</b>.) Tokens and cloud credentials are never included.</div>
-                        <div class="settings-row" style="margin-top:10px; gap:8px;">
-                            <button type="button" class="toolbar-btn settings-io" id="set_backup_export" title="Save your whole workspace to a .ddcs file you own (Ctrl+S). Pick the location once; later saves overwrite it.">💾 Save workspace</button>
-                            <button type="button" class="toolbar-btn settings-io" id="set_backup_restore" title="Open a workspace — the WHOLE file, from your workspaces folder">📂 Open workspace…</button>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- MACHINE TAB -->
                 <div id="set_tab_machine" style="display:none">
@@ -1647,9 +1575,8 @@ function wireSettingsOverlay(ov) {
     const q = (id) => ov.querySelector('#' + id);
     const num = (v, d) => { const n = parseFloat(v); return Number.isFinite(n) ? n : d; };
 
-    renderCloudLogin(q('set_cloud_mount'));   // cloud account login (Network tab) — shared with the Project Manager drawer
-    // t754 — Default save location (cloud-when-connected | always-local): an APP pref (savePrefs), not the machine profile.
-    { const sel = q('set_save_location'); if (sel) import('./savePrefs.js').then((SP) => { sel.value = SP.getDefaultSaveLocation(); sel.addEventListener('change', () => SP.setDefaultSaveLocation(sel.value)); }); }
+    // t1245 — the CLOUD subtab is gone: its sign-in was the shared renderCloudLogin, which the workspace manager's
+    // Cloud tab already hosts (t1243), and its one unique control — Default save location — moved there with it.
     // t990 — Display units (mm | inch): an app-wide DISPLAY pref (mm-native STORAGE regardless). Live → re-render open forms via settings-changed.
     { const un = q('set_units'); if (un) { un.value = getSettings().units || 'mm'; un.addEventListener('change', () => { getSettings().units = un.value; saveSettings(); window.dispatchEvent(new CustomEvent('ddcs:settings-changed')); }); } }
     renderMachineNet(q('set_machinenet_mount'));   // MACHINE NETWORK: live controller connection via the gateway
@@ -3022,9 +2949,6 @@ function wireSettingsOverlay(ov) {
         _health.checked = (_ddcsSettings.setup || {}).health !== false;
         _health.addEventListener('change', () => { try { window.ddcsSetHealthSignals && window.ddcsSetHealthSignals(_health.checked); } catch (_) { /* noop */ } });
     }
-    const _aboutVer = q('set_about_ver');
-    if (_aboutVer) { const v = document.querySelector('.ver'); _aboutVer.textContent = v ? v.textContent.trim() : 'V10.20'; }
-
     // Spindle / Program → insert generated G-code into the editor (mirrors the ATC "Insert tool table").
     const _emInsert = (code) => {
         const em = (window.ddcsStudio && window.ddcsStudio.editorManager) || window.editorManager;
@@ -3064,12 +2988,8 @@ function wireSettingsOverlay(ov) {
         if (db) UIUtils.downloadFile('ddcs_variables.csv', db.exportCSV());
     });
 
-    // Report a bug (moved here from the header)
-    q('set_report').addEventListener('click', () => {
-        const code = (document.getElementById('editor') || {}).value || '';
-        const body = 'Version: V10.20\n\nDescribe your feedback or bug below:\n\n' + (code ? '--- Editor Code ---\n' + code : '(editor empty)');
-        window.location.href = 'mailto:dansemur@gmail.com?subject=' + encodeURIComponent('DDCS Studio Feedback / Bug Report') + '&body=' + encodeURIComponent(body);
-    });
+    // t1245 — Report a bug retired with the FEEDBACK subtab. It was a bare mailto to the same maintainer the quick
+    // menu's ⭐ Rate / Feedback toast already reaches — and that one carries stars and a comment. One feedback door.
 
     // t1217 — machine-config import/export + cloud save/load live on data/profileStore.js (window.ddcsImportProfile /
     // ddcsExportProfile / ddcsSaveProfileToCloud / ddcsLoadCloudProfile). They now APPLY to this workspace's machine;
@@ -3095,13 +3015,24 @@ function wireSettingsOverlay(ov) {
 
     // Machine → AXES: the vertical per-axis role list (renderAxesGui) attaches its own change listeners (commit + re-render), so no static wiring here (t648).
 
-        // Two-level tab logic: main L1 (General | Hardware) → filters sidebar items.
+        // Two-level tab logic: main L1 (Look and feel | Controller | Hardware) → filters sidebar items.
     const mainTabs = [...ov.querySelectorAll('.settings-main-tab')];
     const sideTabs = [...ov.querySelectorAll('.settings-sidebar .settings-tab')];
     const sideGroupLabels = [...ov.querySelectorAll('.settings-sidebar .sidebar-group-label')];
-        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_wizards', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway', 'set_tab_cloud', 'set_tab_faq', 'set_tab_feedback', 'set_tab_backup', 'set_tab_about',
+        // t1245 — five panels left Settings entirely (Workspace + Cloud duplicated the workspace manager; FAQ + About
+        // moved to the quick menu's Help; Feedback merged into Rate / Feedback). They are deleted, not hidden.
+        const ALL_IDS = ['set_tab_profile', 'set_tab_appearance', 'set_tab_preview', 'set_tab_compose', 'set_tab_wizards', 'set_tab_variables', 'set_tab_program', 'set_tab_gateway',
                      'set_tab_machine', 'set_tab_wcs', 'set_tab_spindle', 'set_tab_input', 'set_tab_output', 'set_tab_atc'];
+    /**
+     * t1245 — A PANEL CARRIES ITS OWN GROUP. Its subtab button already declares one (data-group), so showing a panel
+     * can ACTIVATE that group itself instead of trusting the caller to name it. That is what makes this turn's split
+     * safe: a deep link that says only "set_tab_preview" lands on the right main tab no matter which tab that panel
+     * lives under today, and no caller can point at a group token that has been renamed out from under it.
+     */
+    const groupOf = (panelId) => (sideTabs.find(b => b.dataset.target === panelId) || {}).dataset?.group || null;
     function showPanel(id) {
+        const g = groupOf(id);
+        if (g && !mainTabs.some(b => b.dataset.group === g && b.classList.contains('active'))) showGroup(g, id);
         ALL_IDS.forEach(p => { const el = ov.querySelector('#' + p); if (el) el.style.display = (p === id) ? 'block' : 'none'; });
         sideTabs.forEach(b => b.classList.toggle('active', b.dataset.target === id));
         if (id === 'set_tab_machine') { renderMachineGui(); renderAxesGui(); }   // envelope box + the vertical axis-role list track motors; re-render on open (t648)
@@ -3111,11 +3042,16 @@ function wireSettingsOverlay(ov) {
         if (id === 'set_tab_variables') renderVarList(q('set_var_search') ? q('set_var_search').value : '');   // build lazily on open
         if (id === 'set_tab_wizards') renderWizardLibrary(ov.querySelector('#wizard_library_manager'));   // the wizard-bar library manager
     }
-    function showGroup(g) {
+    /**
+     * `want` (optional) is the panel the caller is heading for — passed in by showPanel so the group switch does not
+     * first land on the group's FIRST panel and then move again (a visible flash, and a wasted lazy render).
+     */
+    function showGroup(g, want) {
         mainTabs.forEach(b => b.classList.toggle('active', b.dataset.group === g));
         sideTabs.forEach(b => { b.style.display = (b.dataset.group === g) ? '' : 'none'; });
         sideGroupLabels.forEach(l => { l.style.display = (l.dataset.groupLabel === g) ? '' : 'none'; });
         if (g === 'hardware') applyHardwareTabs();   // toggle each subsystem tab's Add button vs config
+        if (want) return;   // the caller is about to show its own panel
         const firstVisible = sideTabs.find(b => b.dataset.group === g && b.style.display !== 'none');
         if (firstVisible) showPanel(firstVisible.dataset.target);
     }
@@ -3125,14 +3061,18 @@ function wireSettingsOverlay(ov) {
     // t1199 — the intentional save: a user-owned .ddcs via the File System Access API (falls back to the download).
     // t1223 — both doors lead to the ONE workspace manager, on the half they asked for. Settings is no longer a
     // second, differently-shaped way to save or open; it just points at the same surface as the quick menu.
-    ov.querySelector('#set_backup_export')?.addEventListener('click', () => window.openWorkspaceManager?.('save'));
-    ov.querySelector('#set_backup_restore')?.addEventListener('click', () => window.openWorkspaceManager?.('open'));
+    // t1245 — the WORKSPACE subtab is gone. Its two buttons only ever opened the workspace manager, which the quick
+    // menu's Save / Open already do; Settings now holds ZERO workspace controls (the identity band above the strip
+    // still SAYS which workspace this is — display only).
     // Expose group+panel navigation so callers (e.g. the Homing wizard's "⚙ Homing setup" link) can deep-link
     // to Settings → Hardware → Machine where the homing section now lives.
-    _settingsNavTo = (group, panelId) => { showGroup(group); if (panelId) showPanel(panelId); };
-    // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (General) where the head body dims live.
+    // t1245 — the PANEL wins when both are given: it declares its own group (groupOf), so it cannot be sent to a
+    // group that has been renamed, split or merged since the call site was written. A group with no panel still works
+    // (it lands on that group's first tab), which is what a plain "open Settings at Hardware" wants.
+    _settingsNavTo = (group, panelId) => { if (panelId) showPanel(panelId); else if (group) showGroup(group); };
+    // Cross-link: Hardware → Head's "sim appearance" jumps to the Preview tab (Look and feel) where the head body dims live.
     const _headSimLink = q('set_head_simlink');
-    if (_headSimLink) _headSimLink.addEventListener('click', () => { showGroup('general'); showPanel('set_tab_preview'); });
+    if (_headSimLink) _headSimLink.addEventListener('click', () => showPanel('set_tab_preview'));   // t1245 — the panel names its own group
     // Spindle attachments are I/O pins — deep-link out to the Input / Output pin tables (no codegen/interlock logic here).
     const _headInputLink = q('set_head_inputlink');
     if (_headInputLink) _headInputLink.addEventListener('click', () => { showGroup('hardware'); showPanel('set_tab_input'); });
@@ -3172,7 +3112,7 @@ function wireSettingsOverlay(ov) {
         for (const ax in cfg) cfg[ax].order = rank[ax] || 9;
         saveSettings(); renderHomingGui();
     });
-    showGroup('general');
+    showGroup('lookfeel');
 
     // "+ Add hardware" tool: adds a subsystem category tab + its standard I/O (mirrored + badged).
     function addSubsystem(kind) {
@@ -3210,7 +3150,7 @@ function wireSettingsOverlay(ov) {
         const outs = getOutputs(), ins = getInputs();
         for (let i = outs.length - 1; i >= 0; i--) if (outs[i].group === kind) outs.splice(i, 1);
         for (let i = ins.length - 1; i >= 0; i--) if (ins[i].group === kind) ins.splice(i, 1);
-        saveSettings(); applyHardwareTabs(); showGroup('general');
+        saveSettings(); applyHardwareTabs(); showGroup('lookfeel');
     }
     const _atcRemoveBtn = q('set_atc_remove_btn');
     if (_atcRemoveBtn) _atcRemoveBtn.addEventListener('click', () => removeSubsystem('atc'));
@@ -3280,10 +3220,11 @@ export function openSettings(nav) {
             ov.dataset.wired = '1';
         }
     }
-    // Optional deep-link: { group, panel } — e.g. open straight to Hardware → Machine (homing section). Only when a
-    // group is actually given: a nav with just { returnToken } (the in-wizard ⚙) must NOT navigate, or showGroup
-    // (undefined) would blank the sidebar — leave the panel on its current/last group instead.
-    if (nav && nav.group && _settingsNavTo) { try { _settingsNavTo(nav.group, nav.panel); } catch (_) { /* noop */ } }
+    // Optional deep-link: { group, panel } — e.g. open straight to Hardware → Machine (homing section). EITHER is
+    // enough (t1245): a panel alone now names its own group, which is the point of the split — a caller should not
+    // have to know, or keep up with, which main tab a panel currently lives under. A nav with just { returnToken }
+    // (the in-wizard ⚙) still must NOT navigate: it means "open where I left off", so it lands on neither.
+    if (nav && (nav.group || nav.panel) && _settingsNavTo) { try { _settingsNavTo(nav.group, nav.panel); } catch (_) { /* noop */ } }
     // Optional scroll-to-section: land ON a section (e.g. the Homing section within the Machine tab).
     if (nav && nav.scrollTo) { try { setTimeout(() => { const el = document.getElementById(nav.scrollTo); if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'auto' }); }, 0); } catch (_) { /* noop */ } }
     // Glow the panel when we arrived via a return path (e.g. the Setup checklist) — the ambient "leaving here walks

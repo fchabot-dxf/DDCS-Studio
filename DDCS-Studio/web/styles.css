@@ -5624,6 +5624,20 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wsm-empty { padding: 14px 10px; font-size: 12px; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 6px; }
 @media (max-width: 640px) { .wsm-overlay { padding: 0; align-items: flex-start; } .wsm-modal { max-width: none; height: 100dvh; max-height: none; border-radius: 0; } }
 
+/* ── t1245 — THE HELP PANEL (ui/helpPanel.js). FAQ + About left Settings: neither is a setting, and looking for an
+   answer inside the configuration screen is a lesson nobody should have to learn. Same modal shape as the workspace
+   manager so there is one modal language, not two. ─────────────────────────────────────────────────────────────── */
+.help-overlay { position: fixed; inset: 0; z-index: 13300; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.55); }
+.help-modal { width: 100%; max-width: 720px; max-height: calc(100vh - 48px); display: flex; flex-direction: column;
+    background: var(--panel, #1a1f27); color: var(--text-main, #e7edf5); border: 1px solid var(--border, #333a45);
+    border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.5); overflow: hidden; }
+.help-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
+.help-close { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; min-width: 44px; min-height: 44px; }
+.help-body { overflow: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 18px; }
+.help-body .settings-section-title { font-size: 11px; font-weight: 700; letter-spacing: .8px; color: var(--text-dim); margin-bottom: 6px; }
+.help-body .settings-hint { font-size: 12px; color: var(--text-dim); line-height: 1.45; }
+@media (max-width: 640px) { .help-overlay { padding: 0; align-items: flex-start; } .help-modal { max-width: none; height: 100dvh; max-height: none; border-radius: 0; } }
+
 /* ── t1225 — THE FIRST-SAVE ASK (ui/workspaceSave.js): name + workspaces folder in ONE dialog, so the first Save is
    one step and the saved file lands where the manager lists it. ────────────────────────────────────────────────── */
 .wss-ask { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }

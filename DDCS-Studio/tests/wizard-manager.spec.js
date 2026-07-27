@@ -3,7 +3,7 @@ import { autoAppDialog } from './_appDialog.js';   // t684 d — the in-app dial
 
 /**
  * The Settings "Wizard library manager" — a section tree that designs the bar. Drives the real overlay:
- * open Settings → General → Wizards, then exercise every control (hide, rename, regroup, reorder, reset) and
+ * open Settings → Look and feel → Wizard bar, then exercise every control (hide, rename, regroup, reorder, reset) and
  * assert each edit flows LIVE to the wizard bar. A custom op (authored in Dev mode) shows in its Custom dropdown.
  */
 test.use({ viewport: { width: 1280, height: 900 } });
@@ -32,9 +32,9 @@ test('Wizard library manager: every control flows live to the bar', async ({ pag
   await autoAppDialog(page, { accept: true });   // confirm → proceed; notice → dismiss
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 
-  // open Settings → General → Wizards
+  // open Settings → Look and feel → Wizard bar (t1245 — the shrink; this tab configures the wizard BAR)
   await page.evaluate(() => window.openSettings());
-  await page.click('.settings-main-tab[data-group="general"]');
+  await page.click('.settings-main-tab[data-group="lookfeel"]');
   await page.click('[data-target="set_tab_wizards"]');
   await expect(page.locator('#set_tab_wizards')).toBeVisible();
 
@@ -100,7 +100,7 @@ test('Wizard library manager: the section tree — create dropdown, move a wizar
   await autoAppDialog(page, { accept: true });
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
   await page.evaluate(() => window.openSettings());
-  await page.click('.settings-main-tab[data-group="general"]');
+  await page.click('.settings-main-tab[data-group="lookfeel"]');
   await page.click('[data-target="set_tab_wizards"]');
   const mgr = page.locator('#wizard_library_manager');
 

@@ -71,6 +71,7 @@ function runQuickAction(act) {
         case 'setupSheet': openSetupSheet(); break;   // t850 — the print-ready job page
         case 'library': openLibrary(); break;   // t854 — the Library (last-used tab)
         case 'rate': window.ddcsOpenRate?.(); break;   // t598 — the always-available Rate / Feedback path (opens the repo)
+        case 'help': import('./helpPanel.js').then((m) => m.openHelp()); break;   // t1245 — FAQ + About, out of Settings
         // t1223 — WORKSPACE (the .ddcs). Both open the ONE manager modal, on the half the user asked for: Save
         // focuses the current workspace + its delta, Open focuses the granted folder's cards.
         case 'wsSave': window.openWorkspaceManager?.('save'); break;
@@ -178,7 +179,14 @@ export function initHeaderPost() {
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="settings">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco('settings')
             + '<span class="hdr-quick-lbl">Settings…</span></button>';
-        // t598 — always-available Rate / Feedback.
+        // t1245 (user) — HELP leaves Settings and lands here. FAQ and About are not settings: nothing on either
+        // changes how the app behaves, so a gear was the wrong door for them. One row, one small two-section panel.
+        const helpRow =
+            '<button type="button" role="menuitem" class="hdr-quick-item" data-act="help">'
+            + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">❓ Help — FAQ &amp; About</span></button>';
+        // t598 — always-available Rate / Feedback. t1245 — and now the ONE feedback door: Settings' Report-a-bug
+        // button was a bare mailto pointing at the same maintainer this toast already reaches (with stars and a
+        // comment), so it retired rather than being carried along beside it.
         const rateRow =
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭐ Rate / Feedback</span></button>';
@@ -191,7 +199,7 @@ export function initHeaderPost() {
             + libraryRow
             + themeSection
             + '<div class="hdr-quick-sep"></div>'
-            + setupSheetRow + checklistRow + settingsRow + rateRow;
+            + setupSheetRow + checklistRow + settingsRow + helpRow + rateRow;
 
         btn.title = `Quick actions — ${ap.name || 'untitled workspace'} · ${apCtrl}`;
         btn.setAttribute('aria-label', `Quick actions (${ap.name || 'untitled workspace'} · ${apCtrl})`);

@@ -168,7 +168,9 @@ function render() {
     box.querySelector('.sc-health').onchange = (e) => { setHealthSignals(e.target.checked); if (!e.target.checked) close(); };   // master switch (also in Settings); off → close the panel too
     box.querySelectorAll('.sc-set').forEach((b) => b.onclick = () => {
         const key = b.dataset.set;
-        if (key === 'connectcloud') { close(); window.openSettings && window.openSettings({ group: 'general', panel: 'set_tab_cloud', returnToken: pushReturn('Setup checklist', openSetupChecklist) }); return; }
+        // t1245 — the Settings Cloud subtab is gone; cloud sign-in lives in the workspace manager's Cloud tab (t1243),
+        // so the checklist's Connect… link points THERE. One door, and it is the door that actually holds the account.
+        if (key === 'connectcloud') { close(); window.openWorkspaceManager && window.openWorkspaceManager('open', { place: 'cloud' }); return; }
         const it = ITEMS.find((i) => i.key === key);
         close();
         if (it) it.set();

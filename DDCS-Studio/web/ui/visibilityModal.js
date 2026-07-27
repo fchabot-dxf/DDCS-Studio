@@ -56,7 +56,7 @@ export function openVisibilityModal(anchor) {
     // t796 P4 — the deeper preview prefs (default view, follow-cam, sim probe dims, speed…) are one tap away in Settings.
     pop.querySelector('[data-morepreview]').addEventListener('click', (e) => {
         e.preventDefault(); closeVisibilityModal();
-        import('./formWidgets.js').then((m) => m.openFieldLink({ kind: 'settings', group: 'general', panel: 'set_tab_preview', label: 'Preview settings', returnLabel: 'Preview' })).catch(() => {});
+        import('./formWidgets.js').then((m) => m.openFieldLink({ kind: 'settings', group: 'lookfeel', panel: 'set_tab_preview', label: 'Preview settings', returnLabel: 'Preview' })).catch(() => {});
     });
     document.addEventListener('keydown', _onKey);
     _pop = pop;

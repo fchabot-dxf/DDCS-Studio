@@ -230,7 +230,13 @@ function hasMachineRecord(obj) {
 let _ov = null;
 
 /** Open the manager. `focus` = 'save' (top) | 'open' (bottom) — the two entry points into the ONE surface. */
-export async function openWorkspaceManager(focus = 'save') {
+/**
+ * @param {'save'|'open'} focus  which half to bring the eye to
+ * @param {{place?: 'local'|'cloud'}} [opts]  t1245 — open ON a shelf. The setup checklist's "Connect…" needs the CLOUD
+ *   tab specifically (its sign-in moved here when Settings' Cloud subtab retired), and a caller that means "the cloud"
+ *   should be able to say so instead of opening the manager and hoping the user finds the second tab.
+ */
+export async function openWorkspaceManager(focus = 'save', opts = {}) {
     if (_ov) { _ov.remove(); _ov = null; }
     const ov = document.createElement('div');
     ov.id = 'wsmOverlay';
@@ -242,8 +248,8 @@ export async function openWorkspaceManager(focus = 'save') {
             <section class="wsm-current" id="wsmCurrent"></section>
             <section class="wsm-folder">
                 <div class="wsm-places" role="tablist" aria-label="Where workspaces live">
-                    <button type="button" class="wsm-place is-active" data-place="local" role="tab">📁 Local folder</button>
-                    <button type="button" class="wsm-place" data-place="cloud" role="tab">☁ Cloud</button>
+                    <button type="button" class="wsm-place${opts && opts.place === 'cloud' ? '' : ' is-active'}" data-place="local" role="tab">📁 Local folder</button>
+                    <button type="button" class="wsm-place${opts && opts.place === 'cloud' ? ' is-active' : ''}" data-place="cloud" role="tab">☁ Cloud</button>
                 </div>
                 <div class="wsm-folder-head">
                     <span class="wsm-folder-path" id="wsmFolderPath">No workspace folder yet</span>
@@ -290,7 +296,7 @@ export async function openWorkspaceManager(focus = 'save') {
     // somewhere else gets dropped into the folder like any other document, which is a thing the OS already does well.
     // (openWorkspaceFile still takes a null handle — that is how it FORGETS a stale save target, not a second door.)
     // t1233 — THE PLACE TABS. Local folder | Cloud. Same table, same formatter, same open; a different shelf.
-    ov.__place = 'local';
+    ov.__place = opts && opts.place === 'cloud' ? 'cloud' : 'local';
     ov.querySelector('.wsm-places').addEventListener('click', async (e) => {
         const t = e.target.closest('[data-place]');
         if (!t || t.dataset.place === ov.__place) return;
@@ -396,6 +402,7 @@ async function renderPlace(ov) {
             if (stale()) return;
             renderCards(ov, null, list, 'cloud');
             cards.insertAdjacentHTML('afterbegin', cloudAccountBar(acc));   // t1243 — WHO you are signed in as, and out
+            await wireSaveLocation(ov);   // t1245 — …and the save-location pref that came with the retired Settings tab
         }
         catch (e) {
             if (stale()) return;
@@ -423,7 +430,24 @@ async function renderPlace(ov) {
 function cloudAccountBar(acc) {
     const who = esc(acc.email || acc.name || 'your Google account');
     return `<div class="wsm-cloudbar" id="wsmCloudBar"><span class="wsm-dim">Signed in as</span> <b>${who}</b>`
-        + '<button type="button" class="wss-link" id="wsmCloudOut">Sign out</button></div>';
+        + '<button type="button" class="wss-link" id="wsmCloudOut">Sign out</button>'
+        // t1245 — DEFAULT SAVE LOCATION, moved here whole from the retired Settings > Cloud subtab. It was that
+        // subtab's ONE unique control (everything else there was the shared sign-in this tab already hosts), and it
+        // decides where a NEW save lands — so it belongs beside the place that IS the cloud, not behind a gear.
+        + '<label class="wsm-dim" for="wsmSaveLoc" style="margin-left:auto">New saves go to</label>'
+        + '<select id="wsmSaveLoc" title="Where a NEW save lands first. The other option is always one click away; existing saves never move.">'
+        + '<option value="cloud-when-connected">Cloud when connected</option>'
+        + '<option value="always-local">Always local</option></select>'
+        + '</div>';
+}
+
+/** Fill + wire the moved save-location pref from its ONE source (ui/savePrefs.js) — no second copy of the value. */
+async function wireSaveLocation(ov) {
+    const sel = ov.querySelector('#wsmSaveLoc');
+    if (!sel) return;
+    const SP = await import('./savePrefs.js');
+    sel.value = SP.getDefaultSaveLocation();
+    sel.addEventListener('change', () => SP.setDefaultSaveLocation(sel.value));
 }
 
 /** The signed-out cloud tab: ONE button, and nothing else to decide. */
@@ -432,7 +456,16 @@ function renderCloudSignedOut(ov) {
     ov.__dir = null;
     ov.querySelector('#wsmCards').innerHTML =
         '<div class="wsm-empty">Keep workspaces in your own Google Drive as well as on this machine — the same file, reachable from anywhere you sign in.'
-        + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="wsmCloudSignIn">☁ Sign in to Google Drive</button></div></div>';
+        + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="wsmCloudSignIn">☁ Sign in to Google Drive</button></div></div>'
+        // t1245 — the save-location pref renders HERE TOO, not only once signed in. It moved off the retired Settings
+        // Cloud subtab, where it was reachable signed out; hiding it behind a sign-in would have quietly taken a
+        // setting away from anyone who wants to say "always local" BEFORE connecting an account.
+        + '<div class="wsm-cloudbar" id="wsmCloudBar">'
+        + '<label class="wsm-dim" for="wsmSaveLoc">New saves go to</label>'
+        + '<select id="wsmSaveLoc" title="Where a NEW save lands first. The other option is always one click away; existing saves never move.">'
+        + '<option value="cloud-when-connected">Cloud when connected</option>'
+        + '<option value="always-local">Always local</option></select></div>';
+    wireSaveLocation(ov);
 }
 
 /**

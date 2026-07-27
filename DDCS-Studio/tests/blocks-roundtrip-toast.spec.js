@@ -32,11 +32,12 @@ test('round-trip toast: shows ONCE on the first wizard-op insert, never again', 
   expect(second, 'no toast on subsequent inserts — shown once ever').toBeNull();
 });
 
-test('round-trip FAQ: the Settings FAQ explains editing a wizard op in Blocks', async ({ page }) => {
+test('round-trip FAQ: the Help FAQ explains editing a wizard op in Blocks', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetSettings);
-  await page.evaluate(async () => { const { openSettings } = await import('/ui/settingsPanel.js'); openSettings({ group: 'general', panel: 'set_tab_faq' }); });
-  const faq = page.locator('#set_tab_faq');
+  // t1245 — the FAQ left Settings for the quick menu's Help panel (it is not a setting). Same entry, same words.
+  await page.evaluate(async () => { const { openHelp } = await import('/ui/helpPanel.js'); openHelp(); });
+  const faq = page.locator('#help_faq');
   await expect(faq, 'the FAQ has the round-trip entry').toContainText('Can I edit a wizard op after inserting it?');
   await expect(faq, 'it names the editable block stack').toContainText('editable block stack');
   await expect(faq, 'and the round-trip back to the form').toContainText('round-trip back to the wizard form');

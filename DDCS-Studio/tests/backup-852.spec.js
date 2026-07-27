@@ -98,7 +98,7 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
  * (ui/workspaceManager.js), so there is no per-store preview to tick and nothing here to assert. The manager's own
  * spec covers the replacement, including that the whole file lands and that an unsaved buffer is prompted once.
  */
-test('t1137 workspace: the CAM pack rides inside the .ddcs; Save downloads a .ddcs; the UI reframes to Save/Open workspace', async ({ page }) => {
+test('t1137 workspace: the CAM pack rides inside the .ddcs; Save downloads a .ddcs; saving/opening lives ONLY in the manager (t1245)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openSettings, null, { timeout: 15000 });
     const r = await page.evaluate(async () => {
@@ -125,10 +125,22 @@ test('t1137 workspace: the CAM pack rides inside the .ddcs; Save downloads a .dd
     expect(r.fname, 'Save workspace downloads a .ddcs file').toMatch(/\.ddcs$/);
     expect(r.restored, 'the CAM pack round-trips through Save→wipe→Open').toEqual(r.orig);
 
-    // UI reframe: the Workspace tab exposes Save workspace / Open workspace (same button IDs, reframed labels)
+    // t1245 — the Settings > Workspace SUBTAB is gone: its two buttons only opened the workspace manager, which the
+    // quick menu's Save / Open already do. The behaviour this spec cares about (a door to save and a door to open the
+    // whole workspace) is unchanged — it just asks the surface that actually owns it now, and asserts Settings holds
+    // ZERO workspace controls so the duplicate cannot quietly come back.
     await page.evaluate(() => window.openSettings());
-    await page.waitForSelector('#set_tab_backup', { state: 'attached', timeout: 6000 });
-    await page.evaluate(() => { const b = document.querySelector('.settings-tab[data-target="set_tab_backup"]'); if (b) b.click(); });
-    expect(await page.evaluate(() => document.getElementById('set_backup_export').textContent), 'Export everything → Save workspace').toContain('Save workspace');
-    expect(await page.evaluate(() => document.getElementById('set_backup_restore').textContent), 'Restore → Open workspace').toContain('Open workspace');
+    await page.waitForSelector('#settings-app .settings-tabs', { timeout: 6000 });
+    const gone = await page.evaluate(() => ({
+        subtab: !!document.querySelector('.settings-tab[data-target="set_tab_backup"]'),
+        panel: !!document.getElementById('set_tab_backup'),
+        buttons: !!(document.getElementById('set_backup_export') || document.getElementById('set_backup_restore')),
+    }));
+    expect(gone.subtab, 'no Workspace subtab').toBe(false);
+    expect(gone.panel, 'no Workspace panel').toBe(false);
+    expect(gone.buttons, 'and no workspace buttons anywhere in Settings').toBe(false);
+    await page.evaluate(() => window.closeSettings && window.closeSettings());
+    await page.evaluate(() => window.openWorkspaceManager('save'));
+    await expect(page.locator('#wsmCurrent [data-wsm="save"]'), 'Save lives in the manager').toBeVisible();
+    await expect(page.locator('.wsm-place[data-place="local"]'), 'and so does the place you open from').toBeVisible();
 });
