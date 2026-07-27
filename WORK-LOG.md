@@ -17879,3 +17879,86 @@ GATE (fast tier, widened): smoke 21 files + every settings / deep-link / manager
 SCREENSHOTS (scratchpad/s1245-*): the 3-tab strip with Look and feel's four subtabs, the Wizard bar panel, the Help
 panel (FAQ + About, version read from the one .ver source), the quick menu showing the Help row, and the manager's
 Cloud tab carrying the moved save-location row.
+
+---
+
+## turn 1247 -- THE LIBRARY (.wiz + .cam). Built, green -- and then a HOLD arrived. Read the sequencing note first.
+
+### SEQUENCING, stated plainly because it matters.
+
+The dispatch was a full build order. I built it and gated it (135/135). THEN the amendment poll returned "HOLD t1247 --
+do not build yet; the user asked for the plan to be explained first. Pass back a no-op." The hold arrived after the
+work existed, not before. I am not going to pretend otherwise, and I am not going to present a finished feature as
+though it were approved. So: the code is committed ON THE BRANCH (nothing released, nothing merged), the pass-back
+leads with the PLAN EXPLAINED -- which is what was actually asked for -- and every piece of this is revertible with a
+single `git revert`. If the discussion reshapes the model, this reconciles the way t1245's three-way did.
+
+### THE MODEL, as I implemented it.
+
+  ONE granted LIBRARY FOLDER (data/libraryFolder.js) -- a second directory handle beside the workspaces one, its own
+  IDB key, its own picker id, asked once on first library use. Both kinds live in it because they are the same idea:
+  a source file you can hand to someone.
+
+    .wiz  = a wizard's DEF (template + bindings + declared sim intent). Import calls the existing createWizard ->
+            registerUserOp, so it lands on the bar and opens in Blocks exactly like an op you authored.
+    .cam  = a slot's declared OPS (the buildSlotFromOps input). Import rebuilds through the ordinary build path.
+
+  Neither carries baked output. That is the whole point: a shared bake is a thing the recipient cannot change.
+
+### FOUR DECISIONS I WANT LOOKED AT.
+
+1. **I did not invent a .wiz format.** `wizardToFile`/`wizardFromFile` already existed. The new thing is the
+   TRANSPORT (a granted folder instead of download + file-input) and the naming. Inventing a parallel format would
+   have given the app two serializers for one concept.
+
+2. **But the existing format was LOSSY, and the round-trip test is what found it.** It dropped `group` (the bar
+   dropdown -- authored, so a shared wizard landed in the wrong place) and `defV` (the author's version stamp, which
+   the staleness rule and the CAM sub-stack boundary both read; resetting it to 1 tells a recipient's placed
+   instances they are current when they are not). Both ride now. `layout` deliberately does NOT: registerUserOp
+   re-derives it from the template, and storing a derived value is a second copy free to disagree with its source.
+
+3. **ONE shelf component, not two screens** (ui/libraryShelf.js). The wizard surface and the CAM surface differ only
+   in what a card SAYS; the folder-picking, the listing, the named refusals and the empty state are identical.
+
+4. **The .cam import restores the recipe's NAME after the rebuild.** buildSlotFromOps names a slot after the ops it
+   generated, so without this "Two-hole plate.cam" imported as a slot called "Drill + Bore" -- the file would stop
+   naming the thing, which breaks one-name. Duplicate already did the same restore; I followed it.
+
+### THE ROUND-TRIP TESTS ARE THE DELIVERABLE, and they are deliberately harsh.
+
+Export -> WIPE the thing out of the app -> import from the file -> assert the def/ops come back IDENTICAL and the
+thing still EMITS byte-identically. The .wiz one runs through the registry; the .cam one runs through the REAL CAM
+surface: the export button on the slot card, the slot deleted from the pack, the shelf card clicked to import, and
+the rebuilt macro body compared byte for byte against a body the app itself generated (via Duplicate, so both sides
+are real builds). The lossy-format bug above was found by this test and by nothing else.
+
+Also covered: named refusals (a .cam renamed .wiz says so and says the fix), zero-writes-on-list/import (the folder
+map is snapshotted before and after), and fails-closed (a declined picker writes nothing and never falls back to a
+silent download).
+
+### TWO REAL BUGS FOUND WHILE BUILDING.
+
+  - The shelf re-bound its delegated click handler on every render, so by the third redraw one click ran the import
+    three times. Bound once now, with the current rows read off the host instead of captured in a closure.
+  - Persisting a directory handle is best-effort (a private window or locked-down webview can refuse the IDB write),
+    and without a session cache the folder was forgotten the instant it was picked -- the shelf would look broken
+    rather than unpersisted. The handle you just granted is usable now regardless.
+
+### THE t1225 RESIDUAL -- and the honest answer is that the gap was in the LEDGER, not the code.
+
+I was asked to close it and to state what it actually was. I drove the flow fresh before touching anything: a brand
+new browser, Ctrl+S, ONE dialog carrying name + folder, one button reading "Choose folder and save", the folder
+granted in that same click, the file written INTO it, and the manager listing it afterwards. It already works, and
+`workspace-save-open-1225.spec.js` has asserted exactly that -- including `dirPicks === 1`, the folder granted in the
+same click -- since t1225's amendment landed. So there was nothing to close: the item stayed on the board because
+nobody verified and struck it, not because the flow was missing a step. I re-verified rather than trusting the green.
+
+One thing I noticed and did NOT act on, because I cannot demonstrate it: saveWorkspace re-requests the remembered
+folder's permission BEFORE the dialog opens, outside any user gesture, and discards the folder if that returns false.
+If a browser drops persistent permission between sessions, that would make the user re-pick a folder they already
+granted. I could not reproduce it with a stub (permission behaviour is the real browser's, and a stubbed handle
+cannot be persisted through IndexedDB at all), so it is a FLAG for the advisor, not a fix I am claiming.
+
+GATE (fast tier): smoke 21 files + library/wizard/CAM/manager specs = 135/135.
+SCREENSHOTS (scratchpad/s1247-*): a .wiz on the folder shelf after exporting it, the imported op's dropdown live on
+the wizard bar, a .cam recipe card reading "2 ops — drill, bore", and the one-step first-save dialog.
