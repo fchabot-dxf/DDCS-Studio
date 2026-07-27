@@ -8,14 +8,18 @@
  *
  * File shape: { kind:'ddcs.backup', v, app, date, stores:{ <id>: <the store's persisted value> } }.
  *
- * HONESTY: a store absent from an (older) backup is reported "not in this backup" and left untouched on restore;
- * a backup whose v is newer than we understand is flagged. Before any restore, a SAFETY auto-export of the current
- * state is written (the undo path). Sensitive keys (tokens / cloud creds / device identity) are NOT backed up.
+ * OPENING IS THE WHOLE FILE (t1225). The .ddcs IS the workspace, so a restore leaves you with exactly what the file
+ * says — every declared store is CLEARED to its default first, then the file's stores are written. A store the file
+ * does not carry is therefore RESET, not left holding the previous workspace's values: the old keep-it behaviour
+ * produced a blend that was neither the file nor what you had, and then marked that blend "saved".
+ * A backup whose v is newer than we understand is flagged. Sensitive keys (tokens / cloud creds / device identity) are
+ * NOT backed up. There is no silent safety auto-export: an unsaved buffer is offered ONE save-first prompt instead
+ * (ui/workspaceManager.js), because a file appearing in Downloads that nobody asked for is not consent.
  */
 import { UIUtils } from '../ui/uiUtils.js';
-import { exportAllEntries, importAllEntries } from '../ui/projects/projectStore.js';
+import { exportAllEntries, importAllEntries, clearAllEntries } from '../ui/projects/projectStore.js';
 import { loadUserOps } from '../blocks/userOps.js';
-import { getMachine, setMachine } from './workspaceMachine.js';   // t1217 — the workspace's ONE machine record
+import { getMachine, setMachine, MACHINE_KEY } from './workspaceMachine.js';   // t1217 — the workspace's ONE machine record
 
 export const BACKUP_VERSION = 1;
 const MACRO_KIND = 'ddcs.backup';
@@ -26,21 +30,26 @@ const fileStamp = () => nowISO().slice(0, 19).replace(/[:T]/g, '-') || 'backup';
 const safeParse = (s) => { try { return JSON.parse(s); } catch (_) { return undefined; } };
 const len = (a) => Array.isArray(a) ? a.length : 0;
 
-// ── store-kind factories — each returns { read(), write(value) } over the store's OWN persisted form ────────────
+// ── store-kind factories — each returns { read(), write(value), clear() } over the store's OWN persisted form ───
+// `clear` is what "reset to default" means for that KIND, declared once beside its read/write so a whole-file open
+// never needs a second, per-store list of how to undo a store (t1225).
 // A localStorage JSON store: read = parse the key, write = stringify back (the SAME codec the store uses).
 const ls = (key) => ({
     read: () => { const v = localStorage.getItem(key); return v == null ? undefined : safeParse(v); },
     write: (val) => { if (val !== undefined) localStorage.setItem(key, JSON.stringify(val)); },
+    clear: () => localStorage.removeItem(key),
 });
 // Several coupled localStorage keys (e.g. the pane prefs) captured as { key: value } and restored key-by-key.
 const lsMulti = (keys) => ({
     read: () => { const o = {}; let any = false; for (const k of keys) { const v = localStorage.getItem(k); if (v != null) { o[k] = safeParse(v); any = true; } } return any ? o : undefined; },
     write: (val) => { if (!val) return; for (const k of keys) if (Object.prototype.hasOwnProperty.call(val, k)) localStorage.setItem(k, JSON.stringify(val[k])); },
+    clear: () => { for (const k of keys) localStorage.removeItem(k); },
 });
 // All localStorage keys sharing a prefix (e.g. the per-op-type presets ddcs_tpl_*), captured as { key: value }.
 const lsPrefix = (prefix) => ({
     read: () => { const o = {}; let any = false; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(prefix)) { o[k] = safeParse(localStorage.getItem(k)); any = true; } } return any ? o : undefined; },
     write: (val) => { if (!val) return; for (const k in val) if (k.startsWith(prefix)) localStorage.setItem(k, JSON.stringify(val[k])); },
+    clear: () => { const doomed = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(prefix)) doomed.push(k); } for (const k of doomed) localStorage.removeItem(k); },
 });
 
 // ── THE DECLARED REGISTRY — the single source of truth for what a backup contains ───────────────────────────────
@@ -54,6 +63,7 @@ export const BACKUP_STORES = [
     { id: 'machine', label: 'Machine (this workspace)', unit: 'machine',
       read: () => { try { return getMachine(); } catch (_) { return undefined; } },
       write: (val) => { try { if (val) setMachine(val, true); } catch (_) {} },
+      clear: () => localStorage.removeItem(MACHINE_KEY),   // no record → getMachine() derives the default one
       count: (v) => (v && (v.name || v.controllerId) ? 1 : 0) },
     // t1223 — the legacy `profiles` row is GONE ([[no-legacy-burden]]). It kept a pre-t1217 profile library readable so
     // an old .ddcs could still be migrated on open. There is no install base to migrate, and while that row existed it
@@ -63,16 +73,20 @@ export const BACKUP_STORES = [
         read: ls('ddcs_user_ops').read,
         // re-register into the live federated layer after writing the key (so restored wizards appear without a reload).
         write: (val) => { ls('ddcs_user_ops').write(val); try { loadUserOps(); } catch (_) {} },
+        clear: () => { ls('ddcs_user_ops').clear(); try { loadUserOps(); } catch (_) {} },
     },
     // t1137 — the CAM pack (ddcs_campack = macrosApp CAMPACK_KEY) rides inside the workspace. No live-reload hook: the
-    // restore flow reloads the page (backupModal.js), so macrosApp re-reads _camPack = loadCamPack() on boot and re-renders.
+    // open flow reloads the page (ui/workspaceManager.js), so macrosApp re-reads _camPack = loadCamPack() on boot and re-renders.
     { id: 'campack', label: 'CAM pack', ...ls('ddcs_campack'), count: (v) => len(v && v.slots), unit: 'slots' },
     { id: 'wizardLayout', label: 'Wizard bar layout', ...ls('ddcs_wizard_layout'), count: (v) => (v ? (len(v.customGroups) + Object.keys(v.entries || {}).length) : 0), unit: 'overrides' },
     { id: 'presets', label: 'Wizard presets', ...lsPrefix('ddcs_tpl_'), count: (v) => (v ? Object.values(v).reduce((n, list) => n + len(list), 0) : 0), unit: 'presets' },
     { id: 'variables', label: 'Variables', ...ls('ddcs_vars_persistent'), count: (v) => (Array.isArray(v) ? v.filter((x) => x && !x.isSys).length : 0), unit: 'user vars' },
     { id: 'displayPrefs', label: 'Preview display prefs', ...ls('ddcs_display'), count: (v) => (v ? Object.keys(v).length : 0), unit: 'elements' },
     { id: 'panePrefs', label: 'Panel layout', ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_follow_exec', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },
-    { id: 'projects', label: 'Projects (local)', async: true, count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects', read: () => exportAllEntries(), write: (val) => importAllEntries(val) },
+    // The project VOLUME is written by CLEAR-then-import (its importAllEntries puts entry by entry, so a bare import
+    // would MERGE the file's projects into whatever this browser held — the blend a whole-file open must not produce).
+    { id: 'projects', label: 'Projects (local)', async: true, count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects',
+      read: () => exportAllEntries(), write: (val) => importAllEntries(val), clear: () => clearAllEntries() },
 ];
 
 /** Build the full backup object (reads every store's own persisted value; async for the IDB project volume). */
@@ -96,27 +110,32 @@ export function previewBackup(obj) {
     return { valid: !!(obj && obj.kind === MACRO_KIND && obj.stores), app: (obj && obj.app) || 'unknown', date: (obj && obj.date) || '', version: v, newer: v > BACKUP_VERSION, rows };
 }
 
-/** Restore the selected stores (default: all present). Writes each store's OWN persisted form verbatim. Async (IDB). */
-export async function restoreBackup(obj, selectedIds) {
+/**
+ * Open a workspace — the WHOLE file, always (t1225; there is no store-picker any more, so there is no subset to ask
+ * about). Each declared store is CLEARED to its default and then written from the file, so what you are left with is
+ * exactly the file: a store the file does not carry is RESET (`reset`), never left holding the previous workspace's
+ * values. Returns { restored, reset, failed }. Async (the project volume is IDB).
+ */
+export async function restoreBackup(obj) {
     const stores = (obj && obj.stores) || {};
-    const sel = selectedIds ? new Set(selectedIds) : new Set(BACKUP_STORES.map((s) => s.id));
-    const restored = [], skipped = [];
+    const restored = [], reset = [], failed = [];
     for (const s of BACKUP_STORES) {
-        if (!sel.has(s.id)) continue;
-        if (!Object.prototype.hasOwnProperty.call(stores, s.id)) { skipped.push(s.id); continue; }   // not in this backup → leave untouched
-        try { await s.write(stores[s.id]); restored.push(s.id); } catch (_) { skipped.push(s.id); }
+        try { await s.clear(); } catch (_) { /* best-effort: a store that cannot be cleared is still overwritten below */ }
+        if (!Object.prototype.hasOwnProperty.call(stores, s.id)) { reset.push(s.id); continue; }
+        try { await s.write(stores[s.id]); restored.push(s.id); } catch (_) { failed.push(s.id); }
     }
     // t1223 — the legacy-library migration that used to run here is GONE ([[no-legacy-burden]]). The file's identity
     // now arrives the one way it should: the declared `machine` row's own write, which adopts the file's controller.
-    markWorkspaceSavedToFile();   // the workspace now MATCHES the just-opened .ddcs → clean (persists across the restore reload)
-    return { restored, skipped };
+    // The caller stamps the FILENAME (one-name rule) before marking saved — see ui/workspaceManager.js.
+    return { restored, reset, failed };
 }
 
-/** Save the whole workspace → download one .ddcs file (t1137; the JSON shape is unchanged, so it opens on any build). */
-export async function exportEverything() {
+/** Save the whole workspace → download one .ddcs file. The no-FSA fallback path; `fileName` is the name the user typed
+ *  (t1225 — a workspace never gets an autogenerated backup-style name; only a nameless caller falls back to a stamp). */
+export async function exportEverything(fileName) {
     const obj = await buildBackup();
-    UIUtils.downloadFile('ddcs-workspace-' + fileStamp() + '.ddcs', JSON.stringify(obj, null, 2));
-    markWorkspaceSavedToFile();   // this state is now IN a portable file → clear the "unsaved to file" signal
+    UIUtils.downloadFile(fileName || ('ddcs-workspace-' + fileStamp() + '.ddcs'), JSON.stringify(obj, null, 2));
+    markWorkspaceSavedToFile(fileName);   // this state is now IN a portable file → clear the "unsaved to file" signal
     return obj;
 }
 
@@ -223,21 +242,15 @@ export function isWorkspaceDirtyToFile() {
     return mark !== String(workspaceSignature());
 }
 
-/** The pre-open safety auto-export (the undo path): download the current workspace + stash it for verification. */
-export async function safetyExport() {
-    const obj = await buildBackup();
-    const name = 'ddcs-workspace-before-open-' + fileStamp() + '.ddcs';
-    UIUtils.downloadFile(name, JSON.stringify(obj, null, 2));
-    if (typeof window !== 'undefined') window.__ddcsSafetyExport = { name, at: nowISO() };
-    return { name, obj };
-}
+// t1225 — `safetyExport` is DELETED, not just unwired. It downloaded a .ddcs nobody asked for before every destructive
+// landing; the t1223 sweep took its last caller, and a dead function that writes files is an invitation to call it
+// again. The protection is now the save-first PROMPT (ui/workspaceManager.js confirmDiscardBuffer).
 
 if (typeof window !== 'undefined') {
     window.ddcsBuildBackup = buildBackup;
     window.ddcsPreviewBackup = previewBackup;
     window.ddcsRestoreBackup = restoreBackup;
     window.ddcsExportBackup = exportEverything;
-    window.ddcsSafetyExport = safetyExport;
     window.ddcsWorkspaceDirtyToFile = isWorkspaceDirtyToFile;
     window.ddcsMarkWorkspaceSaved = markWorkspaceSavedToFile;
     window.ddcsFileSavedAt = fileSavedAt;

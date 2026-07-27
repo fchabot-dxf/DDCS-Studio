@@ -94,3 +94,5 @@ export async function rename(oldPath, newPath) {
 //    shape (path/type/data/savedAt), never a second project serializer. importAllEntries puts each entry back as-is.
 export async function exportAllEntries() { return getAll(); }
 export async function importAllEntries(entries) { for (const e of (entries || [])) if (e && e.path) await put(e); }
+/** Empty the volume — what "reset to default" means for this store when a workspace is opened (t1225 whole-file open). */
+export async function clearAllEntries() { for (const e of await getAll()) await del(e.path); }

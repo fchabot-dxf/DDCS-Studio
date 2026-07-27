@@ -20,7 +20,7 @@ const seedProfile = async (page) => {
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };
 
-test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library + one gcode row; retired profile section GONE, ≤9 rows', async ({ page }) => {
+test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library + one gcode row + one workspace row; retired profile section GONE, ≤10 rows', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
     await openMenu(page);
@@ -52,8 +52,12 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library
             dialectItems: menu.querySelectorAll('[data-post]').length,
             oldCur: menu.querySelectorAll('.hdr-quick-cur').length,
             generateFor: /Generate for/.test(menu.textContent),
-            // ≤9 top-level rows: the identity + each hdr-quick-item + the gcode row + the theme swatch strip
-            rowCount: menu.querySelectorAll('.hdr-quick-item, .hq-gcode-row, .hdr-quick-subitems[data-subitems="theme"]').length,
+            // t1225 — count EVERY visible row, including the t1223 workspace row. It has its own class (a workspace
+            // row is not a gcode row), and leaving that class out of this selector made the count read 9 while the
+            // menu showed 10 — a diet number kept true by not looking. The declared target moves instead.
+            wsRows: menu.querySelectorAll('.hq-ws-row').length,
+            wsBtns: menu.querySelectorAll('.hq-ws-row [data-act="wsSave"], .hq-ws-row [data-act="wsOpen"]').length,
+            rowCount: menu.querySelectorAll('.hdr-quick-item, .hq-ws-row, .hq-gcode-row, .hdr-quick-subitems[data-subitems="theme"]').length,
         };
     });
     // The ONE compound identity row + its three affordances
@@ -67,6 +71,8 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library
     expect(m.hasLibrary, 'Library row').toBe(1);
     expect(m.gcodeRows, 'ONE gcode row').toBe(1);
     expect(m.gcodeBtns, 'Load / Insert / Export inline').toBe(3);
+    expect(m.wsRows, 'ONE workspace row').toBe(1);
+    expect(m.wsBtns, 'Save + Open inline (the workspace manager\'s two entry points)').toBe(2);
     expect(m.hasClear + m.hasSetupSheet + m.hasSettings + m.hasRate, 'Clear + Setup sheet + Settings + Rate all present').toBe(4);
     expect(m.themeChips, 'theme swatches present').toBeGreaterThan(1);
     // RETIRED shape gone
@@ -75,8 +81,9 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library
     expect(m.dialectItems, 'no dialect list').toBe(0);
     expect(m.oldCur, 'the old .hdr-quick-cur profile line is gone').toBe(0);
     expect(m.generateFor, 'the "Generate for" label is gone').toBe(false);
-    // ≤9 rows (the diet target)
-    expect(m.rowCount, 'the diet menu is ≤9 rows').toBeLessThanOrEqual(9);
+    // The diet target, declared honestly: the workspace row made it 10, so 10 is what it says. (The upcoming curation
+    // batch slims the menu; when it lands this number comes DOWN — it does not get worked around again.)
+    expect(m.rowCount, 'the diet menu is ≤10 rows').toBeLessThanOrEqual(10);
 
     // the three identity tap targets are each ≥44px (the mock's touch requirement)
     const box = async (sel) => (await page.locator(sel).first().boundingBox()) || { width: 0, height: 0 };

@@ -5528,30 +5528,9 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .lib-name { background:none; border:0; color:inherit; cursor:pointer; font:inherit; text-align:left; }
 #library_wizard_manager { padding:0 16px 12px; }
 
-/* ── One-file backup: the restore preview-then-confirm modal (t852). Themed (both-theme legible). ─────────────── */
-.backup-restore-overlay { position:fixed; inset:0; z-index:13200; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(0,0,0,.55); }
-.backup-restore-modal { width:100%; max-width:560px; max-height:calc(100vh - 48px); display:flex; flex-direction:column; background:var(--panel, #1a1f27); color:var(--text, #e7edf5); border:1px solid var(--border, #333a45); border-radius:8px; box-shadow:0 12px 40px rgba(0,0,0,.5); overflow:hidden; }
-.backup-restore-modal .bk-head { display:flex; align-items:center; justify-content:space-between; padding:11px 15px; border-bottom:1px solid var(--border, #333a45); }
-.backup-restore-modal .bk-title { font-weight:600; font-size:14px; }
-.backup-restore-modal .bk-x { font:inherit; font-size:14px; background:none; border:0; color:var(--text-dim, #9fb0c4); cursor:pointer; padding:2px 6px; }
-.backup-restore-modal .bk-x:hover { color:var(--text, #fff); }
-.backup-restore-modal .bk-body { padding:14px 15px; overflow:auto; }
-.backup-restore-modal .bk-meta { font-size:12px; color:var(--text-dim, #9fb0c4); margin-bottom:8px; }
-.backup-restore-modal .bk-warn { color:#e0a63a; }
-.backup-restore-modal .bk-note { font-size:12px; opacity:.9; margin-bottom:12px; }
-.backup-restore-modal .bk-rows { display:flex; flex-direction:column; gap:2px; }
-.backup-restore-modal .bk-row { display:flex; align-items:center; gap:9px; padding:7px 9px; border-radius:5px; font-size:13px; }
-.backup-restore-modal .bk-row:hover { background:rgba(127,140,160,.10); }
-.backup-restore-modal .bk-row input { width:15px; height:15px; accent-color:var(--accent, #0ea5e9); }
-.backup-restore-modal .bk-lbl { flex:1 1 auto; }
-.backup-restore-modal .bk-count { font-size:11.5px; color:var(--text-dim, #9fb0c4); }
-.backup-restore-modal .bk-row.bk-absent { opacity:.5; }
-.backup-restore-modal .bk-row.bk-absent .bk-count { font-style:italic; }
-.backup-restore-modal .bk-foot { display:flex; justify-content:flex-end; gap:9px; padding:11px 15px; border-top:1px solid var(--border, #333a45); }
-.backup-restore-modal .bk-btn { font:inherit; font-size:13px; padding:6px 15px; border-radius:6px; border:1px solid var(--border, #333a45); background:var(--bg, #11151c); color:var(--text, #e7edf5); cursor:pointer; }
-.backup-restore-modal .bk-btn:hover { filter:brightness(1.18); }
-.backup-restore-modal .bk-danger { border-color:#b3543a; background:#7a3320; color:#ffe8de; }
-.backup-restore-modal .bk-btn:disabled { opacity:.6; cursor:default; }
+/* t1225 — the .backup-restore-* block is DELETED with the store-picker modal it styled (ui/backupModal.js, retired in
+   t1223 when opening became the whole file). Orphaned CSS for a modal that cannot be opened is a trap for the next
+   reader, not a spare part. Its replacement is the .wsm-* workspace manager further down. */
 
 @media print {
     body > *:not(#setupSheetOverlay) { display:none !important; }
@@ -5605,3 +5584,19 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wsm-fico { flex: 0 0 auto; }
 .wsm-empty { padding: 14px 10px; font-size: 12px; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 6px; }
 @media (max-width: 640px) { .wsm-overlay { padding: 0; align-items: flex-start; } .wsm-modal { max-width: none; height: 100dvh; max-height: none; border-radius: 0; } }
+
+/* ── t1225 — THE FIRST-SAVE ASK (ui/workspaceSave.js): name + workspaces folder in ONE dialog, so the first Save is
+   one step and the saved file lands where the manager lists it. ────────────────────────────────────────────────── */
+.wss-ask { position: fixed; inset: 0; z-index: 20000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }
+.wss-box { background: var(--panel, #161b22); color: var(--text-main, #e6edf5); border: 1px solid var(--border, #333a45);
+    border-radius: 8px; padding: 16px 18px; width: min(440px, 92vw); box-shadow: 0 12px 40px rgba(0,0,0,.5); }
+.wss-title { font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+.wss-lbl { display: block; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--text-dim); margin-bottom: 4px; }
+.wss-namerow { display: flex; align-items: center; gap: 6px; }
+.wss-box .wss-name { flex: 1; min-width: 0; font: inherit; font-size: 14px; padding: 6px 9px; border-radius: 5px;
+    border: 1px solid var(--border, #333a45); background: var(--bg, #11151c); color: var(--text-main, #e7edf5); }
+.wss-ext { font-size: 13px; color: var(--text-dim); }
+.wss-folder { margin: 12px 0 16px; font-size: 12px; min-height: 18px; }
+.wss-dim { color: var(--text-dim); }
+.wss-link { font: inherit; font-size: 12px; background: none; border: 0; color: var(--accent, #2d7ff9); cursor: pointer; padding: 0 2px; }
+.wss-foot { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }

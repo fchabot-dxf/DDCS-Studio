@@ -6,9 +6,10 @@
  *
  *   TOP — THIS workspace: its name, whether it is saved, and WHAT CHANGED since the last save (derived per declared
  *   BACKUP_STORES row, so a new store shows up here for free), plus Save / Save As… / Duplicate…
- *   BOTTOM — the GRANTED FOLDER: every *.ddcs in it as a card, ENVELOPE FIRST (the thing you actually recognise a
- *   machine by), then dialect, name, saved-when — all read from the FILES, not from anything this browser remembers.
- *   Click a card to open it. One Browse-elsewhere escape covers files outside the folder.
+ *   BOTTOM — the GRANTED FOLDER as an OS-style file panel: every *.ddcs in it as a row (name · ENVELOPE · controller ·
+ *   saved-when), every value read from the FILES themselves, not from anything this browser remembers. The envelope
+ *   earns a column of its own because that is what you actually recognise a machine by. Click a row to open it; one
+ *   Browse-elsewhere escape covers files outside the folder.
  *
  * WHY A GRANTED FOLDER: the OS dialog lives in exactly one place. Pick the folder once, and from then on opening a
  * workspace is a click on a card instead of a file dialog. The directory handle persists in IDB, so it survives
@@ -19,33 +20,14 @@
  * Save and continue / Discard / Cancel — and never a silent download.
  */
 import { restoreBackup, previewBackup, markWorkspaceSavedToFile, workspaceDelta, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt } from '../data/backup.js';
-import { saveWorkspace } from './workspaceSave.js';
+import { saveWorkspace, adoptSaveHandle } from './workspaceSave.js';
+import { getHandle, putHandle, handleGranted, FOLDER_KEY } from '../data/fsHandles.js';
+import { setMachineName } from '../data/workspaceMachine.js';
 import { dlgNotice } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 
-const DB = 'ddcs_fs', STORE = 'kv', FOLDER_KEY = 'workspaceFolder';
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
-
-// ── the granted-folder handle (same tiny IDB kv the file handle uses; a different key) ──────────────────────────
-function idb() {
-    return new Promise((res, rej) => {
-        const r = indexedDB.open(DB, 1);
-        r.onupgradeneeded = () => { try { r.result.createObjectStore(STORE); } catch (_) {} };
-        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
-    });
-}
-async function putFolder(h) { try { const db = await idb(); db.transaction(STORE, 'readwrite').objectStore(STORE).put(h, FOLDER_KEY); } catch (_) {} }
-async function getFolder() {
-    try {
-        const db = await idb();
-        return await new Promise((res) => { const g = db.transaction(STORE).objectStore(STORE).get(FOLDER_KEY); g.onsuccess = () => res(g.result || null); g.onerror = () => res(null); });
-    } catch (_) { return null; }
-}
-async function folderReadable(h) {
-    if (!h || !h.queryPermission) return !!h;
-    try { return (await h.queryPermission({ mode: 'readwrite' })) === 'granted'; } catch (_) { return false; }
-}
 
 /**
  * THE UNSAVED GATE — the ONE prompt (user ruling). Opening replaces the whole buffer, so if there is unsaved work the
@@ -90,13 +72,50 @@ function threeWay(message) {
     });
 }
 
-/** Read one .ddcs and summarize it for a CARD — every value from the FILE itself, never from this browser's state. */
+/**
+ * READ ONE WORKSPACE FILE — and when it cannot be opened, say WHICH CHECK FAILED (t1225 amendment, user live symptom:
+ * their own saved workspace came back as a flat "not a valid .ddcs file", which tells them nothing and is not even
+ * true of most failures). Every file this app writes is buildBackup JSON, so the only thing that ever gets refused is
+ * something this app did not write — and then the message names the reason.
+ *
+ * A leading byte-order mark is TOLERATED, not treated as a syntax error: the app never writes one, but a file that has
+ * been through an external editor can pick one up, and refusing a workspace over an invisible character is nonsense.
+ *
+ * @returns {Promise<{obj?:object, error?:string}>}
+ */
+export async function readWorkspaceFile(file) {
+    let text;
+    try { text = await file.text(); } catch (_) { return { error: `“${file.name}” could not be read from disk.` }; }
+    const body = String(text || '').replace(/^﻿/, '').trim();
+    if (!body) return { error: `“${file.name}” is empty — there is nothing in it to open.` };
+    let obj;
+    try { obj = JSON.parse(body); } catch (e) { return { error: `“${file.name}” is not a workspace: its contents are not valid JSON (${(e && e.message) || 'parse error'}).` }; }
+    if (!obj || typeof obj !== 'object') return { error: `“${file.name}” is not a workspace: it holds a bare value, not a workspace object.` };
+    if (!previewBackup(obj).valid) {
+        // Name the shape when we recognise it. The likeliest wrong file to have on hand is a machine-configuration
+        // BUNDLE (what the retired Backup Profile button wrote) — saying so beats "not valid". No door is promised
+        // here because the bundle import has no UI door today (see data/profileStore.js).
+        if (!obj.kind && (obj.controllerId || obj.userVars || obj.machine)) {
+            return { error: `“${file.name}” looks like a machine-configuration bundle, not a workspace file.` };
+        }
+        const why = !obj.kind ? 'it carries no kind marker'
+            : (obj.kind !== 'ddcs.backup' ? `it is a “${obj.kind}” file, not a DDCS workspace`
+                : 'it carries no stores');
+        return { error: `“${file.name}” is not a DDCS workspace — ${why}.` };
+    }
+    // A pre-pivot .ddcs has no machine record. Per [[no-legacy-burden]] we do NOT migrate it — restoring it would put
+    // this workspace on whatever controller happened to be active, which is worse than not opening it at all.
+    if (!hasMachineRecord(obj)) return { error: 'This file is from an older format and has no machine record.' };
+    return { obj };
+}
+
+/** Read one .ddcs and summarize it for a row — every value from the FILE itself, never from this browser's state. */
 async function cardFor(fileHandle) {
     const name = fileHandle.name.replace(/\.ddcs$/i, '');
     try {
-        const text = await (await fileHandle.getFile()).text();
-        const obj = JSON.parse(text);
-        if (!previewBackup(obj).valid) return { name, handle: fileHandle, invalid: true };
+        const file = await fileHandle.getFile();
+        const { obj, error } = await readWorkspaceFile(file);
+        if (error) return { name, handle: fileHandle, invalid: true, reason: error };
         const st = obj.stores || {};
         const mach = st.machine || {};
         const mm = (st.settings && st.settings.machine) || {};
@@ -123,17 +142,30 @@ async function listWorkspaces(dir) {
     return cards.sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
 }
 
-/** Open a .ddcs File — the WHOLE file, always — then reload so every module re-reads the restored stores. */
-async function openWorkspaceFile(file, label) {
-    let obj;
-    try { obj = JSON.parse(await file.text()); }
-    catch (_) { dlgNotice('That file is not a valid workspace — pick a .ddcs file.'); return false; }
-    if (!previewBackup(obj).valid) { dlgNotice('That file is not a DDCS workspace (the marker is missing).'); return false; }
+/**
+ * Open a .ddcs File — the WHOLE file, always — then reload so every module re-reads the restored stores.
+ *
+ * `fileHandle` is the writable handle this file came from when there is one (a row in the granted folder). Passing it
+ * RETARGETS the save handle: after opening B, Ctrl+S must write B, not silently overwrite the file that was open
+ * before. Browse… has no handle, so it passes null — which forgets the old one rather than leaving it armed.
+ */
+async function openWorkspaceFile(file, label, fileHandle) {
+    const { obj, error } = await readWorkspaceFile(file);   // ONE reader: the panel row and this door refuse for the same reason
+    if (error) { dlgNotice(error); return false; }
     if (!(await confirmDiscardBuffer(label || 'a workspace'))) return false;
-    await restoreBackup(obj);                       // no selectedIds → the WHOLE file, by construction
-    markWorkspaceSavedToFile(file.name);            // the buffer now IS this file (one-name rule: its name is the name)
+    await restoreBackup(obj);                       // the WHOLE file, by construction — absent stores reset to default
+    // ORDER (t1225): the name is stamped BEFORE the save baseline, or the workspace is dirty the moment it is opened.
+    try { setMachineName(file.name); } catch (_) {}   // ONE-NAME RULE: an OS-renamed file shows its OWN name everywhere
+    markWorkspaceSavedToFile(file.name);            // the buffer now IS this file
+    await adoptSaveHandle(fileHandle || null);      // …and Save writes THIS file from now on
     if (!window.__ddcsNoReload) location.reload();
     return true;
+}
+
+/** Does this .ddcs carry the machine row every current workspace has? (identity, not config — see BACKUP_STORES) */
+function hasMachineRecord(obj) {
+    const m = obj && obj.stores && obj.stores.machine;
+    return !!(m && (m.name || m.controllerId));
 }
 
 // ── the modal ───────────────────────────────────────────────────────────────────────────────────────────────────
@@ -186,13 +218,14 @@ export async function openWorkspaceManager(focus = 'save') {
 
     ov.querySelector('#wsmPickFolder').addEventListener('click', async () => {
         if (!hasFSA()) { dlgNotice('This browser cannot grant a folder. Use Browse… to open a .ddcs file instead.'); return; }
-        try { const dir = await window.showDirectoryPicker({ mode: 'readwrite' }); await putFolder(dir); await renderFolder(ov, dir); }
+        try { const dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'ddcsWorkspaces' }); await putHandle(FOLDER_KEY, dir); await renderFolder(ov, dir); }
         catch (e) { if (!e || e.name !== 'AbortError') dlgNotice('Could not open that folder: ' + ((e && e.message) || e)); }
     });
     ov.querySelector('#wsmBrowse').addEventListener('click', async () => {
         const input = document.createElement('input');
         input.type = 'file'; input.accept = '.ddcs,application/json';
-        input.addEventListener('change', async () => { const f = input.files && input.files[0]; if (f) await openWorkspaceFile(f, `“${f.name}”`); });
+        // no handle from a plain file input → openWorkspaceFile FORGETS the old one (a Save then asks where to put it)
+        input.addEventListener('change', async () => { const f = input.files && input.files[0]; if (f) await openWorkspaceFile(f, `“${f.name}”`, null); });
         input.click();
     });
     ov.querySelector('#wsmCards').addEventListener('click', async (e) => {
@@ -200,12 +233,13 @@ export async function openWorkspaceManager(focus = 'save') {
         if (!card) return;
         const idx = Number(card.dataset.wsmOpen);
         const card_ = (ov.__cards || [])[idx];
-        if (!card_ || card_.invalid) return;
-        await openWorkspaceFile(await card_.handle.getFile(), `“${card_.name}”`);
+        if (!card_) return;
+        if (card_.invalid) { dlgNotice(card_.reason || `“${card_.name}” is not a readable workspace.`); return; }
+        await openWorkspaceFile(await card_.handle.getFile(), `“${card_.name}”`, card_.handle);
     });
 
-    const dir = await getFolder();
-    if (dir && await folderReadable(dir)) await renderFolder(ov, dir);
+    const dir = await getHandle(FOLDER_KEY);
+    if (dir && await handleGranted(dir)) await renderFolder(ov, dir);
     else renderCards(ov, null, []);
 
     if (focus === 'open') ov.querySelector('.wsm-folder')?.scrollIntoView({ block: 'nearest' });
@@ -219,17 +253,23 @@ function renderCurrent(ov) {
     const at = fileSavedAt();
     const rows = workspaceDelta();
     const changed = rows.filter((r) => r.changed === true);
-    const known = rows.some((r) => r.changed !== null);
-    const state = !known ? 'Never saved to a file' : (dirty ? 'Unsaved changes' : 'Saved');
+    const known = rows.some((r) => r.changed !== null);   // is there a per-store baseline (a save since t1223)?
+    // NEVER-SAVED and BASELINE-UNKNOWN are different states, and conflating them made a workspace that HAS a file read
+    // "Never saved to a file". The saved/dirty state comes from the watermark (which every save has always written);
+    // only WHICH PARTS changed depends on the newer per-store baseline.
+    const everSaved = at != null || !!name;
+    const state = !everSaved ? 'Never saved to a file' : (dirty ? 'Unsaved changes' : 'Saved');
     host.innerHTML = `
         <div class="wsm-cur-head">
             <span class="wsm-cur-name">${esc(name || 'Untitled workspace')}</span>
-            <span class="wsm-state ${dirty || !known ? 'is-dirty' : 'is-saved'}">${esc(state)}</span>
+            <span class="wsm-state ${dirty || !everSaved ? 'is-dirty' : 'is-saved'}">${esc(state)}</span>
             ${at ? `<span class="wsm-cur-when">${esc(new Date(at).toLocaleString())}</span>` : ''}
         </div>
         <div class="wsm-delta">${
             !known
-                ? '<span class="wsm-dim">Save it once and this will list exactly what changed since.</span>'
+                ? (everSaved
+                    ? '<span class="wsm-dim">Which parts changed is unknown until the next save.</span>'
+                    : '<span class="wsm-dim">Save it once and this will list exactly what changed since.</span>')
                 : (changed.length
                     ? rows.map((r) => `<span class="wsm-drow ${r.changed ? 'is-chg' : ''}">${esc(r.label)}${r.count != null ? ` <b>${esc(r.count)}</b> ${esc(r.unit)}` : ''}</span>`).join('')
                     : '<span class="wsm-dim">Nothing has changed since the last save.</span>')
@@ -261,9 +301,10 @@ function renderCards(ov, dir, cards) {
         + '<span class="wsm-c-ctrl">Controller</span><span class="wsm-c-when">Saved</span></div>'
         + '<div class="wsm-fp-list">'
         + cards.map((c, i) => (c.invalid
-            ? `<div class="wsm-fp-row is-bad" title="not a readable workspace">`
+            // a file it cannot open is still CLICKABLE — clicking it says why, instead of a row that ignores you
+            ? `<button type="button" class="wsm-fp-row is-bad" data-wsm-open="${i}" title="${esc(c.reason || 'not a readable workspace')}">`
               + `<span class="wsm-c-name">${FILE_ICON}${esc(c.name)}</span>`
-              + `<span class="wsm-c-env">—</span><span class="wsm-c-ctrl">not a readable workspace</span><span class="wsm-c-when"></span></div>`
+              + `<span class="wsm-c-env">—</span><span class="wsm-c-ctrl">cannot be opened</span><span class="wsm-c-when"></span></button>`
             : `<button type="button" class="wsm-fp-row" data-wsm-open="${i}" title="Open ${esc(c.name)}">`
               + `<span class="wsm-c-name">${FILE_ICON}${esc(c.name)}</span>`
               + `<span class="wsm-c-env">${esc(c.envelope || '—')}</span>`

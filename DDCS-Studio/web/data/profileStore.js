@@ -101,16 +101,16 @@ export function landImportedProfile(obj) {
 
 /**
  * THE PRE-IMPORT SAFETY GATE (t1219). Landing a bundle FULL-SWAPS this workspace's machine — the same blast radius as
- * opening a .ddcs over your work — so it gets the same two protections the .ddcs restore path already has: an EXPLICIT
- * confirm, then an automatic safety export as the undo path (ui/backupModal.js does exactly this: its preview modal is
- * the confirm, then `await safetyExport()` before the restore).
+ * opening a .ddcs over your work — so it gets the same two protections the .ddcs open path has: an EXPLICIT confirm,
+ * then the save-first prompt for whatever is unsaved (ui/workspaceManager.js confirmDiscardBuffer — the same one an
+ * Open uses; there is no silent safety download any more).
  *
  * Declared ONCE, so every landing site is covered by construction rather than by remembering. Both of today's sites
  * are currently reachable only via the console or the pywebview bridge — the UI door retired with the profile library
  * — but "no door today" is not a reason to leave a destructive path unguarded; a door is one button away.
  *
- * FAILS CLOSED: if the confirm cannot be shown, the swap does NOT happen. A destructive operation that cannot ask is
- * one that must not proceed.
+ * FAILS CLOSED, both halves: if the confirm cannot be shown, OR the save-first prompt is missing / throws, the swap
+ * does NOT happen. A destructive operation that cannot ask is one that must not proceed.
  * @returns {Promise<boolean>} may the caller land the bundle
  */
 export async function allowDestructiveLanding(what) {
@@ -126,7 +126,9 @@ export async function allowDestructiveLanding(what) {
     // t1223 SILENT-DOWNLOAD SWEEP: this used to fire safetyExport() — a .ddcs appearing in Downloads that nobody asked
     // for. A file the user did not request is not consent and taught them nothing about their state. They now get the
     // SAME save-first prompt an Open gets, and a download remains only as the no-FSA fallback inside saveWorkspace.
-    try { return await window.ddcsConfirmDiscardBuffer('this machine configuration'); } catch (e) { return true; }
+    // t1225 — and it fails CLOSED like the confirm above it: no prompt available (or a save that threw) means the
+    // unsaved buffer cannot be protected, which is exactly when a full machine swap must not run.
+    try { return await window.ddcsConfirmDiscardBuffer('this machine configuration'); } catch (e) { return false; }
 }
 
 export async function importProfile() {

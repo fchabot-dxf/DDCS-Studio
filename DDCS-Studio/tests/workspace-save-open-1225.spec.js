@@ -1,0 +1,248 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * t1225 — SAVING AND OPENING, against a fake File System Access layer.
+ *
+ * The whole point of these tests is the pair of things a green t1223 suite could not see, because nothing there ever
+ * WROTE a file after opening one:
+ *
+ *   1. OPEN MUST RETARGET THE SAVE HANDLE. Opening B while the remembered handle still points at A meant the next
+ *      Ctrl+S silently overwrote A with B's contents — the worst kind of data loss, since nothing on screen is wrong.
+ *   2. THE NAME IS STAMPED BEFORE THE BYTES ARE BUILT. Stamping after meant the file carried the PREVIOUS name and the
+ *      workspace was dirty the instant it was saved (the stamp landed outside the baseline that was supposed to cover it).
+ *
+ * The FSA layer is faked with real bytes in a Map, so the code under test is the real save/open path — the only thing
+ * replaced is the OS dialog. `showSaveFilePicker` is deliberately absent: the ruled first-save flow is name + FOLDER.
+ */
+test.use({ viewport: { width: 1280, height: 900 } });
+
+const wsFile = (name, controllerId = 'ddcs-expert-m350', extra = {}) => JSON.stringify({
+    kind: 'ddcs.backup', v: 1, app: 'test', date: '2026-07-20T10:00:00.000Z',
+    stores: {
+        machine: { name, controllerId },
+        settings: { machine: { x: 500, y: 400, z: -100, show: true } },
+        ...extra,
+    },
+});
+
+/** A fake granted folder over an in-memory Map of REAL .ddcs bytes; every handle behaves like the FSA shape. */
+async function fakeFs(page, seed) {
+    await page.evaluate((entries) => {
+        const files = new Map(entries);
+        const fs = window.__fs = { files, dirPicks: 0, seeded: new Map(entries) };
+        const fileHandle = (name) => ({
+            kind: 'file', name,
+            getFile: async () => new File([files.get(name) || ''], name),
+            queryPermission: async () => 'granted',
+            requestPermission: async () => 'granted',
+            createWritable: async () => ({ write: async (t) => { files.set(name, t); }, close: async () => {} }),
+        });
+        const dir = {
+            kind: 'directory', name: 'Workspaces',
+            queryPermission: async () => 'granted',
+            requestPermission: async () => 'granted',
+            async *entries() { for (const n of [...files.keys()]) yield [n, fileHandle(n)]; },
+            async getFileHandle(n, opts) {
+                if (!files.has(n)) {
+                    if (!opts || !opts.create) { const e = new Error('not found'); e.name = 'NotFoundError'; throw e; }
+                    files.set(n, '');
+                }
+                return fileHandle(n);
+            },
+        };
+        fs.dir = dir;
+        window.showDirectoryPicker = async () => { fs.dirPicks++; return dir; };
+        window.showSaveFilePicker = undefined;   // the ruled flow is name + folder, not an OS save dialog
+    }, [...Object.entries(seed)]);
+}
+
+async function boot(page, seed) {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.openWorkspaceManager && window.ddcsSaveWorkspace && window.ddcsSaveHandleName);
+    await page.evaluate(() => { window.__ddcsNoReload = true; });   // the open path reloads in the app; keep the test page
+    await fakeFs(page, seed);
+}
+
+/** Open the manager on the folder half and click the row for `name`. */
+async function openFromFolder(page, name) {
+    await page.evaluate(() => window.openWorkspaceManager('open'));
+    await page.locator('#wsmPickFolder').click();
+    await page.locator(`#wsmCards .wsm-fp-row:has-text("${name}")`).first().click();
+}
+
+const readFs = (page) => page.evaluate(() => Object.fromEntries(window.__fs.files));
+
+test('BLOCKER — opening B RETARGETS the save handle: the next Save writes B and leaves A untouched', async ({ page }) => {
+    await boot(page, { 'alpha.ddcs': wsFile('alpha'), 'beta.ddcs': wsFile('beta', 'ddcs-v41') });
+
+    await openFromFolder(page, 'alpha');
+    await page.waitForFunction(() => (window.ddcsGetMachine() || {}).name === 'alpha');
+    expect(await page.evaluate(() => window.ddcsSaveHandleName()), 'opening A arms Save on A').toBe('alpha.ddcs');
+
+    await openFromFolder(page, 'beta');
+    await page.waitForFunction(() => (window.ddcsGetMachine() || {}).name === 'beta');
+    expect(await page.evaluate(() => window.ddcsSaveHandleName()), 'opening B re-arms Save on B').toBe('beta.ddcs');
+
+    // the plain Save — no dialog, writes in place
+    const res = await page.evaluate(() => window.ddcsSaveWorkspace());
+    expect(res.ok).toBe(true);
+    expect(res.name).toBe('beta.ddcs');
+
+    const files = await readFs(page);
+    const seeded = await page.evaluate(() => Object.fromEntries(window.__fs.seeded));
+    expect(files['alpha.ddcs'], 'A is byte-for-byte what it was — the save did NOT reach back into it').toBe(seeded['alpha.ddcs']);
+    expect(files['beta.ddcs'], 'B was actually rewritten').not.toBe(seeded['beta.ddcs']);
+    expect(JSON.parse(files['beta.ddcs']).stores.machine.name, 'and B holds B').toBe('beta');
+});
+
+test('BLOCKER — the name is stamped BEFORE the bytes: the file carries its own name and is clean the moment it is saved', async ({ page }) => {
+    await boot(page, { 'alpha.ddcs': wsFile('alpha') });
+    await openFromFolder(page, 'alpha');
+    await page.waitForFunction(() => (window.ddcsGetMachine() || {}).name === 'alpha');
+
+    // Save As under a NEW name → the guided flow (name + the already-granted folder)
+    const saving = page.evaluate(() => window.ddcsSaveWorkspace({ pickNew: true }));
+    await page.waitForSelector('#wssAsk', { timeout: 8000 });
+    await page.fill('#wssName', 'gamma');
+    await page.locator('#wssAsk [data-wss="save"]').click();
+    expect((await saving).name).toBe('gamma.ddcs');
+
+    const files = await readFs(page);
+    expect(Object.keys(files), 'the new file exists beside the old one').toContain('gamma.ddcs');
+    expect(JSON.parse(files['gamma.ddcs']).stores.machine.name, 'the file carries the name it was saved AS, not the previous one').toBe('gamma');
+    expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'and saving leaves the workspace CLEAN (the stamp is inside the baseline)').toBe(false);
+    expect(await page.evaluate(() => window.ddcsGetMachine().name), 'the live workspace took the new name too').toBe('gamma');
+});
+
+test('the FIRST save is ONE step: name + folder grant together, written INTO the folder, never an autogenerated name', async ({ page }) => {
+    await boot(page, {});   // an empty folder and no remembered file — a brand-new user
+    let downloaded = false;
+    page.on('download', () => { downloaded = true; });
+
+    const saving = page.evaluate(() => window.ddcsSaveWorkspace());
+    await page.waitForSelector('#wssAsk', { timeout: 8000 });
+    // ONE dialog asks the name, and its primary button says what the click will do about the folder
+    await expect(page.locator('#wssAsk [data-wss="save"]')).toHaveText(/Choose folder and save/i);
+    await page.fill('#wssName', 'lathe-1');
+    await page.locator('#wssAsk [data-wss="save"]').click();
+
+    const res = await saving;
+    expect(res.ok, 'the save went through').toBe(true);
+    expect(res.viaFsa, 'through a real file handle, not a download').toBe(true);
+    expect(await page.evaluate(() => window.__fs.dirPicks), 'the folder was granted in that same click').toBe(1);
+
+    const files = await readFs(page);
+    expect(Object.keys(files), 'the file landed IN the workspaces folder, named what the user typed').toEqual(['lathe-1.ddcs']);
+    expect(Object.keys(files)[0], 'no backup-style autogenerated filename').not.toMatch(/^ddcs-workspace-/);
+    expect(downloaded, 'and nothing was downloaded').toBe(false);
+    expect(await page.evaluate(() => window.ddcsFileSavedName())).toBe('lathe-1.ddcs');
+
+    // …and the manager lists what was just saved — the point of saving into the granted folder
+    await page.evaluate(() => window.openWorkspaceManager('open'));
+    await page.locator('#wsmPickFolder').click();
+    await expect(page.locator('#wsmCards .wsm-fp-row')).toHaveCount(1);
+    await expect(page.locator('#wsmCards .wsm-fp-row .wsm-c-name')).toContainText('lathe-1');
+});
+
+/**
+ * THE USER FLOW, END TO END (t1225 amendment — live symptom: opening their OWN workspace said "not a valid .ddcs
+ * file"). Nothing above proves this: those files are hand-written JSON. This one saves through the real Save door,
+ * then opens THAT file through the real Open door, so the bytes under test are the ones the app actually writes.
+ */
+test('ROUND TRIP — a workspace this app just saved opens again through the same doors', async ({ page }) => {
+    await boot(page, {});
+    await page.evaluate(() => localStorage.setItem('ddcs_tpl_roundtrip_1225', JSON.stringify([{ name: 'before saving' }])));
+
+    // SAVE through the real door
+    const saving = page.evaluate(() => window.ddcsSaveWorkspace());
+    await page.waitForSelector('#wssAsk', { timeout: 8000 });
+    await page.fill('#wssName', 'my-shop');
+    await page.locator('#wssAsk [data-wss="save"]').click();
+    expect((await saving).ok).toBe(true);
+
+    // change something, so opening has real work to replace…
+    await page.evaluate(() => localStorage.setItem('ddcs_tpl_roundtrip_1225', JSON.stringify([{ name: 'after saving' }])));
+    expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile())).toBe(true);
+
+    // …then OPEN it back through the real door: the folder panel lists it as a readable workspace, not "cannot be opened"
+    await page.evaluate(() => window.openWorkspaceManager('open'));
+    await page.locator('#wsmPickFolder').click();
+    const row = page.locator('#wsmCards .wsm-fp-row');
+    await expect(row).toHaveCount(1);
+    await expect(row, 'the app can read its own file').not.toHaveClass(/is-bad/);
+    await row.click();
+    await page.locator('.wsm-3way [data-w3="discard"]').click();
+
+    // no refusal, and the saved state came back
+    await expect(page.locator('.app-dialog'), 'no "not a valid workspace" notice on the app\'s OWN file').toHaveCount(0);
+    await page.waitForFunction(() => !window.ddcsWorkspaceDirtyToFile(), null, { timeout: 8000 });
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('ddcs_tpl_roundtrip_1225'))[0].name),
+        'the SAVED state is what came back').toBe('before saving');
+    expect(await page.evaluate(() => window.ddcsFileSavedName())).toBe('my-shop.ddcs');
+});
+
+test('a refusal SAYS WHICH CHECK FAILED — and a byte-order mark is not a reason to refuse', async ({ page }) => {
+    const good = wsFile('bommed');
+    await boot(page, {
+        'has-bom.ddcs': '﻿' + good,            // been through an external editor; still this app's own bytes
+        'not-json.ddcs': 'this is not json at all',
+        'other-kind.ddcs': JSON.stringify({ kind: 'ddcs.macro', v: 1, stack: [] }),
+        'empty.ddcs': '',
+        'a-bundle.ddcs': JSON.stringify({ name: 'Rig B', controllerId: 'ddcs-v41', settings: {}, userVars: [] }),
+    });
+    await page.evaluate(() => window.openWorkspaceManager('open'));
+    await page.locator('#wsmPickFolder').click();
+    await expect(page.locator('#wsmCards .wsm-fp-row')).toHaveCount(5);
+
+    const reason = async (name) => page.locator(`#wsmCards .wsm-fp-row:has-text("${name}")`).first().getAttribute('title');
+    expect(await reason('not-json'), 'says it is not JSON, and shows the parser\'s own words').toMatch(/not valid JSON/i);
+    expect(await reason('other-kind'), 'names the kind it actually found').toMatch(/ddcs\.macro.*not a DDCS workspace/i);
+    expect(await reason('empty'), 'says the file is empty').toMatch(/empty/i);
+    expect(await reason('a-bundle'), 'names the shape it recognises instead of a flat "not valid"').toMatch(/machine-configuration bundle/i);
+
+    // the BOM'd file is a normal, openable row — tolerated, not refused
+    const bom = page.locator('#wsmCards .wsm-fp-row:has-text("has-bom")').first();
+    await expect(bom).not.toHaveClass(/is-bad/);
+    await bom.click();
+    await page.waitForFunction(() => (window.ddcsGetMachine() || {}).name === 'has-bom', null, { timeout: 8000 });
+    await expect(page.locator('.app-dialog'), 'no refusal for an invisible byte-order mark').toHaveCount(0);
+});
+
+test('ONE NAME — an OS-renamed file shows its OWN name everywhere after opening', async ({ page }) => {
+    // the file was renamed on disk; its INNER machine record still says the old name
+    await boot(page, { 'renamed-on-disk.ddcs': wsFile('what-it-used-to-be-called') });
+    await openFromFolder(page, 'renamed-on-disk');
+    await page.waitForFunction(() => window.ddcsFileSavedName() === 'renamed-on-disk.ddcs');
+
+    expect(await page.evaluate(() => window.ddcsGetMachine().name), 'the machine record takes the FILE name').toBe('renamed-on-disk');
+    expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'and the rename does not make the workspace dirty').toBe(false);
+});
+
+test('a whole-file open RESETS what the file does not carry (the file IS the workspace)', async ({ page }) => {
+    await boot(page, { 'alpha.ddcs': wsFile('alpha') });   // carries machine + settings, nothing else
+    await page.evaluate(() => localStorage.setItem('ddcs_tpl_pocket_1225', JSON.stringify([{ name: 'buffer only' }])));
+
+    await openFromFolder(page, 'alpha');
+    await page.waitForFunction(() => (window.ddcsGetMachine() || {}).name === 'alpha');
+
+    expect(await page.evaluate(() => localStorage.getItem('ddcs_tpl_pocket_1225')),
+        'a preset the opened file never carried does not survive the open').toBeNull();
+    expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'and the result is clean — it IS the file').toBe(false);
+});
+
+test('a machine-less (pre-pivot) .ddcs is REFUSED with one plain message, not silently restored', async ({ page }) => {
+    const legacy = JSON.stringify({ kind: 'ddcs.backup', v: 1, app: 'old', date: '2025-01-01T00:00:00.000Z', stores: { settings: { machine: { x: 1, y: 2, z: -3 } } } });
+    await boot(page, { 'old-format.ddcs': legacy });
+    const before = await page.evaluate(() => window.ddcsGetMachine());
+
+    await openFromFolder(page, 'old-format');
+    // the panel already marks it unopenable, and clicking says WHY rather than ignoring the click
+    await expect(page.locator('#wsmCards .wsm-fp-row').first()).toHaveClass(/is-bad/);
+    const dlg = page.locator('.app-dialog');
+    await expect(dlg).toBeVisible();
+    await expect(dlg).toContainText(/older format and has no machine record/i);
+
+    // nothing was applied: no migration, no wrong controller adopted, no envelope from the old file
+    expect(await page.evaluate(() => window.ddcsGetMachine()), 'the workspace is untouched').toEqual(before);
+    expect(await page.evaluate(() => window.ddcsGetSettings().machine.x), 'the refused envelope never landed').not.toBe(1);
+});

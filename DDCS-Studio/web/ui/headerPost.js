@@ -168,7 +168,7 @@ export function initHeaderPost() {
         // ── t1223 (1) — WORKSPACE ROW: Save + Open are the PRIMARY buttons, and all workspace management lives
         //    here rather than in a new header menu. Same two-button shape as the gcode row below it. ─────────────
         const workspaceRow =
-            `<div class="hq-ws-row">`   // its OWN class: a workspace row is not a gcode row, and counting it as one broke the menu-diet assert
+            `<div class="hq-ws-row">`   // its OWN class (a workspace row is not a gcode row); the menu-diet spec counts it
             + `<button type="button" class="hq-gcode-btn" data-act="wsSave" title="Save this workspace to its .ddcs file">💾 Save</button>`
             + `<button type="button" class="hq-gcode-btn" data-act="wsOpen" title="Open a workspace from your workspaces folder">📂 Open</button>`
             + `</div>`;

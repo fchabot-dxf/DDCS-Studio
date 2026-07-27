@@ -40,9 +40,9 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
         const countOf = (id) => (pv.rows.find((x) => x.id === id) || {}).count;
         const counts = { settings: countOf('settings'), projects: countOf('projects'), userOps: countOf('userOps'), presets: countOf('presets'), variables: countOf('variables') };
 
-        // SAFETY export of the current state (the undo path) BEFORE the wipe.
-        await backup.safetyExport();
-        const safety = !!window.__ddcsSafetyExport;
+        // t1225 — the pre-restore SAFETY auto-export is gone (function and all). It downloaded a .ddcs nobody asked
+        // for; the undo path is now the save-first PROMPT an Open shows (tests/workspace-manager-1223.spec.js).
+        const safetyGone = typeof backup.safetyExport === 'undefined' && !window.ddcsSafetyExport;
 
         // WIPE — a fresh context: clear localStorage + the project VFS.
         localStorage.clear();
@@ -53,14 +53,17 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
         const res = await backup.restoreBackup(obj);
         const after = await read();
 
-        // OLDER / PARTIAL backup: drop two stores; it should restore only its stores and leave the rest UNTOUCHED.
+        // OLDER / PARTIAL backup: drop two stores. Opening is the WHOLE file (t1225), so a store the file does NOT
+        // carry is RESET to its default — not left holding this browser's values, which would leave you with a blend
+        // of the file and what you had and then call that blend "saved".
         const partial = JSON.parse(JSON.stringify(obj)); delete partial.stores.projects; delete partial.stores.userOps;
         const pvPartial = backup.previewBackup(partial);
         localStorage.setItem('ddcs_user_ops', JSON.stringify([{ opType: 'user_keep', label: 'Keep' }]));   // a DIFFERENT current state
         const resPartial = await backup.restoreBackup(partial);
-        const userOpsAfterPartial = JSON.parse(localStorage.getItem('ddcs_user_ops'));
+        const userOpsAfterPartial = localStorage.getItem('ddcs_user_ops');
+        const projectAfterPartial = await store.readProject('MyJob');
 
-        return { before, after, counts, wipedProject, safety, res, pvPartialRows: pvPartial.rows, resPartial, userOpsAfterPartial };
+        return { before, after, counts, wipedProject, safetyGone, res, pvPartialRows: pvPartial.rows, resPartial, userOpsAfterPartial, projectAfterPartial };
     });
 
     // DEEP-EQUAL store by store.
@@ -78,15 +81,16 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
     // PREVIEW COUNTS.
     expect(r.counts, 'the per-store preview counts').toEqual({ settings: 2, projects: 1, userOps: 1, presets: 1, variables: 1 });
 
-    // SAFETY export exists.
-    expect(r.safety, 'a pre-restore safety export was produced (the undo path)').toBe(true);
+    // The silent safety download is gone, not merely unwired.
+    expect(r.safetyGone, 'safetyExport is DELETED — the save-first prompt replaced it').toBe(true);
     expect(r.res.restored, 'all seeded stores restored').toEqual(expect.arrayContaining(['settings', 'userOps', 'presets', 'variables', 'projects']));
 
-    // OLDER / PARTIAL backup honesty.
+    // OLDER / PARTIAL backup honesty — the file IS the workspace, so what it omits is RESET.
     expect((r.pvPartialRows.find((x) => x.id === 'projects') || {}).present, 'projects absent from the partial backup').toBe(false);
     expect((r.pvPartialRows.find((x) => x.id === 'userOps') || {}).present, 'userOps absent from the partial backup').toBe(false);
-    expect(r.resPartial.skipped, 'absent stores are skipped, not restored').toEqual(expect.arrayContaining(['projects', 'userOps']));
-    expect(r.userOpsAfterPartial, 'a store absent from the backup is left UNTOUCHED').toEqual([{ opType: 'user_keep', label: 'Keep' }]);
+    expect(r.resPartial.reset, 'absent stores are RESET to their defaults, not silently kept').toEqual(expect.arrayContaining(['projects', 'userOps']));
+    expect(r.userOpsAfterPartial, 'the buffer-only custom wizard does not survive the open').toBeNull();
+    expect(r.projectAfterPartial, 'nor does a project the opened file never carried').toBeNull();
 });
 
 /**

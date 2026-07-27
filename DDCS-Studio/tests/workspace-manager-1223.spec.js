@@ -149,7 +149,10 @@ test('DISCARD opens the WHOLE file — every store, no picker', async ({ page })
     await page.locator('#wsmCards .wsm-fp-row').first().click();
     await page.locator('.wsm-3way [data-w3="discard"]').click();
 
-    await page.waitForFunction(() => (window.ddcsGetMachine() || {}).name === 'bench-router', null, { timeout: 8000 });
+    // wait for the LAST step of the open (the file-name stamp), not the machine row: the machine store is written
+    // early in the restore loop, so waiting on it can read the workspace mid-open (t1225 — the loop now clears the
+    // IDB project volume too, which put a real await between the two).
+    await page.waitForFunction(() => window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
     const after = await page.evaluate(() => ({
         machine: window.ddcsGetMachine(),
         envX: window.ddcsGetSettings().machine.x,
