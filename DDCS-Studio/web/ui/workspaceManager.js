@@ -8,8 +8,8 @@
  *   BACKUP_STORES row, so a new store shows up here for free), plus Save / Save As… / Duplicate…
  *   BOTTOM — the GRANTED FOLDER as an OS-style file panel: every *.ddcs in it as a row (name · ENVELOPE · controller ·
  *   saved-when), every value read from the FILES themselves, not from anything this browser remembers. The envelope
- *   earns a column of its own because that is what you actually recognise a machine by. Click a row to open it; one
- *   Browse-elsewhere escape covers files outside the folder.
+ *   earns a column of its own because that is what you actually recognise a machine by. Click a row to open it — and
+ *   that is the ONLY way in (t1227): a workspace kept somewhere else gets dropped into the folder like any document.
  *
  * WHY A GRANTED FOLDER: the OS dialog lives in exactly one place. Pick the folder once, and from then on opening a
  * workspace is a click on a card instead of a file dialog. The directory handle persists in IDB, so it survives
@@ -186,7 +186,6 @@ export async function openWorkspaceManager(focus = 'save') {
                 <div class="wsm-folder-head">
                     <span class="wsm-folder-path" id="wsmFolderPath">No workspace folder yet</span>
                     <button type="button" class="toolbar-btn settings-io" id="wsmPickFolder">📁 Choose folder…</button>
-                    <button type="button" class="toolbar-btn settings-io" id="wsmBrowse" title="Open a .ddcs from anywhere else">Browse…</button>
                 </div>
                 <div class="wsm-cards" id="wsmCards"></div>
             </section>
@@ -221,13 +220,9 @@ export async function openWorkspaceManager(focus = 'save') {
         try { const dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'ddcsWorkspaces' }); await putHandle(FOLDER_KEY, dir); await renderFolder(ov, dir); }
         catch (e) { if (!e || e.name !== 'AbortError') dlgNotice('Could not open that folder: ' + ((e && e.message) || e)); }
     });
-    ov.querySelector('#wsmBrowse').addEventListener('click', async () => {
-        const input = document.createElement('input');
-        input.type = 'file'; input.accept = '.ddcs,application/json';
-        // no handle from a plain file input → openWorkspaceFile FORGETS the old one (a Save then asks where to put it)
-        input.addEventListener('change', async () => { const f = input.files && input.files[0]; if (f) await openWorkspaceFile(f, `“${f.name}”`, null); });
-        input.click();
-    });
+    // t1227 (user ruling) — the BROWSE… escape is gone: the granted folder is the ONE door. A workspace that lives
+    // somewhere else gets dropped into the folder like any other document, which is a thing the OS already does well.
+    // (openWorkspaceFile still takes a null handle — that is how it FORGETS a stale save target, not a second door.)
     ov.querySelector('#wsmCards').addEventListener('click', async (e) => {
         const card = e.target.closest('[data-wsm-open]');
         if (!card) return;
@@ -277,7 +272,8 @@ function renderCurrent(ov) {
         <div class="wsm-cur-actions">
             <button type="button" class="toolbar-btn settings-io" data-wsm="save" style="border-color:var(--accent);">💾 Save</button>
             <button type="button" class="toolbar-btn settings-io" data-wsm="saveas">Save As…</button>
-            <button type="button" class="toolbar-btn settings-io" data-wsm="duplicate">Duplicate…</button>
+            ${/* t1227 — Duplicate is meaningless before there IS a file to duplicate, so first run does not offer it. */''
+            }${everSaved ? '<button type="button" class="toolbar-btn settings-io" data-wsm="duplicate">Duplicate…</button>' : ''}
         </div>`;
 }
 

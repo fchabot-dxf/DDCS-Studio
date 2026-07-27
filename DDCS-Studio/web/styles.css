@@ -613,12 +613,18 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 /* active selection ring — sits OUTSIDE the chip so each theme's own look stays intact */
 .hdr-quick-subitems .hq-theme-chip.active { outline: 2px solid var(--text-main, #fff) !important; outline-offset: 2px; }
 
-/* ── MENU DIET (t851) — identity row + gcode row ─────────────────────────────────────── */
-/* Identity row: full-width button whose label flexes and whose ☁ / ↧ are inline tap-targets */
-.hdr-quick-menu .hq-identity {
-    align-items: center; gap: 4px; padding: 4px 4px 4px 10px; min-height: 44px;   /* t859 — the ROW tap-target ≥44px (mock) */
-    border-left: 2px solid var(--accent, #0ea5e9); border-radius: 5px;
+/* ── MENU DIET (t851) — identity line + workspace row ────────────────────────────────── */
+/* t1227 (user) — the identity is a QUIET PLAIN-TEXT LINE above Save / Open, no longer a full-width button: no accent
+   bar, no button skin, nothing to press. Its ☁ / ↧ keep their own ≥44px tap targets — they are separate live doors. */
+.hdr-quick-menu .hq-identity-line {
+    display: flex; align-items: center; gap: 4px; padding: 2px 4px 0 10px;
+    background: none; border: 0; cursor: default;
 }
+.hq-identity-txt {
+    flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 11.5px; font-weight: 600; color: var(--text-dim, #9fb0c4); opacity: .85;
+}
+.hq-identity-txt b { font-weight: 700; }
 .hq-cloud-badge, .hq-pull-btn {
     /* t859 — each of the identity row's THREE tap targets is ≥44px: the row (label), the ☁ cloud state, the ↧ pull */
     flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
@@ -631,22 +637,22 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 }
 .hq-cloud-badge.connected { opacity: .9; color: #4ade80; }
 
-/* Gcode row: 3 small compact buttons in one horizontal row */
-.hq-ws-row,
-.hq-gcode-row {
+/* Workspace row: small compact buttons in one horizontal row. (t1227 — the .hq-gcode-* twin went with the gcode row
+   itself: Load/Insert/Export moved to the editor's corner file menu, so this styling has one user again.) */
+.hq-ws-row {
     display: flex; gap: 4px; padding: 3px 6px 4px; align-items: center;
 }
-.hq-gcode-btn {
+.hq-ws-btn {
     flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 4px;
     padding: 5px 4px; border: 1px solid var(--border, rgba(255,255,255,.14)); border-radius: 5px;
     background: var(--panel2, rgba(255,255,255,.06)); color: var(--text-main, #e6edf3);
     font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap;
     transition: background .12s ease, border-color .12s ease;
 }
-.hq-gcode-btn:hover {
+.hq-ws-btn:hover {
     background: var(--panel2, rgba(255,255,255,.14)); border-color: var(--accent, #0ea5e9);
 }
-.hq-gcode-btn svg { flex: 0 0 auto; }
+.hq-ws-btn svg { flex: 0 0 auto; }
 
 /* Profile/post capability warning — a prominent amber badge (was an easy-to-miss 15px glyph) that gently
    pulses to draw the eye; only ever shown when there's a real warning (hidden otherwise). */
@@ -4946,6 +4952,14 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 }
 .editor-copy-float:hover { opacity: 1; }
 .editor-copy-float.copied { color: #22c55e; opacity: 1; }
+/* t1227 — the editor FILE menu button, left of the follow-execution toggle (which sits at right:44px). Same floating
+   treatment as Copy so the corner reads as one row of pane tools. */
+.editor-file-float {
+    position: absolute; right: 72px; top: 8px; z-index: 3; opacity: .75;
+    padding: 4px 5px; line-height: 0; display: inline-flex; align-items: center; gap: 2px;
+}
+.editor-file-float:hover { opacity: 1; }
+.editor-file-caret { font-size: 9px; line-height: 1; }
 @media (max-width: 520px) {
     .app-header .brand { padding: 0 8px; gap: 6px; }
     .app-header .logo { height: 26px; }

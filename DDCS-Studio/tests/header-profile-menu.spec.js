@@ -20,7 +20,7 @@ const seedProfile = async (page) => {
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };
 
-test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library + one gcode row + one workspace row; retired profile section GONE, ≤10 rows', async ({ page }) => {
+test('the compact diet menu: identity row (name·controller, ☁, ↧) + one workspace row + Library; the EDITOR file rows are gone, ≤8 rows', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
     await openMenu(page);
@@ -29,14 +29,18 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library
         const id = menu.querySelector('.hq-identity');
         return {
             hasIdentity: !!id,
-            identityIsBrowse: !!(id && id.matches('[data-profact="browse"]')),
+            // t1227 (user) — the identity is a QUIET PLAIN-TEXT LINE, not a button: nothing to press, no handler
+            identityIsButton: !!(id && (id.tagName === 'BUTTON' || id.matches('[data-profact]') || id.matches('.hdr-quick-item'))),
             identityName: id ? (id.querySelector('b') || {}).textContent || '' : '',
             identityCtrl: id ? (id.querySelector('.hq-cur') || {}).textContent || '' : '',
+            // …and it sits directly above the Save / Open buttons, so a save has its context
+            identityAboveWs: !!(id && id.nextElementSibling && id.nextElementSibling.classList.contains('hq-ws-row')),
             hasCloud: !!menu.querySelector('.hq-identity [data-cloud]'),
             hasPull: !!menu.querySelector('.hq-identity .hq-pull-btn[data-profact="pull"]'),
             hasLibrary: menu.querySelectorAll('[data-act="library"]').length,
+            // t1227 CURATION — the editor's file rows left this menu for the editor's own corner menu
             gcodeRows: menu.querySelectorAll('.hq-gcode-row').length,
-            gcodeBtns: menu.querySelectorAll('.hq-gcode-row .hq-gcode-btn[data-act]').length,
+            editorFileActs: menu.querySelectorAll('[data-act="load"], [data-act="insert"], [data-act="export"], [data-act="clear"]').length,
             hasClear: menu.querySelectorAll('[data-act="clear"]').length,
             hasSetupSheet: menu.querySelectorAll('[data-act="setupSheet"]').length,
             hasSettings: menu.querySelectorAll('[data-act="settings"]').length,
@@ -57,23 +61,28 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library
             // menu showed 10 — a diet number kept true by not looking. The declared target moves instead.
             wsRows: menu.querySelectorAll('.hq-ws-row').length,
             wsBtns: menu.querySelectorAll('.hq-ws-row [data-act="wsSave"], .hq-ws-row [data-act="wsOpen"]').length,
-            rowCount: menu.querySelectorAll('.hdr-quick-item, .hq-ws-row, .hq-gcode-row, .hdr-quick-subitems[data-subitems="theme"]').length,
+            rowCount: menu.querySelectorAll('.hq-identity-line, .hdr-quick-item, .hq-ws-row, .hq-gcode-row, .hdr-quick-subitems[data-subitems="theme"]').length,
+            // every row, named — so a count change has to be explained, not just re-numbered
+            rowNames: [...menu.querySelectorAll('.hq-identity-line, .hdr-quick-item, .hq-ws-row, .hdr-quick-subitems[data-subitems="theme"]')]
+                .map((r) => r.dataset.act || r.dataset.subitems || r.className.split(' ')[0]),
         };
     });
-    // The ONE compound identity row + its three affordances
-    expect(m.hasIdentity, 'the compound identity row').toBe(true);
-    expect(m.identityIsBrowse, 'the identity row opens the machine settings (data-profact=browse)').toBe(true);
-    expect(m.identityName, 'identity shows the MACHINE name (t1217 — from the machine record)').toMatch(/Rig B/);
-    expect(m.identityCtrl, 'identity shows the controller').toMatch(/·/);
-    expect(m.hasCloud, 'the ☁ cloud-state tap target').toBe(true);
-    expect(m.hasPull, 'the ↧ pull tap target').toBe(true);
+    // The identity LINE — display only (t1227), with its two live sub-targets
+    expect(m.hasIdentity, 'the identity line').toBe(true);
+    expect(m.identityIsButton, 'it is NOT a button any more — its click served the retired profile world').toBe(false);
+    expect(m.identityAboveWs, 'it sits directly above Save / Open (save context)').toBe(true);
+    expect(m.identityName, 'identity shows the WORKSPACE name (t1217 — from the machine record)').toMatch(/Rig B/);
+    expect(m.identityCtrl, 'and the dialect after it').toMatch(/·/);
+    expect(m.hasCloud, 'the ☁ cloud-state tap target survives — it is a live door, and the only one on a phone (t742)').toBe(true);
+    expect(m.hasPull, 'so does the ↧ pull tap target').toBe(true);
     // The compact rows
     expect(m.hasLibrary, 'Library row').toBe(1);
-    expect(m.gcodeRows, 'ONE gcode row').toBe(1);
-    expect(m.gcodeBtns, 'Load / Insert / Export inline').toBe(3);
+    expect(m.gcodeRows, 'the gcode row is GONE — Load/Insert/Export live in the editor corner menu now').toBe(0);
+    expect(m.editorFileActs, 'no editor file action survives in this menu (Load/Insert/Export/Clear)').toBe(0);
     expect(m.wsRows, 'ONE workspace row').toBe(1);
     expect(m.wsBtns, 'Save + Open inline (the workspace manager\'s two entry points)').toBe(2);
-    expect(m.hasClear + m.hasSetupSheet + m.hasSettings + m.hasRate, 'Clear + Setup sheet + Settings + Rate all present').toBe(4);
+    expect(m.hasSetupSheet + m.hasSettings + m.hasRate, 'the app-level rows stay: Setup sheet + Settings + Rate').toBe(3);
+    expect(m.hasClear, 'Clear editor is NOT app-level — it went to the editor corner menu').toBe(0);
     expect(m.themeChips, 'theme swatches present').toBeGreaterThan(1);
     // RETIRED shape gone
     expect(m.recents, 'no recents rows (moved to the Library)').toBe(0);
@@ -81,29 +90,32 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + Library
     expect(m.dialectItems, 'no dialect list').toBe(0);
     expect(m.oldCur, 'the old .hdr-quick-cur profile line is gone').toBe(0);
     expect(m.generateFor, 'the "Generate for" label is gone').toBe(false);
-    // The diet target, declared honestly: the workspace row made it 10, so 10 is what it says. (The upcoming curation
-    // batch slims the menu; when it lands this number comes DOWN — it does not get worked around again.)
-    expect(m.rowCount, 'the diet menu is ≤10 rows').toBeLessThanOrEqual(10);
+    // The diet target, re-encoded honestly after the t1227 curation — and it came DOWN, as t1225 said it would:
+    // identity · workspace · Library · theme · setup sheet · checklist · settings · rate. Nothing is hidden from the
+    // count by class (the t1225 lesson); the rows are NAMED so the next change has to say what it added or removed.
+    expect(m.rowNames, 'exactly these rows, in this order').toEqual([
+        'hq-identity-line', 'hq-ws-row', 'library', 'theme', 'setupSheet', 'checklist', 'settings', 'rate',
+    ]);
+    expect(m.rowCount, 'the diet menu is 8 rows (was 10 before the curation)').toBe(8);
 
-    // the three identity tap targets are each ≥44px (the mock's touch requirement)
+    // the identity's two TAP TARGETS are each ≥44px (the mock's touch requirement). The line itself is no longer a
+    // target, so it is no longer measured as one — t1227 made it display-only.
     const box = async (sel) => (await page.locator(sel).first().boundingBox()) || { width: 0, height: 0 };
-    const rowB = await box('.hq-identity'), cloudB = await box('.hq-identity [data-cloud]'), pullB = await box('.hq-identity .hq-pull-btn');
-    expect(Math.min(rowB.height), 'the identity ROW is ≥44px tall').toBeGreaterThanOrEqual(44);
+    const cloudB = await box('.hq-identity [data-cloud]'), pullB = await box('.hq-identity .hq-pull-btn');
     expect(Math.min(cloudB.width, cloudB.height), 'the ☁ target is ≥44px').toBeGreaterThanOrEqual(44);
     expect(Math.min(pullB.width, pullB.height), 'the ↧ target is ≥44px').toBeGreaterThanOrEqual(44);
 });
 
-test('the identity row taps: row → the MACHINE settings, ☁ → connect, ↧ → pull flow', async ({ page }) => {
+test('the identity line taps: it does NOTHING itself; ☁ → connect, ↧ → pull flow', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
 
-    // ROW tap → this workspace's MACHINE settings (t1217 — was the Library's Profiles tab, retired with the library)
+    // TAPPING THE LINE does nothing — no settings, and the menu stays put (t1227: display only)
     await openMenu(page);
-    await page.click('.hq-identity');
-    await expect(page.locator('#settings-app')).toBeVisible({ timeout: 6000 });
-    await expect(page.locator('#set_tab_profile')).toBeVisible();   // t1223 — the name INPUT died with the one-name rule; the panel is the destination
-    await page.evaluate(() => window.closeSettings && window.closeSettings());
+    await page.click('.hq-identity-txt');
     await expect(page.locator('#settings-app')).toBeHidden();
+    await expect(page.locator('#hdrPostMenu'), 'a dead press does not even close the menu').toBeVisible();
+    await page.keyboard.press('Escape');   // it stayed open, so close it before the next step re-opens it
 
     // ☁ CLOUD tap → the cloud connect flow (not connected → the login/connect UI)
     await openMenu(page);

@@ -60,10 +60,8 @@ function runQuickAction(act) {
         case 'open':   document.getElementById('projOpenBtn')?.click(); break;
         case 'save':   document.getElementById('projSaveBtn')?.click(); break;
         case 'wizard': window.ddcsSaveAsWizard ? window.ddcsSaveAsWizard() : dlgNotice('Open an op in the Blocks tab first, then save it as a wizard.'); break;
-        case 'load':   window.loadGcodeFile?.(); break;
-        case 'insert': window.insertGcodeFile?.(); break;
-        case 'clear':  window.clearCode?.(); break;
-        case 'export': window.downloadFile?.(); break;
+        // t1227 — load / insert / export / clear left this router with their rows: they are the EDITOR's file
+        // actions and now live in the editor's corner menu (ui/globalFunctions.js EDITOR_FILE_ACTIONS).
         case 'standalone':
             // The "standalone" IS the desktop EXE (bundles the gateway, runs fully offline) — open the SAME
             // release link the Gateway page uses (gatewayStatus.EXE_DOWNLOAD_URL → the latest GitHub release).
@@ -119,9 +117,10 @@ export function initHeaderPost() {
 
     const svgIco = (k) => `<svg class="hq-ico" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="${HQ_ICONS[k].c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${HQ_ICONS[k].d}</svg>`;
 
-    // Build the quick-actions popover — menu diet (t851): ~17 rows → ~9.
-    // Layout: identity row · Library… · gcode row (Load/Insert/Export) · Clear editor · Theme · Setup sheet… · Settings… · Rate.
-    // MOVED NOT LOST: Save/Open/wizard → Library; Pull → Gateway (↧ on identity row); standalone/checklist → Settings.
+    // Build the quick-actions popover — menu diet (t851): ~17 rows → ~9, and t1227 curation: 10 → 8.
+    // Layout: identity row · workspace row (Save/Open) · Library… · Theme · Setup sheet… · Setup checklist · Settings… · Rate.
+    // MOVED NOT LOST: Save/Open/wizard → Library; Pull → Gateway (↧ on identity row); standalone/checklist → Settings;
+    // and t1227 Load/Insert/Export/Clear → the EDITOR's corner file menu, the pane they act on.
     let postSubOpen = false;    // (preserved for the post-switch handler below; no post rows emitted in the slimmed menu)
     let themeSubOpen = false;
 
@@ -129,19 +128,18 @@ export function initHeaderPost() {
         const machinePost = getDialect(getActiveProfile().id);
         const active = getActivePostId();
         const curTheme = document.body.getAttribute('data-theme') || 'studio';
-        const actionRow = (a) =>
-            `<button type="button" role="menuitem" class="hdr-quick-item" data-act="${a.act}">`
-            + '<span class="hdr-quick-check" aria-hidden="true"></span>' + svgIco(a.act)
-            + `<span class="hdr-quick-lbl">${a.label}</span></button>`;
+        // (t1227 — the generic `actionRow` helper went with its last caller, the Clear editor row.)
         const themeRow = (name) => {
             const label = name[0].toUpperCase() + name.slice(1);
             return `<button type="button" role="menuitemradio" class="hq-theme-chip${curTheme === name ? ' active' : ''}" data-theme="${name}" title="${label}" aria-label="${label} theme" aria-checked="${curTheme === name}" style="--chip:${HQ_THEME_SWATCH[name] || '#888'}"></button>`;
         };
 
-        // ── IDENTITY ROW ──────────────────────────────────────────────────────────────────────────────
-        // Menu diet (t851): ONE compound row — machine name · controller · ☁ state · ↧ pull.
-        // t1217 — the name/controller now come from THIS WORKSPACE'S MACHINE record, not the retired profile library.
-        // Tap main area → the machine's settings. ☁ span → cloud connect. ↧ span → Pull from controller.
+        // ── IDENTITY LINE (t1227 amendment, user) ─────────────────────────────────────────────────────
+        // It was a big compound BUTTON whose tap opened the machine's settings — a door built for the retired profile
+        // world. It is now one QUIET PLAIN-TEXT line, "<workspace> · <dialect>", sitting directly above Save / Open so
+        // a save has its context: no click handler, no button styling, nothing to press by accident.
+        // The ☁ and ↧ spans stay: they are their OWN tap targets for live features (cloud connect, pull from the
+        // controller) — never the row's retired click — and ☁ is the only cloud-connect affordance on a phone (t742).
         const ap = getMachine();
         const apCtrl = (CONTROLLER_PROFILES[ap.controllerId] || {}).name || ap.controllerId || '';
         const acc = getAccount();
@@ -150,31 +148,24 @@ export function initHeaderPost() {
             ? `Cloud: ${esc(acc.email || acc.name || 'connected')} — tap to manage`
             : 'Connect cloud account';
         const identityRow =
-            `<button type="button" class="hdr-quick-item hq-identity" data-profact="browse" title="This workspace's machine — open its settings">`
-            + `<span class="hdr-quick-check" aria-hidden="true"></span>`
-            + `<span class="hdr-quick-lbl"><b>${esc(ap.name || '(unnamed machine)')}</b><span class="hq-cur"> · ${esc(apCtrl)}</span></span>`
-            + `<span class="${cloudCls}" data-cloud="1" title="${cloudTitle}">☁</span>`
-            + `<span class="hq-pull-btn" data-profact="pull" title="Pull from controller">↧</span>`
-            + `</button>`;
-
-        // ── GCODE ROW — Load / Insert / Export inline ─────────────────────────────────────────────────
-        const gcodeRow =
-            `<div class="hq-gcode-row">`
-            + `<button type="button" class="hq-gcode-btn" data-act="load"   title="Load gcode (replace)">${svgIco('load')} Load</button>`
-            + `<button type="button" class="hq-gcode-btn" data-act="insert" title="Insert gcode at cursor">${svgIco('insert')} Insert</button>`
-            + `<button type="button" class="hq-gcode-btn" data-act="export" title="Export / download">${svgIco('export')} Export</button>`
+            `<div class="hq-identity-line hq-identity">`
+            + `<span class="hq-identity-txt"><b>${esc(ap.name || 'Untitled workspace')}</b><span class="hq-cur"> · ${esc(apCtrl)}</span></span>`
+            + `<span class="${cloudCls}" data-cloud="1" role="button" tabindex="0" title="${cloudTitle}">☁</span>`
+            + `<span class="hq-pull-btn" data-profact="pull" role="button" tabindex="0" title="Pull from controller">↧</span>`
             + `</div>`;
+
+        // t1227 CURATION (user ruling): the GCODE ROW (Load / Insert / Export) and CLEAR EDITOR are GONE from here.
+        // They act on the program in the editor pane, and this menu is where you look for APP things — so they moved
+        // to the editor's own corner file menu (index.html #editor-file-btn → ddcsEditorFileMenu). Same handlers, one
+        // place. What is left in this menu is the WORKSPACE and app-level entries.
 
         // ── t1223 (1) — WORKSPACE ROW: Save + Open are the PRIMARY buttons, and all workspace management lives
-        //    here rather than in a new header menu. Same two-button shape as the gcode row below it. ─────────────
+        //    here rather than in a new header menu. ────────────────────────────────────────────────────────────
         const workspaceRow =
             `<div class="hq-ws-row">`   // its OWN class (a workspace row is not a gcode row); the menu-diet spec counts it
-            + `<button type="button" class="hq-gcode-btn" data-act="wsSave" title="Save this workspace to its .ddcs file">💾 Save</button>`
-            + `<button type="button" class="hq-gcode-btn" data-act="wsOpen" title="Open a workspace from your workspaces folder">📂 Open</button>`
+            + `<button type="button" class="hq-ws-btn" data-act="wsSave" title="Save this workspace to its .ddcs file">💾 Save</button>`
+            + `<button type="button" class="hq-ws-btn" data-act="wsOpen" title="Open a workspace from your workspaces folder">📂 Open</button>`
             + `</div>`;
-
-        // ── CLEAR ─────────────────────────────────────────────────────────────────────────────────────
-        const clearRow = actionRow({ act: 'clear', label: 'Clear editor' });
 
         // ── THEME ─────────────────────────────────────────────────────────────────────────────────────
         const themeSection = '<div class="hdr-quick-sep"></div><div class="hdr-quick-head">Theme</div>'
@@ -206,14 +197,12 @@ export function initHeaderPost() {
             '<button type="button" role="menuitem" class="hdr-quick-item" data-act="rate">'
             + '<span class="hdr-quick-check" aria-hidden="true"></span><span class="hdr-quick-lbl">⭐ Rate / Feedback</span></button>';
 
-        // ── ASSEMBLE — ≤9 logical rows ────────────────────────────────────────────────────────────────
+        // ── ASSEMBLE — the workspace, then app-level entries (t1227: the editor's file rows are no longer here) ──
         menu.innerHTML =
-            identityRow
-            + '<div class="hdr-quick-sep"></div>'
+            identityRow          // t1227 — the quiet name · dialect line sits WITH the workspace buttons (save context)
             + workspaceRow
+            + '<div class="hdr-quick-sep"></div>'
             + libraryRow
-            + gcodeRow
-            + clearRow
             + themeSection
             + '<div class="hdr-quick-sep"></div>'
             + setupSheetRow + checklistRow + settingsRow + rateRow;
@@ -314,14 +303,10 @@ export function initHeaderPost() {
 
     btn.addEventListener('click', (e) => { e.stopPropagation(); if (menu.hidden) openMenu(); else closeMenu(); });
 
-    // Route a menu click: a file action, a theme, or a gcode-row btn, or an identity-row sub-target.
+    // Route a menu click: an identity-line sub-target (☁ / ↧), a workspace button, a theme chip, or a menu row.
     menu.addEventListener('click', (e) => {
-        // The identity row's inner ☁ and ↧ spans carry their own data-* — check the EXACT target first before
-        // ascending to the parent .hdr-quick-item (so tapping ☁ opens cloud, not Library).
-        const exactCloud = e.target.closest('[data-cloud]');
-        if (exactCloud && exactCloud !== e.target.closest('.hdr-quick-item')) {
-            closeMenu(); openCloudModal(); return;
-        }
+        // t1227 — the identity is plain text now, so ☁ needs no guard against the row stealing its click.
+        if (e.target.closest('[data-cloud]')) { closeMenu(); openCloudModal(); return; }
         const exactPull = e.target.closest('.hq-pull-btn[data-profact]');
         if (exactPull) {
             closeMenu();
@@ -330,9 +315,9 @@ export function initHeaderPost() {
             return;
         }
 
-        // gcode-row inline action buttons (hq-gcode-btn carry data-act)
-        const gcodeBtn = e.target.closest('.hq-gcode-btn');
-        if (gcodeBtn && gcodeBtn.dataset.act) { closeMenu(); runQuickAction(gcodeBtn.dataset.act); return; }
+        // workspace-row inline action buttons (they carry data-act)
+        const rowBtn = e.target.closest('.hq-ws-btn');
+        if (rowBtn && rowBtn.dataset.act) { closeMenu(); runQuickAction(rowBtn.dataset.act); return; }
 
         const it = e.target.closest('.hdr-quick-item, .hq-theme-chip');
         if (!it) return;
@@ -351,16 +336,9 @@ export function initHeaderPost() {
 
         if (it.dataset.theme) { setQuickTheme(it.dataset.theme); fillMenu(); return; }   // chips stay open; just refresh the active ring
         closeMenu();
-        if (it.dataset.cloud) { openCloudModal(); return; }   // t742 — the account row → the shared cloud-connect flow
         if (it.dataset.act) { runQuickAction(it.dataset.act); return; }
-        // t1217 — the identity row names THIS WORKSPACE'S MACHINE. Profile switching / Save-as are retired with the
-        // library (a second machine is a second .ddcs), so the row's only door is the machine's own settings.
-        if (it.dataset.profact) {
-            const a = it.dataset.profact;
-            if (a === 'browse') { if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' }); }
-            else if (a === 'pull') { if (window.openSettings) window.openSettings({ group: 'controller', panel: 'set_tab_profile' }); setTimeout(() => { const b = document.getElementById('set_profile_pull'); if (b) b.click(); }, 60); }
-            return;
-        }
+        // t1227 — the identity's own `browse` click (open the machine's settings) is GONE with its button: it was a
+        // door built for the retired profile world. ☁ and ↧ are handled above, on the exact span that was tapped.
         if (!it.dataset.post) return;   // (dialect switching removed from the menu — no data-post items remain)
 
         setActivePostId(it.dataset.post);                           // persist the active post (override or 'auto')

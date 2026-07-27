@@ -69,12 +69,15 @@ test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Th
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="settings"]').count(), 'Settings… row present').toBe(1);
   // t598 — the always-available Rate / Feedback utility entry (alongside Settings / checklist).
   expect(await page.locator('#hdrPostMenu .hdr-quick-item[data-act="rate"]').count(), 'Rate / Feedback row present').toBe(1);
-  // t688 b2 — the dialect (Generate-for) list is GONE from the menu; it now has a PROFILE section instead. One active theme.
+  // t688 b2 — the dialect (Generate-for) list is GONE from the menu. t1227 — and so is the identity's own door: the
+  // machine name + dialect are a quiet DISPLAY line above Save/Open now, with no click of their own. One active theme.
   const dialectItems = await page.locator('#hdrPostMenu .hdr-quick-item[data-post]').count();
-  const profileDoors = await page.locator('#hdrPostMenu [data-profact="browse"]').count();
+  const identityDoors = await page.locator('#hdrPostMenu [data-profact="browse"]').count();
+  const identityLine = await page.locator('#hdrPostMenu .hq-identity-line .hq-identity-txt').count();
   const themeChecked = await page.locator('#hdrPostMenu .hq-theme-chip[data-theme][aria-checked="true"]').count();
   expect(dialectItems, 'no dialect switching in the menu (moved to Settings)').toBe(0);
-  expect(profileDoors, 'the Profile section (Profiles… door) is present').toBe(1);
+  expect(identityDoors, 'the identity is not a door any more (t1227)').toBe(0);
+  expect(identityLine, 'it is a plain-text line — still there, just not pressable').toBe(1);
   expect(themeChecked, 'one active theme checked').toBe(1);
 
   // Escape closes it.
