@@ -1,6 +1,10 @@
 // viz/pathStyle.js — THE ONE declared source of the path-visual palette (t317 unification).
-// TYPE (color · dash · widthScale · shape) is ORTHOGONAL to STATE (alpha · width): a renderer COMPOSES them —
-//   color = TYPE.color · dash = TYPE.dash · width = STATE.width × TYPE.widthScale · alpha = STATE.alpha · shape = TYPE.shape.
+// TYPE (color · dash · widthScale) is ORTHOGONAL to STATE (alpha · width): a renderer COMPOSES them —
+//   color = TYPE.color · dash = TYPE.dash · width = STATE.width × TYPE.widthScale · alpha = STATE.alpha.
+// t1241 D16 — `shape` ('line'|'arc') is DELETED rather than wired: the arc is the MANUAL-JOG bow, and manual is a
+// property of the PASS SOURCE, not of the path TYPE (a manual traverse still classifies as rapid/lifted). A per-type
+// shape therefore could not express the one case it existed for, and a declared token no renderer reads is a contract
+// that lies. The bow stays where the fact lives: toolpath2d reads startSources[s.pass].
 // Both path renderers (viz/toolpath2d 2D, viz/gcodeViz3d 3D) AND the legend (createPreviewPanel) read this, collapsing
 // the four hand-maintained palette copies to one — so a value edit (the human's coming mods, t312d) lands ONCE and hits
 // both previews. Built at the CURRENT values = byte-neutral, plus the 2 agreed micro-fixes: (1) jog is ONE colour (t317 unified
@@ -20,7 +24,7 @@ export const hexCss = (n) => '#' + (((n >>> 0) & 0xffffff)).toString(16).padStar
 const RAPID = 0xffcc00;
 
 export const PATH_TYPES = {
-    rapid:     { color: RAPID,    dash: [],     widthScale: 0.6, shape: 'line', label: 'Rapid' },   // t331 — SOLID (was dashed); rapid solid + jog dashed → distinct by line-style AND colour
+    rapid:     { color: RAPID,    dash: [],     widthScale: 0.6, label: 'Rapid' },   // t331 — SOLID (was dashed); rapid solid + jog dashed → distinct by line-style AND colour
     // t893 — SAFE-HEIGHT TRAVEL: a horizontal rapid traverse (z1≈z2, an XY move at constant height) reads as a DASHED line
     // so a TOP-DOWN view can never mistake a LIFTED cross-over (e.g. the middle dogleg/diagonal trans-axis traverse, or the
     // corner diagonal, crossing in XY but safe in Z) for a cutting move. Distinct from `rapid` (positioning/plunge, solid)
@@ -29,13 +33,13 @@ export const PATH_TYPES = {
     // the 2D reclassified it to a grey `lifted`, so the SAME move read yellow in 3D and grey in 2D. That divergence was the
     // bug; the DASH (not a second colour) carries the "moving over" distinction, and the two views now agree by construction.
     // `dim` dropped for the same reason — a dimmed 2D traverse could never match the 3D's alpha.
-    lifted:    { color: RAPID,    dash: [6, 5], widthScale: 0.6, shape: 'line', label: 'Safe travel' },
-    feed:      { color: 0x3b82f6, dash: [],    widthScale: 1,   shape: 'line', label: 'Cut' },       // t331 — FLAT blue (was the FEED_HIGH teal gradient top); the Z-depth gradient was removed
-    probeFast: { color: 0x22d3ee, dash: [5, 4], widthScale: 1,   shape: 'line', label: 'Probe' },     // t331 — CYAN (was #3b82f6 blue), stepped off the new blue feed; DASHED (was dotted [2,3], human t330)
-    probeSlow: { color: 0xffffff, dash: [5, 4], widthScale: 1,   shape: 'line', label: 'Probe slow' },   // t319 — WHITE; drawn ON TOP of the fast at the collinear re-probe overlap; t331 DASHED (was dotted)
+    lifted:    { color: RAPID,    dash: [6, 5], widthScale: 0.6, label: 'Safe travel' },
+    feed:      { color: 0x3b82f6, dash: [],    widthScale: 1,   label: 'Cut' },       // t331 — FLAT blue (was the FEED_HIGH teal gradient top); the Z-depth gradient was removed
+    probeFast: { color: 0x22d3ee, dash: [5, 4], widthScale: 1,   label: 'Probe' },     // t331 — CYAN (was #3b82f6 blue), stepped off the new blue feed; DASHED (was dotted [2,3], human t330)
+    probeSlow: { color: 0xffffff, dash: [5, 4], widthScale: 1,   label: 'Probe slow' },   // t319 — WHITE; drawn ON TOP of the fast at the collinear re-probe overlap; t331 DASHED (was dotted)
 
-    retract:   { color: 0x33cc55, dash: [],     widthScale: 1,   shape: 'line', label: 'Retract' },
-    jog:       { color: 0xff4500, dash: [5, 4], widthScale: 0.6, shape: 'arc',  label: 'Jog' },   // t331 (human t330) — ORANGE-RED #ff4500 (was #ff6a00 → #ff9a0d), stepped off the rapid-yellow #ffcc00 AND the red probe-tip #ff2a44. Tunable. Kept DASHED.
+    retract:   { color: 0x33cc55, dash: [],     widthScale: 1,   label: 'Retract' },
+    jog:       { color: 0xff4500, dash: [5, 4], widthScale: 0.6,  label: 'Jog' },   // t331 (human t330) — ORANGE-RED #ff4500 (was #ff6a00 → #ff9a0d), stepped off the rapid-yellow #ffcc00 AND the red probe-tip #ff2a44. Tunable. Kept DASHED.
 };
 
 /** STATE (progress) tokens — orthogonal to TYPE. A renderer picks static / future(untraveled) / traveled.

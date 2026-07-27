@@ -38,4 +38,8 @@ export const SMOKE_SPECS = [
     // probe + settings library
     'probe-wcs.spec.js',                // a probe routine core
     'wizard-restore-default.spec.js',   // the wizard/settings library (restore-to-factory)
+    // t1241 E — TWO GATE BLIND SPOTS. Both are contract guards that no per-family filter matched, so a change could
+    // pass every targeted run and still break them:
+    'check-console.spec.js',            // zero boot errors — the NEW-FILE / 404 tripwire (a fresh web/ module 404s until the server reloads)
+    'op-sim-context.spec.js',           // the op-type → declared-intent CONTRACT (missed when opSimContext.js itself was edited)
 ];

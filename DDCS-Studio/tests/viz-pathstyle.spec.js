@@ -128,4 +128,17 @@ test('a real dogleg + diagonal traverse renders the RAPID hue in 2D (matching 3D
   expect(r.rapidDash, 'a positioning rapid stays SOLID, so the two remain distinguishable').toEqual([]);
   const feed = r.control.find((s) => s.t === 'feed');
   expect(feed && feed.c, 'no over-reach: a CUT is still blue').toBe('#3b82f6');
+    // t1241 C12 — hue alone is degenerate (lifted shares the rapid colour), and comparing palette dashes to themselves
+    // proves nothing about what was DRAWN. Assert the render-time classification of the traced traverse and its dash.
+    const cls = await page.evaluate(async () => {
+        const { typeOf, dashFor } = await import('/viz/toolpath2d.js');
+        const p = window.ddcsStudio.wizardManager._activePanel;
+        const segs = (p && p.getSegments) ? p.getSegments() : [];
+        const trav = segs.find((s2) => (s2.type === 'rapid' || s2.rapid) && Math.abs((s2.z2 || 0) - (s2.z1 || 0)) < 1e-6 && (Math.abs((s2.x2 || 0) - (s2.x1 || 0)) > 0.02 || Math.abs((s2.y2 || 0) - (s2.y1 || 0)) > 0.02));
+        return trav ? { t: typeOf(trav), dash: dashFor(typeOf(trav)) } : null;
+    });
+    if (cls) {
+        expect(cls.t, 'a horizontal rapid IS the safe-travel class at render time').toBe('lifted');
+        expect(cls.dash.length, 'and it draws dashed — the discriminator colour cannot provide').toBeGreaterThan(0);
+    }
 });

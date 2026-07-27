@@ -119,5 +119,6 @@ export function applyProgramIntent(panel, opTypes) {
         if (panel.setToolMachineFrame) panel.setToolMachineFrame(!!ctx.toolMachineFrame);  // raw-machine-coords tool (G53)
         if (panel.setSeatAtStart) panel.setSeatAtStart(!!ctx.seatAtStart);               // seat the initial pos at the Start (alignment)
         if (panel.setProbesForWcs) panel.setProbesForWcs(!!ctx.probesForWcs);            // t1203 — a probe program never renders through the declared WCS table
+        if (panel.setShowMagazine) panel.setShowMagazine(!!ctx.showMagazine);            // t1241 D15 — the union already carried it; nothing applied it (an ATC op in the editor showed no magazine)
     } catch (_) { /* a panel may lack a setter — harmless */ }
 }

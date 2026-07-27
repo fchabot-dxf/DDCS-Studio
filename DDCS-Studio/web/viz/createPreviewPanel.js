@@ -17,7 +17,7 @@
  *     → { setGcode, refresh, setActive, stop, viz, engine, el }
  */
 import { GcodeViz3D } from './gcodeViz3d.js';
-import { createToolpath2d, typeOf } from './toolpath2d.js';   // t1205 — typeOf: the ONE render-time classification the legend must share with the paint
+import { createToolpath2d, typeOf, dashFor } from './toolpath2d.js';   // t1205 — typeOf: the ONE render-time classification the legend must share with the paint
 import { LEGEND_ROWS } from './pathStyle.js';   // t317 — the ONE declared path-visual palette (the legend reads it, can't drift from the renderers)
 import { traceToolpath } from '../engine/trace.js';
 import { passAnchorFor } from '../engine/passAnchor.js';
@@ -371,7 +371,10 @@ export function createPreviewPanel(container, opts = {}) {
         const m = String(raw || '').replace(/\([^)]*\)/g, ' ').match(/\bG5([4-9])\b/);
         if (!m) return;
         simActiveWcs = +m[1] - 3;                            // G54→1 … G59→6 — SIM/viz DISPLAY ONLY, never settings.machine.wcs.active
-        if (engine) engine._wcsOffset = activeWcsOffset();   // the engine's G53 moves track the program's WCS change too
+        // t1241 A2 — this used to assign the RAW table row straight onto the running engine, which threw away the two
+        // things the route's own frame applies: the machine-frame zeroing and the mill part-Z map. Mid-program the tool
+        // then ran in a different frame from the route it was drawing over. Reseed through THE ONE config instead.
+        if (engine) applySimConfig(engine, lastAbsolute);
         if (droWcsEl) droWcsEl.textContent = m[0];
     }
     function flashDro() {       // re-trigger the CSS flash on the Work column (the re-reference cue)
@@ -515,7 +518,7 @@ export function createPreviewPanel(container, opts = {}) {
             wcsOffset: wcsForViz(),
             simSpeed: simSpeed(),
             rapidRate: (machineForViz() || {}).rapidRate,   // t844 — time-true playback uses the DECLARED G0 rate, so it matches the time estimate
-            createVarStore: opts.createVarStore || null,
+            createVarStore: opts.createVarStore ? (() => opts.createVarStore({ persist: true })) : null,   // t1241 A5 — the RUN owns the persistent store (a serial bumped by one Play survives into the next)
             onLineChange: ({ lineIndex, raw }) => {
                 if (typeof opts.onLine === 'function') opts.onLine(lineIndex);
                 if (raw != null) setStatus(fmtExecLine(lineIndex + 1, raw));   // t867 rider — the RAW executing line (one source with the editor highlight), not a paraphrase
@@ -609,7 +612,10 @@ export function createPreviewPanel(container, opts = {}) {
                 updateRunBtn();
                 if (typeof opts.onLine === 'function') opts.onLine(null);
                 setProgress(null);   // t865 — run finished → hide the progress bar (a looped run re-shows it on its next line)
-                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); pendingProbe = null; pendingDatum = null; compMap = readEnabledComps(compOps()); applySimConfig(engine, lastAbsolute); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // t1205 — re-apply THE ONE simConfig on a loop replay too (it bypassed it, so a config change mid-session only took effect after a manual re-run)   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
+                // t1241 A6 — the loop replay used to hand-roll a PARTIAL seed (config + probe overlay + the deferred
+                // probe/datum state) and missed everything else seedFreshRun does — the stock-flip reset, the device
+                // rest states, the retired tool, the sim speed. A looped run is a FRESH run; seed it like one.
+                if (loopOn) { clearTimeout(loopTimer); loopTimer = setTimeout(() => { lastRunCode = get('getGcode') || lastRunCode; if (viz && viz.resetProbe) viz.resetProbe(); compMap = readEnabledComps(compOps()); seedFreshRun(engine); engine.run(lastRunCode); updateRunBtn(); }, 2000); }   // t1205 — re-apply THE ONE simConfig on a loop replay too (it bypassed it, so a config change mid-session only took effect after a manual re-run)   // 2 s idle so the final datum/result is VISIBLE before looping (was 800 ms — cleared too fast); fresh probe overlay each loop (datum re-derives from the WCS-write)
             },
         });
         return engine;
@@ -672,7 +678,9 @@ export function createPreviewPanel(container, opts = {}) {
     const simStock = () => machineFrameTool ? null : previewStock();   // a homing SWITCH-SEEK ignores the workpiece for COLLISION (rendered separately); the op sim-stock (rotary bar) wins over the global, for BOTH consumers
     function simWcsOffset(absolute, stk) {
         if (machineFrameTool) return { x: 0, y: 0, z: 0 };   // a machine-frame route/run draws in MACHINE coords (no work-origin shift — the recurring few-inch delta)
-        const wo = wcsForViz() || { x: 0, y: 0, z: 0 };
+        // t1241 A2 — read the ACTIVE index (the program's G54-G59 override when one has fired, else the settings active).
+        // wcsForViz() always read the SETTINGS row, which is why the DRO path had to hand-roll its own offset.
+        const wo = activeWcsOffset() || wcsForViz() || { x: 0, y: 0, z: 0 };
         const mch = machineForViz();
         // faithful machine frame for an ABSOLUTE (mill) program: part-zero's machine Z = the table + the datum height above the
         // stock bottom, so a `G53 Z0` (end safe-Z retract) draws at machine home (the top) instead of plunging onto a bottom-datum origin.
@@ -703,7 +711,11 @@ export function createPreviewPanel(container, opts = {}) {
             passStarts,                                        // per-pass starts (multi-point probe collision fires from each)
             wcsOffset: simWcsOffset(absolute, stk),
             g53ApproxZ: g53ApproxForViz(),                     // t826 — undeclared: render machine-frame G53 Z retracts as a margin-clearance above the work
-            createVarStore: opts.createVarStore || null,       // t1189 — the STATIC route trace must seed the SAME #vars as play (the engine already gets this at creation). Without it a CAM-slot macro reads its #2600+ mirrors as 0 → e.g. a Pocket's size guard trips → 'No drawable moves'. Route↔play parity; applySimConfig ignores this field so play is unchanged.
+            // t1189 — the STATIC route trace must seed the SAME #vars as play (the engine already gets this at creation).
+            // Without it a CAM-slot macro reads its #2600+ mirrors as 0 → e.g. a Pocket's size guard trips.
+            // t1241 A5 — but the trace must NOT keep what it writes: `persist:false` (the default) hands it a COPY, so a
+            // {SN} serial no longer increments on every re-trace. The RUN below asks for the persistent store.
+            createVarStore: opts.createVarStore ? (() => opts.createVarStore({ persist: false })) : null,
         };
     }
     // Apply the ONE config to the LIVE animation engine (the trace consumes it via traceToolpath opts).
@@ -716,6 +728,28 @@ export function createPreviewPanel(container, opts = {}) {
         eng._passStarts = (c.passStarts && c.passStarts.length) ? c.passStarts : null;
         eng._wcsOffset = c.wcsOffset;
         eng._g53ApproxZ = c.g53ApproxZ;   // t826 — undeclared: the live tool retracts to the same margin-clearance the route drew
+    }
+
+    /**
+     * t1241 A — THE ONE RESEED PATH (the two-consumer drift class).
+     *
+     * The panel has TWO consumers of the same config: the DRAWN ROUTE (a fresh trace) and the RUNNING ENGINE (a live
+     * play). Every setter and listener that re-traced updated the first and left the second on stale config — the
+     * machine-frame hint, the WCS row, the stock, a settings change. The engine then drew a route that its own tool
+     * disagreed with, which is exactly the class of "works here, wrong there" bug this panel keeps producing.
+     * So: anything that re-traces while a play is in flight calls THIS, and this is the only place that decides how a
+     * running engine catches up (restart on the seat pattern — the engine's seeded state cannot be patched mid-run).
+     */
+    function reseedRunning() {
+        if (!engine || !engine.running) return false;
+        stopPlay(); play();
+        return true;
+    }
+    /** Re-trace the route AND bring a running engine with it — the pair that used to be done by hand at each site. */
+    function retraceAndReseed() {
+        if (!active) return;
+        setGcode();
+        reseedRunning();
     }
 
     function setGcode(text) {
@@ -910,7 +944,15 @@ export function createPreviewPanel(container, opts = {}) {
             else present.add('feed');   // G1 cut/plunge — the basic feed move
         }
         if (viz && viz.starts && viz.starts.length > 1) present.add('jog');
-        el.innerHTML = LEGEND.filter((x) => present.has(x.key)).map((x) => `<span style="color:${x.color}">${x.label}</span>`).join('');
+        // t1241 C14 — a colour-only chip cannot tell Rapid from Safe travel: since lifted took the rapid HUE they render
+        // as two identical yellows, so the legend claimed a distinction the eye could not make. Each chip now draws its
+        // own DASH SAMPLE from the declared token (dashFor), which is the thing that actually distinguishes them.
+        const sample = (key) => {
+            const d = dashFor(key === 'probeSlow' ? 'probe' : key);
+            const pattern = (d && d.length) ? `repeating-linear-gradient(90deg, currentColor 0 ${d[0]}px, transparent ${d[0]}px ${d[0] + (d[1] || d[0])}px)` : 'currentColor';
+            return `<i class="lg-dash" aria-hidden="true" style="background:${pattern}"></i>`;
+        };
+        el.innerHTML = LEGEND.filter((x) => present.has(x.key)).map((x) => `<span style="color:${x.color}">${sample(x.key)}${x.label}</span>`).join('');
         el.style.display = el.childElementCount ? '' : 'none';
     }
 
@@ -929,7 +971,7 @@ export function createPreviewPanel(container, opts = {}) {
             const v = ensureViz();
             if (v) { if (v.renderer) v.renderer.domElement.style.display = ''; v.setActive(true); }
         }
-        if (active) setGcode();
+        retraceAndReseed();   // t1241 A — the tripwire caught this one too: a frame flip mid-play left the live tool behind
         if (mode === '2d') { t2.setMachine(machineForViz()); t2.setStock(stockForViz()); t2.fit(); }   // t744 — envelope everywhere (2D): pass the declared machine regardless of anchor
         syncJog();
     }
@@ -1025,7 +1067,10 @@ export function createPreviewPanel(container, opts = {}) {
     //      store + broadcasts ddcs:settings-changed; renderStock() then pushes it into this panel's viz/engine. ----
     function renderStock() {
         const s = stockForViz();
-        if (viz) viz.setStock(s); if (engine) engine.stock = stockForViz(); t2.setStock(s);
+        // t1241 A3 — the VIZ draws the global stock, but a running ENGINE collides against the SIM stock (simStock():
+        // a homing switch-seek ignores the workpiece, a rotary op has its own bar). Assigning the global one here meant
+        // any settings change mid-play silently swapped the collision body under the tool. One source: simConfig's.
+        if (viz) viz.setStock(s); if (engine) engine.stock = simConfig(lastAbsolute).stock; t2.setStock(s);
         // A stock GEOMETRY change (dims / shape / datum) must refresh the view — the grid floor + framing are set
         // in fit(), which otherwise only runs once. Reset `fitted` so the next render re-fits (grid follows the
         // new stock bottom). Keyed so unrelated settings changes don't reframe.
@@ -1089,7 +1134,9 @@ export function createPreviewPanel(container, opts = {}) {
 
     window.addEventListener('ddcs:stop-previews', stopPlay);
     // Stock (or other settings) changed — e.g. the Stock modal — update the workpiece box + re-trace (probe clamp).
-    window.addEventListener('ddcs:settings-changed', () => { renderStock(); updateStockGlow(); const m = machineForViz(); if (viz) viz.setMachine(m); t2.setMachine(m); applyPreviewSettings(); if (active) setGcode(); });   // t744 — envelope everywhere: the declared machine regardless of anchor (the registry gates the box in both viz.setMachine + t2.paint)
+    // t1241 A4 — …and a running play is brought with it (retraceAndReseed), instead of re-tracing the ROUTE and leaving
+    // the engine on the config it was seeded with.
+    window.addEventListener('ddcs:settings-changed', () => { renderStock(); updateStockGlow(); const m = machineForViz(); if (viz) viz.setMachine(m); t2.setMachine(m); applyPreviewSettings(); retraceAndReseed(); });   // t744 — envelope everywhere: the declared machine regardless of anchor (the registry gates the box in both viz.setMachine + t2.paint)
 
     function setActive(on) {
         active = !!on;
@@ -1132,7 +1179,7 @@ export function createPreviewPanel(container, opts = {}) {
         if (on === forceMachine) return;
         forceMachine = on;
         lastAnchor = null;   // force the anchor/envelope block in setGcode to re-evaluate
-        if (active) setGcode();
+        retraceAndReseed();   // t1241 A — the tripwire caught this one too: a frame flip mid-play left the live tool on the old frame
     }
 
     // t1203 — Host hint: this program probes FOR the WCS (see `probesForWcs`). Changes g53ApproxForViz's answer, which
@@ -1145,7 +1192,7 @@ export function createPreviewPanel(container, opts = {}) {
         // view calls preview3D FIRST and applies the declared intent AFTER, so the on-open auto-play has already captured
         // _g53ApproxZ while this flag was still false — the animation would keep mapping G53 through the declared WCS table
         // for the whole first run. scheduleLiveRestart bails on unchanged G-code, so only a forced restart re-seeds it.
-        if (active) { setGcode(); if (engine && engine.running) { stopPlay(); play(); } }
+        retraceAndReseed();   // t1241 A — was the same pair hand-rolled; through the one path now
     }
 
     // Host hint: show/hide the 4th-axis rotary rig (rotary probe ops). Symmetric with setForceMachine — stores the
@@ -1167,7 +1214,10 @@ export function createPreviewPanel(container, opts = {}) {
         machineFrameTool = on;
         if (viz && viz.setToolMachineFrame) viz.setToolMachineFrame(on);
         if (t2 && t2.setMachineFrame) t2.setMachineFrame(on);   // t652 — the 2D draws the machine frame too (Start + envelope raw machine coords), matching the 3D
-        if (active) setGcode();   // t578 — a machine-frame flip changes the trace FRAME (machine coords + seat + stock-ignore); RE-TRACE so the seated route lands NOW (mirrors setSeatAtStart). Without this the first render kept the pre-seat origin route until the next edit/drag ('on open it's not connecting the start and probe, only after first drag').
+        // t578 — a machine-frame flip changes the trace FRAME (machine coords + seat + stock-ignore); RE-TRACE so the
+        // seated route lands NOW. t1241 A1 — and RESEED a running play through the one path: the flip used to update
+        // the drawn route only, leaving the live tool in the part frame it was seeded with (the homing first-open class).
+        retraceAndReseed();
     }
 
     // Host hint: SEAT the trace/engine initial position at the draggable Start (marker A) — the homing initialPos seam WITHOUT
@@ -1180,7 +1230,7 @@ export function createPreviewPanel(container, opts = {}) {
         // intent is applied AFTER the on-open auto-play (preview3D → setActive → autoStartOnOpen ran while seatAtStart was
         // still false → engine seeded pos=0). scheduleLiveRestart bails on unchanged G-code, so the running animation stays
         // at origin until a drag. Force a restart so the sim seats at the Start on FRESH OPEN with zero interaction.
-        if (active) { setGcode(); if (engine && engine.running) { stopPlay(); play(); } }
+        retraceAndReseed();   // t1241 A — was the same pair hand-rolled; through the one path now
     }
 
     // Arm the ATC tool-swap + device animation for this op. A 'push' (firmware) or 'pick-place' (generic/disk)
@@ -1260,6 +1310,17 @@ export function createPreviewPanel(container, opts = {}) {
         const theta = diskTheta(spindleTool);
         if (viz) { viz._diskTheta = theta; if (viz.setMagazine) viz.setMagazine(magPocketList(new Set(magToolNums().filter((t) => t !== spindleTool)), theta)); }
     }
+    /**
+     * t1241 D15 — SHOW THE MAGAZINE because the program says so. `showMagazine` was DECLARED per-op and UNIONED by
+     * programSimContext, but nothing ever applied it: an ATC op in the editor or Blocks program rendered no magazine
+     * while the same op in its wizard did. The pockets themselves come from the profile (magazinePockets); this only
+     * decides whether they are rendered, which is what the declaration always meant.
+     */
+    function setShowMagazine(on) {
+        if (!viz || !viz.setMagazine) return;
+        viz.setMagazine(on ? magPocketList(new Set(magToolNums()), 0) : null);
+    }
+
     function doToolSwap(oldN, newN) {
         const tools = toolsForViz();
         const spec = (n) => tools.find((t) => t && Number(t.num) === Number(n)) || { type: 'endmill', dia: 6, length: 35 };
@@ -1276,7 +1337,7 @@ export function createPreviewPanel(container, opts = {}) {
         }
     }
 
-    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setProbesForWcs, setMarkerDragWriter, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
+    return { setGcode, refresh, setActive, setView: setMode, stop: stopPlay, seekLine, getStartPos, setForceMachine, setRotaryFixture, setToolMachineFrame, setSeatAtStart, setProbesForWcs, setShowMagazine, setMarkerDragWriter, setAtcSwap, setLimitSwitches, onStartDrag, getPassStarts: () => passStarts, getPassSources: () => lastPassSources, getPassEnds: () => lastPassEnds,
         getSegments: () => segs,                                                          // t309 — the shared trace for the Layout animation overlay (no re-trace)
         // t1187 — a CLEAN geometry-only PNG data-URL of the sim (stock + toolpath, NO overlay: grid/axes/handles/markers/HUD).
         // 2D-toolpath capture (the WebGL 3D clean-capture is a follow-on — no preserveDrawingBuffer + no clean-overlay toggle

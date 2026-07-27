@@ -56,8 +56,17 @@ function gpStartHints() {
 // t764 — REUSE the PERSISTENT sim-uservar store (models the controller's non-volatile uservar file) so a {SN} serial
 // counter bumped by one Play survives into the next Play (two Plays → different serials). The config vars below are
 // re-seeded fresh into it each run; the user vars (#100-549, incl. the serial slot) persist.
-function gpSeededVarStore() {
-    const m = simUserVarStore();
+/**
+ * t1241 A5 (LIVE bug) — this returned the PERSISTENT store BY REFERENCE, and the panel calls it for the route TRACE as
+ * well as for a play. So every re-trace — every keystroke in the editor — ran the program's arithmetic against the real
+ * store and left its writes there: a {SN} serial-number program incremented its serial while you were typing.
+ * A TRACE gets a COPY (it may compute freely; nothing it writes survives), a RUN gets the real store (a serial bumped
+ * by one Play is meant to survive into the next). `opts.persist` says which, and the default is the safe one.
+ */
+function gpSeededVarStore(opts) {
+    const persist = !!(opts && opts.persist);
+    const src = simUserVarStore();
+    const m = persist ? src : new Map(src);
     const cfg = window.ddcsGetSettings ? window.ddcsGetSettings() : null;
     const p = (cfg && cfg.probes) || {};
     const a = (cfg && cfg.atc) || {};

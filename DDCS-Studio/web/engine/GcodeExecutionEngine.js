@@ -412,8 +412,7 @@ export class GcodeExecutionEngine {
         // t107 — the FINAL pass has no trailing reposition to record its end, so capture it here (O + local pos). Only
         // an anchorsAtPrev pass READS _passEnds (via passAnchorFor), so this is inert for every non-corner op; publishing
         // it lets the preview relocate the reposition-DESTINATION markers to the same runtime end the collision fired from.
-        const oFin = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
-        this._passEnds[this._pass] = { x: oFin.x + this.pos.x, y: oFin.y + this.pos.y, z: oFin.z + this.pos.z };
+        this._passEnds[this._pass] = this._worldOf(this.pos);   // t1241 B8 — the same anchor expression, through the one seam
         return {
             segments,
             bounds: segments.length ? b : null,
@@ -613,8 +612,10 @@ export class GcodeExecutionEngine {
     // the SAME frame the probe trigger uses (#1925 = O + target). A=0 (no rotary axis tracked). Guarded to pure-sim.
     _updateDro() {
         if (!this._populateDro) return;
-        const O = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };   // t94/t107 — same re-park anchor the collision uses (runtime END for an anchorsAtPrev pass), so the DRO frame matches #1925-1927
-        const mx = (O.x || 0) + this.pos.x, my = (O.y || 0) + this.pos.y, mz = (O.z || 0) + this.pos.z;
+        // t94/t107 — the same re-park anchor the collision uses, so the DRO frame matches #1925-1927. t1241 B — through
+        // the ONE seam now: the hand-inline omitted _anchor()'s initialPos gate, so on a SEATED run (homing/alignment)
+        // the DRO quoted a frame the collision did not use. The claim in this very comment is now enforced by sharing.
+        const { x: mx, y: my, z: mz } = this._worldOf(this.pos);
         for (const base of DRO_BASES) {
             this.vars.set(base, mx); this.vars.set(base + 1, my); this.vars.set(base + 2, mz); this.vars.set(base + 3, 0);
         }
@@ -629,7 +630,11 @@ export class GcodeExecutionEngine {
         const s = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings() : null;
         if (!s || !s.machine) return;
         const wo = this._wcsOffset || {}, us = this.unitScale || 1;
-        const mp = { x: (pos.x + (wo.x || 0)) / us, y: (pos.y + (wo.y || 0)) / us, z: (pos.z + (wo.z || 0)) / us };
+        // t1241 B7 (LIVE) — `pos` is PASS-LOCAL, and this mapped it as if every pass were pass 0: on any pass ≥ 1 of a
+        // multi-pass op the machine position was out by the pass anchor, so the home/limit lamps tripped at the wrong
+        // place. Go through the declared seam (_worldOf → _anchor) that the docstring above already promises.
+        const w = this._worldOf(pos);
+        const mp = { x: (w.x + (wo.x || 0)) / us, y: (w.y + (wo.y || 0)) / us, z: (w.z + (wo.z || 0)) / us };
         setLimitSwitches(limitSwitchTrips(mp, s.machine, s.limits || {}));
     }
 
@@ -730,8 +735,7 @@ export class GcodeExecutionEngine {
             // emanate from HERE when it's an anchorsAtPrev pass (passAnchorFor reads _passEnds), not from the static
             // previous START marker — so the route, the relocated marker, and #1925-1927 all land on where the tool
             // actually is. Preview/sim only (never emitted).
-            const oEnd = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
-            this._passEnds[this._pass] = { x: oEnd.x + this.pos.x, y: oEnd.y + this.pos.y, z: oEnd.z + this.pos.z };
+            this._passEnds[this._pass] = this._worldOf(this.pos);   // t1241 B8 — was a byte-copy of the anchor math; one seam
             this._pass += 1;
             if (this._pass > this._maxPass) this._maxPass = this._pass;
             this._passSources[this._pass] = /auto-traverse/i.test(step.raw) ? 'auto' : 'manual';   // marker colour by source: auto-traverse vs operator jog
@@ -1080,8 +1084,7 @@ export class GcodeExecutionEngine {
         // Record the datum origin (machine coord of work-0 per axis) so the probe-datum check can verify the touched face
         // reads work-0. (Without this, G92 fell into the move handler below and drew a spurious jump.)
         if (gcodes.includes(92)) {
-            const O = passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 };
-            const cur = { x: (O.x || 0) + this.pos.x, y: (O.y || 0) + this.pos.y, z: (O.z || 0) + this.pos.z };
+            const cur = this._worldOf(this.pos);   // t1241 B — the same anchor expression; one seam (initialPos gate included)
             for (const [k, f] of [['X', 'x'], ['Y', 'y'], ['Z', 'z']]) {
                 if (wm[k] != null && Number.isFinite(wm[k])) this._datumOrigin[f] = cur[f] - wm[k] * this.unitScale;
             }
@@ -1189,7 +1192,7 @@ export class GcodeExecutionEngine {
                 // and the probe-vs-stock ray misses the fence entirely (alignment's horizontal G31 never collided). O = 0 then,
                 // so aStart = the tool's real world pos. (Homing seeks in the MACHINE frame → still miss the part-frame stock →
                 // the seek clamp below handles them, unchanged.)
-                const O = this._initialPos ? { x: 0, y: 0, z: 0 } : (passAnchorFor(this._passStarts, this._passEnds, this._pass) || this._stockOffset || { x: 0, y: 0, z: 0 });
+                const O = this._anchor();   // t1241 B9 — was a hand-inline of exactly what _anchor() declares (initialPos gate included)
                 const aStart = { x: O.x + this.pos.x, y: O.y + this.pos.y, z: O.z + this.pos.z };
                 const bEnd = { x: O.x + target.x, y: O.y + target.y, z: O.z + target.z };
                 const dir = { x: target.x - this.pos.x, y: target.y - this.pos.y, z: target.z - this.pos.z };

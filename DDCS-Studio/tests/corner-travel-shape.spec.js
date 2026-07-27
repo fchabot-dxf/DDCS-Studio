@@ -125,7 +125,7 @@ test('travelShape=diagonal: the traverse renders as LIFTED safe-travel (the rapi
   await page.waitForTimeout(900);
 
   const r = await page.evaluate(async () => {
-    const { segColor } = await import('/viz/toolpath2d.js');
+    const { segColor, typeOf, dashFor } = await import('/viz/toolpath2d.js');   // t1241 — typeOf/dashFor: the discriminators colour can no longer be
     const { PATH_TYPES, hexCss } = await import('/viz/pathStyle.js');
     const box = document.getElementById('userViz3dContainer');
     const host = box && box.parentElement && box.parentElement.querySelector('.wiz-viz3d');
@@ -148,7 +148,13 @@ test('travelShape=diagonal: the traverse renders as LIFTED safe-travel (the rapi
         if (R > 150 && G > 110 && B < 120 && R >= G) lifted++;   // the rapid hue #ffcc00 (red+green high, blue low — tolerant of the alpha blend over the dark canvas)
       }
     }
-    return { transType: trans && (trans.type || (trans.rapid ? 'rapid' : 'other')), transColor: trans ? segColor(trans, 0, 1, 0) : null, liftedHex, cyanHex, rapidHex: hexCss(PATH_TYPES.rapid.color), liftedDash: PATH_TYPES.lifted.dash, lifted };
+    // t1241 C10/C11 — the pixel count and the hex equality below are DEGENERATE now that lifted shares the rapid hue:
+    // >2 yellow pixels passes on any rapid, and a hex compare of two identical colours proves nothing. Classify the
+    // traced segment through the RENDER-TIME seam (typeOf) and read its DASH — that is what actually distinguishes a
+    // safe-travel from a rapid, so a solid-rendering regression can no longer pass.
+    const transTypeOf = trans ? typeOf(trans) : null;
+    const transDash = trans ? dashFor(typeOf(trans)) : null;
+    return { transType: trans && (trans.type || (trans.rapid ? 'rapid' : 'other')), transTypeOf, transDash, transColor: trans ? segColor(trans, 0, 1, 0) : null, liftedHex, cyanHex, rapidHex: hexCss(PATH_TYPES.rapid.color), liftedDash: PATH_TYPES.lifted.dash, lifted };
   });
   await page.evaluate(() => localStorage.removeItem('ddcs_user_ops'));
 
@@ -158,6 +164,9 @@ test('travelShape=diagonal: the traverse renders as LIFTED safe-travel (the rapi
   expect(r.transColor, 'the lifted safe-travel is NOT the probe cyan').not.toBe(r.cyanHex);
   // t1203 (USER) — that colour IS the rapid hue, so the 2D Layout and the 3D preview agree by construction...
   expect(r.liftedHex, 'the safe-travel colour == the rapid hue (2D matches the 3D convention)').toBe(r.rapidHex);
+  // …which is precisely why the CLASSIFICATION + the DASH are the discriminators that mean something (t1241 C10/C11):
+  expect(r.transTypeOf, 'the render-time classification promotes the horizontal traverse to lifted safe-travel').toBe('lifted');
+  expect(r.transDash && r.transDash.length, 'and it draws DASHED — a solid re-render would be a regression colour cannot see').toBeGreaterThan(0);
   // ...and the DASH is what keeps a traverse distinguishable from a solid positioning rapid / a cut
   expect(r.liftedDash.length, 'the traverse stays dashed (distinct without needing a second colour)').toBeGreaterThan(0);
   // the real Layout paint: the traverse band is actually drawn in that hue

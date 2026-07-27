@@ -5639,3 +5639,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wss-dim { color: var(--text-dim); }
 .wss-link { font: inherit; font-size: 12px; background: none; border: 0; color: var(--accent, #2d7ff9); cursor: pointer; padding: 0 2px; }
 .wss-foot { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* t1241 C14 — the legend chip's DASH SAMPLE: a short rule drawn with the type's own declared dash, so Rapid and Safe
+   travel (which share a hue since t1203) are tellable apart at a glance instead of by reading the label. */
+.viz3d-legend .lg-dash { display: inline-block; width: 18px; height: 2px; margin-right: 5px; vertical-align: middle; }

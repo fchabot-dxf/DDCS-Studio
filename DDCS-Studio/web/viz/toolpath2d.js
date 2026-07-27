@@ -267,7 +267,7 @@ export function createToolpath2d(canvas, opts = {}) {
         const drawSeg = (s) => {
             const t = typeOf(s), el = elOf(t), d = displayOf(el);
             if (!d.visible) return;   // t744 — the registry hides this path type live
-            ctx.globalAlpha = alpha * d.alpha * ((PATH_TYPES[t] && PATH_TYPES[t].dim) || 1);   // compose the registry alpha onto the progress-state alpha; t893 — a lifted safe-travel is dimmed
+            ctx.globalAlpha = alpha * d.alpha;   // t1241 C13 — the per-type `dim` multiplier is GONE from the palette (t1203 gave lifted its own colour + widthScale instead), so multiplying by a value no token declares was dead arithmetic reading as live intent
             // MOTION-TYPE colouring (matches the 3D): a rapid is a rapid → the one-source rapid YELLOW, whether single-axis
             // (dogleg leg) or 2-axis (diagonal traverse) — it IS a G0 positioning move (human t328). The ONLY source-special
             // case is the MANUAL 2-axis jog, which arcs UP ('rainbow') in its own amber jog colour. Markers still carry the
