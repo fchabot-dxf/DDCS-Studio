@@ -630,17 +630,17 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .hq-identity-txt b { font-weight: 700; }
 /* the envelope wraps as ONE unit — a machine's travel must never break across a line mid-number */
 .hq-identity-txt .hq-env { white-space: nowrap; }
-.hq-cloud-badge, .hq-pull-btn {
-    /* t859 — each of the identity row's THREE tap targets is ≥44px: the row (label), the ☁ cloud state, the ↧ pull */
+.hq-pull-btn {
+    /* t859 — the identity row's tap target is ≥44px. t1243 — the ☁ badge that shared this rule is retired (cloud
+       moved to the workspace manager's Cloud tab), so only the ↧ pull remains. */
     flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
     min-width: 44px; min-height: 44px; padding: 0; border-radius: 4px; font-size: 13px; line-height: 1;
     opacity: .6; cursor: pointer; text-align: center;
     transition: opacity .12s ease, background .12s ease;
 }
-.hq-cloud-badge:hover, .hq-pull-btn:hover {
+.hq-pull-btn:hover {
     opacity: 1; background: var(--panel2, rgba(255,255,255,.14));
 }
-.hq-cloud-badge.connected { opacity: .9; color: #4ade80; }
 
 /* Workspace row: small compact buttons in one horizontal row. (t1227 — the .hq-gcode-* twin went with the gcode row
    itself: Load/Insert/Export moved to the editor's corner file menu, so this styling has one user again.) */
@@ -5643,3 +5643,7 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* t1241 C14 — the legend chip's DASH SAMPLE: a short rule drawn with the type's own declared dash, so Rapid and Safe
    travel (which share a hue since t1203) are tellable apart at a glance instead of by reading the label. */
 .viz3d-legend .lg-dash { display: inline-block; width: 18px; height: 2px; margin-right: 5px; vertical-align: middle; }
+
+/* t1243 — the Cloud tab's account bar: who you are signed in as, and the way out. The header ☁ badge is retired, so
+   this is the one place the cloud connection is stated. */
+.wsm-cloudbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: 12px; }

@@ -5,7 +5,7 @@
   "type": "module",
   "main": "app.js",
   "scripts": {
-    "start": "npx http-server ./web -p 3000 --silent",
+    "start": "npx http-server ./web -p 3000 --silent -c-1",
     "generate-vars": "node web/data/import_vars.js --input \"data/Variables-ENG 01-04-2025.csv\" --output web/data/default_vars.js",
     "svg:rename-gradients": "python \"web/assets/svg/rename_gradients.py\" --dir \"web/assets/svg\"",
     "prebundle": "npm run svg:rename-gradients",

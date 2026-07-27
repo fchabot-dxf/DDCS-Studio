@@ -20,7 +20,7 @@ const seedProfile = async (page) => {
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };
 
-test('the compact diet menu: identity row (name·controller, ☁, ↧) + one workspace row + Library; the EDITOR file rows are gone, ≤8 rows', async ({ page }) => {
+test('the compact diet menu: identity line (name·controller, ↧) + one workspace row + Library; the EDITOR file rows are gone, 8 rows', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
     await openMenu(page);
@@ -35,7 +35,7 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + one wor
             identityCtrl: id ? (id.querySelector('.hq-cur') || {}).textContent || '' : '',
             // …and it sits directly above the Save / Open buttons, so a save has its context
             identityAboveWs: !!(id && id.nextElementSibling && id.nextElementSibling.classList.contains('hq-ws-row')),
-            hasCloud: !!menu.querySelector('.hq-identity [data-cloud]'),
+            hasCloud: !!menu.querySelector('.hq-identity [data-cloud]'),   // t1243 — must now be FALSE (the badge moved to the manager's Cloud tab)
             hasPull: !!menu.querySelector('.hq-identity .hq-pull-btn[data-profact="pull"]'),
             hasLibrary: menu.querySelectorAll('[data-act="library"]').length,
             // t1227 CURATION — the editor's file rows left this menu for the editor's own corner menu
@@ -73,7 +73,7 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + one wor
     expect(m.identityAboveWs, 'it sits directly above Save / Open (save context)').toBe(true);
     expect(m.identityName, 'identity shows the WORKSPACE name (t1217 — from the machine record)').toMatch(/Rig B/);
     expect(m.identityCtrl, 'and the dialect after it').toMatch(/·/);
-    expect(m.hasCloud, 'the ☁ cloud-state tap target survives — it is a live door, and the only one on a phone (t742)').toBe(true);
+    expect(m.hasCloud, 'the cloud badge is RETIRED (t1243) — cloud lives in the workspace manager Cloud tab, one door not two').toBe(false);
     expect(m.hasPull, 'so does the ↧ pull tap target').toBe(true);
     // The compact rows
     expect(m.hasLibrary, 'Library row').toBe(1);
@@ -101,12 +101,11 @@ test('the compact diet menu: identity row (name·controller, ☁, ↧) + one wor
     // the identity's two TAP TARGETS are each ≥44px (the mock's touch requirement). The line itself is no longer a
     // target, so it is no longer measured as one — t1227 made it display-only.
     const box = async (sel) => (await page.locator(sel).first().boundingBox()) || { width: 0, height: 0 };
-    const cloudB = await box('.hq-identity [data-cloud]'), pullB = await box('.hq-identity .hq-pull-btn');
-    expect(Math.min(cloudB.width, cloudB.height), 'the ☁ target is ≥44px').toBeGreaterThanOrEqual(44);
-    expect(Math.min(pullB.width, pullB.height), 'the ↧ target is ≥44px').toBeGreaterThanOrEqual(44);
+    const pullB = await box('.hq-identity .hq-pull-btn');
+    expect(Math.min(pullB.width, pullB.height), 'the ↧ target is ≥44px (the ☁ one retired with the badge, t1243)').toBeGreaterThanOrEqual(44);
 });
 
-test('the identity line taps: it does NOTHING itself; ☁ → connect, ↧ → pull flow', async ({ page }) => {
+test('the identity line taps: it does NOTHING itself; ↧ → pull flow (the ☁ badge retired, t1243)', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await seedProfile(page);
 
@@ -117,12 +116,8 @@ test('the identity line taps: it does NOTHING itself; ☁ → connect, ↧ → p
     await expect(page.locator('#hdrPostMenu'), 'a dead press does not even close the menu').toBeVisible();
     await page.keyboard.press('Escape');   // it stayed open, so close it before the next step re-opens it
 
-    // ☁ CLOUD tap → the cloud connect flow (not connected → the login/connect UI)
-    await openMenu(page);
-    await page.click('.hq-identity [data-cloud]');
-    // scope to the MODAL's own mount — Settings hosts a second, hidden .cloud-login (the shared component)
-    await expect(page.locator('.cloud-account-ov .cloud-login, .cloud-account-ov .cloud-connect').first()).toBeVisible({ timeout: 6000 });
-    await page.keyboard.press('Escape');
+    // t1243 — the ☁ tap is GONE from this menu (cloud moved to the workspace manager's Cloud tab; its own spec,
+    // header-account-row-742, now proves the phone route end to end).
 
     // ↧ PULL tap → the pull flow (Settings → Controller → Profile, where the pull lives)
     await openMenu(page);

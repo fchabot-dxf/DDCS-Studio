@@ -25,7 +25,7 @@ import { getHandle, putHandle, handleGranted, FOLDER_KEY } from '../data/fsHandl
 import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
 import { dlgNotice, dlgConfirm } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
-import { getAccount, connect } from './cloudAccount.js';   // t1233 — the SAME sign-in Settings and the drawer use
+import { getAccount, connect, disconnect } from './cloudAccount.js';   // t1233 — the SAME sign-in Settings and the drawer use
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
@@ -302,6 +302,7 @@ export async function openWorkspaceManager(focus = 'save') {
     ov.querySelector('#wsmCards').addEventListener('click', async (e) => {
         const signin = e.target.closest('#wsmCloudSignIn');
         if (signin) { await cloudSignIn(ov); return; }
+        if (e.target.closest('#wsmCloudOut')) { disconnect(); await renderPlace(ov); return; }   // t1243 — the badge's disconnect, transferred
         const del = e.target.closest('[data-wsm-del]');
         if (del) {
             const c = (ov.__cards || [])[Number(del.dataset.wsmDel)];
@@ -376,6 +377,13 @@ function renderCurrent(ov) {
  * Feature-detect and DEGRADE: no folder support, no account, no network — each says which, and none of them throw.
  */
 async function renderPlace(ov) {
+    // t1243 — THE STALE-RENDER GUARD. Both halves await (IDB + the folder walk locally, the Drive listing in the cloud),
+    // so switching tabs while one is in flight used to let the SLOWER, OLDER render land last and paint over the newer
+    // one. That is not just a wrong picture: the render also writes `ov.__cards`, which is what a row click opens or
+    // deletes — so a Cloud-looking list could hold local rows. One monotonic token, checked after every await: a render
+    // that is no longer the current one writes nothing at all.
+    const token = (ov.__renderSeq = (ov.__renderSeq || 0) + 1);
+    const stale = () => ov.__renderSeq !== token;
     const head = ov.querySelector('.wsm-folder-head');
     const cards = ov.querySelector('#wsmCards');
     if (ov.__place === 'cloud') {
@@ -383,8 +391,14 @@ async function renderPlace(ov) {
         const acc = getAccount();
         if (!acc.connected || acc.provider !== 'google') { renderCloudSignedOut(ov); return; }
         cards.innerHTML = '<div class="wsm-dim">Reading your Drive…</div>';
-        try { renderCards(ov, null, await listCloudWorkspaces(), 'cloud'); }
+        try {
+            const list = await listCloudWorkspaces();
+            if (stale()) return;
+            renderCards(ov, null, list, 'cloud');
+            cards.insertAdjacentHTML('afterbegin', cloudAccountBar(acc));   // t1243 — WHO you are signed in as, and out
+        }
         catch (e) {
+            if (stale()) return;
             ov.__cards = [];
             const why = /cloud-auth/.test(String(e && e.message)) ? 'Your Google sign-in has expired.' : `Drive could not be reached (${(e && e.message) || e}).`;
             cards.innerHTML = `<div class="wsm-empty">${esc(why)} Your local workspaces are unaffected — switch back to <b>Local folder</b>, or sign in again.`
@@ -394,8 +408,22 @@ async function renderPlace(ov) {
     }
     head.hidden = false;
     const dir = await getHandle(FOLDER_KEY);
-    if (dir && await handleGranted(dir)) await renderFolder(ov, dir);
+    if (stale()) return;
+    const granted = dir && await handleGranted(dir);
+    if (stale()) return;
+    if (granted) await renderFolder(ov, dir, stale);
     else renderCards(ov, null, []);
+}
+
+/**
+ * t1243 (user) — THE ACCOUNT BAR. The header's ☁ badge is retired: cloud access lives in ONE place, this tab. The badge
+ * carried three things and all three land here rather than being orphaned — sign-in (the signed-out panel below),
+ * WHO you are signed in as, and the way back out. The identity is read from the shared account API, not a second copy.
+ */
+function cloudAccountBar(acc) {
+    const who = esc(acc.email || acc.name || 'your Google account');
+    return `<div class="wsm-cloudbar" id="wsmCloudBar"><span class="wsm-dim">Signed in as</span> <b>${who}</b>`
+        + '<button type="button" class="wss-link" id="wsmCloudOut">Sign out</button></div>';
 }
 
 /** The signed-out cloud tab: ONE button, and nothing else to decide. */
@@ -449,10 +477,14 @@ async function deleteCloudWorkspace(ov, card) {
     await renderPlace(ov);
 }
 
-async function renderFolder(ov, dir) {
+async function renderFolder(ov, dir, stale = () => false) {
     ov.querySelector('#wsmFolderPath').textContent = dir.name || 'Workspace folder';
     ov.querySelector('#wsmCards').innerHTML = '<div class="wsm-dim">Reading the folder…</div>';
-    renderCards(ov, dir, await listWorkspaces(dir));
+    // the folder walk reads every file's header, so it is the SLOWEST await in the modal and the one most likely to
+    // land after a tab switch — it takes renderPlace's staleness check with it (t1243)
+    const list = await listWorkspaces(dir);
+    if (stale()) return;
+    renderCards(ov, dir, list);
 }
 
 function renderCards(ov, dir, cards, place = 'local') {

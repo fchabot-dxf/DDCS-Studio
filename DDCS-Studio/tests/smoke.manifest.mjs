@@ -42,4 +42,8 @@ export const SMOKE_SPECS = [
     // pass every targeted run and still break them:
     'check-console.spec.js',            // zero boot errors — the NEW-FILE / 404 tripwire (a fresh web/ module 404s until the server reloads)
     'op-sim-context.spec.js',           // the op-type → declared-intent CONTRACT (missed when opSimContext.js itself was edited)
+    // t1243 — the STALE-MODULE GHOST guard. Studio serves raw ES modules, so one cacheable header re-runs deleted code
+    // on a normal reload; that cost five phantom bug reports in a single day. Cheap (4 tests, ~3s) and it belongs on
+    // every run, because the failure it prevents makes EVERY other test's green meaningless in the browser.
+    'module-cache-headers-1243.spec.js',
 ];

@@ -73,13 +73,19 @@ export function setMachineName(fileName) {
  * END of the axis the machine homes to, so `850 × -850 × -120` and `850 × 850 × 120` are two different machines. Both
  * summaries used to run the numbers through Math.abs, which made a machine unrecognisable from the one line that is
  * supposed to identify it. ONE formatter, so the Settings band, the file panel and any tooltip cannot disagree.
+ *
+ * t1243 (user) — the AXIS LETTERS are part of the reading. "850 × -850 × -120" makes you count positions to know
+ * which number is Z; "X 850 Y -850 Z -120" says it. The letters make the × separators redundant, so they go —
+ * the line stays the same length it was. Changing it HERE changes all three surfaces at once, which is the point
+ * of there being one formatter. (ONE space between groups, not two: HTML collapses the second, so a wider gap here
+ * would be a declaration that no surface honours.)
  * @param {{x:number,y:number,z:number}} m  a settings `machine` block — live, or read out of a .ddcs
- * @returns {string|null} e.g. "850 × -850 × -120", or null when an axis is not a finite number
+ * @returns {string|null} e.g. "X 850 Y -850 Z -120", or null when an axis is not a finite number
  */
 export function envelopeSummary(m) {
     const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
     const xyz = [n(m && m.x), n(m && m.y), n(m && m.z)];
-    return xyz.every((v) => v != null) ? xyz.join(' × ') : null;
+    return xyz.every((v) => v != null) ? xyz.map((v, i) => `${'XYZ'[i]} ${v}`).join(' ') : null;
 }
 
 if (typeof window !== 'undefined') {

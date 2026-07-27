@@ -100,13 +100,13 @@ test('THE ENVELOPE IS SHOWN AS DECLARED — signs included (the sign IS the home
     await grantFolder(page, FILES);
     await openFolder(page);
     const row = page.locator('#wsmCards .wsm-fp-row', { hasText: 'm350-shop' });
-    await expect(row.locator('.wsm-c-env'), 'not 850 × 850 × 120 — that is a different machine').toHaveText('850 × -850 × -120');
+    await expect(row.locator('.wsm-c-env'), 'not X 850 Y 850 Z 120 — that is a different machine (t1243: with the axis LETTERS)').toHaveText('X 850 Y -850 Z -120');
     await page.locator('#wsmCards').screenshot({ path: testInfo.outputPath('signed-envelope-rows.png') });
 
     // the Settings band reads the SAME formatter, so the two surfaces cannot describe one machine differently
     await page.evaluate(() => { const s = window.ddcsGetSettings(); Object.assign(s.machine, { x: 850, y: -850, z: -120 }); });
     await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
-    await expect(page.locator('#set_identity_band')).toContainText('850 × -850 × -120');
+    await expect(page.locator('#set_identity_band')).toContainText('X 850 Y -850 Z -120');
 });
 
 test('DELETE: the confirm names the file, says PERMANENT + no Recycle Bin, and Cancel touches nothing', async ({ page }, testInfo) => {
@@ -244,7 +244,7 @@ test('the quick-menu identity line carries the SIGNED envelope, from the same on
     const line = page.locator('#hdrPostMenu .hq-identity-line');
     await expect(line).toContainText('m350-shop');
     await expect(line).toContainText(/Expert M350/);
-    await expect(line, 'the envelope as declared, signs and all').toContainText('850 × -850 × -120');
+    await expect(line, 'the envelope as declared — signs AND axis letters (t1243), from the one formatter').toContainText('X 850 Y -850 Z -120');
     expect(await page.evaluate(() => document.querySelector('#hdrPostMenu .hq-identity-line').tagName), 'still plain text, still not a button').not.toBe('BUTTON');
 });
 

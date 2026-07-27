@@ -18,7 +18,6 @@ import { validate, summarize } from '../shared/js/validate/validate.js';
 import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare alert)
 import { getMachine, envelopeSummary } from '../data/workspaceMachine.js';   // t1217 — the identity line names THIS WORKSPACE'S MACHINE; t1231 — with its signed envelope
 import { THEMES } from './themes.js';
-import { getAccount, renderCloudLogin } from './cloudAccount.js';   // t742 — the header ACCOUNT row consumes the ONE shared cloud-account API (no second connect impl)
 import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
 import { openSetupSheet } from './setupSheet.js';   // t850 — the print-ready job page (reads every value from its declared source)
 import { openLibrary } from './libraryModal.js';   // t854 — the Library (Projects · Wizards; Profiles retired t1217)
@@ -87,25 +86,9 @@ function setQuickTheme(name) {
     } catch (_) { document.body.setAttribute('data-theme', name); }
 }
 
-// t742 — the header ACCOUNT row's tap: open a small modal hosting the SHARED renderCloudLogin (the ONE cloud-connect UI
-// Settings + the Projects drawer use — no duplicated connect logic; it self-refreshes on ddcs:cloud-account + routes
-// desktop/pywebview to the loopback flow inside cloudAccount.connect). Theme-token styled so it's legible on every theme.
-function openCloudModal() {
-    const ov = document.createElement('div');
-    ov.className = 'cloud-account-ov';
-    ov.style.cssText = 'position:fixed; inset:0; z-index:10060; background:rgba(0,0,0,0.45); display:flex; align-items:flex-start; justify-content:center;';
-    const box = document.createElement('div');
-    box.style.cssText = 'margin-top:12vh; min-width:min(340px,92vw); max-width:92vw; background:var(--panel,#161b22); color:var(--text,#e6edf5); border:1px solid var(--border,rgba(255,255,255,0.14)); border-radius:10px; padding:16px 18px; box-shadow:0 12px 40px rgba(0,0,0,0.5);';
-    box.innerHTML = '<div style="font-weight:700; margin-bottom:10px">Cloud account</div><div class="cloud-mount"></div>'
-        + '<div style="text-align:right; margin-top:14px"><button type="button" class="primary cloud-done" style="padding:5px 18px; font-size:13px">Done</button></div>';
-    ov.appendChild(box);
-    document.body.appendChild(ov);
-    renderCloudLogin(box.querySelector('.cloud-mount'));   // the shared component (connect / connected+disconnect / auto-refresh)
-    const close = () => ov.remove();
-    box.querySelector('.cloud-done').addEventListener('click', close);
-    ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
-    document.addEventListener('keydown', function onEsc(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); } });
-}
+// t1243 — openCloudModal is DELETED with the ☁ badge that opened it. The shared renderCloudLogin it hosted is
+// still the ONE connect UI (Settings + the projects drawer use it); the workspace manager's Cloud tab is the
+// wizard-side door now, carrying sign-in, the signed-in account and sign-out.
 
 export function initHeaderPost() {
     const btn = document.getElementById('hdrPostBtn');
@@ -138,25 +121,22 @@ export function initHeaderPost() {
         // It was a big compound BUTTON whose tap opened the machine's settings — a door built for the retired profile
         // world. It is now one QUIET PLAIN-TEXT line, "<workspace> · <dialect>", sitting directly above Save / Open so
         // a save has its context: no click handler, no button styling, nothing to press by accident.
-        // The ☁ and ↧ spans stay: they are their OWN tap targets for live features (cloud connect, pull from the
-        // controller) — never the row's retired click — and ☁ is the only cloud-connect affordance on a phone (t742).
+        // The ↧ span stays: it is its OWN tap target for a live feature (pull from the controller) — never the row's
+        // retired click. (t1243 — the ☁ badge that sat beside it moved to the workspace manager's Cloud tab.)
         const ap = getMachine();
         const apCtrl = (CONTROLLER_PROFILES[ap.controllerId] || {}).name || ap.controllerId || '';
         // t1231 (user) — the line also carries the ENVELOPE, signed, from the SAME formatter the manager rows and the
         // Settings band use. Three surfaces, one source: they cannot describe the same machine differently.
         const apEnv = envelopeSummary((window.ddcsGetSettings && window.ddcsGetSettings().machine) || {});
-        const acc = getAccount();
-        const cloudCls = acc.connected ? 'hq-cloud-badge connected' : 'hq-cloud-badge';
-        const cloudTitle = acc.connected
-            ? `Cloud: ${esc(acc.email || acc.name || 'connected')} — tap to manage`
-            : 'Connect cloud account';
+        // t1243 (user) — THE ☁ BADGE IS GONE. Cloud access lives in ONE place: the workspace manager's Local | Cloud
+        // tabs, which carry the sign-in, the signed-in account and the sign-out. A second door in the header meant two
+        // places to learn for one connection. The ↧ PULL span stays — that is a controller read, not a cloud thing.
         const identityRow =
             `<div class="hq-identity-line hq-identity">`
             + `<span class="hq-identity-txt"><b>${esc(ap.name || 'Untitled workspace')}</b>`
             + `<span class="hq-cur"> · ${esc(apCtrl)}</span>`
             + (apEnv ? `<span class="hq-cur hq-env"> · ${esc(apEnv)}</span>` : '')
             + `</span>`
-            + `<span class="${cloudCls}" data-cloud="1" role="button" tabindex="0" title="${cloudTitle}">☁</span>`
             + `<span class="hq-pull-btn" data-profact="pull" role="button" tabindex="0" title="Pull from controller">↧</span>`
             + `</div>`;
 
@@ -311,8 +291,6 @@ export function initHeaderPost() {
 
     // Route a menu click: an identity-line sub-target (☁ / ↧), a workspace button, a theme chip, or a menu row.
     menu.addEventListener('click', (e) => {
-        // t1227 — the identity is plain text now, so ☁ needs no guard against the row stealing its click.
-        if (e.target.closest('[data-cloud]')) { closeMenu(); openCloudModal(); return; }
         const exactPull = e.target.closest('.hq-pull-btn[data-profact]');
         if (exactPull) {
             closeMenu();

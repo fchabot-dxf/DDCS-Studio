@@ -1,65 +1,79 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * t742 — THE HEADER ACCOUNT ROW. The header quick-menu (#hdrPostBtn → #hdrPostMenu) gains a one-line ACCOUNT row in the
- * Profile section showing cloud state at a glance ("☁ Cloud: not connected · Connect" / "☁ <email>" when connected). Tap
- * opens the SAME connect flow (renderCloudLogin) Settings + the Projects drawer use — NO second connect implementation.
- * Context: cloud-connect was invisible on mobile (zero affordances on a fresh 390px boot). Emit untouched (header UI only).
+ * t742 — CLOUD-CONNECT MUST BE REACHABLE, ESPECIALLY ON A PHONE.
+ *
+ * The original symptom: a fresh 390px boot had ZERO cloud affordances, so the account row was added to the header
+ * quick menu. t1243 (user) retired that ☁ badge — cloud access lives in ONE place now, the workspace manager's
+ * Local | Cloud tabs — so this spec is RE-ENCODED, not deleted: the requirement was never "a badge in the header",
+ * it was "a person on a phone can find and use the cloud". That requirement now points at the Cloud tab, and these
+ * tests fail if it stops being reachable there.
  */
-
-// initHeaderPost wires the quick-menu click handler ASYNC on boot — window.ddcsStudio can exist before it's wired, so
-// clicking too early no-ops. Poll (t710-style, no fixed sleep): click only when the menu isn't already open, retry until
-// the row is actually visible — robust under -workers contention.
+// The menu's MARKUP is built by the same initHeaderPost() call that attaches its click handler, so waiting for a row
+// of that markup is the honest "the button is live now" signal. Waiting on #hdrPostMenu merely EXISTING is not: the
+// element is in index.html from the first byte, so a click can land before anything is listening and the menu never
+// opens — which is exactly how this spec flaked under load (t1243).
 const openMenu = async (page) => {
-    await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 20000 });
-    await expect(async () => {
-        const open = await page.evaluate(() => { const m = document.getElementById('hdrPostMenu'); return !!(m && !m.hidden && m.querySelector('[data-cloud]')); });
-        if (!open) await page.locator('#hdrPostBtn').click();
-        await expect(page.locator('#hdrPostMenu [data-cloud]')).toBeVisible({ timeout: 1500 });
-    }).toPass({ timeout: 15000 });
+    await page.waitForFunction(() => window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+    await page.locator('#hdrPostBtn').click();
+    await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
 };
 
-test('DESKTOP: the account row is in the header menu (not-connected state) + tap opens the SHARED cloud flow', async ({ page }) => {
+test('the retired ☁ badge is GONE from the header — one door, not two', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForSelector('#hdrPostBtn', { timeout: 8000 });
-    // ensure a fresh (not-connected) state
-    await page.evaluate(() => { ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email', 'ddcs_cloud_name'].forEach((k) => localStorage.removeItem(k)); });
     await openMenu(page);
-    const row = page.locator('#hdrPostMenu [data-cloud]');
-    await expect(row, 'the ☁ badge is visible in the header menu identity row').toBeVisible();
-    // t851 menu diet: cloud state is in the title= attr (compact badge shows ☁ only, state at a glance via tooltip)
-    await expect(row, 'not-connected state is stated in the badge title').toHaveAttribute('title', /Connect cloud|not connected|Connect/i);
-
-    // tap → the SHARED connect flow opens (a modal hosting renderCloudLogin — its .cloud-login component)
-    await row.click();
-    await page.waitForSelector('.cloud-account-ov', { timeout: 12000 });
-    await expect(page.locator('.cloud-account-ov .cloud-login'), 'the modal hosts the SHARED renderCloudLogin component (no duplicate connect impl)').toBeVisible();
-    await expect(page.locator('.cloud-account-ov .cloud-connect').first(), 'the shared provider-connect button is present').toBeVisible();
-    await page.screenshot({ path: 'scratchpad/account_row_desktop_742.png' });
-    await page.locator('.cloud-account-ov .cloud-done').click();
-    await expect(page.locator('.cloud-account-ov')).toHaveCount(0);
+    await expect(page.locator('#hdrPostMenu [data-cloud]'), 'the header no longer carries a cloud door').toHaveCount(0);
+    await expect(page.locator('#hdrPostMenu .hq-pull-btn'), 'the ↧ PULL span stays — a controller read, not a cloud thing').toBeVisible();
 });
 
-test('MOBILE 390px: the account row is visible in the header menu + tap opens the flow', async ({ page }) => {
+test('DESKTOP: cloud lives in the workspace manager — sign-in is one click from the Cloud tab', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.openWorkspaceManager);
+    await page.evaluate(() => { ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email'].forEach((k) => localStorage.removeItem(k)); });
+    await page.evaluate(() => window.openWorkspaceManager('open'));
+    await page.locator('.wsm-place[data-place="cloud"]').click();
+    const btn = page.locator('#wsmCloudSignIn');
+    await expect(btn, 'ONE sign-in button, in the one place cloud lives now').toBeVisible();
+    await expect(page.locator('#wsmCards button')).toHaveCount(1);
+});
+
+test('MOBILE 390px: the manager, its Cloud tab and the sign-in are all reachable AND tappable', async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('http://localhost:3211');
-    await page.waitForSelector('#hdrPostBtn', { timeout: 8000 });
-    await page.evaluate(() => { ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email', 'ddcs_cloud_name'].forEach((k) => localStorage.removeItem(k)); });
-    await expect(page.locator('#hdrPostBtn'), 'the header quick-menu button is reachable at 390px').toBeVisible();
+    await page.evaluate(() => { ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email'].forEach((k) => localStorage.removeItem(k)); });
+
+    // the route a person actually takes on a phone: quick menu → Open → Cloud → Sign in
+    await expect(page.locator('#hdrPostBtn'), 'the quick-menu button is reachable at 390px').toBeVisible();
     await openMenu(page);
-    await expect(page.locator('#hdrPostMenu [data-cloud]'), 'the account row is visible at 390px (cloud-connect was invisible on mobile before)').toBeVisible();
-    await page.locator('#hdrPostMenu [data-cloud]').click();
-    await page.waitForSelector('.cloud-account-ov', { timeout: 12000 });
-    await expect(page.locator('.cloud-account-ov .cloud-login')).toBeVisible();
+    await page.locator('#hdrPostMenu [data-act="wsOpen"]').click();
+    await expect(page.locator('#wsmOverlay')).toBeVisible();
+    const tab = page.locator('.wsm-place[data-place="cloud"]');
+    await expect(tab).toBeVisible();
+    await tab.click();
+    const btn = page.locator('#wsmCloudSignIn');
+    await expect(btn, 'the sign-in is ON SCREEN at phone width — the t742 symptom was that it was not').toBeVisible();
+    const b = await btn.boundingBox();
+    expect(b.width, 'and big enough to tap').toBeGreaterThan(80);
+    expect(b.x >= 0 && b.x + b.width <= 390, 'fully within the viewport').toBe(true);
     await page.screenshot({ path: 'scratchpad/account_row_mobile_742.png' });
 });
 
-test('CONNECTED state: the row shows the account identity', async ({ page }) => {
+test('CONNECTED: the Cloud tab shows WHO you are signed in as, and the way out', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForSelector('#hdrPostBtn', { timeout: 8000 });
-    // simulate a connected account (the ONE source cloudAccount.getAccount reads)
-    await page.evaluate(() => { localStorage.setItem('ddcs_cloud_token', 'tok'); localStorage.setItem('ddcs_cloud_provider', 'google'); localStorage.setItem('ddcs_cloud_email', 'maker@example.com'); });
-    await openMenu(page);
-    await expect(page.locator('#hdrPostMenu [data-cloud]'), 'the connected state shows the account email in the badge title').toHaveAttribute('title', /maker@example\.com/);
-    await page.evaluate(() => { ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email', 'ddcs_cloud_name'].forEach((k) => localStorage.removeItem(k)); });
+    await page.waitForFunction(() => window.openWorkspaceManager);
+    await page.route('https://www.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [] }) }));
+    await page.evaluate(() => {
+        localStorage.setItem('ddcs_cloud_token', 'tok'); localStorage.setItem('ddcs_cloud_provider', 'google');
+        localStorage.setItem('ddcs_cloud_email', 'maker@example.com');
+    });
+    await page.evaluate(() => window.openWorkspaceManager('open'));
+    await page.locator('.wsm-place[data-place="cloud"]').click();
+    const bar = page.locator('#wsmCloudBar');
+    await expect(bar, 'the identity the header badge used to carry in a tooltip is stated here').toBeVisible();
+    await expect(bar).toContainText('maker@example.com');
+    await expect(bar.locator('#wsmCloudOut'), 'and the disconnect it carried').toBeVisible();
+
+    await bar.locator('#wsmCloudOut').click();
+    await expect(page.locator('#wsmCloudSignIn'), 'signing out returns to the one sign-in button').toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('ddcs_cloud_token')), 'the token really is gone').toBeNull();
 });

@@ -97,7 +97,7 @@ test('the CLOUD tab lists Drive workspaces in the same table, with the SIGNED en
     await expect(rows).toHaveCount(2);
     await expect(page.locator('#wsmCards .wsm-fp-head')).toContainText(/Envelope/i);
     const m350 = rows.filter({ hasText: 'm350-shop' });
-    await expect(m350.locator('.wsm-c-env'), 'the same one formatter as the local rows — signs included').toHaveText('850 × -850 × -120');
+    await expect(m350.locator('.wsm-c-env'), 'the same one formatter as the local rows — signs AND axis letters (t1243)').toHaveText('X 850 Y -850 Z -120');
     await expect(m350.locator('.wsm-c-ctrl')).toHaveText(/Expert M350/);
     await expect(page.locator('#wsmPickFolder'), 'the local folder pick is not part of the cloud shelf').toBeHidden();
     await page.locator('#wsmOverlay .wsm-modal').screenshot({ path: testInfo.outputPath('tabs-cloud.png') });
@@ -213,4 +213,35 @@ test('a Drive that will not answer states WHY and leaves the local shelf alone',
     await expect(page.locator('#wsmCards'), 'and it points at the shelf that still works').toContainText(/Local folder/);
     await page.locator('.wsm-place[data-place="local"]').click();
     await expect(page.locator('#wsmPickFolder')).toBeVisible();
+});
+
+test('a SLOW render that lost the race paints nothing — the tab you are on is the tab you see (t1243)', async ({ page }) => {
+    // THE RACE, staged: switch to Cloud (whose Drive listing is held up), then switch straight back to Local. The late
+    // cloud render must not paint over the local half — and, the part that actually bites, must not leave ov.__cards
+    // holding CLOUD rows under a LOCAL-looking list, where the next click opens or deletes the wrong workspace.
+    await boot(page);
+    await fakeDrive(page);
+    let held;
+    await page.route('https://www.googleapis.com/drive/v3/files?**', async (route) => {
+        const q = decodeURIComponent((route.request().url().split('q=')[1] || '').split('&')[0]);
+        if (/in parents/.test(q) && !/name=/.test(q)) { held = route; return; }   // hold the LISTING open
+        route.fallback();
+    });
+    await page.evaluate(() => window.openWorkspaceManager('open'));
+    await page.locator('.wsm-place[data-place="cloud"]').click();
+    await expect(page.locator('#wsmCards')).toContainText(/Reading your Drive/i);
+    await page.locator('.wsm-place[data-place="local"]').click();
+    await expect(page.locator('.wsm-folder-head'), 'we are back on the local half').toBeVisible();
+
+    // now let the stale cloud listing arrive
+    await held.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [
+        { id: 'file-a', name: 'm350-shop.ddcs', mimeType: 'application/json', modifiedTime: '2026-07-24T10:00:00.000Z' },
+    ] }) });
+    await page.waitForTimeout(600);
+
+    await expect(page.locator('.wsm-place[data-place="local"]'), 'the Local tab is still the active one').toHaveClass(/is-active/);
+    await expect(page.locator('.wsm-folder-head'), 'and its folder head was not hidden by the late render').toBeVisible();
+    await expect(page.locator('#wsmCloudBar'), 'no cloud account bar leaked onto the local half').toHaveCount(0);
+    const rows = await page.evaluate(() => (document.querySelector('#wsmOverlay').__cards || []).map((c) => c.name));
+    expect(rows, 'and the row MODEL a click reads is local, not the cloud list that lost the race').not.toContain('m350-shop.ddcs');
 });

@@ -420,15 +420,35 @@ class DDCSStudio {
 // (V10.97) can't tell you WHAT you're running — burning turns on "is my page stale?". HEAD-fetch the served app.js's
 // Last-Modified (the entry module's mtime, no-store) → window.__ddcsBuild + a boot log + the .ver chip TOOLTIP, so "what am
 // I running" is a visible fact. Dev-cheap (one HEAD, no build pipeline); silent no-op when packaged / no server. Tracks app.js.
+// t1243 — …and the stamp alone was not enough. It reports what the SERVER has; the ghost is what the BROWSER KEPT. A
+// dev server sending max-age (http-server's default was 3600) lets a normal reload re-run a module the fix already
+// deleted — five "it came back" reports in one day, each spent hunting code that was already gone. The servers now all
+// send no-cache (package.json -c-1, fairy/server.py, the mem-server; Cloudflare Pages already sent must-revalidate),
+// and this compares the two directly: what the HTTP cache would hand the module loader (force-cache) against what the
+// server has right now (no-store). Different → say so, once, loudly enough to stop the hunt.
 (async () => {
     try {
-        const res = await fetch(new URL('app.js', import.meta.url).href, { method: 'HEAD', cache: 'no-store' });
+        const url = new URL('app.js', import.meta.url).href;
+        const cached = await fetch(url, { cache: 'force-cache' }).then((r) => r.headers.get('last-modified')).catch(() => null);
+        const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
         const lm = res && res.headers.get('last-modified');
         if (!lm) return;
         const stamp = new Date(lm).toISOString().replace('T', ' ').slice(0, 19) + 'Z';
         window.__ddcsBuild = stamp;
+        window.__ddcsStale = !!(cached && new Date(cached).getTime() !== new Date(lm).getTime());
         console.log('[DDCS] served app.js build: ' + stamp + '  (window.__ddcsBuild)');
-        const setTip = () => { const v = document.querySelector('.ver'); if (v) v.title = 'app.js build: ' + stamp + ' — served mtime; if it is older than your last edit, the tree is stale (hard-reload).'; };
+        if (window.__ddcsStale) {
+            console.warn('[DDCS] STALE MODULE CACHE: your browser is holding app.js from '
+                + new Date(cached).toISOString().replace('T', ' ').slice(0, 19) + 'Z but the server has ' + stamp
+                + '. What you see is NOT this code — hard-reload (Ctrl+Shift+R).');
+        }
+        const setTip = () => {
+            const v = document.querySelector('.ver');
+            if (!v) return;
+            v.title = window.__ddcsStale
+                ? 'STALE: the browser cached an older app.js — hard-reload (Ctrl+Shift+R). Served build: ' + stamp
+                : 'app.js build: ' + stamp + ' — served mtime; if it is older than your last edit, the tree is stale (hard-reload).';
+        };
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setTip); else setTip();
     } catch (_) { /* packaged / no server → no stamp */ }
 })();

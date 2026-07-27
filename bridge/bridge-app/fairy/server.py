@@ -212,6 +212,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        # t1243 — NO-CACHE ON EVERY STATIC BYTE. Studio ships raw ES modules; with no Cache-Control at all a browser
+        # applies HEURISTIC freshness (a fraction of the file's age) and re-serves a module it already has, so a fixed
+        # bug reappears on a normal reload and the code no longer explains the screen. Revalidate always.
+        self.send_header("Cache-Control", "no-cache")
         self.end_headers()
         self.wfile.write(body)
 
