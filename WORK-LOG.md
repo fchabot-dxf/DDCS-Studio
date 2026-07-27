@@ -17644,3 +17644,63 @@ Display only; it reads the same raw line the chip already had.
 GATE (fast tier): smoke 59/59 + 155 corner/middle/settings/form specs (2 pre-existing skips). Screenshots: the
 settings strip, the corner form (identity/geometry/tool-cut with the gear beside its field and the source circles on
 the left, mirrors gone), and the stock modal at Z=20 vs Z=60. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1241 -- TURN E: the hardening batch. 19 sites, and the tripwire found three more while I was writing it.
+
+### (A) THE TWO-CONSUMER DRIFT -- one seam, and then the seam did the finding.
+
+The panel has TWO consumers of one config: the DRAWN ROUTE (a fresh trace) and the RUNNING ENGINE (a live play). Six
+sites re-traced the first and left the second on the config it was seeded with. Rather than patch six, I added the ONE
+path — `reseedRunning()` / `retraceAndReseed()` — and routed them through it, because the engine's seeded state cannot
+be patched mid-run (the seat pattern already knew that: it restarts).
+Then I wrote the TRIPWIRE — enumerate every bare `setGcode()` in the panel and require it to be inside the shared pair
+or on a DECLARED allow-list with a reason — and it immediately named THREE MORE of the same class that the scan had
+not: setForceMachine, setProbesForWcs (hand-rolling the same restart) and, benignly, the sites that follow with
+replayFromStart or stopPlay first. Those three are folded too, and the allow-list states why each exception is one.
+A2 was the interesting one: the DRO's WCS select assigned the RAW table row onto the running engine, throwing away the
+machine-frame zeroing and the mill part-Z map the route applies — so mid-program the tool ran in a different frame from
+the route it was drawing over. It reseeds through the one config now, which required the config's WCS read to honour
+the PROGRAM-driven active index (the only reason two expressions existed).
+A5 was a LIVE bug and my favourite kind: `gpSeededVarStore` returned the persistent store BY REFERENCE, and the panel
+calls it for the route TRACE as well as for a play — so a {SN} serial-number program incremented its serial WHILE YOU
+TYPED. A trace now gets a copy, a run gets the real store, and `persist` says which at each call site.
+
+### (B) THE FRAME INLINES -- and the one that was a live wrong-lamp bug.
+
+B7: `_updateLimitSwitches` mapped a PASS-LOCAL position to machine coords as if every pass were pass 0, so on any pass
+>= 1 of a multi-pass op the home/limit lamps tripped at the wrong place. Through `_worldOf` now.
+The other four (the trace tail, the REPOSITION handler, the probe collision, the DRO, the G92 datum) were byte-copies
+of the same anchor expression. All fold through `_anchor()`/`_worldOf` — which the docstring already promised — and
+the DRO fold fixed a quieter drift: the inline omitted `_anchor()`'s initialPos gate, so on a SEATED run the DRO quoted
+a frame the collision did not use. The tripwire asserts `passAnchorFor` appears exactly ONCE.
+
+### (C) THE DEGENERATE DISCRIMINATORS -- what a test proves after two colours became one.
+
+Since lifted took the rapid HUE, a hue assertion proves nothing and a >2-pixel count passes on any rapid. Those specs
+now classify the traced segment through the render-time seam (`typeOf`) and read its DASH — the property that actually
+distinguishes a safe-travel from a rapid — so a solid-rendering regression can no longer pass.
+Same fact, user-facing: the LEGEND rendered colour-only chips, so "Rapid" and "Safe travel" were two identical yellow
+words. Each chip now draws its own dash sample from the declared token. The dead per-type `dim` multiplier went with
+the grey era it belonged to.
+
+### (D) DECLARED-UNCONSUMED -- one wired, one deleted, one deleted.
+
+  - showMagazine: WIRED. It was declared per-op and unioned by programSimContext, but nothing applied it — an ATC op in
+    the editor or Blocks showed no magazine while the same op in its wizard did.
+  - PATH_TYPES.shape: DELETED, and here is the why (the dispatch asked me to state which). The 'arc' exists for the
+    MANUAL JOG bow, and manual is a property of the pass SOURCE, not of the path TYPE — a manual traverse still
+    classifies as rapid/lifted. A per-type shape therefore cannot express the one case it was declared for, and a
+    token no renderer reads is a contract that lies. The bow stays where the fact lives (startSources).
+  - probe_titles.js: DELETED. Three block defs, zero importers anywhere in the tree.
+
+### (E) THE GATE BLIND SPOTS.
+
+check-console (the zero-boot-errors / new-file-404 tripwire) and op-sim-context (the op-type -> declared-intent
+contract) matched no per-family filter and were not in smoke. Both are in the manifest now — smoke went 59 -> 61.
+
+### VERIFIED AGAINST THE CURRENT TREE FIRST, as instructed: all 19 were still live. None had been fixed en route.
+
+GATE (fast tier): smoke 61/61 + 106 corner/viz/engine/sim specs + the 8 new tripwires. Screenshot: the legend, where
+Rapid now draws solid and Safe travel dashed under the same hue. Branch feat/ddcs-workspace. NO release.
