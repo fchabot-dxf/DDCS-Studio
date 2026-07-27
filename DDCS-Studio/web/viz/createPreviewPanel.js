@@ -20,7 +20,8 @@ import { GcodeViz3D } from './gcodeViz3d.js';
 import { createToolpath2d, typeOf } from './toolpath2d.js';   // t1205 — typeOf: the ONE render-time classification the legend must share with the paint
 import { LEGEND_ROWS } from './pathStyle.js';   // t317 — the ONE declared path-visual palette (the legend reads it, can't drift from the renderers)
 import { traceToolpath } from '../engine/trace.js';
-import { passAnchorFor } from '../engine/passAnchor.js';   // t1205 — the ONE pass→world anchor the 3D tool + the engine DRO registers already read; the readout must use it too
+import { passAnchorFor } from '../engine/passAnchor.js';
+import { markerWorldOf } from './markerWorld.js';   // t1235 — the ONE marker-world source the connector's far end reads   // t1205 — the ONE pass→world anchor the 3D tool + the engine DRO registers already read; the readout must use it too
 import { carveTipForToolType } from '../engine/stockRemoval.js';   // t682 — the carve tip PROFILE from the tool `type` (ball-nose etc.), one source
 import { wcsOffsetAt, declaredWcsOffset } from './sceneFrame.js';   // t588 — wcsOffsetAt = the ONE WCS read for RENDERING (engine G53 + 2D frame; keeps the workOrigin fallback). t861 — declaredWcsOffset = the HONEST Mach source (null when no declared WCS row, no scene-placement fallback).
 import { toggleVisibilityModal } from '../ui/visibilityModal.js';   // t738 — the preview-visibility modal (opens from the toolbar 👁)
@@ -146,6 +147,54 @@ export function probeAxis(raw) {
     if (!/\bG31\b/.test(code)) return null;
     const m = code.match(/\bG31\b[^()]*?([XYZ])\s*[-#\[\d.]/i);   // value may be a literal (-10), a #var (#8), or an expr ([0-#1])
     return m ? m[1].toLowerCase() : null;
+}
+
+/**
+ * THE INTER-PASS CONNECTOR (t1235 Turn B) — the segment that bridges one probe pass to the next.
+ *
+ * WHY IT HAS TO BE SYNTHESISED: the wizards mark a pass boundary with a `REPOSITION:` comment, and the engine treats
+ * that comment as the DELIMITER — it records the finishing pass's runtime end, increments `_pass` and resets the local
+ * position. The traverse the operator (or the program) actually makes between the two passes is therefore consumed by
+ * the boundary itself: it is never traced as a segment, and the drawn route ends up as a set of disconnected within-pass
+ * fragments. That gap is the "traverse that never connects".
+ *
+ * BOTH ENDPOINTS ARE REAL POSITIONS — nothing here is invented geometry:
+ *   FROM  passEnds[p-1]                    the previous pass's RUNTIME end (post probe + retract + lift, collision-clamped)
+ *   TO    markerWorldOf(starts, ends, p)   where pass p's start marker actually renders (the same one source the 3D
+ *                                          sprite and the Layout handle read), so it ends ON the marker BY DEFINITION
+ *                                          and follows it on every drag without any drag-time bookkeeping.
+ * Expressed in pass p's own frame (world − passAnchorFor), because that is the frame every segment of pass p is drawn in.
+ *
+ * CLASSIFICATION: a plain rapid. The renderers then decide what that MEANS through their existing declared language —
+ * `typeOf` promotes a horizontal rapid to `lifted` (the dimmed dashed safe-travel), and a pass whose declared source is
+ * MANUAL draws its traverse in the amber jog style, because the 2D reads `startSources[s.pass]`. The connector inherits
+ * the operator-jog look for free rather than hardcoding a second style.
+ */
+function withInterPassConnectors(segs, starts, passEnds) {
+    const list = Array.isArray(segs) ? segs : [];
+    if (!Array.isArray(starts) || starts.length < 2 || !Array.isArray(passEnds)) return list;
+    const bridge = (p) => {
+        const from = passEnds[p - 1];
+        if (!from) return null;                       // no runtime end recorded → nothing honest to draw from
+        const to = markerWorldOf(starts, passEnds, p);
+        const off = passAnchorFor(starts, passEnds, p) || { x: 0, y: 0, z: 0 };
+        const a = { x: (+from.x || 0) - off.x, y: (+from.y || 0) - off.y, z: (+from.z || 0) - off.z };
+        const b = { x: (+to.x || 0) - off.x, y: (+to.y || 0) - off.y, z: (+to.z || 0) - off.z };
+        if (Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) < 1e-6) return null;   // the passes already coincide — no traverse happened
+        return { x1: a.x, y1: a.y, z1: a.z, x2: b.x, y2: b.y, z2: b.z,
+            rapid: true, probe: false, type: 'rapid', feed: 0, pass: p, line: -1, connector: true };
+    };
+    // Insert each connector immediately BEFORE the first segment of its pass, so the animation's traveled/future split
+    // and the eye both read it as what it is: the move that gets you to that pass.
+    const out = [];
+    let seen = 0;
+    for (const s of list) {
+        const p = +s.pass || 0;
+        while (seen < p) { seen++; const c = bridge(seen); if (c) out.push(c); }
+        out.push(s);
+    }
+    while (seen < starts.length - 1) { seen++; const c = bridge(seen); if (c) out.push(c); }   // trailing passes with no segments of their own
+    return out;
 }
 
 export function createPreviewPanel(container, opts = {}) {
@@ -696,6 +745,15 @@ export function createPreviewPanel(container, opts = {}) {
         // machine frame via the wcsOffset map + the undeclared g53ApproxZ), so the probe passes STAY start-anchored (each
         // pass anchors to its own start via passAnchor.js) instead of collapsing to machine 0. forceMachine (ATC) pins regardless.
         curAnchor = !forceMachine && !(parsed.stats && parsed.stats.absolute);
+        // t1235 TURN B — THE INTER-PASS CONNECTOR. The route the engine traces has a HOLE at every pass boundary: a
+        // `REPOSITION:` comment CONSUMES the between-pass traverse (it is the pass delimiter — the engine resets pos and
+        // starts a new frame there), so no segment ever bridges passEnds[n-1] → the next pass's start. The drawn route
+        // showed only within-pass motion, which is why the traverse read as a stub that never connects.
+        // The bridge is SYNTHESISED into the ONE route feed, so the 2D panel, the Layout overlay and the 3D all get it
+        // from the same array. It is honest by construction: both endpoints are positions the tool actually occupies —
+        // the previous pass's RUNTIME end and the next pass's marker world — so it re-anchors on every drag for free.
+        segs = withInterPassConnectors(segs, passStarts, passEnds);
+        parsed.segments = segs;   // the 3D takes the whole `parsed` object → literally the same array, not a copy
         t2.setSegments(segs);   // keep the 2D view in sync so a 2D toggle shows the path immediately
         if (t2.setMachineFrame) t2.setMachineFrame(machineFrameTool);   // t652 — machine-frame op → the 2D draws in raw machine coords (Start + envelope), matching the 3D (robust vs lazy init)
         t2.setStarts(passStarts);   // the draggable 2D start handles — ALL per-pass starts, numbered (①②…)
