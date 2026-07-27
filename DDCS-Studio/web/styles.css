@@ -2184,8 +2184,12 @@ button.primary:hover {
     align-items: center; justify-content: center; cursor: row-resize; touch-action: none; }
 .viz-split[data-split-on="1"] > .viz-pane-splitter { display: flex; }
 .viz-pane-splitter::before { content: ''; position: absolute; left: 0; right: 0; top: -18px; bottom: -18px; }   /* 8 + 2·18 = 44px effective grab */
-.viz-pane-splitter-grip { width: 46px; height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--text-dim) 55%, transparent); transition: background .12s ease, width .12s ease; }
-.viz-pane-splitter:hover .viz-pane-splitter-grip, .viz-split.is-dragging > .viz-pane-splitter .viz-pane-splitter-grip { background: var(--accent); width: 60px; }
+/* t1239 (user) — THINNER grips: the bar was a 4px slab; 2px reads as a divider you can grab rather than a rule. */
+.viz-pane-splitter-grip { width: 46px; height: 2px; border-radius: 2px; background: color-mix(in srgb, var(--text-dim) 55%, transparent); transition: background .12s ease, width .12s ease, height .12s ease; }
+.viz-pane-splitter:hover .viz-pane-splitter-grip, .viz-split.is-dragging > .viz-pane-splitter .viz-pane-splitter-grip { background: var(--accent); width: 60px; height: 3px; }
+/* t1239 — the SECOND handle, below the feature canvas: it resizes the whole visual block (the handle above shares the
+   space between the two previews). Always available — it is not part of the two-pane ratio, so no split-on gate. */
+.viz-split > .viz-pane-sizer { display: flex; flex: 0 0 6px; }
 .viz-pane-splitter:focus-visible { outline: none; }
 .viz-pane-splitter:focus-visible .viz-pane-splitter-grip { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
 
@@ -2411,7 +2415,16 @@ button.primary:hover {
 /* t796 P4 — the row-end deep-link gear (a field whose truth lives in Settings / a modal). Absolute top-right so it never
    disrupts the label-above-input row layout; discreet until hover. */
 .has-field-link { position: relative; }
-.field-link-gear { position: absolute; top: 0; right: 0; z-index: 1; padding: 1px 3px; border: none; background: transparent; color: var(--text-dim, #9aa); cursor: pointer; font-size: 12px; line-height: 1.2; opacity: .55; transition: opacity .12s ease, color .12s ease; }
+/* t1239 (user) — the gear sits BESIDE its field, never OVER it. Absolutely-positioned top-right, it landed on top of a
+   select's chevron and on the right edge of a wide input; the row is a grid now, so the gear gets its own column and
+   nothing overlaps at any width. ONE fix in the shared form layer — every wizard inherits it. */
+/* The row becomes a 2-COLUMN grid: column 1 keeps whatever the widget rendered, stacked exactly as before (each child
+   lands on its own implicit row), and the gear gets column 2 to itself, spanning the full height. No assumptions about
+   the widget's internal markup — it works for a label+input, a segmented control or a canvas widget alike. */
+.has-field-link { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 6px; align-items: center; }
+.has-field-link > * { grid-column: 1; min-width: 0; }
+.has-field-link > .field-link-gear { grid-column: 2; grid-row: 1 / -1; }
+.field-link-gear { align-self: center; position: static; padding: 2px 4px; border: none; background: transparent; color: var(--text-dim, #9aa); cursor: pointer; font-size: 13px; line-height: 1.2; opacity: .55; transition: opacity .12s ease, color .12s ease; }
 .field-link-gear:hover { opacity: 1; color: var(--accent, #0ea5e9); }
 .field-link-gear:focus-visible { outline: 2px solid var(--accent, #0ea5e9); outline-offset: 1px; border-radius: 3px; opacity: 1; }
 
@@ -4873,27 +4886,10 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 /* Phone (≤600): the Settings tab is a 160px sidebar + content row (injected inline by ui/settingsPanel.js).
    Stack it — sidebar becomes a horizontal scrolling tab strip, content goes full-width so selects stop
    clipping. `body #settings-app …` so it outranks the runtime-injected `#settings-app …` rules. */
+/* t1239 — the phone-only horizontalisation of the subtab rail is GONE: the rail itself is gone, and the strip is
+   horizontal at every width (ui/settingsPanel.js). What remains here is the phone content padding. */
 @media (max-width: 600px) {
-    body #settings-app .settings-body { flex-direction: column; }
-    body #settings-app .settings-sidebar {
-        width: 100%;
-        flex: 0 0 auto;
-        flex-direction: row;
-        gap: 4px;
-        overflow-x: auto;
-        overflow-y: hidden;
-        white-space: nowrap;
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-        padding: 8px;
-    }
-    body #settings-app .settings-sidebar .settings-tab { width: auto; flex: 0 0 auto; }
-    body #settings-app .settings-sidebar .settings-tab.active {
-        border-left: none;
-        border-bottom: 3px solid var(--accent);
-        padding-left: 12px;
-    }
-    body #settings-app .settings-sidebar .sidebar-group-label { display: none; }
+    body #settings-app .settings-sidebar { overflow-x: auto; flex-wrap: nowrap; white-space: nowrap; }   /* narrow: scroll the strip rather than wrap it into a block */
     body #settings-app .settings-content { padding: 14px; }
     body #settings-app .settings-field { max-width: none; }
 }

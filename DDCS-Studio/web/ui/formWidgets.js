@@ -961,6 +961,14 @@ export function renderOpForm(host, bindings) {
     // stays plain). Rows go INTO a per-section body (folded ≠ removed → still in the DOM for the form-integrity/help
     // guards). The header reuses the accordion motion engine (theme drawer tokens) + a panePrefs per-kind fold state.
     const sectionOf = (unit) => (unit[0] && unit[0].section) || null;
+    // t1239 IDENTITY FIRST ([[op-defining-fields-at-top]], user) — a DECLARED section ORDER, applied in the ONE form
+    // layer so every wizard (built-in twin or user-authored) inherits it. Bindings are assembled value-sockets-first,
+    // which put the tool/cut scalars (feeds, radius, port) ABOVE the fields that decide what the op IS — corner opened
+    // on "Max Probe Dist" and you scrolled to find WHICH CORNER. Ranked, the form reads the way the op is decided:
+    // what it is → where it is → how it cuts. An unlisted section keeps its declaration order after the ranked ones.
+    const SECTION_RANK = ['IDENTITY', 'GEOMETRY', 'TOOL & CUT'];
+    const rankOf = (sec) => { const i = SECTION_RANK.indexOf(String(sec || '').toUpperCase()); return i < 0 ? SECTION_RANK.length : i; };
+    units.sort((a, b) => rankOf(sectionOf(a)) - rankOf(sectionOf(b)));   // Array#sort is stable → order WITHIN a section is untouched
     const secList = []; for (const u of units) { const s = sectionOf(u); if (s && !secList.includes(s)) secList.push(s); }
     const rowCount = units.reduce((n, u) => n + ((u.length > 1 && !MULTI_WIDGETS.has(u[0] && u[0].widget)) ? u.length : 1), 0);
     const sectionize = rowCount > SECTION_THRESHOLD && secList.length >= 2;

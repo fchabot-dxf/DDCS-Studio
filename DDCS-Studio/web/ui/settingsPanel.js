@@ -936,12 +936,15 @@ function buildSettingsOverlay() {
             #settings-app .settings-head { padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--panel); flex: 0 0 auto; display: flex; align-items: center; }
             /* .settings-main-tab styling is shared/global in styles.css */
             #settings-app .settings-body { display: flex; flex-direction: row; flex: 1; min-height: 0; overflow: hidden; }
-            #settings-app .settings-sidebar { width: 160px; flex: 0 0 160px; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
-            #settings-app .settings-sidebar .settings-tab { display: block; width: 100%; text-align: left; padding: 7px 12px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius, 4px); border: none; background: transparent; color: var(--text-dim); cursor: pointer; transition: 120ms; }
+            /* t1239 (user) — THE RAIL DIES. The subtabs were a 160px left column; they are now a HORIZONTAL strip
+               directly under the main tabs, at EVERY width (this is what the phone layout already did — the split
+               personality is gone, so there is one place to look for a subtab on any screen). */
+            #settings-app .settings-body { flex-direction: column; }
+            #settings-app .settings-sidebar { width: 100%; flex: 0 0 auto; display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--panel); overflow: visible; }
+            #settings-app .settings-sidebar .settings-tab { display: inline-block; width: auto; flex: 0 0 auto; text-align: center; padding: 6px 12px; font-size: 12.5px; font-weight: 600; border-radius: var(--radius, 4px); border: none; background: transparent; color: var(--text-dim); cursor: pointer; transition: 120ms; }
             #settings-app .settings-sidebar .settings-tab:hover { background: var(--bg); color: var(--text-main); }
-            #settings-app .settings-sidebar .settings-tab.active { background: var(--bg); color: var(--text-main); border-left: 3px solid var(--accent); padding-left: 9px; }
-            #settings-app .settings-sidebar .sidebar-group-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-dim); padding: 8px 12px 4px; opacity: .6; }
-            #settings-app .settings-sidebar .sidebar-group-label:first-child { padding-top: 2px; }
+            #settings-app .settings-sidebar .settings-tab.active { background: var(--bg); color: var(--text-main); border-bottom: 3px solid var(--accent); padding-bottom: 3px; }
+            #settings-app .settings-sidebar .sidebar-group-label { display: none; }   /* the group is already named by the ACTIVE main tab above */
             #settings-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
             #settings-app .settings-foot { flex: 0 0 auto; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); display: flex; gap: 8px; }
             #settings-app .settings-head { justify-content: space-between; }

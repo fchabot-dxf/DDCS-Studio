@@ -85,6 +85,37 @@ export function setPaneRatio(r) {
     for (const cb of _ratioSubs) { try { cb(next); } catch (_) { /* isolate */ } }
 }
 
+// ── The visual BLOCK HEIGHT (t1239, user) — the ratio decides how the two previews SHARE the visual space; this decides
+// how much space the visual block gets in the first place. The canvas can now be resized from BOTH edges: the handle
+// above it moves the 3D/2D ratio, the handle below it moves this total. Same class of pref as the ratio (app-wide
+// display state in localStorage, never the machine profile); null = unset → the layout's own flex sizing holds. ──
+const VIZH_KEY = 'ddcs_visual_height';
+export const VIZH_MIN = 160, VIZH_MAX = 900;
+let _vizH;
+const _vizHSubs = new Set();
+const clampVizH = (h) => Math.max(VIZH_MIN, Math.min(VIZH_MAX, Math.round(Number(h))));
+
+/** The visual block's height in px, or null when the user has never dragged it (flex sizing holds). */
+export function getVisualHeight() {
+    if (_vizH === undefined) {
+        _vizH = null;
+        try { const raw = localStorage.getItem(VIZH_KEY); if (raw != null && Number.isFinite(Number(raw))) _vizH = clampVizH(raw); } catch (_) { /* defaults */ }
+    }
+    return _vizH;
+}
+
+/** Set the visual block height; clamps, persists, notifies every mounted wizard. */
+export function setVisualHeight(h) {
+    const next = h == null ? null : clampVizH(h);
+    if (next === _vizH) return;
+    _vizH = next;
+    try { if (next == null) localStorage.removeItem(VIZH_KEY); else localStorage.setItem(VIZH_KEY, String(next)); } catch (_) { /* private mode */ }
+    for (const cb of _vizHSubs) { try { cb(next); } catch (_) { /* isolate */ } }
+}
+
+/** Subscribe to visual-height changes. Returns an unsubscribe fn. */
+export function onVisualHeightChange(cb) { _vizHSubs.add(cb); return () => _vizHSubs.delete(cb); }
+
 /** Subscribe to ratio changes (a drag in one wizard rebalances every mounted pane). Returns an unsubscribe fn. */
 export function onRatioChange(cb) { _ratioSubs.add(cb); return () => _ratioSubs.delete(cb); }
 

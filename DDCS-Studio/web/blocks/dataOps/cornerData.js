@@ -93,14 +93,14 @@ export const CORNER_BINDING_SPECS = [
     // ② B4 step 4a — SEMANTIC relTo: anchor the drag to the sim-start row NAMED 'wall1' (not a fragile numeric index).
     // resolveRelToIndex maps 'wall1' → its position among the SURVIVING when-filtered starts, so the handle tracks wall-1
     // in BOTH probeZ states (off: wall1 is filtered-index 0; on: the zsurf row shifts it to 1). Declare-never-infer.
-    { param: 'cross1_x',   type: 'number', group: 'reposition', role: 'x', relTo: { row: 'wall1' }, label: 'Wall 2 dX', section: 'GEOMETRY', match: { type: 'assign', var: '#23' }, key: 'value' },
-    { param: 'cross1_y',   type: 'number', group: 'reposition', role: 'y', relTo: { row: 'wall1' }, label: 'Wall 2 dY', section: 'GEOMETRY', match: { type: 'assign', var: '#24' }, key: 'value' },
+    { param: 'cross1_x',   type: 'number', formHidden: true, group: 'reposition', role: 'x', relTo: { row: 'wall1' }, label: 'Wall 2 dX', section: 'GEOMETRY', match: { type: 'assign', var: '#23' }, key: 'value' },
+    { param: 'cross1_y',   type: 'number', formHidden: true, group: 'reposition', role: 'y', relTo: { row: 'wall1' }, label: 'Wall 2 dY', section: 'GEOMETRY', match: { type: 'assign', var: '#24' }, key: 'value' },
     // ③ — the Z-first START handle (#21/#22, the zsurf→wall1 traverse): PRUNE-GATED on probeZFirst (only emitted when Z-first),
     // so `optional` (deriveBindings skips it when the socket is pruned away, off) + `when` (the form field + the canvas handle
     // show only under probeZFirst). relTo:{row:'zsurf'} anchors the drag to the Z-surface pass (the incremental datum); NO
     // `default` → the socket's baked expression holds (perp axis = '0', probe axis = signed travel) → NON-DEGENERATE (kills B3 0,0).
-    { param: 'startX', type: 'number', group: 'start', role: 'x', relTo: { row: 'zsurf' }, optional: true, when: { param: 'probeZFirst', is: true }, label: 'Z→Wall1 dX', section: 'GEOMETRY', match: { type: 'assign', var: '#21' }, key: 'value' },
-    { param: 'startY', type: 'number', group: 'start', role: 'y', relTo: { row: 'zsurf' }, optional: true, when: { param: 'probeZFirst', is: true }, label: 'Z→Wall1 dY', section: 'GEOMETRY', match: { type: 'assign', var: '#22' }, key: 'value' },
+    { param: 'startX', type: 'number', formHidden: true, group: 'start', role: 'x', relTo: { row: 'zsurf' }, optional: true, when: { param: 'probeZFirst', is: true }, label: 'Z→Wall1 dX', section: 'GEOMETRY', match: { type: 'assign', var: '#21' }, key: 'value' },
+    { param: 'startY', type: 'number', formHidden: true, group: 'start', role: 'y', relTo: { row: 'zsurf' }, optional: true, when: { param: 'probeZFirst', is: true }, label: 'Z→Wall1 dY', section: 'GEOMETRY', match: { type: 'assign', var: '#22' }, key: 'value' },
 ];
 
 export const CORNER_DATA_OPTYPE = 'user_corner_data';
@@ -176,6 +176,12 @@ function cornerSimStartsProvider(params, stock) {
  *  auto↔manual — the hands-free G0 seq move vs the #1505 jog-and-wait prompt, on BOTH the Z→wall1 and wall1→wall2 traverses.
  *  (t154 — DEFINED HERE, above cornerDataStack, so cornerDataStack can DERIVE its STRUCTURAL-section controls from it at eval.) */
 export const CORNER_STRUCT_BINDINGS = [
+    // t1239 IDENTITY FIRST ([[op-defining-fields-at-top]], user) — WHICH CORNER and WHICH WALL FIRST decide what this
+    // op IS: every other field below tunes an op these two have already defined. They lead the form now; the rest keep
+    // their order (identity -> geometry -> tool/cut).
+    // ③b — corner quadrant + probe order: value/order swaps driven by the 8-way corner×probeSeq guard (NOT prune-add/remove).
+    { param: 'corner', type: 'enum', default: CORNER_DEFAULTS.corner, label: 'Corner', help: 'Which corner of the stock you are probing — sets the two walls and their approach directions (Front-Left / Front-Right / Back-Left / Back-Right).', section: 'IDENTITY', widgetConfig: { options: [['Front-Left', 'FL'], ['Front-Right', 'FR'], ['Back-Left', 'BL'], ['Back-Right', 'BR']] } },
+    { param: 'probeSeq', type: 'enum', default: CORNER_DEFAULTS.probeSeq, label: 'Probe Order', help: 'Which wall to probe first — Y-wall then X-wall, or X then Y.', section: 'IDENTITY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
     { param: 'probeZFirst', type: 'bool', default: !!CORNER_DEFAULTS.probeZFirst, label: 'Probe Z First', help: 'Probe the top surface for Z before the two walls — anchors the sideways probes to a real measured Z instead of a jogged guess.', section: 'GEOMETRY' },
     { param: 'travelApproach', type: 'enum', widget: 'segmented', default: CORNER_DEFAULTS.travelApproach, label: 'Travel', help: 'Auto = the machine moves itself between the walls; Manual = you jog to each start and press Cycle Start (operator-in-the-loop).', section: 'GEOMETRY', widgetConfig: { options: [['Manual', 'manual'], ['Auto', 'auto']] } },   // t323 — opt-in segmented; t328 human — DISPLAY order [Manual|Auto] (Manual left); default stays 'auto' (value-mapped, not index)
     // t328 — TRAVEL SHAPE for the wall1→wall2 AUTO traverse. dogleg (default) = BYTE-IDENTICAL to today (firstAxis routes around the
@@ -186,9 +192,6 @@ export const CORNER_STRUCT_BINDINGS = [
     { param: 'wcs', type: 'enum', default: CORNER_DEFAULTS.wcs, label: 'WCS', help: 'Which work-coordinate register to store the found corner into — Active uses the currently-selected WCS; G54..G59 write that specific register.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
     // ② B4 step 4d — dual-gantry sync: a bool block-ADD (appends G1 A0 + the slave-offset write #74=[#70+slave], #[#74]=#883).
     { param: 'syncA', type: 'bool', default: !!CORNER_DEFAULTS.syncA, label: 'Dual-Gantry Sync A', help: 'Dual-gantry: also write the found corner to the slave A-axis WCS, keeping a twin-motor gantry squared. A WCS write only — no extra motion.', section: 'GEOMETRY' },
-    // ③b — corner quadrant + probe order: value/order swaps driven by the 8-way corner×probeSeq guard (NOT prune-add/remove).
-    { param: 'corner', type: 'enum', default: CORNER_DEFAULTS.corner, label: 'Corner', help: 'Which corner of the stock you are probing — sets the two walls and their approach directions (Front-Left / Front-Right / Back-Left / Back-Right).', section: 'GEOMETRY', widgetConfig: { options: [['Front-Left', 'FL'], ['Front-Right', 'FR'], ['Back-Left', 'BL'], ['Back-Right', 'BR']] } },
-    { param: 'probeSeq', type: 'enum', default: CORNER_DEFAULTS.probeSeq, label: 'Probe Order', help: 'Which wall to probe first — Y-wall then X-wall, or X then Y.', section: 'GEOMETRY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
 ];
 
 /** The wrapped `user_root` template for a given param set. Structural params bake the stack SHAPE; the 9 bound scalars

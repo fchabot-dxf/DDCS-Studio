@@ -43,8 +43,8 @@ export const EDGE_BINDING_SPECS = [
 /** The STRUCTURAL toggle bindings — params that drive the guard prune (NO value socket → no blockIndex/match). axis×dir
  *  reshapes the confirm+probe region (per-combo vars/sign); axis×wcs the WCS write; wcs the base address. */
 export const EDGE_STRUCT_BINDINGS = [
-    { param: 'axis', type: 'enum', default: EDGE_DEFAULTS.axis, label: 'Axis', help: 'Which axis the wall faces — X (a wall you approach along X) or Y.', section: 'GEOMETRY', widgetConfig: { options: [['X', 'X'], ['Y', 'Y']] } },
-    { param: 'dir', type: 'enum', default: EDGE_DEFAULTS.dir, label: 'Direction', help: 'Which way the stylus travels to reach the wall — Positive (toward +axis) or Negative.', section: 'GEOMETRY', widgetConfig: { options: [['Positive', 'pos'], ['Negative', 'neg']] } },
+    { param: 'axis', type: 'enum', default: EDGE_DEFAULTS.axis, label: 'Axis', help: 'Which axis the wall faces — X (a wall you approach along X) or Y.', section: 'IDENTITY', widgetConfig: { options: [['X', 'X'], ['Y', 'Y']] } },
+    { param: 'dir', type: 'enum', default: EDGE_DEFAULTS.dir, label: 'Direction', help: 'Which way the stylus travels to reach the wall — Positive (toward +axis) or Negative.', section: 'IDENTITY', widgetConfig: { options: [['Positive', 'pos'], ['Negative', 'neg']] } },
     { param: 'wcs', type: 'enum', default: EDGE_DEFAULTS.wcs, label: 'WCS', help: 'Which work-coordinate register to store the found edge into — Active uses the currently-selected WCS; G54..G59 write that specific register.', section: 'GEOMETRY', widgetConfig: { options: [['Active', 'active'], ['G54', 'G54'], ['G55', 'G55'], ['G56', 'G56'], ['G57', 'G57'], ['G58', 'G58'], ['G59', 'G59']] } },
 ];
 

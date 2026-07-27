@@ -18,7 +18,7 @@
  *   mechanism (measured-height collapse + a data-reveal/data-dir the CSS keys the personality off) → N distinct personalities
  *   from pure data. Every declared token value has an effect (no silent no-ops). prefers-reduced-motion ⇒ instant. View-only.
  */
-import { isPaneCollapsed, setPaneCollapsed, onPaneChange, PANE_KINDS, getPaneRatio, setPaneRatio, onRatioChange, RATIO_MIN, RATIO_MAX } from './panePrefs.js';
+import { isPaneCollapsed, setPaneCollapsed, onPaneChange, PANE_KINDS, getPaneRatio, setPaneRatio, onRatioChange, RATIO_MIN, RATIO_MAX, getVisualHeight, setVisualHeight, onVisualHeightChange, VIZH_MIN, VIZH_MAX } from './panePrefs.js';
 
 const LABEL = Object.fromEntries(PANE_KINDS.map((k) => [k.id, k.label]));
 const DUR_CAP = 350;   // ms — the hard ceiling on any theme's drawer duration
@@ -157,6 +157,56 @@ function updateSplitOn(split) {
     split.dataset.splitOn = ok ? '1' : '0';
 }
 
+/**
+ * t1239 (user) — THE SECOND HANDLE. The splitter ABOVE the feature canvas moves the 3D/2D ratio; this one sits BELOW
+ * the last pane and moves the whole visual block's HEIGHT, so the canvas can be resized from both of its edges. The
+ * two are different quantities on purpose (a share vs a size) and each persists on its own.
+ */
+function applyVisualHeight(h) {
+    const px = h === undefined ? getVisualHeight() : h;
+    document.querySelectorAll('.wiz-visual').forEach((v) => {
+        if (px == null) { v.style.removeProperty('height'); v.style.removeProperty('flex'); return; }
+        v.style.height = px + 'px';
+        v.style.flex = '0 0 auto';   // an explicit height only means something once it stops flexing
+    });
+}
+
+function addVisualSizer(split) {
+    const visual = split.closest('.wiz-visual');
+    if (!visual || split.querySelector(':scope > .viz-pane-sizer')) return;
+    const sp = document.createElement('div');
+    sp.className = 'viz-pane-splitter viz-pane-sizer';   // same grip language as the ratio handle above
+    sp.setAttribute('role', 'separator'); sp.setAttribute('aria-orientation', 'horizontal');
+    sp.setAttribute('aria-label', 'Drag to resize the preview area'); sp.tabIndex = 0;
+    sp.innerHTML = '<span class="viz-pane-splitter-grip" aria-hidden="true"></span>';
+    split.appendChild(sp);   // BELOW the last pane (the feature canvas)
+
+    const heightAt = (y) => Math.max(VIZH_MIN, Math.min(VIZH_MAX, Math.round(y - visual.getBoundingClientRect().top)));
+    let dragging = false, stopFollow = null;
+    const onMove = (e) => { if (!dragging) return; e.preventDefault(); applyVisualHeight(heightAt(e.clientY)); };
+    const onUp = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        try { sp.releasePointerCapture(e.pointerId); } catch (_) { /* */ }
+        sp.removeEventListener('pointermove', onMove); sp.removeEventListener('pointerup', onUp); sp.removeEventListener('pointercancel', onUp);
+        if (stopFollow) { stopFollow(); stopFollow = null; }
+        split.classList.remove('is-dragging');
+        setVisualHeight(heightAt(e.clientY));   // persist + notify (final), like the ratio
+    };
+    sp.addEventListener('pointerdown', (e) => {
+        dragging = true; e.preventDefault();
+        try { sp.setPointerCapture(e.pointerId); } catch (_) { /* */ }
+        split.classList.add('is-dragging');
+        stopFollow = followPanelResize(split);   // rAF-resize both canvases live during the drag (same as the ratio handle)
+        sp.addEventListener('pointermove', onMove); sp.addEventListener('pointerup', onUp); sp.addEventListener('pointercancel', onUp);
+    });
+    sp.addEventListener('keydown', (e) => {
+        const step = e.shiftKey ? 40 : 12;
+        if (e.key === 'ArrowUp') { e.preventDefault(); setVisualHeight((getVisualHeight() || visual.getBoundingClientRect().height) - step); }
+        if (e.key === 'ArrowDown') { e.preventDefault(); setVisualHeight((getVisualHeight() || visual.getBoundingClientRect().height) + step); }
+    });
+}
+
 function addPaneSplitter(split) {
     if (!split || split.querySelector(':scope > .viz-pane-splitter')) { if (split) updateSplitOn(split); return; }
     const panes = [...split.querySelectorAll(':scope > [data-viz-pane]')];
@@ -226,14 +276,16 @@ export function makePanesCollapsible(root) {
     // The G-code preview block (inside the form) — a separate, independent pane kind.
     root.querySelectorAll('.preview-block').forEach((pb) => enhancePane(pb, 'code', LABEL.code || 'G-code'));
     // t790 — a drag-splitter between the two viz panes (idempotent); apply the persisted ratio.
-    root.querySelectorAll('.wiz-visual .viz-split').forEach((split) => addPaneSplitter(split));
+    root.querySelectorAll('.wiz-visual .viz-split').forEach((split) => { addPaneSplitter(split); addVisualSizer(split); });
     applyPaneRatio();
+    applyVisualHeight();
 
     // Live cross-wizard sync: folding a kind in one open wizard re-applies (snapped) to every mounted pane of that kind.
     if (!_wired) {
         _wired = true;
         applyPaneRatio();
         onRatioChange((r) => applyPaneRatio(r));                   // a drag in one wizard rebalances every mounted pane live
+        onVisualHeightChange((h) => applyVisualHeight(h));         // …and the bottom handle resizes every mounted visual live
         onPaneChange((id) => {
             document.querySelectorAll('.wiz-body [data-pane-kind]').forEach((pane) => {
                 const kind = pane.dataset.paneKind;

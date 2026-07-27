@@ -391,9 +391,25 @@ export function createPreviewPanel(container, opts = {}) {
     // source>", end-trimmed with an ellipsis when long. The per-move paraphrase (length / feed / seconds) demotes to the
     // hover tooltip (set from the engine's RUNNING status; see onStatus). The progress bar underneath is unchanged (t865).
     const CHIP_MAX = 52;
+    // t1239 (user) — THE CALC TAG. Stepping through a probe macro spends many lines on ARITHMETIC (register assigns, IF
+    // tests, comments) where nothing moves, and a chip that only ever showed a line read as a frozen sim. A small tag
+    // says which kind of line you are on, so "nothing moved" becomes "nothing was SUPPOSED to move". Display only — it
+    // reads the same raw line the chip already shows and changes no semantics.
+    const calcTagOf = (raw) => {
+        const t = String(raw == null ? '' : raw).trim();
+        if (!t) return '';
+        if (/^\s*[(;]/.test(t)) return 'note';                       // a comment
+        if (/^\s*(IF|WHILE|GOTO|END\d|DO\d|M9[89])/i.test(t)) return 'flow';   // a branch / loop / call
+        if (/^\s*#\s*\d+\s*=/.test(t) || /^\s*#\s*\[/.test(t)) return 'calc';   // a register assignment
+        if (/G3[18]/i.test(t)) return '';                        // a probe IS motion
+        if (/G0?[0-3]|G53/i.test(t)) return '';            // ordinary motion — no tag
+        if (/^\s*[MG]\d/i.test(t)) return 'set';                     // a mode / M-code with no motion
+        return '';
+    };
     const fmtExecLine = (lineNo, raw) => {
         const t = String(raw == null ? '' : raw).trim();
-        return `${lineNo} · ${t.length > CHIP_MAX ? t.slice(0, CHIP_MAX - 1) + '…' : t}`;
+        const tag = calcTagOf(t);
+        return `${lineNo} · ${t.length > CHIP_MAX ? t.slice(0, CHIP_MAX - 1) + '…' : t}${tag ? `  [${tag}]` : ''}`;
     };
     const setStatus = (text, isError = false) => {
         if (!statusEl) return;

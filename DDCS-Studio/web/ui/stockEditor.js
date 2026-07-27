@@ -259,7 +259,13 @@ export function openStockEditor(anchor, opts) {
         const pane = pop.querySelector('#se_3d'); if (!pane) return;
         if (viz.__host.parentElement !== pane) pane.appendChild(viz.__host);
         const st = getSettings().stock || {};
-        try { viz.setStock({ ...st, show: true }); } catch (_) {}
+        // t1239 (user) — MODAL PREVIEW ONLY: pin the slab's BOTTOM to the floor while you edit. The stock is placed by
+        // its DATUM, and the default datum's Z is the TOP — so growing Z hung the block DOWNWARD off a fixed top and it
+        // read as floating away from the grid. Forcing the preview's Z-datum to the bottom makes a taller block grow UP
+        // from the floor, which is what a person watching a slab get thicker expects. The REAL datum is untouched (it is
+        // what the machine uses); only these preview bytes carry the override.
+        const previewDatum = String(st.datum || 'nnp').slice(0, 2) + 'n';
+        try { viz.setStock({ ...st, datum: previewDatum, show: true }); } catch (_) {}
         // Re-frame when the DATUM or SHAPE changes — the stock repositions per datum, so re-fit keeps it centred +
         // matching the MAIN 3D beside the modal; NOT on every dimension tweak (a resize drag would jump). First render fits.
         const key = `${st.datum}|${st.shape}`;

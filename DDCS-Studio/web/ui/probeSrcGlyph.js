@@ -73,12 +73,14 @@ export function decorateInputEl(input, field, opts) {
         wrap = document.createElement('span');
         wrap.className = 'psrc-wrap';
         input.parentNode.insertBefore(wrap, input);
-        wrap.appendChild(input);
         btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'psrc-glyph';
         btn.innerHTML = GLYPH_SVG;
+        // t1239 (user) — the toggle sits to the LEFT of its field. On the right it collided with the field's own
+        // right edge (and with a select's chevron), and it read as part of the value rather than a control over it.
         wrap.appendChild(btn);
+        wrap.appendChild(input);
         btn.addEventListener('click', () => {
             setProbeSrc(field, probeSrc(field) ? 'studio' : 'ctrl');  // saveSettings broadcasts → wizard re-renders
             applyState(input, btn, field, gate);
