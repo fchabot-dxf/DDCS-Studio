@@ -18,7 +18,10 @@ test('the review renders the V4.1 WCS table from coord1 (G54 taught) when /api/v
     await page.route('**/api/profile', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'ddcs-v41', name: 'DDCS V4.1', hardwareTabs: [], wcs: V41_WCS }) }));
     await page.route('**/api/vars**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ connected: true, values: {} }) }));   // the vars endpoint declines #15xx → empty → the file-read fallback fires
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings);
+    await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings && window.ddcsSetMachine);
+    // t1229 — this workspace IS the V4.1 being pulled from (the ordinary case), so the new mismatch gate stays out of
+    // the way; a pull from a DIFFERENT controller is covered in tests/gateway-mismatch-gate-1229.spec.js.
+    await page.evaluate(() => window.ddcsSetMachine({ name: 'june-rig', controllerId: 'ddcs-v41' }, true));
     await page.evaluate(() => window.openSettings());
     await page.click('.settings-main-tab[data-group="controller"]');
     await page.click('[data-target="set_tab_profile"]');

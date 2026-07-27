@@ -13,10 +13,13 @@ const repo = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..', 'bri
 const b64 = (p) => readFileSync(join(repo, p)).toString('base64');
 const txt = (p) => readFileSync(join(repo, p), 'utf8');
 
-const openControllerPanel = async (page) => {
+// t1229 — `targets` seeds THIS WORKSPACE'S machine. These tests import a dump FROM THE MACHINE THE WORKSPACE IS FOR
+// (the ordinary case), so the controller matches and the new mismatch gate correctly stays out of the way. The gate's
+// own behaviour — a dump from a DIFFERENT controller — is covered in tests/gateway-mismatch-gate-1229.spec.js.
+const openControllerPanel = async (page, targets = 'ddcs-v41') => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings);
-    await page.evaluate(() => { localStorage.removeItem('ddcs_profile_library'); });
+    await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings && window.ddcsSetMachine);
+    await page.evaluate((id) => window.ddcsSetMachine({ name: 'the-bench', controllerId: id }, true), targets);
     await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
     await page.waitForFunction(() => typeof window.ddcsOpenDumpImport === 'function');
 };
@@ -63,7 +66,7 @@ test('drop a V4.1 dump → review modal derives the envelope + WCS by name; Appl
 });
 
 test('drop a DM500 dump → honest "named from the eng, values N/A" (its setting layout is ungrounded)', async ({ page }) => {
-    await openControllerPanel(page);
+    await openControllerPanel(page, 'ddcs-v3-dm500');   // a DM500 workspace reading its own DM500 dump
     await dropDump(page, [
         { name: 'setting', b64: b64('dm500/setting') },
         { name: 'eng', text: txt('dm500/install/eng') },

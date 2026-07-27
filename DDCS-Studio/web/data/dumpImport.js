@@ -231,7 +231,9 @@ export function classifyFile(name) {
 
 /**
  * Recognize a dropped dump. `files` = [{ name, text?, buffer? }] (text for eng, ArrayBuffer/bytes for setting/coord).
- * Returns { controllerId, recognized:[{name,role}], unrecognized:[name], geometry, wcs, grounded, note }.
+ * Returns { controllerId, idSource, recognized:[{name,role}], unrecognized:[name], geometry, wcs, grounded, note }.
+ * `idSource`: 'param-count' (measured from the setting file's size) | 'eng-assumed' (an eng alone — an ASSUMPTION,
+ * which the import modal states as such and lets the user correct) | null (nothing identified it).
  */
 export function recognizeDump(files) {
     let settingParams = null, engText = null, coordParams = null;
@@ -244,8 +246,11 @@ export function recognizeDump(files) {
         else unrecognized.push(f.name);
     }
     // Identify the controller: prefer the setting size; else the eng shape (has soft-limit names) → treat as by-name.
+    // t1229 — WHICH OF THOSE TWO IT WAS is now DECLARED (`idSource`), not left for the caller to re-infer. A param-count
+    // match is a measurement; an eng-only drop is an ASSUMPTION, and the import modal must say which it is showing.
     let controllerId = settingParams ? controllerFromParamCount(settingParams.length) : null;
-    if (!controllerId && engText) controllerId = 'ddcs-v3-dm500';   // eng-only drop (no setting) — by-name, values N/A
+    let idSource = controllerId ? 'param-count' : null;
+    if (!controllerId && engText) { controllerId = 'ddcs-v3-dm500'; idSource = 'eng-assumed'; }   // eng-only drop (no setting) — by-name, values N/A
     let geometry = null, wcs = null, spindle = null, grounded = false, note = '';
     if (controllerId === 'ddcs-expert-m350' && settingParams) {
         geometry = mapExpertGeometry(settingParams); wcs = mapExpertWcs(settingParams); grounded = true;
@@ -261,5 +266,5 @@ export function recognizeDump(files) {
         grounded = false;
         note = 'DM500 geometry is named from the eng, but its setting layout is not yet grounded — values show N/A until a real dump confirms them.';
     }
-    return { controllerId, recognized, unrecognized, geometry, wcs, spindle, grounded, note };
+    return { controllerId, idSource, recognized, unrecognized, geometry, wcs, spindle, grounded, note };
 }

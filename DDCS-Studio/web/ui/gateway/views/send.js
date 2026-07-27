@@ -3,8 +3,9 @@
 // progress tracking, then submitJob to the gateway queue. A WRITE op — the operator still presses Cycle Start.
 import { el, toast } from '../util.js';
 import { instrument, DEFAULTS } from '../../../shared/js/instrument/instrument.js';
-import { dlgConfirm } from '../../dialog.js';
+import { dlgConfirm, dlgNotice } from '../../dialog.js';
 import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — pre-flight before the push
+import { compareController, mismatchStatement } from '../../../data/controllerMatch.js';   // t1229 A2 — the ONE comparison, shared with the pull
 
 const field = (labelText, control) => el('div', {}, el('span', { class: 'label' }, labelText), control);
 const int = (v, d) => { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; };
@@ -68,6 +69,26 @@ export default {
       const name = (nameField.value || file.name || 'job.nc').trim();
       btn.disabled = true;
       try {
+        // t1229 A2 — THE MISMATCH HARD BLOCK (user ruling). A push is a WRITE to a physical machine: if the controller
+        // on the other end is not the one this workspace was built for, then its envelope, WCS, tool table and macros
+        // were all written for a different machine — so there is no "send anyway" here, and no duplicate offer either
+        // (that belongs on the read side). One statement, one way out.
+        // An UNIDENTIFIED controller is not a mismatch: if the gateway cannot say what it is, we cannot claim it is
+        // wrong, and the send keeps its existing guards.
+        try {
+          const prof = await ctx.client.profile();
+          const cmp = compareController(prof && prof.id);
+          if (!cmp.match) {
+            await dlgNotice(
+              mismatchStatement(cmp)
+              + '\n\nThis program was not made for the machine on the other end, so nothing here can be sent to it — '
+              + 'its travel, work offsets, tool table and macros all belong to a different controller.',
+              { title: 'Wrong controller — send blocked', okLabel: 'Cancel' },
+            );
+            return;   // the finally block re-enables the button
+          }
+        } catch (_) { /* no gateway answer → nothing to compare; the other guards still apply */ }
+
         // t838 PRE-FLIGHT ENVELOPE CHECK — warn before pushing a program that would leave the machine travel. The machine
         // is the USER's, so we ASK (an explicit confirm), never silently block. Fires only on RED (declared placement +
         // a real breach); advisory (a checker error never blocks the send).

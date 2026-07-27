@@ -20,9 +20,12 @@ const txt = (p) => readFileSync(join(repo, p), 'utf8');
 
 test.use({ viewport: { width: 1280, height: 900 } });
 
-async function openProfileTab(page) {
+async function openProfileTab(page, targets) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings);
+    await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings && window.ddcsSetMachine);
+    // t1229 — when a test APPLIES a dump, the workspace targets that same controller (importing your own machine's
+    // parameters). The mismatch gate itself has its own spec; this one is about the door, not the gate.
+    if (targets) await page.evaluate((id) => window.ddcsSetMachine({ name: 'the-bench', controllerId: id }, true), targets);
     await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
     await page.waitForSelector('#set_tab_profile', { state: 'visible', timeout: 8000 });
     await page.waitForFunction(() => typeof window.ddcsOpenDumpImport === 'function');
@@ -90,7 +93,7 @@ test('the modal offers BOTH transports, and the live read still starts on open (
 });
 
 test('a USB .eng file goes through the SAME review before anything is applied', async ({ page }, testInfo) => {
-    await openProfileTab(page);
+    await openProfileTab(page, 'ddcs-v41');
 
     const before = await page.evaluate(() => JSON.parse(JSON.stringify(window.ddcsGetSettings().machine || {})));
 

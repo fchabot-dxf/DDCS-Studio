@@ -30,6 +30,9 @@ import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js'
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 import { getMachine, setMachine } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine record
+import { compareController, mismatchStatement } from '../data/controllerMatch.js';   // t1229 A2 — the ONE controller comparison + its wording (shared with the gateway send)
+import { saveWorkspace } from './workspaceSave.js';   // t1229 — Duplicate = the existing Save-As-a-copy, no second mechanism
+import { fileSavedName } from '../data/backup.js';
 import { confirmSetupRow } from './setupChecklist.js';   // t1217 — a visit+confirm satisfies a checklist row even when the value is unchanged   // t684 b — the profile browser (save-as / browse)
 // t1223 — ui/backupModal.js is DELETED: it WAS the restore-selected store-picker, and opening a workspace is now
 // always the WHOLE file through the workspace manager. A partial restore produced a state that was neither the
@@ -2195,7 +2198,34 @@ function wireSettingsOverlay(ov) {
         renderLibSummary();
     }
     let _importCands = [];
-    let _importController = null;   // the connected controller {id,name} for the "will switch profile" banner
+    let _importController = null;   // the controller the READ came from {id,name} — detected (live/param-count) or assumed
+    let _importIdSource = null;     // t1229 — HOW we know: 'gateway' | 'param-count' | 'eng-assumed' | null
+    let _importPick = '';           // t1229 — the EFFECTIVE controller: the detection, or the user's correction of it
+    let _importPickBy = 'detected'; // 'detected' | 'user' — a corrected pick is a DECLARATION, not an assumption
+
+    // t1229 (4) — THE STATED ASSUMPTION. The read always states WHICH controller it is talking about and how it knows,
+    // and an assumption is correctable: an eng file alone can only be guessed at (recognizeDump says DM500 by shape),
+    // so the guess is shown as a guess with a picker beside it. Everything downstream — the banner, the mismatch gate —
+    // reads THIS pick, never the raw detection, so correcting it here is the one place that decides.
+    function importIdRowHtml() {
+        if (!_importController && !_importPick) return '';
+        const pick = _importPick || (_importController && _importController.id) || '';
+        const corrected = _importPickBy === 'user';
+        // Once the USER picks, it stops being an assumption — it is a declaration, and calling their own explicit
+        // choice "assumed" would be the same dishonesty in the other direction.
+        const assumed = _importIdSource === 'eng-assumed' && !corrected;
+        const how = corrected ? 'you set this — the comparison below uses your pick'
+            : _importIdSource === 'gateway' ? 'the controller answered over the Gateway'
+                : _importIdSource === 'param-count' ? 'measured from the parameter file’s size'
+                    : _importIdSource === 'eng-assumed' ? 'assumed from the eng file alone — no setting file to confirm it'
+                        : 'not identified';
+        const opts = Object.keys(CONTROLLER_PROFILES)
+            .map((id) => `<option value="${id}"${id === pick ? ' selected' : ''}>${CONTROLLER_PROFILES[id].name}</option>`).join('');
+        return `<div class="im-idrow${assumed ? ' is-assumed' : ''}" id="import-idrow">`
+            + `<span class="im-idlbl">${assumed ? 'Assumed controller' : 'Controller'}</span>`
+            + `<select class="im-idpick" id="import-idpick" title="Correct the controller if this is wrong — the comparison below uses this pick">${opts}</select>`
+            + `<span class="im-idhow">${how}</span></div>`;
+    }
     function buildImportModal() {
         if (document.getElementById('import-modal')) return;
         const m = document.createElement('div');
@@ -2234,6 +2264,13 @@ function wireSettingsOverlay(ov) {
                 #import-modal .im-transport .im-tlbl { font-size: 11.5px; color: var(--text-dim); }
                 #import-modal .im-tbtn.is-active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
                 #import-modal .im-safe { font-size: 11px; color: var(--text-dim); }
+                /* t1229 — the STATED ASSUMPTION row: which controller this read is about, how we know, and a picker to
+                   correct it. Amber when it is an assumption (an eng file alone), quiet when it was measured. */
+                #import-modal .im-idrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 2px 2px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px; }
+                #import-modal .im-idrow.is-assumed { background: rgba(224,160,32,.12); border-color: rgba(224,160,32,.5); }
+                #import-modal .im-idlbl { font-weight: 700; text-transform: uppercase; font-size: 10.5px; letter-spacing: .5px; color: var(--text-dim); }
+                #import-modal .im-idpick { font: inherit; font-size: 12px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg, #11151c); color: var(--text-main); }
+                #import-modal .im-idhow { color: var(--text-dim); font-size: 11px; flex: 1 1 160px; }
                 #import-modal .im-drop { margin: 10px 2px 2px; padding: 10px; border: 1px dashed var(--border); border-radius: 4px; text-align: center; font-size: 11.5px; color: var(--text-dim); }
                 #import-modal .im-drop.is-over { border-color: var(--accent); color: var(--text-main); }
             </style>
@@ -2270,9 +2307,13 @@ function wireSettingsOverlay(ov) {
         const hiddenDefaults = _importCands.filter((c) => !isNote(c) && !c.changed).length;
         const groups = {};
         shown.forEach((c) => { (groups[c.group] = groups[c.group] || []).push(c); });
-        let html = '';
-        if (_importController && _importController.id && _importController.id !== getActiveProfile().id) {   // pulling will change the dialect
-            html += `<div class="im-banner">Connected controller: <b>${_importController.name}</b> — applying <b>Hardware &amp; I/O</b> retargets this machine + its post from <b>${getActiveProfile().name}</b> to it.</div>`;
+        let html = importIdRowHtml();
+        // t1229 — the banner used to promise that applying RETARGETS this machine to the connected controller. That is
+        // no longer what happens (user ruling): a pull NEVER retargets the workspace it is in. It states the mismatch
+        // and what the Apply will offer instead — a claim the code actually honours (see the apply handler below).
+        const cmp = compareController(_importPick || (_importController && _importController.id));
+        if (!cmp.match) {
+            html += `<div class="im-banner">${mismatchStatement(cmp)} A pull never retargets this workspace — applying will offer to <b>duplicate it as a ${cmp.detected.name} workspace</b> and land these values in the copy.</div>`;
         }
         // DETAIL sub-rows (t622) — the RAW value read AND the derivation per row, always visible (the user came to REVIEW).
         const detailHtml = (c) => (c.detail && c.detail.length)
@@ -2296,6 +2337,8 @@ function wireSettingsOverlay(ov) {
         if (onlyChanged && hiddenDefaults) html += `<div class="im-empty">+${hiddenDefaults} value${hiddenDefaults > 1 ? 's' : ''} at factory default — untick “Show only changed” to add them.</div>`;
         body.innerHTML = html;
         body.querySelectorAll('[data-cand]').forEach((cb) => cb.addEventListener('change', () => { _importCands[+cb.dataset.cand].checked = cb.checked; updateApply(); }));
+        const pick = body.querySelector('#import-idpick');
+        if (pick) pick.addEventListener('change', () => { _importPick = pick.value; _importPickBy = 'user'; renderImportReview(); });   // the correction re-runs the comparison
         updateApply();
     }
     function updateApply() {
@@ -2303,6 +2346,21 @@ function wireSettingsOverlay(ov) {
         const n = _importCands.filter((c) => c.checked).length;
         applyBtn.disabled = !n; applyBtn.textContent = n ? `Apply ${n}` : 'Apply';
     }
+    /**
+     * t1229 — DUPLICATE AS THE DETECTED MACHINE. No new mechanism: it is the workspace manager's Save-As-a-copy over
+     * the same bytes (ui/workspaceSave.js), then the COPY adopts the detected controller. The workspace you were in is
+     * left alone because Save As leaves the ORIGINAL FILE untouched — the copy is what carries on from here.
+     * @returns {Promise<boolean>} false if the user backed out of naming the copy
+     */
+    async function duplicateForController(detected) {
+        const base = (fileSavedName() || 'workspace').replace(/\.ddcs$/i, '');
+        const slug = String(detected.name || detected.id).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        const r = await saveWorkspace({ pickNew: true, suggestedName: `${base}-${slug}.ddcs` });
+        if (!r || !r.ok) return false;
+        setMachine({ controllerId: detected.id }, true);   // the COPY is that machine now — controller, post and vars
+        return true;
+    }
+
     // scanOverride = a pre-computed scan (t666: from a dropped dump folder) → skip the network scanController.
     async function openImportModal(scanOverride) {
         buildImportModal();
@@ -2347,19 +2405,41 @@ function wireSettingsOverlay(ov) {
             return;
         }
         _importController = scan.controller || null;
+        _importIdSource = scan.idSource || (scanOverride ? null : 'gateway');   // live reads are the gateway's own answer
+        _importPick = (scan.controller && scan.controller.id) || '';
+        _importPickBy = 'detected';
         _importCands = scan.candidates.map((c) => ({ ...c, checked: !!c.changed }));   // pre-tick what the operator changed
         renderImportReview();
         m.querySelector('#import-only').onchange = renderImportReview;
         m.querySelector('#import-apply').onclick = async () => {
             const checked = _importCands.filter((c) => c.checked);
             const btn = m.querySelector('#import-apply'); btn.disabled = true; btn.textContent = 'Applying…';
-            // t1221 — applying rewrites this machine's envelope / WCS / homing / spindle, so it earns the same
-            // protection opening a .ddcs has. t1223 SWEEP: that protection is now the save-first PROMPT rather than a
-            // silent download — if there is unsaved work the user chooses (save / discard / cancel) instead of finding
-            // an unasked-for .ddcs in Downloads. Clean buffer → no prompt at all, because there is nothing to lose.
-            if (!(await window.ddcsConfirmDiscardBuffer?.('these controller parameters'))) { btn.disabled = false; btn.textContent = 'Apply'; return; }
-            try { await applyCandidates(checked); m.classList.remove('active'); }
-            catch (e) { body.innerHTML = '<div class="im-empty">Apply failed: ' + (e && e.message ? e.message : e) + '</div>'; }
+            const reset = () => { btn.disabled = false; btn.textContent = 'Apply'; updateApply(); };
+            // t1229 A2 — THE MISMATCH GATE. Reading was free; landing the values is where the machine's identity
+            // matters. A pull NEVER retargets this workspace (user ruling), so the ONE dialog offers exactly two
+            // things: duplicate as the detected machine, or back out. There is deliberately no "apply anyway".
+            const cmp = compareController(_importPick || (_importController && _importController.id));
+            if (!cmp.match) {
+                const ok = await dlgConfirm(
+                    mismatchStatement(cmp)
+                    + '\n\nA pull never retargets this workspace. These values can land in a COPY set up for the '
+                    + `${cmp.detected.name} instead — this workspace and its file stay exactly as they are.`,
+                    { title: 'Different controller', okLabel: `Duplicate as a ${cmp.detected.name} workspace`, cancelLabel: 'Cancel' },
+                );
+                if (!ok) { reset(); return; }
+                if (!(await duplicateForController(cmp.detected))) { reset(); return; }   // they backed out of naming the copy
+            } else if (!(await window.ddcsConfirmDiscardBuffer?.('these controller parameters'))) {
+                // t1221/t1223 — the matching case still earns the save-first prompt: applying rewrites this machine's
+                // envelope / WCS / homing / spindle. (The duplicate path above IS a save, so it needs no second ask.)
+                reset(); return;
+            }
+            try {
+                await applyCandidates(checked);
+                // the copy was named and written BEFORE these values existed — write them into it so the file on disk
+                // is the workspace the dialog promised. The handle is armed by the Save As, so this asks nothing.
+                if (!cmp.match) { try { await saveWorkspace(); } catch (_) { /* the values are applied either way */ } }
+                m.classList.remove('active');
+            } catch (e) { body.innerHTML = '<div class="im-empty">Apply failed: ' + (e && e.message ? e.message : e) + '</div>'; }
         };
     }
 
@@ -2415,7 +2495,8 @@ function wireSettingsOverlay(ov) {
             }
         }
         const spc = spindleCandidate(rec.spindle); if (spc) cands.push(spc);   // t780 — the pulled spindle interface + mapping axis
-        return { connected: true, controller: prof.id ? { id: prof.id, name: prof.name } : { id: rec.controllerId, name: rec.controllerId }, candidates: cands.concat(notes) };
+        // t1229 — carry HOW the controller was identified through to the modal, so an assumption can be shown as one.
+        return { connected: true, idSource: rec.idSource || null, controller: prof.id ? { id: prof.id, name: prof.name } : { id: rec.controllerId, name: rec.controllerId }, candidates: cands.concat(notes) };
     }
     async function readDumpFiles(files) {
         const out = [];
