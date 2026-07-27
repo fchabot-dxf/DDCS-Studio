@@ -342,7 +342,16 @@ export function initMacrosApp() {
         const send = panel.querySelector('#macfile_send');
         if (send) send.addEventListener('click', async () => {
             const content = ta.value;
-            if (isExport) { UIUtils.downloadFile(path, content); return; }
+            // t1249 — a SYSDISK file (T.nc, key-N.nc, slib-m.nc) exported for the no-LAN transport IS a deploy: it
+            // walks to the controller on a stick. It goes to the granted deploy target, not Downloads.
+            if (isExport) {
+                const D = await import('../data/deployFolder.js');
+                const r = await D.deployFiles([{ name: path, data: content }], {
+                    fallbackDownload: (fs) => fs.forEach((f) => UIUtils.downloadFile(f.name, f.data)),
+                });
+                if (!r.aborted) dlgNotice(D.deployedMessage(r));
+                return;
+            }
             if (!await dlgConfirm('Push “' + path + '” to the controller? This overwrites the file on the machine.')) return;
             const orig = send.textContent; send.disabled = true; send.textContent = 'Pushing…';
             makeClient().writeSysfile(path, content, 'write')
@@ -1761,7 +1770,14 @@ function homingPostIsExpert() {
         files.push({ name: 'eng-additions.txt', data: '( MERGE these lines into the controller eng/chs language file — do NOT replace it. )\n\n' + eng.join('\n') });
         const name = (_camPack.meta && _camPack.meta.name) || 'CAM pack';
         files.push({ name: 'README.txt', data: readmeText(name) });
-        downloadBytes(name.replace(/[^\w-]+/g, '_') + '.zip', makeZip(files));
+        // t1249 — DEPLOY THE FILE SET, not a zip. Every byte is identical to what the download produced; what changes
+        // is the destination. A stick wants CAM/ sitting on it (step 3 of the README is "cursor on the CAM folder"),
+        // so writing the tree directly removes the unzip step that stood between the export and the machine.
+        const D = await import('../data/deployFolder.js');
+        const r = await D.deployFiles(files, {
+            fallbackDownload: (fs) => downloadBytes(name.replace(/[^\w-]+/g, '_') + '.zip', makeZip(fs)),
+        });
+        if (!r.aborted) dlgNotice(D.deployedMessage(r));
     });
 
     // Safe eng merge: paste the controller's CURRENT eng → append this pack's params, flag collisions, download.

@@ -33,6 +33,22 @@ async function boot(page) {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.openWorkspaceManager && window.ddcsFileSaveState && window.ddcsWorkspaceDirtyToFile);
     await page.evaluate(() => { window.__ddcsNoReload = true; });
+    // …and WAIT FOR BOOT TO SETTLE before any test records a "saved" watermark (t1249). Those globals appear early,
+    // while boot is still writing stores — so a mark taken here snapshots a signature that a later boot write
+    // immediately invalidates, and the workspace reads "Unsaved changes" the instant after it was marked saved.
+    // The tests passed on timing luck; a change elsewhere in the module graph was enough to expose it. Wait for the
+    // stores to stop changing, which is the actual precondition every state assertion below depends on.
+    // A store row hides its key behind read()/write() closures, so the signature is taken through the SAME
+    // declared registry the .ddcs writer uses — the thing that would actually differ if a fresh file were written.
+    await page.waitForFunction(async () => {
+        const sig = async () => {
+            const { BACKUP_STORES } = await import('/data/backup.js');
+            return JSON.stringify(BACKUP_STORES.map((s) => { try { return s.read(); } catch (_) { return null; } }));
+        };
+        const a = await sig();
+        await new Promise((r) => setTimeout(r, 120));
+        return a === await sig();
+    }, null, { timeout: 15000 });
 }
 
 /** A fake granted folder whose files can be READ and REMOVED, so delete is driven for real. */

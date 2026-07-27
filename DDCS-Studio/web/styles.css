@@ -628,6 +628,10 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
     font-size: 11.5px; font-weight: 600; color: var(--text-dim, #9fb0c4); opacity: .85; line-height: 1.35;
 }
 .hq-identity-txt b { font-weight: 700; }
+/* t1249 — the identity line's SUBJECT label. Its own class, not .hq-cur: the dialect and the envelope are VALUES
+   the line reports, the label is what the line is ABOUT, and giving them one class made the two indistinguishable
+   to anything reading the row (a spec found it immediately). */
+.hq-identity-txt .hq-label { color: var(--text-dim, #9fb0c4); font-weight: 600; }
 /* the envelope wraps as ONE unit — a machine's travel must never break across a line mid-number */
 .hq-identity-txt .hq-env { white-space: nowrap; }
 .hq-pull-btn {

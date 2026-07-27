@@ -134,7 +134,10 @@ export function initHeaderPost() {
         // places to learn for one connection. The ↧ PULL span stays — that is a controller read, not a cloud thing.
         const identityRow =
             `<div class="hq-identity-line hq-identity">`
-            + `<span class="hq-identity-txt"><b>${esc(ap.name || 'Untitled workspace')}</b>`
+            // t1249 (user) — the line says WHAT it describes. Without the label it is three facts with no subject:
+            // a reader has to work out that "Rig B" is the workspace and not, say, the controller. Same wording as
+            // the disk tooltip, so the two surfaces name the same thing the same way.
+            + `<span class="hq-identity-txt"><span class="hq-label">Workspace: </span><b>${esc(ap.name || 'Untitled workspace')}</b>`
             + `<span class="hq-cur"> · ${esc(apCtrl)}</span>`
             + (apEnv ? `<span class="hq-cur hq-env"> · ${esc(apEnv)}</span>` : '')
             + `</span>`

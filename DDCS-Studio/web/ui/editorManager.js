@@ -235,9 +235,21 @@ export class EditorManager {
         return { name: `${outName}.nc`, code };
     }
 
-    downloadFile() {
+    /**
+     * EXPORT THE PROGRAM — a DEPLOY, not a save (t1249). The .nc is baked output that a controller eats, so it goes to
+     * the granted deploy target (typically the USB stick itself) rather than into Downloads, where the user would then
+     * have to find it and copy it by hand. The download survives only where File System Access does not exist.
+     */
+    async downloadFile() {
         const { name, code } = this.buildProgram();
-        UIUtils.downloadFile(name, code);
+        const D = await import('../data/deployFolder.js');
+        const r = await D.deployFiles([{ name, data: code }], {
+            fallbackDownload: (files) => files.forEach((f) => UIUtils.downloadFile(f.name, f.data)),
+        });
+        const { dlgNotice } = await import('./dialog.js');
+        if (r.aborted) return r;   // declined the picker → nothing written, nothing downloaded, nothing to announce
+        dlgNotice(D.deployedMessage(r));
+        return r;
     }
 
     getValue() {

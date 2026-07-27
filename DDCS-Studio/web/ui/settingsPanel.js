@@ -3009,8 +3009,15 @@ function wireSettingsOverlay(ov) {
         const dl = q('atc_dl_tnc'); if (dl) dl.style.display = '';
     });
     const dlTnc = q('atc_dl_tnc');
-    if (dlTnc) dlTnc.addEventListener('click', () => {
-        const out = q('atc_tnc_out'); if (out && out.value) UIUtils.downloadFile('T.nc', out.value);
+    // t1249 — T.nc is the controller's TOOL TABLE file: baked output that walks to the machine, so it deploys to the
+    // granted target like every other bake. Downloads only where File System Access does not exist.
+    if (dlTnc) dlTnc.addEventListener('click', async () => {
+        const out = q('atc_tnc_out'); if (!out || !out.value) return;
+        const D = await import('../data/deployFolder.js');
+        const r = await D.deployFiles([{ name: 'T.nc', data: out.value }], {
+            fallbackDownload: (fs) => fs.forEach((f) => UIUtils.downloadFile(f.name, f.data)),
+        });
+        if (!r.aborted) dlgNotice(D.deployedMessage(r));
     });
 
     // Machine → AXES: the vertical per-axis role list (renderAxesGui) attaches its own change listeners (commit + re-render), so no static wiring here (t648).

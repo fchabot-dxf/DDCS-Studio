@@ -24,17 +24,14 @@
  *   - NAMED REFUSALS (the t1225 pattern). A file that cannot be read says WHICH CHECK FAILED — "not JSON", "a .cam,
  *     not a .wiz" — because "invalid file" tells a person nothing about the file in their hand.
  */
-import { getHandle, putHandle, handleGranted, requestHandle } from './fsHandles.js';
+import { handleGranted } from './fsHandles.js';
+// t1249 — the granted-folder MACHINERY moved to grantedFolder.js when the deploy folder made it the third case of the
+// same thing. This module keeps what is LIBRARY-specific: the declared kinds, the named refusals, the header reads.
+import { makeGrantedFolder, hasFSA as _hasFSA } from './grantedFolder.js';
 
 export const LIBRARY_KEY = 'libraryFolder';
 
-/**
- * THE SESSION'S FOLDER, cached in memory beside the IDB record. Persisting a directory handle is BEST-EFFORT — a
- * private window, a locked-down webview or a quota refusal can all reject the write — and without this cache such an
- * environment would forget the folder the instant the user picked it, making the shelf look broken rather than
- * unpersisted. The handle you just granted is usable NOW whether or not it survives the reload.
- */
-let _dir = null;
+const folder = makeGrantedFolder({ key: LIBRARY_KEY, pickerId: 'ddcsLibrary', what: 'library' });
 
 /**
  * THE DECLARED KINDS. Each shareable source declares its extension, its file `kind` marker and what it is, in ONE
@@ -46,32 +43,20 @@ export const LIBRARY_KINDS = {
     cam: { ext: '.cam', kind: 'ddcs.cam', what: 'CAM recipe' },
 };
 
-export const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
+export const hasFSA = _hasFSA;
 
 /** The remembered folder handle, or null. Does NOT request permission — reading is not an act. */
-export async function getLibraryFolder() {
-    return _dir || getHandle(LIBRARY_KEY);
-}
+export const getLibraryFolder = folder.get;
 
 /**
  * The folder, ready to use. MUST be called inside a user gesture: a remembered handle whose permission lapsed is
  * re-requested (one click, no OS folder dialog), and only a folder we have never been given opens the picker.
  * @returns {Promise<FileSystemDirectoryHandle|null>} null = the user declined, or this environment cannot
  */
-export async function ensureLibraryFolder({ ask = true } = {}) {
-    const known = _dir || await getHandle(LIBRARY_KEY);
-    if (known && await requestHandle(known)) { _dir = known; return known; }
-    if (!ask || !hasFSA()) return null;
-    try {
-        const dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'ddcsLibrary' });
-        _dir = dir;
-        await putHandle(LIBRARY_KEY, dir);   // best-effort: the cache above is what makes this session work regardless
-        return dir;
-    } catch (_) { return null; }   // declined / unavailable → fails closed, and the caller says so
-}
+export const ensureLibraryFolder = folder.ensure;
 
 /** Forget the folder (the user re-picks next time). */
-export async function forgetLibraryFolder() { _dir = null; await putHandle(LIBRARY_KEY, null); }
+export const forgetLibraryFolder = folder.forget;
 
 const extOf = (name) => { const m = String(name || '').match(/\.[a-z0-9]+$/i); return m ? m[0].toLowerCase() : ''; };
 const stemOf = (name) => String(name || '').replace(/\.[a-z0-9]+$/i, '');
@@ -143,9 +128,9 @@ export async function readLibraryFile(name, kindKey) {
 export async function writeLibraryFile(stem, kindKey, text, { confirmReplace = null } = {}) {
     const want = LIBRARY_KINDS[kindKey];
     if (!want) return { ok: false, error: `unknown library kind “${kindKey}”.` };
-    const dir = await ensureLibraryFolder();
+    const dir = await folder.ensure();
     if (!dir) return { ok: false, aborted: true, error: 'no library folder — pick one and try again.' };
-    const name = `${String(stem).replace(/[\\/:*?"<>|]/g, '-').trim() || 'untitled'}${want.ext}`;
+    const name = `${String(stem).replace(/[\/:*?"<>|]/g, '-').trim() || 'untitled'}${want.ext}`;
     let existing = null;
     try { existing = await dir.getFileHandle(name); } catch (_) { existing = null; }
     if (existing && confirmReplace) {
@@ -153,18 +138,13 @@ export async function writeLibraryFile(stem, kindKey, text, { confirmReplace = n
         try { ok = await confirmReplace(name, dir.name || 'the library folder'); } catch (_) { ok = false; }
         if (!ok) return { ok: false, aborted: true };
     }
-    try {
-        const h = existing || await dir.getFileHandle(name, { create: true });
-        const w = await h.createWritable();
-        await w.write(text);
-        await w.close();
-        return { ok: true, name };
-    } catch (e) { return { ok: false, error: (e && e.message) || String(e) }; }
+    const r = await folder.writeFiles([{ name, data: text }], { ensureFolder: false });
+    return r.ok ? { ok: true, name } : { ok: false, error: (r.failed[0] || {}).why || r.error };
 }
 
 /** Delete a source from the library folder (the user's explicit act only). */
 export async function deleteLibraryFile(name) {
-    const dir = await getLibraryFolder();
+    const dir = await folder.get();
     if (!dir) return false;
     try { await dir.removeEntry(name); return true; } catch (_) { return false; }
 }

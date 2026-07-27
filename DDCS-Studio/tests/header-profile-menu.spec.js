@@ -32,6 +32,7 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
             // t1227 (user) — the identity is a QUIET PLAIN-TEXT LINE, not a button: nothing to press, no handler
             identityIsButton: !!(id && (id.tagName === 'BUTTON' || id.matches('[data-profact]') || id.matches('.hdr-quick-item'))),
             identityName: id ? (id.querySelector('b') || {}).textContent || '' : '',
+            identityLabel: id ? (id.querySelector('.hq-identity-txt') || {}).textContent.trim() || '' : '',
             identityCtrl: id ? (id.querySelector('.hq-cur') || {}).textContent || '' : '',
             // …and it sits directly above the Save / Open buttons, so a save has its context
             identityAboveWs: !!(id && id.nextElementSibling && id.nextElementSibling.classList.contains('hq-ws-row')),
@@ -72,6 +73,8 @@ test('the compact diet menu: identity line (name·controller, ↧) + one workspa
     expect(m.identityIsButton, 'it is NOT a button any more — its click served the retired profile world').toBe(false);
     expect(m.identityAboveWs, 'it sits directly above Save / Open (save context)').toBe(true);
     expect(m.identityName, 'identity shows the WORKSPACE name (t1217 — from the machine record)').toMatch(/Rig B/);
+    // t1249 (user) — and the line SAYS what it describes, in the disk tooltip's wording
+    expect(m.identityLabel, 'the line is labelled, so the name has a subject').toMatch(/^Workspace:/);
     expect(m.identityCtrl, 'and the dialect after it').toMatch(/·/);
     expect(m.hasCloud, 'the cloud badge is RETIRED (t1243) — cloud lives in the workspace manager Cloud tab, one door not two').toBe(false);
     expect(m.hasPull, 'so does the ↧ pull tap target').toBe(true);
