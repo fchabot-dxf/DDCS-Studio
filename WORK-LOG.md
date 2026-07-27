@@ -17574,3 +17574,73 @@ appearing only when Find Both is on.
 GATE (fast tier): smoke 59/59 + every middle spec (55, 2 pre-existing skips) including the seam, repos-landing,
 manual-markers and traverse-lands + the inter-pass connector + the new direction byte sweep. The FULL suite is the
 advisor's merge gate for this emit-class change. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1239 -- TURN D: the polish batch. Eight built, one proposed, and three of them turned out to be ONE fix each.
+
+### (1) THE CANVAS RESIZES FROM BOTH EDGES.
+
+A second handle below the feature canvas. It is deliberately NOT a second ratio: the handle above SHARES the visual
+space between the two previews, this one sets how much space the visual block GETS. Different quantities, each with
+its own persisted pref (`getVisualHeight` beside `getPaneRatio`, same class of app-wide display state). Both grips
+went 4px -> 2px. Proven by dragging it: 800 -> 707px, persisted.
+
+### (2) THE SETTINGS RAIL DIES.
+
+The subtabs were a 160px left column on desktop and a horizontal strip on a phone — two layouts to learn for one
+control. Now it is the strip at EVERY width, which is what the phone already did; the media query keeps only its
+scroll behaviour. One place to look for a subtab on any screen.
+
+### (3)+(4) TWO FIXES IN THE SHARED FORM LAYER, so every wizard inherits.
+
+The ⚙ was ABSOLUTELY POSITIONED top-right — it landed ON a select's chevron. The row is a 2-column grid now: column 1
+keeps whatever the widget rendered, stacked exactly as before, and the gear owns column 2, spanning the full height.
+No assumption about the widget's markup, so a label+input, a segmented control and a canvas widget all behave.
+The controller-source circle moved to the LEFT of its field — on the right it collided with the field's own edge and
+read as part of the VALUE rather than a control over it. One line in probeSrcGlyph (append the button before the
+input), because the wrap was already the one place that builds it.
+
+### (5) THE STOCK MODAL GROWS UPWARD.
+
+Stock is placed by its DATUM, and the default datum's Z is the TOP — so growing Z hung the slab DOWNWARD off a fixed
+top and it read as floating away from the grid. The MODAL PREVIEW ONLY forces its Z-datum to the bottom, so a thicker
+slab grows up from the floor, which is what someone watching a block get thicker expects. The real datum is untouched
+(it is what the machine uses). Verified with a before/after pair at Z=20 and Z=60.
+
+### (6) IDENTITY FIRST -- and the honest version of this is ONE declaration, not a sweep.
+
+Measured first: corner's form opened with "Max Probe Dist" and you scrolled past nine tuning fields to reach WHICH
+CORNER. The cause is structural, not per-wizard: bindings are assembled value-sockets-first, so tool/cut scalars
+always preceded the fields that decide what the op IS.
+So the fix is in the ONE form layer: a DECLARED section rank (IDENTITY -> GEOMETRY -> TOOL & CUT) applied with a
+STABLE sort, so order WITHIN a section is untouched and every wizard — built-in twin or user-authored — inherits it.
+Corner, middle and edge then declare their op-defining fields into the IDENTITY section (corner + probe order; axis
+order + both directions + feature; axis + direction). Corner now reads IDENTITY / GEOMETRY / TOOL & CUT top to bottom.
+WHAT I DID NOT DO, and why it is not a gap: the BUILT-IN HTML forms for the ported wizards are unreachable — the
+library declares `opensAs: 'user_*_data'` for corner / middle / edge / alignment / homing / wcs / comm / rotary /
+atc…, so opening any of them opens the TWIN. Reordering their legacy HTML would be dead work on a surface nobody can
+open. I surveyed every twin's first structural field instead: all of the rest already lead with theirs (method / mode
+/ type / strategy / action / axis), so corner was the outlier and it is fixed.
+
+### (7) THE DERIVED MIRROR ROWS -- reusing the flag that already existed.
+
+Corner's Wall 2 dX/dY + Z->Wall1 dX/dY are written by DRAGGING a marker; the form field only ever mirrored what the
+drag had already written. I started to add a `derived` flag and then found `formHidden` (t792) already means exactly
+this — declared out of the form, still in the stack, the round-trip and the drag. Inventing a second flag for one
+concept is how a codebase grows two ways to say the same thing, so I deleted mine and used theirs. Four bindings, one
+word each; the spec asserts the bindings SURVIVE (count 4, all formHidden) so hiding a row cannot quietly drop a drag
+target.
+
+### (9) THE CALC TAG.
+
+Stepping a probe macro spends many lines on arithmetic where nothing moves, and a chip that only showed the line read
+as a frozen sim. The chip now appends a small tag — calc (a register assign), flow (IF/WHILE/GOTO/M98), note (a
+comment), set (a mode/M-code) — and MOTION gets NO tag, because the tag exists to explain the ABSENCE of motion.
+Display only; it reads the same raw line the chip already had.
+
+### (8) NOT BUILT, as instructed -- the General-tab regrouping is in the pass-back for the user to rule on.
+
+GATE (fast tier): smoke 59/59 + 155 corner/middle/settings/form specs (2 pre-existing skips). Screenshots: the
+settings strip, the corner form (identity/geometry/tool-cut with the gear beside its field and the source circles on
+the left, mirrors gone), and the stock modal at Z=20 vs Z=60. Branch feat/ddcs-workspace. NO release.
