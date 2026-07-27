@@ -104,10 +104,11 @@ test('the folder half is an OS-style file panel listing every .ddcs, read from t
     // an OS-style file PANEL with a column header; the ENVELOPE is the strongest column, read from the FILE's settings
     await expect(page.locator('#wsmCards .wsm-fp-head')).toContainText(/Envelope/i);
     const first = cards.first();
-    await expect(first.locator('.wsm-c-env')).toHaveText('300 × 200 × 80');   // newest saved first
+    // t1231 — AS DECLARED, signs included: the sign is the home-direction declaration, never cosmetic
+    await expect(first.locator('.wsm-c-env')).toHaveText('300 × 200 × -80');   // newest saved first
     await expect(first.locator('.wsm-c-ctrl')).toHaveText(/V4\.1/);
     await expect(first.locator('.wsm-c-name')).toContainText('bench-router');
-    await expect(cards.nth(1).locator('.wsm-c-env'), 'the other machine, its own envelope').toHaveText('756 × 776 × 120');
+    await expect(cards.nth(1).locator('.wsm-c-env'), 'the other machine, its own envelope + its own home ends').toHaveText('756 × -776 × -120');
     await page.locator('#wsmOverlay .wsm-modal').screenshot({ path: testInfo.outputPath('wsm-folder-cards.png') });
 });
 

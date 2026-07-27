@@ -122,7 +122,9 @@ test('the dirty state persists across a reload (watermark is stored), and Save s
   await page.waitForFunction(() => window.ddcsFileSaveState && window.ddcsWorkspaceDirtyToFile);
   expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'still dirty after reload (unsaved work is not in a file)').toBe(true);
 
-  await page.evaluate(() => window.ddcsMarkWorkspaceSaved());
+  // t1231 — a save is a FILE with a NAME (the nameless mark is what produced "Untitled workspace - Saved"), so the
+  // save being simulated here names the file it wrote.
+  await page.evaluate(() => window.ddcsMarkWorkspaceSaved('bench.ddcs'));
   await page.reload();
   await page.waitForFunction(() => window.ddcsFileSaveState && window.ddcsWorkspaceDirtyToFile);
   expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'clean after Save survives a reload').toBe(false);

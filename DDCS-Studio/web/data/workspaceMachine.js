@@ -68,6 +68,20 @@ export function setMachineName(fileName) {
     return setMachine({ name: stem }, false);
 }
 
+/**
+ * THE ENVELOPE AS DECLARED — SIGNS INCLUDED (t1231, user ruling). A travel's sign is not decoration: it declares which
+ * END of the axis the machine homes to, so `850 × -850 × -120` and `850 × 850 × 120` are two different machines. Both
+ * summaries used to run the numbers through Math.abs, which made a machine unrecognisable from the one line that is
+ * supposed to identify it. ONE formatter, so the Settings band, the file panel and any tooltip cannot disagree.
+ * @param {{x:number,y:number,z:number}} m  a settings `machine` block — live, or read out of a .ddcs
+ * @returns {string|null} e.g. "850 × -850 × -120", or null when an axis is not a finite number
+ */
+export function envelopeSummary(m) {
+    const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+    const xyz = [n(m && m.x), n(m && m.y), n(m && m.z)];
+    return xyz.every((v) => v != null) ? xyz.join(' × ') : null;
+}
+
 if (typeof window !== 'undefined') {
     window.ddcsGetMachine = getMachine;
     window.ddcsSetMachine = setMachine;

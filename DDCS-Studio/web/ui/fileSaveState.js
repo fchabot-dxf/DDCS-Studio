@@ -85,9 +85,11 @@ function install() {
         setTimeout(tick, 400);
     }
 
+    // t1231 — `markSaved()` is GONE with the nameless mark it wrapped: it stamped "saved" without a file name, which is
+    // not a state the one-name rule allows (and is how "Untitled workspace · Saved" was produced). Marking a save is
+    // the save path's job, under the name it actually wrote.
     window.ddcsFileSaveState = {
         refresh, isDirty: isWorkspaceDirtyToFile, save: saveWorkspace, signature: workspaceSignature,
-        markSaved: () => { window.ddcsMarkWorkspaceSaved && window.ddcsMarkWorkspaceSaved(); return refresh(); },
     };
 }
 

@@ -5585,12 +5585,23 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     letter-spacing: .04em; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border);
     background: color-mix(in srgb, var(--panel) 70%, transparent); }
 .wsm-fp-list { max-height: 240px; overflow: auto; }
-.wsm-modal .wsm-fp-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 10px; text-align: left;
+/* t1231 — the row is a ROW now: the OPEN button carries the columns, the DELETE button sits at its end. A button
+   cannot nest in a button, and delete needs its own target so a mis-tap opens a workspace instead of erasing one. */
+.wsm-fp .wsm-fp-row { display: flex; align-items: stretch; border-bottom: 1px solid var(--border); }
+.wsm-fp .wsm-fp-row:last-child { border-bottom: none; }
+.wsm-modal .wsm-fp-del {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 30px;
+    background: transparent; border: none; color: var(--text-dim); cursor: pointer; opacity: .35;
+    transition: opacity .12s ease, color .12s ease, background .12s ease;
+}
+.wsm-fp .wsm-fp-row:hover .wsm-fp-del, .wsm-modal .wsm-fp-del:focus-visible { opacity: 1; }
+.wsm-modal .wsm-fp-del:hover { color: #ef4444; background: rgba(239,68,68,.14); }
+.wsm-modal .wsm-fp-open { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; padding: 6px 10px; text-align: left;
     font: inherit; font-size: 12.5px; color: var(--text-main); background: transparent; border: none;
-    border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); cursor: pointer; }
-.wsm-modal .wsm-fp-row:last-child { border-bottom: none; }
-.wsm-modal .wsm-fp-row:hover { background: color-mix(in srgb, var(--accent, #2d7ff9) 14%, transparent); }
-.wsm-modal .wsm-fp-row.is-bad { opacity: .55; cursor: default; }
+    cursor: pointer; }
+.wsm-modal .wsm-fp-open:hover { background: color-mix(in srgb, var(--accent, #2d7ff9) 14%, transparent); }
+.wsm-modal .wsm-fp-row.is-bad { opacity: .55; }
+.wsm-modal .wsm-fp-row.is-bad .wsm-fp-open { cursor: default; }
 .wsm-fp .wsm-c-name { flex: 1 1 40%; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .wsm-fp .wsm-c-env { flex: 0 0 26%; font-weight: 700; }
 .wsm-fp .wsm-c-ctrl { flex: 0 0 22%; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

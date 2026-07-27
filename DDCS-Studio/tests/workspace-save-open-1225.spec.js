@@ -194,7 +194,8 @@ test('a refusal SAYS WHICH CHECK FAILED — and a byte-order mark is not a reaso
     await page.locator('#wsmPickFolder').click();
     await expect(page.locator('#wsmCards .wsm-fp-row')).toHaveCount(5);
 
-    const reason = async (name) => page.locator(`#wsmCards .wsm-fp-row:has-text("${name}")`).first().getAttribute('title');
+    // t1231 — the row is a wrapper now (open button + delete button); the reason tooltip lives on the OPEN button
+    const reason = async (name) => page.locator(`#wsmCards .wsm-fp-row:has-text("${name}") .wsm-fp-open`).first().getAttribute('title');
     expect(await reason('not-json'), 'says it is not JSON, and shows the parser\'s own words').toMatch(/not valid JSON/i);
     expect(await reason('other-kind'), 'names the kind it actually found').toMatch(/ddcs\.macro.*not a DDCS workspace/i);
     expect(await reason('empty'), 'says the file is empty').toMatch(/empty/i);

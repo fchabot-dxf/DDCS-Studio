@@ -29,7 +29,7 @@ import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 �
 import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
-import { getMachine, setMachine } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine record
+import { getMachine, setMachine, envelopeSummary } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine record; t1231 — the signed envelope summary
 import { compareController, mismatchStatement } from '../data/controllerMatch.js';   // t1229 A2 — the ONE controller comparison + its wording (shared with the gateway send)
 import { saveWorkspace } from './workspaceSave.js';   // t1229 — Duplicate = the existing Save-As-a-copy, no second mechanism
 import { fileSavedName } from '../data/backup.js';
@@ -1899,10 +1899,10 @@ function wireSettingsOverlay(ov) {
         if (!band) return;
         const m = getMachine();
         const ctrl = (CONTROLLER_PROFILES[m.controllerId] || {}).name || m.controllerId || '—';
-        const mm = _ddcsSettings.machine || {};
-        const num = (v) => (Number.isFinite(Number(v)) ? Math.abs(Number(v)) : null);
-        const env = [num(mm.x), num(mm.y), num(mm.z)];
-        const envTxt = env.every((v) => v != null) ? `${env[0]} × ${env[1]} × ${env[2]} mm` : 'not set';
+        // t1231 — AS DECLARED, signs and all (the sign is the home-direction declaration): ONE formatter shared with
+        // the workspace manager's file panel, so the band and the rows cannot describe the same machine differently.
+        const envSummary = envelopeSummary(_ddcsSettings.machine || {});
+        const envTxt = envSummary ? envSummary + ' mm' : 'not set';
         const named = (m.name || '').trim();
         band.innerHTML = named
             ? `<span class="si-name">${escHtml(named)}</span>`

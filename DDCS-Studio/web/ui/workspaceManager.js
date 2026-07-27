@@ -19,11 +19,11 @@
  * workspace that was neither the file nor what you had. If the buffer has unsaved work you get ONE prompt —
  * Save and continue / Discard / Cancel — and never a silent download.
  */
-import { restoreBackup, previewBackup, markWorkspaceSavedToFile, workspaceDelta, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt } from '../data/backup.js';
+import { restoreBackup, previewBackup, markWorkspaceSavedToFile, forgetWorkspaceFile, workspaceDelta, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt } from '../data/backup.js';
 import { saveWorkspace, adoptSaveHandle } from './workspaceSave.js';
 import { getHandle, putHandle, handleGranted, FOLDER_KEY } from '../data/fsHandles.js';
-import { setMachineName } from '../data/workspaceMachine.js';
-import { dlgNotice } from './dialog.js';
+import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
+import { dlgNotice, dlgConfirm } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -119,11 +119,9 @@ async function cardFor(fileHandle) {
         const st = obj.stores || {};
         const mach = st.machine || {};
         const mm = (st.settings && st.settings.machine) || {};
-        const n = (v) => (Number.isFinite(Number(v)) ? Math.abs(Number(v)) : null);
-        const env = [n(mm.x), n(mm.y), n(mm.z)];
         return {
             name, handle: fileHandle,
-            envelope: env.every((v) => v != null) ? `${env[0]} × ${env[1]} × ${env[2]}` : null,
+            envelope: envelopeSummary(mm),   // t1231 — signs INCLUDED: the sign declares the home end, so stripping it hid the machine
             dialect: (CONTROLLER_PROFILES[mach.controllerId] || {}).name || mach.controllerId || null,
             savedAt: obj.date || null,
         };
@@ -147,7 +145,8 @@ async function listWorkspaces(dir) {
  *
  * `fileHandle` is the writable handle this file came from when there is one (a row in the granted folder). Passing it
  * RETARGETS the save handle: after opening B, Ctrl+S must write B, not silently overwrite the file that was open
- * before. Browse… has no handle, so it passes null — which forgets the old one rather than leaving it armed.
+ * before. A file with no handle (there is no such door today) passes null, which FORGETS the old one rather than
+ * leaving a stale save target armed.
  */
 async function openWorkspaceFile(file, label, fileHandle) {
     const { obj, error } = await readWorkspaceFile(file);   // ONE reader: the panel row and this door refuse for the same reason
@@ -216,7 +215,9 @@ export async function openWorkspaceManager(focus = 'save') {
     });
 
     ov.querySelector('#wsmPickFolder').addEventListener('click', async () => {
-        if (!hasFSA()) { dlgNotice('This browser cannot grant a folder. Use Browse… to open a .ddcs file instead.'); return; }
+        // t1231 — this used to point at Browse…, a button t1227 retired: a message naming a door that no longer
+        // exists is worse than no message. It now says what this browser can actually do.
+        if (!hasFSA()) { dlgNotice('This browser cannot grant a workspaces folder. Saving still works — it downloads the .ddcs instead, and you can open it in a browser that supports folders (Chrome, Edge, or the desktop app).'); return; }
         try { const dir = await window.showDirectoryPicker({ mode: 'readwrite', id: 'ddcsWorkspaces' }); await putHandle(FOLDER_KEY, dir); await renderFolder(ov, dir); }
         catch (e) { if (!e || e.name !== 'AbortError') dlgNotice('Could not open that folder: ' + ((e && e.message) || e)); }
     });
@@ -224,6 +225,12 @@ export async function openWorkspaceManager(focus = 'save') {
     // somewhere else gets dropped into the folder like any other document, which is a thing the OS already does well.
     // (openWorkspaceFile still takes a null handle — that is how it FORGETS a stale save target, not a second door.)
     ov.querySelector('#wsmCards').addEventListener('click', async (e) => {
+        const del = e.target.closest('[data-wsm-del]');
+        if (del) {
+            const c = (ov.__cards || [])[Number(del.dataset.wsmDel)];
+            if (c && ov.__dir) await deleteWorkspaceFile(ov, ov.__dir, c);
+            return;
+        }
         const card = e.target.closest('[data-wsm-open]');
         if (!card) return;
         const idx = Number(card.dataset.wsmOpen);
@@ -250,15 +257,18 @@ function renderCurrent(ov) {
     const changed = rows.filter((r) => r.changed === true);
     const known = rows.some((r) => r.changed !== null);   // is there a per-store baseline (a save since t1223)?
     // NEVER-SAVED and BASELINE-UNKNOWN are different states, and conflating them made a workspace that HAS a file read
-    // "Never saved to a file". The saved/dirty state comes from the watermark (which every save has always written);
-    // only WHICH PARTS changed depends on the newer per-store baseline.
-    const everSaved = at != null || !!name;
+    // "Never saved to a file". Only WHICH PARTS changed depends on the newer per-store baseline.
+    // t1231 — SAVED REQUIRES A NAME. This used to accept a bare timestamp (`at != null`), so a browser carrying a
+    // nameless mark from an older build reported "Untitled workspace · Saved" — saved to a file it could not name.
+    // The name is the one fact that proves a file exists, so it is the one this reads. (data/backup.js no longer
+    // writes a nameless mark at all; this keeps the display honest for browsers that already have one.)
+    const everSaved = !!name;
     const state = !everSaved ? 'Never saved to a file' : (dirty ? 'Unsaved changes' : 'Saved');
     host.innerHTML = `
         <div class="wsm-cur-head">
             <span class="wsm-cur-name">${esc(name || 'Untitled workspace')}</span>
             <span class="wsm-state ${dirty || !everSaved ? 'is-dirty' : 'is-saved'}">${esc(state)}</span>
-            ${at ? `<span class="wsm-cur-when">${esc(new Date(at).toLocaleString())}</span>` : ''}
+            ${everSaved && at ? `<span class="wsm-cur-when">${esc(new Date(at).toLocaleString())}</span>` : ''}
         </div>
         <div class="wsm-delta">${
             !known
@@ -285,6 +295,7 @@ async function renderFolder(ov, dir) {
 
 function renderCards(ov, dir, cards) {
     ov.__cards = cards;
+    ov.__dir = dir;   // the granted folder handle — delete needs it to removeEntry
     const host = ov.querySelector('#wsmCards');
     if (!dir) { host.innerHTML = '<div class="wsm-empty">Choose a folder to keep your workspaces in — then opening one is a click, not a file dialog.</div>'; return; }
     if (!cards.length) { host.innerHTML = '<div class="wsm-empty">No .ddcs workspaces in this folder yet. Save one here and it will show up.</div>'; return; }
@@ -296,22 +307,60 @@ function renderCards(ov, dir, cards) {
         + '<div class="wsm-fp-head"><span class="wsm-c-name">Name</span><span class="wsm-c-env">Envelope</span>'
         + '<span class="wsm-c-ctrl">Controller</span><span class="wsm-c-when">Saved</span></div>'
         + '<div class="wsm-fp-list">'
-        + cards.map((c, i) => (c.invalid
-            // a file it cannot open is still CLICKABLE — clicking it says why, instead of a row that ignores you
-            ? `<button type="button" class="wsm-fp-row is-bad" data-wsm-open="${i}" title="${esc(c.reason || 'not a readable workspace')}">`
-              + `<span class="wsm-c-name">${FILE_ICON}${esc(c.name)}</span>`
-              + `<span class="wsm-c-env">—</span><span class="wsm-c-ctrl">cannot be opened</span><span class="wsm-c-when"></span></button>`
-            : `<button type="button" class="wsm-fp-row" data-wsm-open="${i}" title="Open ${esc(c.name)}">`
-              + `<span class="wsm-c-name">${FILE_ICON}${esc(c.name)}</span>`
-              + `<span class="wsm-c-env">${esc(c.envelope || '—')}</span>`
-              + `<span class="wsm-c-ctrl">${esc(c.dialect || 'unknown')}</span>`
-              + `<span class="wsm-c-when">${c.savedAt ? esc(String(c.savedAt).slice(0, 10)) : ''}</span></button>`)).join('')
+        // t1231 — each row is now a ROW (a div) holding the OPEN button plus its own DELETE button: a button cannot
+        // nest inside a button, and delete has to be a target of its own so a mis-tap opens a workspace rather than
+        // erasing one. `.wsm-fp-row` stays the row for everything that reads it (specs, styling, hover).
+        + cards.map((c, i) => `<div class="wsm-fp-row${c.invalid ? ' is-bad' : ''}">`
+            + (c.invalid
+                // a file it cannot open is still CLICKABLE — clicking it says why, instead of a row that ignores you
+                ? `<button type="button" class="wsm-fp-open" data-wsm-open="${i}" title="${esc(c.reason || 'not a readable workspace')}">`
+                  + `<span class="wsm-c-name">${FILE_ICON}${esc(c.name)}</span>`
+                  + `<span class="wsm-c-env">—</span><span class="wsm-c-ctrl">cannot be opened</span><span class="wsm-c-when"></span></button>`
+                : `<button type="button" class="wsm-fp-open" data-wsm-open="${i}" title="Open ${esc(c.name)}">`
+                  + `<span class="wsm-c-name">${FILE_ICON}${esc(c.name)}</span>`
+                  + `<span class="wsm-c-env">${esc(c.envelope || '—')}</span>`
+                  + `<span class="wsm-c-ctrl">${esc(c.dialect || 'unknown')}</span>`
+                  + `<span class="wsm-c-when">${c.savedAt ? esc(String(c.savedAt).slice(0, 10)) : ''}</span></button>`)
+            + `<button type="button" class="wsm-fp-del" data-wsm-del="${i}" title="Delete ${esc(c.name)}.ddcs permanently" aria-label="Delete ${esc(c.name)}">${TRASH_ICON}</button>`
+            + '</div>').join('')
         + '</div></div>';
 }
 
 const FILE_ICON = '<svg class="wsm-fico" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">'
     + '<path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="#2f6fd0"/>'
     + '<path d="M15 2l5 5h-5z" fill="#8fb6e8"/></svg>';
+const TRASH_ICON = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" '
+    + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/>'
+    + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
+    + '<line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
+
+/**
+ * DELETE A WORKSPACE FILE (t1231, user-ruled). The confirm NAMES the file and says plainly what deletion means here:
+ * this is a File System Access removeEntry, which does NOT go to the Recycle Bin and cannot be undone from the app.
+ * It FAILS CLOSED — if the confirm cannot be shown, nothing is deleted.
+ *
+ * The OPEN workspace can be deleted too (the user's ruling, and their machine): the buffer keeps working, so the only
+ * thing that changes is that its work no longer lives in any file — which the confirm says, and which the state then
+ * reflects (never-saved, and the save handle is dropped so Ctrl+S asks where to put it).
+ */
+async function deleteWorkspaceFile(ov, dir, card) {
+    const fileName = card.name + '.ddcs';
+    const isActive = fileSavedName() === fileName;
+    let ok = false;
+    try {
+        ok = await dlgConfirm(
+            `Delete “${fileName}” from ${dir.name || 'this folder'}?\n\n`
+            + 'This deletes the file PERMANENTLY. It does not go to the Recycle Bin, and this app cannot undo it.'
+            + (isActive ? '\n\nThis is the workspace you have open. Your work stays open here, but it will no longer be saved to a file.' : ''),
+            { title: 'Delete workspace file', danger: true, okLabel: 'Delete', cancelLabel: 'Cancel' },
+        );
+    } catch (_) { return; }   // cannot ask → do not delete
+    if (!ok) return;
+    try { await dir.removeEntry(fileName); }
+    catch (e) { dlgNotice(`“${fileName}” could not be deleted: ${(e && e.message) || e}`); return; }
+    if (isActive) { forgetWorkspaceFile(); await adoptSaveHandle(null); renderCurrent(ov); }
+    await renderFolder(ov, dir);
+}
 
 if (typeof window !== 'undefined') {
     window.openWorkspaceManager = openWorkspaceManager;
