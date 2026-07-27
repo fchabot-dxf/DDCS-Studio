@@ -17219,3 +17219,83 @@ than deleted or loosened.
 
 GATE (fast tier): smoke 59/59 + 51 touched specs (2 pre-existing skips). Screenshots taken for all four proof
 surfaces the dispatch named, plus the phone corner menu. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1229 -- A2, THE GATEWAY MISMATCH GATE: reads stay free, a pull can only duplicate, a push cannot happen.
+
+All four rules landed. The whole turn hangs on one idea: the workspace's machine record is a CLAIM about which machine
+this is for, and the gateway (or a dump) is EVIDENCE about which machine is actually there. Where they disagree, the
+read side and the write side must do very different things -- and must say the same sentence while doing them.
+
+### THE SEAM FIRST -- one comparison, one wording (data/controllerMatch.js).
+
+compareController(detectedId) + mismatchStatement(cmp), used by BOTH the pull-apply and the gateway send. Hand-rolling
+the comparison at each surface would have been two `!==` and two sentences, and the day one of them changed the app
+would be telling the user two different things about the same fact. The module also fixes the meaning of UNKNOWN:
+if nothing identified the controller, `match` is TRUE. We cannot claim a machine is wrong on the strength of an
+absence -- blocking on silence is a guess wearing a safety hat, and it would have broken every existing send spec
+(whose stub client has no profile()) for no safety gain.
+
+### (2) PULL-APPLY -- one dialog, exactly two buttons, and the pull NEVER retargets you.
+
+The apply handler compares before it lands anything. On a mismatch it asks ONCE, and the dialog has precisely two ways
+out: [Duplicate as a <detected> workspace] and [Cancel]. There is no "apply anyway" and the spec asserts the BUTTON
+COUNT is 2, because that is the actual ruling -- a third option would be the whole gate quietly undone.
+DUPLICATE IS NOT A NEW MECHANISM: it is saveWorkspace({pickNew}) -- the same Save-As-a-copy the workspace manager uses
+-- then the copy adopts the detected controller, then the pulled values land in the copy, then a silent re-save through
+the now-armed handle so the FILE on disk is the workspace the dialog promised. The workspace you came from is untouched
+BY CONSTRUCTION: Save As leaves the original file alone, and the spec asserts its bytes are identical afterwards.
+The old banner said applying "retargets this machine + its post" -- true when it was written, FALSE under this ruling.
+It now states the mismatch and what Apply will offer, which is what the code does.
+
+### (3) PUSH -- a hard block, and it runs BEFORE the pre-flight.
+
+ui/gateway/views/send.js had no identity check at all. It has one now: the statement plus [Cancel], nothing else. No
+duplicate offer on this side (that belongs to the read), no override. ORDER MATTERS AND IS DELIBERATE: the identity
+check runs before the envelope/dead-spindle pre-flight, because if the controller is the wrong machine then the
+pre-flight is checking this program against the wrong travel anyway -- answering "is this the right machine" first is
+the only order that means anything.
+Watched FAILING first: with the guard cut out, the block test fails (no dialog, and the job submits).
+
+### (4) THE STATED ASSUMPTION -- my own t1221 flag, closed.
+
+recognizeDump now DECLARES how it identified the controller (`idSource`): 'param-count' when the setting file's size
+measured it, 'eng-assumed' when an eng file alone was all there was (that is the DM500-by-shape guess I flagged in
+t1221). The modal shows a row stating which controller this read is about and how it knows, with a PICKER to correct
+it -- amber when it is an assumption, quiet when it was measured -- and every downstream consumer (the banner, the
+mismatch gate) reads the PICK, never the raw detection.
+One thing the test caught and I changed my mind on: after the user corrects the pick, the row kept calling it
+"Assumed". That is the same dishonesty pointing the other way -- their explicit choice is a DECLARATION. It now reads
+"you set this - the comparison below uses your pick" and drops the amber.
+
+### (1) READS STAY FREE, and there is a test that says so.
+
+Nothing about reading is gated: the review renders in full on a mismatched controller, states the mismatch up front,
+and Apply is where the question gets asked. Detection is how you find out what you are looking at, so gating the
+finding-out would be circular.
+
+### FOUR EXISTING SPECS RECKONED WITH, none loosened.
+
+dump-import-ui (x2), controller-import-one-door-1221 and pull-v41-wcs all APPLY a V4.1 dump while the workspace was
+whatever the default is -- so the new gate correctly intercepted them. Their subject is the derivation and the door,
+not the gate, and their real-world scenario is "importing MY machine's parameters", so each now SEEDS the workspace as
+that machine (one line, named in a comment that points at the gate's own spec). That is the scenario they always meant;
+it was implicit before because nothing compared.
+
+### A RACE I WROTE AND THE TEST CAUGHT (the t1225 lesson, second sighting).
+
+My duplicate test waited on the machine record to know the act had finished. The retarget happens EARLY -- before the
+values are applied and before the copy is re-written -- so the wait returned mid-flight and read a stale file. It waits
+on the LAST step now (the modal closing). Worth writing down twice: when an operation has several persistent effects,
+wait on the one that lands LAST, never the one that is easiest to observe.
+
+### NOTED, NOT FIXED (not mine).
+
+The review's note rows squeeze a long label into a narrow column (visible in both screenshots: "Soft limits DISABLED on
+the controller" and "Named from the eng - values N/A" wrap one word per line). It is the shared .im-row grid
+(22px 1fr auto auto) and it predates this turn -- flagging rather than touching a grid every review row depends on.
+
+GATE (fast tier): smoke 59/59 + 69 gateway/pull/send/settings/workspace specs. Screenshots for all three surfaces the
+dispatch named (the pull mismatch dialog, the push hard block, the stated-assumption row with its picker) plus the
+mismatch review. Branch feat/ddcs-workspace. NO release.
