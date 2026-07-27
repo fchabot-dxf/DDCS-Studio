@@ -17809,3 +17809,73 @@ before initHeaderPost had attached anything and the menu never opened. It now wa
 MARKUP, which the same call builds. 24/24 across a repeat-each=6 stress.
 
 GATE after the amendments: 99/99 (smoke 21 files + the header/manager/cloud/hardening specs), clean on the re-run.
+
+---
+
+## turn 1245 -- THE SHRINK. The nine subtabs did not need regrouping; five of them did not belong in Settings.
+
+I started this turn building the dispatched 3-WAY SPLIT (Look and feel / Your stuff / Help) and had it working --
+strip, retag, deep links, spec, screenshots -- when the amendment arrived: STAND DOWN, the user wants to discuss,
+followed by the resolution. The discussion picked something better, so the 3-way scaffolding is reconciled away and
+what landed is the shrink. I am recording the abandoned branch because the reasoning is the interesting part: the
+question "how should these nine be grouped?" presupposed that all nine belonged, and once that premise was dropped
+the answer got much smaller.
+
+### WHAT STAYED, AND WHAT LEFT.
+
+  Appearance · Preview · Editor · Wizards -> STAY, as LOOK AND FEEL. Wizards is renamed WIZARD BAR: it configures the
+    bar (what shows, in what order), it does not list wizards, and the old name sent people there looking for a list.
+  WORKSPACE -> DELETED. Its two buttons called openWorkspaceManager('save'|'open') -- literally the quick menu's own
+    Save / Open. Settings now holds ZERO workspace controls. The identity band above the strip still SAYS which
+    workspace this is; display-only was always its point, and it is untouched.
+  CLOUD -> DELETED. Its sign-in was the shared renderCloudLogin the manager's Cloud tab already hosts (t1243). But it
+    was NOT empty: DEFAULT SAVE LOCATION (cloud-when-connected | always-local) was its one unique control, so that row
+    moved to the Cloud tab rather than dying with the panel. It reads and writes the SAME savePrefs module -- no
+    second copy of the value.
+  FAQ + ABOUT -> OUT of Settings, into a new quick-menu HELP panel (web/ui/helpPanel.js). Neither changes how the app
+    behaves; teaching people to look for answers inside the configuration screen was the bug.
+  FEEDBACK -> MERGED into the quick menu's Rate / Feedback. The Settings button was a bare mailto to the same
+    maintainer that toast already reaches WITH stars and a comment -- a second, weaker door.
+
+Strip: Look and feel | Controller | Hardware. Nineteen subtabs -> fourteen.
+
+### THE PART I WOULD WANT REVIEWED: deep links, fixed structurally rather than remapped.
+
+Every deep link into Settings named a GROUP alongside its panel, so any regroup could send one to a tab that no
+longer exists and land the user on a blank surface. Remapping the call sites would have fixed today and left the trap
+armed. Instead A PANEL NOW CARRIES ITS OWN GROUP: its subtab button already declares data-group, so showPanel reads
+it and activates that main tab itself. openSettings({panel}) with no group is now the correct call, and a caller
+cannot point at a group token that has been renamed, split or -- this turn -- deleted.
+
+Writing the exhaustive version of that test is what caught the gap: openSettings still had `if (nav && nav.group)`,
+so a panel-only deep link did NOTHING. Three spot-checks would have missed it (they all passed a group). The loop
+over EVERY panel failed on the second one. Two specs were also passing for the wrong reason -- toContainText on a
+hidden panel -- which the visibility assertion now catches.
+
+### THE CHECKLIST SET BUTTONS, WHICH THE DISPATCH ASKED ME TO PROVE.
+
+The dispatch says "the checklist spec proves its Set links still arrive". THERE WAS NO SUCH SPEC -- nothing in the
+suite covered them. So I wrote it, driving the real checklist UI: each Set button lands on its panel WITH the right
+main tab active. Its cloud link is the one that had to change destination, not just its token: it pointed at
+Settings > Cloud, which no longer exists, so it opens the workspace manager ON the Cloud shelf. That needed
+openWorkspaceManager to accept a place -- a caller that means "the cloud" should be able to say so rather than open
+the manager and hope.
+
+### ONE THING I CHANGED MY MIND ABOUT, AFTER A CHECK.
+
+The save-location pref first landed only in the SIGNED-IN cloud bar. On the retired Settings tab it was reachable
+with no account at all, so that would have quietly cost a setting anyone could previously reach -- a behavioural loss
+dressed as a tidy-up. It renders on the signed-out cloud tab too now, with its own test.
+
+### DEBRIS FROM MY OWN DELETIONS, and a spec my LAST turn missed.
+
+Deleting five panels left three `<!-- GENERAL: X -->` markers dangling above panels they no longer describe (the
+ABOUT marker ended up labelling set_tab_machine). Those are gone; the eight surviving markers say which group they
+are actually in now, and the module docblock -- which still described "two L1 groups: General / Hardware" from two
+turns ago -- says what is true. Separately, workspace-manager-1223 still asserted the PRE-t1243 envelope format
+(300 × 200 × -80). That is a spec my own last turn should have caught and its gate did not include; fixed here.
+
+GATE (fast tier, widened): smoke 21 files + every settings / deep-link / manager / layout spec = 148/148.
+SCREENSHOTS (scratchpad/s1245-*): the 3-tab strip with Look and feel's four subtabs, the Wizard bar panel, the Help
+panel (FAQ + About, version read from the one .ver source), the quick menu showing the Help row, and the manager's
+Cloud tab carrying the moved save-location row.
