@@ -17518,3 +17518,59 @@ over-broad-proxy trap as t1231's /Browse/i and t1233's Drive matcher, one frame 
 GATE (fast tier): smoke 59/59 + the full corner suite (108) + middle/edge/alignment (96) + every spec that counts
 segments (38). Screenshots: corner + middle connectors, and the drag-before/drag-after pair where the traverse follows
 the chain instead of vanishing. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1237 -- TURN C: MIDDLE'S DIRECTIONS UNBAKED. The t1211 pattern, applied a second time and cheaper for it.
+
+### WHAT WAS ALREADY DONE FOR ME, and why that is the point of the pattern.
+
+middleAxes() ALREADY resolved dir1/dir2 -- t1211 built it that way (dir2 derived as the opposite of dir1 when nothing
+is stored) even though only the ORDER was surfaced then. So the sim providers, the 2D/3D markers, the animator and the
+emit were all ALREADY reading the directions through the one resolver. Surfacing them therefore added NO derivation
+site anywhere: the markers re-orient, the numbering follows and the t1235 inter-pass connectors follow the markers,
+because none of those read a direction of their own. That is the payoff of "one resolver, every surface" -- the second
+unbake cost a fraction of the first.
+
+### THE FORK: order x dir1 x dir2, and why every combination has to exist.
+
+instantiate() prunes a STATIC template and never rewrites params, so a direction cannot be applied as a value later --
+it decides G31 signs, wall-face expressions and register writes that must already BE in the template. The superset now
+carries a nested guard chain (order x dir1 x dir2 = 8 arms) and pruneGuards keeps the declared one. CONCRETE MODE IS
+UNTOUCHED: it still calls fn(_ax) exactly once, which is what keeps the default emit byte-identical.
+The absent-key trap that t1211 taught: whenOk is a strict ===, and dir2's default is DERIVED (nothing is stored), so
+an op that never set it would match NO arm and lose the whole region. deriveGuards fills all three -- axisOrder, dir1
+AND dir2 -- from the resolver, and CANONICAL_BIND pins them so the binding derive still sees exactly ONE arm (the fork
+now duplicates every bound socket 8x).
+
+### THE BYTE DISCIPLINE -- three gates, and the middle one is the interesting one.
+
+  1. THE DEFAULT IS UNCHANGED: declaring dir1 'pos' + dir2 'neg' (the values the resolver already produced) emits
+     byte-for-byte what the bake emitted, across pocket/boss x findBoth x probeZ. If this had failed, the unbake would
+     have silently changed everybody's program.
+  2. A FLIP CHANGES ONLY WHAT A DIRECTION CAN CHANGE. Every differing line is classified against a DECLARED set of
+     token classes -- probe (G31), motion (G0/G1/G53), register (#nn= expressions), comment prose -- and an unclassified
+     line FAILS the test. Measured, both directions flipped: 29 changed lines = 12 motion + 8 probe + 8 register + 1
+     comment, ZERO unexplained. The line COUNT is asserted unchanged too: a direction flips signs, it never changes the
+     SHAPE of the program.
+  3. E0 across 14336 combos (was 3584 -- x2 dir1 x2 dir2): prune(superset) == the concrete build for every one.
+Plus the twin == built-in for every order x dir1 x dir2 x findBoth combination, and a round-trip check that both
+fields are declared bindings with the built-in's own wording and its show-when, and that the declared dir2 reaches the
+emitted program (the `2axis_XtoY_<dir2>` marker comment).
+
+### THE FORM MIRRORS THE BUILT-IN, deliberately and to the letter.
+
+'1st Axis Dir' / '2nd Axis Dir', pos|neg, the second shown ONLY under Find Both (when: twoAxis) -- the same wording and
+the same show-when as m_dir / m_dir2, because a twin that says the same thing differently is a second thing to learn.
+They sit with the ORDER at the top of the form: which wall face each probe approaches is op-DEFINING, not a tuning
+detail ([[op-defining-fields-at-top]]).
+
+### PROVEN VISUALLY, not just numerically.
+
+dir1 pos -> the start marker and the approach sit LEFT of the feature, probing toward +X; dir1 neg -> the whole thing
+mirrors to the RIGHT. Same canvas, same op, one dropdown. The Find-Both form shot shows the 2nd-axis dropdown
+appearing only when Find Both is on.
+
+GATE (fast tier): smoke 59/59 + every middle spec (55, 2 pre-existing skips) including the seam, repos-landing,
+manual-markers and traverse-lands + the inter-pass connector + the new direction byte sweep. The FULL suite is the
+advisor's merge gate for this emit-class change. Branch feat/ddcs-workspace. NO release.
