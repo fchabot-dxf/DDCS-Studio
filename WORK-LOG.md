@@ -17387,3 +17387,83 @@ Settings band read -- three surfaces, one source. Adding it exposed a real layou
 immediately: the quick menu had a min-width and NO max, so a shrink-to-fit popover simply grew until its ☁ and ↧
 targets were outside the viewport and unclickable. Bounded now (min 300 / max 340, both viewport-clamped), with the
 envelope in a nowrap span so a machine's travel never breaks mid-number across a wrap.
+
+---
+
+## turn 1233 -- A3 THE CLOUD TAB: Drive is another PLACE a workspace lives, not another kind of thing.
+
+The whole design follows from that sentence. A workspace in Drive is the same bytes as a workspace in the folder, so
+it gets the same row, the same open, the same prompt and the same rules -- only the SHELF differs.
+
+### WHAT I REUSED, AND THE ONE THING I REBUILT (the dispatch asked me to state this).
+
+REUSED WHOLESALE, untouched: ui/cloud/googleDrive.js (ensureRoot / list / read / write, the GIS token model and its
+silent refresh, the desktop loopback branch) and ui/cloudAccount.js (the ONE sign-in Settings and the projects drawer
+already share). The plumbing outlived the retired project-cloud doors exactly as the dispatch said; all it needed was
+a different payload -- a whole .ddcs instead of a project bundle. buildBackup gives the same bytes either way.
+REBUILT, and only this: `trash(id)`. The existing `del(id)` is files.delete -- PERMANENT. Drive's trash keeps a file
+~30 days and the user can restore it themselves, which is the honest thing to do with a whole workspace and is what
+lets the cloud confirm promise something DIFFERENT from the local one (removeEntry has no trash at all).
+NOT rebuilt but extracted: `summarizeWorkspace(name, obj)` -- the local panel read a File handle and the cloud panel
+reads Drive JSON, but what a row SAYS about a machine is now ONE function, so a workspace cannot look like two
+different machines depending on which tab you are on. Same for the OPEN: `openWorkspaceObject` is the shared body,
+with `readWorkspaceFile` in front of it on the local path.
+
+### WHERE A WORKSPACE LIVES IS NOW RECORDED, and a plain Save goes back there.
+
+`markWorkspaceSavedToFile(name, place)` gained the place ('local' | 'cloud'); `fileSavedPlace()` reads it. A cloud
+workspace re-saves to the cloud with no dialog, exactly as a local one re-saves through its handle -- and on the Cloud
+tab, Save / Save As / Duplicate write to Drive, because the ACTIVE TAB is where a save goes. The first-save ask drops
+its folder half in the cloud (Drive's app folder is the one place) and says so.
+
+### THE SAME RULES, CLOUD INCLUDED.
+
+Whole-file open, the save-first prompt, the one-name stamp, and ZERO WRITES ON OPEN -- there is a regression for the
+cloud version of that too (open a Drive workspace: no upload, no trash call, no download). Delete fails closed like
+its local twin. An invalid or machine-less file in Drive is refused with the SAME wording the local panel uses.
+
+### DEGRADING HONESTLY (feature-detect, never crash).
+
+Signed out -> ONE sign-in button and nothing else to decide. Drive unreachable or the token expired -> the tab says
+which, points at the Local folder tab that still works, and offers to sign in again; the local shelf never depends on
+the cloud. Zero files -> a cloud-shaped empty state, not the folder one.
+THE ORIGIN PROBLEM, stated honestly: I could NOT detect origin_mismatch programmatically. Google shows its 400 inside
+its own popup and GIS reports back a generic type (an unregistered origin is indistinguishable from a cancelled
+popup), so there is no specific failure to branch on. What the tab does instead is name the thing the user cannot see:
+when a sign-in does not complete it prints THIS origin, says it must be listed under Authorized JavaScript origins on
+the OAuth client, and says plainly that this is a Google-side setting the app cannot change. That is the most an
+honest implementation can do from inside the browser -- flagged rather than claimed as detection.
+
+### A PROCESS NOTE: I WAITED FOR THE PORT INSTEAD OF FIGHTING IT.
+
+The advisor's full suite was running and its mem-server held 3211 with a PRELOAD of web/ from before my edits -- so
+every one of my new tests failed at boot on a stale module (fileSavedPlace missing). I verified that was the cause
+(curl the served backup.js, grep for the new export: absent) rather than debugging my own code against a stale server,
+and then waited for the port as the dispatch instructed instead of killing their run.
+
+### A REAL DEFECT THE CLOUD TESTS UNCOVERED -- and it was never a cloud defect.
+
+A workspace opened ACROSS CONTROLLERS read "Unsaved changes" the instant it opened. Measured rather than guessed: the
+per-store delta named exactly one store, `variables`. The cause is an ordering one -- adopting the file's controller
+calls variableDB.setControllerVars, which is ASYNC (it fetches that controller's variable list, THEN writes) and is
+called fire-and-forget, so its write lands after the open has already taken its save baseline.
+The open now takes the baseline AGAIN once that settles, waiting on the variable DB's own completion signal with a
+short cap so an open never hangs on a signal that may not come. It is the same family as the t1225 name-stamp and the
+t1231 nameless mark: THE BASELINE MUST COVER EVERYTHING THE ACT WRITES. The invariant is pinned on BOTH shelves now
+(the local cross-controller open in the t1223 spec, the cloud one in this turn's).
+That also moved the finish line of an open, which broke a t1225 test that waited on the machine record -- so
+openFromFolder now waits on the LAST effect (the save handle being armed). Third sighting of that lesson.
+
+### TWO MISTAKES OF MY OWN, recorded because both cost a cycle.
+
+  - MY TEST FAKE lied: the Drive folder LISTING url contains the word "mimeType" (in fields=) and the word "folder"
+    (in orderBy=folder,name), so my loose /mimeType.*folder/ matcher swallowed it and returned the ROOT as the only
+    file -- an EMPTY list with no error, which looked exactly like a broken feature. Matching the decoded `q=` query
+    precisely fixed it. Same lesson as t1231's over-broad /Browse/i: specify the hazard, not a proxy that shares
+    letters with it.
+  - I left a background runner armed to fire when the port freed AND ran the same spec in the foreground; the two
+    playwright runs fought over the mem-server and killed each other's (ERR_CONNECTION_REFUSED mid-suite). One runner
+    at a time.
+
+GATE (fast tier): smoke 59/59 + 73 manager/cloud/workspace/gateway specs. Screenshots: both tabs, the cloud table with
+signed envelopes, a cloud open, the signed-out state, the cloud delete confirm. Branch feat/ddcs-workspace. NO release.
