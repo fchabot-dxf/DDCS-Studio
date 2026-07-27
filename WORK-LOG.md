@@ -17299,3 +17299,70 @@ the controller" and "Named from the eng - values N/A" wrap one word per line). I
 GATE (fast tier): smoke 59/59 + 69 gateway/pull/send/settings/workspace specs. Screenshots for all three surfaces the
 dispatch named (the pull mismatch dialog, the push hard block, the stated-assumption row with its picker) plus the
 mismatch review. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1231 -- THE MANAGER TELLS THE TRUTH: an impossible state closed at both ends, row delete, signed envelopes.
+
+### (1) "UNTITLED WORKSPACE - SAVED - NOTHING HAS CHANGED" -- found, and closed twice.
+
+The user's screenshot showed a state the one-name rule forbids: a save IS a file with a name, so "saved, but we cannot
+say to what" should not be reachable. It came from a NAMELESS MARK. `markWorkspaceSavedToFile(name)` treated the name
+as optional: with no name it stamped the save TIME, wrote the delta baseline and DELETED the name key. The manager then
+read the bare timestamp (`at != null`) as proof that a file existed, and the delta baseline made it add "nothing has
+changed since the last save" -- three true-looking statements resting on nothing.
+Two callers could do it: the pre-t1225 download fallback (`exportEverything()` with no name -- almost certainly what
+the user hit, since it also explains the backup-style filename they reported earlier), and `ddcsFileSaveState.markSaved()`.
+CLOSED AT BOTH ENDS, deliberately:
+  - THE SOURCE: a nameless mark now records NOTHING rather than half a fact, `exportEverything` passes the name it
+    actually downloaded, and `markSaved()` is deleted (it existed only to make the nameless call).
+  - THE DISPLAY: "Saved" is derived from the NAME, never the clock -- because a browser that already carries the
+    corrupt pair has to start telling the truth without the user doing anything. That is the half that fixes the user's
+    machine; the source fix is what stops it happening again.
+The screenshot caught one more of the same lie in a smaller font: the save TIME was still rendered beside "Never saved
+to a file". A time for a save that left no file is the same claim, quieter. It only renders when there is a name now.
+
+### (2) ROW DELETE -- and what the confirm has to say.
+
+Each row gets its own trash button. The row had to become a real ROW to hold it: a button cannot nest inside a button,
+and more importantly delete needs a target of its own so a mis-tap OPENS a workspace instead of erasing one. The
+columns moved into `.wsm-fp-open`; `.wsm-fp-row` stays the row for styling, hover and every spec that reads it.
+The confirm NAMES the file and says the thing the OS would normally say for us: this is `removeEntry`, so it does NOT
+go to the Recycle Bin and this app cannot undo it. It FAILS CLOSED (a confirm that cannot be shown deletes nothing).
+THE OPEN WORKSPACE CAN BE DELETED (user ruling, and it is their machine). The buffer keeps working -- what changes is
+that its work now lives in NO file, so the confirm says exactly that, and afterwards the state flips to never-saved.
+That needed a declared `forgetWorkspaceFile()`: simply clearing the watermark would have said "clean", which is the
+opposite of true. It writes a sentinel no hash can equal, so the disk button and the manager both read UNSAVED, and it
+drops the save handle so Ctrl+S asks where to put the work instead of writing to a file that is gone.
+
+### (3) THE ENVELOPE AS DECLARED -- signs included.
+
+Both summaries ran the travel through Math.abs. The sign is not decoration: it declares which END of the axis the
+machine homes to, so `850 x -850 x -120` and `850 x 850 x 120` are two different machines and the line that is supposed
+to identify a workspace was describing the wrong one. ONE formatter now (`envelopeSummary` in data/workspaceMachine.js)
+read by the Settings band and the file panel, so the two surfaces cannot disagree about the same machine.
+
+### (4) BROWSE... -- the button is NOT in this branch, and here is what IS.
+
+I hunted it properly: repo-wide grep, every html/js/css, and there is exactly ONE workspaceManager.js. The BUTTON was
+removed in t1227 (d458a0f) and no second render path exists. What DID survive is a message: the no-folder-support path
+still told the user to "Use Browse… to open a .ddcs file instead" -- naming a door that no longer exists, which is the
+same claim-outruns-code defect in the other direction, and is the only place the word could still reach a screen. It
+now says what that browser can actually do (saving downloads; open it where folders work).
+So the screenshot is either a build predating d458a0f or a cached module -- the app ships as raw ES modules, so a
+stale workspaceManager.js survives a soft reload. The spec now asserts the ABSENCE of any Browse… affordance on the
+surface AND in that message, so a regression cannot reintroduce it quietly. If the user still sees it after a hard
+reload, the next thing to check is which build they are on, not the source.
+
+### FOUR SPECS REPOINTED (three of them consequences I made, one an over-broad assertion of my own).
+
+persistence-file-indicator marked a save with NO name (now names its file); workspace-save-open-1225 read the row's
+tooltip, which moved to the open button; workspace-manager-1223 asserted unsigned envelopes. And my OWN new test
+asserted /Browse/i, which the honest no-folder message failed on the word "browser" -- the hazard is the retired
+BUTTON, not the letters ([[specify-the-hazard-not-an-over-broad-proxy]], caught on the first run).
+
+The state fix was watched FAILING against the old display rule: with `at != null` restored, the manager reports
+"Saved" on an unnamed workspace -- the user's exact screenshot, reproduced and then cured.
+
+GATE (fast tier): smoke 59/59 + 57 workspace/persistence/settings/gateway specs. Screenshots: the honest never-saved
+state, the delete confirm, the signed-envelope rows. Branch feat/ddcs-workspace. NO release.
