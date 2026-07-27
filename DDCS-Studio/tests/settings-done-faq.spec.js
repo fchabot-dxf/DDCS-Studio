@@ -62,3 +62,156 @@ test('HELP holds the FAQ and About, opens from the quick menu, and the FAQ still
   await page.keyboard.press('Escape');
   await expect(page.locator('#helpOverlay')).toHaveCount(0);
 });
+
+/**
+ * t1251 — THE FAQ IS DOCUMENTATION OF A LIVE APP, so it is tested like code.
+ *
+ * The old FAQ predated the workspace era and still described a profile library, a USB-ready .zip, and cloud
+ * profile-sync — three things that no longer exist. Prose rots silently: nothing fails when an answer names a button
+ * that was renamed two turns ago, and the person reading it is the one who finds out. These tests pin the two things
+ * that actually go wrong — an answer naming a DEAD path, and the workspace chapter quietly disappearing — so the
+ * next IA change has to update the words in the same breath as the code.
+ */
+test('the FAQ leads with the workspace chapter, and every entry it promises is there', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+  await page.click('#hdrPostBtn');
+  await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
+  await page.click('#hdrPostMenu [data-act="help"]');
+  await expect(page.locator('#helpOverlay')).toBeVisible({ timeout: 6000 });
+
+  const qs = await page.evaluate(() => [...document.querySelectorAll('#help_faq details summary')].map((s) => s.textContent.trim()));
+  // IDENTITY FIRST applies to docs too: what is it, then where is my work
+  expect(qs[0], 'the opener still says what this is').toMatch(/What is DDCS Studio/);
+  expect(qs.slice(1, 5), 'then the workspace chapter, before anything else').toEqual([
+    'Where is my work saved?',
+    'How do I work with two machines?',
+    'How do I share a wizard or a CAM recipe?',
+    'How do I get files onto the USB stick?',
+  ]);
+  // …and the troubleshooting tail stays at the end, where you reach for it
+  expect(qs[qs.length - 1], 'the bug-report entry is last').toMatch(/Found a bug/);
+  expect(qs[qs.length - 2]).toMatch(/jog the start position/);
+});
+
+test('NO DEAD PATHS: the FAQ never names a thing the app retired', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
+  await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
+  // textContent, NOT innerText: a collapsed <details> renders none of its answer, so innerText here returns just the
+  // list of questions — every assertion about what an ANSWER says would then be checking nothing.
+  const faq = await page.evaluate(() => document.getElementById('help_faq').textContent);
+
+  // each of these named a real feature once; each is gone, and an answer that still says it sends someone hunting
+  expect(faq, 'the profile library retired with the one-workspace-one-machine pivot').not.toMatch(/profile librar/i);
+  expect(faq, 'cloud does not sync profiles — Drive is another place workspaces live').not.toMatch(/sync(s|es)? your profiles|profiles and programs across devices/i);
+  expect(faq, 'Settings has no Feedback tab — Rate / Feedback is the one door').not.toMatch(/Settings\s*→\s*<?b?>?Feedback/i);
+  // the CAM entry specifically: the pack DEPLOYS a file tree now; a .zip is only the no-FSA fallback
+  const cam = await page.evaluate(() => [...document.querySelectorAll('#help_faq details')]
+    .find((d) => /What is a CAM pack/.test(d.querySelector('summary').textContent)).textContent);
+  expect(cam, 'it describes the deploy, not a USB-ready zip').toMatch(/deploy folder|Deploy pack/i);
+  expect(cam, 'and mentions the zip only as the fallback it now is').toMatch(/cannot write to a folder falls back/i);
+  expect(cam, 'no USB-ready-zip framing').not.toMatch(/USB-ready/i);
+});
+
+test('every Settings path the FAQ names actually resolves — the claim cannot outrun the code', async ({ page }) => {
+  // The rule this turn was given: a named UI path must be VERIFIED, not remembered. So the test walks the paths the
+  // prose promises and asserts the panel really opens, which is what makes the sentence true rather than plausible.
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.openSettings, null, { timeout: 15000 });
+  await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
+  const faq = await page.evaluate(() => document.getElementById('help_faq').textContent);
+
+  const CLAIMED = [
+    { says: /Settings → Controller → Gateway/, panel: 'set_tab_gateway', group: 'controller' },
+    { says: /Settings → Controller → Profile/, panel: 'set_tab_profile', group: 'controller' },
+    { says: /Settings → Look and feel → Wizard bar/, panel: 'set_tab_wizards', group: 'lookfeel' },
+    { says: /Settings → <?b?>?Hardware/, panel: 'set_tab_machine', group: 'hardware' },
+  ];
+  for (const c of CLAIMED) {
+    expect(faq, `the FAQ names ${c.panel}'s path`).toMatch(c.says);
+    const landed = await page.evaluate(async (p) => {
+      const { openSettings } = await import('/ui/settingsPanel.js');
+      openSettings({ panel: p });
+      const el = document.getElementById(p);
+      const main = document.querySelector('#settings-app .settings-tabs .settings-main-tab.active');
+      return { shown: el && getComputedStyle(el).display !== 'none', group: main && main.dataset.group };
+    }, c.panel);
+    expect(landed.shown, `${c.panel} really opens`).toBe(true);
+    expect(landed.group, `under the tab the FAQ names`).toBe(c.group);
+  }
+  await page.evaluate(() => window.closeSettings && window.closeSettings());
+});
+
+/**
+ * t1251 (user amendment) — EVERY FAQ LINK LANDS.
+ *
+ * The paths an answer names are now clickable, and the pairing lives in ONE declared registry (FAQ_LINKS): id → the
+ * call that opens the surface, plus the words the link reads as. This walks every entry in that registry and asserts
+ * the opener actually arrives — the t1245 per-panel deep-link pattern extended to documentation. A surface renamed or
+ * moved now breaks a test instead of stranding a reader on a dead sentence.
+ */
+test('every registered FAQ link opens its surface — and every registry entry is actually used', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio && window.openSettings && window.openWorkspaceManager, null, { timeout: 15000 });
+  await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
+
+  const ids = await page.evaluate(async () => Object.keys((await import('/ui/helpPanel.js')).FAQ_LINKS));
+  expect(ids.length, 'the registry is populated').toBeGreaterThan(6);
+
+  // NO DEAD DECLARATIONS: a registry row nothing references is a promise no reader can reach
+  const used = await page.evaluate(() => [...document.querySelectorAll('#help_faq [data-help-link]')].map((a) => a.dataset.helpLink));
+  for (const id of ids) expect(used, `${id} is referenced by an answer`).toContain(id);
+
+  // …and every link's WORDS come from the registry, so the text and the destination cannot drift
+  const mismatched = await page.evaluate(async () => {
+    const { FAQ_LINKS } = await import('/ui/helpPanel.js');
+    return [...document.querySelectorAll('#help_faq [data-help-link]')]
+      .filter((a) => { const e = FAQ_LINKS[a.dataset.helpLink]; return !e; })
+      .map((a) => a.dataset.helpLink);
+  });
+  expect(mismatched, 'no link points at an id the registry does not declare').toEqual([]);
+
+  // WHERE EACH ONE LANDS — asserted per id, by clicking the real link in the real panel
+  const LANDS = {
+    'settings-gateway':   async () => expect(page.locator('#set_tab_gateway')).toBeVisible(),
+    'settings-profile':   async () => expect(page.locator('#set_tab_profile')).toBeVisible(),
+    'settings-wizardbar': async () => expect(page.locator('#set_tab_wizards')).toBeVisible(),
+    'settings-hardware':  async () => expect(page.locator('#set_tab_machine')).toBeVisible(),
+    'workspace-manager':  async () => expect(page.locator('#wsmOverlay')).toBeVisible(),
+    'workspace-cloud':    async () => expect(page.locator('.wsm-place[data-place="cloud"]')).toHaveClass(/is-active/),
+    'gateway-tab':        async () => expect(page.locator('#gateway-app, .gateway-app').first()).toBeVisible(),
+    'gateway-files':      async () => expect(page.locator('#gateway-app, .gateway-app').first()).toBeVisible(),
+    'macros-cam':         async () => expect(page.locator('#cam_slots')).toBeVisible(),
+    'blocks-tab':         async () => expect(page.locator('#blocks-app, .blocks-app').first()).toBeVisible(),
+  };
+  expect(Object.keys(LANDS).sort(), 'this test covers the WHOLE registry, not a sample').toEqual([...ids].sort());
+
+  for (const id of ids) {
+    await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
+    await expect(page.locator('#helpOverlay')).toBeVisible();
+    // a link lives inside its answer, and an answer is collapsed until you open it — same two steps a reader takes
+    await page.evaluate((lid) => {
+      const a = document.querySelector(`#help_faq [data-help-link="${lid}"]`);
+      const d = a && a.closest('details');
+      if (d) d.open = true;
+    }, id);
+    await page.click(`#help_faq [data-help-link="${id}"]`);
+    // the Help overlay must get OUT OF THE WAY — the destination is often a modal, and Help on top of it would hide
+    // the very thing the reader asked to see
+    await expect(page.locator('#helpOverlay'), `${id} closed Help on the way out`).toHaveCount(0, { timeout: 6000 });
+    await LANDS[id]();
+    // t1251 AMEND-3 (user, retracting the return-chip idea): an FAQ link CLOSES Help and opens the target, full stop.
+    // No return token, no Back chip — getting back to Help is the normal door (quick menu → Help), same as always.
+    // The ABSENCE is the design, so it is asserted: a link that started leaving breadcrumbs would fail here.
+    const back = await page.evaluate(() => ({
+        activeReturn: !!(window.ddcsNavReturn && window.ddcsNavReturn.activeReturn && window.ddcsNavReturn.activeReturn()),
+        glow: !!document.querySelector('.return-glow'),
+        chip: document.querySelectorAll('.nav-return, .ret-chip, [data-navreturn]').length,
+    }));
+    expect(back.activeReturn, `${id} pushed no return token`).toBe(false);
+    expect(back.glow, `${id} left no return-glow`).toBe(false);
+    expect(back.chip, `${id} rendered no Back chip`).toBe(0);
+    await page.evaluate(() => { window.closeSettings && window.closeSettings(); document.getElementById('wsmOverlay')?.remove(); });
+  }
+});
