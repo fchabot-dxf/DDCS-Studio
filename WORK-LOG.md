@@ -17138,3 +17138,84 @@ unknown until the next save."
 
 GATE (fast tier, per the skill): smoke 59/59 + 56 touched specs (1 pre-existing skip). The full suite is the advisor's
 merge gate. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1227 -- THE CURATION: file actions move to the pane they act on, and the menu gets quieter.
+
+Seven ruled items plus the mid-turn amendment. One item is NOT done and is flagged below rather than guessed at.
+
+### (3)(4) THE EDITOR'S OWN FILE MENU -- the move that motivates the rest.
+
+Load / Insert / Export / Clear acted on the PROGRAM IN THE EDITOR but lived in the header quick menu, which is where
+you look for APP things. They are now a small file-icon dropdown in the editor pane's top-right corner, beside Copy.
+Same handlers (loadGcodeFile / insertGcodeFile / downloadFile / clearCode) -- the spec drives the new door and asserts
+each item reaches the exact function its old row called, so "moved" is proven rather than asserted.
+It follows the pane's existing idiom rather than inventing one: `＋ Make ▾` is already a static button in index.html
+with a global opener in globalFunctions.js, so this is the same shape (a declared EDITOR_FILE_ACTIONS row list, one
+click router, toggle-and-outside-close) popping BELOW its button instead of above.
+THE PHONE CASE IS THE ONE THAT MATTERED. The header trash is hidden at <=600px, so the quick menu WAS the phone's only
+access to Clear -- editor-chrome.spec.js exists to lock exactly that. Taking Clear out of the menu therefore had to be
+paid for on a phone, so that test now drives the corner menu at 390px and screenshots it. It is reachable, it fits,
+and Clear is in it. A curation that silently took Clear away from phones would have been a regression wearing the
+word "slim".
+
+### (1)(5) THE MANAGER: one door in, and no offer to duplicate nothing.
+
+Browse... is gone: the granted folder is the ONE way in, and a workspace kept elsewhere gets dropped into the folder
+like any other document -- something the OS already does better than a second file picker. (openWorkspaceFile keeps
+its null-handle parameter: that is how an open FORGETS a stale save target, not a second door.)
+Duplicate... only appears once there IS a file to duplicate; first run offers Save + Save As only.
+
+### (6) THE MENU-DIET RECOUNT -- it came DOWN, as t1225 promised.
+
+10 -> 8, and the spec now asserts the rows BY NAME in order (identity line, workspace, Library, theme, setup sheet,
+checklist, settings, rate) rather than a bare number. A count is easy to keep true by not looking; a named list makes
+the next change say what it added or removed. Nothing is excluded from the count by class -- that was the t1225 sin.
+LIBRARY STAYS, and here is the reasoning the dispatch asked for: its declared TABS are Projects + Wizards. Projects
+are programs, but Wizards is the custom-op library that feeds the wizard bar and the Blocks tab -- app-level, not
+editor content. A door that is half app-level does not belong in the editor's file menu, so it stayed put.
+
+### THE AMENDMENT -- the identity row stops being a button.
+
+It was a full-width 44px button with an accent bar whose tap opened the machine's settings -- a door built for the
+retired profile world. It is now one quiet plain-text line, "<workspace> . <dialect>", sitting directly ABOVE Save /
+Open so a save has its context, with no click handler and no button styling.
+WHAT I DID NOT REMOVE, and why: the line's inner ☁ and ↧ spans stay. They are not the row's retired click -- they are
+their own tap targets for LIVE features (cloud connect, pull from the controller), and ☁ is the only cloud-connect
+affordance that exists on a phone. That is not my opinion: tests/header-account-row-742.spec.js asserts
+`#hdrPostMenu [data-cloud]` is visible and tappable at 390px, and t742 exists precisely because cloud-connect was
+invisible on mobile. Dropping them would have been an unasked capability removal hiding inside a styling change. The
+row's own `browse` handler and its now-dead `data-cloud` branch went with the button; the ☁ guard that existed only to
+stop the row stealing the tap went too.
+
+### (2) NOT DONE -- the referent does not exist, and I am not deleting the thing that looks like it.
+
+"REMOVE the editor's standalone download/export arrow button (top-right of the editor pane)". There is no export or
+download button there. The corner holds exactly two buttons: Copy (stays, ruled) and a ⤓ that is the FOLLOW-EXECUTION
+toggle (ui/followExec.js, t865) -- auto-scroll the editor to keep the running line in view during playback. Its glyph
+is an arrow into a line, which is why it reads as a download.
+The rationale behind every other removal this turn was DUPLICATION: the action already exists somewhere better. That
+premise does not hold here -- follow-execution exists nowhere else, so deleting it removes a capability with no
+replacement, on a misidentification. It stays, flagged, one line to remove if the user does want it gone. I would
+rather be told to delete it next turn than have quietly deleted the wrong button this turn.
+([[confirm-the-referent-before-dropping]] -- a "drop X" can name a VISUAL rather than the feature behind it.)
+
+### (7) The t1223 tooltip flag is CLOSED per the ruling: Workspace: <file> . <dialect> stays as it is.
+
+### ORPHANS MY OWN CHANGES MADE (cleaned, per surgical-changes).
+
+`actionRow` (its last caller was the Clear row), the `.hq-gcode-row` / `.hq-gcode-btn` CSS (the workspace row now uses
+its own `.hq-ws-btn`, which is what it should have been all along), the four dead cases in runQuickAction, and the
+identity row's `browse` branch. Pre-existing dead code around them (HQ_ACTIONS, HQ_STANDALONE, the 'open'/'save'/
+'wizard'/'standalone' cases) is NOT mine and was left alone -- worth a curation of its own if the advisor wants it.
+
+### FOUR SPECS REPOINTED, NONE BENT.
+
+editor-chrome (menu keeps Clear -> the corner menu keeps Clear, proven on a phone), header-responsive (an identity
+DOOR -> an identity LINE), library-854 (its identity deep-link -> the Library's own place in the slimmed menu), and
+the diet spec itself. Each one's subject survived the curation, so each was repointed at what it actually owns rather
+than deleted or loosened.
+
+GATE (fast tier): smoke 59/59 + 51 touched specs (2 pre-existing skips). Screenshots taken for all four proof
+surfaces the dispatch named, plus the phone corner menu. Branch feat/ddcs-workspace. NO release.
