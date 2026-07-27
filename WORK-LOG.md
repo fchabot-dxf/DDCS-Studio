@@ -17035,3 +17035,106 @@ THE FAST TIER THEN CAUGHT THREE THINGS THE FULL RUNS HAD NOT, because they were 
 GATE (fast tier, per the skill): smoke 59/59 + the 15 touched specs 45/45. The FULL suite is the advisor's merge gate;
 the last full run I completed this turn was green before the final amendments (glyph/tooltip/file-panel), which are
 UI-only and covered by the touched specs above. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1225 -- TURN-A FIX-BACK: the two blockers, the whole-file truth, and a refusal that says WHY.
+
+All nine dispatched items landed, plus the mid-turn amendment (the user's live "not a valid .ddcs" symptom). Both
+BLOCKERS were watched FAILING against the unfixed code before the fix went in -- the only way a new test proves
+anything.
+
+### (1) THE SAVE HANDLE IS PART OF WHAT AN OPEN CHANGES.
+
+The bug the advisor caught: openWorkspaceFile restored a file and stamped its name but never touched the handle
+ui/workspaceSave.js re-saves through, so after opening B the next Ctrl+S wrote B's contents into A's FILE. Nothing on
+screen was wrong while it happened, which is the worst kind of data loss.
+The fix is one exported seam -- adoptSaveHandle(h) -- called by the open with the row's handle, and with NULL from the
+Browse... path (a file from a plain <input> has no handle, so the honest state is "forget the old one and ask next
+time", never "keep the previous file armed"). Save As / Duplicate already re-point the handle by construction.
+That seam forced a real question: the FILE handle lived privately in workspaceSave.js and the FOLDER handle privately
+in workspaceManager.js, each with its own copy of the IDB kv, and now both modules need both. So the handles became a
+declared module of their own -- data/fsHandles.js -- rather than a third private copy. Two stores that must agree are
+one store.
+REGRESSION: open A, open B, Save -> A is byte-for-byte untouched and B was rewritten with B in it. Against the old
+code it fails exactly as reported.
+
+### (2) ORDER: NAME, THEN BYTES, THEN BASELINE.
+
+writeTo stamped the machine name AFTER building the backup and AFTER marking the baseline, so a first save / Save As
+wrote the PREVIOUS name into the file and left the workspace dirty the instant it was saved (the stamp landed outside
+the baseline that was supposed to cover it). Now: setMachineName -> buildBackup -> write -> markWorkspaceSavedToFile.
+The open path has the SAME hazard and got the same order (restore -> setMachineName(file name) -> mark), which is also
+where item (4)'s one-name rule lives: an OS-renamed file now shows the FILE's name everywhere, not the stale one
+inside it.
+
+### (5) A WHOLE-FILE OPEN IS THE WHOLE FILE -- including what the file does NOT say.
+
+A store absent from the .ddcs was left holding the previous workspace's values, and then the result was marked clean:
+a blend that was neither the file nor what you had, labelled "saved". Restoring now CLEARS each declared store and
+then writes what the file carries, so an absent store is RESET.
+The declaration made that nearly free: `clear()` sits beside `read`/`write` in each store-KIND factory (ls / lsMulti /
+lsPrefix), so every row got its reset semantics without a second list to maintain -- and a new store row will get one
+for free. Two rows needed their own: the machine record (drop the key; getMachine derives the default) and the project
+volume (a new clearAllEntries, because importAllEntries puts entry-by-entry and would otherwise MERGE the file's
+projects into this browser's -- the same blend, one level down).
+restoreBackup lost its selectedIds parameter with the picker that used it, and returns {restored, reset, failed}.
+
+### (6)(3)(7)(8) THE SMALLER RULINGS.
+
+  - a machine-less pre-pivot .ddcs is REFUSED, not migrated ([[no-legacy-burden]]): restoring it would put the
+    workspace on whatever controller happened to be active, which is worse than not opening it.
+  - profileStore's save-first gate FAILED OPEN (catch -> return true) directly under a doc-comment promising it fails
+    closed. No prompt available means the unsaved buffer cannot be protected, which is exactly when a full machine
+    swap must not run. It returns false now.
+  - the menu-diet spec is UN-BENT. The workspace row keeps its own class (a workspace row is not a gcode row) but the
+    spec now counts it: the count read 9 while the menu showed 10, a number kept true by not looking. Declared target
+    is 10, and the comment says it comes DOWN with the curation batch rather than being worked around again.
+  - swept: the orphaned .backup-restore-* CSS (the store-picker's styling, retired in t1223), safetyExport itself
+    (deleted, not merely unwired -- a dead function that writes files is an invitation to call it again) and its
+    window global, plus the stale docs in backup.js and profileStore.js.
+
+### (9) THE FIRST SAVE IS ONE STEP -- and the user symptom it came from.
+
+"Save produced a backup-style file" was the download fallback firing and naming the file ddcs-workspace-<stamp>.ddcs.
+Now the first Save asks the NAME and grants the WORKSPACES FOLDER in one dialog and writes <name>.ddcs INTO that
+folder through the handle -- so what you just saved is what the manager lists, which is the whole point of the granted
+folder. A workspace is never given an autogenerated name on ANY path now: the download fallback carries the name the
+user typed too.
+A REFUSED FOLDER MUST NOT DEAD-END, and that is not hypothetical: headless Chromium HAS showDirectoryPicker and aborts
+it instantly (measured, not assumed -- I probed it after three specs hung), and embedded webviews can do the same.
+The old shape treated an abort as "stay put", leaving the user in a dialog whose only button silently did nothing.
+Now the ask drops the folder half, says so, and the same button becomes a plain Save.
+
+### THE AMENDMENT -- "opening their OWN workspace said NOT A VALID .DDCS FILE".
+
+I could not reproduce it, and I am saying so rather than inventing a fix: the new ROUND-TRIP regression saves through
+the real Save door and re-opens THAT file through the real Open door, with the app's own bytes, and it is green.
+What I could fix is why the report told us nothing. There is now ONE reader (readWorkspaceFile) behind both the folder
+panel and the open door, and every refusal NAMES THE CHECK THAT FAILED: not JSON (with the parser's own words), empty,
+no kind marker, a different kind, a recognisable machine-configuration BUNDLE (the likeliest wrong file to have on
+hand -- what the retired Backup Profile button wrote), or the item-6 machine-less wording. A leading byte-order mark is
+now tolerated rather than treated as a syntax error -- the app never writes one, but a file that has been through an
+external editor can carry one, and refusing a workspace over an invisible character is nonsense. And a row the panel
+cannot read is still CLICKABLE: clicking it says why, instead of a row that ignores you.
+So the next report identifies itself. If it was a bundle or a half-written file, the message now says which.
+
+### THE BASELINE-UNKNOWN HONESTY (the advisor's concern).
+
+A workspace saved before t1223 has a watermark but no per-store baseline, and the manager called that "Never saved to
+a file" -- false for a workspace that has a file. Saved/dirty comes from the watermark (which every save has always
+written); only WHICH PARTS changed depends on the newer baseline, so it now reads "Saved" plus "Which parts changed is
+unknown until the next save."
+
+### TWO TEST TRAPS WORTH RECORDING.
+
+  - a spec waited on the MACHINE row to know the open had finished. That row is written early in the restore loop, so
+    the wait could return mid-open and read the state before the name stamp. It waits on the LAST step now. Clearing
+    the IDB project volume put a real await between the two and turned a latent race into a failure -- which is the
+    useful kind of luck.
+  - `npx playwright` pulled a DIFFERENT playwright version from the network mid-run and produced the spurious
+    "test.use() called here" collection error ([[playwright-stale-cache-testuse-error]] wearing a new hat). The local
+    ./node_modules/.bin/playwright is the one to run.
+
+GATE (fast tier, per the skill): smoke 59/59 + 56 touched specs (1 pre-existing skip). The full suite is the advisor's
+merge gate. Branch feat/ddcs-workspace. NO release.
