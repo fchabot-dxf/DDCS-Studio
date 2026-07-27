@@ -13,7 +13,7 @@ import { test, expect } from '@playwright/test';
  * Also folds in the transTraverse → safeTraverseStack `mode:'center'` dedup (the pre-declared byte-identical
  * extraction, previously ZERO callers): middle no longer hand-rolls the diagonal re-centre.
  */
-test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identical across the full 3584-combo structural sweep', async ({ page }) => {
+test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identical across the full 14336-combo structural sweep', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
@@ -29,7 +29,10 @@ test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identic
     // the FULL structural sweep — every combo sets ALL 10 structural params EXPLICITLY (dir/scalars default on both sides).
     // t1211 — axisOrder joined the structural set: the superset now carries BOTH order arms, so the sweep must exercise
     // each one or half the template would never be pruned (and the concrete build it must match would never be compared).
-    const FEATS = ['pocket', 'boss'], MODES = ['auto', 'manual'], BOOLS = [false, true], ORDERS = ['XY', 'YX'];
+    // t1237 — the DIRECTIONS joined the structural set for the same reason the order did: the superset now carries an
+    // arm per (order × dir1 × dir2), so the sweep has to exercise each one or seven eighths of the template would never
+    // be pruned — and the concrete build it must match would never be compared.
+    const FEATS = ['pocket', 'boss'], MODES = ['auto', 'manual'], BOOLS = [false, true], ORDERS = ['XY', 'YX'], DIRS = ['pos', 'neg'];
     const WCSV = ['active', 'G54', 'G55', 'G56', 'G57', 'G58', 'G59'], SHAPES = ['dogleg', 'diagonal'];
     const combos = [];
     for (const featureType of FEATS)
@@ -42,7 +45,9 @@ test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identic
                   for (const wcs of WCSV)
                     for (const syncA of BOOLS)
                       for (const axisOrder of ORDERS)
-                        combos.push({ featureType, inAxis, transAxis, travelShape, twoAxis, circular, probeZ, wcs, syncA, axisOrder });
+                        for (const dir1 of DIRS)
+                          for (const dir2 of DIRS)
+                            combos.push({ featureType, inAxis, transAxis, travelShape, twoAxis, circular, probeZ, wcs, syncA, axisOrder, dir1, dir2 });
 
     const diffs = [];
     let leftoverGuards = 0;
@@ -59,10 +64,10 @@ test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identic
   });
 
   expect(r.supGuardCount, 'the superset carries guard blocks (it IS a superset, not accidentally concrete)').toBeGreaterThan(10);
-  expect(r.comboCount, 'the full structural sweep is 2^8 * 7 * 2 orders = 3584 combos').toBe(3584);
+  expect(r.comboCount, 'the full structural sweep is 2^8 * 7 * 2 orders * 2 dir1 * 2 dir2 = 14336 combos').toBe(14336);
   expect(r.leftoverGuards, 'prune leaves ZERO guard blocks (fully collapsed to the concrete shape)').toBe(0);
   if (r.firstDiff) console.log('FIRST DIFF @ ' + JSON.stringify(r.firstDiff.c) + '\n--- PRUNED SUPERSET ---\n' + r.firstDiff.a + '\n--- CONCRETE ---\n' + r.firstDiff.b);
-  expect(r.diffCount, 'prune(superset) is BYTE-IDENTICAL to concrete middleStack for ALL 1792 structural combos (the E0 gate)').toBe(0);
+  expect(r.diffCount, 'prune(superset) is BYTE-IDENTICAL to concrete middleStack for ALL structural combos (the E0 gate)').toBe(0);
 });
 
 /**

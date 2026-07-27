@@ -34,11 +34,13 @@ import { makeProvider, middleReposLanding } from '../../viz/opSimStarts.js';   /
 export const MIDDLE_DEFAULTS = {
     // structural (STRING enums / bools — the guards match by value-equality / !! coercion)
     featureType: 'boss', inAxis: 'auto', transAxis: 'auto', travelShape: 'dogleg', twoAxis: false, circular: false, probeZ: 0, wcs: 'active', syncA: 0,
-    // t1211 — axisOrder is now DECLARED (which axis probes first). dir1/dir2 stay baked (the user asked for the ORDER).
-    // 'XY' mirrors the historical X-primary bake, so the default emit is byte-identical.
-    axisOrder: 'XY',
+    // t1211 — axisOrder is DECLARED (which axis probes first). t1237 — and so are the DIRECTIONS: dir1 (the first
+    // axis's probe direction) and dir2 (the second axis's, shown only under Find Both). Every default below is the
+    // value the resolver ALREADY produced when they were baked — 'XY' + dir1 'pos' + dir2 the derived opposite 'neg' —
+    // so the default emit is byte-identical and the unbake is a pure surfacing.
+    axisOrder: 'XY', dir1: 'pos', dir2: 'neg',
     // baked value swaps (NOT bound)
-    axis: 'X', dir1: 'pos', slave: '3',
+    axis: 'X', slave: '3',
     // scalars — dist default 200 (t381: 20 was too small to reach the wall on a typical stock → "retract-only"; matches middleStack's fallback + the m_dist form default)
     dist: 200, retract: 2, f_fast: 200, f_slow: 50, port: 3, radius: 2, safeZ: 10, clearOver: 15,
     crossX: '80', crossY: '80', diagTravel: '50', diagPrimary: '#53',
@@ -79,6 +81,12 @@ export const MIDDLE_STRUCT_BINDINGS = [
     // t1211 — PROBE ORDER: which axis probes FIRST. Corner's exact wording/pattern (cornerData 'Probe Order'), driving a
     // 2-way guard fork in middleStack's superset. Structural (no value socket) → it belongs here, not in the value specs.
     { param: 'axisOrder', type: 'enum', default: MIDDLE_DEFAULTS.axisOrder, label: 'Probe Order', help: 'Which axis to probe first — Y then X, or X then Y.', section: 'GEOMETRY', widgetConfig: { options: [['Y then X', 'YX'], ['X then Y', 'XY']] } },
+    // t1237 — THE DIRECTIONS, mirroring the built-in form's own wording + show-when (m_dir / m_dir2). They are
+    // op-DEFINING (which wall face each probe approaches), so they sit with the order at the top of the form.
+    { param: 'dir1', type: 'enum', default: MIDDLE_DEFAULTS.dir1, label: '1st Axis Dir', help: 'Probe direction for the first axis. The opposite wall is probed automatically. First edge → #51, second → #52, center → #53.', section: 'GEOMETRY', widgetConfig: { options: [['pos', 'pos'], ['neg', 'neg']] } },
+    // shown only under Find Both, exactly like the built-in's m_dir2_block; its default is the OPPOSITE of dir1 (the
+    // resolver's own rule — middleAxes derives it that way when nothing is stored).
+    { param: 'dir2', type: 'enum', default: MIDDLE_DEFAULTS.dir2, when: { param: 'twoAxis', is: true }, label: '2nd Axis Dir', help: 'Probe direction for the second axis (Find Both). Its opposite wall is probed automatically. Edges → #54 and #55, center → #56.', section: 'GEOMETRY', widgetConfig: { options: [['pos', 'pos'], ['neg', 'neg']] } },
     { param: 'featureType', type: 'enum', default: MIDDLE_DEFAULTS.featureType, label: 'Feature', help: 'Pocket (find the centre from INSIDE two walls) or Boss (find the centre from OUTSIDE, crossing over the part).', section: 'GEOMETRY', widgetConfig: { options: [['Pocket', 'pocket'], ['Boss', 'boss']] } },
     { param: 'inAxis', type: 'enum', widget: 'segmented', default: MIDDLE_DEFAULTS.inAxis, label: 'In-Axis Travel', help: 'Boss: how to reach wall 2 within an axis — Auto crosses over hands-free (the cross-over distance), Manual pauses for you to jog around.', section: 'GEOMETRY', widgetConfig: { options: [['Manual', 'manual'], ['Auto', 'auto']] } },
     { param: 'transAxis', type: 'enum', widget: 'segmented', default: MIDDLE_DEFAULTS.transAxis, label: 'Trans-Axis Travel', help: 'Boss two-axis: how to reach the perpendicular walls — Auto crosses hands-free, Manual pauses for you to jog.', section: 'GEOMETRY', widgetConfig: { options: [['Manual', 'manual'], ['Auto', 'auto']] } },
@@ -112,7 +120,7 @@ export function middleDataStack(params = MIDDLE_DEFAULTS) {
 /** Bindings for the value sockets — DERIVED (not hand-counted) over a CANONICAL-pruned stack that makes ALL bound sockets
  *  present exactly once: boss + inAxis-auto (→ #19/#20) + transAxis-auto + twoAxis (→ #21/#22). EMIT re-derives BY IDENTITY
  *  over the actual PRUNED stack each build (via def.bindingSpecs), so the frozen indices below never desync. */
-const CANONICAL_BIND = { ...MIDDLE_DEFAULTS, axisOrder: 'XY', featureType: 'boss', inAxis: 'auto', transAxis: 'auto', twoAxis: true };   // t1211 — PIN the order too: the fork duplicates every bound socket per arm, so the derive must see ONE arm (mirrors cornerData pinning corner/probeSeq)
+const CANONICAL_BIND = { ...MIDDLE_DEFAULTS, axisOrder: 'XY', dir1: 'pos', dir2: 'neg', featureType: 'boss', inAxis: 'auto', transAxis: 'auto', twoAxis: true };   // t1237 — pin the DIRECTION arms too (order × dir1 × dir2 duplicates every bound socket 8×; the derive must see exactly one)   // t1211 — PIN the order too: the fork duplicates every bound socket per arm, so the derive must see ONE arm (mirrors cornerData pinning corner/probeSeq)
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(middleDataStack(MIDDLE_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const MIDDLE_BINDINGS = deriveBindingsFor(canonicalPrunedStack(), MIDDLE_BINDING_SPECS);
 
@@ -172,7 +180,10 @@ export function middleDataDef() {
     def.bindingSpecs = MIDDLE_BINDING_SPECS;   // re-derive value-socket indices BY IDENTITY over the PRUNED stack every build
     // t1211 — fill in `axisOrder` for the guard when an op stored only the legacy `axis` (middleAxes normalises), so a
     // pre-existing saved op still prunes to exactly one order arm instead of losing both.
-    def.deriveGuards = (p) => ({ axisOrder: middleAxes(p || {}).order });
+    // t1211/t1237 — fill the guard params the FORK reads from the ONE resolver, so a stored op that predates them (or
+    // one that simply never set dir2, whose default is DERIVED) still matches an arm: whenOk is a strict === and an
+    // absent key would prune every arm away.
+    def.deriveGuards = (p) => { const a = middleAxes(p || {}); return { axisOrder: a.order, dir1: a.dir1, dir2: a.dir2 }; };
     def.simStartsProvider = middleSimStartsProvider;   // E2 — the per-pass preview markers, byte-faithful to BUILT_IN.middle (sim-only)
     return def;
 }

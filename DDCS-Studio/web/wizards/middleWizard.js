@@ -141,8 +141,21 @@ export function middleStack(params = {}, opts = {}) {
     // baked (the user asked for the ORDER, not the directions). The guard reads `axisOrder`; a LEGACY op that stored only
     // the old `axis` gets it filled in by the twin's deriveGuards (middleAxes normalises axis→order), because whenOk is a
     // strict === and an absent key would drop BOTH arms.
+    // t1237 — …and the DIRECTIONS join it. dir1/dir2 are the same class of thing as the order: a VALUE/ORDER swap that
+    // changes G31 signs, the wall-face expressions and the register writes, none of which a binding can rewrite after
+    // instantiate() prunes a static template. So the superset carries every combination as a nested guard chain
+    // (order × dir1 × dir2 = 8 arms) and pruneGuards keeps the declared one. CONCRETE MODE IS UNTOUCHED — it still
+    // calls fn(_ax) exactly once, so the default emit is byte-identical.
+    // dir2's guard needs a VALUE even when the op never stored one (its default is DERIVED — the opposite of dir1), so
+    // the twin's deriveGuards fills both through middleAxes; whenOk is a strict === and an absent key would drop every
+    // arm (the trap axisOrder already taught us).
     const orderFork = (fn) => superset
-        ? ['XY', 'YX'].map((o) => GUARD({ param: 'axisOrder', is: o }, fn(middleAxes({ ...params, axisOrder: o }))))
+        ? ['XY', 'YX'].flatMap((o) => ['pos', 'neg'].flatMap((d1) => ['pos', 'neg'].map((d2) =>
+            GUARD({ param: 'axisOrder', is: o }, [
+                GUARD({ param: 'dir1', is: d1 }, [
+                    GUARD({ param: 'dir2', is: d2 }, fn(middleAxes({ ...params, axisOrder: o, dir1: d1, dir2: d2 }))),
+                ]),
+            ]))))
         : fn(_ax);
     const featBossOnly = (kids) => superset ? [GUARD({ param: 'featureType', is: 'boss' }, kids)] : (featureType === 'boss' ? kids : []);
     const inAxisFork = (autoKids, manualKids) => superset ? [GUARD({ param: 'inAxis', is: 'auto' }, autoKids), GUARD({ param: 'inAxis', is: 'manual' }, manualKids)] : (inAxis === 'manual' ? manualKids : autoKids);
