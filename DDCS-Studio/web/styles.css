@@ -563,7 +563,9 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
    (--kbd-glass / --kbd-blur / --kbd-edge tokens). Items are buttons → override the per-theme skin via (0,2,0). */
 .hdr-quick-menu {
     left: 0; right: auto;                 /* the chevron now sits LEFT (by the logo) → menu opens leftward-anchored */
-    min-width: 226px; max-height: min(72vh, 560px); overflow-y: auto;
+    /* t1231 — a MAX width too: the identity line grew an envelope, and an unbounded shrink-to-fit popover simply got
+       wider until its ☁ / ↧ targets were off the screen (the account-row spec caught it). Bounded, the line wraps. */
+    min-width: min(300px, calc(100vw - 20px)); max-width: min(340px, calc(100vw - 20px)); max-height: min(72vh, 560px); overflow-y: auto;
     padding: 6px; display: flex; flex-direction: column; gap: 2px;
     background: var(--kbd-glass, var(--panel, #1e1e1e));
     -webkit-backdrop-filter: blur(var(--kbd-blur, 8px)) saturate(1.1);
@@ -621,10 +623,13 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
     background: none; border: 0; cursor: default;
 }
 .hq-identity-txt {
-    flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-size: 11.5px; font-weight: 600; color: var(--text-dim, #9fb0c4); opacity: .85;
+    /* WRAPS rather than ellipsizes: the envelope is the point of the line, so hiding its tail would defeat it. */
+    flex: 1 1 auto; min-width: 0;
+    font-size: 11.5px; font-weight: 600; color: var(--text-dim, #9fb0c4); opacity: .85; line-height: 1.35;
 }
 .hq-identity-txt b { font-weight: 700; }
+/* the envelope wraps as ONE unit — a machine's travel must never break across a line mid-number */
+.hq-identity-txt .hq-env { white-space: nowrap; }
 .hq-cloud-badge, .hq-pull-btn {
     /* t859 — each of the identity row's THREE tap targets is ≥44px: the row (label), the ☁ cloud state, the ↧ pull */
     flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;

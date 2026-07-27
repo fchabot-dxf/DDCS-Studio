@@ -16,7 +16,7 @@ import { listPosts, getActivePostId, setActivePostId, getDialect, resolveActiveP
 import { getActiveProfile, CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { validate, summarize } from '../shared/js/validate/validate.js';
 import { dlgNotice } from './dialog.js';   // in-app notice (t684 d — no bare alert)
-import { getMachine } from '../data/workspaceMachine.js';   // t1217 — the identity row names THIS WORKSPACE'S MACHINE
+import { getMachine, envelopeSummary } from '../data/workspaceMachine.js';   // t1217 — the identity line names THIS WORKSPACE'S MACHINE; t1231 — with its signed envelope
 import { THEMES } from './themes.js';
 import { getAccount, renderCloudLogin } from './cloudAccount.js';   // t742 — the header ACCOUNT row consumes the ONE shared cloud-account API (no second connect impl)
 import { EXE_DOWNLOAD_URL } from './gatewayStatus.js';   // the "standalone" desktop EXE release link (same as the Gateway page)
@@ -142,6 +142,9 @@ export function initHeaderPost() {
         // controller) — never the row's retired click — and ☁ is the only cloud-connect affordance on a phone (t742).
         const ap = getMachine();
         const apCtrl = (CONTROLLER_PROFILES[ap.controllerId] || {}).name || ap.controllerId || '';
+        // t1231 (user) — the line also carries the ENVELOPE, signed, from the SAME formatter the manager rows and the
+        // Settings band use. Three surfaces, one source: they cannot describe the same machine differently.
+        const apEnv = envelopeSummary((window.ddcsGetSettings && window.ddcsGetSettings().machine) || {});
         const acc = getAccount();
         const cloudCls = acc.connected ? 'hq-cloud-badge connected' : 'hq-cloud-badge';
         const cloudTitle = acc.connected
@@ -149,7 +152,10 @@ export function initHeaderPost() {
             : 'Connect cloud account';
         const identityRow =
             `<div class="hq-identity-line hq-identity">`
-            + `<span class="hq-identity-txt"><b>${esc(ap.name || 'Untitled workspace')}</b><span class="hq-cur"> · ${esc(apCtrl)}</span></span>`
+            + `<span class="hq-identity-txt"><b>${esc(ap.name || 'Untitled workspace')}</b>`
+            + `<span class="hq-cur"> · ${esc(apCtrl)}</span>`
+            + (apEnv ? `<span class="hq-cur hq-env"> · ${esc(apEnv)}</span>` : '')
+            + `</span>`
             + `<span class="${cloudCls}" data-cloud="1" role="button" tabindex="0" title="${cloudTitle}">☁</span>`
             + `<span class="hq-pull-btn" data-profact="pull" role="button" tabindex="0" title="Pull from controller">↧</span>`
             + `</div>`;

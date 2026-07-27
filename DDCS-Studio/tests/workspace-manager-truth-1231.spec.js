@@ -166,6 +166,88 @@ test('DELETE: the OPEN workspace can be deleted — the buffer keeps working and
     expect(r.handle, 'and Ctrl+S will ask where to put it rather than writing to a deleted file').toBeNull();
 });
 
+/**
+ * t1231 AMENDMENT (user: "a backup copy still appears when loading a workspace").
+ *
+ * The rule: an OPEN performs exactly ZERO writes beyond the user's own explicit save in the save-first prompt. These
+ * three tests pin every branch of the open flow — discard, cancel, and save-and-continue — against BOTH kinds of write
+ * a workspace can produce: a new file in the granted folder, and a download.
+ */
+test('OPENING WRITES NOTHING: discarding an unsaved buffer creates no file and downloads nothing', async ({ page }) => {
+    await boot(page);
+    await grantFolder(page, FILES);
+    await page.evaluate(() => { window.ddcsMarkWorkspaceSaved('m350-shop.ddcs'); localStorage.setItem('ddcs_tpl_dirty_1231', JSON.stringify([{ n: 1 }])); });
+    expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'there IS unsaved work, so the prompt fires').toBe(true);
+
+    let downloads = 0;
+    page.on('download', () => { downloads++; });
+    await openFolder(page, 'open');
+    await page.locator('#wsmCards .wsm-fp-row', { hasText: 'bench-router' }).click();
+    await page.locator('.wsm-3way [data-w3="discard"]').click();
+    await page.waitForFunction(() => window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
+
+    expect(await page.evaluate(() => [...window.__fs.keys()]), 'no new file in the folder — an open is a READ')
+        .toEqual(['m350-shop.ddcs', 'bench-router.ddcs']);
+    expect(downloads, 'and no backup copy in Downloads').toBe(0);
+});
+
+test('OPENING WRITES NOTHING: cancelling the prompt writes nothing either', async ({ page }) => {
+    await boot(page);
+    await grantFolder(page, FILES);
+    await page.evaluate(() => { window.ddcsMarkWorkspaceSaved('m350-shop.ddcs'); localStorage.setItem('ddcs_tpl_dirty2_1231', JSON.stringify([{ n: 2 }])); });
+    let downloads = 0;
+    page.on('download', () => { downloads++; });
+    await openFolder(page, 'open');
+    await page.locator('#wsmCards .wsm-fp-row', { hasText: 'bench-router' }).click();
+    await page.locator('.wsm-3way [data-w3="cancel"]').click();
+    expect(await page.evaluate(() => [...window.__fs.keys()])).toHaveLength(2);
+    expect(downloads).toBe(0);
+    expect(await page.evaluate(() => window.ddcsFileSavedName()), 'and the workspace is the one we started in').toBe('m350-shop.ddcs');
+});
+
+test('SAVE AND CONTINUE writes exactly ONE file — the user\'s own, no second copy beside it', async ({ page }) => {
+    await boot(page);
+    await grantFolder(page, FILES);
+    // the buffer belongs to m350-shop and has unsaved work; the save handle points at that file
+    await page.evaluate(() => {
+        const files = window.__fs;
+        window.showSaveFilePicker = undefined;
+        window.ddcsMarkWorkspaceSaved('m350-shop.ddcs');
+        localStorage.setItem('ddcs_tpl_dirty3_1231', JSON.stringify([{ n: 3 }]));
+        window.__writes = [];
+        window.ddcsAdoptSaveHandle({
+            name: 'm350-shop.ddcs', queryPermission: async () => 'granted', requestPermission: async () => 'granted',
+            createWritable: async () => ({ write: async (t) => { window.__writes.push('m350-shop.ddcs'); files.set('m350-shop.ddcs', t); }, close: async () => {} }),
+        });
+    });
+    let downloads = 0;
+    page.on('download', () => { downloads++; });
+
+    await openFolder(page, 'open');
+    await page.locator('#wsmCards .wsm-fp-row', { hasText: 'bench-router' }).click();
+    await page.locator('.wsm-3way [data-w3="save"]').click();
+    await page.waitForFunction(() => window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
+
+    expect(await page.evaluate(() => window.__writes), 'ONE write, to the file the user was already in').toEqual(['m350-shop.ddcs']);
+    expect(await page.evaluate(() => [...window.__fs.keys()]), 'no third file appeared').toEqual(['m350-shop.ddcs', 'bench-router.ddcs']);
+    expect(downloads, 'and nothing was downloaded on the side').toBe(0);
+});
+
+test('the quick-menu identity line carries the SIGNED envelope, from the same one source', async ({ page }) => {
+    await boot(page);
+    await page.evaluate(() => {
+        window.ddcsSetMachine({ name: 'm350-shop', controllerId: 'ddcs-expert-m350' }, true);
+        const s = window.ddcsGetSettings(); Object.assign(s.machine, { x: 850, y: -850, z: -120 });
+        window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
+    });
+    await page.locator('#hdrPostBtn').click();
+    const line = page.locator('#hdrPostMenu .hq-identity-line');
+    await expect(line).toContainText('m350-shop');
+    await expect(line).toContainText(/Expert M350/);
+    await expect(line, 'the envelope as declared, signs and all').toContainText('850 × -850 × -120');
+    expect(await page.evaluate(() => document.querySelector('#hdrPostMenu .hq-identity-line').tagName), 'still plain text, still not a button').not.toBe('BUTTON');
+});
+
 test('BROWSE… is gone — no button, and no message pointing at one', async ({ page }) => {
     await boot(page);
     await grantFolder(page, FILES);

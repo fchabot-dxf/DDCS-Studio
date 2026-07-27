@@ -17366,3 +17366,24 @@ The state fix was watched FAILING against the old display rule: with `at != null
 
 GATE (fast tier): smoke 59/59 + 57 workspace/persistence/settings/gateway specs. Screenshots: the honest never-saved
 state, the delete confirm, the signed-envelope rows. Branch feat/ddcs-workspace. NO release.
+
+### t1231 ADDENDUM -- the two mid-turn amendments.
+
+(5) NO BACKUP COPY ON LOAD. I enumerated EVERY write path in web/ (downloadFile / createWritable / getFileHandle /
+exportEverything) rather than guessing: the only writer of a workspace file is ui/workspaceSave.js, and the only way an
+open can reach it is the user's own "Save and continue". Three regressions now pin every branch of the open flow --
+DISCARD, CANCEL, and SAVE-AND-CONTINUE -- against BOTH kinds of write (a new file in the granted folder AND a
+download). All three are green: an open in this branch writes nothing, and Save-and-continue writes exactly ONE file,
+the one the user was already in. The gateway's own `.bak` (bridge ops.py) is a controller-file push, not this path.
+So, like the Browse button, I could not reproduce it HERE -- and the pattern across three user reports is now hard to
+ignore: Browse visible, a backup copy on load, and Untitled+Saved are ALL explained by a build predating t1225/t1227
+(the t1223 import gate wrote a safetyExport; the pre-t1225 fallback downloaded ddcs-workspace-<stamp>.ddcs and marked
+the workspace saved WITHOUT a name -- which is exactly the trio of symptoms). The app ships as raw ES modules, so a
+soft reload can keep a stale one. The state fix is the only one of the three that can heal an already-affected
+browser, which is why it was worth doing at the display layer too. WHAT TO CHECK NEXT is the version they are on.
+
+(3-ext) THE IDENTITY LINE CARRIES THE ENVELOPE, signed, from the same envelopeSummary the manager rows and the
+Settings band read -- three surfaces, one source. Adding it exposed a real layout bug the account-row spec caught
+immediately: the quick menu had a min-width and NO max, so a shrink-to-fit popover simply grew until its ☁ and ↧
+targets were outside the viewport and unclickable. Bounded now (min 300 / max 340, both viewport-clamped), with the
+envelope in a nowrap span so a machine's travel never breaks mid-number across a wrap.
