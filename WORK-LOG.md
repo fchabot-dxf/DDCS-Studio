@@ -18054,3 +18054,94 @@ read()/write() closures) — it would have been a wait that only ever waited 120
 something, so it reads real store content now. 33/33 across three repeats.
 
 FINAL GATE: 131/131.
+
+---
+
+## turn 1251 -- THE FAQ CATCHES UP. Every named path DRIVEN before it shipped.
+
+The rule for this turn was that a named UI path is VERIFIED, not remembered. So before writing a word I drove every
+path the FAQ was about to claim, in the app, and wrote from what came back:
+
+  Settings > Controller > Gateway ......... DRIVEN. The old answer said "Settings > Gateway", which the shrink broke.
+                                            Two entries named it (send-a-program AND the phone entry); both corrected.
+  Settings > Controller > Profile > Pull .. DRIVEN. The modal really carries BOTH transports in one row:
+                                            "↧ Live via the Gateway" and "📁 From a USB copy (.eng file or disk folder)".
+  Settings > Look and feel > Wizard bar ... DRIVEN. The subtab is labelled "Wizard bar" (t1245 renamed it) and the
+                                            .wiz shelf is on it.
+  Macros > CAM Pack Builder ............... DRIVEN. The .cam shelf is there.
+  Gateway > Files > DEPLOY TARGET ......... DRIVEN. Row present; reads "not chosen yet — the first deploy will ask".
+  The workspace manager ................... DRIVEN. Duplicate, Save As and the Cloud tab all present.
+  The header disk button .................. DRIVEN. Its tooltip reads "Workspace: Rig A.ddcs · DDCS Expert M350".
+
+### WHAT THE DRIVING FOUND -- two things the words could not have been true about.
+
+**(1) The CAM button still said ".zip".** I was asked to rewrite the CAM entry around the deploy model, but
+`cam_export_pack` still read "📦 Export pack (.zip)" with a title promising a USB-ready zip -- my own t1249 changed
+what it DOES and left what it SAYS. Writing a FAQ entry describing the deploy while the button advertised a zip would
+have documented a lie, so the label is now "📦 Deploy pack" and its tooltip describes the real behaviour (tree onto
+the granted folder; zip only where the browser cannot write to one).
+
+**(2) THE RELEASE LEFT A FALSE RED BANNER ON EVERY DEV BOOT.** Clicking the header timed out because
+`.ddcs-stale-bar` was intercepting the click -- the dev-only "stale page" warning. Cause: release 9434f6e bumped
+`web/version.json` to 2026.07.27.1 and touched nothing else, while the `.ver` chip in index.html still said
+2026.07.24.2. bump-version.cjs says in its first line that the chip is the SINGLE SOURCE OF TRUTH and syncs chip +
+title + version.json together; a hand-edit of one of the three broke the invariant, so the app told every developer
+its own page was stale, and physically blocked the header while doing it. I synced the chip and title to the version
+the release declared. FLAGGING IT rather than burying it: this is the advisor's release commit, and the fix belongs
+in the release process (run the script) rather than in my hands next time.
+
+### THE CONTENT.
+
+Rewritten: the CAM pack (deploy model), Cloud vs Gateway (Drive is ANOTHER PLACE YOUR WORKSPACES LIVE -- profile sync
+is a dead concept), which controllers (the WORKSPACE's controller; Duplicate to retarget), Pull from controller (one
+modal, two transports, the assumption row, Duplicate-as on a mismatch -- and the sentence says WHY: a pull never
+silently retargets the workspace you are in), and the send-a-program path.
+
+New, and placed FIRST because identity-first applies to documentation too -- what is it, then where is my work:
+Where is my work saved? / How do I work with two machines? / How do I share a wizard or a CAM recipe? / How do I get
+files onto the USB stick? The troubleshooting tail stays last, where someone reaches for it.
+
+### THE SPEC, and a bug in my own first version of it.
+
+Three new tests: the chapter order, NO DEAD PATHS (a scan for "profile library", profile-sync wording, a Settings >
+Feedback path, and "USB-ready" in the CAM entry), and one that walks every Settings path the prose names and asserts
+the panel really opens under the tab the sentence claims -- the claim cannot outrun the code.
+
+My first version read the FAQ with `innerText`. A COLLAPSED `<details>` renders none of its answer, so that returned
+only the list of questions: every assertion about what an ANSWER says was checking nothing, and two of them passed
+for that reason. It reads `textContent` now. Same class of mistake as the degenerate discriminators in t1241 -- a
+test that looks like it checks something.
+
+GATE (fast tier): smoke + FAQ/help/settings/library/deploy/CAM specs = 101/101.
+SCREENSHOT: scratchpad/s1251-faq.png -- the workspace chapter open, in order, under the opener.
+
+### AMENDMENT: the FAQ's paths became IN-APP LINKS, from a declared registry.
+
+`FAQ_LINKS` maps a link id to the call that opens the surface AND to the words the link reads as, so the text and the
+destination are one fact. The markup references ids; one delegated handler closes Help (first — the destination is
+often a modal of its own, and leaving Help on top would hide the thing you asked for) and runs the opener. Every
+opener goes through the app's own structural doors, so `openSettings({panel})` resolves the panel's group and these
+survive the next Settings reshuffle untouched.
+
+The spec walks the WHOLE registry, not a sample: it asserts each id is referenced by an answer (a registry row nobody
+links to is a promise no reader can reach), that the coverage map equals the registry exactly, and then clicks every
+link in the real panel and checks the surface arrives and Help got out of the way. `settings-preview` was declared
+and then linked by nothing, so it was deleted rather than shipped as a dead row.
+
+**The registry walk found a live defect in one of my own links.** `macros-cam` called `showApp('macros')` and clicked
+the CAM subtab in the same tick — the app mounts asynchronously, so it landed on Macros with the CAM panel still
+hidden: a link that half-arrives. It now waits for the subtab to be wired and confirms the panel is actually shown.
+Exactly what the amendment predicted the walk would be for, on its first run.
+
+GATE after the amendment: 104/104.
+SCREENSHOTS: s1251-faq.png (the workspace chapter open, in order) + s1251-faq-links.png (a linked answer — "Settings
+→ Controller → Profile" reads as a link inside the sentence).
+
+### AMEND-2 → AMEND-3: the return chip, proposed and then retracted.
+
+AMEND-2 asked for every FAQ link to push a navReturn token so the destination showed a "back to Help" chip. AMEND-3
+retracted it after discussion: a link closes Help and opens the target, full stop — getting back to Help is the normal
+door (quick menu → Help), same as always. I had not built AMEND-2 yet, so nothing had to be unwound; what the
+retraction ADDS is that the absence is now DECLARED rather than incidental. The walk-all-links spec asserts each link
+leaves NO return token, NO return-glow and NO Back chip, so a future link that starts leaving breadcrumbs fails a test
+instead of quietly growing a second way back.
