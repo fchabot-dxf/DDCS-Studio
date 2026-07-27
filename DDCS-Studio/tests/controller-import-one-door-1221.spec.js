@@ -79,7 +79,9 @@ test('the modal offers BOTH transports, and the live read still starts on open (
 
     // t1221 amendment — the undo copy is AUTOMATIC, so the manual duplicate is gone and the modal SAYS so
     await expect(page.locator('#import-backup'), 'the manual "Backup Profile" duplicate is retired').toHaveCount(0);
-    await expect(page.locator('#import-safenote')).toContainText(/safety copy of your workspace is saved automatically/i);
+    // t1223 — the footer must state what the app ACTUALLY does now: the silent copy was swept, so it promises the
+    // save-first PROMPT instead. A claim the code no longer honours is the bug this assertion exists to catch.
+    await expect(page.locator('#import-safenote')).toContainText(/asked to save it before applying/i);
     // settled vocabulary: "profile" is dead on this surface (workspace stays reserved for the .ddcs, as used above)
     const modalText = await page.locator('#import-modal .im-panel').innerText();
     expect(modalText, 'the dead word "profile" is gone from this surface').not.toMatch(/profile/i);
@@ -116,8 +118,8 @@ test('a USB .eng file goes through the SAME review before anything is applied', 
     const after = await page.evaluate(() => window.ddcsGetSettings().machine);
     expect(Math.abs(after.x), 'the reviewed envelope applied (V4.1 golden X travel)').toBe(3830);
     expect(Math.abs(after.y), 'and Y').toBe(3900);
-    // the modal PROMISES an automatic safety copy before applying — prove the promise is kept, not just printed
+    // t1223 — the automatic SILENT export is gone: applying now routes through the save-first prompt instead, and a
+    // clean buffer (this one) has nothing to protect, so nothing is written behind the user's back at all.
     const safety = await page.evaluate(() => window.__ddcsSafetyExport || null);
-    expect(safety, 'applying took the automatic undo copy the footer promises').not.toBeNull();
-    expect(String(safety.name), 'and it is a real before-open workspace file').toMatch(/before-open.*\.ddcs$/);
+    expect(safety, 'no unasked-for .ddcs lands in Downloads — the prompt replaced the silent copy').toBeNull();
 });

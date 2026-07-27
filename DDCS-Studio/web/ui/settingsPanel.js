@@ -26,13 +26,14 @@ import { FACTORY_MACROS } from '../data/factoryMacros.js';
 import { TOOL_CATALOG, TOOL_CATALOG_GROUPS } from '../data/toolCatalog.js';   // the declared catalog the "＋ Add from catalog" picker adds individual tools from
 import { toDisp, fromDisp } from './units.js';   // t1008 — the ONE shared mm<->inch conversion (tool-library editor + catalog picker; same leaf as the op-form widget)
 import { recognizeDump, classifyFile } from '../data/dumpImport.js';   // t666 — no-LAN machine-truth: a USB copy of the controller's parameters → derive geometry → the review modal
-import { safetyExport } from '../data/backup.js';   // t1221 — applying a parameter import writes machine config: same automatic undo copy the .ddcs restore takes
 import { declaredHomeEdgeSide, rotaryHomeDir } from '../engine/limitSwitches.js';   // t628/t670 — the DECLARED home switch drives the seek direction (one source); linear = edge, rotary = declared dir
 import { slaveAxes, slaveFollowing, isSlaveAxis } from '../engine/gantry.js';   // t648 — the ONE source of the gantry topology (motors[ax]={role:'slave',follows}); homing display + pull derive from it
 import { dlgConfirm, dlgPrompt, dlgNotice } from './dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
-import { getMachine, setMachine, legacyMachineConfigs, machineConfigFile, dropLegacyProfile } from '../data/workspaceMachine.js';   // t1217/t1219 — the workspace's ONE machine (replaces the profile library) + the legacy-machines door
+import { getMachine, setMachine } from '../data/workspaceMachine.js';   // t1217 — the workspace's ONE machine record
 import { confirmSetupRow } from './setupChecklist.js';   // t1217 — a visit+confirm satisfies a checklist row even when the value is unchanged   // t684 b — the profile browser (save-as / browse)
-import './backupModal.js';   // t852 — registers window.ddcsExportBackup + window.openBackupRestore (the one-file backup)
+// t1223 — ui/backupModal.js is DELETED: it WAS the restore-selected store-picker, and opening a workspace is now
+// always the WHOLE file through the workspace manager. A partial restore produced a state that was neither the
+// file nor what you had, and its silent safety download is replaced by the manager's save-first prompt.
 const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 
 // --- Tool library ----------------------------------------------------------
@@ -952,7 +953,18 @@ function buildSettingsOverlay() {
             #settings-app .mach-col-field { position: static; width: 74px; text-align: right; padding: 3px 6px; box-shadow: none; }
             #settings-app .mach-travel-row { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 12px; }
             #settings-app .mach-travel-row .mach-ax { width: 12px; display: inline-block; text-align: center; }
+            /* t1223 — the IDENTITY BAND (display only), full width above the tab strip. */
+            #settings-app .settings-identity { flex: 0 0 auto; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+                padding: 8px 16px; background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-bottom: 1px solid var(--border); }
+            #settings-app .settings-identity .si-name { font-weight: 700; font-size: 14px; color: var(--text-main); }
+            #settings-app .settings-identity .si-unsaved { font-weight: 600; font-size: 12px; color: var(--accent); }
+            #settings-app .settings-identity .si-item { font-size: 12px; color: var(--text-dim); }
+            #settings-app .settings-identity .si-item b { color: var(--text-main); font-weight: 600; }
         </style>
+            <!-- t1223 (6) — THE IDENTITY BAND. Display only: which machine this workspace IS, at a glance, above
+                 everything else in Settings. Nothing here is editable — the name comes from the FILE (one-name rule),
+                 the controller from the dropdown below, the envelope from the machine panel. -->
+            <div class="settings-identity" id="set_identity_band"></div>
             <div class="settings-head">
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <div class="settings-tabs" style="display: flex; gap: 8px;">
@@ -1060,40 +1072,16 @@ function buildSettingsOverlay() {
                         <label class="settings-check"><input type="checkbox" id="set_cp_ghost"> Suggestion box — a floating box of likely next blocks on the canvas (click, or Tab takes the first)</label>
                     </div>
                 </div>
-                <!-- GENERAL: PROFILE (t658 — profile-first: a named profile is the unit; the controller is a property, in its own section) -->
+                <!-- GENERAL: THIS WORKSPACE'S MACHINE -->
                 <div id="set_tab_profile">
                     <div class="settings-section">
                         <div class="settings-section-title">THIS WORKSPACE'S MACHINE</div>
-                        <div class="settings-row" style="align-items:center;">
-                            <input type="text" id="set_machine_name" placeholder="Name this machine (e.g. Rig B)" title="What to call the machine this workspace describes. The name travels in the .ddcs file and labels the workspace in the header." style="flex:1; background:#222; color:#ddd; border:1px solid #888; font-size:14px; font-weight:600; padding:4px 8px;">
-                        </div>
-                        <div class="settings-row" style="margin-top:8px;">
-                            <!-- t1217 RETIRED ([[one-workspace-one-machine]]): "Save as profile…" + "Profiles…" are gone.
-                                 A workspace holds exactly ONE machine, so there is no library to browse and nothing to
-                                 switch between — a second machine is a second .ddcs (Duplicate workspace). Retiring the
-                                 switching machinery also retires the stale-snapshot bug class it created. -->
-                            <!-- t1221 RETIRED: "Import from dump" was a SECOND door doing the same act as
-                                 "Pull from controller" — read this machine's parameters, review, apply. It is now a
-                                 TRANSPORT inside that one modal ("From a USB file (.eng)"), which is also where the
-                                 review already lived, so both ways in converge on the same review + apply. -->
-                            <!-- t1219 — the READ side of the machine-config file the legacy door below writes. Without
-                                 it that export is a file nothing can open, which would make "save it and open it in a
-                                 new workspace" untrue. It REPLACES this workspace's machine, so it asks first and
-                                 exports an undo copy (data/profileStore.js allowDestructiveLanding). -->
-                            <button class="toolbar-btn settings-io" id="set_machine_open" title="Open a machine-config file (.ddcsmachine.json) — REPLACES this workspace's machine with it. Your current workspace is exported first so you can undo.">📂 Open machine config…</button>
-                        </div>
-                        <div class="settings-hint">This workspace has <b>one machine</b>. Everything below — controller, envelope, WCS, boot macro, variables — describes it, and it all travels inside this workspace's <b>.ddcs</b> file. A second machine is a second workspace: use <b>Duplicate workspace…</b>, then change the controller on the copy.</div>
-                        <!-- t1219 — LEGACY MACHINES: hidden unless this browser still carries pre-t1217 profiles that were
-                             never adopted. They are the OTHER machines from the retired library; the migration refuses to
-                             delete them, so this is where the user resolves each one — export it as a machine-config file
-                             (which seeds a new workspace) or dismiss it. When the last one is resolved the zombie library
-                             key clears, so it stops riding along inside every future .ddcs. -->
-                        <div id="set_legacy_machines" style="display:none; margin-top:10px;">
-                            <div class="settings-hint" style="border-left:3px solid #d6a11c; padding-left:8px;">
-                                <b>Machines from the old profile library</b> — this workspace kept only the one it was using. Save each of the others as a machine-config file (open it in a new workspace), or dismiss it. Nothing is deleted until you say so.
-                            </div>
-                            <div id="set_legacy_list"></div>
-                        </div>
+                        <!-- t1223 ONE-NAME RULE: the name input is GONE. The workspace's name IS its filename IS what
+                             every surface shows, so a second place to type it could only ever disagree with the file.
+                             Renaming is Save As. The identity band above the tab strip displays it.
+                             t1223 LEGACY PURGE ([[no-legacy-burden]]): the legacy-machines export rows and the
+                             Open-machine-config reader are removed with the rest of the pre-pivot compat surface. -->
+                        <div class="settings-hint">This workspace has <b>one machine</b>. Everything below — controller, envelope, WCS, boot macro, variables — describes it, and it all travels inside this workspace's <b>.ddcs</b> file. A second machine is a second workspace: <b>Duplicate…</b> in the workspace manager, then change the controller on the copy.</div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">CONTROLLER</div>
@@ -1257,7 +1245,7 @@ function buildSettingsOverlay() {
                         <div class="settings-hint">Save your whole workspace — profiles, projects, settings, the tool table, custom wizards, your <b>CAM pack</b>, presets, prefs — as one <b>.ddcs</b> file, and open it on another machine or after a reset. (One job is a <b>.mjson</b>; the whole workspace is a <b>.ddcs</b>.) Tokens and cloud credentials are never included.</div>
                         <div class="settings-row" style="margin-top:10px; gap:8px;">
                             <button type="button" class="toolbar-btn settings-io" id="set_backup_export" title="Save your whole workspace to a .ddcs file you own (Ctrl+S). Pick the location once; later saves overwrite it.">💾 Save workspace</button>
-                            <button type="button" class="toolbar-btn settings-io" id="set_backup_restore" title="Open a .ddcs workspace (or a legacy .json backup) — you'll pick what to restore, and a safety copy of your current state is saved first">📂 Open workspace…</button>
+                            <button type="button" class="toolbar-btn settings-io" id="set_backup_restore" title="Open a workspace — the WHOLE file, from your workspaces folder">📂 Open workspace…</button>
                         </div>
                     </div>
                 </div>
@@ -1894,69 +1882,40 @@ function wireSettingsOverlay(ov) {
     // configuration (envelope, WCS, motors, macros, variables) already lives in the live stores that ride the .ddcs.
     // Retiring the switching machinery retires the stale-snapshot bug class it created: an active profile held a COPY of
     // settings the live stores also held, and every switch/create/delete had to re-sync that copy.
-    const machineNameEl = q('set_machine_name');
-    function renderMachineLine() {
-        // never clobber what the user is mid-typing (this also runs on the ddcs:settings-changed broadcast)
-        if (machineNameEl && document.activeElement !== machineNameEl) machineNameEl.value = getMachine().name || '';
+    // t1223 ONE-NAME RULE — there is no machine-name INPUT any more. The workspace's name is its FILENAME, set by
+    // saving (Save As renames), and shown by the identity band + the header disk button + the workspace cards. A second
+    // place to type it could only ever disagree with the file it names.
+    //
+    // (6) THE IDENTITY BAND — display only: what this workspace IS, at a glance, above every tab. Every value is read
+    // from its own declared source, never re-typed here: the NAME from the file, the CONTROLLER from the machine
+    // record, the ENVELOPE from settings.machine.
+    // a machine name is user text going into innerHTML — escape it, never trust it
+    const escHtml = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    function renderIdentityBand() {
+        const band = q('set_identity_band');
+        if (!band) return;
+        const m = getMachine();
+        const ctrl = (CONTROLLER_PROFILES[m.controllerId] || {}).name || m.controllerId || '—';
+        const mm = _ddcsSettings.machine || {};
+        const num = (v) => (Number.isFinite(Number(v)) ? Math.abs(Number(v)) : null);
+        const env = [num(mm.x), num(mm.y), num(mm.z)];
+        const envTxt = env.every((v) => v != null) ? `${env[0]} × ${env[1]} × ${env[2]} mm` : 'not set';
+        const named = (m.name || '').trim();
+        band.innerHTML = named
+            ? `<span class="si-name">${escHtml(named)}</span>`
+            : '<span class="si-name">Untitled workspace</span><span class="si-unsaved">not saved yet</span>';
+        band.insertAdjacentHTML('beforeend',
+            `<span class="si-item">Controller <b>${escHtml(ctrl)}</b></span>`
+            + `<span class="si-item">Envelope <b>${escHtml(envTxt)}</b></span>`);
     }
-    if (machineNameEl) machineNameEl.addEventListener('change', () => {
-        setMachine({ name: machineNameEl.value }, false);   // false — renaming the machine must not re-apply the controller
-        window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
-    });
+    function renderMachineLine() { try { renderIdentityBand(); } catch (e) { /* */ } }
     renderMachineLine();
     window.addEventListener('ddcs:settings-changed', () => { try { renderMachineLine(); } catch (e) { /* */ } });
+    window.addEventListener('ddcs:file-state', () => { try { renderMachineLine(); } catch (e) { /* */ } });
 
-    // ── t1219 — THE LEGACY-MACHINES DOOR ──────────────────────────────────────────────────────────────
-    // migrateProfileLibrary deliberately REFUSES to delete the non-active profiles from the retired library — losing a
-    // machine the user configured is not an acceptable migration cost. That promise only means something if there is a
-    // way to act on them, so this is it: one row per leftover machine, each exportable as a standalone machine-config
-    // file (which seeds a new workspace) or dismissable. Resolving the last one clears the zombie library key, which is
-    // also what stops it riding along inside every future .ddcs as a legacy `profiles` row.
-    // the READ side of machineConfigFile — window.ddcsImportProfile carries its own confirm + undo export
-    const openMachineBtn = q('set_machine_open');
-    if (openMachineBtn) openMachineBtn.addEventListener('click', () => { try { if (window.ddcsImportProfile) window.ddcsImportProfile(); } catch (e) { /* */ } });
-
-    const legacyWrap = q('set_legacy_machines');
-    const legacyList = q('set_legacy_list');
-    // a machine NAME is user text going into innerHTML / a filename — escape it, never trust it
-    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    const safeFileName = (s) => (String(s || 'machine').replace(/[\\/:*?"<>|]+/g, '_').trim() || 'machine');
-    function renderLegacyMachines() {
-        if (!legacyWrap || !legacyList) return;
-        let rows = [];
-        try { rows = legacyMachineConfigs(); } catch (e) { rows = []; }
-        legacyWrap.style.display = rows.length ? '' : 'none';
-        if (!rows.length) return;
-        legacyList.innerHTML = rows.map((p) => {
-            const ctrl = (CONTROLLER_PROFILES[p.controllerId] || {}).name || p.controllerId || 'unknown controller';
-            return '<div class="settings-row" style="align-items:center; margin-top:6px;">'
-                + '<span style="flex:1; font-size:13px;">' + esc(p.name || '(unnamed machine)') + '<span style="opacity:.7;"> · ' + esc(ctrl) + '</span></span>'
-                + '<button class="toolbar-btn settings-io" data-legacy-save="' + esc(p.id) + '" title="Save this machine as a .ddcsmachine file — open it in a new workspace to keep using it">💾 Save as file</button>'
-                + '<button class="toolbar-btn settings-io" data-legacy-drop="' + esc(p.id) + '" title="Forget this machine (it is not used by this workspace)">Dismiss</button>'
-                + '</div>';
-        }).join('');
-    }
-    if (legacyList) legacyList.addEventListener('click', async (e) => {
-        const saveBtn = e.target.closest('[data-legacy-save]');
-        const dropBtn = e.target.closest('[data-legacy-drop]');
-        if (!saveBtn && !dropBtn) return;
-        const id = (saveBtn || dropBtn).getAttribute(saveBtn ? 'data-legacy-save' : 'data-legacy-drop');
-        let rec = null;
-        try { rec = legacyMachineConfigs().find((p) => p && p.id === id) || null; } catch (err) { rec = null; }
-        if (!rec) { renderLegacyMachines(); return; }
-        if (saveBtn) {
-            // EXPORTING resolves it: the config now exists as a file the user owns, so it need not linger here.
-            try { UIUtils.downloadFile(safeFileName(rec.name || 'machine') + '.ddcsmachine.json', machineConfigFile(rec)); }
-            catch (err) { dlgNotice('Could not save that machine: ' + ((err && err.message) || err)); return; }
-            dropLegacyProfile(id);
-            dlgNotice('Saved “' + (rec.name || 'unnamed machine') + '”. Open that file in a new workspace to use it.');
-        } else {
-            if (!(await dlgConfirm('Dismiss “' + (rec.name || 'unnamed machine') + '”? This workspace does not use it, and it will be forgotten.', { danger: true, okLabel: 'Dismiss' }))) return;
-            dropLegacyProfile(id);
-        }
-        renderLegacyMachines();
-    });
-    renderLegacyMachines();
+    // t1223 — the LEGACY-MACHINES DOOR is REMOVED ([[no-legacy-burden]]). It surfaced leftover pre-t1217 profiles as
+    // one-time machine-config exports, plus an Open-machine-config reader for the file it wrote. Both existed only to
+    // carry a browser across the pivot; there is no install base, and the whole .ddcsmachine.json format went with it.
         // When a gateway answers (same-origin in the gateway-served/exe face, or via the ?api= dev
         // override), fetch the controller's own profile and offer it in the list (shown as
         // "… (from controller)"). Silently ignored if offline / not bridged (hosted Studio).
@@ -2288,7 +2247,7 @@ function wireSettingsOverlay(ov) {
                 <div class="im-body" id="import-body"></div>
                 <div class="im-foot">
                     <label class="im-only"><input type="checkbox" id="import-only" checked> Show only changed</label>
-                    <span class="im-safe" id="import-safenote">A safety copy of your workspace is saved automatically before applying.</span>
+                    <span class="im-safe" id="import-safenote">If you have unsaved work, you'll be asked to save it before applying.</span>
                     <span style="flex:1"></span>
                     <button class="toolbar-btn settings-io" id="import-cancel">Cancel</button>
                     <button class="toolbar-btn settings-io" id="import-apply" disabled>Apply</button>
@@ -2394,11 +2353,11 @@ function wireSettingsOverlay(ov) {
         m.querySelector('#import-apply').onclick = async () => {
             const checked = _importCands.filter((c) => c.checked);
             const btn = m.querySelector('#import-apply'); btn.disabled = true; btn.textContent = 'Applying…';
-            // t1221 — the undo copy is AUTOMATIC now, so the manual "Backup Profile" button is gone. Applying rewrites
-            // this machine's envelope / WCS / homing / spindle, so it earns the same protection opening a .ddcs has:
-            // safetyExport() first (ui/backupModal.js does exactly this before a restore). Best-effort — a failed
-            // export must not block the apply the user asked for, but it is attempted every time.
-            try { await safetyExport(); } catch (e) { /* the apply still proceeds */ }
+            // t1221 — applying rewrites this machine's envelope / WCS / homing / spindle, so it earns the same
+            // protection opening a .ddcs has. t1223 SWEEP: that protection is now the save-first PROMPT rather than a
+            // silent download — if there is unsaved work the user chooses (save / discard / cancel) instead of finding
+            // an unasked-for .ddcs in Downloads. Clean buffer → no prompt at all, because there is nothing to lose.
+            if (!(await window.ddcsConfirmDiscardBuffer?.('these controller parameters'))) { btn.disabled = false; btn.textContent = 'Apply'; return; }
             try { await applyCandidates(checked); m.classList.remove('active'); }
             catch (e) { body.innerHTML = '<div class="im-empty">Apply failed: ' + (e && e.message ? e.message : e) + '</div>'; }
         };
@@ -3080,8 +3039,10 @@ function wireSettingsOverlay(ov) {
     sideTabs.forEach(t => t.addEventListener('click', () => showPanel(t.dataset.target)));
     // t852 — the one-file backup buttons (the module registered the globals on import).
     // t1199 — the intentional save: a user-owned .ddcs via the File System Access API (falls back to the download).
-    ov.querySelector('#set_backup_export')?.addEventListener('click', () => (window.ddcsSaveWorkspace || window.ddcsExportBackup)?.());
-    ov.querySelector('#set_backup_restore')?.addEventListener('click', () => window.openBackupRestore && window.openBackupRestore());
+    // t1223 — both doors lead to the ONE workspace manager, on the half they asked for. Settings is no longer a
+    // second, differently-shaped way to save or open; it just points at the same surface as the quick menu.
+    ov.querySelector('#set_backup_export')?.addEventListener('click', () => window.openWorkspaceManager?.('save'));
+    ov.querySelector('#set_backup_restore')?.addEventListener('click', () => window.openWorkspaceManager?.('open'));
     // Expose group+panel navigation so callers (e.g. the Homing wizard's "⚙ Homing setup" link) can deep-link
     // to Settings → Hardware → Machine where the homing section now lives.
     _settingsNavTo = (group, panelId) => { showGroup(group); if (panelId) showPanel(panelId); };

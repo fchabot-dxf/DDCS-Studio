@@ -104,10 +104,19 @@
             <div id="hdrPostMenu" class="scale-pop hdr-quick-menu" role="menu" hidden></div>
         </div>
         <span id="hdrPostWarn" class="hdr-post-warn" hidden title="">⚠</span>
-        <!-- PERSISTENCE-A: shown only when the workspace has changes not yet saved to a portable .ddcs file. Click = Save workspace. -->
-        <button type="button" id="fileSaveChip" class="file-save-chip" hidden
-                title="You have changes that aren't saved to a portable .ddcs workspace file — click to Save workspace.">
-            <span class="fsc-dot" aria-hidden="true"></span><span class="fsc-tx">Unsaved</span>
+        <!-- t1223 (5, amended) — THE CLASSIC FLAT FLOPPY. The BUTTON-NESS is the state: UNSAVED = full-colour glyph
+             with a real button affordance (border + fill, clearly clickable); SAVED = the SAME artwork desaturated and
+             lowered in contrast, with the border/fill removed, so it recedes into the header as a quiet status mark.
+             Tooltip = the filename (+ the dialect it generates for). Nothing else sits beside it. -->
+        <button type="button" id="fileSaveChip" class="file-save-chip" title="Not saved yet">
+            <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2" y="2" width="20" height="20" rx="3" fill="#2f6fd0"/>
+                <rect x="7" y="3" width="10" height="7.5" rx="1" fill="#ffffff"/>
+                <rect x="13" y="4.2" width="2.8" height="5.2" rx="0.5" fill="#2f6fd0"/>
+                <rect x="5.5" y="13" width="13" height="8" rx="1" fill="#ffffff"/>
+                <line x1="7.5" y1="15.5" x2="16.5" y2="15.5" stroke="#9db4d6" stroke-width="1.1"/>
+                <line x1="7.5" y1="17.8" x2="16.5" y2="17.8" stroke="#9db4d6" stroke-width="1.1"/>
+            </svg>
         </button>
         <!-- Project Manager: 📂 Open (drawer) / ⤓ Save (modal). Wired by ui/macroBar.js -->
         <div class="macro-bar" id="macroBar">

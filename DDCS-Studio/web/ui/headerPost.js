@@ -74,6 +74,10 @@ function runQuickAction(act) {
         case 'setupSheet': openSetupSheet(); break;   // t850 — the print-ready job page
         case 'library': openLibrary(); break;   // t854 — the Library (last-used tab)
         case 'rate': window.ddcsOpenRate?.(); break;   // t598 — the always-available Rate / Feedback path (opens the repo)
+        // t1223 — WORKSPACE (the .ddcs). Both open the ONE manager modal, on the half the user asked for: Save
+        // focuses the current workspace + its delta, Open focuses the granted folder's cards.
+        case 'wsSave': window.openWorkspaceManager?.('save'); break;
+        case 'wsOpen': window.openWorkspaceManager?.('open'); break;
     }
 }
 
@@ -161,6 +165,14 @@ export function initHeaderPost() {
             + `<button type="button" class="hq-gcode-btn" data-act="export" title="Export / download">${svgIco('export')} Export</button>`
             + `</div>`;
 
+        // ── t1223 (1) — WORKSPACE ROW: Save + Open are the PRIMARY buttons, and all workspace management lives
+        //    here rather than in a new header menu. Same two-button shape as the gcode row below it. ─────────────
+        const workspaceRow =
+            `<div class="hq-ws-row">`   // its OWN class: a workspace row is not a gcode row, and counting it as one broke the menu-diet assert
+            + `<button type="button" class="hq-gcode-btn" data-act="wsSave" title="Save this workspace to its .ddcs file">💾 Save</button>`
+            + `<button type="button" class="hq-gcode-btn" data-act="wsOpen" title="Open a workspace from your workspaces folder">📂 Open</button>`
+            + `</div>`;
+
         // ── CLEAR ─────────────────────────────────────────────────────────────────────────────────────
         const clearRow = actionRow({ act: 'clear', label: 'Clear editor' });
 
@@ -198,6 +210,7 @@ export function initHeaderPost() {
         menu.innerHTML =
             identityRow
             + '<div class="hdr-quick-sep"></div>'
+            + workspaceRow
             + libraryRow
             + gcodeRow
             + clearRow
@@ -205,8 +218,8 @@ export function initHeaderPost() {
             + '<div class="hdr-quick-sep"></div>'
             + setupSheetRow + checklistRow + settingsRow + rateRow;
 
-        btn.title = `Quick actions — profile: ${ap.name || 'unnamed'} · ${apCtrl}`;
-        btn.setAttribute('aria-label', `Quick actions (profile: ${ap.name || 'unnamed'} · ${apCtrl})`);
+        btn.title = `Quick actions — ${ap.name || 'untitled workspace'} · ${apCtrl}`;
+        btn.setAttribute('aria-label', `Quick actions (${ap.name || 'untitled workspace'} · ${apCtrl})`);
     };
 
     const onDocClick = (e) => { if (!menu.contains(e.target) && !btn.contains(e.target)) closeMenu(); };

@@ -10,7 +10,6 @@ import { getSettings, applySettings, replaceSettings } from '../ui/settingsPanel
 import { getAccessToken, ensureRoot, list as driveList, read as driveRead, write as driveWrite, mkdir as driveMkdir, del as driveDel } from '../ui/cloud/googleDrive.js';
 import { getActiveProfile, setActiveProfile, CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { getMachine, setMachine } from './workspaceMachine.js';   // t1217 — the bundle's name/controller ARE this workspace's machine
-import { safetyExport } from './backup.js';   // t1219 — an import full-swaps: same undo path the .ddcs restore uses
 import { dlgConfirm } from '../ui/dialog.js';   // t1219 — an explicit confirm before a destructive swap
 
 const PROFILE_VERSION = 1;
@@ -119,13 +118,15 @@ export async function allowDestructiveLanding(what) {
     try {
         ok = await dlgConfirm(
             `Import ${what}? This REPLACES this workspace's machine — its envelope, WCS, macros, variables and`
-            + ' controller are all swapped for the imported ones. Your current workspace is exported first so you can undo.',
+            + ' controller are all swapped for the imported ones.',
             { danger: true, okLabel: 'Replace this machine' },
         );
     } catch (e) { return false; }   // cannot ask → do not swap
     if (!ok) return false;
-    try { await safetyExport(); } catch (e) { /* the export is best-effort; the user already confirmed */ }
-    return true;
+    // t1223 SILENT-DOWNLOAD SWEEP: this used to fire safetyExport() — a .ddcs appearing in Downloads that nobody asked
+    // for. A file the user did not request is not consent and taught them nothing about their state. They now get the
+    // SAME save-first prompt an Open gets, and a download remains only as the no-FSA fallback inside saveWorkspace.
+    try { return await window.ddcsConfirmDiscardBuffer('this machine configuration'); } catch (e) { return true; }
 }
 
 export async function importProfile() {

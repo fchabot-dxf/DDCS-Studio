@@ -59,9 +59,8 @@ import './ui/settingsPanel.js';
 
 // Profile store (one JSON = settings + user variables; pywebview file-I/O ready)
 import './data/profileStore.js';
-// t1217 — THE WORKSPACE'S ONE MACHINE ([[one-workspace-one-machine]]): the .ddcs IS the machine. Importing this also
-// registers the migration; the boot call below collapses a legacy profile library to the single machine record.
-import { migrateProfileLibrary } from './data/workspaceMachine.js';
+// t1217 — THE WORKSPACE'S ONE MACHINE ([[one-workspace-one-machine]]): the .ddcs IS the machine. The record rides the
+// file as its own declared BACKUP_STORES row, and opening a workspace adopts the controller it names.
 
 // Virtual I/O simulation — browser-only mock of hardware handshakes (ATC, drawbar, etc.)
 // Used by the Studio's G-code simulation/preview engine to animate full macro cycles
@@ -76,6 +75,9 @@ import './ui/fileSaveState.js';
 
 // INTENTIONAL SAVE — Ctrl+S / Save writes the whole workspace to a user-owned .ddcs via the File System Access API
 import './ui/workspaceSave.js';
+
+// t1223 — THE WORKSPACE MANAGER: one modal for Save / Save As / Duplicate + the granted-folder card browser (Open).
+import './ui/workspaceManager.js';
 
 // Anonymous, opt-out usage analytics — fires a `visit` on load; see ui/analytics.js
 import './ui/analytics.js';
@@ -134,12 +136,9 @@ class DDCSStudio {
 
     init() {
         console.debug('DDCSStudio.init() start');
-        // t1217 — collapse a legacy profile LIBRARY to this workspace's single machine record. Idempotent, and it does
-        // NOT retarget the controller at boot (the live one already IS this browser's); a RESTORE adopts the file's
-        // controller through the declared `machine` store instead. Non-active legacy profiles are LEFT for one-time
-        // export, so migrating can never lose a machine the user configured.
-        try { migrateProfileLibrary(); } catch (_) { /* a corrupt legacy blob must never block boot */ }
-        
+        // t1223 — the boot-time legacy-library migration is GONE ([[no-legacy-burden]]): nothing to migrate, and it ran
+        // on every single boot forever to serve a one-time case that no longer exists.
+
         // Initialize the global program model and history (undo/redo)
         initProgramModel();
         initSaveStates();

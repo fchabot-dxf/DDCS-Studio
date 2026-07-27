@@ -19,7 +19,6 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
 
         // SEED — write each store's OWN persisted form (localStorage key / the IDB project volume).
         localStorage.setItem('ddcs_studio_settings', JSON.stringify({ machine: { x: 300, y: 300, z: -120 }, atc: { baseVar: 1430, tools: [{ num: 1, name: '6mm Flat', type: 'endmill', dia: 6 }, { num: 2, name: '3mm Ball', type: 'ballnose', dia: 3 }] }, stock: { x: 120, y: 80, z: 20 } }));
-        localStorage.setItem('ddcs_profile_library', JSON.stringify({ activeId: 'p1', profiles: [{ id: 'p1', name: 'My Expert', controllerId: 'ddcs_expert' }, { id: 'p2', name: 'Bench', controllerId: 'generic' }] }));
         localStorage.setItem('ddcs_user_ops', JSON.stringify([{ opType: 'user_myop', label: 'My Op', template: [], bindings: [] }]));
         localStorage.setItem('ddcs_tpl_pocket', JSON.stringify([{ name: 'Roughing', params: { depth: 5 } }]));
         localStorage.setItem('ddcs_vars_persistent', JSON.stringify([{ i: 1, t: 'd', d: 0, n: 'X', isSys: true }, { i: 1500, t: 'd', d: 5, n: 'MyVar', isSys: false }]));
@@ -28,7 +27,6 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
 
         const read = async () => ({
             settings: JSON.parse(localStorage.getItem('ddcs_studio_settings')),
-            profiles: JSON.parse(localStorage.getItem('ddcs_profile_library')),
             userOps: JSON.parse(localStorage.getItem('ddcs_user_ops')),
             presets: JSON.parse(localStorage.getItem('ddcs_tpl_pocket')),
             variables: JSON.parse(localStorage.getItem('ddcs_vars_persistent')),
@@ -40,7 +38,7 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
         const obj = await backup.buildBackup();
         const pv = backup.previewBackup(obj);
         const countOf = (id) => (pv.rows.find((x) => x.id === id) || {}).count;
-        const counts = { settings: countOf('settings'), profiles: countOf('profiles'), projects: countOf('projects'), userOps: countOf('userOps'), presets: countOf('presets'), variables: countOf('variables') };
+        const counts = { settings: countOf('settings'), projects: countOf('projects'), userOps: countOf('userOps'), presets: countOf('presets'), variables: countOf('variables') };
 
         // SAFETY export of the current state (the undo path) BEFORE the wipe.
         await backup.safetyExport();
@@ -68,7 +66,9 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
     // DEEP-EQUAL store by store.
     expect(r.after.settings, 'settings round-trip').toEqual(r.before.settings);
     expect(r.after.settings.atc.tools[0].dia, 'the tool dia round-trips (numeric spot-check)').toBe(6);
-    expect(r.after.profiles, 'profile library round-trip').toEqual(r.before.profiles);
+    // t1223 — the legacy `profiles` store was PURGED ([[no-legacy-burden]]); its assertions are deleted, not bent.
+    // It carried a pre-t1217 profile library so an old .ddcs could still be migrated, and while it existed it rode
+    // inside every NEW .ddcs too. The registry is the thing under test here, so the rows simply drop out of it.
     expect(r.after.userOps, 'custom wizard round-trip').toEqual(r.before.userOps);
     expect(r.after.presets, 'presets round-trip').toEqual(r.before.presets);
     expect(r.after.variables, 'variables round-trip').toEqual(r.before.variables);
@@ -76,11 +76,11 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
     expect(r.wipedProject, 'the wipe really cleared the project').toBeNull();
 
     // PREVIEW COUNTS.
-    expect(r.counts, 'the per-store preview counts').toEqual({ settings: 2, profiles: 2, projects: 1, userOps: 1, presets: 1, variables: 1 });
+    expect(r.counts, 'the per-store preview counts').toEqual({ settings: 2, projects: 1, userOps: 1, presets: 1, variables: 1 });
 
     // SAFETY export exists.
     expect(r.safety, 'a pre-restore safety export was produced (the undo path)').toBe(true);
-    expect(r.res.restored, 'all seeded stores restored').toEqual(expect.arrayContaining(['settings', 'profiles', 'userOps', 'presets', 'variables', 'projects']));
+    expect(r.res.restored, 'all seeded stores restored').toEqual(expect.arrayContaining(['settings', 'userOps', 'presets', 'variables', 'projects']));
 
     // OLDER / PARTIAL backup honesty.
     expect((r.pvPartialRows.find((x) => x.id === 'projects') || {}).present, 'projects absent from the partial backup').toBe(false);
@@ -89,38 +89,11 @@ test('export -> wipe -> restore: every store deep-equals its pre-wipe state; cou
     expect(r.userOpsAfterPartial, 'a store absent from the backup is left UNTOUCHED').toEqual([{ opType: 'user_keep', label: 'Keep' }]);
 });
 
-test('the Settings Backup tab exposes Export + Restore; the restore modal previews stores in both themes', async ({ page }, testInfo) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openSettings && window.openBackupRestore, null, { timeout: 15000 });
-
-    // Settings → Backup tab (asserted). The panel div is display:none until its tab is selected, so wait for it
-    // ATTACHED, then click the tab (via evaluate — works regardless of the active group).
-    await page.evaluate(() => window.openSettings());
-    await page.waitForSelector('#set_tab_backup', { state: 'attached', timeout: 6000 });
-    await page.evaluate(() => { const b = document.querySelector('.settings-tab[data-target="set_tab_backup"]'); if (b) b.click(); });
-    await expect(page.locator('#set_backup_export')).toBeVisible();
-    await expect(page.locator('#set_backup_restore')).toBeVisible();
-
-    // The restore modal, fed a synthetic backup (skips the file picker) — a NEWER one to also exercise the warning.
-    await page.evaluate(async () => {
-        window.__ddcsNoReload = true;
-        const obj = { kind: 'ddcs.backup', v: 1, app: 'V2026.07.13.10', date: '2026-07-13T00:00:00.000Z', stores: { settings: { atc: { tools: [{ num: 1, dia: 6 }, { num: 2, dia: 3 }] } }, profiles: { profiles: [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }] }, projects: [{ path: 'A', type: 'project', data: {} }, { path: 'B', type: 'project', data: {} }] } };
-        await window.openBackupRestore(obj);
-    });
-    const ov = page.locator('#backupRestoreOverlay');
-    await expect(ov).toBeVisible();
-    await expect(ov, 'settings tool count').toContainText('2 tools');
-    await expect(ov, 'profiles count').toContainText('3 profiles');
-    await expect(ov, 'projects count').toContainText('2 projects');
-    await expect(ov, 'absent stores are shown honestly, not omitted').toContainText('not in this backup');
-
-    for (const theme of ['studio', 'futuristic']) {
-        await page.evaluate((t) => document.body.setAttribute('data-theme', t), theme);
-        await page.waitForTimeout(90);
-        await ov.screenshot({ path: testInfo.outputPath(`backup-restore-${theme}.png`) });
-    }
-});
-
+/**
+ * t1223 — the store-picker test is REMOVED with the picker itself. Opening a workspace is now always the WHOLE file
+ * (ui/workspaceManager.js), so there is no per-store preview to tick and nothing here to assert. The manager's own
+ * spec covers the replacement, including that the whole file lands and that an unsaved buffer is prompted once.
+ */
 test('t1137 workspace: the CAM pack rides inside the .ddcs; Save downloads a .ddcs; the UI reframes to Save/Open workspace', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openSettings, null, { timeout: 15000 });

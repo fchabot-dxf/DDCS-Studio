@@ -25,7 +25,7 @@ async function ready(page) {
   await page.waitForFunction(() => window.ddcsSaveWorkspace && window.ddcsFileSavedAt && window.ddcsFileSavedName);
 }
 
-test('FSA save writes the workspace to a user-owned file, reuses the handle, and reads "Saved to <name>"', async ({ page }) => {
+test('FSA save writes the workspace to a user-owned file, reuses the handle, and the disk reads saved + names the file', async ({ page }) => {
   await ready(page);
   await page.evaluate(MOCK_FSA);
 
@@ -45,9 +45,11 @@ test('FSA save writes the workspace to a user-owned file, reuses the handle, and
   expect(second.wrote, 'the file was written again').toBe(2);
 
   // the persistence-A chip reflects the filename
-  const chip = await page.evaluate(() => { const c = document.getElementById('fileSaveChip'); return { saved: c.classList.contains('saved'), text: c.querySelector('.fsc-tx').textContent }; });
-  expect(chip.saved, 'the chip is in the saved state').toBe(true);
-  expect(chip.text, 'the chip names the file').toContain('my-workspace.ddcs');
+  // t1223 — the indicator is a disk BUTTON: the state is its colour class, and the filename lives in the tooltip.
+  const chip = await page.evaluate(() => { const c = document.getElementById('fileSaveChip'); return { saved: c.classList.contains('saved'), title: c.title, label: c.textContent.trim() }; });
+  expect(chip.saved, 'the disk goes muted/saved').toBe(true);
+  expect(chip.title, 'and its tooltip names the file').toContain('my-workspace.ddcs');
+  expect(chip.label, 'with no label beside the icon').toBe('');
 });
 
 test('Ctrl+S triggers the workspace save (Ctrl+Shift+S forces a re-pick = Save As)', async ({ page }) => {

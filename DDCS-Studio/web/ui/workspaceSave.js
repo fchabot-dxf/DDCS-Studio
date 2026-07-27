@@ -9,6 +9,7 @@
  * SAME file with no re-pick — a real "Save", not "Save As every time".
  */
 import { buildBackup, markWorkspaceSavedToFile, exportEverything } from '../data/backup.js';
+import { setMachineName } from '../data/workspaceMachine.js';   // t1223 — saving names the workspace
 
 const hasFSA = () => typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';   // checked at call time (robust + testable)
 const PICKER_OPTS = { suggestedName: 'workspace.ddcs', types: [{ description: 'DDCS workspace', accept: { 'application/json': ['.ddcs'] } }] };
@@ -38,18 +39,24 @@ async function ensurePermission(h) {
 
 async function writeToHandle(h, text) { const w = await h.createWritable(); await w.write(text); await w.close(); }
 
-/** The deliberate save. `pickNew` forces the picker (Save As). Returns {ok, name, viaFsa, aborted?}. */
-export async function saveWorkspace({ pickNew = false } = {}) {
+/**
+ * The deliberate save. `pickNew` forces the picker (Save As / Duplicate). `suggestedName` seeds the picker's filename —
+ * that is all Duplicate needs, because a duplicate IS a Save As under a different name over the same buildBackup bytes.
+ * Returns {ok, name, viaFsa, aborted?}.
+ */
+export async function saveWorkspace({ pickNew = false, suggestedName = '' } = {}) {
     if (hasFSA()) {
         try {
             if (pickNew || !handle || !(await ensurePermission(handle))) {
-                handle = await window.showSaveFilePicker(PICKER_OPTS);   // throws AbortError if the user cancels
+                const opts = suggestedName ? { ...PICKER_OPTS, suggestedName } : PICKER_OPTS;
+                handle = await window.showSaveFilePicker(opts);   // throws AbortError if the user cancels
                 persistHandle(handle);
             }
             const text = JSON.stringify(await buildBackup(), null, 2);
             await writeToHandle(handle, text);
             const name = handle.name || 'workspace.ddcs';
             markWorkspaceSavedToFile(name);
+            try { setMachineName(name); } catch (_) {}   // t1223 ONE-NAME RULE: the file's stem IS the workspace name
             return { ok: true, name, viaFsa: true };
         } catch (e) {
             if (e && e.name === 'AbortError') return { ok: false, aborted: true };   // user cancelled — do NOT fall back

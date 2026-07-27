@@ -59,17 +59,26 @@ test('a file import ASKS before it swaps, and DECLINING leaves the workspace exa
     expect(after.safety, 'and it does not spam an undo export for a swap that never happened').toBeNull();
 });
 
-test('accepting takes a SAFETY EXPORT first (the undo path), then the swap lands whole', async ({ page }) => {
+test('accepting lands the swap whole — and never downloads a file nobody asked for (t1223 sweep)', async ({ page }) => {
     await bootWithImportBridge(page);
+    // a CLEAN buffer has nothing to protect, so the save-first prompt correctly does not appear; the import confirm is
+    // the only ask. (A dirty buffer gets the three-way prompt — that path is covered in workspace-manager-1223.)
+    await page.evaluate(() => { window.ddcsMarkWorkspaceSaved('before.ddcs'); window.ddcsFileSaveState.refresh(); });
     await autoAppDialog(page, { accept: true });
 
-    const dl = page.waitForEvent('download', { timeout: 8000 });
-    await page.evaluate(async () => { const s = await import('/data/profileStore.js'); await s.importProfile(); });
-    const file = await dl;
+    let downloaded = false;
+    page.on('download', () => { downloaded = true; });
+    const run = page.evaluate(async () => { const s = await import('/data/profileStore.js'); await s.importProfile(); });
+    // if boot left the buffer dirty, the save-first prompt appears — Discard is the "proceed without saving" answer.
+    // (That prompt REPLACING the old silent download is the whole point of the sweep, so answering it is the flow.)
+    const ask = page.locator('.wsm-3way');
+    try { await ask.waitFor({ state: 'visible', timeout: 2500 }); await ask.locator('[data-w3="discard"]').click(); } catch (_) { /* clean buffer → no prompt */ }
+    await run;
+    await page.waitForFunction(() => (window.ddcsGetMachine() || {}).name === 'Imported Rig', null, { timeout: 8000 });
 
     const after = await liveState(page);
-    expect(file.suggestedFilename(), 'the undo path is a real .ddcs of the PREVIOUS workspace').toMatch(/before-open.*\.ddcs$/);
-    expect(after.safety, 'the safety export ran').not.toBeNull();
+    expect(downloaded, 'the silent safety download is GONE — an unasked-for file is not consent').toBe(false);
+    expect(after.safety, 'and nothing pretended to export one').toBeNull();
     expect(after.machine, 'the workspace became the imported machine').toEqual({ name: 'Imported Rig', controllerId: 'ddcs-v41' });
     expect(after.controller, 'including its LIVE controller — the emit follows the imported machine').toBe('ddcs-v41');
     expect(after.envX, 'and the envelope full-swapped in').toBe(642);
@@ -98,85 +107,10 @@ test('an exported bundle takes its whole identity from the machine record (never
 });
 
 /**
- * THE LEGACY-MACHINES DOOR. migrateProfileLibrary deliberately refuses to delete the non-active profiles from the
- * retired library — losing a machine the user configured is not an acceptable migration cost. That promise is only
- * worth something if the user can act on them, so this is the surface where each is resolved. Resolving the LAST one
- * clears the zombie library key, which is what stops it riding inside every future .ddcs as a legacy `profiles` row.
+ * t1223 — TWO TESTS REMOVED HERE ([[no-legacy-burden]]), not bent:
+ *   · "leftover legacy machines surface in Settings…" — the legacy-machines door is purged.
+ *   · "a legacy machine exports to a file the app can actually READ BACK…" — machineConfigFile and the whole
+ *     .ddcsmachine.json format are purged with it.
+ * Both covered features that existed only to carry a pre-t1217 browser across the pivot. The import SAFETY they
+ * shared (confirm + automatic undo copy) is still covered by the tests above, which test the live import path.
  */
-test('leftover legacy machines surface in Settings, resolve one at a time, and the last one clears the zombie key', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openSettings && window.ddcsGetMachine);
-    await page.evaluate(() => {
-        localStorage.setItem('ddcs_machine', JSON.stringify({ name: 'Active Rig', controllerId: 'ddcs-expert-m350' }));
-        localStorage.setItem('ddcs_profile_library', JSON.stringify({ activeId: 'p1', profiles: [
-            { id: 'p1', name: 'Active Rig', controllerId: 'ddcs-expert-m350', settings: {}, userVars: [] },
-            { id: 'p2', name: 'Old Bee', controllerId: 'ddcs-v41', settings: { machine: { x: 300 } }, userVars: [] },
-            { id: 'p3', name: 'Old Router', controllerId: 'generic', settings: {}, userVars: [] },
-        ] }));
-    });
-    await autoAppDialog(page, { accept: true });
-    await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
-    await page.waitForSelector('#set_legacy_machines', { state: 'visible', timeout: 8000 });
-
-    // the two NON-active machines are offered; the adopted one is not (it IS this workspace)
-    await expect(page.locator('#set_legacy_list [data-legacy-save]'), 'one row per leftover machine').toHaveCount(2);
-    await expect(page.locator('#set_legacy_list')).toContainText('Old Bee');
-    await expect(page.locator('#set_legacy_list')).toContainText('Old Router');
-    await expect(page.locator('#set_legacy_list'), 'this workspace\'s OWN machine is not a leftover').not.toContainText('Active Rig');
-
-    // EXPORT the first → a machine-config file the user owns, and that entry is resolved
-    const dl = page.waitForEvent('download', { timeout: 8000 });
-    await page.locator('#set_legacy_list [data-legacy-save]').first().click();
-    const file = await dl;
-    expect(file.suggestedFilename(), 'exports as a machine-config file').toMatch(/\.ddcsmachine\.json$/);
-    await expect(page.locator('#set_legacy_list [data-legacy-save]'), 'the exported machine is resolved').toHaveCount(1);
-    expect(await page.evaluate(() => localStorage.getItem('ddcs_profile_library')),
-        'one still unresolved → the library key must NOT be cleared yet').not.toBeNull();
-
-    // DISMISS the last one → the whole zombie key goes and the section hides
-    await page.locator('#set_legacy_list [data-legacy-drop]').first().click();
-    await expect(page.locator('#set_legacy_machines'), 'nothing left to resolve → the section hides itself').toBeHidden();
-    expect(await page.evaluate(() => localStorage.getItem('ddcs_profile_library')),
-        'the zombie library key is gone, so it stops riding inside every future .ddcs').toBeNull();
-});
-
-/**
- * t1219 — THE EXPORTED MACHINE-CONFIG FILE MUST ACTUALLY BE READABLE.
- *
- * The legacy door writes a file and then DELETES the in-app record, so if that file cannot be read back the identity
- * is gone for good. It originally carried the name/controller ONLY as a nested `machine:{…}`, which no reader looks
- * at — the importer reads the TOP LEVEL — so a perfect-looking export re-imported as an unnamed machine on whatever
- * controller the receiving workspace happened to be. This drives the real bytes through the real importer.
- */
-test('a legacy machine exports to a file the app can actually READ BACK (identity and all)', async ({ page }) => {
-    await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsGetMachine && window.ddcsSetMachine);
-
-    // the exact bytes the Settings door writes, for a machine on a controller the workspace is NOT on
-    const body = await page.evaluate(async () => {
-        const wm = await import('/data/workspaceMachine.js');
-        return wm.machineConfigFile({
-            id: 'p2', name: 'Old Bee', controllerId: 'ddcs-v41',
-            settings: { machine: { x: 321, y: 200, z: -80, show: true } }, userVars: [],
-        });
-    });
-    expect(JSON.parse(body).kind, 'it is a machine-config file').toBe('ddcs.machine');
-
-    // this workspace is a DIFFERENT machine; now open that file through the REAL import path
-    await page.evaluate((json) => {
-        window.ddcsSetMachine({ name: 'Receiving Rig', controllerId: 'ddcs-expert-m350' }, true);
-        window.ddcsGetSettings().machine = { x: 500, y: 400, z: -120, show: true };
-        window.pywebview = { api: { loadProfile: async () => json } };
-    }, body);
-    await autoAppDialog(page, { accept: true });
-    await page.evaluate(async () => { const s = await import('/data/profileStore.js'); await s.importProfile(); });
-
-    const after = await page.evaluate(async () => {
-        const { getActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
-        return { machine: window.ddcsGetMachine(), controller: (getActiveProfile() || {}).id, envX: window.ddcsGetSettings().machine.x };
-    });
-    expect(after.machine, 'the exported identity survives the round trip — NOT blank, NOT the receiving machine')
-        .toEqual({ name: 'Old Bee', controllerId: 'ddcs-v41' });
-    expect(after.controller, 'and the live controller became the imported one').toBe('ddcs-v41');
-    expect(after.envX, 'along with its settings').toBe(321);
-});

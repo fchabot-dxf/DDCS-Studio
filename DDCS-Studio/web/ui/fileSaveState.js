@@ -4,8 +4,8 @@
  * PRINCIPLE (user): unsaved data is TEMPORARY, even when auto-saved to localStorage — localStorage is a working buffer,
  * only a .ddcs FILE counts as saved. The workspace auto-saves to localStorage ONLY; a .ddcs is its sole PORTABLE copy.
  * This surfaces that state so the user KNOWS when their work lives only in this browser:
- *   - a header chip with TWO honest states — dirty = "Temporary — not saved to a file"; clean-with-a-prior-file-save =
- *     "Saved to file · Nm ago" (a never-file-saved clean workspace stays hidden). Click = Save workspace.
+ *   - ONE header DISK BUTTON (t1223): accent = unsaved, muted = saved, click = Save. Its tooltip is the filename plus
+ *     the dialect; the name itself is displayed where there is room for it (the workspace modal, the Settings band).
  *   (t1221 — there is deliberately NO exit warning. The buffer survives a reload/close, so a leave prompt would warn
  *   about a loss that does not happen; the chip tells the truth without blocking the gesture.)
  *
@@ -14,43 +14,33 @@
  * localStorage-vs-.ddcs AWARENESS layer only. The workspace .ddcs is the config/library grain (settings, wizards, CAM
  * pack, presets, layout); the current PROGRAM is the separate .mjson job grain and is not part of this signal.
  */
-import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedAt, fileSavedName } from '../data/backup.js';
+import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedName } from '../data/backup.js';
+import { getMachine } from '../data/workspaceMachine.js';   // t1223 — the tooltip names the file AND the dialect it generates for
+import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 
 let chip = null;
 
-// PRINCIPLE (user): unsaved data is TEMPORARY, even when auto-saved to localStorage — localStorage is a working buffer,
-// only a .ddcs FILE counts as saved. The badge reflects that: dirty = "Temporary — not saved to a file"; clean-with-a-
-// prior-file-save = "Saved to file · Nm ago"; a never-file-saved clean workspace stays hidden (nothing to report yet).
-function agoText(ms) {
-    const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
-    if (s < 45) return 'just now';
-    const m = Math.round(s / 60);
-    if (m < 60) return m + 'm ago';
-    const h = Math.round(m / 60);
-    if (h < 24) return h + 'h ago';
-    return Math.round(h / 24) + 'd ago';
-}
-
+/**
+ * t1223 (5, user-refined) — ONE DISK BUTTON. Always present, because it is the Save control as well as the indicator.
+ * The COLOUR is the whole state (accent = unsaved, muted = saved), and the TOOLTIP is the filename plus the dialect it
+ * generates for — the two facts you actually want when hovering a save button. No label, no timestamp, no dot: the
+ * fat pill spelled out in prose what one colour already says, and a timestamp nobody asked for kept re-rendering.
+ * The NAME lives where there is room to read it — the workspace modal and the Settings identity band.
+ */
 function refresh() {
     const dirty = isWorkspaceDirtyToFile();
     if (!chip) return dirty;
-    const savedAt = fileSavedAt();
-    const tx = chip.querySelector('.fsc-tx');
-    if (dirty) {
-        chip.hidden = false;
-        chip.classList.add('dirty'); chip.classList.remove('saved');
-        if (tx) tx.textContent = 'Temporary — not saved to a file';
-        chip.title = 'Your work is only in this browser (temporary, auto-saved). It is NOT in a portable file — click to Save workspace to a .ddcs file.';
-    } else if (savedAt) {
-        chip.hidden = false;
-        chip.classList.add('saved'); chip.classList.remove('dirty');
-        const name = fileSavedName();
-        if (tx) tx.textContent = (name ? 'Saved to ' + name : 'Saved to file') + ' · ' + agoText(savedAt);
-        chip.title = 'This workspace was saved to ' + (name || 'a .ddcs file') + ' ' + agoText(savedAt) + '. Click to save again.';
-    } else {
-        chip.hidden = true;   // clean but never saved to a file (fresh default state) — nothing to announce yet
-        chip.classList.remove('dirty', 'saved');
-    }
+    const name = fileSavedName();
+    let dialect = '';
+    try {
+        const cid = getMachine().controllerId;
+        dialect = (CONTROLLER_PROFILES[cid] || {}).name || cid || '';
+    } catch (_) { dialect = ''; }
+    chip.classList.toggle('dirty', dirty);
+    chip.classList.toggle('saved', !dirty);
+    // labelled "Workspace" so the tooltip says WHAT the name is, not just a bare filename floating on a header icon
+    chip.title = 'Workspace: ' + (name || 'not saved yet') + (dialect ? ' · ' + dialect : '');
+    chip.setAttribute('aria-label', dirty ? 'Save workspace (unsaved changes)' : 'Save workspace');
     return dirty;
 }
 

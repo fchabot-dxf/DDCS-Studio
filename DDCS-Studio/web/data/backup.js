@@ -15,7 +15,7 @@
 import { UIUtils } from '../ui/uiUtils.js';
 import { exportAllEntries, importAllEntries } from '../ui/projects/projectStore.js';
 import { loadUserOps } from '../blocks/userOps.js';
-import { getMachine, setMachine, migrateProfileLibrary } from './workspaceMachine.js';   // t1217 — the workspace's ONE machine record (replaces the profile library)
+import { getMachine, setMachine } from './workspaceMachine.js';   // t1217 — the workspace's ONE machine record
 
 export const BACKUP_VERSION = 1;
 const MACRO_KIND = 'ddcs.backup';
@@ -55,9 +55,9 @@ export const BACKUP_STORES = [
       read: () => { try { return getMachine(); } catch (_) { return undefined; } },
       write: (val) => { try { if (val) setMachine(val, true); } catch (_) {} },
       count: (v) => (v && (v.name || v.controllerId) ? 1 : 0) },
-    // LEGACY: pre-t1217 files carry a profile LIBRARY. Kept readable so an old .ddcs still restores — migrateProfileLibrary
-    // adopts its active profile as the machine record and surfaces the rest as one-time machine-config exports.
-    { id: 'profiles', label: 'Profile library (legacy)', ...ls('ddcs_profile_library'), count: (v) => len(v && v.profiles), unit: 'profiles' },
+    // t1223 — the legacy `profiles` row is GONE ([[no-legacy-burden]]). It kept a pre-t1217 profile library readable so
+    // an old .ddcs could still be migrated on open. There is no install base to migrate, and while that row existed it
+    // rode along inside every NEW .ddcs too — the compat surface reproducing itself into files that never needed it.
     {
         id: 'userOps', label: 'Custom wizards', count: (v) => len(v), unit: 'wizards',
         read: ls('ddcs_user_ops').read,
@@ -106,23 +106,8 @@ export async function restoreBackup(obj, selectedIds) {
         if (!Object.prototype.hasOwnProperty.call(stores, s.id)) { skipped.push(s.id); continue; }   // not in this backup → leave untouched
         try { await s.write(stores[s.id]); restored.push(s.id); } catch (_) { skipped.push(s.id); }
     }
-    // t1217 — a LEGACY file (profile library, no machine row) collapses to the single machine record on open, so the
-    // pivot's invariant holds for old workspaces too. Idempotent: a file that already carries `machine` no-ops here.
-    // t1219 — and it ADOPTS that legacy file's machine identity unconditionally (the file IS the machine), retargeting
-    // the live controller. `fileHasMachineRecord` tells it when the newer explicit row already did that job, so a
-    // legacy library riding in the same file can't override it.
-    // Both flags describe the FILE, never the user's SELECTION — that distinction is the whole correctness of this call.
-    //  · fileHasMachineRecord: does the file CARRY a machine row? `machine.read` never returns undefined, so every
-    //    post-t1217 file has one and its absence is exactly what identifies a legacy file. Deriving this from what was
-    //    RESTORED instead would conflate "legacy file" with "the user un-ticked Machine in the restore modal" — and
-    //    then declining the machine would adopt one anyway, from the legacy row, retargeting the live controller.
-    //  · legacyFromFile: did the legacy library come from THIS FILE? migrateProfileLibrary reads the library out of
-    //    localStorage, so without this a restore would adopt the RECEIVING browser's own unresolved leftovers, silently
-    //    reverting a machine rename the user made after boot migration.
-    const fileHasMachine = Object.prototype.hasOwnProperty.call(stores, 'machine') && !!stores.machine;
-    try {
-        migrateProfileLibrary({ fromRestore: true, fileHasMachineRecord: fileHasMachine, legacyFromFile: restored.includes('profiles') });
-    } catch (_) {}
+    // t1223 — the legacy-library migration that used to run here is GONE ([[no-legacy-burden]]). The file's identity
+    // now arrives the one way it should: the declared `machine` row's own write, which adopts the file's controller.
     markWorkspaceSavedToFile();   // the workspace now MATCHES the just-opened .ddcs → clean (persists across the restore reload)
     return { restored, skipped };
 }
@@ -142,6 +127,7 @@ export async function exportEverything() {
 // so a new store is covered automatically and there is no second, divergeable definition of "the workspace state".
 const WATERMARK_KEY = 'ddcs_file_watermark';
 const SAVED_AT_KEY = 'ddcs_file_saved_at';   // epoch-ms of the last REAL .ddcs save/open — set ONLY by a file save, never the boot baseline
+const STORE_MARKS_KEY = 'ddcs_file_store_marks';   // t1223 — per-store signatures at the last save (the delta baseline)
 const SAVED_NAME_KEY = 'ddcs_file_saved_name';   // the last .ddcs file NAME (for the indicator's "Saved to <name>"); optional
 const hash32 = (str) => { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; };
 
@@ -159,11 +145,51 @@ export function workspaceSignature() {
     return hash32(acc);
 }
 
+/**
+ * t1223 — PER-STORE SIGNATURES, the baseline the workspace manager's DELTA is derived from.
+ *
+ * Same principle as `workspaceSignature`, one level finer: a hash PER declared store rather than one over all of them.
+ * That is what lets the manager say WHICH parts changed since the last save instead of only "something did" — and it
+ * is derived from the SAME declared registry, so a new store row shows up in the delta for free, with no second list
+ * to keep in step. The async (IDB projects) store is skipped for the same reason it is skipped there: it has its own
+ * .mjson save grain and its read cannot be done synchronously on a poll.
+ */
+export function storeSignatures() {
+    const out = {};
+    for (const s of BACKUP_STORES) {
+        if (s.async) continue;
+        let v; try { v = s.read(); } catch (_) { continue; }
+        if (v === undefined || (v && typeof v.then === 'function')) continue;
+        try { out[s.id] = hash32(JSON.stringify(v)); } catch (_) { /* unserializable — omit */ }
+    }
+    return out;
+}
+
+/**
+ * Which declared stores DIFFER from the last saved/opened .ddcs → [{ id, label, unit, count, changed }].
+ * `changed` is null when there is no baseline yet (never saved), which the UI must show as "not saved yet" rather than
+ * inventing a "everything changed" that would be equally true and equally useless.
+ */
+export function workspaceDelta() {
+    let base = null;
+    try { base = JSON.parse(localStorage.getItem(STORE_MARKS_KEY) || 'null'); } catch (_) { base = null; }
+    const now = storeSignatures();
+    return BACKUP_STORES.filter((s) => !s.async).map((s) => {
+        let v; try { v = s.read(); } catch (_) { v = undefined; }
+        return {
+            id: s.id, label: s.label, unit: s.unit || '',
+            count: (s.count && v !== undefined) ? s.count(v) : null,
+            changed: base ? (base[s.id] !== now[s.id]) : null,
+        };
+    });
+}
+
 /** Record the current workspace as "saved to file" — called after a .ddcs is written OR opened. Stamps the time so the
  *  indicator can honestly read "Saved to file · Nm ago" (the ONLY thing that counts as saved; localStorage is temporary).
  *  An optional file NAME (from the intentional FSA save) lets the indicator read "Saved to <name>". */
 export function markWorkspaceSavedToFile(name) {
     try { localStorage.setItem(WATERMARK_KEY, String(workspaceSignature())); } catch (_) {}
+    try { localStorage.setItem(STORE_MARKS_KEY, JSON.stringify(storeSignatures())); } catch (_) {}   // t1223 — the per-store delta baseline
     try { localStorage.setItem(SAVED_AT_KEY, String(Date.now())); } catch (_) {}
     try { if (name) localStorage.setItem(SAVED_NAME_KEY, String(name)); else localStorage.removeItem(SAVED_NAME_KEY); } catch (_) {}
     try { window.dispatchEvent(new Event('ddcs:file-state')); } catch (_) {}
@@ -216,4 +242,5 @@ if (typeof window !== 'undefined') {
     window.ddcsMarkWorkspaceSaved = markWorkspaceSavedToFile;
     window.ddcsFileSavedAt = fileSavedAt;
     window.ddcsFileSavedName = fileSavedName;
+    window.ddcsWorkspaceDelta = workspaceDelta;   // t1223 — the manager's per-store delta
 }

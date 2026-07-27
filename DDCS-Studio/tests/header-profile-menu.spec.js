@@ -94,7 +94,7 @@ test('the identity row taps: row → the MACHINE settings, ☁ → connect, ↧ 
     await openMenu(page);
     await page.click('.hq-identity');
     await expect(page.locator('#settings-app')).toBeVisible({ timeout: 6000 });
-    await expect(page.locator('#set_machine_name')).toBeVisible();
+    await expect(page.locator('#set_tab_profile')).toBeVisible();   // t1223 — the name INPUT died with the one-name rule; the panel is the destination
     await page.evaluate(() => window.closeSettings && window.closeSettings());
     await expect(page.locator('#settings-app')).toBeHidden();
 

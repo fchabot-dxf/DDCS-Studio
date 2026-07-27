@@ -509,23 +509,35 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
    `button` skin so the chevron stays flat, not a beveled pill. */
 .hdr-quick { position: relative; display: inline-flex; align-items: center; }
 
-/* PERSISTENCE-A — the file-save status chip. TWO honest states (the user's principle: localStorage is temporary; only
-   a .ddcs FILE counts as saved): .dirty = amber "Temporary — not saved to a file"; .saved = green "Saved to file · Nm
-   ago". Hidden when clean but never yet saved to a file. Click = Save workspace. `--fsc` carries the active accent. */
+/* t1223 — THE PERSISTENCE INDICATOR IS ONE DISK BUTTON (user). The old fat pill carried a dot, a label and a
+   timestamp; the state only ever needed a colour. UNSAVED = accent (asks for attention), SAVED = muted (findable, not
+   shouting). Always present — it is the Save button as well as the indicator — and the tooltip carries the filename +
+   the dialect. Nothing sits beside it: no label, no timestamp, no unasked affordances. */
 .file-save-chip {
-    display: inline-flex; align-items: center; gap: 6px; margin-left: 6px; padding: 3px 10px;
-    --fsc: var(--warn, #eab308);
-    border: 1px solid var(--fsc); border-radius: 999px;
-    background: color-mix(in srgb, var(--fsc) 20%, var(--panel, transparent));
-    color: var(--text-main, #e6edf3); font-size: 11px; font-weight: 600; letter-spacing: .02em; line-height: 1;
-    white-space: nowrap; cursor: pointer; opacity: .95; transition: opacity .12s ease, background .12s ease;
+    /* t1223 (user) — SAME size and style as the header's trash button (.hdr-undo/.hdr-clear): no border, transparent
+       background, a 15px glyph, and only a subtle hover tint. The earlier bordered pill stretched to 53px in a 54px
+       header and read as crammed; matching the existing header chrome is what makes it sit right. */
+    display: inline-flex; align-items: center; justify-content: center; align-self: center; flex: 0 0 auto;
+    padding: 2px 6px; margin-left: 4px; line-height: 1; border: none; border-radius: 4px;
+    background: transparent; cursor: pointer;
+    transition: filter .12s ease, opacity .12s ease, background .12s ease;
 }
-.file-save-chip[hidden] { display: none; }
-.file-save-chip.dirty { --fsc: var(--warn, #eab308); }
-.file-save-chip.saved { --fsc: var(--success, #22c55e); }
-.file-save-chip:hover { opacity: 1; background: color-mix(in srgb, var(--fsc) 32%, var(--panel, transparent)); }
-.file-save-chip .fsc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--fsc); box-shadow: 0 0 4px color-mix(in srgb, var(--fsc) 60%, transparent); }
-@media (max-width: 640px) { .file-save-chip.saved .fsc-tx { display: none; } .file-save-chip.saved { padding: 4px; } }
+/* SAVED — the SAME artwork, drained of colour and contrast: at rest it is a status mark that recedes into the header
+   rather than a control asking to be pressed. */
+.file-save-chip.saved { filter: grayscale(1) contrast(.7); opacity: .5; }
+.file-save-chip.saved:hover { filter: grayscale(.4) contrast(.95); opacity: .95; background: rgba(128,128,128,.15); }
+/* UNSAVED — the full MULTI-COLOUR floppy (blue body, white shutter + label), because this is the state that wants the
+   eye. Same chrome as its neighbours; the colour does the work, not a border. */
+.file-save-chip.dirty { filter: none; opacity: 1; }
+.file-save-chip.dirty:hover { background: rgba(128,128,128,.15); }
+.file-save-chip svg { display: block; }
+/* the header's own button skin out-specifies a bare class, which is why this rendered 31px next to a 24px trash;
+   match the trash's exact box with the same specificity the header uses. */
+.app-header button.file-save-chip, .app-header .hdr-controls button.file-save-chip {
+    font-size: 15px; padding: 2px 6px; line-height: 1; border: none; border-radius: 4px; background: transparent;
+    min-height: 0; height: auto; width: auto; box-shadow: none; text-shadow: none; transform: none;
+}
+@media (max-width: 640px) { .app-header button.file-save-chip { margin-left: 2px; padding: 2px 4px; } }
 .app-header button.hdr-quick-btn {
     position: relative;   /* t748 — anchors the ≥44px hit-area expander (::before) */
     display: inline-flex; align-items: center; justify-content: center;
@@ -620,6 +632,7 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .hq-cloud-badge.connected { opacity: .9; color: #4ade80; }
 
 /* Gcode row: 3 small compact buttons in one horizontal row */
+.hq-ws-row,
 .hq-gcode-row {
     display: flex; gap: 4px; padding: 3px 6px 4px; align-items: center;
 }
@@ -5547,3 +5560,48 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     #setupSheetOverlay .setup-sheet-chrome { display:none !important; }
     #setupSheetOverlay .setup-sheet-page { overflow:visible !important; padding:0 !important; }
 }
+
+/* ── t1223 — THE WORKSPACE MANAGER (ui/workspaceManager.js). One modal, two halves: THIS workspace on top (name,
+   state, what changed since the last save, Save/Save As/Duplicate) and the GRANTED FOLDER below as cards. The card
+   leads with the ENVELOPE because that is what a machine is recognised by, not its filename. ─────────────────── */
+.wsm-overlay { position: fixed; inset: 0; z-index: 13200; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.55); }
+.wsm-modal { width: 100%; max-width: 720px; max-height: calc(100vh - 48px); display: flex; flex-direction: column;
+    background: var(--panel, #1a1f27); color: var(--text-main, #e7edf5); border: 1px solid var(--border, #333a45);
+    border-radius: 8px; box-shadow: 0 12px 40px rgba(0,0,0,.5); overflow: hidden; }
+.wsm-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; letter-spacing: .5px; }
+.wsm-head .wsm-x { background: transparent; border: none; color: var(--text-dim); font-size: 18px; cursor: pointer; }
+.wsm-body { overflow: auto; padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 18px; }
+.wsm-cur-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.wsm-cur-name { font-size: 15px; font-weight: 700; }
+.wsm-state { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.wsm-state.is-saved { color: var(--text-dim); border: 1px solid var(--border); }
+.wsm-state.is-dirty { color: var(--accent, #2d7ff9); border: 1px solid color-mix(in srgb, var(--accent, #2d7ff9) 55%, transparent); background: color-mix(in srgb, var(--accent, #2d7ff9) 12%, transparent); }
+.wsm-cur-when { font-size: 11px; color: var(--text-dim); }
+.wsm-delta { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+.wsm-drow { font-size: 11px; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border); color: var(--text-dim); }
+.wsm-drow.is-chg { color: var(--text-main); border-color: color-mix(in srgb, var(--accent, #2d7ff9) 55%, transparent); background: color-mix(in srgb, var(--accent, #2d7ff9) 12%, transparent); }
+.wsm-dim { font-size: 12px; color: var(--text-dim); }
+.wsm-cur-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.wsm-folder { border-top: 1px solid var(--border); padding-top: 14px; }
+.wsm-folder-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.wsm-folder-path { flex: 1; min-width: 120px; font-size: 12px; color: var(--text-dim); }
+/* t1223 (user) — an OS-style FILE PANEL, not a card grid: a bordered, scrollable list with a column header. */
+.wsm-cards { margin-top: 2px; }
+.wsm-fp { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: color-mix(in srgb, var(--bg, #111) 45%, transparent); }
+.wsm-fp-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; font-size: 11px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; color: var(--text-dim); border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--panel) 70%, transparent); }
+.wsm-fp-list { max-height: 240px; overflow: auto; }
+.wsm-modal .wsm-fp-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 10px; text-align: left;
+    font: inherit; font-size: 12.5px; color: var(--text-main); background: transparent; border: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); cursor: pointer; }
+.wsm-modal .wsm-fp-row:last-child { border-bottom: none; }
+.wsm-modal .wsm-fp-row:hover { background: color-mix(in srgb, var(--accent, #2d7ff9) 14%, transparent); }
+.wsm-modal .wsm-fp-row.is-bad { opacity: .55; cursor: default; }
+.wsm-fp .wsm-c-name { flex: 1 1 40%; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.wsm-fp .wsm-c-env { flex: 0 0 26%; font-weight: 700; }
+.wsm-fp .wsm-c-ctrl { flex: 0 0 22%; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsm-fp .wsm-c-when { flex: 0 0 74px; text-align: right; color: var(--text-dim); font-size: 11px; }
+.wsm-fico { flex: 0 0 auto; }
+.wsm-empty { padding: 14px 10px; font-size: 12px; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 6px; }
+@media (max-width: 640px) { .wsm-overlay { padding: 0; align-items: flex-start; } .wsm-modal { max-width: none; height: 100dvh; max-height: none; border-radius: 0; } }

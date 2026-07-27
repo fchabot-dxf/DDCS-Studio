@@ -181,141 +181,15 @@ test('restoring a workspace ADOPTS the file\'s controller (the file is the machi
 });
 
 /**
- * t1217 — a LEGACY .ddcs (profile library, no machine row) still opens, and collapses to the single machine record.
- * Nothing is lost: the ACTIVE profile becomes the workspace's machine, and non-active profiles stay available as
- * one-time machine-config exports rather than being silently dropped.
- *
- * t1219 — THIS TEST WAS MASKING THE BUG IT EXISTED TO CATCH. It deleted `ddcs_machine` first, which is precisely the
- * condition that let the migration's `!hadRecord` guard pass, and it asserted only the RECORD — never the live
- * controller. So a legacy file could apply its settings/WCS while its machine identity was discarded, leaving the
- * header naming the file's machine and the EMIT still on the receiving browser's dialect. Every case below therefore
- * asserts `getActiveProfile().id` (what actually decides the emitted G-code), not just the stored record.
+ * t1223 — TWO TESTS REMOVED HERE ([[no-legacy-burden]]), not bent:
+ *   · "a legacy workspace restores, adopts the FILE's controller…" and
+ *   · "a restore adopts from the FILE only — not from a declined machine row, and not from local leftovers".
+ * Both exercised migrateProfileLibrary and the legacy `profiles` backup row, which are purged. What they were really
+ * protecting — that opening a workspace adopts the FILE's controller rather than keeping the receiving browser's —
+ * is still covered by "restoring a workspace ADOPTS the file's controller" above, which goes through the declared
+ * `machine` store that is now the only path in.
  */
-test('a legacy workspace restores, adopts the FILE\'s controller (with or without an existing record), and keeps the others exportable', async ({ page }) => {
-  test.setTimeout(120000);
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsRestoreBackup && window.ddcsGetMachine && window.ddcsLegacyMachineConfigs && window.ddcsSetMachine);
 
-  const r = await page.evaluate(async () => {
-    const { getActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
-    const legacyFile = (profiles, activeId) => ({
-      kind: 'ddcs.backup', v: 1, app: 'test', date: new Date().toISOString(),
-      stores: { profiles: { activeId, profiles } },   // NO `machine` row — that absence is what makes a file legacy
-    });
-    const TWO = [
-      { id: 'p1', name: 'Bee', controllerId: 'ddcs-v41', settings: {}, userVars: [] },
-      { id: 'p2', name: 'Router 2', controllerId: 'ddcs-expert-m350', settings: {}, userVars: [] },
-    ];
-    const live = () => ({ machine: window.ddcsGetMachine(), controller: (getActiveProfile() || {}).id });
-
-    // CASE A — a browser with NO machine record yet (the original, easy case)
-    localStorage.removeItem('ddcs_machine');
-    localStorage.removeItem('ddcs_profile_library');
-    window.ddcsSetMachine({ controllerId: 'ddcs-expert-m350' }, true);   // live controller ≠ the file's
-    localStorage.removeItem('ddcs_machine');                             // …but still no RECORD
-    await window.ddcsRestoreBackup(legacyFile(TWO, 'p1'));
-    const a = { ...live(), pending: window.ddcsLegacyMachineConfigs().map((p) => p.name) };
-
-    // CASE B — THE BLOCKER: a browser that ALREADY has a machine record, on a different controller.
-    localStorage.removeItem('ddcs_profile_library');
-    window.ddcsSetMachine({ name: 'Other', controllerId: 'ddcs-expert-m350' }, true);
-    const bBefore = live();
-    await window.ddcsRestoreBackup(legacyFile(TWO, 'p1'));
-    const b = { ...live(), pending: window.ddcsLegacyMachineConfigs().map((p) => p.name) };
-
-    // CASE C — the single-profile sub-case: nothing is left pending, so the zombie library key must clear, and the
-    // file's identity must have been adopted BEFORE that cleanup (it used to be discarded silently).
-    localStorage.removeItem('ddcs_profile_library');
-    window.ddcsSetMachine({ name: 'Other', controllerId: 'ddcs-expert-m350' }, true);
-    await window.ddcsRestoreBackup(legacyFile([{ id: 'solo', name: 'Solo Rig', controllerId: 'ddcs-v41', settings: {}, userVars: [] }], 'solo'));
-    const c = { ...live(), libKey: localStorage.getItem('ddcs_profile_library') };
-
-    return { a, bBefore, b, c };
-  });
-
-  // CASE A
-  expect(r.a.machine.name, 'A: the ACTIVE legacy profile became this workspace\'s machine').toBe('Bee');
-  expect(r.a.machine.controllerId, 'A: with its controller').toBe('ddcs-v41');
-  expect(r.a.controller, 'A: and the LIVE controller followed the file').toBe('ddcs-v41');
-  expect(r.a.pending, 'A: the non-active profile is NOT dropped — it stays exportable').toEqual(['Router 2']);
-
-  // CASE B — the blocker
-  expect(r.bBefore.controller, 'B: the browser really was on its own different controller first').toBe('ddcs-expert-m350');
-  expect(r.bBefore.machine.name, 'B: …and really did already have a machine record').toBe('Other');
-  expect(r.b.machine, 'B: an EXISTING record does not veto the file — the file IS the machine').toEqual({ name: 'Bee', controllerId: 'ddcs-v41' });
-  expect(r.b.controller, 'B: the LIVE controller was retargeted — otherwise the emit keeps the wrong dialect').toBe('ddcs-v41');
-  expect(r.b.pending, 'B: the other machine is still exportable').toEqual(['Router 2']);
-
-  // CASE C — single profile + existing record
-  expect(r.c.machine, 'C: a single-profile legacy file still hands over its identity').toEqual({ name: 'Solo Rig', controllerId: 'ddcs-v41' });
-  expect(r.c.controller, 'C: and its controller').toBe('ddcs-v41');
-  expect(r.c.libKey, 'C: with nothing left to resolve, the zombie library key is cleared').toBeNull();
-});
-
-/**
- * t1219 — THE ADOPTION MUST READ THE FILE, NEVER THE USER'S SELECTION OR THE LOCAL LEFTOVERS.
- *
- * Making a legacy restore adopt unconditionally is right, but "is this a legacy file?" is easy to answer with the
- * wrong signal, and both wrong answers hand the workspace a machine the user never asked for — retargeting the LIVE
- * controller, which is what decides the emitted G-code:
- *   D. deriving it from what was RESTORED conflates "the file had no machine row" with "the user UN-TICKED Machine in
- *      the restore modal" — so declining the file's machine would adopt one anyway, out of the legacy row.
- *   E. the legacy library is read from localStorage, not from the file — so a restore could adopt the RECEIVING
- *      browser's own unresolved leftovers and silently revert a rename the user made after their boot migration.
- */
-test('a restore adopts from the FILE only — not from a declined machine row, and not from local leftovers', async ({ page }) => {
-  test.setTimeout(120000);
-  await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsRestoreBackup && window.ddcsGetMachine && window.ddcsSetMachine);
-
-  const r = await page.evaluate(async () => {
-    const { getActiveProfile } = await import('/shared/js/profiles/controllerProfiles.js');
-    const live = () => ({ machine: window.ddcsGetMachine(), controller: (getActiveProfile() || {}).id });
-    const LEGACY_ROW = { activeId: 'p1', profiles: [
-      { id: 'p1', name: 'Old Bee', controllerId: 'generic', settings: {}, userVars: [] },
-      { id: 'p2', name: 'Old Router', controllerId: 'ddcs-v3-dm500', settings: {}, userVars: [] },
-    ] };
-
-    // D — a TRANSITIONAL file carrying BOTH rows; the user un-ticks Machine to keep their own.
-    localStorage.removeItem('ddcs_profile_library');
-    window.ddcsSetMachine({ name: 'Shop Mill', controllerId: 'ddcs-expert-m350' }, true);
-    await window.ddcsRestoreBackup({
-      kind: 'ddcs.backup', v: 1, app: 'test', date: new Date().toISOString(),
-      stores: { machine: { name: 'Rig A', controllerId: 'ddcs-v41' }, profiles: LEGACY_ROW },
-    }, ['profiles']);   // ← exactly what the restore modal sends when Machine is un-ticked
-    const d = live();
-
-    // E — a MODERN file (no legacy row at all), restored into a browser that still has unresolved leftovers.
-    localStorage.setItem('ddcs_profile_library', JSON.stringify(LEGACY_ROW));
-    window.ddcsSetMachine({ name: 'Renamed After Boot', controllerId: 'ddcs-v41' }, true);
-    await window.ddcsRestoreBackup({
-      kind: 'ddcs.backup', v: 1, app: 'test', date: new Date().toISOString(),
-      stores: { machine: { name: 'Rig A', controllerId: 'ddcs-expert-m350' } },
-    });
-    const e = live();
-
-    return { d, e };
-  });
-
-  // D — declining the machine row must leave THIS workspace's machine alone
-  expect(r.d.machine.name, 'D: un-ticking Machine keeps the user\'s own machine — the legacy row is not a back door').toBe('Shop Mill');
-  expect(r.d.controller, 'D: and the live controller is NOT retargeted by a machine the user just declined').toBe('ddcs-expert-m350');
-
-  // E — the file's own machine row applies; the browser's leftovers must not override it
-  expect(r.e.machine, 'E: the FILE\'s machine row wins; local leftovers do not resurrect an old identity')
-    .toEqual({ name: 'Rig A', controllerId: 'ddcs-expert-m350' });
-  expect(r.e.controller, 'E: with the live controller following the file').toBe('ddcs-expert-m350');
-});
-
-/**
- * t1217 (4) — A CHECKLIST ROW IS SATISFIED BY CONFIRMATION, NOT ONLY BY A DIFF.
- *
- * The Controller row read "was the id key ever written", whose only writer is the select's `change` event — so the very
- * common case (open Settings, see the CORRECT controller, close) could never satisfy it and the row nagged forever with
- * nothing to do. Same shape for Stock: a correct default was indistinguishable from "never looked at it". The user's
- * explicit acknowledgment is now recorded and counts. A genuine value still satisfies the row on its own, so nothing
- * that already passed starts failing.
- */
 test('a confirmed row counts even when the value never changed (and a real value still counts)', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetSettings);
@@ -347,10 +221,7 @@ test('a confirmed row counts even when the value never changed (and a real value
 test('the profile-library surface is GONE from Settings and the machine surface is present', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openSettings && window.ddcsGetSettings && window.ddcsGetMachine);
-  // seed a legacy library, THEN open Settings — a resurrecting reader would rebuild the retired UI from it
-  await page.evaluate(() => localStorage.setItem('ddcs_profile_library', JSON.stringify({
-    activeId: 'p1', profiles: [{ id: 'p1', name: 'Legacy Rig', controllerId: 'ddcs-v41', settings: {}, userVars: [] }],
-  })));
+  // t1223 — the legacy library seed is gone with the library ([[no-legacy-burden]]); nothing reads that key any more.
   await page.evaluate(() => window.openSettings({ group: 'controller', panel: 'set_tab_profile' }));
   await page.waitForSelector('#set_tab_profile', { state: 'visible', timeout: 8000 });
 
@@ -364,8 +235,10 @@ test('the profile-library surface is GONE from Settings and the machine surface 
     del: !!document.getElementById('set_profile_delete'),
     legacyName: !!document.getElementById('set_profile_name'),
     globalLib: !!window.ddcsProfileLib,
-    // PRESENT — the machine surface that replaced it
-    machineName: !!document.getElementById('set_machine_name'),
+    // t1223 ONE-NAME RULE — the machine-NAME input is gone too: the workspace's name IS its filename, shown by the
+    // identity band, and a second place to type it could only ever disagree with the file it names.
+    machineNameInput: !!document.getElementById('set_machine_name'),
+    identityBand: !!document.getElementById('set_identity_band'),
     controllerDropdown: !!document.getElementById('set_profile'),
     // t1221 — "Import from dump" retired: reading this machine's parameters is ONE door (Pull from controller),
     // with the USB file as a transport inside its modal. Assert the door, not the retired second button.
@@ -377,7 +250,8 @@ test('the profile-library surface is GONE from Settings and the machine surface 
   expect(s.saveas || s.browse || s.list || s.newDup || s.newBase || s.del || s.legacyName,
     'no profile-library control survives in Settings').toBe(false);
   expect(s.globalLib, 'window.ddcsProfileLib is gone (the module that auto-created the library is deleted)').toBe(false);
-  expect(s.machineName, 'the machine NAME field is the identity control now').toBe(true);
+  expect(s.machineNameInput, 'there is no machine-name INPUT — the name is the filename (one-name rule)').toBe(false);
+  expect(s.identityBand, 'the identity BAND displays it instead').toBe(true);
   expect(s.controllerDropdown, 'the CONTROLLER dropdown stays — it retargets THIS workspace').toBe(true);
   expect(s.pull, 'the ONE controller-parameter door stays').toBe(true);
   expect(s.dumpGone, 'the second door (Import from dump) is retired — it folded into that modal as a transport').toBe(true);

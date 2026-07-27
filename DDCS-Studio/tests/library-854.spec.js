@@ -15,10 +15,7 @@ async function seed(page) {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.openLibrary, null, { timeout: 15000 });
     await page.evaluate(async () => {
-        localStorage.setItem('ddcs_profile_library', JSON.stringify({ activeId: 'p1', profiles: [
-            { id: 'p1', name: 'Shop Expert', controllerId: 'ddcs_expert', settings: {}, userVars: [] },
-            { id: 'p2', name: 'Bench Router', controllerId: 'generic', settings: {}, userVars: [] },
-        ] }));
+        // t1223 — the legacy profile-library seed is gone with the library itself ([[no-legacy-burden]]).
         const store = await import('/ui/projects/projectStore.js');
         await store.saveProject('Bracket', { kind: 'ddcs.macro', v: 1, name: 'Bracket', stack: [{ type: 'op', opType: 'user_pocket_data' }] });
     });
@@ -72,7 +69,7 @@ test('last-used tab is remembered; the identity row opens the MACHINE settings (
     await page.click('#hdrPostBtn');
     await page.click('#hdrPostMenu [data-profact="browse"]');
     await expect(page.locator('#settings-app')).toBeVisible({ timeout: 6000 });
-    await expect(page.locator('#set_machine_name')).toBeVisible();
+    await expect(page.locator('#set_tab_profile')).toBeVisible();   // t1223 — the name INPUT died with the one-name rule; the panel is the destination
     await expect(page.locator('#libraryOverlay')).toHaveCount(0);
 });
 
