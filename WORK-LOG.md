@@ -16918,3 +16918,120 @@ used to warn about. Asserting the absence alone would have recorded the removal 
 
 GATE after BOTH amendments: FULL unfiltered suite 1520 passed / 0 FAILED / 4 skipped (15.2m, EXIT=0) -- clean, flakes
 included. Branch feat/ddcs-workspace. NO release.
+
+---
+
+## turn 1223 -- TURN A: THE WORKSPACE MANAGER, the legacy purge, and the silent-download sweep.
+
+Eight of the ten dispatched items landed, plus both mid-turn amendments. A2 is deferred per licence; item (8) first-run
+landed only in part and is called out honestly below rather than ticked.
+
+### (9) THE LEGACY PURGE went first, because it DELETES code the rest would otherwise have to work around.
+
+Gone: `migrateProfileLibrary` (boot + restore), the legacy `profiles` BACKUP_STORES row, `machineConfigFile` /
+`legacyMachineConfigs` / `dropLegacyProfile`, the legacy-machines Settings rows, the Open-machine-config reader, and
+the whole `.ddcsmachine.json` format. Most of that I built myself in t1217/t1219 to carry a pre-pivot browser across
+the change; the no-legacy-burden memory (advisor, t1220) rules there is no install base to carry. The `profiles` row is
+the one worth naming: while it existed it rode inside every NEW .ddcs too, so the compat surface was reproducing
+itself into files that never needed it.
+Specs asserting purged behaviour were DELETED with a note saying what went and why (backup-852's profile-library
+assertions, two import-safety tests, two workspace-roundtrip migration tests, the store-picker test) -- not bent into
+passing. Where a test's SUBJECT survived, it was repointed instead: `#set_machine_name` was how two specs proved
+"Settings opened", so they now assert the panel.
+
+### (2)(1)(3) THE MANAGER -- one modal, two entry points, and OPEN means the whole file.
+
+New ui/workspaceManager.js. TOP = this workspace: name, state, the PER-STORE DELTA, Save / Save As… / Duplicate…
+BOTTOM = the granted folder, every value read from the FILES themselves. It shipped as an envelope-first CARD GRID per
+the dispatch, then the user looked at it and asked for an OS-STYLE FILE PANEL instead: a bordered, scrollable list with
+a NAME / ENVELOPE / CONTROLLER / SAVED column header and a document glyph per row. The name leads the row because that
+is what a file browser is; the ENVELOPE keeps the strongest column because that is what a machine is recognised by.
+The delta needed a baseline that did not exist: the watermark was a single hash over all stores, which can only say
+"something changed". `storeSignatures()` + `workspaceDelta()` in backup.js derive it PER declared row from the same
+registry, so a new store row appears in the delta for free and there is no second list to keep in step. `changed` is
+null before the first save, and the UI says "save it once and this will list exactly what changed" rather than
+inventing an "everything changed" that would be true and useless.
+DUPLICATE has no separate mechanism: it is Save As with a `copy-of-<name>` suggestion over the same buildBackup bytes.
+That is why `saveWorkspace` grew `suggestedName` and nothing else.
+OPEN retired ui/backupModal.js entirely -- it WAS the store-picker. A partial restore produced a workspace that was
+neither the file nor what you had.
+
+### (4) THE SWEEP -- and what it says about the safety copy I added last turn.
+
+All three safetyExport sites are off it: the import gate, the pull-Apply (the one I truth-fixed in t1221), and
+backupModal (deleted). They now route to the SAME save-first prompt. Worth recording the reversal honestly: in t1221 I
+argued for making the automatic download real because the UI claimed it; the user's ruling is that an unasked-for file
+in Downloads was never the right protection in the first place -- it is not consent, and it taught nobody anything
+about their state. The prompt does what the download was pretending to do. A download survives ONLY as the no-FSA
+fallback inside saveWorkspace.
+
+### (5) THE DISK BUTTON (amended FIVE times mid-turn) -- and the responsive conflict it created.
+
+The fat pill is gone. One disk icon: muted = saved, accent = unsaved, click = Save, tooltip = FILENAME + DIALECT (the
+second amendment refined tooltip-is-just-the-filename to include the dialect). No label, no timestamp.
+AMENDMENTS 3-5 then replaced the thin line icon with the CLASSIC FLAT FLOPPY (blue rounded body, white shutter with a
+coloured slider notch, white label area) and made the BUTTON-NESS the state: unsaved = full-colour artwork WITH a real
+border/fill affordance, saved = the SAME artwork desaturated and lowered in contrast with the affordance REMOVED, so at
+rest it recedes into the header as a status mark rather than a control. One assertion caught a trap worth recording:
+`getComputedStyle` mid-transition returns the INTERPOLATED filter, so the test was reading a cross-fade frame and
+"proving" the wrong state; it now reads the settled style.
+TOOLTIP CONFLICT, FLAGGED NOT GUESSED: AMEND-2 said "just the filename", the user then told me directly "filename plus
+the dialect", and AMEND-3 says "tooltip stays filename-only". I kept FILENAME + DIALECT (the user's own words to me)
+and am flagging it rather than silently picking the other reading.
+IT DID NOT FIT. "Always present" collided with the 390px header contract, which two specs enforce -- the header was
+already 1px from the edge, and the pill had been HIDDEN when clean. Rather than hide the indicator on the device most
+likely to lose a buffer, the disk goes compact on phones (2px padding, 14px icon), which buys 8px and fits. Measured
+before choosing, rather than guessing which control to sacrifice.
+THEN THE USER SAW IT: "button pill is too tall / looks crammed". Measured rather than nudged — as a flex CHILD of the
+header the button was STRETCHING to 53px inside a 54px header, beside 30px neighbours. Then the final call: make it the
+SAME size and style as the header's TRASH button, keeping the coloured version multi-colour. So the pill is gone
+entirely -- no border, no fill, a 15px glyph with the trash's own `2px 6px` box and hover tint. That needed the
+header's own specificity to land (a bare class rendered 31px beside a 24px trash). The state is now carried purely by
+the artwork: full multi-colour vs desaturated + low-contrast. 53 -> 19, flush with its neighbours.
+
+### (6)(7) THE BAND AND THE ONE-NAME RULE.
+
+A display-only identity band sits above the tab strip: name, controller, envelope, each from its own declared source.
+The machine-name INPUT is deleted -- the workspace's name IS its filename, so `saveWorkspace` calls `setMachineName`
+with the file's stem and a second place to type it could only ever disagree with the file it names.
+
+### TWO THINGS THE SCREENSHOTS CAUGHT (the standing prove-the-wiring rule earning its place again).
+
+  - the folder CARDS rendered as one horizontal line. The app's global button skin sets display:flex, so the card's
+    block children became flex items in a row. Fixed with the specificity to beat it -- and only found by looking.
+  - the file panel's rows and the tooltip label both came from the user LOOKING at real screenshots mid-turn, not from
+    the spec: "too tall", "crammed", "same style as the trash button", "add the label workspace". Every one of those
+    was invisible in green tests.
+  - the three-way prompt borrowed `class="app-dialog"` from ui/dialog.js. That made it answerable by anything driving
+    dialogs generically: the test helper clicked its last button ("Save and continue") and hung the flow. Renamed to
+    its own class. Borrowing another component's class is a coupling, not a shortcut.
+
+### NOT DONE -- stated plainly.
+
+(8) FIRST RUN is only PARTLY landed: the app opens usable on the buffer, the disk reads "Not saved yet", the manager
+says "Untitled workspace", and the first Save picks name + location through the FSA dialog. What is NOT built is the
+dispatched "asks the name + the folder ONCE" -- the first save does not also grant the workspaces folder, so a new user
+still picks the folder separately in the manager. Flagged, not faked.
+(10) A2 the gateway mismatch gate: DEFERRED per the licence, along with browser polish. It still carries the fix for
+the eng-alone-assumed-DM500 reachability I flagged in t1221.
+
+### A PROCESS CORRECTION I MADE MID-TURN, worth recording because it cost real time.
+
+The dispatch said "GATE: FULL unfiltered suite", and I ran it -- then re-ran it after EVERY amendment, six launches of a
+~15-minute suite for what were, by the end, style tweaks (pill height, glyph, tooltip wording). Re-reading the worker
+skill mid-turn surfaced the rule I was breaking: per-pass gates run the FAST tier (smoke + the specs the change
+touches); the FULL suite is the ADVISOR'S merge gate, and absorbing an amendment re-gates at the fast tier ONLY. The
+skill is explicit that a dispatch demanding a full run per change should be FLAGGED, not obeyed. Flagging it here.
+
+THE FAST TIER THEN CAUGHT THREE THINGS THE FULL RUNS HAD NOT, because they were consequences of the last amendments:
+  - the new workspace row reused `hq-gcode-row`, so the menu-diet assert counted TWO gcode rows. A workspace row is not
+    a gcode row; it has its own class now, sharing the styling.
+  - the pull-Apply spec still asserted the automatic silent export the sweep had removed.
+  - and the one that matters: the import modal's FOOTER still read "A safety copy of your workspace is saved
+    automatically before applying" -- a claim the sweep had made FALSE. The test was green because it asserted the
+    string, not the truth of it. It now states what the app does: you are asked to save first. This is the same class
+    of defect I fixed in t1221 (the claim outrunning the code), reintroduced by my own sweep and caught by re-reading.
+
+GATE (fast tier, per the skill): smoke 59/59 + the 15 touched specs 45/45. The FULL suite is the advisor's merge gate;
+the last full run I completed this turn was green before the final amendments (glyph/tooltip/file-panel), which are
+UI-only and covered by the touched specs above. Branch feat/ddcs-workspace. NO release.
