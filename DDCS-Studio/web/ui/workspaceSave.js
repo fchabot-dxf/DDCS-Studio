@@ -14,7 +14,7 @@
  * with no dialog — a real "Save". Opening a workspace RETARGETS that handle (see ui/workspaceManager.js), because a
  * save that still points at the previously-open file would silently overwrite it with someone else's contents.
  */
-import { buildBackup, markWorkspaceSavedToFile, exportEverything, fileSavedName } from '../data/backup.js';
+import { buildBackup, markWorkspaceSavedToFile, exportEverything, fileSavedName, fileSavedPlace } from '../data/backup.js';
 import { setMachineName } from '../data/workspaceMachine.js';   // t1223 — saving names the workspace
 import { getHandle, putHandle, requestHandle, FILE_KEY, FOLDER_KEY } from '../data/fsHandles.js';
 import { dlgConfirm } from './dialog.js';
@@ -44,10 +44,11 @@ async function writeToHandle(h, text) { const w = await h.createWritable(); awai
  * THE FIRST-SAVE / SAVE-AS FLOW — name + folder in ONE dialog.
  * Resolves { name, dir } (dir may be null when this browser cannot grant folders), or null if the user backs out.
  */
-function askNameAndFolder(suggested, folder) {
+function askNameAndFolder(suggested, folder, place = 'local') {
     return new Promise((resolve) => {
         let dir = folder, folderRefused = false;
-        const wantFolder = () => !dir && canPickFolder() && !folderRefused;
+        // t1233 — a CLOUD save has no folder half: Drive's app folder is the one place, so the ask is just the name.
+        const wantFolder = () => place !== 'cloud' && !dir && canPickFolder() && !folderRefused;
         const ov = document.createElement('div');
         ov.className = 'wss-ask';   // its OWN class — never `app-dialog`, which generic dialog drivers answer for you
         ov.id = 'wssAsk';
@@ -61,7 +62,9 @@ function askNameAndFolder(suggested, folder) {
                 <button type="button" class="toolbar-btn settings-io" data-wss="save" style="border-color:var(--accent);"></button>
             </div></div>`;
         const paint = () => {
-            ov.querySelector('#wssFolder').innerHTML = dir
+            ov.querySelector('#wssFolder').innerHTML = place === 'cloud'
+                ? '<span class="wss-dim">It will be saved to your Google Drive, in the DDCS Studio folder.</span>'
+                : dir
                 ? `<span class="wss-dim">Folder</span> <b>📁 ${esc(dir.name || 'workspaces')}</b>`
                   + (canPickFolder() ? ' <button type="button" class="wss-link" data-wss="folder">Change…</button>' : '')
                 : (wantFolder()
@@ -77,6 +80,7 @@ function askNameAndFolder(suggested, folder) {
         const commit = async () => {
             const name = stemOf(ov.querySelector('#wssName').value);
             if (!name) { ov.querySelector('#wssName').focus(); return; }
+            if (place === 'cloud') { done({ name, dir: null, place: 'cloud' }); return; }
             if (wantFolder()) {
                 // A REFUSED folder must never dead-end. Backing out of the OS folder dialog (or an environment that
                 // refuses it outright — headless Chromium aborts it instantly, and so do some embedded webviews) used
@@ -125,7 +129,12 @@ async function fileInFolder(dir, name) {
  * all Duplicate needs, because a duplicate IS a Save As under a different name over the same buildBackup bytes.
  * Returns {ok, name, viaFsa, aborted?}.
  */
-export async function saveWorkspace({ pickNew = false, suggestedName = '' } = {}) {
+export async function saveWorkspace({ pickNew = false, suggestedName = '', to = '' } = {}) {
+    // t1233 — WHERE does this workspace live? An explicit `to` (the manager's active tab) wins; otherwise a plain Save
+    // goes back where it came from, so a cloud workspace re-saves to the cloud with no dialog, exactly like a local one.
+    const place = to || fileSavedPlace();
+    if (place === 'cloud') return saveToCloud({ pickNew, suggestedName });
+
     // RE-SAVE: a remembered, still-permitted handle writes in place with no dialog at all.
     if (!pickNew && handle && await requestHandle(handle)) {
         try { return await writeTo(handle, handle.name || 'workspace.ddcs'); }
@@ -160,6 +169,35 @@ export async function saveWorkspace({ pickNew = false, suggestedName = '' } = {}
     try { setMachineName(fileName); } catch (_) {}
     await exportEverything(fileName);
     return { ok: true, name: fileName, viaFsa: false };
+}
+
+/**
+ * SAVE TO THE CLOUD (t1233) — the same act, a different shelf.
+ *
+ * REUSED, not rebuilt: ui/cloud/googleDrive.js already had the whole Drive path (ensureRoot / write / the GIS token +
+ * silent refresh) from the retired project-cloud doors. All this does is hand it a WHOLE .ddcs instead of a project
+ * bundle — the bytes are the same buildBackup the local save writes, so a workspace is the same file wherever it sits.
+ * The ORDER is the local one, for the same reason: name first, then bytes, then the save baseline.
+ */
+async function saveToCloud({ pickNew = false, suggestedName = '' } = {}) {
+    let name = stemOf(suggestedName) || stemOf(fileSavedName());
+    if (pickNew || !name) {
+        const picked = await askNameAndFolder(name || 'workspace', null, 'cloud');
+        if (!picked) return { ok: false, aborted: true };
+        name = picked.name;
+    }
+    const fileName = name + '.ddcs';
+    try {
+        const drive = await import('./cloud/googleDrive.js');
+        const root = await drive.ensureRoot();
+        try { setMachineName(fileName); } catch (_) {}                 // 1. the file carries this file's name
+        const obj = await buildBackup();                               // 2. build AFTER the stamp
+        await drive.write(fileName, obj, root);
+        markWorkspaceSavedToFile(fileName, 'cloud');                   // 3. baseline LAST, and it records WHERE
+        return { ok: true, name: fileName, viaFsa: false, place: 'cloud' };
+    } catch (e) {
+        return { ok: false, error: (e && e.message) || String(e), place: 'cloud' };
+    }
 }
 
 /**

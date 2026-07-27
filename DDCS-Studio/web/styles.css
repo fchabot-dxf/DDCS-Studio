@@ -5581,6 +5581,19 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wsm-dim { font-size: 12px; color: var(--text-dim); }
 .wsm-cur-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .wsm-folder { border-top: 1px solid var(--border); padding-top: 14px; }
+/* t1233 — WHERE workspaces live: a tab pair over the same table. Local folder | Cloud. */
+.wsm-places { display: flex; gap: 4px; margin-bottom: 10px; }
+.wsm-modal .wsm-place {
+    font: inherit; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px 6px 0 0;
+    border: 1px solid transparent; border-bottom: none; background: transparent; color: var(--text-dim); cursor: pointer;
+}
+.wsm-modal .wsm-place:hover { color: var(--text-main); }
+.wsm-modal .wsm-place.is-active {
+    color: var(--text-main); border-color: var(--border);
+    background: color-mix(in srgb, var(--accent, #2d7ff9) 12%, transparent);
+}
+.wsm-origin { font-family: ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
+.wsm-folder-head[hidden] { display: none; }
 .wsm-folder-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .wsm-folder-path { flex: 1; min-width: 120px; font-size: 12px; color: var(--text-dim); }
 /* t1223 (user) — an OS-style FILE PANEL, not a card grid: a bordered, scrollable list with a column header. */

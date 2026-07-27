@@ -25,6 +25,7 @@ import { getHandle, putHandle, handleGranted, FOLDER_KEY } from '../data/fsHandl
 import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
 import { dlgNotice, dlgConfirm } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
+import { getAccount, connect } from './cloudAccount.js';   // t1233 — the SAME sign-in Settings and the drawer use
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
@@ -109,22 +110,31 @@ export async function readWorkspaceFile(file) {
     return { obj };
 }
 
-/** Read one .ddcs and summarize it for a row — every value from the FILE itself, never from this browser's state. */
+/**
+ * ONE ROW SUMMARY for a workspace, wherever it lives (t1233). The local panel reads a FILE handle and the cloud panel
+ * reads Drive JSON, but what a row SAYS about a machine is one function — so a workspace cannot look like two different
+ * machines depending on which tab you are on.
+ */
+function summarizeWorkspace(name, obj, extra) {
+    const st = (obj && obj.stores) || {};
+    const mach = st.machine || {};
+    const mm = (st.settings && st.settings.machine) || {};
+    return {
+        name, ...extra,
+        envelope: envelopeSummary(mm),   // t1231 — signs INCLUDED: the sign declares the home end, so stripping it hid the machine
+        dialect: (CONTROLLER_PROFILES[mach.controllerId] || {}).name || mach.controllerId || null,
+        savedAt: (obj && obj.date) || null,
+    };
+}
+
+/** Read one LOCAL .ddcs and summarize it — every value from the FILE itself, never from this browser's state. */
 async function cardFor(fileHandle) {
     const name = fileHandle.name.replace(/\.ddcs$/i, '');
     try {
         const file = await fileHandle.getFile();
         const { obj, error } = await readWorkspaceFile(file);
         if (error) return { name, handle: fileHandle, invalid: true, reason: error };
-        const st = obj.stores || {};
-        const mach = st.machine || {};
-        const mm = (st.settings && st.settings.machine) || {};
-        return {
-            name, handle: fileHandle,
-            envelope: envelopeSummary(mm),   // t1231 — signs INCLUDED: the sign declares the home end, so stripping it hid the machine
-            dialect: (CONTROLLER_PROFILES[mach.controllerId] || {}).name || mach.controllerId || null,
-            savedAt: obj.date || null,
-        };
+        return summarizeWorkspace(name, obj, { handle: fileHandle });
     } catch (_) { return { name, handle: fileHandle, invalid: true }; }
 }
 
@@ -151,14 +161,63 @@ async function listWorkspaces(dir) {
 async function openWorkspaceFile(file, label, fileHandle) {
     const { obj, error } = await readWorkspaceFile(file);   // ONE reader: the panel row and this door refuse for the same reason
     if (error) { dlgNotice(error); return false; }
+    return openWorkspaceObject(obj, file.name, label, { handle: fileHandle || null, place: 'local' });
+}
+
+/**
+ * THE OPEN ITSELF (t1233) — shared by both places. A workspace from Drive is the same bytes as a workspace from the
+ * folder, so it gets the same whole-file restore, the same save-first prompt and the same one-name stamp; only the
+ * SAVE TARGET differs (an FSA handle locally, the Drive app folder in the cloud), and that is recorded so a plain Save
+ * afterwards goes back where the workspace came from. NO WRITES happen here beyond the user's own save in the prompt.
+ */
+async function openWorkspaceObject(obj, fileName, label, { handle = null, place = 'local' } = {}) {
     if (!(await confirmDiscardBuffer(label || 'a workspace'))) return false;
     await restoreBackup(obj);                       // the WHOLE file, by construction — absent stores reset to default
     // ORDER (t1225): the name is stamped BEFORE the save baseline, or the workspace is dirty the moment it is opened.
-    try { setMachineName(file.name); } catch (_) {}   // ONE-NAME RULE: an OS-renamed file shows its OWN name everywhere
-    markWorkspaceSavedToFile(file.name);            // the buffer now IS this file
-    await adoptSaveHandle(fileHandle || null);      // …and Save writes THIS file from now on
+    try { setMachineName(fileName); } catch (_) {}   // ONE-NAME RULE: a renamed file shows its OWN name everywhere
+    markWorkspaceSavedToFile(fileName, place);      // the buffer now IS this file, and we remember WHERE it lives
+    // …and then take the baseline AGAIN, because the open is not finished when restoreBackup returns. Adopting the
+    // file's controller re-seeds the variable DB, and variableDB.setControllerVars is ASYNC (it fetches that
+    // controller's variable list before writing) — so on a cross-controller open that write lands AFTER the baseline
+    // and the workspace reads "Unsaved changes" the instant it opens. Measured, not guessed: the delta named
+    // `variables` as the only changed store. Its own completion signal is what we wait for.
+    await controllerSettled();
+    markWorkspaceSavedToFile(fileName, place);
+    await adoptSaveHandle(handle || null);          // …and Save writes THIS file (a cloud open has no local handle)
     if (!window.__ddcsNoReload) location.reload();
     return true;
+}
+
+/** Resolve when the controller retarget's variable re-seed has landed (or promptly, if nothing is re-seeding). */
+function controllerSettled(cap = 900) {
+    return new Promise((resolve) => {
+        let done = false;
+        const finish = () => { if (done) return; done = true; window.removeEventListener('variableDB:ready', finish); resolve(); };
+        window.addEventListener('variableDB:ready', finish);
+        setTimeout(finish, cap);   // never hang an open on a signal that may not come
+    });
+}
+
+// ── THE CLOUD SHELF (t1233) — Google Drive as another place workspaces live ─────────────────────────────────────
+// REUSED WHOLESALE from the retired project-cloud doors: ui/cloud/googleDrive.js (ensureRoot / list / read / write,
+// the GIS token + its silent refresh) and ui/cloudAccount.js (the ONE sign-in Settings and the drawer already use).
+// REBUILT: only `trash()` (the existing del() was a permanent files.delete) and this workspace-shaped listing.
+const drive = () => import('./cloud/googleDrive.js');
+
+async function listCloudWorkspaces() {
+    const d = await drive();
+    const root = await d.ensureRoot();
+    const files = (await d.list(root)).filter((f) => f.type !== 'folder' && /\.ddcs$/i.test(f.name)).slice(0, 60);
+    const cards = await Promise.all(files.map(async (f) => {
+        const name = f.name.replace(/\.ddcs$/i, '');
+        try {
+            const obj = await d.read(f.id);
+            if (!previewBackup(obj).valid) return { name, cloudId: f.id, invalid: true, reason: `“${f.name}” is not a DDCS workspace.` };
+            if (!hasMachineRecord(obj)) return { name, cloudId: f.id, invalid: true, reason: 'This file is from an older format and has no machine record.' };
+            return summarizeWorkspace(name, obj, { cloudId: f.id });
+        } catch (e) { return { name, cloudId: f.id, invalid: true, reason: `“${f.name}” could not be read from Drive.` }; }
+    }));
+    return cards.sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || '')));
 }
 
 /** Does this .ddcs carry the machine row every current workspace has? (identity, not config — see BACKUP_STORES) */
@@ -182,6 +241,10 @@ export async function openWorkspaceManager(focus = 'save') {
         <div class="wsm-body">
             <section class="wsm-current" id="wsmCurrent"></section>
             <section class="wsm-folder">
+                <div class="wsm-places" role="tablist" aria-label="Where workspaces live">
+                    <button type="button" class="wsm-place is-active" data-place="local" role="tab">📁 Local folder</button>
+                    <button type="button" class="wsm-place" data-place="cloud" role="tab">☁ Cloud</button>
+                </div>
                 <div class="wsm-folder-head">
                     <span class="wsm-folder-path" id="wsmFolderPath">No workspace folder yet</span>
                     <button type="button" class="toolbar-btn settings-io" id="wsmPickFolder">📁 Choose folder…</button>
@@ -203,14 +266,16 @@ export async function openWorkspaceManager(focus = 'save') {
         const act = e.target.closest('[data-wsm]');
         if (!act) return;
         const kind = act.dataset.wsm;
-        if (kind === 'save') { const r = await saveWorkspace(); if (r && r.ok) { renderCurrent(ov); } return; }
-        if (kind === 'saveas') { const r = await saveWorkspace({ pickNew: true }); if (r && r.ok) { renderCurrent(ov); } return; }
+        // t1233 — the ACTIVE TAB is where a save goes: on the Cloud tab, Save / Save As / Duplicate write to Drive.
+        const to = ov.__place === 'cloud' ? 'cloud' : '';
+        const after = async (r) => { if (r && r.ok) { renderCurrent(ov); await renderPlace(ov); } if (r && r.error) dlgNotice('Could not save to Drive: ' + r.error); };
+        if (kind === 'save') { await after(await saveWorkspace({ to })); return; }
+        if (kind === 'saveas') { await after(await saveWorkspace({ pickNew: true, to })); return; }
         if (kind === 'duplicate') {
             // DUPLICATE = Save As a copy. There is no separate copy mechanism to keep correct: the bytes are the same
             // buildBackup, and the new file's NAME becomes the copy's name (one-name rule).
             const base = (fileSavedName() || 'workspace').replace(/\.ddcs$/i, '');
-            const r = await saveWorkspace({ pickNew: true, suggestedName: `copy-of-${base}.ddcs` });
-            if (r && r.ok) renderCurrent(ov);
+            await after(await saveWorkspace({ pickNew: true, suggestedName: `copy-of-${base}.ddcs`, to }));
         }
     });
 
@@ -224,11 +289,25 @@ export async function openWorkspaceManager(focus = 'save') {
     // t1227 (user ruling) — the BROWSE… escape is gone: the granted folder is the ONE door. A workspace that lives
     // somewhere else gets dropped into the folder like any other document, which is a thing the OS already does well.
     // (openWorkspaceFile still takes a null handle — that is how it FORGETS a stale save target, not a second door.)
+    // t1233 — THE PLACE TABS. Local folder | Cloud. Same table, same formatter, same open; a different shelf.
+    ov.__place = 'local';
+    ov.querySelector('.wsm-places').addEventListener('click', async (e) => {
+        const t = e.target.closest('[data-place]');
+        if (!t || t.dataset.place === ov.__place) return;
+        ov.__place = t.dataset.place;
+        ov.querySelectorAll('.wsm-place').forEach((b) => b.classList.toggle('is-active', b.dataset.place === ov.__place));
+        await renderPlace(ov);
+    });
+
     ov.querySelector('#wsmCards').addEventListener('click', async (e) => {
+        const signin = e.target.closest('#wsmCloudSignIn');
+        if (signin) { await cloudSignIn(ov); return; }
         const del = e.target.closest('[data-wsm-del]');
         if (del) {
             const c = (ov.__cards || [])[Number(del.dataset.wsmDel)];
-            if (c && ov.__dir) await deleteWorkspaceFile(ov, ov.__dir, c);
+            if (!c) return;
+            if (c.cloudId) await deleteCloudWorkspace(ov, c);
+            else if (ov.__dir) await deleteWorkspaceFile(ov, ov.__dir, c);
             return;
         }
         const card = e.target.closest('[data-wsm-open]');
@@ -237,12 +316,17 @@ export async function openWorkspaceManager(focus = 'save') {
         const card_ = (ov.__cards || [])[idx];
         if (!card_) return;
         if (card_.invalid) { dlgNotice(card_.reason || `“${card_.name}” is not a readable workspace.`); return; }
+        if (card_.cloudId) {   // a cloud row: read it from Drive, then the SAME open
+            try {
+                const obj = await (await drive()).read(card_.cloudId);
+                await openWorkspaceObject(obj, card_.name + '.ddcs', `“${card_.name}”`, { handle: null, place: 'cloud' });
+            } catch (e) { dlgNotice(`“${card_.name}” could not be read from Drive: ${(e && e.message) || e}`); }
+            return;
+        }
         await openWorkspaceFile(await card_.handle.getFile(), `“${card_.name}”`, card_.handle);
     });
 
-    const dir = await getHandle(FOLDER_KEY);
-    if (dir && await handleGranted(dir)) await renderFolder(ov, dir);
-    else renderCards(ov, null, []);
+    await renderPlace(ov);
 
     if (focus === 'open') ov.querySelector('.wsm-folder')?.scrollIntoView({ block: 'nearest' });
     return ov;
@@ -287,18 +371,101 @@ function renderCurrent(ov) {
         </div>`;
 }
 
+/**
+ * Render whichever PLACE is active. Local keeps exactly today's behaviour; cloud lists Drive (or states why it cannot).
+ * Feature-detect and DEGRADE: no folder support, no account, no network — each says which, and none of them throw.
+ */
+async function renderPlace(ov) {
+    const head = ov.querySelector('.wsm-folder-head');
+    const cards = ov.querySelector('#wsmCards');
+    if (ov.__place === 'cloud') {
+        head.hidden = true;
+        const acc = getAccount();
+        if (!acc.connected || acc.provider !== 'google') { renderCloudSignedOut(ov); return; }
+        cards.innerHTML = '<div class="wsm-dim">Reading your Drive…</div>';
+        try { renderCards(ov, null, await listCloudWorkspaces(), 'cloud'); }
+        catch (e) {
+            ov.__cards = [];
+            const why = /cloud-auth/.test(String(e && e.message)) ? 'Your Google sign-in has expired.' : `Drive could not be reached (${(e && e.message) || e}).`;
+            cards.innerHTML = `<div class="wsm-empty">${esc(why)} Your local workspaces are unaffected — switch back to <b>Local folder</b>, or sign in again.`
+                + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="wsmCloudSignIn">Sign in to Google Drive</button></div></div>';
+        }
+        return;
+    }
+    head.hidden = false;
+    const dir = await getHandle(FOLDER_KEY);
+    if (dir && await handleGranted(dir)) await renderFolder(ov, dir);
+    else renderCards(ov, null, []);
+}
+
+/** The signed-out cloud tab: ONE button, and nothing else to decide. */
+function renderCloudSignedOut(ov) {
+    ov.__cards = [];
+    ov.__dir = null;
+    ov.querySelector('#wsmCards').innerHTML =
+        '<div class="wsm-empty">Keep workspaces in your own Google Drive as well as on this machine — the same file, reachable from anywhere you sign in.'
+        + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="wsmCloudSignIn">☁ Sign in to Google Drive</button></div></div>';
+}
+
+/**
+ * Sign in, then show the shelf. THE ORIGIN PROBLEM (user hit a Google 400 origin_mismatch): Google's own page says
+ * nothing a person can act on, and the address it objects to is one we KNOW. So when sign-in fails we name it, in
+ * plain words, instead of leaving them on Google's generic error.
+ */
+async function cloudSignIn(ov) {
+    try { await connect('google'); } catch (_) { /* the shared flow reports its own failures */ }
+    // GIS resolves asynchronously; the account event is the honest signal that it worked.
+    const done = () => { window.removeEventListener('ddcs:cloud-account', done); renderPlace(ov); };
+    window.addEventListener('ddcs:cloud-account', done);
+    setTimeout(() => {
+        window.removeEventListener('ddcs:cloud-account', done);
+        if (getAccount().connected) { renderPlace(ov); return; }
+        ov.querySelector('#wsmCards').innerHTML =
+            `<div class="wsm-empty">Google did not sign you in for this address.<br><br>If you saw a <b>400: origin_mismatch</b>, this exact origin has to be listed under <b>Authorized JavaScript origins</b> on the OAuth client:<br><b class="wsm-origin">${esc(location.origin)}</b><br><br>That is a setting on the Google side, not something the app can change for you.`
+            + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="wsmCloudSignIn">Try again</button></div></div>';
+    }, 20000);
+}
+
+/**
+ * DELETE A CLOUD WORKSPACE — Drive's TRASH, which is recoverable, so the confirm promises something different from the
+ * local one (removeEntry has no trash at all). Fails closed, same as local.
+ */
+async function deleteCloudWorkspace(ov, card) {
+    const fileName = card.name + '.ddcs';
+    const isActive = fileSavedName() === fileName;
+    let ok = false;
+    try {
+        ok = await dlgConfirm(
+            `Move “${fileName}” to your Google Drive trash?\n\n`
+            + 'It leaves this list straight away. Drive keeps trashed files for about 30 days, so you can restore it there if you change your mind.'
+            + (isActive ? '\n\nThis is the workspace you have open. Your work stays open here, but it will no longer be saved to a file.' : ''),
+            { title: 'Move workspace to Drive trash', danger: true, okLabel: 'Move to trash', cancelLabel: 'Cancel' },
+        );
+    } catch (_) { return; }
+    if (!ok) return;
+    try { await (await drive()).trash(card.cloudId); }
+    catch (e) { dlgNotice(`“${fileName}” could not be trashed: ${(e && e.message) || e}`); return; }
+    if (isActive) { forgetWorkspaceFile(); await adoptSaveHandle(null); renderCurrent(ov); }
+    await renderPlace(ov);
+}
+
 async function renderFolder(ov, dir) {
     ov.querySelector('#wsmFolderPath').textContent = dir.name || 'Workspace folder';
     ov.querySelector('#wsmCards').innerHTML = '<div class="wsm-dim">Reading the folder…</div>';
     renderCards(ov, dir, await listWorkspaces(dir));
 }
 
-function renderCards(ov, dir, cards) {
+function renderCards(ov, dir, cards, place = 'local') {
     ov.__cards = cards;
-    ov.__dir = dir;   // the granted folder handle — delete needs it to removeEntry
+    ov.__dir = dir;   // the granted folder handle — delete needs it to removeEntry (null in the cloud: Drive is by id)
     const host = ov.querySelector('#wsmCards');
-    if (!dir) { host.innerHTML = '<div class="wsm-empty">Choose a folder to keep your workspaces in — then opening one is a click, not a file dialog.</div>'; return; }
-    if (!cards.length) { host.innerHTML = '<div class="wsm-empty">No .ddcs workspaces in this folder yet. Save one here and it will show up.</div>'; return; }
+    if (place === 'local' && !dir) { host.innerHTML = '<div class="wsm-empty">Choose a folder to keep your workspaces in — then opening one is a click, not a file dialog.</div>'; return; }
+    if (!cards.length) {
+        host.innerHTML = place === 'cloud'
+            ? '<div class="wsm-empty">No workspaces in your Drive yet. Save one while this tab is open and it will show up here.</div>'
+            : '<div class="wsm-empty">No .ddcs workspaces in this folder yet. Save one here and it will show up.</div>';
+        return;
+    }
     // An OS-style FILE PANEL (user): a bordered, scrollable list with a column header, not a card grid. The ENVELOPE
     // keeps the strongest column because that is what a machine is recognised by; the name leads the row because that
     // is what a file browser is.

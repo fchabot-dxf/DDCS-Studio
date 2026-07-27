@@ -140,6 +140,14 @@ export async function write(name, obj, parentId) {
 }
 
 export async function del(id) { await api(`${API}/files/${id}`, { method: 'DELETE' }); }
+/**
+ * t1233 — TRASH, not delete. `del` above is files.delete: permanent and unrecoverable. Drive's own trash keeps a file
+ * for ~30 days and the user can restore it themselves, which is the honest thing to do with a whole workspace — and it
+ * is what lets the cloud delete confirm promise something DIFFERENT from the local one (removeEntry has no trash).
+ */
+export async function trash(id) {
+    await api(`${API}/files/${id}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+}
 export async function rename(id, name) { await api(`${API}/files/${id}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }); }
 
 /** The signed-in account → { name, email }. about.get works with the drive.file scope (no extra consent). Best-effort. */

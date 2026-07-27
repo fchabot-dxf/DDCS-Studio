@@ -151,6 +151,7 @@ const WATERMARK_KEY = 'ddcs_file_watermark';
 const SAVED_AT_KEY = 'ddcs_file_saved_at';   // epoch-ms of the last REAL .ddcs save/open — set ONLY by a file save, never the boot baseline
 const STORE_MARKS_KEY = 'ddcs_file_store_marks';   // t1223 — per-store signatures at the last save (the delta baseline)
 const SAVED_NAME_KEY = 'ddcs_file_saved_name';   // the last .ddcs file NAME (for the indicator's "Saved to <name>"); optional
+const SAVED_PLACE_KEY = 'ddcs_file_saved_place';   // t1233 — WHERE that file lives: 'local' (a granted folder) | 'cloud' (Drive)
 const hash32 = (str) => { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; };
 
 /** A cheap SYNCHRONOUS content signature of the localStorage-backed workspace stores. Skips the async IDB projects
@@ -214,14 +215,20 @@ export function workspaceDelta() {
  * DELETED the name, leaving the manager to report "Untitled workspace · Saved · nothing has changed" (the state the
  * user screenshotted). A nameless call now records nothing at all rather than half a fact.
  */
-export function markWorkspaceSavedToFile(name) {
+export function markWorkspaceSavedToFile(name, place = 'local') {
     const file = String(name == null ? '' : name).trim();
     if (!file) return;   // not a file save — recording it as one is how the impossible state got made
     try { localStorage.setItem(WATERMARK_KEY, String(workspaceSignature())); } catch (_) {}
     try { localStorage.setItem(STORE_MARKS_KEY, JSON.stringify(storeSignatures())); } catch (_) {}   // t1223 — the per-store delta baseline
     try { localStorage.setItem(SAVED_AT_KEY, String(Date.now())); } catch (_) {}
     try { localStorage.setItem(SAVED_NAME_KEY, file); } catch (_) {}
+    try { localStorage.setItem(SAVED_PLACE_KEY, place === 'cloud' ? 'cloud' : 'local'); } catch (_) {}   // t1233
     try { window.dispatchEvent(new Event('ddcs:file-state')); } catch (_) {}
+}
+
+/** WHERE this workspace's file lives — 'local' (a granted folder) or 'cloud' (Drive). A plain Save goes back there. */
+export function fileSavedPlace() {
+    try { return localStorage.getItem(SAVED_PLACE_KEY) === 'cloud' ? 'cloud' : 'local'; } catch (_) { return 'local'; }
 }
 
 /**
@@ -236,6 +243,7 @@ export function forgetWorkspaceFile() {
     try { localStorage.removeItem(STORE_MARKS_KEY); } catch (_) {}
     try { localStorage.removeItem(SAVED_AT_KEY); } catch (_) {}
     try { localStorage.removeItem(SAVED_NAME_KEY); } catch (_) {}
+    try { localStorage.removeItem(SAVED_PLACE_KEY); } catch (_) {}
     try { window.dispatchEvent(new Event('ddcs:file-state')); } catch (_) {}
 }
 
@@ -280,5 +288,6 @@ if (typeof window !== 'undefined') {
     window.ddcsMarkWorkspaceSaved = markWorkspaceSavedToFile;
     window.ddcsFileSavedAt = fileSavedAt;
     window.ddcsFileSavedName = fileSavedName;
+    window.ddcsFileSavedPlace = fileSavedPlace;   // t1233 — local folder or Drive
     window.ddcsWorkspaceDelta = workspaceDelta;   // t1223 — the manager's per-store delta
 }

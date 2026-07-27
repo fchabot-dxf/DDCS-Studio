@@ -163,6 +163,9 @@ test('DISCARD opens the WHOLE file — every store, no picker', async ({ page })
     expect(after.machine.controllerId, 'including its controller').toBe('ddcs-v41');
     expect(after.envX, 'and its envelope — the whole file, not a chosen subset').toBe(300);
     expect(after.savedName, 'one-name rule: the file it came from is its name').toBe('bench-router.ddcs');
+    // t1233 — a CROSS-CONTROLLER open (expert → V4.1) re-seeds the variable DB asynchronously; the baseline is taken
+    // again once that lands, or a workspace reads "Unsaved changes" the instant it is opened.
+    expect(await page.evaluate(() => window.ddcsWorkspaceDirtyToFile()), 'a just-opened workspace is CLEAN, controller change and all').toBe(false);
 });
 
 test('Settings shows the IDENTITY BAND above the tabs (display only)', async ({ page }, testInfo) => {

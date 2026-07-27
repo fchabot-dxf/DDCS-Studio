@@ -68,6 +68,9 @@ async function openFromFolder(page, name) {
     await page.evaluate(() => window.openWorkspaceManager('open'));
     await page.locator('#wsmPickFolder').click();
     await page.locator(`#wsmCards .wsm-fp-row:has-text("${name}")`).first().click();
+    // wait for the LAST effect of an open, not the first: arming the save handle is the final step (t1233 put the
+    // controller-settle wait in front of it), so anything that reads state before this is reading mid-open.
+    await page.waitForFunction((n) => window.ddcsSaveHandleName() === n + '.ddcs', name, { timeout: 8000 }).catch(() => {});
 }
 
 const readFs = (page) => page.evaluate(() => Object.fromEntries(window.__fs.files));
