@@ -17962,3 +17962,95 @@ cannot be persisted through IndexedDB at all), so it is a FLAG for the advisor, 
 GATE (fast tier): smoke 21 files + library/wizard/CAM/manager specs = 135/135.
 SCREENSHOTS (scratchpad/s1247-*): a .wiz on the folder shelf after exporting it, the imported op's dropdown live on
 the wizard bar, a .cam recipe card reading "2 ops — drill, bore", and the one-step first-save dialog.
+
+---
+
+## turn 1249 -- THE DEPLOY TARGET. The third folder, and the ownership model closes.
+
+    WORKSPACES   where THIS machine's .ddcs lives            -- the workspace IS the machine
+    LIBRARY      where shareable SOURCES live (.wiz / .cam)  -- things you hand to a person
+    DEPLOY       where BAKED OUTPUT goes                     -- things the CONTROLLER eats
+
+Three folders, three questions, and the separation is the point: sharing a wizard with a friend and loading a macro
+onto a controller are different acts, and merging them would put your shareable sources on a stick you are about to
+hand to a machine.
+
+### THE RULE-OF-THREE FIRED, so I built the engine instead of a third copy.
+
+The workspaces folder was the first granted folder, the library folder the second, and I was about to write a third
+near-identical module. That is exactly the case the rule-of-three names, so `data/grantedFolder.js` now holds the
+machinery -- remember the handle, re-grant permission inside a click, list, write, fail closed -- and a folder is a
+DECLARATION: `makeGrantedFolder({key, pickerId, what})`. libraryFolder.js was folded onto it in the same pass (it
+kept only what is library-specific: the declared kinds, the named refusals, the header reads), so this landed as
+ONE engine and two declarations rather than three copies of the same 90 lines. A fourth folder is now a data row.
+
+What I deliberately did NOT fold in: the workspaces folder. It has a richer flow of its own (a save handle, a replace
+prompt, the first-save dialog that grants the folder in the same step), and rewriting a working save path to serve a
+generalisation is the wrong direction. The engine exists to stop the NEXT copy, not to absorb a working one.
+
+### THE ENUMERATION I WAS ASKED FOR -- every download site, and the ruling on each.
+
+ROUTED (baked output; it walks to the machine):
+  - editorManager.downloadFile ............ the program .nc from the editor's Export
+  - macrosApp macfile export (isExport) ... a SYSDISK file -- T.nc, key-N.nc, slib-m.nc -- on the no-LAN transport.
+                                            This is the K-BUTTON path the dispatch named: key-N.nc reaches a file here.
+  - cam_export_pack ....................... the CAM install bundle
+  - settingsPanel atc_dl_tnc .............. T.nc from the ATC tool table
+
+LEFT ALONE, and why -- a download is right for these:
+  - backup.js / wizardManagerPanel / macrosApp .cam ... the .ddcs / .wiz / .cam no-FSA FALLBACKS. Sources, not
+    deploys; each already has its own folder, and the fallback only fires where File System Access does not exist.
+  - settingsPanel + varListPanel ddcs_variables.csv ... a REPORT about the machine, not a file the machine runs.
+    Nothing eats it; it goes to a spreadsheet. Routing it to a stick would be cargo-culting the rule.
+
+### THE BUNDLE DEPLOYS AS A FILE TREE, NOT A ZIP -- and that is the one behaviour change worth arguing.
+
+Same bytes, same file set. But the zip existed only because a download can carry one file, and step 3 of the pack's
+own README is "cursor on the CAM folder" -- so a user unzipped it onto a stick as the first thing they did. Writing
+CAM/ straight onto the granted stick deletes that step. The regression computes the expected macro bodies from the
+same declared sources the exporter reads and compares byte for byte, so this is "identical bytes, better destination"
+and not "some files appeared". The zip remains the no-FSA fallback.
+
+### THE RULES, each with its own test rather than a shared happy path.
+
+  - NO DOWNLOAD when a folder is granted (the download listener counts zero, in two separate tests).
+  - A DECLINED PICKER WRITES NOTHING AND DOWNLOADS NOTHING. This is the one I care about most: turning a refusal into
+    a surprise file in Downloads is the app deciding it knew better than the person who just said no. The fallback is
+    reachable ONLY from "this browser has no File System Access", never from "the user declined".
+  - NAMED REFUSAL on write failure -- a write-protected stick reports the words the OS used, not "write failed".
+  - THE WORD IS "DEPLOYED", NEVER "SAVED" (ruled). The test asserts the message does not contain "saved" at all:
+    saving is what you do to YOUR workspace, and letting both acts share a word is how someone ends up believing
+    their work is safe because a macro reached a stick.
+  - RE-PICK: asked once on the first deploy, remembered after, and Change... forces a fresh picker (a re-pick button
+    that silently reused the remembered folder would look broken).
+
+### PORT ETIQUETTE.
+
+The advisor's full suite was running on the shared mem-server (3211) with bytes preloaded BEFORE my edits, so gating
+against it would have measured stale code. I brought up my own mem-server on 3251 and pointed this turn's specs at it
+via DDCS_BASE, leaving their run untouched. The fast-tier gate over the shared specs waits for their run to finish
+rather than bouncing a server out from under it.
+
+SCREENSHOTS (scratchpad/s1249-*): the Gateway target row before ("not chosen yet — the first deploy will ask (a USB
+stick works: deploys land straight on it)") and after ("📁 USB (E:)" + Change...), and the deploy toast reading
+"Deployed 4 files to USB (E:): CAM/macro_cam22.nc, CAM/macro_cam23.nc, eng-additions.txt, README.txt."
+
+### AMENDMENT (rider) + a race I caused and had to own.
+
+**The rider:** the quick-menu identity line now reads `Workspace: <name> · <dialect> · <lettered envelope>`, matching
+the disk tooltip's wording. Still plain text, still not a button. First attempt reused `.hq-cur` for the label, and a
+spec caught it immediately: the dialect and the envelope are VALUES the line reports, the label is what the line is
+ABOUT, and giving them one class made the two indistinguishable to anything reading the row. Its own class now.
+
+**The race:** the final gate failed `workspace-manager-truth` "reads Saved" — 2 of 3 runs. I stashed my whole change
+set and re-ran: 3 of 3 PASSED without it. So my change caused it, and I went looking rather than re-running until it
+went green. The test's boot() waits for `window.openWorkspaceManager && ddcsFileSaveState && ddcsWorkspaceDirtyToFile`
+— globals that appear EARLY, while boot is still writing stores. Marking "saved" there snapshots a signature that a
+later boot write immediately invalidates, so the workspace reads "Unsaved changes" the instant after being marked
+saved. The suite had been passing on timing luck; one more module in the boot graph was enough to expose it. boot()
+now waits for the stores to STOP CHANGING, read through the SAME declared BACKUP_STORES registry the .ddcs writer
+uses. My first version of that wait read `s.key`, which does not exist (a store row hides its key behind
+read()/write() closures) — it would have been a wait that only ever waited 120ms while looking like it checked
+something, so it reads real store content now. 33/33 across three repeats.
+
+FINAL GATE: 131/131.
