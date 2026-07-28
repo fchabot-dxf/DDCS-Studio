@@ -19966,3 +19966,60 @@ Resolving it moved above the tool block, where the stylus needs it.
 
 Fast tier: smoke 65/65; the new spec 5/5; `lathe-odturn-1273` 18/18; the lathe family 70/70; the recent
 lathe/probe/form specs 36/36.
+
+---
+
+## t1307 — hygiene batch: the ready sweep, the quiet gateway, and 100 lines of insurance that insured nothing
+
+### (1) The ddcs:ready sweep
+
+t1279 declared a boot signal because `window.ddcsStudio` exists LONG before the deferred imports put handlers on the
+header buttons and menus — a click before that lands on a control nobody is listening to, and is simply swallowed.
+The pollution class two turns ago re-motivated it, so the sweep is done.
+
+**Seven specs drove header/menu controls after waiting on `window.ddcsStudio`** and now wait on the declared signal:
+`header-never-clips-748` (4 boot waits), `header-responsive` (3), `project-drawer-smoke`, `settings-modal`,
+`standalone-download`, `ui-presence`, `form-hidden-handle-1303`. The arbitrary `waitForTimeout(150…400)` that
+followed those waits went with them — the signal is what they were approximating.
+
+**Sixteen more wait on a SPECIFIC global they then call** (`openLibrary`, `ddcsEditorFileMenu`, `openSettings`,
+`ddcsRefreshWizardBar`, …) and also click header/menu controls. Those waits are not wrong — they are targeted — so
+they keep them and gain the signal in front: `ddcsReady === '1' && window.openLibrary`. Files: `dev-mode`,
+`editor-chrome`, `editor-file-menu-1227`, `header-account-row-742`, `header-profile-menu`, `io-step-shots`,
+`library-854`, `rate-prompt`, `settings-done-faq`, `settings-ia-regroup-1245`, `setup-sheet-850`,
+`wiz-bar-canvas-route`, `wizard-bar`, `wizard-manager`, `workspace-manager-1223`, `workspace-manager-truth-1231`.
+
+Specs that already declare their own state were left alone, as instructed. Two of the seven are `test.skip`ped and
+were before this turn (`standalone-download`, `project-drawer-smoke`) — noted, not touched.
+
+### (2) The gateway poll: watching without shouting
+
+The user's console filled with a repeating 404 for `/api/descriptor`. The important part of the diagnosis: **that
+line is the browser's own network log, not ours** — the fetch was already caught, and catching it again changes
+nothing. The only lever is how often we ask.
+
+So the poll backs off while nothing answers: 5s, then 10, 20, 30 capped — twelve requests a minute becomes two. The
+chip's job is unchanged and that is the harder half, because a back-off and "it must light the moment a gateway
+appears" pull against each other. They are reconciled by asking on the events that mean a person has just come back
+to the window — `focus`, `visibilitychange`, and the browser's own `online` — which is exactly when someone has
+started a gateway. Throttled, so a flurry of focus events is one request; on success the fast cadence returns, so a
+gateway going away is still noticed as quickly as before.
+
+One ordering detail worth recording: the wait after a failure is the CURRENT delay and the doubling is for the wait
+after that. Written the other way round (double, then schedule) the first retry silently became 10s — measured, not
+guessed, from the request timestamps.
+
+### (3) The fallback wizard block, deleted
+
+~100 lines in index.html installing `openWiz`/`openMiddleWiz`/`openEdgeWiz`/`openAlignmentWiz`/`closeWiz`/
+`insertWiz` at parse time, behind a guard (`if (typeof window.openMiddleWiz !== 'undefined') return`) that could
+never fire — app.js is a module, so it runs afterwards. The real wiring replaced all six a moment later.
+
+Verified before removing, not assumed: every one of the six resolves to the module version once the ready signal
+fires (checked by reading `Function.toString` for the wizardManager call); the three `closeWiz` and one `insertWiz`
+onclicks in the HTML need a user, who cannot click before boot; and no spec reaches them earlier. What the block
+actually did each boot was print "Fallback wizard controls installed" — and leave behind openers that would show a
+bare panel with no wizard behind it if the app HAD failed, which is worse than an honest failure. [[no-legacy-burden]]
+
+Gate: smoke 65/65; the new gateway spec 3/3; the seven swept specs 13 passed + the 2 pre-existing skips; the sixteen
+strengthened specs 69/69 across two batches.
