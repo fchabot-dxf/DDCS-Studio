@@ -19829,3 +19829,79 @@ a mill workspace with all seven lathe entries greyed.
 and `header-never-clips-748` (the quick-menu chevron's 44px touch target). Both fail identically at the last commit.
 Flagged for the advisor's full-suite triage rather than fixed here, since neither is in this turn's scope and the
 cause predates it.
+
+---
+
+## t1303 — the corner pilot's drag handles, lost to one flag doing two jobs
+
+### The bisect
+
+`wiz-bar-canvas-route` failed alone at HEAD and at the pre-t1301 commit, so I walked the commits that touched the
+canvas path — `panelTypes` / `featureCanvas` / `userOpView` / `cornerData` — checking out each one's `web/` tree and
+asking a single question: does the corner canvas render an `fc-handle-move`?
+
+    3c1d3d19 polish batch    move: 0   ← BROKEN
+    6b4c491a middle order    move: 1
+    cc5e9a6d sim batch 2     move: 1
+    fc7187ec middle parity   move: 1
+
+The break is **t1239, the polish batch** — whose own subject line reads "canvas handles".
+
+### The cause: `formHidden` hid the param, not just the row
+
+t1239 declared corner's derived mirror rows `formHidden`, and that declaration is RIGHT: `cross1_x/y` and
+`startX/Y` are dragged, not typed. But the flag was implemented as `continue` — the field never reached the DOM at
+all. And the 2D canvas decides whether a param is settable by looking for its rendered `[data-param]` field:
+
+    const _writable = (name) => !!_field(name);      // DOM presence used as a proxy for "settable"
+    const pos = () => { if (wr('x') && wr('y')) decls.push({ type: 'point', … }); };
+
+…then WRITES through that same field. So hiding the row took the handle with it: the op whose whole point is that
+you drag the marker instead of typing the number lost the marker, **and** lost the number. Corner is the gated
+pilot; every mechanism in the family was proven on its canvas, and its canvas had nothing draggable on it.
+
+The fix is one line moved and one line added: render the row, then hide it. Every seam stays intact — the reader,
+the writer, the handle — and the user sees nothing, which is all the flag ever claimed to do.
+
+**A false start worth recording:** my first version set `display:none` BEFORE the widget rendered, and every widget
+assigns `host.style.cssText = ROW_CSS`, which wiped it. The fix looked right, the spec still failed, and only
+walking the ancestor chain in the live DOM showed the row sitting at `flex` with my `data-form-hidden` on it.
+
+### It was four tests wider than the two flagged
+
+Before/after check with only the formWidgets change stashed: `corner-data-drag` (1) and `corner-data-repos-handle`
+(3) were red too. So the loss had taken **six** tests, not two — and every one of them either failed alone and was
+never run alone, or passed in-suite by accident.
+
+### Six more specs used a proxy that no longer holds
+
+`corner-data-repos-handle`, `-layout-coherence`, `-marker-labels`, `-prefill`, `-probeseq`, `-viz-polish` all wait
+for `[data-param="cross1_x"]` to be **visible** — "the form fields exist → the handle is built". With the field now
+correctly present-and-hidden, that wait is asking for something the design says will never be true again. They wait
+for `attached` now, which is what the comment always said they were checking.
+
+### The header chevron: a real overlap, not pollution
+
+Measured on a fresh profile at both widths: the hit span was 34px (desktop) / 22px (phone) against a required 44,
+and `elementFromPoint` at the edge named the culprit — `fileSaveChip`. The t1223 save chip was placed a few pixels
+right of the chevron, on top of the chevron's ≥44px expander. The expander is absolute and costs no layout width,
+which is exactly why a later neighbour could be put ON it with nothing looking wrong. Two controls cannot both own
+the same pixels, so the gap is real now: 12px, declared next to the expander it protects. 46×46 at both widths, and
+the header's own clipping tests still pass.
+
+### The hygiene, applied
+
+Both named specs declare their own state (`ddcs_user_ops`, `ddcs_machine`, `ddcs_panes` cleared, machine kind set)
+rather than inheriting whatever ran before — the corner spec passing in-suite while the app was broken is what hid
+this for four turns. The new spec does the same, and asserts the invariant that was never written down: a
+`formHidden` binding is PRESENT and INVISIBLE, its canvas handle exists, and dragging it writes the param.
+
+### The scan for more of the class
+
+Ran the canvas/handle/form family individually: `corner-data-drag`, `corner-data-repos-handle`,
+`corner-data-sim-marker-emits`, `canvas-widgets`, `blocks-live-form`, `alignment-handles-independent` — all green
+alone after the fix. The whole `corner-*` family (104 tests) is green, as are the other `formHidden` consumers
+(bore/contour/drill/datum/form-kernel/homing, 12 tests). No further members of the class surfaced.
+
+Gate: smoke 65/65; the two repaired specs green ALONE and in suite; the six proxy-updated corner specs 15/15; the
+corner family 104/104; the recent lathe/probe specs 34/34.
