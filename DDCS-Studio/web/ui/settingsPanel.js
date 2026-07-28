@@ -961,6 +961,16 @@ function buildSettingsOverlay() {
             #settings-app .mach-travel-row { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 12px; }
             #settings-app .mach-travel-row .mach-ax { width: 12px; display: inline-block; text-align: center; }
             /* t1223 — the IDENTITY BAND (display only), full width above the tab strip. */
+            /* t1265 — the header row: the identity band takes the space, the close keeps its corner. align-items
+               flex-start puts the X level with the band's FIRST line (the name), not floating in the middle of a
+               band that has wrapped to two lines on a phone. */
+            #settings-app .settings-headerrow { flex: 0 0 auto; display: flex; align-items: flex-start; gap: 8px;
+                background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-bottom: 1px solid var(--border); }
+            #settings-app .settings-headerrow .settings-identity { flex: 1 1 auto; min-width: 0; background: none; border-bottom: none; }
+            /* the X never rides over the envelope text: it is its own flex item with a reserved 44px box, so the band
+               truncates/wraps against it rather than underneath it */
+            #settings-app .settings-headerrow .settings-close { flex: 0 0 auto; min-width: 44px; min-height: 44px;
+                display: inline-flex; align-items: center; justify-content: center; margin: 0; align-self: flex-start; }
             #settings-app .settings-identity { flex: 0 0 auto; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
                 padding: 8px 16px; background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-bottom: 1px solid var(--border); }
             #settings-app .settings-identity .si-name { font-weight: 700; font-size: 14px; color: var(--text-main); }
@@ -971,7 +981,15 @@ function buildSettingsOverlay() {
             <!-- t1223 (6) — THE IDENTITY BAND. Display only: which machine this workspace IS, at a glance, above
                  everything else in Settings. Nothing here is editable — the name comes from the FILE (one-name rule),
                  the controller from the dropdown below, the envelope from the machine panel. -->
-            <div class="settings-identity" id="set_identity_band"></div>
+            <!-- t1265 (user sketch) — THE BAND AND THE X ARE ONE HEADER. The close used to sit in the tab-strip row
+                 below, which read as a control belonging to the TABS rather than to the modal. Lifted into the band's
+                 own row, top-right, the two together are the modal's one true header: what this is, and the way out.
+                 The X is a SIBLING of the band, not inside it — the band's innerHTML is re-rendered whenever the
+                 machine changes, and a button living in there would be wiped on the next render. -->
+            <div class="settings-headerrow">
+                <div class="settings-identity" id="set_identity_band"></div>
+                <button class="settings-close" type="button" title="Close (Esc)" aria-label="Close settings" onclick="window.closeSettings && window.closeSettings()">✕</button>
+            </div>
             <div class="settings-head">
                 <div style="display: flex; align-items: center; gap: 16px;">
                     <!-- t1245 (user ruling — THE SHRINK, chosen over a 3-way split of the same nine subtabs). "General"
@@ -985,7 +1003,6 @@ function buildSettingsOverlay() {
                         <button class="settings-main-tab" data-group="hardware">Hardware</button>
                     </div>
                 </div>
-                <button class="settings-close" type="button" title="Close (Esc)" aria-label="Close settings" onclick="window.closeSettings && window.closeSettings()">✕</button>
             </div>
             <div class="settings-body">
                 <div class="settings-sidebar">

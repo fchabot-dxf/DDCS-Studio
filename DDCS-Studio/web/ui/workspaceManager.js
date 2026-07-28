@@ -19,7 +19,7 @@
  * workspace that was neither the file nor what you had. If the buffer has unsaved work you get ONE prompt —
  * Save and continue / Discard / Cancel — and never a silent download.
  */
-import { restoreBackup, previewBackup, markWorkspaceSavedToFile, forgetWorkspaceFile, workspaceDelta, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt } from '../data/backup.js';
+import { restoreBackup, previewBackup, markWorkspaceSavedToFile, forgetWorkspaceFile, workspaceDelta, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt, fileSavedPlace } from '../data/backup.js';
 import { saveWorkspace, adoptSaveHandle } from './workspaceSave.js';
 import { getHandle, putHandle, handleGranted, requestHandle, FOLDER_KEY } from '../data/fsHandles.js';
 import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
@@ -250,6 +250,7 @@ let _ov = null;
  *   should be able to say so instead of opening the manager and hoping the user finds the second tab.
  */
 export async function openWorkspaceManager(focus = 'save', opts = {}) {
+    const _place0 = initialPlace(opts);   // t1265 — decided ONCE, so the chrome and the render cannot disagree
     if (_ov) { _ov.remove(); _ov = null; }
     const ov = document.createElement('div');
     ov.id = 'wsmOverlay';
@@ -261,8 +262,8 @@ export async function openWorkspaceManager(focus = 'save', opts = {}) {
             <section class="wsm-current" id="wsmCurrent"></section>
             <section class="wsm-folder">
                 <div class="wsm-places" role="tablist" aria-label="Where workspaces live">
-                    <button type="button" class="wsm-place${opts && opts.place === 'cloud' ? '' : ' is-active'}" data-place="local" role="tab">📁 Local folder</button>
-                    <button type="button" class="wsm-place${opts && opts.place === 'cloud' ? ' is-active' : ''}" data-place="cloud" role="tab">☁ Cloud</button>
+                    <button type="button" class="wsm-place${_place0 === 'cloud' ? '' : ' is-active'}" data-place="local" role="tab">📁 Local folder</button>
+                    <button type="button" class="wsm-place${_place0 === 'cloud' ? ' is-active' : ''}" data-place="cloud" role="tab">☁ Cloud</button>
                 </div>
                 <div class="wsm-folder-head">
                     <span class="wsm-folder-path" id="wsmFolderPath">No workspace folder yet</span>
@@ -309,7 +310,14 @@ export async function openWorkspaceManager(focus = 'save', opts = {}) {
     // somewhere else gets dropped into the folder like any other document, which is a thing the OS already does well.
     // (openWorkspaceFile still takes a null handle — that is how it FORGETS a stale save target, not a second door.)
     // t1233 — THE PLACE TABS. Local folder | Cloud. Same table, same formatter, same open; a different shelf.
-    ov.__place = opts && opts.place === 'cloud' ? 'cloud' : 'local';
+    // t1265 AMEND-2 (user: "if I'm connected I expect the file explorer to open ON the Cloud tab") — THE INITIAL TAB
+    // IS DECIDED BY CONTEXT, never by a setting:
+    //   1. an explicit place from the caller wins (the checklist's Connect… means the Cloud tab, specifically)
+    //   2. else, if this workspace HAS a home, open on ITS shelf — a Drive-living file opens on Cloud, a local one
+    //      on Local, because the thing you are looking at is the thing you most likely want to act on
+    //   3. else (no file yet): Cloud when signed in, Local otherwise
+    // The tabs stay freely clickable either way; this only decides where the eye lands first.
+    ov.__place = _place0;
     ov.querySelector('.wsm-places').addEventListener('click', async (e) => {
         const t = e.target.closest('[data-place]');
         if (!t || t.dataset.place === ov.__place) return;
@@ -431,7 +439,6 @@ async function renderPlace(ov) {
             if (stale()) return;
             renderCards(ov, null, list, 'cloud');
             cards.insertAdjacentHTML('afterbegin', cloudAccountBar(acc));   // t1243 — WHO you are signed in as, and out
-            await wireSaveLocation(ov);   // t1245 — …and the save-location pref that came with the retired Settings tab
         }
         catch (e) {
             if (stale()) return;
@@ -464,23 +471,25 @@ function cloudAccountBar(acc) {
     const who = esc(acc.email || acc.name || 'your Google account');
     return `<div class="wsm-cloudbar" id="wsmCloudBar"><span class="wsm-dim">Signed in as</span> <b>${who}</b>`
         + '<button type="button" class="wss-link" id="wsmCloudOut">Sign out</button>'
-        // t1245 — DEFAULT SAVE LOCATION, moved here whole from the retired Settings > Cloud subtab. It was that
-        // subtab's ONE unique control (everything else there was the shared sign-in this tab already hosts), and it
-        // decides where a NEW save lands — so it belongs beside the place that IS the cloud, not behind a gear.
-        + '<label class="wsm-dim" for="wsmSaveLoc" style="margin-left:auto">New saves go to</label>'
-        + '<select id="wsmSaveLoc" title="Where a NEW save lands first. The other option is always one click away; existing saves never move.">'
-        + '<option value="cloud-when-connected">Cloud when connected</option>'
-        + '<option value="always-local">Always local</option></select>'
+        // t1265 (user ruling) — THE "new saves go to" PREFERENCE IS GONE. The CONTEXT already decides: a plain Save
+        // returns the file to the shelf it lives on, Save As follows the tab you are looking at, and a brand-new
+        // workspace runs the name+folder dialog. A setting that pre-decides all that could only ever disagree with
+        // what the screen was showing — and when a setting and the visible context disagree, people trust the screen.
         + '</div>';
 }
 
-/** Fill + wire the moved save-location pref from its ONE source (ui/savePrefs.js) — no second copy of the value. */
-async function wireSaveLocation(ov) {
-    const sel = ov.querySelector('#wsmSaveLoc');
-    if (!sel) return;
-    const SP = await import('./savePrefs.js');
-    sel.value = SP.getDefaultSaveLocation();
-    sel.addEventListener('change', () => SP.setDefaultSaveLocation(sel.value));
+/**
+ * Which shelf the manager opens on (t1265). Pure decision, no side effects — so the three cases can be read at once
+ * and tested one by one.
+ */
+function initialPlace(opts) {
+    if (opts && (opts.place === 'cloud' || opts.place === 'local')) return opts.place;
+    // "HAS a home" is answered by the saved NAME, not by fileSavedPlace(): that function answers "which shelf does a
+    // save go to", and it defaults to 'local' when there is no file at all — a sensible fallback for the save path,
+    // and a wrong answer to this question. Asking it here would make every unsaved workspace look local-living and
+    // the signed-in case unreachable.
+    if (fileSavedName()) return fileSavedPlace() === 'cloud' ? 'cloud' : 'local';
+    return getAccount().connected ? 'cloud' : 'local';
 }
 
 /** The signed-out cloud tab: ONE button, and nothing else to decide. */
@@ -489,16 +498,7 @@ function renderCloudSignedOut(ov) {
     ov.__dir = null;
     ov.querySelector('#wsmCards').innerHTML =
         '<div class="wsm-empty">Keep workspaces in your own Google Drive as well as on this machine — the same file, reachable from anywhere you sign in.'
-        + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="wsmCloudSignIn">☁ Sign in to Google Drive</button></div></div>'
-        // t1245 — the save-location pref renders HERE TOO, not only once signed in. It moved off the retired Settings
-        // Cloud subtab, where it was reachable signed out; hiding it behind a sign-in would have quietly taken a
-        // setting away from anyone who wants to say "always local" BEFORE connecting an account.
-        + '<div class="wsm-cloudbar" id="wsmCloudBar">'
-        + '<label class="wsm-dim" for="wsmSaveLoc">New saves go to</label>'
-        + '<select id="wsmSaveLoc" title="Where a NEW save lands first. The other option is always one click away; existing saves never move.">'
-        + '<option value="cloud-when-connected">Cloud when connected</option>'
-        + '<option value="always-local">Always local</option></select></div>';
-    wireSaveLocation(ov);
+        + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="wsmCloudSignIn">☁ Sign in to Google Drive</button></div></div>';
 }
 
 /**

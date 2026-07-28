@@ -15,7 +15,7 @@ import * as gdrive from '../cloud/googleDrive.js';   // Google adapter (others p
 import { pickFolder } from '../cloud/googlePicker.js';
 import { googleApiKey, setGoogleApiKey } from '../cloud/providers.js';
 import { dlgConfirm, dlgPrompt, dlgNotice } from '../dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
-import { preferredSaveTarget, getDefaultSaveLocation, cloudConnected, localFallbackNote } from '../savePrefs.js';   // t754 — cloud-default-when-connected
+import { cloudConnected, localFallbackNote } from '../savePrefs.js';   // t1265 — the PREF is gone; context decides
 
 const sanitize = (s) => (String(s || '').trim().replace(/[^A-Za-z0-9 _.-]+/g, '_').replace(/^\.+/, '') || 'untitled');
 
@@ -23,7 +23,7 @@ const sanitize = (s) => (String(s || '').trim().replace(/[^A-Za-z0-9 _.-]+/g, '_
 let drawer = null, listEl = null, crumbEl = null, footEl = null, importInput = null;
 let localWrap = null, cloudWrap = null, cloudMount = null;
 let cwd = '', vol = 'local';
-let saveTarget = 'local';   // t754 — the save modal's current target (local | cloud), defaulted from preferredSaveTarget()
+let saveTarget = 'local';   // the save modal's current target (local | cloud); t1265 — set from CONTEXT on open
 let _drawerCloud = null;   // t863 — the drawer's own renderCloudInto instance (its OWN folder stack; no singleton leak)
 
 export function openOpenDrawer() {
@@ -329,7 +329,9 @@ export async function openSaveModal() {
     if (!stack.length) { dlgNotice('Nothing to save — build a program first.'); return; }
     if (!saveOv) buildSaveModal();
     saveDest = cwd || '';                         // default to the drawer's current folder
-    saveTarget = preferredSaveTarget();           // t754 — cloud when connected + the setting says so, else local
+    // t1265 (user ruling) — CONTEXT, not a setting: cloud when you are signed in, local otherwise. The preference
+    // that used to gate this is gone, and its default is simply what happens now.
+    saveTarget = cloudConnected() ? 'cloud' : 'local';
     nameInput.value = 'macro';
     saveOv.hidden = false;
     await renderTree();
@@ -353,7 +355,7 @@ function updateSaveTargetUI() {
     const folder = saveOv.querySelector('#projLocalFolder'); if (folder) folder.style.display = saveTarget === 'local' ? '' : 'none';
     const note = saveOv.querySelector('#projSaveNote');
     if (note) {
-        const offline = saveTarget === 'local' && getDefaultSaveLocation() === 'cloud-when-connected' && !connected;
+        const offline = saveTarget === 'local' && !connected;
         if (offline) { note.textContent = localFallbackNote('offline'); note.hidden = false; }
         else note.hidden = true;
     }
@@ -451,7 +453,7 @@ async function onSaveClick(e) {
             closeSave();
             if (drawer && !drawer.hidden) renderDrawer();
             // Landed local while cloud was the preference (signed out) → the quiet sync note.
-            if (getDefaultSaveLocation() === 'cloud-when-connected' && !cloudConnected()) dlgNotice(localFallbackNote('offline'));
+            if (!cloudConnected()) dlgNotice(localFallbackNote('offline'));   // t1265 — context, not a preference
             return;
         }
         if (act === 'exportfile') { downloadMacro(name); closeSave(); return; }

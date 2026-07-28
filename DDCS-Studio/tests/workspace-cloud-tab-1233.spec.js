@@ -83,12 +83,15 @@ const openCloudTab = async (page) => {
 test('the list grows a TAB PAIR — Local folder | Cloud — and local is unchanged', async ({ page }, testInfo) => {
     await boot(page);
     await fakeDrive(page);
-    await page.evaluate(() => window.openWorkspaceManager('open'));
+    // t1265 — WHICH tab opens first is now decided by CONTEXT (the file's shelf; signed-in when there is no file),
+    // and has its own three-case test. This one is about the PAIR and the local half, so it asks for local explicitly
+    // instead of asserting a default that moved.
+    await page.evaluate(() => window.openWorkspaceManager('open', { place: 'local' }));
     const tabs = page.locator('.wsm-places .wsm-place');
     await expect(tabs).toHaveCount(2);
     await expect(tabs.nth(0)).toHaveText(/Local folder/);
     await expect(tabs.nth(1)).toHaveText(/Cloud/);
-    await expect(tabs.nth(0), 'local is where you start').toHaveClass(/is-active/);
+    await expect(tabs.nth(0), 'and the tab asked for is the one showing').toHaveClass(/is-active/);
     await expect(page.locator('#wsmPickFolder'), 'and the local half still offers its folder pick').toBeVisible();
     await page.locator('#wsmOverlay .wsm-modal').screenshot({ path: testInfo.outputPath('tabs-local.png') });
 });
@@ -232,7 +235,7 @@ test('a SLOW render that lost the race paints nothing — the tab you are on is 
         if (/in parents/.test(q) && !/name=/.test(q)) { held = route; return; }   // hold the LISTING open
         route.fallback();
     });
-    await page.evaluate(() => window.openWorkspaceManager('open'));
+    await page.evaluate(() => window.openWorkspaceManager('open', { place: 'local' }));   // t1265 — start local ON PURPOSE: the race is the switch TO cloud
     await page.locator('.wsm-place[data-place="cloud"]').click();
     await expect(page.locator('#wsmCards')).toContainText(/Reading your Drive/i);
     await page.locator('.wsm-place[data-place="local"]').click();

@@ -120,38 +120,69 @@ test('ONE feedback door: the Settings Report-a-bug is gone and Rate / Feedback i
     expect(await page.locator('#set_report').count(), 'and no second one behind the gear').toBe(0);
 });
 
-test('the CLOUD subtab\'s one unique control came with it — Default save location is on the manager\'s Cloud tab', async ({ page }) => {
+test('t1265 — the “new saves go to” PREFERENCE is gone from the Cloud tab, signed in AND signed out', async ({ page }) => {
+    // t1245 moved this control here from the retired Settings > Cloud subtab; t1265 (user) removed it outright,
+    // because the CONTEXT already decides — the shelf a file lives on, the tab you are looking at, the first-save
+    // dialog. A setting on top of that could only ever disagree with what the screen was showing.
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.openWorkspaceManager);
     await page.route('https://www.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [] }) }));
-    await page.evaluate(() => {
-        localStorage.setItem('ddcs_cloud_token', 'tok'); localStorage.setItem('ddcs_cloud_provider', 'google');
-        localStorage.setItem('ddcs_cloud_email', 'maker@example.com');
+
+    for (const signedIn of [true, false]) {
+        await page.evaluate((yes) => {
+            if (yes) { localStorage.setItem('ddcs_cloud_token', 'tok'); localStorage.setItem('ddcs_cloud_provider', 'google'); localStorage.setItem('ddcs_cloud_email', 'maker@example.com'); }
+            else ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email'].forEach((k) => localStorage.removeItem(k));
+        }, signedIn);
+        await page.evaluate(() => window.openWorkspaceManager('open', { place: 'cloud' }));
+        expect(await page.locator('#wsmSaveLoc').count(), 'no preference control').toBe(0);
+        await expect(page.locator('#wsmCards'), 'and no wording promising one').not.toContainText(/new saves go to/i);
+        await page.evaluate(() => { const o = document.getElementById('wsmOverlay'); if (o) o.remove(); });
+    }
+    // …and the module that stored it no longer offers one
+    const gone = await page.evaluate(async () => {
+        const m = await import('/ui/savePrefs.js');
+        return { getter: typeof m.getDefaultSaveLocation, setter: typeof m.setDefaultSaveLocation, list: typeof m.SAVE_LOCATIONS, preferred: typeof m.preferredSaveTarget };
     });
-    await page.evaluate(() => window.openWorkspaceManager('open', { place: 'cloud' }));
-    const sel = page.locator('#wsmSaveLoc');
-    await expect(sel, 'the moved row, on the tab that IS the cloud').toBeVisible({ timeout: 8000 });
-    // it reads and writes the ONE pref module — not a second copy of the value
-    await sel.selectOption('always-local');
-    expect(await page.evaluate(async () => (await import('/ui/savePrefs.js')).getDefaultSaveLocation()),
-        'changing it writes through to savePrefs').toBe('always-local');
-    await sel.selectOption('cloud-when-connected');
-    expect(await page.evaluate(async () => (await import('/ui/savePrefs.js')).getDefaultSaveLocation())).toBe('cloud-when-connected');
+    expect(gone, 'the plumbing went with the row — not left dangling for a future caller to resurrect')
+        .toEqual({ getter: 'undefined', setter: 'undefined', list: 'undefined', preferred: 'undefined' });
 });
 
-test('…and it is reachable SIGNED OUT — the move must not cost a setting anyone could reach before', async ({ page }) => {
-    // On the old Settings > Cloud subtab this pref was reachable with no account at all. Putting it behind a sign-in
-    // would be a quiet behavioural loss dressed up as a tidy-up, so the signed-out cloud tab carries it too.
+test('t1265 — THE MANAGER OPENS ON THE SHELF THE CONTEXT IMPLIES (three cases)', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openWorkspaceManager);
-    await page.evaluate(() => { ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email'].forEach((k) => localStorage.removeItem(k)); });
-    await page.evaluate(() => window.openWorkspaceManager('open', { place: 'cloud' }));
-    await expect(page.locator('#wsmCloudSignIn'), 'signed out, so the sign-in is what you see first').toBeVisible();
-    const sel = page.locator('#wsmSaveLoc');
-    await expect(sel, 'and the save-location pref is still settable').toBeVisible();
-    await sel.selectOption('always-local');
-    expect(await page.evaluate(async () => (await import('/ui/savePrefs.js')).getDefaultSaveLocation()),
-        'writing through to the same one pref module').toBe('always-local');
+    await page.waitForFunction(() => window.openWorkspaceManager && window.ddcsMarkWorkspaceSaved);
+    await page.route('https://www.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [] }) }));
+    const signIn = (yes) => page.evaluate((y) => {
+        if (y) { localStorage.setItem('ddcs_cloud_token', 'tok'); localStorage.setItem('ddcs_cloud_provider', 'google'); localStorage.setItem('ddcs_cloud_email', 'maker@example.com'); }
+        else ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email'].forEach((k) => localStorage.removeItem(k));
+    }, yes);
+    const openAndRead = async () => {
+        await page.evaluate(() => window.openWorkspaceManager('open'));
+        const place = await page.evaluate(() => document.querySelector('.wsm-place.is-active').dataset.place);
+        await page.evaluate(() => { const o = document.getElementById('wsmOverlay'); if (o) o.remove(); });
+        return place;
+    };
+
+    // 1 — THE FILE'S OWN SHELF WINS: a workspace living in Drive opens on Cloud…
+    await signIn(true);
+    await page.evaluate(() => window.ddcsMarkWorkspaceSaved('rig.ddcs', 'cloud'));
+    expect(await openAndRead(), 'a Drive-living workspace opens on its own shelf').toBe('cloud');
+
+    // …and a local one opens on Local EVEN WHILE SIGNED IN — the file you are in beats the account you have
+    await page.evaluate(() => window.ddcsMarkWorkspaceSaved('rig.ddcs', 'local'));
+    expect(await openAndRead(), 'a local workspace opens on Local even when signed in').toBe('local');
+
+    // 2 — NO FILE YET: signed in → Cloud (the user's stated expectation)
+    await page.evaluate(() => { localStorage.removeItem('ddcs_file_saved_place'); localStorage.removeItem('ddcs_file_saved_name'); });
+    expect(await openAndRead(), 'no file + signed in → Cloud').toBe('cloud');
+
+    // 3 — no file, signed out → Local
+    await signIn(false);
+    expect(await openAndRead(), 'no file + signed out → Local').toBe('local');
+
+    // and the tabs stay freely clickable regardless of how it opened
+    await page.evaluate(() => window.openWorkspaceManager('open'));
+    await page.locator('.wsm-place[data-place="cloud"]').click();
+    await expect(page.locator('.wsm-place[data-place="cloud"]')).toHaveClass(/is-active/);
 });
 
 test('EVERY surviving panel deep-links to itself — a panel carries its own group', async ({ page }) => {
@@ -222,3 +253,45 @@ test('THREE tabs still fit a 390px phone', async ({ page }) => {
     expect(m.overflowsRight, 'nothing runs off the edge').toBe(false);
     expect(m.bodyScroll, 'and the page never scrolls sideways').toBeLessThanOrEqual(m.vw);
 });
+
+test('t1265 — the close X lives in the identity band row, not the tab strip', async ({ page }) => {
+    // The band and the X together are the modal's ONE header: what this is, and the way out. Before, the X sat in the
+    // tab-strip row, which read as a control belonging to the TABS.
+    await openSettings(page);
+    expect(await page.locator('#settings-app .settings-head .settings-close').count(),
+        'the tab row no longer carries it').toBe(0);
+    const x = page.locator('#settings-app .settings-headerrow .settings-close');
+    await expect(x, 'the header row does').toBeVisible();
+
+    const m = await page.evaluate(() => {
+        const band = document.querySelector('#settings-app .settings-identity').getBoundingClientRect();
+        const btn = document.querySelector('#settings-app .settings-headerrow .settings-close').getBoundingClientRect();
+        const head = document.querySelector('#settings-app .settings-head').getBoundingClientRect();
+        const modal = document.getElementById('settings-app').getBoundingClientRect();
+        return { bandRight: band.right, xLeft: btn.left, w: btn.width, h: btn.height,
+                 fromRightEdge: modal.right - btn.right,
+                 topAligned: Math.abs(btn.top - band.top) <= 2, aboveTabs: btn.bottom <= head.top + 1 };
+    });
+    expect(m.topAligned, 'level with the band’s first line, not floating mid-band when it wraps').toBe(true);
+    expect(m.aboveTabs, 'and above the tab strip entirely').toBe(true);
+    expect(Math.min(m.w, m.h), 'still a ≥44px target').toBeGreaterThanOrEqual(44);
+    expect(m.xLeft, 'and it does not sit on top of the band text').toBeGreaterThanOrEqual(m.bandRight);
+    expect(m.fromRightEdge, 'in the modal’s top-right CORNER — right of the band is not the same claim').toBeLessThan(24);
+    // it still closes
+    await x.click();
+    await expect(page.locator('#settings-overlay.active')).toHaveCount(0);
+});
+
+test('t1265 — at 390px the X still clears the envelope line', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openSettings(page);
+    const m = await page.evaluate(() => {
+        const band = document.querySelector('#settings-app .settings-identity').getBoundingClientRect();
+        const btn = document.querySelector('#settings-app .settings-headerrow .settings-close').getBoundingClientRect();
+        return { gap: btn.left - band.right, inView: btn.right <= innerWidth + 1, w: btn.width, h: btn.height };
+    });
+    expect(m.gap, 'the band truncates AGAINST the X, never underneath it').toBeGreaterThanOrEqual(0);
+    expect(m.inView, 'and the X is fully on screen').toBe(true);
+    expect(Math.min(m.w, m.h), 'a phone target is still ≥44px').toBeGreaterThanOrEqual(44);
+});
+
