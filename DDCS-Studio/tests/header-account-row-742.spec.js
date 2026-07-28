@@ -14,7 +14,7 @@ import { test, expect } from '@playwright/test';
 // element is in index.html from the first byte, so a click can land before anything is listening and the menu never
 // opens — which is exactly how this spec flaked under load (t1243).
 const openMenu = async (page) => {
-    await page.waitForFunction(() => window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     await page.locator('#hdrPostBtn').click();
     await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
 };
@@ -28,7 +28,7 @@ test('the retired ☁ badge is GONE from the header — one door, not two', asyn
 
 test('DESKTOP: cloud lives in the workspace manager — sign-in is one click from the Cloud tab', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openWorkspaceManager);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openWorkspaceManager);
     await page.evaluate(() => { ['ddcs_cloud_token', 'ddcs_cloud_provider', 'ddcs_cloud_email'].forEach((k) => localStorage.removeItem(k)); });
     await page.evaluate(() => window.openWorkspaceManager('open'));
     await page.locator('.wsm-place[data-place="cloud"]').click();
@@ -60,7 +60,7 @@ test('MOBILE 390px: the manager, its Cloud tab and the sign-in are all reachable
 
 test('CONNECTED: the Cloud tab shows WHO you are signed in as, and the way out', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openWorkspaceManager);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openWorkspaceManager);
     await page.route('https://www.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [] }) }));
     await page.evaluate(() => {
         localStorage.setItem('ddcs_cloud_token', 'tok'); localStorage.setItem('ddcs_cloud_provider', 'google');

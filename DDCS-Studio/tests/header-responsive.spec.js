@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 test('phone (390): header fits; chevron quick-menu visible; standalone Open/Save hidden (in the chevron)', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });   // t1307 — the DECLARED boot signal (t1279): `window.ddcsStudio` exists long before the deferred wiring puts handlers on the header/menu controls this spec clicks
 
   const s = await page.evaluate(() => {
     const h = document.querySelector('.app-header');
@@ -29,8 +28,7 @@ test('phone (390): header fits; chevron quick-menu visible; standalone Open/Save
 test('desktop (1100): quick-menu chevron present; standalone Open/Save moved into it', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 });
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
   const d = await page.evaluate(() => {
     const h = document.querySelector('.app-header');
     return {
@@ -47,8 +45,7 @@ test('desktop (1100): quick-menu chevron present; standalone Open/Save moved int
 test('quick-menu chevron: icon-only; opens Program actions + Post-processor + Theme', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 });
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 
   // Icon-only at full width — no "Auto · …" text leaks onto the chevron.
   const btnText = (await page.locator('#hdrPostBtn').innerText()).trim();

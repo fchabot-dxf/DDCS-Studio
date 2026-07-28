@@ -10,7 +10,7 @@ test.use({ viewport: { width: 1400, height: 1000 } });
 test('dev mode: expose a value → Save as custom op → it registers in the library + bar', async ({ page }) => {
   page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsRefreshWizardBar);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.showApp && window.ddcsRefreshWizardBar);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 
   // open an op → show it as blocks
@@ -18,7 +18,7 @@ test('dev mode: expose a value → Save as custom op → it registers in the lib
   await page.waitForSelector('#wiz_drill', { state: 'visible' });
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
   await page.evaluate(() => window.showApp('blocks'));
-  await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.__blkws && window.__blkws.getAllBlocks().length > 0);
   await page.waitForTimeout(400);
 
   // authoring is always on — the "Save wizard…" button is present and atoms already grew their "expose" rows

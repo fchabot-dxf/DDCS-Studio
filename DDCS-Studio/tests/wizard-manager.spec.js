@@ -28,7 +28,7 @@ const libState = (page) => page.evaluate(async () => {
 
 test('Wizard library manager: every control flows live to the bar', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.openSettings && window.ddcsRefreshWizardBar);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openSettings && window.ddcsRefreshWizardBar);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
   await autoAppDialog(page, { accept: true });   // confirm → proceed; notice → dismiss
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
 
@@ -96,7 +96,7 @@ test('Wizard library manager: every control flows live to the bar', async ({ pag
 
 test('Wizard library manager: the section tree — create dropdown, move a wizard in, delete', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.openSettings && window.ddcsRefreshWizardBar);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openSettings && window.ddcsRefreshWizardBar);
   await autoAppDialog(page, { accept: true });
   await page.evaluate(() => { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_wizard_layout'); window.ddcsRefreshWizardBar(); });
   await page.evaluate(() => window.openSettings());

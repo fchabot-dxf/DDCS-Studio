@@ -20,7 +20,7 @@ test('B3c/B3d: clicking the IN-PLACE Corner slot in the wiz-bar opens the twin �
     try { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_machine'); localStorage.removeItem('ddcs_panes'); } catch (_) {}
   });
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsRefreshWizardBar && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsRefreshWizardBar && window.ddcsGetBlockProgram);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
   // …a MILL workspace, declared, because the corner probe is a mill op and a lathe workspace greys it (t1301)
   await page.evaluate(async () => { const M = await import('/data/workspaceMachine.js'); M.setMachine({ kind: 'mill' }, false); });
 

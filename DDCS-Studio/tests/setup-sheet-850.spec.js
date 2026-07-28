@@ -14,7 +14,7 @@ const DECLARED_STOCK = { show: true, x: 120, y: 80, z: 20, shape: 'boss', datum:
 // then DECLARE each op's tool number (T1 reused on pocket+contour → dedup to 2 rows). The sheet reads params.toolNum.
 async function seedProgram(page, stock) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz && window.ddcsLoadBlockStack && window.openSetupSheet, null, { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.ddcsGetSettings && window.openWiz && window.ddcsLoadBlockStack && window.openSetupSheet, null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     await page.evaluate(async (stock) => {
         const s = window.ddcsGetSettings();
         s.stock = stock;

@@ -31,7 +31,7 @@ const FILES = [
 
 async function boot(page) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openWorkspaceManager && window.ddcsFileSaveState && window.ddcsWorkspaceDirtyToFile);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openWorkspaceManager && window.ddcsFileSaveState && window.ddcsWorkspaceDirtyToFile);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     await page.evaluate(() => { window.__ddcsNoReload = true; });
     // …and WAIT FOR BOOT TO SETTLE before any test records a "saved" watermark (t1249). Those globals appear early,
     // while boot is still writing stores — so a mark taken here snapshots a signature that a later boot write
@@ -200,7 +200,7 @@ test('OPENING WRITES NOTHING: discarding an unsaved buffer creates no file and d
     await openFolder(page, 'open');
     await page.locator('#wsmCards .wsm-fp-row', { hasText: 'bench-router' }).click();
     await page.locator('.wsm-3way [data-w3="discard"]').click();
-    await page.waitForFunction(() => window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
 
     expect(await page.evaluate(() => [...window.__fs.keys()]), 'no new file in the folder — an open is a READ')
         .toEqual(['m350-shop.ddcs', 'bench-router.ddcs']);
@@ -242,7 +242,7 @@ test('SAVE AND CONTINUE writes exactly ONE file — the user\'s own, no second c
     await openFolder(page, 'open');
     await page.locator('#wsmCards .wsm-fp-row', { hasText: 'bench-router' }).click();
     await page.locator('.wsm-3way [data-w3="save"]').click();
-    await page.waitForFunction(() => window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
 
     expect(await page.evaluate(() => window.__writes), 'ONE write, to the file the user was already in').toEqual(['m350-shop.ddcs']);
     expect(await page.evaluate(() => [...window.__fs.keys()]), 'no third file appeared').toEqual(['m350-shop.ddcs', 'bench-router.ddcs']);

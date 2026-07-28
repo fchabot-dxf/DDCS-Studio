@@ -7,8 +7,7 @@ import { test, expect } from '@playwright/test';
 test.skip('quick-menu "Download standalone" opens the latest-release EXE link', async ({ page }) => {
   await page.setViewportSize({ width: 1100, height: 800 });
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });   // t1307 — the DECLARED boot signal (t1279): `window.ddcsStudio` exists long before the deferred wiring puts handlers on the header/menu controls this spec clicks
 
   // Capture window.open instead of actually navigating away.
   await page.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; });

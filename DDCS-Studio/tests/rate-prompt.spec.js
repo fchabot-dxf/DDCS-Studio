@@ -42,7 +42,7 @@ async function boot(page, seed, opts = {}) {
     // seed only if ABSENT — so a reload preserves the state the app wrote (e.g. 'never'); addInitScript re-runs each navigation.
     await page.addInitScript((s) => { try { if (!localStorage.getItem('ddcs_rate')) localStorage.setItem('ddcs_rate', JSON.stringify(s)); } catch (_) {} }, seed);
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.__ddcsRate && window.ddcsOpenRate);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.__ddcsRate && window.ddcsOpenRate);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     if (opts.simRunning) await page.evaluate(() => { const d = document.createElement('button'); d.className = 'pp-run on'; document.body.appendChild(d); });
 }
 
@@ -72,7 +72,7 @@ test('Never is permanent — it stays never across a reload', async ({ page }) =
     await page.click('.ddcs-rate-toast .rate-never');
     await expect(page.locator('.ddcs-rate-toast')).toHaveCount(0);
     await page.reload();   // the seed is only set when ABSENT → the app-written 'never' survives
-    await page.waitForFunction(() => window.__ddcsRate);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.__ddcsRate);
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:op-inserted')));
     await page.waitForTimeout(300);
     await expect(page.locator('.ddcs-rate-toast'), "'never' stays never after reload").toHaveCount(0);
@@ -95,7 +95,7 @@ test('a running sim suppresses the ask even at the threshold', async ({ page }) 
 
 test('a REAL wizard insert (the success moment) fires the toast AFTER the op commits', async ({ page }) => {
     await boot(page, { sessionCount: 2, successfulInserts: 4, lastSessionDay: TODAY() });
-    await page.waitForFunction(() => window.openWiz && window.insertWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openWiz && window.insertWiz);
     await page.evaluate(() => { const s = window.ddcsGetSettings(); s.preview = s.preview || {}; s.preview.autoLoop = false; });
     await page.evaluate(() => window.openWiz('user_homing_data'));
     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });

@@ -25,12 +25,12 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 const openSettings = async (page) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openSettings, null, { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openSettings, null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     await page.evaluate(() => window.openSettings());
     await page.waitForSelector('#settings-app .settings-tabs .settings-main-tab', { timeout: 8000 });
 };
 const openMenu = async (page) => {
-    await page.waitForFunction(() => window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
     await page.click('#hdrPostBtn');
     await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
 };
@@ -125,7 +125,7 @@ test('t1265 — the “new saves go to” PREFERENCE is gone from the Cloud tab,
     // because the CONTEXT already decides — the shelf a file lives on, the tab you are looking at, the first-save
     // dialog. A setting on top of that could only ever disagree with what the screen was showing.
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openWorkspaceManager);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openWorkspaceManager);
     await page.route('https://www.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [] }) }));
 
     for (const signedIn of [true, false]) {
@@ -149,7 +149,7 @@ test('t1265 — the “new saves go to” PREFERENCE is gone from the Cloud tab,
 
 test('t1265 — THE MANAGER OPENS ON THE SHELF THE CONTEXT IMPLIES (three cases)', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openWorkspaceManager && window.ddcsMarkWorkspaceSaved);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openWorkspaceManager && window.ddcsMarkWorkspaceSaved);
     await page.route('https://www.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ files: [] }) }));
     const signIn = (yes) => page.evaluate((y) => {
         if (y) { localStorage.setItem('ddcs_cloud_token', 'tok'); localStorage.setItem('ddcs_cloud_provider', 'google'); localStorage.setItem('ddcs_cloud_email', 'maker@example.com'); }
@@ -214,7 +214,7 @@ test('EVERY surviving panel deep-links to itself — a panel carries its own gro
 
 test('the setup checklist Set buttons still ARRIVE — including the cloud one, which now opens the manager', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openSetupChecklist && window.openSettings, null, { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openSetupChecklist && window.openSettings, null, { timeout: 15000 });
 
     const EXPECT = {
         machine: { panel: 'set_tab_machine', group: 'hardware' },

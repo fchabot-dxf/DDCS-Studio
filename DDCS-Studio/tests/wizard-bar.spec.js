@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test';
  */
 test('wizard bar renders from the library (groups, I/O, openers, icons, live custom group)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsRefreshWizardBar && window.ddcsGetBlockProgram);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsRefreshWizardBar && window.ddcsGetBlockProgram);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
 
   // Read the live bar DOM: each dropdown's group label, its content buttons (+ onclick/svg), and any dividers.
   const readBar = () => page.evaluate(() => {

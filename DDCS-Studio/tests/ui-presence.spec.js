@@ -14,7 +14,7 @@ test('UI basics: header, generators, chips and import control are present', asyn
   await expect(page.locator('#wiz_edge')).toHaveCount(1);
 
   // Variable chips render in the command deck's VARIABLES tab (replaced #varList)
-  await page.waitForFunction(() => window.ddcsStudio);   // dock listeners attach on app init
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });   // t1307 — the DECLARED boot signal (t1279): `window.ddcsStudio` exists long before the deferred wiring puts handlers on the header/menu controls this spec clicks   // dock listeners attach on app init
   await page.click('#controller-dock .header-handle');
   await page.waitForSelector('#controller-dock.is-expanded');
   await page.click('[data-deck-tab="variables"]');

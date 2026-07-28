@@ -41,7 +41,7 @@ const glyphOverflow = () => {
 
 test('no tab-top clips across the full width×zoom sweep (tab glyphs stay within the header box)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });   // t1307 — the DECLARED boot signal (t1279): `window.ddcsStudio` exists long before the deferred wiring puts handlers on the header/menu controls this spec clicks
   await page.evaluate(() => document.fonts && document.fonts.ready);
 
   const clips = [];
@@ -60,7 +60,7 @@ test('no tab-top clips across the full width×zoom sweep (tab glyphs stay within
 
 test('the header is CONTENT-DRIVEN: a much larger tab font GROWS the header instead of clipping the tabs', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
   await page.setViewportSize({ width: 1366, height: 900 });
   await settle(page);
 
@@ -91,7 +91,7 @@ test('the header is CONTENT-DRIVEN: a much larger tab font GROWS the header inst
 
 test('the declared yield order engages in sequence (applied classes are always an in-order prefix of HEADER_YIELD)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
   await page.evaluate(() => document.fonts && document.fonts.ready);
 
   const applied = async () => page.evaluate((Y) => {
@@ -126,7 +126,7 @@ test('the quick-menu chevron has a >=44px touch target on desktop and phone', as
   // workspace, and this measurement must not inherit one.
   await page.addInitScript(() => { try { localStorage.removeItem('ddcs_machine'); localStorage.removeItem('ddcs_panes'); } catch (_) {} });
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 
   for (const W of [1366, 390]) {
     await page.setViewportSize({ width: W, height: 844 });

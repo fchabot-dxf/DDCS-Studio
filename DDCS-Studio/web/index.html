@@ -2553,107 +2553,15 @@
             }
         };
     </script>
-    <!-- Fallback: expose simple wizard controls if module failed to initialize -->
-    <script>
-    (function(){
-        if (typeof window.openMiddleWiz !== 'undefined') return;   // (was openCornerWiz — retired ④; re-anchored to a surviving opener)
-
-        function showWizardPanel(type){
-            const w = document.getElementById('wizard');
-            if (!w) return console.warn('Fallback wizard: no #wizard in DOM');
-            const box = w.querySelector('.wiz-box');
-            w.style.display = 'flex';
-            w.classList.add('active');
-            ['wiz_comm','wiz_wcs','wiz_middle','wiz_edge','wiz_alignment'].forEach(id=>{
-                const el = document.getElementById(id);
-                if (el) el.style.display = 'none';
-            });
-            const panel = document.getElementById('wiz_' + type);
-            if (panel) panel.style.display = 'block';
-        }
-
-        window.openWiz = (type) => showWizardPanel(type);
-        // openCornerWiz fallback RETIRED (④) — the built-in Corner is replaced by the "Corner (data)" twin (user_corner_data).
-        // Enhanced fallback: show the middle panel and attempt autoplay if animator exists
-        window.openMiddleWiz = () => {
-            showWizardPanel('middle');
-            // draw SVG and start animation — drawMiddleViz is awaited before animator starts
-            if (window.__middleAnimTimeout) { clearTimeout(window.__middleAnimTimeout); window.__middleAnimTimeout = null; }
-            const startAnim = async () => {
-                try {
-                    if (window.drawMiddleViz) await window.drawMiddleViz();
-
-                    const featureType = document.getElementById('m_type')?.value || 'pocket';
-                    const axis = document.getElementById('m_axis')?.value || 'X';
-                    const dir1 = document.getElementById('m_dir')?.value || 'pos';
-                    const twoAxis = !!document.getElementById('m_both')?.checked;
-                    const animate = document.getElementById('m_animate')?.checked !== false;
-
-                    if (window.discoverAnimSteps && window.PathAnimator) {
-                        const dir2 = document.getElementById('m_dir2')?.value || (dir1 === 'pos' ? 'neg' : 'pos');
-                        const animInput = window.discoverAnimSteps({ featureType, axis, dir1, twoAxis, dir2 });
-
-                        if (window.__middleAnimator) {
-                            try { window.__middleAnimator.stop(); } catch (e) { /* ignore */ }
-                        }
-
-                        if (animate) {
-                            if (!window.__middleAnimator) {
-                                window.__middleAnimator = new window.PathAnimator({ loop: true });
-                            }
-                            window.__middleAnimTimeout = setTimeout(() => {
-                                window.__middleAnimTimeout = null;
-                                const wcsId = `middle_probe_${featureType}_${axis}_${dir1}_wcs`;
-                                animInput.wcsEls = [document.getElementById(wcsId)].filter(Boolean);
-                                window.__middleAnimator.playSequence(animInput).catch(() => {});
-                            }, 60);
-                        } else {
-                            // Static mode - show all paths immediately
-                            const allSteps = [
-                                ...(animInput.axis1Steps || []),
-                                ...(animInput.jogPath ? [animInput.jogPath] : []),
-                                ...(animInput.axis2Steps || [])
-                            ];
-                            allSteps.forEach(step => {
-                                if (!step || !step.selector) return;
-                                const el = document.querySelector(step.selector);
-                                if (el) {
-                                    el.classList.add('path-draw');
-                                    const parent = el.closest('g');
-                                    if (parent) {
-                                        if (step.type === 'probe') parent.classList.add('is-probing');
-                                        else if (step.type === 'retract') parent.classList.add('is-retracting');
-                                        else if (step.type === 'jog') parent.classList.add('is-jogging');
-                                    }
-                                }
-                            });
-                        }
-                    }
-                } catch (err) {
-                    console.warn('fallback openMiddleWiz autoplay failed', err);
-                }
-            };
-            startAnim();
-        };
-        window.openEdgeWiz = () => showWizardPanel('edge');
-        window.openAlignmentWiz = () => showWizardPanel('alignment');
-        window.closeWiz = () => {
-            const w = document.getElementById('wizard');
-            if (w) { w.style.display = 'none'; w.classList.remove('active'); }
-        };
-        window.insertWiz = () => {
-            // append current visible pre text to editor as a simple fallback
-            const editor = document.getElementById('editor');
-            if (!editor) return;
-            const pre = document.querySelector('#wizard pre:not(:empty)');
-            if (pre) {
-                editor.value = editor.value + '\n' + pre.textContent + '\n';
-            }
-            window.closeWiz();
-        };
-        console.info('Fallback wizard controls installed');
-    })();
-    </script>
+    <!-- t1307 — THE FALLBACK WIZARD BLOCK IS GONE (~100 lines of pre-data-twin insurance).
+         It installed openWiz / openMiddleWiz / openEdgeWiz / openAlignmentWiz / closeWiz / insertWiz at parse time,
+         behind a guard that could never fire (app.js is a module, so it runs later) — and the real wiring in
+         ui/globalFunctions.js replaced every one of them a moment afterwards. Verified before removing: all six
+         globals resolve to the module version once the declared ready signal fires, nothing in this file calls them
+         before then (the onclicks need a user), and no spec reaches them earlier.
+         What it actually did each boot was print "Fallback wizard controls installed" and leave behind openers that
+         would show a bare panel with no wizard behind it if the app HAD failed — which is worse than an honest
+         failure, not better. [[no-legacy-burden]] -->
 
 </body>
 </html>

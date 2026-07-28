@@ -13,7 +13,7 @@ test.use({ viewport: { width: 1300, height: 980 } });
 
 async function seed(page) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openLibrary, null, { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.openLibrary, null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     await page.evaluate(async () => {
         // t1223 — the legacy profile-library seed is gone with the library itself ([[no-legacy-burden]]).
         const store = await import('/ui/projects/projectStore.js');

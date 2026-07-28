@@ -1,7 +1,8 @@
 /**
  * ui/gatewayStatus.js — live-gateway status LED + GATEWAY tab gating in the header.
  *
- * Polls the gateway's /api/descriptor through the shared client seam. The LED is always visible:
+ * Polls the gateway's /api/descriptor through the shared client seam, backing off while nothing answers (t1307).
+ * The LED is always visible:
  * green when a gateway answers (controller detail in the tooltip), red when it reports a fault, and
  * unlit grey when there is no gateway at all (hosted Studio / standalone) — in that state the GATEWAY
  * tab greys out too, and clicking it offers the desktop download (the full exe bundles the gateway;
@@ -111,6 +112,42 @@ export function initGatewayStatus() {
     if (settingsTab) settingsTab.addEventListener('click', () => showApp('settings'));
     if (blocksTab) blocksTab.addEventListener('click', () => showApp('blocks'));
 
-    tick();
-    setInterval(tick, 5000);
+    // t1307 — WATCH WITHOUT SHOUTING. The poll ran every 5 s forever, so a Studio with no gateway (the hosted app,
+    // or the raw web app in a browser) filled the console with a 404 for /api/descriptor twelve times a minute. That
+    // line is the BROWSER's own network log, not ours — a caught fetch still logs it — so the only way to quiet it is
+    // to stop asking so often.
+    //
+    // The chip's job is unchanged: it must light the moment a gateway appears. So the back-off is paired with the
+    // events that mean "a person just came back to this window", which is exactly when they have started one:
+    //   • connected      → 5 s, as before
+    //   • offline        → 5 s, then 10, 20, 30 — capped, so a steady offline session costs 2 requests a minute
+    //   • focus/visible  → check NOW and reset the cadence (throttled, so a flurry of focus events is one request)
+    //   • back online    → check NOW (the browser's own signal that a network came back)
+    const FAST = 5000, MAX = 30000;
+    let delay = FAST, timer = null, last = 0;
+
+    const schedule = () => { clearTimeout(timer); timer = setTimeout(run, delay); };
+    async function run() {
+        last = Date.now();
+        await tick();
+        // `bridged` is what tick() just decided — one source, no second flag to keep in step. The NEXT wait is the
+        // current delay (so the sequence really is 5, 10, 20, 30), and the doubling is for the wait after that.
+        if (bridged) { delay = FAST; schedule(); }
+        else { schedule(); delay = Math.min(MAX, delay * 2); }
+    }
+    /** A person is back at the window (or the network returned): ask now, and go back to watching closely. */
+    const wake = () => {
+        if (document.hidden) return;
+        if (Date.now() - last < 1500) return;   // …a burst of focus/visibility events is still one request
+        delay = FAST;
+        clearTimeout(timer);
+        run();
+    };
+    try {
+        window.addEventListener('focus', wake);
+        window.addEventListener('online', wake);
+        document.addEventListener('visibilitychange', wake);
+    } catch (_) { /* the poll alone still works */ }
+
+    run();
 }

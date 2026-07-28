@@ -22,7 +22,7 @@ test.skip('project Open drawer + Cloud tab load without import errors', async ({
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });   // t1307 — the DECLARED boot signal (t1279): `window.ddcsStudio` exists long before the deferred wiring puts handlers on the header/menu controls this spec clicks
 
   // Open the header quick-menu, re-clicking the chevron if a full-suite init-race left the first click unwired (the
   // menu item exists but stays hidden until the menu opens). Click only WHILE hidden so an already-open menu is never

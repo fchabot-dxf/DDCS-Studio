@@ -10,7 +10,7 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 test('settings has a Done button — and no longer carries FAQ / Feedback / About (t1245)', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsGetSettings && window.openSettings);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsGetSettings && window.openSettings);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
   await page.evaluate(() => window.openSettings());
   await page.waitForFunction(() => document.querySelector('#settings-app .settings-done'));
 
@@ -37,7 +37,7 @@ test('settings has a Done button — and no longer carries FAQ / Feedback / Abou
 // t1245 — the questions that moved, asked of the surface that now answers them.
 test('HELP holds the FAQ and About, opens from the quick menu, and the FAQ still has its entries', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
   await page.click('#hdrPostBtn');
   await page.waitForSelector('#hdrPostMenu:not([hidden])');
   await page.click('#hdrPostMenu [data-act="help"]');
@@ -74,7 +74,7 @@ test('HELP holds the FAQ and About, opens from the quick menu, and the FAQ still
  */
 test('the FAQ leads with the workspace chapter, and every entry it promises is there', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
   await page.click('#hdrPostBtn');
   await page.waitForSelector('#hdrPostMenu:not([hidden])', { timeout: 6000 });
   await page.click('#hdrPostMenu [data-act="help"]');
@@ -98,7 +98,7 @@ test('the FAQ leads with the workspace chapter, and every entry it promises is t
 
 test('NO DEAD PATHS: the FAQ never names a thing the app retired', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio, null, { timeout: 15000 });
   await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
   // textContent, NOT innerText: a collapsed <details> renders none of its answer, so innerText here returns just the
   // list of questions — every assertion about what an ANSWER says would then be checking nothing.
@@ -120,7 +120,7 @@ test('every Settings path the FAQ names actually resolves — the claim cannot o
   // The rule this turn was given: a named UI path must be VERIFIED, not remembered. So the test walks the paths the
   // prose promises and asserts the panel really opens, which is what makes the sentence true rather than plausible.
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.openSettings, null, { timeout: 15000 });
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.openSettings, null, { timeout: 15000 });
   await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
   const faq = await page.evaluate(() => document.getElementById('help_faq').textContent);
 
@@ -155,7 +155,7 @@ test('every Settings path the FAQ names actually resolves — the claim cannot o
  */
 test('every registered FAQ link opens its surface — and every registry entry is actually used', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio && window.openSettings && window.openWorkspaceManager, null, { timeout: 15000 });
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.openSettings && window.openWorkspaceManager, null, { timeout: 15000 });
   await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
 
   const ids = await page.evaluate(async () => Object.keys((await import('/ui/helpPanel.js')).FAQ_LINKS));
@@ -228,7 +228,7 @@ test('every registered FAQ link opens its surface — and every registry entry i
  */
 test('the .ddcs contents answer matches the BACKUP_STORES registry, 1:1 and in order', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio, null, { timeout: 15000 });
   await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
 
   const r = await page.evaluate(async () => {
@@ -249,7 +249,7 @@ test('the .ddcs contents answer matches the BACKUP_STORES registry, 1:1 and in o
 
 test('the file-kinds answer says which file is SOURCE and which is BAKED', async ({ page }) => {
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio, null, { timeout: 15000 });
   await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
   const t = await page.evaluate(() => {
     const d = [...document.querySelectorAll('#help_faq details')].find((x) => /which file is which/.test(x.querySelector('summary').textContent));

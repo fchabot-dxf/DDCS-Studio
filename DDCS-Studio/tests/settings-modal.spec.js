@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 test('settings opens as a modal from the chevron, closes via Esc; no nav tab', async ({ page }) => {
   await page.setViewportSize({ width: 1180, height: 820 });
   await page.goto('http://localhost:3211');
-  await page.waitForFunction(() => window.ddcsStudio);
-  await page.waitForTimeout(400);
+  await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });   // t1307 — the DECLARED boot signal (t1279): `window.ddcsStudio` exists long before the deferred wiring puts handlers on the header/menu controls this spec clicks
 
   // No Settings tab in the nav anymore.
   expect(await page.locator('.hdr-tabs .tab[data-app="settings"]').count()).toBe(0);

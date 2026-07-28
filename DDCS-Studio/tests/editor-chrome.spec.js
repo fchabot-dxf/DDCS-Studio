@@ -17,7 +17,7 @@ test.describe('desktop', () => {
     await page.goto('http://localhost:3211');
     // initHeaderPost (which wires the floating Copy button) runs AFTER window.copyCode exists; its last act is
     // building the chevron menu, so wait for that to avoid clicking before the listener attaches.
-    await page.waitForFunction(() => window.copyCode && window.clearCode
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.copyCode && window.clearCode   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
       && document.querySelector('#hdrPostMenu') && document.querySelector('#hdrPostMenu').children.length > 0);
 
     await expect(page.locator('#btn-clear')).toBeVisible();
@@ -57,7 +57,7 @@ test.describe('phone', () => {
 
   test('PHONE: the TRASH is the Clear — visible and tappable at 390px; the corner menu holds file actions only', async ({ page }, testInfo) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditorFileMenu);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.ddcsEditorFileMenu);
 
     // t1255 (user) — RE-ENCODED. The old shape was: the trash hides ≤600px, so the corner menu carries Clear for
     // phones. That duplicate is gone, which means the trash MUST be here — otherwise the phone loses Clear entirely,

@@ -28,7 +28,7 @@ const FILES = [
 
 async function boot(page) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.openWorkspaceManager && window.ddcsWorkspaceDelta && window.ddcsFileSaveState);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.openWorkspaceManager && window.ddcsWorkspaceDelta && window.ddcsFileSaveState);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     // the quick menu is wired by a separate module — wait for the button AND its menu, or the first click races boot
     await page.waitForFunction(() => document.getElementById('hdrPostBtn') && document.getElementById('hdrPostMenu'));
     await page.evaluate(() => { window.__ddcsNoReload = true; });   // the open path reloads in the app; keep the test page
@@ -154,7 +154,7 @@ test('DISCARD opens the WHOLE file — every store, no picker', async ({ page })
     // wait for the LAST step of the open (the file-name stamp), not the machine row: the machine store is written
     // early in the restore loop, so waiting on it can read the workspace mid-open (t1225 — the loop now clears the
     // IDB project volume too, which put a real await between the two).
-    await page.waitForFunction(() => window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsFileSavedName() === 'bench-router.ddcs', null, { timeout: 8000 });
     const after = await page.evaluate(() => ({
         machine: window.ddcsGetMachine(),
         envX: window.ddcsGetSettings().machine.x,

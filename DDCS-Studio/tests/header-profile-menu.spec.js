@@ -15,7 +15,7 @@ const openMenu = async (page) => { await page.click('#hdrPostBtn'); await page.w
 // Recents + Save-as moved to the Library; Save/Open moved to the Library; dialect list already gone.
 // t1217 — the name now comes from THIS WORKSPACE'S MACHINE record, not the retired profile library.
 const seedProfile = async (page) => {
-    await page.waitForFunction(() => window.ddcsSetMachine && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsSetMachine && window.ddcsGetSettings && document.querySelector('#hdrPostMenu .hdr-quick-head'), null, { timeout: 15000 });   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     await page.evaluate(() => { window.ddcsSetMachine({ name: 'Rig B' }, false); });
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('ddcs:settings-changed')));
 };

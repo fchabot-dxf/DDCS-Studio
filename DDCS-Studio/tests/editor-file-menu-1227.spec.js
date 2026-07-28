@@ -14,7 +14,7 @@ test.use({ viewport: { width: 1280, height: 900 } });
 
 async function boot(page) {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditorFileMenu && window.openWorkspaceManager);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.ddcsEditorFileMenu && window.openWorkspaceManager);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
     // record which handler each menu item reaches (the SAME globals the quick menu's rows called)
     await page.evaluate(() => {
         window.__fired = [];

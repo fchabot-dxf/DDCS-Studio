@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1500, height: 950 } });
 test('E3 screenshots: the SETUP menu I/O section + an io_step block in the Blocks tab', async ({ page }) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio && window.openWiz);   // t1307 — the declared boot signal FIRST (t1279): the globals below exist before the deferred wiring reaches the controls this spec clicks
 
     // (1) the SETUP dropdown open — the I/O quick-actions that open the grouped wizard
     await page.evaluate(() => {

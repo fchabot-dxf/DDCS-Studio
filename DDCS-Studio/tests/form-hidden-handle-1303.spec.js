@@ -93,7 +93,7 @@ test('AND DRAGGING IT WRITES THE PARAM — a handle that moves pixels and not th
 test('THE HEADER CHEVRON KEEPS A REAL TOUCH TARGET — its neighbour cannot stand on it', async ({ page }) => {
     await page.addInitScript(() => { try { localStorage.removeItem('ddcs_machine'); } catch (_) {} });
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio);
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });   // t1307 — the DECLARED boot signal (t1279): `window.ddcsStudio` exists long before the deferred wiring puts handlers on the header/menu controls this spec clicks
     for (const W of [1366, 390]) {
         await page.setViewportSize({ width: W, height: 844 });
         await page.waitForTimeout(600);
