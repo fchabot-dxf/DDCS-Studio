@@ -507,7 +507,11 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 /* Global post-processor (dialect) selector — a discreet chevron quick-action in the header (ui/headerPost.js).
    Icon-only at every width. The `.hdr-controls button.hdr-quick-btn` specificity (0,2,1) beats the per-theme
    `button` skin so the chevron stays flat, not a beveled pill. */
-.hdr-quick { position: relative; display: inline-flex; align-items: center; }
+/* t1303 — ROOM FOR THE TOUCH TARGET. The chevron's ≥44px expander (::before, below) is absolute and costs no layout
+   width, so nothing stopped a later neighbour being placed ON it: the t1223 save chip landed a few pixels to its right
+   and took the expander's right half, leaving a 34px (desktop) / 22px (phone) hittable span. Two adjacent controls
+   cannot both own the same pixels — the gap has to be real, so it is declared here, next to the expander it protects. */
+.hdr-quick { position: relative; display: inline-flex; align-items: center; margin-right: 12px; }
 
 /* t1223 — THE PERSISTENCE INDICATOR IS ONE DISK BUTTON (user). The old fat pill carried a dot, a label and a
    timestamp; the state only ever needed a colour. UNSAVED = accent (asks for attention), SAVED = muted (findable, not

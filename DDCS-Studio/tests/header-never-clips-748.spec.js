@@ -122,6 +122,9 @@ test('the declared yield order engages in sequence (applied classes are always a
 });
 
 test('the quick-menu chevron has a >=44px touch target on desktop and phone', async ({ page }) => {
+  // t1303 — declared state, for the same reason as the corner route spec: what the header carries depends on the
+  // workspace, and this measurement must not inherit one.
+  await page.addInitScript(() => { try { localStorage.removeItem('ddcs_machine'); localStorage.removeItem('ddcs_panes'); } catch (_) {} });
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsStudio);
 

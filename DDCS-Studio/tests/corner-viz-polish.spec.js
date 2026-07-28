@@ -81,7 +81,7 @@ test('(3) Layout renders auto=cyan square / manual=amber circle; the Start is th
     localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'attached' });   // t1303 — ATTACHED, not visible: this field is DECLARED out of the form (its editor is the canvas handle), so its presence is what proves the handle is built
 
   const r = await page.evaluate(async () => {
     const { layoutSpecFromOp } = await import('/wizards/ops/panelTypes.js');

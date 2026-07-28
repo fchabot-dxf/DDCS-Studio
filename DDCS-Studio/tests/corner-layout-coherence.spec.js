@@ -23,7 +23,7 @@ test('Layout handle == 3D/2D marker for BOTH auto (relocated) and manual (declar
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'visible' });   // the form fields exist → the handle is built
+  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'attached' });   // t1303 — ATTACHED, not visible: this field is DECLARED out of the form (its editor is the canvas handle), so its presence is what proves the handle is built
   const r = await page.evaluate(async () => {
     const CD = await import('/blocks/dataOps/cornerData.js');
     const { registerUserOp } = await import('/blocks/userOps.js');

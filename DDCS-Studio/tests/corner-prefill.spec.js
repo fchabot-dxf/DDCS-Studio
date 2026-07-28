@@ -87,7 +87,7 @@ test('(3) LIVE form — the emitted dog-leg #23/#24 flips per corner INSTANTLY (
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'attached' });   // t1303 — ATTACHED, not visible: this field is DECLARED out of the form (its editor is the canvas handle), so its presence is what proves the handle is built
 
   const setCornerRead = (c) => page.evaluate((cc) => {
     const f = [...document.querySelectorAll('#wiz_user_form select')].find((s) => [...s.options].some((o) => o.value === cc));

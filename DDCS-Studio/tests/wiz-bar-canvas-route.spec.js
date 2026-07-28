@@ -13,8 +13,16 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 test('B3c/B3d: clicking the IN-PLACE Corner slot in the wiz-bar opens the twin — BOTH the 3D sim and the 2D drag canvas (not the plain form)', async ({ page }) => {
+  // t1303 — THIS SPEC CONTROLS ITS OWN STATE. It passed inside a full run while failing alone, which means its result
+  // depended on what an earlier spec happened to leave behind — and that masked a real loss of the corner canvas's drag
+  // handles for several turns. A spec that needs an accidental inheritance is not testing what it says it tests.
+  await page.addInitScript(() => {
+    try { localStorage.removeItem('ddcs_user_ops'); localStorage.removeItem('ddcs_machine'); localStorage.removeItem('ddcs_panes'); } catch (_) {}
+  });
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsRefreshWizardBar && window.ddcsGetBlockProgram);
+  // …a MILL workspace, declared, because the corner probe is a mill op and a lathe workspace greys it (t1301)
+  await page.evaluate(async () => { const M = await import('/data/workspaceMachine.js'); M.setMachine({ kind: 'mill' }, false); });
 
   // register Corner (data) as a user op + refresh the bar. t339 E4 — its OWN entry is hidden; the built-in 'Corner' Probe slot
   // `opensAs` it (in-place). So the USER clicks the 'Corner' slot, which routes openWiz('user_corner_data') → the canvas view.

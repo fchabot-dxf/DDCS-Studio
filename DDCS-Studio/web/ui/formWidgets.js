@@ -917,10 +917,16 @@ export function formBindings(def) {
 export function renderOpForm(host, bindings) {
     const readers = [], units = [], byGroup = {};
     for (const b of (bindings || [])) {
-        // t792 — a binding may DECLARE itself out of the form (`formHidden`): it stays in the stack + Blocks + round-trip
-        // (the escape hatch), but no form field renders. The stock spill uses it — stockW/H/Z/stockDatum resolve from the
-        // GLOBAL stock, so the per-op form field was a data-model artifact, not a real placement choice.
-        if (b && b.formHidden) continue;
+        // t792 — a binding may DECLARE itself out of the form (`formHidden`): the stock spill uses it, since stockW/H/Z
+        // resolve from the GLOBAL stock and the per-op field was a data-model artifact, not a real placement choice.
+        //
+        // t1303 — IT HIDES THE ROW, IT DOES NOT REMOVE THE PARAM. This used to `continue`, and the field never reached
+        // the DOM at all — which silently killed the CORNER PILOT'S DRAG HANDLES. The 2D canvas decides whether a param
+        // is settable by looking for its rendered `[data-param]` field (a DOM presence used as a proxy for "settable"),
+        // and it WRITES through that same field. So hiding the row took the canvas handle with it: the op whose whole
+        // point is that you drag the marker instead of typing the number lost the marker, and typing was gone too.
+        // Rendered-but-hidden keeps every seam intact — the reader, the writer, the handle — and shows the user nothing,
+        // which is all the flag ever claimed to do.
         if (b.group) { if (!byGroup[b.group]) { byGroup[b.group] = []; units.push(byGroup[b.group]); } byGroup[b.group].push(b); }
         else units.push([b]);
     }
@@ -942,6 +948,11 @@ export function renderOpForm(host, bindings) {
         if (help) { row.title = help; row.dataset.help = '1'; }   // data-help marks a helped row for the coverage guard
         try { readers.push(renderFormWidget(row, spec).read); }
         catch (e) { console.warn('widget render failed for', label, e); }
+        // t1303 — the DECLARED-out-of-the-form row: present (so the canvas can drag it and the value round-trips) and
+        // invisible. AFTER the widget renders, because every widget assigns the row's whole cssText — setting it before
+        // was silently overwritten, which is how the first version of this fix looked right and changed nothing.
+        // Marked too, so a test can assert the honest property — not VISIBLE — rather than not present.
+        if (w && w.formHidden) { row.style.display = 'none'; row.dataset.formHidden = '1'; }
         const gear = linkGear(fieldLinkFor(w));   // t796 P4 — the row-end deep-link gear (declared `link` / FIELD_LINKS)
         if (gear) { row.classList.add('has-field-link'); row.appendChild(gear); }
         (target || host).appendChild(row);

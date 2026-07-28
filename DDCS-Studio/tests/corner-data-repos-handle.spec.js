@@ -20,7 +20,7 @@ test('reposition handle renders at anchor+evaluated-offset (the destination), un
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'visible' });   // the form fields exist → the handle is built
+  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'attached' });   // t1303 — ATTACHED, not visible: this field is DECLARED out of the form (its editor is the canvas handle), so its presence is what proves the handle is built
 
   const r = await page.evaluate(async () => {
     const { layoutSpecFromOp } = await import('/wizards/ops/panelTypes.js');
@@ -67,7 +67,7 @@ test('the Layout reposition handle relocates to the RUNTIME wall-1 END + cross w
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'attached' });
 
   const r = await page.evaluate(async () => {
     const { layoutSpecFromOp } = await import('/wizards/ops/panelTypes.js');

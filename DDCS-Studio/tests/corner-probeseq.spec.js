@@ -78,7 +78,7 @@ test('(3) LIVE form — the emitted Z→wall1 start #21/#22 (+ dog-leg #23/#24) 
     U.createUserOp(CD.cornerDataDef());
   });
   await page.evaluate(() => window.openWiz('user_corner_data'));
-  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'visible' });
+  await page.waitForSelector('#wiz_user_form [data-param="cross1_x"]', { state: 'attached' });   // t1303 — ATTACHED, not visible: this field is DECLARED out of the form (its editor is the canvas handle), so its presence is what proves the handle is built
   // probeZFirst ON (so #21/#22 emit), FL
   await page.evaluate(() => { const cb = document.querySelector('#wiz_user_form input[type="checkbox"]'); if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change', { bubbles: true })); } });
   await page.waitForTimeout(150);
