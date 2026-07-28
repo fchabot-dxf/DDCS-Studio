@@ -43,6 +43,42 @@ async function fetchJSON(url) {
 
 const escapeHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
+/**
+ * t1261 — ONE-CLICK UPDATE (user-ruled). The exe can replace itself: the gateway downloads the new build, verifies it
+ * against the release's published checksum, swaps it in and relaunches. This function only ASKS — it deliberately
+ * sends no URL, because the page must not get to say what the updater installs; the Python side resolves the release
+ * from the repo it was built from.
+ *
+ * It is added only when the gateway says the running app can actually do it (it is the exe, and its folder is
+ * writable). Everywhere else the Download link is still the whole story, so the web app never grows a button that
+ * cannot work.
+ */
+async function addSelfUpdate(bar, tag) {
+  let st = null;
+  try { st = await (await fetch('/api/update/status')).json(); } catch (_) { return; }
+  if (!st || !st.supported || !st.writable || !st.has_asset || !st.has_checksum) return;
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'upd-btn upd-self';
+  btn.textContent = `Update to ${tag} and restart`;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    const was = btn.textContent;
+    btn.textContent = 'Downloading and verifying…';
+    let r = null;
+    try { r = await (await fetch('/api/update/apply', { method: 'POST' })).json(); } catch (e) { r = { ok: false, error: String(e) }; }
+    if (r && r.ok) { btn.textContent = 'Updated — restarting…'; return; }
+    // a NAMED refusal, and the release page as the way forward — never a silent failure, never an unverified install
+    btn.disabled = false; btn.textContent = was;
+    const { dlgNotice } = await import('./dialog.js');
+    dlgNotice(`The update did not install: ${(r && r.error) || 'unknown error'}
+
+You can download it yourself from the release page.`);
+  });
+  bar.insertBefore(btn, bar.querySelector('.upd-btn[href]'));
+}
+
 function showBanner(tag, dl, body, commits) {
   if (document.querySelector('.ddcs-update-bar')) return;
   const bar = document.createElement('div');
@@ -66,6 +102,7 @@ function showBanner(tag, dl, body, commits) {
   bar.querySelector('.upd-what').addEventListener('click', () => { notes.hidden = !notes.hidden; });
   bar.querySelector('.upd-x').addEventListener('click', () => { try { localStorage.setItem('ddcs_update_dismissed', tag); } catch (_) { /* */ } bar.remove(); });
   document.body.appendChild(bar);
+  if (isDesktopApp()) addSelfUpdate(bar, tag);   // exe only, and only if the gateway says the swap can succeed
 }
 
 // ── WEB version-nudge ────────────────────────────────────────────────────────────────────────────────────

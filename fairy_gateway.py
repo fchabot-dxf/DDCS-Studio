@@ -334,6 +334,15 @@ def main():
         # System Access handles for all three granted folders. The policy lives in ONE place (fairy.webview_storage)
         # because it was previously fixed in the OTHER launcher and the shipped exe, built from THIS file, kept
         # forgetting. See that module for where the data goes and why it is not beside the executable.
+        # t1261 — sweep the build a previous self-update moved aside. It is renamed rather than deleted because
+        # Windows cannot delete a RUNNING exe; by now that process is gone, so this is where it is cleaned up.
+        try:
+            from fairy.selfupdate import sweep_old
+            for name in sweep_old():
+                print(f"[fairy] removed the previous build: {name}")
+        except Exception:
+            pass   # never let housekeeping stop the app from starting
+
         from fairy.webview_storage import start_persistent
         start_persistent(webview)             # blocks until the window closes
         print("[fairy] window closed — gateway down.")

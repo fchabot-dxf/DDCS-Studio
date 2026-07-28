@@ -61,12 +61,23 @@ jobs:
         shell: pwsh
         run: ./build_fairy.ps1
 
+      # t1261 — the checksum the SELF-UPDATER verifies against. Without a code-signing certificate this is the only
+      # integrity story the one-click update has, and fairy/selfupdate.py REFUSES to install a release that does not
+      # publish one — so this file is not optional decoration, it is what makes the update path work at all.
+      - name: Checksum the exe (the self-updater verifies against this)
+        if: steps.gate.outputs.build == 'true'
+        shell: pwsh
+        run: |
+          $h = (Get-FileHash ./DDCS-Studio.exe -Algorithm SHA256).Hash.ToLower()
+          "$h  DDCS-Studio.exe" | Out-File -Encoding ascii ./DDCS-Studio.exe.sha256
+          Write-Host "sha256 $h"
+
       - name: Publish release (notifies running exes via the update-check)
         if: steps.gate.outputs.build == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.ver.outputs.tag }}" ./DDCS-Studio.exe `
+          gh release create "${{ steps.ver.outputs.tag }}" ./DDCS-Studio.exe ./DDCS-Studio.exe.sha256 `
             --title "DDCS Studio ${{ steps.ver.outputs.tag }} (desktop)" `
             --generate-notes

@@ -122,6 +122,22 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.read_sysfile((q.get("name") or [""])[0]))
         if path == "/api/scan":
             return self._send_json({"controllers": self.ops.scan_controllers()})
+        # t1261 — SELF-UPDATE. Status is a read: is this the exe, can it write where it lives, is there a newer
+        # release. The page uses it to decide whether to OFFER an update; it never says WHAT to install.
+        if path == "/api/update/status":
+            from . import selfupdate as su
+            try:
+                rel = su.latest_release()
+            except Exception as e:
+                return self._send_json({"supported": su.is_frozen(), "error": str(e), "page": su.RELEASES_PAGE})
+            return self._send_json({
+                "supported": su.is_frozen(),
+                "writable": su.can_write_here() if su.is_frozen() else False,
+                "tag": rel.get("tag", ""),
+                "has_asset": bool(rel.get("exe_url")),
+                "has_checksum": bool(rel.get("sha_url")),
+                "page": su.RELEASES_PAGE,
+            })
         if path == "/api/lan-qr":
             try:                              # QR of the LAN URL (pure-python SVG, offline) for the Settings LAN ACCESS panel
                 import io
@@ -181,6 +197,11 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send_json(self.ops.delete_file(b.get("name", "")))
         if self.path == "/api/config":
             return self._send_json(self.ops.set_config(self._read_body()))
+        # t1261 — APPLY the update. The body carries NO url: the updater resolves the release from the hard-coded
+        # repo itself, so a confused or hostile page cannot point the downloader at arbitrary bytes.
+        if self.path == "/api/update/apply":
+            from . import selfupdate as su
+            return self._send_json(su.perform_update())
         if self.path == "/api/sysfile":
             b = self._read_body()
             return self._send_json(self.ops.write_sysfile(b.get("name", ""), b.get("content", ""), b.get("mode", "write")))
