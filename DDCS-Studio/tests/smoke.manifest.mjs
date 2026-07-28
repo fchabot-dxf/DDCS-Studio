@@ -25,6 +25,11 @@ export const SMOKE_SPECS = [
     'cam-build-mode.spec.js',           // the CAM builder (door-2 auto-import)
     'cam-slot-roundtrip-s43.spec.js',   // CAM slot ops ↔ blocks round-trip
     'cam-slot-sim.spec.js',             // CAM slot simulate (DDCS macro sim)
+    // release integrity — t1311. A file-only check (no browser, ~2 ms) that the four version stamps agree. It is in
+    // the FAST tier deliberately: the mistake it guards against happens at RELEASE time, which is exactly when nobody
+    // is running the slow suite. bump-version.cjs is the one writer; this is what makes forgetting that impossible to
+    // ship rather than merely against the rules.
+    'version-sync-1311.spec.js',
     // persistence
     'backup-852.spec.js',               // the .ddcs workspace backup/restore
     'persistence-file-indicator.spec.js', // unsaved-to-file indicator + exit warning (t1193)

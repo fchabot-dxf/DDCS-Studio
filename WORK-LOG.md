@@ -20078,3 +20078,46 @@ names (it fits, and nothing pushes the page sideways).
 
 Fast tier: smoke 65/65; the new spec 8/8; the persistence family (intentional-save, file-indicator, save-open-1225,
 workspace-manager-1223, -truth-1231, settings-ux-1287, backup-852) 30/30; the project specs 8/8.
+
+---
+
+## t1311 — the version stamps agree, or the gate goes red
+
+The advisor's own recorded mistake: a hand-edited `version.json` desynced from the `.ver` chip, the in-app update
+banner compared the two and decided the running app was stale, and a nag covered the header — while the exe CI cuts
+from the chip and wore a different number again. The rule since has been "bump-version.cjs only". A rule in memory
+is weaker than a guard in the tree.
+
+### What it checks, and why exactly these four
+
+`scripts/bump-version.cjs` is the one writer, so the surfaces are the ones IT stamps — the guard is derived from the
+writer rather than from a list someone remembered to keep:
+
+1. the `.ver` chip in `web/index.html` — what `desktop-release.yml` cuts a release from and what `updateCheck.js`
+   compares; the source of truth by declaration, so every problem is phrased as "this surface is stale against the
+   chip", which is the sentence that tells you what to do;
+2. the window `<title>` — the same version where a user reads it, and the one no release script re-checks;
+3. `web/version.json` — the cache-bustable artifact the deployed app fetches; the desync that produced the nag;
+4. `package.json` — **checked as a relationship, not as equality**. The writer stamps the DATE ONLY, as integers
+   (`V2026.07.28.12` → `2026.7.28`), because the daily counter lives in the chip. A guard that demanded equality here
+   would fail a correctly-bumped tree and teach everyone to ignore it. A test asserts that specifically: putting the
+   chip's own four-part string into package.json is REJECTED.
+
+### One declaration, two seams
+
+The check lives in `scripts/check-version-sync.cjs` and is consumed by the fast-tier spec AND runnable as
+`node scripts/check-version-sync.cjs` (exit 1, naming the stale surface) for a pre-push or CI step. A copy in each
+would be the same drift this guards against, one level up.
+
+**In the smoke tier deliberately.** It costs ~2ms and needs no browser, and the mistake it catches happens at RELEASE
+time — which is exactly when nobody is running the slow suite. A guard that only runs in the full suite would not
+have caught the day it was written.
+
+### Test-the-test, as asked
+
+Every failure mode is perturbed in a THROWAWAY COPY of the four files (never the real tree) and the guard is shown
+going red with the naming message: a stale `version.json`, a stale `<title>` (and only the title blamed — one wrong
+surface, one problem), a hand-bumped chip (which correctly reports the other three as stale against it), the
+package.json relationship, and the standalone CLI's non-zero exit with the real tree still passing.
+
+Gate: smoke 71/71 (65 + the 6 new, which now ride every gate).
