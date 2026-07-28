@@ -19,7 +19,7 @@
  * workspace that was neither the file nor what you had. If the buffer has unsaved work you get ONE prompt —
  * Save and continue / Discard / Cancel — and never a silent download.
  */
-import { restoreBackup, previewBackup, markWorkspaceSavedToFile, forgetWorkspaceFile, workspaceDelta, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt, fileSavedPlace } from '../data/backup.js';
+import { restoreBackup, previewBackup, markWorkspaceSavedToFile, markItemsSavedToFile, forgetWorkspaceFile, workspaceDelta, changedItemsSince, changeLabel, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt, fileSavedPlace } from '../data/backup.js';   // t1309 — the save-first modal names the programs too
 import { saveWorkspace, adoptSaveHandle } from './workspaceSave.js';
 import { getHandle, putHandle, handleGranted, requestHandle, FOLDER_KEY } from '../data/fsHandles.js';
 import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
@@ -179,6 +179,7 @@ async function openWorkspaceObject(obj, fileName, label, { handle = null, place 
     // ORDER (t1225): the name is stamped BEFORE the save baseline, or the workspace is dirty the moment it is opened.
     try { setMachineName(fileName); } catch (_) {}   // ONE-NAME RULE: a renamed file shows its OWN name everywhere
     markWorkspaceSavedToFile(fileName, place);      // the buffer now IS this file, and we remember WHERE it lives
+    try { await markItemsSavedToFile(); } catch (_) {}   // t1309 — …including the per-program baseline the file just became
     // …and then take the baseline AGAIN, because the open is not finished when restoreBackup returns. Adopting the
     // file's controller re-seeds the variable DB, and variableDB.setControllerVars is ASYNC (it fetches that
     // controller's variable list before writing) — so on a cross-controller open that write lands AFTER the baseline
@@ -186,6 +187,7 @@ async function openWorkspaceObject(obj, fileName, label, { handle = null, place 
     // `variables` as the only changed store. Its own completion signal is what we wait for.
     await controllerSettled(900, t0);
     markWorkspaceSavedToFile(fileName, place);
+    try { await markItemsSavedToFile(); } catch (_) {}   // t1309 — the opened file is the new per-program baseline
     await adoptSaveHandle(handle || null);          // …and Save writes THIS file (a cloud open has no local handle)
     if (!window.__ddcsNoReload) location.reload();
     return true;
@@ -385,6 +387,22 @@ export async function openWorkspaceManager(focus = 'save', opts = {}) {
     return ov;
 }
 
+/**
+ * t1309 — WHICH PROGRAMS, filled in a tick later. The rest of this panel is derived synchronously from localStorage;
+ * the project volume is IDB, so its item detail arrives asynchronously and is written into the row the render left
+ * for it. If it says nothing (no per-item baseline yet, or no program changed) the row stays hidden rather than
+ * printing an empty parenthesis.
+ */
+function fillProgramDelta(ov) {
+    const host = ov.querySelector('#wsmPrograms');
+    if (!host) return;
+    changedItemsSince('projects').then((d) => {
+        if (!d.known || !d.items.length) return;
+        host.hidden = false;
+        host.textContent = changeLabel({ label: 'Saved programs', unit: 'programs', unitOne: 'program', count: d.items.length, items: d.items });
+    }).catch(() => {});
+}
+
 function renderCurrent(ov) {
     const host = ov.querySelector('#wsmCurrent');
     const name = fileSavedName();
@@ -415,13 +433,14 @@ function renderCurrent(ov) {
                 : (changed.length
                     ? rows.map((r) => `<span class="wsm-drow ${r.changed ? 'is-chg' : ''}">${esc(r.label)}${r.count != null ? ` <b>${esc(r.count)}</b> ${esc(r.unit)}` : ''}</span>`).join('')
                     : '<span class="wsm-dim">Nothing has changed since the last save.</span>')
-        }</div>
+        }<span class="wsm-drow is-chg" id="wsmPrograms" hidden></span></div>
         <div class="wsm-cur-actions">
             <button type="button" class="toolbar-btn settings-io" data-wsm="save" style="border-color:var(--accent);">💾 Save</button>
             <button type="button" class="toolbar-btn settings-io" data-wsm="saveas">Save As…</button>
             ${/* t1227 — Duplicate is meaningless before there IS a file to duplicate, so first run does not offer it. */''
             }${everSaved ? '<button type="button" class="toolbar-btn settings-io" data-wsm="duplicate">Duplicate…</button>' : ''}
         </div>`;
+    fillProgramDelta(ov);   // t1309 — the program names arrive a tick later (IDB), into the row above
 }
 
 /**

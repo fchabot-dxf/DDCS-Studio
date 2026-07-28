@@ -17,7 +17,7 @@
  * (ui/workspaceManager.js), because a file appearing in Downloads that nobody asked for is not consent.
  */
 import { UIUtils } from '../ui/uiUtils.js';
-import { exportAllEntries, importAllEntries, clearAllEntries } from '../ui/projects/projectStore.js';
+import { exportAllEntries, importAllEntries, clearAllEntries, baseName } from '../ui/projects/projectStore.js';
 import { loadUserOps } from '../blocks/userOps.js';
 import { getMachine, setMachine, MACHINE_KEY } from './workspaceMachine.js';   // t1217 — the workspace's ONE machine record
 
@@ -88,7 +88,24 @@ export const BACKUP_STORES = [
     { id: 'panePrefs', label: 'Window layout (which panes are open, their sizes)', ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_follow_exec', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },
     // The project VOLUME is written by CLEAR-then-import (its importAllEntries puts entry by entry, so a bare import
     // would MERGE the file's projects into whatever this browser held — the blend a whole-file open must not produce).
-    { id: 'projects', label: 'Saved programs (projects)', async: true, count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects',
+    // t1309 — THE ITEM GRAIN, declared where the store is. Every other row answers "did this change"; a program volume
+    // has to answer "WHICH ones", because "Saved programs (3 projects)" after editing one of three is the store-level
+    // silence the user asked us to fix. `items` is the whole declaration: how to enumerate the store's items and how
+    // to mark each one. A hash of the item's own content, not a rev counter — the counter would mean every writer has
+    // to remember to bump it, and a marker nobody can forget to maintain is worth more than a cheaper comparison.
+    { id: 'projects', label: 'Saved programs', async: true, count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects',
+      items: {
+          one: 'program', many: 'programs',
+          marks: (v) => {
+              const out = {};
+              for (const e of (Array.isArray(v) ? v : [])) {
+                  if (!e || e.type !== 'project' || !e.path) continue;
+                  try { out[e.path] = hash32(JSON.stringify(e.data ?? null)); } catch (_) { out[e.path] = 0; }
+              }
+              return out;
+          },
+          name: (path) => baseName(path) || path,
+      },
       read: () => exportAllEntries(), write: (val) => importAllEntries(val), clear: () => clearAllEntries() },
 ];
 
@@ -153,6 +170,7 @@ export async function exportEverything(fileName) {
 const WATERMARK_KEY = 'ddcs_file_watermark';
 const SAVED_AT_KEY = 'ddcs_file_saved_at';   // epoch-ms of the last REAL .ddcs save/open — set ONLY by a file save, never the boot baseline
 const STORE_MARKS_KEY = 'ddcs_file_store_marks';   // t1223 — per-store signatures at the last save (the delta baseline)
+const ITEM_MARKS_KEY = 'ddcs_file_item_marks';    // t1309 — per-ITEM signatures for the stores that declare an item grain
 const SAVED_NAME_KEY = 'ddcs_file_saved_name';   // the last .ddcs file NAME (for the indicator's "Saved to <name>"); optional
 const SAVED_PLACE_KEY = 'ddcs_file_saved_place';   // t1233 — WHERE that file lives: 'local' (a granted folder) | 'cloud' (Drive)
 const hash32 = (str) => { let h = 0x811c9dc5; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); } return h >>> 0; };
@@ -235,6 +253,83 @@ export function changedStoresSince() {
     return rows.filter((r) => r.changed).map((r) => ({ id: r.id, label: r.label, count: r.count, unit: r.unit }));
 }
 
+/**
+ * t1309 — WHICH ITEMS CHANGED, for the stores that declare an item grain.
+ *
+ * Async, because the only store with a grain today is the IDB project volume — which is exactly why it was invisible
+ * to the sync delta and why a save that wrote one edited program said "Saved programs" and nothing more.
+ *
+ * The four answers, and each is a real thing a person did:
+ *   added / edited     — a path that is new, or whose content marker moved
+ *   removed            — a path that is gone. A deletion that saves silently is the old silence back.
+ *   renamed            — a removed path and an added path with the SAME content marker. Cheap, and honest: same
+ *                        program, new name. (Two identical copies renamed at once could pair the wrong way round;
+ *                        both names are right, so the sentence stays true.)
+ * @returns {Promise<{known:boolean, items:Array<{name:string, how:string}>}>}
+ */
+export async function changedItemsSince(storeId = 'projects') {
+    const store = BACKUP_STORES.find((s) => s.id === storeId && s.items);
+    if (!store) return { known: false, items: [] };
+    let base = null;
+    try { base = (JSON.parse(localStorage.getItem(ITEM_MARKS_KEY) || 'null') || {})[storeId] || null; } catch (_) { base = null; }
+    if (!base) return { known: false, items: [] };   // no per-item baseline → we cannot name them, which is not "nothing changed"
+    let now = {};
+    try { now = store.items.marks(await store.read()); } catch (_) { now = {}; }
+    const gone = Object.keys(base).filter((p) => !(p in now));
+    const fresh = Object.keys(now).filter((p) => !(p in base));
+    const items = [];
+    const pairedGone = new Set();
+    for (const p of fresh) {
+        const from = gone.find((g) => !pairedGone.has(g) && base[g] === now[p]);
+        if (from) { pairedGone.add(from); items.push({ name: store.items.name(p), how: 'renamed' }); }
+        else items.push({ name: store.items.name(p), how: 'added' });
+    }
+    for (const p of gone) if (!pairedGone.has(p)) items.push({ name: store.items.name(p), how: 'removed' });
+    for (const p of Object.keys(now)) if (p in base && base[p] !== now[p]) items.push({ name: store.items.name(p), how: 'edited' });
+    return { known: true, items };
+}
+
+/** The per-item baseline for every store that declares a grain — captured with the same timing as the store one. */
+export async function markItemsSavedToFile() {
+    const out = {};
+    for (const s of BACKUP_STORES) {
+        if (!s.items) continue;
+        try { out[s.id] = s.items.marks(await s.read()); } catch (_) { /* unreadable — omit, so the next delta says "unknown" */ }
+    }
+    try { localStorage.setItem(ITEM_MARKS_KEY, JSON.stringify(out)); } catch (_) {}
+}
+
+/**
+ * t1309 — THE ONE SUMMARY, with the item detail folded in. The sync `changedStoresSince` stays exactly as it was for
+ * every caller that cannot await; this is the same answer plus the grain, and both surfaces that name what a save
+ * wrote read THIS one rather than assembling their own.
+ */
+export async function changedSince() {
+    const rows = changedStoresSince();
+    const detail = await changedItemsSince('projects');
+    const store = BACKUP_STORES.find((s) => s.id === 'projects');
+    if (!detail.known || !detail.items.length) return rows;
+    const row = { id: 'projects', label: store.label, unit: store.items.many, count: detail.items.length, items: detail.items };
+    return Array.isArray(rows) ? [...rows, row] : [row];   // null (no baseline at all) stays null — that honesty is t1287's
+}
+
+/**
+ * How a changed row READS, in one place, so the popup and the modal cannot word it differently.
+ * Programs are NAMED (up to three, then "+N more" — a phone has to be able to read this); everything else keeps the
+ * count that qualifies it.
+ */
+export function changeLabel(row, max = 3) {
+    if (!row) return '';
+    if (Array.isArray(row.items) && row.items.length) {
+        const n = row.items.length;
+        const shown = row.items.slice(0, max).map((it) => (it.how === 'edited' || it.how === 'added') ? it.name : `${it.name} ${it.how}`);
+        const more = n > max ? `, +${n - max} more` : '';
+        const unit = n === 1 ? (row.unitOne || 'program') : (row.unit || 'programs');
+        return `${n} ${unit} (${shown.join(', ')}${more})`;
+    }
+    return (Number(row.count) > 0 && row.unit) ? `${row.label} (${row.count} ${row.unit})` : row.label;
+}
+
 export function markWorkspaceSavedToFile(name, place = 'local') {
     const file = String(name == null ? '' : name).trim();
     if (!file) return;   // not a file save — recording it as one is how the impossible state got made
@@ -310,5 +405,8 @@ if (typeof window !== 'undefined') {
     window.ddcsFileSavedName = fileSavedName;
     window.ddcsFileSavedPlace = fileSavedPlace;   // t1233 — local folder or Drive
     window.ddcsWorkspaceDelta = workspaceDelta;
-    window.ddcsChangedStoresSince = changedStoresSince;   // t1287 — what a save is about to write   // t1223 — the manager's per-store delta
+    window.ddcsChangedStoresSince = changedStoresSince;
+    window.ddcsChangedSince = changedSince;             // t1309 — …the same answer with the per-program grain
+    window.ddcsChangedItemsSince = changedItemsSince;
+    window.ddcsChangeLabel = changeLabel;   // t1287 — what a save is about to write   // t1223 — the manager's per-store delta
 }

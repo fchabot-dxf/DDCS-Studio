@@ -14,7 +14,7 @@
  * localStorage-vs-.ddcs AWARENESS layer only. The workspace .ddcs is the config/library grain (settings, wizards, CAM
  * pack, presets, layout); the current PROGRAM is the separate .mjson job grain and is not part of this signal.
  */
-import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedName } from '../data/backup.js';
+import { isWorkspaceDirtyToFile, ensureWorkspaceWatermark, hasWorkspaceWatermark, workspaceSignature, fileSavedName, changeLabel } from '../data/backup.js';   // t1309 — changeLabel: the ONE way a changed row reads
 import { getMachine } from '../data/workspaceMachine.js';   // t1223 — the tooltip names the file AND the dialect it generates for
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 
@@ -74,7 +74,10 @@ function refresh() {
 function announceSaved(res) {
     if (!res || !res.ok || typeof document === 'undefined') return;
     const changed = res.changed;
-    const bit = (c) => (Number(c.count) > 0 && c.unit ? `${c.label} (${c.count} ${c.unit})` : c.label);
+    // t1309 — ONE phrase builder (data/backup.js), so the popup and the save-first modal cannot word the same fact
+    // differently. It NAMES the programs a save wrote — up to three, then "+N more" — and keeps the qualifying count
+    // for every other store.
+    const bit = (c) => changeLabel(c);
     // the count QUALIFIES the store, never replaces it: naming alone once read "4 tools" for a machine-envelope edit
     const what = !Array.isArray(changed) ? 'The whole workspace was written.'
         : changed.length ? changed.map(bit).join(' · ')

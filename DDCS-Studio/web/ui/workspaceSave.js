@@ -14,7 +14,7 @@
  * with no dialog — a real "Save". Opening a workspace RETARGETS that handle (see ui/workspaceManager.js), because a
  * save that still points at the previously-open file would silently overwrite it with someone else's contents.
  */
-import { buildBackup, changedStoresSince, markWorkspaceSavedToFile, exportEverything, fileSavedName, fileSavedPlace } from '../data/backup.js';   // t1287 — a save says what it wrote
+import { buildBackup, changedSince, markWorkspaceSavedToFile, markItemsSavedToFile, exportEverything, fileSavedName, fileSavedPlace } from '../data/backup.js';   // t1287 — a save says what it wrote; t1309 — and NAMES the programs
 import { setMachineName } from '../data/workspaceMachine.js';   // t1223 — saving names the workspace
 import { getHandle, putHandle, requestHandle, handleGranted, FILE_KEY, FOLDER_KEY } from '../data/fsHandles.js';
 import { dlgConfirm } from './dialog.js';
@@ -209,6 +209,7 @@ async function saveToCloud({ pickNew = false, suggestedName = '' } = {}) {
         const obj = await buildBackup();                               // 2. build AFTER the stamp
         await drive.write(fileName, obj, root);
         markWorkspaceSavedToFile(fileName, 'cloud');                   // 3. baseline LAST, and it records WHERE
+        try { await markItemsSavedToFile(); } catch (_) {}             //    …with the per-item baseline (t1309)
         return { ok: true, name: fileName, viaFsa: false, place: 'cloud' };
     } catch (e) {
         return { ok: false, error: (e && e.message) || String(e), place: 'cloud' };
@@ -226,9 +227,12 @@ async function writeTo(h, name) {
     // t1287 — WHAT THIS SAVE IS WRITING, read BEFORE the baseline moves (step 3 resets it, so afterwards every save
     // would report "nothing changed"). The user's live report was that a bound-file save is silent: no dialog, no
     // confirmation, no way to know it happened. This is what the confirmation says.
-    let changed = []; try { changed = changedStoresSince(); } catch (_) { changed = []; }
+    // t1309 — the same read, one grain finer: which PROGRAMS changed, not just that the volume did. Async because the
+    // project volume is IDB — which is exactly why it was invisible to the sync delta until now.
+    let changed = []; try { changed = await changedSince(); } catch (_) { changed = []; }
     await writeToHandle(h, text);
     markWorkspaceSavedToFile(name);                     // 3. baseline LAST — it must cover the stamped name
+    try { await markItemsSavedToFile(); } catch (_) {}  //    …and the per-item baseline moves with it, or the next save re-reports these
     return { ok: true, name, viaFsa: true, changed };
 }
 
