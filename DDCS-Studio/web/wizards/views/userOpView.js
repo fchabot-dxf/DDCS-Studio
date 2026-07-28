@@ -34,7 +34,7 @@ import { getActiveProfile } from '../../shared/js/profiles/controllerProfiles.js
 const activePostOword = () => { try { return getCaps(resolveActivePost(getActiveProfile().id).id).flow === 'oword'; } catch (_) { return false; } };
 const activePostId = () => { try { return resolveActivePost(getActiveProfile().id).id || ''; } catch (_) { return ''; } };   // t778 — for the tapping rigid gate (Expert-only)
 import { builtinLabelForTwin } from '../../blocks/wizardLibrary.js';   // t343 E5 — an IN-PLACE port (opensAs) shows the built-in's PLAIN title (seamless)
-import { latheProbeTool, latheBarFrom } from '../../viz/latheScene.js';   // t1301 — a lathe probe's stylus is the form's declared radius, scaled to the bar
+import { latheProbeTool, latheBarOf } from '../../viz/latheScene.js';   // t1301 — a lathe probe's stylus is the form's declared radius, scaled to the bar
 
 // t309 — THE 2D-ANIMATION OVERLAY: a path-only toolpath2d <canvas> UNDER the Layout SVG (behind, pointer-events:none via
 // CSS) so the animated toolpath + red probe head show under the interactive handles. Created ONCE per container (memoised
@@ -316,10 +316,14 @@ export const userOpView = {
         // honours, so declaring it here settles the question for the mesh AND the header at once — no flag set
         // beside the owner, nothing to lose a race with whatever rebuilds next. A picked table tool still wins:
         // this is the fallback for "no tool chosen", where the honest default on a lathe is not an endmill.
+        // t1305 — resolved BEFORE the tool, because a lathe probe's stylus is scaled against the bar this op shows.
+        // (A stored def carries data, not functions, so the op's declared sim-stock comes from the registry.)
+        let _simStock = null;
+        try { const _fn = getUserSimStock(_def.opType); const _gs = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; _simStock = _fn ? _fn(params, _gs) : null; } catch (_) { /* op declares no sim-stock */ }
         if (!_opTool && _def && _def.latheTool === 'probe') {
             // t1301 — a lathe PROBE declares the stylus the FORM declares, sized against the bar it touches (the mill
             // probe body dwarfed a Ø20 bar, and its ball was unrelated to the radius the emit compensates by).
-            try { _opTool = { ...latheProbeTool(params.tipRadius, latheBarFrom(params, _def.simStockFallback || {}), _def.latheProbeAxis), _default: true }; } catch (_) { _opTool = { type: 'probe', dia: 6, _default: true }; }
+            try { _opTool = { ...latheProbeTool(params.tipRadius, latheBarOf(_def, params, _simStock), _def.latheProbeAxis), _default: true }; } catch (_) { _opTool = { type: 'probe', dia: 6, _default: true }; }
         } else if (!_opTool && _def && _def.latheTool) _opTool = { type: _def.latheTool, dia: 6, _default: true };
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
@@ -362,8 +366,6 @@ export const userOpView = {
         });
         // t417 E3 — a per-op SIM-STOCK override (the rotary twin projects a round bar from #57; sim-only, no global mutation).
         // Feeds BOTH the sim-starts (opSimStarts) AND the preview render (preview3D) so the bar + the flank starts agree.
-        let _simStock = null;
-        try { const _fn = getUserSimStock(_def.opType); const _gs = (window.ddcsGetSettings && window.ddcsGetSettings().stock) || null; _simStock = _fn ? _fn(params, _gs) : null; } catch (_) { /* op declares no sim-stock */ }
         let gcode = '';
         if (isGroup) {
             // group: no builder — emit the stored children with the form values applied (a pure view, no recordOp).

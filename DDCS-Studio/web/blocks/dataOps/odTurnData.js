@@ -121,22 +121,11 @@ export function rebuildOdTurn(stack, resolved) {
 }
 
 /**
- * A STRAIGHT turn's far-end diameter is not a copy of the target — it IS the target. Writing the reference keeps one
- * source and makes the macro say so; a taper leaves the typed number alone.
+ * t1305 — `applyStraightEnd` IS GONE, and its absence is the point. It existed to patch the far-end socket back to
+ * the one-source reference (`#133=#132`) after instantiate() baked a concrete number into a snapshot. The macro now
+ * decides straight-vs-taper at RUN TIME, so the builder writes that reference itself for a straight turn and the
+ * patcher could only ever disagree with it — which it had already started doing, in its note text.
  */
-export function applyStraightEnd(stack, resolved) {
-    if (odKind(resolved && resolved.kind) === 'taper') return stack;
-    const walk = (blocks) => (blocks || []).forEach((b) => {
-        if (b.type === 'assign' && b.params && b.params.var === OD_VARS.dEnd) {
-            b.params.value = OD_VARS.dTarget;
-            b.params.note = 'far-end DIAMETER — the target itself, so a straight turn stays straight';
-        }
-        if (b.children) walk(b.children);
-        if (b.uiChildren) walk(b.uiChildren);
-    });
-    walk(stack);
-    return stack;
-}
 
 /** The twin, ready for registerUserOp — a Lathe-group op with a 2D panel and no rotary/machine sim claims. */
 export function odTurnDataDef() {
@@ -153,7 +142,6 @@ export function odTurnDataDef() {
     // bindings stay correct. (Setting it anyway cost the `.wiz` round trip its identity — bindingSpecs is not part of
     // the wizard file format, so an exported copy came back missing it.)
     // REGENERATE FIRST (the shape follows kind), THEN the straight-end reference — order matters: the rebuild emits a
-    // concrete far-end number, and applyStraightEnd turns it back into the one-source reference for a straight turn.
-    def.postInstantiate = (stack, resolved) => applyStraightEnd(rebuildOdTurn(stack, resolved), resolved);
+    def.postInstantiate = (stack, resolved) => rebuildOdTurn(stack, resolved);
     return def;
 }

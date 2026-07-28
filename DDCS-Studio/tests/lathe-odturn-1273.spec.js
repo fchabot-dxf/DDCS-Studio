@@ -65,6 +65,7 @@ test('THE EMIT is a PARAMETRIC macro — a #var header, a controller-side loop, 
             labels: stack.filter((b) => b.type === 'label').map((b) => b.params.n),
             jumps: stack.filter((b) => b.type === 'ifgoto').map((b) => `${b.params.lhs}${b.params.op}${b.params.rhs}->${b.params.goto}`),
             moves: stack.filter((b) => b.type === 'move').length,
+            movesFine: O.odTurnStack({ ...C, doc: 0.2 }).filter((b) => b.type === 'move').length,   // 5× the passes
         };
     }, CASE);
     // THE HEADER SPEAKS DIAMETER — the number a person types, in the units they say it in…
@@ -89,7 +90,10 @@ test('THE EMIT is a PARAMETRIC macro — a #var header, a controller-side loop, 
     // a zero depth of cut would spin the counting loop forever — the macro defends itself
     expect(r.jumps.some((j) => j.startsWith(`${r.vars.doc}>0`)), 'a zero depth of cut is guarded, not trusted').toBe(true);
     // NOT UNROLLED: three roughing passes must not mean three copies of the cut moves
-    expect(r.moves, 'the move count is fixed — the passes come from the loop, not from repetition').toBeLessThan(12);
+    // t1305 — the number that matters is not a threshold, it is that the move count DOES NOT GROW WITH THE PASSES:
+    // the macro loops, it does not unroll. (The absolute count went from 11 to 14 when the three roughing routes
+    // moved into the program; a threshold would have to be re-guessed every time the macro gains a route.)
+    expect(r.movesFine, 'five times as many passes, not one move more — the loop is doing the repeating').toBe(r.moves);
 });
 
 test('THE SIM RUNS THE LOOP — the resolved trace cuts at exactly the hand-derived radii, over the declared depth', async ({ page }) => {
@@ -124,16 +128,22 @@ test('THE SIM RUNS THE LOOP — the resolved trace cuts at exactly the hand-deri
 
 test('THE RETRACT COMES OFF THE PART FIRST — +X, then +Z (the turning convention)', async ({ page }) => {
     await boot(page);
+    // t1305 — READ OFF THE EXECUTED PATH, not the stack order. The macro now carries three roughing routes and jumps
+    // between them, so "the block after the cut" is no longer the block that RUNS after it. The convention was always
+    // about what the machine does: come off the part in X, and only then back out in Z.
     const order = await page.evaluate(async (C) => {
         const O = await import('/wizards/lathe/odTurn.js');
-        const stack = O.odTurnStack(C);
-        const V = O.OD_VARS;
-        // the roughing loop: the cut along the bar, then what happens next
-        const i = stack.findIndex((b) => b.type === 'move' && b.params.mode === 'cut' && b.params.z === V.zEnd);
-        return stack.slice(i, i + 3).map((b) => `${b.params.mode}:${b.params.x || ''}/${b.params.z || ''}`);
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const { traceToolpath } = await import('/engine/trace.js');
+        const segs = traceToolpath(String(emitProgram(O.odTurnStack(C)))).segments || [];
+        const i = segs.findIndex((s) => !s.rapid && Math.abs(s.z2 + C.depth) < 0.001);   // the first cut to full depth
+        return segs.slice(i, i + 3).map((s) => ({ rapid: !!s.rapid, dx: +(s.x2 - s.x1).toFixed(3), dz: +(s.z2 - s.z1).toFixed(3) }));
     }, CASE);
-    expect(order[1], 'the first retract is in X, clear of the surface just cut').toMatch(/rapid:#126\//);
-    expect(order[2], 'only THEN does it come back in Z — the other order drags the tool along the part').toMatch(/rapid:\/#130/);
+    expect(order[1].rapid, 'what follows the cut is a rapid').toBe(true);
+    expect(order[1].dx, 'moving OUT in X, clear of the surface just cut').toBeGreaterThan(0);
+    expect(order[1].dz, 'and not in Z at the same time').toBeCloseTo(0, 3);
+    expect(order[2].dz, 'only THEN does it come back in Z — the other order drags the tool along the part').toBeGreaterThan(0);
+    expect(order[2].dx, 'by then already clear').toBeCloseTo(0, 3);
 });
 
 test('A TAPER is one interpolated finishing pass — not a second code path', async ({ page }) => {
@@ -171,8 +181,13 @@ test('A TAPER is one interpolated finishing pass — not a second code path', as
     // A TAPER IS DIFFERENT NUMBERS, and t1291 adds the cone-following roughing it needs in order not to gouge the
     // part. The MOVE count is unchanged — one cut per pass either way; what the taper adds is the ARITHMETIC that
     // says how far that cut may run. (The straight arm is byte-identical, asserted separately.)
+    // t1305 — AND NOW IT IS LITERALLY THE SAME PROGRAM. The straight/taper choice moved onto the controller, so the
+    // two emits carry the identical machinery and differ ONLY in the far-end number the header hands it. This assert
+    // used to say the taper had MORE arithmetic than the straight turn; that was true of build-time branching and is
+    // the opposite of what this turn set out to achieve.
     expect(r.taperMoves, 'the same moves — a taper does not add passes').toBe(r.straightMoves);
-    expect(r.taperVars, 'what it adds is the crossing it has to work out').toBeGreaterThan(r.straightVars);
+    expect(r.taperVars, 'and the same arithmetic: one program, both shapes').toBe(r.straightVars);
+    expect(r.nc, 'the crossing is worked out at run time, behind the straight test').toMatch(/IF #128==#122 GOTO/);
 });
 
 test('THE TWIN registers in the Lathe group, IDENTITY-FIRST, with bindings derived BY IDENTITY', async ({ page }) => {
@@ -221,9 +236,12 @@ test('A STRAIGHT turn REFERENCES the target for its far end — one source, not 
             return hit;
         };
         const mk = (kind) => JSON.parse(JSON.stringify([{ type: 'user_root', params: {}, children: O.odTurnStack({ kind, endDiameter: 18 }) }]));
+        // t1305 — asked of the BUILDER, which is where the answer now lives. The twin used to patch this socket
+        // after the fact (applyStraightEnd); with the shape decided at run time the builder writes the reference
+        // itself, so the patcher was a second opinion waiting to drift — and had already drifted in its note.
         return {
-            straight: grab(D.applyStraightEnd(mk('straight'), { kind: 'straight' })),
-            taper: grab(D.applyStraightEnd(mk('taper'), { kind: 'taper' })),
+            straight: grab(mk('straight')),
+            taper: grab(mk('taper')),
             targetVar: O.OD_VARS.dTarget,
         };
     });
@@ -472,12 +490,18 @@ test('A STRAIGHT TURN IS UNTOUCHED — the taper is numbers, not a second progra
                  lines: nc.split(String.fromCharCode(10)).filter((l) => l.trim()).length,
                  cuts: (nc.match(/^G1 /gm) || []).length };
     });
-    // none of the taper machinery appears in a straight program: no crossing, no extrapolated start, no extra labels
-    expect(r.nc.includes(r.V.zCross), 'no crossing variable').toBe(false);
-    expect(r.nc.includes(r.V.xStartFin), 'no extrapolated finish start').toBe(false);
-    expect(r.nc, 'and no extra jump targets').not.toMatch(/N6[45]\b/);
-    // …and the shape the earlier turns pinned is exactly as it was: one cut per roughing pass plus the finish
-    expect(r.cuts, 'the same cutting moves as before').toBe(2);
+    // t1305 — THIS ASSERT'S PREMISE CHANGED BY RULING, and the replacement is stricter about what matters. The
+    // straight/taper choice moved INTO the macro so an operator retuning the far end at the machine gets
+    // cone-following roughing — so a straight program now CARRIES the taper machinery and jumps over it. The property
+    // worth pinning was never "the text has no crossing variable"; it is that a straight turn EXECUTES the moves it
+    // always did, which od-runtime-taper-1305 asserts against the sim (and which was re-verified move-for-move
+    // against the pre-branch build). What the TEXT must still be true of:
+    expect(r.nc, 'the branch is taken on the two RADII, with no trig anywhere').toMatch(/IF #128==#122 GOTO/);
+    expect(r.nc, 'and a straight program lands in the straight route').toMatch(/N67/);
+    // …the crossing formula divides by [#128-#122], which is exactly zero here, so the IF must come FIRST and the
+    // controller never reach that line. Text ORDER is the only place that can be checked.
+    expect(r.nc.indexOf('IF #128==#122'), 'the straight test precedes the division it guards')
+        .toBeLessThan(r.nc.indexOf('/[#128-#122]'));
 });
 
 test('FACING WITH NO DEPTH PER PASS TAKES ONE SKIM — the comment and the emit finally agree', async ({ page }) => {

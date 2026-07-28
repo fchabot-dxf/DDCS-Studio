@@ -79,7 +79,6 @@ export function withLatheScene(def, fallback, tool = 'turning', probeAxis = null
     def.simStock = (params, stock) => latheSimStock(params, stock, fallback);
     def.latheTool = tool;
     if (probeAxis) def.latheProbeAxis = probeAxis;   // t1301 — which way a stylus stands off; only a probe has one
-    def.simStockFallback = fallback;                 // …so a consumer can rebuild the same bar this op shows
     return def;
 }
 
@@ -165,4 +164,23 @@ if (typeof window !== 'undefined') {
     // …applied when the workspace BECOMES a lathe, and once at boot for one that already is (app.js).
     window.addEventListener('ddcs:machine-changed', () => { try { applyLatheWorkspaceStock(); } catch (_) {} });
     window.ddcsApplyLatheStock = applyLatheWorkspaceStock;
+}
+
+/**
+ * t1305 — THE BAR AN OP SHOWS, read back out of the op's own declared sim stock.
+ *
+ * A consumer that needs the bar (the probe render, to size a stylus against it) asks the DECLARED hook rather than a
+ * second copy of the defaults. The first version of this stored the fallback on the def — which broke the `.wiz`
+ * round trip, because plain fields travel and that one had no reason to: `simStock` is re-attached on import, so
+ * deriving from it is both shorter and the only version that survives an export.
+ */
+export function latheBarOf(def, params, simStock) {
+    try {
+        // …the RESOLVED sim stock when the caller has one (the view resolves it through the registry, since a stored
+        // def carries data and not functions), else the def's own hook. Either way it is the op's DECLARED bar.
+        const st = simStock || ((def && typeof def.simStock === 'function') ? def.simStock(params || {}, null) : null);
+        if (!st) return normalizeBar({});
+        const face = Number(st.faceZ) || 0;
+        return normalizeBar({ diameter: st.diameter, stickOut: (Number(st.z) || 0) - face, allowance: face });
+    } catch (_) { return normalizeBar({}); }
 }
