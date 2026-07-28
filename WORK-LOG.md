@@ -18503,3 +18503,68 @@ counts pickers and fails against the real old behaviour. That is the [[assert-th
 walked into it twice in one turn before catching it.
 
 GATE after the amendment: 129/129 (smoke + all three folders' specs + manager/save/update/loading).
+
+---
+
+## turn 1265 -- THE CLOSE X JOINS THE IDENTITY BAND. One header, not a control belonging to the tabs.
+
+The X sat in the tab-strip row, which read as if it closed the TABS. Lifted into the identity band's own row it is
+the modal's one true header: what this is on the left, the way out on the right.
+
+THE ONE STRUCTURAL DECISION: the X is a SIBLING of the band, not a child of it. `#set_identity_band` has its
+innerHTML rewritten whenever the machine changes, so a button living inside would be wiped on the next render — the
+kind of bug that only shows up after someone renames their workspace. A wrapper row holds both.
+
+THE PHONE CASE, which is the whole risk of the move: the band already wraps/truncates, so an X floating over it would
+land on the envelope text. It is a flex sibling with a reserved 44px box, so the band ends BEFORE it — measured at
+390px: band right edge 338, X left edge 346, X 44x44 fully inside the viewport. `align-items: flex-start` keeps it
+level with the NAME line rather than drifting to the middle of a band that has wrapped to two lines.
+
+### A DUPLICATE I MADE, AND REMOVED.
+
+I appended two regression tests and then found the file already carried a t1265 pair covering the same ground -- and
+the existing one is BETTER than mine: it CLICKS the X and asserts the modal actually closes, which mine never did. So
+mine went, and I grafted on the single thing they lacked: that the X is in the top-right CORNER, since "to the right
+of the band" is also true of a button floating in the middle of the row. One coherent pair, not four overlapping
+tests. (Two of the smaller wins in this project have come from reading what is already there before adding to it.)
+
+GATE (fast tier): smoke + settings-ia / settings-responsive / mobile-settings / manager / controller-group / faq =
+96/96. SCREENSHOTS: s1265-header-desktop.png, s1265-header-futuristic.png (both themes), s1265-header-390.png.
+
+### AMENDMENTS: the save-location preference is deleted, and the manager's opening tab is decided by CONTEXT.
+
+**(1) THE PREFERENCE IS GONE** — the row on the Cloud tab and the plumbing behind it. The reasoning is the part worth
+keeping: the CONTEXT already decided everything the setting claimed to. A plain Save returns a file to the shelf it
+lives on; Save As follows the tab you are looking at; a new workspace runs the name+folder dialog; a project save
+targets the cloud when you are signed in. A setting sitting on top of that could only ever DISAGREE with what the
+screen was showing — and when a setting and the visible context disagree, people trust the screen.
+
+SAVEPREFS' OTHER CONSUMERS, since I was asked: exactly one — `ui/projects/projectModal.js`, which used
+preferredSaveTarget() to pick the project save dialog's initial target and getDefaultSaveLocation() to decide whether
+to show the "saved locally" note. Both now read the context directly (signed in → cloud). savePrefs keeps the two
+things that were never preferences: cloudConnected() and localFallbackNote(). SAVE_LOCATIONS, the storage key,
+getDefaultSaveLocation, setDefaultSaveLocation and preferredSaveTarget are deleted, and a test asserts the module's
+export list is exactly the two survivors so a future caller cannot quietly reintroduce the control.
+
+**(2) THE OPENING TAB, from context:** an explicit place from the caller wins; else the CURRENT workspace's own shelf
+(a Drive-living file opens on Cloud, a local one on Local — even while signed in, because the file you are in beats
+the account you have); else Cloud when signed in, Local otherwise. Tabs stay freely clickable.
+
+A REAL BUG SURFACED WHILE SPECCING CASE 3: my first version asked `fileSavedPlace()` whether the workspace had a
+home — but that function answers "which shelf does a save go to" and DEFAULTS TO 'local' when there is no file at
+all. Sensible for the save path, wrong for this question: every unsaved workspace looked local-living and the
+signed-in case was unreachable. "Has a home" is answered by the saved NAME. Caught because the test asserted the
+third case rather than only the two that happened to work.
+
+### THREE SPECS RE-ENCODED, NOT BENT.
+
+  - the two t1245 pref tests → the row's ABSENCE (signed in AND signed out) + the module exposing no getter/setter.
+  - `cloud-default-754` → its real subject survives (cloud pre-targeted when connected, the offline note, the
+    failure fallback). The one test that asserted "the setting flips the default" had NO SUBJECT LEFT, so it became
+    an assertion that the preference cannot come back — rather than bending it around a control that is gone.
+  - `workspace-cloud-tab-1233` × 2 → they assumed "local is where you start", which was a DEFAULT, not their subject.
+    Both now ask for the tab they need explicitly (the race test in particular must start on Local, or the switch it
+    stages never happens), and the opening tab has its own three-case test.
+
+GATE: 139/139 (smoke + settings/manager/cloud/save/library/permission/loading/responsive).
+SCREENSHOT: s1265-cloud-no-pref.png — signed in with no file, opened on Cloud by context, no preference row.
