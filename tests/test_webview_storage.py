@@ -4,7 +4,7 @@ THE DESKTOP APP MUST REMEMBER (t1259) — unit-test the storage policy the launc
 Background, because this bug survived a fix and a release: pywebview defaults to PRIVATE MODE, which discards
 localStorage + IndexedDB when the window closes. In Studio that storage is the workspace buffer, the save watermark
 and the File System Access handles for all three granted folders — so the app forgot everything on every restart.
-t1257 fixed `bridge/bridge-app/desktop.py`; the shipped exe is built from `fairy_gateway.py`, which still called a
+t1257 fixed a launcher that the exe is not built from; the shipped exe is built from `fairy_gateway.py`, which still called a
 bare `webview.start()`. One policy, two launchers, one of them fixed.
 
 What CANNOT be tested here is pywebview actually persisting to disk in a real window — that is the user's retest.
@@ -64,7 +64,9 @@ def test_extra_kwargs_pass_through():
 
 def test_both_launchers_defer_to_the_helper():
     """The actual root cause was TWO COPIES of the policy. Neither launcher may decide storage on its own again."""
-    for rel in [("fairy_gateway.py",), ("bridge", "bridge-app", "desktop.py")]:
+    # t1287 — desktop.py is DELETED (the user confirmed the .bat that ran it never runs; CI's build_fairy.ps1 is the
+    # only builder). fairy_gateway.py is the one launcher, so it is the one this asserts about.
+    for rel in [("fairy_gateway.py",)]:
         path = os.path.join(ROOT, *rel)
         src = open(path, encoding="utf-8").read()
         assert "start_persistent(webview)" in src, f"{path} does not go through the shared helper"

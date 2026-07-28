@@ -83,12 +83,12 @@ export const BACKUP_STORES = [
     { id: 'campack', label: 'CAM pack', ...ls('ddcs_campack'), count: (v) => len(v && v.slots), unit: 'slots' },
     { id: 'wizardLayout', label: 'Wizard bar layout', ...ls('ddcs_wizard_layout'), count: (v) => (v ? (len(v.customGroups) + Object.keys(v.entries || {}).length) : 0), unit: 'overrides' },
     { id: 'presets', label: 'Wizard presets', ...lsPrefix('ddcs_tpl_'), count: (v) => (v ? Object.values(v).reduce((n, list) => n + len(list), 0) : 0), unit: 'presets' },
-    { id: 'variables', label: 'Variables', ...ls('ddcs_vars_persistent'), count: (v) => (Array.isArray(v) ? v.filter((x) => x && !x.isSys).length : 0), unit: 'user vars' },
-    { id: 'displayPrefs', label: 'Preview display prefs', ...ls('ddcs_display'), count: (v) => (v ? Object.keys(v).length : 0), unit: 'elements' },
-    { id: 'panePrefs', label: 'Panel layout', ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_follow_exec', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },
+    { id: 'variables', label: 'User variables (your #var values)', ...ls('ddcs_vars_persistent'), count: (v) => (Array.isArray(v) ? v.filter((x) => x && !x.isSys).length : 0), unit: 'user vars' },
+    { id: 'displayPrefs', label: 'What the 3D preview shows', ...ls('ddcs_display'), count: (v) => (v ? Object.keys(v).length : 0), unit: 'elements' },
+    { id: 'panePrefs', label: 'Window layout (which panes are open, their sizes)', ...lsMulti(['ddcs_panes', 'ddcs_pane_ratio', 'ddcs_follow_exec', 'ddcs_form_sections']), count: (v) => (v ? Object.keys(v).length : 0), unit: 'keys' },
     // The project VOLUME is written by CLEAR-then-import (its importAllEntries puts entry by entry, so a bare import
     // would MERGE the file's projects into whatever this browser held — the blend a whole-file open must not produce).
-    { id: 'projects', label: 'Projects (local)', async: true, count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects',
+    { id: 'projects', label: 'Saved programs (projects)', async: true, count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects',
       read: () => exportAllEntries(), write: (val) => importAllEntries(val), clear: () => clearAllEntries() },
 ];
 
@@ -218,6 +218,23 @@ export function workspaceDelta() {
  * DELETED the name, leaving the manager to report "Untitled workspace · Saved · nothing has changed" (the state the
  * user screenshotted). A nameless call now records nothing at all rather than half a fact.
  */
+/**
+ * t1287 (user, live) — WHAT A SAVE ACTUALLY WROTE, captured BEFORE the baseline moves.
+ *
+ * A bound-file save gives no browser dialog, so without this it is silent: the work goes to disk and the screen says
+ * nothing. The changed-store summary the save-first modal already computes is the ONE source for what to say — but it
+ * is measured against a baseline that `markWorkspaceSavedToFile` resets, so it has to be read FIRST or every save
+ * reports "nothing changed". Returns only the stores that really changed, with their counts.
+ */
+export function changedStoresSince() {
+    const rows = workspaceDelta();
+    // NO BASELINE = NOT KNOWN, which is a different answer from "nothing changed". Before the first save to a file
+    // there is nothing to compare against, and that save writes the WHOLE workspace — reporting it as "nothing had
+    // changed" would be false in the one case where the most is happening. `null` says we cannot name the parts.
+    if (!rows.some((r) => r.changed !== null)) return null;
+    return rows.filter((r) => r.changed).map((r) => ({ id: r.id, label: r.label, count: r.count, unit: r.unit }));
+}
+
 export function markWorkspaceSavedToFile(name, place = 'local') {
     const file = String(name == null ? '' : name).trim();
     if (!file) return;   // not a file save — recording it as one is how the impossible state got made
@@ -292,5 +309,6 @@ if (typeof window !== 'undefined') {
     window.ddcsFileSavedAt = fileSavedAt;
     window.ddcsFileSavedName = fileSavedName;
     window.ddcsFileSavedPlace = fileSavedPlace;   // t1233 — local folder or Drive
-    window.ddcsWorkspaceDelta = workspaceDelta;   // t1223 — the manager's per-store delta
+    window.ddcsWorkspaceDelta = workspaceDelta;
+    window.ddcsChangedStoresSince = changedStoresSince;   // t1287 — what a save is about to write   // t1223 — the manager's per-store delta
 }

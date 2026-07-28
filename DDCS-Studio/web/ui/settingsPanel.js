@@ -949,9 +949,17 @@ function buildSettingsOverlay() {
             #settings-app .settings-content { flex: 1; min-width: 0; overflow-y: auto; padding: 16px 20px; background: var(--bg); }
             #settings-app .settings-foot { flex: 0 0 auto; padding: 8px 16px; border-top: 1px solid var(--border); background: var(--panel); display: flex; gap: 8px; }
             #settings-app .settings-head { justify-content: space-between; }
-            #settings-app .settings-close { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; cursor: pointer; color: #fff; font-size: 14px; font-weight: 700; line-height: 1; border-radius: 6px; border: 1px solid #8e1408; background: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 2px rgba(0,0,0,.35); text-shadow: 0 1px 1px rgba(0,0,0,.35); padding: 0; min-height: 0; }
-            #settings-app .settings-close:hover { filter: brightness(1.08); background: linear-gradient(180deg, #ff8276 0%, #ef4d33 45%, #d62311 50%, #e6431c 100%); }
-            #settings-app .settings-close:active { transform: translateY(1px); box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
+            /* t1287 (user) — SMALLER AND MORE ELEGANT. It was a glossy red button: a gradient, an inset highlight, a
+               dark ring and a text shadow, all to say "close". Closing a settings panel is not a warning, and a
+               control that shouts drowns the one thing on this bar that IS worth reading — the identity band beside
+               it. The GLYPH shrinks and goes quiet (flat, no gloss, no ring until you reach for it); the HIT AREA is
+               untouched at 44px, guaranteed by the min-width/min-height in the .settings-headerrow rule below, so
+               what shrinks is what you SEE, not what you can press. The t1265 rule stands: it keeps its own corner
+               and never rides over the band's text. */
+            #settings-app .settings-close { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; cursor: pointer; color: rgba(255,255,255,.72); font-size: 13px; font-weight: 600; line-height: 1; border-radius: 6px; border: 1px solid transparent; background: transparent; box-shadow: none; text-shadow: none; padding: 0; min-height: 0; transition: color 120ms, background-color 120ms, border-color 120ms; }
+            #settings-app .settings-close:hover { color: #fff; background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.22); }
+            #settings-app .settings-close:active { background: rgba(0,0,0,.18); }
+            #settings-app .settings-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
             #settings-app .settings-foot { justify-content: flex-end; }
             #settings-app .settings-done { background: var(--accent); color: #fff; border: none; border-radius: var(--radius, 5px); padding: 7px 24px; font-size: 13px; font-weight: 600; cursor: pointer; transition: filter 120ms; }
             #settings-app .settings-done:hover { filter: brightness(1.12); }
@@ -1090,6 +1098,15 @@ function buildSettingsOverlay() {
                 </div>
                 <!-- LOOK AND FEEL: EDITOR (authoring assists — Blocks suggestions + Studio editor autocomplete) -->
                 <div id="set_tab_compose" style="display:none;">
+                    <!-- t1287 (user) — FOLLOW EXECUTION moved off the editor's corner and lands HERE, in the Editor tab
+                         where editor preferences already live. Deliberately NOT the preview's FOLLOW CAMERA section:
+                         that one centres the CAMERA on the tool in 3D, this one scrolls the TEXT. They share a word and
+                         nothing else, and filing them together is how someone ends up toggling the wrong one. -->
+                    <div class="settings-section">
+                        <div class="settings-section-title">WHILE A PROGRAM PLAYS</div>
+                        <label class="settings-check"><input type="checkbox" id="set_follow_exec"> Follow execution — scroll the editor to keep the running line in view</label>
+                        <div class="settings-hint">Off by default: the editor never jumps under you mid-run unless you ask it to. The running line is highlighted in the text either way.</div>
+                    </div>
                     <div class="settings-section">
                         <div class="settings-section-title">EDITOR ASSISTS</div>
                         <div class="settings-hint">Authoring help across both editors — the Blocks tab and the Studio text editor. All optional.</div>
@@ -3054,6 +3071,20 @@ function wireSettingsOverlay(ov) {
         const out = q('atc_tnc_out'); if (out) { out.value = nc; out.style.display = 'block'; }
         const dl = q('atc_dl_tnc'); if (dl) dl.style.display = '';
     });
+    // t1287 (user) — FOLLOW EXECUTION moved here from a floating button on the editor corner. Same `ddcs_follow_exec`
+    // pref, same auto-scroll machinery, same in-text highlight: only the control moved, because a preference that
+    // looks like a tool invites people to treat it as one.
+    {
+        const cb = q('set_follow_exec');
+        if (cb) {
+            import('./panePrefs.js').then(({ getFollowExecOn, setFollowExecOn, onFollowExecChange }) => {
+                cb.checked = !!getFollowExecOn();
+                cb.addEventListener('change', () => setFollowExecOn(!!cb.checked));
+                onFollowExecChange((on) => { cb.checked = !!on; });   // …stays true if anything else flips it
+            }).catch(() => {});
+        }
+    }
+
     // t1269 — the kind control: reads and writes the ONE machine record. Changing it re-renders the identity band
     // (which shows the kind) and the axis note below, because the same envelope numbers MEAN something different on
     // a lathe — X is a cross-slide radius, Z is the carriage.

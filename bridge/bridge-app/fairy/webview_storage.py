@@ -6,7 +6,7 @@ workspace: localStorage holds the working buffer and the save watermark, Indexed
 handles for the workspaces folder, the library folder and the deploy target. So every close+reopen looked like
 amnesia (t1257, reported live).
 
-That fix was applied to `bridge/bridge-app/desktop.py`, and the amnesia survived the release — because the shipped exe
+That fix was applied to a second launcher (since DELETED, t1287), and the amnesia survived the release — because the shipped exe
 is built from `fairy_gateway.py` at the repo root by build_fairy.ps1, a DIFFERENT launcher with its own bare
 `webview.start()`. Two launchers, two copies of a policy, one of them fixed. The answer is not to fix the second copy
 too; it is to stop having copies. Both launchers now call `start_persistent()` and neither decides anything.

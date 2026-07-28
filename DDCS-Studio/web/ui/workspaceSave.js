@@ -14,7 +14,7 @@
  * with no dialog — a real "Save". Opening a workspace RETARGETS that handle (see ui/workspaceManager.js), because a
  * save that still points at the previously-open file would silently overwrite it with someone else's contents.
  */
-import { buildBackup, markWorkspaceSavedToFile, exportEverything, fileSavedName, fileSavedPlace } from '../data/backup.js';
+import { buildBackup, changedStoresSince, markWorkspaceSavedToFile, exportEverything, fileSavedName, fileSavedPlace } from '../data/backup.js';   // t1287 — a save says what it wrote
 import { setMachineName } from '../data/workspaceMachine.js';   // t1223 — saving names the workspace
 import { getHandle, putHandle, requestHandle, handleGranted, FILE_KEY, FOLDER_KEY } from '../data/fsHandles.js';
 import { dlgConfirm } from './dialog.js';
@@ -140,6 +140,7 @@ async function fileInFolder(dir, name) {
  * Returns {ok, name, viaFsa, aborted?}.
  */
 export async function saveWorkspace({ pickNew = false, suggestedName = '', to = '' } = {}) {
+    try { if (window.ddcsDismissSaved) window.ddcsDismissSaved(); } catch (_) {}   // t1287 — the last confirmation must not block this one's dialog
     // t1233 — WHERE does this workspace live? An explicit `to` (the manager's active tab) wins; otherwise a plain Save
     // goes back where it came from, so a cloud workspace re-saves to the cloud with no dialog, exactly like a local one.
     const place = to || fileSavedPlace();
@@ -222,16 +223,23 @@ async function saveToCloud({ pickNew = false, suggestedName = '' } = {}) {
 async function writeTo(h, name) {
     try { setMachineName(name); } catch (_) {}          // 1. the file's own machine record carries this file's name
     const text = JSON.stringify(await buildBackup(), null, 2);   // 2. build AFTER the stamp
+    // t1287 — WHAT THIS SAVE IS WRITING, read BEFORE the baseline moves (step 3 resets it, so afterwards every save
+    // would report "nothing changed"). The user's live report was that a bound-file save is silent: no dialog, no
+    // confirmation, no way to know it happened. This is what the confirmation says.
+    let changed = []; try { changed = changedStoresSince(); } catch (_) { changed = []; }
     await writeToHandle(h, text);
     markWorkspaceSavedToFile(name);                     // 3. baseline LAST — it must cover the stamped name
-    return { ok: true, name, viaFsa: true };
+    return { ok: true, name, viaFsa: true, changed };
 }
 
 function onKeydown(e) {
     if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
     if ((e.key || '').toLowerCase() !== 's') return;
     e.preventDefault();   // stop the browser's Save-Page dialog
-    saveWorkspace({ pickNew: e.shiftKey }).catch(() => {});   // Ctrl+Shift+S = Save As
+    // t1287 — the keyboard save announces too: it is the same write, and it is even quieter than the button.
+    saveWorkspace({ pickNew: e.shiftKey })
+        .then((res) => { try { if (window.ddcsAnnounceSaved) window.ddcsAnnounceSaved(res); } catch (_) {} })
+        .catch(() => {});   // Ctrl+Shift+S = Save As
 }
 
 function install() {

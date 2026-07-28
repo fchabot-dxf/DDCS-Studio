@@ -149,7 +149,7 @@ DDCS-Studio/            The app — a monorepo of three shells over one web core
     ui/                 Tabs, wizards, settings, gateway, CAM builder, icon editor, workspace save, …
     data/               Controller variable tables, CAM mappers, backup registry, dialects
 bridge/                 The machine gateway + controller research
-  bridge-app/           The Python gateway (server, transfer over SMB, Modbus, OAuth) + desktop.py
+  bridge-app/           The Python gateway (server, transfer over SMB, Modbus, OAuth)
   controllers/<id>/     Per-controller dialect notes, FINDINGS, and real firmware dumps (ground truth)
 ddcs-vscode-extension/  Experimental VS Code webview shell
 docs/                   Design notes, plans, and the at-machine verification checklist

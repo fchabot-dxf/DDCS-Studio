@@ -3644,13 +3644,6 @@ body #editor.editor-layer {
    of Copy. When ON it auto-scrolls the editor to keep the running line in view during playback (a display pref; the
    editor stays full-width — no strip, no padding inset). The minimap + all its gm-* CSS and pull-tab accommodations were
    removed here; the pull-tab (.viz3d-handle) reverts to its base right:0 anchor (pre-t812). */
-.follow-toggle {
-    position: absolute; top: 8px; right: 44px; z-index: 3; width: 22px; height: 22px; padding: 0;
-    border: 1px solid var(--border, #333); border-radius: 5px; background: var(--panel, #1a1a1a); color: var(--text-dim, #889);
-    font-size: 13px; line-height: 1; cursor: pointer; opacity: .55;
-}
-.follow-toggle:hover { opacity: 1; }
-.follow-toggle.on { color: var(--accent, #4a90d9); border-color: var(--accent, #4a90d9); opacity: .9; }
 
 .editor-layer {
     position: absolute;
@@ -4967,10 +4960,11 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 }
 .editor-copy-float:hover { opacity: 1; }
 .editor-copy-float.copied { color: #22c55e; opacity: 1; }
-/* t1227 — the editor FILE menu button, left of the follow-execution toggle (which sits at right:44px). Same floating
-   treatment as Copy so the corner reads as one row of pane tools. */
+/* t1227 — the editor FILE menu button. Same floating treatment as Copy so the corner reads as one row of pane tools.
+   t1287 — it used to sit at right:72px to clear the follow-execution toggle at right:44px; that toggle became a
+   Settings checkbox, so the file button closes the gap it was leaving for a button that no longer exists. */
 .editor-file-float {
-    position: absolute; right: 72px; top: 8px; z-index: 3; opacity: .75;
+    position: absolute; right: 44px; top: 8px; z-index: 3; opacity: .75;
     padding: 4px 5px; line-height: 0; display: inline-flex; align-items: center; gap: 2px;
 }
 .editor-file-float:hover { opacity: 1; }
@@ -5728,3 +5722,21 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     border-top-color: #4ab3ff; animation: ddcs-busy-rot 0.8s linear infinite; }
 .ddcs-busy-text { color: #dbe6f2; font-size: 13px; letter-spacing: 0.2px; }
 @keyframes ddcs-busy-rot { to { transform: rotate(360deg); } }
+
+/* t1287 (user, live, refined) — WHAT THE SAVE WROTE, as a dismissible popup. It was a label beside the disk chip,
+   and the refinement names why that failed: on a narrow screen the chip is not rendered at all, so the feedback went
+   to a place the user could not be looking. Centred, at every width, and it waits to be dismissed rather than timing
+   out — a message naming what was written should not vanish before it is read. */
+.saved-pop { position: fixed; inset: 0; z-index: 100001; display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 11, 16, 0.45); padding: 16px; }
+.saved-pop-card { max-width: min(92vw, 420px); display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 20px 24px; border-radius: 12px; text-align: center;
+    background: rgba(20, 26, 34, 0.97); border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 12px 44px rgba(0, 0, 0, 0.55); }
+.saved-pop-title { font-size: 15px; font-weight: 700; letter-spacing: .3px; color: #7ddc9a; }
+.saved-pop-name { font-size: 12.5px; color: #cfe0f2; word-break: break-word; }
+.saved-pop-what { font-size: 12px; color: #9fb2c6; line-height: 1.45; word-break: break-word; }
+.saved-pop-ok { margin-top: 8px; min-width: 84px; min-height: 36px; padding: 8px 18px; border-radius: 8px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.18); color: #e6edf5; font-size: 13px; }
+.saved-pop-ok:hover { background: rgba(255, 255, 255, 0.16); }
+
