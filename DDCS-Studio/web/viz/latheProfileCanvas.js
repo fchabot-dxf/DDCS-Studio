@@ -122,6 +122,12 @@ export function latheLayoutSpec(def, params, setFields) {
             sides: p.sides, acrossFlats: p.acrossFlats, depth: p.depth, segmentsPerFace: p.segmentsPerFace,
         }, write);
     }
+    if (/faceprobe/.test(String(def.opType || ''))) {
+        return faceProbeSpec(barFromSettings(null), { ahead: p.ahead, tipRadius: p.tipRadius }, write);
+    }
+    if (/odprobe/.test(String(def.opType || ''))) {
+        return odProbeSpec(barFromSettings(null), { caliperDiameter: p.caliperDiameter, tipRadius: p.tipRadius }, write);
+    }
     const bar = barFromSettings(null);
     return odProfileSpec(bar, {
         kind: p.kind, targetDiameter: p.targetDiameter, endDiameter: p.endDiameter, depth: p.depth,
@@ -287,6 +293,94 @@ export function drillProfileSpec(bar, drill, onChange) {
             if (id !== DRILL_DEPTH_HANDLE_ID || typeof onChange !== 'function') return;
             // depth grows into −Z, and a hole of zero depth is not a hole
             onChange({ depth: r3(Math.max(0.001, -canvasToZ(world.x))) });
+        },
+    };
+}
+
+// ── THE PROBE FAMILY (t1299) ────────────────────────────────────────────────────────────────────────────────────
+/** The face the stylus touches — dragging it says how far AHEAD of Z0 that face is. */
+export const FACE_PROBE_HANDLE_ID = 'probeFace';
+/** The measured bar diameter, dragged on the surface the stylus touches. */
+export const OD_PROBE_HANDLE_ID = 'probeOD';
+
+/** A stylus ball sitting ON a surface, with the direction it came from. Drawn the same way in both probe pictures. */
+function touchMarker(z, r, axis, tip) {
+    const t = Math.max(0.4, Number(tip) || 1);
+    return axis === 'z'
+        // …touching the FACE: the ball sits at +Z of it, and the approach runs in −Z
+        ? [{ kind: 'circle', cx: zToCanvas(z) + t, cy: r, r: t, cls: 'fc-probe-touch' },
+           { kind: 'line', x1: zToCanvas(z) + t * 5, y1: r, x2: zToCanvas(z) + t, y2: r, cls: 'fc-probe-approach' }]
+        // …touching the OUTSIDE: the ball sits at +X of it, and the approach runs inward
+        : [{ kind: 'circle', cx: zToCanvas(z), cy: r + t, r: t, cls: 'fc-probe-touch' },
+           { kind: 'line', x1: zToCanvas(z), y1: r + t * 5, x2: zToCanvas(z), y2: r + t, cls: 'fc-probe-approach' }];
+}
+
+/**
+ * THE FACE PROBE PICTURE. Two lines matter: the face the stylus will touch, and Z0. The distance between them is the
+ * op's one real decision, so it is what the handle writes — the same grab, on the same line, as facing's allowance.
+ * With the default of zero they coincide, which is the picture of "the face I touch IS zero".
+ */
+export function faceProbeSpec(bar, probe, onChange) {
+    const b = normalizeBar(bar);
+    const prof = halfProfile(b);
+    const barR = radiusOf(b.diameter);
+    const p = probe || {};
+    const ahead = Math.max(0, Number(p.ahead) || 0);
+    const tip = Math.max(0.3, Number(p.tipRadius) || 2);
+
+    return {
+        stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },
+        items: [
+            { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
+            // what still sits AHEAD of the datum being set — nothing at all when the touched face is Z0
+            ...(ahead > 1e-9 ? [{ kind: 'rect', x: zToCanvas(0), y: 0, w: ahead, h: barR, cls: 'fc-feature-pocket' }] : []),
+            { kind: 'line', x1: zToCanvas(0), y1: 0, x2: zToCanvas(0), y2: barR },              // Z0, what gets written
+            ...touchMarker(ahead, barR * 0.55, 'z', tip),
+        ],
+        handles: [
+            { id: FACE_PROBE_HANDLE_ID, x: zToCanvas(ahead), y: barR, kind: 'size', axis: 'x', teal: true,
+              label: 'touched face', value: ahead },
+        ],
+        onDrag: (id, world) => {
+            if (id !== FACE_PROBE_HANDLE_ID || typeof onChange !== 'function') return;
+            // …never behind Z0: a face BEHIND the datum would mean the finished face is still to be found, which the
+            // probe cannot know. Dragging stops where the two coincide — the ordinary touch-off.
+            onChange({ ahead: r3(Math.max(0, canvasToZ(world.x))) });
+        },
+    };
+}
+
+/**
+ * THE OD PROBE PICTURE. The bar is drawn at the MEASURED diameter, because that is what the op declares and what the
+ * DRO will read afterwards; the handle IS that measurement. It is a DIAMETER on the way in and out — the halving
+ * happens once, on the controller.
+ */
+export function odProbeSpec(bar, probe, onChange) {
+    const b = normalizeBar(bar);
+    const prof = halfProfile(b);
+    const p = probe || {};
+    const dia = Math.max(0.001, Number(p.caliperDiameter) || b.diameter);
+    const measuredR = radiusOf(dia);
+    const tip = Math.max(0.3, Number(p.tipRadius) || 2);
+    const zTouch = -Math.max(2, (prof.bounds.z2 - prof.bounds.z1) * 0.15);   // …on the round, a little back from the face
+
+    return {
+        stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: Math.max(measuredR, radiusOf(b.diameter)) },
+        items: [
+            { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
+            // THE MEASURED SURFACE — the line the datum is about, drawn the length of the bar
+            { kind: 'line', x1: zToCanvas(prof.bounds.z1), y1: measuredR, x2: zToCanvas(prof.bounds.z2), y2: measuredR },
+            { kind: 'line', x1: zToCanvas(0), y1: 0, x2: zToCanvas(0), y2: measuredR },
+            ...touchMarker(zTouch, measuredR, 'x', tip),
+        ],
+        handles: [
+            { id: OD_PROBE_HANDLE_ID, x: zToCanvas(zTouch), y: measuredR, kind: 'size', axis: 'y', teal: true,
+              label: 'measured Ø', value: r3(dia) },
+        ],
+        onDrag: (id, world) => {
+            if (id !== OD_PROBE_HANDLE_ID || typeof onChange !== 'function') return;
+            // a diameter out, because a diameter went in: diameterOf is the one converter, and it runs once
+            onChange({ caliperDiameter: r3(diameterOf(Math.max(0.001, world.y))) });
         },
     };
 }

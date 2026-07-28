@@ -56,6 +56,38 @@ export const OP_AXIS_NEEDS = {
     lathe_polygon: ['X', 'Z', 'A'],   // …the A is the point of the op: the chuck must TURN to a commanded angle   // …the only op in the app that needs ONE axis: the drill never leaves the centreline
 };
 
+/**
+ * t1299 — WHAT AN OP ASSUMES ABOUT THE FRAME, which is a different question from which axes exist.
+ *
+ * The axis table above asks CAN this machine move that way. The probe family needs the other question asked too: a
+ * mill has an X, a Z and a spindle, so nothing above would ever grey a lathe probe — and yet running one on a mill
+ * writes a WRONG NUMBER into the datum table, silently, which is the worst thing this app can do.
+ *
+ * Declared per op with ITS OWN sentence, because the hazards are not the same one twice: the OD probe's X is a
+ * RADIUS from a centreline a mill does not have, and the face probe is modelled on a bar's end face, where a mill
+ * user wants the edge probe instead. A single shared "wrong machine" message would name neither.
+ */
+export const OP_FRAME_NEEDS = {
+    lathe_odprobe: {
+        kind: 'lathe',
+        why: 'assumes the LATHE FRAME — X is a radius from the centreline. On a mill this would write a datum half the bar out, with nothing on screen looking wrong.',
+    },
+    lathe_faceprobe: {
+        kind: 'lathe',
+        why: 'assumes the end face of a BAR and a lathe Z0 (the FINISHED face). On a mill, the Edge probe sets a Z datum.',
+    },
+};
+
+/**
+ * The frame an op assumes that this machine is not. Empty string = nothing to say.
+ * @param {string} opType
+ */
+export function frameWhy(opType, machine = getMachine()) {
+    const need = OP_FRAME_NEEDS[String(opType || '').replace(/^user_/, '')];
+    if (!need || machine.kind === need.kind) return '';
+    return need.why;
+}
+
 /** The sentence a greyed op shows. Names the axis AND why we believe it is absent, so it is checkable. */
 export function axisWhy(missing, machine = getMachine()) {
     const axes = missing.join(' and ');
@@ -92,12 +124,13 @@ export function applyAxisGating(root = document) {
     root.querySelectorAll('[data-wiz], [data-optype]').forEach((el) => {
         const opType = el.dataset.optype || el.dataset.wiz || '';
         const missing = missingAxesFor(opType, machine);
-        const gated = missing.length > 0;
+        const frame = frameWhy(opType, machine);                    // t1299 — …or the right axes, wrong frame
+        const gated = missing.length > 0 || !!frame;
         el.classList.toggle('axis-gated', gated);
         el.setAttribute('aria-disabled', gated ? 'true' : 'false');
         if (gated) {
             if (el.dataset.origTitle === undefined) el.dataset.origTitle = el.title || '';
-            el.title = axisWhy(missing, machine);
+            el.title = missing.length > 0 ? axisWhy(missing, machine) : frame;
         } else if (el.dataset.origTitle !== undefined) {
             el.title = el.dataset.origTitle;
             delete el.dataset.origTitle;
@@ -106,7 +139,7 @@ export function applyAxisGating(root = document) {
 }
 
 if (typeof window !== 'undefined') {
-    window.ddcsAxisGating = { applyAxisGating, missingAxesFor, declaredAxes, axisWhy, OP_AXIS_NEEDS };
+    window.ddcsAxisGating = { applyAxisGating, missingAxesFor, declaredAxes, axisWhy, OP_AXIS_NEEDS, frameWhy, OP_FRAME_NEEDS };
     window.addEventListener('ddcs:machine-changed', () => { try { applyAxisGating(); } catch (_) {} });
     window.addEventListener('ddcs:settings-changed', () => { try { applyAxisGating(); } catch (_) {} });
 }

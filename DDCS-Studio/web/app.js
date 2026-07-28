@@ -22,6 +22,8 @@ import { odTurnDataDef } from './blocks/dataOps/odTurnData.js';
 import { partingDataDef } from './blocks/dataOps/partingData.js';   // t1275 — parting / grooving
 import { centerDrillDataDef } from './blocks/dataOps/centerDrillData.js';
 import { polygonDataDef } from './blocks/dataOps/polygonData.js';
+import { faceProbeDataDef } from './blocks/dataOps/faceProbeData.js';   // t1299 — the lathe probe family
+import { odProbeDataDef } from './blocks/dataOps/odProbeData.js';
 import { applyLatheWorkspaceStock } from './viz/latheScene.js';   // t1297 — a lathe workspace's workpiece IS a bar
 import './ui/axisGating.js';   // t1271 — grey (never hide) the ops this machine's declared axes cannot run
 import { atcLengthDataDef } from './blocks/dataOps/atcLengthData.js';   // t409 — ATC Tool Length light port (new twin, opened IN-PLACE from the ATC Tool Length slot)
@@ -100,6 +102,7 @@ const SEED_BUILDERS = [
     cornerDataDef, edgeDataDef, middleDataDef, rotaryCenterDataDef, rotaryClockDataDef, alignmentDataDef,
     commDataDef, ioStepDataDef, pauseConfirmDataDef, homingDataDef,
     facingDataDef, odTurnDataDef, partingDataDef, centerDrillDataDef, polygonDataDef,   // t1271/t1273/t1275/t1277 — LATHE: seeded for every workspace; the bar decides where it SITS by machine kind
+    faceProbeDataDef, odProbeDataDef,   // t1299 — the lathe PROBE family: they write the datum the five turning ops are measured from
 ];
 const seedBuilderFor = (opType) => SEED_BUILDERS.find((fn) => { try { return fn().opType === opType; } catch (_) { return false; } }) || null;
 
