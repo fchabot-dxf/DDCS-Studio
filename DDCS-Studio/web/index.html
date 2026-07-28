@@ -1875,6 +1875,19 @@
                 const { initProbeInputSelects } = await import('./ui/probeInputSelect.js');
                 initProbeInputSelects();
             } catch (err) { console.error('probe-input selects init failed', err); }
+
+            /* t1279 — THE SETTLED SIGNAL. Everything above is wired by DEFERRED dynamic imports, so `window.ddcsStudio`
+               exists LONG before the header buttons, the quick menu or the panels have handlers on them. Anything that
+               drives the app from outside — a test, a script, a future automation — was left guessing which global to
+               wait for, and under load a click landed on a control that was not listening yet and was simply swallowed
+               (that is the whole story of the lathe-model identity flake: the menu never opened, so the assertion timed
+               out on a menu that had never been asked to open).
+               ONE DECLARED SIGNAL instead of a guess: the flag says the deferred wiring is DONE, and the event is for
+               anyone who was already waiting. */
+            try {
+                document.documentElement.dataset.ddcsReady = '1';
+                window.dispatchEvent(new CustomEvent('ddcs:ready'));
+            } catch (_) { /* the app is up either way; the signal is for observers */ }
         })();
     </script>
     

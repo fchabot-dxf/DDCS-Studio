@@ -19,7 +19,13 @@ const web = join(fileURLToPath(new URL('.', import.meta.url)), '..', 'web');
 
 const boot = async (page) => {
     await page.goto('http://localhost:3211');
-    await page.waitForFunction(() => window.ddcsStudio && window.ddcsSetMachine, null, { timeout: 15000 });
+    // t1279 — wait for the DECLARED settled signal, not for a global that appears mid-boot. `window.ddcsStudio` is up
+    // long before the header quick-menu is wired (it comes from a deferred dynamic import), so under parallel load a
+    // click on #hdrPostBtn was landing on a button with no handler and being swallowed — the menu never opened and the
+    // assertion timed out waiting for a menu nothing had asked to open. This is the boot-quiescence rule: assert on
+    // the signal that says the app is READY, never on a proxy that happens to appear early.
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1'
+        && window.ddcsStudio && window.ddcsSetMachine, null, { timeout: 20000 });
 };
 
 test('(1) THE KIND is on the machine record, defaults to mill, and ROUND-TRIPS the .ddcs', async ({ page }) => {

@@ -6,10 +6,33 @@ WHY: the Expert's parser (parse.out, a Berkeley-yacc grammar) reports `syntax er
 ONLY on its own screen - it is not written to any file we can read over SMB. So instead of
 capturing the error after the fact, catch it BEFORE the macro ever reaches the controller.
 
-Grounded in:
-  * the parser's real vocabulary mined from parse.out (math fns ASIN/ACOS/ATAN/SQRT/ROUND/LN, etc.)
-  * the documented firmware quirks in the ddcs-expert skill CORE_TRUTH.md
-  * hazards we confirmed live on the machine 2026-06-06 (reading #1630 wedges the analyzer)
+Grounded in, and ONLY in, evidence of three declared kinds (t1279 - see THE EXPRESSION VOCABULARY below):
+  * DEMONSTRATED  - the construct appears in the 59 captured factory macros (CNCDISK/SYSDISK, 2026-06-10)
+  * VERIFIED      - we ran it on the machine and recorded the result (the V-series in verify/)
+  * ABSENT        - neither of the above. Not "forbidden", but not something to emit and hope.
+
+WHAT THIS HEADER USED TO CLAIM, AND WHY IT WAS WRONG (t1279):
+  it said the accepted vocabulary was "the parser's real vocabulary mined from parse.out (math fns ASIN/ACOS/ATAN/
+  SQRT/ROUND/LN, etc.)". Those lowercase names DO appear in parse.out - at offset ~3300, immediately after the string
+  `libm.so.6`, in the binary's ELF DYNAMIC-SYMBOL IMPORT TABLE. They are the C functions the FIRMWARE LINKS AGAINST,
+  not tokens the macro language exposes. Two things give it away: parse.out contains no UPPERCASE grammar tokens at
+  all - not even ABS, which demonstrably works - so nothing about the vocabulary can be read out of that file; and
+  `cos`/`sin` are not in the list at all while `asin`/`acos` are, which is the shape of a maths-library import table,
+  not of a G-code grammar. A linter that blesses COS[...] passes a macro the controller rejects with a syntax error
+  it only ever prints on its own screen - the exact failure this tool exists to prevent.
+
+THE EXPRESSION VOCABULARY, as the evidence actually supports it:
+  MATH FUNCTIONS   ABS[...]                        DEMONSTRATED (10 uses, e.g. `#24=ABS[#22-#23]`)
+                   everything else                 ABSENT - no trig, no SQRT, no FUP/FIX/ROUND/LN in the corpus
+  CONTROL FLOW     IF [...] GOTO<n>                DEMONSTRATED
+                   WHILE [...] DO<n>               DEMONSTRATED (35 uses)
+  WORD OPERATORS   EQ                              VERIFIED on machine (V10_operators.nc, 2026-06-23)
+                   NE                              DEMONSTRATED (25 uses, `WHILE [#[...] NE 0] DO14`)
+                   LT / GT / LE / GE               ABSENT
+  ARITHMETIC       + - * / , [ ] nesting, #n, #[n]  DEMONSTRATED throughout
+
+  * plus the documented firmware quirks in the ddcs-expert skill CORE_TRUTH.md
+  * plus hazards we confirmed live on the machine 2026-06-06 (reading #1630 wedges the analyzer)
 
 Severities:
   ERROR   - will fail to parse OR will freeze/wedge the controller (fix before running)
@@ -62,7 +85,7 @@ def scan_comments(line):
 
 
 # --------------------------------------------------------------------------- checks
-FANUC_OPS = re.compile(r"(?<![A-Za-z0-9_])(NE|LT|GT|LE|GE)(?![A-Za-z0-9_])")  # EQ excluded - CONFIRMED working (V10); others untested
+FANUC_OPS = re.compile(r"(?<![A-Za-z0-9_])(LT|GT|LE|GE)(?![A-Za-z0-9_])")   # EQ VERIFIED (V10); NE DEMONSTRATED (25 factory uses, t1279); LT/GT/LE/GE ABSENT
 ASSIGN = re.compile(r"#(\d+)\s*=\s*(.+?)\s*$")
 HASH_REF = re.compile(r"#(\d+)")
 GOTO_SPACE = re.compile(r"\bGOTO\s+([0-9\[])")
@@ -73,6 +96,13 @@ MCALL = re.compile(r"\b(MSETDATA|MGETDATA)\s*\[([^\]]*)\]")
 MSG_FMT = re.compile(r"#(1503|1505)\s*=\s*-?\d+\s*\(")
 LITERAL_ASSIGN = re.compile(r"#(\d+)\s*=\s*[-+]?\d+(?:\.\d+)?\s*$")  # '#n = <constant>'
 DWELL_DECIMAL = re.compile(r"\bG0*4\s+P(\d*\.\d+)")                  # 'G04 P3.0' - decimal dwell (NOT seconds)
+
+# t1279 - THE FUNCTION VOCABULARY, split by the evidence that supports it (see the header).
+DEMONSTRATED_FNS = {"ABS"}                                         # real code in the captured factory macros
+TRIG_FNS = {"COS", "SIN", "TAN", "ASIN", "ACOS", "ATAN", "ATAN2"}  # ABSENT - and geometry is where it bites
+OTHER_ABSENT_FNS = {"SQRT", "ROUND", "FUP", "FIX", "LN", "EXP", "POW", "MOD"}
+FN_CALL = re.compile(r"(?<![A-Za-z0-9_#])([A-Za-z]{2,6})\s*\[")
+FLOW_WORDS = {"IF", "WHILE", "DO", "GOTO", "THEN", "AND", "OR", "XOR"}   # control flow, not functions
 
 
 def _is_persistent(n):
@@ -95,6 +125,24 @@ def lint_line(n, raw, findings, primed=frozenset()):
         findings.append(Finding(n, "WARN", "W-GOTOSPACE",
                                 "space after GOTO ('GOTO 1') is accepted on the DDCS Expert - emit 'GOTO1' / "
                                 "'GOTO[expr]' for portability"))
+
+    # t1279 - FUNCTION VOCABULARY. Trig is an ERROR: no captured factory macro uses one, none is verified, and the
+    # names an earlier version of this file cited are the firmware's libm imports, not the grammar. A macro that needs
+    # a cosine must have it computed at POST time (that is what Studio's polygon turning does).
+    for m in FN_CALL.finditer(code):
+        fn = m.group(1).upper()
+        if fn in FLOW_WORDS or fn in DEMONSTRATED_FNS:
+            continue
+        if fn in TRIG_FNS:
+            findings.append(Finding(n, "ERROR", "E-NOTRIG",
+                                    f"'{fn}[...]' - the DDCS macro language has NO TRIG. No captured factory macro "
+                                    "uses one, none is verified on the machine, and the names in parse.out are the "
+                                    "firmware's libm imports, not grammar. Compute the value at post time instead."))
+        elif fn in OTHER_ABSENT_FNS:
+            findings.append(Finding(n, "WARN", "W-UNDEMONSTRATED",
+                                    f"'{fn}[...]' is not demonstrated in any captured factory macro and is not "
+                                    "verified on the machine. ABS is the only math function with evidence - verify "
+                                    "this one on the controller before relying on it."))
 
     # FANUC comparison words (EQ excluded - confirmed working; others untested)
     m = FANUC_OPS.search(code)
@@ -210,12 +258,18 @@ def self_test():
         ("( try X5=4 (input regs) )\nM30\n", "E-NESTPAREN"),
         ("IF #1!=2 GOTO 5\nM30\n", "W-GOTOSPACE"),   # GOTO-space accepted on Expert -> warning, not error
         ("IF #1 EQ 5 GOTO1\nM30\n", None),           # EQ confirmed working -> no W-FANUCOP
-        ("IF #1 NE 5 GOTO1\nM30\n", "W-FANUCOP"),     # NE still untested -> warns
+        ("IF #1 NE 5 GOTO1\nM30\n", None),          # t1279 - NE is DEMONSTRATED in the corpus -> no warn
+        ("IF #1 LT 5 GOTO1\nM30\n", "W-FANUCOP"),   # LT/GT/LE/GE remain ABSENT -> warns
+        ("#100=COS[#5]\nM30\n", "E-NOTRIG"),        # t1279 - trig is REJECTED: the language has none
+        ("#100=SIN[[#5]/2]\nM30\n", "E-NOTRIG"),
+        ("#100=SQRT[#5]\nM30\n", "W-UNDEMONSTRATED"),
+        ("#24=ABS[#22-#23]\nM30\n", None),          # the ONE math function with evidence
+        ("WHILE [#100 NE 0] DO1\nM30\n", None),     # demonstrated control flow, not a function call
         ("G10 L20 P6 X25\nM30\n", "E-G10MOVE"),       # G10 L20 + axis word = confirmed-dangerous move -> ERROR
         ("#1153 = #880\nM30\n", "W-PRIME"),
         ("#1153 = #880 + 0\nM30\n", None),
         ("#1153 = 1\n#1153 = #880\nM30\n", None),   # primed with constant first -> suppressed
-        ("#100=FUP[[#53-#52]/2] ;;cmt with [#x]\nM30\n", None),  # ; comment brackets ignored; code balanced
+        ("#100=FUP[[#53-#52]/2] ;;cmt with [#x]\nM30\n", "W-UNDEMONSTRATED"),  # brackets balance, but FUP has no evidence (t1279)
         ("#250 = #1630 + 10\nMSETDATA[250,1,0,2,16,300]\nM30\n", "E-CH1630"),
         ("#2070 = 1175(Enter speed)\nM30\n", "W-2070RANGE"),
         ("G53 X0 Y0\nM30\n", "W-G53CONST"),
