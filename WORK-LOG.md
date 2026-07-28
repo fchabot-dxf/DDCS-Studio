@@ -19362,3 +19362,51 @@ intersection now.
 GATE (fast tier): smoke + the touched specs = 101/101, plus the python suite 20/20.
 SCREENSHOTS: s1287-saved-desktop.png + s1287-saved-phone.png (the popup after a real bound-file save, both widths),
 s1287-x.png (the quiet X).
+
+---
+
+## turn 1289 -- THE SPIN, honestly this time. And a half-kerf the sim had been cutting in the wrong place.
+
+### (B) THE PARTING CARVE WAS HALF A KERF OFF, and the reason it survived is the interesting part.
+
+`carveSegment` spread the blade width SYMMETRICALLY around the cutting line (z ± half). But the emit's own
+declaration settles the meaning: the macro writes `#150 = [#143-#144]` — the face LESS the kerf — so the cutting line
+is the slot's FAR wall and the blade occupies everything between it and the typed face. The slot is ONE-SIDED.
+
+Face −10 with a 3mm blade: the machine cuts [−13, −10]; the sim was drawing [−14.5, −11.5]. Every groove sat one and
+a half millimetres chuck-ward of where the machine puts it, and a part-off stub ended at −24.5 instead of −23.
+
+IT SURVIVED A WHOLE TURN OF TESTING BECAUSE MY SPEC SAMPLED THE SLOT'S MIDDLE — where a symmetric reading and a
+one-sided one agree. The walls are the only place they differ, and that is where the new asserts look: z −10.5 CUT,
+z −14 UNCUT, and a part-off stub ending on exactly −23. The lesson is not "test more", it is that a test which
+samples where two candidate models agree cannot tell them apart, however many points it checks.
+
+THE 2D WAS ALREADY RIGHT — confirmed, not assumed: the drawn band runs [−13, −10] and the handles sit on the face
+and the blade line. It was the carve alone that disagreed with the emit, and now they are asserted together.
+
+### (A) THE SPIN — the two traps I named last turn, written in as the spec.
+
+TRAP ONE, WHAT SAYS "RUNNING": `engine.running` is NOT the signal, and that is the whole story of the bar spinning
+while idle. `trace()` sets `running = true` to walk the program for the drawn route, so every re-trace looked like a
+run to anything watching that flag — and the run-button repaint I first hung it off fires on every re-render besides.
+The engine now DECLARES `playing`, raised only between a real `run()` and its end, lowered by stop AND by the program
+finishing, pushed to consumers through `onPlayState`. A trace raises nothing and emits nothing; a test asserts that
+directly, because it is the exact confusion that produced a lying animation twice.
+
+TRAP TWO, WHICH VIZ: only the ACTIVE panel's instance turns its bar. The live instance is published on activation
+rather than inferred, and an arriving panel tells the outgoing one to stop — because a panel can leave the screen by
+routes that never reach `setActive(false)`, and closing a wizard is one of them. Then the loop itself stops when its
+canvas is NOT VISIBLE, which is a stronger condition than detached: a closed wizard is hidden with display:none and
+its canvas stays in the document, quietly animating. Whatever a caller forgets, a scene nobody can see does not turn.
+
+ASSERTED IN EVERY STATE the dispatch named: still before play, still after stop, still after the program ends,
+turning mid-play, and a hidden panel's bar stops. The idle assert is the one that matters — a bar that turns while
+nothing is running is a lie about the machine, and that is what shipped twice before this.
+
+ONE MEASUREMENT MISTAKE OF MY OWN, worth recording: my first probe read `__ddcsLastViz` (the last instance
+CONSTRUCTED) rather than the live one, and reported the spin inverted. It also misread the run button — the preview
+AUTO-PLAYS on open, so my "first click" was stopping a program that was already running. The test now brings the
+panel to a known idle before asserting anything about idle.
+
+GATE (fast tier): smoke + the lathe family + the new spin/kerf asserts = 145/145.
+SCREENSHOT: s1289-midplay.png — the bar turned about its axis mid-run, chuck at the grip end, insert at the cut.
