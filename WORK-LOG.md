@@ -18175,3 +18175,69 @@ that test is that the order is DECLARED, so a change to it has to be stated.
 
 GATE (fast tier): smoke + FAQ / backup / workspace-roundtrip = 82/82.
 SCREENSHOT: scratchpad/s1253-file-kinds.png -- both answers open, the contents list reading straight out of the registry.
+
+---
+
+## turn 1255 -- ONE LABEL, THREE SURFACES. A micro turn whose whole point was the propagation.
+
+`BACKUP_STORES` machine row: "Machine (this workspace)" -> "Machine identity (name + controller)". The old wording
+told a reader WHERE the row applies and nothing about what is in it, which is the question a delta chip and a
+file-contents list are both answering.
+
+ONE edit, and I verified each reader rather than assuming the wiring:
+  - the FAQ's derived contents list (t1253) ...... shows it, unchanged code -- it reads the registry
+  - the manager's per-store delta chips .......... "Machine identity (name + controller) 1 machine"
+  - workspaceDelta(), what any restore-review row reads ... returns the new label
+
+That is the propagation the turn was for, so it is measured, not asserted from the diff. No copy of the old string
+existed anywhere in web/ or tests/ -- worth stating, because a rename is only cheap when there is exactly one source.
+
+GATE (fast tier): smoke + FAQ / manager / backup / workspace-roundtrip = 97/97. The FAQ registry spec passed
+UNCHANGED IN SHAPE, as required: it reads labels from the registry, so a renamed label is not a spec edit.
+SCREENSHOTS: s1255-faq-contents.png + s1255-manager-chips.png -- the same string in both, from one edit.
+
+### PROPOSED (NOT CHANGED) -- the other labels that read mechanism-y rather than content-y.
+
+Asked to propose, not to touch. Four worth a ruling, each with why:
+
+  "Variables" -> "User variables (your #var values)" -- the current name says the datatype, not whose or which. The
+      row holds ddcs_vars_persistent and counts only non-system vars, so what it carries is specifically the values
+      YOU set; a reader with a full file cannot tell today whether this means controller registers or their own.
+  "Panel layout" -> "Window layout (panes, split, form sections)" -- "Panel" collides with the wizard PANEL concept
+      (def.panel / form3d), and the row actually spans four keys: pane visibility, the split ratio, follow-exec, and
+      form section open/closed. Two different meanings of one word in one app is the cost here.
+  "Preview display prefs" -> "What the 3D preview shows" -- "prefs" is the storage word, not the content word; the
+      row is the per-element visibility map, which is a thing a person can picture.
+  "Projects (local)" -> "Saved programs (projects)" -- "(local)" qualifies the STORAGE, and now that Drive is just
+      another place a workspace lives, "local" invites the wrong question ("is my cloud project missing?"). The
+      parenthetical is the mechanism; the content is saved programs.
+
+Not proposed: "Settings + tool table", "Custom wizards", "CAM pack", "Wizard bar layout", "Wizard presets" -- each
+already names its content in the user's own vocabulary.
+
+### AMENDMENT: Clear editor leaves the corner menu; the TRASH becomes the one door, at every width.
+
+The duplicate existed for a reason worth naming: the header trash hid below 600px (t1227), so the corner menu carried
+Clear for phones. Removing the row therefore had to come WITH unhiding the trash, or the phone would silently lose
+Clear — the exact regression the re-encoded spec now exists to catch.
+
+**Unhiding it broke the phone header, and I measured rather than nudged.** At 390px the header already applies every
+shrink class it has (hy-logo, is-compact, hy-tabscale, is-mini, is-tiny, hy-controls) and still summed to 406px of
+content once the trash claimed its 44px touch target: brand 89 + quick 20 + chip 23 + tabs 194 + controls 80. So the
+trash rendered off-screen — visible to a test that only asked "is it displayed", useless to a thumb.
+
+I made room where a phone can afford it: the wordmark shrinks to the logo (34px) and the icon-only tabs give up a few
+pixels of padding. The alternative — keeping the visual box small and expanding the hit area with a pseudo-element —
+would have put a 44px target overlapping the 17px undo/redo beside it, i.e. mis-taps landing on the one DESTRUCTIVE
+control in the header. Not a trade worth making to save a wordmark on a phone.
+
+The phone spec is re-encoded around what the amendment actually requires: the trash is on screen, is a real ≥44px
+target, sits FULLY inside the 390px viewport (the assertion that caught the overflow), and the corner menu holds
+Load/Insert/Export with no second Clear. The t1227 spec counts three items by name, so a re-added row has to be argued.
+
+NOTED, NOT TOUCHED: `HQ_ACTIONS` / `HQ_STANDALONE` in ui/headerPost.js are dead — nothing has consumed them since the
+t1227 curation removed the gcode rows, and one of their comments still describes Clear as "the phone access point",
+which is now false twice over. Pre-existing dead code, so I am flagging it rather than deleting it unasked.
+
+GATE after the amendment: 108/108 (adds the editor / header-responsive / mobile-settings / settings-responsive specs).
+SCREENSHOT: s1255-phone-trash.png -- the 390px editor, trash top-right, corner menu showing three file actions.
