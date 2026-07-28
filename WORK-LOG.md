@@ -19410,3 +19410,54 @@ panel to a known idle before asserting anything about idle.
 
 GATE (fast tier): smoke + the lathe family + the new spin/kerf asserts = 145/145.
 SCREENSHOT: s1289-midplay.png — the bar turned about its axis mid-run, chuck at the grip end, insert at the cut.
+
+---
+
+## turn 1291 -- TWO EMIT-CLASS DEFECTS. One would have gouged a part; the other cut nothing at all.
+
+### (1) THE TAPER ROUGHING WAS REMOVING THE CONE.
+
+Every roughing pass ran `G1 Z#129` — the FULL length — at radii counted down from the face floor. On a cone that is
+not conservative, it is destructive: for a fat far end (Ø8 at the face, Ø16 deep) the floor sits at the FACE radius
+plus the allowance, so full-length passes took the whole cone away and the finish pass then interpolated through air.
+The advisor's carve probe measured the length flat at r 4.5 where the cone should rise 4 → 8. On a real machine that
+is a scrapped part. The inverted cone (fat face, thin far) failed the same way in reverse: under-roughed, leaving
+4.5mm RADIAL for one finishing pass.
+
+THE FIX IS THE COURSE OF THE CONE, and it needs no trig: the Z where the finished surface reaches a given radius is a
+pure ratio, `z = −depth·(x − rFace)/(rFar − rFace)`, which the controller computes from the numbers already in its
+header. WHICH SIDE to cut is decided by which end is fat — a fat far end leaves the thin material near the face (cut
+from the face to the crossing); a fat face leaves it deep (come in AT the crossing, where the cone is exactly this
+radius so the approach touches rather than cuts, and run to the far end). Clamped into the turned length, so a pass
+wider than the whole cone still runs its full length.
+
+AND A SECOND TAPER DEFECT THE CARVE EXPOSED WHILE I WAS IN THERE: the finish pass began at the target radius while
+the tool was still at the SAFE Z, so the interpolated line ran from (rFace, +zSafe) to (rFar, −depth) — a cone
+shifted by the height of its own approach. Measured 4.46 at the face where the drawing says 4. The start radius is
+now the cone EXTRAPOLATED BACK to the approach, so the line passes through the face exactly.
+
+HAND-DERIVED BOTH DIRECTIONS, at points where the old behaviour and the new one differ by millimetres:
+  fat far  r(−0.3)=4.04  r(−12.5)=6.00  r(−24.7)=7.96      (the cone: 4.048 / 6.0 / 7.952)
+  fat face r(−0.3)=7.96  r(−12.5)=6.00  r(−24.7)=4.04      (mirrored, as it must be)
+
+THE STRAIGHT TURN IS UNTOUCHED, and asserted so: no crossing variable, no extrapolated start, no extra jump targets,
+the same cutting moves. The taper adds ARITHMETIC, not passes — one cut per pass either way; what it adds is the
+calculation of how far that cut may run.
+
+ONE LIMITATION, STATED: the straight/taper branch is taken at BUILD time, so an operator who edits the far-end
+diameter at the machine on a program built STRAIGHT gets straight roughing. It is safe (full-length passes at the
+face radius under-cut a cone rather than gouging it) but it is not re-planned. Making the macro branch on the sign of
+[#128−#122] at runtime is possible and is a real turn's work; FLAGGED rather than smuggled in.
+
+### (2) FACING WITH doc = 0 EMITTED NOTHING AT ALL.
+
+The guard jumped past the loop, so a program with 3mm of material and a zero depth of cut silently cut air — while
+the macro's own comment promised a skim at the face. I took the advisor's lean, and it is also what the comment
+already said: ZERO MEANS ONE SKIM. "Just kiss the face" is a real thing to ask a lathe for, and the alternative
+(greying the field) refuses an operation rather than performing it. It cannot fall into the loop — that steps by the
+depth, so a zero step would never terminate — so it emits one explicit pass and leaves. The JS pass list says the
+same, and a test pins the comment and the emit together so they cannot drift apart again.
+
+GATE (fast tier): smoke + the lathe family + the new asserts = 149/149.
+FLAGGED FOR THE FULL SUITE: both changes are in the EMIT. The straight OD turn is byte-identical; TAPER programs and
+FACING-with-zero-doc programs change by design. Any golden that pinned either will move, and should.
