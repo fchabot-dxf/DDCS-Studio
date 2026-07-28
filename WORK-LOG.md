@@ -19223,3 +19223,60 @@ a test asserts the second click is still swallowed. LIBRARY IMPORTS KEEP THE ROW
 both modules: they finish on this screen, where an overlay would claim a busyness the app does not have. The
 distinction is not the length of the wait, it is whether the app survives it — and busyRow.js's header now records
 that ruling so the reasoning stays true for the next reader.
+
+---
+
+## turn 1285 -- THE TOOL AND THE CHUCK, confirmed by pixels. And the spin WITHDRAWN, on purpose.
+
+### (A) THE MILL SPINDLE: the root was that tool identity has ONE owner, and I kept answering somewhere else.
+
+`simTool()` in createPreviewPanel is that owner: it returns the tool, and BOTH the mesh and the material-view header
+read it. So every earlier attempt was doomed by construction — keyed on the stock, it lost a race during load; moved
+onto the workspace kind inside the mesh builder, it was overwritten the next time the owner ran. The fix is to answer
+IN THE OWNER: a lathe workspace's default tool is a turning insert, not an endmill, and the header names what the
+scene shows because there is nothing else for it to read.
+
+AND THE OP DECLARES WHICH ONE, beside where it declares its bar: `withLatheScene(def, defaults, tool)`. Most turning
+ops are an insert on a holder; a centre drill really is a bit in the tailstock on the centreline. Declared per op
+rather than inferred from a toolpath. The wizard hands it over through `getTool`, which the owner honours FIRST — so
+a picked table tool still wins, and this is only the answer to "no tool chosen", where an endmill was never right.
+
+### (B) THE CHUCK: built, then destroyed a moment later.
+
+It was being built correctly and then removed — `setRotaryFixture(false)`, which every one of these ops sets because
+none wants the 4th-axis rig, calls `setRotaryRig(null)`. The chuck and the rotary rig were sharing one slot. They
+answer different questions, so they get different fields: the chuck lives in `_latheChuck`, built with the SAME
+render (one chuck concept) told the bar lies along Z, and `noTailstock` — a turner's bar sticks out FREE, and a
+tailstock would put steel exactly where every one of these ops cuts.
+
+### VERIFIED BOTH WAYS, which is the standard this family earned.
+
+  · LATHE: tool identity is 'turning', the assembly is exactly holder + insert, the header says "turning tool
+    (insert)" — AND the mill's spindle and collet are ABSENT, and nothing calls it an endmill. Presence alone would
+    only prove the scene got busier.
+  · CENTRE DRILL: identity 'centerdrill', header "centre drill", and NOT "insert" — the op's own declaration.
+  · CHUCK: present, exactly four parts (a disc and three jaws), with the 4th-axis rig slot still empty.
+  · MILL: no chuck, no turning tool, no bar axis on the stock — and its OWN spindle and collet still there. That
+    last half is the one that catches a fix which quietly broke the other world.
+  · PIXELS: five per-op screenshots where the chuck and the insert can be pointed at.
+
+### THE SPIN IS WITHDRAWN, and that is the honest outcome rather than a shortfall.
+
+The mechanism works. Wiring it to a truthful signal did not. Hung off the run-button repaint, the bar span while IDLE
+and stopped when the program RAN — that repaint fires on every re-render, not on a state change. Moved onto
+play()/stopPlay(), the spin landed on one panel's viz while a STALE instance kept turning, so what a viewer saw
+depended on which panel built last. A bar that turns while nothing is running is a LIE ABOUT THE MACHINE, and worse
+than a still one, which merely omits. So the call sites are gone and the method carries a note naming the two traps
+and the question that has to be answered first: which viz instance is live, and what single signal says a program is
+running. The next turn wires an answer instead of rediscovering the trap.
+
+### ONE MORE THING THE ROUND-TRIP SPECS CAUGHT, immediately.
+
+`latheTool` is authored DATA — what this op puts against the work — so it has to travel in the `.wiz`, exactly like
+`group` did (t1247: dropping it landed every shared wizard in the wrong dropdown; dropping this would land one
+showing the wrong cutter). Added to the file. And my own part/drill assert compared defs with `JSON.stringify`, which
+is key-ORDER sensitive: an imported def's keys arrive in file order, so a new field made it fail on ordering rather
+than content. Compared as objects now — the property that was always meant.
+
+GATE (fast tier): smoke + the lathe family + world/overlay specs = 142/142.
+SCREENSHOTS: s1285-facing / -odturn / -parting / -centerdrill / -polygon.png.
