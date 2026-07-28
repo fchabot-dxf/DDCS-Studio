@@ -19280,3 +19280,85 @@ than content. Compared as objects now — the property that was always meant.
 
 GATE (fast tier): smoke + the lathe family + world/overlay specs = 142/142.
 SCREENSHOTS: s1285-facing / -odturn / -parting / -centerdrill / -polygon.png.
+
+---
+
+## turn 1287 -- FIVE USER-RULED UX ITEMS. The save that had nothing to say, and four smaller ones.
+
+### (1) A BOUND-FILE SAVE NOW SAYS WHAT IT SAVED (user, live).
+
+Re-saving to a remembered file shows no browser dialog at all, so the whole gesture was silent: the work went to disk
+and nothing on screen changed. The chip confirms now, and a transient label beside it names the stores that ACTUALLY
+changed — read from the ONE registry the save-first modal and the FAQ already use, so all three say the same words
+about the same things.
+
+ORDER IS LOAD-BEARING, again: the change-set has to be read BEFORE `markWorkspaceSavedToFile` resets the baseline, or
+every save reports "nothing changed". `changedStoresSince()` is captured in `writeTo` between the build and the mark.
+
+THREE HONEST ANSWERS, and the middle one is the one that was easy to get wrong:
+  · a baseline exists and stores changed → name them ("Saved Shop Bee.ddcs · Settings + tool table (4 tools)");
+  · a baseline exists and nothing changed → "Already saved — nothing had changed", not a claim of work not done;
+  · NO baseline — the first save to this file → "the whole workspace". The first draft said "nothing had changed"
+    here, which is false in exactly the case where the most is happening. A null change-set means NOT KNOWN, which is
+    a different answer from NOTHING, and the label now distinguishes them.
+And the count QUALIFIES the store, never replaces it: naming alone produced "Saved · 4 tools" for an edit to the
+machine envelope — true about the store, a false impression about the edit.
+
+(An earlier draft anchored the label to the chip's rect after finding it had landed 950px down the page — present,
+announced, invisible — because an absolutely-positioned child of a `static` header resolves against the viewport.
+The refinement below replaced that approach entirely.)
+
+"Saved" still belongs ONLY to a real file write: this shows on the resolved result of `writeTo`, never a buffer flush.
+
+### (1b) THE REFINEMENT, mid-turn (user, live): NOT ON THE PILL — A POPUP THAT CAN BE CLICKED AWAY.
+
+The first version put the answer beside the disk chip, and the refinement names exactly why that was wrong: ON A
+NARROW SCREEN THE CHIP IS NOT RENDERED AT ALL. Feedback anchored to a control a phone does not draw is feedback
+nobody gets — the same failure as silence, with more code behind it. (The phone screenshot proves it twice over: the
+first attempt at capturing it clicked the chip and hit nothing.)
+
+It is a centred overlay now, at every width, and it WAITS: a click, a tap or Esc dismisses it, and there is no timer,
+because a message naming what was written should not be able to vanish before it is read. Asserted at 390px: on
+screen, inside the viewport both ways, with a finger-sized OK.
+
+AND THE SUITE CAUGHT WHAT A MODAL COSTS: the popup outlived its moment and covered the Save-As dialog of the NEXT
+save, which is unreachable underneath it. Any save now clears the previous answer before it starts producing a new
+one. A confirmation that blocks the next gesture is not an improvement on silence either.
+
+### (2) THE FOUR RULED LABELS, at the one registry every surface inherits.
+
+Variables → "User variables (your #var values)" · Panel layout → "Window layout (which panes are open, their sizes)"
+· Preview display prefs → "What the 3D preview shows" · Projects (local) → "Saved programs (projects)". The modal, the
+FAQ contents list and the new save label all read BACKUP_STORES, so one edit moved all three.
+
+### (3) THE DEAD LAUNCHER PAIR IS DELETED.
+
+`bridge/bridge-app/desktop.py` + `build-exe.bat` are gone (the user confirmed the .bat never runs; CI's
+build_fairy.ps1 is the only builder). References swept: the README's folder map, the shared webview-storage helper's
+header (it told the t1257 story by pointing at the file), and `tests/test_webview_storage.py`, which asserted the
+launcher's existence — it now asserts about the one launcher that ships. Python suite 20/20.
+
+### (4) FOLLOW EXECUTION IS A PREFERENCE, WHERE PREFERENCES LIVE.
+
+The floating ⤓ on the editor's corner is gone; the same `ddcs_follow_exec` pref, the same auto-scroll machinery, the
+same in-text highlight — only the control moved. It landed in the EDITOR tab (which already exists and already holds
+editor preferences), deliberately NOT in the preview's FOLLOW CAMERA section: that one centres the CAMERA on the
+tool, this one scrolls the TEXT, and filing them together is how someone toggles the wrong one. The file-menu button
+was offsetting itself at right:72px to clear a button that no longer exists, so it closes the gap.
+
+### (5) THE SETTINGS X: smaller and quieter, same target.
+
+It was a glossy red button — a gradient, an inset highlight, a dark ring, a text shadow — all to say "close". The
+glyph shrinks to 18px and goes flat (no gloss, no ring until you reach for it); the HIT AREA is untouched at 44px,
+which is the headerrow's min-size rule, so what shrank is what you SEE and not what you can press. The t1265 rule
+stands and is asserted.
+
+TWO OF MY OWN MISTAKES, worth recording. I first wrote the restyle into styles.css, where it could never win: the
+real rule is an inline style block in settingsPanel.js (the one t1265 added). Fixed at the rule that wins, and my
+dead stylesheet rule withdrawn. And my t1265 assert tested VERTICAL overlap only — the X shares a row with the
+identity band by design, and it is the horizontal separation that keeps it off the text; it is a real rectangle
+intersection now.
+
+GATE (fast tier): smoke + the touched specs = 101/101, plus the python suite 20/20.
+SCREENSHOTS: s1287-saved-desktop.png + s1287-saved-phone.png (the popup after a real bound-file save, both widths),
+s1287-x.png (the quiet X).
