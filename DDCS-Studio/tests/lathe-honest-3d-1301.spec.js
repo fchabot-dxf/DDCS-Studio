@@ -8,6 +8,20 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 950 } });
 
+/**
+ * t1313 — THIS SPEC DECLARES THE BAR IT TESTS. The stock modal made the WORKSPACE record the one bar in the chuck,
+ * so an op's own `barDiameter` default no longer outranks it (that default WAS the parallel store the redesign
+ * removed). Every hand-derived truth below is against a Ø20 bar, so the workspace is told to hold one — which is
+ * what a turner would have done before running any of this.
+ */
+const setBar = (page, diameter = 20, stickOut = 60) => page.evaluate(async ({ d, so }) => {
+    // built straight from the declared bar shape — NOT through latheSimStock, which now (correctly) prefers the
+    // workspace bar and would therefore hand back the one already there instead of the one being asked for
+    const { barStock } = await import('/data/stockShape.js');
+    window.ddcsGetSettings().stock = barStock({ diameter: d, stickOut: so, allowance: 1 }, window.ddcsGetSettings().stock);
+    try { window.ddcsSaveSettings && window.ddcsSaveSettings(); } catch (_) {}
+}, { d: diameter, so: stickOut });
+
 const boot = async (page, kind = 'lathe') => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
@@ -15,6 +29,7 @@ const boot = async (page, kind = 'lathe') => {
         const M = await import('/data/workspaceMachine.js');
         M.setMachine({ name: 'Rig', kind: k, chuck: 'axis' }, false);
     }, kind);
+    if (kind === 'lathe') await setBar(page);   // t1313 — a LATHE workspace holds the Ø20 bar these truths are derived against; a mill keeps its block
 };
 
 /** Open a wizard and read what its 3D pane actually drew. */

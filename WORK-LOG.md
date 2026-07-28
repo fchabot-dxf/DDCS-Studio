@@ -20121,3 +20121,63 @@ surface, one problem), a hand-bumped chip (which correctly reports the other thr
 package.json relationship, and the standalone CLI's non-zero exit with the real tree still passing.
 
 Gate: smoke 71/71 (65 + the 6 new, which now ride every gate).
+
+---
+
+## t1313 — stock has a shape, and the modal finally says so
+
+The model has carried this since t1281 (`shape` / `axis` / `origin`, and `latheSimStock` building the bar); what was
+missing was the face. `data/stockShape.js` now says what the combinations MEAN — box, round blank, lathe bar — so the
+modal, the 3D and persistence stop each deciding for themselves.
+
+### Shape is identity, so it leads
+
+Box | Cylinder at the top of the modal. `boss`/`pocket` stay a box VARIANT (which side a probe works from) rather
+than being flattened into the same list — they answer a different question, and they sit with the box.
+
+**On a lathe the choice is already made:** cylinder by declaration, Box greyed with the reason (never hidden), and
+the datum DISPLAYED rather than picked — the centreline with Z0 at the finished face is the lathe convention, not a
+choice anyone makes. **On a mill** the box is the default and is pixel-for-pixel what it was (asserted both ways,
+including that switching to a cylinder and back leaves no round facts behind). The round blank's datum is the CENTRE
+OF THE TOP FACE, and the corner picks grey with the reason: a round blank has no corner to measure from.
+
+The along-the-rotary axis choice appears only where the workspace DECLARES a rotary — offering "along A" on a machine
+with no A is offering a workpiece it cannot spin.
+
+### The one bar record, and the parallel store I found while asserting it
+
+The chain the dispatch asked me to assert to the pixel — type a diameter, watch the preview — **failed**, and the
+reason was worth the turn on its own: every lathe op carries its own `barDiameter` default (20), no form field binds
+it, and `latheBarFrom` preferred it. So the stock modal said Ø40 and the wizard pane drew Ø20. That default WAS the
+parallel store the redesign exists to remove: the stock in the chuck is a fact about the SETUP, not about the op.
+
+A declared workspace bar now wins, with the op's default as the fallback for a workspace that declares none (both
+halves asserted). The RAW END stays the op's — facing's allowance really is material ahead of the face.
+
+Four specs' premises changed by that ruling and are restated rather than weakened: they now DECLARE the bar their
+hand-derived truths are written against (Ø20), which is what a turner would have set before running any of it.
+
+### The 2D pane draws what the stock IS
+
+A top view of a bar is a circle that never changes, so a lathe gets the same half-profile its wizards draw — one
+picture of the workpiece across the app — with a handle on each of the three numbers (Ø, stick-out, raw end), and a
+mill's round blank gets the circle it actually is with its radius on a handle. Every drag writes a FIELD through the
+form, so a handle is a second way to type a number and never a second source.
+
+### Three things flagged, not built
+
+1. **The heightmap carve over the circle.** The grid is rectangular, so carving a round blank with it would replace
+   the disc with a square slab — a picture of a workpiece the machine does not have. The blank keeps its cylinder
+   mesh (it already did; `setStock` skips the carve for a cylinder, and `setCarve` now says so explicitly). Masking
+   the grid is not a small change: the crisp mesher traces a marching contour and builds a perimeter skirt, both of
+   which assume the rectangle.
+2. **The EMIT-side bar precedence.** The SCENE follows the workspace bar now; the stack builders still size their
+   headers from the op's own default. Making the emit follow too is a G-CODE change (every bar-derived clearance
+   moves), so I did not make it unilaterally — flagged for a ruling, with the incoherence it leaves named: a
+   workspace bar that differs from the op's default shows a picture whose retract radius the program does not use.
+3. **Features on a cylinder.** Not cheap: the editor is built on a rectangular face frame (datumXY, the workpiece
+   backdrop, corner-relative offsets). A round face needs a polar frame. v1 says why instead of half-working.
+
+Gate: smoke 71/71; the new spec 9/9; the whole lathe family + the taper spec 129/129; all 26 specs that drive the
+stock modal green. Screenshots: the lathe modal, the mill modal in both shapes, and the Ø45 typed in the modal
+arriving in the main preview.

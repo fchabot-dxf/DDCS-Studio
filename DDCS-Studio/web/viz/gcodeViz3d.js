@@ -1587,7 +1587,13 @@ export class GcodeViz3D {
     // ── t680 — MATERIAL REMOVAL (E1). The heightmap carve: a displaced grid + skirt replaces the box, live + end-state. ──
     /** t1283 — the LATHE carve is not the heightmap: `setCarve(false)` (a probe/rapid program, or the mill's carve
      *  preference off) must not silently disable a turned profile, which costs one array and is the whole picture. */
-    setCarve(on) { on = !!on; if (this._isLatheStock()) { this._carveOn = on; return; } if (on === !!this._carveOn) return; this._carveOn = on; if (!on) this._disposeCarve(); if (this._stock) this.setStock(this._stock); }   // rebuild → (un)swaps the box for the grid
+    /** t1313 — A ROUND BLANK KEEPS ITS SHAPE. The heightmap is a rectangular X×Y grid, so carving a cylinder with it
+     *  replaces the round blank with a square slab — a picture of a workpiece the machine does not have. A lathe bar
+     *  already takes the profile carve; a mill's round blank keeps its cylinder mesh until the carve grid can be
+     *  masked to a circle (its crisp mesher traces a marching contour and builds a perimeter skirt — both assume the
+     *  rectangle). FLAGGED, not silently half-built. */
+    _isRoundBlank() { const st = this._stock; return !!(st && st.shape === 'cylinder' && !this._isLatheStock()); }
+    setCarve(on) { on = !!on; if (this._isLatheStock() || this._isRoundBlank()) { this._carveOn = on; return; } if (on === !!this._carveOn) return; this._carveOn = on; if (!on) this._disposeCarve(); if (this._stock) this.setStock(this._stock); }   // rebuild → (un)swaps the box for the grid
 
     _disposeCarve() {
         if (this._carveMesh) { this._partGroup && this._partGroup.remove(this._carveMesh); this._carveMesh.geometry.dispose(); this._carveMesh.material.dispose(); this._carveMesh = null; }

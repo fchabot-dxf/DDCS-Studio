@@ -297,6 +297,67 @@ export function drillProfileSpec(bar, drill, onChange) {
     };
 }
 
+// ── THE STOCK MODAL'S BAR (t1313) ───────────────────────────────────────────────────────────────────────────────
+/** The bar's diameter, dragged on its surface — the number a turner reads off the stock rack. */
+export const BAR_DIA_HANDLE_ID = 'barDia';
+/** How far it stands out of the chuck, dragged at the grip end. */
+export const BAR_OUT_HANDLE_ID = 'barOut';
+/** …and the raw end still ahead of the finished face — the same grab facing's allowance handle uses. */
+export const BAR_RAW_HANDLE_ID = 'barRaw';
+
+/**
+ * THE BAR, AS THE STOCK MODAL EDITS IT. The mill's top view is a box seen from above; a bar has nothing useful to
+ * show that way (a circle that never changes), so the modal draws the same HALF-PROFILE every lathe wizard draws —
+ * one picture of the workpiece across the whole app — with a handle on each of the three numbers.
+ *
+ * Every drag writes a FIELD, through the writer the caller passes: this canvas has no opinion about the record, and
+ * the modal's commit is the one place a bar is built. GUI over fields, without a second source.
+ */
+export function barStockSpec(bar, onChange) {
+    const b = normalizeBar(bar);
+    const prof = halfProfile(b);
+    const r = radiusOf(b.diameter);
+    const write = (patch) => { if (typeof onChange === 'function') onChange(patch); };
+    return {
+        stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: r },
+        items: [
+            { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
+            // the raw end — what facing takes off, between Z0 and the sawn face
+            { kind: 'rect', x: zToCanvas(prof.allowance.z1), y: 0, w: prof.allowance.z2 - prof.allowance.z1, h: r, cls: 'fc-feature-pocket' },
+            { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: r },   // Z0, the finished face
+        ],
+        handles: [
+            // …on the SURFACE, halfway along, because that is where a diameter is measured
+            { id: BAR_DIA_HANDLE_ID, x: zToCanvas(-b.stickOut / 2), y: r, kind: 'size', axis: 'y', teal: true, label: 'Ø', value: r3(b.diameter) },
+            // …at the grip end: how much bar is out of the chuck
+            { id: BAR_OUT_HANDLE_ID, x: zToCanvas(prof.bounds.z1), y: r / 2, kind: 'size', axis: 'x', teal: true, label: 'stick-out', value: r3(b.stickOut) },
+            // …and the sawn end, the same grab facing's allowance uses
+            { id: BAR_RAW_HANDLE_ID, x: zToCanvas(prof.allowance.z2), y: r, kind: 'size', axis: 'x', teal: true, label: 'raw end', value: r3(b.allowance) },
+        ],
+        onDrag: (id, world) => {
+            if (id === BAR_DIA_HANDLE_ID) { write({ diameter: r3(diameterOf(Math.max(0.05, world.y))) }); return; }
+            // the chuck end runs in −Z, so the stick-out is how far BACK the grip end is from the finished face
+            if (id === BAR_OUT_HANDLE_ID) { write({ stickOut: r3(Math.max(1, -canvasToZ(world.x))) }); return; }
+            // …and the raw end cannot be behind the finished face: that is not less material, it is a cut into the part
+            if (id === BAR_RAW_HANDLE_ID) write({ allowance: r3(Math.max(0, canvasToZ(world.x))) });
+        },
+    };
+}
+
+/**
+ * A MILL'S ROUND BLANK, seen from above: the circle it really is, with its radius on a handle. The datum crosshair
+ * sits at the CENTRE because that is where a round blank's datum is (data/stockShape.js says so once).
+ */
+export function roundBlankSpec(diameter, onChange) {
+    const d = Math.max(0.001, Number(diameter) || 0), r = d / 2;
+    return {
+        stock: { ox: -r, oy: -r, w: d, h: d },
+        items: [{ kind: 'circle', cx: 0, cy: 0, r, cls: 'fc-feature-pocket' }],
+        handles: [{ id: 'blankDia', x: r, y: 0, kind: 'size', axis: 'x', teal: true, label: 'Ø', value: r3(d) }],
+        onDrag: (id, world) => { if (typeof onChange === 'function') onChange({ diameter: r3(Math.max(0.1, Math.abs(world.x) * 2)) }); },
+    };
+}
+
 // ── THE PROBE FAMILY (t1299) ────────────────────────────────────────────────────────────────────────────────────
 /** The face the stylus touches — dragging it says how far AHEAD of Z0 that face is. */
 export const FACE_PROBE_HANDLE_ID = 'probeFace';

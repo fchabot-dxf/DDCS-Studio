@@ -26,6 +26,19 @@ import { isLathe } from '../data/workspaceMachine.js';
 /** The bar every lathe op shows, from whatever the op knows about it. Defaults are the op's, not this file's. */
 export function latheBarFrom(params, fallback) {
     const p = params || {}, f = fallback || {};
+    // t1313 — THE WORKSPACE'S BAR IS THE ONE IN THE CHUCK. Every op carried its own `barDiameter` default (20) and no
+    // form field binds it, so the op's default silently outranked the bar the user had actually declared: the stock
+    // modal said Ø40 and the wizard pane drew Ø20. That is the parallel store this turn exists to remove — the stock
+    // in the chuck is a fact about the SETUP, not about the op, so a declared workspace bar wins.
+    // (The RAW END stays the op's: facing's allowance IS material ahead of the face, which is an op-level decision.)
+    const ws = (() => {
+        try {
+            const st = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().stock : null;
+            if (!st || st.shape !== 'cylinder' || st.axis !== 'z' || st.origin !== 'finished-face') return null;
+            const face = Number(st.faceZ) || 0;
+            return { diameter: Number(st.diameter) || 0, stickOut: (Number(st.z) || 0) - face };
+        } catch (_) { return null; }
+    })();
     // THE RAW END MUST CONTAIN WHAT THE OP REMOVES. Facing's whole job is the material ahead of the finished face, so
     // its `allowance` IS the bar's raw end — drawing the generic 1mm stub put the first two passes outside the bar,
     // in mid-air. (Caught by the on-the-bar assert, which is exactly what it is for.)
@@ -34,8 +47,8 @@ export function latheBarFrom(params, fallback) {
         Number(p.allowance) || 0,
     );
     return normalizeBar({
-        diameter: Number(p.barDiameter) || Number(f.barDiameter) || 20,
-        stickOut: Number(p.stickOut) || Number(f.stickOut) || 60,
+        diameter: (ws && ws.diameter) || Number(p.barDiameter) || Number(f.barDiameter) || 20,
+        stickOut: (ws && ws.stickOut) || Number(p.stickOut) || Number(f.stickOut) || 60,
         allowance: raw,
     });
 }
@@ -154,7 +167,16 @@ export function applyLatheWorkspaceStock() {
     if (cur.shape === 'cylinder' && cur.axis === 'z' && cur.origin === 'finished-face') return false;   // already a bar
     // THE DECLARED DEFAULT BAR — not the mill box's width read as a diameter. A 100mm block is not a 100mm bar; the
     // box says nothing about the stock a turner has in the chuck, and inferring one from the other invents a fact.
-    const fallback = { barDiameter: DEFAULT_BAR.diameter, stickOut: DEFAULT_BAR.stickOut, barAllowance: DEFAULT_BAR.allowance };
+    //
+    // t1313 — …but a CYLINDER already carries one. A round blank opened on a lathe becomes a bar of the SAME
+    // diameter rather than the default: the user declared that size, and the shapes are close enough that resetting
+    // it would be throwing away a fact we have. (A box still gets the default, for the reason above.)
+    const round = cur.shape === 'cylinder' && Number(cur.diameter) > 0;
+    const fallback = {
+        barDiameter: round ? Number(cur.diameter) : DEFAULT_BAR.diameter,
+        stickOut: round && Number(cur.z) > 0 ? Number(cur.z) : DEFAULT_BAR.stickOut,
+        barAllowance: DEFAULT_BAR.allowance,
+    };
     s.stock = { ...latheSimStock(null, cur, fallback), features: [] };
     try { window.ddcsSaveSettings && window.ddcsSaveSettings(); } catch (_) {}
     return true;

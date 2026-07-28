@@ -7,7 +7,7 @@
  * does (via applySettings → broadcasts ddcs:settings-changed → the preview re-renders).
  * Pick a template, tweak dims/shape/show, and save/delete your own templates here.
  */
-import { getSettings, applySettings, STOCK_TEMPLATES } from './settingsPanel.js';
+import { getSettings, applySettings, STOCK_TEMPLATES, getRotaryAxes } from './settingsPanel.js';
 import { confirmSetupRow } from './setupChecklist.js';   // t1217 — Done = the user's explicit declaration
 import { openFieldLink, WCS_LINK } from './formWidgets.js';   // t796 P4 — the shared field deep-link (the "Sits at WCS" ⚙ → the WCS table)
 import { makeDraggable } from './uiUtils.js';
@@ -16,6 +16,11 @@ import { popReturn, dropReturn, activeReturn } from './navReturn.js';   // centr
 import { FeatureCanvas } from '../viz/featureCanvas.js';                // M1: the shared 2D top-down canvas (workpiece editor)
 import { getWorkpiece, workpieceBackdrop, featureSize, featureType, datumXY } from '../engine/workpiece.js';   // M1/M2: the workpiece VIEW + backdrop + side resolver + type + datum frame
 import { GcodeViz3D } from '../viz/gcodeViz3d.js';                      // M1b: a stock-ONLY 3D preview (setStock, no toolpath) for depth
+import { shapeKindOf, isLatheBar, isRoundBlank, roundBlankStock, barOfStock, barStock, DEFAULT_BOX_VARIANT,
+         ROUND_BLANK_DATUM, ROUND_DATUM_WHY, LATHE_BOX_WHY, FEATURES_BOX_ONLY_WHY, BAR_DATUM_TEXT } from '../data/stockShape.js';   // t1313 — what shape the stock IS, declared once
+import { isLathe } from '../data/workspaceMachine.js';                 // t1313 — a lathe workspace turns bar stock, by declaration
+import { barStockSpec, roundBlankSpec } from '../viz/latheProfileCanvas.js';   // t1313 — round stock draws itself: the half-profile / the circle
+
 
 // M1b — ONE reused GcodeViz3D for the modal's 3D pane. A fresh WebGLRenderer per open would leak WebGL contexts
 // (browsers cap them); instead we keep a single instance + its host div module-level and RE-PARENT the host into the
@@ -80,6 +85,13 @@ export function openStockEditor(anchor, opts) {
             .se-zsel button.on { background:#ffb454; color:#1a1a1a; border-color:#ffe0b0; font-weight:bold; }
             .se-zsel .se-zdot { width:7px; height:7px; border-radius:50%; background:#5a6675; border:1px solid #7a8699; }
             .se-zsel button.on .se-zdot { background:#1a1a1a; border-color:#1a1a1a; }
+            /* t1313 — the shape identity picker + the reasons a choice is unavailable (grey, never hidden) */
+            .se-kind { display:flex; gap:6px; }
+            .se-kind button { flex:1; padding:5px 8px; background:#2a3340; color:#cfe0f2; border:1px solid #3a414d; border-radius:4px; cursor:pointer; font-size:12px; }
+            .se-kind button.on { background:#ffb454; color:#1a1a1a; border-color:#ffe0b0; font-weight:bold; }
+            .se-kind button[aria-disabled="true"] { opacity:.42; filter:grayscale(.7); cursor:not-allowed; }
+            .se-why { font-size:10px; color:#9fb4cc; line-height:1.35; }
+            .se-fixed { background:#11141a; border:1px dashed #3a414d; border-radius:4px; padding:6px 8px; color:#9fb4cc; font-size:11px; }
         </style>
         ${backLabel ? `<button id="se_back" type="button" title="Back to ${esc(backLabel)}" style="display:inline-flex; align-items:center; gap:5px; margin-bottom:9px; padding:2px 9px 2px 6px; font-size:11px; background:transparent; border:1px solid #3a414d; color:#9fb4cc; border-radius:4px; cursor:pointer;">‹ ${esc(backLabel)}</button>` : ''}
         <div class="stock-editor-head" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -105,25 +117,57 @@ export function openStockEditor(anchor, opts) {
                     <button id="se_tpl_cancel" class="toolbar-btn" style="padding:3px 9px;" title="Cancel">✕</button>
                 </div>
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-                <label class="col">X<input id="se_x" type="number" min="0" step="1"></label>
-                <label class="col">Y<input id="se_y" type="number" min="0" step="1"></label>
-                <label class="col">Z<input id="se_z" type="number" min="0" step="1"></label>
+            <!-- t1313 — SHAPE IS THE IDENTITY of a workpiece: it decides what every field below MEANS, so it leads
+                 ([[op-defining-fields-at-top]]). Box and Cylinder are the two things stock IS; boss/pocket stay a box
+                 VARIANT (which side a probe works from), which is a different question and sits with the box. -->
+            <label class="col" id="se_kind_row">Shape
+                <div id="se_kind" class="se-kind">
+                    <button type="button" data-kind="box">Box</button>
+                    <button type="button" data-kind="cylinder">Cylinder</button>
+                </div>
+                <span id="se_kind_why" class="se-why"></span>
+            </label>
+            <!-- BOX: the block's three dimensions, and which side a probe works from -->
+            <div id="se_box_fields" style="display:flex; flex-direction:column; gap:10px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                    <label class="col">X<input id="se_x" type="number" min="0" step="1"></label>
+                    <label class="col">Y<input id="se_y" type="number" min="0" step="1"></label>
+                    <label class="col">Z<input id="se_z" type="number" min="0" step="1"></label>
+                </div>
+                <label class="col">Probe side
+                    <select id="se_shape">
+                        <option value="boss">Boss — probe the outside</option>
+                        <option value="pocket">Pocket — probe the inside</option>
+                    </select>
+                </label>
             </div>
-            <label class="col">Shape
-                <select id="se_shape">
-                    <option value="boss">Boss — probe the outside</option>
-                    <option value="pocket">Pocket — probe the inside</option>
-                    <option value="cylinder">Cylinder — rotary stock</option>
-                </select>
-            </label>
-            <label class="col" id="se_dia_row" style="display:none;">Bar Ø <span style="color:#9fb4cc;font-size:10px;">(optional — the cylinder OD; blank = fills the box, min Y/Z)</span>
-                <input id="se_dia" type="number" min="0" step="0.1" placeholder="min(Y, Z)">
-            </label>
+            <!-- ROUND BLANK (mill): a disc standing on the table, or a bar along a DECLARED rotary axis -->
+            <div id="se_round_fields" style="display:none; flex-direction:column; gap:10px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                    <label class="col">Ø<input id="se_rd_dia" type="number" min="0" step="0.1"></label>
+                    <label class="col">Height<input id="se_rd_len" type="number" min="0" step="0.1"></label>
+                </div>
+                <label class="col" id="se_rd_axis_row" style="display:none;">Lies along
+                    <select id="se_rd_axis">
+                        <option value="z">Standing on the table (Z)</option>
+                    </select>
+                </label>
+            </div>
+            <!-- BAR (lathe): what a turner types — the stock in the chuck -->
+            <div id="se_bar_fields" style="display:none; flex-direction:column; gap:10px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                    <label class="col">Bar Ø<input id="se_bar_dia" type="number" min="0" step="0.1"></label>
+                    <label class="col">Stick-out<input id="se_bar_out" type="number" min="0" step="1"></label>
+                    <label class="col">Raw end<input id="se_bar_allow" type="number" min="0" step="0.1" title="The material still ahead of the finished face — what facing removes"></label>
+                </div>
+            </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                 <label class="col">Part-zero (datum)
                     <div id="se_datum_pick" class="se-datum-pick" title="Click the box point of the stock that is your part-zero / program origin"></div>
                     <span id="se_datum_name" style="font-size:10px; color:#9fb4cc; text-align:center;"></span>
+                    <!-- t1313 — ROUND STOCK HAS NO CORNER TO PICK. The picker stays on screen, greyed, with the reason
+                         underneath it (grey-not-hide), and this line says what the datum IS instead. -->
+                    <span id="se_datum_fixed" class="se-fixed" style="display:none;"></span>
                 </label>
                 <label class="col">Sits at WCS <button type="button" id="se_wcs_link" class="field-link-gear" style="position:static; margin-left:3px; vertical-align:middle;" title="Open the WCS table — over this modal, returns here">⚙</button>
                     <select id="se_pin" title="Where this stock sits in the machine: the program zero, or pinned to a WCS offset from the table (the ⚙ opens the WCS table). This is the stock's WCS — the op runs from its datum.">
@@ -133,13 +177,14 @@ export function openStockEditor(anchor, opts) {
                     </select>
                 </label>
             </div>
-            <div style="color:#7f8a99; font-size:11px;">Cylinder lies along the rotary axis (Y = diameter, X = length).</div>
+            <div id="se_shape_note" style="color:#7f8a99; font-size:11px;"></div>
             <!-- DECLARED pocket DEPTH — the user owns the number (declare-not-derive); the previews render a real floor -->
             <div id="se_features"></div>
+            <div id="se_features_why" class="se-fixed" style="display:none;"></div>
           </div>
           <div style="flex:1 1 auto; min-width:300px; display:flex; flex-direction:column; gap:10px;">
             <div style="display:flex; flex-direction:column; gap:3px;">
-                <span style="font-size:10px; letter-spacing:.5px; color:#9fb4cc;">TOP VIEW — drag the ◇ corner to resize</span>
+                <span id="se_canvas_label" style="font-size:10px; letter-spacing:.5px; color:#9fb4cc;">TOP VIEW — drag the ◇ corner to resize</span>
                 <div id="se_canvas" style="height:230px; background:#0d0f14; border:1px solid #2a3340; border-radius:5px; overflow:hidden;"></div>
             </div>
             <div style="display:flex; flex-direction:column; gap:3px;">
@@ -175,6 +220,26 @@ export function openStockEditor(anchor, opts) {
     const writeFeatures = (feats) => { applySettings({ stock: { features: feats } }); renderWorkpiece(); render3d(); };
     const renderWorkpiece = () => {
         const host = pop.querySelector('#se_canvas'); if (!host) return;
+        // t1313 — ROUND STOCK DRAWS ITSELF. A top view of a bar is a circle that never changes, so a lathe gets the
+        // same HALF-PROFILE its wizards draw (one picture of the workpiece across the app) and a mill's round blank
+        // gets the circle it actually is. Both route their drags to the SAME fields the form holds, so a handle is a
+        // second way to type a number and never a second source of truth.
+        const lbl = pop.querySelector('#se_canvas_label');
+        if (kind === 'cylinder') {
+            const spec = latheWs
+                ? barStockSpec({ diameter: parseFloat(q('se_bar_dia').value), stickOut: parseFloat(q('se_bar_out').value), allowance: parseFloat(q('se_bar_allow').value) },
+                    (patch) => {
+                        if (patch.diameter != null) q('se_bar_dia').value = patch.diameter;
+                        if (patch.stickOut != null) q('se_bar_out').value = patch.stickOut;
+                        if (patch.allowance != null) q('se_bar_allow').value = patch.allowance;
+                        commit();
+                    })
+                : roundBlankSpec(parseFloat(q('se_rd_dia').value), (patch) => { q('se_rd_dia').value = patch.diameter; commit(); });
+            if (lbl) lbl.textContent = latheWs ? 'HALF-PROFILE — drag the Ø, the stick-out or the raw end' : 'TOP VIEW — drag the Ø';
+            _fc.render(host, spec);
+            return;
+        }
+        if (lbl) lbl.textContent = 'TOP VIEW — drag the ◇ corner to resize';
         const wp = getWorkpiece();
         const spec = workpieceBackdrop(wp);
         const o = wp.outer;
@@ -317,13 +382,65 @@ export function openStockEditor(anchor, opts) {
     q('se_x').value = s.x ?? '';
     q('se_y').value = s.y ?? '';
     q('se_z').value = s.z ?? '';
-    q('se_shape').value = s.shape || 'boss';
-    q('se_dia').value = s.diameter ?? '';   // SPATIAL-MODEL inc2: the declared bar OD (blank = inferred from the box)
+    q('se_shape').value = (s.shape === 'pocket') ? 'pocket' : DEFAULT_BOX_VARIANT;
     setDatum(s.datum);
     q('se_pin').value = s.pin || 'origin';
-    // The Bar Ø field is meaningful only for a cylinder (rotary bar) — show it just then.
-    const syncDiaRow = () => { const row = q('se_dia_row'); if (row) row.style.display = q('se_shape').value === 'cylinder' ? '' : 'none'; };
-    syncDiaRow();
+
+    // ── t1313 — THE SHAPE IDENTITY ─────────────────────────────────────────────────────────────────────────────
+    // A LATHE WORKSPACE TURNS BAR STOCK, by declaration: the choice is made, so Box greys with the reason rather
+    // than offering a workpiece the machine cannot hold. On a mill both are real choices.
+    const latheWs = (() => { try { return isLathe(); } catch (_) { return false; } })();
+    let kind = latheWs ? 'cylinder' : shapeKindOf(s);
+    const rotaryAxes = (() => { try { return Object.values(getRotaryAxes() || {}); } catch (_) { return []; } })();
+    const bar0 = barOfStock(s);
+    q('se_bar_dia').value = bar0.diameter;
+    q('se_bar_out').value = bar0.stickOut;
+    q('se_bar_allow').value = bar0.allowance;
+    q('se_rd_dia').value = (isRoundBlank(s) && s.diameter) ? s.diameter : (s.diameter || Math.min(s.x || 50, s.y || 50) || 50);
+    q('se_rd_len').value = (isRoundBlank(s) && s.z) ? s.z : (s.z || 25);
+    // …the ALONG-THE-ROTARY option exists only when the workspace DECLARES a rotary axis. No declaration, no choice:
+    // offering "along A" on a machine with no A is offering a workpiece it cannot spin.
+    {
+        const sel = q('se_rd_axis'), row = q('se_rd_axis_row');
+        if (sel && row) {
+            const extra = rotaryAxes.filter((a) => a === 'x' || a === 'y');
+            sel.innerHTML = '<option value="z">Standing on the table (Z)</option>' +
+                extra.map((a) => `<option value="${a}">Along the rotary axis (${a.toUpperCase()})</option>`).join('');
+            sel.value = (s.axis === 'x' || s.axis === 'y') ? s.axis : 'z';
+            row.style.display = extra.length ? '' : 'none';
+        }
+    }
+
+    /** What this modal shows depends ONLY on the shape — one function, so no surface can disagree with another. */
+    const syncShape = () => {
+        const bar = latheWs;                                   // a lathe's cylinder IS a bar; a mill's is a blank
+        const cyl = kind === 'cylinder';
+        [...q('se_kind').querySelectorAll('button')].forEach((b) => {
+            const on = b.dataset.kind === kind;
+            b.classList.toggle('on', on);
+            const blocked = latheWs && b.dataset.kind === 'box';
+            b.setAttribute('aria-disabled', blocked ? 'true' : 'false');
+            b.title = blocked ? LATHE_BOX_WHY : '';
+        });
+        q('se_kind_why').textContent = latheWs ? LATHE_BOX_WHY : '';
+        q('se_box_fields').style.display = cyl ? 'none' : 'flex';
+        q('se_round_fields').style.display = (cyl && !bar) ? 'flex' : 'none';
+        q('se_bar_fields').style.display = (cyl && bar) ? 'flex' : 'none';
+        // THE DATUM IS NOT A CHOICE ON ROUND STOCK — the picker greys, and the line says what it is instead.
+        const pickWrap = q('se_datum_pick'), fixed = q('se_datum_fixed');
+        if (pickWrap) { pickWrap.classList.toggle('axis-gated', cyl); pickWrap.title = cyl ? (bar ? BAR_DATUM_TEXT : ROUND_DATUM_WHY) : 'Click the box point of the stock that is your part-zero / program origin'; }
+        if (fixed) { fixed.style.display = cyl ? '' : 'none'; fixed.textContent = cyl ? (bar ? `Datum: ${BAR_DATUM_TEXT}` : `Datum: the CENTRE of the top face — ${ROUND_DATUM_WHY}`) : ''; }
+        // FEATURES stay box-scoped (v1): on round stock the section says why instead of half-working.
+        const feats = q('se_features'), why = q('se_features_why');
+        if (feats) feats.style.display = cyl ? 'none' : '';
+        if (why) { why.style.display = cyl ? '' : 'none'; why.textContent = `Pockets and bosses: box stock only for now — ${FEATURES_BOX_ONLY_WHY}.`; }
+        const note = q('se_shape_note');
+        if (note) note.textContent = !cyl ? '' : (bar
+            ? 'The bar every lathe wizard draws — change it here and every pane follows.'
+            : 'A round blank on the table. Its datum is the centre of the top face.');
+    };
+    const syncDiaRow = syncShape;   // …the old name, kept for the callers below; there is one sync now
+    syncShape();                    // …and the modal opens already showing the shape this workspace holds
 
     const updateTplDel = () => {
         const sel = q('se_tpl');
@@ -346,21 +463,50 @@ export function openStockEditor(anchor, opts) {
 
     rebuildTplDropdown();
 
-    const commit = () => { syncDiaRow(); applySettings({ stock: {
-        x: parseFloat(q('se_x').value) || 0,
-        y: parseFloat(q('se_y').value) || 0,
-        z: parseFloat(q('se_z').value) || 0,
-        shape: q('se_shape').value,
-        // SPATIAL-MODEL inc2: a cylinder's declared OD (sim + collision read it); blank / non-cylinder → undefined (inferred from the box)
-        diameter: (q('se_shape').value === 'cylinder' && parseFloat(q('se_dia').value) > 0) ? parseFloat(q('se_dia').value) : undefined,
-        datum: getDatum(),
-        pin: q('se_pin').value,
-        show: true,   // the modal has its own 3D pane now (the 'Show in 3D' control was removed); the stock ALWAYS renders in the main 3D
-    } }); renderWorkpiece(); render3d(); };   // M1b: reflect the just-committed stock in BOTH the 2D top-view + the 3D depth preview
+    /**
+     * t1313 — ONE COMMIT, THREE SHAPES. Which fields are read depends on what the stock IS, and each branch writes
+     * the record its consumers already read: a BAR goes through `barStock` (the same `barToStock` latheSimStock uses,
+     * so the bar the modal writes is the bar every wizard pane draws), a ROUND BLANK through `roundBlankStock` with
+     * its centre-of-top-face datum, and a BOX exactly as before.
+     */
+    const commit = () => {
+        syncShape();
+        const cur = getSettings().stock || {};
+        let next;
+        if (kind === 'cylinder' && latheWs) {
+            next = barStock({ diameter: parseFloat(q('se_bar_dia').value), stickOut: parseFloat(q('se_bar_out').value), allowance: parseFloat(q('se_bar_allow').value) }, cur);
+            next.pin = q('se_pin').value;
+        } else if (kind === 'cylinder') {
+            next = roundBlankStock(parseFloat(q('se_rd_dia').value), parseFloat(q('se_rd_len').value), (q('se_rd_axis') || {}).value, cur);
+            next.pin = q('se_pin').value;
+        } else {
+            next = {
+                ...cur,
+                x: parseFloat(q('se_x').value) || 0,
+                y: parseFloat(q('se_y').value) || 0,
+                z: parseFloat(q('se_z').value) || 0,
+                shape: q('se_shape').value,
+                diameter: undefined, axis: undefined, origin: undefined, faceZ: undefined,   // …a box carries no round facts
+                datum: getDatum(),
+                pin: q('se_pin').value,
+                show: true,   // the modal has its own 3D pane now; the stock ALWAYS renders in the main 3D
+            };
+        }
+        applySettings({ stock: next });
+        renderWorkpiece(); render3d();   // M1b: reflect the just-committed stock in BOTH the 2D top-view + the 3D depth preview
+    };
 
-    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_dia', 'se_pin'].forEach((id) => {
-        q(id).addEventListener('input', commit);
-        q(id).addEventListener('change', commit);
+    // the identity picker: a lathe's Box is greyed, and clicking a greyed choice does nothing (it is not a choice)
+    q('se_kind').addEventListener('click', (e) => {
+        const b = e.target && e.target.closest && e.target.closest('button[data-kind]');
+        if (!b || b.getAttribute('aria-disabled') === 'true' || b.dataset.kind === kind) return;
+        kind = b.dataset.kind;
+        commit();
+    });
+    ['se_x', 'se_y', 'se_z', 'se_shape', 'se_pin', 'se_bar_dia', 'se_bar_out', 'se_bar_allow', 'se_rd_dia', 'se_rd_len', 'se_rd_axis'].forEach((id) => {
+        const el = q(id); if (!el) return;
+        el.addEventListener('input', commit);
+        el.addEventListener('change', commit);
     });
     // t796 P4 — the "Sits at WCS" ⚙ deep-links to the WCS table (the SAME affordance the twin wcs fields carry), over this modal.
     { const wl = q('se_wcs_link'); if (wl) wl.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openFieldLink({ ...WCS_LINK, returnLabel: 'Stock' }); }); }
@@ -379,9 +525,16 @@ export function openStockEditor(anchor, opts) {
         updateTplDel();
         if (i < 0 || !all[i]) return;
         const t = all[i].t;
+        // t1313 — a template carries a SHAPE, so applying one sets the identity as well as the numbers. On a lathe
+        // the identity is already decided, so a box template's numbers are ignored rather than silently retyping the
+        // workpiece to something the machine cannot hold.
         q('se_x').value = t.x; q('se_y').value = t.y; q('se_z').value = t.z;
-        q('se_shape').value = t.shape || 'boss';
-        if (t.datum) setDatum(t.datum);
+        q('se_shape').value = (t.shape === 'pocket') ? 'pocket' : DEFAULT_BOX_VARIANT;
+        if (!latheWs) {
+            kind = (t.shape === 'cylinder') ? 'cylinder' : 'box';
+            if (kind === 'cylinder') { q('se_rd_dia').value = t.diameter || Math.min(t.y, t.z) || 50; q('se_rd_len').value = t.x || 25; }
+        }
+        if (t.datum && kind === 'box') setDatum(t.datum);
         if (t.pin) q('se_pin').value = t.pin;
         commit();
     });
@@ -398,7 +551,8 @@ export function openStockEditor(anchor, opts) {
             x: parseFloat(q('se_x').value) || 0,
             y: parseFloat(q('se_y').value) || 0,
             z: parseFloat(q('se_z').value) || 0,
-            shape: q('se_shape').value || 'boss',
+            shape: kind === 'cylinder' ? 'cylinder' : (q('se_shape').value || DEFAULT_BOX_VARIANT),
+            ...(kind === 'cylinder' ? { diameter: parseFloat(q('se_rd_dia').value) || undefined } : {}),
             datum: getDatum(), pin: q('se_pin').value,
         };
         const updated = [...currentTemplates, newTemplate];

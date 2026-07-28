@@ -16,6 +16,20 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 950 } });
 
+/**
+ * t1313 — THIS SPEC DECLARES THE BAR IT TESTS. The stock modal made the WORKSPACE record the one bar in the chuck,
+ * so an op's own `barDiameter` default no longer outranks it (that default WAS the parallel store the redesign
+ * removed). Every hand-derived truth below is against a Ø20 bar, so the workspace is told to hold one — which is
+ * what a turner would have done before running any of this.
+ */
+const setBar = (page, diameter = 20, stickOut = 60) => page.evaluate(async ({ d, so }) => {
+    // built straight from the declared bar shape — NOT through latheSimStock, which now (correctly) prefers the
+    // workspace bar and would therefore hand back the one already there instead of the one being asked for
+    const { barStock } = await import('/data/stockShape.js');
+    window.ddcsGetSettings().stock = barStock({ diameter: d, stickOut: so, allowance: 1 }, window.ddcsGetSettings().stock);
+    try { window.ddcsSaveSettings && window.ddcsSaveSettings(); } catch (_) {}
+}, { d: diameter, so: stickOut });
+
 const boot = async (page, kind = 'lathe') => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
@@ -23,6 +37,7 @@ const boot = async (page, kind = 'lathe') => {
         const M = await import('/data/workspaceMachine.js');
         M.setMachine({ name: 'Rig', kind: k, chuck: 'axis' }, false);
     }, kind);
+    if (kind === 'lathe') await setBar(page);   // t1313 — a LATHE workspace holds the Ø20 bar these truths are derived against; a mill keeps its block
 };
 
 const OPS = ['user_lathe_facing', 'user_lathe_odturn', 'user_lathe_parting', 'user_lathe_centerdrill', 'user_lathe_polygon'];
@@ -54,11 +69,34 @@ test('EVERY lathe op declares its BAR into the scene — size, axis and datum', 
         // THE AXIS IS DECLARED, not guessed from a rotary motor a lathe does not have
         expect(stock.axis, `${t} says which way the bar lies — along the bed`).toBe('z');
         expect(stock.origin, `${t} anchors it on the FINISHED FACE, so Z0 is where the frame says`).toBe('finished-face');
-        // …and it is THIS OP'S bar: each declares its own default, and the scene must show that one
-        expect(stock.diameter, `${t} draws the bar IT declares, not a generic one`).toBe(r[t].barDiameter);
+        // t1313 — THE PREMISE CHANGED BY RULING, and the new one is the point of the stock redesign: the bar in the
+        // chuck is a fact about the SETUP, so every op draws the WORKSPACE's bar. Each op still carries its own
+        // default for a workspace that declares none — asserted separately below, where that state is set up.
+        expect(stock.diameter, `${t} draws the bar the WORKSPACE declares — one record, every pane`).toBe(20);
         expect(stock.x, `${t} cross-section is the diameter (a radius here would draw a bar half size)`).toBe(stock.diameter);
         expect(stock.z, `${t} draws its full length — stick-out plus the raw end`).toBeGreaterThan(50);
     }
+});
+
+test('…AND ITS OWN DEFAULT STILL STANDS when the workspace declares no bar', async ({ page }) => {
+    // t1313 — the fallback half of the same rule. A workspace holding a mill's BOX has not said what is in the
+    // chuck, so an op falls back to the bar it declares rather than drawing nothing (or a box).
+    await boot(page);
+    const r = await page.evaluate(async (types) => {
+        const O = await import('/viz/opSimStarts.js');
+        const uo = await import('/blocks/userOps.js');
+        window.ddcsGetSettings().stock = { x: 100, y: 80, z: 20, shape: 'boss', datum: 'nnp', show: true };   // no bar declared
+        try { window.ddcsSaveSettings && window.ddcsSaveSettings(); } catch (_) {}
+        const out = {};
+        for (const t of types) {
+            const def = uo.listUserOps().find((d) => d.opType === t);
+            const fn = O.getUserSimStock(t);
+            const params = uo.defaultParams(def);
+            out[t] = { d: fn(params, window.ddcsGetSettings().stock).diameter, own: Number(params.barDiameter) || (t.indexOf('polygon') >= 0 ? 25 : 20) };
+        }
+        return out;
+    }, OPS);
+    for (const t of OPS) expect(r[t].d, `${t} falls back to the bar IT declares`).toBe(r[t].own);
 });
 
 test('THE TRACED PATH lies ON the bar — inside its radius and along its length', async ({ page }) => {
@@ -70,9 +108,16 @@ test('THE TRACED PATH lies ON the bar — inside its radius and along its length
         const { traceToolpath } = await import('/engine/trace.js');
         const O = await import('/viz/opSimStarts.js');
         const out = {};
+        const { barStock } = await import('/data/stockShape.js');
         for (const t of types) {
             const def = uo.listUserOps().find((d) => d.opType === t);
             const params = uo.defaultParams(def);
+            // t1313 — DECLARE THE BAR THIS OP IS BEING RUN AGAINST. The scene follows the WORKSPACE bar now, while the
+            // emit is still sized from the op's own default (polygon's across-flats is drawn for a Ø25 bar) — so the
+            // two only agree when the workspace holds the bar the program was written for, which is what a turner
+            // would have. Whether the emit should follow the workspace bar too is a G-code change, and is FLAGGED.
+            const own = Number(params.barDiameter) || (t.indexOf('polygon') >= 0 ? 25 : 20);
+            window.ddcsGetSettings().stock = barStock({ diameter: own, stickOut: Number(params.stickOut) || 60, allowance: 1 }, window.ddcsGetSettings().stock);
             const nc = String(emitProgram(builderOf(t)(params)));
             const segs = (traceToolpath(nc).segments || []);
             const stock = O.getUserSimStock(t)(params, window.ddcsGetSettings().stock);
