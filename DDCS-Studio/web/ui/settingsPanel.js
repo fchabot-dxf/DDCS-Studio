@@ -1203,6 +1203,21 @@ function buildSettingsOverlay() {
 
                 <!-- MACHINE TAB -->
                 <div id="set_tab_machine" style="display:none">
+                    <!-- t1269 — THE KIND. A DDCS drives whatever you wired it to, so only the person who built the
+                         machine can say what it is. Two options, one line, no ceremony: it decides what the app SHOWS
+                         (the identity surfaces, the lathe wizards, what X and Z are called below), never what any op
+                         emits. Duplicate the workspace to retarget a second machine. -->
+                    <div class="settings-section">
+                        <div class="settings-section-title">THIS MACHINE</div>
+                        <div class="settings-row" style="align-items:center; gap:10px;">
+                            <label class="label" for="set_machine_kind">Kind</label>
+                            <select id="set_machine_kind" title="What kind of machine this workspace is for. The controller cannot report this — a DDCS drives either.">
+                                <option value="mill">Mill / router</option>
+                                <option value="lathe">Lathe</option>
+                            </select>
+                            <span class="settings-hint" id="set_machine_kind_note" style="margin:0;"></span>
+                        </div>
+                    </div>
                     <div class="settings-section">
                         <div class="settings-section-title">MACHINE ENVELOPE (mm)</div>
                         <div class="settings-hint">Travel per axis, edited on the envelope. The <b>sign sets the home direction</b>: <code>X 300</code> homes at one end and travels +X; <code>X -300</code> homes at the other and travels −X. The ⬤ marks home (machine 0); the coloured edges are the travels.</div>
@@ -3028,6 +3043,28 @@ function wireSettingsOverlay(ov) {
         const out = q('atc_tnc_out'); if (out) { out.value = nc; out.style.display = 'block'; }
         const dl = q('atc_dl_tnc'); if (dl) dl.style.display = '';
     });
+    // t1269 — the kind control: reads and writes the ONE machine record. Changing it re-renders the identity band
+    // (which shows the kind) and the axis note below, because the same envelope numbers MEAN something different on
+    // a lathe — X is a cross-slide radius, Z is the carriage.
+    {
+        const sel = q('set_machine_kind'), note = q('set_machine_kind_note');
+        const paintKind = async () => {
+            const { axisLabels } = await import('../data/lathe.js');
+            const k = getMachine().kind;
+            if (sel) sel.value = k;
+            if (note) note.textContent = axisLabels(k).note || '';
+        };
+        if (sel) {
+            sel.addEventListener('change', async () => {
+                setMachine({ kind: sel.value }, false);
+                await paintKind();
+                try { renderIdentityBand(); } catch (_) { /* the band redraws with the kind */ }
+                window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
+            });
+            paintKind();
+        }
+    }
+
     const dlTnc = q('atc_dl_tnc');
     // t1249 — T.nc is the controller's TOOL TABLE file: baked output that walks to the machine, so it deploys to the
     // granted target like every other bake. Downloads only where File System Access does not exist.
