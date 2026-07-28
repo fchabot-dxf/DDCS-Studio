@@ -44,3 +44,20 @@ export function compareController(detectedId) {
 export function mismatchStatement(cmp) {
     return `This controller is a ${cmp.detected.name} — this workspace targets a ${cmp.workspace.name}.`;
 }
+
+/**
+ * THE MACHINE KIND AND THIS GATE (t1267) — and the honest answer is that the gate CANNOT compare kinds.
+ *
+ * A pull reads controller parameters: envelope, WCS table, motors, homing, feeds. None of them says "I am wired to a
+ * lathe" — a DDCS has no lathe mode, and the same parameter set describes a mill and a lathe equally well (user,
+ * definitive: "it doesn't"). So there is nothing to detect, and this gate DOES NOT INVENT IT: no heuristic on axis
+ * counts, no guessing from travels. A kind mismatch is not a thing the app can know.
+ *
+ * What it CAN do is state the workspace's own declaration as context when it is already speaking — a person told
+ * that this workspace is a LATHE workspace can judge for themselves whether the controller in front of them is the
+ * right one. That is a fact we hold, not a comparison we fabricated.
+ * @returns {string} '' for a mill workspace — nothing to add — or one clause naming the kind
+ */
+export function kindContext(kind) {
+    return kind === 'lathe' ? 'This is a lathe workspace (the controller cannot report which kind of machine it drives).' : '';
+}

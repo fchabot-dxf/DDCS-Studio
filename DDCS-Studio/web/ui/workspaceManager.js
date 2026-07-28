@@ -123,6 +123,7 @@ function summarizeWorkspace(name, obj, extra) {
     return {
         name, ...extra,
         envelope: envelopeSummary(mm),   // t1231 — signs INCLUDED: the sign declares the home end, so stripping it hid the machine
+        kind: (obj.stores && obj.stores.machine && obj.stores.machine.kind === 'lathe') ? 'lathe' : 'mill',   // t1267 — read from the FILE, like everything else on a row
         dialect: (CONTROLLER_PROFILES[mach.controllerId] || {}).name || mach.controllerId || null,
         savedAt: (obj && obj.date) || null,
     };
@@ -590,7 +591,8 @@ function renderCards(ov, dir, cards, place = 'local') {
                 : `<button type="button" class="wsm-fp-open" data-wsm-open="${i}" title="Open ${esc(c.name)}">`
                   + `<span class="wsm-c-name">${FILE_ICON}${esc(c.name)}</span>`
                   + `<span class="wsm-c-env">${esc(c.envelope || '—')}</span>`
-                  + `<span class="wsm-c-ctrl">${esc(c.dialect || 'unknown')}</span>`
+                  // t1267 — a LATHE row says so beside its dialect; a mill row says nothing extra (the default needs no label)
+                  + `<span class="wsm-c-ctrl">${esc(c.dialect || 'unknown')}${c.kind === 'lathe' ? ' · Lathe' : ''}</span>`
                   + `<span class="wsm-c-when">${c.savedAt ? esc(String(c.savedAt).slice(0, 10)) : ''}</span></button>`)
             + `<button type="button" class="wsm-fp-del" data-wsm-del="${i}" title="Delete ${esc(c.name)}.ddcs permanently" aria-label="Delete ${esc(c.name)}">${TRASH_ICON}</button>`
             + '</div>').join('')

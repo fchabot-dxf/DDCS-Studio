@@ -27,12 +27,31 @@ export const MACHINE_KEY = 'ddcs_machine';
 const readJSON = (k) => { try { const v = localStorage.getItem(k); return v == null ? null : JSON.parse(v); } catch (_) { return null; } };
 const liveControllerId = () => { try { return (getActiveProfile() || {}).id || DEFAULT_PROFILE_ID; } catch (_) { return DEFAULT_PROFILE_ID; } };
 
-/** THE machine record for this workspace: { name, controllerId }. Never null — an un-named workspace is legal (''). */
+/**
+ * THE MACHINE KIND (t1267) — what SHAPE of machine this workspace is for.
+ *
+ * A DDCS controller has no lathe mode: one controller, one G-code set (user, definitive). So the kind is a fact about
+ * the MACHINE THE USER BUILT, not something the controller can be asked — which is exactly why it belongs on the
+ * workspace record, beside its name and controller, and why nothing downstream may try to infer it.
+ *
+ * It changes what the app SHOWS and what ops make sense (a lathe workspace has no pocketing; a mill has no facing
+ * pass down a bar), never what a given op emits.
+ */
+export const MACHINE_KINDS = ['mill', 'lathe'];
+export const DEFAULT_KIND = 'mill';
+const cleanKind = (k) => (MACHINE_KINDS.includes(k) ? k : DEFAULT_KIND);
+
+/** THE machine record for this workspace: { name, controllerId, kind }. Never null — an un-named workspace is legal (''). */
 export function getMachine() {
     const m = readJSON(MACHINE_KEY);
-    if (m && typeof m === 'object') return { name: String(m.name || ''), controllerId: m.controllerId || liveControllerId() };
-    return { name: '', controllerId: liveControllerId() };   // derived, NOT written — writing on read would mask a real save
+    if (m && typeof m === 'object') {
+        return { name: String(m.name || ''), controllerId: m.controllerId || liveControllerId(), kind: cleanKind(m.kind) };
+    }
+    return { name: '', controllerId: liveControllerId(), kind: DEFAULT_KIND };   // derived, NOT written — writing on read would mask a real save
 }
+
+/** Is this workspace a lathe? The one question every surface asks; nobody re-derives it from anything else. */
+export const isLathe = () => getMachine().kind === 'lathe';
 
 /**
  * Persist the record. `applyController` (default true) also RETARGETS this workspace's live controller/dialect — the
@@ -42,7 +61,13 @@ export function getMachine() {
  */
 export function setMachine(next, applyController = true) {
     const cur = getMachine();
-    const rec = { name: String((next && next.name) != null ? next.name : cur.name), controllerId: (next && next.controllerId) || cur.controllerId };
+    const rec = {
+        name: String((next && next.name) != null ? next.name : cur.name),
+        controllerId: (next && next.controllerId) || cur.controllerId,
+        // t1267 — the kind rides with the record, so it travels in the .ddcs like the name and the controller do
+        // ([[one-workspace-one-machine]]: the file IS the machine, and what kind of machine is part of that).
+        kind: cleanKind((next && next.kind) || cur.kind),
+    };
     try { localStorage.setItem(MACHINE_KEY, JSON.stringify(rec)); } catch (_) {}
     if (applyController && rec.controllerId) {
         try {

@@ -174,9 +174,11 @@ test('restoring a workspace ADOPTS the file\'s controller (the file is the machi
     return { inFile, before, after: { controller: (getActiveProfile() || {}).id, machine: window.ddcsGetMachine() } };
   });
 
-  expect(r.inFile, 'the .ddcs carries the machine record as a declared store').toEqual({ name: 'Shop Bee', controllerId: 'ddcs-v41' });
+  // t1267 — the record gained `kind` (mill | lathe): the file IS the machine, and WHICH KIND of machine is part of
+  // that. Asserted in full rather than loosened, so the next field added to the record has to be stated here too.
+  expect(r.inFile, 'the .ddcs carries the machine record as a declared store').toEqual({ name: 'Shop Bee', controllerId: 'ddcs-v41', kind: 'mill' });
   expect(r.before.controller, 'the browser really was on a different controller first').toBe('ddcs-expert-m350');
-  expect(r.after.machine, 'the restored machine record is the FILE\'s').toEqual({ name: 'Shop Bee', controllerId: 'ddcs-v41' });
+  expect(r.after.machine, 'the restored machine record is the FILE\'s').toEqual({ name: 'Shop Bee', controllerId: 'ddcs-v41', kind: 'mill' });
   expect(r.after.controller, 'and the LIVE controller was retargeted to it — the file is the machine').toBe('ddcs-v41');
 });
 

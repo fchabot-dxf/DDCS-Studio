@@ -1855,7 +1855,10 @@ function wireSettingsOverlay(ov) {
             ? `<span class="si-name">${escHtml(named)}</span>`
             : '<span class="si-name">Untitled workspace</span><span class="si-unsaved">not saved yet</span>';
         band.insertAdjacentHTML('beforeend',
-            `<span class="si-item">Controller <b>${escHtml(ctrl)}</b></span>`
+            // t1267 — the KIND, shown only when it is a lathe. A mill workspace is the default and does not need a
+            // label; a lathe one does, because every axis on the line below means something different on a lathe.
+            (m.kind === 'lathe' ? '<span class="si-item">Kind <b>Lathe</b></span>' : '')
+            + `<span class="si-item">Controller <b>${escHtml(ctrl)}</b></span>`
             + `<span class="si-item">Envelope <b>${escHtml(envTxt)}</b></span>`);
     }
     function renderMachineLine() { try { renderIdentityBand(); } catch (e) { /* */ } }

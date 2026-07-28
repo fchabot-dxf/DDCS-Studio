@@ -119,6 +119,9 @@ export function initHeaderPost() {
         // t1231 (user) — the line also carries the ENVELOPE, signed, from the SAME formatter the manager rows and the
         // Settings band use. Three surfaces, one source: they cannot describe the same machine differently.
         const apEnv = envelopeSummary((window.ddcsGetSettings && window.ddcsGetSettings().machine) || {});
+        // t1267 — a LATHE workspace says so on the identity line. Only when it is a lathe: 'mill' is the default and
+        // labelling every mill workspace "mill" would be noise on the line that identifies the machine.
+        const apKind = ap.kind === 'lathe' ? ' · Lathe' : '';
         // t1243 (user) — THE ☁ BADGE IS GONE. Cloud access lives in ONE place: the workspace manager's Local | Cloud
         // tabs, which carry the sign-in, the signed-in account and the sign-out. A second door in the header meant two
         // places to learn for one connection. The ↧ PULL span stays — that is a controller read, not a cloud thing.
@@ -129,6 +132,7 @@ export function initHeaderPost() {
             // the disk tooltip, so the two surfaces name the same thing the same way.
             + `<span class="hq-identity-txt"><span class="hq-label">Workspace: </span><b>${esc(ap.name || 'Untitled workspace')}</b>`
             + `<span class="hq-cur"> · ${esc(apCtrl)}</span>`
+            + `<span class="hq-cur">${esc(apKind)}</span>`
             + (apEnv ? `<span class="hq-cur hq-env"> · ${esc(apEnv)}</span>` : '')
             + `</span>`
             + `<span class="hq-pull-btn" data-profact="pull" role="button" tabindex="0" title="Pull from controller">↧</span>`
