@@ -193,7 +193,7 @@ export function simIntentFromStack(children) {
 }
 
 // ── def.sim.starts ⇄ `simstart` blocks (B3) — the DECLARATION round-trip (NOT the macro: a sim-start emits no line) ──
-const ANCHORS = ['centre', 'edge', 'frac', 'radial'];
+const ANCHORS = ['centre', 'edge', 'frac', 'radial', 'lathe'];   // t1301 — 'lathe': outside the BAR radius, at a Z along it
 const numOrTok = (v) => (typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v.trim())) ? Number(v) : v;   // "15"→15, "@outset"→"@outset"
 
 /** The `simstart` blocks in a stack → def.sim.starts ROWS (B1's makeProvider vocabulary). Each block declares one
@@ -206,6 +206,7 @@ export function simStartsFromStack(children) {
         if (a === 'edge') { row.axis = p.axis || 'X'; row.side = p.wall || '@dir1'; row.out = numOrTok(p.out); }
         else if (a === 'frac') { row.fx = Number(p.fx) || 0; row.fy = Number(p.fy) || 0; }
         else if (a === 'radial') { row.axis = p.axis || 'Y'; row.sign = p.sign === '-' ? '-' : '+'; row.r = numOrTok(p.rad); }
+        else if (a === 'lathe') { row.out = numOrTok(p.out); }   // t1301 — how far OUTSIDE the bar; the Z is the plane, as a number
         if (p.whenparam) row.when = { param: p.whenparam, is: p.whenis === 'true' ? true : p.whenis === 'false' ? false : p.whenis };
         if (p.id) row.id = p.id;   // stable pass id (② B4 step 4a) — the anchor a semantic relTo names; only present when declared
         if (p.emits === 'true' || p.emits === true) row.emits = true;   // sim-marker-distinguish (t69): a reposition-destination pass → SOLID marker (a drag edits the program)

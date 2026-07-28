@@ -193,7 +193,7 @@ export function resolveRelToIndex(opType, params, relTo) {
 
 // ── makeProvider: a DECLARED `def.sim.starts` ROWS spec → a (params, stock) ⇒ [{x,y,z}…] provider (Option A, blessed) ────
 // Each ROW = one pass. The human-blessed bounded vocabulary:
-//   anchor : 'centre' | 'edge'(axis,side,out) | 'frac'(fx,fy) | 'radial'(axis,sign,r)
+//   anchor : 'centre' | 'edge'(axis,side,out) | 'frac'(fx,fy) | 'radial'(axis,sign,r) | 'lathe'(out) — outside the BAR
 //   plane  : 'top' (above the top, +z) | 'probe' (below the top, into the stock) | '@flank' (= -R, the bar centreline) | <number>
 //   side/out/r : a literal OR an @token from the bound set { @dir1 @dir2 @outset @R }
 //   when   : { param, is } — optional; the row only contributes when params[param] matches (the conditional pass count)
@@ -236,6 +236,20 @@ const rowToStart = (row, ctx) => {
             const axis = row.axis === 'X' ? 'X' : 'Y';
             const r = n(TOK(row.r, ctx), 0) * (row.sign === '-' ? -1 : 1);
             return axis === 'X' ? { x: cx + r, y: cy, z } : { x: cx, y: cy + r, z };
+        }
+        // t1301 — THE LATHE ANCHOR. Every anchor above is MILL-FRAME: they resolve against a stock spanning 0..sx with
+        // its corner at the origin. A lathe's X is a RADIUS from a centreline the bar is wrapped around, so `edge`
+        // aimed at a bar seats the stylus a full RADIUS out — which is how the OD probe's stroke came to be drawn
+        // crossing the centreline. This one says the only thing a lathe start needs to say: OUTSIDE THE BAR by `out`,
+        // at a Z along it (`plane`, as a number) — the operator's jog position, which is what the op's own prompt
+        // asks them for. `R` is the DECLARED bar radius the ctx already carries; nothing here re-derives it.
+        case 'lathe': {
+            // STOCK-LOCAL, like every anchor here: the bar's AXIS is the box centre, so "outside the bar" is the
+            // centre plus the radius plus the stand-off. (Returning a program-frame radius instead left the start a
+            // half-diameter adrift of the collision geometry — the stylus then began INSIDE the bar's shadow and its
+            // stroke exited through the far side, which is the crossing-the-centreline picture in another disguise.)
+            const out = n(TOK(row.out, ctx), 0);
+            return { x: cx + ctx.R + out, y: cy, z };
         }
         case 'centre':
         default:

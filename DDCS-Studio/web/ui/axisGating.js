@@ -47,8 +47,9 @@ export const OP_AXIS_NEEDS = {
     edge: ['X', 'Y'],
     middle: ['X', 'Y'],
     alignment: ['X', 'Y'],
-    // the lathe ops need exactly what a lathe has — which a mill also has, so they are never greyed on a mill.
-    // Gating asks CAN this machine move that way, not IS this the right machine; the bar's ordering answers the latter.
+    // the lathe ops need exactly what a lathe has — which a mill also has, so THIS table never greys them on a mill.
+    // It asks CAN this machine move that way. Whether the machine has the right FRAME for them is the other question,
+    // and OP_FRAME_NEEDS below answers it (t1301) — every lathe op is frame-gated there.
     lathe_facing: ['X', 'Z'],
     lathe_odturn: ['X', 'Z'],
     lathe_parting: ['X', 'Z'],
@@ -68,6 +69,29 @@ export const OP_AXIS_NEEDS = {
  * user wants the edge probe instead. A single shared "wrong machine" message would name neither.
  */
 export const OP_FRAME_NEEDS = {
+    // t1301 (ADVISOR RULING, surfaced to the user) — ALL SEVEN, not just the probes. A mill workspace could open
+    // Facing or OD Turn and get a program written in a frame that machine does not have; that is exactly as wrong as
+    // the OD probe, and the fact that it CUTS rather than measures makes it worse, not better.
+    lathe_facing: {
+        kind: 'lathe',
+        why: 'faces the end of a BAR held in a chuck, cutting to a CENTRELINE at X0. A mill has no centreline: the same program there drives the tool to the corner of the table.',
+    },
+    lathe_odturn: {
+        kind: 'lathe',
+        why: 'turns a DIAMETER — its X is a radius from the centreline, so every size it cuts on a mill comes out half what you typed.',
+    },
+    lathe_parting: {
+        kind: 'lathe',
+        why: 'plunges a blade to the CENTRELINE to part a bar off. On a mill there is nothing at X0 to part against.',
+    },
+    lathe_centerdrill: {
+        kind: 'lathe',
+        why: 'drills down the axis of a bar that is turning in the chuck. On a mill the work does not turn — use the Drill op, which spins the tool instead.',
+    },
+    lathe_polygon: {
+        kind: 'lathe',
+        why: 'cuts flats by pairing the CHUCK ANGLE with the cross-slide. A mill has neither that pairing nor a workpiece that rotates under the tool.',
+    },
     lathe_odprobe: {
         kind: 'lathe',
         why: 'assumes the LATHE FRAME — X is a radius from the centreline. On a mill this would write a datum half the bar out, with nothing on screen looking wrong.',
@@ -130,7 +154,10 @@ export function applyAxisGating(root = document) {
         el.setAttribute('aria-disabled', gated ? 'true' : 'false');
         if (gated) {
             if (el.dataset.origTitle === undefined) el.dataset.origTitle = el.title || '';
-            el.title = missing.length > 0 ? axisWhy(missing, machine) : frame;
+            // t1301 — A FRAME MISMATCH ANSWERS FIRST. Polygon turning on a mill is missing an A axis AND in the wrong
+            // frame; quoting the axis sends the operator to Settings to declare a driven chuck, which would not make a
+            // mill turn polygons. The deeper fact is the one to say.
+            el.title = frame || axisWhy(missing, machine);
         } else if (el.dataset.origTitle !== undefined) {
             el.title = el.dataset.origTitle;
             delete el.dataset.origTitle;

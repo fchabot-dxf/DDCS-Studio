@@ -5,7 +5,7 @@
  * authoring layer. Emits NOTHING: it's metadata read at SAVE time → def.sim.starts (userOps.simStartsFromStack),
  * which B1's makeProvider turns into the per-pass markers. A DECLARATION, never inferred from motion.
  *
- * The fields ARE the Option-A vocabulary (B1): anchor centre|edge|frac|radial · the per-anchor offset(s) ·
+ * The fields ARE the Option-A vocabulary (B1): anchor centre|edge|frac|radial|lathe · the per-anchor offset(s) ·
  * zplane top|probe|@flank|<num> · an optional when-gate. `dynamic: 'anchor'` shows only the fields the chosen
  * anchor needs (the ddcs_dynfields extension), so the block stays readable.
  */
@@ -20,6 +20,7 @@ export const simStartBlock = {
         if (a === 'edge') f.push('axis', 'wall', 'out');
         else if (a === 'frac') f.push('fx', 'fy');
         else if (a === 'radial') f.push('axis', 'sign', 'rad');
+        else if (a === 'lathe') f.push('out');            // t1301 — outside the BAR by this much; zplane carries the Z along it
         f.push('zplane', 'whenparam', 'whenis');
         return f;
     },

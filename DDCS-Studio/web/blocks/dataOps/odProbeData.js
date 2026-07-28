@@ -57,6 +57,9 @@ function odProbeDataStack(p = OD_PROBE_DEFAULTS) {
             { type: 'panel', params: { panel: 'form3d+2d' } },
             { type: 'layout', params: { kind: 'lathe_profile' } },
             { type: 'sim', params: { probeWcs: true } },   // this op PRODUCES the WCS — never render through the table
+            // t1301 — WHERE THE OPERATOR PUT THE STYLUS: just outside the bar, a little back along the round and
+            // clear of the chuck, which is word for word what this op's prompt asks them to do.
+            { type: 'simstart', params: { anchor: 'lathe', out: 4, zplane: -8 } },
             { type: 'param_group', params: { group: 'OD Probe' }, children: [] },
         ],
         children: odProbeStack(p),
@@ -88,7 +91,7 @@ export function odProbeDataDef() {
         'form3d+2d',
         null,
         LATHE_GROUP,
-    ), OD_PROBE_DEFAULTS, 'probe');
+    ), OD_PROBE_DEFAULTS, 'probe', 'x');
     def.postInstantiate = (stack, resolved) => rebuildOdProbe(stack, resolved);
     return def;
 }

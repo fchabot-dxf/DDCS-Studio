@@ -59,7 +59,11 @@ export function latheSimStock(params, current, fallback) {
         // the FINISHED FACE is the datum: the bar runs back into the chuck in −Z, with its raw end in +Z
         origin: 'finished-face',
         faceZ: bar.allowance,
-        datum: 'nnp', pin: 'origin', show: true,
+        // t1301 — THE BAR'S DATUM IS ITS CENTRELINE, which is what X being a RADIUS means. It said 'nnp' (a mill's
+        // min-XY corner) because that is what every stock before it said, and the consequence was invisible until a
+        // probe needed to collide with the bar: the collision put the bar's axis at the stock corner, so a stylus
+        // coming in from +X missed it entirely and drew its full seek out through the far side of the centreline.
+        datum: 'ccp', pin: 'origin', show: true,
     };
 }
 
@@ -71,10 +75,48 @@ export function latheSimStock(params, current, fallback) {
  * the centreline. Declared per op rather than inferred from the program, so nothing has to read a toolpath and guess.
  * @param {'turning'|'centerdrill'} tool
  */
-export function withLatheScene(def, fallback, tool = 'turning') {
+export function withLatheScene(def, fallback, tool = 'turning', probeAxis = null) {
     def.simStock = (params, stock) => latheSimStock(params, stock, fallback);
     def.latheTool = tool;
+    if (probeAxis) def.latheProbeAxis = probeAxis;   // t1301 — which way a stylus stands off; only a probe has one
+    def.simStockFallback = fallback;                 // …so a consumer can rebuild the same bar this op shows
     return def;
+}
+
+/**
+ * t1301 — THE STYLUS, SIZED AGAINST THE BAR IT TOUCHES.
+ *
+ * A probe program got the MILL's touch probe: a Ø30-ish body on a 40mm stylus, which against a Ø20 bar is a boulder
+ * beside a pencil. Worse, its ball had nothing to do with the stylus radius the operator TYPED INTO THE FORM — the
+ * one number the emit compensates by. A picture whose ball is not the ball being compensated teaches the wrong thing.
+ *
+ * So the render speaks the declaration: the ball IS the declared stylus radius, and the body behind it is scaled to
+ * the bar rather than to a mill's spindle. Nothing here is a new fact — it is the form's number and the bar's radius,
+ * arranged into the fields toolProfile already reads.
+ *
+ * IT ALSO SAYS WHICH WAY THE STYLUS COMES IN, because on a lathe that is a fact about the op: the face probe comes
+ * along the bed (+Z) and the OD probe comes down onto the round (+X). The mill mesh only knows one direction, so an
+ * OD probe drawn with it reads as a face probe hanging in the wrong place.
+ *
+ * @param {number} tipRadius  the DECLARED stylus radius, straight off the form
+ * @param {object} bar        the bar this op shows (its radius sets the body's scale)
+ * @param {'x'|'z'} axis      which way the stylus stands off from its touch point
+ */
+export function latheProbeTool(tipRadius, bar, axis = 'z') {
+    const b = normalizeBar(bar || {});
+    const R = Math.max(2, radiusOf(b.diameter));
+    const ball = Math.max(0.2, Number(tipRadius) || 1) * 2;              // …the DECLARED stylus, as a diameter
+    return {
+        type: 'probe',
+        probeAxis: axis === 'x' ? 'x' : 'z',
+        dia: Math.max(2, Math.min(R * 0.8, ball * 3)),                    // the shank: readable beside the bar, never wider than it
+        probeDims: {
+            ballDia: ball,
+            stylusLen: Math.max(ball * 4, R * 1.2),                       // enough stand-off to read as a stylus at this scale
+            bodyDia: Math.max(ball * 2, R * 1.1),                         // a body the size of the work, not of a spindle
+            bodyLen: Math.max(ball * 4, R * 1.6),
+        },
+    };
 }
 
 /**

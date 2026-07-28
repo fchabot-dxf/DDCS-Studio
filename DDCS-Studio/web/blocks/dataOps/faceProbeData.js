@@ -61,6 +61,10 @@ function faceProbeDataStack(p = FACE_PROBE_DEFAULTS) {
             // IRON RULE 2, declared to the preview: this op PRODUCES the WCS, so the picture must never be mapped
             // through the declared WCS table — that table describes a previous setup, not the one being measured.
             { type: 'sim', params: { probeWcs: true } },
+            // t1301 — WHERE THE OPERATOR PUT THE STYLUS. The op's own prompt asks them to jog just clear of the face,
+            // so the preview starts there: a negative `out` places it INSIDE the bar's radius (it touches the FACE,
+            // not the round), a few mm ahead of the raw end in +Z. Without this the stroke began at the scene origin.
+            { type: 'simstart', params: { anchor: 'lathe', out: -4, zplane: 6 } },
             { type: 'param_group', params: { group: 'Face Probe' }, children: [] },
         ],
         children: faceProbeStack(p),
@@ -93,7 +97,7 @@ export function faceProbeDataDef() {
         'form3d+2d',
         null,
         LATHE_GROUP,
-    ), FACE_PROBE_DEFAULTS, 'probe');
+    ), FACE_PROBE_DEFAULTS, 'probe', 'z');
     def.postInstantiate = (stack, resolved) => rebuildFaceProbe(stack, resolved);
     return def;
 }

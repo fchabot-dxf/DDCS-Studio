@@ -57,7 +57,7 @@ const SELECTS = {
     order: ['outside-in', 'inside-out'],             // concentric-fill ring order
     strategy: ['parallel', 'concentric'],            // step-over pass strategy
     // SIM-START (per-pass preview start, the simstart authoring block — B3). The Option-A vocabulary as dropdowns.
-    anchor: ['centre', 'edge', 'frac', 'radial'],    // where this pass begins relative to the stock
+    anchor: ['centre', 'edge', 'frac', 'radial', 'lathe'],    // where this pass begins relative to the stock (t1301 — 'lathe': outside the BAR)
     wall: ['@dir1', '@dir2', 'min', 'max'],          // edge anchor: which wall side (@token follows the op's dir param, or a fixed min/max)
     sign: ['+', '-'],                                // radial anchor: which side of centre
     zplane: ['probe', 'top', '@flank'],              // probe height: into the stock / above the top / the bar centreline (-R)
@@ -130,7 +130,7 @@ const DESCRIPTIONS = {
     rotary: "Preview shows the 4th-axis rotary rig (+ the A± jog row)",
     machine: "Preview pins to the machine frame (draws the envelope)",
     magazine: "Preview shows the ATC magazine (pockets + tool stubs)",
-    anchor: "Where this preview pass begins: centre / edge (a wall) / frac (a fraction of the stock) / radial (offset from centre)",
+    anchor: "Where this preview pass begins: centre / edge (a wall) / frac (a fraction of the stock) / radial (offset from centre) / lathe (outside the bar, at a Z along it)",
     wall: "Edge anchor: which wall side — @dir1/@dir2 follow the op's direction param, or a fixed min/max",
     out: "Stand-off distance outside the wall (a number, or @outset = the op's standard approach)",
     rad: "Radial offset from centre (a number, or @R = the bar radius)",

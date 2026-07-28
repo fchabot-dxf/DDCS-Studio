@@ -29,3 +29,21 @@ export const droRow = (axis, work, mach, lathe = isLathe()) => ({
     work: droValue(axis, work, lathe),
     mach: droValue(axis, mach, lathe),
 });
+
+/**
+ * t1301 — WHERE THE LATHE'S WORK ZERO IS, for a readout quoting a start-anchored probe.
+ *
+ * A start-anchored op reports its position relative to the operator START, and the sim expresses those starts in the
+ * STOCK frame — whose origin is the box's min corner. On a mill that IS the part frame, so the readout has always
+ * been right. A lathe bar's datum is its CENTRELINE (declared 'ccp'), which sits half a diameter away — so quoting the
+ * stock number unchanged told a turner their stylus was a whole radius further out than it was.
+ *
+ * This is the SHIFT to take off before displaying, and nothing else reads it: geometry and emit are untouched.
+ * @returns {{x:number, y:number}} zero for anything that is not a lathe bar
+ */
+export function droWorkShift(stock, lathe = isLathe()) {
+    const s = stock || {};
+    const isBar = lathe && s.shape === 'cylinder' && s.axis === 'z' && String(s.datum || '').slice(0, 2) === 'cc';
+    if (!isBar) return { x: 0, y: 0 };
+    return { x: (Number(s.x) || 0) / 2, y: (Number(s.y) || 0) / 2 };
+}

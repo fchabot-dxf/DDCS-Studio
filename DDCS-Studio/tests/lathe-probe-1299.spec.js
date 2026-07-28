@@ -177,7 +177,9 @@ test('GATING — greyed on a mill with the reason each op actually has, and clea
     expect(onMill.od, 'the OD probe names the radius frame').toMatch(/radius from the centreline/);
     expect(onMill.od, 'and what going wrong looks like').toMatch(/half the bar out/);
     expect(onMill.face, 'the face probe points at the mill op that does its job').toMatch(/Edge probe/);
-    expect(onMill.facing, 'a turning op is NOT frame-gated — that ruling stands').toBe('');
+    // t1301 — THE RULING CHANGED, and so does this line: every lathe op is frame-gated now, because a turning
+    // program on a mill is written in a frame that machine does not have. It cuts, so it is worse than the probe.
+    expect(onMill.facing, 'and a turning op is frame-gated too, since t1301').toMatch(/centreline/);
     await boot(page, 'lathe');
     const onLathe = await page.evaluate(async () => {
         const G = await import('/ui/axisGating.js');

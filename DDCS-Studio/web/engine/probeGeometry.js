@@ -45,7 +45,12 @@ export function barRadius(stock, crossA, crossB) {
 /** A finite cylinder for `stock.shape==='cylinder'`, in stock-local space — identical to the mesh setStock
  *  draws: centred at (X/2, Y/2, −Z/2), radius = the DECLARED bar radius (stock.diameter, else min(cross)/2), along the rotary axis. */
 export function cylinderOf(stock, rotaryAxis) {
-    const axis = (rotaryAxis === 'y' || rotaryAxis === 'z') ? rotaryAxis : 'x';
+    // t1301 — THE STOCK'S OWN DECLARED AXIS WINS. t1281 gave a cylinder `stock.axis` because guessing from the rotary
+    // MOTOR is wrong for a lathe bar (a lathe declares no rotary motor, so the guess fell back to X and laid the bar
+    // across the machine). The mesh was fixed then; this — the collision the probe stop uses — still guessed, so a
+    // lathe probe hit nothing and drew its full seek straight through the bar and out the other side of the centreline.
+    const declared = stock && (stock.axis === 'x' || stock.axis === 'y' || stock.axis === 'z') ? stock.axis : null;
+    const axis = declared || ((rotaryAxis === 'y' || rotaryAxis === 'z') ? rotaryAxis : 'x');
     const dims = { x: stock.x, y: stock.y, z: stock.z };
     const ctr = { x: dims.x / 2, y: dims.y / 2, z: -dims.z / 2 };
     const cross = axis === 'x' ? ['y', 'z'] : axis === 'y' ? ['x', 'z'] : ['x', 'y'];
@@ -54,24 +59,46 @@ export function cylinderOf(stock, rotaryAxis) {
     return { axis, u: cross[0], v: cross[1], cu: ctr[cross[0]], cv: ctr[cross[1]], r, lo, hi };
 }
 
-/** Ray vs finite cylinder — the two radial-wall crossings, clamped to the axial extent (probing the round
- *  OD). Returns { hit, tEnter, tExit }. A ray parallel to the axis (no radial component) does not hit. */
+/**
+ * Ray vs finite cylinder — INCLUDING ITS END FACES. Returns { hit, tEnter, tExit }.
+ *
+ * t1301 — THE CAPS WERE MISSING, and on a lathe the caps are the point. This modelled an infinite tube clipped to an
+ * axial span: a ray running ALONG the axis was declared a miss outright, because the only case that had ever mattered
+ * was a mill probing a rotary bar on its round. A lathe FACE probe travels exactly along the axis into the end of the
+ * bar — so it hit nothing and drew itself straight through sixty millimetres of steel.
+ *
+ * Solved as two intervals intersected (the slab method, one radial pair and one axial pair), which gives the caps for
+ * free and leaves a radial touch answering exactly as before.
+ */
 export function rayCylinder(A, B, cyl) {
     const { axis, u, v, cu, cv, r, lo, hi } = cyl;
     const Au = A[u] - cu, Av = A[v] - cv, du = B[u] - A[u], dv = B[v] - A[v];
+    // …the interval of t over which the ray is INSIDE the radius
     const a = du * du + dv * dv;
-    if (a < 1e-12) return { hit: false };
-    const b = 2 * (Au * du + Av * dv);
-    const c = Au * Au + Av * Av - r * r;
-    const disc = b * b - 4 * a * c;
-    if (disc < 0) return { hit: false };
-    const sq = Math.sqrt(disc);
-    let t0 = (-b - sq) / (2 * a), t1 = (-b + sq) / (2 * a);
-    if (t0 > t1) { const tmp = t0; t0 = t1; t1 = tmp; }
-    const axialOk = (t) => { const p = A[axis] + (B[axis] - A[axis]) * t; return p >= lo - 1e-6 && p <= hi + 1e-6; };
-    const e = axialOk(t0) ? t0 : null, x = axialOk(t1) ? t1 : null;
-    if (e == null && x == null) return { hit: false };
-    return { hit: true, tEnter: e != null ? e : x, tExit: x != null ? x : e };
+    let rEnter = -Infinity, rExit = Infinity;
+    if (a < 1e-12) {
+        if (Au * Au + Av * Av > r * r + 1e-6) return { hit: false };   // parallel to the axis and outside it — never enters
+    } else {
+        const b = 2 * (Au * du + Av * dv);
+        const c = Au * Au + Av * Av - r * r;
+        const disc = b * b - 4 * a * c;
+        if (disc < 0) return { hit: false };
+        const sq = Math.sqrt(disc);
+        rEnter = (-b - sq) / (2 * a); rExit = (-b + sq) / (2 * a);
+        if (rEnter > rExit) { const tmp = rEnter; rEnter = rExit; rExit = tmp; }
+    }
+    // …and the interval over which it is inside the axial EXTENT — the two end faces
+    const dAx = B[axis] - A[axis];
+    let aEnter = -Infinity, aExit = Infinity;
+    if (Math.abs(dAx) < 1e-9) {
+        if (A[axis] < lo - 1e-6 || A[axis] > hi + 1e-6) return { hit: false };
+    } else {
+        aEnter = (lo - A[axis]) / dAx; aExit = (hi - A[axis]) / dAx;
+        if (aEnter > aExit) { const tmp = aEnter; aEnter = aExit; aExit = tmp; }
+    }
+    const tEnter = Math.max(rEnter, aEnter), tExit = Math.min(rExit, aExit);
+    if (tEnter > tExit) return { hit: false };
+    return { hit: true, tEnter, tExit };
 }
 
 /**
@@ -93,7 +120,8 @@ export function stockProbeStop(A, B, stock, rotaryAxis, tipR = 0) {
 
     if (stock.shape === 'cylinder') {
         const cyl = cylinderOf(stock, rotaryAxis);
-        cyl.r += r;   // the ball touches the OD a radius out
+        cyl.r += r;                       // the ball touches the OD a radius out…
+        cyl.lo -= r; cyl.hi += r;         // …and the END FACES the same way (t1301) — a face touch stops the CENTRE a radius short
         const rc = rayCylinder(A, B, cyl);
         if (rc.hit) { if (rc.tEnter > 1e-6) take(rc.tEnter); else if (rc.tExit > 1e-6) take(rc.tExit); }
         return tt;

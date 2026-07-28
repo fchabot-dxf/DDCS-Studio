@@ -535,6 +535,11 @@ export class GcodeViz3D {
         // workspace kind, and both lost races against whatever rebuilt the tool next; the tool identity has ONE owner
         // (the preview's simTool), so reading the type it hands over is the answer that cannot be overwritten.
         if (tool.type === 'turning' || tool.type === 'centerdrill') { this._buildLatheTool(tool); return; }
+        // t1301 — A LATHE PROBE IS NOT A MILL PROBE ON A SPINDLE. The mill assembly hangs a Ø80 × 200 spindle body and
+        // its collet above the tool; a lathe has no such thing over the work, and against a Ø20 bar that body WAS the
+        // picture. A declared lathe probe renders as what it is: a ball, a stylus, and a small body, standing off along
+        // the axis the op declares it approaches from.
+        if (tool.type === 'probe' && tool.probeAxis) { this._buildLatheProbe(tool); return; }
         const half = toolHalfProfile(tool);
         const tr = Math.max(0.5, (Number(tool.dia) || 6) / 2);          // shank radius (what the collet clamps)
         const topZ = Math.max(0.1, ...half.map((p) => p[1]));           // the tool's TOP (the shank) — sets the clamp height
@@ -667,6 +672,32 @@ export class GcodeViz3D {
     // Called by execution engine to update tool position during execution
     /** t1283 — the fixed turning tool: a square HOLDER reaching in from +X with an INSERT at its tip (the origin, so
      *  it rides the traced path like every other tool). A drill-like op keeps a pointed bit ON CENTRE instead. */
+    /**
+     * t1301 — the lathe probe assembly: ruby ball at the touch point, a thin stylus, a small body behind it. No collet
+     * and no spindle, because a lathe has neither over the work. `probeAxis` says which way it stands off: 'z' for the
+     * face probe (along the bed) or 'x' for the OD probe (down onto the round).
+     */
+    _buildLatheProbe(tool) {
+        const THREE = this.THREE;
+        const grp = new THREE.Group();
+        const part = (geo, color, op, name) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: op })); m.name = name; return m; };
+        const pd = tool.probeDims || {};
+        const rball = Math.max(0.3, (Number(pd.ballDia) || 4) / 2);
+        const rsty = Math.max(0.2, rball * 0.45);
+        const styL = Math.max(4, Number(pd.stylusLen) || rball * 6);
+        const rbody = Math.max(rball, (Number(pd.bodyDia) || rball * 4) / 2);
+        const bodyL = Math.max(4, Number(pd.bodyLen) || rball * 6);
+        // Built along +Z (tip at the origin), then turned to face the declared approach — one shape, one rotation.
+        const ball = new THREE.SphereGeometry(rball, 20, 20); ball.translate(0, 0, rball);
+        const sty = new THREE.CylinderGeometry(rsty, rsty, styL, 16); sty.rotateX(Math.PI / 2); sty.translate(0, 0, 2 * rball + styL / 2);
+        const body = new THREE.CylinderGeometry(rbody, rbody, bodyL, 20); body.rotateX(Math.PI / 2); body.translate(0, 0, 2 * rball + styL + bodyL / 2);
+        grp.add(part(ball, 0xff2a44, 1, 'ruby'), part(sty, 0xffab40, 0.95, 'tool'), part(body, 0x9aa6b2, 0.9, 'collet'));
+        if (tool.probeAxis === 'x') grp.rotation.y = Math.PI / 2;   // …stands off in +X, over the round
+        grp.renderOrder = 25; grp.visible = !!this._animOn;
+        this._animParts = { ruby: grp.children[0], tool: grp.children[1], collet: grp.children[2], spindle: grp.children[2] };
+        this._animTool = grp; this._applyPartVis(); this.partFrame.add(grp);
+    }
+
     _buildLatheTool(tool) {
         const THREE = this.THREE;
         const grp = new THREE.Group();
@@ -1356,7 +1387,20 @@ export class GcodeViz3D {
             const zCap = hasStock ? sh.z + 0.35 * Math.max(d.maxX - d.minX, d.maxY - d.minY, 50) : Infinity;
             b = this._growBounds(b, d.minX + sh.x, d.minY + sh.y, d.minZ + sh.z, d.maxX + sh.x, d.maxY + sh.y, Math.min(d.maxZ + sh.z, zCap));
         }
-        if (hasStock) b = this._growBounds(b, sh.x, sh.y, sh.z - s.z, sh.x + s.x, sh.y + s.y, sh.z);
+        if (hasStock) {
+            // t1301 — THE STOCK SPANS WHERE ITS DATUM SAYS IT DOES. This assumed the mill's min-corner datum (0..x,
+            // 0..y, −z..0), which is why a lathe bar — whose datum is its CENTRELINE — was framed half a diameter off
+            // centre and ran out of the pane. Derived from the declared datum now, which leaves every min-corner stock
+            // byte-identical (its offset is zero) and puts a bar where it actually is.
+            const D = this._datumFrac(s);
+            b = this._growBounds(b, sh.x - D[0], sh.y - D[1], sh.z - D[2], sh.x + s.x - D[0], sh.y + s.y - D[1], sh.z + s.z - D[2]);
+            // …and a lathe's CHUCK is part of the picture: it is what the bar is held in, and a frame that cuts it off
+            // shows a bar floating in space. Only when one exists — a mill scene is untouched.
+            if (this._latheChuckSpan) {
+                const c = this._latheChuckSpan;
+                b = this._growBounds(b, sh.x - c.r, sh.y - c.r, sh.z + c.z0, sh.x + c.r, sh.y + c.r, sh.z + c.z1);
+            }
+        }
         // t780 (user) — THE WORK DRIVES THE DEFAULT FIT: on a big declared machine the envelope framing shrank the
         // stock/toolpath to a speck, so the envelope stays DRAWN as context but joins the fit ONLY when asked (wide —
         // dbl-click cycles it) or when there is nothing else to frame. Machine ops (homing/ATC) span the envelope with
@@ -1394,6 +1438,7 @@ export class GcodeViz3D {
     setStock(stock) {
         const THREE = this.THREE;
         this._stock = stock || null;
+        this._latheChuckSpan = null;        // t1301 — re-measured below when a lathe chuck is (re)built
         this._stockFloorZ = null;   // stock bottom in part-local Z (datum-aware) → the table/grid floor; set below
         this._pocketFloors = [];    // DECLARED pocket-depth floors: [{x,y,depth,floorZ}] (floorZ in the pg frame; stock top = z/2) — for the depth assertion
         this._stockTopZ = null;     // the stock top in the pg frame (= z/2) → floor-Z == top − depth
@@ -1510,6 +1555,17 @@ export class GcodeViz3D {
                 this._latheChuck = this._rotaryFixture;
                 this._rotaryFixture = keep;                       // …hand the rotary slot straight back, untouched
                 if (this._latheChuck) this._latheChuck.position.set(0, 0, face - halfL);   // the chuck rides the bar's grip end
+                // t1301 — REMEMBER WHERE IT REACHES, so the camera can frame the bar AND what holds it. Measured off the
+                // built group rather than guessed, so a change to the chuck's own geometry cannot leave this stale.
+                this._latheChuckSpan = null;
+                if (this._latheChuck) {
+                    try {
+                        pg.updateWorldMatrix(true, true);
+                        const bb = new THREE.Box3().setFromObject(this._latheChuck);
+                        const o = pg.getWorldPosition(new THREE.Vector3());   // …the group's WORLD placement, since the box is in world coords
+                        this._latheChuckSpan = { z0: bb.min.z - o.z, z1: bb.max.z - o.z, r: Math.max(Math.abs(bb.min.x - o.x), Math.abs(bb.max.x - o.x)) };
+                    } catch (_) { this._latheChuckSpan = null; }
+                }
             }
             this.stockEdges = edges; pg.add(edges);
             // t680 — MATERIAL REMOVAL: when carving is ON (a box/pocket stock, not a rotary cylinder), the DISPLACED

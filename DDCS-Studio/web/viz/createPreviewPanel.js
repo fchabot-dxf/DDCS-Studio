@@ -28,7 +28,7 @@ import { toggleVisibilityModal } from '../ui/visibilityModal.js';   // t738 — 
 import { onDisplayChange } from './displayPrefs.js';   // t738 — re-apply the visibility registry to THIS panel on any modal change
 import { GcodeExecutionEngine } from '../engine/index.js';
 import { toggleStockEditor } from '../ui/stockEditor.js';
-import { droAxisLabel, droValue } from './latheDro.js';   // t1283 — the readout speaks diameter on a lathe   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
+import { droAxisLabel, droValue, droWorkShift } from './latheDro.js';   // t1283 — the readout speaks diameter on a lathe   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
 import { builderOf } from '../blocks/opBuilders.js';        // rebuild the op stack to read its radiuscomp atoms (disc-on-surface, inc2)
 import { magazinePockets } from '../wizards/views/atcViews.js';   // shared ATC magazine layout (handles the disk RING + a rotation) — reused for the pick-place occupancy swap
@@ -368,8 +368,12 @@ export function createPreviewPanel(container, opts = {}) {
         // we cannot know the machine offset, so the Mach column shows "—" rather than a scene-placement placeholder dressed
         // as controller truth (the +40 Mach-Z leak). The engine G53 rendering keeps activeWcsOffset() (workOrigin fallback).
         const off = declaredWcsOffset(machineForViz(), activeWcsIdx());
+        // t1301 — a start-anchored op reports against a start expressed in the STOCK frame; a lathe bar's work zero is
+        // its CENTRELINE, half a diameter away. Take that shift off before displaying, or the readout puts the stylus a
+        // whole radius further out than it is. Display only — nothing downstream reads this.
+        const shift = droWorkShift(previewStock());
         droAxes.forEach((ax) => {
-            const w = +(pos && pos[ax]) || 0;
+            const w = (+(pos && pos[ax]) || 0) - (+shift[ax] || 0);
             const row = droBody.querySelector(`tr[data-ax="${ax}"]`);
             // t1283 — BOTH columns go through the one formatter: on a lathe X reads as a DIAMETER (Work and Mach
             // alike), everything else passes through. The number the machine holds is still the radius.
@@ -673,7 +677,9 @@ export function createPreviewPanel(container, opts = {}) {
     function simTool(code, parsed) {
         // Attach the configured SIM probe body dims (Settings → Preview → 3D PROBE) to ANY probe tool, so the
         // rendered touch probe matches what the user set on the diagram. Non-probe tools pass through untouched.
-        const withProbe = (t) => (t && t.type === 'probe') ? { ...t, probeDims: (previewPrefs().probe || {}) } : t;
+        // t1301 — an op that DECLARES its probe dims wins over the global preference: the settings diagram is a default
+        // for "whatever probe you own", while a lathe probe op states the stylus radius its own emit compensates by.
+        const withProbe = (t) => (t && t.type === 'probe') ? { ...t, probeDims: { ...(previewPrefs().probe || {}), ...(t.probeDims || {}) } } : t;
         const ht = get('getTool'); if (ht) return withProbe(ht);
         const m = /\bT(\d+)\b/.exec(code || '');
         if (m) {

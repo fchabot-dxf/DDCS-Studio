@@ -1,4 +1,5 @@
 import { el, UIUtils } from './uiUtils.js';
+import { applyAxisGating } from './axisGating.js';   // t1301 — grey the ops this machine's frame cannot run
 import { initSuggestBar } from './suggestBar.js';
 import { resolveActivePost } from '../wizards/dialects/index.js';
 import { getActiveProfile } from '../shared/js/profiles/controllerProfiles.js';
@@ -96,7 +97,10 @@ function wizItemHtml(e) {
     const sub = WIZ_SUBLABEL[e.id]
         ? `<div style="padding:4px 12px; font-size:10px; opacity:.55; text-transform:uppercase; letter-spacing:1px;">${WIZ_SUBLABEL[e.id]}</div>`
         : '';
-    return `${sub}<button onclick="${wizItemOnclick(e)}">${wizItemIcon(e)}${_escHtml(e.label)}</button>`;
+    // t1301 — STAMP WHAT THIS ENTRY IS. The gating (ui/axisGating) has always keyed on `[data-optype]`, and the bar
+    // never carried one — so every op it declared as impossible on this machine still looked, and behaved, available.
+    // The declaration was right and unreachable; this is the attribute that reaches it.
+    return `${sub}<button data-optype="${_escHtml(e.type || e.opensAs || e.id || '')}" onclick="${wizItemOnclick(e)}">${wizItemIcon(e)}${_escHtml(e.label)}</button>`;
 }
 function wizGroupHtml(group) {
     const icon = WIZ_GROUP_ICON[group.id] || HEADER_ICONS.custom;
@@ -661,6 +665,9 @@ export class CommandDeck {
         const rightTarget = document.querySelector('.dock-header .header-right');   // pure user dropdowns now (Copy/Clear moved to the header chevron menu)
         if (rightTarget) rightTarget.innerHTML = `<div style="display:flex; gap:6px; align-items:center;">${sect.right.map(wizGroupHtml).join('')}</div>`;
         this._bindWizardDropdowns();
+        // …and grey what this machine cannot run, every time the bar is (re)built — the gating is idempotent and
+        // reversible, so a re-render or a kind switch both land in the same place.
+        try { applyAxisGating(document); } catch (_) { /* gating is advisory */ }
     }
 
     // (Re)bind the per-trigger mobile/touch toggle + the focus-steal guard on the wizard buttons. These are
