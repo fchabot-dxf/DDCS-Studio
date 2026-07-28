@@ -28,6 +28,7 @@ export class VariableDatabase {
         if (this.activeDB && this.activeDB.length > 0) {
             // dispatch event and resolve promise asynchronously to avoid reentrancy
             setTimeout(() => {
+                try { window.__ddcsVarsReadyAt = Date.now(); } catch (e) { /* ignore */ }   // t1257 — the latch, see setControllerVars
                 try { window.dispatchEvent(new CustomEvent('variableDB:ready', { detail: { count: this.activeDB.length } })); } catch (err) {}
                 if (this._resolveReady) { this._resolveReady(this.activeDB); this._resolveReady = null; }
             }, 0);
@@ -93,6 +94,7 @@ export class VariableDatabase {
                 }
             }).finally(() => {
                 // notify consumers that initial DB loading finished (whether it populated or not)
+                try { window.__ddcsVarsReadyAt = Date.now(); } catch (e) { /* ignore */ }   // t1257 — the latch, see setControllerVars
                 try { window.dispatchEvent(new CustomEvent('variableDB:ready', { detail: { count: this.activeDB.length } })); } catch (err) {}
                 if (this._resolveReady) { this._resolveReady(this.activeDB); this._resolveReady = null; }
             });
@@ -218,6 +220,11 @@ export class VariableDatabase {
             this.activeDB = Array.from(map.values());
             this.saveToStorage();
         }
+        // t1257 — STAMP IT, then fire. An event is a MOMENT: a consumer that starts listening after it has passed waits
+        // for a signal that already came and gone. The workspace open did exactly that — its restore triggers this
+        // re-seed, finishes in ~13ms, and only then attaches its listener, so it burned the full 900ms cap on EVERY
+        // open. A latch anyone can read after the fact costs one assignment and removes the whole class.
+        try { window.__ddcsVarsReadyAt = Date.now(); } catch (e) { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('variableDB:ready', { detail: { count: this.activeDB.length, family: fam } })); } catch (e) { /* ignore */ }
         return fam;
     }

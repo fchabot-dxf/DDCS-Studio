@@ -26,6 +26,7 @@ import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';  
 import { dlgNotice, dlgConfirm } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { getAccount, connect, disconnect } from './cloudAccount.js';   // t1233 — the SAME sign-in Settings and the drawer use
+import { busyRow } from './busyRow.js';   // t1257 — feedback on the row you clicked, the instant you click it
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
@@ -172,6 +173,7 @@ async function openWorkspaceFile(file, label, fileHandle) {
  */
 async function openWorkspaceObject(obj, fileName, label, { handle = null, place = 'local' } = {}) {
     if (!(await confirmDiscardBuffer(label || 'a workspace'))) return false;
+    const t0 = Date.now();                          // t1257 — the window in which a re-seed counts as "settled"
     await restoreBackup(obj);                       // the WHOLE file, by construction — absent stores reset to default
     // ORDER (t1225): the name is stamped BEFORE the save baseline, or the workspace is dirty the moment it is opened.
     try { setMachineName(fileName); } catch (_) {}   // ONE-NAME RULE: a renamed file shows its OWN name everywhere
@@ -181,15 +183,26 @@ async function openWorkspaceObject(obj, fileName, label, { handle = null, place 
     // controller's variable list before writing) — so on a cross-controller open that write lands AFTER the baseline
     // and the workspace reads "Unsaved changes" the instant it opens. Measured, not guessed: the delta named
     // `variables` as the only changed store. Its own completion signal is what we wait for.
-    await controllerSettled();
+    await controllerSettled(900, t0);
     markWorkspaceSavedToFile(fileName, place);
     await adoptSaveHandle(handle || null);          // …and Save writes THIS file (a cloud open has no local handle)
     if (!window.__ddcsNoReload) location.reload();
     return true;
 }
 
-/** Resolve when the controller retarget's variable re-seed has landed (or promptly, if nothing is re-seeding). */
-function controllerSettled(cap = 900) {
+/**
+ * Resolve when the controller retarget's variable re-seed has landed (or promptly, if nothing is re-seeding).
+ *
+ * t1257 — MEASURED: this was the whole of the open's lag. The re-seed is triggered by restoreBackup and completes in
+ * milliseconds, so by the time this function attached its listener the event had ALREADY FIRED — and it then waited
+ * out the full 900ms cap on every single open, for a thing that had finished before it started looking. The fix is to
+ * ask "has it happened SINCE the restore began?" instead of "will it happen next?": variableDB stamps
+ * window.__ddcsVarsReadyAt when it fires, so a re-seed that landed in the gap counts. The event path stays for a
+ * re-seed still in flight, and the cap stays because a signal that never comes must not hang an open.
+ * @param {number} since  a timestamp from BEFORE the work that would trigger the re-seed
+ */
+function controllerSettled(cap = 900, since = 0) {
+    if (since && Number(window.__ddcsVarsReadyAt || 0) >= since) return Promise.resolve();
     return new Promise((resolve) => {
         let done = false;
         const finish = () => { if (done) return; done = true; window.removeEventListener('variableDB:ready', finish); resolve(); };
@@ -323,14 +336,22 @@ export async function openWorkspaceManager(focus = 'save', opts = {}) {
         const card_ = (ov.__cards || [])[idx];
         if (!card_) return;
         if (card_.invalid) { dlgNotice(card_.reason || `“${card_.name}” is not a readable workspace.`); return; }
+        // The busy state belongs to the ROW, not to the open BUTTON inside it: the row also holds a delete button, and
+        // freezing the whole row is what stops a mis-tap landing on delete while the workspace is opening.
+        const busyTarget = card.closest('.wsm-fp-row') || card;
+        // t1257 (user live report) — the row goes BUSY on the click, not when the read returns. A cloud row is the
+        // worst case (a Drive fetch, then the whole restore); a local row is fast now but still ends in a reload, and
+        // the glyph has to bridge that or the screen goes quiet again just before the page changes.
         if (card_.cloudId) {   // a cloud row: read it from Drive, then the SAME open
-            try {
-                const obj = await (await drive()).read(card_.cloudId);
-                await openWorkspaceObject(obj, card_.name + '.ddcs', `“${card_.name}”`, { handle: null, place: 'cloud' });
-            } catch (e) { dlgNotice(`“${card_.name}” could not be read from Drive: ${(e && e.message) || e}`); }
+            await busyRow(busyTarget, async () => {
+                try {
+                    const obj = await (await drive()).read(card_.cloudId);
+                    return await openWorkspaceObject(obj, card_.name + '.ddcs', `“${card_.name}”`, { handle: null, place: 'cloud' });
+                } catch (e) { dlgNotice(`“${card_.name}” could not be read from Drive: ${(e && e.message) || e}`); return false; }
+            });
             return;
         }
-        await openWorkspaceFile(await card_.handle.getFile(), `“${card_.name}”`, card_.handle);
+        await busyRow(busyTarget, async () => openWorkspaceFile(await card_.handle.getFile(), `“${card_.name}”`, card_.handle));
     });
 
     await renderPlace(ov);

@@ -11,6 +11,7 @@
  */
 import { listLibrary, ensureLibraryFolder, getLibraryFolder, deleteLibraryFile, LIBRARY_KINDS, hasFSA } from '../data/libraryFolder.js';
 import { dlgConfirm, dlgNotice } from './dialog.js';
+import { busyRow } from './busyRow.js';   // t1257 — an import reads a file and installs an op; that is a wait, so it shows
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -93,7 +94,12 @@ export async function renderLibraryShelf(host, opts) {
         if (!card) return;
         const entry = rows[Number(card.dataset.lshOpen)];
         if (!entry || entry.error) return;
-        try { await onImport(entry); }
-        catch (err) { dlgNotice(`“${entry.name}” could not be imported: ${(err && err.message) || err}`); }
+        // t1257 — the card goes busy for the import (a .cam rebuild walks the whole slot build). keepOnSuccess is
+        // FALSE here: unlike a workspace open, the shelf stays on screen afterwards, so a glyph left spinning would
+        // be a lie about work that has finished.
+        await busyRow(card, async () => {
+            try { await onImport(entry); }
+            catch (err) { dlgNotice(`“${entry.name}” could not be imported: ${(err && err.message) || err}`); }
+        }, { keepOnSuccess: false });
     });
 }

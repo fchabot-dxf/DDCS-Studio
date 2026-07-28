@@ -39,19 +39,9 @@ const HQ_ICONS = {
     wizard: { c: '#a855f7', d: '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>' },
 };
 // data-act → the existing handler it proxies (file ops are window globals; Open/Save click their header buttons).
-const HQ_ACTIONS = [
-    { act: 'open',   label: 'Open project' },
-    { act: 'save',   label: 'Save project' },
-    { act: 'wizard', label: 'Save as custom wizard' },   // register the current op's stack as a bar button (+ its form)
-    { act: 'load',   label: 'Load gcode (replace)' },
-    { act: 'insert', label: 'Insert gcode' },
-    // Copy moved to a floating button in the editor (ui: #editor-copy-btn). Clear stays here as the phone access
-    // point (the header Clear shortcut is desktop-only); on desktop it's a fallback to the header trash button.
-    { act: 'clear',  label: 'Clear editor' },
-    { act: 'export', label: 'Export / download' },
-];
-// Rendered as its OWN section (the standalone = the desktop EXE release, not a file op).
-const HQ_STANDALONE = { act: 'standalone', label: 'Download standalone' };
+// t1257 — HQ_ACTIONS / HQ_STANDALONE DELETED (authorized). They were the quick menu's gcode-row list until the t1227
+// curation moved those actions to the editor's own corner menu; nothing has read either since, and one of their
+// comments still called Clear "the phone access point", which stopped being true in t1227 and again in t1255.
 const HQ_THEME_SWATCH = { studio: '#9aa0a6', normal: '#4a90e2', steampunk: '#b07a2a', futuristic: '#00e5e5', organic: '#6b8e23' };
 
 function runQuickAction(act) {

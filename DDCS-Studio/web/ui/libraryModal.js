@@ -17,6 +17,7 @@ import * as store from './projects/projectStore.js';
 import { openSaveModal, renderCloudInto } from './projects/projectModal.js';
 import { loadProject } from '../blocks/programFile.js';
 import { dlgPrompt, dlgConfirm, dlgNotice } from './dialog.js';
+import { busyRow } from './busyRow.js';   // t1257 — feedback on the row you clicked
 
 const TAB_KEY = 'ddcs_library_tab';
 const esc = (s) => String(s == null ? '' : s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
@@ -114,9 +115,14 @@ function renderProjectsTab(body, ctx) {
         syncPrimary(localWrap);
     }
 
+    // t1257 (user live report) — the clicked project row goes busy while it is read and loaded. keepOnSuccess is
+    // FALSE because a project load closes the Library rather than reloading the page, so the glyph has a real end.
     installSelectLoad(localWrap, async (path) => {
-        try { const obj = await store.readProject(path); if (obj) { loadProject(obj); ctx.close(); } }
-        catch (err) { dlgNotice('Open failed: ' + (err && err.message || err)); }
+        const row = localWrap.querySelector(`.sl-row[data-sl-id="${CSS.escape(path)}"]`);
+        await busyRow(row, async () => {
+            try { const obj = await store.readProject(path); if (obj) { loadProject(obj); ctx.close(); } }
+            catch (err) { dlgNotice('Open failed: ' + (err && err.message || err)); }
+        }, { keepOnSuccess: false });
     });
     localWrap.addEventListener('click', async (e) => {
         const cd = e.target.closest('[data-cd]'); if (cd) { cwd = cd.dataset.cd; render(); return; }

@@ -5638,6 +5638,22 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wsm-empty { padding: 14px 10px; font-size: 12px; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 6px; }
 @media (max-width: 640px) { .wsm-overlay { padding: 0; align-items: flex-start; } .wsm-modal { max-width: none; height: 100dvh; max-height: none; border-radius: 0; } }
 
+/* ── t1257 — THE BUSY ROW (ui/busyRow.js). Feedback where the wait is: on the row you clicked, from the instant you
+   click it. The glyph is a CSS-only spinner appended to the row, so nothing has to re-render to show it. ────────── */
+.is-busy { position: relative; opacity: .72; cursor: progress; }
+.is-busy::after {
+    content: ''; position: absolute; right: 10px; top: 50%; width: 14px; height: 14px; margin-top: -7px;
+    border: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); border-top-color: var(--accent);
+    border-radius: 50%; animation: ddcs-busy-spin .7s linear infinite; pointer-events: none;
+}
+.lsh-card.is-busy::after, .wsm-fp-row.is-busy::after { right: 10px; }
+@keyframes ddcs-busy-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    /* a spinner is motion for its own sake here — the state still has to READ as busy, so it pulses instead */
+    .is-busy::after { animation: ddcs-busy-pulse 1.2s ease-in-out infinite; }
+    @keyframes ddcs-busy-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+}
+
 /* ── t1247 — THE LIBRARY SHELF (ui/libraryShelf.js): the granted library folder's .wiz / .cam files as cards. Same
    card language as the workspace manager's file rows — one folder, one way of showing what is in it. ───────────── */
 .lsh-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }

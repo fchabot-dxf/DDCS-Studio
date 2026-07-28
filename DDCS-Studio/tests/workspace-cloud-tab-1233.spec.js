@@ -13,6 +13,11 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1280, height: 900 } });
 
+// t1257 — the fake Drive's route handler calls page.evaluate, so a request still in flight when a test ends throws
+// "Test ended" and fails the run at random. It flaked across several turns and was written off as load each time;
+// Playwright names the fix in the error itself. Dropping the routes first makes the end of a test deterministic.
+test.afterEach(async ({ page }) => { await page.unrouteAll({ behavior: 'ignoreErrors' }); });
+
 const ws = (name, { x, y, z }, controllerId) => ({
     kind: 'ddcs.backup', v: 1, app: 'test', date: '2026-07-24T10:00:00.000Z',
     stores: { machine: { name, controllerId }, settings: { machine: { x, y, z, show: true } } },
