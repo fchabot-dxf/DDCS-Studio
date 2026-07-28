@@ -19905,3 +19905,64 @@ alone after the fix. The whole `corner-*` family (104 tests) is green, as are th
 
 Gate: smoke 65/65; the two repaired specs green ALONE and in suite; the six proxy-updated corner specs 15/15; the
 corner family 104/104; the recent lathe/probe specs 34/34.
+
+---
+
+## t1305 — the taper branch moves onto the controller, and takes a post-processor with it
+
+My own t1291 flag, closed. The OD turn's straight/taper choice was made when the program was POSTED — correct for
+the program as built, wrong the moment the operator does what this family's whole design invites: retune a diameter
+at the machine. A program built straight then ran full-length passes down a cone. Safe (it cuts less than it should)
+but not re-planned, and the finish pass was left a ridge to take off in one bite.
+
+### Three build-time branches, all three now IF/GOTO
+
+- **The floor** — which end roughing stops at. It was picked in JS from the two radii; the controller derives it now
+  (`#123` from the target, then one IF that swaps it for the far end when that is the thinner one).
+- **The roughing arm** — straight / fat-far / fat-face, the same three t1291 and t1293 derived. What changed is who
+  picks. **Order matters and is the load-bearing detail:** the straight test comes FIRST because the crossing formula
+  divides by `[#128−#122]`, which is exactly zero on a straight turn. The controller must never reach that line, and
+  a spec pins the text order for exactly that reason — it is the one property only the text can carry.
+- **The finish pass** — which needed no branch at all, and that is the part I did not expect. The taper's start
+  radius is the cone extrapolated back to the approach height; when the two ends are equal the extrapolation term is
+  zero, so it lands on the target. The straight arm that used to sit beside it was the same two moves with the same
+  numbers. One route, both shapes.
+
+### The straight case, verified the way the dispatch asked
+
+Not by bytes — the text necessarily changed, since it now carries all three routes. I emitted and traced the
+straight program, then stashed only `odTurn.js` and traced the pre-branch build: **19 moves each, identical values,
+move for move.** The durable form of that check lives in the new spec as the derived pass list (which is also
+independent of both implementations); the old-vs-new comparison is recorded here because the old build is gone.
+
+### `applyStraightEnd` deleted
+
+The twin used to patch the far-end socket back to the one-source reference (`#133=#132`) after instantiate() baked a
+number into the snapshot. With the shape decided at run time the builder writes that reference itself, so the patcher
+could only disagree — and had already started to, in its note text (the emit diff that surfaced it showed exactly one
+line differing, and it was the comment). Its test now asks the builder directly, which is where the answer lives.
+
+### Four asserts whose premise this turn reversed
+
+`lathe-odturn-1273` pinned the old design in four places. Each is restated as the property that still holds:
+
+- *"no taper machinery in a straight program"* → the branch is taken on the two radii, and the straight test precedes
+  the division it guards (text order, checked as text because that is where order lives).
+- *"the move count is under 12"* → the count does not GROW WITH THE PASSES: `doc 1` and `doc 0.2` emit the same
+  number of moves. That was always the property; the threshold was a proxy that had to be re-guessed whenever the
+  macro gained a route.
+- *"the taper has more arithmetic than the straight turn"* → they now have exactly the same arithmetic, which is the
+  point of the turn.
+- *"the retract is the next block after the cut"* → read off the EXECUTED path instead: the block after the cut is no
+  longer the block that runs after it, but the machine still comes off in X and only then back in Z.
+
+### And a t1301 field that could not travel
+
+The round-trip spec caught `simStockFallback` — a field I put on the def two turns ago so the probe render could
+rebuild the op's bar. Plain fields travel in a `.wiz`; that one had no reason to, and its absence after an import
+made the def differ from itself. It is gone: the bar is derived from the op's DECLARED sim stock (resolved through
+the registry, since a stored def carries data and not functions), which is re-attached on import and so survives.
+Resolving it moved above the tool block, where the stylus needs it.
+
+Fast tier: smoke 65/65; the new spec 5/5; `lathe-odturn-1273` 18/18; the lathe family 70/70; the recent
+lathe/probe/form specs 36/36.
