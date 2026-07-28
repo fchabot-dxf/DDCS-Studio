@@ -20023,3 +20023,58 @@ bare panel with no wizard behind it if the app HAD failed, which is worse than a
 
 Gate: smoke 65/65; the new gateway spec 3/3; the seven swept specs 13 passed + the 2 pre-existing skips; the sixteen
 strengthened specs 69/69 across two batches.
+
+---
+
+## t1309 — the save names the programs it wrote
+
+The user's arc lands: "i would like to see what saved in a label" → the stores got names, then counts qualified them,
+and a save that changed ONE of three programs still said "Saved programs" and nothing more.
+
+### Why it could never say which
+
+The project volume is IDB, so its row is `async: true` — and `storeSignatures()` / `workspaceDelta()` deliberately
+skip async stores (their read cannot be done on a synchronous poll, and `beforeunload` needs one). So the projects
+row was not merely coarse in the save summary: **it was absent from it entirely.** A save that wrote three edited
+programs and nothing else reported "Nothing had changed since the last save."
+
+### The grain is declared on the store, not tracked beside it
+
+`BACKUP_STORES`'s projects row gains an `items` declaration: how to enumerate its items and how to mark each one.
+The marker is a **content hash of the entry's own data**, not a rev counter. The counter would have been cheaper to
+compare and would have required every writer to remember to bump it — a marker nobody can forget to maintain is
+worth more than a cheaper comparison, and `saveProject`/`rename`/`remove` stay exactly as they are.
+
+`changedItemsSince()` derives the four answers by comparing the current marks against the baseline:
+
+    added / edited  — a path that is new, or whose marker moved
+    removed         — a path that is gone (a deletion that saves silently is the old silence back)
+    renamed         — a removed path and an added path with the SAME marker: same program, new name
+
+The rename pairing is cheap and honest. Two identical copies renamed at once could pair the wrong way round — and
+both names would still be right, so the sentence stays true either way.
+
+### One summary, one phrase
+
+`changedSince()` is the sync `changedStoresSince()` plus the item detail, so the save path reads ONE source, and
+`changeLabel(row)` is the only place a changed row is worded — the popup and the save-first modal cannot describe
+the same fact differently. Programs are named up to three, then "+N more"; every other store keeps the count that
+qualifies it. The t1287 honesty cases are untouched: no baseline at all still returns null (not an empty list), and
+no per-ITEM baseline means the programs are not named rather than all claimed as new.
+
+### Timing, which is where this kind of thing goes wrong
+
+The detail is read BEFORE the write (the baseline moves after it, so reading later reports nothing), and the item
+baseline is stamped in every place the store baseline is — both save paths and BOTH of the open path's two stamps.
+Missing the second open stamp would have made a freshly-opened workspace report its own programs as changed.
+
+### Verified
+
+The dispatch's flow, end to end through the real save: three programs, edit one, press Save, answer the one-name
+ask — the popup names `flange.nc` and does not name the two that did not change, one file is written, and a second
+save immediately after reports no programs at all (the baseline moved). Plus delete → "removed", rename → "renamed"
+as one fact rather than two, nothing-changed, no-baseline, the three-name cap, and the popup at 390px with long
+names (it fits, and nothing pushes the page sideways).
+
+Fast tier: smoke 65/65; the new spec 8/8; the persistence family (intentional-save, file-indicator, save-open-1225,
+workspace-manager-1223, -truth-1231, settings-ux-1287, backup-852) 30/30; the project specs 8/8.
