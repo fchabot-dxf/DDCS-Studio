@@ -20181,3 +20181,10 @@ form, so a handle is a second way to type a number and never a second source.
 Gate: smoke 71/71; the new spec 9/9; the whole lathe family + the taper spec 129/129; all 26 specs that drive the
 stock modal green. Screenshots: the lathe modal, the mill modal in both shapes, and the Ø45 typed in the modal
 arriving in the main preview.
+
+**AMENDMENT (t1313, user live) — a cylinder is diameter and length only.** It arrived as the commit above was
+landing. The build already satisfied it: the W/D/H rows belong to the box group, which is not rendered for a
+cylinder, and `roundBlankStock`/`barStock` DERIVE the trio (x = y = Ø, z = the length) rather than taking typed
+values. What was missing was the assertion, so it is now pinned in both workspaces: no W/D/H field is on screen for
+round stock in either kind, exactly the round fields are (Ø + stick-out + raw end on a lathe, Ø + height on a mill),
+and a Ø edit moves the derived pair with it while leaving the length alone.

@@ -231,3 +231,51 @@ test('THE ROUND BLANK RENDERS ROUND — a cylinder on the table, and the carve d
     expect(r.carveMesh, 'no square slab replaces it').toBe(false);
     expect(r.visible, 'the round blank is what stays on screen').toBe(true);
 });
+
+test('A CYLINDER IS DIAMETER AND LENGTH ONLY — no W/D/H rows, in either workspace (t1313 amendment)', async ({ page }) => {
+    // USER, live: a round workpiece has two sizes, not three. Any x/y/z a downstream consumer still reads off the
+    // record is DERIVED (x = y = Ø, z = the length) — never typed, and never shown as something to type.
+    for (const kind of ['lathe', 'mill']) {
+        await boot(page, kind);
+        await openStock(page);
+        if (kind === 'mill') {
+            await page.evaluate(() => document.querySelector('#se_kind button[data-kind="cylinder"]').click());
+            await page.waitForTimeout(300);
+        }
+        const r = await page.evaluate(() => {
+            const shown = (id) => { const e = document.getElementById(id); return !!(e && e.offsetParent); };
+            return { x: shown('se_x'), y: shown('se_y'), z: shown('se_z'), box: shown('se_box_fields'),
+                     fields: [...document.querySelectorAll('.stock-editor-pop input')].filter((i) => i.offsetParent).map((i) => i.id) };
+        });
+        expect(r.x, `${kind}: no W field on round stock`).toBe(false);
+        expect(r.y, `${kind}: no D field`).toBe(false);
+        expect(r.z, `${kind}: no H field`).toBe(false);
+        expect(r.box, `${kind}: the box group is not on screen at all`).toBe(false);
+        // …and what IS on screen is the two (or three, on a lathe) numbers a round workpiece actually has
+        const want = kind === 'lathe' ? ['se_bar_dia', 'se_bar_out', 'se_bar_allow'] : ['se_rd_dia', 'se_rd_len'];
+        expect(r.fields.filter((f) => /se_(x|y|z|bar_|rd_)/.test(f)), `${kind}: exactly the round fields`).toEqual(want);
+    }
+});
+
+test('AND THE DERIVED TRIO TRACKS THE Ø — x = y = diameter, z = the length', async ({ page }) => {
+    await boot(page, 'mill');
+    await openStock(page);
+    await page.evaluate(() => document.querySelector('#se_kind button[data-kind="cylinder"]').click());
+    await page.waitForTimeout(300);
+    const set = async (id, v) => { await page.evaluate(({ i, val }) => { const e = document.getElementById(i); e.value = val; e.dispatchEvent(new Event('input', { bubbles: true })); }, { i: id, val: v }); await page.waitForTimeout(250); };
+    await set('se_rd_dia', '52'); await set('se_rd_len', '18');
+    let s = await stock(page);
+    expect([s.x, s.y], 'the cross-section IS the diameter, both ways').toEqual([52, 52]);
+    expect(s.z, 'and the axial dimension is the length').toBe(18);
+    await set('se_rd_dia', '31');
+    s = await stock(page);
+    expect([s.diameter, s.x, s.y], 'a Ø edit moves the derived pair with it').toEqual([31, 31, 31]);
+    expect(s.z, 'and leaves the length alone').toBe(18);
+    // …the same rule on a lathe, where the length is the stick-out plus the raw end
+    await boot(page, 'lathe');
+    await openStock(page);
+    await set('se_bar_dia', '28'); await set('se_bar_out', '70'); await set('se_bar_allow', '2');
+    const b = await stock(page);
+    expect([b.x, b.y], 'the bar cross-section is its diameter').toEqual([28, 28]);
+    expect(b.z, 'and its length is what stands out plus the raw end').toBe(72);
+});
