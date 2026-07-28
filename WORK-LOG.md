@@ -18319,3 +18319,57 @@ ON PERSISTING FILE-SYSTEM PERMISSION GRANTS (asked, not built): pywebview expose
 in IndexedDB — so a re-grant, if the runtime still asks for one, is a one-click confirm on a remembered folder rather
 than a re-pick through the OS dialog. Whether a per-session bubble remains is exactly what the user's retest tells
 us; I am not building for either answer before we know.
+
+---
+
+## turn 1259 -- I FIXED THE WRONG LAUNCHER. The exe has two, and the release packages the other one.
+
+t1257's storage fix landed in `bridge/bridge-app/desktop.py`. The shipped exe is built by build_fairy.ps1 from
+`fairy_gateway.py` AT THE REPO ROOT, whose start was still a bare `webview.start()`. So the user retested .3 and the
+amnesia was exactly as before — the fix was real and shipped nothing.
+
+### THE VERDICT ON THE PAIR (asked for, and it decided the shape of the fix).
+
+`bridge/bridge-app/desktop.py` is built ONLY by `bridge/bridge-app/build-exe.bat`, and build-exe.bat is referenced by
+NOTHING live: not the release workflow (.github/workflows/desktop-release.yml runs ./build_fairy.ps1), not
+build_fairy.ps1, not bridge/README.md, not bridge-app/README.md, not DEPLOY.md. The only mention of desktop.py
+outside itself is docs/archive/REMINDERS.md — archived. Its last non-trivial commit was the monorepo restructure.
+So: the pair looks DEAD.
+
+I did NOT delete it, and the reason is the dispatch's own instruction to make this "minimal and certain". Deleting two
+files is neither, and my evidence is "nothing references build-exe.bat" — strong, but it cannot rule out a human
+running it by hand from that folder. Deletion is a one-way door on someone else's workflow; I would rather ask.
+RECOMMENDED: delete both `bridge/bridge-app/desktop.py` and `bridge/bridge-app/build-exe.bat` in a follow-up once the
+user confirms they do not run that bat.
+
+### THE FIX: ONE POLICY, NOT A SECOND COPY OF IT.
+
+The dispatch offered "shared helper" or "delete the dead one", and the shared helper is the answer to the actual root
+cause — which is not that a launcher was wrong, but that STORAGE POLICY EXISTED IN TWO PLACES. Fixing the second copy
+would leave the same trap armed for the third.
+
+`bridge/bridge-app/fairy/webview_storage.py` now owns it: the path (LOCALAPPDATA/DDCS-Studio/webview, makedirs first,
+deliberately not beside the executable so a PyInstaller temp unpack and an app UPDATE do not both read as fresh
+installs), private_mode=False, the TypeError fallback that still launches on an older pywebview while saying on
+stderr that it will forget, and the why. It lives in `fairy` because fairy_gateway.py already imports from that
+package and build_fairy.ps1 already collects it — no build change needed. Both launchers now call
+`start_persistent(webview)` and neither decides anything.
+
+### AND IT IS NOT UNVERIFIABLE AFTER ALL.
+
+I said last turn that no headless verification was possible. That was true of pywebview persisting in a real window,
+and false of everything else — which is most of the bug. `tests/test_webview_storage.py` (plain asserts, matching the
+existing test_pull_geometry.py convention) checks: the path is per-user, stable across calls, really created, and NOT
+inside the repo/app dir; a modern pywebview receives private_mode=False + the path; an OLD one still launches; extra
+kwargs pass through; and — the one that would have caught this whole turn — BOTH launchers go through the helper and
+neither contains a bare `webview.start(`. 5/5.
+
+### BUILD-INPUT SANITY (item 3).
+
+No other divergence. There is exactly ONE `fairy` package (bridge/bridge-app/fairy) — build_fairy.ps1 reaches it via
+`--paths bridge/bridge-app` + `--collect-submodules fairy` — so the t1243 no-cache header IS in the packaged build
+(fairy/server.py:218, verified) and the exe serves Studio through that same server (studio_dir). The bundled web is
+`DDCS-Studio/web`, the tree I edit. The launcher pair was the only two-worlds problem.
+
+GATE: smoke 65/65 (JS side untouched by this), plus both python tests green — the new storage one and the existing
+pull-geometry one. NO headless proof of the real window; the user's retest on .4 is that.
