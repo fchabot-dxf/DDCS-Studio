@@ -78,28 +78,11 @@ def main():
             time.sleep(0.1)
 
     webview.create_window("DDCS Bridge", url, width=900, height=840)
-    # ── STORAGE MUST SURVIVE THE APP CLOSING (t1257, proven live by the user) ─────────────────────────────────────
-    # pywebview defaults to PRIVATE MODE, which throws browser storage away when the window closes. In this app that
-    # storage is not a cache — it is the workspace: localStorage holds the working buffer and the save watermark, and
-    # IndexedDB holds the File System Access handles for the workspaces folder, the library folder and the deploy
-    # target. So every close+reopen looked like amnesia: the granted folder gone, the save handle gone, unsaved work
-    # gone. private_mode=False turns persistence on; storage_path pins WHERE it persists.
-    #
-    # The path is deliberately in the user's own app-data, NOT beside the executable: a PyInstaller build unpacks to a
-    # temp dir, and an install-location path would also mean an app UPDATE reads as a fresh amnesiac install. It is
-    # created up front because pywebview will not create a missing storage directory for us.
-    storage = os.path.join(
-        os.environ.get("LOCALAPPDATA") or os.path.join(os.path.expanduser("~"), ".local", "share"),
-        "DDCS-Studio", "webview",
-    )
-    try:
-        os.makedirs(storage, exist_ok=True)
-        webview.start(private_mode=False, storage_path=storage)
-    except TypeError:
-        # an older pywebview without these arguments: start anyway rather than refusing to launch, and say why the
-        # app will still forget things, so the symptom is never a mystery again.
-        print("[ddcs] pywebview is too old for private_mode/storage_path — browser storage will NOT persist; upgrade pywebview.", file=sys.stderr)
-        webview.start()
+    # t1259 — the storage policy is NOT decided here. It lives in fairy.webview_storage, because when this launcher
+    # carried its own copy the shipped exe (built from the repo-root fairy_gateway.py) kept forgetting everything:
+    # one policy, two launchers, one of them fixed. Both call the same helper now.
+    from fairy.webview_storage import start_persistent
+    start_persistent(webview)
 
 
 if __name__ == "__main__":

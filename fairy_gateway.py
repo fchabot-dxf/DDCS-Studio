@@ -329,7 +329,13 @@ def main():
             window.events.closing += on_closing
         except Exception as e:
             print(f"[fairy] close-confirm unavailable ({e}); window closes without asking.")
-        webview.start()                       # blocks until the window closes
+        # t1259 — STORAGE MUST SURVIVE THE WINDOW CLOSING. pywebview defaults to private mode, which discards
+        # localStorage + IndexedDB on exit — and here that is the workspace buffer, the save watermark and the File
+        # System Access handles for all three granted folders. The policy lives in ONE place (fairy.webview_storage)
+        # because it was previously fixed in the OTHER launcher and the shipped exe, built from THIS file, kept
+        # forgetting. See that module for where the data goes and why it is not beside the executable.
+        from fairy.webview_storage import start_persistent
+        start_persistent(webview)             # blocks until the window closes
         print("[fairy] window closed — gateway down.")
         os._exit(0)                           # daemon threads + serial released; guarantee no orphan
     except Exception as e:
