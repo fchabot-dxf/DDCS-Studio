@@ -47,6 +47,7 @@ function facingDataStack(p = FACING_DEFAULTS) {
         uiChildren: [
             // form2d: the form on the left, the half-profile canvas on the right (t1271 part 3)
             { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'layout', params: { kind: 'lathe_profile' } },   // t1273 — the half-profile, not the mill's XY stock
             {
                 type: 'param_group',
                 // …not "identity": facing HAS no identity fields, and a group named for something that does not

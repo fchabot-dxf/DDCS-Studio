@@ -165,24 +165,32 @@ test('(3) THE HALF-PROFILE CANVAS draws the MODEL — bar, centreline, datum, al
         const bar = { diameter: 20, stickOut: 50, allowance: 3 };
         const spec = C.latheProfileSpec(bar, () => {});
         const prof = L.halfProfile(bar);
+        // WHAT THE CANVAS CAN ACTUALLY DRAW. A first version of this spec invented `poly` and `band` item kinds;
+        // FeatureCanvas renders circle/line/rect/hole and silently ignores anything else, so the pane came up EMPTY
+        // the first time it was wired into a real wizard (t1273). The drawable set is asserted, not assumed.
+        const DRAWABLE = ['circle', 'line', 'rect', 'hole'];
         return {
             kinds: spec.items.map((i) => i.kind),
-            outlineY: spec.items[0].points.map((p) => p.y),
+            undrawable: spec.items.map((i) => i.kind).filter((k) => !DRAWABLE.includes(k)),
             profOutlineX: prof.outline.map((p) => p.x),
-            datumX: spec.items.find((i) => /finished face/.test(i.label || '')).x1,
-            band: spec.items.find((i) => i.kind === 'band'),
+            datumX: spec.items.filter((i) => i.kind === 'line').map((i) => i.x1),
+            band: spec.items.find((i) => i.kind === 'rect'),
             handle: spec.handles[0],
             stock: spec.stock,
             inverse: [C.canvasToZ(C.zToCanvas(-7.5)), C.canvasToZ(C.zToCanvas(3))],
         };
     });
-    expect(r.kinds, 'the bar, the centreline, the allowance band and the datum').toEqual(['poly', 'line', 'band', 'line']);
-    // the outline comes STRAIGHT from the model — radius up, never diameter
-    expect(r.outlineY, 'drawn from halfProfile, so the picture and the emit read the same numbers').toEqual(r.profOutlineX);
-    expect(r.outlineY, 'and those are RADII (a diameter would draw the bar twice as tall)').toEqual([0, 10, 10, 0]);
-    expect(r.datumX, 'Z0 is where the finished face will be').toBe(0);
-    expect(r.band.x1, 'the allowance band starts at the datum').toBe(0);
-    expect(r.band.x2, 'and ends at the raw face').toBe(3);
+    expect(r.undrawable, 'every drawn item is a kind FeatureCanvas actually renders — an invented kind is invisible').toEqual([]);
+    expect(r.kinds, 'the centreline, the allowance, the datum').toEqual(['line', 'rect', 'line']);
+    // THE BAR IS THE FRAME, and its height is a RADIUS — a diameter would draw the bar twice as tall
+    expect(r.stock.h, 'the drawn bar is half its diameter high, because the picture is a HALF-profile').toBe(10);
+    expect(Math.max(...r.profOutlineX), 'and that is exactly the outline radius the MODEL states').toBe(10);
+    expect(r.stock.ox, 'the frame starts at the chuck end').toBe(-50);
+    expect(r.stock.w, 'and runs to the raw face').toBe(53);
+    expect(r.datumX[1], 'Z0 is where the finished face will be').toBe(0);
+    expect(r.band.x, 'the allowance starts at the datum').toBe(0);
+    expect(r.band.w, 'and is as wide as the material to remove').toBe(3);
+    expect(r.band.h, 'and as tall as the bar RADIUS').toBe(10);
     expect(r.handle.id).toBe('faceLine');
     expect(r.handle.teal, 'TEAL: this handle drives the emit').toBe(true);
     expect(r.handle.x, 'and it sits on the raw end — what moves when you remove more or less').toBe(3);

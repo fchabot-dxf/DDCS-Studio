@@ -18,7 +18,8 @@ import { partZeroShift } from '../../viz/sceneFrame.js';   // t586 PREVIEW-PARIT
 import { BLOCKS } from './index.js';   // t708 — the block-def registry (type → def), to resolve an atom's DECLARED previewGeometry
 import { builderOf } from '../../blocks/opBuilders.js';   // t708 — build the op's stack to find its geometry atom + its live params
 import { getUserPreviewGeometry } from '../../blocks/userOps.js';   // t712 — a twin's DECLARED preview-geometry hook (slot/contour per-feature handles)
-import { placeShiftOfStack } from '../../blocks/blockEmitter.js';   // t718 LAYOUT PLACEMENT PARITY — the op's DECLARED placement shift (== the emit's), to draw previewGeometry PLACED
+import { placeShiftOfStack } from '../../blocks/blockEmitter.js';
+import { latheLayoutSpec } from '../../viz/latheProfileCanvas.js';   // t1273 — a LATHE op draws its half-profile here; the mill XY-stock layout has nothing to say about a bar on centres   // t718 LAYOUT PLACEMENT PARITY — the op's DECLARED placement shift (== the emit's), to draw previewGeometry PLACED
 
 // t554 — the MACHINE-FRAME LAYOUT backdrop (the ENVELOPE rect + the declared HOME corner) — from settings.machine spans +
 // settings.limits (the <edge>Home per axis). Machine coords, HOME pinned at the declared home edge. Null if no envelope.
@@ -57,6 +58,7 @@ export const LAYOUT_TYPES = {
     alignment:    { id: 'alignment',    label: 'Alignment probe starts' },
     rotary_clock: { id: 'rotary_clock', label: 'Rotary clock probe' },
     rotary_center:{ id: 'rotary_center',label: 'Rotary center probe' },
+    lathe_profile:{ id: 'lathe_profile',label: 'Lathe half-profile' },   // t1273 — Z across, radius up, centreline along the bottom
 };
 export const DEFAULT_LAYOUT = 'none';
 export const layoutType = (id) => LAYOUT_TYPES[id] || LAYOUT_TYPES[DEFAULT_LAYOUT];
@@ -142,6 +144,12 @@ function _previewGeometryOf(def, params) {
 }
 
 export function layoutSpecFromOp(def, params, simStart, sources, passEnds, spots, setSpots, panelStarts, simMarkers) {
+    // t1273 — A LATHE OP DRAWS ITSELF. Everything below this line reasons about an XY stock rectangle: a datum corner,
+    // a top-down footprint, corner picks. None of that means anything for a bar spinning on centres, so a lathe op
+    // DECLARES its layout kind and gets its half-profile instead. Its handles route to the SAME _writeParam field
+    // writer as every other canvas handle — a lathe drag and a mill drag reach the form by one path.
+    const _lathe = latheLayoutSpec(def, params, (m) => { for (const k in m) _writeParam(k, m[k]); });
+    if (_lathe) return _lathe;
     const s = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().stock) || null;
     const stock = (s && s.x > 0 && s.y > 0) ? { w: s.x, h: s.y, ox: 0, oy: 0 } : { w: 200, h: 150, ox: 0, oy: 0 };
     // t359 — the part-zero crosshair follows the DATUM (the selected part-zero corner/centre), consistent with the stock

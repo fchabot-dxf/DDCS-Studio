@@ -42,8 +42,10 @@ export const OP_AXIS_NEEDS = {
     edge: ['X', 'Y'],
     middle: ['X', 'Y'],
     alignment: ['X', 'Y'],
-    // the lathe ops need exactly what a lathe has
+    // the lathe ops need exactly what a lathe has — which a mill also has, so they are never greyed on a mill.
+    // Gating asks CAN this machine move that way, not IS this the right machine; the bar's ordering answers the latter.
     lathe_facing: ['X', 'Z'],
+    lathe_odturn: ['X', 'Z'],
 };
 
 /** The sentence a greyed op shows. Names the axis AND why we believe it is absent, so it is checkable. */
