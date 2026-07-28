@@ -16,7 +16,13 @@ export const moveBlock = {
     emit: (p, dx = 0, dy = 0) => {
         const words = [];
         if (p.x != null && p.x !== '') words.push(`X${val(p.x, 0, dx)}`);
-        if (p.y != null && p.y !== '') words.push(`Y${val(p.y, 0, dy)}`);
+        // t1315 — A LATHE HAS NO Y, so a ZERO one is dropped. Nothing in the lathe family authors a Y; the round trip
+        // through the Blocks canvas is what puts it there, because a Blockly move block materialises all three axis
+        // fields and a blank one comes back as 0. Emitting `G0 X#126 Y0 Z#130` to a machine with two axes is a wrong
+        // operator message at best. A NON-ZERO Y is left alone deliberately: on a lathe that is a real authoring
+        // mistake, and hiding it would be the worse failure.
+        const dropY = (Number(p.y) === 0 || p.y === '0') && (() => { try { return !!(window.ddcsIsLathe && window.ddcsIsLathe()); } catch (_) { return false; } })();
+        if (p.y != null && p.y !== '' && !dropY) words.push(`Y${val(p.y, 0, dy)}`);
         if (p.z != null && p.z !== '') words.push(`Z${val(p.z, 0)}`);
         if (p.a != null && p.a !== '') words.push(`A${val(p.a, 0)}`);   // rotary 4th axis (e.g. rotary index)
         if (p.b != null && p.b !== '') words.push(`B${val(p.b, 0)}`);   // rotary 5th axis

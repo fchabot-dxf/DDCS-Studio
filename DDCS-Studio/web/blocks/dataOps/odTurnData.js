@@ -14,7 +14,7 @@
  * target at the machine keeps it straight, and there is exactly one place a straight turn's diameter lives.
  */
 import { odTurnStack, OD_DEFAULTS, OD_VARS, OD_KINDS, odKind } from '../../wizards/lathe/odTurn.js';
-import { userOpFromStack } from '../userOps.js';
+import { userOpFromStack, registerLiveDefault } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // the declared tool marker — UNSET → emits nothing
 import { LATHE_GROUP } from './facingData.js';
@@ -30,7 +30,31 @@ export const OD_DATA_OPTYPE = 'user_lathe_odturn';
  * They bind the DIAMETER sockets, not the radius ones. That is the point of the header carrying both: a field
  * labelled Ø must be bound to a socket that holds a diameter, or the form↔block round trip halves the part.
  */
+/**
+ * t1315 (advisor ruling) — THE BAR THE PROGRAM IS WRITTEN FOR, on the form where the operator can see it.
+ *
+ * The stock modal declares the bar in the chuck; this field PREFILLS from it, and the emit follows the FIELD as it
+ * always has. So a Ø45 typed in the modal is visible here and lands in #131 — the G-code moves only through a number
+ * a person can read. An op-level edit still wins for that op instance, and the baked default is what a workspace
+ * with no declared bar falls back to.
+ */
+export const WORKSPACE_BAR_KEY = 'workspaceBarDiameter';
+const workspaceBarDiameter = () => {
+    try {
+        const st = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().stock : null;
+        if (st && st.shape === 'cylinder' && st.axis === 'z' && st.origin === 'finished-face' && Number(st.diameter) > 0) return Number(st.diameter);
+    } catch (_) { /* no workspace stock — the baked default below is the answer */ }
+    return OD_DEFAULTS.barDiameter;
+};
+
+registerLiveDefault(WORKSPACE_BAR_KEY, workspaceBarDiameter);   // …the fact belongs to whoever knows it
+
 export const OD_BINDING_SPECS = [
+    // …the bar this program is written for. Bound to the header socket that already holds it (#131), so the number
+    // on the form and the number in the macro are the same one.
+    { param: 'barDiameter', match: { type: 'assign', var: OD_VARS.dBar }, key: 'value', type: 'number',
+      label: 'Bar Ø (stock)', section: 'GEOMETRY', default: OD_DEFAULTS.barDiameter, defaultLive: WORKSPACE_BAR_KEY,
+      help: 'The stock in the chuck. Prefilled from the workspace stock; type here to override it for this op alone.' },
     { param: 'targetDiameter', match: { type: 'assign', var: OD_VARS.dTarget }, key: 'value', type: 'number',
       label: 'Target Ø', help: 'The finished diameter at the face end — as it is written on the drawing. The controller works out the radius.',
       section: 'GEOMETRY', units: 'mm', default: OD_DEFAULTS.targetDiameter },
@@ -112,6 +136,10 @@ export function rebuildOdTurn(stack, resolved) {
         finish: num('finish'),
         feed: num('feed'),
         feedFinish: num('feedFinish'),
+        // t1315 — …AND THE BAR. The rebuild regenerates the whole macro, so a param it does not carry is a param the
+        // substitution cannot keep: the bar field wrote #131 and this wrote it straight back to the baked default.
+        // (Found by asserting the chain end to end rather than at the binding.)
+        barDiameter: num('barDiameter'),
     });
     const root = Array.isArray(stack) && stack[0] ? stack[0] : null;
     if (!root) return stack;

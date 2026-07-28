@@ -15,7 +15,12 @@ const CAT = {
   control: '#f59e0b', math: '#84cc16', variables: '#06b6d4', wizardui: '#d946ef', markup: '#94a3b8',
   campendant: '#ec4899',   // block-native-params: the CAM pendant-field family (cam_table/cam_field) — a warm pink, ONE family colour, distinct from the fuchsia Wizard-UI authoring blocks (opunit/section/formfield)
   wizardform: '#6366f1',   // block-native-params S5.1: the FORM-field family (param_group/param_field) — indigo, distinct from the pendant pink AND the Wizard-UI fuchsia
-};
+  // t1315 — THE LATHE FAMILY'S ONE COLOUR ([[mind-block-color]]): a warm amber-bronze, the colour of turned brass.
+  // Legible on both the light and dark canvases, and taken by no other family — the nearest are the orange
+  // spindle/feed group and the amber control group, and it sits clear of both so a turning op never reads as either.
+  lathe: '#c2843a',
+  ops: '#7c8ba1',          // …and the neutral slate every OTHER registered wizard family falls back to, so a new
+};                         //    group is legible from the day it registers rather than inheriting a default hue
 
 /** Read a CSS custom property off <body> (where data-theme lives), with a fallback. */
 function tok(name, fallback) {

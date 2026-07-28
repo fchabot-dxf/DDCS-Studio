@@ -20188,3 +20188,61 @@ cylinder, and `roundBlankStock`/`barStock` DERIVE the trio (x = y = Ø, z = the 
 values. What was missing was the assertion, so it is now pinned in both workspaces: no W/D/H field is on screen for
 round stock in either kind, exactly the round fields are (Ø + stick-out + raw end on a lathe, Ø + height on a mill),
 and a Ø edit moves the derived pair with it while leaving the length alone.
+
+---
+
+## t1315 — the lathe reaches Blocks, and the bar reaches the form
+
+### (1) The root cause: never wired
+
+`buildToolbox` had exactly two sources — the ATOM palette and whatever categories the caller passed (the curated
+learner library). **The federated op registry was never one of them.** Not a filter, not a stale category map: a
+workspace could hold seven registered twins and the palette would show none. (`OP_BLOCKS` in the Blockly bridge is a
+separate hand-kept list from before the user layer; adding to it would have been exactly the hand edit the ruling
+forbids.)
+
+So `blocks/opToolbox.js` DERIVES the families from the registry: every registered op, grouped by the `group` it
+already declares, labelled from the group registry that already names them. Nothing in it knows what a lathe is —
+register the eighth lathe op, or a family nobody has thought of, and it appears with no edit anywhere. Each entry is
+`builderOf(opType)(defaultParams(def))`, the same builder the wizard's Insert runs, so a palette block emits what the
+wizard emits by construction rather than by a copy kept in step.
+
+The family colour is declared with the others: a warm amber-bronze for the lathe (turned brass), clear of the orange
+spindle group and the amber control group so a turning op never reads as either; every other family takes a neutral
+slate rather than inheriting a default hue.
+
+### The round trip proved something I did not expect
+
+The authored values all survive — the `#var` header comes back identical, and editing a field on the canvas moves
+the emitted program. But **the canvas materialises blank axis words as zeros**: `G0 X#120` round-trips as
+`G0 X#120 Z0`. In G91 that is a no-op; in ABSOLUTE mode it is a real move to Z0 — a different program. It is not
+lathe-specific (any op whose moves omit an axis is affected), so it is REPORTED, and pinned by a test that says in
+its own comment that it documents a defect and should fail the day it is fixed.
+
+The lathe's half of it IS fixed: a machine with no Y never emits a zero one. A NON-zero Y on a lathe is left alone
+deliberately — that is a real authoring mistake, and hiding it would be the worse failure.
+
+### (2) The bar precedence, per the ruling
+
+t1313 had `latheBarFrom` prefer the workspace bar outright, which fixed the picture and left the emit behind it. The
+ruling is better: the FIELD prefills from the declared bar and the emit follows the field, so the G-code only ever
+moves through a number the operator can see. Implemented as a **live default** — and the mechanism is the part worth
+recording:
+
+- a binding says `defaultLive: '<key>'`, naming a resolver registered by whoever owns the fact;
+- **by NAME and not by function, because a def is persisted as JSON.** My first version passed a function, and it
+  worked on a freshly built def and silently fell back to the baked 20 on the registered one — which is the same
+  class of bug as the derivation allow-list that dropped `defaultLive` on the way through (both found by asserting
+  the chain end to end rather than at the binding).
+- and `rebuildOdTurn` had to carry `barDiameter` too: the rebuild regenerates the whole macro, so a param it does
+  not carry is a param the substitution cannot keep — the field wrote #131 and the rebuild wrote it straight back.
+
+Chain asserted whole: modal Ø45 → the form field shows 45 → `#131=45`; a typed 32 wins for that op instance; a
+workspace with no declared bar falls back to the op's own 20; and the SCENE reads the same params, so there is no
+second path around the form.
+
+`od-runtime-taper-1305` now declares its bar like the four from t1313 — verified, not assumed: those four set the
+workspace stock, so they were unaffected; this one did not, so its Ø20 truths were being asserted against whatever
+the default workspace bar happened to be.
+
+Gate: smoke 71/71; the new spec 7/7; the lathe family + taper + stock + the two Blocks smoke specs 140/140.

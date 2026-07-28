@@ -26,12 +26,12 @@ import { isLathe } from '../data/workspaceMachine.js';
 /** The bar every lathe op shows, from whatever the op knows about it. Defaults are the op's, not this file's. */
 export function latheBarFrom(params, fallback) {
     const p = params || {}, f = fallback || {};
-    // t1313 — THE WORKSPACE'S BAR IS THE ONE IN THE CHUCK. Every op carried its own `barDiameter` default (20) and no
-    // form field binds it, so the op's default silently outranked the bar the user had actually declared: the stock
-    // modal said Ø40 and the wizard pane drew Ø20. That is the parallel store this turn exists to remove — the stock
-    // in the chuck is a fact about the SETUP, not about the op, so a declared workspace bar wins.
-    // (The RAW END stays the op's: facing's allowance IS material ahead of the face, which is an op-level decision.)
-    const ws = (() => {
+    // t1313/t1315 — THE WORKSPACE BAR REACHES AN OP THROUGH ITS FORM, not around it (advisor ruling). t1313 had this
+    // function prefer the workspace bar outright, which fixed the picture and left the emit behind it; the ruling is
+    // that the FIELD prefills from the declared bar (a live default) and the emit follows the field, so the G-code
+    // only ever moves through a number the operator can see. So the params are the one input again — and the
+    // workspace is consulted HERE only when the op passes none at all (a bare sim call, no form behind it).
+    const ws = (Number(p.barDiameter) > 0) ? null : (() => {
         try {
             const st = (typeof window !== 'undefined' && window.ddcsGetSettings) ? window.ddcsGetSettings().stock : null;
             if (!st || st.shape !== 'cylinder' || st.axis !== 'z' || st.origin !== 'finished-face') return null;

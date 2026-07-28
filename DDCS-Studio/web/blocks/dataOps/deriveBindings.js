@@ -77,6 +77,10 @@ export function deriveBindings(flatStack, specs) {
         if (s.widget) b.widget = s.widget;
         if (s.widgetConfig) b.widgetConfig = s.widgetConfig;
         if (s.units) b.units = s.units;
+        // t1315 — carry the LIVE-DEFAULT key. This derivation is an allow-list, so an un-carried property is silently
+        // dropped: the first version of the bar field prefilled on a freshly built def and read its baked default on
+        // the registered one, which is the same class of bug the widgetConfig line above was written for.
+        if (s.defaultLive) b.defaultLive = s.defaultLive;
         if (s.section) b.section = s.section;
         if (s.group) b.group = s.group;   // canvas-layout grouping (layoutSpecFromOp reads b.group)
         if (s.role) b.role = s.role;      // canvas-layout role (x/y/w/h/… — the draggable handle it drives)

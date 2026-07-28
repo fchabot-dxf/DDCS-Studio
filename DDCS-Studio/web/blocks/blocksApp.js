@@ -18,6 +18,7 @@ import { mountDevMode, deriveAuthoredDef, editingWizardType, writeAuthoredValue 
 import { isStructCtlType, SC_PARAM } from '../wizards/ops/structCtl.js';   // t154 — structural-control blocks drive the op's guards → live reprune
 import { renderOpForm, formBindings } from '../ui/formWidgets.js';   // render the wizard's form from bindings (the live block→form view); S5.2 — param_field rows when present
 import { learnerToolboxCategories } from '../data/learnerLibrary.js';   // curated Snippets / Complete Programs toolbox groups
+import { opToolboxCategories } from './opToolbox.js';   // t1315 — the REGISTERED wizard families, derived from the op registry
 import { isOpBlockEdited, valueTokenRanges, valueRangesForSubtree } from './opGlow.js';   // op-edit guard + word-level value-token spans (hover/select highlight)
 import { recordEdit } from './opEdits.js';   // DECLARE a block edit when its change event fires (vs inferring it by re-derivation)
 import { createPreviewPanel } from '../viz/createPreviewPanel.js';   // THE shared preview (2D+3D+engine+trail+stock), same in all 3 hosts
@@ -181,7 +182,9 @@ async function buildWorkspace() {
   // once here; the rest of the chrome re-skins live via setTheme below).
   const gridColour = (() => { try { return getComputedStyle(document.body).getPropertyValue('--border').trim() || '#1b2733'; } catch (_) { return '#1b2733'; } })();
   const ws = B.inject(host, {
-    toolbox: buildToolbox(learnerToolboxCategories()), theme: ddcsTheme(B), renderer: 'geras', collapse: true,
+    // t1315 — the rail reads Atoms · Wizards · Snippets · Programs. The Wizards group is DERIVED from the federated
+    // op registry, so a newly registered twin appears without an edit here or anywhere else.
+    toolbox: buildToolbox([...opToolboxCategories(), ...learnerToolboxCategories()]), theme: ddcsTheme(B), renderer: 'geras', collapse: true,
     grid: { spacing: 26, length: 2, colour: gridColour, snap: true },
     zoom: { controls: true, wheel: true, startScale: 0.9 }, trashcan: true, move: { smoothScroll: true },
   });

@@ -21,6 +21,12 @@ const boot = async (page) => {
     await page.evaluate(async () => {
         const M = await import('/data/workspaceMachine.js');
         M.setMachine({ name: 'Rig', kind: 'lathe', chuck: 'axis' }, false);
+        // t1315 — DECLARE THE BAR THESE TRUTHS ARE DERIVED AGAINST. The OD wizard's bar field prefills from the
+        // workspace stock now (the advisor's precedence ruling), so a spec that does not say what is in the chuck is
+        // asserting against whatever the default workspace bar happens to be.
+        const { barStock } = await import('/data/stockShape.js');
+        window.ddcsGetSettings().stock = barStock({ diameter: 20, stickOut: 60, allowance: 1 }, window.ddcsGetSettings().stock);
+        try { window.ddcsSaveSettings && window.ddcsSaveSettings(); } catch (_) {}
     });
 };
 

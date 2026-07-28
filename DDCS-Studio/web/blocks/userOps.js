@@ -518,9 +518,30 @@ function stripIds(v) {
 }
 
 /** The op's default params — each binding at its declared default (the op's params on first insert). */
+/**
+ * t1315 — THE LIVE-DEFAULT REGISTRY: a binding says `defaultLive: '<key>'` and this says what that key resolves to.
+ * Registered at module load by whoever owns the fact (data/lathe declares the bar one), so a def stays plain JSON.
+ */
+const LIVE_DEFAULTS = new Map();
+export function registerLiveDefault(key, fn) { if (key && typeof fn === 'function') LIVE_DEFAULTS.set(String(key), fn); }
+export const liveDefaultKeys = () => [...LIVE_DEFAULTS.keys()];
+
 export function defaultParams(def) {
     const p = {};
-    for (const b of (def.bindings || [])) p[b.param] = b.default;
+    for (const b of (def.bindings || [])) {
+        // t1315 — A DEFAULT MAY BE LIVE, and it is DECLARED BY NAME. Most defaults are a baked number; some describe
+        // something the WORKSPACE already knows — the bar in the chuck being the case that forced it, since an op's
+        // own default silently outranked the stock the user had declared. `defaultLive: '<key>'` names a registered
+        // resolver, asked at form-open time, so the field PREFILLS with the live fact and the operator sees the
+        // number their program will carry ([[twin-default-mirrors-form-not-fallback]]).
+        //
+        // A NAME AND NOT A FUNCTION, because a def is PERSISTED AS JSON: a function default vanishes the moment the
+        // op is stored and re-read, which is exactly what happened when this was first written that way — the fresh
+        // def prefilled and the registered one did not.
+        const live = b.defaultLive ? LIVE_DEFAULTS.get(b.defaultLive) : null;
+        if (live) { try { const v = live(def, b); p[b.param] = (v === undefined || v === null) ? b.default : v; } catch (_) { p[b.param] = b.default; } }
+        else p[b.param] = b.default;
+    }
     return p;
 }
 
