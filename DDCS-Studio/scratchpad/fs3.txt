@@ -1,0 +1,1500 @@
+﻿
+Running 993 tests using 12 workers
+
+[1A[2K[1/993] tests\alignment-fork1-handles.spec.js:11:1 › the alignment Layout has 2 draggable handles: A drag → the ax/ay anchor (sim-only); B drag → the SPAN field
+[1A[2K[2/993] tests\alignment-envelope-unclamp.spec.js:9:1 › the A anchor allows fractions beyond [0,1] (a probe point past the stock edge)
+[1A[2K[3/993] tests\alignment-handle-visible-exit.spec.js:9:1 › a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (not stuck at the edge)
+[1A[2K[4/993] tests\alignment-in-place.spec.js:12:1 › E3 opensAs wiring: Align opens user_alignment_data IN-PLACE, plain title, twin retired, openAlignmentWiz un-routed
+[1A[2K[5/993] tests\align-rotate-gui.spec.js:8:1 › Align modal renders the path in a 2D canvas; angle + Apply rotate the program
+[1A[2K[6/993] tests\alignment-onesource.spec.js:10:1 › opSimStarts.alignment = A (the anchor fraction) + B (A + the declared span along checkAxis)
+[1A[2K[7/993] tests\alignment-data-emit.spec.js:11:1 › E1 byte-diff ZERO: user_alignment_data == alignmentStack across 8 structural + a scalar sweep (incl safeZ/tolerance), studio AND Expert
+[1A[2K[8/993] tests\alignment-handles-independent.spec.js:58:1 › ALIGN: dragging A along the fence moves ONLY A — B stays put + the span field recomputes (no longer carried)
+[1A[2K[9/993] tests\alignment-fork2-twin-auto.spec.js:10:1 › the twin AUTO emit == alignmentStack (span model, studio + Expert); the SPAN drives #73; the A anchor is sim-only
+[1A[2K[10/993] tests\alignment-probe-collides.spec.js:32:5 › combo X/pos: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+[1A[2K[11/993] tests\alignment-fresh-seat.spec.js:54:5 › alignment: 3D-INITIAL open seats the trace + sim at A (fresh, zero interaction)
+[1A[2K[12/993] tests\alignment-sim-starts-at-a.spec.js:12:1 › the alignment intent carries seatAtStart (the declared sim{seatStart} → opSimContext)
+[1A[2K[13/993] tests\alignment-envelope-unclamp.spec.js:25:1 › a REAL drag past the stock edge writes a fraction >1, bounded by the machine envelope; the marker follows
+[1A[2K[14/993] tests\alignment-in-place.spec.js:33:1 › E3 emit BYTE-IDENTICAL: user_alignment_data == alignmentStack across the checkAxis/probeDir/frame sweep (the seed/menu wire never touches the stack)
+[1A[2K[15/993] tests\alignment-sim-starts-at-a.spec.js:23:1 › the played trace STARTS at handle A (not origin) — the drawn path begins at A, nothing at {0,0}
+[1A[2K[16/993] tests\alignment-onesource.spec.js:42:1 › emit AUTO probes A IN PLACE (no travel/Confirm) then a relative span jog to B; MANUAL keeps the Confirm gates
+[1A[2K[17/993] tests\alignment-fork2-twin-auto.spec.js:67:1 › REAL APP: the in-place form shows the Travel toggle + a Span field; AUTO no longer greys without a stock (t544)
+[1A[2K[18/993] tests\alignment-span-verify.spec.js:10:1 › typing the A→B span moves handle B (one source: field ↔ marker) + the AUTO emit is probe-A-in-place + a span jog
+[1A[2K[19/993] tests\alignment-data-emit.spec.js:74:1 › E2 sim-starts: the twin POSITIONS + COUNT == the EXISTING BUILT_IN.alignment (2 starts A/B); emit BYTE-IDENTICAL
+[1A[2K[20/993] tests\alignment-fresh-seat.spec.js:71:5 › alignment: DEFAULT-view open → setView('3d') seats the trace at A (the advisor's repro)
+[1A[2Ktests\alignment-probe-collides.spec.js:32:5 › combo X/pos: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+X/pos: markers outside ✓, 4 legs at face -2 ✓, markerB==routeB ✓
+
+[1A[2K[21/993] tests\alignment-probe-collides.spec.js:32:5 › combo X/neg: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+[1A[2K[22/993] tests\alignment-handles-independent.spec.js:67:1 › ROTARY CLOCK: dragging A along the touch line moves ONLY A — B stays put + the span recomputes (same contract)
+[1A[2K  1) tests\alignment-onesource.spec.js:42:1 › emit AUTO probes A IN PLACE (no travel/Confirm) then a relative span jog to B; MANUAL keeps the Confirm gates 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      42 | test('emit AUTO probes A IN PLACE (no travel/Confirm) then a relative span jog to B; MANUAL keeps the Confirm gates', async ({ page }) => {
+      43 |     await page.goto('http://localhost:3211');
+    > 44 |     await page.waitForFunction(() => window.ddcsGetBlockProgram);
+         |                ^
+      45 |     const r = await page.evaluate(async () => {
+      46 |         const { alignmentStack } = await import('/wizards/alignmentWizard.js');
+      47 |         const { emitMapped } = await import('/blocks/blockEmitter.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-onesource.spec.js:44:16
+
+    Error Context: test-results\alignment-onesource-emit-A-f3834-UAL-keeps-the-Confirm-gates\error-context.md
+
+
+[1A[2K  2) tests\alignment-fork2-twin-auto.spec.js:67:1 › REAL APP: the in-place form shows the Travel toggle + a Span field; AUTO no longer greys without a stock (t544) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      67 | test('REAL APP: the in-place form shows the Travel toggle + a Span field; AUTO no longer greys without a stock (t544)', async ({ page }) => {
+      68 |     await page.goto('http://localhost:3211');
+    > 69 |     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+         |                ^
+      70 |     await page.evaluate(async () => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 0, y: 0, show: false } }); });   // NO stock
+      71 |     await page.evaluate(() => window.openWiz('user_alignment_data'));
+      72 |     await page.waitForSelector('#wiz_user_form [data-param="travel"]', { state: 'visible', timeout: 8000 });
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-fork2-twin-auto.spec.js:69:16
+
+    Error Context: test-results\alignment-fork2-twin-auto--b2246-greys-without-a-stock-t544-\error-context.md
+
+
+[1A[2K[23/993] tests\alignment-data-emit.spec.js:110:1 › E2 real-symptom: the twin renders the BOX + the 2 fence starts on the preview (alignment = a fence probe, NO rig/bar)
+[1A[2K  3) tests\alignment-sim-starts-at-a.spec.js:23:1 › the played trace STARTS at handle A (not origin) — the drawn path begins at A, nothing at {0,0} 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      23 | test('the played trace STARTS at handle A (not origin) — the drawn path begins at A, nothing at {0,0}', async ({ page }) => {
+      24 |     await page.goto('http://localhost:3211');
+    > 25 |     await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetSettings && window.openWiz);
+         |                ^
+      26 |     await page.evaluate(() => {
+      27 |         const s = window.ddcsGetSettings();
+      28 |         s.stock = { show: true, x: 150, y: 100, z: 25, datum: 'nnp' };
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-sim-starts-at-a.spec.js:25:16
+
+    Error Context: test-results\alignment-sim-starts-at-a--4f614-begins-at-A-nothing-at-0-0-\error-context.md
+
+
+[1A[2K  4) tests\alignment-span-verify.spec.js:10:1 › typing the A→B span moves handle B (one source: field ↔ marker) + the AUTO emit is probe-A-in-place + a span jog 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      10 | test('typing the A→B span moves handle B (one source: field ↔ marker) + the AUTO emit is probe-A-in-place + a span jog', async ({ page }) => {
+      11 |     await page.goto('http://localhost:3211');
+    > 12 |     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+         |                ^
+      13 |     await page.evaluate(async () => { const SP = await import('/ui/settingsPanel.js'); SP.applySettings({ stock: { x: 200, y: 120, z: 30, shape: 'box', show: true } }); });
+      14 |     await page.evaluate(() => window.openWiz('user_alignment_data'));
+      15 |     await page.waitForSelector('#wiz_user_form [data-param="span"]', { state: 'visible', timeout: 8000 });
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-span-verify.spec.js:12:16
+
+    Error Context: test-results\alignment-span-verify-typi-fdd63-probe-A-in-place-a-span-jog\error-context.md
+
+
+[1A[2K  5) tests\alignment-in-place.spec.js:33:1 › E3 emit BYTE-IDENTICAL: user_alignment_data == alignmentStack across the checkAxis/probeDir/frame sweep (the seed/menu wire never touches the stack) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      33 | test('E3 emit BYTE-IDENTICAL: user_alignment_data == alignmentStack across the checkAxis/probeDir/frame sweep (the seed/menu wire never touches the stack)', async ({ page }) => {
+      34 |     await page.goto('http://localhost:3211');
+    > 35 |     await page.waitForFunction(() => window.ddcsStudio);
+         |                ^
+      36 |     const r = await page.evaluate(async () => {
+      37 |         const { builderOf } = await import('/blocks/opBuilders.js');
+      38 |         const { emitMapped } = await import('/blocks/blockEmitter.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-in-place.spec.js:35:16
+
+    Error Context: test-results\alignment-in-place-E3-emit-75047-re-never-touches-the-stack-\error-context.md
+
+
+[1A[2K  6) tests\alignment-envelope-unclamp.spec.js:25:1 › a REAL drag past the stock edge writes a fraction >1, bounded by the machine envelope; the marker follows 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      25 | test('a REAL drag past the stock edge writes a fraction >1, bounded by the machine envelope; the marker follows', async ({ page }) => {
+      26 |     await page.goto('http://localhost:3211');
+    > 27 |     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+         |                ^
+      28 |     // stock 200×120; a TIGHT envelope 220×220 (workOrigin 0) → the max reach is 220mm → the max ax fraction = 220/200 = 1.10
+      29 |     await page.evaluate(async () => {
+      30 |         const SP = await import('/ui/settingsPanel.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-envelope-unclamp.spec.js:27:16
+
+    Error Context: test-results\alignment-envelope-unclamp-f2ac9-envelope-the-marker-follows\error-context.md
+
+
+[1A[2K[24/993] tests\atc-cap-gate.spec.js:10:1 › V4.1 folds the ATC pneumatic M-codes; Expert emits them; the tool-setter probes carry the miss-check
+[1A[2K[25/993] tests\atc-change-in-place.spec.js:12:1 › opensAs wiring: Tool Change opens the twin IN-PLACE (plain title, twin retired) + opSimContext + the choreography hook
+[1A[2K[26/993] tests\alignment-superset.spec.js:13:1 › E0 GATE: prune(alignmentStack superset) == concrete alignmentStack, byte-identical across the full 8-combo structural sweep
+[1A[2Ktests\alignment-probe-collides.spec.js:32:5 › combo X/neg: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+X/neg: markers outside ✓, 4 legs at face 102 ✓, markerB==routeB ✓
+
+[1A[2K[27/993] tests\alignment-probe-collides.spec.js:32:5 › combo Y/pos: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+[1A[2K[28/993] tests\analytics.spec.js:3:1 › web analytics fires visit + feature beacons with the right payload
+[1A[2K[29/993] tests\alignment-in-place.spec.js:63:1 › E3 DRIVE: Align opens IN-PLACE — non-empty form + the 3D sim renders the box + 2 fence starts (no rig); the 2D is coherent
+[1A[2K[30/993] tests\alignment-onesource.spec.js:66:1 › AUTO no longer needs a stock — the span is plain mm (emit is span-based whether or not a stock exists)
+[1A[2K[31/993] tests\atc-backcompat.spec.js:17:1 › INC-D (1): old/legacy atc_change markers rebuild to the T# M6 call (migrate-on-rebuild)
+[1A[2K[32/993] tests\analytics-kv-guard.spec.js:10:1 › a Playwright (automated) boot fires ZERO requests to the analytics Worker
+[1A[2K[33/993] tests\atc-change-in-place.spec.js:39:1 › DRIVE: Tool Change opens IN-PLACE — the per-method field gating matches the legacy + each method emits + the 3D sim renders
+[1A[2K  7) tests\alignment-handle-visible-exit.spec.js:9:1 › a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (not stuck at the edge) 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: mouse.move: Test timeout of 30000ms exceeded.
+
+      30 |     await page.mouse.move(hb0.x + hb0.width / 2, hb0.y + hb0.height / 2);
+      31 |     await page.mouse.down();
+    > 32 |     for (let k = 0; k < 6; k++) await page.mouse.move(targetX, targetY, { steps: 8 });   // hold at the edge → the auto-pan keeps scrolling the handle out
+         |                                                  ^
+      33 |
+      34 |     // DURING the drag (before mouse.up) — the auto-pan must keep the marker VISIBLE in the canvas + far past the stock edge
+      35 |     const during = await page.evaluate(() => {
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-handle-visible-exit.spec.js:32:50
+
+    Error Context: test-results\alignment-handle-visible-e-d5096-rect-not-stuck-at-the-edge-\error-context.md
+
+
+[1A[2K  8) tests\alignment-fork1-handles.spec.js:11:1 › the alignment Layout has 2 draggable handles: A drag → the ax/ay anchor (sim-only); B drag → the SPAN field 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: mouse.move: Test timeout of 30000ms exceeded.
+
+      46 |     await page.mouse.move(hbB.x + hbB.width / 2, hbB.y + hbB.height / 2);
+      47 |     await page.mouse.down();
+    > 48 |     await page.mouse.move(hbB.x + hbB.width / 2 + 90, hbB.y + hbB.height / 2, { steps: 14 });   // +90px in X → grow the span
+         |                      ^
+      49 |     await page.mouse.up();
+      50 |     await page.waitForTimeout(250);
+      51 |     const spanAfter = await page.evaluate(() => Number(document.querySelector('#wiz_user_form [data-param="span"]').value));
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-fork1-handles.spec.js:48:22
+
+    Error Context: test-results\alignment-fork1-handles-th-c512e-nly-B-drag-→-the-SPAN-field\error-context.md
+
+
+[1A[2K[34/993] tests\alignment-superset.spec.js:52:1 › E0 golden + F2 restructure: #20 = [0-#19] (references the #var, NOT the [0-safeZ] literal); value unchanged; superset:false == concrete
+[1A[2K[35/993] tests\alignment-onesource.spec.js:84:1 › the span + A-anchor + travel mode round-trip through the op marker codec (Blockly params)
+[1A[2Ktests\analytics.spec.js:3:1 › web analytics fires visit + feature beacons with the right payload
+BEACONS [{"url":"https://example.test/e","body":"{\"event\":\"visit\",\"name\":\"/\",\"id\":\"8bd593fc-c6e6-4b7f-bd56-10b82518e4ee\",\"app\":\"web\",\"version\":\"10.128\",\"os\":\"Win32\",\"dev\":0}"},{"url":"https://example.test/e","body":"{\"event\":\"feature\",\"name\":\"wizard:drill\",\"id\":\"8bd593fc-c6e6-4b7f-bd56-10b82518e4ee\",\"app\":\"web\",\"version\":\"10.128\",\"os\":\"Win32\",\"dev\":0}"}]
+
+[1A[2K[36/993] tests\atc-backcompat.spec.js:46:1 › INC-D (2): T# M6 region byte-identical on rebuild; the inline region follows LIVE settings
+[1A[2K[37/993] tests\atc-changer-gui.spec.js:29:1 › the PRESET LIBRARY lists the presets (relabeled) and picking one sets settings.atc.{grip,motion,layout}
+[1A[2K[38/993] tests\atc-check-in-place.spec.js:11:1 › emit BYTE-IDENTICAL to atcToolCheckStack across a scalar sweep — studio AND Expert (source-resolver stubbed ON)
+[1A[2K[39/993] tests\analytics-kv-guard.spec.js:21:1 › the dev-network refresh is throttled to ONCE PER DAY (KV-write guard)
+[1A[2K[40/993] tests\atc-change-twin.spec.js:17:1 › E1: the twin emit == atcChangeStack byte-diff ZERO across method × callMacro × config on Expert + V4.1
+[1A[2K[41/993] tests\atc-change-superset.spec.js:18:1 › E0 GATE: prune(atcChangeStack superset) == concrete, byte-identical across method × callMacro × config
+[1A[2K[42/993] tests\atc-collet.spec.js:12:1 › (1) the seam resolves generic/disk to the pick-place kind (firmware stays push, m6 macro-call)
+[1A[2Ktests\alignment-in-place.spec.js:63:1 › E3 DRIVE: Align opens IN-PLACE — non-empty form + the 3D sim renders the box + 2 fence starts (no rig); the 2D is coherent
+E3 IN-PLACE FORM: 12 fields → dist, retract, f_fast, f_slow, port, safeZ, span, travel, checkAxis, probeDir, safeZFrame, tolerance | {"twoD":{"shown":true,"hasCanvas":true},"nStarts":2}
+
+[1A[2K[43/993] tests\atc-dialect.spec.js:14:1 › the ATC_DIALECT table declares the M350 ground truth (one source, real pins)
+[1A[2Ktests\alignment-probe-collides.spec.js:32:5 › combo Y/pos: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+Y/pos: markers outside ✓, 4 legs at face -2 ✓, markerB==routeB ✓
+
+[1A[2K[44/993] tests\alignment-probe-collides.spec.js:32:5 › combo Y/neg: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+[1A[2K[45/993] tests\atc-changer-gui.spec.js:39:1 › the declared config DRIVES the sim — the choreo from settings.atc == the method choreo (identical)
+[1A[2K  9) tests\alignment-fresh-seat.spec.js:71:5 › alignment: DEFAULT-view open → setView('3d') seats the trace at A (the advisor's repro) 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: page.evaluate: Test timeout of 30000ms exceeded.
+
+      38 | const fromOrigin = (a) => a ? Math.hypot(a.x, a.y) : 0;
+      39 | const setStock = (page, autoLoop) => page.evaluate((al) => { const s = window.ddcsGetSettings(); s.stock = { show: true, x: 150, y: 100, z: 25, datum: 'ccp' }; s.preview = s.preview || {}; s.preview.autoLoop = al; }, autoLoop);
+    > 40 | const to3D = async (page) => { await page.evaluate(() => { const p = window.ddcsStudio.wizardManager._activePanel; if (p && p.setView) p.setView('3d'); }); await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 }); await page.waitForTimeout(600); };
+         |                                           ^
+      41 | const seedTwin = (page) => page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const M = await import('/blocks/dataOps/alignmentData.js'); try { U.createUserOp(M.alignmentDataDef()); } catch (_) {} });
+      42 |
+      43 | // The core assertions, for a given op × view-flow (already in 3D).
+        at to3D (C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-fresh-seat.spec.js:40:43)
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-fresh-seat.spec.js:80:15
+
+    Error Context: test-results\alignment-fresh-seat-align-5658f-e-at-A-the-advisor-s-repro-\error-context.md
+
+
+[1A[2K  10) tests\alignment-onesource.spec.js:84:1 › the span + A-anchor + travel mode round-trip through the op marker codec (Blockly params) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      84 | test('the span + A-anchor + travel mode round-trip through the op marker codec (Blockly params)', async ({ page }) => {
+      85 |     await page.goto('http://localhost:3211');
+    > 86 |     await page.waitForFunction(() => window.ddcsGetBlockProgram);
+         |                ^
+      87 |     const r = await page.evaluate(async () => {
+      88 |         const { markerLine, parseMarker } = await import('/blocks/opSchema.js');
+      89 |         const params = { checkAxis: 'X', probeDir: 'pos', travel: 'auto', ax: 0.5, ay: 0.6, span: 65, safeZ: 10, dist: 20 };
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\alignment-onesource.spec.js:86:16
+
+    Error Context: test-results\alignment-onesource-the-sp-88265-arker-codec-Blockly-params-\error-context.md
+
+
+[1A[2K[46/993] tests\atc-check-in-place.spec.js:49:1 › opensAs wiring: ATC Tool Check opens the twin IN-PLACE (plain title, twin retired from atc_datawiz)
+[1A[2K[47/993] tests\atc-envelope.spec.js:19:3 › atc_length: machine envelope draws in the preview
+[1A[2K[48/993] tests\atc-collet.spec.js:28:1 › (2) the collet device opens/closes (position + tint) on setStationDevice
+[1A[2K[49/993] tests\atc-change-superset.spec.js:51:1 › E0 golden: the concrete build (no superset) is unchanged — a plain method stack, no guard blocks; the routing is one-source
+[1A[2K[50/993] tests\atc-dialect.spec.js:45:1 › the engine HONORS the dialect — M301 parks, M162/163 toggle the dust OUTPUT, M305 is a gripper WAIT (not dust)
+[1A[2K[51/993] tests\atc-change-twin.spec.js:54:1 › E1: the inlineTnc arm is a LIVE VIEW — change an ATC I/O code → the NEXT emit tracks (no snapshot)
+[1A[2K[52/993] tests\atc-changer-gui.spec.js:53:1 › the FROM-ZERO composer builds a config (layout × grip × motion) — RapidChange-shaped
+[1A[2K[53/993] tests\atc-backcompat.spec.js:77:1 › INC-D (3): stray/stale marker keys load benignly; the emit uses LIVE settings, not the snapshot
+[1A[2K[54/993] tests\atc-check-in-place.spec.js:65:1 › DRIVE: ATC Tool Check opens IN-PLACE with a NON-EMPTY form (incl. tolerance) + the 3D machine sim renders
+[1A[2K[55/993] tests\atc-dialect.spec.js:73:1 › the engine HONORS the M350 pneumatics — M156-161 drive the OUTPUT pins + fire io_change (were no-op)
+[1A[2K[56/993] tests\atc-collet.spec.js:50:1 › (3) a generic (pick-place) op arms the collet; it flips on the drawbar io_change (M154/M155)
+[1A[2K[57/993] tests\alignment-fresh-seat.spec.js:54:5 › user_alignment_data: 3D-INITIAL open seats the trace + sim at A (fresh, zero interaction)
+[1A[2K[58/993] tests\atc-disk-swap.spec.js:12:1 › a disk op tool change rotates the ring to the pickup + swaps the occupancy there
+[1A[2K[59/993] tests\atc-envelope.spec.js:19:3 › atc_check: machine envelope draws in the preview
+[1A[2K[60/993] tests\atc-inline-onesource.spec.js:16:1 › INC-B2 (1): the inline body sources the USER drawbar codes (live), not the assumed M154/M155
+[1A[2Ktests\atc-change-in-place.spec.js:39:1 › DRIVE: Tool Change opens IN-PLACE — the per-method field gating matches the legacy + each method emits + the 3D sim renders
+ATC-CHANGE IN-PLACE gating OK · m6/manual/generic emits + gating verified
+
+[1A[2K[61/993] tests\atc-interpreter.spec.js:17:1 › the interpreter walks a PLUNGE motion → a sim path (plunge + swap, NO drawbar/pneumatic I/O)
+[1A[2K[62/993] tests\atc-change-twin.spec.js:84:1 › E1 M2: a Blocks edit inside a static arm (manual) SURVIVES the param recompose + the park X still tracks
+[1A[2K[63/993] tests\atc-io-labeling.spec.js:12:1 › (0) the dust-cover output TYPE uses M162/M163 (not the stale M305/M306)
+[1A[2K[64/993] tests\atc-changer-gui.spec.js:61:1 › SAVE AS PRESET persists the current config and it reappears in the library
+[1A[2K[65/993] tests\atc-length-in-place.spec.js:12:1 › emit BYTE-IDENTICAL to atcLengthStack across a scalar sweep — studio AND Expert (source-resolver stubbed ON)
+[1A[2Ktests\alignment-probe-collides.spec.js:32:5 › combo Y/neg: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+Y/neg: markers outside ✓, 4 legs at face 152 ✓, markerB==routeB ✓
+
+[1A[2K[66/993] tests\atc-magazine-frame.spec.js:25:1 › the magazine anchor is on the FIXED frame — raw machine coords, INDEPENDENT of workOrigin
+[1A[2K[67/993] tests\atc-inline-onesource.spec.js:31:1 › INC-B2 (2): inline body ≡ the ⚙ Generate T.nc body, modulo the O-header/M99 wrapper
+[1A[2K[68/993] tests\atc-interpreter.spec.js:35:1 › a RapidChange config (from-zero) SIMS via the interpreter — the tool plunges + swaps
+[1A[2K[69/993] tests\atc-model.spec.js:35:1 › the composable GRIP × MOTION schema is declared and well-formed
+[1A[2K[70/993] tests\atc-io-labeling.spec.js:22:1 › (1) assigned ATC pins are LABELED from the config + light LIVE on the sim semantic output (M-code join)
+[1A[2K[71/993] tests\atc-envelope.spec.js:19:3 › atc_warmup: machine envelope draws in the preview
+[1A[2K[72/993] tests\atc-collet.spec.js:75:1 › (4) input SENSOR live-lighting activates: a generic change trace lights the M300/301/302 pins
+[1A[2Ktests\atc-check-in-place.spec.js:65:1 › DRIVE: ATC Tool Check opens IN-PLACE with a NON-EMPTY form (incl. tolerance) + the 3D machine sim renders
+ATC-CHECK IN-PLACE FORM: 8 fields → maxDist, retract, f_fast, f_slow, port, blockHeight, safeZ, tolerance
+
+[1A[2K[73/993] tests\atc-length-in-place.spec.js:52:1 › opensAs wiring: ATC Tool Length opens the twin IN-PLACE (plain title, twin retired from atc_datawiz)
+[1A[2K[74/993] tests\atc-pin-picker.spec.js:30:1 › assigning an ATC OUTPUT pin writes the config row AND the io-tab lights it (the join)
+[1A[2K[75/993] tests\atc-pocket-swap.spec.js:12:1 › a real tool change on a generic op swaps the magazine occupancy at the pockets + spindles the new tool
+[1A[2K[76/993] tests\alignment-fresh-seat.spec.js:71:5 › user_alignment_data: DEFAULT-view open → setView('3d') seats the trace at A (the advisor's repro)
+[1A[2K[77/993] tests\atc-inline-onesource.spec.js:63:1 › INC-B2 (3): the default T# M6 emit is unchanged and its target follows fixedT
+[1A[2K[78/993] tests\atc-model.spec.js:44:1 › the 3 methods (and back-compat old ops) resolve to the correct grip × motion combo
+[1A[2K[79/993] tests\atc-io-labeling.spec.js:55:1 › (2) the dust pin reflects M162/M163 (OUT_DUST_COVER), NOT M305/M306 (which is the gripper)
+[1A[2K[80/993] tests\atc-preview.spec.js:16:3 › atc_length: two-pane + shared 3D preview mounts
+[1A[2K[81/993] tests\atc-magazine-frame.spec.js:57:1 › a STOCK pinned to its WCS is unaffected — the part still rides the stock pin (no regression to mill ops)
+[1A[2K[82/993] tests\atc-length-in-place.spec.js:68:1 › DRIVE: ATC Tool Length opens IN-PLACE with a NON-EMPTY form + the 3D machine sim renders
+[1A[2K[83/993] tests\atc-inline-onesource.spec.js:81:1 › INC-B2 (4): the marker round-trips method + fixedT + callMacro for an inline op
+[1A[2K[84/993] tests\atc-envelope.spec.js:19:3 › atc_change: machine envelope draws in the preview
+[1A[2K[85/993] tests\atc-model.spec.js:58:1 › INC-B2: the inline fallback (callMacro:false) emits the ONE-SOURCE tncProgram body — firmware unchanged, generic/disk source the user I/O codes
+[1A[2K[86/993] tests\atc-interpreter.spec.js:63:1 › I5: the interpreter EMITS a T.nc O-program for a new combo (plunge macro + M99, a STANDALONE subprogram)
+[1A[2K[87/993] tests\atc-roundtrip.spec.js:27:1 › atc_warmup round-trips its RPM / dwell stages
+[1A[2K[88/993] tests\atc-magazine-frame.spec.js:71:1 › a PARTIAL profile (workOrigin set, NO wcs.table) — part rides workOrigin so G53 aligns with the raw-machine magazine (t173)
+[1A[2K  11) tests\atc-inline-onesource.spec.js:81:1 › INC-B2 (4): the marker round-trips method + fixedT + callMacro for an inline op 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+       8 | test.beforeEach(async ({ page }) => {
+       9 |   await page.goto('http://localhost:3211');
+    > 10 |   await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack && window.ddcsGetSettings);
+         |              ^
+      11 | });
+      12 |
+      13 | const ATC = { magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }, { pocket: 2, tool: 2, x: 30, y: 0, z: -5 }] };
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-inline-onesource.spec.js:10:14
+
+    Error Context: test-results\atc-inline-onesource-INC-B-d5e35--callMacro-for-an-inline-op\error-context.md
+
+
+[1A[2K[89/993] tests\atc-interpreter.spec.js:81:1 › I5b-2a: Generate T.nc routes a candidate combo AND the DRAWBAR changer through the interpreter (safety-complete shipped route)
+[1A[2K[90/993] tests\atc-model.spec.js:92:1 › I2: the choreography descriptor is COMPUTED from the model, IDENTICAL to the old fixed table
+[1A[2K[91/993] tests\atc-roundtrip.spec.js:33:1 › atc_check round-trips the tolerance
+[1A[2K[92/993] tests\atc-envelope.spec.js:19:3 › atc_test: machine envelope draws in the preview
+[1A[2K[93/993] tests\atc-setup-canvas.spec.js:52:1 › dragging a generic pocket handle writes settings.atc.magazine at the cursor world point — no controller write
+[1A[2K  12) tests\atc-pin-picker.spec.js:30:1 › assigning an ATC OUTPUT pin writes the config row AND the io-tab lights it (the join) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      11 | async function openAtc(page, seed) {
+      12 |   await page.goto('http://localhost:3211');
+    > 13 |   await page.waitForFunction(() => window.ddcsGetSettings && window.ddcsStudio && window.ioPanel);
+         |              ^
+      14 |   await page.evaluate((seed) => {
+      15 |     const s = window.ddcsGetSettings();
+      16 |     s.hardwareTabs = s.hardwareTabs || {}; s.hardwareTabs.atc = true;
+        at openAtc (C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-pin-picker.spec.js:13:14)
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-pin-picker.spec.js:31:3
+
+    Error Context: test-results\atc-pin-picker-assigning-a-5feb4--io-tab-lights-it-the-join-\error-context.md
+
+
+[1A[2K  13) tests\atc-collet.spec.js:75:1 › (4) input SENSOR live-lighting activates: a generic change trace lights the M300/301/302 pins 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      75 | test('(4) input SENSOR live-lighting activates: a generic change trace lights the M300/301/302 pins', async ({ page }) => {
+      76 |   await page.goto('http://localhost:3211');
+    > 77 |   await page.waitForFunction(() => window.ioPanel && window.ddcsGetSettings && window.virtualIO);
+         |              ^
+      78 |   const r = await page.evaluate(async () => {
+      79 |     const s = window.ddcsGetSettings();
+      80 |     s.atc = s.atc || {}; s.atc.magazine = [{ pocket: 1, tool: 5, x: 100, y: 100, z: -50 }]; s.atc.tools = [{ num: 5, type: 'endmill', dia: 6, length: 40 }];
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-collet.spec.js:77:14
+
+    Error Context: test-results\atc-collet--4-input-SENSOR-a2a06-ights-the-M300-301-302-pins\error-context.md
+
+
+[1A[2K[94/993] tests\atc-station-devices.spec.js:23:1 › (1) the devices are modelled at the station (WCS-independent) + transform on setStationDevice
+[1A[2K[95/993] tests\atc-interpreter.spec.js:115:1 › I5b-1: motionToTnc emits a SAFETY-COMPLETE drawbar T.nc from the DECLARATION (matches the DDCS dance)
+[1A[2K  14) tests\atc-preview.spec.js:16:3 › atc_length: two-pane + shared 3D preview mounts ─────────────
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      16 |   test(`${w.type}: two-pane + shared 3D preview mounts`, async ({ page }) => {
+      17 |     await page.goto('http://localhost:3211');
+    > 18 |     await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
+         |                ^
+      19 |     await page.evaluate((t) => window.ddcsStudio.wizardManager.open(t), w.type);
+      20 |     await page.waitForSelector(`#${w.panel}`, { state: 'visible' });
+      21 |
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-preview.spec.js:18:16
+
+    Error Context: test-results\atc-preview-atc-length-two-pane-shared-3D-preview-mounts\error-context.md
+
+
+[1A[2K[96/993] tests\atc-roundtrip.spec.js:39:1 › atc_change round-trips every change method
+[1A[2K  15) tests\atc-io-labeling.spec.js:55:1 › (2) the dust pin reflects M162/M163 (OUT_DUST_COVER), NOT M305/M306 (which is the gripper) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      55 | test('(2) the dust pin reflects M162/M163 (OUT_DUST_COVER), NOT M305/M306 (which is the gripper)', async ({ page }) => {
+      56 |   await page.goto('http://localhost:3211');
+    > 57 |   await page.waitForFunction(() => window.ioPanel && window.ddcsGetSettings && window.virtualIO);
+         |              ^
+      58 |   const r = await page.evaluate(() => {
+      59 |     const s = window.ddcsGetSettings();
+      60 |     s.outputs = [{ id: 'o3', type: 'dustcover', label: 'Dust cover', pin: 7, onCode: 'M162', offCode: 'M163' }];
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-io-labeling.spec.js:57:14
+
+    Error Context: test-results\atc-io-labeling--2-the-dus-72904--M306-which-is-the-gripper-\error-context.md
+
+
+[1A[2K[97/993] tests\alignment-fresh-seat.spec.js:85:1 › the twin marker DRAG (2D→3D flow): the drag moves A and the 3D trace FOLLOWS to the new A
+[1A[2K  16) tests\atc-length-in-place.spec.js:68:1 › DRIVE: ATC Tool Length opens IN-PLACE with a NON-EMPTY form + the 3D machine sim renders 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      68 | test('DRIVE: ATC Tool Length opens IN-PLACE with a NON-EMPTY form + the 3D machine sim renders', async ({ page }) => {
+      69 |     await page.goto('http://localhost:3211');
+    > 70 |     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+         |                ^
+      71 |     await page.evaluate((op) => window.openWiz(op), OPTYPE);
+      72 |     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
+      73 |     await page.waitForTimeout(500);
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-length-in-place.spec.js:70:16
+
+    Error Context: test-results\atc-length-in-place-DRIVE--d0a3e--the-3D-machine-sim-renders\error-context.md
+
+
+[1A[2K[98/993] tests\atc-interpreter.spec.js:145:1 › I5b-3 INC1: a custom drawbar code SOURCES from the I/O table in BOTH the sim and the emit; default byte-identical
+[1A[2K[99/993] tests\atc-envelope.spec.js:19:3 › atc_table: machine envelope draws in the preview
+[1A[2K[100/993] tests\atc-roundtrip.spec.js:76:1 › fix B / A1: a Blocks edit of the T# M6 tool-word round-trips back to fixedT (the edit wins; bare M6 → 0)
+[1A[2K[101/993] tests\atc-setup-canvas.spec.js:71:1 › dragging a firmware push-station point writes the settings.atc.firmwareStation store
+[1A[2K[102/993] tests\atc-inline-onesource.spec.js:93:1 › INC-B2 (5): re-emit after a live code change is FRESH
+[1A[2K[103/993] tests\atc-interpreter.spec.js:177:1 › INC-A: the FIRMWARE interpreter preview walks the STATION dance (G53 machine frame, station from firmwareStation)
+[1A[2K[104/993] tests\atc-station-devices.spec.js:56:1 › (2) a firmware push arms the devices; they transform on the pneumatic io_change (M160/M161/M156/M157)
+[1A[2K[105/993] tests\atc-roundtrip.spec.js:100:1 › atc_change automatic methods emit a T# M6 CALL by default; callMacro=false keeps the firmware-accurate inline dance
+[1A[2K[106/993] tests\atc-setup-canvas.spec.js:94:1 › the firmware sim station renders from the firmwareStation store (var-seed kills untaught-0)
+[1A[2K[107/993] tests\atc-table-in-place.spec.js:11:1 › opensAs wiring: Tool Table opens the twin IN-PLACE (plain title, twin retired) + opSimContext machine+magazine
+[1A[2K[108/993] tests\atc-preview.spec.js:16:3 › atc_check: two-pane + shared 3D preview mounts
+[1A[2K[109/993] tests\atc-pin-picker.spec.js:45:1 › assigning an ATC INPUT pin (separate pin space) writes settings.inputs and lights it
+[1A[2K[110/993] tests\atc-setup-numeric.spec.js:26:1 › LINEAR: an origin + LENGTH + count generates evenly-spaced pockets (pitch = length ÷ (count−1))
+[1A[2K[111/993] tests\atc-station-highlight.spec.js:13:1 › (1) the choreography seam declares firmware=push, m6=macro-call, others no-op
+[1A[2K[112/993] tests\atc-table-superset.spec.js:12:1 › E0 GATE: prune(atcTableStack superset) == concrete, byte-identical across toggles × table sizes × profiles
+[1A[2K[113/993] tests\atc-roundtrip.spec.js:135:1 › atc_test round-trips drawbar + pocket dry-run
+[1A[2K[114/993] tests\alignment-fresh-seat.spec.js:115:1 › NEGATIVE CONTROL: homing (machine-frame) trace head still coincides with its seated tool — unchanged
+[1A[2K[115/993] tests\atc-io-labeling.spec.js:73:1 › (3) ATC INPUT pins are LABELED from the config sensor rows + best-effort live-light (t185)
+[1A[2K[116/993] tests\atc-inline-onesource.spec.js:112:1 › INC-B2 (6): reconcile over the RAW inline stack recovers the DECLARED fields (fix B)
+[1A[2K[117/993] tests\atc-table-in-place.spec.js:31:1 › DRIVE: Tool Table opens IN-PLACE — the two include toggles + the Edit-table button + the live-view emit + the 3D sim
+[1A[2K[118/993] tests\atc-table-twin.spec.js:9:1 › E1: the twin emit == atcTableStack byte-diff ZERO across toggles × table sizes × profiles (live table)
+[1A[2K[119/993] tests\atc-station-devices.spec.js:85:1 › (3) end-to-end: a real firmware push PLAY animates the devices via the engine io_change
+[1A[2K[120/993] tests\atc-roundtrip.spec.js:143:1 › atc_table round-trips the include-lengths / include-pockets toggles
+[1A[2K[121/993] tests\atc-inline-onesource.spec.js:129:1 › INC-B2b (7): the marker carries NO settings snapshot; re-emit uses the CURRENT live codes (reload-fresh)
+[1A[2K[122/993] tests\atc-setup-numeric.spec.js:45:1 › DISK: diameter + pocket count lays the ring (count pockets, each at Ø/2 from the carousel centre)
+[1A[2K[123/993] tests\atc-station-highlight.spec.js:34:1 › (2) the station highlight sits at RAW machine coords on the fixed frame — WCS-INDEPENDENT
+[1A[2K[124/993] tests\atc-setup-canvas.spec.js:118:1 › the setup canvas is a coherent MACHINE frame — home + axes at machine 0, envelope = travel extents (not a part datum)
+[1A[2K[125/993] tests\atc-pin-picker.spec.js:58:1 › a taken pin is disabled so a pin cannot map to two functions (conflict prevented)
+[1A[2K[126/993] tests\atc-table-twin.spec.js:43:1 › E1: the twin is a LIVE VIEW — edit a tool length in Settings → the NEXT emit tracks (no snapshot)
+[1A[2K[127/993] tests\atc-io-labeling.spec.js:91:1 › (4) the config label is EDITABLE (bound to row.label) + the io tab reflects the new label (t185)
+[1A[2K[128/993] tests\atc-preview.spec.js:16:3 › atc_warmup: two-pane + shared 3D preview mounts
+[1A[2Ktests\atc-table-in-place.spec.js:31:1 › DRIVE: Tool Table opens IN-PLACE — the two include toggles + the Edit-table button + the live-view emit + the 3D sim
+ATC-TABLE IN-PLACE: includeLengths,includePockets,_setup | 14 lines
+
+[1A[2K[129/993] tests\atc-test-in-place.spec.js:11:1 › opensAs wiring: ATC Test opens the twin IN-PLACE (plain title, twin retired) + opSimContext carries machine+magazine
+[1A[2K[130/993] tests\atc-test-superset.spec.js:10:1 › E0 GATE: prune(atcTestStack superset) == concrete, byte-identical across modes × magazine sizes × drawbar counts
+[1A[2K[131/993] tests\atc-roundtrip.spec.js:149:1 › atc_length is registered for reverse-sync (no editable form fields)
+[1A[2K  17) tests\atc-inline-onesource.spec.js:129:1 › INC-B2b (7): the marker carries NO settings snapshot; re-emit uses the CURRENT live codes (reload-fresh) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+       8 | test.beforeEach(async ({ page }) => {
+       9 |   await page.goto('http://localhost:3211');
+    > 10 |   await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack && window.ddcsGetSettings);
+         |              ^
+      11 | });
+      12 |
+      13 | const ATC = { magazine: [{ pocket: 1, tool: 1, x: 10, y: 0, z: -5 }, { pocket: 2, tool: 2, x: 30, y: 0, z: -5 }] };
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-inline-onesource.spec.js:10:14
+
+    Error Context: test-results\atc-inline-onesource-INC-B-4ea5a-NT-live-codes-reload-fresh-\error-context.md
+
+
+[1A[2K[132/993] tests\atc-tnc-verify.spec.js:17:1 › [B] GREEN — T.nc installed on the controller (gateway verified)
+[1A[2K[133/993] tests\atc-setup-numeric.spec.js:64:1 › FIRMWARE: typing the push-station coords writes the store AND the sim station renders the exact values
+[1A[2K[134/993] tests\atc-io-labeling.spec.js:117:1 › (5) RENAME-PROOF (t189 declare-fix): the input live-light joins on the DECLARED waitCode, NOT the label text
+[1A[2K[135/993] tests\atc-tool-setter.spec.js:32:1 › Tool LENGTH preview renders the setter at its configured machine position (fixed frame)
+[1A[2K[136/993] tests\atc-pin-picker.spec.js:74:1 › ONE-SOURCE: the picker reflects a pin set in the config, and clearing it frees the pin
+[1A[2K[137/993] tests\atc-station-highlight.spec.js:55:1 › (3) the traced FIRMWARE push reaches the taught station; the view wires the highlight for firmware only
+[1A[2K[138/993] tests\atc-test-superset.spec.js:41:1 › E0 golden: the concrete build (no superset) is unchanged — a plain drawbar / pockets stack, no guard blocks
+[1A[2K[139/993] tests\atc-test-in-place.spec.js:33:1 › DRIVE: ATC Test opens IN-PLACE — both modes render their fields + the emit preview + the machine+magazine 3D sim
+[1A[2K[140/993] tests\atc-roundtrip.spec.js:156:1 › every ATC op has a BUILDERS stack AND a reconciler
+[1A[2K[141/993] tests\atc-io-labeling.spec.js:134:1 › (6) migrateIO backfills the declared waitCode on legacy ATC sensor rows (no waitCode → M301 by id)
+[1A[2K[142/993] tests\atc-preview.spec.js:16:3 › atc_change: two-pane + shared 3D preview mounts
+[1A[2K[143/993] tests\atc-station-devices.spec.js:108:1 › (4) a NON-firmware method (m6) arms NO devices
+[1A[2K[144/993] tests\atc-tool-swap.spec.js:21:1 › (1) showRetiredTool places the OLD tool at the push station — raw machine coords, WCS-independent
+[1A[2K[145/993] tests\atc-test-twin.spec.js:18:1 › E1: the twin emit == atcTestStack byte-diff ZERO across mode × magazine size × drawbar-count for the CURRENT settings
+[1A[2K[146/993] tests\atc-tnc-verify.spec.js:29:1 › [B] RED — T.nc NOT FOUND on the connected controller
+[1A[2K[147/993] tests\atc-tool-setter.spec.js:42:1 › Tool CHECK preview renders the same setter at its configured position
+[1A[2K[148/993] tests\atc-warmup-as-data.spec.js:18:1 › atc-warmup-as-data: BYTE-IDENTICAL to atcWarmupStack across a param sweep + binding-wiring
+[1A[2K[149/993] tests\atc-wizards.spec.js:17:1 › Tool Change wizard: method switching shows the right fields and dialect
+[1A[2K  18) tests\atc-test-superset.spec.js:41:1 › E0 golden: the concrete build (no superset) is unchanged — a plain drawbar / pockets stack, no guard blocks 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      41 | test('E0 golden: the concrete build (no superset) is unchanged — a plain drawbar / pockets stack, no guard blocks', async ({ page }) => {
+      42 |     await page.goto('http://localhost:3211');
+    > 43 |     await page.waitForFunction(() => window.ddcsGetBlockProgram);
+         |                ^
+      44 |     const r = await page.evaluate(async () => {
+      45 |         const { atcTestStack } = await import('/wizards/atcTestWizard.js');
+      46 |         const { emitMapped } = await import('/blocks/blockEmitter.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-test-superset.spec.js:43:16
+
+    Error Context: test-results\atc-test-superset-E0-golde-8e9f5-ckets-stack-no-guard-blocks\error-context.md
+
+
+[1A[2K  19) tests\atc-preview.spec.js:16:3 › atc_change: two-pane + shared 3D preview mounts ─────────────
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      16 |   test(`${w.type}: two-pane + shared 3D preview mounts`, async ({ page }) => {
+      17 |     await page.goto('http://localhost:3211');
+    > 18 |     await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
+         |                ^
+      19 |     await page.evaluate((t) => window.ddcsStudio.wizardManager.open(t), w.type);
+      20 |     await page.waitForSelector(`#${w.panel}`, { state: 'visible' });
+      21 |
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-preview.spec.js:18:16
+
+    Error Context: test-results\atc-preview-atc-change-two-pane-shared-3D-preview-mounts\error-context.md
+
+
+[1A[2K  20) tests\atc-roundtrip.spec.js:156:1 › every ATC op has a BUILDERS stack AND a reconciler ───────
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      22 | test.beforeEach(async ({ page }) => {
+      23 |   await page.goto('http://localhost:3211');
+    > 24 |   await page.waitForFunction(() => window.ddcsStudio && window.ddcsLoadBlockStack);
+         |              ^
+      25 | });
+      26 |
+      27 | test('atc_warmup round-trips its RPM / dwell stages', async ({ page }) => {
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-roundtrip.spec.js:24:14
+
+    Error Context: test-results\atc-roundtrip-every-ATC-op-a381d-DERS-stack-AND-a-reconciler\error-context.md
+
+
+[1A[2K[150/993] tests\axis-labels-config.spec.js:9:1 › axis labels point in true coordinate directions and sit at envelope edge centres (no config flip)
+[1A[2K  21) tests\atc-station-devices.spec.js:108:1 › (4) a NON-firmware method (m6) arms NO devices ─────
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      108 | test('(4) a NON-firmware method (m6) arms NO devices', async ({ page }) => {
+      109 |   await page.goto('http://localhost:3211');
+    > 110 |   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
+          |              ^
+      111 |   await page.evaluate(() => { const s = window.ddcsGetSettings(); s.machine = { x: 600, y: 400, z: -150, show: true, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } }; });
+      112 |   await page.evaluate(() => window.ddcsStudio.wizardManager.open('atc_change'));
+      113 |   await page.waitForFunction(() => { const h = document.querySelector('.wiz-viz3d'); return !!(h && h.querySelector('canvas')); }, null, { timeout: 8000 });
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\atc-station-devices.spec.js:110:14
+
+    Error Context: test-results\atc-station-devices--4-a-N-21a5b-e-method-m6-arms-NO-devices\error-context.md
+
+
+[1A[2K[151/993] tests\atc-test-twin.spec.js:51:1 › E1: the pockets unroll TRACKS the live magazine — add / edit a pocket → the NEXT emit reflects it (no snapshot)
+[1A[2K[152/993] tests\atc-tool-swap.spec.js:40:1 › (2) a REAL tool change (T# M6) during play retires the OLD tool to the station + swaps the spindle to the NEW tool
+[1A[2K[153/993] tests\block-suggest.spec.js:7:1 › suggestion model: curated seed + learning from programs
+[1A[2Ktests\atc-test-in-place.spec.js:33:1 › DRIVE: ATC Test opens IN-PLACE — both modes render their fields + the emit preview + the machine+magazine 3D sim
+ATC-TEST IN-PLACE: fields=mode,cycles,dwellMs,first,count,zClear,descend | pockets lines=33
+
+[1A[2K[154/993] tests\atc-test-twin.spec.js:87:1 › E1 M2: a Blocks edit inside a pocket arm SURVIVES the magazine recompose + the pocket X still tracks settings
+[1A[2K[155/993] tests\atc-tnc-verify.spec.js:41:1 › [B] AMBER — no gateway connected → can't verify (today's install text)
+[1A[2K[156/993] tests\blockly-port.spec.js:7:1 › Blockly bridge: stack ⇄ workspace round-trips and emits via emitMapped
+[1A[2K[157/993] tests\blocks-accumulate.spec.js:16:1 › two probe ops accumulate with ONE M30 and unique labels
+[1A[2K[158/993] tests\atc-wizards.spec.js:54:1 › Tool Change wizard: INC-B2b field gating — target FOLLOWS fixedT in T# M6, greyed inline; dead toggles + zClear greyed
+[1A[2K[159/993] tests\block-suggest.spec.js:22:1 › curated seed matches the DDCS macro idioms (probe / tool-change / open)
+[1A[2K[160/993] tests\atc-tool-setter.spec.js:50:1 › ONE-SOURCE: the setter render tracks settings.probes (change the config → the mesh moves)
+[1A[2K[161/993] tests\blocks-authoring-always-on.spec.js:22:1 › Blocks authoring is always on: no toggle, save always present, expose marker lights up when exposed
+[1A[2K[162/993] tests\autostart-stored-macro.spec.js:30:1 › a hand edit to the body PERSISTS across reload (stored artifact); export/import round-trips it
+[1A[2K[163/993] tests\block-suggest.spec.js:44:1 › suggestion strip: clicking a chip appends a block
+[1A[2K[164/993] tests\atc-preview.spec.js:16:3 › atc_test: two-pane + shared 3D preview mounts
+[1A[2K[165/993] tests\atom-gating.spec.js:7:1 › controller-specific atoms gate by the active post
+[1A[2K[166/993] tests\atc-test-twin.spec.js:130:1 › E1 declared-I/O: the drawbar/sensor codes == Settings → ATC I/O — a declared override tracks in BOTH twin + concrete
+[1A[2K[167/993] tests\block-suggest-float.spec.js:8:1 › suggestion float shows multiple block options and Tab takes the first
+[1A[2K[168/993] tests\atc-tnc-verify.spec.js:53:1 › [B] the tri-state re-verifies live: RED → GREEN when T.nc appears
+[1A[2K[169/993] tests\atc-tool-swap.spec.js:77:1 › (3) the ISOLATED firmware op (no tool change) shows NO swap — push + highlight only
+[1A[2K[170/993] tests\blocks-col-resize.spec.js:7:1 › Blocks desktop: dragging the column handle resizes (and persists) the preview width
+[1A[2K[171/993] tests\blocks-desktop-collapse.spec.js:11:1 › desktop: the palette collapses and re-expands via the handle; round-trip intact; starts open
+[1A[2K  22) tests\block-suggest.spec.js:44:1 › suggestion strip: clicking a chip appends a block ─────────
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      44 | test('suggestion strip: clicking a chip appends a block', async ({ page }) => {
+      45 |   await page.goto('http://localhost:3211');
+    > 46 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+         |              ^
+      47 |   await page.evaluate(() => window.showApp('blocks'));
+      48 |   await page.waitForFunction(() => window.__blkWs && document.querySelector('#blocks-app .blk-suggest'));
+      49 |   await page.waitForFunction(() => document.querySelector('#blocks-app .blk-suggest .blk-sug-chip'));
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\block-suggest.spec.js:46:14
+
+    Error Context: test-results\block-suggest-suggestion-s-4e8cd-king-a-chip-appends-a-block\error-context.md
+
+
+[1A[2K  23) tests\blocks-authoring-always-on.spec.js:22:1 › Blocks authoring is always on: no toggle, save always present, expose marker lights up when exposed 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      22 | test('Blocks authoring is always on: no toggle, save always present, expose marker lights up when exposed', async ({ page }) => {
+      23 |   await page.goto('http://localhost:3211');
+    > 24 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsLoadBlockStack);
+         |              ^
+      25 |   await page.evaluate(() => window.showApp('blocks'));
+      26 |   await page.waitForFunction(() => window.__blkws && window.ddcsLoadBlockStack);
+      27 |
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-authoring-always-on.spec.js:24:14
+
+    Error Context: test-results\blocks-authoring-always-on-eda12-rker-lights-up-when-exposed\error-context.md
+
+
+[1A[2K[172/993] tests\atc-wizards.spec.js:87:1 › Tool Change wizard: the callMacro toggle switches the preview between the T# M6 call and the inline dance (INC-C1)
+[1A[2K[173/993] tests\blocks-exec-glow.spec.js:11:1 › the projected G-code lights the sim execution line + a fading comet-tail (index-mapped)
+[1A[2K[174/993] tests\blocks-hover.spec.js:37:1 › block hover warms its lines (lighter, no scroll), resolves the INNERMOST block, clears on exit
+[1A[2K[175/993] tests\autostart-stored-macro.spec.js:54:1 › Regenerate rebuilds body == homingStack emit + the additional-G-code suffix; asks before clobbering a hand-edit
+[1A[2K[176/993] tests\blocks-knob-binding.spec.js:25:1 › a data-op opens in Blocks with its BOUND params PRE-TICKED as knobs (byte-identical emit)
+[1A[2K[177/993] tests\blocks-knob-metadata.spec.js:27:1 › metadata blocks (section/panel/param_group) get NO knob kit; a value atom keeps its knob
+[1A[2K[178/993] tests\blocks-live-form.spec.js:10:1 › editing a custom op shows its form derived from the blocks; editing a block updates the form
+[1A[2K[179/993] tests\blocks-edit-reconcile.spec.js:9:1 › editor → blocks WITHOUT ever opening the Blocks tab
+[1A[2K[180/993] tests\block-suggest-float.spec.js:32:1 › clicking a float option inserts that specific block
+[1A[2K[181/993] tests\blocks-mmb-pan.spec.js:34:1 › (1) middle-drag over a block pans the canvas; the block stays put
+[1A[2K[182/993] tests\blocks-dialect-decode.spec.js:65:3 › ddcs-expert-m350: dialect-specific ops decode to proper blocks (no raw) and round-trip
+[1A[2K  24) tests\blocks-hover.spec.js:37:1 › block hover warms its lines (lighter, no scroll), resolves the INNERMOST block, clears on exit 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      13 |   page.on('dialog', (d) => d.accept());
+      14 |   await page.goto('http://localhost:3211');
+    > 15 |   await page.waitForFunction(() => window.openWiz && window.updateWiz && window.insertWiz && window.closeWiz && window.showApp && window.ddcsGetBlockProgram);
+         |              ^
+      16 |   await page.evaluate(async () => {
+      17 |     window.openWiz('surfacing', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
+      18 |   });
+        at seedAndOpen (C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-hover.spec.js:15:14)
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-hover.spec.js:40:3
+
+    Error Context: test-results\blocks-hover-block-hover-w-1f318-ERMOST-block-clears-on-exit\error-context.md
+
+
+[1A[2K  25) tests\blocks-exec-glow.spec.js:11:1 › the projected G-code lights the sim execution line + a fading comet-tail (index-mapped) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      11 | test('the projected G-code lights the sim execution line + a fading comet-tail (index-mapped)', async ({ page }) => {
+      12 |   await page.goto('http://localhost:3211');
+    > 13 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+         |              ^
+      14 |   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
+      15 |   await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_corner_data'));
+      16 |   await page.waitForSelector('#wiz_user_form', { state: 'visible' });
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-exec-glow.spec.js:13:14
+
+    Error Context: test-results\blocks-exec-glow-the-proje-9905a-ng-comet-tail-index-mapped-\error-context.md
+
+
+[1A[2K[183/993] tests\blocks-open-seeded.spec.js:16:1 › Blocks tab renders a non-empty program on open (no swallowed showBlocks ReferenceError)
+[1A[2K[184/993] tests\atc-wizards.spec.js:123:1 › Tool Change wizard: the install-dependency banner shows in T# M6 mode, hides for inline / m6 / manual (INC-C2)
+[1A[2K[185/993] tests\autostart-stored-macro.spec.js:90:1 › t656 amend1/2: the SELECTED controller drives the body — the chip shows it, a stale cross-profile body is flagged, Regenerate rebuilds for the selected post
+[1A[2K[186/993] tests\blocks-dialect-decode.spec.js:65:3 › ddcs-v41: dialect-specific ops decode to proper blocks (no raw) and round-trip
+[1A[2K[187/993] tests\block-suggest-float.spec.js:48:1 › compose.ghost toggle hides the suggestion float
+[1A[2K[188/993] tests\blocks-mmb-pan.spec.js:47:1 › (2) left-drag over a block still moves the block
+[1A[2K[189/993] tests\blocks-live-form.spec.js:52:1 › form→block writeback: editing the live form writes the value back to the block + G-code (no echo clobber)
+[1A[2K[190/993] tests\blocks-hover.spec.js:82:1 › hovering a value field boxes exactly that value’s emitted token (.thot) and warms its block
+[1A[2K[191/993] tests\blocks-dialect-decode.spec.js:65:3 › ddcs-v3-dm500: dialect-specific ops decode to proper blocks (no raw) and round-trip
+[1A[2K  26) tests\blocks-open-seeded.spec.js:16:1 › Blocks tab renders a non-empty program on open (no swallowed showBlocks ReferenceError) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      21 |
+      22 |   await page.goto('http://localhost:3211');
+    > 23 |   await page.waitForFunction(() => window.openWiz && window.updateWiz && window.insertWiz && window.closeWiz && window.showApp && window.ddcsGetBlockProgram);
+         |              ^
+      24 |
+      25 |   // seed the shared program with content (an accumulated wizard insert) → getStack().length > 0
+      26 |   await page.evaluate(async () => {
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-open-seeded.spec.js:23:14
+
+    Error Context: test-results\blocks-open-seeded-Blocks--0efc5--showBlocks-ReferenceError-\error-context.md
+
+
+[1A[2K  27) tests\blocks-edit-reconcile.spec.js:9:1 › editor → blocks WITHOUT ever opening the Blocks tab 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      12 |
+      13 |   await page.goto('http://localhost:3211');
+    > 14 |   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.editorManager && window.ddcsGetBlockProgram);
+         |              ^
+      15 |
+      16 |   // Studio is the default tab (editor visible). Type leaf G-code — never touch the Blocks tab.
+      17 |   await page.locator('#editor').fill('G0 X5 Y5 Z5\nG1 X10 Y10 Z-3 F150');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-edit-reconcile.spec.js:14:14
+
+    Error Context: test-results\blocks-edit-reconcile-edit-08cb5-ever-opening-the-Blocks-tab\error-context.md
+
+
+[1A[2K[192/993] tests\blocks-rotary-rig.spec.js:14:1 › Blocks preview shows the 4th-axis rig for a rotary op, hides it for a mill program
+[1A[2K[193/993] tests\blocks-mobile-drawers.spec.js:8:1 › mobile: palette collapses (canvas reclaims width), preview + palette drawers toggle
+[1A[2K[194/993] tests\blocks-roundtrip-toast.spec.js:6:1 › round-trip toast: shows ONCE on the first wizard-op insert, never again
+[1A[2K[195/993] tests\blocks-dialect-decode.spec.js:65:3 › rs274ngc: dialect-specific ops decode to proper blocks (no raw) and round-trip
+[1A[2K[196/993] tests\autostart-stored-macro.spec.js:125:1 › Push sends EXACTLY the stored body (payload assertion)
+[1A[2K[197/993] tests\blocks-live-form.spec.js:89:1 › editing-context chrome: re-authoring shows the glow class + named chip; saving clears it
+[1A[2K[198/993] tests\blocks-mmb-pan.spec.js:58:1 › (3) middle-drag over empty canvas pans
+[1A[2K[199/993] tests\atc-wizards.spec.js:154:1 › Tool Change wizard: bold UNVERIFIED banner only when INLINING generic/disk assumed codes (INC-C3)
+[1A[2K[200/993] tests\blocks-roundtrip.spec.js:7:1 › Blocks → STUDIO: the editor is the live projection of the block program
+[1A[2K[201/993] tests\blocks-roundtrip-toast.spec.js:35:1 › round-trip FAQ: the Settings FAQ explains editing a wizard op in Blocks
+[1A[2K[202/993] tests\blocks-render.spec.js:8:1 › loaded op blocks are actually RENDERED (have SVG bounding boxes), not just modelled
+[1A[2K[203/993] tests\blocks-edit-reconcile.spec.js:38:1 › editing a HIGH-LEVEL program is reverted (not flattened)
+[1A[2K[204/993] tests\blocks-hover.spec.js:103:1 › selecting a leaf atom boxes its value tokens; selecting a container does not (leaf-scoped)
+[1A[2K[205/993] tests\blocks-live-form.spec.js:141:1 › non-destructive save: re-author + "Save as new" creates a copy, leaving the original intact
+[1A[2K[206/993] tests\blocks-single-inject.spec.js:10:1 › two concurrent showApp(blocks) inject exactly ONE workspace, op in view
+[1A[2K  28) tests\blocks-mobile-drawers.spec.js:8:1 › mobile: palette collapses (canvas reclaims width), preview + palette drawers toggle 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+       8 | test('mobile: palette collapses (canvas reclaims width), preview + palette drawers toggle', async ({ page }) => {
+       9 |   await page.goto('http://localhost:3211');
+    > 10 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+         |              ^
+      11 |   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+      12 |   await page.waitForSelector('#wiz_drill', { state: 'visible' });
+      13 |   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-mobile-drawers.spec.js:10:14
+
+    Error Context: test-results\blocks-mobile-drawers-mobi-5bd45-view-palette-drawers-toggle\error-context.md
+
+
+[1A[2K[207/993] tests\blocks-var-socket.spec.js:8:1 › #var coordinate survives the Blockly workspace round-trip (Variable pill, not 0)
+[1A[2K  29) tests\blocks-rotary-rig.spec.js:14:1 › Blocks preview shows the 4th-axis rig for a rotary op, hides it for a mill program 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      14 | test('Blocks preview shows the 4th-axis rig for a rotary op, hides it for a mill program', async ({ page }) => {
+      15 |   await page.goto('http://localhost:3211');
+    > 16 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsLoadBlockStack);
+         |              ^
+      17 |
+      18 |   // Author a rotary op, then view it in the Blocks tab → the generic preview must frame the rotary rig.
+      19 |   await page.evaluate(() => window.ddcsStudio.wizardManager.open('rotary_clock'));
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-rotary-rig.spec.js:16:14
+
+    Error Context: test-results\blocks-rotary-rig-Blocks-p-4ba1f-hides-it-for-a-mill-program\error-context.md
+
+
+[1A[2K  30) tests\autostart-stored-macro.spec.js:125:1 › Push sends EXACTLY the stored body (payload assertion) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      125 | test('Push sends EXACTLY the stored body (payload assertion)', async ({ page }) => {
+      126 |     await page.goto('http://localhost:3211');
+    > 127 |     await page.waitForFunction(() => window.ddcsGetSettings && window.showApp);
+          |                ^
+      128 |     // capture the writeSysfile payload
+      129 |     let pushed = null;
+      130 |     await page.route('**/api/**', (r) => {
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\autostart-stored-macro.spec.js:127:16
+
+    Error Context: test-results\autostart-stored-macro-Pus-44318-red-body-payload-assertion-\error-context.md
+
+
+[1A[2K  31) tests\block-suggest-float.spec.js:48:1 › compose.ghost toggle hides the suggestion float ─────
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      48 | test('compose.ghost toggle hides the suggestion float', async ({ page }) => {
+      49 |   await page.goto('http://localhost:3211');
+    > 50 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsGetSettings);
+         |              ^
+      51 |   await page.evaluate(() => window.showApp('blocks'));
+      52 |   await page.waitForFunction(() => window.__blkWs);
+      53 |   await page.evaluate(() => { const s = window.ddcsGetSettings(); s.compose.ghost = true; window.dispatchEvent(new Event('ddcs:settings-changed')); });
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\block-suggest-float.spec.js:50:14
+
+    Error Context: test-results\block-suggest-float-compos-0d939--hides-the-suggestion-float\error-context.md
+
+
+[1A[2K[208/993] tests\boss-pocket-reconcile.spec.js:14:1 › boss/box/cylinder show NO inside cavity; pocket shows one; the shape dropdown toggle reconciles (data preserved)
+[1A[2K[209/993] tests\atc-wizards.spec.js:196:1 › ATC table wizard: flags magazine pockets that reference a deleted library tool (A7)
+[1A[2K  32) tests\blocks-single-inject.spec.js:10:1 › two concurrent showApp(blocks) inject exactly ONE workspace, op in view 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      14 |
+      15 |   await page.goto('http://localhost:3211');
+    > 16 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+         |              ^
+      17 |   await page.evaluate(() => window.ddcsStudio.wizardManager.open('surfacing'));
+      18 |   await page.waitForSelector('#wiz_surfacing', { state: 'visible' });
+      19 |   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-single-inject.spec.js:16:14
+
+    Error Context: test-results\blocks-single-inject-two-c-1dfd5-ly-ONE-workspace-op-in-view\error-context.md
+
+
+[1A[2K  33) tests\blocks-edit-reconcile.spec.js:38:1 › editing a HIGH-LEVEL program is reverted (not flattened) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      38 | test('editing a HIGH-LEVEL program is reverted (not flattened)', async ({ page }) => {
+      39 |   await page.goto('http://localhost:3211');
+    > 40 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsStudio.editorManager && window.ddcsGetBlockProgram);
+         |              ^
+      41 |   await page.evaluate(() => window.ddcsStudio.wizardManager.open('surfacing'));
+      42 |   await page.waitForSelector('#wiz_surfacing', { state: 'visible' });
+      43 |   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-edit-reconcile.spec.js:40:14
+
+    Error Context: test-results\blocks-edit-reconcile-edit-711d7--is-reverted-not-flattened-\error-context.md
+
+
+[1A[2K[210/993] tests\atc-wizards.spec.js:224:1 › ATC table wizard: no orphan banner when every pocket tool exists (A7)
+[1A[2K  34) tests\blocks-live-form.spec.js:141:1 › non-destructive save: re-author + "Save as new" creates a copy, leaving the original intact 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      142 |   page.on('dialog', (d) => d.accept());
+      143 |   await page.goto('http://localhost:3211');
+    > 144 |   await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditWizardDef && window.ddcsRefreshWizardBar);
+          |              ^
+      145 |   await reauthor(page, 'orig', 'Original');
+      146 |
+      147 |   await page.evaluate(() => window.ddcsSaveAsWizard());
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-live-form.spec.js:144:14
+
+    Error Context: test-results\blocks-live-form-non-destr-45543-leaving-the-original-intact\error-context.md
+
+
+[1A[2K  35) tests\blocks-var-socket.spec.js:8:1 › #var coordinate survives the Blockly workspace round-trip (Variable pill, not 0) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+       8 | test('#var coordinate survives the Blockly workspace round-trip (Variable pill, not 0)', async ({ page }) => {
+       9 |   await page.goto('http://localhost:3211');
+    > 10 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp && window.ddcsLoadBlockStack);
+         |              ^
+      11 |   await page.evaluate(() => window.showApp('blocks'));
+      12 |   await page.waitForFunction(() => window.__blkws, { timeout: 8000 });
+      13 |
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-var-socket.spec.js:10:14
+
+    Error Context: test-results\blocks-var-socket--var-coo-a7a68-d-trip-Variable-pill-not-0-\error-context.md
+
+
+[1A[2K  36) tests\blocks-render.spec.js:8:1 › loaded op blocks are actually RENDERED (have SVG bounding boxes), not just modelled 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+       8 | test('loaded op blocks are actually RENDERED (have SVG bounding boxes), not just modelled', async ({ page }) => {
+       9 |   await page.goto('http://localhost:3211');
+    > 10 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+         |              ^
+      11 |
+      12 |   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+      13 |   await page.waitForSelector('#wiz_drill', { state: 'visible' });
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\blocks-render.spec.js:10:14
+
+    Error Context: test-results\blocks-render-loaded-op-bl-1864f-ing-boxes-not-just-modelled\error-context.md
+
+
+[1A[2K[211/993] tests\blocks-theme.spec.js:8:1 › blockly chrome follows the app theme (live re-skin on data-theme switch)
+[1A[2K[212/993] tests\bore-as-data.spec.js:9:1 › byte-diff ZERO: user_bore_data == drillStack(helical) across pattern × ramp × cut × placement × wcs
+[1A[2K[213/993] tests\bore-in-place.spec.js:9:1 › opensAs wiring: Bore opens user_bore_data IN-PLACE, plain title, twin retired
+[1A[2K[214/993] tests\bore-glow-cap.spec.js:12:1 › helical bore kernel CAPS a runaway pass count (no hang) but leaves real bores untouched
+[1A[2K[215/993] tests\comm-dwell-units.spec.js:10:1 › comm Dwell (500 ms) folds per-post — Expert/V4.1 P500 (ms), DM500 P0.5 (s) — on BOTH the stack and the (un-frozen) twin
+[1A[2K[216/993] tests\atc-wizards.spec.js:236:1 › ATC Test wizard: drawbar and pocket modes
+[1A[2K[217/993] tests\boss-probe-collision.spec.js:10:1 › each REPOSITION pass probes from ITS start ② → collides (was: fired from ① and missed)
+[1A[2K[218/993] tests\comm-e0-superset.spec.js:9:1 › E0 GATE: prune(commStack superset) == concrete commStack byte-identical across the type × hmi × mode × conditional sweep
+[1A[2K[219/993] tests\cam-slot-sim.spec.js:9:1 › engine traces a generated bore bolt-circle macro with seeded form vars
+[1A[2K[220/993] tests\bore-in-place.spec.js:27:1 › DRIVE: Bore opens IN-PLACE with a NON-EMPTY, correct form + the 3D renders the bore toolpath; screenshot
+[1A[2K[221/993] tests\bore-glow-cap.spec.js:43:1 › selecting a helical-bore leaf does not freeze the value-glow (it bails on depth, boxes the rest)
+[1A[2K[222/993] tests\comm-in-place.spec.js:10:1 › E3 opensAs wiring: Comm opens user_comm_data IN-PLACE, plain title, twin retired
+[1A[2K[223/993] tests\clear-resets-model.spec.js:20:1 › Clear wipes the program model so the next Insert does not re-accumulate
+[1A[2K[224/993] tests\blocks-live-form.spec.js:164:1 › non-destructive save: "Update" overwrites the re-authored wizard in place (no duplicate)
+[1A[2K[225/993] tests\comm-msg-fix.spec.js:9:1 › the MSG bug is fixed: commStack emits on a NON-HMI post (no ReferenceError) + an HMI post, all types
+[1A[2K[226/993] tests\canvas-widgets.spec.js:10:1 › canvasWidgets registry: each gesture places its handle + maps a drag to the right field
+[1A[2K[227/993] tests\comm-post-fold.spec.js:29:1 › comm folds per post: Expert register truth, V4.1/DM500 no leaks + M0, twin == built-in on every post
+[1A[2K[228/993] tests\comm-twin.spec.js:6:1 › TWIN byte-identity: user_comm_data == commStack across the type sweep × HMI + non-HMI posts
+[1A[2K[229/993] tests\compose-settings.spec.js:7:1 › Composing settings tab toggles the block suggestions
+[1A[2K[230/993] tests\contour-canvas.spec.js:21:1 › contour 2D canvas: rect / circle / ellipse size handles each drive their field through the registry
+[1A[2K[231/993] tests\comm-in-place.spec.js:33:1 › E3 DRIVE: Comm opens IN-PLACE — the comm fields render + the DDCS-screen preview shows (not the legacy modal)
+[1A[2K[232/993] tests\cam-slot-sim.spec.js:33:1 › corner probe slot: each corner probes the correct X/Y walls and every branch resolves
+[1A[2K[233/993] tests\canvas-widgets.spec.js:50:1 › canvasWidgets registry: rect + radial gestures place + drag byte-identically to the hand-rolled drill math
+[1A[2K[234/993] tests\contour-data-emit.spec.js:9:1 › E1 byte-diff ZERO: user_contour_data == contourStack across side × 4 shapes × a scalar/placement/wcs sweep
+[1A[2K[235/993] tests\contour-in-place.spec.js:9:1 › E1 opensAs wiring: Contour opens user_contour_data IN-PLACE, plain title, twin retired from its own entry
+[1A[2K[236/993] tests\contour-op.spec.js:8:1 › contour side offsets the traced boundary by the tool radius
+[1A[2K[237/993] tests\contour-wizard.spec.js:9:1 › contour wizard: opens, renders 2D/3D, emits the offset toolpath
+[1A[2K  37) tests\compose-settings.spec.js:7:1 › Composing settings tab toggles the block suggestions ────
+
+    Error: page.evaluate: TypeError: window.showApp is not a function
+        at eval (eval at evaluate (:290:30), <anonymous>:1:14)
+        at UtilityScript.evaluate (<anonymous>:292:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at eval (eval at evaluate (:290:30), <anonymous>:1:14)
+        at UtilityScript.evaluate (<anonymous>:292:16)
+        at UtilityScript.<anonymous> (<anonymous>:1:44)
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\compose-settings.spec.js:22:14
+
+    Error Context: test-results\compose-settings-Composing-7a35f-ggles-the-block-suggestions\error-context.md
+
+
+[1A[2Ktests\bore-in-place.spec.js:27:1 › DRIVE: Bore opens IN-PLACE with a NON-EMPTY, correct form + the 3D renders the bore toolpath; screenshot
+BORE IN-PLACE FORM: 33 fields → wcs, stockAttach, pathDatum, stockDatum, stockW, stockH, stockZ, originX, originY, offZ, pattern, x0, y0, cols, rows, dx, dy, count, spacing, angle, dia, startAngle, w, h, nx, ny, skip, depth, holeDia, toolDia, pitch, ramp, feed | viz=true
+
+[1A[2K[238/993] tests\cam-slot-sim.spec.js:73:1 › edge probe slot: axis/direction select the wall and the WCS axis written
+[1A[2K[239/993] tests\coord-author-block.spec.js:12:1 › dev mode: ✎ positions opens the coordinate editor and writes the list back to the coordlist block
+[1A[2K[240/993] tests\coord-list-block.spec.js:14:1 › coordlist block: registered, emits nothing, positions preview draws + round-trips
+[1A[2K[241/993] tests\blocks-live-form.spec.js:183:1 › the live form pane is hidden when NOT editing a custom op (normal Blocks use)
+[1A[2K  38) tests\contour-canvas.spec.js:21:1 › contour 2D canvas: rect / circle / ellipse size handles each drive their field through the registry 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      25 |
+      26 |   await page.goto('http://localhost:3211');
+    > 27 |   await page.waitForFunction(() => window.ddcsStudio);
+         |              ^
+      28 |   await page.evaluate(() => window.openWiz('contour'));
+      29 |   await page.waitForSelector('#wiz_contour', { state: 'visible' });
+      30 |   await page.waitForSelector('#contourLayoutCanvas svg.feature-canvas', { timeout: 5000 });
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\contour-canvas.spec.js:27:14
+
+    Error Context: test-results\contour-canvas-contour-2D--49ac8--field-through-the-registry\error-context.md
+
+
+[1A[2K  39) tests\canvas-widgets.spec.js:50:1 › canvasWidgets registry: rect + radial gestures place + drag byte-identically to the hand-rolled drill math 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      50 | test('canvasWidgets registry: rect + radial gestures place + drag byte-identically to the hand-rolled drill math', async ({ page }) => {
+      51 |   await page.goto('http://localhost:3211');
+    > 52 |   await page.waitForFunction(() => window.ddcsGetBlockProgram);
+         |              ^
+      53 |   const r = await page.evaluate(async () => {
+      54 |     const { buildCanvasWidgets } = await import('/viz/canvasWidgets.js');
+      55 |     const out = {};
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\canvas-widgets.spec.js:52:14
+
+    Error Context: test-results\canvas-widgets-canvasWidge-47066--the-hand-rolled-drill-math\error-context.md
+
+
+[1A[2K  40) tests\comm-in-place.spec.js:33:1 › E3 DRIVE: Comm opens IN-PLACE — the comm fields render + the DDCS-screen preview shows (not the legacy modal) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      33 | test('E3 DRIVE: Comm opens IN-PLACE — the comm fields render + the DDCS-screen preview shows (not the legacy modal)', async ({ page }) => {
+      34 |     await page.goto('http://localhost:3211');
+    > 35 |     await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+         |                ^
+      36 |     await page.evaluate(() => window.openWiz('user_comm_data'));
+      37 |     await page.waitForSelector('#wiz_user_form', { state: 'visible', timeout: 8000 });
+      38 |     await page.waitForTimeout(500);
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\comm-in-place.spec.js:35:16
+
+    Error Context: test-results\comm-in-place-E3-DRIVE-Com-e587b-shows-not-the-legacy-modal-\error-context.md
+
+
+[1A[2K  41) tests\contour-data-emit.spec.js:9:1 › E1 byte-diff ZERO: user_contour_data == contourStack across side × 4 shapes × a scalar/placement/wcs sweep 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+       9 | test('E1 byte-diff ZERO: user_contour_data == contourStack across side × 4 shapes × a scalar/placement/wcs sweep', async ({ page }) => {
+      10 |     await page.goto('http://localhost:3211');
+    > 11 |     await page.waitForFunction(() => window.ddcsGetBlockProgram);
+         |                ^
+      12 |     const r = await page.evaluate(async () => {
+      13 |         const { contourDataDef, CONTOUR_DEFAULTS } = await import('/blocks/dataOps/contourData.js');
+      14 |         const { registerUserOp } = await import('/blocks/userOps.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\contour-data-emit.spec.js:11:16
+
+    Error Context: test-results\contour-data-emit-E1-byte--2f86f--scalar-placement-wcs-sweep\error-context.md
+
+
+[1A[2K[242/993] tests\contour-in-place.spec.js:32:1 › E1 DRIVE: Contour opens IN-PLACE with a NON-EMPTY, correct form + the 2D layout renders
+[1A[2K[243/993] tests\cam-slot-sim.spec.js:104:1 › inside-centre slot: probes ±X then ±Y with a G53 re-centre between (bore = true diameter)
+[1A[2K[244/993] tests\corner-data-baked-frontier.spec.js:17:1 › BAKED FRONTIER: `level` stays baked-final (non-operator-facing) — the twin diverges from cornerStack when level changes
+[1A[2K[245/993] tests\cam-slot-sim.spec.js:127:1 › boss-centre slot: probes 4 faces from outside, 3 reposition prompts, writes centre
+[1A[2K[246/993] tests\corner-data-cornerseq-live.spec.js:12:1 › ③b corner×probeSeq LIVE: enum bindings drive all 8 combos == cornerStack byte-for-byte + independent-truth derived values
+[1A[2K[247/993] tests\corner-data-drag.spec.js:14:1 › Corner (data): dragging the reposition handle writes the CORRECT incremental delta (world − wall-1) into #23/#24
+[1A[2K[248/993] tests\corner-data-baked-frontier.spec.js:38:1 › IN-PLACE: the Corner Probe slot opens the data-op twin (opensAs), the built-in view stays retired
+[1A[2K[249/993] tests\controller-file-tree.spec.js:23:1 › the tree renders the ACTIVE controller declaration: Expert wraps panels, V4.1 = its firmware files (LAN push), DM500 = install files (USB export, no LAN)
+[1A[2K[250/993] tests\corner-data-emit.spec.js:16:1 › corner-data-emit: functional G-code == cornerStack across a bound-scalar sweep + derived-binding wiring
+[1A[2K[251/993] tests\cam-slot-sim.spec.js:150:1 › alignment slot: fence axis selects the probe axis; measures (no WCS write)
+[1A[2Ktests\contour-in-place.spec.js:32:1 › E1 DRIVE: Contour opens IN-PLACE with a NON-EMPTY, correct form + the 2D layout renders
+E1 IN-PLACE FORM: 21 fields → wcs, originX, originY, stockAttach, pathDatum, stockDatum, stockW, stockH, stockZ, offZ, depth, stepdown, shape, side, w, h, dia, sides, toolDia, feed, plunge | viz=true
+
+[1A[2K[252/993] tests\corner-data-probeZFirst-live.spec.js:14:1 › probeZFirst LIVE: OFF/ON emit == cornerStack byte-for-byte; toggle adds the Z shape; markers + semantic relTo anchor
+[1A[2K[253/993] tests\corner-data-repos-handle.spec.js:13:1 › reposition handle renders at anchor+evaluated-offset (the destination), unset default — FL/YX + BR/XY, one-source
+[1A[2K[254/993] tests\coord-list-widget.spec.js:12:1 › coord-list: renders point markers; add/remove/shared-Z; read() returns the list
+[1A[2K[255/993] tests\corner-atrest-parity.spec.js:60:1 › ANTI-GREEN v2: the wall markers are COINCIDENT (3D == Layout) AT REST across ALL 16 configs
+[1A[2K[256/993] tests\corner-anim-overlay.spec.js:43:1 › INC-1: the overlay is PIXEL-EXACT under the SVG (stock corners coincide) at rest AND after a zoom
+[1A[2K[257/993] tests\canvas-widgets.spec.js:102:1 › canvasWidgets registry: pocket gesture params (ellipse half-extent rect + radius-only radial) match the old formulas
+[1A[2K[258/993] tests\corner-data-emit.spec.js:166:1 › corner-data-emit GOLDEN: a DEFAULT Corner (data) emits a NON-DEGENERATE reposition (kills G0 X0 Y0)
+[1A[2K[259/993] tests\contour-wizard.spec.js:52:1 › contour wizard: side switches the offset; circle is a G3 arc
+[1A[2K[260/993] tests\corner-data-sim-marker-emits.spec.js:21:1 › (A) emits per pass: first pass sim-only, reposition destinations emit — both probeZFirst states, index-aligned
+[1A[2K[261/993] tests\cam-slot-sim.spec.js:173:1 › pocket slot: raster-clears the rect to depth in layers; guards a too-small pocket
+[1A[2K[262/993] tests\corner-data-sim-marker-track.spec.js:16:1 › (1) sim markers chain off their anchor by the reposition — both probeZ states, FL/YX + BR/XY (independent truth)
+[1A[2K[263/993] tests\corner-data-sim-starts.spec.js:12:1 › corner (data) sim starts align 1:1 with probe passes (no waypoint marker; none inside the stock; NaN-safe)
+[1A[2K[264/993] tests\controller-file-tree.spec.js:68:1 › editing a plain file persists in the profile (survives reload); switching profiles SWAPS the workspace
+[1A[2K[265/993] tests\corner-data-repos-handle.spec.js:60:1 › the Layout reposition handle relocates to the RUNTIME wall-1 END + cross when passEnds is threaded (matches the top panel)
+[1A[2K[266/993] tests\corner-data-start-live.spec.js:15:1 › ③(4a) EMITTING start handle: startX/startY wiring + non-degenerate default + bound datum-relative value + zsurf anchor
+[1A[2K[267/993] tests\cam-slot-sim.spec.js:202:1 › circle-pocket slot: concentric rings clear the disc to depth (Ø − tool), guards too-small
+[1A[2K[268/993] tests\corner-data-sim-marker-emits.spec.js:44:1 › (B) end-to-end: the emits flag reaches the shared passStarts + the 3D renderer in the live wizard preview
+[1A[2K[269/993] tests\canvas-widgets.spec.js:134:1 › canvasWidgets registry: projLength gesture (slot width) matches the perpendicular-projection formula
+[1A[2K[270/993] tests\corner-data-sim-marker-track.spec.js:62:1 › (2) emit byte-parity: marker chaining + geometry hoist never touch the G-code (across combos + probeZ)
+[1A[2K[271/993] tests\corner-data-sim-starts.spec.js:74:1 › editor preview renders the placed Corner (data) markers, one per probe pass (no NaN)
+[1A[2Ktests\corner-atrest-parity.spec.js:60:1 › ANTI-GREEN v2: the wall markers are COINCIDENT (3D == Layout) AT REST across ALL 16 configs
+REST FL/YX/Zoff: wall2 3D=(-43.0,43.0) Lay=(-43.0,43.0) Δ=0.00
+
+[1A[2K[272/993] tests\corner-anim-overlay.spec.js:62:1 › INC-2: the shared engine feeds MOVING live positions to the overlay head (path drawn + animates)
+[1A[2K[273/993] tests\corner-data-repos-handle.spec.js:108:1 › the Layout sim-only ◇ renders and is distinct from the (now correctly-placed) emitting reposition handle
+[1A[2K[274/993] tests\corner-data-syncA-live.spec.js:13:1 › syncA LIVE: bool binding toggles the dual-gantry sync == cornerStack byte-for-byte; slave-offset value PINNED independently
+[1A[2K[275/993] tests\cam-slot-sim.spec.js:227:1 › surfacing slot: rasters the full area with no inset and no wall pass
+[1A[2KREST FL/YX/Zon: wall2 3D=(-43.0,43.0) Lay=(-43.0,43.0) Δ=0.00 | wall1 Δ=0.00
+
+[1A[2K[276/993] tests\contour-wizard.spec.js:77:1 › contour op round-trips: BUILDERS.contour → reconcile reads the TRUE boundary
+[1A[2K  42) tests\corner-data-start-live.spec.js:15:1 › ③(4a) EMITTING start handle: startX/startY wiring + non-degenerate default + bound datum-relative value + zsurf anchor 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      15 | test('③(4a) EMITTING start handle: startX/startY wiring + non-degenerate default + bound datum-relative value + zsurf anchor', async ({ page }) => {
+      16 |   await page.goto('http://localhost:3211');
+    > 17 |   await page.waitForFunction(() => window.ddcsStudio && window.ddcsGetBlockProgram);
+         |              ^
+      18 |
+      19 |   const r = await page.evaluate(async () => {
+      20 |     const { cornerStack } = await import('/wizards/cornerWizard.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-data-start-live.spec.js:17:14
+
+    Error Context: test-results\corner-data-start-live-③-4-c9c3a-relative-value-zsurf-anchor\error-context.md
+
+
+[1A[2K  43) tests\corner-data-sim-marker-emits.spec.js:44:1 › (B) end-to-end: the emits flag reaches the shared passStarts + the 3D renderer in the live wizard preview 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      44 | test('(B) end-to-end: the emits flag reaches the shared passStarts + the 3D renderer in the live wizard preview', async ({ page }) => {
+      45 |   await page.goto('http://localhost:3211');
+    > 46 |   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+         |              ^
+      47 |   await page.evaluate(async () => {
+      48 |     const U = await import('/blocks/userOps.js');
+      49 |     const CD = await import('/blocks/dataOps/cornerData.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-data-sim-marker-emits.spec.js:46:14
+
+    Error Context: test-results\corner-data-sim-marker-emi-4524a--in-the-live-wizard-preview\error-context.md
+
+
+[1A[2K  44) tests\corner-data-sim-marker-track.spec.js:62:1 › (2) emit byte-parity: marker chaining + geometry hoist never touch the G-code (across combos + probeZ) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      62 | test('(2) emit byte-parity: marker chaining + geometry hoist never touch the G-code (across combos + probeZ)', async ({ page }) => {
+      63 |   await page.goto('http://localhost:3211');
+    > 64 |   await page.waitForFunction(() => window.ddcsGetBlockProgram);
+         |              ^
+      65 |   const passes = await page.evaluate(async () => {
+      66 |     const { cornerStack } = await import('/wizards/cornerWizard.js');
+      67 |     const { cornerDataDef, CORNER_DEFAULTS, CORNER_DATA_OPTYPE } = await import('/blocks/dataOps/cornerData.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-data-sim-marker-track.spec.js:64:14
+
+    Error Context: test-results\corner-data-sim-marker-tra-bb23e--code-across-combos-probeZ-\error-context.md
+
+
+[1A[2K  45) tests\canvas-widgets.spec.js:134:1 › canvasWidgets registry: projLength gesture (slot width) matches the perpendicular-projection formula 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      134 | test('canvasWidgets registry: projLength gesture (slot width) matches the perpendicular-projection formula', async ({ page }) => {
+      135 |   await page.goto('http://localhost:3211');
+    > 136 |   await page.waitForFunction(() => window.ddcsGetBlockProgram);
+          |              ^
+      137 |   const r = await page.evaluate(async () => {
+      138 |     const { buildCanvasWidgets } = await import('/viz/canvasWidgets.js');
+      139 |     const out = {};
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\canvas-widgets.spec.js:136:14
+
+    Error Context: test-results\canvas-widgets-canvasWidge-5e01d-ndicular-projection-formula\error-context.md
+
+
+[1A[2K[277/993] tests\corner-data-travelApproach-live.spec.js:17:1 › travelApproach LIVE: enum binding drives auto/manual == cornerStack byte-for-byte across the probeZFirst×travelApproach matrix
+[1A[2KREST FL/XY/Zoff: wall2 3D=(43.0,-43.0) Lay=(43.0,-43.0) Δ=0.00
+
+[1A[2K[278/993] tests\cam-slot-sim.spec.js:247:1 › mill variants: raster direction rotates the rows (same coverage); circle arc direction is selectable
+[1A[2K[279/993] tests\corner-data-wcs-live.spec.js:17:1 › wcs LIVE: 7-way enum binding drives all arms == cornerStack byte-for-byte across the wcs×probeZFirst matrix
+[1A[2K[280/993] tests\corner-datum-independence.spec.js:16:1 › corner-pick circles stay on the physical corners at any datum; the crosshair follows the datum; emit byte-identical
+[1A[2K[281/993] tests\corner-datum-probe-anchor.spec.js:13:1 › the 3D probe lands on the physical corner at any datum (path/tool/markers map onto the datum-placed stock); emit byte-identical
+[1A[2K[282/993] tests\corner-draw-anchor.spec.js:60:1 › (4) route reconnect: pass-1 dog-leg starts at the RUNTIME wall-1 END, wall-2 probe fires at the relocated ②
+[1A[2K  46) tests\corner-anim-overlay.spec.js:62:1 › INC-2: the shared engine feeds MOVING live positions to the overlay head (path drawn + animates) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      12 | async function openCorner(page) {
+      13 |   await page.goto('http://localhost:3211');
+    > 14 |   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+         |              ^
+      15 |   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
+      16 |   await page.evaluate(() => window.openWiz('user_corner_data'));
+      17 |   await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
+        at openCorner (C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-anim-overlay.spec.js:14:14)
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-anim-overlay.spec.js:63:3
+
+    Error Context: test-results\corner-anim-overlay-INC-2--62ed4-y-head-path-drawn-animates-\error-context.md
+
+
+[1A[2K[283/993] tests\corner-layout-coherence.spec.js:16:1 › Layout handle == 3D/2D marker for BOTH auto (relocated) and manual (declared) travel — one passEnds, gated alike
+[1A[2KREST FL/XY/Zon: wall2 3D=(43.0,-43.0) Lay=(43.0,-43.0) Δ=0.00 | wall1 Δ=0.00
+
+[1A[2K[284/993] tests\corner-data-sim-marker-emits.spec.js:77:1 › (C) 2D visual: the marker COLOUR follows the SOURCE (decoupled from emits) — a later pass flips cyan↔amber by travel
+[1A[2K[285/993] tests\corner-data-start-live.spec.js:67:1 › ③(4a gate + 4b) start handle GATED on probeZFirst; the SIM-ONLY first-start drag changes the preview but NOT the emit
+[1A[2K[286/993] tests\canvas-widgets.spec.js:164:1 › drill wizard renders its handles from the registry (point + radial)
+[1A[2K[287/993] tests\corner-layout-sim-drag.spec.js:14:1 › (1) Layout sim ◇ is DRAGGABLE — writes userStarts AND recomputes the emit (the reposition datum, t297)
+[1A[2K[288/993] tests\corner-data-sim-marker-track.spec.js:81:1 › (3) Layout canvas: the Start marker is a filled AMBER circle (second renderer of the userStarts seam)
+[1A[2K[289/993] tests\corner-draw-anchor.spec.js:85:1 › (1) engine-frame: the wall-2 probe trigger #1926 == the RELOCATED ②.y (fires from the runtime wall-1 END + dog-leg)
+[1A[2K[290/993] tests\cam-slot-sim.spec.js:278:1 › cutting slots manage the spindle with the proven Expert forms (M3 S[#var], G04 P ms, M5)
+[1A[2KREST FR/YX/Zoff: wall2 3D=(143.0,43.0) Lay=(143.0,43.0) Δ=0.00
+
+[1A[2K[291/993] tests\corner-draw-anchor.spec.js:122:1 › (2) fallback: no anchorsAtPrev → self; a non-corner multi-pass op has NO NaN + per-pass self-anchor
+[1A[2K[292/993] tests\corner-marker-independence.spec.js:66:1 › (1) drag START → reposition machine world (passEnds[wall1]+#23/#24) is preserved
+[1A[2K[293/993] tests\corner-marker-labels.spec.js:12:1 › the Layout handles carry the right labels (Start + pass number); no "pos"; emit unaffected
+[1A[2KREST FR/YX/Zon: wall2 3D=(143.0,43.0) Lay=(143.0,43.0) Δ=0.00 | wall1 Δ=0.00
+
+[1A[2K[294/993] tests\corner-anim-overlay.spec.js:96:1 › INC-3: the handles are still drag-writable through the pointer-events:none overlay
+[1A[2K[295/993] tests\cam-slot-sim.spec.js:304:1 › probe-Z slot: two-pass Z touch down, writes WCS Z so the touch reads as Surface = Z
+[1A[2K[296/993] tests\corner-marker-parity.spec.js:45:1 › ANTI-GREEN: the wall marker is COINCIDENT in both panels at rest AND held after a Start-drag; #23/#24 recompute
+[1A[2KREST FR/XY/Zoff: wall2 3D=(57.0,-43.0) Lay=(57.0,-43.0) Δ=0.00
+
+[1A[2K  47) tests\canvas-widgets.spec.js:164:1 › drill wizard renders its handles from the registry (point + radial) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      164 | test('drill wizard renders its handles from the registry (point + radial)', async ({ page }) => {
+      165 |   await page.goto('http://localhost:3211');
+    > 166 |   await page.waitForFunction(() => window.ddcsStudio && window.ddcsStudio.wizardManager);
+          |              ^
+      167 |   await page.evaluate(() => window.ddcsStudio.wizardManager.open('drill'));
+      168 |   await page.waitForSelector('#wiz_drill', { state: 'visible' });
+      169 |   // Switch to the bolt-circle pattern so the radial 'ring' handle (with its Ø value label) renders.
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\canvas-widgets.spec.js:166:14
+
+    Error Context: test-results\canvas-widgets-drill-wizar-fd066--the-registry-point-radial-\error-context.md
+
+
+[1A[2K[297/993] tests\corner-draw-anchor.spec.js:159:1 › (3) source-gate: MANUAL reposition keeps anchor=self (anchorsAtPrev off), so the route does not shift
+[1A[2K[298/993] tests\cam-slot-sim.spec.js:328:1 › rotateProgram rotates XY + arc I/J about a pivot; tracks partial moves; flags G91
+[1A[2K  48) tests\corner-data-sim-marker-track.spec.js:81:1 › (3) Layout canvas: the Start marker is a filled AMBER circle (second renderer of the userStarts seam) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      81 | test('(3) Layout canvas: the Start marker is a filled AMBER circle (second renderer of the userStarts seam)', async ({ page }) => {
+      82 |   await page.goto('http://localhost:3211');
+    > 83 |   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+         |              ^
+      84 |   await page.evaluate(async () => {
+      85 |     const U = await import('/blocks/userOps.js');
+      86 |     const CD = await import('/blocks/dataOps/cornerData.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-data-sim-marker-track.spec.js:83:14
+
+    Error Context: test-results\corner-data-sim-marker-tra-44e42-rer-of-the-userStarts-seam-\error-context.md
+
+
+[1A[2K  49) tests\corner-data-sim-marker-emits.spec.js:77:1 › (C) 2D visual: the marker COLOUR follows the SOURCE (decoupled from emits) — a later pass flips cyan↔amber by travel 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      77 | test('(C) 2D visual: the marker COLOUR follows the SOURCE (decoupled from emits) — a later pass flips cyan↔amber by travel', async ({ page }) => {
+      78 |   await page.goto('http://localhost:3211');
+    > 79 |   await page.waitForFunction(() => window.ddcsGetBlockProgram);
+         |              ^
+      80 |   const px = await page.evaluate(async () => {
+      81 |     const { createToolpath2d } = await import('/viz/toolpath2d.js');
+      82 |     // render pass-1 (a reposition) with emits held TRUE; vary only the SOURCE → the colour must follow the source.
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-data-sim-marker-emits.spec.js:79:14
+
+    Error Context: test-results\corner-data-sim-marker-emi-a37a0--flips-cyan↔amber-by-travel\error-context.md
+
+
+[1A[2K[299/993] tests\corner-marker-labels.spec.js:40:1 › the Layout renders the labels + the auto-square / manual-circle glyphs (real symptom)
+[1A[2K[300/993] tests\cam-slot-sim.spec.js:351:1 › mergeEng appends pack params, preserves the eng, and flags collisions
+[1A[2KREST FR/XY/Zon: wall2 3D=(57.0,-43.0) Lay=(57.0,-43.0) Δ=0.00 | wall1 Δ=0.00
+
+[1A[2Ktests\corner-marker-parity.spec.js:45:1 › ANTI-GREEN: the wall marker is COINCIDENT in both panels at rest AND held after a Start-drag; #23/#24 recompute
+PARITY before: 3D wall={"x":-43,"y":43} Layout wall={"x":-43.00006260891342,"y":43.00000896741811} Δ=0.00mm
+
+[1A[2Ktests\corner-atrest-parity.spec.js:60:1 › ANTI-GREEN v2: the wall markers are COINCIDENT (3D == Layout) AT REST across ALL 16 configs
+REST BL/YX/Zoff: wall2 3D=(-43.0,37.0) Lay=(-43.0,37.0) Δ=0.00
+
+[1A[2K[301/993] tests\cam-slot-sim.spec.js:371:1 › auto-icon renders a valid 360x180 BMP from the op name/kind
+[1A[2K  50) tests\corner-data-start-live.spec.js:67:1 › ③(4a gate + 4b) start handle GATED on probeZFirst; the SIM-ONLY first-start drag changes the preview but NOT the emit 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      67 | test('③(4a gate + 4b) start handle GATED on probeZFirst; the SIM-ONLY first-start drag changes the preview but NOT the emit', async ({ page }) => {
+      68 |   await page.goto('http://localhost:3211');
+    > 69 |   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+         |              ^
+      70 |
+      71 |   await page.evaluate(async () => {
+      72 |     const U = await import('/blocks/userOps.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-data-start-live.spec.js:69:14
+
+    Error Context: test-results\corner-data-start-live-③-4-cb955-he-preview-but-NOT-the-emit\error-context.md
+
+
+[1A[2K[302/993] tests\corner-pass-align.spec.js:14:1 › corner pass-alignment: Z→wall1 is a REPOSITION delimiter under probeZ (3 passes == 3 markers)
+[1A[2KREST BL/YX/Zon: wall2 3D=(-43.0,37.0) Lay=(-43.0,37.0) Δ=0.00 | wall1 Δ=0.00
+
+[1A[2K[303/993] tests\cam-slot-sim.spec.js:388:1 › preview panel mounts on a seeded slot macro without throwing
+[1A[2KREST BL/XY/Zoff: wall2 3D=(43.0,123.0) Lay=(43.0,123.0) Δ=0.00
+
+[1A[2K[304/993] tests\corner-post-fold.spec.js:26:1 › TRIGGER READ folds per post — Expert #1925 (byte-identical), V4.1 #1500, DM500 #864
+[1A[2K[305/993] tests\cam-slot-sim.spec.js:411:1 › structured op editing: ops manifest drives the macro; edit type/variant + remove regenerates
+[1A[2K  51) tests\corner-anim-overlay.spec.js:96:1 › INC-3: the handles are still drag-writable through the pointer-events:none overlay 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      12 | async function openCorner(page) {
+      13 |   await page.goto('http://localhost:3211');
+    > 14 |   await page.waitForFunction(() => window.openWiz && window.ddcsGetBlockProgram);
+         |              ^
+      15 |   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
+      16 |   await page.evaluate(() => window.openWiz('user_corner_data'));
+      17 |   await page.waitForSelector('#userVizContainer .fc-handle-sim', { timeout: 8000 });
+        at openCorner (C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-anim-overlay.spec.js:14:14)
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-anim-overlay.spec.js:97:3
+
+    Error Context: test-results\corner-anim-overlay-INC-3--025ad-pointer-events-none-overlay\error-context.md
+
+
+[1A[2K[306/993] tests\corner-data-sim-marker-track.spec.js:112:1 › (4) the emitting reposition handle owns its own drag (writes cross1_x); the separated sim ◇ does not steal it
+[1A[2K[307/993] tests\canvas-widgets.spec.js:187:1 › text wizard renders its four canvas handles from the registry
+[1A[2KREST BL/XY/Zon: wall2 3D=(43.0,123.0) Lay=(43.0,123.0) Δ=0.00 | wall1 Δ=0.00
+
+[1A[2K[308/993] tests\cam-slot-sim.spec.js:448:1 › structured op editing: tuned field values persist across an op edit (per-op, matched by key)
+[1A[2K[309/993] tests\corner-post-fold.spec.js:39:1 › HMI (#1505) folds per post — Expert spaced #1505 form (byte-identical), V4.1/DM500 a plain comment (no #1505)
+[1A[2K[310/993] tests\corner-data-sim-marker-emits.spec.js:107:1 › (D) backward-compat: built-in middle/alignment start markers stay sim-only (all emits false)
+[1A[2K  52) tests\corner-layout-sim-drag.spec.js:14:1 › (1) Layout sim ◇ is DRAGGABLE — writes userStarts AND recomputes the emit (the reposition datum, t297) 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: mouse.move: Test timeout of 30000ms exceeded.
+
+      35 |   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+      36 |   await page.mouse.down();
+    > 37 |   await page.mouse.move(hb.x + 70, hb.y + 48, { steps: 12 });
+         |                    ^
+      38 |   await page.mouse.up();
+      39 |
+      40 |   await expect.poll(async () => {
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-layout-sim-drag.spec.js:37:20
+
+    Error Context: test-results\corner-layout-sim-drag--1--69d37--the-reposition-datum-t297-\error-context.md
+
+
+[1A[2K  53) tests\corner-draw-anchor.spec.js:159:1 › (3) source-gate: MANUAL reposition keeps anchor=self (anchorsAtPrev off), so the route does not shift 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      159 | test('(3) source-gate: MANUAL reposition keeps anchor=self (anchorsAtPrev off), so the route does not shift', async ({ page }) => {
+      160 |   await page.goto('http://localhost:3211');
+    > 161 |   await page.waitForFunction(() => window.ddcsGetBlockProgram);
+          |              ^
+      162 |   const auto = await traceCorner(page, { travelApproach: 'auto' });
+      163 |   const manual = await traceCorner(page, { travelApproach: 'manual' });
+      164 |   // auto: pass-1 IS flagged; manual: pass-1 is NOT (no programmed dog-leg)
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-draw-anchor.spec.js:161:14
+
+    Error Context: test-results\corner-draw-anchor--3-sour-aeb10-so-the-route-does-not-shift\error-context.md
+
+
+[1A[2Ktests\corner-marker-parity.spec.js:45:1 › ANTI-GREEN: the wall marker is COINCIDENT in both panels at rest AND held after a Start-drag; #23/#24 recompute
+PARITY after : 3D wall={"x":-43,"y":43} Layout wall={"x":-43.00006260891342,"y":43.00000896741811} Δ=0.00mm
+
+[1A[2KSHOTS C:\Users\danse\AppData\Local\Temp\claude\c--Users-danse-APPS-ddcs-studio-project\306b9087-a4e7-4ecb-a877-d4ad4867bab7\scratchpad\parity_before.png + parity_after.png (both panels each)
+
+[1A[2Ktests\corner-atrest-parity.spec.js:60:1 › ANTI-GREEN v2: the wall markers are COINCIDENT (3D == Layout) AT REST across ALL 16 configs
+REST BR/YX/Zoff: wall2 3D=(143.0,37.0) Lay=(143.0,37.0) Δ=0.00
+
+[1A[2K  54) tests\corner-marker-parity.spec.js:45:1 › ANTI-GREEN: the wall marker is COINCIDENT in both panels at rest AND held after a Start-drag; #23/#24 recompute 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error Context: test-results\corner-marker-parity-ANTI--dee02--Start-drag-23-24-recompute\error-context.md
+
+
+[1A[2K[311/993] tests\cam-slot-sim.spec.js:475:1 › structured op editing: ▲/▼ reorder the ops (macro run order) and tuned values travel
+[1A[2K[312/993] tests\corner-post-fold.spec.js:53:1 › WCS WRITE folds per post — Expert #[#70]/#73 indirect (byte-identical), V4.1/DM500 G92; #883 sync → honest comment
+[1A[2K[313/993] tests\corner-marker-truth.spec.js:90:1 › ASSERT-THE-VALUE: every probe marker sits at the INDEPENDENT geometric truth across all 16 configs
+[1A[2K  55) tests\corner-marker-independence.spec.js:66:1 › (1) drag START → reposition machine world (passEnds[wall1]+#23/#24) is preserved 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: mouse.move: Test timeout of 30000ms exceeded.
+
+      56 |   const h = m.handles[hid];
+      57 |   await page.mouse.move(h.cx, h.cy); await page.mouse.down();
+    > 58 |   await page.mouse.move(h.cx + dx, h.cy + dy, { steps: 12 }); await page.mouse.up();
+         |                    ^
+      59 |   await page.waitForTimeout(380);
+      60 | }
+      61 | const screenMove = (a, b, hid) => Math.hypot(a.handles[hid].cx - b.handles[hid].cx, a.handles[hid].cy - b.handles[hid].cy);
+        at dragHid (C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-marker-independence.spec.js:58:20)
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-marker-independence.spec.js:75:3
+
+    Error Context: test-results\corner-marker-independence-70c98-ds-wall1-23-24-is-preserved\error-context.md
+
+
+[1A[2K[314/993] tests\corner-data-sim-marker-emits.spec.js:123:1 › (E) emit byte-parity: the emits flag is sim-only — no G-code change, no leak
+[1A[2K[315/993] tests\corner-prefill.spec.js:27:1 › (1) per-corner sim-start markers land at the correct corner (independent geometry, NOT canonical-FL) — all 4
+[1A[2K[316/993] tests\corner-redivide.spec.js:12:1 › (1) a `section` block emits its children transparently (in order)
+[1A[2KREST BR/YX/Zon: wall2 3D=(143.0,37.0) Lay=(143.0,37.0) Δ=0.00 | wall1 Δ=0.00
+
+[1A[2K[317/993] tests\corner-post-fold.spec.js:97:1 › EDGE folds per post — Expert byte-identical (confirm+ESC, stop/limit, direct WCS, #1925); V4.1/DM500 G92, no Expert registers
+[1A[2K[318/993] tests\cam-slot-sim.spec.js:504:1 › duplicate op + structured slot: clone inherits tuned values, gets fresh params (no collision)
+[1A[2K[319/993] tests\corner-scalar-parity.spec.js:10:1 › the twin == cornerStack byte-for-byte across NON-DEFAULT scalars (header comment tracks them)
+[1A[2K[320/993] tests\corner-layout-sim-drag.spec.js:57:1 › (2) degenerate overlap: the emitting handle still wins the hit (sim marker yields, no crash)
+[1A[2K[321/993] tests\corner-post-fold.spec.js:140:1 › MIDDLE folds per post — Expert byte-identical (bare base, direct writes, #883 sync); V4.1/DM500 G92, no Expert registers, ESC-IF gone
+[1A[2K[322/993] tests\corner-draw-anchor.spec.js:174:1 › (5) drag-consistency: the resolved anchor tracks a LIVE mutation of marker[N-1] (not frozen)
+[1A[2KREST BR/XY/Zoff: wall2 3D=(57.0,123.0) Lay=(57.0,123.0) Δ=0.00
+
+[1A[2Ktests\corner-marker-truth.spec.js:90:1 › ASSERT-THE-VALUE: every probe marker sits at the INDEPENDENT geometric truth across all 16 configs
+FL/YX/Zoff: wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[323/993] tests\corner-probeseq.spec.js:17:1 › (1) the sim-start markers FLIP per probeSeq (wall order swaps) — build path, independent geometry
+[1A[2K[324/993] tests\cam-slot-sim.spec.js:529:1 › duplicate a legacy (hand-built) slot remaps its #params off the original — no collision
+[1A[2K[325/993] tests\corner-prefill.spec.js:51:1 › (2) the sim probe fires ON the corner wall (not empty space) — all 4 corners
+[1A[2K[326/993] tests\corner-redivide.spec.js:29:1 › (2) all 32 combos: the sectioned twin == cornerStack byte-for-byte
+[1A[2K[327/993] tests\corner-marker-independence.spec.js:89:1 › (2) drag reposition → start machine world (zsurf end+#21/#22) is preserved
+[1A[2Ktests\corner-atrest-parity.spec.js:60:1 › ANTI-GREEN v2: the wall markers are COINCIDENT (3D == Layout) AT REST across ALL 16 configs
+REST BR/XY/Zon: wall2 3D=(57.0,123.0) Lay=(57.0,123.0) Δ=0.00 | wall1 Δ=0.00
+
+[1A[2K[328/993] tests\corner-atrest-parity.spec.js:110:1 › STRESS: no settling flash, literal value, non-default stock, panelStarts covers every pass
+[1A[2K[329/993] tests\corner-selector.spec.js:19:1 › the 4 stock-corner pick targets render on the Layout canvas; the current corner is highlighted
+[1A[2Ktests\corner-marker-truth.spec.js:90:1 › ASSERT-THE-VALUE: every probe marker sits at the INDEPENDENT geometric truth across all 16 configs
+FL/YX/Zon: zsurf Δ=0.00  wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[330/993] tests\corner-post-fold.spec.js:183:1 › ALIGNMENT folds per post — Expert #151x RESULT + #1505 fail byte-identical; V4.1/DM500 keep the meaning as comments (no register write)
+[1A[2K[331/993] tests\corner-source-chips.spec.js:9:1 › source-chips: Expert+ctrl emits the controller register (#5=#1078 + Pr note); studio default emits the literal (byte-identical)
+[1A[2K  56) tests\corner-scalar-parity.spec.js:10:1 › the twin == cornerStack byte-for-byte across NON-DEFAULT scalars (header comment tracks them) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      10 | test('the twin == cornerStack byte-for-byte across NON-DEFAULT scalars (header comment tracks them)', async ({ page }) => {
+      11 |   await page.goto('http://localhost:3211');
+    > 12 |   await page.waitForFunction(() => window.ddcsGetBlockProgram);
+         |              ^
+      13 |   const r = await page.evaluate(async () => {
+      14 |     const { cornerStack } = await import('/wizards/cornerWizard.js');
+      15 |     const CD = await import('/blocks/dataOps/cornerData.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-scalar-parity.spec.js:12:14
+
+    Error Context: test-results\corner-scalar-parity-the-t-30d78-header-comment-tracks-them-\error-context.md
+
+
+[1A[2K[332/993] tests\corner-draw-anchor.spec.js:192:1 › (7) live-head: the 3D tool sprite rides the RUNTIME wall-1 END for a flagged corner pass (not the static start)
+[1A[2K[333/993] tests\corner-prefill.spec.js:80:1 › (3) LIVE form — the emitted dog-leg #23/#24 flips per corner INSTANTLY (no marker nudge needed)
+[1A[2K[334/993] tests\corner-redivide.spec.js:54:1 › (3) the 7 concern sections render in the right mouths (PRESENTATION peers + EXECUTION sections)
+[1A[2K[335/993] tests\corner-probeseq.spec.js:41:1 › (2) the sim probe fires on the RIGHT wall per probeSeq (XY last-probe = Y-wall; YX last-probe = X-wall)
+[1A[2KFL/XY/Zoff: wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[336/993] tests\corner-post-fold.spec.js:201:1 › ROTARY center+clock fold per post — Expert trigger #192x + #1505 fail byte-identical; V4.1/DM500 per-post trigger, no #1505
+[1A[2K[337/993] tests\corner-source-chips.spec.js:65:1 › source-chips: the data-op form shows the inline source dot; click flips ctrl↔studio (readOnly + data-op-gated) and the EMIT follows
+[1A[2K[338/993] tests\corner-selector.spec.js:39:1 › clicking each stock corner SETS the corner param → the emit dog-leg + the sim markers follow (independent truth)
+[1A[2K[339/993] tests\corner-start-datum-drag.spec.js:35:1 › Start-drag HOLDS the wall marker + RECOMPUTES #23/#24 (probeZ off, FL/YX default)
+[1A[2KFL/XY/Zon: zsurf Δ=0.00  wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[340/993] tests\corner-draw-anchor.spec.js:221:1 › (8) marker relocation: a flagged marker sprite sits at passEnds[N-1]+cross (matches the route end + probe fire)
+[1A[2Ktests\corner-atrest-parity.spec.js:110:1 › STRESS: no settling flash, literal value, non-default stock, panelStarts covers every pass
+FLASH @~0ms: 3D=(57.0,123.0) Lay=(57.0,123.0) Δ=0.00 nMk=3 nPS=3
+
+[1A[2KFLASH @~50ms: 3D=(57.0,123.0) Lay=(57.0,123.0) Δ=0.00 nMk=3 nPS=3
+
+[1A[2KFLASH @~200ms: 3D=(57.0,123.0) Lay=(57.0,123.0) Δ=0.00 nMk=3 nPS=3
+
+[1A[2KFLASH @~500ms: 3D=(57.0,123.0) Lay=(57.0,123.0) Δ=0.00 nMk=3 nPS=3
+
+[1A[2Ktests\corner-marker-truth.spec.js:90:1 › ASSERT-THE-VALUE: every probe marker sits at the INDEPENDENT geometric truth across all 16 configs
+FR/YX/Zoff: wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[341/993] tests\corner-source-declared.spec.js:12:1 › per-pass source is DECLARED from travelApproach — toggling auto↔manual changes getPassSources live (both panels)
+[1A[2K[342/993] tests\corner-structctl.spec.js:12:1 › (1) the structural-control blocks reflect CORNER_STRUCT_BINDINGS (param, kind, options)
+[1A[2KFR/YX/Zon: zsurf Δ=0.00  wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2Ktests\corner-atrest-parity.spec.js:110:1 › STRESS: no settling flash, literal value, non-default stock, panelStarts covers every pass
+LITERAL cross1=25,18: 3D=(32.0,11.0) Lay=(32.0,11.0) Δ=0.00
+
+[1A[2K[343/993] tests\corner-draw-anchor.spec.js:249:1 › (6) byte-parity: emit is untouched (no anchor leak) + twin == cornerStack byte-for-byte
+[1A[2K  57) tests\corner-post-fold.spec.js:201:1 › ROTARY center+clock fold per post — Expert trigger #192x + #1505 fail byte-identical; V4.1/DM500 per-post trigger, no #1505 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      201 | test('ROTARY center+clock fold per post — Expert trigger #192x + #1505 fail byte-identical; V4.1/DM500 per-post trigger, no #1505', async ({ page }) => {
+      202 |     await page.goto('http://localhost:3211');
+    > 203 |     await page.waitForFunction(() => window.ddcsGetBlockProgram);
+          |                ^
+      204 |     const c = await emitOf(page, '/wizards/rotaryCenterWizard.js', 'rotaryCenterStack', {});
+      205 |     const k = await emitOf(page, '/wizards/rotaryClockWizard.js', 'rotaryClockStack', {});
+      206 |     // Expert: the Z trigger read (#1927) + the #1505 fail, byte-identical
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-post-fold.spec.js:203:16
+
+    Error Context: test-results\corner-post-fold-ROTARY-ce-215a4-00-per-post-trigger-no-1505\error-context.md
+
+
+[1A[2K[344/993] tests\corner-source-chips.spec.js:119:1 › source-chips: a profile with no native register shows NO dot (graceful)
+[1A[2KSTOCK 320x240: 3D=(-27.6,43.0) Lay=(-27.6,43.0) Δ=0.00
+
+[1A[2K[345/993] tests\corner-travel-shape.spec.js:18:1 › travelShape LIVE: dogleg==cornerStack byte-for-byte (default no-op); diagonal = one straight XY at the retract height, ZERO added Z, both probeZ states
+[1A[2Ktests\corner-marker-truth.spec.js:90:1 › ASSERT-THE-VALUE: every probe marker sits at the INDEPENDENT geometric truth across all 16 configs
+FR/XY/Zoff: wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[346/993] tests\corner-viz-polish.spec.js:16:1 › (1) 2D: pass-0 Start = amber; a later auto reposition = cyan
+[1A[2KFR/XY/Zon: zsurf Δ=0.00  wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K  58) tests\corner-probeseq.spec.js:41:1 › (2) the sim probe fires on the RIGHT wall per probeSeq (XY last-probe = Y-wall; YX last-probe = X-wall) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      41 | test('(2) the sim probe fires on the RIGHT wall per probeSeq (XY last-probe = Y-wall; YX last-probe = X-wall)', async ({ page }) => {
+      42 |   await page.goto('http://localhost:3211');
+    > 43 |   await page.waitForFunction(() => window.ddcsGetBlockProgram);
+         |              ^
+      44 |   const r = await page.evaluate(async ({ stock }) => {
+      45 |     const CD = await import('/blocks/dataOps/cornerData.js');
+      46 |     const { registerUserOp } = await import('/blocks/userOps.js');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-probeseq.spec.js:43:14
+
+    Error Context: test-results\corner-probeseq--2-the-sim-4b375--wall-YX-last-probe-X-wall-\error-context.md
+
+
+[1A[2K[347/993] tests\corner-z-trust.spec.js:12:1 › Z-trust: probeZ-off wall-1 straight to G31 (no pre-plunge) · probeZ-ON keeps the plunge · twin==built-in · manual-off no drop
+[1A[2K[348/993] tests\corner-travel-shape.spec.js:110:1 › travelShape=diagonal: the traverse renders as a RAPID (yellow), not source-cyan, in the Layout (t328 amendment)
+[1A[2K[349/993] tests\custom-op-canvas-handles.spec.js:13:1 › a writable xy param group → a draggable point handle whose drag writes the param fields
+[1A[2K[350/993] tests\corner-viz-polish.spec.js:44:1 › (2) 2D manual jog travel arcs up (rainbow); auto travel stays straight
+[1A[2KBL/YX/Zoff: wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[351/993] tests\custom-op-chip.spec.js:36:1 › a plain custom op → insert → the editor shows its ✎ Edit chip
+[1A[2K[352/993] tests\custom-op-canvas-handles.spec.js:58:1 › a writable xywh group → a position + a size handle; size drag writes w/h from the origin
+[1A[2K[353/993] tests\corner-viz-polish.spec.js:76:1 › (3) Layout renders auto=cyan square / manual=amber circle; the Start is the amber circle
+[1A[2KBL/YX/Zon: zsurf Δ=0.00  wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K  59) tests\corner-redivide.spec.js:54:1 › (3) the 7 concern sections render in the right mouths (PRESENTATION peers + EXECUTION sections) 
+
+    TimeoutError: page.waitForFunction: Timeout 5000ms exceeded.
+
+      54 | test('(3) the 7 concern sections render in the right mouths (PRESENTATION peers + EXECUTION sections)', async ({ page }) => {
+      55 |   await page.goto('http://localhost:3211');
+    > 56 |   await page.waitForFunction(() => window.ddcsStudio && window.showApp);
+         |              ^
+      57 |   await page.evaluate(async () => { const U = await import('/blocks/userOps.js'); const CD = await import('/blocks/dataOps/cornerData.js'); localStorage.removeItem('ddcs_user_ops'); U.createUserOp(CD.cornerDataDef()); });
+      58 |   await page.evaluate(() => window.ddcsStudio.wizardManager.open('user_corner_data'));
+      59 |   await page.waitForSelector('#wiz_user_form', { state: 'visible' });
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-redivide.spec.js:56:14
+
+    Error Context: test-results\corner-redivide--3-the-7-c-2f1ed-N-peers-EXECUTION-sections-\error-context.md
+
+
+[1A[2K[354/993] tests\custom-op-devmode-roles.spec.js:13:1 › dev-mode expose point-x/point-y → a complete point group → a draggable form2d preview handle
+[1A[2K[355/993] tests\custom-op-canvas-handles.spec.js:85:1 › Stage 3: a writable xy+dia group → a position + a radius (radial) handle; drag writes Ø = 2·distance
+[1A[2K[356/993] tests\corner-travel-approach.spec.js:14:1 › corner travelApproach: AUTO = G0 move, MANUAL = #1505 jog prompt — both travels, Z-state mirrors auto
+[1A[2K[357/993] tests\custom-op-chip.spec.js:62:1 › fork a built-in ("Tool Length") via Save-as-wizard → insert the fork → its ✎ Edit chip shows
+[1A[2K[358/993] tests\custom-op-form2d-drag.spec.js:12:1 › a real authored 2D-point op: the form2d preview handle drags and writes the form (real panel, real drag)
+[1A[2KBL/XY/Zoff: wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[359/993] tests\custom-op-canvas-handles.spec.js:117:1 › Stage 3: the 2D-circle role family is declarable end-to-end (decode + complete-group)
+[1A[2K[360/993] tests\corner-probeseq.spec.js:71:1 › (3) LIVE form — the emitted Z→wall1 start #21/#22 (+ dog-leg #23/#24) flip per probeSeq (socket-held fix)
+[1A[2K  60) tests\corner-selector.spec.js:39:1 › clicking each stock corner SETS the corner param → the emit dog-leg + the sim markers follow (independent truth) 
+
+    [31mTest timeout of 30000ms exceeded while setting up "page".[39m
+
+    Error: browserContext.newPage: Test timeout of 30000ms exceeded.
+
+
+[1A[2K  61) tests\corner-start-datum-drag.spec.js:35:1 › Start-drag HOLDS the wall marker + RECOMPUTES #23/#24 (probeZ off, FL/YX default) 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: page.waitForTimeout: Test timeout of 30000ms exceeded.
+
+      44 |   await page.mouse.move(start0.x + 60, start0.y + 45, { steps: 10 });
+      45 |   await page.mouse.up();
+    > 46 |   await page.waitForTimeout(500);
+         |              ^
+      47 |
+      48 |   const start1 = await hid(page, '__simstart0');
+      49 |   const repos1 = await hid(page, 'reposition_pos');
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-start-datum-drag.spec.js:46:14
+
+    Error Context: test-results\corner-start-datum-drag-St-f5ce7-4-probeZ-off-FL-YX-default-\error-context.md
+
+
+[1A[2K  62) tests\corner-marker-independence.spec.js:89:1 › (2) drag reposition → start machine world (zsurf end+#21/#22) is preserved 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: mouse.move: Test timeout of 30000ms exceeded.
+
+      56 |   const h = m.handles[hid];
+      57 |   await page.mouse.move(h.cx, h.cy); await page.mouse.down();
+    > 58 |   await page.mouse.move(h.cx + dx, h.cy + dy, { steps: 12 }); await page.mouse.up();
+         |                    ^
+      59 |   await page.waitForTimeout(380);
+      60 | }
+      61 | const screenMove = (a, b, hid) => Math.hypot(a.handles[hid].cx - b.handles[hid].cx, a.handles[hid].cy - b.handles[hid].cy);
+        at dragHid (C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-marker-independence.spec.js:58:20)
+        at C:\Users\danse\APPS\ddcs-studio-project\DDCS-Studio\tests\corner-marker-independence.spec.js:92:3
+
+    Error Context: test-results\corner-marker-independence-47e0c-surf-end-21-22-is-preserved\error-context.md
+
+
+[1A[2K[361/993] tests\custom-op-form2d-drag.spec.js:71:1 › Stage 3: a real authored 2D-circle op — dragging the RING (radial) handle in the real panel writes Ø + re-emits
+[1A[2K[362/993] tests\corner-travel-approach.spec.js:63:1 › corner dog-leg: wall1→wall2 moves the SECOND wall axis FIRST (routes around the corner) — all 8 combos
+[1A[2K[363/993] tests\corner-structctl.spec.js:52:1 › (2) the STRUCTURAL section shows the 7 controls at their defaults
+[1A[2K[364/993] tests\custom-op-number-roles.spec.js:17:1 › authored 2D-point op: number fields render data-param, preview handle drags them, read() reflects it
+[1A[2KBL/XY/Zon: zsurf Δ=0.00  wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[365/993] tests\corner-redivide.spec.js:84:1 › (4) each concern section renders in its declared colour, and it survives a round-trip
+[1A[2K[366/993] tests\custom-op-panel.spec.js:10:1 › custom op opens + edits in the wizard panel (reuses #wiz_user)
+[1A[2K[367/993] tests\custom-op-sim-intent.spec.js:12:1 › custom-op sim intent is DECLARED, never inferred from motion
+[1A[2K[368/993] tests\custom-op-sim-starts-precedence.spec.js:7:1 › template simstart blocks are canonical; def.sim.starts is fallback only
+[1A[2K[369/993] tests\custom-op-number-roles.spec.js:83:1 › authored 2D-rect (numbers): four data-param fields; preview size-handle writes w/h
+[1A[2KBR/YX/Zoff: wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[370/993] tests\corner-marker-independence.spec.js:107:1 › (3) default undragged emit keeps the #23/#24 socket expression (no literal override)
+[1A[2K[371/993] tests\datum-boxpoint.spec.js:8:1 › datum picker (2D XY grid + height selector) drives setStock across X/Y/Z
+[1A[2K[372/993] tests\custom-op-length.spec.js:11:1 › a length param is declarable (nlen roles decode + complete group) and drags on the form2d preview
+[1A[2K[373/993] tests\custom-op-number-roles.spec.js:127:1 › both author surfaces offer the same role widgets: bridge param-block dropdown == canonical CANVAS_ROLE_WIDGETS
+[1A[2K[374/993] tests\corner-start-datum-drag.spec.js:65:1 › 16-config sweep: Start-drag HOLDS every wall + RECOMPUTES its offset (4 corners × 2 probeSeq × 2 probeZ)
+[1A[2K[375/993] tests\custom-op-sim-intent.spec.js:45:1 › declared custom-op sim intent persists + re-registers via loadUserOps
+[1A[2K[376/993] tests\datum-z-offset.spec.js:10:1 › datum Z offsets the placement by the stock height (top=0, center=half, bottom=full)
+[1A[2KBR/YX/Zon: zsurf Δ=0.00  wall1 Δ=0.00  wall2 Δ=0.00
+
+[1A[2K[377/993] tests\def-change-notice.spec.js:11:1 › N1+N2: version stamp + import staleness detect (lookup) + forward-only rebuild + legacy v0
+[1A[2K[378/993] tests\corner-structctl.spec.js:64:1 › (3) toggling probeZFirst reprunes the preview live and the control keeps its value

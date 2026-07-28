@@ -1,0 +1,353 @@
+﻿
+Running 997 tests using 4 workers
+
+[1A[2K[1/997] tests\align-rotate-gui.spec.js:8:1 › Align modal renders the path in a 2D canvas; angle + Apply rotate the program
+[1A[2K[2/997] tests\alignment-fork1-handles.spec.js:11:1 › the alignment Layout has 2 draggable handles: A drag → the ax/ay anchor (sim-only); B drag → the SPAN field
+[1A[2K[3/997] tests\alignment-envelope-unclamp.spec.js:9:1 › the A anchor allows fractions beyond [0,1] (a probe point past the stock edge)
+[1A[2K[4/997] tests\alignment-data-emit.spec.js:11:1 › E1 byte-diff ZERO: user_alignment_data == alignmentStack across 8 structural + a scalar sweep (incl safeZ/tolerance), studio AND Expert
+[1A[2K[5/997] tests\alignment-envelope-unclamp.spec.js:25:1 › a REAL drag past the stock edge writes a fraction >1, bounded by the machine envelope; the marker follows
+[1A[2K[6/997] tests\alignment-data-emit.spec.js:74:1 › E2 sim-starts: the twin POSITIONS + COUNT == the EXISTING BUILT_IN.alignment (2 starts A/B); emit BYTE-IDENTICAL
+[1A[2K[7/997] tests\alignment-fork2-twin-auto.spec.js:10:1 › the twin AUTO emit == alignmentStack (span model, studio + Expert); the SPAN drives #73; the A anchor is sim-only
+[1A[2K[8/997] tests\alignment-data-emit.spec.js:110:1 › E2 real-symptom: the twin renders the BOX + the 2 fence starts on the preview (alignment = a fence probe, NO rig/bar)
+[1A[2K[9/997] tests\alignment-fork2-twin-auto.spec.js:67:1 › REAL APP: the in-place form shows the Travel toggle + a Span field; AUTO no longer greys without a stock (t544)
+[1A[2K[10/997] tests\alignment-fresh-seat.spec.js:54:5 › alignment: 3D-INITIAL open seats the trace + sim at A (fresh, zero interaction)
+[1A[2K[11/997] tests\alignment-handle-visible-exit.spec.js:9:1 › a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (not stuck at the edge)
+[1A[2Ktests\alignment-envelope-unclamp.spec.js:25:1 › a REAL drag past the stock edge writes a fraction >1, bounded by the machine envelope; the marker follows
+dragged-past-stock: ax=1.1 markA.x=220.00000000000003 (stock 200, envelope 220)
+
+[1A[2K[12/997] tests\alignment-handles-independent.spec.js:58:1 › ALIGN: dragging A along the fence moves ONLY A — B stays put + the span field recomputes (no longer carried)
+[1A[2K[13/997] tests\alignment-in-place.spec.js:12:1 › E3 opensAs wiring: Align opens user_alignment_data IN-PLACE, plain title, twin retired, openAlignmentWiz un-routed
+[1A[2K[14/997] tests\alignment-in-place.spec.js:33:1 › E3 emit BYTE-IDENTICAL: user_alignment_data == alignmentStack across the checkAxis/probeDir/frame sweep (the seed/menu wire never touches the stack)
+[1A[2K[15/997] tests\alignment-fresh-seat.spec.js:71:5 › alignment: DEFAULT-view open → setView('3d') seats the trace at A (the advisor's repro)
+[1A[2K[16/997] tests\alignment-in-place.spec.js:63:1 › E3 DRIVE: Align opens IN-PLACE — non-empty form + the 3D sim renders the box + 2 fence starts (no rig); the 2D is coherent
+[1A[2K[17/997] tests\alignment-handles-independent.spec.js:67:1 › ROTARY CLOCK: dragging A along the touch line moves ONLY A — B stays put + the span recomputes (same contract)
+[1A[2Ktests\alignment-in-place.spec.js:63:1 › E3 DRIVE: Align opens IN-PLACE — non-empty form + the 3D sim renders the box + 2 fence starts (no rig); the 2D is coherent
+E3 IN-PLACE FORM: 12 fields → dist, retract, f_fast, f_slow, port, safeZ, span, travel, checkAxis, probeDir, safeZFrame, tolerance | {"twoD":{"shown":true,"hasCanvas":true},"nStarts":2}
+
+[1A[2K[18/997] tests\alignment-onesource.spec.js:10:1 › opSimStarts.alignment = A (the anchor fraction) + B (A + the declared span along checkAxis)
+[1A[2K[19/997] tests\alignment-probe-collides.spec.js:32:5 › combo X/pos: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+[1A[2K[20/997] tests\alignment-onesource.spec.js:42:1 › emit AUTO probes A IN PLACE (no travel/Confirm) then a relative span jog to B; MANUAL keeps the Confirm gates
+[1A[2Ktests\alignment-handle-visible-exit.spec.js:9:1 › a real canvas drag moves the VISIBLE marker OUTSIDE the drawn stock rect (not stuck at the edge)
+3D SIM: {"startX":600,"markerMeshX":600,"stockX":150}
+
+[1A[2KDURING drag: {"hCx":1264,"stockRight":462.3793182373047,"contRight":1344,"hVisibleInCanvas":true} ax=4
+
+[1A[2KAFTER up: {"hCx":1264,"stockRight":462.3793182373047,"stockLeft":195.1724090576172,"outside":true} | param ax=4
+
+[1A[2K[21/997] tests\alignment-sim-starts-at-a.spec.js:12:1 › the alignment intent carries seatAtStart (the declared sim{seatStart} → opSimContext)
+[1A[2K[22/997] tests\alignment-onesource.spec.js:66:1 › AUTO no longer needs a stock — the span is plain mm (emit is span-based whether or not a stock exists)
+[1A[2K[23/997] tests\alignment-sim-starts-at-a.spec.js:23:1 › the played trace STARTS at handle A (not origin) — the drawn path begins at A, nothing at {0,0}
+[1A[2K[24/997] tests\alignment-onesource.spec.js:84:1 › the span + A-anchor + travel mode round-trip through the op marker codec (Blockly params)
+[1A[2Ktests\alignment-probe-collides.spec.js:32:5 › combo X/pos: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+X/pos: markers outside ✓, 4 legs at face -2 ✓, markerB==routeB ✓
+
+[1A[2K[25/997] tests\alignment-probe-collides.spec.js:32:5 › combo X/neg: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+[1A[2K[26/997] tests\alignment-span-verify.spec.js:10:1 › typing the A→B span moves handle B (one source: field ↔ marker) + the AUTO emit is probe-A-in-place + a span jog
+[1A[2Ktests\alignment-sim-starts-at-a.spec.js:23:1 › the played trace STARTS at handle A (not origin) — the drawn path begins at A, nothing at {0,0}
+ALIGNMENT trace starts at A={"x":45,"y":-4,"z":-5} first={"x":45,"y":-4} minOrigin=45.0
+
+[1A[2K[27/997] tests\alignment-superset.spec.js:13:1 › E0 GATE: prune(alignmentStack superset) == concrete alignmentStack, byte-identical across the full 8-combo structural sweep
+[1A[2Ktests\alignment-probe-collides.spec.js:32:5 › combo X/neg: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+X/neg: markers outside ✓, 4 legs at face 102 ✓, markerB==routeB ✓
+
+[1A[2K[28/997] tests\alignment-probe-collides.spec.js:32:5 › combo Y/pos: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+[1A[2K[29/997] tests\alignment-superset.spec.js:52:1 › E0 golden + F2 restructure: #20 = [0-#19] (references the #var, NOT the [0-safeZ] literal); value unchanged; superset:false == concrete
+[1A[2K[30/997] tests\analytics-kv-guard.spec.js:10:1 › a Playwright (automated) boot fires ZERO requests to the analytics Worker
+[1A[2K[31/997] tests\analytics.spec.js:3:1 › web analytics fires visit + feature beacons with the right payload
+[1A[2K[32/997] tests\alignment-fresh-seat.spec.js:54:5 › user_alignment_data: 3D-INITIAL open seats the trace + sim at A (fresh, zero interaction)
+[1A[2K[33/997] tests\analytics-kv-guard.spec.js:21:1 › the dev-network refresh is throttled to ONCE PER DAY (KV-write guard)
+[1A[2Ktests\alignment-probe-collides.spec.js:32:5 › combo Y/pos: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+Y/pos: markers outside ✓, 4 legs at face -2 ✓, markerB==routeB ✓
+
+[1A[2K[34/997] tests\alignment-probe-collides.spec.js:32:5 › combo Y/neg: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+[1A[2Ktests\analytics.spec.js:3:1 › web analytics fires visit + feature beacons with the right payload
+BEACONS [{"url":"https://example.test/e","body":"{\"event\":\"visit\",\"name\":\"/\",\"id\":\"d3513b47-ab06-4052-bc24-16d35b1f8065\",\"app\":\"web\",\"version\":\"10.129\",\"os\":\"Win32\",\"dev\":0}"},{"url":"https://example.test/e","body":"{\"event\":\"feature\",\"name\":\"wizard:drill\",\"id\":\"d3513b47-ab06-4052-bc24-16d35b1f8065\",\"app\":\"web\",\"version\":\"10.129\",\"os\":\"Win32\",\"dev\":0}"}]
+
+[1A[2K[35/997] tests\atc-backcompat.spec.js:17:1 › INC-D (1): old/legacy atc_change markers rebuild to the T# M6 call (migrate-on-rebuild)
+[1A[2K[36/997] tests\atc-cap-gate.spec.js:10:1 › V4.1 folds the ATC pneumatic M-codes; Expert emits them; the tool-setter probes carry the miss-check
+[1A[2K[37/997] tests\atc-backcompat.spec.js:46:1 › INC-D (2): T# M6 region byte-identical on rebuild; the inline region follows LIVE settings
+[1A[2K[38/997] tests\atc-change-in-place.spec.js:12:1 › opensAs wiring: Tool Change opens the twin IN-PLACE (plain title, twin retired) + opSimContext + the choreography hook
+[1A[2K[39/997] tests\alignment-fresh-seat.spec.js:71:5 › user_alignment_data: DEFAULT-view open → setView('3d') seats the trace at A (the advisor's repro)
+[1A[2K[40/997] tests\atc-backcompat.spec.js:77:1 › INC-D (3): stray/stale marker keys load benignly; the emit uses LIVE settings, not the snapshot
+[1A[2Ktests\alignment-probe-collides.spec.js:32:5 › combo Y/neg: default markers OUTSIDE the stock + BOTH legs stop at the fence face + marker B == route B
+Y/neg: markers outside ✓, 4 legs at face 152 ✓, markerB==routeB ✓
+
+[1A[2K[41/997] tests\atc-change-superset.spec.js:18:1 › E0 GATE: prune(atcChangeStack superset) == concrete, byte-identical across method × callMacro × config
+[1A[2K[42/997] tests\atc-change-in-place.spec.js:39:1 › DRIVE: Tool Change opens IN-PLACE — the per-method field gating matches the legacy + each method emits + the 3D sim renders
+[1A[2K[43/997] tests\atc-change-twin.spec.js:17:1 › E1: the twin emit == atcChangeStack byte-diff ZERO across method × callMacro × config on Expert + V4.1
+[1A[2K[44/997] tests\atc-change-superset.spec.js:51:1 › E0 golden: the concrete build (no superset) is unchanged — a plain method stack, no guard blocks; the routing is one-source
+[1A[2K[45/997] tests\atc-change-twin.spec.js:54:1 › E1: the inlineTnc arm is a LIVE VIEW — change an ATC I/O code → the NEXT emit tracks (no snapshot)
+[1A[2K[46/997] tests\atc-changer-gui.spec.js:29:1 › the PRESET LIBRARY lists the presets (relabeled) and picking one sets settings.atc.{grip,motion,layout}
+[1A[2K[47/997] tests\atc-change-twin.spec.js:84:1 › E1 M2: a Blocks edit inside a static arm (manual) SURVIVES the param recompose + the park X still tracks
+[1A[2K[48/997] tests\atc-changer-gui.spec.js:39:1 › the declared config DRIVES the sim — the choreo from settings.atc == the method choreo (identical)
+[1A[2K[49/997] tests\atc-check-in-place.spec.js:11:1 › emit BYTE-IDENTICAL to atcToolCheckStack across a scalar sweep — studio AND Expert (source-resolver stubbed ON)
+[1A[2K[50/997] tests\atc-changer-gui.spec.js:53:1 › the FROM-ZERO composer builds a config (layout × grip × motion) — RapidChange-shaped
+[1A[2Ktests\atc-change-in-place.spec.js:39:1 › DRIVE: Tool Change opens IN-PLACE — the per-method field gating matches the legacy + each method emits + the 3D sim renders
+ATC-CHANGE IN-PLACE gating OK · m6/manual/generic emits + gating verified
+
+[1A[2K[51/997] tests\atc-collet.spec.js:12:1 › (1) the seam resolves generic/disk to the pick-place kind (firmware stays push, m6 macro-call)
+[1A[2K[52/997] tests\atc-check-in-place.spec.js:49:1 › opensAs wiring: ATC Tool Check opens the twin IN-PLACE (plain title, twin retired from atc_datawiz)
+[1A[2K[53/997] tests\atc-changer-gui.spec.js:61:1 › SAVE AS PRESET persists the current config and it reappears in the library
+[1A[2K[54/997] tests\atc-collet.spec.js:28:1 › (2) the collet device opens/closes (position + tint) on setStationDevice
+[1A[2K[55/997] tests\atc-check-in-place.spec.js:65:1 › DRIVE: ATC Tool Check opens IN-PLACE with a NON-EMPTY form (incl. tolerance) + the 3D machine sim renders
+[1A[2K[56/997] tests\atc-dialect.spec.js:14:1 › the ATC_DIALECT table declares the M350 ground truth (one source, real pins)
+[1A[2K[57/997] tests\atc-dialect.spec.js:45:1 › the engine HONORS the dialect — M301 parks, M162/163 toggle the dust OUTPUT, M305 is a gripper WAIT (not dust)
+[1A[2K[58/997] tests\atc-collet.spec.js:50:1 › (3) a generic (pick-place) op arms the collet; it flips on the drawbar io_change (M154/M155)
+[1A[2K[59/997] tests\atc-dialect.spec.js:73:1 › the engine HONORS the M350 pneumatics — M156-161 drive the OUTPUT pins + fire io_change (were no-op)
+[1A[2Ktests\atc-check-in-place.spec.js:65:1 › DRIVE: ATC Tool Check opens IN-PLACE with a NON-EMPTY form (incl. tolerance) + the 3D machine sim renders
+ATC-CHECK IN-PLACE FORM: 8 fields → maxDist, retract, f_fast, f_slow, port, blockHeight, safeZ, tolerance
+
+[1A[2K[60/997] tests\atc-disk-swap.spec.js:12:1 › a disk op tool change rotates the ring to the pickup + swaps the occupancy there
+[1A[2K[61/997] tests\atc-envelope.spec.js:19:3 › atc_length: machine envelope draws in the preview
+[1A[2K[62/997] tests\atc-collet.spec.js:75:1 › (4) input SENSOR live-lighting activates: a generic change trace lights the M300/301/302 pins
+[1A[2K[63/997] tests\atc-envelope.spec.js:19:3 › atc_check: machine envelope draws in the preview
+[1A[2K[64/997] tests\atc-inline-onesource.spec.js:16:1 › INC-B2 (1): the inline body sources the USER drawbar codes (live), not the assumed M154/M155
+[1A[2K[65/997] tests\atc-interpreter.spec.js:17:1 › the interpreter walks a PLUNGE motion → a sim path (plunge + swap, NO drawbar/pneumatic I/O)
+[1A[2K[66/997] tests\atc-inline-onesource.spec.js:31:1 › INC-B2 (2): inline body ≡ the ⚙ Generate T.nc body, modulo the O-header/M99 wrapper
+[1A[2K[67/997] tests\alignment-fresh-seat.spec.js:85:1 › the twin marker DRAG (2D→3D flow): the drag moves A and the 3D trace FOLLOWS to the new A
+[1A[2K[68/997] tests\atc-envelope.spec.js:19:3 › atc_warmup: machine envelope draws in the preview
+[1A[2K[69/997] tests\atc-interpreter.spec.js:35:1 › a RapidChange config (from-zero) SIMS via the interpreter — the tool plunges + swaps
+[1A[2K[70/997] tests\atc-inline-onesource.spec.js:63:1 › INC-B2 (3): the default T# M6 emit is unchanged and its target follows fixedT
+[1A[2K[71/997] tests\atc-envelope.spec.js:19:3 › atc_change: machine envelope draws in the preview
+[1A[2K[72/997] tests\atc-inline-onesource.spec.js:81:1 › INC-B2 (4): the marker round-trips method + fixedT + callMacro for an inline op
+[1A[2K[73/997] tests\atc-inline-onesource.spec.js:93:1 › INC-B2 (5): re-emit after a live code change is FRESH
+[1A[2K[74/997] tests\atc-envelope.spec.js:19:3 › atc_test: machine envelope draws in the preview
+[1A[2K[75/997] tests\alignment-fresh-seat.spec.js:115:1 › NEGATIVE CONTROL: homing (machine-frame) trace head still coincides with its seated tool — unchanged
+[1A[2K[76/997] tests\atc-inline-onesource.spec.js:112:1 › INC-B2 (6): reconcile over the RAW inline stack recovers the DECLARED fields (fix B)
+[1A[2K[77/997] tests\atc-envelope.spec.js:19:3 › atc_table: machine envelope draws in the preview
+[1A[2K[78/997] tests\atc-inline-onesource.spec.js:129:1 › INC-B2b (7): the marker carries NO settings snapshot; re-emit uses the CURRENT live codes (reload-fresh)
+[1A[2K[79/997] tests\atc-io-labeling.spec.js:12:1 › (0) the dust-cover output TYPE uses M162/M163 (not the stale M305/M306)
+[1A[2K[80/997] tests\atc-length-in-place.spec.js:12:1 › emit BYTE-IDENTICAL to atcLengthStack across a scalar sweep — studio AND Expert (source-resolver stubbed ON)
+[1A[2K[81/997] tests\atc-interpreter.spec.js:63:1 › I5: the interpreter EMITS a T.nc O-program for a new combo (plunge macro + M99, a STANDALONE subprogram)
+[1A[2K[82/997] tests\atc-io-labeling.spec.js:22:1 › (1) assigned ATC pins are LABELED from the config + light LIVE on the sim semantic output (M-code join)
+[1A[2K[83/997] tests\atc-magazine-frame.spec.js:25:1 › the magazine anchor is on the FIXED frame — raw machine coords, INDEPENDENT of workOrigin
+[1A[2K[84/997] tests\atc-length-in-place.spec.js:52:1 › opensAs wiring: ATC Tool Length opens the twin IN-PLACE (plain title, twin retired from atc_datawiz)
+[1A[2K[85/997] tests\atc-interpreter.spec.js:81:1 › I5b-2a: Generate T.nc routes a candidate combo AND the DRAWBAR changer through the interpreter (safety-complete shipped route)
+[1A[2K[86/997] tests\atc-io-labeling.spec.js:55:1 › (2) the dust pin reflects M162/M163 (OUT_DUST_COVER), NOT M305/M306 (which is the gripper)
+[1A[2K[87/997] tests\atc-length-in-place.spec.js:68:1 › DRIVE: ATC Tool Length opens IN-PLACE with a NON-EMPTY form + the 3D machine sim renders
+[1A[2K[88/997] tests\atc-io-labeling.spec.js:73:1 › (3) ATC INPUT pins are LABELED from the config sensor rows + best-effort live-light (t185)
+[1A[2K[89/997] tests\atc-interpreter.spec.js:115:1 › I5b-1: motionToTnc emits a SAFETY-COMPLETE drawbar T.nc from the DECLARATION (matches the DDCS dance)
+[1A[2K[90/997] tests\atc-magazine-frame.spec.js:57:1 › a STOCK pinned to its WCS is unaffected — the part still rides the stock pin (no regression to mill ops)
+[1A[2K[91/997] tests\atc-io-labeling.spec.js:91:1 › (4) the config label is EDITABLE (bound to row.label) + the io tab reflects the new label (t185)
+[1A[2K[92/997] tests\atc-interpreter.spec.js:145:1 › I5b-3 INC1: a custom drawbar code SOURCES from the I/O table in BOTH the sim and the emit; default byte-identical
+[1A[2K[93/997] tests\atc-io-labeling.spec.js:117:1 › (5) RENAME-PROOF (t189 declare-fix): the input live-light joins on the DECLARED waitCode, NOT the label text
+[1A[2Ktests\atc-length-in-place.spec.js:68:1 › DRIVE: ATC Tool Length opens IN-PLACE with a NON-EMPTY form + the 3D machine sim renders
+ATC-LENGTH IN-PLACE FORM: 7 fields → maxDist, retract, f_fast, f_slow, port, blockHeight, safeZ
+
+[1A[2K[94/997] tests\atc-magazine-frame.spec.js:71:1 › a PARTIAL profile (workOrigin set, NO wcs.table) — part rides workOrigin so G53 aligns with the raw-machine magazine (t173)
+[1A[2K[95/997] tests\atc-interpreter.spec.js:177:1 › INC-A: the FIRMWARE interpreter preview walks the STATION dance (G53 machine frame, station from firmwareStation)
+[1A[2K[96/997] tests\atc-model.spec.js:35:1 › the composable GRIP × MOTION schema is declared and well-formed
+[1A[2K[97/997] tests\atc-io-labeling.spec.js:134:1 › (6) migrateIO backfills the declared waitCode on legacy ATC sensor rows (no waitCode → M301 by id)
+[1A[2K[98/997] tests\atc-model.spec.js:44:1 › the 3 methods (and back-compat old ops) resolve to the correct grip × motion combo
+[1A[2K[99/997] tests\atc-pin-picker.spec.js:30:1 › assigning an ATC OUTPUT pin writes the config row AND the io-tab lights it (the join)
+[1A[2K[100/997] tests\atc-pocket-swap.spec.js:12:1 › a real tool change on a generic op swaps the magazine occupancy at the pockets + spindles the new tool
+[1A[2K[101/997] tests\atc-preview.spec.js:16:3 › atc_length: two-pane + shared 3D preview mounts
+[1A[2K[102/997] tests\atc-model.spec.js:58:1 › INC-B2: the inline fallback (callMacro:false) emits the ONE-SOURCE tncProgram body — firmware unchanged, generic/disk source the user I/O codes
+[1A[2K[103/997] tests\atc-pin-picker.spec.js:45:1 › assigning an ATC INPUT pin (separate pin space) writes settings.inputs and lights it
+[1A[2K[104/997] tests\atc-model.spec.js:92:1 › I2: the choreography descriptor is COMPUTED from the model, IDENTICAL to the old fixed table
+[1A[2K[105/997] tests\atc-pin-picker.spec.js:58:1 › a taken pin is disabled so a pin cannot map to two functions (conflict prevented)
+[1A[2K[106/997] tests\atc-preview.spec.js:16:3 › atc_check: two-pane + shared 3D preview mounts
+[1A[2K[107/997] tests\atc-roundtrip.spec.js:27:1 › atc_warmup round-trips its RPM / dwell stages
+[1A[2K[108/997] tests\atc-pin-picker.spec.js:74:1 › ONE-SOURCE: the picker reflects a pin set in the config, and clearing it frees the pin
+[1A[2K[109/997] tests\atc-setup-canvas.spec.js:52:1 › dragging a generic pocket handle writes settings.atc.magazine at the cursor world point — no controller write
+[1A[2K[110/997] tests\atc-preview.spec.js:16:3 › atc_warmup: two-pane + shared 3D preview mounts
+[1A[2K[111/997] tests\atc-roundtrip.spec.js:33:1 › atc_check round-trips the tolerance
+[1A[2K[112/997] tests\atc-setup-numeric.spec.js:26:1 › LINEAR: an origin + LENGTH + count generates evenly-spaced pockets (pitch = length ÷ (count−1))
+[1A[2K[113/997] tests\atc-setup-canvas.spec.js:71:1 › dragging a firmware push-station point writes the settings.atc.firmwareStation store
+[1A[2K[114/997] tests\atc-roundtrip.spec.js:39:1 › atc_change round-trips every change method
+[1A[2K[115/997] tests\atc-preview.spec.js:16:3 › atc_change: two-pane + shared 3D preview mounts
+[1A[2K[116/997] tests\atc-setup-numeric.spec.js:45:1 › DISK: diameter + pocket count lays the ring (count pockets, each at Ø/2 from the carousel centre)
+[1A[2K[117/997] tests\atc-setup-canvas.spec.js:94:1 › the firmware sim station renders from the firmwareStation store (var-seed kills untaught-0)
+[1A[2K[118/997] tests\atc-roundtrip.spec.js:76:1 › fix B / A1: a Blocks edit of the T# M6 tool-word round-trips back to fixedT (the edit wins; bare M6 → 0)
+[1A[2K[119/997] tests\atc-setup-numeric.spec.js:64:1 › FIRMWARE: typing the push-station coords writes the store AND the sim station renders the exact values
+[1A[2K[120/997] tests\atc-preview.spec.js:16:3 › atc_test: two-pane + shared 3D preview mounts
+[1A[2K[121/997] tests\atc-roundtrip.spec.js:100:1 › atc_change automatic methods emit a T# M6 CALL by default; callMacro=false keeps the firmware-accurate inline dance
+[1A[2K[122/997] tests\atc-setup-canvas.spec.js:118:1 › the setup canvas is a coherent MACHINE frame — home + axes at machine 0, envelope = travel extents (not a part datum)
+[1A[2K[123/997] tests\atc-roundtrip.spec.js:135:1 › atc_test round-trips drawbar + pocket dry-run
+[1A[2K[124/997] tests\atc-station-devices.spec.js:23:1 › (1) the devices are modelled at the station (WCS-independent) + transform on setStationDevice
+[1A[2K[125/997] tests\atc-station-highlight.spec.js:13:1 › (1) the choreography seam declares firmware=push, m6=macro-call, others no-op
+[1A[2K[126/997] tests\atc-table-in-place.spec.js:11:1 › opensAs wiring: Tool Table opens the twin IN-PLACE (plain title, twin retired) + opSimContext machine+magazine
+[1A[2K[127/997] tests\atc-roundtrip.spec.js:143:1 › atc_table round-trips the include-lengths / include-pockets toggles
+[1A[2K[128/997] tests\atc-station-highlight.spec.js:34:1 › (2) the station highlight sits at RAW machine coords on the fixed frame — WCS-INDEPENDENT
+[1A[2K[129/997] tests\atc-table-in-place.spec.js:31:1 › DRIVE: Tool Table opens IN-PLACE — the two include toggles + the Edit-table button + the live-view emit + the 3D sim
+[1A[2K[130/997] tests\atc-roundtrip.spec.js:149:1 › atc_length is registered for reverse-sync (no editable form fields)
+[1A[2K[131/997] tests\atc-station-devices.spec.js:56:1 › (2) a firmware push arms the devices; they transform on the pneumatic io_change (M160/M161/M156/M157)
+[1A[2K[132/997] tests\atc-roundtrip.spec.js:156:1 › every ATC op has a BUILDERS stack AND a reconciler
+[1A[2K[133/997] tests\atc-station-highlight.spec.js:55:1 › (3) the traced FIRMWARE push reaches the taught station; the view wires the highlight for firmware only
+[1A[2Ktests\atc-table-in-place.spec.js:31:1 › DRIVE: Tool Table opens IN-PLACE — the two include toggles + the Edit-table button + the live-view emit + the 3D sim
+ATC-TABLE IN-PLACE: includeLengths,includePockets,_setup | 14 lines
+
+[1A[2K[134/997] tests\atc-table-superset.spec.js:12:1 › E0 GATE: prune(atcTableStack superset) == concrete, byte-identical across toggles × table sizes × profiles
+[1A[2K[135/997] tests\atc-table-twin.spec.js:9:1 › E1: the twin emit == atcTableStack byte-diff ZERO across toggles × table sizes × profiles (live table)
+[1A[2K[136/997] tests\atc-station-devices.spec.js:85:1 › (3) end-to-end: a real firmware push PLAY animates the devices via the engine io_change
+[1A[2K[137/997] tests\atc-test-in-place.spec.js:11:1 › opensAs wiring: ATC Test opens the twin IN-PLACE (plain title, twin retired) + opSimContext carries machine+magazine
+[1A[2K[138/997] tests\atc-table-twin.spec.js:43:1 › E1: the twin is a LIVE VIEW — edit a tool length in Settings → the NEXT emit tracks (no snapshot)
+[1A[2K[139/997] tests\atc-test-superset.spec.js:10:1 › E0 GATE: prune(atcTestStack superset) == concrete, byte-identical across modes × magazine sizes × drawbar counts
+[1A[2K[140/997] tests\atc-test-in-place.spec.js:33:1 › DRIVE: ATC Test opens IN-PLACE — both modes render their fields + the emit preview + the machine+magazine 3D sim
+[1A[2K[141/997] tests\atc-test-twin.spec.js:18:1 › E1: the twin emit == atcTestStack byte-diff ZERO across mode × magazine size × drawbar-count for the CURRENT settings
+[1A[2K[142/997] tests\atc-test-superset.spec.js:41:1 › E0 golden: the concrete build (no superset) is unchanged — a plain drawbar / pockets stack, no guard blocks
+[1A[2K[143/997] tests\atc-test-twin.spec.js:51:1 › E1: the pockets unroll TRACKS the live magazine — add / edit a pocket → the NEXT emit reflects it (no snapshot)
+[1A[2K[144/997] tests\atc-tnc-verify.spec.js:17:1 › [B] GREEN — T.nc installed on the controller (gateway verified)
+[1A[2K[145/997] tests\atc-test-twin.spec.js:87:1 › E1 M2: a Blocks edit inside a pocket arm SURVIVES the magazine recompose + the pocket X still tracks settings
+[1A[2K[146/997] tests\atc-tnc-verify.spec.js:29:1 › [B] RED — T.nc NOT FOUND on the connected controller
+[1A[2K[147/997] tests\atc-test-twin.spec.js:130:1 › E1 declared-I/O: the drawbar/sensor codes == Settings → ATC I/O — a declared override tracks in BOTH twin + concrete
+[1A[2Ktests\atc-test-in-place.spec.js:33:1 › DRIVE: ATC Test opens IN-PLACE — both modes render their fields + the emit preview + the machine+magazine 3D sim
+ATC-TEST IN-PLACE: fields=mode,cycles,dwellMs,first,count,zClear,descend | pockets lines=33
+
+[1A[2K[148/997] tests\atc-tool-setter.spec.js:32:1 › Tool LENGTH preview renders the setter at its configured machine position (fixed frame)
+[1A[2K[149/997] tests\atc-station-devices.spec.js:108:1 › (4) a NON-firmware method (m6) arms NO devices
+[1A[2K[150/997] tests\atc-tool-swap.spec.js:21:1 › (1) showRetiredTool places the OLD tool at the push station — raw machine coords, WCS-independent
+[1A[2K[151/997] tests\atc-tnc-verify.spec.js:41:1 › [B] AMBER — no gateway connected → can't verify (today's install text)
+[1A[2K[152/997] tests\atc-tool-setter.spec.js:42:1 › Tool CHECK preview renders the same setter at its configured position
+[1A[2K[153/997] tests\atc-warmup-as-data.spec.js:18:1 › atc-warmup-as-data: BYTE-IDENTICAL to atcWarmupStack across a param sweep + binding-wiring
+[1A[2K[154/997] tests\atc-tool-swap.spec.js:40:1 › (2) a REAL tool change (T# M6) during play retires the OLD tool to the station + swaps the spindle to the NEW tool
+[1A[2K[155/997] tests\atc-tnc-verify.spec.js:53:1 › [B] the tri-state re-verifies live: RED → GREEN when T.nc appears
+[1A[2K[156/997] tests\atc-tool-setter.spec.js:50:1 › ONE-SOURCE: the setter render tracks settings.probes (change the config → the mesh moves)
+[1A[2K[157/997] tests\atc-wizards.spec.js:17:1 › Tool Change wizard: method switching shows the right fields and dialect
+[1A[2K[158/997] tests\atom-gating.spec.js:7:1 › controller-specific atoms gate by the active post
+[1A[2K[159/997] tests\autostart-stored-macro.spec.js:30:1 › a hand edit to the body PERSISTS across reload (stored artifact); export/import round-trips it
+[1A[2K[160/997] tests\atc-wizards.spec.js:54:1 › Tool Change wizard: INC-B2b field gating — target FOLLOWS fixedT in T# M6, greyed inline; dead toggles + zClear greyed
+[1A[2K[161/997] tests\axis-labels-config.spec.js:9:1 › axis labels point in true coordinate directions and sit at envelope edge centres (no config flip)
+[1A[2K[162/997] tests\atc-tool-swap.spec.js:77:1 › (3) the ISOLATED firmware op (no tool change) shows NO swap — push + highlight only
+[1A[2K[163/997] tests\autostart-stored-macro.spec.js:54:1 › Regenerate rebuilds body == homingStack emit + the additional-G-code suffix; asks before clobbering a hand-edit
+[1A[2K[164/997] tests\atc-wizards.spec.js:87:1 › Tool Change wizard: the callMacro toggle switches the preview between the T# M6 call and the inline dance (INC-C1)
+[1A[2K[165/997] tests\block-suggest-float.spec.js:8:1 › suggestion float shows multiple block options and Tab takes the first
+[1A[2K[166/997] tests\autostart-stored-macro.spec.js:90:1 › t656 amend1/2: the SELECTED controller drives the body — the chip shows it, a stale cross-profile body is flagged, Regenerate rebuilds for the selected post
+[1A[2K[167/997] tests\atc-wizards.spec.js:123:1 › Tool Change wizard: the install-dependency banner shows in T# M6 mode, hides for inline / m6 / manual (INC-C2)
+[1A[2K[168/997] tests\block-suggest-float.spec.js:32:1 › clicking a float option inserts that specific block
+[1A[2K[169/997] tests\block-suggest.spec.js:7:1 › suggestion model: curated seed + learning from programs
+[1A[2K[170/997] tests\autostart-stored-macro.spec.js:125:1 › Push sends EXACTLY the stored body (payload assertion)
+[1A[2K[171/997] tests\block-suggest.spec.js:22:1 › curated seed matches the DDCS macro idioms (probe / tool-change / open)
+[1A[2K[172/997] tests\atc-wizards.spec.js:154:1 › Tool Change wizard: bold UNVERIFIED banner only when INLINING generic/disk assumed codes (INC-C3)
+[1A[2K[173/997] tests\block-suggest-float.spec.js:48:1 › compose.ghost toggle hides the suggestion float
+[1A[2K[174/997] tests\block-suggest.spec.js:44:1 › suggestion strip: clicking a chip appends a block
+[1A[2K[175/997] tests\blockly-port.spec.js:7:1 › Blockly bridge: stack ⇄ workspace round-trips and emits via emitMapped
+[1A[2K[176/997] tests\blocks-accumulate.spec.js:16:1 › two probe ops accumulate with ONE M30 and unique labels
+[1A[2K[177/997] tests\blocks-authoring-always-on.spec.js:22:1 › Blocks authoring is always on: no toggle, save always present, expose marker lights up when exposed
+[1A[2K[178/997] tests\atc-wizards.spec.js:196:1 › ATC table wizard: flags magazine pockets that reference a deleted library tool (A7)
+[1A[2K[179/997] tests\blocks-col-resize.spec.js:7:1 › Blocks desktop: dragging the column handle resizes (and persists) the preview width
+[1A[2K[180/997] tests\atc-wizards.spec.js:224:1 › ATC table wizard: no orphan banner when every pocket tool exists (A7)
+[1A[2K[181/997] tests\blocks-desktop-collapse.spec.js:11:1 › desktop: the palette collapses and re-expands via the handle; round-trip intact; starts open
+[1A[2K[182/997] tests\blocks-dialect-decode.spec.js:65:3 › ddcs-expert-m350: dialect-specific ops decode to proper blocks (no raw) and round-trip
+[1A[2K[183/997] tests\blocks-edit-reconcile.spec.js:9:1 › editor → blocks WITHOUT ever opening the Blocks tab
+[1A[2K[184/997] tests\blocks-dialect-decode.spec.js:65:3 › ddcs-v41: dialect-specific ops decode to proper blocks (no raw) and round-trip
+[1A[2K[185/997] tests\atc-wizards.spec.js:236:1 › ATC Test wizard: drawbar and pocket modes
+[1A[2K[186/997] tests\blocks-dialect-decode.spec.js:65:3 › ddcs-v3-dm500: dialect-specific ops decode to proper blocks (no raw) and round-trip
+[1A[2K[187/997] tests\blocks-exec-glow.spec.js:11:1 › the projected G-code lights the sim execution line + a fading comet-tail (index-mapped)
+[1A[2K[188/997] tests\blocks-dialect-decode.spec.js:65:3 › rs274ngc: dialect-specific ops decode to proper blocks (no raw) and round-trip
+[1A[2K[189/997] tests\blocks-hover.spec.js:37:1 › block hover warms its lines (lighter, no scroll), resolves the INNERMOST block, clears on exit
+[1A[2K[190/997] tests\blocks-knob-binding.spec.js:25:1 › a data-op opens in Blocks with its BOUND params PRE-TICKED as knobs (byte-identical emit)
+[1A[2K[191/997] tests\blocks-edit-reconcile.spec.js:38:1 › editing a HIGH-LEVEL program is reverted (not flattened)
+[1A[2K[192/997] tests\blocks-knob-metadata.spec.js:27:1 › metadata blocks (section/panel/param_group) get NO knob kit; a value atom keeps its knob
+[1A[2K[193/997] tests\blocks-hover.spec.js:82:1 › hovering a value field boxes exactly that value’s emitted token (.thot) and warms its block
+[1A[2K[194/997] tests\blocks-live-form.spec.js:10:1 › editing a custom op shows its form derived from the blocks; editing a block updates the form
+[1A[2K[195/997] tests\blocks-mmb-pan.spec.js:34:1 › (1) middle-drag over a block pans the canvas; the block stays put
+[1A[2K[196/997] tests\blocks-mobile-drawers.spec.js:8:1 › mobile: palette collapses (canvas reclaims width), preview + palette drawers toggle
+[1A[2K[197/997] tests\blocks-hover.spec.js:103:1 › selecting a leaf atom boxes its value tokens; selecting a container does not (leaf-scoped)
+[1A[2K[198/997] tests\blocks-live-form.spec.js:52:1 › form→block writeback: editing the live form writes the value back to the block + G-code (no echo clobber)
+[1A[2K[199/997] tests\blocks-mmb-pan.spec.js:47:1 › (2) left-drag over a block still moves the block
+[1A[2K[200/997] tests\blocks-open-seeded.spec.js:16:1 › Blocks tab renders a non-empty program on open (no swallowed showBlocks ReferenceError)
+[1A[2K[201/997] tests\blocks-live-form.spec.js:89:1 › editing-context chrome: re-authoring shows the glow class + named chip; saving clears it
+[1A[2K[202/997] tests\blocks-live-form.spec.js:141:1 › non-destructive save: re-author + "Save as new" creates a copy, leaving the original intact
+[1A[2K[203/997] tests\blocks-render.spec.js:8:1 › loaded op blocks are actually RENDERED (have SVG bounding boxes), not just modelled
+[1A[2K[204/997] tests\blocks-mmb-pan.spec.js:58:1 › (3) middle-drag over empty canvas pans
+[1A[2K[205/997] tests\blocks-rotary-rig.spec.js:14:1 › Blocks preview shows the 4th-axis rig for a rotary op, hides it for a mill program
+[1A[2K[206/997] tests\blocks-roundtrip-toast.spec.js:6:1 › round-trip toast: shows ONCE on the first wizard-op insert, never again
+[1A[2K[207/997] tests\blocks-roundtrip.spec.js:7:1 › Blocks → STUDIO: the editor is the live projection of the block program
+[1A[2K[208/997] tests\blocks-live-form.spec.js:164:1 › non-destructive save: "Update" overwrites the re-authored wizard in place (no duplicate)
+[1A[2K[209/997] tests\blocks-single-inject.spec.js:10:1 › two concurrent showApp(blocks) inject exactly ONE workspace, op in view
+[1A[2K[210/997] tests\blocks-roundtrip-toast.spec.js:35:1 › round-trip FAQ: the Settings FAQ explains editing a wizard op in Blocks
+[1A[2K[211/997] tests\blocks-theme.spec.js:8:1 › blockly chrome follows the app theme (live re-skin on data-theme switch)
+[1A[2K[212/997] tests\blocks-var-socket.spec.js:8:1 › #var coordinate survives the Blockly workspace round-trip (Variable pill, not 0)
+[1A[2K[213/997] tests\blocks-live-form.spec.js:183:1 › the live form pane is hidden when NOT editing a custom op (normal Blocks use)
+[1A[2K[214/997] tests\bore-as-data.spec.js:9:1 › byte-diff ZERO: user_bore_data == drillStack(helical) across pattern × ramp × cut × placement × wcs
+[1A[2K[215/997] tests\bore-glow-cap.spec.js:12:1 › helical bore kernel CAPS a runaway pass count (no hang) but leaves real bores untouched
+[1A[2K[216/997] tests\bore-in-place.spec.js:9:1 › opensAs wiring: Bore opens user_bore_data IN-PLACE, plain title, twin retired
+[1A[2K[217/997] tests\bore-glow-cap.spec.js:43:1 › selecting a helical-bore leaf does not freeze the value-glow (it bails on depth, boxes the rest)
+[1A[2K[218/997] tests\bore-in-place.spec.js:27:1 › DRIVE: Bore opens IN-PLACE with a NON-EMPTY, correct form + the 3D renders the bore toolpath; screenshot
+[1A[2K[219/997] tests\boss-pocket-reconcile.spec.js:14:1 › boss/box/cylinder show NO inside cavity; pocket shows one; the shape dropdown toggle reconciles (data preserved)
+[1A[2K[220/997] tests\boss-probe-collision.spec.js:10:1 › each REPOSITION pass probes from ITS start ② → collides (was: fired from ① and missed)
+[1A[2K[221/997] tests\cam-slot-sim.spec.js:9:1 › engine traces a generated bore bolt-circle macro with seeded form vars
+[1A[2K[222/997] tests\canvas-widgets.spec.js:10:1 › canvasWidgets registry: each gesture places its handle + maps a drag to the right field
+[1A[2K[223/997] tests\cam-slot-sim.spec.js:33:1 › corner probe slot: each corner probes the correct X/Y walls and every branch resolves
+[1A[2K[224/997] tests\canvas-widgets.spec.js:50:1 › canvasWidgets registry: rect + radial gestures place + drag byte-identically to the hand-rolled drill math
+[1A[2K[225/997] tests\clear-resets-model.spec.js:20:1 › Clear wipes the program model so the next Insert does not re-accumulate
+[1A[2K[226/997] tests\cam-slot-sim.spec.js:73:1 › edge probe slot: axis/direction select the wall and the WCS axis written
+[1A[2K[227/997] tests\canvas-widgets.spec.js:102:1 › canvasWidgets registry: pocket gesture params (ellipse half-extent rect + radius-only radial) match the old formulas
+[1A[2Ktests\bore-in-place.spec.js:27:1 › DRIVE: Bore opens IN-PLACE with a NON-EMPTY, correct form + the 3D renders the bore toolpath; screenshot
+BORE IN-PLACE FORM: 33 fields → wcs, stockAttach, pathDatum, stockDatum, stockW, stockH, stockZ, originX, originY, offZ, pattern, x0, y0, cols, rows, dx, dy, count, spacing, angle, dia, startAngle, w, h, nx, ny, skip, depth, holeDia, toolDia, pitch, ramp, feed | viz=true
+
+[1A[2K[228/997] tests\comm-dwell-units.spec.js:10:1 › comm Dwell (500 ms) folds per-post — Expert/V4.1 P500 (ms), DM500 P0.5 (s) — on BOTH the stack and the (un-frozen) twin
+[1A[2K[229/997] tests\cam-slot-sim.spec.js:104:1 › inside-centre slot: probes ±X then ±Y with a G53 re-centre between (bore = true diameter)
+[1A[2K[230/997] tests\canvas-widgets.spec.js:134:1 › canvasWidgets registry: projLength gesture (slot width) matches the perpendicular-projection formula
+[1A[2K[231/997] tests\comm-e0-superset.spec.js:9:1 › E0 GATE: prune(commStack superset) == concrete commStack byte-identical across the type × hmi × mode × conditional sweep
+[1A[2K[232/997] tests\cam-slot-sim.spec.js:127:1 › boss-centre slot: probes 4 faces from outside, 3 reposition prompts, writes centre
+[1A[2K[233/997] tests\canvas-widgets.spec.js:164:1 › drill wizard renders its handles from the registry (point + radial)
+[1A[2K[234/997] tests\cam-slot-sim.spec.js:150:1 › alignment slot: fence axis selects the probe axis; measures (no WCS write)
+[1A[2K[235/997] tests\comm-in-place.spec.js:10:1 › E3 opensAs wiring: Comm opens user_comm_data IN-PLACE, plain title, twin retired
+[1A[2K[236/997] tests\cam-slot-sim.spec.js:173:1 › pocket slot: raster-clears the rect to depth in layers; guards a too-small pocket
+[1A[2K[237/997] tests\comm-in-place.spec.js:33:1 › E3 DRIVE: Comm opens IN-PLACE — the comm fields render + the DDCS-screen preview shows (not the legacy modal)
+[1A[2K[238/997] tests\cam-slot-sim.spec.js:202:1 › circle-pocket slot: concentric rings clear the disc to depth (Ø − tool), guards too-small
+[1A[2K[239/997] tests\canvas-widgets.spec.js:187:1 › text wizard renders its four canvas handles from the registry
+[1A[2K[240/997] tests\cam-slot-sim.spec.js:227:1 › surfacing slot: rasters the full area with no inset and no wall pass
+[1A[2K[241/997] tests\comm-msg-fix.spec.js:9:1 › the MSG bug is fixed: commStack emits on a NON-HMI post (no ReferenceError) + an HMI post, all types
+[1A[2Ktests\comm-in-place.spec.js:33:1 › E3 DRIVE: Comm opens IN-PLACE — the comm fields render + the DDCS-screen preview shows (not the legacy modal)
+E3 IN-PLACE FORM: 14 fields → type, popupMode, statusMode, msg, statusColor, statusDwell, id, dest, val, cycle, slot1, slot2, slot3, slot4 | {"previewHasDialog":true,"legacyModalHidden":true}
+
+[1A[2K[242/997] tests\comm-post-fold.spec.js:29:1 › comm folds per post: Expert register truth, V4.1/DM500 no leaks + M0, twin == built-in on every post
+[1A[2K[243/997] tests\cam-slot-sim.spec.js:247:1 › mill variants: raster direction rotates the rows (same coverage); circle arc direction is selectable
+[1A[2K[244/997] tests\comm-twin.spec.js:6:1 › TWIN byte-identity: user_comm_data == commStack across the type sweep × HMI + non-HMI posts
+[1A[2K[245/997] tests\compose-settings.spec.js:7:1 › Composing settings tab toggles the block suggestions
+[1A[2K[246/997] tests\contour-canvas.spec.js:21:1 › contour 2D canvas: rect / circle / ellipse size handles each drive their field through the registry
+[1A[2K[247/997] tests\cam-slot-sim.spec.js:278:1 › cutting slots manage the spindle with the proven Expert forms (M3 S[#var], G04 P ms, M5)
+[1A[2K[248/997] tests\contour-data-emit.spec.js:9:1 › E1 byte-diff ZERO: user_contour_data == contourStack across side × 4 shapes × a scalar/placement/wcs sweep
+[1A[2K[249/997] tests\cam-slot-sim.spec.js:304:1 › probe-Z slot: two-pass Z touch down, writes WCS Z so the touch reads as Surface = Z
+[1A[2K[250/997] tests\contour-in-place.spec.js:9:1 › E1 opensAs wiring: Contour opens user_contour_data IN-PLACE, plain title, twin retired from its own entry
+[1A[2K[251/997] tests\contour-op.spec.js:8:1 › contour side offsets the traced boundary by the tool radius
+[1A[2K[252/997] tests\cam-slot-sim.spec.js:328:1 › rotateProgram rotates XY + arc I/J about a pivot; tracks partial moves; flags G91
+[1A[2K[253/997] tests\cam-slot-sim.spec.js:351:1 › mergeEng appends pack params, preserves the eng, and flags collisions
+[1A[2K[254/997] tests\contour-in-place.spec.js:32:1 › E1 DRIVE: Contour opens IN-PLACE with a NON-EMPTY, correct form + the 2D layout renders
+[1A[2K[255/997] tests\contour-wizard.spec.js:9:1 › contour wizard: opens, renders 2D/3D, emits the offset toolpath
+[1A[2K[256/997] tests\cam-slot-sim.spec.js:371:1 › auto-icon renders a valid 360x180 BMP from the op name/kind
+[1A[2K[257/997] tests\cam-slot-sim.spec.js:388:1 › preview panel mounts on a seeded slot macro without throwing
+[1A[2Ktests\contour-in-place.spec.js:32:1 › E1 DRIVE: Contour opens IN-PLACE with a NON-EMPTY, correct form + the 2D layout renders
+E1 IN-PLACE FORM: 21 fields → wcs, originX, originY, stockAttach, pathDatum, stockDatum, stockW, stockH, stockZ, offZ, depth, stepdown, shape, side, w, h, dia, sides, toolDia, feed, plunge | viz=true
+
+[1A[2K[258/997] tests\controller-file-tree.spec.js:23:1 › the tree renders the ACTIVE controller declaration: Expert wraps panels, V4.1 = its firmware files (LAN push), DM500 = install files (USB export, no LAN)
+[1A[2K[259/997] tests\cam-slot-sim.spec.js:411:1 › structured op editing: ops manifest drives the macro; edit type/variant + remove regenerates
+[1A[2K[260/997] tests\cam-slot-sim.spec.js:448:1 › structured op editing: tuned field values persist across an op edit (per-op, matched by key)
+[1A[2K[261/997] tests\controller-file-tree.spec.js:68:1 › editing a plain file persists in the profile (survives reload); switching profiles SWAPS the workspace
+[1A[2Ktests\contour-canvas.spec.js:21:1 › contour 2D canvas: rect / circle / ellipse size handles each drive their field through the registry
+rect ct_w before/after: 80 109.81
+
+[1A[2K[262/997] tests\cam-slot-sim.spec.js:475:1 › structured op editing: ▲/▼ reorder the ops (macro run order) and tuned values travel
+[1A[2K[263/997] tests\contour-wizard.spec.js:52:1 › contour wizard: side switches the offset; circle is a G3 arc
+[1A[2K[264/997] tests\coord-author-block.spec.js:12:1 › dev mode: ✎ positions opens the coordinate editor and writes the list back to the coordlist block
+[1A[2K[265/997] tests\cam-slot-sim.spec.js:504:1 › duplicate op + structured slot: clone inherits tuned values, gets fresh params (no collision)
+[1A[2K[266/997] tests\cam-slot-sim.spec.js:529:1 › duplicate a legacy (hand-built) slot remaps its #params off the original — no collision
+[1A[2K[267/997] tests\coord-list-block.spec.js:14:1 › coordlist block: registered, emits nothing, positions preview draws + round-trips
+[1A[2K[268/997] tests\coord-list-widget.spec.js:12:1 › coord-list: renders point markers; add/remove/shared-Z; read() returns the list
+[1A[2K[269/997] tests\corner-anim-overlay.spec.js:43:1 › INC-1: the overlay is PIXEL-EXACT under the SVG (stock corners coincide) at rest AND after a zoom
+[1A[2K[270/997] tests\corner-atrest-parity.spec.js:60:1 › ANTI-GREEN v2: the wall markers are COINCIDENT (3D == Layout) AT REST across ALL 16 configs
+[1A[2Kcircle ct_dia before/after: 50 79.547
+
+[1A[2K[271/997] tests\corner-anim-overlay.spec.js:62:1 › INC-2: the shared engine feeds MOVING live positions to the overlay head (path drawn + animates)
+[1A[2Ktests\corner-atrest-parity.spec.js:60:1 › ANTI-GREEN v2: the wall markers are COINCIDENT (3D == Layout) AT REST across ALL 16 configs
+REST FL/YX/Zoff: wall2 3D=(-43.0,43.0) Lay=(-43.0,43.0) Δ=0.00
+
+[1A[2K[272/997] tests\contour-wizard.spec.js:77:1 › contour op round-trips: BUILDERS.contour → reconcile reads the TRUE boundary
+[1A[2KREST FL/YX/Zon: wall2 3D=(-43.0,43.0) Lay=(-43.0,43.0) Δ=0.00 | wall1 Δ=0.00
+
+[1A[2K[273/997] tests\corner-data-baked-frontier.spec.js:17:1 › BAKED FRONTIER: `level` stays baked-final (non-operator-facing) — the twin diverges from cornerStack when level changes
+[1A[2Ktests\contour-canvas.spec.js:21:1 › contour 2D canvas: rect / circle / ellipse size handles each drive their field through the registry
+ellipse ct_w before/after: 109.81 131.102
+
+[1A[2K[274/997] tests\corner-data-cornerseq-live.spec.js:12:1 › ③b corner×probeSeq LIVE: enum bindings drive all 8 combos == cornerStack byte-for-byte + independent-truth derived values
+[1A[2K[275/997] tests\corner-data-baked-frontier.spec.js:38:1 › IN-PLACE: the Corner Probe slot opens the data-op twin (opensAs), the built-in view stays retired
+[1A[2K[276/997] tests\corner-anim-overlay.spec.js:96:1 › INC-3: the handles are still drag-writable through the pointer-events:none overlay
+[1A[2Ktests\corner-atrest-parity.spec.js:60:1 › ANTI-GREEN v2: the wall markers are COINCIDENT (3D == Layout) AT REST across ALL 16 configs
+REST FL/XY/Zoff: wall2 3D=(43.0,-43.0) Lay=(43.0,-43.0) Δ=0.00
+
+[1A[2K[277/997] tests\corner-data-drag.spec.js:14:1 › Corner (data): dragging the reposition handle writes the CORRECT incremental delta (world − wall-1) into #23/#24
+[1A[2K[278/997] tests\corner-data-emit.spec.js:16:1 › corner-data-emit: functional G-code == cornerStack across a bound-scalar sweep + derived-binding wiring
+[1A[2K[279/997] tests\corner-data-emit.spec.js:166:1 › corner-data-emit GOLDEN: a DEFAULT Corner (data) emits a NON-DEGENERATE reposition (kills G0 X0 Y0)
