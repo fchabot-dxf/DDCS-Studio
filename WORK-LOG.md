@@ -18760,3 +18760,92 @@ SCREENSHOTS: s1271-bar-lathe.png (Lathe leading), s1271-gated-ops.png (Pocket an
 THE PILOT IS COMPLETE. All five mechanisms — twin registration, canvas + marker-derived handle, library citizenship,
 axis gating, and (from t1269) the ground-truth-verified parametric emit — are proven. OD / parting / drilling inherit
 these rather than reinventing any of them.
+
+---
+
+## turn 1273 -- OD TURNING, the first INHERITOR. And the pilot's canvas finally reached a pixel.
+
+### THE HAND-DERIVED GROUND TRUTH, and where the passes are ANCHORED.
+
+Ø20 bar down to Ø14, 1mm of radius per pass, leaving 0.5: roughing stops at radius 7.5, and stepping OUT from there
+while still inside the 10mm bar radius gives 8.5 and 9.5. Cut outside-in: 9.5, 8.5, 7.5 — then the finish at 7.0.
+Both the JS pass list and the SIM EXECUTING the emitted loop land on exactly that, by two independent paths.
+
+The anchor is a real decision, not an accident. When the material does not divide evenly into passes, one cut is
+lighter than the rest, and this anchors on the FLOOR so the light one falls FIRST — through the sawn/scaled skin,
+which is where a light cut belongs. The alternative puts a feather cut immediately before the finishing pass, two
+light cuts back to back for nothing. facing.js anchors the other way; they agree whenever the depth divides evenly,
+which is why the pilot never saw the difference. FLAGGED for the advisor, not silently unified.
+
+The emitted macro COUNTS its passes before cutting any — a short no-motion loop stepping out from the floor to find
+the outermost radius. That count cannot be baked at post time precisely BECAUSE the operator can retune the depth of
+cut at the machine, which is the whole point of the parametric header. A zero depth of cut is guarded by doing NO
+ROUGHING rather than by inventing a depth nobody asked for; the finishing pass still runs, which is exactly what
+"take no roughing passes" should mean. (The first version clamped #124 to 0.5 — and deriveBindings REFUSED to build,
+because #124 was then assigned twice and the "depth per pass" field had two candidate sockets. The identity-derive
+caught a real ambiguity, not a technicality.)
+
+### THE HEADER SPEAKS DIAMETER; THE CONTROLLER DERIVES THE RADIUS.
+
+Every number a person types is a diameter (#131-#133); every radius is `[#132/2]`, worked out by the controller. Two
+reasons, and the first is the load-bearing one: A FORM FIELD MUST BIND A SOCKET THAT HOLDS WHAT THE FIELD SAYS. Bind
+a field labelled Ø to a radius socket and the form↔block round trip halves the part — someone edits the block, the
+form reads 7 back into a Ø field, and the next emit halves it again. Silently, every time. The second reason is that
+the operator editing the macro at the machine types the diameter off the drawing, like they think. radiusOf() is
+still the ONE conversion in JS; this is that rule written once more in G-code where the operator can SEE it.
+
+A STRAIGHT TURN REFERENCES the target for its far end (`#133=#132`) rather than copying it. The macro says out loud
+"the far end is the target", changing the target at the machine keeps the turn straight, and there is one place a
+straight turn's diameter lives. A taper is then not a second code path — the finishing pass is one interpolated move
+whose end radius happens to differ, and the taper build emits the SAME number of moves as the straight one.
+
+### THE STALE COMMENT — caught by looking, not by a test.
+
+The header first read `OD TURN — bar Ø20 → Ø14 over 25mm`. Dragging the shoulder handle in the real wizard left it
+saying exactly that while the variables three lines below said 2.353 and 38.86. A comment is not a socket. An
+operator reading a header that contradicts the program is worse off than one reading no header, so the comment now
+states what the op IS and points at the #vars. A test asserts it carries no digit at all. (facing.js has the same
+restated-numbers header — FLAGGED, not touched.)
+
+### THE CANVAS THAT WAS NEVER DRAWN — the pilot's real gap, found by wiring it.
+
+t1271 shipped `latheProfileSpec` with unit tests proving it produced the right shapes, and the shapes were `poly` and
+`band`. FeatureCanvas renders circle / line / rect / hole and SILENTLY IGNORES anything else. Nothing had ever asked
+it to draw one, so the pane came up empty the first time a real wizard opened. Two lessons, both already written
+down and both re-learned: a module tested in isolation is not a feature, and a screenshot is not a formality.
+
+So the wiring is now DECLARED and real: a lathe op carries `{type:'layout', params:{kind:'lathe_profile'}}` in its
+template (data — it travels in the `.wiz`), and `layoutSpecFromOp` returns the half-profile before it starts reasoning
+about XY stock rectangles, datum corners and corner picks, none of which mean anything for a bar on centres. Its
+handles route through the SAME `_writeParam` field writer every mill canvas handle uses, so a lathe drag and a mill
+drag reach the form by one path. Both specs were rebuilt on the primitives the canvas actually renders, and the
+pilot's canvas test now asserts the drawable-kind set instead of the invented one.
+
+FACING INHERITED THE FIX: its half-profile draws too, with its teal face handle on the raw end — the pilot's own
+missing screenshot, finally taken.
+
+### THE HANDLE: one grab, two numbers, proven against the CODE PREVIEW.
+
+The shoulder corner IS the op: its X is the diameter being turned, its Z is how far the turn runs. Dragging it in the
+real wizard wrote Target Ø 2.35 and Length 38.8 into the FORM and moved the code preview to #132=2.353 / #125=38.86 —
+the chain from pixel to program, end to end. A taper adds the face corner, and each diameter sits on the corner it
+physically IS (the shoulder carries the far-end Ø, the added corner the target) — the dispatch named them the other
+way round, and labelling them that way would put a number on a corner that is not at that diameter: a picture that
+lies. An unset far-end Ø FOLLOWS the target in the drawing exactly as it does in the emit, so picking Taper does not
+flash a cone to a point the program was never going to cut.
+
+### THE .wiz ROUND TRIP, and the one thing that does not travel.
+
+Export → WIPE → import → identical def, byte-identical emit. Getting there cost `def.bindingSpecs`: the wizard file
+format carries template/bindings/panel/sim/group/defV and nothing else, so a def carrying bindingSpecs came back
+without them. This template has NO guards, so nothing shifts its indices and the frozen bindings are correct — the
+re-derive was never needed. NOT SO for `postInstantiate` (the straight-turn restore), which is a function and cannot
+travel: a shared copy keeps the straight default (the template socket already holds the reference) but loses the
+taper→straight restore. That is a FORMAT gap shared by every twin with a postInstantiate (alignment, corner, pocket),
+not an OD one — flagged for the advisor as a schema question, which is a gate.
+
+GATE (fast tier): smoke + the lathe family (12+8+4+10) + the canvas specs the panelTypes change touches = 111/112.
+The one failure, `alignment-canvas-refit-732`, is PRE-EXISTING: verified by stashing every change in this turn and
+re-running it on the clean tree, where it fails identically.
+SCREENSHOTS: s1273-odturn-straight.png, s1273-odturn-taper.png, s1273-odturn-dragged.png (the form and the code
+preview both moved by one drag), s1273-facing-canvas.png.
