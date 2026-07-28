@@ -19081,3 +19081,66 @@ demonstrated math function, NE demonstrated 25 times, LT/GT/LE/GE absent — are
 depended on the parse.out misreading OR on this document.
 
 Self-test 23/23 with the corrected severity; the 59-macro sweep still flags zero.
+
+---
+
+## turn 1281 -- THE LATHE IS VISIBLE. The scene was never empty; the lathe had simply never been declared into it.
+
+### THE ROOT CAUSE, found by opening the wizard and looking (the third of this class).
+
+The user said "no lathe visible at all — an EMPTY one". What the screenshot actually showed was the MILL'S WORLD: a
+100×80×20 box stock, a vertical Ø6 endmill plunging into it, an XY grid with +Y labels, and the facing macro's X/Z
+moves traced at the origin as if they were mill moves. Not empty — furnished with the wrong furniture, because the
+lathe had never been declared into the scene. FOUR omissions, all of a kind:
+
+  1. THE BAR WAS NEVER FED TO THE SCENE. `settings.stock` stayed the mill's box. `barToStock()` has existed in
+     data/lathe.js since t1267 and had NO CONSUMER: none of the five twins declared `def.simStock`. I passed `null`
+     for the sim argument on every one of them across t1271–t1277, which is where this begins.
+  2. EVEN A CYLINDER WOULD HAVE LAIN THE WRONG WAY. gcodeViz3d takes a cylinder's axis from `getRotaryAxes()` — the
+     declared rotary MOTOR — falling back to X. A lathe declares no rotary motor, so the bar would have been drawn
+     ACROSS the machine rather than along it. (The advisor suspected exactly this; the code confirms it.)
+  3. THE WIZARDS HAD NO 3D PANE AT ALL: `panel: 'form2d'`. There was no empty 3D preview in a lathe wizard because
+     there was no 3D preview.
+  4. THE CAMERA IS A MILL'S. Even with the bar right, world-up is +Z, so a bar along Z stands ON ITS END — the one
+     view of a lathe nobody has.
+
+THE TRACED PATH WAS NEVER THE PROBLEM. It drew correctly the whole time, in the wrong world.
+
+### THE FIXES ARE DECLARATIONS, NOT SPECIAL CASES.
+
+THE STOCK NOW CARRIES ITS OWN AXIS. `stock.axis` — read by the renderer instead of guessed from motor roles. A
+rotary bar keeps saying 'x' through the same field; a lathe bar says 'z'; anything without one behaves exactly as
+before. The next consumer of a cylinder gets the right answer instead of re-deriving it. The stock also carries
+`origin:'finished-face'` + `faceZ`, so a bar on CENTRES sits on the centreline with its declared face at the datum,
+rather than in the corner of a table like a block.
+
+`viz/latheScene.js` is the one place the five ops agree about their bar, via `withLatheScene(def, DEFAULTS)`.
+
+THE CAMERA ROLLS 90° FOR A LATHE: up becomes +X, so the bed runs across the screen and the cross-slide is up —
+where the turner stands. Guarded so it never applies when the view direction nears ±X (where an X up-vector would be
+parallel to the look and the camera would degenerate), and a SAVED view still wins: it is a default, not a rule.
+
+### MY OWN ASSERTS CAUGHT THREE MORE THINGS, which is the point of writing them.
+
+  · THE DRAWN BAR DID NOT CONTAIN THE MATERIAL THE OP REMOVES. Facing's default removes 3mm from the raw end, but the
+    generic bar carried a 1mm stub — so two of its three passes were traced in mid-air, outside the stock. The bar's
+    raw end is now the MAX of the declared stub and what the op says it removes.
+  · A POLYGON ROUGHING SWEEP REACHED OUTSIDE THE BAR (13.279 on a 12.5 radius): the walk stopped when the APOTHEM
+    passed the bar, but it is the CORNERS that have to fit. Now it stops on the corner radius, so no sweep swings
+    through air to reach metal it cannot touch.
+  · AN ASSERT OF MINE WAS WRONG: it demanded Ø20 from every op, and polygon declares a Ø25 bar. It now asserts each
+    op draws the bar IT declares, which is the property that actually matters.
+
+### WHAT IS PROVEN BY WHAT.
+
+The asserts prove the SCENE GRAPH: each op declares a bar of its own size, on the Z axis, at the face datum, with a
+3D pane to draw it in, and every cutting move landing inside that bar's radius and length. They cannot prove pixels
+reached the screen — a scene graph can be right while nothing renders, which is exactly how the canvas bugs of t1273
+and t1277 survived their unit tests. THE FIVE SCREENSHOTS ARE THE OTHER HALF, and they show the bar lying along the
+bed with its path on it in every op, including the polygon's A+X sweep as a helix around the bar.
+
+STILL THE MILL'S, and scheduled by the advisor for the next turns: the chuck, a lathe tool model (an endmill still
+points at the bar), revolved material removal, and DRO diameter-speak.
+
+GATE (fast tier): smoke + the lathe family + the new visibility asserts + canvas/workspace = 136/136.
+SCREENSHOTS: s1281-facing / -odturn / -parting / -centerdrill / -polygon.png.
