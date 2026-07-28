@@ -83,8 +83,10 @@ test('the FAQ leads with the workspace chapter, and every entry it promises is t
   const qs = await page.evaluate(() => [...document.querySelectorAll('#help_faq details summary')].map((s) => s.textContent.trim()));
   // IDENTITY FIRST applies to docs too: what is it, then where is my work
   expect(qs[0], 'the opener still says what this is').toMatch(/What is DDCS Studio/);
-  expect(qs.slice(1, 5), 'then the workspace chapter, before anything else').toEqual([
+  expect(qs.slice(1, 7), 'then the workspace chapter, before anything else').toEqual([
     'Where is my work saved?',
+    'What exactly is inside a .ddcs file?',
+    '.ddcs, .wiz, .cam, .nc — which file is which?',
     'How do I work with two machines?',
     'How do I share a wizard or a CAM recipe?',
     'How do I get files onto the USB stick?',
@@ -214,4 +216,50 @@ test('every registered FAQ link opens its surface — and every registry entry i
     expect(back.chip, `${id} rendered no Back chip`).toBe(0);
     await page.evaluate(() => { window.closeSettings && window.closeSettings(); document.getElementById('wsmOverlay')?.remove(); });
   }
+});
+
+/**
+ * t1253 — WHAT IS IN THE FILE, and it cannot go stale.
+ *
+ * The answer listing a .ddcs's contents is RENDERED FROM BACKUP_STORES, the same declared registry the save walks —
+ * not transcribed beside it. A second copy of that list is one somebody forgets, and the FAQ would then name nine
+ * things while the file carried ten. This asserts the correspondence is 1:1 in BOTH directions, so a new store cannot
+ * be added without the FAQ naming it, and the FAQ cannot name something the file does not carry.
+ */
+test('the .ddcs contents answer matches the BACKUP_STORES registry, 1:1 and in order', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
+  await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
+
+  const r = await page.evaluate(async () => {
+    const { BACKUP_STORES } = await import('/data/backup.js');
+    const entry = [...document.querySelectorAll('#help_faq details')]
+      .find((d) => /What exactly is inside a \.ddcs file/.test(d.querySelector('summary').textContent));
+    return { labels: BACKUP_STORES.map((s) => s.label), text: entry ? entry.textContent : '' };
+  });
+
+  expect(r.labels.length, 'the registry is populated').toBeGreaterThan(5);
+  // EVERY store is named…
+  for (const label of r.labels) expect(r.text, `the answer names the "${label}" store`).toContain(label);
+  // …and the answer names NOTHING ELSE as a store: the rendered list is exactly the registry's, in its order
+  const listed = (r.text.match(/Everything this workspace is, in one file: ([^.]+)\./) || [])[1];
+  expect(listed, 'the sentence carries the derived list').toBeTruthy();
+  expect(listed.split(', ').map((x) => x.trim()), 'exactly the declared rows, in registry order').toEqual(r.labels);
+});
+
+test('the file-kinds answer says which file is SOURCE and which is BAKED', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsStudio, null, { timeout: 15000 });
+  await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
+  const t = await page.evaluate(() => {
+    const d = [...document.querySelectorAll('#help_faq details')].find((x) => /which file is which/.test(x.querySelector('summary').textContent));
+    return d ? d.textContent : '';
+  });
+  expect(t, 'all four kinds').toMatch(/\.ddcs/);
+  expect(t).toMatch(/\.wiz/);
+  expect(t).toMatch(/\.cam/);
+  expect(t).toMatch(/\.nc/);
+  // the distinction that actually matters when someone hands you a file
+  expect(t, 'the sources say they import live and editable').toMatch(/live and editable|rebuilds into a slot/);
+  expect(t, 'and the bakes say they are the end of the line, with what to do instead').toMatch(/not re-importable[\s\S]*change its source and deploy again/);
 });

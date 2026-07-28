@@ -11,6 +11,8 @@
  * the same place. One feedback door, and the FAQ answer that used to point at the old one now names it.
  */
 
+import { BACKUP_STORES } from '../data/backup.js';   // t1253 — the file's own contents list, one source
+
 /**
  * THE LINK REGISTRY (t1251, user amendment) — every surface the FAQ names, DECLARED once.
  *
@@ -51,11 +53,23 @@ export const FAQ_LINKS = {
 /** The markup for one FAQ link. Reads its words from the registry, so the label and the destination are one fact. */
 const lk = (id, text) => `<a href="#" class="help-link" data-help-link="${id}">${text || FAQ_LINKS[id].label}</a>`;
 
+/**
+ * WHAT A .ddcs CONTAINS — READ FROM THE REGISTRY, never transcribed (t1253).
+ *
+ * The honest answer to "what is in my file" is the list of BACKUP_STORES rows, because that registry IS what the
+ * writer walks. Copying those names into prose would create a second list, and a second list is one somebody forgets
+ * to update — the FAQ would then confidently name nine things while the file carried ten. So the sentence reads the
+ * same declared rows the file is built from: add a store and this answer names it, with no edit here at all.
+ */
+const ddcsContents = () => BACKUP_STORES.map((s) => s.label).join(', ');
+
 const FAQ_HTML = `
     <div class="settings-section">
         <div class="settings-section-title">FREQUENTLY ASKED</div>
         <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What is DDCS Studio?</summary><div class="settings-hint" style="margin-top:6px;">A companion app for DDCS Expert / M350 controllers: wizards that generate G-code, a CAM-pack builder, a full toolpath simulator, and a gateway to send programs to the machine.</div></details>
 <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">Where is my work saved?</summary><div class="settings-hint" style="margin-top:6px;">While you work, everything lives in a <b>temporary buffer</b> in this browser — handy, but not a file you own. Pressing <b>Ctrl+S</b> (or the disk button in the header) writes the whole workspace to a <code>.ddcs</code> file that is yours: the first save asks for a name and for your <b>workspaces folder</b> in one step, and every save after that goes straight back to the same file. The header disk button tells you which file you are in and whether it has unsaved changes.</div></details>
+<details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">What exactly is inside a .ddcs file?</summary><div class="settings-hint" style="margin-top:6px;">Everything this workspace <i>is</i>, in one file: <b>${ddcsContents()}</b>. That is the whole list — it is read from the same declared registry the save itself walks, so it cannot drift out of date. Tokens and cloud credentials are never included, which is why a <code>.ddcs</code> is safe to copy to another machine or hand to someone rebuilding your setup.</div></details>
+<details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">.ddcs, .wiz, .cam, .nc — which file is which?</summary><div class="settings-hint" style="margin-top:6px;"><b><code>.ddcs</code></b> — the WHOLE workspace: one machine and everything you made on it (the list above).<br><b><code>.wiz</code></b> — ONE wizard's recipe. Source, not output: importing it installs the op live and editable.<br><b><code>.cam</code></b> — ONE CAM slot's recipe, same idea: it rebuilds into a slot you can edit.<br><b><code>.nc</code> and the other deploy outputs</b> — BAKED files the controller runs. They are the end of the line, not re-importable; to change one, change its source and deploy again.</div></details>
 <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I work with two machines?</summary><div class="settings-hint" style="margin-top:6px;"><b>One workspace per machine</b> — the <code>.ddcs</code> file <i>is</i> the machine: its controller, envelope, WCS table, tools, macros and custom wizards all ride inside it. To set up a second machine, open ${lk('workspace-manager')}, <b>Duplicate</b> the one you have, and change the controller on the copy; switching machines is then just opening the other file. Nothing is shared behind your back, so tuning one machine cannot disturb the other.</div></details>
 <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I share a wizard or a CAM recipe?</summary><div class="settings-hint" style="margin-top:6px;">Both are shared as <b>source</b>, not as baked output, so what you send arrives editable. On ${lk('settings-wizardbar')}, <b>Export .wiz</b> writes an op to your <b>library folder</b>; on ${lk('macros-cam')}, <b>⬆ Export .cam</b> writes a slot's recipe there too. Every <code>.wiz</code> / <code>.cam</code> in that folder shows up as a card on the same screens — click one and it installs live: a wizard lands on your bar and opens in Blocks, a recipe rebuilds into a slot you can edit like your own.</div></details>
 <details style="margin:6px 0; border:1px solid var(--border); border-radius:6px; padding:6px 10px;"><summary style="cursor:pointer; font-weight:600; font-size:13px;">How do I get files onto the USB stick?</summary><div class="settings-hint" style="margin-top:6px;">Grant the stick itself as your <b>deploy target</b> — the row at the top of ${lk('gateway-files')} names it and lets you change it, and the first deploy asks if you have not chosen one. After that every baked output writes straight onto it: a program export, a CAM pack, a SYSDISK file like <code>T.nc</code> or <code>key-N.nc</code>. Nothing lands in Downloads to be found and copied — deploy, eject, and walk to the machine.</div></details>
