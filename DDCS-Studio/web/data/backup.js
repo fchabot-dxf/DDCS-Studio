@@ -60,7 +60,10 @@ export const BACKUP_STORES = [
     // the `settings` row and the user vars ride `variables`, exactly as before. USER RULING: opening/restoring a
     // workspace ADOPTS the file's controller, so this row's write RETARGETS the live controller/dialect (the old
     // keep-the-local-controller behaviour contradicted "the file is the machine").
-    { id: 'machine', label: 'Machine (this workspace)', unit: 'machine',
+    // t1255 (user) — the LABEL says its CONTENT, not its scope. "Machine (this workspace)" told a reader WHERE the row
+    // applies and nothing about what is in it, which is the question a delta chip or a file-contents list is answering.
+    // Every surface reads this one string, so the wording improves everywhere at once.
+    { id: 'machine', label: 'Machine identity (name + controller)', unit: 'machine',
       read: () => { try { return getMachine(); } catch (_) { return undefined; } },
       write: (val) => { try { if (val) setMachine(val, true); } catch (_) {} },
       clear: () => localStorage.removeItem(MACHINE_KEY),   // no record → getMachine() derives the default one

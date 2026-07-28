@@ -4943,11 +4943,21 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
 }
 .hdr-controls .hdr-undo:hover:not(:disabled) { opacity: 1; background: rgba(128,128,128,.15); }
 .hdr-controls .hdr-undo:disabled { opacity: .28; cursor: default; filter: grayscale(.5); }
-/* Clear-program shortcut beside undo/redo (destructive → a red-tinted trash glyph). Hidden on phone (≤600px),
-   where header space is tight and the chevron quick-menu keeps Clear as the access point. */
+/* Clear-program shortcut beside undo/redo (destructive → a red-tinted trash glyph).
+   t1255 (user) — VISIBLE AT EVERY WIDTH. It used to hide below 600px, which is exactly why a second "Clear editor"
+   row existed in the editor's file menu for phones; that duplicate is gone, so the trash has to be there when the
+   window is small — otherwise the phone loses Clear altogether. It keeps a ≥44px touch target at phone widths. */
 .hdr-controls .hdr-clear { color: #ef4444; display: inline-flex; align-items: center; }
 .hdr-controls .hdr-clear:hover { opacity: 1; background: rgba(239,68,68,.14); }
-@media (max-width: 600px) { .hdr-controls .hdr-clear { display: none; } }
+@media (max-width: 600px) {
+    .hdr-controls .hdr-clear { min-width: 44px; min-height: 44px; justify-content: center; }
+    /* t1255 — MAKING ROOM for it. At 390px the header was already at every shrink class it has (is-tiny et al) and
+       still summed past the viewport once the trash claimed its 44px touch target. The cheapest thing to give up on a
+       phone is the wordmark: the logo alone still identifies the app, and the alternative — a 44px hit area overlapping
+       the 17px undo/redo beside it — would put mis-taps on the one DESTRUCTIVE control in the header. */
+    .app-header .brand .logo { width: 34px; }
+    .app-header.is-tiny .hdr-tabs .tab { padding: 0 7px; }
+}
 
 /* Floating Copy-program button, top-right of the editor (mirrors the bottom-left ⟳ Transform overlay). Clear of
    the vertically-centred 3D pull-tab; gets covered by the 3D drawer when it's open (copy is for the code view). */

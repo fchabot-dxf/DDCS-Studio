@@ -35,20 +35,23 @@ test('the editor corner carries a FILE menu: Load / Insert / Export / Clear, eac
     await btn.click();
     const menu = page.locator('#editor-file-menu');
     await expect(menu).toBeVisible();
-    await expect(menu.locator('[data-efm]')).toHaveCount(4);
-    for (const [id, label] of [['load', /Load/], ['insert', /Insert/], ['export', /Export/], ['clear', /Clear editor/]]) {
+    // t1255 (user) — THREE, not four: Clear left this menu. The header trash is THE clear at every width now, and
+    // two doors to a destructive action is one too many. Named, so a re-added row has to be explained.
+    await expect(menu.locator('[data-efm]')).toHaveCount(3);
+    for (const [id, label] of [['load', /Load/], ['insert', /Insert/], ['export', /Export/]]) {
         await expect(menu.locator(`[data-efm="${id}"]`), `${id} is offered`).toHaveText(label);
     }
+    await expect(menu.locator('[data-efm="clear"]'), 'and Clear is NOT here — the trash owns it').toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('editor-corner-menu.png'), clip: { x: 980, y: 90, width: 300, height: 230 } });
 
     // every item RUNS the handler its quick-menu row used to run
     await menu.locator('[data-efm="load"]').click();
     await expect(menu, 'picking an item closes the menu').toHaveCount(0);
-    for (const id of ['insert', 'export', 'clear']) {
+    for (const id of ['insert', 'export']) {
         await btn.click();
         await page.locator(`#editor-file-menu [data-efm="${id}"]`).click();
     }
-    expect(await page.evaluate(() => window.__fired)).toEqual(['loadGcodeFile', 'insertGcodeFile', 'downloadFile', 'clearCode']);
+    expect(await page.evaluate(() => window.__fired)).toEqual(['loadGcodeFile', 'insertGcodeFile', 'downloadFile']);
 
     // and it toggles closed on a second press of its own button
     await btn.click();

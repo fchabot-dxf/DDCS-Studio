@@ -45,28 +45,38 @@ test.describe('desktop', () => {
     await expect(page.locator('#hdrPostMenu [data-act="copy"]')).toHaveCount(0);
     await expect(page.locator('#hdrPostMenu [data-act="clear"]')).toHaveCount(0);
     await page.keyboard.press('Escape');
+    // t1255 — Clear is not in the corner menu either: the header TRASH is the one door to it, at every width.
     await page.locator('#editor-file-btn').click();
-    await expect(page.locator('#editor-file-menu [data-efm="clear"]'), 'Clear editor moved, it did not vanish').toBeVisible();
+    await expect(page.locator('#editor-file-menu [data-efm="clear"]'), 'no second Clear in the corner menu').toHaveCount(0);
+    await expect(page.locator('#btn-clear'), 'the trash IS the clear').toBeVisible();
   });
 });
 
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 800 } });
 
-  test('editor chrome: header Clear hidden on phone; the editor corner menu is the phone access point', async ({ page }, testInfo) => {
+  test('PHONE: the TRASH is the Clear — visible and tappable at 390px; the corner menu holds file actions only', async ({ page }, testInfo) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsStudio && window.ddcsEditorFileMenu);
 
-    await expect(page.locator('#btn-clear')).toBeHidden();           // hidden ≤600px
-    // t1227 — Clear left the quick menu, so on a PHONE the corner menu is the only way to it. It has to be reachable
-    // and tappable at 390px, or the curation quietly took Clear away from phones.
+    // t1255 (user) — RE-ENCODED. The old shape was: the trash hides ≤600px, so the corner menu carries Clear for
+    // phones. That duplicate is gone, which means the trash MUST be here — otherwise the phone loses Clear entirely,
+    // which is exactly the regression this test now exists to catch.
+    const trash = page.locator('#btn-clear');
+    await expect(trash, 'the trash is on screen at 390px').toBeVisible();
+    const tb = await trash.boundingBox();
+    expect(Math.min(tb.width, tb.height), 'and is a real touch target').toBeGreaterThanOrEqual(44);
+    expect(tb.x >= 0 && tb.x + tb.width <= 390, 'fully inside the viewport').toBe(true);
+
+    // the corner menu still holds the FILE actions, and only those
     const btn = page.locator('#editor-file-btn');
     await expect(btn, 'the corner file button is on screen at 390px').toBeVisible();
-    const box = await btn.boundingBox();
-    expect(box.width, 'and wide enough to hit').toBeGreaterThanOrEqual(24);
     await btn.click();
-    await expect(page.locator('#editor-file-menu [data-efm="clear"]')).toBeVisible();
-    await expect(page.locator('#editor-file-menu [data-efm="load"]'), 'with the rest of the file actions').toBeVisible();
-    await page.screenshot({ path: testInfo.outputPath('phone-editor-file-menu.png') });
+    for (const id of ['load', 'insert', 'export']) {
+      await expect(page.locator(`#editor-file-menu [data-efm="${id}"]`), `${id} is in the file menu`).toBeVisible();
+    }
+    await expect(page.locator('#editor-file-menu [data-efm="clear"]'), 'and Clear is not duplicated here').toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await page.screenshot({ path: 'scratchpad/s1255-phone-trash.png' });
   });
 });

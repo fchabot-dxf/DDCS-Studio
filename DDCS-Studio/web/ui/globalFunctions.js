@@ -435,8 +435,10 @@ export function setupGlobalFunctions(app) {
         const EDITOR_FILE_ACTIONS = [
             { id: 'load', label: '📂 Load…', title: 'Load a program file (replaces the editor)', run: () => window.loadGcodeFile?.() },
             { id: 'insert', label: '➕ Insert…', title: 'Insert a program file at the cursor', run: () => window.insertGcodeFile?.() },
-            { id: 'export', label: '⭳ Export…', title: 'Download the program as a file', run: () => window.downloadFile?.() },
-            { id: 'clear', label: '🗑 Clear editor', title: 'Clear the program (editor + blocks)', sep: true, run: () => window.clearCode?.() },
+            { id: 'export', label: '⭳ Export…', title: 'Deploy the program as a file', run: () => window.downloadFile?.() },
+            // t1255 (user) — CLEAR IS NOT HERE. The header's 🗑 trash IS the clear, at every width now; this row was a
+            // phone-only stand-in from t1227, back when the trash hid below 600px. Two doors to a destructive action is
+            // one door too many — and the one that hid was the one people learned.
         ];
         window.ddcsEditorFileMenu = (btn) => {
             const ID = 'editor-file-menu';
