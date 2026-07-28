@@ -522,6 +522,23 @@ export function createPreviewPanel(container, opts = {}) {
         } catch (_) { /* projection not ready → no boundaries */ }
         return out.sort((a, b) => a.line - b.line);
     };
+    /**
+     * t1289 — THE WORK TURNS, and the two traps that beat the first two attempts are the spec here.
+     *
+     * TRAP ONE — WHAT SAYS "RUNNING". Not a repaint (updateRunBtn fires on every re-render) and not `engine.running`
+     * (a static route TRACE sets it, which is why the bar span while idle). The engine declares `playing`, raised only
+     * between a real run() and its end, and pushes it through onPlayState.
+     *
+     * TRAP TWO — WHICH VIZ. Only the panel that is ACTIVE — the one on screen — turns its bar. A hidden panel's viz
+     * is a stale instance nobody is looking at, and letting it spin is how a viewer's bar ended up depending on which
+     * panel built last. Deactivating stops it, so the answer cannot outlive the panel that gave it.
+     */
+    function applyLatheSpin(playing) {
+        if (!viz || !viz.setLatheSpin) return;
+        const lathe = !!(viz._isLatheStock && viz._isLatheStock());
+        viz.setLatheSpin(!!playing && lathe && active);
+    }
+
     function ensureEngine() {
         if (engine) return engine;
         engine = new GcodeExecutionEngine({
@@ -531,6 +548,9 @@ export function createPreviewPanel(container, opts = {}) {
             simSpeed: simSpeed(),
             rapidRate: (machineForViz() || {}).rapidRate,   // t844 — time-true playback uses the DECLARED G0 rate, so it matches the time estimate
             createVarStore: opts.createVarStore ? (() => opts.createVarStore({ persist: true })) : null,   // t1241 A5 — the RUN owns the persistent store (a serial bumped by one Play survives into the next)
+            // t1289 — the ONE truthful running signal, from the thing that owns run state. Raised by a real run and
+            // lowered by stop OR by the program ending, so idle looks identical however the run finished.
+            onPlayState: (playing) => { applyLatheSpin(playing); updateRunBtn(); },
             onLineChange: ({ lineIndex, raw }) => {
                 if (typeof opts.onLine === 'function') opts.onLine(lineIndex);
                 if (raw != null) setStatus(fmtExecLine(lineIndex + 1, raw));   // t867 rider — the RAW executing line (one source with the editor highlight), not a paraphrase
@@ -1168,8 +1188,24 @@ export function createPreviewPanel(container, opts = {}) {
 
     function setActive(on) {
         active = !!on;
-        if (!active) { if (_carveRaf && typeof cancelAnimationFrame === 'function') { cancelAnimationFrame(_carveRaf); _carveRaf = 0; } stopPlay(); autoStarted = false; if (viz) viz.setActive(false); if (deviceIoListener) { window.removeEventListener('io_change', deviceIoListener); deviceIoListener = null; } if (limitIoListener) { window.removeEventListener('io_change', limitIoListener); limitIoListener = null; } return; }   // t181/H4 tidy: drop the ATC + limit-switch io_change listeners when the preview deactivates (re-armed via setAtcSwap / setLimitSwitches on next update)
-        if (mode === '3d') { const v = ensureViz(); if (v) v.setActive(true); }
+        if (!active) { applyLatheSpin(false); try { if (window.__ddcsActiveViz === viz) window.__ddcsActiveViz = null; } catch (_) {} if (_carveRaf && typeof cancelAnimationFrame === 'function') { cancelAnimationFrame(_carveRaf); _carveRaf = 0; } stopPlay(); autoStarted = false; if (viz) viz.setActive(false); if (deviceIoListener) { window.removeEventListener('io_change', deviceIoListener); deviceIoListener = null; } if (limitIoListener) { window.removeEventListener('io_change', limitIoListener); limitIoListener = null; } return; }   // t181/H4 tidy: drop the ATC + limit-switch io_change listeners when the preview deactivates (re-armed via setAtcSwap / setLimitSwitches on next update)
+        // t1289 — WHICH INSTANCE IS LIVE, stated rather than guessed. A panel that activates is the one on screen; a
+        // hidden one's viz is a stale object nobody is looking at. Published so a test can assert about the scene the
+        // user can actually see, instead of whichever instance happened to be constructed last.
+        if (mode === '3d') {
+            const v = ensureViz();
+            if (v) {
+                v.setActive(true);
+                // …and the OWNERSHIP HANDOFF: whoever becomes live tells the previous holder to stop. A panel can
+                // leave the screen by routes that never reach setActive(false) — closing a wizard is one — so the
+                // arriving panel is the reliable place to end the outgoing one's answer.
+                try {
+                    const prev = window.__ddcsActiveViz;
+                    if (prev && prev !== v && prev.setLatheSpin) prev.setLatheSpin(false);
+                    window.__ddcsActiveViz = v;
+                } catch (_) {}
+            }
+        }
         else if (mode === '2d' && cv2d) cv2d.style.display = '';   // 2D default: ensure the canvas is visible
         setGcode();
         if (mode === '2d') t2.fit();   // frame the full 2D scene on activate (default-2D)

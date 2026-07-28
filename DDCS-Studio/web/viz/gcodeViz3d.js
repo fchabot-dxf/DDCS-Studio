@@ -667,7 +667,13 @@ export class GcodeViz3D {
         if (this._latheSpinRaf) { cancelAnimationFrame(this._latheSpinRaf); this._latheSpinRaf = 0; }
         if (!this._latheSpin || !this._partGroup) return;
         const step = () => {
-            if (!this._latheSpin || !this._partGroup) { this._latheSpinRaf = 0; return; }
+            // …and STOP IF THE SCENE IS NOT ON SCREEN. A panel can leave by routes that never reach setActive(false)
+            // — closing a wizard is one — and "gone" means NOT VISIBLE rather than merely detached, because a closed
+            // wizard is usually hidden with display:none and its canvas is still in the document. A zero-sized box is
+            // the honest test, and it means the loop cannot outlive what a person can see whatever a caller forgets.
+            const cv = this.renderer && this.renderer.domElement;
+            const gone = !!cv && (!cv.isConnected || (!cv.offsetWidth && !cv.offsetHeight));
+            if (!this._latheSpin || !this._partGroup || gone) { this._latheSpin = false; this._latheSpinRaf = 0; return; }
             this._partGroup.rotation.z += 0.12;
             this.render();
             this._latheSpinRaf = requestAnimationFrame(step);

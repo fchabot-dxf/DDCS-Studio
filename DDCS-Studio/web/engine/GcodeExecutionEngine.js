@@ -62,7 +62,7 @@ export const ATC_DIALECT = {
 };
 
 export class GcodeExecutionEngine {
-    constructor({ stepDelay = 250, onLineChange = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, g53ApproxZ = null, initialPos = null, continuous = false, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000, wcsBase = null, wcsStride = 5 } = {}) {
+    constructor({ stepDelay = 250, onLineChange = null, onPlayState = null, onStatus = null, onFinish = null, onPositionChange = null, onWait = null, stock = null, stockOffset = null, wcsOffset = null, g53ApproxZ = null, initialPos = null, continuous = false, syntaxValidator = null, createVarStore = null, autoAnswer = true, autoAnswerMs = 800, simSpeed = 1, rapidRate = 6000, wcsBase = null, wcsStride = 5 } = {}) {
         this.stepDelay = Number.isFinite(stepDelay) ? stepDelay : 250;
         // t644 — probe-datum tracking (for the datum-correctness check): _datumOrigin[axis] = the MACHINE coord where work-0
         // lands after a WCS write. Set by G92 (any post) and by a write to the WCS-table register range (wcsBase/wcsStride,
@@ -82,6 +82,9 @@ export class GcodeExecutionEngine {
         // (live PC-bridge) store already PROXIES the controller's real DRO → don't overwrite it (it'd write a read-only reg).
         this._populateDro = typeof createVarStore !== 'function';
         this.onLineChange = onLineChange;
+        // t1289 — onPlayState(playing): the declared REAL-run signal. A consumer that wants to know whether a program
+        // is playing asks THIS, never `running` (a trace raises that) and never a repaint (which fires for anything).
+        this.onPlayState = onPlayState;
         this.onStatus = onStatus;
         this.onFinish = onFinish;
         this.onPositionChange = onPositionChange;
@@ -274,6 +277,7 @@ export class GcodeExecutionEngine {
         this.ip = 0;
         this.currentLineIndex = null;
         this.running = false;
+        this.playing = false;   // t1289 — the declared REAL-run signal (never raised by trace)
         this.paused = false;
         this._waitPin = null;
         this._move = null;     // in-flight timed move (interpolated at the programmed feedrate)
@@ -363,8 +367,24 @@ export class GcodeExecutionEngine {
         }
 
         this.running = true;
+        this._setPlaying(true);   // t1289 — a REAL run has started (see _setPlaying: a trace is not one)
         this._setStatus('Starting execution', true);
         this._scheduleTick();
+    }
+
+    /**
+     * t1289 — THE ONE TRUTHFUL RUNNING SIGNAL, declared by the thing that owns run state.
+     *
+     * `running` is NOT it, and that is the whole point: `trace()` sets `running = true` to walk the program for the
+     * drawn route, so anything watching that flag believes a program is playing every time the preview re-traces —
+     * which is why the lathe bar span while idle. `playing` is raised ONLY between a real `run()` and its end, and
+     * every consumer is told, so nobody has to infer it from a repaint.
+     */
+    _setPlaying(on) {
+        on = !!on;
+        if (on === this.playing) return;
+        this.playing = on;
+        try { if (typeof this.onPlayState === 'function') this.onPlayState(on); } catch (_) { /* a listener must not break the run */ }
     }
 
     /**
@@ -428,6 +448,7 @@ export class GcodeExecutionEngine {
         }
         this._clearAutoTimers();
         this.running = false;
+        this._setPlaying(false);   // t1289 — stopped is not running, and every consumer hears it
         this.paused = false;
         this._move = null;
         this._setWaitPin(null);
@@ -538,6 +559,7 @@ export class GcodeExecutionEngine {
 
     _finish() {
         this.running = false;
+        this._setPlaying(false);   // t1289 — the program ENDED: the same signal, so idle looks identical either way
         this.paused = false;
         this._move = null;
         if (this.timer) {

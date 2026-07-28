@@ -62,8 +62,16 @@ export function carveSegment(p, seg, width = 0) {
     if (!p || !seg) return 0;
     const x1 = Math.abs(Number(seg.x1) || 0), x2 = Math.abs(Number(seg.x2) || 0);
     const z1 = Number(seg.z1) || 0, z2 = Number(seg.z2) || 0;
-    const half = Math.max(0, Number(width) || 0) / 2;
-    const zLo = Math.min(z1, z2) - half, zHi = Math.max(z1, z2) + half;
+    // THE KERF IS ONE-SIDED, because the emit says where the BLADE sits, not where the slot's centre is. The macro
+    // declares `#150 = [#143-#144]` — the face LESS the kerf — so the cutting line is the far wall of the slot and
+    // the blade body occupies everything between it and the typed face: [z, z+width], toward +Z.
+    //
+    // Spreading the width symmetrically (z ± half) put the whole groove HALF A KERF chuck-ward of where the machine
+    // cuts it: face −10 with a 3mm blade gave [−14.5, −11.5] instead of [−13, −10], and a part-off stub ended 1.5mm
+    // short. It survived because the spec sampled the slot's MIDDLE, where both readings agree — the walls are the
+    // only place they differ, and that is where the asserts look now.
+    const kerf = Math.max(0, Number(width) || 0);
+    const zLo = Math.min(z1, z2), zHi = Math.max(z1, z2) + kerf;
     const iLo = idxOf(p, zLo), iHi = idxOf(p, zHi);
     let hit = 0;
     for (let i = iLo; i <= iHi; i++) {

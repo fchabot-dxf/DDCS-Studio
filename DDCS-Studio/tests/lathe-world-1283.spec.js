@@ -207,3 +207,140 @@ test('MILL: unchanged in BOTH directions — no lathe furniture, and the mill’
     expect(s.partNames.includes('spindle'), 'the mill keeps its spindle').toBe(true);
     expect(s.partNames.includes('collet'), 'and its collet').toBe(true);
 });
+
+// ── t1289 — THE KERF IS ONE-SIDED, and these asserts look where the two readings DISAGREE ───────────────────────
+
+/**
+ * The carve spread the blade width symmetrically around the cutting line, so every groove sat HALF A KERF
+ * chuck-ward of where the machine cuts it. It survived a whole turn of testing because the existing spec sampled
+ * the slot's MIDDLE — where a symmetric and a one-sided reading agree. The WALLS are the only place they differ.
+ *
+ * THE DECLARED MEANING settles it: the macro writes `#150 = [#143-#144]` — the face LESS the kerf — so the cutting
+ * line is the slot's FAR wall and the blade occupies everything between it and the typed face.
+ */
+test('THE PARTING SLOT sits between the blade line and the typed face — asserted at both WALLS', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const P = await import('/wizards/lathe/parting.js');
+        const L = await import('/data/latheProfile.js');
+        const S = await import('/viz/latheScene.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const { traceToolpath } = await import('/engine/trace.js');
+        const run = (params) => {
+            const nc = String(emitProgram(P.partingStack(params)));
+            const prof = L.profileFromBar(S.latheBarFrom(params, {}));
+            for (const s of (traceToolpath(nc).segments || []).filter((x) => !x.rapid && !x.probe)) L.carveSegment(prof, s, params.width);
+            return { at: (z) => prof.rOut[Math.round((z - prof.z0) / prof.step)], stats: L.profileStats(prof) };
+        };
+        const g = run({ kind: 'groove', barDiameter: 20, targetDiameter: 12, zFace: -10, width: 3, peck: 0 });
+        const p = run({ kind: 'part', barDiameter: 20, spigotDiameter: 0, zFace: -20, width: 3, peck: 0 });
+        // …and what the 2D DRAWS, from the same numbers
+        const V = await import('/viz/latheProfileCanvas.js');
+        const spec = V.partProfileSpec({ diameter: 20, stickOut: 60, allowance: 1 },
+            { kind: 'groove', zFace: -10, floorDiameter: 12, width: 3 }, () => {});
+        const band = spec.items.find((i) => i.kind === 'rect');
+        const at = Object.fromEntries(spec.handles.map((h) => [h.id, h.x]));
+        return {
+            bladeZ: P.partBladeZ({ zFace: -10, width: 3 }),
+            nearWall: g.at(-10.5), farWall: g.at(-14), mid: g.at(-11.5), pastFace: g.at(-9),
+            stubEnd: p.stats.zEnd,
+            band: { from: band.x, to: band.x + band.w }, handles: at,
+        };
+    });
+    // the cutting line is the FAR wall: face −10 less a 3mm blade
+    expect(r.bladeZ, 'the blade sits a kerf behind the typed face').toBe(-13);
+    // ── THE TWO POINTS WHERE THE READINGS DISAGREE ──
+    expect(r.nearWall, 'z −10.5 is INSIDE the slot: cut to the groove floor').toBeCloseTo(6, 2);
+    expect(r.farWall, 'z −14 is BEYOND the blade: untouched bar').toBeCloseTo(10, 2);
+    // …and the points where they agree, kept as the sanity floor
+    expect(r.mid, 'the middle of the slot is cut either way').toBeCloseTo(6, 2);
+    expect(r.pastFace, 'and nothing is removed ahead of the face').toBeCloseTo(10, 2);
+    // A PART-OFF ENDS THE STUB ON THE BLADE LINE, not half a kerf past it
+    expect(r.stubEnd, 'face −20 with a 3mm blade leaves a stub ending at −23').toBeCloseTo(-23, 2);
+    // THE 2D READS THE SAME TRUTH — confirmed, not assumed
+    expect(r.band.from, 'the drawn slot starts on the blade line').toBeCloseTo(-13, 3);
+    expect(r.band.to, 'and ends on the typed face').toBeCloseTo(-10, 3);
+    expect(r.handles.partPos, 'the face handle is on the face').toBeCloseTo(-10, 3);
+    expect(r.handles.partFloor, 'and the floor handle on the blade line').toBeCloseTo(-13, 3);
+});
+
+// ── t1289 — THE SPIN, with the two traps that beat it twice written in as the spec ──────────────────────────────
+
+/**
+ * TRAP ONE — WHAT SAYS "RUNNING". Not a repaint (the run-button refresh fires on every re-render) and not
+ * `engine.running` (a static route TRACE raises that, which is precisely why the bar span while idle). The engine
+ * declares `playing`, raised only between a real run and its end, and pushes it to consumers.
+ *
+ * TRAP TWO — WHICH VIZ. Only the ACTIVE panel's instance turns its bar; a hidden panel's viz is a stale object
+ * nobody is looking at. The live one is published, so this asserts about the scene a person can actually see.
+ */
+test('THE BAR IS STILL WHEN IDLE AND TURNS WHEN IT RUNS — before play, mid-play, after stop, after the end', async ({ page }) => {
+    await boot(page);
+    await page.evaluate(() => window.openWiz('user_lathe_odturn'));
+    await page.waitForTimeout(1600);
+    const look = () => page.evaluate(() => {
+        const v = window.__ddcsActiveViz;
+        return v && v._partGroup ? { z: +v._partGroup.rotation.z.toFixed(3), spin: !!v._latheSpin } : null;
+    });
+    const running = () => page.evaluate(() => !!(window.__ddcsActiveViz && document.querySelector('.pp-run.on')));
+    const toggle = async () => { await page.locator('.pp-run').first().click(); await page.waitForTimeout(600); };
+
+    // the preview auto-plays on open, so bring it to a KNOWN idle first — that is the state being asserted
+    if (await running()) await toggle();
+    const idleA = await look();
+    await page.waitForTimeout(700);
+    const idleB = await look();
+    expect(idleA, 'the lathe scene exists').not.toBeNull();
+    expect(idleB.z, 'IDLE: a bar that turns while nothing runs is a lie about the machine').toBe(idleA.z);
+    expect(idleB.spin, 'and the spin is not merely invisible — it is off').toBe(false);
+
+    // RUNNING: it turns, and keeps turning
+    await toggle();
+    const runA = await look();
+    await page.waitForTimeout(700);
+    const runB = await look();
+    expect(runB.spin, 'a real run raises the declared signal').toBe(true);
+    expect(runB.z, 'and the work turns while it cuts').toBeGreaterThan(runA.z);
+
+    // STOPPED: still again, immediately
+    await toggle();
+    await page.waitForTimeout(300);
+    const stopA = await look();
+    await page.waitForTimeout(700);
+    const stopB = await look();
+    expect(stopB.spin, 'stopping lowers it').toBe(false);
+    expect(stopB.z, 'and the bar is still').toBe(stopA.z);
+});
+
+test('A TRACE IS NOT A RUN — the signal the bar reads cannot be raised by re-drawing the route', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { GcodeExecutionEngine } = await import('/engine/GcodeExecutionEngine.js');
+        const seen = [];
+        const eng = new GcodeExecutionEngine({ onPlayState: (p) => seen.push(p) });
+        // a TRACE walks the whole program — and sets `running` on the way, which is the trap
+        eng.trace('G90\nG0 X0 Z0\nG1 X5 F100\nM30\n');
+        const afterTrace = { playing: !!eng.playing, running: !!eng.running, events: seen.slice() };
+        return { afterTrace };
+    });
+    expect(r.afterTrace.playing, 'a trace never claims to be playing').toBe(false);
+    expect(r.afterTrace.events.length, 'and it emits no start/stop at all — nothing to mislead a consumer').toBe(0);
+});
+
+test('A HIDDEN PANEL DOES NOT TURN ITS BAR — the answer cannot outlive the panel that gave it', async ({ page }) => {
+    await boot(page);
+    await page.evaluate(() => window.openWiz('user_lathe_odturn'));
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(async () => {
+        const v = window.__ddcsActiveViz;
+        const before = !!(v && v._latheSpin);
+        // close the wizard: its panel deactivates, and a deactivated panel is not the one on screen
+        const wm = window.ddcsStudio && window.ddcsStudio.wizardManager;
+        if (wm && wm.close) wm.close(); else document.querySelector('#wiz_user_cancel, .wiz-cancel, [data-wiz="cancel"]')?.click();
+        await new Promise((r2) => setTimeout(r2, 500));
+        // a frame has to run for the loop to notice its canvas is gone — that is the guard doing its job
+        await new Promise((r2) => requestAnimationFrame(() => requestAnimationFrame(r2)));
+        return { before, after: !!(v && v._latheSpin), attached: !!(v && v.renderer && v.renderer.domElement.isConnected) };
+    });
+    expect(r.after, 'a panel that left the screen stops turning its bar').toBe(false);
+});
