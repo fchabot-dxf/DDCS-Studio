@@ -19049,3 +19049,35 @@ established as pre-existing rather than mine.
 
 GATE (fast tier): smoke + the lathe family + the canvas / workspace / wizard specs = 137/137, plus the linter's own
 self-test 23/23 and the 59-macro no-false-positive sweep.
+
+### t1279 RIDER — I overstated the trig verdict, and corrected it before it could bite.
+
+A background search left over from t1277 finished AFTER the pass and surfaced a document I had not seen:
+`~/.claude/skills/ddcs-expert/references/advanced-macro-mathematics.md` — "Advanced MacroB Mathematics", from the
+Russian M350 community — which writes `COS[…]`, `SIN[…]`, `SQRT[…]` and `ATAN[#dy]/[#dx]` throughout and labels
+itself "[CONFIRMED] Community-proven patterns".
+
+WHAT THAT DOES AND DOES NOT CHANGE. It is not a test we ran, and its shape is telling: `ATAN[#dy]/[#dx]` is FANUC
+Macro B's own two-bracket form, so the document reads as Macro B reference material applied to the DDCS. But "not a
+test we ran" is exactly what I said about the linter's old claim, and the same standard has to cut both ways. So the
+evidence CONFLICTS and neither side settles it:
+  AGAINST — zero trig in 59 captured factory macros; libm imports hold asin/acos/atan/sqrt but NOT cos/sin.
+  FOR     — a community source uses it and calls it proven.
+
+SO THE `E-NOTRIG` ERROR I SHIPPED THIS TURN WAS TOO STRONG. An ERROR in this tool means "will fail to parse OR freeze
+the controller — fix before running", and I do not know that. It is now `W-TRIG`, a WARNING carrying BOTH sides of the
+evidence in its message and pointing at the test that would settle it. The header records the conflict rather than
+picking a side, and gains a third evidence kind — CLAIMED (a community source uses it; nobody here has run it) —
+between VERIFIED and ABSENT.
+
+AND THE QUESTION IS NOW ANSWERABLE: `verify/V13_trig.nc` is a no-motion macro that assigns COS[60], SIN[30], SQRT[9]
+and ATAN[1]/[1] into #602-#605 with #601 as a ran-to-the-end sentinel, and tells the reader how to read the result —
+including that a syntax error naming a line identifies exactly which function the parser lacks. Whoever is next at the
+machine can end this in one run.
+
+NOTHING ELSE MOVES. Polygon turning still computes its path at post time: that is correct under uncertainty and stays
+correct if trig turns out to exist. The vocabulary findings that rest on the corpus alone — ABS as the only
+demonstrated math function, NE demonstrated 25 times, LT/GT/LE/GE absent — are untouched, because none of them
+depended on the parse.out misreading OR on this document.
+
+Self-test 23/23 with the corrected severity; the 59-macro sweep still flags zero.

@@ -9,7 +9,10 @@ capturing the error after the fact, catch it BEFORE the macro ever reaches the c
 Grounded in, and ONLY in, evidence of three declared kinds (t1279 - see THE EXPRESSION VOCABULARY below):
   * DEMONSTRATED  - the construct appears in the 59 captured factory macros (CNCDISK/SYSDISK, 2026-06-10)
   * VERIFIED      - we ran it on the machine and recorded the result (the V-series in verify/)
-  * ABSENT        - neither of the above. Not "forbidden", but not something to emit and hope.
+  * CLAIMED       - a community source uses it, but nobody here has run it (t1279 rider: the ddcs-expert skill's
+                    reference/advanced-macro-mathematics.md - "Advanced MacroB Mathematics", from the Russian M350
+                    community - writes COS/SIN/SQRT/ATAN freely and labels itself "community-proven")
+  * ABSENT        - none of the above. Not "forbidden", but not something to emit and hope.
 
 WHAT THIS HEADER USED TO CLAIM, AND WHY IT WAS WRONG (t1279):
   it said the accepted vocabulary was "the parser's real vocabulary mined from parse.out (math fns ASIN/ACOS/ATAN/
@@ -23,7 +26,17 @@ WHAT THIS HEADER USED TO CLAIM, AND WHY IT WAS WRONG (t1279):
 
 THE EXPRESSION VOCABULARY, as the evidence actually supports it:
   MATH FUNCTIONS   ABS[...]                        DEMONSTRATED (10 uses, e.g. `#24=ABS[#22-#23]`)
-                   everything else                 ABSENT - no trig, no SQRT, no FUP/FIX/ROUND/LN in the corpus
+                   COS/SIN/TAN/ASIN/ACOS/ATAN      CLAIMED, and the evidence CONFLICTS - see below
+                   SQRT / ROUND / FUP / FIX / LN    CLAIMED (same source) but never seen in the corpus
+
+  THE TRIG QUESTION IS OPEN, and this file says so rather than picking a side (t1279 rider):
+    AGAINST - zero uses across all 59 captured factory macros; and the firmware's libm import table contains
+              asin/acos/atan/sqrt but NOT cos/sin, which is an odd shape for a language that offers COS[].
+    FOR     - the community MacroB reference above uses COS/SIN/SQRT/ATAN throughout and calls them proven.
+    NEITHER SETTLES IT. The absence of a construct from 59 macros is not proof the parser rejects it, and a
+    community document is not a test we ran. `verify/V13_trig.nc` exists to settle it on the machine; until
+    someone runs it, trig WARNS (with both sides in the message) rather than erroring. An ERROR here would mean
+    "will fail to parse or freeze the controller", and we do not know that.
   CONTROL FLOW     IF [...] GOTO<n>                DEMONSTRATED
                    WHILE [...] DO<n>               DEMONSTRATED (35 uses)
   WORD OPERATORS   EQ                              VERIFIED on machine (V10_operators.nc, 2026-06-23)
@@ -126,18 +139,20 @@ def lint_line(n, raw, findings, primed=frozenset()):
                                 "space after GOTO ('GOTO 1') is accepted on the DDCS Expert - emit 'GOTO1' / "
                                 "'GOTO[expr]' for portability"))
 
-    # t1279 - FUNCTION VOCABULARY. Trig is an ERROR: no captured factory macro uses one, none is verified, and the
-    # names an earlier version of this file cited are the firmware's libm imports, not the grammar. A macro that needs
-    # a cosine must have it computed at POST time (that is what Studio's polygon turning does).
+    # t1279 - FUNCTION VOCABULARY, by the evidence. Trig WARNS rather than errors: the corpus and the libm import
+    # table both point away from it, but a community MacroB reference uses it and calls it proven, and neither side is
+    # a test we ran. Erroring would claim "the controller rejects this", which is exactly the kind of unearned
+    # certainty that put the wrong vocabulary in this file's header in the first place.
     for m in FN_CALL.finditer(code):
         fn = m.group(1).upper()
         if fn in FLOW_WORDS or fn in DEMONSTRATED_FNS:
             continue
         if fn in TRIG_FNS:
-            findings.append(Finding(n, "ERROR", "E-NOTRIG",
-                                    f"'{fn}[...]' - the DDCS macro language has NO TRIG. No captured factory macro "
-                                    "uses one, none is verified on the machine, and the names in parse.out are the "
-                                    "firmware's libm imports, not grammar. Compute the value at post time instead."))
+            findings.append(Finding(n, "WARN", "W-TRIG",
+                                    f"'{fn}[...]' is UNSETTLED on the DDCS. Against: no captured factory macro uses "
+                                    "trig, and the firmware's libm imports hold asin/acos/atan/sqrt but not cos/sin. "
+                                    "For: the community MacroB reference uses it and calls it proven. Nobody here has "
+                                    "run it - see verify/V13_trig.nc. Until then, prefer computing at post time."))
         elif fn in OTHER_ABSENT_FNS:
             findings.append(Finding(n, "WARN", "W-UNDEMONSTRATED",
                                     f"'{fn}[...]' is not demonstrated in any captured factory macro and is not "
@@ -260,8 +275,8 @@ def self_test():
         ("IF #1 EQ 5 GOTO1\nM30\n", None),           # EQ confirmed working -> no W-FANUCOP
         ("IF #1 NE 5 GOTO1\nM30\n", None),          # t1279 - NE is DEMONSTRATED in the corpus -> no warn
         ("IF #1 LT 5 GOTO1\nM30\n", "W-FANUCOP"),   # LT/GT/LE/GE remain ABSENT -> warns
-        ("#100=COS[#5]\nM30\n", "E-NOTRIG"),        # t1279 - trig is REJECTED: the language has none
-        ("#100=SIN[[#5]/2]\nM30\n", "E-NOTRIG"),
+        ("#100=COS[#5]\nM30\n", "W-TRIG"),           # t1279 rider - trig is UNSETTLED: it warns, with both sides of the evidence
+        ("#100=SIN[[#5]/2]\nM30\n", "W-TRIG"),   
         ("#100=SQRT[#5]\nM30\n", "W-UNDEMONSTRATED"),
         ("#24=ABS[#22-#23]\nM30\n", None),          # the ONE math function with evidence
         ("WHILE [#100 NE 0] DO1\nM30\n", None),     # demonstrated control flow, not a function call
