@@ -18241,3 +18241,81 @@ which is now false twice over. Pre-existing dead code, so I am flagging it rathe
 
 GATE after the amendment: 108/108 (adds the editor / header-responsive / mobile-settings / settings-responsive specs).
 SCREENSHOT: s1255-phone-trash.png -- the 390px editor, trash top-right, corner menu showing three file actions.
+
+---
+
+## turn 1257 -- THE LAG WAS NOT SLOW WORK. It was a wait for an event that had already fired.
+
+The user reported: clicking a workspace lags with no feedback, then it opens. I was asked to add feedback and to
+MEASURE where the lag goes. Measuring first is what turned this from a spinner into a fix.
+
+### THE MEASUREMENT (before touching anything).
+
+    getFile            0.3 ms
+    read + parse       0.4 ms
+    restoreBackup     13.5 ms
+    controllerSettled 915.0 ms   <-- the entire lag
+    TOTAL             930 ms, and only THEN does location.reload() start
+
+`controllerSettled` waits for `variableDB:ready` with a 900ms cap. But the re-seed it waits for is triggered BY
+restoreBackup, which finishes in 13ms -- so the event fires while restore is still running, and the listener attaches
+AFTERWARDS. It was never waiting for work; it was waiting out its own timeout, on every open, because it started
+looking after the thing had already happened. A missed-event race.
+
+FIX: variableDB stamps `window.__ddcsVarsReadyAt` when it fires, and controllerSettled asks "did a re-seed land SINCE
+the restore began?" before falling back to listening. The event path stays for a re-seed still in flight and the cap
+stays for a signal that never comes. **Open: 930ms -> 68ms.** The correctness the wait existed for (t1233: a
+cross-controller open must not read dirty) is asserted in the same spec -- the freshly opened workspace is clean.
+
+### THE FEEDBACK, for the waits that are still real.
+
+A Drive read and the post-open reload are genuine waits, so `ui/busyRow.js` puts a glyph ON THE ROW CLICKED, the
+instant it is clicked -- no global overlay (the app is not busy, one row is), and nothing on instant actions (a
+spinner on a tab switch teaches people the app is slow when it is not; there is a test for that absence).
+
+  - the busy state disables the row, which is the half that is easy to forget: without it a second click starts a
+    second open and the two race through restore.
+  - it deliberately SURVIVES success on a workspace open, because that open ends in location.reload() -- clearing the
+    glyph on completion would leave a dead gap right before the page changes. On a project load or a .wiz/.cam
+    import, which stay on screen, it clears (keepOnSuccess: false).
+  - a FAILURE clears it, because the named refusal is the feedback then and must not sit under a spinner.
+
+Applied to: the manager rows (local AND cloud), the Library's project rows, and the shelf import cards. The busy
+state marks the ROW, not the open button inside it -- the row also holds a delete button, and freezing the whole row
+is what stops a mis-tap landing on delete mid-open.
+
+### HOUSEKEEPING (authorized) + a flake I finally read properly.
+
+HQ_ACTIONS / HQ_STANDALONE deleted from ui/headerPost.js -- orphaned by the t1227 curation, zero consumers, and one
+of their comments still called Clear "the phone access point" (false since t1227, and again since t1255).
+
+And the t1233 cloud SAVE-AS flake, which I had written off as load pressure across three separate turns: the failure
+message names the cause outright -- the fake Drive's route handler calls page.evaluate, so a request still in flight
+when a test ends throws "Test ended". `page.unrouteAll({ behavior: 'ignoreErrors' })` in an afterEach makes the end
+of each test deterministic. 27/27 across three repeats. Worth recording that I mis-attributed it three times before
+reading the error properly.
+
+GATE (fast tier): smoke + loading-feedback + manager/library/header/editor = 118/118.
+SCREENSHOTS: s1257-row-busy-local.png + s1257-row-busy-cloud.png -- the glyph on the clicked row, mid-open.
+
+### AMENDMENT (user proved it live): the exe forgets everything on close — pywebview private_mode.
+
+The user closed and reopened the desktop app and found the folder grant, the save handle AND the workspace buffer all
+gone. `bridge/bridge-app/desktop.py` called a bare `webview.start()`, and pywebview defaults to PRIVATE MODE — which
+throws browser storage away when the window closes. In this app that storage is not a cache, it IS the workspace:
+localStorage holds the working buffer and the save watermark, IndexedDB holds the File System Access handles for all
+three folders (workspaces, library, deploy). So every restart looked like amnesia.
+
+  webview.start(private_mode=False, storage_path=%LOCALAPPDATA%/DDCS-Studio/webview)
+
+The path is in the user's own app-data ON PURPOSE, not beside the executable: a PyInstaller build unpacks to a temp
+dir, and an install-location path would make an app UPDATE read as a fresh amnesiac install too. It is created with
+makedirs first (pywebview will not create a missing storage dir). An older pywebview without those arguments falls
+back to plain start() with a stderr line saying storage will not persist — so the symptom can never again be a
+mystery. NO SPEC IS POSSIBLE for this headless: the verification is the user's retest on the next release.
+
+ON PERSISTING FILE-SYSTEM PERMISSION GRANTS (asked, not built): pywebview exposes no API for it, and it is a WebView2
+/ Chromium-side policy rather than something the host can grant. What persistence buys us is that the HANDLES survive
+in IndexedDB — so a re-grant, if the runtime still asks for one, is a one-click confirm on a remembered folder rather
+than a re-pick through the OS dialog. Whether a per-session bubble remains is exactly what the user's retest tells
+us; I am not building for either answer before we know.
