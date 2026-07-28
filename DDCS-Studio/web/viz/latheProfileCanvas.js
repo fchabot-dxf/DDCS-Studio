@@ -19,6 +19,7 @@
  * That mapping is stated once, here, in zToCanvas/canvasToZ — the two are inverses and are tested as such.
  */
 import { halfProfile, normalizeBar, radiusOf, diameterOf } from '../data/lathe.js';
+import { polygonPath, polyRadiusAt, polySides } from '../wizards/lathe/polygon.js';   // t1277 — the end view draws the op's OWN r(angle), never its own idea of a hexagon
 
 /** Lathe Z → canvas x. The bar runs left (chuck, −Z) to right (raw face, +Z), which is how a turner faces one. */
 export const zToCanvas = (z) => z;
@@ -45,8 +46,11 @@ export function latheProfileSpec(bar, onAllowance) {
         items: [
             // the centreline: a lathe drawing is meaningless without it
             { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
-            // THE ALLOWANCE — the material that gets faced off, between the datum and the raw end
-            { kind: 'rect', x: zToCanvas(prof.allowance.z1), y: 0, w: prof.allowance.z2 - prof.allowance.z1, h: r, cls: 'fc-feature' },
+            // THE ALLOWANCE — the material that gets faced off, between the datum and the raw end.
+            // (fc-feature-pocket is the DECLARED class for material coming away. An invented `fc-feature` matched no
+            // rule at all: the rects fell back to an unstyled black box and the polygon path, being fill:none with no
+            // stroke, drew NOTHING — invisible until a real wizard was opened and looked at.)
+            { kind: 'rect', x: zToCanvas(prof.allowance.z1), y: 0, w: prof.allowance.z2 - prof.allowance.z1, h: r, cls: 'fc-feature-pocket' },
             // Z0, the finished face
             { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: r },
         ],
@@ -113,6 +117,11 @@ export function latheLayoutSpec(def, params, setFields) {
     if (/centerdrill/.test(String(def.opType || ''))) {
         return drillProfileSpec(barFromSettings(null), { depth: p.depth }, write);
     }
+    if (/polygon/.test(String(def.opType || ''))) {
+        return polygonProfileSpec(barFromSettings(null), {
+            sides: p.sides, acrossFlats: p.acrossFlats, depth: p.depth, segmentsPerFace: p.segmentsPerFace,
+        }, write);
+    }
     const bar = barFromSettings(null);
     return odProfileSpec(bar, {
         kind: p.kind, targetDiameter: p.targetDiameter, endDiameter: p.endDiameter, depth: p.depth,
@@ -164,7 +173,7 @@ export function odProfileSpec(bar, od, onChange) {
     const items = [
         { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
         // THE MATERIAL THIS OP REMOVES — between the finished surface and the bar, over the turned length
-        { kind: 'rect', x: zToCanvas(zEnd), y: lo, w: depth, h: Math.max(0, barR - lo), cls: 'fc-feature' },
+        { kind: 'rect', x: zToCanvas(zEnd), y: lo, w: depth, h: Math.max(0, barR - lo), cls: 'fc-feature-pocket' },
         // THE FINISHED SURFACE: one line from the face end to the far end. Sloped when the two radii differ — the
         // taper is drawn by the same line, because a taper is not a different shape, it is different numbers.
         { kind: 'line', x1: zToCanvas(0), y1: targetR, x2: zToCanvas(zEnd), y2: endR },
@@ -234,7 +243,7 @@ export function partProfileSpec(bar, part, onChange) {
         items: [
             { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
             // THE KERF — the metal this op removes, as wide as the blade and as deep as the plunge
-            { kind: 'rect', x: zToCanvas(zBlade), y: floorR, w: width, h: Math.max(0, barR - floorR), cls: 'fc-feature' },
+            { kind: 'rect', x: zToCanvas(zBlade), y: floorR, w: width, h: Math.max(0, barR - floorR), cls: 'fc-feature-pocket' },
             { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
         ],
         handles: [
@@ -268,7 +277,7 @@ export function drillProfileSpec(bar, drill, onChange) {
         items: [
             { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
             // the hole, running INTO the work from the face
-            { kind: 'rect', x: zToCanvas(-depth), y: 0, w: depth, h: holeR, cls: 'fc-feature' },
+            { kind: 'rect', x: zToCanvas(-depth), y: 0, w: depth, h: holeR, cls: 'fc-feature-pocket' },
             { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
         ],
         handles: [
@@ -278,6 +287,78 @@ export function drillProfileSpec(bar, drill, onChange) {
             if (id !== DRILL_DEPTH_HANDLE_ID || typeof onChange !== 'function') return;
             // depth grows into −Z, and a hole of zero depth is not a hole
             onChange({ depth: r3(Math.max(0.001, -canvasToZ(world.x))) });
+        },
+    };
+}
+
+// ── POLYGON TURNING: THE END VIEW (t1277) ───────────────────────────────────────────────────────────────────────
+/** The Z extent of the polygon section, dragged on the half-profile. */
+export const POLY_DEPTH_HANDLE_ID = 'polyDepth';
+/** The across-flats size, dragged on the END VIEW — the only place that number is visible as what it is. */
+export const POLY_FLATS_HANDLE_ID = 'polyFlats';
+
+/**
+ * TWO VIEWS ON ONE SHEET, which is how this shape has to be read.
+ *
+ * The half-profile says WHERE along the bar the section is; it cannot show a hexagon, because a half-profile of a
+ * hexagon is just a band. The END VIEW says what the section IS, and cannot show where it sits. Neither is optional,
+ * so both are drawn — side by side in one canvas, laid out like a drawing sheet, rather than as a second panel the
+ * layout seam does not have.
+ *
+ * THE END VIEW DRAWS THE OP'S OWN r(angle). It calls polygonPath — the same function the emit unrolls — so the
+ * picture cannot show a shape the program will not cut. If they ever disagree, one consumer read the model wrong;
+ * there is no second opinion to reconcile.
+ */
+export function polygonProfileSpec(bar, poly, onChange) {
+    const b = normalizeBar(bar);
+    const prof = halfProfile(b);
+    const barR = radiusOf(b.diameter);
+    const o = poly || {};
+    const sides = polySides(o.sides);
+    const across = Math.max(0, Number(o.acrossFlats) || 0);
+    const depth = Math.max(0, Number(o.depth) || 0);
+    const apothem = across / 2;
+
+    // the end view sits to the RIGHT of the bar, clear of it, centred on its own axis
+    const gap = Math.max(6, barR * 0.6);
+    const cx = prof.bounds.z2 + gap + barR;
+    const cy = barR;                                  // …lifted so the circle sits beside the profile, not on it
+
+    const path = polygonPath({ acrossFlats: across, sides, segmentsPerFace: o.segmentsPerFace });
+    const pts = path.map((pt) => ({
+        x: cx + pt.x * Math.cos(pt.a * Math.PI / 180),
+        y: cy + pt.x * Math.sin(pt.a * Math.PI / 180),
+    }));
+
+    return {
+        stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },
+        items: [
+            // ── the half-profile: where the section is ──
+            { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
+            { kind: 'rect', x: zToCanvas(-depth), y: apothem, w: depth, h: Math.max(0, barR - apothem), cls: 'fc-feature-pocket' },
+            { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
+            // ── the end view: what the section IS ──
+            { kind: 'circle', cx, cy, r: barR },                       // the bar, seen down the axis
+            { kind: 'circle', cx, cy, r: Math.max(0.3, barR * 0.03) }, // …and its centre
+        ],
+        // the polygon itself, from the op's own r(angle) — a path, because that is what it is
+        paths: [{ pts, cls: 'fc-path' }],
+        handles: [
+            { id: POLY_DEPTH_HANDLE_ID, x: zToCanvas(-depth), y: apothem, kind: 'size', axis: 'x', teal: true, label: 'extent', value: depth },
+            // …on the middle of a flat, where the across-flats size IS the distance from the centre
+            { id: POLY_FLATS_HANDLE_ID, x: cx, y: cy + apothem, kind: 'size', axis: 'y', teal: true, label: 'across flats', value: across },
+        ],
+        onDrag: (id, world) => {
+            if (typeof onChange !== 'function') return;
+            if (id === POLY_DEPTH_HANDLE_ID) { onChange({ depth: r3(Math.max(0.001, -canvasToZ(world.x))) }); return; }
+            if (id === POLY_FLATS_HANDLE_ID) {
+                // clamped inside the bar: a polygon whose CORNERS stand outside the stock has flats that were never
+                // cut — the corner radius, not the apothem, is what has to fit.
+                const wantApothem = Math.max(0.001, world.y - cy);
+                const corner = polyRadiusAt(0, wantApothem * 2, sides);
+                const scale = corner > barR ? barR / corner : 1;
+                onChange({ acrossFlats: r3(wantApothem * 2 * scale) });
+            }
         },
     };
 }

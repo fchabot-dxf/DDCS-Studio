@@ -174,11 +174,14 @@ test('restoring a workspace ADOPTS the file\'s controller (the file is the machi
     return { inFile, before, after: { controller: (getActiveProfile() || {}).id, machine: window.ddcsGetMachine() } };
   });
 
-  // t1267 — the record gained `kind` (mill | lathe): the file IS the machine, and WHICH KIND of machine is part of
-  // that. Asserted in full rather than loosened, so the next field added to the record has to be stated here too.
-  expect(r.inFile, 'the .ddcs carries the machine record as a declared store').toEqual({ name: 'Shop Bee', controllerId: 'ddcs-v41', kind: 'mill' });
+  // t1267 — the record gained `kind` (mill | lathe); t1277 — and `chuck` (spindle | axis), because polygon turning
+  // needs the chuck commanded to an angle and that is a fact about the machine, not about the op. The file IS the
+  // machine, so both ride in it. Asserted in FULL rather than loosened, so the next field added to the record has to
+  // be stated here too — which is the point of this assertion, and it has now done that job twice.
+  const RECORD = { name: 'Shop Bee', controllerId: 'ddcs-v41', kind: 'mill', chuck: 'spindle' };
+  expect(r.inFile, 'the .ddcs carries the machine record as a declared store').toEqual(RECORD);
   expect(r.before.controller, 'the browser really was on a different controller first').toBe('ddcs-expert-m350');
-  expect(r.after.machine, 'the restored machine record is the FILE\'s').toEqual({ name: 'Shop Bee', controllerId: 'ddcs-v41', kind: 'mill' });
+  expect(r.after.machine, 'the restored machine record is the FILE\'s').toEqual(RECORD);
   expect(r.after.controller, 'and the LIVE controller was retargeted to it — the file is the machine').toBe('ddcs-v41');
 });
 

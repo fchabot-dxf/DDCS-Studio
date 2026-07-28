@@ -1217,6 +1217,17 @@ function buildSettingsOverlay() {
                             </select>
                             <span class="settings-hint" id="set_machine_kind_note" style="margin:0;"></span>
                         </div>
+                        <!-- t1277 — THE CHUCK. Polygon turning needs the chuck commanded to an ANGLE, and most lathe
+                             chucks only spin. The op greys with a reason that points HERE, so the answer has to exist
+                             here: a machine fact the controller cannot report, declared by the person who built it. -->
+                        <div class="settings-row" id="set_chuck_row" style="align-items:center; gap:10px;">
+                            <label class="label" for="set_machine_chuck">Chuck</label>
+                            <select id="set_machine_chuck" title="How this lathe's chuck behaves. A DDCS cannot report it — it depends on what you wired.">
+                                <option value="spindle">Spindle — free RPM (ordinary turning)</option>
+                                <option value="axis">Driven axis — commanded to an angle (A)</option>
+                            </select>
+                            <span class="settings-hint" id="set_machine_chuck_note" style="margin:0;"></span>
+                        </div>
                     </div>
                     <div class="settings-section">
                         <div class="settings-section-title">MACHINE ENVELOPE (mm)</div>
@@ -3063,6 +3074,27 @@ function wireSettingsOverlay(ov) {
             });
             paintKind();
         }
+        // t1277 — the CHUCK control. Only a lathe has one, so the row hides on a mill rather than asking a question
+        // that has no meaning there. Changing it re-gates the bar (polygon turning goes live or greys).
+        const chuck = q('set_machine_chuck'), crow = q('set_chuck_row'), cnote = q('set_machine_chuck_note');
+        const paintChuck = () => {
+            const m = getMachine();
+            if (crow) crow.style.display = m.kind === 'lathe' ? '' : 'none';
+            if (chuck) chuck.value = m.chuck || 'spindle';
+            if (cnote) cnote.textContent = (m.chuck === 'axis')
+                ? 'Polygon turning is available: the chuck can be commanded to an angle.'
+                : 'Ops that need the chuck commanded to an angle (polygon turning) stay greyed.';
+        };
+        if (chuck) {
+            chuck.addEventListener('change', () => {
+                setMachine({ chuck: chuck.value }, false);
+                paintChuck();
+                window.dispatchEvent(new CustomEvent('ddcs:machine-changed'));
+                window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
+            });
+        }
+        if (sel) sel.addEventListener('change', paintChuck);
+        paintChuck();
     }
 
     const dlTnc = q('atc_dl_tnc');

@@ -40,18 +40,31 @@ const liveControllerId = () => { try { return (getActiveProfile() || {}).id || D
 export const MACHINE_KINDS = ['mill', 'lathe'];
 export const DEFAULT_KIND = 'mill';
 const cleanKind = (k) => (MACHINE_KINDS.includes(k) ? k : DEFAULT_KIND);
+const cleanChuck = (c) => (['spindle', 'axis'].includes(c) ? c : 'spindle');
 
 /** THE machine record for this workspace: { name, controllerId, kind }. Never null — an un-named workspace is legal (''). */
 export function getMachine() {
     const m = readJSON(MACHINE_KEY);
     if (m && typeof m === 'object') {
-        return { name: String(m.name || ''), controllerId: m.controllerId || liveControllerId(), kind: cleanKind(m.kind) };
+        return { name: String(m.name || ''), controllerId: m.controllerId || liveControllerId(), kind: cleanKind(m.kind), chuck: cleanChuck(m.chuck) };
     }
     return { name: '', controllerId: liveControllerId(), kind: DEFAULT_KIND };   // derived, NOT written — writing on read would mask a real save
 }
 
 /** Is this workspace a lathe? The one question every surface asks; nobody re-derives it from anything else. */
 export const isLathe = () => getMachine().kind === 'lathe';
+
+/**
+ * HOW THE CHUCK BEHAVES, declared on the workspace (t1277). A lathe chuck is either a free-spinning SPINDLE (rpm
+ * only — the ordinary turning case) or a DRIVEN AXIS (the A axis, commanded to an angle). It is a property of the
+ * machine the user built, not something to infer from an op: polygon turning NEEDS the driven axis, and the honest
+ * way to tell someone their machine cannot run it is to have ASKED what their machine is.
+ */
+export const CHUCK_MODES = ['spindle', 'axis'];
+export const DEFAULT_CHUCK = 'spindle';
+export const chuckMode = (m = getMachine()) => (CHUCK_MODES.includes(m && m.chuck) ? m.chuck : DEFAULT_CHUCK);
+/** Is the chuck a commanded axis? (A lathe question — a mill's rotary is a separate declaration.) */
+export const chuckIsAxis = (m = getMachine()) => m.kind === 'lathe' && chuckMode(m) === 'axis';
 
 /**
  * Persist the record. `applyController` (default true) also RETARGETS this workspace's live controller/dialect — the
@@ -67,6 +80,7 @@ export function setMachine(next, applyController = true) {
         // t1267 — the kind rides with the record, so it travels in the .ddcs like the name and the controller do
         // ([[one-workspace-one-machine]]: the file IS the machine, and what kind of machine is part of that).
         kind: cleanKind((next && next.kind) || cur.kind),
+        chuck: cleanChuck((next && next.chuck) || cur.chuck),
     };
     try { localStorage.setItem(MACHINE_KEY, JSON.stringify(rec)); } catch (_) {}
     if (applyController && rec.controllerId) {

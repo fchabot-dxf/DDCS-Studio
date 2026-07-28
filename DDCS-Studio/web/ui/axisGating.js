@@ -13,7 +13,7 @@
  * KEYED ON THE DECLARED AXES, never inferred: the machine record says which axes exist (via its envelope + kind).
  * Nothing here guesses from travels or counts motors — an undeclared axis is undeclared, not absent-looking.
  */
-import { getMachine } from '../data/workspaceMachine.js';
+import { getMachine, chuckIsAxis } from '../data/workspaceMachine.js';   // t1277 — the chuck is an axis only when the workspace says so
 
 /**
  * Which axes a workspace declares. A lathe is X + Z by construction: the cross-slide and the carriage, with the
@@ -21,7 +21,12 @@ import { getMachine } from '../data/workspaceMachine.js';
  * @returns {Set<string>}
  */
 export function declaredAxes(machine = getMachine()) {
-    return machine.kind === 'lathe' ? new Set(['X', 'Z']) : new Set(['X', 'Y', 'Z']);
+    if (machine.kind !== 'lathe') return new Set(['X', 'Y', 'Z']);
+    // …and A only when the chuck is DECLARED as a driven axis. Most lathe chucks just spin; polygon turning needs
+    // one that can be commanded to an angle, and the difference is a fact about the machine, not about the op.
+    const axes = new Set(['X', 'Z']);
+    if (chuckIsAxis(machine)) axes.add('A');
+    return axes;
 }
 
 /**
@@ -47,12 +52,18 @@ export const OP_AXIS_NEEDS = {
     lathe_facing: ['X', 'Z'],
     lathe_odturn: ['X', 'Z'],
     lathe_parting: ['X', 'Z'],
-    lathe_centerdrill: ['Z'],   // …the only op in the app that needs ONE axis: the drill never leaves the centreline
+    lathe_centerdrill: ['Z'],
+    lathe_polygon: ['X', 'Z', 'A'],   // …the A is the point of the op: the chuck must TURN to a commanded angle   // …the only op in the app that needs ONE axis: the drill never leaves the centreline
 };
 
 /** The sentence a greyed op shows. Names the axis AND why we believe it is absent, so it is checkable. */
 export function axisWhy(missing, machine = getMachine()) {
     const axes = missing.join(' and ');
+    // THE A ANSWER IS ITS OWN SENTENCE. "needs an A axis" tells a turner nothing; "your chuck is declared as a
+    // spindle" tells them what to change, and where.
+    if (missing.length === 1 && missing[0] === 'A') {
+        return 'needs the chuck to be a DRIVEN AXIS — this workspace declares it as a spindle (free RPM). Set the chuck to a driven axis in Settings if your machine has one.';
+    }
     return machine.kind === 'lathe'
         ? `needs a ${axes} axis — this is a lathe workspace (X cross-slide + Z carriage only)`
         : `needs a ${axes} axis — this workspace declares none`;
