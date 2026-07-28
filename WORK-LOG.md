@@ -19512,3 +19512,52 @@ are needed and both are there.
 GATE (fast tier): smoke + the lathe family + the new asserts = 151/151.
 FOR THE FULL SUITE: the OD emit changes for TAPERS through the twin (which is the point). The straight turn is
 byte-identical and asserted through the twin path.
+
+---
+
+## turn 1295 -- THE LATHE REACHES EVERY SURFACE: the camera, and the hardware page.
+
+### (1) THE CAMERA — the t1281 lathe default was DEAD CODE from the day it was written.
+
+It read `sv.phi ?? latheDefault`. But `SETTINGS_DEFAULTS.view` always supplies a theta AND a phi, so the fallback
+could never fire: every pane opened a lathe scene from the mill's three-quarter view down at a table, with the bar
+standing on end and the chuck at the bottom. The wizard panes LOOKED right only because the ROLL (up = +X) was doing
+enough to disguise it; the main preview, where a user orbited, showed it plainly.
+
+AND A DEFAULT ALONE WOULD NOT HAVE BEEN ENOUGH. One saved view for both worlds is wrong even when the defaults are
+right: a camera framed while working on a mill governs every lathe scene afterwards, and the first orbit on either
+poisons the other. So views are SCOPED PER KIND (viz/viewScope.js): each kind has its own default and its own saved
+view, and switching kind re-baselines to that kind's — its saved one if it has one, its default if not. The LEGACY
+flat `{theta, phi}` is read as the MILL's, which is what it was: every view saved before the scope existed was framed
+on a mill.
+
+Asserted with a mill-scoped view PRESENT, which is the state the user was actually in: the lathe still opens level
+with the bed and rolled, and a mill still opens to its own three-quarter view with its own up vector.
+
+### (2) THE HARDWARE PAGE now speaks the machine it is describing.
+
+The kind selector explains that X is a radius, and then the picture underneath drew a mill's flat XY table with a live
+Y row. A lathe has no table and no Y: it has a BED the carriage runs along and a CROSS-SLIDE that comes in and out of
+the centreline. So a lathe workspace gets its own ELEVATION — Z across, X up from the centreline it is measured from —
+drawn from the SAME declared travels with the SAME sign rule, because none of that changed; what changed is which
+axes exist and what they mean.
+
+THE Y ROW GREYS, never hides, with the standing reason under the cursor, and comes back on switching to a mill. That
+rule keeps earning itself: hiding answers a question nobody asked ("where did Y go?") and leaves the real one
+unanswered ("can this machine do it?").
+
+HOMING FOLLOWS THE DECLARED AXES — X and Z, plus the chuck row when the workspace declares the chuck a DRIVEN AXIS
+(the same declaration polygon turning gates on, read from the one machine record). Offering a Y card asks an operator
+to configure a switch on an axis their machine does not have.
+
+A REAL BUG FOUND WHILE WIRING IT: the homing cards were painted ONCE, before the machine kind was known, and never
+repainted — so even with the right axis list a lathe workspace opened Settings showing Y. They repaint on open now,
+beside the envelope that already did.
+
+GATE (fast tier): smoke + the touched specs = 143/143. UI-class, as the dispatch said.
+SCREENSHOTS: s1295-main-preview.png (the bed across the screen with the turning tool and the Ø DRO),
+s1295-hw-lathe.png / s1295-hw-mill.png (both hardware surfaces).
+
+FLAGGED, not done: the MAIN preview frames the lathe correctly but still draws the workspace's GLOBAL stock — the
+per-op bar is a wizard-level declaration. Feeding a lathe workspace's global stock from the bar is the obvious next
+step and belongs in its own turn.
