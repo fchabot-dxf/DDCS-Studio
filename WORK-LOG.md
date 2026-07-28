@@ -19561,3 +19561,85 @@ s1295-hw-lathe.png / s1295-hw-mill.png (both hardware surfaces).
 FLAGGED, not done: the MAIN preview frames the lathe correctly but still draws the workspace's GLOBAL stock — the
 per-op bar is a wizard-level declaration. Feeding a lathe workspace's global stock from the bar is the obvious next
 step and belongs in its own turn.
+
+---
+
+## t1297 — the bar reaches the main preview, the scene stops speaking mill, and the config matrix becomes a spec
+
+**Split flagged and taken.** The dispatch bundled three things and explicitly offered the split ("FLAG if this bundle
+is too heavy — say so and split rather than thin any of it"). I took the offer: (1) and (3) are done in full below;
+(2), THE LATHE PROBE FAMILY, is **not started** — reasons in the pass-back, not thinned here.
+
+### (1) A lathe workspace's workpiece IS a bar
+
+The bar was a wizard-level declaration only, so every wizard pane drew a bar while the MAIN preview — where the user
+actually lives — drew a mill's box, or nothing but a toolpath in empty air. Fixed by declaring the workspace's own
+stock from the bar.
+
+The thing I deliberately did NOT do is write a second bar concept. `applyLatheWorkspaceStock()` calls `latheSimStock`
+— the same function every wizard pane calls — with no op params, so the workspace holds the bar and `def.simStock`
+refines an op's values on top of it. One builder, one shape, nothing that can drift.
+
+Two judgement calls worth recording:
+
+- **It never overwrites a bar the user already has.** Switching kind must not silently retype someone's workpiece, so
+  a workspace already holding a cylinder-on-Z-from-the-finished-face is left exactly alone (asserted: a 40mm bar with
+  a 90 stick-out survives repeated applications and the function returns false).
+- **It does not infer a diameter from the box it replaces.** My first cut read the mill box's X as the bar diameter —
+  a 100mm block became a Ø100 bar, which is not a fact anybody stated. A block says nothing about the stock in the
+  chuck. It takes the DECLARED default bar (Ø25 × 60 + 1) instead. Caught by looking at the value in the probe.
+
+### The labels were lettered for a machine that wasn't there
+
+The scene named ±Y — in a lathe world, floating in the vertical, which is the RADIUS direction. Rather than patch the
+strings at the point of drawing, WHICH labels exist is now declared per kind (`GRID_LABEL_TEXT`), with `null` meaning
+"this machine does not have that axis" so no sprite is made at all. A lathe gets `+X (radius)` on the screen-vertical
+and `+Z` / `-Z` on the bed; `-X` is simply absent, because a lathe tool never crosses the centreline and greying a
+label you can't act on is worse than not drawing it.
+
+Placement had to follow, not just the text: the second pair moves onto the BED (the ends of the Z the scene spans),
+since leaving them on a mill's XY floor would have put "+Z" somewhere Z isn't.
+
+Three things fell out of doing it properly:
+
+- **The sprite canvas was a fixed 128px** because every label had been two characters. `+X (radius)` would have been
+  cropped to `+X (ra`. The canvas now fits its text and the sprite carries its own aspect, so the per-frame scale keeps
+  a constant on-screen height. A two-character label is bit-identical (aspect 2 → the old maths).
+- **The scene did not re-letter in one direction.** Becoming a lathe writes the bar and so repaints; going BACK to a
+  mill writes nothing, so the mill scene kept the lathe's letters until something unrelated redrew it. My first spec
+  run caught it. The viz now listens for the kind change itself (and removes the listener on dispose).
+- **`__text` on the sprite** — a label can now be asked what it says, which is what let the spec assert lettering
+  instead of pixel-diffing it.
+
+Verified by measurement, not by eye alone: both ends of the bed project to the same screen height and are apart
+horizontally (the bed lies ACROSS the screen), with the radius above them — exactly where the user was told +Y was.
+Then eyeballed anyway, both kinds, and with a real facing program loaded: bar, chuck, turning tool, ØX on the DRO.
+
+**Flagged, NOT fixed (no regression, but visible):** with the bar in place the main preview's FRAMING is tight — a
+Ø25×61 bar overflows the pane, sitting off to one side. The same fit rule does it to a mill box at the same zoom, so
+this is a pre-existing framing rule meeting a correctly-drawn new object, not something t1297 broke. It wants its own
+look, and I did not widen scope into it.
+
+### (3) The advisor's config matrix is now a spec — with both named gaps confirmed real
+
+`scratchpad/advisor-lathe-matrix.mjs` → `tests/lathe-matrix.spec.js`, ~50 configurations across all five wizards, each
+run through the app's own chain (builderOf → emit → trace → carve) and judged against a truth derived IN the spec.
+Marked in its header as merge-gate weight; deliberately NOT added to the smoke manifest.
+
+Both gaps the advisor named were real, and I proved it rather than assuming:
+
+- **The OD list must include the FINISH pass.** The finish cut runs the full length at constant radius exactly like a
+  roughing pass, so the filter catches it; an expected list that stops at the roughing floor is quietly demanding the
+  finish pass be MISSING.
+- **The polygon max-X must judge the FINAL sweep only.** A roughing sweep is a larger polygon still buried in the bar,
+  so its corner radius legitimately exceeds the finished one. The emit already names its last sweep, so the spec finds
+  it by that marker rather than counting lines. The no-A-without-X rule stays judged over the WHOLE program — that one
+  is a safety property of every sweep, not just the last.
+
+**Discrimination check, because a green matrix proves nothing on its own.** I perturbed the three truths that carry
+the weight — facing passes heaviest-first, the OD list without the finish pass, the polygon judged over all sweeps —
+and all three went red. The two gap fixes are therefore load-bearing, not decoration: the original checks would have
+failed against correct G-code.
+
+Fast tier: smoke 65/65, the six touched lathe specs 36/36, the matrix 5/5, and `axis-labels-config` (the pre-existing
+mill label assert) still green — that one is the guard that the mill scene is untouched.
