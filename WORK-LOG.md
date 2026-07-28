@@ -18641,3 +18641,64 @@ signed-travel machinery is untouched, and the test pins that: the same envelopeS
 GATE (fast tier): smoke + the new model spec (10) + machine-record / manager / gateway / backup = 120/120.
 Two existing roundtrip assertions were updated IN FULL rather than loosened -- the record gained a declared field, so
 the test that says what the record IS now says it, and the next field added has to be stated there too.
+
+---
+
+## turn 1269 -- FACING: the emit is right and proven. THE PILOT IS NOT COMPLETE, and I am saying so plainly.
+
+The dispatch listed five parts. Two landed and are solid; three did not. Since this is a GATED pilot -- the family
+does not start until Facing is perfect -- a half-built mechanism reported as done would be the worst possible
+outcome, so here is exactly where the line is.
+
+### LANDED (1) THE KIND SETTER.
+
+Settings -> Hardware -> Machine gains a THIS MACHINE section with a two-option Kind control writing the one record.
+Changing it repaints the identity band and the axis note in the same gesture, because the same envelope numbers MEAN
+something different on a lathe. Verified in the real app (screenshot): band reads "Kind Lathe", the note explains X
+is a radius off the centreline. No ceremony, one line, exactly as asked.
+
+### LANDED (2a) THE FACING EMIT -- and it is ground-truth verified, which is the part that matters.
+
+`wizards/lathe/facing.js` builds a PARAMETRIC macro, not an unrolled path: a #var config header (allowance, depth of
+cut, X start, feed -- each with a plain-language note), then an IF/GOTO pass loop that runs ON THE CONTROLLER. An
+operator can change the allowance at the machine and the program adapts; an unrolled program is a photograph of one
+set of numbers, this is the recipe.
+
+  #111=3 ( material ahead of the face )      N51
+  #112=1 ( depth per pass )                  IF #110>=0 GOTO52 / #110=0 ( clamp )
+  #113=12 ( bar radius + clearance RADIUS )  N52  G0 Z#110 / G1 X0 F#114 / G0 X#113
+  #114=120 ( cutting feed )                  #110=[#110-#112] / IF #110>=0 GOTO51
+
+VERIFIED THREE WAYS, all against numbers derived by hand first: the pass list for Ø20 / 3mm / 1mm DOC is [2, 1, 0];
+the emit's X start is 12 (radius 10 + clearance 2 -- a diameter there would start the tool 12mm INSIDE the bar); and
+THE SIM RESOLVES THE LOOP -- traceToolpath runs the IF/GOTO and its cutting segments reach the centreline at exactly
+Z 2, 1, 0. That last one is the assertion that proves a controller-side loop actually works, and it is why the emit
+had to be run rather than read.
+
+TWO BUGS THE HAND-DERIVATION CAUGHT, both mine, both silent:
+  - I read the roughing floor as "allowance − finish" (the amount removed) instead of "finish" (the height it stops
+    at). With no finish pass that made the floor the RAW FACE, so the loop never ran: the pass list came out [3]
+    instead of [2, 1, 0]. It was in BOTH the pass list and the emitted loop, so the two would have agreed with each
+    other while both being wrong -- which is precisely what an independent hand-derivation is for. There is now ONE
+    `roughingFloor()` both read.
+  - My first trace assertion filtered "segments ending at X0" and caught the opening clearance rapid (G0 Z5 at X0,
+    before the tool moves out). Narrowed to CUTS reaching the centreline -- the passes are cuts; a rapid at the
+    centre is just the tool not having moved yet.
+
+### NOT DONE -- and these are the pilot's remaining mechanisms, not polish.
+
+  (2b) THE TWIN REGISTRATION. facing.js is a stack builder; it is NOT yet a registered data-op twin (no
+       facingDataDef / registerUserOp / bindings / Lathe bar group). So there is no wizard form, no bar entry, and
+       kind=lathe does not yet lead with it.
+  (3)  THE HALF-PROFILE CANVAS + the marker-derived FACE-LINE handle. The view CONTRACT exists and is tested from
+       t1267 (halfProfile returns the geometry, and a minimal render proves it draws) -- but the real canvas and the
+       drag that writes the allowance field are not built.
+  (5)  THE .wiz / .cam ROUND TRIP cannot be asserted until (2b) exists: the library machinery round-trips a
+       REGISTERED op, and there is nothing registered to export yet.
+  (4)  AXIS GATING (grey-not-hide on undeclared axes) -- untouched.
+
+I would rather hand back two mechanisms that are genuinely proven than five that are half-wired, especially in a
+turn whose whole premise is that the family inherits whatever is proven here.
+
+GATE (fast tier): smoke + the 4 new facing specs + the t1267 model specs + settings/roundtrip = 99/99.
+SCREENSHOT: s1269-kind-setter.png -- the kind control, the band reading "Kind Lathe", the axis note.
