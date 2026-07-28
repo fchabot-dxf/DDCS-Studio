@@ -18849,3 +18849,82 @@ The one failure, `alignment-canvas-refit-732`, is PRE-EXISTING: verified by stas
 re-running it on the clean tree, where it fails identically.
 SCREENSHOTS: s1273-odturn-straight.png, s1273-odturn-taper.png, s1273-odturn-dragged.png (the form and the code
 preview both moved by one drag), s1273-facing-canvas.png.
+
+---
+
+## turn 1275 -- PARTING + CENTRE DRILLING complete the family; and the three flags, one of which was three bugs.
+
+### THE FLAGS FIRST.
+
+(1) FACING NOW ANCHORS LIKE OD — light pass FIRST, through the sawn end. The pilot's hand-derived case is UNCHANGED
+([2, 1, 0]), which is exactly why the difference hid: the two anchorings agree whenever the depth divides evenly. It
+shows where it matters — 3mm at 0.8 was [2.2, 1.4, 0.6, 0] and is now [2.4, 1.6, 0.8, 0], so the 0.6 remainder is
+taken by the first cut rather than by a feather pass immediately before the finishing skim. The emitted loop got OD's
+counting shape, and its zero-depth guard now answers with NO ROUGHING rather than an invented depth.
+
+(2) FACING'S HEADER RESTATES NOTHING, same as OD's, with the same no-digit test.
+
+(3) THE .wiz GATE, RULED AND BUILT. The format stays DATA. Three parts:
+  · a def's non-serializable hooks are DECLARED as a set (OP_CODE_HOOKS) and remembered per opType in the app;
+  · on import, an opType this build KNOWS gets its LOCAL hooks re-attached — behaviour from the app version, data
+    from the file — proven by exporting OD, WIPING it, importing, and checking the taper→straight restore still runs;
+  · the FILE carries a MANIFEST of the hook NAMES its author had, so a foreign opType's import can say exactly what
+    did not travel instead of losing it in silence. Both import surfaces now print that sentence.
+  Two things this taught: the listed def is the PERSISTED one and never holds functions (the manifest had to be read
+  from the app's registry, not off the def), and postInstantiate runs inside the BUILDER — so a test calling
+  instantiate() directly would have "proved" the hook while never running it.
+
+(4) THE REFIT-ON-DROP FAILURE WAS THREE BUGS, and it had been red since the day the fix landed (verified: the canvas
+at 6c298706 produces byte-identical numbers).
+  · `_followHandle` PARKS a dragged marker at exactly 80px from the edge; `_handleInGutter` asked whether it was
+    STRICTLY inside that band. At exactly 80 the answer was no, so the refit NEVER FIRED for the one case it exists
+    for. The 80 was written twice as two independent literals — now one declared GUTTER_PX, compared inclusively.
+  · the roomy margin was a scale FRACTION (0.55 → the marker lands at 22.5% of the viewport). The layout pane is 354px
+    tall, where 22.5% is 79px — still inside the gutter it was meant to escape. It is now a PIXEL margin measured
+    against the same gutter, so a short pane cannot defeat it.
+  · at pointerup `this.spec` still holds the PRE-drag position (the drag wrote a form field; the re-render has not
+    arrived), so the gutter question got answered about where the marker WAS. The reliable signal is that the drag
+    made _followHandle pan at all — that flag now drives the refit.
+  The test's own assertion was a proxy (screen delta) and is now the property: after every drop the marker sits
+  GUTTER+24 inside, and the world keeps growing. Insets went [80, 80, 80, 80] → [104, 104, 104, 104].
+
+### PARTING / GROOVING — the kerf is the op's whole geometry problem.
+
+HAND-DERIVED: a Ø20 bar grooved to Ø12 at Z−10 with a 3mm blade stops at RADIUS 6 and the blade sits at Z−13. That
+offset is the point of declaring the width: the Z a person types is the FACE of the feature off the drawing, and the
+blade occupies its own width on the material side of it. Without the declaration the operator does that subtraction
+in their head every time, and a kerf is exactly the size of error nobody notices until the part is short. The
+controller derives it (`#150=[#143-#144]`), so changing the blade at the machine moves the blade, not the face.
+
+Pecking 2 from a 10mm bar radius: 8, then 6, landing exactly on the floor — and the sim executing the loop cuts at
+exactly those radii, all at Z−13. The retract goes ALL THE WAY OUT between pecks, because parting chips pack the slot
+and a chip-break twitch does not empty it.
+
+THE IDENTITY IS HONEST ABOUT HOW LITTLE IT CHANGES: parting off IS grooving to the centreline — same plunge, same
+loop, same retract — so the choice changes what the program SAYS and where it stops by default, and nothing else. A
+second code path to make the toggle feel weightier would be ceremony. On the canvas a part-off therefore has ONE
+handle: its floor is the centre, and a control that can only ever report zero is a fake choice.
+
+### CENTRE DRILLING — the one op in the app that needs a single axis.
+
+The drill is on the CENTRELINE. X0, not a radius — the whole family is about radii, and this is the one place where a
+"helpful" X drills the hole off centre. Every move in the emitted program is at X0 and a test asserts that set is
+exactly [0]. Its declared axis need is ['Z'] alone, and saying ['X','Z'] would be a lie the gating would then repeat.
+
+Depth 15 pecking 5 bottoms at −5, −10, −15; an uneven step lands the last peck exactly on depth. STRAIGHT is not a
+second arm — it writes the peck it implies (zero), so one behaviour has two ways to ask for it instead of two paths
+that can disagree.
+
+### BOTH INHERITED EVERYTHING ELSE.
+
+Twin registration with bindings by macro-var identity, identity-first forms, the DECLARED half-profile layout (the
+seam built last turn — both ops carry the layout block and got their canvases for free), teal handles routed through
+the same _writeParam writer, the `.wiz` round trip, axis gating. The handle drags were proven in the REAL wizards:
+the groove's face handle moved Face at Z to −27.14 and the macro's #143 with it; the drill's depth handle moved
+Depth to 33.2 and #161 with it.
+
+GATE (fast tier): smoke + the lathe family (11 + 13 + 9 + 5 + 10) + refit-732 + the canvas/wizard/library specs the
+userOps and wizardLibrary changes touch = 142/142, with refit-732 now GREEN for the first time.
+SCREENSHOTS: s1275-parting.png / -dragged.png, s1275-centerdrill.png / -dragged.png.
+
+THE LATHE FAMILY IS FOUR OPS: facing, OD turning, parting/grooving, centre drilling.
