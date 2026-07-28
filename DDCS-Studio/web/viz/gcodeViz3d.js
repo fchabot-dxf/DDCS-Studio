@@ -27,6 +27,17 @@ import { markerWorldOf } from './markerWorld.js';   // t301 Seam C — the ONE p
 import { PATH_TYPES, PATH_STATE, TOUCH_PULSE } from './pathStyle.js';   // t317/t319 — the ONE declared path-visual palette + the touch-pulse token, shared with the 2D + the legend (t331 — FEED_LOW/HIGH gradient removed)
 import { displayOf } from './displayPrefs.js';   // t738 — the ONE declared preview-visibility registry ({visible,alpha} per element)
 
+/**
+ * t1297 — WHICH AXIS LABELS A SCENE HAS, by the kind of machine it draws. A mill has an XY table; a lathe has a bed
+ * (Z) and a cross-slide measured as a RADIUS off the centreline, and no Y whatsoever. `null` = that axis does not
+ * exist on this machine, so nothing is drawn for it.
+ *   `xp`/`xn` — the pair on the screen-vertical axis      `yp`/`yn` — the pair on the other in-plane axis
+ */
+const GRID_LABEL_TEXT = {
+    mill: { xp: ['+X', '#ff6b6b'], xn: ['-X', '#ff6b6b'], yp: ['+Y', '#5fd35f'], yn: ['-Y', '#5fd35f'] },
+    lathe: { xp: ['+X (radius)', '#ff6b6b'], xn: null, yp: ['+Z', '#6b9bff'], yn: ['-Z', '#6b9bff'] },
+};
+
 export class GcodeViz3D {
     constructor(container) {
         const THREE = window.THREE;
@@ -214,27 +225,57 @@ export class GcodeViz3D {
         this._probeLine.renderOrder = 13; this._probeLine.visible = false; this.partFrame.add(this._probeLine);
         this._probeVals = { x: 0, y: 0, z: 0 }; this._probeAxes = {}; this._probeContacts = [];
         // Direction labels on the grid edges (repositioned to the footprint in setSegments)
-        this._gridLabels = {
-            xp: this._makeTextSprite('+X', '#ff6b6b'), xn: this._makeTextSprite('-X', '#ff6b6b'),
-            yp: this._makeTextSprite('+Y', '#5fd35f'), yn: this._makeTextSprite('-Y', '#5fd35f'),
-        };
-        for (const k in this._gridLabels) this.scene.add(this._gridLabels[k]);
+        this._buildGridLabels();
+        // t1297 — AND THE SCENE RE-LETTERS ITSELF WHEN THE WORKSPACE CHANGES KIND. Rebuilding on the next repaint was
+        // not enough in one direction: becoming a lathe writes the bar and so repaints, but going back to a mill
+        // writes nothing — the mill scene kept the lathe's letters until something unrelated redrew it.
+        this._onKindChanged = () => { try { this._buildGridLabels(); this.setStock(this._stock); } catch (_) {} };
+        try { window.addEventListener('ddcs:machine-changed', this._onKindChanged); } catch (_) {}
     }
+
+    /**
+     * t1297 — THE LABELS SPEAK THE FRAME THEY DECORATE. A lathe scene was labelled with a mill's axes: ±Y floating in
+     * the vertical (the direction that is a lathe's RADIUS), naming the one axis the machine does not have. Which
+     * labels exist is a fact about the kind of machine, so it is DECLARED per kind rather than patched at the point of
+     * drawing — `null` means that axis is absent here and gets no sprite at all, which is truer than greying one.
+     *
+     * The two slots are geometric, not nominal: the `x` pair rides the screen-vertical axis and the `y` pair the other
+     * one, so a lathe puts its RADIUS on the first and its BED on the second (placement follows, in _layoutGridLabels).
+     */
+    _buildGridLabels() {
+        const kind = this._sceneKind();
+        if (this._gridLabels && this._labelKind === kind) return;
+        if (this._gridLabels) for (const k in this._gridLabels) { const s = this._gridLabels[k]; this.scene.remove(s); if (s.material && s.material.map) s.material.map.dispose(); if (s.material) s.material.dispose(); }
+        const set = GRID_LABEL_TEXT[kind] || GRID_LABEL_TEXT.mill;
+        this._gridLabels = {};
+        for (const k in set) { if (!set[k]) continue; this._gridLabels[k] = this._makeTextSprite(set[k][0], set[k][1]); this.scene.add(this._gridLabels[k]); }
+        this._labelKind = kind;
+    }
+
+    /** The kind of world this scene is drawing. The workspace record is the one source; a scene never guesses. */
+    _sceneKind() { try { return (window.ddcsIsLathe && window.ddcsIsLathe()) ? 'lathe' : 'mill'; } catch (_) { return 'mill'; } }
 
     _makeTextSprite(text, color) {
         const THREE = this.THREE;
         const c = document.createElement('canvas');
-        c.width = 128; c.height = 64;
+        c.height = 64;
+        const ctx0 = c.getContext('2d');
+        // t1297 — THE CANVAS FITS THE WORDS. It was a fixed 128px because every label was two characters; a lathe's
+        // '+X (radius)' would have been cropped to '+X (ra'. The sprite carries its own aspect so the per-frame scale
+        // keeps a constant on-screen height whatever the label says (a two-character one is unchanged: aspect 2).
+        ctx0.font = 'bold 46px sans-serif';
+        c.width = Math.max(128, Math.ceil((ctx0.measureText(text).width + 28) / 2) * 2);
         const ctx = c.getContext('2d');
         ctx.font = 'bold 46px sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         // Dark outline so the label stays legible over the grid / toolpath, then the axis-tint fill.
         ctx.lineJoin = 'round'; ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-        ctx.strokeText(text, 64, 36);
+        ctx.strokeText(text, c.width / 2, 36);
         ctx.fillStyle = color || '#7fa8cc';
-        ctx.fillText(text, 64, 36);
+        ctx.fillText(text, c.width / 2, 36);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true }));
         sp.renderOrder = 1;
+        sp.__text = text; sp.__aspect = c.width / c.height;    // what it says, and how wide that made it
         return sp;
     }
 
@@ -439,7 +480,7 @@ export class GcodeViz3D {
         }
         // Direction labels (+X/-X/+Y/-Y): constant on-screen width too (canvas is 2:1), so they don't grow with zoom.
         const L = this._gridLabels;
-        if (L) for (const k in L) { const w = Math.max(1e-4, 55 * worldPerPxAt(L[k].position)); L[k].scale.set(w, w / 2, 1); }
+        if (L) for (const k in L) { const w = Math.max(1e-4, 55 * worldPerPxAt(L[k].position)); L[k].scale.set(w * ((L[k].__aspect || 2) / 2), w / 2, 1); }
         if (this.jogPendant) {
             this.jogPendant.style.display = (this.starts && this.starts.length > 0) ? 'block' : 'none';
         }
@@ -1195,12 +1236,22 @@ export class GcodeViz3D {
         const tW = gW + GRID_OVERHANG * 2, tH = gH + GRID_OVERHANG * 2;
         this._gridParams = { cx: gCx, cy: gCy, floor: gFloor, w: tW, h: tH };
         this._layoutGrid(gCx, gCy, gFloor, tW, tH);
+        this._buildGridLabels();                                   // t1297 — a kind switch re-letters the scene
         if (this._gridLabels) {
             const off = gSpan * 0.07, L = this._gridLabels;
             // +X / +Y at the +scene end (true coordinate directions); labels at the centre of each envelope/grid edge.
             // Scale is applied per-frame in _scaleMarkers (constant on-screen size, independent of zoom).
-            L.xp.position.set(gCx + gHalfX + off, gCy, gFloor); L.xn.position.set(gCx - gHalfX - off, gCy, gFloor);
-            L.yp.position.set(gCx, gCy + gHalfY + off, gFloor); L.yn.position.set(gCx, gCy - gHalfY - off, gFloor);
+            if (this._labelKind === 'lathe') {
+                // THE LATHE'S PLANE IS ZX. X stays where it is — the cross-slide, up the screen under the lathe roll —
+                // and the second pair moves onto the BED, at the ends of the Z the scene actually spans (the travel
+                // when the envelope is shown, the work otherwise), so the bed is named along the direction it runs.
+                const zHi = useMch ? Math.max(0, m.z) : b.maxZ, zLo = useMch ? Math.min(0, m.z) : b.minZ;
+                L.xp.position.set(gCx + gHalfX + off, gCy, gFloor);
+                L.yp.position.set(gCx, gCy, zHi + off); L.yn.position.set(gCx, gCy, zLo - off);
+            } else {
+                L.xp.position.set(gCx + gHalfX + off, gCy, gFloor); L.xn.position.set(gCx - gHalfX - off, gCy, gFloor);
+                L.yp.position.set(gCx, gCy + gHalfY + off, gFloor); L.yn.position.set(gCx, gCy - gHalfY - off, gFloor);
+            }
         }
         // Axis lines mark PART-ZERO — part-local (they ride the part frame, which offsets them to +workOrigin in
         // machine view): X red along y=0, Y green along x=0, over the part footprint at the part floor. When the envelope
@@ -2882,6 +2933,7 @@ export class GcodeViz3D {
 
     dispose() {
         if (this._ro) this._ro.disconnect();
+        try { window.removeEventListener('ddcs:machine-changed', this._onKindChanged); } catch (_) {}
         this.renderer.dispose();
         if (this.renderer.domElement.parentNode) {
             this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);

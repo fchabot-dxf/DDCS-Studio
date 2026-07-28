@@ -20,7 +20,7 @@
  * from motor roles. A rotary bar keeps saying 'x' by the same mechanism; a lathe bar says 'z'. One field, read by
  * whoever draws — and the next consumer of a cylinder gets the right answer for free instead of re-deriving it.
  */
-import { barToStock, normalizeBar, radiusOf } from '../data/lathe.js';
+import { barToStock, normalizeBar, radiusOf, DEFAULT_BAR } from '../data/lathe.js';
 import { isLathe } from '../data/workspaceMachine.js';
 
 /** The bar every lathe op shows, from whatever the op knows about it. Defaults are the op's, not this file's. */
@@ -90,3 +90,37 @@ export function latheCameraDefault() {
 
 /** How tall the scene is, for framing: the bar's radius is the whole of it. */
 export const latheSceneRadius = (bar) => radiusOf(normalizeBar(bar).diameter);
+
+/**
+ * t1297 — THE WORKSPACE'S OWN BAR. A lathe workspace's WORKPIECE is a bar, so the GLOBAL stock is one — and the main
+ * preview, where the user actually lives, draws the same thing the wizards draw instead of a toolpath and a tool in
+ * empty air.
+ *
+ * IT IS NOT A SECOND BAR CONCEPT. The stock is built by `latheSimStock`, the same function every wizard pane calls;
+ * this simply calls it with no op params, so the workspace holds the bar and `def.simStock` refines an op's values on
+ * top of it. One builder, one shape, nothing to drift.
+ *
+ * IT NEVER OVERWRITES A BAR THE USER ALREADY HAS. Switching kind must not silently retype someone's workpiece, so an
+ * existing bar is left exactly as it is; only a workspace still holding a mill's box gets one.
+ * @returns {boolean} whether it wrote
+ */
+export function applyLatheWorkspaceStock() {
+    if (typeof window === 'undefined' || !window.ddcsGetSettings) return false;
+    let s = null;
+    try { s = window.ddcsGetSettings(); } catch (_) { return false; }
+    if (!s || !isLathe()) return false;
+    const cur = s.stock || {};
+    if (cur.shape === 'cylinder' && cur.axis === 'z' && cur.origin === 'finished-face') return false;   // already a bar
+    // THE DECLARED DEFAULT BAR — not the mill box's width read as a diameter. A 100mm block is not a 100mm bar; the
+    // box says nothing about the stock a turner has in the chuck, and inferring one from the other invents a fact.
+    const fallback = { barDiameter: DEFAULT_BAR.diameter, stickOut: DEFAULT_BAR.stickOut, barAllowance: DEFAULT_BAR.allowance };
+    s.stock = { ...latheSimStock(null, cur, fallback), features: [] };
+    try { window.ddcsSaveSettings && window.ddcsSaveSettings(); } catch (_) {}
+    return true;
+}
+
+if (typeof window !== 'undefined') {
+    // …applied when the workspace BECOMES a lathe, and once at boot for one that already is (app.js).
+    window.addEventListener('ddcs:machine-changed', () => { try { applyLatheWorkspaceStock(); } catch (_) {} });
+    window.ddcsApplyLatheStock = applyLatheWorkspaceStock;
+}

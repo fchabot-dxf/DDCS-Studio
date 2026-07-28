@@ -21,7 +21,8 @@ import { facingDataDef } from './blocks/dataOps/facingData.js';   // t1271 — t
 import { odTurnDataDef } from './blocks/dataOps/odTurnData.js';
 import { partingDataDef } from './blocks/dataOps/partingData.js';   // t1275 — parting / grooving
 import { centerDrillDataDef } from './blocks/dataOps/centerDrillData.js';
-import { polygonDataDef } from './blocks/dataOps/polygonData.js';   // t1277 — polygon turning: the family's axis-mode member   // t1275 — centre drilling, the one lathe op with no radius   // t1273 — OD turning: the first INHERITOR (every mechanism copied from the pilot)
+import { polygonDataDef } from './blocks/dataOps/polygonData.js';
+import { applyLatheWorkspaceStock } from './viz/latheScene.js';   // t1297 — a lathe workspace's workpiece IS a bar
 import './ui/axisGating.js';   // t1271 — grey (never hide) the ops this machine's declared axes cannot run
 import { atcLengthDataDef } from './blocks/dataOps/atcLengthData.js';   // t409 — ATC Tool Length light port (new twin, opened IN-PLACE from the ATC Tool Length slot)
 import { atcCheckDataDef } from './blocks/dataOps/atcCheckData.js';   // t411 — ATC Tool Check light port (inherits the Tool Length recipe)
@@ -151,6 +152,9 @@ class DDCSStudio {
         initSaveStates();
         loadUserOps();                              // register every persisted user-defined op (wizard-maker)
         this.seedDefaultPortedUserOps();            // surface shipped data-op ports in the user layer / bar Custom dropdown
+        // t1297 — a lathe workspace's WORKPIECE is a bar, so the global stock is one: the main preview then draws the
+        // same thing the wizards do, instead of a toolpath in empty air. Never overwrites a bar the user already has.
+        try { applyLatheWorkspaceStock(); } catch (_) {}
         window.ddcsInsertUserOp = insertUserOp;     // open the generic param form for a user op (menu / dev panel)
         // Re-author a saved wizard (load its template into Blocks). Exposed early — the Settings manager triggers it
         // from Studio, before the Blocks app (which would otherwise set it) has mounted.
