@@ -27,7 +27,8 @@ import { wcsOffsetAt, declaredWcsOffset } from './sceneFrame.js';   // t588 — 
 import { toggleVisibilityModal } from '../ui/visibilityModal.js';   // t738 — the preview-visibility modal (opens from the toolbar 👁)
 import { onDisplayChange } from './displayPrefs.js';   // t738 — re-apply the visibility registry to THIS panel on any modal change
 import { GcodeExecutionEngine } from '../engine/index.js';
-import { toggleStockEditor } from '../ui/stockEditor.js';   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
+import { toggleStockEditor } from '../ui/stockEditor.js';
+import { droAxisLabel, droValue } from './latheDro.js';   // t1283 — the readout speaks diameter on a lathe   // the rich Stock modal (dims / shape boss-pocket-cylinder / show / templates)
 import { getLastOp } from '../blocks/opRecord.js';          // the active op (wizard PREVIEW) → its declared radius-comp surfaces
 import { builderOf } from '../blocks/opBuilders.js';        // rebuild the op stack to read its radiuscomp atoms (disc-on-surface, inc2)
 import { magazinePockets } from '../wizards/views/atcViews.js';   // shared ATC magazine layout (handles the disk RING + a rotation) — reused for the pick-place occupancy swap
@@ -296,12 +297,20 @@ export function createPreviewPanel(container, opts = {}) {
         _carveRaf = 0;
         // No cuts (probe / rapid-only) or carve off → show the plain stock box, build NOTHING (setCarve(false) no-ops if it
         // was never on). This is the big win: probe wizards (corner/alignment/middle) never pay the carve-mesh cost.
-        if (!carveEnabled() || !hasCut) { if (v.setCarve) v.setCarve(false); return; }
+        // t1283 — A LATHE BAR ALWAYS CARVES ITS PROFILE. The gate above exists for the mill's heightmap, which is
+        // expensive and pointless on a probe program; the turned profile is one array per bar and IS the picture, so
+        // a lathe never opts out of it.
+        const lathe = !!(v._isLatheStock && v._isLatheStock());
+        // t1283 — WHICH TOOL this op shows. A centre drill really is a bit on the centreline; everything else on a
+        // lathe is an insert on a holder. Declared per op rather than one blanket swap, because the honest picture
+        // differs between them.
+        if (v.setLatheTool) v.setLatheTool(lathe ? (/centerdrill/.test(String(opts.opType || '')) ? 'drill' : 'turn') : null);
+        if (!lathe && (!carveEnabled() || !hasCut)) { if (v.setCarve) v.setCarve(false); return; }
         const run = () => {
             _carveRaf = 0;
             if (!active || !v.setCarve) return;   // deactivated/closed before the frame → skip
             v.setCarve(true);
-            if (!(engine && engine.running)) v.carveEndState(_carveSegs, _carveTR, _carveTip, _carveAngle);
+            if (lathe || !(engine && engine.running)) v.carveEndState(_carveSegs, _carveTR, _carveTip, _carveAngle);
         };
         _carveRaf = (typeof requestAnimationFrame === 'function') ? requestAnimationFrame(run) : (run(), 0);
     }
@@ -337,7 +346,9 @@ export function createPreviewPanel(container, opts = {}) {
     let droAxes = ['x', 'y', 'z'];
     function buildDro() {
         droAxes = rotaryFixture ? ['x', 'y', 'z', 'a', 'b'] : ['x', 'y', 'z'];
-        if (droBody) droBody.innerHTML = droAxes.map((ax) => `<tr data-ax="${ax}"><th>${ax.toUpperCase()}</th><td class="pp-dro-w">0.000</td><td class="pp-dro-m">0.000</td></tr>`).join('');
+        // t1283 — the X row is marked Ø on a lathe: a turner reads diameters, and an UNMARKED doubled number is
+        // indistinguishable from a bug. The frame stays radius underneath — this is a display, not a second frame.
+        if (droBody) droBody.innerHTML = droAxes.map((ax) => `<tr data-ax="${ax}"><th>${droAxisLabel(ax)}</th><td class="pp-dro-w">0.000</td><td class="pp-dro-m">0.000</td></tr>`).join('');
     }
     // t1205 — PASS-LOCAL → WORLD. The engine runs a multi-pass probe macro in PASS-LOCAL coords (every `( REPOSITION: )`
     // resets pos to the pass origin) and reports that local position plus `pass`; the CONSUMER anchors it. The 3D tool
@@ -364,7 +375,12 @@ export function createPreviewPanel(container, opts = {}) {
         droAxes.forEach((ax) => {
             const w = +(pos && pos[ax]) || 0;
             const row = droBody.querySelector(`tr[data-ax="${ax}"]`);
-            if (row) { row.children[1].textContent = w.toFixed(3); row.children[2].textContent = off ? (w + (+off[ax] || 0)).toFixed(3) : '—'; }
+            // t1283 — BOTH columns go through the one formatter: on a lathe X reads as a DIAMETER (Work and Mach
+            // alike), everything else passes through. The number the machine holds is still the radius.
+            if (row) {
+                row.children[1].textContent = droValue(ax, w).toFixed(3);
+                row.children[2].textContent = off ? droValue(ax, w + (+off[ax] || 0)).toFixed(3) : '—';
+            }
         });
     }
     function setDroWcs(raw) {   // a G54-G59 select drives the SIM active WCS — label + Mach offset (G10 set-offset keeps the current label)
@@ -626,6 +642,9 @@ export function createPreviewPanel(container, opts = {}) {
         const running = !!(engine && engine.running), paused = !!(engine && engine.paused);
         b.classList.toggle('on', running && !paused);
         b.innerHTML = (running && !paused) ? ICON_STOP : ICON_PLAY;
+        // t1283 — THE BAR TURNS WHILE THE PROGRAM RUNS. On a lathe the spindle is the cutting motion; a still bar
+        // with a tool sliding along it reads as a shaper. Stops with the program, like the machine would.
+        if (viz && viz.setLatheSpin) viz.setLatheSpin(running && !paused && !!(viz._isLatheStock && viz._isLatheStock()));
     }
 
     // Render the static route in the active view from the fed G-code (engine.trace resolves #vars/loops/probes).

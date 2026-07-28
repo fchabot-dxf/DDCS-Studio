@@ -26,7 +26,7 @@ import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';  
 import { dlgNotice, dlgConfirm } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { getAccount, connect, disconnect } from './cloudAccount.js';   // t1233 — the SAME sign-in Settings and the drawer use
-import { busyRow } from './busyRow.js';   // t1257 — feedback on the row you clicked, the instant you click it
+import { busyRow, busyOverlay } from './busyRow.js';   // t1257 — feedback on the row you clicked, the instant you click it
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
@@ -359,16 +359,24 @@ export async function openWorkspaceManager(focus = 'save', opts = {}) {
         // t1257 (user live report) — the row goes BUSY on the click, not when the read returns. A cloud row is the
         // worst case (a Drive fetch, then the whole restore); a local row is fast now but still ends in a reload, and
         // the glyph has to bridge that or the screen goes quiet again just before the page changes.
+        // t1283 (user ruling) — a workspace open ALSO takes the screen centre. This open ends in location.reload(),
+        // so the whole app is going away: a centred glyph is the honest signal and it bridges the gap until the new
+        // page paints. The row state stays as the double-click guard. (Library imports keep the row glyph alone —
+        // they finish on this screen, where an overlay would claim a busyness the app does not have.)
+        const dismiss = busyOverlay(`“${card_.name}”`);
         if (card_.cloudId) {   // a cloud row: read it from Drive, then the SAME open
             await busyRow(busyTarget, async () => {
                 try {
                     const obj = await (await drive()).read(card_.cloudId);
                     return await openWorkspaceObject(obj, card_.name + '.ddcs', `“${card_.name}”`, { handle: null, place: 'cloud' });
-                } catch (e) { dlgNotice(`“${card_.name}” could not be read from Drive: ${(e && e.message) || e}`); return false; }
+                } catch (e) { dismiss(); dlgNotice(`“${card_.name}” could not be read from Drive: ${(e && e.message) || e}`); return false; }
             });
             return;
         }
-        await busyRow(busyTarget, async () => openWorkspaceFile(await card_.handle.getFile(), `“${card_.name}”`, card_.handle));
+        await busyRow(busyTarget, async () => {
+            try { return await openWorkspaceFile(await card_.handle.getFile(), `“${card_.name}”`, card_.handle); }
+            catch (e) { dismiss(); throw e; }
+        });
     });
 
     await renderPlace(ov);

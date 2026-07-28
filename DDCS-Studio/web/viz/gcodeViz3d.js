@@ -13,6 +13,7 @@
  */
 import { initCube, cubeFaceAt, highlightCubeFace, pickCube } from './navCube.js';
 import { setupJogPendant } from './jogPendant.js';
+import { profileFromBar, carveSegment, carveBore, profileOutline } from '../data/latheProfile.js';   // t1283 — turned work carves as a PROFILE, not a heightmap
 import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame, partZeroShift } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
@@ -483,6 +484,15 @@ export class GcodeViz3D {
         const THREE = this.THREE;
         if (this._animTool) { this.partFrame.group.remove(this._animTool); this._animTool.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
         const tool = this._simTool || { type: 'endmill', dia: 6 };
+        // t1283 — A LATHE GETS A TURNING TOOL. An endmill pointing down at a spinning bar is a lie about the machine:
+        // the cutter is a fixed insert on a square holder coming in from +X. The CENTRE-DRILL op keeps a drill-like
+        // bit on centre, because that IS what is in the tailstock — honest per op rather than one blanket swap.
+        // …decided from the WORKSPACE KIND, not from whatever the stock happens to be at this instant: the tool is
+        // rebuilt several times during a load and the bar does not always arrive first, so keying on the stock gave a
+        // mill spindle whenever the rebuild won the race. `setLatheTool` still refines WHICH lathe tool (a centre
+        // drill really is a bit on the centreline); the kind decides THAT it is one.
+        const isLatheWs = (() => { try { return !!(window.ddcsIsLathe && window.ddcsIsLathe()); } catch (_) { return false; } })();
+        if (isLatheWs && tool.type !== 'probe') { this._buildLatheTool(tool); return; }
         const half = toolHalfProfile(tool);
         const tr = Math.max(0.5, (Number(tool.dia) || 6) / 2);          // shank radius (what the collet clamps)
         const topZ = Math.max(0.1, ...half.map((p) => p[1]));           // the tool's TOP (the shank) — sets the clamp height
@@ -613,6 +623,48 @@ export class GcodeViz3D {
     }
 
     // Called by execution engine to update tool position during execution
+    /** t1283 — the fixed turning tool: a square HOLDER reaching in from +X with an INSERT at its tip (the origin, so
+     *  it rides the traced path like every other tool). A drill-like op keeps a pointed bit ON CENTRE instead. */
+    _buildLatheTool(tool) {
+        const THREE = this.THREE;
+        const grp = new THREE.Group();
+        const part = (geo, color, op) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: op }));
+        if (this._latheTool === 'drill') {
+            // ON CENTRE, pointing −Z into the work: the tip at the origin, body behind it
+            const d = Math.max(1, Number(tool.dia) || 6), r = d / 2;
+            const tip = new THREE.ConeGeometry(r, d, 20); tip.rotateX(Math.PI / 2); tip.translate(0, 0, d / 2);
+            const body = new THREE.CylinderGeometry(r, r, d * 5, 20); body.rotateX(Math.PI / 2); body.translate(0, 0, d * 3);
+            grp.add(part(tip, 0xffab40, 0.95), part(body, 0x9aa6b2, 0.9));
+        } else {
+            const w = 8;    // the holder's square section — a real one is about this against a 20mm bar
+            const insert = new THREE.BoxGeometry(2.4, 2.4, 2.4); insert.translate(1.2, 0, 0);
+            const holder = new THREE.BoxGeometry(48, w, w); holder.translate(24 + 2.4, 0, 0);
+            grp.add(part(insert, 0xffab40, 0.95), part(holder, 0x9aa6b2, 0.9));
+        }
+        grp.renderOrder = 25; grp.visible = !!this._animOn;
+        this._animParts = { tool: grp.children[0], collet: grp.children[1], spindle: grp.children[1] };
+        this._animTool = grp; this._applyPartVis(); this.partFrame.add(grp);
+    }
+
+    /** DECLARE which tool this op shows: 'turn' (holder + insert from +X), 'drill' (on centre), or null (the mill's). */
+    setLatheTool(kind) { if (kind === this._latheTool) return; this._latheTool = kind || null; this._buildAnimTool(); this.render(); }
+
+    /** t1283 — THE WORK TURNS. On a lathe the spindle IS the cutting motion, so the bar spins while the program plays:
+     *  a still bar with a tool sliding along it reads as a shaper, not a lathe. Cosmetic by design — the path, the
+     *  carve and the DRO are all computed from the program, and none of them reads this angle. */
+    setLatheSpin(on) {
+        this._latheSpin = !!on;
+        if (this._latheSpinRaf) { cancelAnimationFrame(this._latheSpinRaf); this._latheSpinRaf = 0; }
+        if (!this._latheSpin || !this._partGroup) return;
+        const step = () => {
+            if (!this._latheSpin || !this._partGroup) { this._latheSpinRaf = 0; return; }
+            this._partGroup.rotation.z += 0.12;   // ~1 turn/second at 60fps: readable, not a strobe
+            this.render();
+            this._latheSpinRaf = requestAnimationFrame(step);
+        };
+        this._latheSpinRaf = requestAnimationFrame(step);
+    }
+
     setToolPosition(pos) {
         if (!pos || (!Number.isFinite(pos.x) && !Number.isFinite(pos.y) && !Number.isFinite(pos.z))) return;
         this._ensureAnimTool();
@@ -1360,6 +1412,14 @@ export class GcodeViz3D {
             mesh.position.sub(C);
             edges.position.sub(C);
             this.stockMesh = mesh; pg.add(mesh);
+            // t1283 — THE CHUCK IS PART OF A LATHE BAR, not an op's opt-in: the stock declares a grip end (its −Z),
+            // so it gets the chuck whenever it is drawn. One chuck concept, the rotary rig's own render, told which
+            // way this one lies and that this bar has no tailstock behind it.
+            if (stock.axis === 'z' && stock.origin === 'finished-face') {
+                const face = Number(stock.faceZ) || 0, halfL = stock.z / 2;
+                this.setRotaryRig({ axis: 'z', r: (stock.diameter || stock.x) / 2, L: halfL, jaws: 3, noTailstock: true });
+                if (this._rotaryFixture) this._rotaryFixture.position.set(0, 0, face - halfL);   // the rig rides the bar's centre
+            }
             this.stockEdges = edges; pg.add(edges);
             // t680 — MATERIAL REMOVAL: when carving is ON (a box/pocket stock, not a rotary cylinder), the DISPLACED
             // HEIGHTMAP GRID replaces the translucent box (the recesses are subsumed by the pre-seed). Built here as a
@@ -1378,7 +1438,9 @@ export class GcodeViz3D {
     }
 
     // ── t680 — MATERIAL REMOVAL (E1). The heightmap carve: a displaced grid + skirt replaces the box, live + end-state. ──
-    setCarve(on) { on = !!on; if (on === !!this._carveOn) return; this._carveOn = on; if (!on) this._disposeCarve(); if (this._stock) this.setStock(this._stock); }   // rebuild → (un)swaps the box for the grid
+    /** t1283 — the LATHE carve is not the heightmap: `setCarve(false)` (a probe/rapid program, or the mill's carve
+     *  preference off) must not silently disable a turned profile, which costs one array and is the whole picture. */
+    setCarve(on) { on = !!on; if (this._isLatheStock()) { this._carveOn = on; return; } if (on === !!this._carveOn) return; this._carveOn = on; if (!on) this._disposeCarve(); if (this._stock) this.setStock(this._stock); }   // rebuild → (un)swaps the box for the grid
 
     _disposeCarve() {
         if (this._carveMesh) { this._partGroup && this._partGroup.remove(this._carveMesh); this._carveMesh.geometry.dispose(); this._carveMesh.material.dispose(); this._carveMesh = null; }
@@ -1568,7 +1630,60 @@ export class GcodeViz3D {
     }
 
     /** Instant settled END-STATE: reseed + carve ALL segments once + build the CRISP vertical-wall mesh. segs = parsed.segments; tip = flat|ball. */
+    /** t1283 — is the stock a LATHE BAR? The stock says so itself (axis + face datum), so this is a read, not a guess. */
+    _isLatheStock() {
+        const st = this._stock;
+        return !!(st && st.shape === 'cylinder' && st.axis === 'z' && st.origin === 'finished-face');
+    }
+
+    /**
+     * t1283 — THE PROFILE CARVE: turned material removal, revolved.
+     *
+     * A declared seam BESIDE the heightmap carve, taken when the stock is a lathe bar. The mill's carve is a grid of
+     * z-heights a cutter pushes down — the right model for a fixed part under a spinning tool and the wrong one here.
+     * A turned surface is a RADIUS ALONG Z, revolved, so that is what this builds: exact for turning, and one number
+     * per sample instead of a grid.
+     */
+    _latheCarve(segs) {
+        const THREE = this.THREE;
+        const st = this._stock;
+        const bar = { diameter: st.diameter || st.x, stickOut: (st.z || 0) - (Number(st.faceZ) || 0), allowance: Number(st.faceZ) || 0 };
+        const prof = profileFromBar(bar);
+        for (const sg of (segs || [])) {
+            if (sg.rapid || sg.probe) continue;
+            const onCentre = Math.abs(sg.x1 || 0) < 0.001 && Math.abs(sg.x2 || 0) < 0.001;
+            // ON CENTRE is a drill: it opens a BORE rather than reducing the outside. The tool radius is the declared
+            // one when there is a tool, else a modest default — an unknown drill still has to make a visible hole.
+            if (onCentre) carveBore(prof, Math.max(0.5, ((this._simTool && this._simTool.dia) || 3) / 2), Math.min(sg.z1, sg.z2));
+            else carveSegment(prof, sg, this._latheToolWidth || 0);
+        }
+        const { outline, zEnd } = profileOutline(prof);
+        if (outline.length < 2) return null;
+        // …revolved. A LatheGeometry of (r, z) points IS the turned surface: no approximation, no voxels.
+        const pts = outline.map((o) => new THREE.Vector2(Math.max(0.001, o.r), o.z));
+        const geo = new THREE.LatheGeometry(pts, 64);
+        geo.rotateX(Math.PI / 2);   // three.js lathes run along Y; the bar runs along Z
+        this._latheProfile = prof; this._latheZEnd = zEnd;
+        return geo;
+    }
+
+    /** Swap the plain bar mesh for the carved profile (or back, when nothing has been cut). */
+    _applyLatheCarve(segs) {
+        const geo = this._latheCarve(segs);
+        if (!geo || !this.stockMesh) return;
+        const m = this.stockMesh;
+        if (m.geometry) m.geometry.dispose();
+        m.geometry = geo;
+        m.position.set(0, 0, 0);   // the profile is authored in world Z already — no re-centring
+        // the box's edge lines described the UNCUT bar; on a turned shape they are a lie, so they go
+        m.children.forEach((c) => { if (c.isLineSegments) c.visible = false; });
+        this.render();
+    }
+
     carveEndState(segs, toolR, tip, angle) {
+        // t1283 — a lathe bar carves as a PROFILE. Taken before the heightmap path, which cannot express a bore and
+        // would model a turned surface as a height over XY.
+        if (this._isLatheStock()) { this._applyLatheCarve(segs); return; }
         if (!this._carve || !this._stock) return;
         const feats = (() => { try { return projectWorkpiece(this._stock).features.filter((f) => f.side === 'inside'); } catch (e) { return []; } })();
         this._carve.reseed(this._stock, feats);
@@ -1722,7 +1837,7 @@ export class GcodeViz3D {
             this._rotaryFixture = null;
         }
         if (!spec || !this._partGroup) return;
-        this._buildRotaryFixture(this._partGroup, spec.axis, spec.r, spec.L, { jaws: spec.jaws, cu: spec.cu, cv: spec.cv });   // adds to _partGroup + sets this._rotaryFixture
+        this._buildRotaryFixture(this._partGroup, spec.axis, spec.r, spec.L, { jaws: spec.jaws, cu: spec.cu, cv: spec.cv, noTailstock: spec.noTailstock });   // adds to _partGroup + sets this._rotaryFixture
     }
 
     /**
@@ -1765,6 +1880,10 @@ export class GcodeViz3D {
         }
 
         // --- TAILSTOCK at the HI end (axis +L): a live-centre CONE protruding toward the bar, body BEHIND it ---
+        // t1283 — A LATHE BAR IS HELD AT ONE END. The 4th-axis rig supports its bar between chuck and tailstock; a
+        // turner's bar sticks out FREE, and drawing a tailstock over the face would put steel exactly where every one
+        // of these ops does its cutting. `noTailstock` is the declared difference between the two rigs.
+        if (opts.noTailstock) { this._rotaryFixture = grp; pg.add(grp); return; }
         const coneLen = r * 0.9;
         const cone = new THREE.Mesh(aimConeAtBar(new THREE.ConeGeometry(r * 0.45, coneLen, 24)), jawMat());
         // Tip points toward −axis and lands ~at the bar end (axis = L). Cone is centred on its own length,

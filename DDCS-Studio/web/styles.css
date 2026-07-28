@@ -5717,3 +5717,14 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 /* t1243 — the Cloud tab's account bar: who you are signed in as, and the way out. The header ☁ badge is retired, so
    this is the one place the cloud connection is stated. */
 .wsm-cloudbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: 12px; }
+
+/* t1283 (user ruling) — THE CENTRED OPEN OVERLAY. Only a workspace open earns it: that open ends in a reload, so the
+   app really is going away and a centre-screen glyph is the honest signal, not a claim about one busy row. */
+.ddcs-busy-overlay { position: fixed; inset: 0; z-index: 100000; display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 11, 16, 0.55); backdrop-filter: blur(2px); }
+.ddcs-busy-card { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 22px 30px; border-radius: 12px;
+    background: rgba(20, 26, 34, 0.94); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); }
+.ddcs-busy-spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.18);
+    border-top-color: #4ab3ff; animation: ddcs-busy-rot 0.8s linear infinite; }
+.ddcs-busy-text { color: #dbe6f2; font-size: 13px; letter-spacing: 0.2px; }
+@keyframes ddcs-busy-rot { to { transform: rotate(360deg); } }
