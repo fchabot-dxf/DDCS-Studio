@@ -18928,3 +18928,75 @@ userOps and wizardLibrary changes touch = 142/142, with refit-732 now GREEN for 
 SCREENSHOTS: s1275-parting.png / -dragged.png, s1275-centerdrill.png / -dragged.png.
 
 THE LATHE FAMILY IS FOUR OPS: facing, OD turning, parting/grooving, centre drilling.
+
+---
+
+## turn 1277 -- POLYGON TURNING. And the trig question, answered against the machine rather than against a tool.
+
+### (0a) THE TRIG CHECK — the answer decided the shape, so it was worth doing properly.
+
+VERDICT: THE MACRO LANGUAGE HAS NO TRIG, on the evidence available. Three strands:
+  · the 59 captured factory macros use `ABS[…]` ten times and `COS[` / `SIN[` NOT ONCE;
+  · `parse.out` — the parser dump — contains NO uppercase grammar tokens at all, not even ABS, which demonstrably
+    works. So it can neither prove nor disprove a function name, and anything read out of it about the vocabulary is
+    read out of the wrong part of the file;
+  · which is exactly what happened. `tools/ddcs_lint.py` says in its header that its vocabulary is "the parser's real
+    vocabulary mined from parse.out (math fns ASIN/ACOS/ATAN/SQRT/ROUND/LN)". Those lowercase names sit at offset
+    ~3300, immediately after the string `libm.so.6`, in the binary's ELF DYNAMIC-SYMBOL IMPORT TABLE. They are the C
+    functions the firmware LINKS AGAINST — not tokens the macro language exposes. And `cos`/`sin` are not even among
+    them, while `asin`/`acos` are, which is the shape of a maths library's import list rather than a G-code grammar.
+
+So the geometry is computed in STUDIO and the macro carries the resulting A/X pairs. That is a real departure from the
+rest of the family — facing, OD, parting and drilling all ship a #var recipe the operator can retune at the machine —
+and it is stated at the top of the wizard file, because "why is this one unrolled" is the first question a reader will
+have. FLAGGED for the advisor: the linter's claim is a defect in a tool that gates what we emit. A linter that
+believes COS is valid passes a macro the controller rejects with a screen-only syntax error.
+
+### (0b) THE END VIEW — two views on one sheet, because neither one is optional.
+
+The half-profile says WHERE along the bar the section is; it cannot show a hexagon (a half-profile of a hexagon is a
+band). The end view says what the section IS; it cannot show where it sits. So both are drawn, side by side in one
+canvas, laid out like a drawing sheet. THE END VIEW DRAWS THE OP'S OWN r(angle) — it calls the same polygonPath the
+emit unrolls, so the picture cannot promise a shape the program will not cut.
+
+### THE OP: the family's axis-mode member.
+
+r(angle) = apothem / cos(angle measured from the face centreline). For a hex across 17: 8.5 at the middle of a flat,
+8.5/cos30° = 9.815 at a corner — hand-derived, and asserted at the model, in the emitted A/X pairs, AND in the sim
+executing the sweep. A square across 20 gives 10 and 14.142 by the same rule, which is the check that it is a rule and
+not a hex special case.
+
+THE RESOLUTION IS DECLARED PER FACE, not per revolution: a hex and an octagon then get the same fidelity per flat
+instead of the octagon quietly getting less. It rounds EVEN, because that is what lands a point exactly on each
+corner AND exactly at the middle of each flat — the two places the shape is defined.
+
+EVERY CUTTING MOVE CARRIES BOTH WORDS. A test asserts there is no G1 with an A and no X: that move is the work turning
+under a parked tool, which is a scratch, not a polygon.
+
+THE CHUCK IS NOW A DECLARED MACHINE FACT (`chuck: spindle | axis` on the workspace record). Polygon turning declares
+it needs the driven chuck; on a spindle-only workspace it greys, and the reason names the CHUCK rather than a letter:
+"needs the chuck to be a DRIVEN AXIS — this workspace declares it as a spindle (free RPM). Set the chuck to a driven
+axis in Settings if your machine has one." That sentence points at Settings, so the answer had to EXIST in Settings —
+a chuck row now sits under THIS MACHINE, shown only for a lathe.
+
+ITS BINDINGS ARE UNLIKE THE FAMILY'S, HONESTLY. The other four bind form fields to macro #vars because their macros
+are recipes. This one's path is computed, so the sizes that shape it have no socket to bind: they are Studio-side
+parameters that regenerate the whole program, and the form carries them WITHOUT a match rather than pretending an
+edit could reach the controller. Only the extent and the feed are real sockets.
+
+### THE CANVAS CLASSES WERE INVENTED — the same lesson as t1273's item kinds, one layer along.
+
+`cls: 'fc-feature'` matches no rule in the stylesheet. The rect items fell back to an unstyled black box (visible, so
+nobody looked twice) and the polygon PATH — fill:none with no stroke — drew absolutely nothing. Fixed to the DECLARED
+classes: `fc-feature-pocket` for material coming away, `fc-path` for a cut path. Found by opening the wizard and
+looking at it, which is the second time this family has been caught by a picture that was never rendered.
+
+GATE (fast tier): smoke + the lathe family (7 + 11 + 13 + 9 + 5 + 10) + refit-732 + the canvas / workspace / wizard
+specs the machine-record change touches = 137/137 on a clean run.
+ONE INTERMITTENT: `lathe-model-1267` (1b) "THE IDENTITY SURFACES" fails in roughly half the FULL-gate runs and passes
+every time alone or in a subset. It is a UI-timing assertion under parallel load and it is NOT mine: verified by
+STASHING every change in this turn and running the same list on the clean tree, where it failed identically. Flagged.
+SCREENSHOTS: s1277-polygon.png (both views, the hexagon inscribed in the bar), -dragged.png (across-flats 17.3 with
+the code regenerated), -gated.png.
+
+THE LATHE FAMILY IS FIVE OPS: facing, OD turning, parting/grooving, centre drilling, polygon turning.
