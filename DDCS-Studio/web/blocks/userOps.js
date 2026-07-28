@@ -604,11 +604,38 @@ export function validateUserOp(def) {
 }
 
 /** Install a user-op def into the LIVE user-layer builder + spec + label registries (runtime only — no persistence). */
+/**
+ * THE CODE HOOKS A `.wiz` CANNOT CARRY (t1275 — the advisor's ruling on the wizard-file gate).
+ *
+ * A wizard file is DATA: template, bindings, panel, sim, group, defV. A def's BEHAVIOUR hooks are functions, and a
+ * function cannot be written to a file — so a twin exported and re-imported used to come back quietly missing them
+ * (OD turning's straight-turn restore; every guarded twin's derive-guards). The ruling: the format stays data, and
+ * on import an opType THIS APP ALREADY KNOWS gets its LOCAL hooks re-attached — behaviour from the app version, data
+ * from the file. A foreign opType has no local behaviour to restore, and the import SAYS SO rather than losing it
+ * silently (the file names which hooks its author had; see wizardToFile).
+ */
+export const OP_CODE_HOOKS = ['postInstantiate', 'deriveGuards', 'simStartsProvider', 'previewGeometry', 'simGcode', 'statusHint'];
+const LOCAL_HOOKS = new Map();   // opType → { hookName: fn } — survives deleteUserOp, because the APP still knows it
+
+/** Which code hooks this app has for `opType` (empty = it is a stranger here). */
+export const localHooksFor = (opType) => Object.keys(LOCAL_HOOKS.get(opType) || {});
+
+/** Remember a def's own hooks; give a def that arrived without them the local ones. Returns the names re-attached. */
+function reconcileCodeHooks(def) {
+    const mine = {}, reattached = [];
+    for (const k of OP_CODE_HOOKS) if (typeof def[k] === 'function') mine[k] = def[k];
+    if (Object.keys(mine).length) { LOCAL_HOOKS.set(def.opType, { ...(LOCAL_HOOKS.get(def.opType) || {}), ...mine }); return reattached; }
+    const known = LOCAL_HOOKS.get(def.opType);
+    if (known) for (const k in known) { def[k] = known[k]; reattached.push(k); }
+    return reattached;
+}
+
 export function registerUserOp(def) {
     // composable-authoring (PILOT 1): if the template AUTHORS its value bindings as `formfield` blocks, derive
     // def.bindingSpecs (the emit re-derivation, by var-identity) + def.bindings (the form + schema) FROM them. ADDITIVE —
     // resolveBindingsMeta returns null when there are no formfield blocks, so a hand-written-spec def (today's
     // corner/edge/middle) is UNTOUCHED / byte-identical. Applied before validate so the derived bindings are validated + used.
+    def.hooksReattached = reconcileCodeHooks(def);   // behaviour from the app version, data from the file
     const authored = resolveBindingsMeta(def);
     if (authored) {
         if (authored.specs.length) def.bindingSpecs = authored.specs;   // value fields → emit re-derivation (a layout-only op sets none)

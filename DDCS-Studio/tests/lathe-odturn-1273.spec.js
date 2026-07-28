@@ -311,7 +311,10 @@ test('THE .wiz ROUND TRIP on the registered twin — export, WIPE, import, ident
         wl.importWizard(entry.text);
         const after = JSON.parse(JSON.stringify(uo.listUserOps().find((d) => d.opType === t)));
         const emitAfter = emitProgram(uo.instantiate(after, uo.defaultParams(after)));
-        return { wrote: w.name, gone, before, after, same: String(emitBefore) === String(emitAfter) };
+        // …the import REPORT (t1275) is not def data — it is what the import has to say about itself, so it is
+        // compared separately rather than counted as drift in the wizard.
+        const strip = (d) => { const c = { ...d }; delete c.importNote; delete c.hooksReattached; return c; };
+        return { wrote: w.name, gone, before: strip(before), after: strip(after), same: String(emitBefore) === String(emitAfter) };
     });
     expect(r.wrote, 'ONE-NAME: the file is named after the wizard').toBe('OD Turn.wiz');
     expect(r.gone, 'the op really was wiped before the import').toBe(true);
@@ -350,4 +353,48 @@ test('THE HEADER COMMENT RESTATES NO NUMBER — a comment is not a socket, so it
     expect(r.base, 'the header is the same sentence whatever the sizes are').toBe(r.moved);
     expect(r.base, 'and it carries no size of its own to go stale').not.toMatch(/\d/);
     expect(r.base, 'it says what the op is, and points at where the numbers live').toMatch(/#var/);
+});
+
+test('THE .wiz GATE RULED — a known op gets THIS APP’s behaviour back; a stranger is NAMED, never silently lost', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const uo = await import('/blocks/userOps.js');
+        const wl = await import('/blocks/wizardLibrary.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const O = await import('/wizards/lathe/odTurn.js');
+        const D = await import('/blocks/dataOps/odTurnData.js');
+        const t = D.OD_DATA_OPTYPE;
+
+        const text = wl.exportWizard(t);
+        const manifest = JSON.parse(text).op.hooks || [];
+        uo.deleteUserOp(t);                                  // WIPE the op — the app still KNOWS the type
+        const back = wl.importWizard(text);
+        // the ruled behaviour: switch to taper, then back to straight, and the far end must follow the target again
+        // …through the BUILDER, which is the path the emit actually takes — instantiate() alone skips postInstantiate,
+        // so calling it directly would have "proved" the hook while never running it.
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const build = builderOf(t);
+        const farEnd = (params) => {
+            const nc = String(emitProgram(build({ ...uo.defaultParams(back), ...params })));
+            return (nc.match(new RegExp('^' + O.OD_VARS.dEnd + '=([^ (]+)', 'm')) || [])[1];
+        };
+        const taper = farEnd({ kind: 'taper', endDiameter: 18 });
+        const straightAgain = farEnd({ kind: 'straight', endDiameter: 18 });
+
+        // …and a STRANGER: the same file under an opType this build has never heard of
+        const foreign = JSON.parse(text); foreign.op.opType = 'user_someone_elses_op';
+        const alien = wl.importWizard(JSON.stringify(foreign));
+        return { manifest, reattached: back.hooksReattached, note: back.importNote, taper, straightAgain,
+                 alienNote: alien && alien.importNote, alienReattached: alien && alien.hooksReattached };
+    });
+    expect(r.manifest, 'the FILE names the code it cannot carry — that is what lets the import be honest').toContain('postInstantiate');
+    expect(r.reattached, 'a known opType gets this app’s own behaviour back').toContain('postInstantiate');
+    expect(r.taper, 'the imported op still tapers').toBe('18');
+    expect(r.straightAgain, 'AND the taper→straight restore works — the behaviour really came back, not just the data')
+        .toBe('#132');
+    expect(r.note, 'and the import says where the behaviour came from').toMatch(/carries data, not code/i);
+    // the stranger: nothing to re-attach, and the report NAMES what is missing rather than staying quiet
+    expect(r.alienReattached, 'a foreign opType has no local behaviour to restore').toEqual([]);
+    expect(r.alienNote, 'so the import names the loss').toMatch(/postInstantiate/);
+    expect(r.alienNote, 'and says the op runs on its data alone').toMatch(/data alone/i);
 });

@@ -32,9 +32,12 @@ test('THE PASS LIST matches hand-derived turning — Ø20, 3mm to remove, 1mm pe
     });
     expect(r.base, 'the hand-derived case').toEqual([2, 1, 0]);
     // a finishing skim owns the last 0.2: roughing stops at 0.2, then one pass lands on the face
-    expect(r.finish, 'roughing stops above the face and the finish pass takes the rest').toEqual([2, 1, 0.2, 0]);
-    // an uneven depth of cut must never overshoot INTO the part — the last pass is clamped to the floor
-    expect(r.uneven, 'the last pass is clamped to the face, not stepped past it').toEqual([2.2, 1.4, 0.6, 0]);
+    expect(r.finish, 'roughing stops above the face and the finish pass takes the rest').toEqual([2.2, 1.2, 0.2, 0]);
+    // t1275 — UNIFIED WITH OD TURNING: an uneven depth of cut puts the LIGHT pass FIRST, through the sawn end, and
+    // every later pass is a full bite. (Before, the light pass fell last, which lands a feather cut immediately
+    // before the finishing skim. The two anchorings agree whenever the depth divides evenly — which is exactly why
+    // the hand-derived 3-at-1mm case above is untouched.)
+    expect(r.uneven, 'the light pass falls FIRST; the rest are full depth and the last lands on the floor').toEqual([2.4, 1.6, 0.8, 0]);
     expect(r.nothing, 'nothing to remove still leaves one skim at the face').toEqual([0]);
 });
 
@@ -107,4 +110,17 @@ test('THE MACRO IS READABLE — the header says what each number is, in the oper
     expect(nc, 'and the depth per pass').toMatch(/depth per pass/i);
     // the RADIUS note is the one that stops a person "fixing" the number to a diameter
     expect(nc, 'and says the X value is a radius, where a turner would expect a diameter').toMatch(/RADIUS/);
+});
+
+test('THE HEADER COMMENT RESTATES NO NUMBER — a comment is not a socket (t1275, unified with OD)', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const F = await import('/wizards/lathe/facing.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const head = (p) => String(emitProgram(F.facingStack(p))).split(String.fromCharCode(10)).find((l) => /FACING/.test(l)) || '';
+        return { base: head({ barDiameter: 20, allowance: 3, doc: 1 }), moved: head({ barDiameter: 32, allowance: 7.5, doc: 0.4 }) };
+    });
+    expect(r.base, 'the header is the same sentence whatever the sizes are').toBe(r.moved);
+    expect(r.base, 'and it carries no size of its own to go stale').not.toMatch(/[0-9]/);
+    expect(r.base, 'it says what the op is, and points at where the numbers live').toMatch(/#var/);
 });

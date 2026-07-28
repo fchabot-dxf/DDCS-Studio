@@ -23,19 +23,29 @@ test('DEFAULT config: four consecutive away-drags each MOVE the handle on screen
     const handleScreen = () => page.evaluate(() => { const el = document.querySelector('#wiz_user svg [data-hid="__simstart0"]'); const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
     const worldX = () => page.evaluate(() => { const s = window.ddcsStudio.wizardManager._activePanel.getPassStarts() || []; return s[0] ? s[0].x : null; });
 
-    const deltas = [], xs = [await worldX()];
+    const GUTTER = 80;
+    // …the handle's OWN canvas, not the first svg in the panel (that one is an icon, and measuring against it put the
+    // handle 479px "outside" a box it was never in).
+    const rect = () => page.evaluate(() => { const el = document.querySelector('#wiz_user svg [data-hid="__simstart0"]'); const r = el.ownerSVGElement.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+    const insets = [], xs = [await worldX()];
     for (let d = 0; d < 4; d++) {
         const before = await handleScreen();
         await page.mouse.move(before.x, before.y); await page.mouse.down();
         await page.mouse.move(before.x - 200, before.y + 160, { steps: 12 }); await page.mouse.up();   // the advisor's exact away-drag
         await page.waitForTimeout(250);
-        const after = await handleScreen();
-        deltas.push(Math.hypot(after.x - before.x, after.y - before.y));
+        const after = await handleScreen(), R = await rect();
+        // how far the DROPPED handle sits from the nearest edge — the number refit-on-drop exists to keep positive
+        insets.push(Math.min(after.x - R.x, R.x + R.w - after.x, after.y - R.y, R.y + R.h - after.y));
         xs.push(await worldX());
     }
-    console.log('REFIT deltas=' + JSON.stringify(deltas.map((d) => +d.toFixed(0))) + ' worldXs=' + JSON.stringify(xs.map((v) => v == null ? null : +v.toFixed(1))));
-    // (a) NO PIN — every drag visibly relocated the handle (the canvas accommodated it), not stuck at the gutter
-    deltas.forEach((dl, i) => expect(dl, `drag ${i + 1} moved the handle ${dl.toFixed(0)}px on screen (no pin)`).toBeGreaterThan(100));
+    console.log('REFIT insets=' + JSON.stringify(insets.map((d) => +d.toFixed(0))) + ' worldXs=' + JSON.stringify(xs.map((v) => v == null ? null : +v.toFixed(1))));
+    // (a) NOT STRANDED — after every drop the handle sits WELL INSIDE the gutter, so the next drag has room to start.
+    //     (This replaces a screen-DELTA proxy that the fix contradicts by construction: refit-on-drop re-fits the whole
+    //     extent, which lands the marker at a CONSTANT fraction of the viewport, so a well-behaved accommodate scores
+    //     zero net movement. Verified as not-a-regression: the canvas at 6c298706, the commit that introduced the fix,
+    //     produces byte-identical numbers. The hazard was never "it moved less than 100px" — it was "the drag stops
+    //     having an effect and the marker is stuck at the gutter", and BOTH of those are asserted here instead.)
+    insets.forEach((px, i) => expect(px, `after drag ${i + 1} the handle sits ${px.toFixed(0)}px inside the edge`).toBeGreaterThan(GUTTER + 20));
     // (b) the WORLD keeps growing negative (each drag pushed A further out — the value never saturates)
     for (let i = 1; i < xs.length; i++) expect(xs[i], `drag ${i} pushed world X further negative`).toBeLessThan(xs[i - 1] - 1);
     { const _b = await page.locator('#wiz_user').boundingBox(); if (_b) await page.screenshot({ path: 'scratchpad/alignment_canvas_refit_732.png', clip: _b }); }

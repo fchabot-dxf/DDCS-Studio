@@ -105,6 +105,14 @@ export function latheLayoutSpec(def, params, setFields) {
         const bar = barFromSettings({ allowance: Number(p.allowance) || 0 });
         return latheProfileSpec(bar, (allowance) => write({ allowance }));
     }
+    if (/parting/.test(String(def.opType || ''))) {
+        return partProfileSpec(barFromSettings(null), {
+            kind: p.kind, zFace: p.zFace, floorDiameter: p.floorDiameter, width: p.width,
+        }, write);
+    }
+    if (/centerdrill/.test(String(def.opType || ''))) {
+        return drillProfileSpec(barFromSettings(null), { depth: p.depth }, write);
+    }
     const bar = barFromSettings(null);
     return odProfileSpec(bar, {
         kind: p.kind, targetDiameter: p.targetDiameter, endDiameter: p.endDiameter, depth: p.depth,
@@ -189,6 +197,87 @@ export function odProfileSpec(bar, od, onChange) {
                 return;
             }
             if (id === FACE_DIA_HANDLE_ID) onChange({ targetDiameter: r3(diameterOf(insideBar(world.y))) });
+        },
+    };
+}
+
+// ── PARTING / GROOVING + CENTRE DRILLING (t1275) ────────────────────────────────────────────────────────────────
+/** The slot's position along the bar — dragging it moves the FEATURE, not the blade. */
+export const PART_POS_HANDLE_ID = 'partPos';
+/** The bottom of the slot: how deep the plunge goes, said as a diameter. */
+export const PART_FLOOR_HANDLE_ID = 'partFloor';
+/** The bottom of the hole, on the centreline. */
+export const DRILL_DEPTH_HANDLE_ID = 'drillDepth';
+
+/**
+ * THE SLOT, drawn where the blade will actually cut it.
+ *
+ * The rectangle spans the KERF — from the typed face back by the blade width — because that is the metal that goes
+ * away, and drawing the operator's single Z line would hide the one thing this op's geometry is about. Two handles,
+ * each on the thing it names: the FACE (drag along Z → where the feature sits) and the FLOOR corner (drag in radius →
+ * the diameter it stops at). A part-off has no floor to drag: it stops at the centre, and a handle that only ever
+ * reports zero is a control pretending to be a choice.
+ */
+export function partProfileSpec(bar, part, onChange) {
+    const b = normalizeBar(bar);
+    const prof = halfProfile(b);
+    const barR = radiusOf(b.diameter);
+    const o = part || {};
+    const groove = o.kind !== 'part';
+    const width = Math.max(0, Number(o.width) || 0);
+    const zFace = Number(o.zFace) || 0;
+    const zBlade = zFace - width;                 // the far side of the kerf — where the blade body sits
+    const floorR = groove ? radiusOf(Math.max(0, Number(o.floorDiameter) || 0)) : 0;
+
+    return {
+        stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },
+        items: [
+            { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
+            // THE KERF — the metal this op removes, as wide as the blade and as deep as the plunge
+            { kind: 'rect', x: zToCanvas(zBlade), y: floorR, w: width, h: Math.max(0, barR - floorR), cls: 'fc-feature' },
+            { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
+        ],
+        handles: [
+            { id: PART_POS_HANDLE_ID, x: zToCanvas(zFace), y: barR, kind: 'size', axis: 'x', teal: true, label: 'face', value: zFace },
+            ...(groove ? [{ id: PART_FLOOR_HANDLE_ID, x: zToCanvas(zBlade), y: floorR, kind: 'size', axis: 'y', teal: true,
+                            label: 'stop Ø', value: o.floorDiameter }] : []),
+        ],
+        onDrag: (id, world) => {
+            if (typeof onChange !== 'function') return;
+            if (id === PART_POS_HANDLE_ID) { onChange({ zFace: r3(canvasToZ(world.x)) }); return; }
+            // …clamped INSIDE the bar and at the centre: a groove wider than the bar is not a groove, and one that
+            // passes the centreline is a part-off wearing a groove's name.
+            if (id === PART_FLOOR_HANDLE_ID) onChange({ floorDiameter: r3(diameterOf(Math.min(Math.max(0, world.y), barR - 0.001))) });
+        },
+    };
+}
+
+/**
+ * THE HOLE, on the centreline, with one handle: its bottom. There is nothing else to drag — the drill has no radius
+ * to choose, and the whole point of this op's frame is that it never leaves X0.
+ */
+export function drillProfileSpec(bar, drill, onChange) {
+    const b = normalizeBar(bar);
+    const prof = halfProfile(b);
+    const barR = radiusOf(b.diameter);
+    const depth = Math.max(0, Number((drill || {}).depth) || 0);
+    const holeR = Math.max(0.4, barR * 0.06);     // drawn thin: the hole's SIZE is the drill's, not this op's to say
+
+    return {
+        stock: { ox: prof.bounds.z1, oy: 0, w: prof.bounds.z2 - prof.bounds.z1, h: barR },
+        items: [
+            { kind: 'line', x1: zToCanvas(prof.centreline.z1), y1: 0, x2: zToCanvas(prof.centreline.z2), y2: 0 },
+            // the hole, running INTO the work from the face
+            { kind: 'rect', x: zToCanvas(-depth), y: 0, w: depth, h: holeR, cls: 'fc-feature' },
+            { kind: 'line', x1: zToCanvas(prof.datum.z), y1: 0, x2: zToCanvas(prof.datum.z), y2: barR },
+        ],
+        handles: [
+            { id: DRILL_DEPTH_HANDLE_ID, x: zToCanvas(-depth), y: 0, kind: 'size', axis: 'x', teal: true, label: 'depth', value: depth },
+        ],
+        onDrag: (id, world) => {
+            if (id !== DRILL_DEPTH_HANDLE_ID || typeof onChange !== 'function') return;
+            // depth grows into −Z, and a hole of zero depth is not a hole
+            onChange({ depth: r3(Math.max(0.001, -canvasToZ(world.x))) });
         },
     };
 }

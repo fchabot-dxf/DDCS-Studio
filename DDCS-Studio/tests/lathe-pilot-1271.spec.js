@@ -235,7 +235,9 @@ test('(3) DRAGGING THE FACE LINE MOVES THE EMIT — the value, not just the pixe
     expect(r.afterVar, 'THE EMIT FOLLOWED — the #var header carries the dragged value').toBe('4.5');
     // …and the program really is different work, not just a different number
     expect(r.passesBefore, 'three passes before').toEqual([2, 1, 0]);
-    expect(r.passesAfter, 'five after — the drag changed what the machine will do').toEqual([3.5, 2.5, 1.5, 0.5, 0]);
+    // t1275 — five after, now floor-anchored like OD: the 0.5 remainder is taken by the FIRST cut (4.5 → 4), through
+    // the sawn end, and every later pass is a full 1mm. The drag still changed what the machine will do.
+    expect(r.passesAfter, 'five after — the drag changed what the machine will do').toEqual([4, 3, 2, 1, 0]);
     expect(r.clamped, 'dragging past Z0 stops AT the finished face — it never cuts into the part').toBe(0);
     expect(r.untouched, 'and another handle does not write this parameter').toBe(3);
 });

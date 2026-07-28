@@ -61,10 +61,15 @@ export function facingPasses({ allowance, doc, finish = 0 } = {}) {
     // which is the amount removed, not the height stopped at; with no finish pass it made the floor the raw face
     // and the whole loop vanished. Caught by hand-deriving Ø20/3/1 and getting [3] instead of [2, 1, 0].)
     const floor = roughingFloor(f);
+    // ANCHORED ON THE FLOOR, walking OUT to the raw end, then reversed — so when the material does not divide evenly
+    // the LIGHT pass falls FIRST, through the sawn end, and every later pass is a full depth. (t1275: unified with OD
+    // turning, which reasoned it out first. The two agree whenever the depth divides evenly, which is why the pilot's
+    // hand-derived case — 3mm at 1mm/pass — is unchanged at [2, 1, 0].)
     const out = [];
-    for (let z = round3(a - d); z > floor + 1e-9; z = round3(z - d)) out.push(z);
-    out.push(round3(floor));              // the last roughing pass lands ON the floor, never past it
-    if (f > 1e-9) out.push(0);            // …and the finishing pass lands on the finished face itself
+    for (let z = round3(floor); z < a - 1e-9; z = round3(z + d)) out.push(z);
+    out.reverse();
+    if (!out.length) out.push(round3(floor));   // nothing to remove → one skim at the floor, never zero passes
+    if (f > 1e-9) out.push(0);                  // …and the finishing pass lands on the finished face itself
     return out;
 }
 
@@ -90,7 +95,9 @@ export function facingStack(p = {}) {
 
     const s = [];
     s.push({ type: 'progstart', params: { clearance: 5, feed: v.feed } });
-    s.push({ type: 'comment', params: { text: `FACING — bar Ø${bar.diameter}, remove ${bar.allowance} to the face` } });
+    // THE HEADER RESTATES NOTHING (t1275, the lesson OD learned by watching a drag): a comment is not a socket, and a
+    // header claiming sizes the program no longer uses is a wrong operator message.
+    s.push({ type: 'comment', params: { text: 'FACING — skim the raw end back to the finished face. Every size is a #var below.' } });
     // THE CONFIG HEADER: every number the operator might change, once, at the top where they can find it.
     s.push({ type: 'assign', params: { var: V.allowance, value: String(bar.allowance), note: 'material ahead of the face' } });
     s.push({ type: 'assign', params: { var: V.doc, value: String(v.doc), note: 'depth per pass' } });
@@ -98,19 +105,29 @@ export function facingStack(p = {}) {
     s.push({ type: 'assign', params: { var: V.feed, value: String(v.feed), note: 'cutting feed' } });
     s.push({ type: 'spindle', params: { mode: 'cw', rpm: v.rpm } });
     s.push({ type: 'move', params: { mode: 'rapid', x: V.xStart, z: String(bar.allowance) } });
-    // the loop counter starts one depth in from the raw face — the first pass cuts, it does not touch air
-    s.push({ type: 'assign', params: { var: V.zCut, value: `[${V.allowance}-${V.doc}]`, note: 'first pass Z' } });
 
-    s.push({ type: 'label', params: { n: FACING_LOOP_LABEL } });
-    // …never cut past the roughing floor: clamp before moving, so a doc that does not divide evenly is still safe
-    s.push({ type: 'ifgoto', params: { lhs: V.zCut, op: '>=', rhs: String(rough), goto: FACING_LOOP_LABEL + 1 } });
-    s.push({ type: 'assign', params: { var: V.zCut, value: String(rough), note: 'clamp to the roughing floor' } });
-    s.push({ type: 'label', params: { n: FACING_LOOP_LABEL + 1 } });
+    const L = FACING_LOOP_LABEL;
+    // a zero depth of cut would spin the counting loop below forever. Like OD, the macro answers with NO ROUGHING
+    // rather than an invented depth — the finishing skim, if one is declared, still runs.
+    s.push({ type: 'ifgoto', params: { lhs: V.doc, op: '>', rhs: '0', goto: L } });
+    s.push({ type: 'goto', params: { n: L + 3 } });
+    s.push({ type: 'label', params: { n: L } });
+    // COUNT THE PASSES BEFORE CUTTING ANY (no motion): stepping out from the floor finds the outermost pass, which is
+    // what puts the light cut FIRST — through the sawn end, where an uneven bite belongs.
+    s.push({ type: 'assign', params: { var: V.zCut, value: String(rough), note: 'count out from the roughing floor…' } });
+    s.push({ type: 'label', params: { n: L + 1 } });
+    s.push({ type: 'assign', params: { var: V.zCut, value: `[${V.zCut}+${V.doc}]` } });
+    s.push({ type: 'ifgoto', params: { lhs: V.zCut, op: '<', rhs: V.allowance, goto: L + 1 } });
+    s.push({ type: 'assign', params: { var: V.zCut, value: `[${V.zCut}-${V.doc}]`, note: '…and step back: the outermost pass' } });
+    s.push({ type: 'ifgoto', params: { lhs: V.zCut, op: '>=', rhs: String(rough), goto: L + 2 } });
+    s.push({ type: 'assign', params: { var: V.zCut, value: String(rough), note: 'nothing to remove — one skim at the face' } });
+    s.push({ type: 'label', params: { n: L + 2 } });
     s.push({ type: 'move', params: { mode: 'rapid', z: V.zCut } });
     s.push({ type: 'move', params: { mode: 'cut', x: 0, feed: V.feed } });     // face to the centreline
     s.push({ type: 'move', params: { mode: 'rapid', x: V.xStart } });          // retract +X, clear of the bar
     s.push({ type: 'assign', params: { var: V.zCut, value: `[${V.zCut}-${V.doc}]`, note: 'step down' } });
-    s.push({ type: 'ifgoto', params: { lhs: V.zCut, op: '>=', rhs: String(rough), goto: FACING_LOOP_LABEL } });
+    s.push({ type: 'ifgoto', params: { lhs: V.zCut, op: '>=', rhs: String(rough), goto: L + 2 } });
+    s.push({ type: 'label', params: { n: L + 3 } });
 
     if (finish > 1e-9) {
         s.push({ type: 'comment', params: { text: `finish pass — ${finish} at the face` } });

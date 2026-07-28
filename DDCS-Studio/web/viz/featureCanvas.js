@@ -24,6 +24,22 @@ const r3 = (n) => Math.round(n * 1000) / 1000;
 
 import { displayOf } from './displayPrefs.js';   // t744 — the ONE declared preview-visibility registry ({visible,alpha}), shared with the 3D + toolpath2d
 
+/**
+ * THE EDGE GUTTER, declared once (t1275). Two places need it and they disagreed: `_followHandle` PARKS a dragged
+ * marker at exactly this many px from the edge, and `_handleInGutter` asked whether it was STRICTLY INSIDE that band.
+ * At exactly 80 the second answered "no", so refit-on-drop (t732) never fired for the one case it exists for — the
+ * marker sat pinned on the gutter after every drop. One constant, and the comparison is inclusive of where the park
+ * actually lands.
+ */
+const GUTTER_PX = 80;
+/**
+ * …and how much room the refit-on-drop must leave, IN THE SAME PIXELS. The roomy fit used to be a blanket scale
+ * FRACTION (0.55), which lands the extreme marker at 22.5% of the viewport — 79px in the 354px-tall layout pane this
+ * canvas actually gets, i.e. still inside the very gutter the refit exists to escape. A margin measured against the
+ * gutter cannot be defeated by a short pane.
+ */
+const ROOMY_MARGIN_PX = GUTTER_PX + 24;
+
 function svgEl(tag, attrs) {
     const e = document.createElementNS(SVGNS, tag);
     if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -131,7 +147,11 @@ export class FeatureCanvas {
                     // the frozen viewBox = "stuck at the perimeter"). SCOPED to noSnap markers = the FREE-position sim-start
                     // probe points (alignment/rotary) that are meant to leave the stock — NOT corner/path/ATC handles, whose
                     // exact drag coords + anti-flicker (the wall holds) must not be perturbed by a pan. Translate only, then redraw.
-                    if (this.active.noSnap && this._followHandle()) this._draw(this.spec, this._vw, this._vh);
+                    // …and REMEMBER that it panned. That fact is the reliable signal the drop needs: asking
+                    // afterwards whether the handle LOOKS like it is in the gutter reads `this.spec`, which at
+                    // pointerup still holds the pre-drag position — so the question got answered about where the
+                    // marker WAS, and the refit declined to run.
+                    if (this.active.noSnap && this._followHandle()) { this._followed = true; this._draw(this.spec, this._vw, this._vh); }
                 }
                 e.preventDefault();
             } else if (this.pan) {
@@ -161,9 +181,15 @@ export class FeatureCanvas {
             // there — the next drag can't leave the fitted view, so it goes nowhere (the user's felt symptom). If it landed in
             // the gutter, refit (roomy) to include ALL markers + a generous margin so it sits well inside and the next drag
             // continues; make the roomy view STICK (_userAdjusted) so a field-change re-fit doesn't snap it back to the gutter.
-            if (act && act.noSnap && this.spec && this._handleInGutter(id)) {
+            const followed = this._followed; this._followed = false;
+            if (act && act.noSnap && this.spec && (followed || this._handleInGutter(id))) {
                 this._userAdjusted = true;
                 this._tf = this._fit(this.spec, this._vw, this._vh, true);
+                // …AND AGAIN ON THE NEXT RENDER. At pointerup `this.spec` still holds the handle where it was BEFORE the
+                // drag: the drag wrote a form field, and the re-render carrying the new position has not arrived yet. So
+                // the fit above unions an extent the marker is no longer in, and it lands back on the gutter — which is
+                // why it worked on every OTHER drop (the one that happened to fit a caught-up spec) and not the rest.
+                this._refitPending = true;
                 this._draw(this.spec, this._vw, this._vh);
             } else if (hadSnap && this.spec) {
                 this._draw(this.spec, this._vw, this._vh);   // clear the snap ring
@@ -210,6 +236,7 @@ export class FeatureCanvas {
         // Auto-fit until the user pans/zooms (then they own the view; dbl-click re-fits). Also freeze
         // the fit while a handle is being dragged so the view doesn't "swim" under the cursor.
         if (!this._tf || (!this._userAdjusted && !this.active)) this._tf = this._fit(spec, VW, VH);
+        else if (this._refitPending && !this.active) { this._refitPending = false; this._tf = this._fit(spec, VW, VH, true); }   // the drop's refit, now that the spec has caught up
         else { this._tf.cx = VW / 2; this._tf.cy = VH / 2; }
         this._draw(spec, VW, VH);
     }
@@ -245,7 +272,11 @@ export class FeatureCanvas {
         let w = x1 - x0, h = y1 - y0;
         if (!(w > 1)) { x0 -= 50; x1 += 50; w = x1 - x0; }
         if (!(h > 1)) { y0 -= 50; y1 += 50; h = y1 - y0; }
-        const scale = Math.min(VW / w, VH / h) * (roomy ? 0.55 : 0.82);   // roomy → a wider margin so a just-dropped edge marker sits well inside
+        // roomy → leave a PIXEL margin bigger than the gutter on every side, so a just-dropped edge marker sits well
+        // inside it whatever the pane's shape. Plain fits keep the old 0.82 breathing factor, unchanged.
+        const scale = roomy
+            ? Math.min(Math.max(40, VW - 2 * ROOMY_MARGIN_PX) / w, Math.max(40, VH - 2 * ROOMY_MARGIN_PX) / h)
+            : Math.min(VW / w, VH / h) * 0.82;
         return { scale, cxw: (x0 + x1) / 2, cyw: (y0 + y1) / 2, cx: VW / 2, cy: VH / 2 };
     }
 
@@ -260,7 +291,7 @@ export class FeatureCanvas {
         const h = (this.spec.handles || []).find((x) => String(x.id) === String(this.active.id));
         if (!h || !isFinite(h.x) || !isFinite(h.y)) return false;
         const p = this._placement || { x: 0, y: 0 };
-        const s = this._S(h.x + (p.x || 0), h.y + (p.y || 0)), m = 80;   // keep the handle ≥ 80px from every edge
+        const s = this._S(h.x + (p.x || 0), h.y + (p.y || 0)), m = GUTTER_PX;   // keep the handle ≥ the gutter from every edge
         let dx = 0, dy = 0;
         if (s.x < m) dx = s.x - m; else if (s.x > this._vw - m) dx = s.x - (this._vw - m);
         if (s.y < m) dy = s.y - m; else if (s.y > this._vh - m) dy = s.y - (this._vh - m);
@@ -271,13 +302,15 @@ export class FeatureCanvas {
     }
     /** t732 — did the handle `id` land within the edge gutter (the ≤ margin px band where _followHandle holds it)? Drives
      *  the refit-on-drop: a marker stranded here can't be dragged further until the view accommodates it. */
-    _handleInGutter(id, margin = 80) {
+    _handleInGutter(id, margin = GUTTER_PX) {
         const t = this._tf; if (!t || !(this._vw > 0) || !(this._vh > 0)) return false;
         const h = (this.spec.handles || []).find((x) => String(x.id) === String(id));
         if (!h || !isFinite(h.x) || !isFinite(h.y)) return false;
         const p = this._placement || { x: 0, y: 0 };
         const s = this._S(h.x + (p.x || 0), h.y + (p.y || 0));
-        return s.x < margin || s.x > this._vw - margin || s.y < margin || s.y > this._vh - margin;
+        // INCLUSIVE: _followHandle parks the marker at EXACTLY `margin`, so a strict `<` answered no for the very
+        // position the follow creates — the refit never ran and the marker stayed pinned on the gutter.
+        return s.x <= margin || s.x >= this._vw - margin || s.y <= margin || s.y >= this._vh - margin;
     }
     /** World→screen WITH the toolpath placement applied. Pattern items/handles ride the placement (they're authored
      *  in the build frame); the stock + its attach markers do NOT (they're already in part coords). */

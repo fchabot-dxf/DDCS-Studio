@@ -16,7 +16,7 @@
  * Persistence: user-op defs live in `ddcs_user_ops` (userOps.js); the bar CUSTOMIZATION (per-entry + per-group
  * overrides) lives in `ddcs_wizard_layout`. The default catalog (BUILTINS/GROUPS) is the shipped library.
  */
-import { listUserOps, createUserOp, deleteUserOp } from './userOps.js';
+import { listUserOps, createUserOp, deleteUserOp, OP_CODE_HOOKS, localHooksFor } from './userOps.js';   // t1275 — the hook manifest: a wizard file names the code it cannot carry
 import { isLathe } from '../data/workspaceMachine.js';   // t1271 — the machine kind decides which group leads
 
 // ── the shipped (default) catalog — the current wizard bar as data ───────────────────────────────────────────
@@ -240,6 +240,12 @@ export function wizardToFile(def) {
     if (def.sim) op.sim = def.sim;
     if (def.group) op.group = def.group;
     if (def.defV != null) op.defV = def.defV;
+    // t1275 — A MANIFEST OF WHAT THE FILE CANNOT CARRY. The hooks are functions; only their NAMES travel. That is
+    // enough for the recipient's import to say exactly what it could not restore, instead of losing it in silence.
+    // …read from what the APP knows for this opType, not off the def object: the listed def is the PERSISTED one and
+    // never carries functions (they live in the side registries) — reading it produced an empty manifest every time.
+    const hooks = localHooksFor(def.opType).filter((k) => OP_CODE_HOOKS.includes(k));
+    if (hooks.length) op.hooks = hooks;
     return JSON.stringify({ kind: WIZARD_FILE_KIND, v: WIZARD_FILE_VERSION, op }, null, 2);
 }
 /** Parse `.wizard` file text → a user-op def (or null if it isn't a valid wizard file). Returns o.op verbatim, so
@@ -257,6 +263,18 @@ export function exportWizard(opType) {
 }
 /** Import a `.wizard` file → create the user wizard. Returns the def, or null if the file is invalid. */
 export function importWizard(text) {
-    const def = wizardFromFile(text);
-    return def ? createWizard(def) : null;
+    const file = wizardFromFile(text);
+    if (!file) return null;
+    const wanted = Array.isArray(file.hooks) ? file.hooks.slice() : [];
+    delete file.hooks;                       // a manifest, not a def field
+    const def = createWizard(file);
+    if (!def) return null;
+    // NAME THE OUTCOME. Re-attached = this app knows the op and supplied its own behaviour. Missing = the author's
+    // app had code this one does not, and the wizard runs on its data alone.
+    const got = def.hooksReattached || [];
+    const missing = wanted.filter((k) => !got.includes(k));
+    def.importNote = missing.length
+        ? `Its data came across in full. ${missing.length === 1 ? 'One behaviour' : missing.length + ' behaviours'} the author's app adds in code (${missing.join(', ')}) is not part of a wizard file — this build has no ${def.opType} of its own to take it from, so the op runs on its data alone.`
+        : (got.length ? `Rebuilt from the file, with this app's own ${def.opType} behaviour (${got.join(', ')}) — a wizard file carries data, not code.` : '');
+    return def;
 }

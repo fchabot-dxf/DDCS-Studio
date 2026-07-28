@@ -46,6 +46,8 @@ export const OP_AXIS_NEEDS = {
     // Gating asks CAN this machine move that way, not IS this the right machine; the bar's ordering answers the latter.
     lathe_facing: ['X', 'Z'],
     lathe_odturn: ['X', 'Z'],
+    lathe_parting: ['X', 'Z'],
+    lathe_centerdrill: ['Z'],   // …the only op in the app that needs ONE axis: the drill never leaves the centreline
 };
 
 /** The sentence a greyed op shows. Names the axis AND why we believe it is absent, so it is checkable. */

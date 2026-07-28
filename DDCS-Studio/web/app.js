@@ -18,7 +18,9 @@ import { loadUserOps, listUserOps, createUserOp, updateUserOp, deleteUserOp, get
 import { insertUserOp } from './ui/userOpForm.js';   // wizard-maker: generic param form (→ window.ddcsInsertUserOp)
 import { atcWarmupDataDef } from './blocks/dataOps/atcWarmupData.js';
 import { facingDataDef } from './blocks/dataOps/facingData.js';   // t1271 — the lathe family's first citizen (the gated pilot)
-import { odTurnDataDef } from './blocks/dataOps/odTurnData.js';   // t1273 — OD turning: the first INHERITOR (every mechanism copied from the pilot)
+import { odTurnDataDef } from './blocks/dataOps/odTurnData.js';
+import { partingDataDef } from './blocks/dataOps/partingData.js';   // t1275 — parting / grooving
+import { centerDrillDataDef } from './blocks/dataOps/centerDrillData.js';   // t1275 — centre drilling, the one lathe op with no radius   // t1273 — OD turning: the first INHERITOR (every mechanism copied from the pilot)
 import './ui/axisGating.js';   // t1271 — grey (never hide) the ops this machine's declared axes cannot run
 import { atcLengthDataDef } from './blocks/dataOps/atcLengthData.js';   // t409 — ATC Tool Length light port (new twin, opened IN-PLACE from the ATC Tool Length slot)
 import { atcCheckDataDef } from './blocks/dataOps/atcCheckData.js';   // t411 — ATC Tool Check light port (inherits the Tool Length recipe)
@@ -95,7 +97,7 @@ const SEED_BUILDERS = [
     drillDataDef, tapDataDef, boreDataDef, slotDataDef, surfacingDataDef, contourDataDef, pocketDataDef, wcsDataDef, textDataDef,
     cornerDataDef, edgeDataDef, middleDataDef, rotaryCenterDataDef, rotaryClockDataDef, alignmentDataDef,
     commDataDef, ioStepDataDef, pauseConfirmDataDef, homingDataDef,
-    facingDataDef, odTurnDataDef,   // t1271/t1273 — LATHE: seeded for every workspace; the bar decides where it SITS by machine kind
+    facingDataDef, odTurnDataDef, partingDataDef, centerDrillDataDef,   // t1271/t1273/t1275 — LATHE: seeded for every workspace; the bar decides where it SITS by machine kind
 ];
 const seedBuilderFor = (opType) => SEED_BUILDERS.find((fn) => { try { return fn().opType === opType; } catch (_) { return false; } }) || null;
 

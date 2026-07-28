@@ -147,6 +147,9 @@ function importWizardFile(onDone) {
             try {
                 const def = importWizard(e.target.result || '');
                 if (!def) { dlgNotice('That isn’t a valid .wizard file.'); return; }
+                // t1275 — SAY what did and did not come across. A wizard file carries data; the author's code hooks
+                // do not travel, and a silent loss is the thing the ruling forbids.
+                if (def.importNote) dlgNotice(`“${def.label || def.opType}” imported. ${def.importNote}`);
                 onDone();
             } catch (err) { dlgNotice('Import failed: ' + (err && err.message || err)); }
         };
@@ -215,7 +218,7 @@ export function renderWizardLibrary(container) {
         onImport: async (e) => {
             const def = importWizard(e.text);   // parse → createUserOp → registerUserOp: LIVE, exactly like a local op
             if (!def) { dlgNotice(`“${e.name}” is not a wizard file this version understands.`); return; }
-            dlgNotice(`“${def.label || def.opType}” is on your bar now — open it, or edit it in Blocks like any op you authored.`);
+            dlgNotice(`“${def.label || def.opType}” is on your bar now — open it, or edit it in Blocks like any op you authored.${def.importNote ? ' ' + def.importNote : ''}`);
             apply();
         },
     });
