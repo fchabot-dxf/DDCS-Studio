@@ -13,6 +13,11 @@ OP_BLOCKS.forEach(b => HAS_CUSTOM_OP[b.type] = true);
 
 // ── workspace → stack ────────────────────────────────────────────────────────
 /** One block (NOT its next sibling) → a record { id, type, params, children? }. */
+/** t1317 — is this value ABSENT (no value at all), as opposed to an explicit zero? */
+const isAbsent = (v) => v === undefined || v === null || v === '';
+/** …and does this atom DECLARE that this field may be absent? (wizards/ops/*.js `absentable`) */
+const absentable = (def, f) => !!(def && Array.isArray(def.absentable) && def.absentable.includes(f));
+
 function toRecord(b) {
     if (b.type === 'op' || b.type.endsWith('_op')) {         // op CONTAINER — opType/requires/params ride in `data`
         let meta = {};
@@ -98,6 +103,9 @@ function toRecord(b) {
             const inp = b.getInput(name), tgt = inp && inp.connection && inp.connection.targetBlock();
             if (tgt && tgt.isShadow()) r.params[f] = Number(tgt.getFieldValue('NUM'));   // shadow number
             else if (tgt) r.params[f] = toRecord(tgt);                       // a plugged reporter → nested record
+            // t1317 — an EMPTY socket on an absentable field is ABSENCE, not the default: the record carries no value
+            // and the emit writes no word, which is what the op said in the first place.
+            else if (absentable(def, f)) { /* leave params[f] undefined */ }
             else r.params[f] = def.defaults[f];                             // empty socket → the op default
         } else if (k === 'checkbox') r.params[f] = b.getFieldValue(name) === 'TRUE';
         else r.params[f] = b.getFieldValue(name);                           // dropdown / text field
@@ -225,6 +233,10 @@ function recToJson(rec) {
             // a #var / [expr] string in a numeric socket → a Variable reporter pill (a math_number shadow would
             // collapse `#18` to Number()||0 = 0, silently losing the ref); a plain number → the shadow.
             else if (k === 'value' && typeof v === 'string' && /[#[]/.test(v)) inputs[name] = { block: { type: 'variable', fields: { NAME: v } } };
+            // t1317 — AN ABSENT ABSENTABLE FIELD GETS NO SOCKET CONTENT AT ALL. A shadow here would make the canvas
+            // say zero where the program said nothing, and hand back a word the op never wrote. An explicit 0 still
+            // gets its shadow below, because zero and absence are different facts and each must round-trip as itself.
+            else if (k === 'value' && isAbsent(v) && absentable(def, f)) { /* leave the socket EMPTY */ }
             else if (k === 'value') inputs[name] = { shadow: { type: 'math_number', fields: { NUM: Number(v) || 0 } } };
             // empty region/boolean socket → leave unset
         } else if (k === 'checkbox') fields[name] = !!v;
@@ -266,7 +278,11 @@ function chainToJson(records) {
 function recWithDefaults(rec) {
     if (!rec || rec.type === 'op') return rec;
     const def = BLOCKS[rec.type];
-    const out = { ...rec, params: def ? { ...def.defaults, ...(rec.params || {}) } : (rec.params || {}) };
+    // t1317 — …EXCEPT the absentable ones. Filling those is what gave a palette entry phantom axis words: the flyout
+    // block for `G0 X#120` would arrive carrying Y0 Z0 because the merge helpfully supplied them.
+    const base = {};
+    if (def) for (const k in def.defaults) if (!absentable(def, k)) base[k] = def.defaults[k];
+    const out = { ...rec, params: def ? { ...base, ...(rec.params || {}) } : (rec.params || {}) };
     if (rec.children) out.children = rec.children.map(recWithDefaults);
     return out;
 }

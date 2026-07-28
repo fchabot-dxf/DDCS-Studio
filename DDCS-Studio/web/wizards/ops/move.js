@@ -11,6 +11,12 @@ export const moveBlock = {
     type: 'move', label: 'Move', kind: 'leaf', category: 'Move',
     defaults: { mode: 'cut', x: 0, y: 0, z: 0, feed: 2000 },
     fields: ['mode', 'x', 'y', 'z', 'feed'],
+    // t1317 — ABSENCE IS NOT ZERO, declared where the fact lives. An axis word this move does not carry is a
+    // DIFFERENT INSTRUCTION from one carrying zero: `G0 X5` leaves Z where it is, `G0 X5 Z0` drives Z to zero (in
+    // absolute mode — a different program). The emit has always known that (`p.x != null && p.x !== ''`); what did
+    // not was the Blocks canvas, which filled every empty socket with the default and handed back phantom words.
+    // Listing them here is what lets the bridge keep an empty socket empty in both directions.
+    absentable: ['x', 'y', 'z', 'a', 'b'],
     // Only the axes that are set are emitted (a blank/absent axis is omitted → single-axis moves like `G0 X#9`).
     // Each coordinate/feed accepts a literal OR a #var/[expr] (val), so `Move(rapid, X=#9)` → `G0 X#9`.
     emit: (p, dx = 0, dy = 0) => {

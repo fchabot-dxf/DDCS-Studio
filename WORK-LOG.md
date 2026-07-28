@@ -20246,3 +20246,47 @@ workspace stock, so they were unaffected; this one did not, so its Ø20 truths w
 the default workspace bar happened to be.
 
 Gate: smoke 71/71; the new spec 7/7; the lathe family + taper + stock + the two Blocks smoke specs 140/140.
+
+---
+
+## t1317 — absence is not zero
+
+The defect my own round-trip exposed at t1315, fixed where the fact lives.
+
+### Both halves filled the hole in
+
+Outbound, `recToJson` minted a `math_number` shadow for EVERY value field — `Number(v) || 0` — so a param that was
+not there became a socket saying zero. Inbound, `toRecord` read an empty socket as the atom's DEFAULT, which for a
+move's axes is 0. And `recWithDefaults` (the flyout path) merged the same defaults in before conversion, so a palette
+entry would have carried the phantom words too. Three places, one assumption: that a field always has a value.
+
+### The declaration is on the atom
+
+`move` now declares `absentable: ['x', 'y', 'z', 'a', 'b']` — the words whose ABSENCE is itself an instruction. The
+emit has always known this (`p.x != null && p.x !== ''`); the canvas did not, and nothing said so out loud. With it
+declared, the bridge keeps an empty socket empty in both directions and the defaults-merge skips those fields.
+
+**Both truths survive, which is the whole point:** an authored `G0 X#120` round-trips byte-for-byte, and an explicit
+`{x: 0}` round-trips as `G1 X0` — and gains no companions. Absence and zero are different facts and each is now
+itself. (Before: `G1 X0 Z0 F100`.)
+
+### The discriminating case, executed
+
+A phantom `Z0` is invisible in G91 — a zero word is a no-op — and REAL in G90. So the new test builds a program that
+mixes both modes and ends absolute, where a phantom Z0 would drive Z from 5 to 0, and runs the original and the
+round-tripped emit through the sim: byte-identical, and the same moves point for point, with Z still at 5.
+
+My t1315 pinned test is restated as the fixed truth with its history kept in the comment — it was written to fail the
+day this was fixed, and it did.
+
+### The sweep
+
+Every round-trip spec (45), the Blocks family, the lathe family (134) and the matrix + both-paths guards are green,
+and the palette entries carry no phantom words — the builderOf-equal assert from t1315 covers it and was re-run
+rather than assumed. The `progend` tail and one corner reposition step still differ across a canvas round trip; I
+checked by stashing this turn's change and re-running: **both predate it** (before the fix, the phantom axis words
+were simply the first difference in the list). Reported, not touched — it is a different gap, in blocks that do not
+declare an item grain of their own.
+
+Gate: smoke 71/71; the t1315 spec 8/8 (two of them new); matrix + odturn + taper + Blocks 36/36; lathe family 134/134;
+round-trip specs 45/45; flyout/snippet specs 29/29.

@@ -116,12 +116,11 @@ test('THE ROUND TRIP — every authored value survives the canvas, and an edit m
     expect(r.doc, 'to the typed value').toMatch(/#124=2/);
 });
 
-test('KNOWN GAP, pinned — the canvas materialises blank axis words as zeros', async ({ page }) => {
-    // NOT desired behaviour: this test exists so the day it is fixed, it FAILS and gets rewritten. A Blockly move
-    // block has a field per axis, and a blank one comes back as 0 — so `G0 X#120` round-trips as `G0 X#120 Z0`.
-    // In G91 that is a no-op; in ABSOLUTE mode it is a real move to Z0, which is a different program. It is not
-    // lathe-specific (every op whose moves omit an axis is affected), so it is reported rather than patched here.
-    // The lathe's own Y is already handled: a machine with no Y never emits a zero one (wizards/ops/move.js).
+test('ABSENCE SURVIVES THE CANVAS — no phantom axis words (t1315 found it, t1317 fixed it)', async ({ page }) => {
+    // HISTORY, kept deliberately: this test was written at t1315 to PIN A DEFECT — the canvas materialised blank axis
+    // words as zeros, so `G0 X#120` came back as `G0 X#120 Z0`. In G91 that is a no-op; in ABSOLUTE mode it is a real
+    // move to Z0, a different program. It was written to fail the day it was fixed, and t1317 fixed it: the move atom
+    // DECLARES which of its fields may be absent, and the bridge keeps an empty socket empty in both directions.
     await boot(page);
     await page.evaluate(() => window.showApp && window.showApp('blocks'));
     await page.waitForTimeout(2200);
@@ -137,11 +136,46 @@ test('KNOWN GAP, pinned — the canvas materialises blank axis words as zeros', 
         SB.stackToWorkspace(stack, ws);
         const after = String(emitProgram(SB.workspaceToStack(ws)));
         const moves = (nc) => nc.split(String.fromCharCode(10)).filter((l) => /^G[01] /.test(l));
-        return { before: moves(before), after: moves(after), y: after.includes(' Y0') };
+        // …and an EXPLICIT zero, which is a different fact and must survive as itself
+        SB.stackToWorkspace([{ type: 'move', params: { mode: 'cut', x: 0, feed: 100 } }], ws);
+        const zero = String(emitProgram(SB.workspaceToStack(ws))).trim();
+        return { before: moves(before), after: moves(after), zero };
     });
-    expect(r.y, 'no Y is added on a machine that has none — that half IS fixed').toBe(false);
-    const grew = r.after.filter((l, i) => r.before[i] && l !== r.before[i] && /Z0|X0/.test(l));
-    expect(grew.length, 'but blank X/Z still come back as zeros — the gap this pins').toBeGreaterThan(0);
+    expect(r.after, 'every move comes back exactly as it was written').toEqual(r.before);
+    expect(r.after.some((l) => / Y0| Z0| X0/.test(l)), 'no phantom zero word anywhere').toBe(false);
+    // BOTH TRUTHS: an explicit zero is a real instruction and keeps its word
+    expect(r.zero, 'a typed X0 stays X0 — and gains no companions').toBe('G1 X0 F100');
+});
+
+test('THE DISCRIMINATING CASE — a phantom Z0 would move the tool, and the sim proves it does not', async ({ page }) => {
+    // The failure this prevents is invisible in G91 (a zero word is a no-op) and REAL in G90: the mixed-mode program
+    // below ends absolute, so a phantom Z0 on that last move would drive Z to zero from 5. Executed both ways.
+    await boot(page);
+    await page.evaluate(() => window.showApp && window.showApp('blocks'));
+    await page.waitForTimeout(2200);
+    const r = await page.evaluate(async () => {
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const { traceToolpath } = await import('/engine/trace.js');
+        const SB = await import('/blocks/blockly/stackBridge.js');
+        const ws = Blockly.getMainWorkspace();
+        const stack = [
+            { type: 'distmode', params: { dist: 'abs' } },
+            { type: 'move', params: { mode: 'rapid', x: 10, y: 5, z: 5 } },
+            { type: 'distmode', params: { dist: 'inc' } },
+            { type: 'move', params: { mode: 'cut', x: 2, feed: 100 } },        // incremental: a phantom Z0 is a no-op
+            { type: 'distmode', params: { dist: 'abs' } },
+            { type: 'move', params: { mode: 'cut', x: 20, feed: 100 } },       // ABSOLUTE: a phantom Z0 would dive to 0
+        ];
+        const a = String(emitProgram(stack));
+        SB.stackToWorkspace(stack, ws);
+        const b = String(emitProgram(SB.workspaceToStack(ws)));
+        const pts = (nc) => (traceToolpath(nc).segments || []).map((s) => [+s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3)]);
+        return { same: a === b, a, movesA: pts(a), movesB: pts(b) };
+    });
+    expect(r.same, 'the program is byte-identical through the canvas').toBe(true);
+    expect(r.movesB, 'and the SIM executes the same moves, point for point').toEqual(r.movesA);
+    // the last absolute cut must still end at Z5 — a phantom Z0 is exactly what would have taken it to zero
+    expect(r.movesA[r.movesA.length - 1][2], 'Z is where the program left it, not at zero').toBeCloseTo(5, 3);
 });
 
 test('THE BAR FIELD PREFILLS FROM THE WORKSPACE — modal Ø45, form 45, emit #131=45', async ({ page }) => {
