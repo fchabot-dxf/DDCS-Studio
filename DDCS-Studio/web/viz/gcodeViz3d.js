@@ -1423,10 +1423,23 @@ export class GcodeViz3D {
             // real feature (a bottom datum offsets the path up by the stock height for a precision height cut).
             // See docs/archive/probe-preview-frame-issues.md.
             const dzCol = this._anchorToStart ? stock.z : D[2];   // start-anchored → top-at-0; mill → datum-aware
-            pg.position.set(stock.x / 2 - D[0], stock.y / 2 - D[1], stock.z / 2 - dzCol);
-            this._stockFloorZ = pg.position.z - stock.z / 2;   // stock bottom → where the table/grid sits
-            mesh.position.sub(C);
-            edges.position.sub(C);
+            // t1293 — A BAR ON CENTRES LIVES IN ABSOLUTE PART COORDINATES. The box path pivots the group on the
+            // stock CENTRE and compensates each mesh by −C; a turned bar is authored on the axis already (X is a
+            // radius from it, Z runs along it, and the profile carve builds its outline in those very numbers), so
+            // the compensation is not just unnecessary, it is what moved everything off-axis: the carve rebuild
+            // resets its mesh to the origin, dropping a −C the group was still applying. The result was the bar, its
+            // carve and its chuck all sitting at (10,10) — the "ghost bars" floating beside the origin were the real
+            // ones, in the wrong place. A bar's group sits at zero and its children speak absolute coordinates.
+            const latheBar = stock.axis === 'z' && stock.origin === 'finished-face';
+            if (latheBar) {
+                pg.position.set(0, 0, 0);
+                this._stockFloorZ = -(stock.diameter || stock.x) / 2;   // the grid sits under the bar, not under a box
+            } else {
+                pg.position.set(stock.x / 2 - D[0], stock.y / 2 - D[1], stock.z / 2 - dzCol);
+                this._stockFloorZ = pg.position.z - stock.z / 2;   // stock bottom → where the table/grid sits
+                mesh.position.sub(C);
+                edges.position.sub(C);
+            }
             this.stockMesh = mesh; pg.add(mesh);
             // t1283 — THE CHUCK IS PART OF A LATHE BAR, not an op's opt-in: the stock declares a grip end (its −Z),
             // so it gets the chuck whenever it is drawn. One chuck concept, the rotary rig's own render, told which

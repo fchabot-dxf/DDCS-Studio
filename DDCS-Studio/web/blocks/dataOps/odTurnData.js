@@ -84,6 +84,43 @@ function odDataStack(p = OD_DEFAULTS) {
 export const OD_BINDINGS = deriveBindingsFor(odDataStack(OD_DEFAULTS), OD_BINDING_SPECS);
 
 /**
+ * t1293 — THE TWIN DELEGATES TO THE ONE STACK BUILDER. This is the blocker the advisor's probe found, and the root is
+ * worth stating plainly: a data twin's template is a SNAPSHOT, built once from the defaults. t1291's taper fix is a
+ * BUILD-TIME branch inside `odTurnStack`, so the snapshot froze the STRAIGHT arm — and picking Taper in the UI only
+ * wrote values into that straight structure. My asserts passed because they called the stack builder directly; the
+ * app resolves the twin, and the twin still emitted the pre-fix gouge.
+ *
+ * (Facing's zero-DOC fix verified through its twin for the opposite reason: that branch runs on the CONTROLLER, so it
+ * is present in every snapshot whatever the default was. A build-time branch cannot survive being snapshotted; a
+ * runtime one cannot help but.)
+ *
+ * So the macro is REGENERATED from the resolved params — the same thing polygon turning already does, and the same
+ * reason: when a parameter changes the SHAPE of the program rather than a number in it, the program has to be rebuilt
+ * rather than patched. One emit source, and the duplicate cannot drift because there is no duplicate.
+ */
+export function rebuildOdTurn(stack, resolved) {
+    const p = resolved || {};
+    const num = (k) => (Number(p[k]) > 0 || Number(p[k]) === 0 ? Number(p[k]) : OD_DEFAULTS[k]);
+    const built = odTurnStack({
+        ...OD_DEFAULTS,
+        kind: odKind(p.kind),
+        targetDiameter: num('targetDiameter'),
+        // an UNSET far end means "follows the target" — the straight turn's reference, resolved to a number here
+        endDiameter: (Number(p.endDiameter) > 0) ? Number(p.endDiameter) : num('targetDiameter'),
+        depth: num('depth'),
+        doc: num('doc'),
+        finish: num('finish'),
+        feed: num('feed'),
+        feedFinish: num('feedFinish'),
+    });
+    const root = Array.isArray(stack) && stack[0] ? stack[0] : null;
+    if (!root) return stack;
+    const keep = (root.children || []).filter((b) => b && b.type === 'toolsel');   // the declared tool marker rides along
+    root.children = [...built, ...keep];
+    return stack;
+}
+
+/**
  * A STRAIGHT turn's far-end diameter is not a copy of the target — it IS the target. Writing the reference keeps one
  * source and makes the macro say so; a taper leaves the typed number alone.
  */
@@ -115,6 +152,8 @@ export function odTurnDataDef() {
     // …no `bindingSpecs` re-derive: this template carries NO guards, so no prune shifts the indices and the frozen
     // bindings stay correct. (Setting it anyway cost the `.wiz` round trip its identity — bindingSpecs is not part of
     // the wizard file format, so an exported copy came back missing it.)
-    def.postInstantiate = (stack, resolved) => applyStraightEnd(stack, resolved);
+    // REGENERATE FIRST (the shape follows kind), THEN the straight-end reference — order matters: the rebuild emits a
+    // concrete far-end number, and applyStraightEnd turns it back into the one-source reference for a straight turn.
+    def.postInstantiate = (stack, resolved) => applyStraightEnd(rebuildOdTurn(stack, resolved), resolved);
     return def;
 }

@@ -198,7 +198,7 @@ export function odTurnStack(p = {}) {
     // What a person TYPES, in the units they say it in…
     s.push({ type: 'assign', params: { var: V.dBar, value: String(dBar), note: 'bar DIAMETER' } });
     s.push({ type: 'assign', params: { var: V.dTarget, value: String(dTarget), note: 'target DIAMETER at the face' } });
-    s.push({ type: 'assign', params: { var: V.dEnd, value: String(dEnd), note: taper ? 'DIAMETER at the far end (the taper)' : 'far-end DIAMETER — equal to the target on a straight turn' } });
+    s.push({ type: 'assign', params: { var: V.dEnd, value: String(dEnd), note: taper ? 'DIAMETER at the far end (the taper)' : 'far-end DIAMETER — the target itself, so a straight turn stays straight' } });
     s.push({ type: 'assign', params: { var: V.doc, value: String(v.doc), note: 'radial depth per pass' } });
     s.push({ type: 'assign', params: { var: V.depth, value: String(v.depth), note: 'how far along the bar the turn runs' } });
     s.push({ type: 'assign', params: { var: V.finish, value: String(finish), note: 'finish allowance left on the RADIUS (the depth-of-cut terms)' } });

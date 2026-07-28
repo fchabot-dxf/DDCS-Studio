@@ -423,13 +423,19 @@ test('THE .wiz GATE RULED — a known op gets THIS APP’s behaviour back; a str
  * The crossing where the finished surface reaches a given radius is a pure ratio, so the controller computes it with
  * no trig; which SIDE of it to cut is decided by which end is fat.
  */
+// t1293 — THROUGH THE PATH THE UI ACTUALLY RESOLVES. These asserts used to call the stack builder directly, which is
+// the copy the app does NOT run: the wizard emits through the TWIN, and the twin's template is a snapshot of the
+// defaults. That is how a fix could pass its own tests and leave the shipped program gouging a cone. Everything here
+// goes through builderOf now — the same resolution openWiz uses.
 const carveTaper = (page, p) => page.evaluate(async (params) => {
-    const O = await import('/wizards/lathe/odTurn.js');
+    const uo = await import('/blocks/userOps.js');
+    const { builderOf } = await import('/blocks/opBuilders.js');
     const L = await import('/data/latheProfile.js');
     const S = await import('/viz/latheScene.js');
     const { emitProgram } = await import('/blocks/blockEmitter.js');
     const { traceToolpath } = await import('/engine/trace.js');
-    const nc = String(emitProgram(O.odTurnStack(params)));
+    const def = uo.listUserOps().find((d) => d.opType === 'user_lathe_odturn');
+    const nc = String(emitProgram(builderOf('user_lathe_odturn')({ ...uo.defaultParams(def), ...params })));
     const prof = L.profileFromBar(S.latheBarFrom(params, {}));
     for (const s of (traceToolpath(nc).segments || []).filter((x) => !x.rapid && !x.probe)) L.carveSegment(prof, s, 0);
     const at = (z) => +prof.rOut[Math.round((z - prof.z0) / prof.step)].toFixed(2);
@@ -457,8 +463,11 @@ test('A STRAIGHT TURN IS UNTOUCHED — the taper is numbers, not a second progra
     await boot(page);
     const r = await page.evaluate(async () => {
         const O = await import('/wizards/lathe/odTurn.js');
+        const uo = await import('/blocks/userOps.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitProgram } = await import('/blocks/blockEmitter.js');
-        const nc = String(emitProgram(O.odTurnStack({ barDiameter: 20, targetDiameter: 14, depth: 25, doc: 1, finish: 0.5 })));
+        const def = uo.listUserOps().find((d) => d.opType === 'user_lathe_odturn');
+        const nc = String(emitProgram(builderOf('user_lathe_odturn')({ ...uo.defaultParams(def), targetDiameter: 14, depth: 25, doc: 1, finish: 0.5 })));
         return { nc, V: O.OD_VARS,
                  lines: nc.split(String.fromCharCode(10)).filter((l) => l.trim()).length,
                  cuts: (nc.match(/^G1 /gm) || []).length };
@@ -491,4 +500,32 @@ test('FACING WITH NO DEPTH PER PASS TAKES ONE SKIM — the comment and the emit 
     expect(r.passes, 'and the pass list agrees with both').toEqual([0]);
     // …the ordinary case is untouched
     expect(r.one.zs, 'a real depth of cut still steps down to the face').toEqual([2, 1, 0]);
+});
+
+test('ONE EMIT SOURCE — the twin and the stack builder cannot disagree, because the twin IS the stack builder', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const uo = await import('/blocks/userOps.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const O = await import('/wizards/lathe/odTurn.js');
+        const def = uo.listUserOps().find((d) => d.opType === 'user_lathe_odturn');
+        const build = builderOf('user_lathe_odturn');
+        const cases = [
+            { kind: 'straight', targetDiameter: 14, depth: 25, doc: 1, finish: 0.5 },
+            { kind: 'taper', targetDiameter: 8, endDiameter: 16, depth: 25, doc: 1, finish: 0.5 },
+            { kind: 'taper', targetDiameter: 16, endDiameter: 8, depth: 30, doc: 1.5, finish: 0.25 },
+        ];
+        return cases.map((c) => {
+            const viaTwin = String(emitProgram(build({ ...uo.defaultParams(def), ...c })));
+            const viaStack = String(emitProgram(O.odTurnStack({ ...O.OD_DEFAULTS, ...c })));
+            // the twin wraps the macro, so compare the MACRO LINES both produce — the cutting program itself
+            const macro = (nc) => nc.split(String.fromCharCode(10)).filter((l) => /^(G0|G1|#1[23]|IF|N6|GOTO)/.test(l.trim())).join('|');
+            return { kind: c.kind, same: macro(viaTwin) === macro(viaStack) };
+        });
+    });
+    // THE DEFECT THIS GUARDS: a build-time branch in the stack builder never reached the twin's snapshot, so the
+    // wizard shipped the pre-fix program while the stack builder's own tests passed. If these two ever differ again,
+    // one of them is a copy nobody is running.
+    for (const c of r) expect(c.same, `${c.kind}: the twin emits what the builder emits`).toBe(true);
 });

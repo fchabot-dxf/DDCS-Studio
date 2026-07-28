@@ -133,3 +133,52 @@ test('A MILL WORKSPACE IS UNTOUCHED — the lathe scene is a declaration, not a 
     // the global stock is still the mill's own — nothing about the lathe scene leaked into it
     expect(r.stock, 'the mill keeps its block stock').not.toBe('cylinder');
 });
+
+// ── t1293 — ONE BAR, ON THE CENTRELINE ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * A user orbited the scene and saw bars floating beside the origin. They were not extra bars: they were THE bar and
+ * its chuck, in the wrong place. The box path pivots the part group on the stock CENTRE and compensates each mesh by
+ * −C; a turned bar is authored on the axis already, and the profile carve rebuilds its mesh at the origin — dropping
+ * a compensation the group was still applying. Everything ended up half a bar off in X and Y.
+ *
+ * A bar on centres has no datum corner: X is a radius FROM the axis and Z runs ALONG it. So its group sits at zero
+ * and its children speak absolute coordinates — the same numbers the carve, the emit and the 2D all use.
+ */
+test('ONE BAR, ON THE AXIS — and the only other cylinder in the scene is the chuck', async ({ page }) => {
+    await boot(page);
+    await page.evaluate(() => window.openWiz('user_lathe_odturn'));
+    await page.waitForTimeout(1800);
+    const r = await page.evaluate(() => {
+        const v = window.__ddcsActiveViz;
+        if (!v || !v.scene) return null;
+        const vis = (o) => { let q = o; while (q) { if (!q.visible) return false; q = q.parent; } return true; };
+        const bars = [];
+        v.scene.traverse((o) => {
+            const t = o.geometry && o.geometry.type;
+            if (!t || !/Cylinder|Lathe/.test(t) || !vis(o)) return;
+            const p = new v.THREE.Vector3(); o.getWorldPosition(p);
+            const r0 = o.geometry.parameters ? o.geometry.parameters.radiusTop : null;
+            bars.push({ t, x: +p.x.toFixed(2), y: +p.y.toFixed(2),
+                        stock: o === v.stockMesh, chuck: !!(v._latheChuck && v._latheChuck.children.includes(o)),
+                        r: r0 });
+        });
+        return { bars, pg: v._partGroup ? [v._partGroup.position.x, v._partGroup.position.y] : null };
+    });
+    expect(r, 'the lathe scene exists to be counted').not.toBeNull();
+    // EXACTLY ONE BAR, and it is the stock mesh
+    const stock = r.bars.filter((b) => b.stock);
+    expect(stock.length, 'exactly one visible bar').toBe(1);
+    // …ON THE AXIS. This is the number that was wrong: 10, 10 — half the bar, in both transverse axes.
+    expect(Math.abs(stock[0].x), 'the bar is on the centreline in X').toBeLessThan(0.01);
+    expect(Math.abs(stock[0].y), 'and in Y').toBeLessThan(0.01);
+    expect(r.pg, 'its group sits at zero — a bar has no datum corner to be placed by').toEqual([0, 0]);
+    // EVERY OTHER visible cylinder belongs to the chuck. Nothing else may be drawing a bar.
+    const strays = r.bars.filter((b) => !b.stock && !b.chuck && (b.r == null || b.r > 1));
+    expect(strays, 'no second bar: every other cylinder in the scene is chuck').toEqual([]);
+    // …and the chuck is on the axis too, since it grips the thing that is
+    for (const c of r.bars.filter((b) => b.chuck)) {
+        expect(Math.abs(c.x), 'the chuck is on the axis in X').toBeLessThan(0.01);
+        expect(Math.abs(c.y), 'and in Y').toBeLessThan(0.01);
+    }
+});
