@@ -61,6 +61,9 @@ export function facingPasses({ allowance, doc, finish = 0 } = {}) {
     // which is the amount removed, not the height stopped at; with no finish pass it made the floor the raw face
     // and the whole loop vanished. Caught by hand-deriving Ø20/3/1 and getting [3] instead of [2, 1, 0].)
     const floor = roughingFloor(f);
+    // t1291 — A ZERO DEPTH OF CUT IS ONE SKIM AT THE FLOOR, matching the emit and the comment both. The loop below
+    // steps by `d` (clamped to 0.001), so it would otherwise grind out thousands of passes for a zero step.
+    if (!(Number(doc) > 0)) { const out0 = [round3(floor)]; if (f > 1e-9) out0.push(0); return out0; }
     // ANCHORED ON THE FLOOR, walking OUT to the raw end, then reversed — so when the material does not divide evenly
     // the LIGHT pass falls FIRST, through the sawn end, and every later pass is a full depth. (t1275: unified with OD
     // turning, which reasoned it out first. The two agree whenever the depth divides evenly, which is why the pilot's
@@ -107,9 +110,19 @@ export function facingStack(p = {}) {
     s.push({ type: 'move', params: { mode: 'rapid', x: V.xStart, z: String(bar.allowance) } });
 
     const L = FACING_LOOP_LABEL;
-    // a zero depth of cut would spin the counting loop below forever. Like OD, the macro answers with NO ROUGHING
-    // rather than an invented depth — the finishing skim, if one is declared, still runs.
+    // t1291 — A ZERO DEPTH OF CUT TAKES ONE SKIM, which is what this macro's own comment has always promised and
+    // what the emit did not do: it jumped past the loop and the program silently cut NOTHING, with an allowance still
+    // sitting on the face. "Just kiss the face" is a real thing to ask for, so it is what zero means — and the
+    // alternative (greying the field) would refuse an operation rather than perform it. The comment and the emit
+    // agree now, and a test pins the pair.
+    //
+    // It cannot fall into the loop below: that loop steps by #112, so a zero step would never terminate. One
+    // explicit pass, then out.
     s.push({ type: 'ifgoto', params: { lhs: V.doc, op: '>', rhs: '0', goto: L } });
+    s.push({ type: 'comment', params: { text: 'no depth per pass — one skim at the face' } });
+    s.push({ type: 'move', params: { mode: 'rapid', z: String(rough) } });
+    s.push({ type: 'move', params: { mode: 'cut', x: 0, feed: V.feed } });
+    s.push({ type: 'move', params: { mode: 'rapid', x: V.xStart } });
     s.push({ type: 'goto', params: { n: L + 3 } });
     s.push({ type: 'label', params: { n: L } });
     // COUNT THE PASSES BEFORE CUTTING ANY (no motion): stepping out from the floor finds the outermost pass, which is

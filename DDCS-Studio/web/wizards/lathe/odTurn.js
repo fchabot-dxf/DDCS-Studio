@@ -79,6 +79,9 @@ export const OD_VARS = {
     finish: '#134',      // the finish allowance, on the RADIUS — the same terms as the depth of cut
     clearance: '#135',   // how far outside the bar to retract, on the RADIUS
     feedFinish: '#136',  // the finishing feed — a real turning knob, so it is a variable and not a baked number
+    zCross: '#137',      // derived, taper only: the Z where the finished cone reaches THIS pass's radius
+    xStartFin: '#138',   // derived, taper only: the cone extrapolated back to the approach Z, so the finish pass
+                         //                     passes through the face at exactly the target radius
 };
 
 /** Label base. 60 = the depth-of-cut guard, 61 = the pass count, 62 = the roughing loop, 63 = the finish pass. */
@@ -130,6 +133,31 @@ export function odPasses(p = {}) {
     for (let r = floor; r < barR - 1e-9; r = round3(r + d)) rough.push(r);
     rough.reverse();
     return { rough, finish: { start: targetR, end: endR }, floor, barR };
+}
+
+/**
+ * t1291 — HOW FAR ALONG THE BAR A ROUGHING PASS MAY CUT, which on a taper is not the whole length.
+ *
+ * A cone's radius changes with Z, so a pass at radius x may only cut where the finished surface is THINNER than x.
+ * Cutting the full length at every radius — which is what this op did — removes the cone itself: for a fat far end
+ * (Ø8 at the face, Ø16 deep) roughing to the face floor took the whole cone away and the finish pass then cut air.
+ * On a real machine that is a gouged part, not a cosmetic sim error.
+ *
+ * The crossing is a pure ratio, so the controller can compute it with no trig:  z = −depth·(x − rFace)/(rFar − rFace).
+ * Which SIDE of it to cut depends on which end is fat: a fat FAR end leaves the thin material near the face (cut from
+ * the face to the crossing); a fat FACE leaves it deep (cut from the crossing to the end).
+ *
+ * @returns {{from:number, to:number}} the Z span this pass cuts, already clamped into the turned length
+ */
+export function odPassExtent(x, p = {}) {
+    const v = { ...OD_DEFAULTS, ...p };
+    const targetR = radiusOf(Math.max(0, Number(v.targetDiameter) || 0));
+    const endR = odKind(v.kind) === 'taper' ? radiusOf(Math.max(0, Number(v.endDiameter) || 0)) : targetR;
+    const depth = Math.max(0, Number(v.depth) || 0);
+    const zEnd = -depth;
+    if (Math.abs(endR - targetR) < 1e-9) return { from: 0, to: zEnd };          // straight: the whole length, as before
+    const cross = Math.max(zEnd, Math.min(0, round3(-depth * (x - targetR) / (endR - targetR))));
+    return endR > targetR ? { from: 0, to: cross } : { from: cross, to: zEnd };
 }
 
 /**
@@ -213,8 +241,33 @@ export function odTurnStack(p = {}) {
 
     // ── THE ROUGHING LOOP ───────────────────────────────────────────────────────────────────────────────────────
     s.push({ type: 'label', params: { n: L + 2 } });
-    s.push({ type: 'move', params: { mode: 'rapid', x: V.xCut } });                     // in to this pass's radius, still ahead of the face
-    s.push({ type: 'move', params: { mode: 'cut', z: V.zEnd, feed: V.feed } });         // …and cut along the bar
+    if (!taper) {
+        s.push({ type: 'move', params: { mode: 'rapid', x: V.xCut } });                 // in to this pass's radius, still ahead of the face
+        s.push({ type: 'move', params: { mode: 'cut', z: V.zEnd, feed: V.feed } });     // …and cut along the bar
+    } else {
+        // t1291 — A TAPER'S ROUGHING FOLLOWS THE CONE. Cutting the full length at every radius removed the cone
+        // itself and left the finish pass cutting air — a gouged part, not a sim artefact. The crossing Z where the
+        // finished surface reaches THIS pass's radius is a pure ratio, so the controller works it out with no trig,
+        // and it is clamped into the turned length (a pass wider than the whole cone still runs full length).
+        s.push({ type: 'assign', params: { var: V.zCross, value: `[0-[${V.depth}*[${V.xCut}-${V.xTarget}]/[${V.xEnd}-${V.xTarget}]]]`, note: 'where the cone reaches this pass' } });
+        s.push({ type: 'ifgoto', params: { lhs: V.zCross, op: '<=', rhs: '0', goto: L + 4 } });
+        s.push({ type: 'assign', params: { var: V.zCross, value: '0', note: 'clamp: not past the face' } });
+        s.push({ type: 'label', params: { n: L + 4 } });
+        s.push({ type: 'ifgoto', params: { lhs: V.zCross, op: '>=', rhs: V.zEnd, goto: L + 5 } });
+        s.push({ type: 'assign', params: { var: V.zCross, value: V.zEnd, note: 'clamp: not past the far end' } });
+        s.push({ type: 'label', params: { n: L + 5 } });
+        if (endR > targetR) {
+            // FAT FAR END: the thin material is near the face, so cut from the face TO the crossing.
+            s.push({ type: 'move', params: { mode: 'rapid', x: V.xCut } });
+            s.push({ type: 'move', params: { mode: 'cut', z: V.zCross, feed: V.feed } });
+        } else {
+            // FAT FACE: the thin material is deep, so come in AT the crossing — where the cone is exactly this
+            // radius, so the approach touches the surface rather than cutting into it — and run to the far end.
+            s.push({ type: 'move', params: { mode: 'rapid', z: V.zCross } });
+            s.push({ type: 'move', params: { mode: 'rapid', x: V.xCut } });
+            s.push({ type: 'move', params: { mode: 'cut', z: V.zEnd, feed: V.feed } });
+        }
+    }
     // THE TURNING RETRACT, in this order and not the other: OFF the part in +X first, THEN back out in +Z. Pulling
     // back in Z while still at depth drags the tool along the surface it just cut.
     s.push({ type: 'move', params: { mode: 'rapid', x: V.xClear } });
@@ -227,8 +280,18 @@ export function odTurnStack(p = {}) {
     // the target, so there is no taper branch here — the geometry falls out of the numbers.
     s.push({ type: 'label', params: { n: L + 3 } });
     s.push({ type: 'comment', params: { text: taper ? 'finish pass — X interpolates across the taper' : 'finish pass — the final size' } });
-    s.push({ type: 'move', params: { mode: 'rapid', x: V.xTarget } });
-    s.push({ type: 'move', params: { mode: 'cut', x: V.xEnd, z: V.zEnd, feed: V.feedFinish } });
+    if (!taper) {
+        s.push({ type: 'move', params: { mode: 'rapid', x: V.xTarget } });
+        s.push({ type: 'move', params: { mode: 'cut', x: V.xEnd, z: V.zEnd, feed: V.feedFinish } });
+    } else {
+        // t1291 — THE TAPER'S FINISH PASS STARTS ON THE CONE, NOT BESIDE IT. It began at the target radius while the
+        // tool was still at the SAFE Z, so the interpolated line ran from (rFace, +zSafe) to (rFar, −depth) — a cone
+        // shifted by the approach. Measured: the finished face came out at r 4.46 where the drawing says 4. The start
+        // radius is the cone EXTRAPOLATED BACK to the approach height, so the line passes through the face exactly.
+        s.push({ type: 'assign', params: { var: V.xStartFin, value: `[${V.xTarget}-[[${V.xEnd}-${V.xTarget}]*${V.zSafe}/${V.depth}]]`, note: 'the cone, extrapolated to the approach' } });
+        s.push({ type: 'move', params: { mode: 'rapid', x: V.xStartFin } });
+        s.push({ type: 'move', params: { mode: 'cut', x: V.xEnd, z: V.zEnd, feed: V.feedFinish } });
+    }
     s.push({ type: 'move', params: { mode: 'rapid', x: V.xClear } });
     s.push({ type: 'move', params: { mode: 'rapid', z: V.zSafe } });
     s.push({ type: 'progend', params: {} });

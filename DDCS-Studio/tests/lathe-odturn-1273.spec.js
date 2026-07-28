@@ -150,16 +150,29 @@ test('A TAPER is one interpolated finishing pass — not a second code path', as
             nc,
             last: segs[segs.length - 1],
             taperMoves: O.odTurnStack(p).filter((b) => b.type === 'move').length,
+            taperVars: O.odTurnStack(p).filter((b) => b.type === 'assign').length,
+            straightVars: O.odTurnStack(C).filter((b) => b.type === 'assign').length,
             straightMoves: straight,
         };
     }, CASE);
     const r3 = (n) => Math.round(n * 1000) / 1000;
-    // the finishing pass moves in X *and* Z: 7 at the face → 9 at 25 deep. That IS the taper.
-    expect(r3(r.last.x1), 'the finish pass starts at the face radius').toBe(7);
+    // the finishing pass moves in X *and* Z: through 7 AT THE FACE, out to 9 at 25 deep. That IS the taper.
+    // t1291 — it now begins AHEAD of the face, on the cone extrapolated back to the approach height, so that the
+    // line passes through the face at exactly the target radius. Asserting its start POINT (as this once did) tested
+    // the approach rather than the part: the cone it cut used to land 0.46 fat at the face because the line started
+    // beside the cone instead of on it.
+    const t = (0 - r.last.z1) / (r.last.z2 - r.last.z1);          // where along the move the FACE plane falls
+    const atFace = r.last.x1 + (r.last.x2 - r.last.x1) * t;
+    expect(r3(atFace), 'the finish pass passes through the target radius AT the face').toBeCloseTo(7, 2);
     expect(r3(r.last.x2), 'and ends at the far-end radius — X interpolated across the travel').toBe(9);
     expect(r3(r.last.z2), 'over the declared depth').toBe(-25);
-    // SAME MACRO SHAPE: a taper is different NUMBERS, not a different program
-    expect(r.taperMoves, 'a taper adds no moves — the geometry falls out of the far-end radius').toBe(r.straightMoves);
+    // …and it really does start ahead of the face, which is what makes the line land on the cone
+    expect(r.last.z1, 'the approach is ahead of the face, in air').toBeGreaterThan(0);
+    // A TAPER IS DIFFERENT NUMBERS, and t1291 adds the cone-following roughing it needs in order not to gouge the
+    // part. The MOVE count is unchanged — one cut per pass either way; what the taper adds is the ARITHMETIC that
+    // says how far that cut may run. (The straight arm is byte-identical, asserted separately.)
+    expect(r.taperMoves, 'the same moves — a taper does not add passes').toBe(r.straightMoves);
+    expect(r.taperVars, 'what it adds is the crossing it has to work out').toBeGreaterThan(r.straightVars);
 });
 
 test('THE TWIN registers in the Lathe group, IDENTITY-FIRST, with bindings derived BY IDENTITY', async ({ page }) => {
@@ -397,4 +410,85 @@ test('THE .wiz GATE RULED — a known op gets THIS APP’s behaviour back; a str
     expect(r.alienReattached, 'a foreign opType has no local behaviour to restore').toEqual([]);
     expect(r.alienNote, 'so the import names the loss').toMatch(/postInstantiate/);
     expect(r.alienNote, 'and says the op runs on its data alone').toMatch(/data alone/i);
+});
+
+// ── t1291 — THE TAPER'S ROUGHING FOLLOWS THE CONE ───────────────────────────────────────────────────────────────
+
+/**
+ * Every roughing pass used to run the FULL length at radii counted from the face floor. On a cone that removes the
+ * cone: for a fat far end (Ø8 at the face, Ø16 deep) the whole length came out flat at the floor radius and the
+ * finish pass then cut air — a gouged part on a real machine, not a sim artefact. And the inverted cone was
+ * under-roughed the same way, leaving 4.5mm RADIAL for one finishing pass.
+ *
+ * The crossing where the finished surface reaches a given radius is a pure ratio, so the controller computes it with
+ * no trig; which SIDE of it to cut is decided by which end is fat.
+ */
+const carveTaper = (page, p) => page.evaluate(async (params) => {
+    const O = await import('/wizards/lathe/odTurn.js');
+    const L = await import('/data/latheProfile.js');
+    const S = await import('/viz/latheScene.js');
+    const { emitProgram } = await import('/blocks/blockEmitter.js');
+    const { traceToolpath } = await import('/engine/trace.js');
+    const nc = String(emitProgram(O.odTurnStack(params)));
+    const prof = L.profileFromBar(S.latheBarFrom(params, {}));
+    for (const s of (traceToolpath(nc).segments || []).filter((x) => !x.rapid && !x.probe)) L.carveSegment(prof, s, 0);
+    const at = (z) => +prof.rOut[Math.round((z - prof.z0) / prof.step)].toFixed(2);
+    return { r: [at(-0.3), at(-12.5), at(-24.7)], nc };
+}, p);
+
+test('A FAT FAR END is roughed to the cone, not through it', async ({ page }) => {
+    await boot(page);
+    const r = await carveTaper(page, { kind: 'taper', barDiameter: 20, targetDiameter: 8, endDiameter: 16, depth: 25, doc: 1, finish: 0.5 });
+    // the cone runs r 4 → 8 over 25mm; these three points are where a full-length roughing pass showed 4.5 flat
+    expect(r.r[0], 'just inside the face the finished radius is the target').toBeCloseTo(4, 1);
+    expect(r.r[1], 'halfway along it is halfway between the two').toBeCloseTo(6, 1);
+    expect(r.r[2], 'and at the far end it is the far-end radius').toBeCloseTo(8, 1);
+});
+
+test('A FAT FACE is the same rule mirrored — the cut comes in at the crossing and runs deep', async ({ page }) => {
+    await boot(page);
+    const r = await carveTaper(page, { kind: 'taper', barDiameter: 20, targetDiameter: 16, endDiameter: 8, depth: 25, doc: 1, finish: 0.5 });
+    expect(r.r[0], 'the face keeps its own (larger) radius').toBeCloseTo(8, 1);
+    expect(r.r[1], 'the middle is the middle either way').toBeCloseTo(6, 1);
+    expect(r.r[2], 'and the far end is the thin one').toBeCloseTo(4, 1);
+});
+
+test('A STRAIGHT TURN IS UNTOUCHED — the taper is numbers, not a second program', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const O = await import('/wizards/lathe/odTurn.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const nc = String(emitProgram(O.odTurnStack({ barDiameter: 20, targetDiameter: 14, depth: 25, doc: 1, finish: 0.5 })));
+        return { nc, V: O.OD_VARS,
+                 lines: nc.split(String.fromCharCode(10)).filter((l) => l.trim()).length,
+                 cuts: (nc.match(/^G1 /gm) || []).length };
+    });
+    // none of the taper machinery appears in a straight program: no crossing, no extrapolated start, no extra labels
+    expect(r.nc.includes(r.V.zCross), 'no crossing variable').toBe(false);
+    expect(r.nc.includes(r.V.xStartFin), 'no extrapolated finish start').toBe(false);
+    expect(r.nc, 'and no extra jump targets').not.toMatch(/N6[45]\b/);
+    // …and the shape the earlier turns pinned is exactly as it was: one cut per roughing pass plus the finish
+    expect(r.cuts, 'the same cutting moves as before').toBe(2);
+});
+
+test('FACING WITH NO DEPTH PER PASS TAKES ONE SKIM — the comment and the emit finally agree', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const F = await import('/wizards/lathe/facing.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const { traceToolpath } = await import('/engine/trace.js');
+        const run = (doc) => {
+            const nc = String(emitProgram(F.facingStack({ barDiameter: 20, allowance: 3, doc })));
+            const cuts = (traceToolpath(nc).segments || []).filter((s) => !s.rapid && !s.probe);
+            return { n: cuts.length, zs: [...new Set(cuts.map((c) => Math.round(c.z2 * 100) / 100))], nc };
+        };
+        return { zero: run(0), one: run(1), passes: F.facingPasses({ allowance: 3, doc: 0 }) };
+    });
+    // it USED TO EMIT NOTHING: a program with 3mm of material and a zero step silently cut air
+    expect(r.zero.n, 'one skim, not silence').toBe(1);
+    expect(r.zero.zs, 'and it lands on the face, which is what the macro says it does').toEqual([0]);
+    expect(r.zero.nc, 'the emitted comment says the same thing the emit now does').toMatch(/one skim at the face/i);
+    expect(r.passes, 'and the pass list agrees with both').toEqual([0]);
+    // …the ordinary case is untouched
+    expect(r.one.zs, 'a real depth of cut still steps down to the face').toEqual([2, 1, 0]);
 });
