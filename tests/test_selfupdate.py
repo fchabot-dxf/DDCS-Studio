@@ -187,6 +187,80 @@ def test_the_page_cannot_choose_what_gets_installed():
     assert "latest_release(" in src, "the release is resolved from the hard-coded repo instead"
 
 
+
+def test_the_resolver_picks_the_versioned_exe_and_ignores_unrelated_assets():
+    """t1263 — assets are version-named now, so the updater matches a PATTERN. It must not grab just any .exe."""
+    assets = {
+        "DDCS-Studio-v2026.07.27.1.exe": "http://x/app",
+        "DDCS-Studio-v2026.07.27.1.exe.sha256": "http://x/app.sha",
+        "SourceCode.zip": "http://x/src",
+        "benchgateway.exe": "http://x/other-tool",          # an .exe that is NOT the app
+        "release-notes.txt": "http://x/notes",
+    }
+    got = su.pick_assets(assets)
+    assert got["exe_name"] == "DDCS-Studio-v2026.07.27.1.exe", got
+    assert got["exe_url"] == "http://x/app"
+    assert got["sha_url"] == "http://x/app.sha", "paired to ITS checksum, by exact name"
+
+
+def test_the_resolver_pairs_a_checksum_to_its_own_binary_only():
+    """A stray .sha256 must never be attached to a different exe — that would verify the wrong thing."""
+    assets = {
+        "DDCS-Studio-v1.exe": "http://x/v1",
+        "DDCS-Studio-v2.exe": "http://x/v2",
+        "DDCS-Studio-v2.exe.sha256": "http://x/v2.sha",
+    }
+    got = su.pick_assets(assets)
+    assert got["exe_name"] == "DDCS-Studio-v2.exe", "the one that HAS a checksum wins"
+    assert got["sha_url"] == "http://x/v2.sha"
+
+
+def test_an_exe_with_no_checksum_is_reported_as_unverifiable_not_as_missing():
+    got = su.pick_assets({"DDCS-Studio-v9.exe": "http://x/v9"})
+    assert got["exe_url"] == "http://x/v9", "the download EXISTS…"
+    assert got["sha_url"] == "", "…but cannot be verified, which is a different refusal"
+
+
+def test_a_release_with_no_app_asset_at_all():
+    got = su.pick_assets({"notes.txt": "http://x/n", "other.exe": "http://x/o"})
+    assert got["exe_url"] == "" and got["sha_url"] == ""
+
+
+def test_the_versioned_checksum_line_still_parses():
+    """CI writes `<hex>  DDCS-Studio-<tag>.exe` now — the name changed, the hex is what we read."""
+    digest = "a" * 64
+    assert su.parse_sha256(f"{digest}  DDCS-Studio-v2026.07.27.1.exe" + chr(10)) == digest
+    assert su.parse_sha256(f"{digest} *DDCS-Studio-v2026.07.27.1.exe" + chr(13) + chr(10)) == digest, "the binary-mode marker too"
+
+
+def test_the_swap_keeps_the_users_filename_even_though_the_asset_is_versioned():
+    """t1263 — shortcuts and pins point at the user's path; an update must not rename their file."""
+    d, target = _tmp()
+    try:
+        renamed = os.path.join(d, "MyShopApp.exe")       # the user renamed it; the asset is DDCS-Studio-v….exe
+        os.rename(target, renamed)
+        good = b"NEW-APP-BYTES"
+        digest = hashlib.sha256(good).hexdigest()
+
+        def fetch(url, timeout=30):
+            if url == su.API_LATEST:
+                return json.dumps({"tag_name": "v9.9.9", "assets": [
+                    {"name": "DDCS-Studio-v9.9.9.exe", "browser_download_url": "http://x/exe"},
+                    {"name": "DDCS-Studio-v9.9.9.exe.sha256", "browser_download_url": "http://x/sha"},
+                ]}).encode()
+            return good if url.endswith("/exe") else (f"{digest}  DDCS-Studio-v9.9.9.exe" + chr(10)).encode()
+
+        su.is_frozen = lambda: True
+        su.exe_path = lambda: renamed
+        r = su.perform_update(fetch=fetch, relaunch=False)
+
+        assert r["ok"] is True, r
+        assert open(renamed, "rb").read() == good, "the new build is at the USER'S path and name"
+        assert not os.path.exists(os.path.join(d, "DDCS-Studio-v9.9.9.exe")), "no versioned duplicate appears"
+        assert os.path.isfile(renamed + su.OLD_SUFFIX), "their previous build is beside it"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

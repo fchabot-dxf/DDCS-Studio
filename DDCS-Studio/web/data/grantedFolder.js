@@ -38,14 +38,45 @@ export function makeGrantedFolder({ key, pickerId, what }) {
     const get = async () => _dir || getHandle(key);
 
     /**
-     * The folder, ready to use. Call inside a user gesture: a remembered handle whose permission lapsed is re-requested
-     * (one click, no OS dialog), and only a folder we have never been given opens the picker.
-     * @returns {Promise<FileSystemDirectoryHandle|null>} null = declined, or this environment cannot
+     * WHAT STATE IS THIS FOLDER IN — asked with a QUERY, never a request (t1263, user-proven).
+     *
+     * Chromium auto-denies a permission REQUEST made outside a user gesture. Boot-time code was calling one, getting
+     * "denied", and concluding the folder was gone — so a folder the user had granted looked unchosen after every
+     * restart, and they were sent back through the OS picker. A query is safe anywhere and answers the only question
+     * a non-gesture caller should be asking.
+     * @returns {Promise<'none'|'remembered'|'ready'>}
+     *   none       — nothing has ever been granted
+     *   remembered — we HAVE the handle; the runtime wants one click to re-allow it (NOT a reason to forget it)
+     *   ready      — usable right now
      */
-    const ensure = async ({ ask = true, repick = false } = {}) => {
+    const state = async () => {
+        const known = _dir || await getHandle(key);
+        if (!known) return 'none';
+        _dir = known;
+        return (await handleGranted(known)) ? 'ready' : 'remembered';
+    };
+
+    /**
+     * The folder, ready to use. CALL THIS INSIDE A USER GESTURE.
+     *
+     * A remembered handle is re-requested — that is the one-click "Allow" on a folder the user already chose, with NO
+     * OS picker — and the picker opens ONLY when there is nothing remembered at all. The distinction matters: a
+     * picker asks "which folder?", which is the wrong question when the app already knows and merely needs permission
+     * again. An explicit denial is the only thing that can forget a folder, and the caller is told so it can say why.
+     * @returns {Promise<FileSystemDirectoryHandle|null>} null = declined / unavailable
+     */
+    const ensure = async ({ ask = true, repick = false, forgetOnDeny = false } = {}) => {
         if (!repick) {
             const known = _dir || await getHandle(key);
-            if (known && await requestHandle(known)) { _dir = known; return known; }
+            if (known) {
+                if (await handleGranted(known)) { _dir = known; return known; }
+                if (await requestHandle(known)) { _dir = known; return known; }   // one click, the SAME folder
+                // An in-gesture DENIAL: the user said no to a folder they had chosen. Keep it unless the caller has
+                // decided otherwise — a denial today is not "this folder no longer exists", and re-picking it from
+                // the OS dialog is a worse answer than offering Allow again next time.
+                if (forgetOnDeny) await forget();
+                return null;
+            }
         }
         if (!ask || !hasFSA()) return null;
         try {
@@ -107,5 +138,5 @@ export function makeGrantedFolder({ key, pickerId, what }) {
         return out.sort((a, b) => a.name.localeCompare(b.name));
     };
 
-    return { key, pickerId, what, get, ensure, forget, ready, writeFiles, list };
+    return { key, pickerId, what, get, state, ensure, forget, ready, writeFiles, list };
 }

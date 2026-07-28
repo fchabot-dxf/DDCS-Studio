@@ -16,7 +16,7 @@
  */
 import { buildBackup, markWorkspaceSavedToFile, exportEverything, fileSavedName, fileSavedPlace } from '../data/backup.js';
 import { setMachineName } from '../data/workspaceMachine.js';   // t1223 — saving names the workspace
-import { getHandle, putHandle, requestHandle, FILE_KEY, FOLDER_KEY } from '../data/fsHandles.js';
+import { getHandle, putHandle, requestHandle, handleGranted, FILE_KEY, FOLDER_KEY } from '../data/fsHandles.js';
 import { dlgConfirm } from './dialog.js';
 
 const canPickFile = () => typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
@@ -44,9 +44,9 @@ async function writeToHandle(h, text) { const w = await h.createWritable(); awai
  * THE FIRST-SAVE / SAVE-AS FLOW — name + folder in ONE dialog.
  * Resolves { name, dir } (dir may be null when this browser cannot grant folders), or null if the user backs out.
  */
-function askNameAndFolder(suggested, folder, place = 'local') {
+function askNameAndFolder(suggested, folder, place = 'local', { needsAllow = false } = {}) {
     return new Promise((resolve) => {
-        let dir = folder, folderRefused = false;
+        let dir = folder, folderRefused = false, allow = needsAllow;
         // t1233 — a CLOUD save has no folder half: Drive's app folder is the one place, so the ask is just the name.
         const wantFolder = () => place !== 'cloud' && !dir && canPickFolder() && !folderRefused;
         const ov = document.createElement('div');
@@ -66,11 +66,15 @@ function askNameAndFolder(suggested, folder, place = 'local') {
                 ? '<span class="wss-dim">It will be saved to your Google Drive, in the DDCS Studio folder.</span>'
                 : dir
                 ? `<span class="wss-dim">Folder</span> <b>📁 ${esc(dir.name || 'workspaces')}</b>`
+                  // t1263 — a REMEMBERED folder whose permission lapsed is not a missing folder. Say which it is, so
+                  // the button below reads as "allow the folder you already chose" rather than "pick one again".
+                  + (allow ? ' <span class="wss-dim">— this app needs your OK to use it again</span>' : '')
                   + (canPickFolder() ? ' <button type="button" class="wss-link" data-wss="folder">Change…</button>' : '')
                 : (wantFolder()
                     ? '<span class="wss-dim">It will go in your workspaces folder — you pick that once, now.</span>'
                     : '<span class="wss-dim">No workspaces folder — this save will ask you where to put the file.</span>');
-            ov.querySelector('[data-wss="save"]').textContent = wantFolder() ? 'Choose folder and save' : '💾 Save';
+            ov.querySelector('[data-wss="save"]').textContent = wantFolder() ? 'Choose folder and save'
+                : (allow ? 'Allow the folder and save' : '💾 Save');
         };
         const done = (v) => { ov.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
         const onKey = (e) => {
@@ -81,6 +85,12 @@ function askNameAndFolder(suggested, folder, place = 'local') {
             const name = stemOf(ov.querySelector('#wssName').value);
             if (!name) { ov.querySelector('#wssName').focus(); return; }
             if (place === 'cloud') { done({ name, dir: null, place: 'cloud' }); return; }
+            // t1263 — THE RE-ALLOW, inside the click that is a real user gesture. Same handle, no OS picker: the user
+            // is confirming the folder they already chose. Only a denial here drops through to picking a new one.
+            if (dir && allow) {
+                if (await requestHandle(dir)) { allow = false; }
+                else { dir = null; allow = false; folderRefused = false; paint(); return; }
+            }
             if (wantFolder()) {
                 // A REFUSED folder must never dead-end. Backing out of the OS folder dialog (or an environment that
                 // refuses it outright — headless Chromium aborts it instantly, and so do some embedded webviews) used
@@ -142,10 +152,14 @@ export async function saveWorkspace({ pickNew = false, suggestedName = '', to = 
     }
 
     const suggested = stemOf(suggestedName) || stemOf(handle && handle.name) || stemOf(fileSavedName()) || 'workspace';
-    let folder = await getHandle(FOLDER_KEY);
-    if (folder && !(await requestHandle(folder))) folder = null;
+    // t1263 (user-proven) — DO NOT REQUEST PERMISSION HERE. This runs before the dialog opens, outside any user
+    // gesture, and Chromium auto-denies an out-of-gesture request — so this line used to throw away a folder the user
+    // had granted, on every launch, and send them back to the OS picker. Read the state with a QUERY and carry the
+    // handle into the ask; the Save CLICK is a real gesture and re-requests it there (one Allow, no picker).
+    const folder = await getHandle(FOLDER_KEY);
+    const folderReady = folder ? await handleGranted(folder) : false;
 
-    const picked = await askNameAndFolder(suggested, folder);
+    const picked = await askNameAndFolder(suggested, folder, 'local', { needsAllow: !!folder && !folderReady });
     if (!picked) return { ok: false, aborted: true };
     const fileName = picked.name + '.ddcs';
 

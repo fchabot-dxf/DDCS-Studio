@@ -93,23 +93,51 @@ def _get(url: str, timeout: int = 30) -> bytes:
         return r.read()
 
 
+def pick_assets(assets: dict) -> dict:
+    """
+    Choose the exe and its checksum from a release's assets, BY PATTERN (t1263).
+
+    Release assets are version-named — `DDCS-Studio-v2026.07.27.1.exe` — so that a Downloads folder full of them
+    still tells you which is which. That means the updater cannot look for a fixed filename, and it must not simply
+    take "the first .exe" either: a release can carry other files, and picking the wrong one would download something
+    that is not the app. It matches the DDCS-Studio-*.exe family, prefers the one whose .sha256 it can also find, and
+    pairs them by exact name so a stray checksum cannot be attached to the wrong binary.
+    @param assets {name: url}
+    """
+    exes = sorted(n for n in assets if n.lower().startswith("ddcs-studio") and n.lower().endswith(".exe"))
+    for name in exes:
+        sha = name + ".sha256"
+        if sha in assets:
+            return {"exe_url": assets[name], "sha_url": assets[sha], "exe_name": name}
+    # an exe with no matching checksum: report it so the caller can refuse for the RIGHT reason (unverifiable),
+    # rather than reporting "no download" and sending someone hunting for a missing asset
+    return {"exe_url": assets[exes[0]] if exes else "", "sha_url": "", "exe_name": exes[0] if exes else ""}
+
+
 def latest_release(fetch=None) -> dict:
     """
     Resolve the latest release from the REPO ITSELF (never a URL handed in from the page).
-    @returns {tag, exe_url, sha_url} — exe_url/sha_url are '' when the release does not carry them.
+
+    /releases/latest returns the newest NON-prerelease, so the rolling `latest` build of main — published as a
+    pre-release — is invisible here by construction. The updater cannot be walked backwards onto a main build.
+    @returns {tag, exe_url, sha_url, exe_name} — urls are '' when the release does not carry them.
     """
     fetch = fetch or _get
     data = json.loads(fetch(API_LATEST).decode("utf-8", "replace"))
     assets = {a.get("name", ""): a.get("browser_download_url", "") for a in (data.get("assets") or [])}
-    exe = next((u for n, u in assets.items() if n.lower().endswith(".exe")), "")
-    sha = next((u for n, u in assets.items() if n.lower().endswith(".exe.sha256")), "")
-    return {"tag": data.get("tag_name", ""), "exe_url": exe, "sha_url": sha}
+    picked = pick_assets(assets)
+    return {"tag": data.get("tag_name", ""), **picked}
 
 
 # ── the swap ────────────────────────────────────────────────────────────────────────────────────────────────────
 def swap_in(new_file: str, target: str) -> dict:
     """
     Put `new_file` at `target`, where `target` may be a RUNNING executable.
+
+    THE UPDATE KEEPS THE USER'S FILENAME (t1263). Release assets are version-named, but the installed app is whatever
+    the user called it and wherever they put it — shortcuts, taskbar pins and scripts all point at THAT path. Renaming
+    it to match the release would break every one of them and leave a stale duplicate behind. The version chip inside
+    the app is the truth about which build this is; the filename is the user's business.
 
     Assumes the caller has already verified `new_file` — this function does the dangerous part and nothing else, so
     the verify-before-touch order is visible at the call site instead of buried here.

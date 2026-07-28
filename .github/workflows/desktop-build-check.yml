@@ -66,8 +66,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # t1263 — the rolling build gets a self-describing name too, and one that can never be mistaken for a
+          # stable download. The SELF-UPDATER never sees this release: GitHub's /releases/latest returns the newest
+          # NON-prerelease, so the updater cannot be walked backwards onto a main build. No checksum here on purpose —
+          # the updater would refuse an unverifiable release anyway, and this one is a human-choice download.
+          $asset = "DDCS-Studio-latest-main.exe"
+          Copy-Item ./DDCS-Studio.exe $asset
           gh release delete latest --yes --cleanup-tag   # drop the previous rolling build (no-op on first run)
-          gh release create latest ./DDCS-Studio.exe `
+          gh release create latest $asset `
             --prerelease `
             --target ${{ github.sha }} `
             --title "Latest build (main)" `

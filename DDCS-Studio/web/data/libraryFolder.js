@@ -57,6 +57,7 @@ export const ensureLibraryFolder = folder.ensure;
 
 /** Forget the folder (the user re-picks next time). */
 export const forgetLibraryFolder = folder.forget;
+export const libraryFolderState = folder.state;   // t1263 — 'none' | 'remembered' | 'ready', query-only
 
 const extOf = (name) => { const m = String(name || '').match(/\.[a-z0-9]+$/i); return m ? m[0].toLowerCase() : ''; };
 const stemOf = (name) => String(name || '').replace(/\.[a-z0-9]+$/i, '');

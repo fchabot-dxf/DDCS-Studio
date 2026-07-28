@@ -23,18 +23,29 @@ function idb() {
     });
 }
 
+/**
+ * THE SESSION MIRROR (t1263). Persisting a handle is BEST-EFFORT: a private window, a locked-down webview or a quota
+ * refusal can all reject the IndexedDB write, and without this the app would lose a folder the user just granted the
+ * instant they granted it — the grant would appear to do nothing. What is remembered for THIS session is remembered
+ * whether or not it survives a restart, and the two answers are kept in the same place so no caller has to know.
+ */
+const _mem = new Map();
+
 export async function getHandle(key) {
     try {
         const db = await idb();
-        return await new Promise((res) => {
+        const stored = await new Promise((res) => {
             const g = db.transaction(STORE).objectStore(STORE).get(key);
             g.onsuccess = () => res(g.result || null); g.onerror = () => res(null);
         });
-    } catch (_) { return null; }
+        if (stored) return stored;
+    } catch (_) { /* fall through to the session mirror */ }
+    return _mem.has(key) ? _mem.get(key) : null;
 }
 
 /** Remember a handle under `key`; a null/undefined handle FORGETS it (used when an opened file has no handle). */
 export async function putHandle(key, h) {
+    if (h) _mem.set(key, h); else _mem.delete(key);   // this session is certain; the write below is the durable half
     try {
         const db = await idb();
         const os = db.transaction(STORE, 'readwrite').objectStore(STORE);

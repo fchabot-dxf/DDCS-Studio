@@ -68,9 +68,15 @@ jobs:
         if: steps.gate.outputs.build == 'true'
         shell: pwsh
         run: |
-          $h = (Get-FileHash ./DDCS-Studio.exe -Algorithm SHA256).Hash.ToLower()
-          "$h  DDCS-Studio.exe" | Out-File -Encoding ascii ./DDCS-Studio.exe.sha256
-          Write-Host "sha256 $h"
+          # t1263 (user) — VERSION-NAMED ASSETS: four DDCS-Studio.exe files in a Downloads folder are
+          # indistinguishable; DDCS-Studio-v2026.07.27.1.exe says what it is. The checksum line carries the same
+          # versioned name (the verifier reads the hex, not the name, but the file should still read correctly to a
+          # human running `sha256sum -c`).
+          $asset = "DDCS-Studio-${{ steps.ver.outputs.tag }}.exe"
+          Copy-Item ./DDCS-Studio.exe $asset
+          $h = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLower()
+          "$h  $asset" | Out-File -Encoding ascii "$asset.sha256"
+          Write-Host "sha256 $h  $asset"
 
       - name: Publish release (notifies running exes via the update-check)
         if: steps.gate.outputs.build == 'true'
@@ -78,6 +84,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.ver.outputs.tag }}" ./DDCS-Studio.exe ./DDCS-Studio.exe.sha256 `
+          $asset = "DDCS-Studio-${{ steps.ver.outputs.tag }}.exe"
+          gh release create "${{ steps.ver.outputs.tag }}" $asset "$asset.sha256" `
             --title "DDCS Studio ${{ steps.ver.outputs.tag }} (desktop)" `
             --generate-notes

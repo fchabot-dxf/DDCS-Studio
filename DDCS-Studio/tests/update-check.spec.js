@@ -31,7 +31,7 @@ test('update banner: silent on web, version compare correct, shows in (simulated
     const real = window.fetch;
     window.fetch = async (url, opts) => {
       const s = String(url);
-      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'DDCS-Studio.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
+      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'release-notes.txt', browser_download_url: 'https://example/notes.txt' }, { name: 'benchgateway.exe', browser_download_url: 'https://example/other.exe' }, { name: 'DDCS-Studio-v9999.0.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
       if (s.includes('/commits')) return { ok: true, json: async () => ([{ commit: { message: 'feat: shiny new thing\n\nbody' } }, { commit: { message: 'fix: a bug' } }]) };
       return real(url, opts);
     };
@@ -68,7 +68,7 @@ test('Download button triggers exactly ONE download: window.open once + anchor d
     const real = window.fetch;
     window.fetch = async (url, opts) => {
       const s = String(url);
-      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'DDCS-Studio.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
+      if (s.includes('/releases/latest')) return { ok: true, json: async () => ({ tag_name: 'v9999.0', html_url: 'https://example/rel', assets: [{ name: 'release-notes.txt', browser_download_url: 'https://example/notes.txt' }, { name: 'benchgateway.exe', browser_download_url: 'https://example/other.exe' }, { name: 'DDCS-Studio-v9999.0.exe', browser_download_url: 'https://example/DDCS-Studio.exe' }], body: 'notes' }) };
       if (s.includes('/commits')) return { ok: true, json: async () => ([]) };
       return real(url, opts);
     };

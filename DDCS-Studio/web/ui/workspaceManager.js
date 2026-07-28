@@ -21,7 +21,7 @@
  */
 import { restoreBackup, previewBackup, markWorkspaceSavedToFile, forgetWorkspaceFile, workspaceDelta, isWorkspaceDirtyToFile, fileSavedName, fileSavedAt } from '../data/backup.js';
 import { saveWorkspace, adoptSaveHandle } from './workspaceSave.js';
-import { getHandle, putHandle, handleGranted, FOLDER_KEY } from '../data/fsHandles.js';
+import { getHandle, putHandle, handleGranted, requestHandle, FOLDER_KEY } from '../data/fsHandles.js';
 import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';   // t1231 — the envelope AS DECLARED (signs included)
 import { dlgNotice, dlgConfirm } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
@@ -319,6 +319,14 @@ export async function openWorkspaceManager(focus = 'save', opts = {}) {
     });
 
     ov.querySelector('#wsmCards').addEventListener('click', async (e) => {
+        // t1263 — the RE-ALLOW. A click is a user gesture, so the runtime will actually ask; the handle is the one
+        // already remembered, so there is no OS picker and no chance of picking a different folder by mistake.
+        if (e.target.closest('#wsmAllowFolder')) {
+            const known = await getHandle(FOLDER_KEY);
+            if (known && await requestHandle(known)) { ov.__needsAllow = false; await renderPlace(ov); }
+            else dlgNotice('Without access to that folder your workspaces cannot be listed. You can allow it next time, or choose a different folder.');
+            return;
+        }
         const signin = e.target.closest('#wsmCloudSignIn');
         if (signin) { await cloudSignIn(ov); return; }
         if (e.target.closest('#wsmCloudOut')) { disconnect(); await renderPlace(ov); return; }   // t1243 — the badge's disconnect, transferred
@@ -437,10 +445,14 @@ async function renderPlace(ov) {
     head.hidden = false;
     const dir = await getHandle(FOLDER_KEY);
     if (stale()) return;
-    const granted = dir && await handleGranted(dir);
+    const granted = dir && await handleGranted(dir);   // QUERY only — this runs on open, outside any click (t1263)
     if (stale()) return;
-    if (granted) await renderFolder(ov, dir, stale);
-    else renderCards(ov, null, []);
+    if (granted) { await renderFolder(ov, dir, stale); return; }
+    // t1263 (user-proven) — TWO DIFFERENT STATES, and conflating them is what made a granted folder look unchosen
+    // after every restart. `dir` here means the user HAS chosen a folder and the runtime wants one click to re-allow
+    // it; that is not the same as never having chosen one, and it must not send them back through the OS picker.
+    ov.__needsAllow = !!dir;
+    renderCards(ov, null, []);
 }
 
 /**
@@ -545,7 +557,13 @@ function renderCards(ov, dir, cards, place = 'local') {
     ov.__cards = cards;
     ov.__dir = dir;   // the granted folder handle — delete needs it to removeEntry (null in the cloud: Drive is by id)
     const host = ov.querySelector('#wsmCards');
-    if (place === 'local' && !dir) { host.innerHTML = '<div class="wsm-empty">Choose a folder to keep your workspaces in — then opening one is a click, not a file dialog.</div>'; return; }
+    if (place === 'local' && !dir) {
+        host.innerHTML = ov.__needsAllow
+            ? '<div class="wsm-empty">Your workspaces folder is remembered — this app just needs your OK to read it again.'
+              + '<div style="margin-top:10px"><button type="button" class="toolbar-btn settings-io" id="wsmAllowFolder">📁 Allow the folder</button></div></div>'
+            : '<div class="wsm-empty">Choose a folder to keep your workspaces in — then opening one is a click, not a file dialog.</div>';
+        return;
+    }
     if (!cards.length) {
         host.innerHTML = place === 'cloud'
             ? '<div class="wsm-empty">No workspaces in your Drive yet. Save one while this tab is open and it will show up here.</div>'

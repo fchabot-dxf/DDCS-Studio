@@ -31,6 +31,7 @@ export const ensureDeployFolder = folder.ensure;
 export const forgetDeployFolder = folder.forget;
 export const deployReady = folder.ready;
 export const listDeployFolder = folder.list;
+export const deployFolderState = folder.state;   // t1263 — query-only state, safe outside a user gesture
 export const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
 
 /**

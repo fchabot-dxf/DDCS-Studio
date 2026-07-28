@@ -178,7 +178,9 @@ export async function initUpdateCheck() {
   try { if (localStorage.getItem('ddcs_update_dismissed') === tag) return; } catch (_) { /* */ }   // already dismissed this version
 
   let dl = rel.html_url;                                // prefer the .exe asset, else the release page
-  const exe = (rel.assets || []).find((a) => /\.exe$/i.test(a.name));
+  // t1263 — assets are VERSION-NAMED (DDCS-Studio-v2026.07.27.1.exe), so match the family rather than a fixed name —
+  // and rather than "any .exe", which would happily hand someone a different tool that happened to ride along.
+  const exe = (rel.assets || []).find((a) => /^ddcs-studio.*\.exe$/i.test(a.name || ''));
   if (exe) dl = exe.browser_download_url;
 
   let commits = [];                                     // "what's new" = recent commit subjects ("last commit comments")
