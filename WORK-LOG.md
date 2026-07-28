@@ -18145,3 +18145,33 @@ door (quick menu → Help), same as always. I had not built AMEND-2 yet, so noth
 retraction ADDS is that the absence is now DECLARED rather than incidental. The walk-all-links spec asserts each link
 leaves NO return token, NO return-glow and NO Back chip, so a future link that starts leaving breadcrumbs fails a test
 instead of quietly growing a second way back.
+
+---
+
+## turn 1253 -- WHAT IS IN THE FILE. The list is DERIVED, so the anti-stale test has almost nothing left to catch.
+
+The ask was for the .ddcs contents list plus a spec asserting it corresponds 1:1 to BACKUP_STORES. I took the
+stronger reading of the same intent: rather than transcribe the ten labels into prose and then police the copy, the
+sentence RENDERS from the registry — `ddcsContents()` maps BACKUP_STORES to its labels. A second copy of a list is
+the thing that goes stale; with no second copy there is nothing to drift. Add a store and the answer names it with no
+edit here at all.
+
+The 1:1 spec still earns its place, because the derivation could be broken (someone "tidies" the sentence back into
+literal text, or filters the list). It asserts BOTH directions: every registry label appears, AND the rendered list
+is exactly the registry's rows in registry order — so the FAQ can neither miss a store nor invent one. I proved it
+BITES rather than trusting the green: temporarily dropped one row from the derived list, watched the test fail,
+restored it.
+
+TWO ENTRIES, in the workspace chapter where the question arises:
+  - "What exactly is inside a .ddcs file?" -- the derived list, plus the fact that tokens and cloud credentials are
+    never in it (which is what makes copying one to another machine safe).
+  - ".ddcs, .wiz, .cam, .nc -- which file is which?" -- four lines. The distinction that actually matters when
+    someone hands you a file is SOURCE vs BAKED: .wiz and .cam import live and editable; .nc and the other deploy
+    outputs are the end of the line, not re-importable, and the answer says what to do instead (change the source and
+    deploy again) rather than leaving that as a dead end.
+
+The chapter-order test was updated to name the two new entries rather than being loosened to a range — the point of
+that test is that the order is DECLARED, so a change to it has to be stated.
+
+GATE (fast tier): smoke + FAQ / backup / workspace-roundtrip = 82/82.
+SCREENSHOT: scratchpad/s1253-file-kinds.png -- both answers open, the contents list reading straight out of the registry.
