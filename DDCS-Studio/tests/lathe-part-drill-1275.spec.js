@@ -274,13 +274,16 @@ test('BOTH SURVIVE THE .wiz ROUND TRIP — export, WIPE, import, identical and b
             wl.importWizard(text);
             const after = strip(JSON.parse(JSON.stringify(uo.listUserOps().find((d) => d.opType === t))));
             const emitAfter = String(emitProgram(uo.instantiate(after, uo.defaultParams(after))));
-            return { gone, same: JSON.stringify(before) === JSON.stringify(after), sameEmit: emitBefore === emitAfter };
+            // …compared as OBJECTS, not as JSON text: stringify is key-ORDER sensitive, and an imported def's keys
+            // arrive in file order rather than the seed's. That is not drift in the wizard, it is drift in how the
+            // question was asked (t1285 — adding a declared field to the file surfaced it).
+            return { gone, before, after, sameEmit: emitBefore === emitAfter };
         };
         return { part: trip('user_lathe_parting'), drill: trip('user_lathe_centerdrill') };
     });
     for (const [name, o] of Object.entries(r)) {
         expect(o.gone, `${name} really was wiped before the import`).toBe(true);
-        expect(o.same, `${name} came back identical — a library citizen like any other`).toBe(true);
+        expect(o.after, `${name} came back identical — a library citizen like any other`).toEqual(o.before);
         expect(o.sameEmit, `${name} emits byte-identically: the file carries the recipe`).toBe(true);
     }
 });

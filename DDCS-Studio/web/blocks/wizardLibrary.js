@@ -240,6 +240,11 @@ export function wizardToFile(def) {
     if (def.sim) op.sim = def.sim;
     if (def.group) op.group = def.group;
     if (def.defV != null) op.defV = def.defV;
+    // t1285 — the op's DECLARED TOOL rides too. It is authored DATA (what this op puts against the work: an insert
+    // on a holder, or a bit on centre), not something derivable from the template — so dropping it would land a
+    // shared lathe wizard showing the wrong cutter, exactly the way dropping `group` once landed one in the wrong
+    // dropdown. Caught by the round-trip specs the moment it was added, which is what they are for.
+    if (def.latheTool) op.latheTool = def.latheTool;
     // t1275 — A MANIFEST OF WHAT THE FILE CANNOT CARRY. The hooks are functions; only their NAMES travel. That is
     // enough for the recipient's import to say exactly what it could not restore, instead of losing it in silence.
     // …read from what the APP knows for this opType, not off the def object: the listed def is the PERSISTED one and

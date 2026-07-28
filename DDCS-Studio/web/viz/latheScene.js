@@ -63,9 +63,17 @@ export function latheSimStock(params, current, fallback) {
     };
 }
 
-/** Attach the lathe's scene declarations to a twin. One call per op, so all five say the same thing. */
-export function withLatheScene(def, fallback) {
+/**
+ * Attach the lathe's scene declarations to a twin. One call per op, so all five say the same thing.
+ *
+ * THE TOOL IS DECLARED HERE TOO (t1285), beside the bar, because it is the same kind of fact: what this op puts
+ * against the work. Most turning ops are an insert on a holder; a centre drill really is a bit in the tailstock, on
+ * the centreline. Declared per op rather than inferred from the program, so nothing has to read a toolpath and guess.
+ * @param {'turning'|'centerdrill'} tool
+ */
+export function withLatheScene(def, fallback, tool = 'turning') {
     def.simStock = (params, stock) => latheSimStock(params, stock, fallback);
+    def.latheTool = tool;
     return def;
 }
 

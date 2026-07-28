@@ -301,10 +301,6 @@ export function createPreviewPanel(container, opts = {}) {
         // expensive and pointless on a probe program; the turned profile is one array per bar and IS the picture, so
         // a lathe never opts out of it.
         const lathe = !!(v._isLatheStock && v._isLatheStock());
-        // t1283 — WHICH TOOL this op shows. A centre drill really is a bit on the centreline; everything else on a
-        // lathe is an insert on a holder. Declared per op rather than one blanket swap, because the honest picture
-        // differs between them.
-        if (v.setLatheTool) v.setLatheTool(lathe ? (/centerdrill/.test(String(opts.opType || '')) ? 'drill' : 'turn') : null);
         if (!lathe && (!carveEnabled() || !hasCut)) { if (v.setCarve) v.setCarve(false); return; }
         const run = () => {
             _carveRaf = 0;
@@ -642,9 +638,6 @@ export function createPreviewPanel(container, opts = {}) {
         const running = !!(engine && engine.running), paused = !!(engine && engine.paused);
         b.classList.toggle('on', running && !paused);
         b.innerHTML = (running && !paused) ? ICON_STOP : ICON_PLAY;
-        // t1283 — THE BAR TURNS WHILE THE PROGRAM RUNS. On a lathe the spindle is the cutting motion; a still bar
-        // with a tool sliding along it reads as a shaper. Stops with the program, like the machine would.
-        if (viz && viz.setLatheSpin) viz.setLatheSpin(running && !paused && !!(viz._isLatheStock && viz._isLatheStock()));
     }
 
     // Render the static route in the active view from the fed G-code (engine.trace resolves #vars/loops/probes).
@@ -655,6 +648,8 @@ export function createPreviewPanel(container, opts = {}) {
     // The sim tool, RESPECTING THE TOOL TABLE: the host's op tool (getTool) wins; else the program's active T#
     // looked up in the tool table (settings.atc.tools → type/Ø/length); else infer from the path (probe → touch
     // probe); else a default endmill.
+    /** t1285 — is this a lathe workspace? Asked of the machine record, which is the one place that knows. */
+    const isLatheWorkspace = () => { try { return !!(window.ddcsIsLathe && window.ddcsIsLathe()); } catch (_) { return false; } };
     function simTool(code, parsed) {
         // Attach the configured SIM probe body dims (Settings → Preview → 3D PROBE) to ANY probe tool, so the
         // rendered touch probe matches what the user set on the diagram. Non-probe tools pass through untouched.
@@ -666,6 +661,16 @@ export function createPreviewPanel(container, opts = {}) {
             if (t) return withProbe({ type: t.type || 'endmill', dia: Number(t.dia) || 6, length: Number(t.length) || undefined, angle: Number(t.angle) || undefined });   // t875 — carry the vee angle to the carve + sim cone
         }
         if ((parsed && parsed.stats && parsed.stats.probe) > 0) return withProbe({ type: 'probe', dia: 6 });
+        // t1285 — A LATHE'S DEFAULT TOOL IS NOT AN ENDMILL. This function is the ONE owner of tool identity: the mesh
+        // and the header line both read it, so anything decided downstream is overwritten the next time it runs. That
+        // is why keying the tool on the stock, or on a flag set beside this, kept losing — the answer has to be HERE.
+        // Kind in, correct tool out, whoever re-renders and whenever.
+        if (isLatheWorkspace()) {
+            const drill = /centerdrill/.test(String(opts.opType || ''));
+            return drill
+                ? { type: 'centerdrill', dia: 6, _default: true }   // the tailstock really does hold a bit on centre
+                : { type: 'turning', dia: 6, _default: true };      // everything else is an insert on a holder
+        }
         return { type: 'endmill', dia: 6, _default: true };   // no host tool / no T# / not a probe → the honest 6mm default (E); flagged so the carve note can own up to the assumption
     }
     // THE one declared source of the per-pass starts (inc2): the precedence userStarts > pass-0 start > registry hint
@@ -897,7 +902,11 @@ export function createPreviewPanel(container, opts = {}) {
                     if (note) {
                         const show = carveEnabled() && !!(parsed.stats && parsed.stats.feed > 0);   // only when there's material to remove
                         const tp = tl && tl.type;
-                        const tipName = _carveTip === 'ball' ? 'ball-nose' : (_carveTip === 'vee' ? tp + ' (v-carve)' : 'flat endmill');
+                        // …and the HEADER names what the scene shows. A lathe op calling its insert a flat endmill is
+                        // the same lie as drawing one: same source, same answer.
+                        const tipName = tp === 'turning' ? 'turning tool (insert)'
+                            : tp === 'centerdrill' ? 'centre drill'
+                            : (_carveTip === 'ball' ? 'ball-nose' : (_carveTip === 'vee' ? tp + ' (v-carve)' : 'flat endmill'));
                         // t722 P2a (2)+(4) — HONEST wording (no cognition verbs) + the op's TYPED Ø: an unset tool states the
                         // default fact; an op-value tool discloses only the tip-shape unknown (the Ø is the typed op value).
                         const dia = Math.round((Number(tl && tl.dia) || 6) * 10) / 10;

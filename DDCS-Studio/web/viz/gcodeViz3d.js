@@ -112,6 +112,8 @@ export class GcodeViz3D {
         this._bindControls();
         this._applyCamera();
 
+        // t1285 — a handle for the scene-graph asserts: what is actually IN the scene, not what a spec hopes is.
+        try { if (typeof window !== 'undefined') window.__ddcsLastViz = this; } catch (_) {}
         this._ro = new ResizeObserver(() => this._resize());
         this._ro.observe(container);
         this._resize();
@@ -487,12 +489,10 @@ export class GcodeViz3D {
         // t1283 — A LATHE GETS A TURNING TOOL. An endmill pointing down at a spinning bar is a lie about the machine:
         // the cutter is a fixed insert on a square holder coming in from +X. The CENTRE-DRILL op keeps a drill-like
         // bit on centre, because that IS what is in the tailstock — honest per op rather than one blanket swap.
-        // …decided from the WORKSPACE KIND, not from whatever the stock happens to be at this instant: the tool is
-        // rebuilt several times during a load and the bar does not always arrive first, so keying on the stock gave a
-        // mill spindle whenever the rebuild won the race. `setLatheTool` still refines WHICH lathe tool (a centre
-        // drill really is a bit on the centreline); the kind decides THAT it is one.
-        const isLatheWs = (() => { try { return !!(window.ddcsIsLathe && window.ddcsIsLathe()); } catch (_) { return false; } })();
-        if (isLatheWs && tool.type !== 'probe') { this._buildLatheTool(tool); return; }
+        // t1285 — THE TOOL'S OWN TYPE decides its shape. Earlier attempts keyed this on the stock, then on the
+        // workspace kind, and both lost races against whatever rebuilt the tool next; the tool identity has ONE owner
+        // (the preview's simTool), so reading the type it hands over is the answer that cannot be overwritten.
+        if (tool.type === 'turning' || tool.type === 'centerdrill') { this._buildLatheTool(tool); return; }
         const half = toolHalfProfile(tool);
         const tr = Math.max(0.5, (Number(tool.dia) || 6) / 2);          // shank radius (what the collet clamps)
         const topZ = Math.max(0.1, ...half.map((p) => p[1]));           // the tool's TOP (the shank) — sets the clamp height
@@ -629,7 +629,7 @@ export class GcodeViz3D {
         const THREE = this.THREE;
         const grp = new THREE.Group();
         const part = (geo, color, op) => new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true, opacity: op }));
-        if (this._latheTool === 'drill') {
+        if (tool.type === 'centerdrill') {
             // ON CENTRE, pointing −Z into the work: the tip at the origin, body behind it
             const d = Math.max(1, Number(tool.dia) || 6), r = d / 2;
             const tip = new THREE.ConeGeometry(r, d, 20); tip.rotateX(Math.PI / 2); tip.translate(0, 0, d / 2);
@@ -649,16 +649,26 @@ export class GcodeViz3D {
     /** DECLARE which tool this op shows: 'turn' (holder + insert from +X), 'drill' (on centre), or null (the mill's). */
     setLatheTool(kind) { if (kind === this._latheTool) return; this._latheTool = kind || null; this._buildAnimTool(); this.render(); }
 
-    /** t1283 — THE WORK TURNS. On a lathe the spindle IS the cutting motion, so the bar spins while the program plays:
-     *  a still bar with a tool sliding along it reads as a shaper, not a lathe. Cosmetic by design — the path, the
-     *  carve and the DRO are all computed from the program, and none of them reads this angle. */
+    /**
+     * t1285 — THE SPIN IS WITHDRAWN, deliberately, and this note is why.
+     *
+     * A turning bar sells the world, and the mechanism below works — but wiring it to a truthful signal did not. Hung
+     * off the run-button repaint it span while IDLE and stopped when the program RAN (that repaint fires on every
+     * re-render, not on a state change); moved onto play()/stopPlay() the spin landed on a panel's viz while a STALE
+     * instance kept turning, so what a viewer saw depended on which panel built last.
+     *
+     * A bar that turns while nothing is running is a LIE ABOUT THE MACHINE — worse than a still one, because a still
+     * bar merely omits. So the call sites are gone until the ownership question is answered: WHICH viz instance is
+     * the live one, and what single signal says a program is running. The method stays, unused and honest about it,
+     * so the next turn wires a working answer instead of rediscovering the trap.
+     */
     setLatheSpin(on) {
         this._latheSpin = !!on;
         if (this._latheSpinRaf) { cancelAnimationFrame(this._latheSpinRaf); this._latheSpinRaf = 0; }
         if (!this._latheSpin || !this._partGroup) return;
         const step = () => {
             if (!this._latheSpin || !this._partGroup) { this._latheSpinRaf = 0; return; }
-            this._partGroup.rotation.z += 0.12;   // ~1 turn/second at 60fps: readable, not a strobe
+            this._partGroup.rotation.z += 0.12;
             this.render();
             this._latheSpinRaf = requestAnimationFrame(step);
         };
@@ -1417,8 +1427,17 @@ export class GcodeViz3D {
             // way this one lies and that this bar has no tailstock behind it.
             if (stock.axis === 'z' && stock.origin === 'finished-face') {
                 const face = Number(stock.faceZ) || 0, halfL = stock.z / 2;
-                this.setRotaryRig({ axis: 'z', r: (stock.diameter || stock.x) / 2, L: halfL, jaws: 3, noTailstock: true });
-                if (this._rotaryFixture) this._rotaryFixture.position.set(0, 0, face - halfL);   // the rig rides the bar's centre
+                // t1285 — THE LATHE CHUCK IS ITS OWN RIG. Built through the same render (one chuck concept) but kept
+                // in its OWN field: `setRotaryFixture(false)` — which every one of these ops sets, because none of
+                // them wants the 4th-axis rig — calls setRotaryRig(null) and was quietly destroying the chuck a
+                // moment after it was built. The two rigs answer different questions; they cannot share a slot.
+                if (this._latheChuck) { pg.remove(this._latheChuck); this._latheChuck.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); this._latheChuck = null; }
+                const keep = this._rotaryFixture;
+                this._rotaryFixture = null;
+                this._buildRotaryFixture(pg, 'z', (stock.diameter || stock.x) / 2, halfL, { jaws: 3, noTailstock: true });
+                this._latheChuck = this._rotaryFixture;
+                this._rotaryFixture = keep;                       // …hand the rotary slot straight back, untouched
+                if (this._latheChuck) this._latheChuck.position.set(0, 0, face - halfL);   // the chuck rides the bar's grip end
             }
             this.stockEdges = edges; pg.add(edges);
             // t680 — MATERIAL REMOVAL: when carving is ON (a box/pocket stock, not a rotary cylinder), the DISPLACED

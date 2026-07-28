@@ -137,3 +137,73 @@ test('A MILL DRO IS UNTOUCHED — the diameter reading is a lathe declaration, n
     expect(r.label, 'a mill X is an X').toBe('X');
     expect(r.shown, 'and its number is the number').toBe(7);
 });
+
+// ── t1285 — THE TOOL AND THE CHUCK, asserted BOTH WAYS ──────────────────────────────────────────────────────────
+
+/**
+ * The standard this family earned: it is not enough that the lathe things are present — the MILL things must be
+ * ABSENT, or "present" only means the scene got busier. And a mill workspace must be untouched in both directions.
+ */
+const sceneOf = async (page, kind, type) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
+    await page.evaluate(async (k) => {
+        const M = await import('/data/workspaceMachine.js');
+        M.setMachine({ kind: k, chuck: 'axis' }, false);
+    }, kind);
+    await page.evaluate((t) => window.openWiz(t), type);
+    await page.waitForTimeout(2000);
+    return page.evaluate(() => {
+        const v = window.__ddcsLastViz;
+        if (!v) return null;
+        const names = [];
+        if (v._animTool) v._animTool.traverse((o) => { if (o.name) names.push(o.name); });
+        return {
+            toolType: v._simTool && v._simTool.type,
+            toolParts: v._animTool ? v._animTool.children.length : -1,
+            partNames: names,
+            hasChuck: !!v._latheChuck,
+            chuckParts: v._latheChuck ? v._latheChuck.children.length : 0,
+            rotaryRig: !!v._rotaryFixture,
+            stock: v._stock ? { shape: v._stock.shape, axis: v._stock.axis || null } : null,
+            note: (document.querySelector('.pp-carve-note') || {}).textContent || '',
+        };
+    });
+};
+
+test('LATHE: the turning tool is there AND the mill spindle is NOT', async ({ page }) => {
+    const s = await sceneOf(page, 'lathe', 'user_lathe_odturn');
+    expect(s, 'the scene exists to be asserted about').not.toBeNull();
+    // PRESENT: an insert on a holder, named as one everywhere the user can read it
+    expect(s.toolType, 'the tool identity says turning — one owner, so the mesh and the header agree').toBe('turning');
+    expect(s.toolParts, 'holder + insert, and nothing else').toBe(2);
+    expect(s.note, 'the header names it too').toMatch(/turning tool \(insert\)/);
+    // ABSENT: the mill's spindle assembly. Presence alone would only mean the scene got busier.
+    expect(s.partNames.includes('spindle'), 'no mill spindle body').toBe(false);
+    expect(s.partNames.includes('collet'), 'no collet').toBe(false);
+    expect(s.note, 'and nothing calls it an endmill').not.toMatch(/endmill/);
+    // THE CHUCK: a disc and three jaws, gripping the bar, with NO tailstock over the face
+    expect(s.hasChuck, 'the bar is held').toBe(true);
+    expect(s.chuckParts, 'a disc and three jaws — no tailstock, because a turner’s bar sticks out free').toBe(4);
+    expect(s.rotaryRig, 'and the 4th-axis rig slot is untouched: two rigs, two questions').toBe(false);
+});
+
+test('LATHE: the centre drill declares its OWN tool — a bit on centre, not an insert', async ({ page }) => {
+    const s = await sceneOf(page, 'lathe', 'user_lathe_centerdrill');
+    expect(s.toolType, 'the op declares what it puts against the work').toBe('centerdrill');
+    expect(s.note, 'and the header says so').toMatch(/centre drill/);
+    expect(s.note, 'never a turning insert, which this op does not use').not.toMatch(/insert/);
+    expect(s.hasChuck, 'the bar is still held').toBe(true);
+});
+
+test('MILL: unchanged in BOTH directions — no lathe furniture, and the mill’s own still there', async ({ page }) => {
+    const s = await sceneOf(page, 'mill', 'user_pocket_data');
+    expect(s, 'the mill scene exists').not.toBeNull();
+    // the lathe things are ABSENT
+    expect(s.hasChuck, 'no chuck on a mill').toBe(false);
+    expect(s.toolType, 'and no turning tool').not.toBe('turning');
+    expect(s.stock && s.stock.axis, 'the stock declares no bar axis').toBeFalsy();
+    // …and the mill's OWN tool assembly is intact: this is the half that catches a fix which broke the other world
+    expect(s.partNames.includes('spindle'), 'the mill keeps its spindle').toBe(true);
+    expect(s.partNames.includes('collet'), 'and its collet').toBe(true);
+});

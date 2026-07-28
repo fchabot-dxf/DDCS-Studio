@@ -311,6 +311,11 @@ export const userOpView = {
         const _dia = (_tdia > 0) ? _tdia : ((_opToolDia > 0) ? _opToolDia : NaN);
         if (_tbl && Number.isFinite(_dia)) _opTool = { type: _tbl.type || 'endmill', dia: _dia, name: _tbl.name, angle: Number(_tbl.angle) || undefined };   // t875 — the vee angle → the carve cone + sim tool
         else if (_opToolDia > 0) _opTool = { type: 'endmill', dia: _opToolDia, _opValue: true };
+        // t1285 — A LATHE OP'S OWN DECLARED TOOL. `getTool` is the FIRST thing the preview's tool-identity owner
+        // honours, so declaring it here settles the question for the mesh AND the header at once — no flag set
+        // beside the owner, nothing to lose a race with whatever rebuilds next. A picked table tool still wins:
+        // this is the fallback for "no tool chosen", where the honest default on a lathe is not an endmill.
+        if (!_opTool && _def && _def.latheTool) _opTool = { type: _def.latheTool, dia: 6, _default: true };
         // ③ — gate `when`-conditioned form rows from the LIVE params (corner's start #21/#22 → visible only under probeZFirst),
         // so the fields follow the toggle dynamically (the row still reads; it's hidden when off, and its canvas handle absents).
         const fhost = el('wiz_user_form');
