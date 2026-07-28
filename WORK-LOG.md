@@ -19643,3 +19643,101 @@ failed against correct G-code.
 
 Fast tier: smoke 65/65, the six touched lathe specs 36/36, the matrix 5/5, and `axis-labels-config` (the pre-existing
 mill label assert) still green — that one is the guard that the mill scene is untouched.
+
+---
+
+## t1299 — the lathe probe family: the model first, then two ops that write the datum everything else is measured from
+
+The five turning ops move metal. These two move a NUMBER, and that is the whole reason this turn was built in the
+order it was: a turning op that is wrong cuts one part wrong; a probe that is wrong makes every part after it wrong,
+silently, and nothing on the screen looks different.
+
+### (0) The model, before either op existed
+
+`wizards/lathe/latheProbe.js` holds the vars, the defaults, the shared config header, the one TOUCH, and the two iron
+rules as checkers. Deliberate decisions in it:
+
+- **It reuses the mill's probe machinery rather than paralleling it.** `probeSurfaceStack` is the touch (guard → fast
+  G31 → check → retract → slow G31 → check → radius-comp → retract, per post); `wcsbaseinto`/`wcswrite` are the write.
+  The scratch NUMBERING is the mill probe numbering too — #6 means the stylus radius in both, so an operator who has
+  read an edge-probe macro can read this one.
+- **The spindle stop is emitted by the TOUCH itself**, above the guard and the G31, which is what makes it structural:
+  an op cannot forget it and no parameter can reach it. Per touch rather than once per program on purpose — M5 is
+  modal and harmless to repeat, and a rule that holds locally survives being reordered, copied, or pruned by a twin's
+  instantiate().
+- **Rule 2 is stated PRECISELY, not as the obvious over-broad version.** "No WCS register may appear anywhere" would
+  fail on the op's own WRITE, which is the point of the op. The hazard is a probe whose MOTION or RESULT depends on a
+  datum VALUE — so a datum read on the right-hand side of an assignment or in a motion line is a violation; writing
+  one is not; and computing which table row to write to (#578 → #70) is an address, not a datum. The checker's own
+  precision is asserted four ways, including that it does NOT flag the write.
+- Both checkers read the EMITTED TEXT, never the stack that produced it. A checker reading the same structure the
+  builder wrote would only prove the builder agrees with itself.
+
+### (1) The face probe — the one thing it has to decide
+
+The family's frame says Z0 is the FINISHED face; the face you can touch on a freshly chucked bar is the RAW one.
+Those are the same face only if you are not going to face it off. So the op asks, in one field, how far ahead of Z0
+the touched face is: zero (the default) is the ordinary touch-off, and typing the facing allowance lands the datum on
+the finished face so Z0 is still Z0 afterwards. Getting it wrong is every subsequent Z out by the allowance, in the
+direction that cuts deeper — which is why it is a field and not an assumption.
+
+### (2) The OD probe — the measurement the machine cannot make
+
+A mill edge probe sets the touched surface to read ZERO. A lathe X datum is not like that: the number a turner needs
+on the DRO is the DIAMETER they just measured with calipers. Hand-derived, and the emit matches:
+
+    surface  = trigger − tip            (machine radius; probing inward, the stylus centre stops one radius out)
+    X origin = surface − caliper/2      (so the surface reads the true radius, and the DRO the true diameter)
+
+THE DIAMETER STAYS A DIAMETER until the controller halves it — the field, the #var, and only then `[#51/2]`. That is
+the family's rule and the reason it exists: a diameter quietly bound into a radius socket makes every part exactly
+half size with nothing on screen wrong. Asserted both ways (the var holds 24.85; nothing holds 12.425).
+
+### No positioning move, in either op
+
+Both are entirely incremental from wherever the operator jogged. An "approach the face" rapid would have to be aimed
+in the work frame — using the very datum the op exists to establish. Asserted structurally: every G0 in either
+program is a probe retract (`G0 Z#10` / `G0 X#10`), and nothing else.
+
+### The twins regenerate through the one builder
+
+The snapshot lesson is one turn old, so I did not have to learn it twice: the WCS choice is a BUILD-TIME branch (it
+decides the base address AND the write target), so `postInstantiate` rebuilds the macro from the resolved params.
+Asserted by picking G55 and watching the base become the literal 810 with no active-index read left anywhere, then
+going back to active and watching `#71=#578` return.
+
+### Gating — the ruling implemented honestly, which needed a new dimension
+
+The dispatch asked for "greys with reason on a mill". The existing gating could not express it and says so in its own
+comment: it asks CAN this machine move that way, and a mill has an X, a Z and a spindle, so nothing would ever grey a
+lathe probe. But running an OD probe on a mill writes a WRONG NUMBER into the datum table, silently.
+
+So `OP_FRAME_NEEDS` sits beside `OP_AXIS_NEEDS` — a different question (what does this machine's X MEAN) with its own
+sentence per op, because the hazards are not the same one twice: the OD probe names the radius frame and what going
+wrong looks like ("half the bar out"), the face probe points at the mill op that does its job (the Edge probe). The
+five TURNING ops are deliberately NOT frame-gated — that existing ruling stands untouched, and a test pins it.
+
+### The picture
+
+The half-profile draws the stylus ball where it touches and the approach it came in on, in the same red as the 3D
+ruby — one colour for "the probe contacts here", whichever view you are in. Two declared CSS rules, because the
+t1283 lesson was that an invented class matches nothing and draws nothing. The handles are teal (they drive the
+emit): the face probe's writes how far ahead of Z0 the touched face is, clamped at Z0; the OD probe's writes the
+measured DIAMETER, twice the radius grabbed. Asserted through the same onDrag the panel calls.
+
+### Verified
+
+Emit hand-derived line by line for both ops and compared as an ordered slice (not a set — order is the sequence).
+The sim EXECUTES both: two probe strokes and two retracts each, the face probe entirely in Z with X untouched, the OD
+probe entirely in −X with Z untouched. Both wizards opened through the real `openWiz` path and eyeballed: form
+identity-first, code preview, 3D, and the half-profile with the touch marker.
+
+Fast tier: smoke 65/65, the new family 10/10, the touched lathe + probe-wcs + axis-label specs 35/35, and the four
+older lathe specs that cover the gating module 44/44.
+
+**FLAGGED, not fixed — the 3D SEAT.** The strokes are correct in axis, direction and length, but they start at the
+scene origin, so the OD probe's stroke is drawn crossing the centreline and the mill-sized stylus body dwarfs a Ø20
+bar. The cause is declared, not mysterious: the sim-start vocabulary (`centre`/`edge`/`frac`/`radial`) is a MILL
+frame one — its `edge` anchor resolves against a stock spanning 0..sx, so pointing it at a lathe bar would seat the
+stylus a full radius wrong. Bolting it on would ship a different lie, so the picture says nothing rather than
+something false. A lathe start anchor (outside the bar radius, at a Z along it) is its own piece of work.
