@@ -18433,3 +18433,73 @@ about this can be verified headless today, and I am not going to imply otherwise
 
 GATE: smoke 65/65 (the banner change is exe-gated and does not alter web behaviour) + all three python test files
 green (selfupdate 9/9, webview_storage 5/5, pull_geometry).
+
+---
+
+## turn 1263 -- VERSION-NAMED RELEASE ASSETS, and the four consequences that came with them.
+
+`DDCS-Studio-v2026.07.27.1.exe` + its `.sha256`, so a Downloads folder full of them still tells you which is which.
+The rename is one CI line; the interesting part is everything that was quietly depending on the fixed name.
+
+**(1) BOTH resolvers now match a PATTERN, and specifically NOT "any .exe".** A release can carry other files, and
+"the first .exe" would happily hand someone a different tool that rode along. `pick_assets()` matches the
+DDCS-Studio-*.exe family, and pairs an exe to its checksum BY EXACT NAME so a stray .sha256 can never be attached to
+the wrong binary — with a test for exactly that (two exes, one checksum: the one that HAS a checksum wins). An exe
+with no checksum is reported as UNVERIFIABLE rather than as missing, because those are different refusals and the
+user should be told which one they hit. The JS banner's picker got the same tightening, and its spec's stub now
+carries a release-notes.txt and a benchgateway.exe alongside the app so "ignores unrelated assets" is actually tested.
+
+**(2) THE SWAP STILL LANDS ON THE USER'S FILENAME**, and the reasoning is now in the code rather than in my head: the
+asset is version-named but the INSTALLED app is whatever they called it and wherever they put it — shortcuts, taskbar
+pins and scripts all point at THAT path. Renaming it to match the release would break every one of them and leave a
+stale duplicate. The version chip inside the app is the truth about which build this is; the filename is the user's
+business. Tested by renaming the target to MyShopApp.exe and asserting the update lands there, with no versioned
+duplicate appearing beside it.
+
+**(3) THE CHECKSUM FILE still parses.** CI writes `<hex>  DDCS-Studio-<tag>.exe` now; the verifier reads the hex, so
+the name change is inert — but the test says so explicitly, including the `*name` binary-mode marker form.
+
+**(4) THE ROLLING PRE-RELEASE: checked, aligned, and the important part is why it cannot interfere.** It publishes
+`DDCS-Studio-latest-main.exe` now (self-describing, and impossible to mistake for a stable download). It carries NO
+checksum, deliberately: the updater refuses an unverifiable release anyway, and this one is a human-choice download.
+The updater never sees it at all — /releases/latest returns the newest NON-prerelease — so the update path cannot be
+walked backwards onto a build of main. That is recorded in latest_release's docstring, because it is a guarantee
+GitHub gives us rather than something visible in our code.
+
+GATE: python 15/15 selfupdate (6 new) + webview_storage 5/5 + pull_geometry; smoke 67/67 including the update-check
+spec. Both workflows re-parsed as YAML after editing. The CI naming itself is verified by the next release producing
+the assets — same generational plan as t1261.
+
+### AMENDMENT: the .5 retest decoded — a REMEMBERED folder is not a MISSING folder (my own t1247 flag, proven live).
+
+The storage fix worked (the workspace came back); the FOLDER did not. The cause was ours, not pywebview's: Chromium
+AUTO-DENIES a permission request made outside a user gesture, and the app made one at boot — before the manager
+rendered, before the save dialog opened. It read that auto-denial as "no access", THREW THE REMEMBERED HANDLE AWAY,
+and sent the user through the OS picker on every launch. I flagged this exact mechanism in t1247 and could not
+reproduce it then; the user's retest reproduced it for me.
+
+THE RULE, now enforced:
+  - OUTSIDE a gesture: query only. `state()` answers none | remembered | ready, and 'remembered' means "needs one
+    click", never "forget this".
+  - INSIDE a gesture: requestPermission on the REMEMBERED handle — one Allow, the same folder, NO picker. A picker
+    asks "which folder?", which is the wrong question when the app already knows.
+  - only an explicit in-gesture DENIAL may drop it, and only when the caller asks (forgetOnDeny).
+
+Applied in the shared engine (so the library and deploy folders inherit it) and at the workspaces folder's own two
+sites: saveWorkspace no longer requests-then-discards before the dialog, and the manager now distinguishes NEVER
+CHOSEN from REMEMBERED — the second offers "📁 Allow the folder", which re-requests the handle it already has.
+
+**A REAL ROBUSTNESS FIX FELL OUT OF THE TEST.** My stubs could not survive `putHandle` because IndexedDB
+structured-clones and a stub carries methods — and that exposed something true of the product: if the IDB write is
+refused (private window, locked-down webview, quota), the app FORGETS a folder the instant the user grants it, so the
+grant appears to do nothing. fsHandles now keeps a session mirror beside the IDB record — this session is certain,
+the write is the durable half. Same reasoning as the t1247 grantedFolder cache, one layer down where the workspaces
+folder and the save handle live too.
+
+**AND I CHECKED THAT THE TESTS ACTUALLY DISCRIMINATE**, which caught two that did not. I reverted the engine to its
+pre-fix body and re-ran: "IN GESTURE" and "DENIAL" both still passed, because my first revert was not faithful and
+because the denial case never asserted what the OLD code did — fall through to the OS picker. The denial test now
+counts pickers and fails against the real old behaviour. That is the [[assert-the-value-not-the-change]] trap and I
+walked into it twice in one turn before catching it.
+
+GATE after the amendment: 129/129 (smoke + all three folders' specs + manager/save/update/loading).
