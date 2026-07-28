@@ -18568,3 +18568,76 @@ third case rather than only the two that happened to work.
 
 GATE: 139/139 (smoke + settings/manager/cloud/save/library/permission/loading/responsive).
 SCREENSHOT: s1265-cloud-no-pref.png — signed in with no file, opened on Cloud by context, no preference row.
+
+---
+
+## turn 1267 -- THE LATHE MODEL. Six declarations, no wizard; turn 2's wizards arrive as READERS of this.
+
+I read the pinned spec in the memory header first, as instructed. The line that shapes everything: a DDCS has NO
+lathe mode -- one controller, one G-code set (user, definitive). So "lathe" is never something the app reads back
+from a machine; it is a fact about the machine the USER BUILT.
+
+### (1) THE KIND -- on the workspace record, beside the name and the controller.
+
+`kind: 'mill' | 'lathe'`, default mill, cleaned on both read and write so an undeclared value can never be stored.
+It rides the .ddcs through the existing `machine` BACKUP_STORES row, which the test proves the hard way: set lathe →
+build the file → WIPE the record → restore → it comes back lathe. Wiping first is the point; without it the test
+would pass on a record that never left memory.
+
+SHOWN ONLY WHEN IT IS A LATHE, on all three identity surfaces (quick-menu line, Settings band, manager rows). A mill
+workspace gets no badge: mill is the default, and labelling every mill workspace "mill" is noise on the line whose
+whole job is to identify the machine.
+
+### THE MISMATCH GATE -- and the honest answer is that it CANNOT compare kinds.
+
+A pull reads envelope, WCS, motors, homing, feeds. None of that says "I drive a lathe", and the same parameter set
+describes both machines equally well. So there is nothing to detect and THE GATE DOES NOT INVENT IT -- no heuristic
+on axis counts, no guess from travels. What it can do is STATE the workspace's own declaration as context when it is
+already speaking, so a person can judge for themselves; `kindContext()` returns that one clause for a lathe and an
+empty string for a mill. A test asserts the comparison object has no kind field at all, so nothing can start
+pretending to detect one.
+
+### (2) THE MECHANISM -- one chuck, two declared behaviours. REUSED vs NEW, stated as asked.
+
+REUSED: the chuck + bar concepts and the cylinder stock, from the rotary rig -- a cylinder gripped at one end, free
+at the other, is the same physical idea.
+NEW: `spindle` rotation (the rotary rig has no notion of spinning to CUT rather than to position -- it commands no
+angle at all), and the Z orientation.
+The two rotations differ by exactly one declared fact -- `commandsAngle` -- so a consumer asks that instead of
+branching on a name.
+
+### (3) THE BAR -> the existing cylinder stock, and the mapping is the whole reuse.
+
+Two differences and only two: the rotary cylinder lies along the ROTARY AXIS (X today) while a bar lies along Z, and
+a bar is measured from the FINISHED FACE rather than from wherever it was set. Everything else -- round shape,
+diameter field, the 3D draw -- is the same model, which is why this is a mapping and not a second stock type. The
+test asserts the length lands on `z` and that diameter + total length come back out losslessly.
+
+### (4) THE FRAME + THE ONE CONVERSION.
+
+X is a radius off the centreline; Z runs along the bar; Z0 is the FINISHED FACE so cutting runs -Z toward the chuck.
+UI speaks DIAMETER, emit writes RADIUS, and that halving lives in `radiusOf()` and nowhere else.
+
+THE TRIPWIRE, AND THE MISTAKE I MADE WRITING IT: my first version scanned the whole tree for a diameter being halved
+and flagged ELEVEN sites -- all mill code computing a bore or circle radius, which is correct and has nothing to do
+with turning. That is the over-broad-proxy trap ([[specify-the-hazard-not-an-over-broad-proxy]]). The hazard is a
+SECOND LATHE converter, so the scan is scoped to files that work with the lathe model (lathe.js plus anything
+importing it) -- which grows on its own as turn 2 adds readers -- plus an assertion that the model contains exactly
+one halving. Proved it BITES: introduced a plausible `b.diameter / 2` in halfProfile, watched it fail, restored.
+
+### (5) THE VIEW CONTRACT -- geometry as DATA, with a minimal render proving it draws.
+
+`halfProfile(bar)` returns the centreline, the outline, the datum and the allowance band in the declared frame. The
+split is deliberate: the model is testable without a canvas, and a canvas cannot invent a shape the model did not
+state. The test asserts the outline's X values are RADII (0, 10, 10, 0 for a Ø20 bar) -- the one conversion, visible
+in the shape -- and a second test rasterises it and counts ink, so "the contract is drawable" is measured rather than
+assumed. Full canvas polish arrives with Facing in turn 2.
+
+### (6) ENVELOPE SEMANTICS -- wording only.
+
+Under kind=lathe, X reads as the cross-slide in radius-space and Z as the carriage along the bed. The declared
+signed-travel machinery is untouched, and the test pins that: the same envelopeSummary output either way.
+
+GATE (fast tier): smoke + the new model spec (10) + machine-record / manager / gateway / backup = 120/120.
+Two existing roundtrip assertions were updated IN FULL rather than loosened -- the record gained a declared field, so
+the test that says what the record IS now says it, and the next field added has to be stated there too.
