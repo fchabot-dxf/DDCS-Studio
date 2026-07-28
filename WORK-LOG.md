@@ -19741,3 +19741,91 @@ bar. The cause is declared, not mysterious: the sim-start vocabulary (`centre`/`
 frame one — its `edge` anchor resolves against a stock spanning 0..sx, so pointing it at a lathe bar would seat the
 stylus a full radius wrong. Bolting it on would ship a different lie, so the picture says nothing rather than
 something false. A lathe start anchor (outside the bar radius, at a Z along it) is its own piece of work.
+
+---
+
+## t1301 — the 3D pane tells the truth about a lathe, and one wrong declaration turns out to be behind most of it
+
+Four items were dispatched. Three of them had the SAME root, which only became visible once the first was chased all
+the way down: **everything that placed a lathe bar in space assumed a mill's frame, where a stock's datum is the
+corner of a box.** A bar's datum is its CENTRELINE. Every consumer that did not know that was wrong by exactly one
+radius — and each showed up as a different-looking bug.
+
+### (1) The lathe start anchor — and what it uncovered
+
+The sim-start vocabulary (`centre`/`edge`/`frac`/`radial`) is mill-frame: `edge` resolves against a stock spanning
+0..sx. A `lathe` anchor now says the only thing a lathe start needs to say — OUTSIDE the bar by `out`, at a Z along
+it — reading the bar radius the context already carries. It travels as a `simstart` BLOCK in the template, so it
+round-trips in the `.wiz` like everything else, and it reuses the existing `out`/`zplane` fields rather than adding
+new ones.
+
+My first version returned a PROGRAM-frame radius (X as a radius from the centreline). That was wrong in an
+instructive way: the collision geometry lives in stock-local coords, so the start landed half a diameter from the
+bar and the stroke exited through the far side — the crossing-the-centreline picture again, in a new disguise. The
+anchor is stock-local now, like every anchor beside it.
+
+Then three more layers, each found by measuring rather than reasoning:
+
+- **The bar's datum was declared `'nnp'`** — a mill's min-corner — copied in when `latheSimStock` was written. It is
+  `'ccp'` now (centred in X and Y, Z at the finished face). The whole lathe suite stayed green through the change,
+  which is the evidence that the declaration was simply wrong rather than load-bearing.
+- **The probe collision guessed the bar's axis from the rotary MOTOR.** That is the t1281 bug one layer down: the
+  mesh was taught to read `stock.axis` then, but `cylinderOf` still guessed, and a lathe declares no rotary motor —
+  so the cylinder lay across the machine and a stylus coming in from +X hit nothing.
+- **The cylinder had no END FACES.** `rayCylinder` modelled an infinite tube clipped to an axial span and declared a
+  ray running ALONG the axis a miss outright — the only case that had ever mattered was a mill probing a rotary bar
+  on its round. A lathe FACE probe travels exactly along the axis, so it hit nothing and drew itself through sixty
+  millimetres of steel. Solved as two intervals intersected, which gives the caps for free and leaves a radial touch
+  answering exactly as before.
+
+Measured after: the OD stroke starts 4 outside a Ø20 bar and stops at radius 12 — one stylus radius off the surface,
+where a real machine stops. The face stroke stops 2 short of the raw end. Nothing crosses the centreline.
+
+**One regression I introduced and fixed in the same turn:** with the start now stock-local, the DRO quoted a radius
+too much (Ø44 where the truth was Ø24). The lathe readout module owns what a lathe DRO says, so the shift lives
+there as `droWorkShift` — display only, nothing downstream reads it.
+
+### (2) The stylus is the one the form declares
+
+The mill assembly hangs a Ø80 × 200 spindle body and a collet above the tool. Against a Ø20 bar that body WAS the
+picture. A lathe has no such thing over the work, so a declared lathe probe renders as what it is — ball, stylus,
+small body — standing off along the axis the op declares it approaches from (`+Z` for the face, `+X` for the OD).
+The ball IS the stylus radius from the form, the number its own emit compensates by; asserted by typing 0.5 into the
+field and watching the ball become Ø1. An op's declared probe dims now beat the global settings default, which is
+the right precedence: the settings diagram is "whatever probe you own", the op states what it is compensating.
+
+### (3) The framing
+
+`fitAll` grew the stock bounds as 0..x, 0..y, −z..0 — the min-corner assumption again. Derived from the declared
+datum now (byte-identical for every mill box, whose offset is zero), so the camera targets the centreline instead of
+half a diameter off it. The CHUCK joins the fit as well, measured off the built group rather than guessed, because a
+frame that cuts off what holds the bar shows a bar floating in space.
+
+### (4) The frame gate extends to all seven — and it had never reached the screen
+
+The ruling was straightforward to declare: five more entries in `OP_FRAME_NEEDS`, each with its own sentence, since
+the hazards are not the same one seven times (OD turning's failure is SILENT and halves every size; centre drilling
+points at the mill op that does the job; polygon needs a pairing a mill does not have). The pin test's premise
+changed by ruling, so it now asserts the ruling instead.
+
+**Then the real find:** the wizard bar's buttons carried no `data-optype`, and `applyAxisGating` has always queried
+exactly that. The gating was RIGHT AND UNREACHABLE — every op the app declared impossible on this machine still
+looked and clicked like the rest, including the ones t1271 declared. One attribute, plus the call after the bar
+renders, and all seven grey with their reasons; asserted at the DOM, not just through the pure function.
+
+One ordering call while wiring it: polygon on a mill is BOTH missing an A axis and in the wrong frame. It quoted the
+axis, which sends the operator to Settings to declare a driven chuck — a wrong answer politely delivered. The frame
+reason answers first now.
+
+### Verified
+
+Fast tier: smoke 65/65; the new spec 9/9; every touched lathe/probe/label spec 58/58; the shared-file coverage
+(sim-starts registry, sim context, engine trace, corner post-fold, grid/envelope, pocket depth, dev-mode) green.
+Screenshots: both probe wizards with honest strokes and a scaled stylus, the main preview framed on bar + chuck, and
+a mill workspace with all seven lathe entries greyed.
+
+**TWO PRE-EXISTING FAILURES, not from this turn — verified by stashing every change and re-running:**
+`wiz-bar-canvas-route` (the Corner slot opens, the canvas and 3D pane both render, but `.fc-handle-move` is absent)
+and `header-never-clips-748` (the quick-menu chevron's 44px touch target). Both fail identically at the last commit.
+Flagged for the advisor's full-suite triage rather than fixed here, since neither is in this turn's scope and the
+cause predates it.
