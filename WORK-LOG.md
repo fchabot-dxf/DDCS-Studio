@@ -19144,3 +19144,82 @@ points at the bar), revolved material removal, and DRO diameter-speak.
 
 GATE (fast tier): smoke + the lathe family + the new visibility asserts + canvas/workspace = 136/136.
 SCREENSHOTS: s1281-facing / -odturn / -parting / -centerdrill / -polygon.png.
+
+---
+
+## turn 1283 -- THE LATHE WORLD: two of four delivered and proven, two wired but NOT confirmed. Reported as such.
+
+### (3) THE PROFILE CARVE — the star, and it works.
+
+TURNED MATERIAL REMOVAL IS NOT A HEIGHTMAP. The mill carves a grid of z-heights a cutter pushes down: right for a
+fixed part under a spinning tool, wrong for a spinning part under a fixed one. A turned surface is a RADIUS ALONG Z,
+revolved — modelled that way the carve is not an approximation at all, it is EXACT for turning, and it costs one
+number per sample instead of a grid. So `data/latheProfile.js` is a declared seam BESIDE the voxel carve, taken when
+the stock says it is a lathe bar (the axis + face datum it already carries since t1281).
+
+ASSERTED AGAINST THE HAND-DERIVED PASS TRUTHS, each op through its REAL emitted program:
+  · FACING removes its 3mm allowance → the bar is 3 SHORTER, its new face exactly at Z0, full diameter just inside it.
+  · OD TURNING to Ø14 over 25 → radius 7 through the turned length, radius 10 past the shoulder, min Ø exactly 14.
+  · PARTING → Ø12 at the blade Z and the full bar either side of it.
+  · CENTRE DRILLING → a bore at the face, running in to depth, stopping there, and the OUTSIDE untouched.
+
+TWO MODELLING GAPS THE GROUND TRUTH CAUGHT, both real:
+  · A PLUNGE REMOVED NOTHING. Interpolating the tool radius along a move with no Z extent gave t=0 — the radius it
+    STARTED at — so a parting plunge left the bar untouched. A plunge removes everything from where it started to
+    where it ENDED.
+  · FACING LEFT THREE THIN GROOVES instead of shortening the bar. The missing rule is the physical one: MATERIAL
+    EXISTS ONLY WHILE IT IS ATTACHED TO THE CHUCK. Walking out from the grip end, the first sample cut clean through
+    is where the workpiece ends — everything past it has fallen off. That one rule makes facing shorten the bar AND
+    makes parting actually part, without either op being special-cased.
+  · And the plane the tool cut THROUGH is the new face, not the last sample that survived it — a one-sample lie in
+    the length otherwise.
+
+POLYGON, stated rather than fudged: a revolved profile CANNOT express flats. Its section is not carved; the hexagon
+is drawn in the end view and the sweep traces on the bar. Progressive flats need an angular dimension — a different
+structure, and a later turn if it is wanted.
+
+### (4) DRO DIAMETER-SPEAK — delivered, one formatter, visible in the shots.
+
+`viz/latheDro.js`: the X row is labelled Ø and both columns (Work and Mach) pass through one function. The screenshots
+show ØX 13.728 / 20.624 while the machine holds the radius. The frame stays radius underneath and `radiusOf()` is
+still the only converter — this is a DISPLAY. An unmarked doubled number would be indistinguishable from a bug, so
+the row says Ø. A mill DRO is untouched, asserted.
+
+### (1)+(2) THE CHUCK AND THE TURNING TOOL — WIRED, NOT CONFIRMED. This is the honest part.
+
+The chuck reuses the rotary rig's own render (one chuck concept), told the bar lies along Z and given a declared
+`noTailstock` — a turner's bar sticks out FREE, and a tailstock would put steel exactly where every one of these ops
+cuts. It is attached to the bar in setStock, because a grip end is a fact about the stock rather than an op's opt-in.
+The spin follows the run state (the work turns while the program plays; cosmetic by design — nothing reads the angle).
+A turning-tool model (holder + insert from +X, a drill-like bit on centre for the centre-drill op) is built and
+switched on the workspace KIND rather than the stock, after keying it on the stock lost a race during load.
+
+BUT THE EYEBALL RULE SAYS LOOK, AND WHAT I SEE IS THE MILL'S SPINDLE STILL RENDERING. The turning tool is not
+reaching the screen: the header still reads "flat endmill Ø6" and the tall grey spindle body is still over the bar.
+The chuck's placement is likewise unconfirmed — I cannot point at it in a screenshot and say that is the chuck.
+
+I am NOT claiming those two. The user's ruling was that the pass-back delivers the COMPLETE world, and this one does
+not: it delivers the carve and the DRO, proven and visible, on top of t1281's bar and path. Passing the rest as done
+because the code exists is exactly the "prove the wiring to the visible pixel" failure this family has already hit
+three times (t1273's item kinds, t1277's canvas classes, t1281's whole scene). The remaining work is to find why
+_buildAnimTool's lathe branch does not survive whatever rebuilds the tool afterwards, and to verify the chuck's
+position against a screenshot rather than against the arithmetic.
+
+GATE (fast tier): smoke + the lathe family + the new world specs = 143/143. Everything landed is additive and green.
+SCREENSHOTS: s1283-facing / -odturn / -parting / -centerdrill / -polygon.png — the carve is visible in each (the
+faced bar is shorter, the turned bar is stepped, the groove is cut) and so is the Ø DRO.
+
+### AMENDMENT (user, live): the workspace-open glyph goes to the SCREEN CENTRE.
+
+The standing rule is no global overlay, and the reason is honesty: one busy row does not mean a busy app. A workspace
+open is the exception the user named, and what makes it not a lie is that the open ends in `location.reload()` — the
+whole app IS going away. So the centred glyph is both the truthful signal and the bridge over the quiet gap before
+the new page paints. `busyOverlay(label)` names what is opening in the user's own words, announces itself politely to
+a screen reader, and is never cleared on success (success here means the page reloads out from under it); the failure
+path dismisses it, because a named refusal is the feedback then.
+
+THE ROW STATE STAYS. It is the double-click guard — two opens of one workspace race each other through restore — and
+a test asserts the second click is still swallowed. LIBRARY IMPORTS KEEP THE ROW GLYPH ALONE, asserted by reading
+both modules: they finish on this screen, where an overlay would claim a busyness the app does not have. The
+distinction is not the length of the wait, it is whether the app survives it — and busyRow.js's header now records
+that ruling so the reasoning stays true for the next reader.
