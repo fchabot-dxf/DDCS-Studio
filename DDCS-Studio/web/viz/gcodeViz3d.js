@@ -13,7 +13,8 @@
  */
 import { initCube, cubeFaceAt, highlightCubeFace, pickCube } from './navCube.js';
 import { setupJogPendant } from './jogPendant.js';
-import { profileFromBar, carveSegment, carveBore, profileOutline } from '../data/latheProfile.js';   // t1283 — turned work carves as a PROFILE, not a heightmap
+import { profileFromBar, carveSegment, carveBore, profileOutline } from '../data/latheProfile.js';
+import { viewFor } from './viewScope.js';   // t1295 — the start orientation is scoped to the machine KIND   // t1283 — turned work carves as a PROFILE, not a heightmap
 import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame, partZeroShift } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
@@ -1151,14 +1152,15 @@ export class GcodeViz3D {
         const fov = this.camera.fov * Math.PI / 180;
         this.radius = (radius / Math.sin(fov / 2)) * 1.25;
         // Start orientation from the saved JSON settings (defaults to the front view)
+        // t1295 — THE CAMERA STANDS WHERE THIS KIND OF MACHINE WANTS IT. One unscoped setting governed both worlds,
+        // and because SETTINGS_DEFAULTS.view always supplies a theta and a phi, the lathe default added in t1281
+        // could never fire — every pane opened a lathe scene with the mill's view down at a table, the bar on end.
+        // Scoped per kind now: a mill-framed camera never governs a lathe scene, or the other way about.
         const sv = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().view) || {};
-        // t1281 — A LATHE IS LOOKED AT FROM THE SIDE. The default (phi = 60° off +Z) is a mill's three-quarter view
-        // down at a table, and it stands a bar-along-Z on its end: the one shape a turner never sees. A lathe
-        // workspace opens square-on to the ZX plane instead — the bar lying left-to-right, X up off the centreline,
-        // which is the view they stand in. A SAVED view still wins: this is a default, not a rule.
-        const latheDefault = (() => { try { return !!(window.ddcsIsLathe && window.ddcsIsLathe()); } catch (_) { return false; } })();
-        this.theta = (typeof sv.theta === 'number') ? sv.theta : -Math.PI / 2;
-        this.phi = (typeof sv.phi === 'number') ? sv.phi : (latheDefault ? Math.PI / 2 : Math.PI / 3);
+        const kind = (() => { try { return (window.ddcsIsLathe && window.ddcsIsLathe()) ? 'lathe' : 'mill'; } catch (_) { return 'mill'; } })();
+        const stand = viewFor(kind, sv);
+        this.theta = stand.theta;
+        this.phi = stand.phi;
 
         // Rescale the floor grid to roughly match the part footprint. Anchor it to the stock bottom
         // (the table) so the stock always rests on the grid — otherwise a deep move (e.g. Z-first probe

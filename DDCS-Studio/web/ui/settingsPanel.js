@@ -101,7 +101,10 @@ export const SETTINGS_DEFAULTS = {
     // part-zero), kept in sync from wcs.table[active-1]. wcs = the G54–G59 table pulled from the controller.
     units: 'mm',   // t990 — DISPLAY unit for numeric form fields ('mm' | 'inch'). mm-native STORAGE always; inch is a derived view (no emit change).
     machine: { x: 300, y: 300, z: -120, show: true, softLimits: true, safeZMargin: 5, rapidRate: 6000, toolChangeSec: 15, workOrigin: { x: 0, y: 0, z: 0 }, wcs: { active: 1, table: null } },   // Z is negative: homes at the TOP (machine 0) and travels down into the work — the router/mill norm. safeZMargin (t822) = mm below home the error-handler retract via G53. rapidRate (t844) = G0 traverse mm/min for the time estimate + time-true sim (pull-seeded from the controller G0-speed register when read); toolChangeSec = per-M6 allowance (s)
-    view:    { theta: -1.5708, phi: 1.0472 }, // 3D preview start orientation (front: +X right, +Y back)
+    // t1295 — the 3D start orientation, SCOPED BY MACHINE KIND (viz/viewScope.js owns the meaning). The flat pair is
+    // kept and read as the MILL's, which is what every view saved before the scope existed actually was; `byKind`
+    // holds the per-kind ones. A lathe never inherits a mill-framed camera, or the other way about.
+    view:    { theta: -1.5708, phi: 1.0472, byKind: {} }, // mill front-ish default (+X right, +Y back)
     probes:  {
         probePin: 3, probeLevel: 0,        // IN03 = YunKia V6 3D probe (confirmed)
         setterPin: 2, setterLevel: 0,      // IN02 = fixed Tool Setter (confirmed); was 4 (IN04 = unwired)
@@ -586,8 +589,64 @@ const _gvs = (id, d) => {
 };
 // Interactive MACHINE ENVELOPE: an isometric box drawn from the SIGNED travels, so home (machine 0) sits at the
 // corner the signs dictate and each axis edge points the travel direction. The travel inputs sit on their axis edge.
+/**
+ * t1295 (user screenshot) — THE LATHE'S OWN ENVELOPE. The kind selector already explains that X is a radius, and
+ * then the picture underneath drew a mill's flat XY table with a live Y row. A lathe has no table and no Y: it has a
+ * BED the carriage runs along and a CROSS-SLIDE that comes in and out of the centreline.
+ *
+ * So this is an elevation, not an isometric: Z across (the bed), X up (the cross-slide, a RADIUS off the centreline
+ * which is drawn as the axis it is measured from). Same declared travel numbers, same sign rule — a sign still says
+ * which end home is at — because none of that changed; what changed is which axes exist and what they mean.
+ */
+function latheEnvelopeSvg(X, Z) {
+    const W = 200, H = 200, pad = 26;
+    const spanZ = Math.max(1, Math.abs(Z)), spanX = Math.max(1, Math.abs(X));
+    const sc = Math.min((W - 2 * pad) / spanZ, (H - 2 * pad) / (spanX * 1.15));
+    const cx = W / 2, axisY = H * 0.68;                       // the centreline sits low: X only goes one way from it
+    const zSign = Z >= 0 ? 1 : -1, xSign = X >= 0 ? 1 : -1;
+    const z0 = cx - (spanZ * sc) / 2, z1 = cx + (spanZ * sc) / 2;
+    const xTop = axisY - spanX * sc;
+    const ln = (a, b, c2, d, col, w, extra = '') => `<line x1="${a.toFixed(1)}" y1="${b.toFixed(1)}" x2="${c2.toFixed(1)}" y2="${d.toFixed(1)}" stroke="${col}" stroke-width="${w}"${extra}/>`;
+    // home (machine 0) sits at the end each sign dictates — the same rule the mill box uses
+    const homeZ = zSign > 0 ? z0 : z1, homeX = xSign > 0 ? axisY : xTop;
+    return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
+        <rect x="${z0.toFixed(1)}" y="${xTop.toFixed(1)}" width="${(z1 - z0).toFixed(1)}" height="${(axisY - xTop).toFixed(1)}"
+              fill="rgba(120,150,190,0.10)" stroke="rgba(160,180,210,0.35)" stroke-width="1"/>
+        ${ln(z0, axisY, z1, axisY, '#8fa4bd', 1.2, ' stroke-dasharray="5 4"')}
+        ${ln(z0, axisY, z1, axisY, '#e0564f', 2.4, ' opacity="0.0"')}
+        ${ln(z0, axisY, z1, axisY, '#5fbf6a', 0, '')}
+        ${ln(z0, axisY + 0.5, z1, axisY + 0.5, '#4a90d9', 2.6)}
+        ${ln(homeZ, axisY, homeZ, xTop, '#e0564f', 2.6)}
+        <circle cx="${homeZ.toFixed(1)}" cy="${homeX.toFixed(1)}" r="4.5" fill="#e0564f"/>
+        <text x="${(z1 - 4).toFixed(1)}" y="${(axisY + 15).toFixed(1)}" text-anchor="end" font-size="10" fill="#8fa4bd">Z — carriage, along the bed</text>
+        <text x="${(z0 + 4).toFixed(1)}" y="${(xTop + 12).toFixed(1)}" font-size="10" fill="#8fa4bd">X — cross-slide (radius)</text>
+        <text x="${(z0 + 4).toFixed(1)}" y="${(axisY - 5).toFixed(1)}" font-size="9" fill="#6f8199">centreline</text>
+    </svg>`;
+}
+
 function renderMachineGui() {
     const svgBox = document.getElementById('set_mach_env_svg'); if (!svgBox) return;
+    // t1295 — a LATHE draws its own envelope, from the same numbers. The Y row greys rather than hides (the standing
+    // rule: hiding answers a question nobody asked and leaves the real one — CAN this machine do it — unanswered).
+    try {
+        const lathe = !!(window.ddcsIsLathe && window.ddcsIsLathe());
+        const yRow = document.getElementById('set_mach_y') && document.getElementById('set_mach_y').closest('.mach-travel-row');
+        if (yRow) {
+            yRow.classList.toggle('axis-gated', lathe);
+            if (lathe) {
+                if (yRow.dataset.origTitle === undefined) yRow.dataset.origTitle = yRow.title || '';
+                yRow.title = 'this is a lathe workspace — X cross-slide + Z carriage only';
+                const yi = document.getElementById('set_mach_y'); if (yi) yi.disabled = true;
+            } else if (yRow.dataset.origTitle !== undefined) {
+                yRow.title = yRow.dataset.origTitle; delete yRow.dataset.origTitle;
+                const yi = document.getElementById('set_mach_y'); if (yi) yi.disabled = false;
+            }
+        }
+        if (lathe) {
+            svgBox.innerHTML = latheEnvelopeSvg(_gvs('set_mach_x', 300), _gvs('set_mach_z', -120));
+            return;
+        }
+    } catch (_) { /* fall through to the mill drawing */ }
     // t1217 — the Z fallback is NEGATIVE, matching the stored default (-120: Z homes at the TOP and travels down).
     // It was +120, so an EMPTY Z field drew the envelope inverted relative to the real default — the picture
     // disagreed with the machine. Only reachable via an empty field, but the fallback should never contradict
@@ -689,12 +748,24 @@ const AX_OF_IDX = { 0: 'x', 1: 'y', 2: 'z', 3: 'a', 4: 'b' };   // t648 — idx 
 function homingConfiguredAxes() {
     const s = getSettings();
     const m = (s.motors) || {};
+    // t1295 — HOMING FOLLOWS THE DECLARED AXES. A lathe has no Y to home; offering a Y card asks the operator to
+    // configure a switch on an axis their machine does not have. The chuck earns its own row only when it is
+    // declared a DRIVEN AXIS — the same declaration polygon turning gates on, read from the one machine record.
+    try {
+        if (window.ddcsIsLathe && window.ddcsIsLathe()) {
+            const lathe = ['x', 'z'];
+            const mach = (window.ddcsGetMachine && window.ddcsGetMachine()) || {};
+            if (mach.chuck === 'axis') lathe.push('a');
+            return lathe;
+        }
+    } catch (_) { /* not a lathe, or the record is unreadable → the mill list below */ }
     const out = ['x', 'y', 'z'];
     // t648 — a SLAVE-role axis is never independently homed (the master syncs it), so it gets no homing card — excluded like 'unused'.
     if (m.a && m.a.role && m.a.role !== 'unused' && m.a.role !== 'slave') out.push('a');
     if (m.b && m.b.role && m.b.role !== 'unused' && m.b.role !== 'slave') out.push('b');
     return out;
 }
+try { if (typeof window !== 'undefined') { window.__ddcsHomingAxes = homingConfiguredAxes; window.__ddcsRenderHoming = () => renderHomingGui(); } } catch (_) {}
 function homingPostIsExpert() {
     try {
         const ap = localStorage.getItem('ddcs_active_post');
@@ -1710,6 +1781,10 @@ function wireSettingsOverlay(ov) {
         q('set_mach_z').value = s.machine.z;
         if (q('set_safez_margin')) q('set_safez_margin').value = s.machine.safeZMargin != null ? s.machine.safeZMargin : 5;   // t822 — machine-frame safe-Z margin
         renderMachineGui();
+        // t1295 — and the HOMING cards, on every open. They were painted once (before the machine kind was known) and
+        // never repainted, so a lathe workspace opened Settings showing a Y axis to home that it does not have. The
+        // envelope beside them already repaints here; these follow the same declared axes, so they follow it.
+        try { renderHomingGui(); } catch (_) {}
         renderWcsTable(q('set_mach_wcs_table'), s.machine);
         if (q('set_mach_softlimit')) q('set_mach_softlimit').checked = !!s.machine.softLimits;
         renderAxesGui();   // t648 — the vertical per-axis role list (was static A/B role+around selects)
@@ -3100,6 +3175,11 @@ function wireSettingsOverlay(ov) {
             sel.addEventListener('change', async () => {
                 setMachine({ kind: sel.value }, false);
                 await paintKind();
+                // t1295 — the hardware surface follows the kind IMMEDIATELY: the envelope becomes that machine's
+                // picture, the Y row greys or comes back, and the homing cards follow the declared axes. Reversible,
+                // because a kind is a setting a person toggles while working out what they have.
+                try { renderMachineGui(); } catch (_) {}
+                try { renderHomingGui(); } catch (_) {}
                 try { renderIdentityBand(); } catch (_) { /* the band redraws with the kind */ }
                 window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
             });
