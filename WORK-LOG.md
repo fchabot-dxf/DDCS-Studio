@@ -19000,3 +19000,52 @@ SCREENSHOTS: s1277-polygon.png (both views, the hexagon inscribed in the bar), -
 the code regenerated), -gated.png.
 
 THE LATHE FAMILY IS FIVE OPS: facing, OD turning, parting/grooving, centre drilling, polygon turning.
+
+---
+
+## turn 1279 -- TWO REPAIRS. A linter that believed an import table, and a click that landed on nothing.
+
+### (1) THE LINTER'S VOCABULARY now derives from evidence, and says which kind.
+
+THE FINAL DEMONSTRATED VOCABULARY, mined from the 59 captured factory macros rather than from a binary's symbol table:
+  MATH FUNCTIONS   `ABS[…]` — DEMONSTRATED, 10 uses (`#24=ABS[#22-#23]`). It is the ONLY one. Nothing else appears.
+  CONTROL FLOW     `IF […] GOTO<n>` — DEMONSTRATED. `WHILE […] DO<n>` — DEMONSTRATED, 35 uses.
+  WORD OPERATORS   `EQ` — VERIFIED on the machine (V10, 2026-06-23). `NE` — DEMONSTRATED, 25 uses, in real code:
+                   `WHILE [#[1520+#1099-1] NE 0] DO14`. LT / GT / LE / GE — ABSENT.
+  ARITHMETIC       `+ - * /`, bracket nesting, `#n`, `#[n]` indirect — DEMONSTRATED throughout.
+
+The header now states that evidence base in three declared kinds — DEMONSTRATED (in the corpus) / VERIFIED (run on the
+machine) / ABSENT (neither) — and records what it used to claim and why that was wrong, because the mistake is worth
+keeping visible: the names it cited as "the parser's real vocabulary mined from parse.out" sit immediately after the
+string `libm.so.6` in the ELF dynamic-symbol import table. Two tells: parse.out holds no uppercase grammar tokens at
+all (not even ABS, which works), so the vocabulary cannot be read out of that file at all; and `cos`/`sin` are absent
+from the list while `asin`/`acos` are present, which is a maths library's imports, not a G-code grammar.
+
+TRIG IS NOW AN ERROR (`E-NOTRIG`) with the evidence in the message. The other undemonstrated functions (SQRT, ROUND,
+FUP, FIX, LN, EXP…) are a WARNING, not an error — the honest distinction: absence of evidence is a reason to VERIFY
+before relying, and only trig has the second, independent signal (the missing libm imports) pointing the same way.
+`NE` stopped warning, because the same evidence sweep that killed the trig claim proved NE is used 25 times in
+factory code.
+
+DISCRIMINATION: the new rules flag ZERO of the 59 real factory macros — they reject what the controller rejects and
+nothing else. Self-test 23/23.
+
+### (2) THE INTERMITTENT WAS A CLICK THAT LANDED ON NOTHING.
+
+ROOTED, not smoothed over. The failure was never in the assertion the name suggests — it was at line 60, the FIRST
+menu open:  `page.click('#hdrPostBtn')` then `waitForSelector('#hdrPostMenu:not([hidden])')` → TimeoutError, waiting
+for a menu that had never been asked to open. `initHeaderPost()` runs inside a long chain of DEFERRED dynamic imports
+in index.html, well after `window.ddcsStudio` exists — which is all the test waited for. Under parallel load the gap
+widens, the click lands on a button with no handler, and it is swallowed silently.
+
+THE FIX IS A DECLARED SIGNAL, not a longer wait: the deferred boot block now ends by setting
+`document.documentElement.dataset.ddcsReady = '1'` and dispatching `ddcs:ready`. One flag that means THE WIRING IS
+DONE, instead of every caller guessing which global appears when. The spec waits on that. Any UI test that drives a
+deferred-wired control can adopt it — that whole class of flake has one answer now.
+
+VERIFIED: 12/12 with repeat-each in isolation, and THREE consecutive clean runs of the exact combination that used to
+fail about half the time (87/87 each). Before the fix the same list failed on a clean tree too, which is how it was
+established as pre-existing rather than mine.
+
+GATE (fast tier): smoke + the lathe family + the canvas / workspace / wizard specs = 137/137, plus the linter's own
+self-test 23/23 and the 59-macro no-false-positive sweep.
