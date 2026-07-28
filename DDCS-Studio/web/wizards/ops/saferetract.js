@@ -53,7 +53,11 @@ export const safeHopBlock = {
 // wraps; NO marker in the live projection). One brick in Blocks; the primitives stay first-class (wizards use the bundle,
 // machinists author from primitives). `emit` here is the childless fallback ([]); the real lines come from its children.
 export const safeTraverseBlock = {
-    type: 'safetraverse', label: 'Safe Traverse', kind: 'leaf', category: 'Move',
+    // t1319 — IT CARRIES ITS TRAVERSE, so it declares that it does. Declared a LEAF, the bridge had no reason to give
+    // it a mouth: its children never became blocks, so a corner op came back from the canvas with its reposition step
+    // GONE — the tool would have driven straight to wall 2 without the traverse that routes it around the corner.
+    // The emit already said as much ("the real lines come from its children"); the block shape did not.
+    type: 'safetraverse', label: 'Safe Traverse', kind: 'container', category: 'Move',
     defaults: { to: 'wall2', shape: 'dogleg' }, fields: ['to', 'shape'],
     // t903 — HIDDEN from the DRAGGABLE palette/toolbox until P2.5 makes it standalone-functional (a childless drop is inert;
     // no broken affordance ships — the empty-dropdown lesson). It STAYS in BLOCKS (newBlock, wizard-composed use) + keeps its

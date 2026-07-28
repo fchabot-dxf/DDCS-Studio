@@ -20290,3 +20290,45 @@ declare an item grain of their own.
 
 Gate: smoke 71/71; the t1315 spec 8/8 (two of them new); matrix + odturn + taper + Blocks 36/36; lathe family 134/134;
 round-trip specs 45/45; flyout/snippet specs 29/29.
+
+---
+
+## t1319 — the round trip keeps the whole program (two unrelated causes, kept apart)
+
+### Cause 1: an absent CHOICE was written to the canvas as false
+
+`progend` is authored with `params: {}` — every one of its defaults applies, which is how the tail (M5, M9, the
+staged #101 + G53 retract) gets emitted. But `recToJson` wrote `fields[name] = !!v` for a checkbox, so an ABSENT
+boolean landed on the block UNCHECKED and came back false. A program returned from Blocks **left the spindle
+running**. Same family as t1317: absence turned into a wrong concrete value.
+
+The rule, stated where it belongs: **a checkbox or a dropdown has no "no value" state** — the emit reads them as a
+boolean or a string, so writing false/'' is not an omission, it is a different instruction. An absent choice takes
+the atom's default.
+
+**Numeric sockets deliberately keep today's behaviour, and that was a correction mid-turn.** I first applied the
+default to value fields too, and the sweep caught it: for several atoms the EMIT'S OWN FALLBACK differs from the
+declared default (progstart's rpm falls back to 0 = no spindle line, while its default is 12000), so a round trip
+started ADDING lines the program never had. Where a number's absence is meaningful, the atom declares it
+`absentable` (t1317) and the socket stays empty — that is the seam for it.
+
+### Cause 2: a block that carries children was declared a leaf
+
+Entirely separate. `safetraverse` bundles the traverse it emits — its own `emit` is `[]` and its comment says "the
+real lines come from its children" — but it declared `kind: 'leaf'`, so the bridge gave it no mouth and its children
+never became blocks. A corner op came back **without the step that routes the tool around the corner** to wall 2.
+It declares `kind: 'container'` now: the declaration, not a special case in the bridge.
+
+### What the sweep says
+
+Measured by stashing this turn's change and re-running, which is also what proves the asserts are not vacuous:
+before, `corner` lost 4 blocks and `middle` lost 5. **Now no registered op loses a single block**, and corner is
+byte-identical end to end with its dog-leg ordering intact (out on one axis, then in on the other — that order IS
+the safety).
+
+A remaining, separate class is COUNTED rather than hidden: 11 ops still differ in their emitted TEXT across a round
+trip, `middle` among them, for reasons that predate this turn (same set with the change stashed). Nothing is lost —
+the block counts match — so it is value fidelity, not structure. Pinned as a count so it cannot quietly grow.
+
+Gate: smoke 71/71; the new spec 4/4; the round-trip sweep (every spec touching stackToWorkspace/workspaceToStack,
+plus the matrix, the both-paths guard and the two corner-drag specs) 76/76.

@@ -239,8 +239,17 @@ function recToJson(rec) {
             else if (k === 'value' && isAbsent(v) && absentable(def, f)) { /* leave the socket EMPTY */ }
             else if (k === 'value') inputs[name] = { shadow: { type: 'math_number', fields: { NUM: Number(v) || 0 } } };
             // empty region/boolean socket → leave unset
-        } else if (k === 'checkbox') fields[name] = !!v;
-        else fields[name] = String(v ?? '');
+        // t1319 — AN ABSENT CHOICE TAKES THE ATOM'S DEFAULT, and only a choice. A checkbox or a dropdown has no "no
+        // value" state: the emit reads them as a boolean or a string, so writing false / '' onto the canvas is not
+        // an omission, it is a DIFFERENT INSTRUCTION — which is how a program came back from Blocks with its
+        // `progend` tail switched off and the spindle left running.
+        //
+        // Numeric sockets deliberately keep today's behaviour: for several atoms the EMIT'S OWN FALLBACK differs
+        // from the declared default (progstart's rpm falls back to 0 = no spindle line, while its default is 12000),
+        // so applying the default there would ADD lines the program never had. Where a number's absence is meaningful
+        // the atom declares it `absentable` (t1317) and the socket stays empty.
+        } else if (k === 'checkbox') fields[name] = !!(isAbsent(v) ? def.defaults[f] : v);
+        else fields[name] = String((isAbsent(v) ? def.defaults[f] : v) ?? '');
     }
     // Non-field params (snapshots like PlaceOnStock's stock dims + bbox) → `data`, so they survive a block edit.
     const fset = new Set(fieldsOf(def)), extra = {};
