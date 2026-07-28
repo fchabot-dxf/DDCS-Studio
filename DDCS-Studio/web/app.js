@@ -17,6 +17,8 @@ import { playClick } from './ui/sound.js';  // click feedback sound
 import { loadUserOps, listUserOps, createUserOp, updateUserOp, deleteUserOp, getUserDef } from './blocks/userOps.js';   // wizard-maker: register + seed/upgrade user-defined ops; t1107 — per-wizard Restore-to-factory reseed
 import { insertUserOp } from './ui/userOpForm.js';   // wizard-maker: generic param form (→ window.ddcsInsertUserOp)
 import { atcWarmupDataDef } from './blocks/dataOps/atcWarmupData.js';
+import { facingDataDef } from './blocks/dataOps/facingData.js';   // t1271 — the lathe family's first citizen (the gated pilot)
+import './ui/axisGating.js';   // t1271 — grey (never hide) the ops this machine's declared axes cannot run
 import { atcLengthDataDef } from './blocks/dataOps/atcLengthData.js';   // t409 — ATC Tool Length light port (new twin, opened IN-PLACE from the ATC Tool Length slot)
 import { atcCheckDataDef } from './blocks/dataOps/atcCheckData.js';   // t411 — ATC Tool Check light port (inherits the Tool Length recipe)
 import { atcTestDataDef } from './blocks/dataOps/atcTestData.js';   // t556-t560 ATC Test port — the "ATC Test (data)" twin: opened IN-PLACE from the built-in ATC Test slot (opensAs); mode superset + pockets unroll + M2 recompose + declared-I/O one-source + machine-frame/magazine sim
@@ -92,6 +94,7 @@ const SEED_BUILDERS = [
     drillDataDef, tapDataDef, boreDataDef, slotDataDef, surfacingDataDef, contourDataDef, pocketDataDef, wcsDataDef, textDataDef,
     cornerDataDef, edgeDataDef, middleDataDef, rotaryCenterDataDef, rotaryClockDataDef, alignmentDataDef,
     commDataDef, ioStepDataDef, pauseConfirmDataDef, homingDataDef,
+    facingDataDef,   // t1271 — LATHE: seeded for every workspace; the bar decides where it SITS by machine kind
 ];
 const seedBuilderFor = (opType) => SEED_BUILDERS.find((fn) => { try { return fn().opType === opType; } catch (_) { return false; } }) || null;
 

@@ -623,6 +623,10 @@ export class CommandDeck {
 
         // Live re-render hook for the Settings "wizard library manager" (stage 5) — re-reads getLibrary().
         window.ddcsRefreshWizardBar = () => { this._renderWizardBar(); requestAnimationFrame(() => { this._fitHeader(); this._fitAppHeader(); }); };
+        // t1271 — the MACHINE KIND changes which group leads (a lathe workspace leads with Lathe), so the bar has to
+        // re-render when the record changes. Without this the ordering is only correct on the next reload — which is
+        // exactly the kind of "works after a refresh" behaviour that reads as broken.
+        window.addEventListener('ddcs:machine-changed', () => { try { window.ddcsRefreshWizardBar(); } catch (_) {} });
 
         // One-line toolbar: collapse labels→icons the instant the labelled bar wouldn't fit, so it
         // never wraps (wrapping clipped the 2nd row) and the page never scrolls. Re-measure on

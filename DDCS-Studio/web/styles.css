@@ -5638,6 +5638,12 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
 .wsm-empty { padding: 14px 10px; font-size: 12px; color: var(--text-dim); border: 1px dashed var(--border); border-radius: 6px; }
 @media (max-width: 640px) { .wsm-overlay { padding: 0; align-items: flex-start; } .wsm-modal { max-width: none; height: 100dvh; max-height: none; border-radius: 0; } }
 
+/* ── t1271 — AXIS GATING. A wizard this machine cannot physically run is greyed, never hidden: hiding rewrites the
+   screen and answers a question nobody asked, while leaving "can this machine do it?" unanswered. The tooltip is the
+   whole explanation, exactly as postGating does it for fields. ─────────────────────────────────────────────────── */
+.axis-gated { opacity: .42; filter: grayscale(.7); cursor: not-allowed; }
+.axis-gated * { pointer-events: none; }
+
 /* ── t1257 — THE BUSY ROW (ui/busyRow.js). Feedback where the wait is: on the row you clicked, from the instant you
    click it. The glyph is a CSS-only spinner appended to the row, so nothing has to re-render to show it. ────────── */
 .is-busy { position: relative; opacity: .72; cursor: progress; }

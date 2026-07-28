@@ -17,6 +17,7 @@
  * overrides) lives in `ddcs_wizard_layout`. The default catalog (BUILTINS/GROUPS) is the shipped library.
  */
 import { listUserOps, createUserOp, deleteUserOp } from './userOps.js';
+import { isLathe } from '../data/workspaceMachine.js';   // t1271 — the machine kind decides which group leads
 
 // ── the shipped (default) catalog — the current wizard bar as data ───────────────────────────────────────────
 // (Faithful to commandDeck.renderHeader's groups/entries. Icons: emoji where the bar used emoji; the SVG-iconed
@@ -29,6 +30,10 @@ const GROUPS = [
     { id: 'probe', label: 'Probe', section: 'center' },
     { id: 'atc', label: 'ATC', section: 'center' },
     { id: 'mill', label: 'Mill', section: 'center' },
+    // t1271 — THE LATHE GROUP. Declared for every workspace (the ops exist either way); WHERE it sits is decided by
+    // the machine kind at render time, not by hiding it: a lathe workspace leads with it, a mill shows it after the
+    // mill groups. Same catalogue, different emphasis — which is the whole difference between the two machines.
+    { id: 'lathe', label: 'Lathe', section: 'center' },
     { id: 'probe_datawiz', label: 'Probe Data Wiz', section: 'right' },
     { id: 'atc_datawiz', label: 'ATC Data Wiz', section: 'right' },
     { id: 'mill_datawiz', label: 'Mill Data Wiz', section: 'right' },
@@ -181,7 +186,16 @@ export function getLibrary({ includeHidden = false, includeEmpty = false } = {})
     const byGroup = new Map();
     for (const e of entries) { if (!byGroup.has(e.group)) byGroup.set(e.group, []); byGroup.get(e.group).push(e); }
     // dropdown order: the shipped GROUPS first, then user-created dropdowns, then any legacy entry-introduced group.
-    const knownIds = GROUPS.map((g) => g.id), customIds = custom.map((c) => c.id);
+    // t1271 — A LATHE WORKSPACE LEADS WITH ITS OWN GROUP. The catalogue is identical either way; what changes is the
+    // order, because the first dropdown is where a person looks first and on a lathe that should not be "Probe". A
+    // MILL workspace keeps Lathe where it was declared, behind the mill groups — present, just not first.
+    const kindFirst = (ids) => {
+        try {
+            if (!isLathe()) return ids;
+            return ['lathe', ...ids.filter((x) => x !== 'lathe')];
+        } catch (_) { return ids; }
+    };
+    const knownIds = kindFirst(GROUPS.map((g) => g.id)), customIds = custom.map((c) => c.id);
     const orderedIds = [...new Set([...knownIds, ...customIds, ...[...byGroup.keys()].filter((g) => !knownIds.includes(g) && !customIds.includes(g))])];
     const groups = orderedIds
         .filter((id) => byGroup.has(id) || (includeEmpty && customById.has(id)))           // populated, or empty user dropdowns when asked
