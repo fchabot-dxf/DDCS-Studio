@@ -12,6 +12,7 @@ import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { appendToolSel } from '../../wizards/ops/toolsel.js';
 import { LATHE_GROUP } from './facingData.js';
+import { withLatheScene } from '../../viz/latheScene.js';   // t1281 — the bar, in the 3D scene
 
 export const PART_DATA_OPTYPE = 'user_lathe_parting';
 
@@ -47,7 +48,7 @@ function partDataStack(p = PART_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'panel', params: { panel: 'form3d+2d' } },
             { type: 'layout', params: { kind: 'lathe_profile' } },
             { type: 'param_group', params: { group: 'Part / Groove' }, children: [] },
         ],
@@ -74,10 +75,10 @@ export function applyPartHeader(stack, resolved) {
 }
 
 export function partingDataDef() {
-    const def = userOpFromStack(
+    const def = withLatheScene(userOpFromStack(
         'lathe_parting', 'Part / Groove (lathe)', partDataStack(PART_DEFAULTS),
-        [...PART_BINDINGS, ...PART_STRUCT_BINDINGS], 'form2d', null, LATHE_GROUP,
-    );
+        [...PART_BINDINGS, ...PART_STRUCT_BINDINGS], 'form3d+2d', null, LATHE_GROUP,
+    ), PART_DEFAULTS);
     def.postInstantiate = (stack, resolved) => applyPartHeader(stack, resolved);
     return def;
 }

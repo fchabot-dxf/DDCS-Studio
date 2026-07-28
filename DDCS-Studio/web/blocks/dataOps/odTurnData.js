@@ -18,6 +18,7 @@ import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // the declared tool marker — UNSET → emits nothing
 import { LATHE_GROUP } from './facingData.js';
+import { withLatheScene } from '../../viz/latheScene.js';   // t1281 — the bar, in the 3D scene
 
 export const OD_DATA_OPTYPE = 'user_lathe_odturn';
 
@@ -72,7 +73,7 @@ function odDataStack(p = OD_DEFAULTS) {
         params: {},
         uiChildren: [
             // form2d: the form on the left, the half-profile canvas on the right — the pilot's layout
-            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'panel', params: { panel: 'form3d+2d' } },
             { type: 'layout', params: { kind: 'lathe_profile' } },   // the half-profile, not the mill's XY stock
             { type: 'param_group', params: { group: 'OD Turn' }, children: [] },
         ],
@@ -102,15 +103,15 @@ export function applyStraightEnd(stack, resolved) {
 
 /** The twin, ready for registerUserOp — a Lathe-group op with a 2D panel and no rotary/machine sim claims. */
 export function odTurnDataDef() {
-    const def = userOpFromStack(
+    const def = withLatheScene(userOpFromStack(
         'lathe_odturn',
         'OD Turn (lathe)',
         odDataStack(OD_DEFAULTS),
         [...OD_BINDINGS, ...OD_STRUCT_BINDINGS],
-        'form2d',
+        'form3d+2d',
         null,
         LATHE_GROUP,
-    );
+    ), OD_DEFAULTS);
     // …no `bindingSpecs` re-derive: this template carries NO guards, so no prune shifts the indices and the frozen
     // bindings stay correct. (Setting it anyway cost the `.wiz` round trip its identity — bindingSpecs is not part of
     // the wizard file format, so an exported copy came back missing it.)

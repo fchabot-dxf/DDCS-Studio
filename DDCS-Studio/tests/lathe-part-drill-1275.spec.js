@@ -181,7 +181,7 @@ test('BOTH TWINS register in the Lathe group, IDENTITY-FIRST, bound by macro-var
     for (const [name, o] of Object.entries(r)) {
         expect(o.found, `${name} is a registered op`).toBe(true);
         expect(o.group, `${name} lives with the other lathe ops`).toBe('lathe');
-        expect(o.panel, `${name} shows the form beside the profile`).toBe('form2d');
+        expect(o.panel, `${name} shows the 3D bar AND the profile beside the form`).toBe('form3d+2d');
         expect(o.layout, `${name} DECLARES the half-profile — the mill's XY layout means nothing to it`).toBe('lathe_profile');
         expect(o.sections, `${name} leads with the op-defining choice`).toEqual(['IDENTITY', 'GEOMETRY', 'TOOL & CUT']);
         expect(o.matchedBy.every((m) => /^#\d+$|^toolsel$/.test(m)), `${name} binds by identity, never by position`).toBe(true);

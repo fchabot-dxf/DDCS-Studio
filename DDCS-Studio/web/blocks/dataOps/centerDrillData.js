@@ -13,6 +13,7 @@ import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { appendToolSel } from '../../wizards/ops/toolsel.js';
 import { LATHE_GROUP } from './facingData.js';
+import { withLatheScene } from '../../viz/latheScene.js';   // t1281 — the bar, in the 3D scene
 
 export const CDRILL_DATA_OPTYPE = 'user_lathe_centerdrill';
 
@@ -40,7 +41,7 @@ function cdrillDataStack(p = CDRILL_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'panel', params: { panel: 'form3d+2d' } },
             { type: 'layout', params: { kind: 'lathe_profile' } },
             { type: 'param_group', params: { group: 'Centre Drill' }, children: [] },
         ],
@@ -66,10 +67,10 @@ export function applyStraightPeck(stack, resolved) {
 }
 
 export function centerDrillDataDef() {
-    const def = userOpFromStack(
+    const def = withLatheScene(userOpFromStack(
         'lathe_centerdrill', 'Centre Drill (lathe)', cdrillDataStack(CDRILL_DEFAULTS),
-        [...CDRILL_BINDINGS, ...CDRILL_STRUCT_BINDINGS], 'form2d', null, LATHE_GROUP,
-    );
+        [...CDRILL_BINDINGS, ...CDRILL_STRUCT_BINDINGS], 'form3d+2d', null, LATHE_GROUP,
+    ), CDRILL_DEFAULTS);
     def.postInstantiate = (stack, resolved) => applyStraightPeck(stack, resolved);
     return def;
 }

@@ -18,6 +18,7 @@ import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
 import { appendToolSel } from '../../wizards/ops/toolsel.js';
 import { LATHE_GROUP } from './facingData.js';
+import { withLatheScene } from '../../viz/latheScene.js';   // t1281 — the bar, in the 3D scene
 
 export const POLY_DATA_OPTYPE = 'user_lathe_polygon';
 
@@ -53,7 +54,7 @@ function polyDataStack(p = POLY_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            { type: 'panel', params: { panel: 'form2d' } },
+            { type: 'panel', params: { panel: 'form3d+2d' } },
             { type: 'layout', params: { kind: 'lathe_profile' } },
             { type: 'param_group', params: { group: 'Polygon' }, children: [] },
         ],
@@ -87,10 +88,10 @@ export function rebuildPolygon(stack, resolved) {
 }
 
 export function polygonDataDef() {
-    const def = userOpFromStack(
+    const def = withLatheScene(userOpFromStack(
         'lathe_polygon', 'Polygon Turn (lathe)', polyDataStack(POLY_DEFAULTS),
-        [...POLY_BINDINGS, ...POLY_STRUCT_BINDINGS], 'form2d', null, LATHE_GROUP,
-    );
+        [...POLY_BINDINGS, ...POLY_STRUCT_BINDINGS], 'form3d+2d', null, LATHE_GROUP,
+    ), POLY_DEFAULTS);
     def.postInstantiate = (stack, resolved) => rebuildPolygon(stack, resolved);
     return def;
 }

@@ -181,7 +181,7 @@ test('THE TWIN registers in the Lathe group, IDENTITY-FIRST, with bindings deriv
     expect(r.found, 'OD turning is a registered op, not just a stack builder').toBe(true);
     expect(r.group, 'and it lives in the Lathe group, beside facing').toBe('lathe');
     expect(r.label).toMatch(/OD Turn/);
-    expect(r.panel, 'form on the left, half-profile on the right — the pilot layout').toBe('form2d');
+    expect(r.panel, 'the 3D bar AND the half-profile — the pilot layout, since t1281').toBe('form3d+2d');
     // IDENTITY FIRST, and unlike facing this op HAS one: straight or taper decides what the other fields mean
     expect(r.sections[0], 'the op-defining choice leads the form').toBe('IDENTITY');
     expect(r.first, 'and it is the kind of turn').toBe('kind');

@@ -129,6 +129,7 @@ export function envelopeSummary(m) {
 
 if (typeof window !== 'undefined') {
     window.ddcsGetMachine = getMachine;
+    window.ddcsIsLathe = isLathe;   // t1281 — the 3D reads the KIND to pick a turner's camera; the record is the one source
     window.ddcsSetMachine = setMachine;
     window.ddcsSetMachineName = setMachineName;
 }

@@ -35,7 +35,9 @@ test('(2b) THE TWIN registers as a real op, in the Lathe group, with bindings de
     expect(r.found, 'facing is a registered op, not just a stack builder').toBe(true);
     expect(r.group, 'and it lives in the Lathe group').toBe('lathe');
     expect(r.label).toMatch(/Facing/);
-    expect(r.panel, 'form on the left, half-profile on the right').toBe('form2d');
+    // t1281 — form3d+2d: the 3D BAR and the half-profile. It was form2d, and that is why a lathe wizard had no 3D
+    // pane at all — the op could not show its bar because it never declared anywhere to draw one.
+    expect(r.panel, 'the 3D bar AND the half-profile').toBe('form3d+2d');
     expect(r.params, 'the four numbers a turner actually sets').toEqual(['allowance', 'doc', 'xStart', 'feed']);
     // EVERY spec matched by WHAT THE BLOCK IS (its #var), never by an index — an index drifts when a line is added
     expect(r.specs.every(([, v]) => /^#\d+$/.test(v)), 'each binding is matched by its variable identity').toBe(true);

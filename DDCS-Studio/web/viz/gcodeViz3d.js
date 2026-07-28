@@ -1084,8 +1084,13 @@ export class GcodeViz3D {
         this.radius = (radius / Math.sin(fov / 2)) * 1.25;
         // Start orientation from the saved JSON settings (defaults to the front view)
         const sv = (typeof window !== 'undefined' && window.ddcsGetSettings && window.ddcsGetSettings().view) || {};
+        // t1281 — A LATHE IS LOOKED AT FROM THE SIDE. The default (phi = 60° off +Z) is a mill's three-quarter view
+        // down at a table, and it stands a bar-along-Z on its end: the one shape a turner never sees. A lathe
+        // workspace opens square-on to the ZX plane instead — the bar lying left-to-right, X up off the centreline,
+        // which is the view they stand in. A SAVED view still wins: this is a default, not a rule.
+        const latheDefault = (() => { try { return !!(window.ddcsIsLathe && window.ddcsIsLathe()); } catch (_) { return false; } })();
         this.theta = (typeof sv.theta === 'number') ? sv.theta : -Math.PI / 2;
-        this.phi = (typeof sv.phi === 'number') ? sv.phi : Math.PI / 3;
+        this.phi = (typeof sv.phi === 'number') ? sv.phi : (latheDefault ? Math.PI / 2 : Math.PI / 3);
 
         // Rescale the floor grid to roughly match the part footprint. Anchor it to the stock bottom
         // (the table) so the stock always rests on the grid — otherwise a deep move (e.g. Z-first probe
@@ -1306,14 +1311,25 @@ export class GcodeViz3D {
                 // 4th axis, around Z = vertical table). Defaults to X (horizontal) when no rotary
                 // axis is declared: the templates store length in X, and a 4th axis is typically
                 // along X. Diameter = the smaller of the two cross-section dims.
-                const axis = Object.values(getRotaryAxes())[0] || 'x';
+                // t1281 — THE STOCK SAYS WHICH WAY IT LIES. Guessing from the rotary MOTOR is right for a 4th-axis
+                // bar and wrong for a lathe one: a lathe declares no rotary motor, so the fallback laid its bar
+                // across the machine instead of along it. A declared `axis` wins; everything without one behaves
+                // exactly as before.
+                const axis = stock.axis || Object.values(getRotaryAxes())[0] || 'x';
                 const dims = { x: stock.x, y: stock.y, z: stock.z };
                 const cross = axis === 'x' ? [dims.y, dims.z] : axis === 'y' ? [dims.x, dims.z] : [dims.x, dims.y];
                 const r = barRadius(stock, cross[0], cross[1]);   // SPATIAL-MODEL inc2: declared stock.diameter wins, else min(cross)/2
                 geo = new THREE.CylinderGeometry(r, r, dims[axis], 48); // three.js cylinders run along Y
                 if (axis === 'x') geo.rotateZ(Math.PI / 2);
                 else if (axis === 'z') geo.rotateX(Math.PI / 2);
-                mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
+                // t1281 — a bar on CENTRES sits on the centreline, not in the corner of a table: X and Y are its
+                // axis, and its declared FACE is the Z datum, so the stock runs back into the chuck in −Z.
+                if (stock.origin === 'finished-face') {
+                    const face = Number(stock.faceZ) || 0;
+                    mesh.position.set(0, 0, face - stock.z / 2);
+                } else {
+                    mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
+                }
             } else {
                 geo = new THREE.BoxGeometry(stock.x, stock.y, stock.z);
                 mesh.position.set(stock.x / 2, stock.y / 2, -stock.z / 2);
@@ -2175,7 +2191,13 @@ export class GcodeViz3D {
         const z = this.radius * Math.cos(this.phi);
         // Up tangent to the meridian: identical to Z-up away from the poles, but stays valid AT
         // a pole, so a true top/bottom view has no gimbal tilt (stock top/bottom edges align).
-        this.camera.up.set(-Math.cos(this.phi) * Math.cos(this.theta), -Math.cos(this.phi) * Math.sin(this.theta), sinPhi);
+        // t1281 — A LATHE ROLLS THE CAMERA 90°. The bar lies along Z, and with up pinned to the meridian (≈ +Z) it can
+        // only ever stand on END — the one view of a lathe nobody has. Rolling up to +X lays the bed across the screen
+        // with the cross-slide up: where the turner actually stands. Only while the view direction is not near ±X,
+        // where an X up-vector would be parallel to the look and the camera would degenerate.
+        const latheRoll = (() => { try { return !!(window.ddcsIsLathe && window.ddcsIsLathe()); } catch (_) { return false; } })();
+        if (latheRoll && Math.abs(sinPhi * Math.cos(this.theta)) < 0.98) this.camera.up.set(1, 0, 0);
+        else this.camera.up.set(-Math.cos(this.phi) * Math.cos(this.theta), -Math.cos(this.phi) * Math.sin(this.theta), sinPhi);
         this.camera.position.set(this.target.x + x, this.target.y + y, this.target.z + z);
         this.camera.lookAt(this.target);
         if (this.camera.isOrthographicCamera) {

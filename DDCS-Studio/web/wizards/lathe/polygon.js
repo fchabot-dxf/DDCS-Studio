@@ -110,13 +110,16 @@ export function polygonPath({ acrossFlats, sides, segmentsPerFace } = {}) {
  * the one meeting a round bar with a shape that is not round yet.
  * @returns {number[]} the across-flats size of each sweep, largest first, ending exactly on the finished size
  */
-export function polygonSweeps({ barDiameter, acrossFlats, doc } = {}) {
+export function polygonSweeps({ barDiameter, acrossFlats, doc, sides } = {}) {
     const barR = radiusOf(normalizeBar({ diameter: barDiameter }).diameter);
+    const n = polySides(sides);
     const finalA = Math.max(0, Number(acrossFlats) || 0);
     const d = Math.max(0.001, Number(doc) || 0.001);
     const out = [];
-    // in ACROSS-FLATS terms a radial step of `doc` is a step of 2·doc, because a wrench size spans both sides
-    for (let a = finalA; a / 2 < barR - 1e-9; a = round3(a + 2 * d)) out.push(a);
+    // in ACROSS-FLATS terms a radial step of `doc` is a step of 2·doc, because a wrench size spans both sides.
+    // THE CORNERS ARE WHAT HAVE TO FIT: a sweep whose corner radius exceeds the bar cuts nothing at the corners and
+    // swings through air to get there, so the walk stops at the largest size that still lies inside the stock.
+    for (let a = finalA; polyRadiusAt(0, a, n) < barR - 1e-9; a = round3(a + 2 * d)) out.push(a);
     out.reverse();
     if (!out.length) out.push(round3(finalA));
     return out;

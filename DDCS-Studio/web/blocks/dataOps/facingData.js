@@ -17,6 +17,7 @@
 import { facingStack, FACING_DEFAULTS, FACING_VARS } from '../../wizards/lathe/facing.js';
 import { userOpFromStack } from '../userOps.js';
 import { deriveBindingsFor } from './deriveBindings.js';
+import { withLatheScene } from '../../viz/latheScene.js';   // t1281 — the bar, in the 3D scene
 
 export const FACING_DATA_OPTYPE = 'user_lathe_facing';
 export const LATHE_GROUP = 'lathe';
@@ -45,8 +46,9 @@ function facingDataStack(p = FACING_DEFAULTS) {
         type: 'user_root',
         params: {},
         uiChildren: [
-            // form2d: the form on the left, the half-profile canvas on the right (t1271 part 3)
-            { type: 'panel', params: { panel: 'form2d' } },
+            // t1281 — form3d+2d: the 3D BAR and the half-profile, both. It was form2d, which is why a lathe
+            // wizard had no 3D pane at all — the op could not show the bar because it never declared a place to.
+            { type: 'panel', params: { panel: 'form3d+2d' } },
             { type: 'layout', params: { kind: 'lathe_profile' } },   // t1273 — the half-profile, not the mill's XY stock
             {
                 type: 'param_group',
@@ -64,13 +66,13 @@ export const FACING_BINDINGS = deriveBindingsFor(facingDataStack(FACING_DEFAULTS
 
 /** The twin, ready for registerUserOp — a Lathe-group op with a 2D panel and no rotary/machine sim claims. */
 export function facingDataDef() {
-    return userOpFromStack(
+    return withLatheScene(userOpFromStack(
         'lathe_facing',
         'Facing (lathe)',
         facingDataStack(FACING_DEFAULTS),
         FACING_BINDINGS,
-        'form2d',
+        'form3d+2d',
         null,
         LATHE_GROUP,
-    );
+    ), FACING_DEFAULTS);
 }
