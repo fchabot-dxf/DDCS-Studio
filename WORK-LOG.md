@@ -18373,3 +18373,63 @@ No other divergence. There is exactly ONE `fairy` package (bridge/bridge-app/fai
 
 GATE: smoke 65/65 (JS side untouched by this), plus both python tests green — the new storage one and the existing
 pull-geometry one. NO headless proof of the real window; the user's retest on .4 is that.
+
+---
+
+## turn 1261 -- THE SELF-REPLACING UPDATER. The portable model stays; the ritual goes.
+
+"Update" used to mean: open a browser, download, find the file, quit the app, overwrite it, reopen. Now it is one
+button. Still one .exe you can put anywhere -- no installer, no service.
+
+### THE ORDER IS THE SAFETY, and it is the whole design.
+
+Windows lets a RUNNING exe be renamed but not overwritten. Everything follows from that:
+
+    1. download the new build -> <name>.new.exe   (beside the running one, same volume)
+    2. download the .sha256, hash the file, COMPARE      <-- nothing has been touched yet
+    3. rename the RUNNING exe -> <name>.old.exe          <-- the FIRST destructive step
+    4. move .new.exe into the running exe's exact path + name
+    5. relaunch; the next boot sweeps *.old.exe
+
+A failure at 1 or 2 leaves the installation byte-identical. A failure at 4 -- after the rename -- PUTS THE ORIGINAL
+BACK, because an app that cannot update is a nuisance and an app that deleted itself is a disaster. That case has its
+own test, which simulates the move failing and asserts the app still exists at its own path with its own bytes.
+
+### INTEGRITY WITHOUT A CERTIFICATE, described honestly.
+
+CI now publishes `DDCS-Studio.exe.sha256` beside the exe (one step), and the updater refuses to install a release that
+does not carry one -- with no published hash there is nothing to check the bytes against, so it falls back to the
+release page rather than installing blind. I have written what this IS in the module: it proves the bytes match what
+the release published, NOT who published them (both come over TLS from the same release). That is worth stating
+rather than letting "verified" imply a signature.
+
+### THE PAGE ASKS; IT DOES NOT CHOOSE.
+
+`perform_update()` takes no URL. The browser side POSTs to /api/update/apply with an empty body, and the Python
+resolves the release from the hard-coded repo it was built from -- so a confused or hostile page cannot aim the
+downloader at arbitrary bytes. There is a test asserting the function SIGNATURE has no url parameter, because this is
+a property of the interface, not of today's behaviour.
+
+### SCOPE RULES, each enforced rather than documented.
+
+  - EXE ONLY: the button is added only when /api/update/status says supported (frozen) AND writable AND the release
+    has both assets. The web app cannot reach that endpoint at all, and perform_update refuses when not frozen.
+  - A READ-ONLY LOCATION is a named refusal naming the folder, with the release page -- not a swap that fails halfway.
+  - PLAIN WORDING: "Update to <tag> and restart". No saved/deployed vocabulary.
+
+### TESTS (python, the t1259 convention): 9/9.
+
+Both checksum formats parse; a corrupted byte is refused with NOTHING touched (no rename, no staging file left); a
+verified download lands at the exact target path with the previous build kept as .old.exe; a release with no checksum
+refuses; a failed move rolls back; a missing new file refuses before renaming anything; the sweep removes *.old.exe
+and leaves config.json and notes.old.txt alone; the web app can never self-update; and the no-url structural check.
+
+### THE VERIFICATION PLAN IS GENERATIONAL -- stating it because it cannot be shortcut.
+
+This code ships IN the next release, so that release is still installed by hand. The FIRST REAL SELF-UPDATE is the
+release AFTER it: the .4 exe will show the button for .5 and replace itself. So the live proof arrives one release
+later than the code, and until then what we have is the unit tests plus the CI producing the .sha256 asset. Nothing
+about this can be verified headless today, and I am not going to imply otherwise.
+
+GATE: smoke 65/65 (the banner change is exe-gated and does not alter web behaviour) + all three python test files
+green (selfupdate 9/9, webview_storage 5/5, pull_geometry).
