@@ -19461,3 +19461,54 @@ same, and a test pins the comment and the emit together so they cannot drift apa
 GATE (fast tier): smoke + the lathe family + the new asserts = 149/149.
 FLAGGED FOR THE FULL SUITE: both changes are in the EMIT. The straight OD turn is byte-identical; TAPER programs and
 FACING-with-zero-doc programs change by design. Any golden that pinned either will move, and should.
+
+---
+
+## turn 1293 -- THE BLOCKER: my fix was in the copy the app does not run. And the ghost bars were the real ones.
+
+### (1) ONE EMIT SOURCE — and the root is worth stating, because it explains why my own tests lied.
+
+t1291's taper fix is a BUILD-TIME branch inside `odTurnStack`. A data twin's template is a SNAPSHOT, built once from
+the DEFAULTS — and the default is a straight turn. So the snapshot froze the straight arm, and choosing Taper in the
+UI only wrote values into a structure that had no cone-following in it. My asserts passed because they called the
+stack builder directly; the app resolves the twin. The advisor's probe through `builderOf` reproduced the pre-fix
+gouge verbatim, with no crossing-Z anywhere in the dumped NC.
+
+WHY FACING'S FIX SURVIVED THE SAME JOURNEY, which the advisor asked me to root: facing's zero-DOC branch runs ON THE
+CONTROLLER (`IF #112>0`), so it is present in every snapshot whatever the default was. A build-time branch cannot
+survive being snapshotted; a runtime one cannot help but. That is the whole difference between the two ops.
+
+THE FIX: the twin DELEGATES. `postInstantiate` regenerates the macro from the resolved params through the one stack
+builder — the same thing polygon turning already does, and for the same reason: when a parameter changes the SHAPE of
+the program rather than a number in it, the program has to be rebuilt rather than patched. There is now one emit
+source per op, and no duplicate to drift.
+
+AND A GUARD SO THEY CANNOT DIVERGE AGAIN: a test emits the same params through BOTH paths and compares the macro
+line-for-line, for a straight turn and both taper directions. It found a real (small) divergence immediately — the
+same fact stated in two different sentences, because `applyStraightEnd` rewrote the far-end comment in wording the
+builder did not use. One sentence for one fact now.
+
+EVERY TAPER ASSERT NOW DRIVES `builderOf` — the resolution `openWiz` uses. Through that path: fat far 4.04 / 6.00 /
+7.96 against a true cone of 4.048 / 6.0 / 7.952, and the mirror for a fat face.
+
+### (2) THE GHOST BARS WERE THE REAL ONES, IN THE WRONG PLACE.
+
+The scene probe found three bar-like geometries. One is a hidden 0.5mm marker. Of the two visible, ONE IS THE CHUCK
+DISC (r 16 = the bar radius × 1.6) — so there were never two bars, which matters, because "delete the duplicate"
+would have deleted the chuck.
+
+The real defect is that both sat at (10, 10): half the bar, in both transverse axes. The box path pivots the part
+group on the stock CENTRE and compensates each mesh by −C. A turned bar is authored on the AXIS already — X is a
+radius from it, Z runs along it, and the profile carve builds its outline in exactly those numbers — and the carve
+rebuild resets its mesh to the origin, dropping a compensation the group was still applying. The bar, its carve and
+its chuck all went off-axis together.
+
+A BAR ON CENTRES HAS NO DATUM CORNER, so its group sits at zero and its children speak absolute coordinates. Asserted
+both ways as the dispatch asked: exactly one visible bar, on the axis in X and Y, its group at zero, and every other
+visible cylinder in the scene belonging to the chuck — with the chuck on the axis too, since it grips the thing that
+is. A stray-bar check would have passed while the bar floated; an on-axis check would have passed with two bars. Both
+are needed and both are there.
+
+GATE (fast tier): smoke + the lathe family + the new asserts = 151/151.
+FOR THE FULL SUITE: the OD emit changes for TAPERS through the twin (which is the point). The straight turn is
+byte-identical and asserted through the twin path.
