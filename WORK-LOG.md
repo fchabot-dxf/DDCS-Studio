@@ -18702,3 +18702,61 @@ turn whose whole premise is that the family inherits whatever is proven here.
 
 GATE (fast tier): smoke + the 4 new facing specs + the t1267 model specs + settings/roundtrip = 99/99.
 SCREENSHOT: s1269-kind-setter.png -- the kind control, the band reading "Kind Lathe", the axis note.
+
+---
+
+## turn 1271 -- THE FACING PILOT COMPLETES. Four mechanisms, in the order I recommended, each proven on its own terms.
+
+### (2b) THE TWIN — a real op, in the Lathe group, bindings derived BY IDENTITY.
+
+`facingDataDef()` registers through the same federated user layer every ported built-in uses, so it inherits the live
+form↔blocks round-trip for free. Every binding is matched by WHAT THE BLOCK IS — "the assign whose var is #112" —
+never by an index into the stack: an index drifts one block sideways the moment a comment is added, and
+deriveBindings throws when a spec does not match exactly one block, so an authoring mistake is a build error rather
+than a wrong number in a form.
+
+THE FORM IS IDENTITY-FIRST, and facing's honest identity is EMPTY. A facing pass has no corner, no direction, no
+order to choose. Rather than invent a toggle to fill an IDENTITY section, the form leads with what a turner actually
+decides: how much to remove. The test asserts the sections are exactly GEOMETRY then TOOL & CUT — the absence is
+declared, not accidental.
+
+THE LATHE GROUP LEADS in a lathe workspace and merely FOLLOWS in a mill one: same catalogue, different emphasis,
+because the first dropdown is where a person looks first and on a lathe that should not be "Probe". That needed a
+product fix, not just an order: the bar now re-renders on `ddcs:machine-changed`, because without it the ordering was
+only right after a reload — precisely the "works after a refresh" behaviour that reads as broken.
+
+### (3) THE HALF-PROFILE CANVAS + THE FACE-LINE HANDLE — the mechanism the family inherits.
+
+`viz/latheProfileCanvas.js` maps `halfProfile()`'s data into the shared FeatureCanvas frame: bar outline, centreline,
+the allowance band, the Z0 datum. It DRAWS the model; it computes no geometry. The test asserts the drawn outline's Y
+values are the model's X values and that they are RADII (0, 10, 10, 0 for a Ø20 bar) — a diameter would draw the bar
+twice as tall, which is the mistake made visible.
+
+THE FACE LINE IS TEAL AND WRITES THE ALLOWANCE. Dragging it does not move a line, it sets how much material sits
+ahead of the finished face — and the test proves that by RE-READING THE EMIT after the drag: the macro's #111 header
+goes 3 → 4.5, and the pass list goes [2,1,0] → [3.5,2.5,1.5,0.5,0]. The drag changed what the machine will DO, not
+what the screen shows. It clamps at Z0, because dragging past the finished face is not a smaller cut — it is a cut
+into the part.
+
+### (5) THE .wiz ROUND TRIP on the registered twin — the harsh t1247 pattern.
+
+Export → WIPE the op out of the registry → import from the file → the def is IDENTICAL and it emits BYTE-IDENTICALLY.
+A lathe op is a library citizen like any other, and what travels is the RECIPE (the parametric macro), not a snapshot
+of one set of numbers.
+
+### (4) AXIS GATING — grey, never hide, keyed on the DECLARED axes.
+
+A lathe has no Y, so the Y-needing mill ops grey with the reason under the cursor: "needs a Y axis — this is a lathe
+workspace (X cross-slide + Z carriage only)". Hiding them would rewrite the screen and answer a question nobody asked
+while leaving the real one — CAN this machine do it? — unanswered. Each op's requirement is DECLARED per op-type
+rather than sniffed from an emit: an op that happens not to move in Y with today's parameters still NEEDS Y, and
+inferring it from one emit would let a parameter change silently make an impossible op look possible. An op with no
+declared need is never gated on a guess, and the gating is reversible — switching back to a mill restores the op AND
+its own tooltip.
+
+GATE (fast tier): smoke + the pilot (8) + facing (4) + model (10) + library/wizard/roundtrip = 104/104.
+SCREENSHOTS: s1271-bar-lathe.png (Lathe leading), s1271-gated-ops.png (Pocket and Contour greyed, Facing live).
+
+THE PILOT IS COMPLETE. All five mechanisms — twin registration, canvas + marker-derived handle, library citizenship,
+axis gating, and (from t1269) the ground-truth-verified parametric emit — are proven. OD / parting / drilling inherit
+these rather than reinventing any of them.
