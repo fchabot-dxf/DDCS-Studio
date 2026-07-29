@@ -7071,3 +7071,78 @@ on its own and can be re-taken cleanly if the switch wants it.
 GATE: fast tier — 71 smoke green; the five triaged specs green (pane-splitter 4/4 · minimap 4/4 · stock-spill 2/2 ·
 collapsible 8/8 · io-panel-resize 2/2); and the full suite at the figure above. One SOURCE file changed all turn
 (`styles.css`, the header ladder); everything else is spec restatement.
+
+---
+
+## t1359 — the switch: steps 1–2 built and verified, then PARKED on a branch rather than half-landed
+
+The main line is exactly where t1357 left it — `0e1ba782`, the 1926 baseline, green. The switch's first half is
+built, working and preserved on `wip/t1359-switch`. I stopped mid-act deliberately, and this entry is mostly about
+what is proven so the next attempt starts from evidence rather than from scratch.
+
+### WHAT IS BUILT AND VERIFIED (on the branch)
+
+**Step 1 — the named test-only literal reference, FIRST, exactly as the counsel says.** `surfacingLiteralStack` is
+the old emitter under a name that says what it is for; all 28 bridge call sites moved onto it BEFORE anything
+re-pointed. The pilot spec then ran **63/63** — which is the whole point: the bridges are still comparing the
+parametric emit to the LITERAL one. Had the re-point gone first they would have compared it to itself and passed
+while proving nothing.
+
+**Step 2 — the re-point and both fold seams.** `surfacingStack` builds
+`[progstart · wcs · placeonstock{ surfaceraster } · progend]`, skim swapping the skim wrapper in at the same index.
+The atom is registered, has a leaf `emit()` that folds a container's dx/dy into its frame, and declares
+`absorbsPlacement`. `absorbingChild()` is the one seam both folds read, so they cannot disagree about which children
+are self-framing; it is deliberately strict (exactly one declaring child) because a mixed body would need the shift
+both passed and painted, and the literal atoms keep the text rewrite that has always worked for them.
+
+**The emits are right, and I read them rather than inferring them:**
+
+    PLACED (originX 50, originY 25, offZ 3)      SKIM
+      G0 Z8          ← 3 + clearance 5             #62=-99999 … sentinel first
+      #47=[25 + #44 / 2 + #48 * #44]               #62=#790  #63=#791  #64=#792
+      G0 X50 Y#47                                  IF #62 == -99999 GOTO 93   ← refuse, tool up
+      G0 X[50 + #40] Y#47                          G0 Z[#64 + 5]   ← a REAL lift
+      G1 Z[3 - #46] F180                           G1 Z[#64 - #46]
+                                                   (no G91, no relativize)
+
+The frame is PASSED, never painted on — which is the whole reason this could land at all, given what t1349 measured a
+text rewrite doing to `X[0 + #40]` and `Y#47`.
+
+**The twin's bindings re-aimed by identity** onto `surfaceraster`, which is exactly what t1349 built them for: the
+collapse moved every index and re-aimed nothing. The flat `stepover` mm became `toolDia` + `stepoverPct` — one source
+with the CAM slot and with the macro header that re-derives it at the machine (gate 3).
+
+### WHY IT IS PARKED AND NOT SHIPPED
+
+Eleven specs still assert the shapes the switch retires (the G91 skim body, `surfacefill.stepover` as the CAM seed,
+the binding count, `surfacefill carries entry=ramp`), and one of them — form-kernel-720's cc-attach byte-identity —
+I had not yet measured, so I do not know whether it is a stale assert or a real divergence in my seam. Beyond those:
+the both-paths guard, the `surfacingSlot` retirement, pendant mirror stability, the six register-remainder items, the
+iron rule and four screenshots are all untouched.
+
+That is more than I had the working room left to do WELL, and this is emit-class work that drives a real machine.
+The moment that settled it: restating one spec through a scripted edit mangled its escaping and left the file
+syntactically broken. I caught it and restored from HEAD — but doing that later, deeper in, on the emitter rather
+than a spec, is the failure this arc has spent every turn avoiding.
+
+**So the choice was between three states, not two.** Shipping eleven reds would have thrown away the green baseline
+t1357 spent a whole turn buying, and left the CAM slot disagreeing with the wizard about what a surfacing op is —
+precisely the split t1347 refused to create. Reverting outright would have discarded a working, verified mechanism.
+A branch keeps both: the main line is green and reviewable, the work is intact and re-runnable, and the next attempt
+starts from a proven design with a named inventory instead of an empty page.
+
+### WHAT THE NEXT ATTEMPT SHOULD KNOW
+
+- Steps 1 and 2 are DONE on the branch and independently verified; the bridges being real at 63/63 is the load-bearing
+  fact, because it is what proves the literal reference was moved before the re-point and not after.
+- The eleven reds are listed in the pass-back with their messages. Ten read as mechanical restatements to the new
+  block and the new skim shape. **form-kernel-720 is the one to measure FIRST** — if the twin and the built-in really
+  do diverge under a cc-attach placement, that is a defect in the fold seam and everything downstream waits on it.
+- One deviation from the dispatch to rule on: it said `applySkimStructure`'s swap retires. I kept it. The swap is
+  what makes the twin structurally identical to the built-in (skim sits where placeonstock does); what actually
+  retired is its RELATIVIZE consequence, now that the skim fold hands the atom a mode instead of rewriting its text.
+  If the intent was to drop the swap entirely, the twin needs zMode bound straight to the atom's socket instead, and
+  that is a different (smaller) shape worth choosing deliberately.
+
+GATE: main line unchanged and green — the surfacing/cam/form/stepover/depth-entry families re-run at 87/87 after the
+restore, on the 1926 baseline commit. Nothing shipped this turn; nothing broken either.
