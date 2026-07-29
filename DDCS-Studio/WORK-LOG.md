@@ -6248,3 +6248,77 @@ degrading to a plunge with its reason when the run does not fit), but it belongs
 one field on the form, and shipping half a descent would leave the envelope naming a mode that half-works.
 
 GATE: fast tier — 191 surfacing/cam/roundtrip specs + 71 smoke, green. 25/25 in the pilot spec.
+
+---
+
+## t1337 — the descent's premise, checked before building on it
+
+The ruling (match the polyline, migrate-first-improve-second) I accept without reservation — it is the right order
+and I would have argued for it. But it came with a factual correction to my note, and checking that correction
+before building on it turned up evidence pointing the other way. Reported rather than quietly worked around, and no
+descent code written this turn as a result.
+
+### THE CORRECTION I WAS GIVEN
+
+"The dialect does NOT have SIN/COS — your own linter's evidence taxonomy says trig is E-NOTRIG, ABS is the only
+demonstrated function."
+
+### WHAT I FOUND WHEN I WENT TO CITE IT
+
+**1. There is no `E-NOTRIG` tag anywhere in the repo.** The linter's codes are E-NESTPAREN, E-STRAYPAREN,
+E-OPENCOMMENT, E-BRACKET, E-STRAYWORD. Nothing about trig.
+
+**2. What the linter DOES contain is `VALID_MACRO_WORDS`** — `SIN, COS, TAN, ATAN, ASIN, ACOS, SQRT, ABS, ROUND,
+FIX, FUP, LN, EXP, MOD…`. That is an ALLOW-LIST so E-STRAYWORD does not false-positive on macro vocabulary. It is
+not a capability claim in either direction, and I should not have read the sim's evaluator as one either — my
+t1335 note cited `engine/core/expression.js`, which is what the SIMULATOR implements, not what the controller does.
+That part of the correction was right and I was sloppy.
+
+**3. But ATAN IS ALREADY SHIPPING IN A REAL MACRO.** `probeToSlot.js:538` emits
+`#54=ATAN[#52]/[#53]   ;angle (deg) = atan2(delta, span)` — in the alignment probe, which runs on the user's actual
+machine. So a trig function is not merely "undemonstrated": one is in production G-code today and the alignment
+result depends on it.
+
+That does not prove SIN/COS work — ATAN could be implemented where they are not — but it does mean "ABS is the only
+demonstrated function" is not right, and a taxonomy carrying that would mis-decide other things.
+
+### WHAT I DID WITH IT
+
+Nothing yet, deliberately. **The recurrence is the correct build either way** — it needs no unproven capability, it
+is the technique the bolt circles already use, and it is what I will implement. So the instruction stands even
+though its justification is in question; there was no need to resolve the evidence before coding, and I would have
+built the recurrence regardless.
+
+I stopped because of a SECOND thing the plan does not yet address, which is the same class:
+
+### THE RAMP NEEDS A SQUARE ROOT AT THE MACHINE, OR IT STOPS FOLLOWING THE PENDANT
+
+The kernel ramps toward the area CENTRE: `run = drop / tan(angle)`, then the midpoint is
+`start + (run / toC) · (centre − start)` where `toC = hypot(centre − start)`.
+
+`tan(angle)` bakes cleanly — the angle is a form field, its tangent is a build-time number, exactly as ruled. But
+`toC` depends on the ramp's START, and the raster's start row is `y0 + step/2` where `step` is the DERIVED stepover
+`#44` — the whole point of which is that the pendant can change it. So:
+
+- bake `toC` → the ramp geometry is computed for the tool Ø that was on the desk, and dialling a different tool at
+  the machine leaves the ramp stale while the raster re-derives around it. A quietly inconsistent program.
+- compute `toC` live → the macro needs SQRT, which is the very question above.
+
+There is a third option worth considering rather than assuming: ramp along a DECLARED run vector instead of toward
+the centre. The literal kernel already supports exactly that (`runX`/`runY`, used by slot and contour), and along
++X the distance available is `#40` — no square root at all. It would be a different set of moves from the
+centre-ward ramp, so it is an IMPROVEMENT-class change, not a migration one, and by the ruling's own principle it
+belongs in the follow-up turn rather than this one.
+
+So the descent has one open question with three answers, and picking one silently would be the blur the ruling
+exists to prevent.
+
+### THE TODO, written where it cannot be lost
+
+Not added yet — it belongs beside the recurrence, and the recurrence is not written. It is stated here so the next
+turn carries it: *true-arc descent upgrade, with start/end points, radius envelope, depth-per-revolution and a
+sim-executed polyline-vs-arc comparison inside a stated tolerance — an improvement with its own proof.*
+
+### STATE
+
+No code changed this turn. The envelope still names the descent, correctly. 25/25 in the pilot spec, unchanged.
