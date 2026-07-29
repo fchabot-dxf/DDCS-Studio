@@ -32,8 +32,13 @@ export const PART_BINDING_SPECS = [
       section: 'GEOMETRY', units: 'mm', default: PART_DEFAULTS.peck },
     { param: 'feed', match: { type: 'assign', var: PART_VARS.feed }, key: 'value', type: 'number',
       label: 'Plunge feed', section: 'TOOL & CUT', units: 'mm/min', default: PART_DEFAULTS.feed },
+    // t1325 — THE PICKER OFFERS BLADES, AND THE BLADE BRINGS ITS WIDTH. A parting op run with an endmill selected is
+    // a mistake the list itself should not allow, and the kerf is the number a turner picks the blade BY — so the
+    // width field prefills from the tool instead of being typed twice and drifting. A typed value still wins for this
+    // op (the fill runs on PICK, not on every render).
     { param: 'toolNum', match: { type: 'toolsel' }, key: 'toolNum', type: 'number',
-      label: 'Tool', help: 'The tool-library number this op runs. Unset = no declared tool.', section: 'TOOL & CUT' },
+      widgetConfig: { toolKinds: ['parting'], fill: { bladeWidth: 'width' } },
+      label: 'Tool', help: 'The parting blade this op runs. Picking one fills the blade width below from the tool table.', section: 'TOOL & CUT' },
 ];
 
 /** THE IDENTITY — where the plunge is meant to stop, said in words. */

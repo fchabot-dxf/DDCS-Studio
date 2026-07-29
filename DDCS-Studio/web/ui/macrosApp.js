@@ -1264,6 +1264,22 @@ function homingPostIsExpert() {
         // already its carrier — no new manifest field. It must be re-supplied BEFORE the seed, or a saved Skim slot would
         // re-hydrate on the Normal arm and quietly rebuild the wrong program shape the next time it is touched.
         for (const f of buildEnumFields(getUserDef(m.opType))) { const v = m.baked && m.baked[f.key]; if (v !== undefined && v !== '') seedParams[f.key] = v; }
+        // t1325 MIGRATION — a slot SAVED before the stepover became a percentage stored `stepover` in MM. That key no
+        // longer names a field, so it would be dropped on re-hydration and the slot would silently rebuild at the
+        // default 60% — a changed raster on a program the user already trusts. Recover the pct from the pair they
+        // stored, ONCE, right here: the same cut, expressed the new way. Written back into `values` so the next save
+        // carries the pct and this branch never runs again for that slot.
+        // …SCOPED TO THE SURFACE ARM, which is the only generator whose field changed. Unscoped it also fired on a
+        // POCKET slot — whose stepover is still a legitimate millimetre — and rewrote a valid 3.6mm into a different
+        // number entirely. A migration keyed on a NAME rather than on the thing that actually changed is a migration
+        // that corrupts its neighbours.
+        if (m.type === 'surface' && m.values && m.values.stepover && !m.values.stepoverPct) {
+            const mm = Number(m.values.stepover.def), d = Number((m.values.toolDia || {}).def);
+            if (Number.isFinite(mm) && mm > 0 && Number.isFinite(d) && d > 0) {
+                m.values.stepoverPct = { ...m.values.stepover, def: Math.round((mm / d) * 1000) / 10 };
+                delete m.values.stepover;
+            }
+        }
         const a = makeAuthOp({ opType: m.opType, params: seedParams });
         if (!a) return null;
         if (m.variant != null && m.variant !== '') a.variant = m.variant;

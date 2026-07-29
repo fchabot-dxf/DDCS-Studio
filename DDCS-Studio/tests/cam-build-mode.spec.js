@@ -109,12 +109,17 @@ test('t1049 FIX: a real data-op TWIN op opens the modal seeded (user_surfacing_d
   const seeded = await page.evaluate(() => ({
     recognized: document.querySelectorAll('#cbm_table tbody tr').length > 0,   // rows render ⇒ seedFromOp resolved the twin (not "pick an op")
     fromOpSurface: /surface/.test(document.querySelector('.cam-build-mode').textContent),
-    stepover: document.querySelector('#cbm_table tr[data-fkey="stepover"] .cbm-val').value,
+    stepoverPct: document.querySelector('#cbm_table tr[data-fkey="stepoverPct"] .cbm-val').value,
+    toolDia: document.querySelector('#cbm_table tr[data-fkey="toolDia"] .cbm-val').value,
     depth: document.querySelector('#cbm_table tr[data-fkey="depth"] .cbm-val').value,
   }));
   expect(seeded.recognized, 'the twin resolves to a CAM type (table renders, not unsupported)').toBe(true);
   expect(seeded.fromOpSurface, 'the seed-locked header names the surface CAM type').toBe(true);
-  expect(seeded.stepover, 'the twin flat stepover 9.6 seeds the table').toBe('9.6');
+  // t1325 — PREMISE CHANGED BY RULING, restated. The table's field is the stepover PERCENTAGE; the twin's flat 9.6mm
+  // is RECOVERED against the tool Ø the slot carries (Ø12 → 80%). The cut is the same 9.6mm it always was, which is
+  // what this assert was guarding, so it is checked here as the product rather than as the raw field.
+  expect(seeded.stepoverPct, 'the twin flat stepover 9.6 seeds the table as its intent').toBe('80');
+  expect(Number(seeded.toolDia) * Number(seeded.stepoverPct) / 100, 'and it still cuts 9.6mm').toBeCloseTo(9.6, 6);
   expect(seeded.depth).toBe('0.8');
 });
 

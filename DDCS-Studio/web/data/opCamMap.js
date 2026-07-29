@@ -154,7 +154,19 @@ const DERIVE = {
     cpocket: { stepover: stepoverMm },
     // surfacing: the BUILT-IN op stores stepoverPct+toolDia (derive); the data-op TWIN precomputes a FLAT `stepover` and has
     // NO stepoverPct/toolDia (surfacingData.js) — so use the flat value if present, else derive. Mirrors surfacingWizard.js:27.
-    surface: { stepover: (p) => (p.stepover != null && p.stepover !== '') ? Number(p.stepover) : stepoverMm(p) },
+    // t1325 — the surface generator's field is now the PERCENTAGE (the mm is derived in its macro header). Seeding it
+    // reads the op's own intent where the op has it (the built-in stores stepoverPct), and RECOVERS it from the twin's
+    // flat mm where it does not — pct = mm / toolØ · 100, computed ONCE here rather than left to drift.
+    surface: { stepoverPct: (p, toolDia) => {
+        const pct = Number(p.stepoverPct);
+        if (Number.isFinite(pct) && pct > 0) return pct;
+        // THE TWIN HAS NO toolDia AT ALL — it precomputes a flat mm — so the recovery uses the tool Ø the SLOT will
+        // actually carry (the op's, else the generator field's own default). Recovering against anything else changes
+        // the cut: a 9.6mm stepover is 80% of the Ø12 default, and calling it 60% would quietly widen the raster.
+        const mm = Number(p.stepover), d = Number(toolDia);
+        if (Number.isFinite(mm) && mm > 0 && Number.isFinite(d) && d > 0) return Math.round((mm / d) * 1000) / 10;
+        return 60;   // neither number anywhere → the CAM convention, not a guess
+    } },
 };
 
 // NON_BAKEABLE[camType] = generator field keys that MUST be Expose-only (Bake greyed). t1047 amend (user + advisor
@@ -353,7 +365,11 @@ export function seedFromOp(op) {
     const alias = PARAM_ALIAS[camType] || {}, nb = NON_BAKEABLE[camType] || [], derive = DERIVE[camType] || {};
     // Read a field's op value via its alias — a STRING key or an ARRAY of candidates (first present wins: built-in vs twin).
     const readParam = (fkey) => { const a = alias[fkey], keys = Array.isArray(a) ? a : [a || fkey]; for (const k of keys) if (params[k] !== undefined) return params[k]; return undefined; };
-    const fields = genFieldsFor(camType, params).map((f) => {
+    const genFields = genFieldsFor(camType, params);
+    // t1325 — the tool Ø the slot will CARRY (the op's own, else the generator's field default): a derive that
+    // recovers a percentage from a stored mm has to divide by the very number the macro will multiply back.
+    const toolDiaCarried = (() => { const v = readParam('toolDia'); if (v !== undefined && v !== '') return Number(v); const f = genFields.find((x) => x.key === 'toolDia'); return f ? Number(f.def) : NaN; })();
+    const fields = genFields.map((f) => {
         const opts = ENUM_OPTIONS[f.key];
         let value, meta;
         if (opts) {   // ENUM — map the op's string/bool value to the CAM int (S1d); the friendly dropdown lives on `enum`
@@ -361,7 +377,7 @@ export function seedFromOp(op) {
             const opt = opts.find((o) => o.op === opVal) || opts.find((o) => o.value === opVal);
             value = opt ? opt.value : f.def;
             meta = { type: 'enum', enum: opts };
-        } else if (derive[f.key]) { value = derive[f.key](params); meta = { type: f.type }; }   // DERIVED (e.g. stepover from stepoverPct / the twin's flat stepover)
+        } else if (derive[f.key]) { value = derive[f.key](params, toolDiaCarried); meta = { type: f.type }; }   // DERIVED (e.g. stepover from stepoverPct / the twin's flat stepover)
         else { const opVal = readParam(f.key); value = opVal !== undefined ? opVal : f.def; meta = { type: f.type }; }   // op value via alias, else the generator default
         return { key: f.key, label: f.label, def: f.def, value, exposed: true, bakeable: !nb.includes(f.key), ...meta };
     });

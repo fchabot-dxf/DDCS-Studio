@@ -6,6 +6,7 @@
  * dimensions and feeds/speeds into the wizard fields as the defaults.
  */
 import { libraryTools } from '../ui/settingsPanel.js';
+import { LATHE_TOOL_KINDS, factsOf, factLabel, unitOf } from '../data/latheTools.js';   // t1325 — a lathe tool's kind + its quick facts, for the picker's label and its filter
 
 /** A compact unicode TIP GLYPH per tool type — for the picker rows (the tool-table modal shows the full SVG silhouette).
  *  t768 P1b — the "tip glyph" of the ruled row read T# · name · Ø · tip. */
@@ -20,9 +21,30 @@ export function getToolLibrary() {
     return libraryTools(s.atc || {}).map((t) => {
         const dia = (t.dia !== '' && t.dia != null) ? ('Ø' + t.dia) : '';
         // t768 P1b — the full row read: T# · name · Ø · tip glyph.
+        // t1325 — A LATHE TOOL READS AS ITSELF: its kind, and its own quick fact with the unit it is spoken in
+        // ("T2 · 1/8 blade · Parting 0.125 in"), because a blade's width is what the turner picks it BY. A mill tool's
+        // label is untouched — same expression, same output, since `kind` is empty on every tool that exists today.
+        const kd = LATHE_TOOL_KINDS[t.kind];
+        if (kd) {
+            const f = factsOf(t.kind)[0];
+            const fv = f && t[f.key] !== '' && t[f.key] != null ? ' ' + t[f.key] + ' ' + (f.unit === '°' ? '°' : (unitOf(t) === 'inch' ? 'in' : 'mm')) : '';
+            return { ...t, label: 'T' + t.num + (t.name ? ' · ' + t.name : '') + ' · ' + kd.label + fv };
+        }
         const label = 'T' + t.num + (t.name ? ' · ' + t.name : '') + (dia ? ' (' + dia + ')' : '') + ' · ' + tipGlyph(t.type);
         return { ...t, label };
     });
+}
+
+/**
+ * t1325 — THE KINDS AN OP CAN HOLD. A parting op offers BLADES, not endmills: a picker that lists every tool invites
+ * the one mistake the list exists to prevent. `kinds` is the op's own declaration (widgetConfig.toolKinds); an op
+ * that declares none gets the whole library exactly as before.
+ */
+export function toolsOfKinds(kinds) {
+    const lib = getToolLibrary();
+    if (!Array.isArray(kinds) || !kinds.length) return lib;
+    const want = new Set(kinds);
+    return lib.filter((t) => want.has(t.kind));
 }
 
 /** <option> markup for a picker <select>; first entry is a no-pick placeholder. */

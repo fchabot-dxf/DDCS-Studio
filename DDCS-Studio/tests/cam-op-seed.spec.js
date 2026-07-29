@@ -53,7 +53,10 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
         cornerMaxProbe: byKey(corner, 'maxProbe').value, cornerTravel: byKey(corner, 'travel').value, cornerFast: byKey(corner, 'fast').value,
         cornerSeq: byKey(corner, 'seq').value, cornerCorner: byKey(corner, 'corner').value, cornerRetract: byKey(corner, 'retract').value,
         drillPosX: byKey(drill, 'posX').value, drillDia: byKey(drill, 'dia').value, pocketToolDia: byKey(pocket, 'toolDia').value, surfDepth: byKey(surface, 'depth').value,
-        pocketStepover: byKey(pocket, 'stepover').value, surfStepover: byKey(surface, 'stepover').value,
+        pocketStepover: byKey(pocket, 'stepover').value,
+        // t1325 — the surface field is now the PERCENTAGE (see the restated assert below); its mm is derived in the macro
+        surfStepoverPct: byKey(surface, 'stepoverPct').value, surfStepoverGone: !surface.fields.some((f) => f.key === 'stepover'),
+        surfToolDia: byKey(surface, 'toolDia').value,
         wizStepover: wizFill && wizFill.params.stepover, expectPocketStepover: stepoverMm(P_POCKET) },
       bake: {
         cornerCorner: byKey(corner, 'corner').bakeable, cornerSeq: byKey(corner, 'seq').bakeable, cornerRetract: byKey(corner, 'retract').bakeable,
@@ -78,10 +81,17 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
   expect(r.val.cornerMaxProbe).toBe(80); expect(r.val.cornerTravel).toBe(40); expect(r.val.cornerFast).toBe(250);
   expect(r.val.cornerSeq, 'seq enum XY -> int 1 (S1d)').toBe(1); expect(r.val.cornerCorner, 'corner enum FR -> int 2 (S1d)').toBe(2); expect(r.val.cornerRetract).toBe(4);
   expect(r.val.drillPosX).toBe(10); expect(r.val.drillDia).toBe(60); expect(r.val.pocketToolDia).toBe(8); expect(r.val.surfDepth).toBe(0.8);
-  // DERIVED stepover == the real wizard value (surface) + the canonical stepoverMm (pocket)
-  expect(r.val.surfStepover, 'surface stepover == the actual surfacingStack value').toBe(r.val.wizStepover);
-  expect(r.val.surfStepover, 'surface stepover = 16*60/100 = 9.6').toBe(9.6);
+  // DERIVED stepover == the canonical stepoverMm (pocket, unchanged — only the SURFACE generator moved)
   expect(r.val.pocketStepover, 'pocket stepover == stepoverMm(op)').toBe(r.val.expectPocketStepover);
+  // t1325 — PREMISE CHANGED BY RULING, restated rather than deleted. This used to assert that the surface generator
+  // seeded an absolute stepover in MM equal to the wizard's own (16 · 60% = 9.6). Stepover is now declared as the
+  // PERCENTAGE and the mm is derived in the macro header from the two pendant knobs, so that mm is no longer a field
+  // at all. The PROPERTY THAT MATTERED — the slot cuts what the wizard cuts — survives exactly, one step removed:
+  // the pct times the tool Ø still equals the wizard's mm.
+  expect(r.val.surfStepoverGone, 'the mm field is gone from the surface generator — the % replaced it').toBe(true);
+  expect(r.val.surfStepoverPct, 'the surface field is the intent: 60%').toBe(60);
+  expect(r.val.surfToolDia * r.val.surfStepoverPct / 100, 'and it still resolves to the actual surfacingStack value').toBe(r.val.wizStepover);
+  expect(r.val.surfToolDia * r.val.surfStepoverPct / 100, 'which is 16*60/100 = 9.6, the number this assert has always guarded').toBe(9.6);
   // exposed defaults + NON-BAKEABLE guards
   expect(r.allExposed).toBe(true);
   expect(r.bake.cornerCorner, 'choice params ARE bakeable now (t1047 amend)').toBe(true); expect(r.bake.cornerSeq).toBe(true); expect(r.bake.cornerRetract).toBe(true);
@@ -136,7 +146,7 @@ test('S1 fix: data-op TWINS are CAM-able and seed correct values', async ({ page
       camable: { surf: isCamableType('user_surfacing_data'), pocket: isCamableType('user_pocket_data'), corner: isCamableType('user_corner_data'), bore: isCamableType('user_bore_data'), contour: isCamableType('user_contour_data') },
       camType: { surf: surf.camType, pocket: pocket.camType, corner: corner.camType, bore: bore.camType },
       contourUniversal: !!seedFromOp(op('user_contour_data', {})).universal,   // U2 — the contour twin now routes to the universal unroll path (has a def to unroll)
-      surf: { stepover: byKey(surf, 'stepover').value, depth: byKey(surf, 'depth').value, w: byKey(surf, 'w').value },
+      surf: { stepoverPct: byKey(surf, 'stepoverPct').value, toolDia: byKey(surf, 'toolDia').value, depth: byKey(surf, 'depth').value, w: byKey(surf, 'w').value },
       pocket: { stepover: byKey(pocket, 'stepover').value, toolDia: byKey(pocket, 'toolDia').value, depth: byKey(pocket, 'depth').value },
       corner: { corner: byKey(corner, 'corner').value, probeZ: byKey(corner, 'probeZ').value, wcs: byKey(corner, 'wcs').value, maxProbe: byKey(corner, 'maxProbe').value },
       bore: { holeDia: byKey(bore, 'holeDia').value, posX: byKey(bore, 'posX').value, camType: bore.camType },
@@ -146,8 +156,12 @@ test('S1 fix: data-op TWINS are CAM-able and seed correct values', async ({ page
   expect(r.camable).toEqual({ surf: true, pocket: true, corner: true, bore: true, contour: true });
   expect(r.camType).toEqual({ surf: 'surface', pocket: 'pocket', corner: 'corner', bore: 'bore' });
   expect(r.contourUniversal, 'contour twin now CAM-able via the universal path (no generator → unroll)').toBe(true);
-  // surfacing twin: uses its FLAT stepover (no stepoverPct/toolDia to derive from)
-  expect(r.surf.stepover, 'surfacing twin uses its flat stepover 9.6').toBe(9.6);
+  // surfacing twin: t1325 — PREMISE CHANGED BY RULING, restated. The twin still stores a FLAT mm (9.6) and has no
+  // toolDia at all; the generator's field is now a PERCENTAGE. So the seed RECOVERS the pct against the tool Ø the
+  // slot will carry (the generator default, Ø12) — and the cut is byte-for-byte the same one it always was, which is
+  // what this assert has always been about: 9.6mm of stepover.
+  expect(r.surf.stepoverPct, 'the twin’s flat 9.6mm recovers as 80% of the Ø12 the slot carries').toBe(80);
+  expect(r.surf.toolDia * r.surf.stepoverPct / 100, 'NO SILENT RASTER CHANGE — it still cuts 9.6mm').toBe(9.6);
   expect(r.surf.depth).toBe(0.8); expect(r.surf.w).toBe(200);
   // pocket twin: derives stepover from stepoverPct+toolDia (both present)
   expect(r.pocket.stepover, 'pocket twin derives 8*45/100 = 3.6').toBe(3.6);

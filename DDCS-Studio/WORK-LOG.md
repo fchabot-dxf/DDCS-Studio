@@ -5764,3 +5764,99 @@ says explicitly not to thin the enum work for it, so it is NOT started — flagg
 GATE: fast tier — 185 touched specs (cam*/preflight/envelope/spindle/soft-limit/honest-mach/setup-sheet/universal/
 substack/editor-chip) + 71 smoke, all green. The CAM-slot half is emit-adjacent and now touches stackToSlot's emit
 path, so the advisor's full suite on acceptance is worth it.
+
+---
+
+## t1325 — the authored tool table: per-kind rows, per-tool units, a dragged silhouette, and stepover as intent
+
+Four parts, plus two mid-turn amendments. One part is delivered whole rather than split, and the SECOND amendment
+(the gateway blocker) is landed separately — see the end.
+
+### (1) THE RECORD — one table, per-kind rows
+
+`data/latheTools.js` declares the kinds (turning · parting · centre drill · drill) and the QUICK FACTS each one
+carries. The mill table is untouched and that is asserted BOTH ways: the mill header is compared verbatim, and the
+lathe branch is checked for not leaking into it. A fact belonging to another kind renders as a HATCHED no-cell, not
+a blank input — a turning insert does not have an empty blade width, it has no blade.
+
+**The unit is a fact about the tool, not a mode the machine is in.** An imperial blade in a metric shop is normal.
+So the unit rides the record, the label carries it everywhere the number surfaces (`Blade width [in]`), and the
+conversion happens ONCE. Never G20/G21: a modal switch rescales every word after it — feeds, arcs, an unrelated
+axis in the same block — so one imperial blade would silently reinterpret the whole program.
+
+WHERE "once" IS, stated because it is a real fork: for the WIZARD path the conversion happens at the PREFILL, so
+the form field holds the mm the program will carry and a person can read it (odTurn's rule — the G-code moves only
+through a number a person can read). `factHeaderLine()` is the same single conversion for the other path, where a
+tool fact reaches a macro without passing through a form.
+
+### (2) THE AUTHORED PROFILE
+
+`viz/toolProfiles.js`: a tip-relative `[z,x]` polyline, per-kind STARTERS prefilled and then dragged. The editor is
+the app's own FeatureCanvas with one handle per point, so a tool grind is dragged exactly the way a pocket corner
+is. Every drag writes the WHOLE polyline back onto the record — the picture and the stored shape are one object.
+
+**Two things caught by looking rather than by trusting:**
+- I first wrote the silhouette as `{kind:'poly'}`. FeatureCanvas draws circle/line/rect/hole and NOTHING else, so it
+  would have drawn absolutely nothing — the exact trap latheProfileCanvas already records in its own comment. It is
+  a chain of `line` items, and the spec asserts the spec uses only kinds the canvas knows.
+- THE PROFILE VANISHED ON EVERY BOOT. It saved, it went into the .ddcs, it restored — and `normalizeTool` built a
+  new object from an explicit key list that did not name `profile`, so boot normalized it straight back off the
+  tool. The STORE round-tripped perfectly and the shape still disappeared. That is why the assert reloads the app
+  instead of stopping at the store, and why it restores over a DECOY shape rather than over nothing.
+
+THE CARVE STAYS POINT-INSERT, said in the module, again at the editor's footer, and asserted as a property of the
+source: the sim still removes material at the tip point, so a blade's kerf is not swept and a nose radius does not
+round the simulated corner.
+
+### (3) PREFILLS — the mechanism already existed
+
+The tool picker already declares `widgetConfig.fill` (tool key → form param). So the prefill is a DECLARATION, not
+new widget code: parting declares `{ toolKinds:['parting'], fill:{ bladeWidth:'width' } }`. The picker filters to
+the kinds an op says it can hold — a parting op offers blades, and an op that declares none gets the whole library
+exactly as before, so the filter is inert until a def opts in. A typed value still wins, because the fill runs on
+PICK rather than on every render (asserted).
+
+**THE CENTRE DRILL PREFILLS NOTHING, and that is a fact about the op rather than a gap.** The dispatch asked for
+"centre-drill bore dia from its tool". The centre drill sits ON THE CENTRELINE — no diameter reaches the macro,
+only Z cuts. Adding a `dia` param purely to receive a prefill would put a socket in the program that the program
+does not use. Its picker is still filtered, and the tool's Ø now reads in the picker's own label.
+
+### (4) STEPOVER AS INTENT (the t1323 split, folded in)
+
+Stored in mm it was a number computed for ONE tool: expose Tool Ø as a pendant knob, dial Ø12 → Ø8 at the machine,
+and a 7.2mm stepover silently becomes 90% of the new tool. So the generator's field is the PERCENTAGE and the macro
+derives `#22 = [#toolØ · #pct / 100]`. Asserted by RUNNING the macro at two tool diameters: the smaller tool rasters
+finer, automatically.
+
+**A REAL BUG, caught by reading the emitted text rather than the variable name.** I first derived into `#27`.
+camMacroKit declares the split in its own header — callers own #20–#26, the kit owns #27–#33 — and `rasterClear`
+promptly overwrote my stepover with the raster ROW COUNT one line later. The ramp length, the first row and the
+WHILE bound then all ran on that number: clean-looking G-code cutting a different part. Moved to #22 (free in the
+caller's band), and the spec now asserts the derived var is assigned EXACTLY ONCE and only read afterwards.
+
+**A SECOND REAL BUG, caught by a spec I did not write.** The migration was keyed on the NAME `stepover`, so it also
+fired on POCKET slots — whose stepover is still a legitimate millimetre — and rewrote a valid 3.6mm into 2.4. It is
+now scoped to the surface arm, the only generator whose field changed. A migration keyed on a name rather than on
+the thing that actually changed is a migration that corrupts its neighbours.
+
+The recovery divides by the tool Ø THE SLOT WILL CARRY (the op's own, else the generator's field default), because
+the macro multiplies that same number back. The twin's flat 9.6mm recovers as 80% of Ø12 and still cuts 9.6mm.
+
+### PREMISE CHANGED BY RULING — five specs restated, none weakened
+
+cam-op-seed (×2), cam-slot-guards-977, cam-substack, cam-substack-modal and cam-build-mode all asserted an absolute
+mm field that this ruling replaces. Each is restated as the new truth WITH its history in a comment, and each keeps
+the property it was really guarding — the cut — by asserting `pct × toolØ` instead of the raw field.
+
+### PRE-EXISTING, NOT MINE
+
+`settings-done-faq.spec.js` ("the .ddcs contents answer matches the BACKUP_STORES registry, 1:1 and in order")
+fails on this branch WITHOUT any of this turn's changes — stash-verified before reporting it. Untouched here.
+
+### AMENDMENT 1 — the WCS table survives a kind switch
+
+One assert, no behaviour change, placed beside the per-kind stock-parking machinery it fences: mill → lathe → mill
+leaves `settings.machine.wcs` byte-identical. One controller, one G54 table; the kind changes the VIEW, never the
+stored offsets.
+
+GATE: fast tier — 308 touched specs (tool*/lathe*/cam*/surfacing*/stepover*) + 71 smoke, green.

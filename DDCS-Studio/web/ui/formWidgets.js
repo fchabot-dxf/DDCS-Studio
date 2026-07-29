@@ -15,9 +15,10 @@ import { buildRegions, paintRegions, regionValueFromEvent, regionLabel } from '.
 import { FeatureCanvas } from '../viz/featureCanvas.js';
 import { workpieceFeatureItems, stockTopWorkZ, suggestedPlaneZ } from '../engine/workpiece.js';   // t933 — the shared stock-top + suggested-plane-Z (Plane assists, one source with the middle wizard)
 import { decorateInputEl } from './probeSrcGlyph.js';   // t289 — the SAME inline source dot the built-in forms use, on sourceField bindings
-import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';   // t522 declared-I/O picker; t768 P1b the tool-library modal opener (pickable from a wizard)
+import { getOutputs, getInputs, openToolLibrary } from './settingsPanel.js';
+import { factsOf, factMm, factLabel, unitOf } from '../data/latheTools.js';   // t1325 — the tool's quick facts, and the ONE conversion for its unit   // t522 declared-I/O picker; t768 P1b the tool-library modal opener (pickable from a wizard)
 import { ioInputSupported, ioEdgeOptions } from '../wizards/ioStepWizard.js';   // t522/t524 — the mode-picker greys INPUT on a post without wait-on-input; the Edge options are dialect-aware
-import { getToolLibrary, getTool } from '../wizards/toolPicker.js';   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
+import { getToolLibrary, getTool, toolsOfKinds } from '../wizards/toolPicker.js';   // t1325 — toolsOfKinds: an op offers only the kinds it declares it can hold   // t768 P1a — the tool picker lists settings.atc.tools (live) + auto-fills Ø/feeds on pick (one source = the table)
 import { paramFieldsFromStack } from '../blocks/userOps.js';   // block-native-params S5.2 — the FORM-field declaration (param_field rows), when present
 import { THREAD_PRESETS, threadPreset } from '../wizards/threads.js';   // t778 — the thread preset table for the tapping wizard's pitch picker
 import { MATERIALS, suggestFeedsSpeeds } from '../wizards/materials.js';   // t867 — feeds & speeds: the material table + the classic RPM/feed math
@@ -257,7 +258,10 @@ function toolPickWidget(host, b) {
         const mk = (val, lab) => { const o = document.createElement('option'); o.value = String(val); o.textContent = lab; sel.appendChild(o); };
         mk('', 'No tool (use typed Ø)');
         let lib = [];
-        try { lib = getToolLibrary(); } catch (_) { /* no settings yet */ }
+        // t1325 — FILTERED BY THE KINDS THIS OP DECLARES IT CAN HOLD. A parting op offers blades; an op that declares
+        // no kinds (every mill op) gets the whole library, so this is inert until a def opts in.
+        const kinds = (b.widgetConfig && b.widgetConfig.toolKinds) || null;
+        try { lib = kinds ? toolsOfKinds(kinds) : getToolLibrary(); } catch (_) { /* no settings yet */ }
         lib.forEach((t) => mk(t.num, t.label));
         sel.value = keep;
         if (String(sel.value) !== String(keep)) sel.value = '';   // the kept T# was deleted from the library → fall back to no-tool
@@ -274,6 +278,26 @@ function toolPickWidget(host, b) {
         // t871 — the target fields default to the MAIN tool cluster; a picker can override (e.g. the rest tool fills restDia).
         const fill = (b.widgetConfig && b.widgetConfig.fill) || { dia: 'toolDia', feed: 'feed', plunge: 'plunge', rpm: 'rpm' };
         for (const key in fill) put(key, fill[key]);
+        // t1325 — A LATHE QUICK FACT PREFILLS ITS FIELD, converted HERE and nowhere else. The form field is the mm
+        // number the program will carry, and a person has to be able to read it (odTurn's rule: the G-code moves only
+        // through a number a person can read) — so an inch blade lands as 3.175 and the note says where it came from
+        // and in what unit it was bought. The macro-header conversion (latheTools.factHeaderLine) is the same single
+        // conversion for the other path, where a tool fact reaches a macro without passing through a form.
+        for (const f of factsOf(tool.kind || '')) {
+            const target = fill[f.key];
+            if (!target) continue;
+            const mm = factMm(tool, tool.kind, f.key);
+            if (mm == null) continue;
+            const el = form.querySelector(`[data-param="${target}"]`);
+            if (!el) continue;
+            el.value = mm;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            const row = el.closest('[data-row], label, div');
+            const note = row && row.querySelector('.tool-fact-note');
+            const txt = 'from T' + tool.num + ' — ' + factLabel(tool, tool.kind, f.key) + ' ' + tool[f.key] + (unitOf(tool) === 'inch' ? ' = ' + mm + ' mm' : '');
+            if (note) note.textContent = txt;
+            else if (row) { const n = document.createElement('span'); n.className = 'tool-fact-note'; n.style.cssText = 'margin-left:8px; font-size:11px; color:var(--text-dim,#8b93a1);'; n.textContent = txt; row.appendChild(n); }
+        }
     });
     // LIVE: re-fill when the tool library changes (a tool added/edited in Settings). Detach when the row leaves the DOM.
     const onSettings = () => { if (!sel.isConnected) { if (typeof window !== 'undefined') window.removeEventListener('ddcs:settings-changed', onSettings); return; } fill(); };

@@ -179,3 +179,38 @@ test('THE STOCK IS SCOPED PER KIND — a mill gets its box back, and the bar sur
     expect(bar.z, 'stick-out and raw end included').toBe(72);
     expect(bar.origin).toBe('finished-face');
 });
+
+/**
+ * t1325 (advisor amendment — probed as passing today, pinned so it stays that way).
+ *
+ * THE WCS TABLE IS SHARED ACROSS KINDS, deliberately: one controller, one G54 table. The lathe view greys Y rather
+ * than owning a second table. The per-kind stock PARKING added at t1321 is machinery that swaps what a kind switch
+ * carries — so this asserts, byte-identically, that it never grows to swallow the WCS with it. No behaviour change;
+ * this is a fence around one, placed next to the machinery it fences.
+ */
+test('THE KIND SWITCH LEAVES THE WCS TABLE ALONE — mill → lathe → mill, byte-identical', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
+    const r = await page.evaluate(async () => {
+        const wm = await import('/data/workspaceMachine.js');
+        const S = window.ddcsGetSettings();
+        S.machine = { ...(S.machine || {}), wcs: { active: 2, table: [
+            { n: 1, x: -10.5, y: -20.25, z: -3 },
+            { n: 2, x: 100, y: 55.125, z: -42.75 },
+        ] } };
+        const snap = () => JSON.stringify(window.ddcsGetSettings().machine.wcs);
+        const before = snap();
+        wm.setMachine({ ...wm.getMachine(), kind: 'lathe' });
+        window.dispatchEvent(new Event('ddcs:settings-changed'));
+        await new Promise((res) => setTimeout(res, 250));
+        const asLathe = snap();
+        wm.setMachine({ ...wm.getMachine(), kind: 'mill' });
+        window.dispatchEvent(new Event('ddcs:settings-changed'));
+        await new Promise((res) => setTimeout(res, 250));
+        return { before, asLathe, after: snap() };
+    });
+    // ONE CONTROLLER, ONE G54 TABLE — the offsets a lathe uses are the offsets a mill uses; the kind changes the VIEW
+    // (Y greys out), never the stored table.
+    expect(r.asLathe, 'switching to lathe leaves the WCS table untouched').toBe(r.before);
+    expect(r.after, 'and switching back leaves it untouched again — nothing was parked, swapped or defaulted').toBe(r.before);
+});

@@ -63,7 +63,7 @@ test('S1b subStackToSlot — a standard sub-unit stays LIVE (generator loop) + c
         return {
             derivedStepover: derived.stepover, derivedDepth: derived.depth,
             body: slot.body, nfields: slot.fields.length,
-            stepoverVar: byKey.stepover ? byKey.stepover.var : null,
+            stepoverVar: byKey.stepoverPct ? byKey.stepoverPct.var : null,   // t1325 — the surface generator's knob is the PERCENTAGE now; the mm is derived in the macro
             cfeed: byKey.cfeed || null, cz: byKey.cz || null,
             macro,
         };
@@ -79,8 +79,12 @@ test('S1b subStackToSlot — a standard sub-unit stays LIVE (generator loop) + c
     expect(r.body, 'row count computed live from the stepover var').toContain(';raster row count');
     expect(r.body, 'NO unrolled literal raster passes (all cut targets are #vars)').not.toMatch(/G1 [XY]-?\d/);
     // the stepover is an exposed #var driving the loop (a live #2600 knob)
-    expect(r.stepoverVar, 'stepover is an exposed field').toBeTruthy();
-    expect(r.body).toContain(`/${r.stepoverVar}]   ;raster row count`);
+    // t1325 — PREMISE CHANGED BY RULING, restated. The exposed knob is the stepover PERCENTAGE; the row count now
+    // divides by the DERIVED mm (#22 = toolØ · pct / 100), so the loop is still driven by a live pendant value — one
+    // step removed, and the property this guarded (the raster is computed at the machine, not baked) is intact.
+    expect(r.stepoverVar, 'the stepover percentage is an exposed field').toBeTruthy();
+    expect(r.body, 'and the row count divides by the derived mm, which reads that knob').toContain('/#22]   ;raster row count');
+    expect(r.body, 'which is itself derived from the exposed percentage').toContain(` * ${r.stepoverVar} / 100]`);
 
     // (3) the custom feed + plunge Z are EXPOSED as #vars (a #2600 knob each), not baked
     expect(r.cfeed, 'custom feed exposed').toBeTruthy();

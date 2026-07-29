@@ -45,7 +45,11 @@ const SURFACE_FIELDS = [
     { key: 'h', label: 'Area Y', units: 'mm', def: 80, min: 1, max: 99999, type: 1 },
     { key: 'depth', label: 'Depth', units: 'mm', def: 0.5, min: 0.05, max: 999, type: 1 },
     { key: 'stepdown', label: 'Stepdown', units: 'mm', def: 0.5, min: 0.05, max: 999, type: 1 },
-    { key: 'stepover', label: 'Stepover', units: 'mm', def: 7.2, min: 0.1, max: 999, type: 1 },
+    // t1325 — STEPOVER IS A PERCENTAGE OF THE TOOL, the CAM convention, and the mm is DERIVED in the header below.
+    // Stored as mm it was a number computed for ONE tool: expose Tool Ø as a pendant knob, dial it from 12 to 8 at the
+    // machine, and a 7.2mm stepover silently becomes 90% of the new tool instead of the 60% that was meant. Two knobs
+    // that must agree is one knob too many, so only the intent is exposed and the machine re-derives the rest.
+    { key: 'stepoverPct', label: 'Stepover', units: '%', def: 60, min: 1, max: 100, type: 1 },
     { key: 'toolDia', label: 'Tool Ø', units: 'mm', def: 12, min: 0.1, max: 999, type: 1 },
     { key: 'feed', label: 'Feed', units: 'mm/min', def: 800, min: 1, max: 99999, type: 0 },
     { key: 'plunge', label: 'Plunge feed', units: 'mm/min', def: 200, min: 1, max: 99999, type: 0 },
@@ -148,16 +152,25 @@ export function surfacingSlot(used = new Set(), varOffset = 0, dir = 'x', decl) 
         `#24=[#20+${v.w}]   ;x1`,
         '#25=#21   ;y0',
         `#26=[#21+${v.h}]   ;y1`,
+        '( t1325 — the raster overlap, DERIVED here from the two pendant knobs. Change Tool Ø at the machine and the )',
+        '( stepover follows it, because the % is the intent and the mm is only its consequence. )',
+        // #22 — the CALLER'S band. camMacroKit declares the split in its own header: callers own #20–#26 and the kit
+        // owns #27–#33. This was written as #27 first, and rasterClear promptly overwrote it with the raster ROW
+        // COUNT one line later — the ramp length, the first row and the WHILE bound all then ran on that number. It
+        // emitted clean-looking G-code that cut a different part, which is why the fix was to read the emitted text
+        // rather than trust the variable name.
+        `#22=[${v.toolDia} * ${v.stepoverPct} / 100]   ;stepover mm = tool Ø · %`,
         'IF #24 LE #23 GOTO 8',
         'IF #26 LE #25 GOTO 8',
         '( guard: step / tool / clearance must be positive — a 0 stepover div-by-zeros the row count, a 0 stepdown loops the Z pass forever, and a 0 clearance is not a safe retract. Clean error, not a runaway. )',
-        `IF ${v.stepover} LE 0 GOTO 7`,
+        'IF #22 LE 0 GOTO 7',
         `IF ${v.stepdown} LE 0 GOTO 7`,
         `IF ${v.toolDia} LE 0 GOTO 7`,
         `IF ${v.clearance} LE 0 GOTO 7`,
         '',
         ...spindleOn(v.rpm),
-        ...rasterClear(rasterOpts(v, { x0: '#23', x1: '#24', y0: '#25', y1: '#26' }, false, dir)),
+        // the raster steps by the DERIVED mm — one source, so the guard above and the motion below cannot disagree
+        ...rasterClear(rasterOpts({ ...v, stepover: '#22' }, { x0: '#23', x1: '#24', y0: '#25', y1: '#26' }, false, dir)),
         ...spindleOff(),
         'GOTO 9',
         '( errors )',

@@ -45,6 +45,9 @@ const DDCS_SETTINGS_KEY = 'ddcs_studio_settings';
 // tool-length offset written to #[baseVar + i] (#1430 = T1); the other fields are
 // the Studio-side tool library the Mill wizards pick from. Not ATC-specific — the
 // Tool table tab is always present, so this works for manual tool change too.
+import { LATHE_TOOL_KINDS, LATHE_TOOL_KIND_IDS, LATHE_FACT_KEYS, factsOf, factLabel, unitOf, toolKindsFor, TOOL_UNITS } from '../data/latheTools.js';
+import { profileOf, profileSvg, toolProfileSpec, starterProfile } from '../viz/toolProfiles.js';   // t1325 — the authored cutting silhouette (starter until dragged) + its drag-editor spec   // t1325 — the per-kind lathe tool record (quick facts + the per-tool unit)
+
 export const TOOL_TYPES = ['endmill', 'drill', 'ballnose', 'tapered', 'chamfer', 'vbit', 'spotdrill', 'surfacing', 'face', 'tap', 'reamer', 'engraver', 'other'];
 // A small starter library so the Mill wizards have tools to pick on a fresh install. Seeded into a new install's
 // defaults and, once, into an existing install with an empty library (the `toolsSeeded` flag means clearing it
@@ -72,6 +75,19 @@ export function normalizeTool(t, fallbackNum) {
         dia: o.dia ?? '', flutes: o.flutes ?? '', length: o.length ?? '',
         rpm: o.rpm ?? '', feed: o.feed ?? '', plunge: o.plunge ?? '',
         angle: o.angle ?? '',   // t875 — the V-bit/chamfer/engraver included angle (degrees); blank = the per-type default
+        // t1325 — THE LATHE HALF of one table. `kind` selects which quick facts a row shows (turning | parting |
+        // centredrill | drill); `unit` is a fact about the TOOL, not a mode the machine is in, so an imperial blade
+        // keeps its own number and converts ONCE in the macro header. Both default to '' / mm, so every tool that
+        // exists today normalizes byte-identically and the mill table is untouched.
+        kind: o.kind || '',
+        unit: (o.unit === 'inch') ? 'inch' : (o.unit === 'mm' ? 'mm' : ''),
+        // THE AUTHORED PROFILE RIDES THE RECORD. normalizeTool builds a NEW object from an explicit key list, so a
+        // field that is not named here is DROPPED — which is exactly what happened to the ground profile on the first
+        // run: it saved, it went into the .ddcs, it restored… and then boot normalized it straight back off the tool.
+        // The store round-tripped perfectly and the shape still vanished, which is why the assert reloads the app
+        // instead of stopping at the store.
+        profile: Array.isArray(o.profile) ? o.profile : '',
+        ...Object.fromEntries(LATHE_FACT_KEYS.map((k) => [k, o[k] ?? ''])),
     };
 }
 // The library as a sparse list of real tools: normalized, with a tool number, blanks dropped.
@@ -2656,6 +2672,99 @@ function wireSettingsOverlay(ov) {
     // (opened from a wizard's ⚙). In pick mode each row grows a "Use" affordance (+ row double-click) that selects the tool
     // INTO the wizard binding + closes. Editing/adding stays available in pick mode so add-then-use has no dead end.
     let _toolLibPick = null;
+    // t1325 — THE LATHE ROWS. Same table, same edit path (data-tool/data-field → the one input handler), different
+    // COLUMNS: the kind picks which quick facts the row carries, and each fact's header carries the tool's own unit.
+    // A fact belonging to another kind simply has no cell — not a disabled one — because a turning insert does not
+    // have a blank blade width, it has no blade.
+    // The row's silhouette cell: the user's AUTHORED grind when they have dragged one, else the kind's starter —
+    // dimmed, so "this is a starting point, not your tool" reads at a glance rather than in a tooltip.
+    function latheToolProfileSvg(t, kind) {
+        const pr = profileOf(t, kind);
+        return '<span class="tl-profsvg' + (pr.authored ? ' tl-authored' : '') + '" title="'
+            + (pr.authored ? 'Your ground profile — click to edit' : 'Starter profile for a ' + (LATHE_TOOL_KINDS[kind] || {}).label + ' — click to drag it into your real grind')
+            + '">' + profileSvg(pr.points, { w: 54, h: 34 }) + '</span>';
+    }
+    function latheFactCols() {
+        // the union, in kind order, so a table of mixed kinds keeps one stable column layout
+        const seen = new Set(), cols = [];
+        LATHE_TOOL_KIND_IDS.forEach((k) => factsOf(k).forEach((f) => { if (!seen.has(f.key)) { seen.add(f.key); cols.push(f); } }));
+        return cols;
+    }
+    function latheHeadHtml() {
+        return '<tr><th>Tool #</th><th>Name</th><th>Kind</th><th>Profile</th><th title="A fact about the TOOL — its numbers are stored in this unit and converted once in the macro header">Unit</th>'
+            + latheFactCols().map((f) => '<th title="' + String(f.hint || '').replace(/"/g, '&quot;') + '">' + f.label + (f.unit === '°' ? '°' : '') + '</th>').join('')
+            + '<th>RPM</th><th data-uhdr="feed">Feed</th><th></th></tr>';
+    }
+    function latheRowsHtml(tools) {
+        const cols = latheFactCols();
+        return tools.map((raw, i) => {
+            const t = normalizeTool(raw, i + 1);
+            const kind = t.kind || 'turning';
+            const mine = new Set(factsOf(kind).map((f) => f.key));
+            const kindOpts = LATHE_TOOL_KIND_IDS.map((k) => '<option value="' + k + '"' + (k === kind ? ' selected' : '') + '>' + LATHE_TOOL_KINDS[k].label + '</option>').join('');
+            const unitOpts = TOOL_UNITS.map((u) => '<option value="' + u + '"' + (u === unitOf(t) ? ' selected' : '') + '>' + u + '</option>').join('');
+            return '<tr data-kind="' + kind + '">'
+                + '<td class="tl-numcell"><input type="number" step="1" min="1" max="99" data-tool="' + i + '" data-field="num" value="' + (t.num === '' || t.num == null ? '' : t.num) + '"><span class="tl-var" data-var="' + i + '">' + lenVarLabel(t.num, parseInt((_ddcsSettings.atc || {}).baseVar, 10) || 1430) + '</span></td>'
+                + '<td><input type="text" data-tool="' + i + '" data-field="name" value="' + String(t.name).replace(/"/g, '&quot;') + '" placeholder="e.g. 93° DCMT"></td>'
+                + '<td><select data-tool="' + i + '" data-field="kind">' + kindOpts + '</select></td>'
+                + '<td class="tl-prof" data-prof="' + i + '">' + latheToolProfileSvg(t, kind) + '</td>'
+                + '<td><select data-tool="' + i + '" data-field="unit" title="This tool is sold and measured in this unit; the emit converts it once">' + unitOpts + '</select></td>'
+                + cols.map((f) => mine.has(f.key)
+                    ? '<td><input type="number" step="any" data-tool="' + i + '" data-field="' + f.key + '" value="' + (t[f.key] === '' || t[f.key] == null ? '' : t[f.key]) + '" title="' + factLabel(t, kind, f.key).replace(/"/g, '&quot;') + '"></td>'
+                    : '<td class="tl-nofact" title="' + LATHE_TOOL_KINDS[kind].label + ' tools do not carry a ' + f.label.toLowerCase() + '"></td>').join('')
+                + '<td><input type="number" step="1" data-tool="' + i + '" data-field="rpm" value="' + (t.rpm === '' || t.rpm == null ? '' : t.rpm) + '"></td>'
+                + '<td><input type="number" step="1" data-tool="' + i + '" data-field="feed" value="' + (t.feed === '' || t.feed == null ? '' : t.feed) + '"></td>'
+                + '<td class="tl-actcell"><button class="tl-use" data-usenum="' + (t.num === '' || t.num == null ? '' : t.num) + '" title="Use this tool in the wizard">Use</button><button class="tl-del" data-del="' + i + '" title="Remove tool">✕</button></td>'
+                + '</tr>';
+        }).join('');
+    }
+    // t1325 — THE PROFILE EDITOR. A small canvas with one drag point per profile point, on the SAME FeatureCanvas the
+    // wizards use — so a tool grind is dragged exactly the way a pocket corner is, and nothing here re-implements a
+    // handle. Every drag writes the WHOLE polyline back onto the tool record: the picture and the stored shape are
+    // the same object, so there is nothing to re-derive and nothing that can drift.
+    async function openToolProfileEditor(index) {
+        const a = _ddcsSettings.atc || {}; a.tools = a.tools || [];
+        const t = normalizeTool(a.tools[index], index + 1);
+        const kind = t.kind || 'turning';
+        let pts = profileOf(t, kind).points;
+        const { FeatureCanvas } = await import('../viz/featureCanvas.js');
+        let m = document.getElementById('toolprof-modal');
+        if (m) m.remove();
+        m = document.createElement('div');
+        m.id = 'toolprof-modal';
+        m.innerHTML = '<style>'
+            + '#toolprof-modal { position: fixed; inset: 0; z-index: 13200; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.5); }'
+            + '#toolprof-modal .tp-panel { background: var(--panel); color: var(--text-main); border: 1px solid var(--border); border-radius: var(--radius,6px); width: min(720px, 94vw); box-shadow: 0 12px 40px rgba(0,0,0,.5); }'
+            + '#toolprof-modal .tp-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); font-weight:700; }'
+            + '#toolprof-modal .tp-canvas { height: 340px; }'
+            + '#toolprof-modal .tp-foot { padding:10px 16px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:8px; }'
+            + '#toolprof-modal .tp-hint { font-size:11px; color: var(--text-dim); }'
+            + '</style>'
+            + '<div class="tp-panel">'
+            + '<div class="tp-head"><span>✎ ' + (LATHE_TOOL_KINDS[kind] || {}).label + ' profile — T' + t.num + (t.name ? ' · ' + t.name : '') + '</span><button id="toolprof-close">✕</button></div>'
+            + '<div class="tp-canvas" id="toolprof-canvas"></div>'
+            + '<div class="tp-foot"><span class="tp-hint">Drag a point to match the tool you actually ground. The tip stays the origin. <b>The preview draws this shape; the cut is still simulated at the tip point.</b></span>'
+            + '<span><button class="toolbar-btn settings-io" id="toolprof-reset">Reset to starter</button> <button class="toolbar-btn settings-io primary" id="toolprof-done">Done</button></span></div>'
+            + '</div>';
+        document.body.appendChild(m);
+        const fc = new FeatureCanvas();
+        const host = m.querySelector('#toolprof-canvas');
+        const store = (next) => {
+            pts = next;
+            const rec = normalizeTool(a.tools[index], index + 1);
+            rec.profile = next.map(([z, x]) => [z, x]);   // PLAIN POINTS — it travels in the .ddcs as data, not as a shape object
+            a.tools[index] = rec;
+            saveSettings();
+        };
+        const draw = () => fc.render(host, toolProfileSpec(pts, (next) => { store(next); draw(); }));
+        draw();
+        const close = () => { m.remove(); renderToolLibRows(); };
+        m.querySelector('#toolprof-close').addEventListener('click', close);
+        m.querySelector('#toolprof-done').addEventListener('click', close);
+        m.querySelector('#toolprof-reset').addEventListener('click', () => { store(starterProfile(kind)); draw(); });
+        m.addEventListener('mousedown', (e) => { if (e.target === m) close(); });
+        window.ddcsToolProfileCanvas = fc;   // test/debug seam — the live canvas, like the other canvases expose
+    }
     function renderToolLibRows() {
         const body = document.getElementById('toollib-rows');
         if (!body) return;
@@ -2664,6 +2773,15 @@ function wireSettingsOverlay(ov) {
         const tools = a.tools || (a.tools = []);
         const inchMode = (_ddcsSettings.units === 'inch');   // t1008 — dual-unit DISPLAY (storage stays mm-native)
         const modal = document.getElementById('toollib-modal');
+        // t1325 — the HEAD follows the machine kind, once, here (the rows below branch on the same fact).
+        const headEl = modal && modal.querySelector('thead');
+        if (headEl && toolKindsFor(getMachine().kind).length) {
+            headEl.innerHTML = latheHeadHtml();
+            // …and the foot note too: a lathe table advertising the Mill wizards' Tool picker describes a surface the
+            // operator is not looking at. Same table, same hint slot, the sentence that is true here.
+            const hint = modal.querySelector('.tl-hint');
+            if (hint) hint.innerHTML = 'Tool # → length offset #[base + #−1]. Each tool carries its own <b>unit</b> — its numbers convert once in the macro header, never with G20/G21. Click a <b>profile</b> to drag it into your real grind.';
+        }
         if (modal) {   // flip the unit column headers + the "feeds in …" foot note to the user unit
             const HDR = inchMode ? { dia: 'Ø in', length: 'Length in', feed: 'Feed IPM', plunge: 'Plunge IPM', feedunit: 'IPM' }
                                  : { dia: 'Ø mm', length: 'Length', feed: 'Feed', plunge: 'Plunge', feedunit: 'mm/min' };
@@ -2676,6 +2794,10 @@ function wireSettingsOverlay(ov) {
             '<td><input type="number" step="' + (step || 'any') + '" data-tool="' + i + '" data-field="' + f + '" value="' + (val === '' || val == null ? '' : dispVal(f, val)) + '"></td>';
         if (!tools.length) { body.innerHTML = '<tr><td colspan="12" class="tl-empty">No tools yet — “＋ Add tool” to start your library.</td></tr>'; return; }
         let html = '';
+        // t1325 — ONE TABLE, PER-KIND ROWS. A lathe workspace's rows speak lathe; a mill workspace takes the branch
+        // below completely untouched, which is the property asserted both ways.
+        const latheKinds = toolKindsFor(getMachine().kind);
+        if (latheKinds.length) { body.innerHTML = latheRowsHtml(tools); return; }
         tools.forEach((raw, i) => {
             const t = normalizeTool(raw, i + 1);
             html += '<tr>' +
@@ -2711,6 +2833,15 @@ function wireSettingsOverlay(ov) {
                 #toollib-modal .tl-numcell input { width: 46px; }
                 #toollib-modal .tl-var { display: inline-block; margin-left: 6px; font-size: 10px; color: var(--text-dim); }
                 #toollib-modal .tl-prof { text-align: center; width: 34px; }
+                /* t1325 — the lathe columns: a Kind that reads "Centre d" is a column that lies about its own value. */
+                #toollib-modal tr[data-kind] td:nth-child(3) { min-width: 132px; }
+                #toollib-modal tr[data-kind] td:nth-child(3) select { width: 132px; }
+                #toollib-modal tr[data-kind] td:nth-child(5) select { width: 62px; }
+                #toollib-modal tr[data-kind] td:nth-child(4) { width: 58px; }
+                #toollib-modal .tl-nofact { background: repeating-linear-gradient(135deg, transparent, transparent 4px, color-mix(in srgb, var(--border) 45%, transparent) 4px, color-mix(in srgb, var(--border) 45%, transparent) 5px); }
+                #toollib-modal .tl-profsvg { display: inline-block; cursor: pointer; opacity: .55; }
+                #toollib-modal .tl-profsvg.tl-authored { opacity: 1; }
+                #toollib-modal .tl-profsvg:hover { opacity: 1; filter: brightness(1.2); }
                 #toollib-modal .tl-prof svg { display: block; margin: 0 auto; }
                 #toollib-modal .tl-empty { padding: 16px; text-align: center; color: var(--text-dim); }
                 #toollib-modal input, #toollib-modal select { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 3px; padding: 4px 6px; font: inherit; }
@@ -2759,7 +2890,7 @@ function wireSettingsOverlay(ov) {
             const a = _ddcsSettings.atc; a.tools = a.tools || [];
             const rec = normalizeTool(a.tools[i], i + 1);
             let val = t.value;
-            if (f !== 'name' && f !== 'type') {
+            if (f !== 'name' && f !== 'type' && f !== 'kind' && f !== 'unit') {   // t1325 — kind/unit are declared strings, never parseFloat'd
                 val = (val === '') ? '' : parseFloat(val);
                 if (val !== '' && Number.isFinite(val) && _ddcsSettings.units === 'inch' && TOOL_UNIT_COLS.has(f)) val = fromDisp(val);   // t1008 — inch/IPM typed → mm STORAGE (exact; 0.25 → 6.35)
             }
@@ -2769,6 +2900,9 @@ function wireSettingsOverlay(ov) {
             if (f === 'num') {   // update the #var label inline (don't re-render — keeps focus)
                 const span = m.querySelector('.tl-var[data-var="' + i + '"]');
                 if (span) span.textContent = lenVarLabel(rec.num, parseInt(a.baseVar, 10) || 1430);
+            }
+            if (f === 'kind' || f === 'unit') {   // t1325 — the KIND changes which columns exist and UNIT changes every label: a full re-render, not an in-place patch
+                renderToolLibRows(); renderLibSummary(); return;
             }
             if (f === 'type' || f === 'dia' || f === 'length' || f === 'angle') {   // redraw the silhouette in place (keeps focus) — t875: angle re-cuts the cone
                 const cellEl = m.querySelector('.tl-prof[data-prof="' + i + '"]');
@@ -2786,6 +2920,10 @@ function wireSettingsOverlay(ov) {
                 return;
             }
             if (e.target.id === 'toollib-catalog') { openToolCatalogPicker(); return; }
+            // t1325 — the silhouette cell is the way in to the profile editor (a lathe table only; a mill row's
+            // profile is still DERIVED from its type, and nothing there is authored)
+            const profCell = e.target.closest && e.target.closest('.tl-prof');
+            if (profCell && toolKindsFor(getMachine().kind).length) { openToolProfileEditor(parseInt(profCell.dataset.prof, 10)); return; }
             const del = e.target.dataset ? e.target.dataset.del : null;
             if (del != null) {
                 const a = _ddcsSettings.atc; a.tools = a.tools || [];

@@ -23,11 +23,11 @@ test('surfacing slot GUARDS: bad step/tool/clearance errors cleanly (no div-by-z
     return {
       macro,
       normal: run({}),
-      zeroStepover: run({ stepover: 0 }),
+      zeroStepover: run({ stepoverPct: 0 }),   // t1325 — the surface field is the PERCENTAGE now; zero intent still means zero step
       zeroStepdown: run({ stepdown: 0 }),
       zeroTool: run({ toolDia: 0 }),
       zeroClear: run({ clearance: 0 }),
-      negStepover: run({ stepover: -3 }),
+      negStepover: run({ stepoverPct: -3 }),
     };
   });
   // STRUCTURE: the four positive-param guards + the ramp bound are in the macro

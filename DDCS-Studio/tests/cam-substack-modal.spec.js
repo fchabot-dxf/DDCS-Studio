@@ -49,7 +49,7 @@ test.describe(() => {
             const ebState = (k) => ({ expose: !!(cell(k, 'expose') && cell(k, 'expose').checked), exposeDisabled: !!(cell(k, 'expose') && cell(k, 'expose').disabled), bakeDisabled: !!(cell(k, 'bake') && cell(k, 'bake').disabled) });
             // the surfacing part's value cell must be read-only (a SPAN), not an editable input (subStackToSlot re-derives from the def)
             const valTag = (k) => { const td = document.querySelector(`#cbm_table tr[data-fkey="${fkOf(k)}"] td:nth-child(2)`); return td && td.firstElementChild ? td.firstElementChild.tagName : null; };
-            return { partHdrs, camLabel, rowKeys, stepover: ebState('stepover'), cfeed: ebState('cfeed'), cz: ebState('cz'), stepoverValTag: valTag('stepover') };
+            return { partHdrs, camLabel, rowKeys, stepover: ebState('stepoverPct'), cfeed: ebState('cfeed'), cz: ebState('cz'), stepoverValTag: valTag('stepoverPct') };
         });
 
         await page.screenshot({ path: `${SCRATCH}/cam-substack-modal.png` });   // VIEWED (ACCEPT, gated to the advisor)
@@ -60,7 +60,8 @@ test.describe(() => {
         expect(out.partHdrs.join(' | '), 'the custom part is labelled').toMatch(/custom atoms/i);
         expect(out.camLabel, 'the op is routed as sub-stack (not whole-op universal)').toMatch(/sub-stack/i);
         // the surfacing stepover is a LIVE generator knob: Expose enabled (not greyed) + checked, Bake disabled (baking would break the loop)
-        expect(out.rowKeys.map((k) => k.replace(/^\d+:/, '')), 'the surfacing stepover shows as a knob').toContain('stepover');
+        // t1325 — restated: the knob is the stepover PERCENTAGE (the mm is derived in the macro from it + tool Ø)
+        expect(out.rowKeys.map((k) => k.replace(/^\d+:/, '')), 'the surfacing stepover shows as a knob').toContain('stepoverPct');
         expect(out.rowKeys.every((k) => /^\d+:/.test(k)), 't1077 — every sub-stack row key is PART-SCOPED (two parts may share a param name)').toBe(true);
         expect(out.stepover, 'stepover = live knob → Expose enabled + checked, Bake disabled').toMatchObject({ expose: true, exposeDisabled: false, bakeDisabled: true });
         expect(out.stepoverValTag, 'a sub-stack part value is read-only (derived from the def), not a corruptible input').toBe('SPAN');

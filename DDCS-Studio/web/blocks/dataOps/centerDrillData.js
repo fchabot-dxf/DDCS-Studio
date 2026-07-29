@@ -26,8 +26,13 @@ export const CDRILL_BINDING_SPECS = [
       section: 'GEOMETRY', units: 'mm', default: CDRILL_DEFAULTS.peck },
     { param: 'feed', match: { type: 'assign', var: CDRILL_VARS.feed }, key: 'value', type: 'number',
       label: 'Feed', section: 'TOOL & CUT', units: 'mm/min', default: CDRILL_DEFAULTS.feed },
+    // t1325 — THE PICKER OFFERS CENTRE DRILLS (and plain drills, which do the same job deeper). NOTHING PREFILLS,
+    // and that is a fact about this op rather than a gap: the drill sits ON THE CENTRELINE, so no diameter ever
+    // reaches the macro — only Z cuts. The tool's Ø is real, and it now reads in the picker's own label, but adding a
+    // dia PARAM here purely to receive it would put a socket in the program that the program does not use.
     { param: 'toolNum', match: { type: 'toolsel' }, key: 'toolNum', type: 'number',
-      label: 'Tool', help: 'The tool-library number this op runs. Unset = no declared tool.', section: 'TOOL & CUT' },
+      widgetConfig: { toolKinds: ['centredrill', 'drill'] },
+      label: 'Tool', help: 'The centre drill this op runs. Its Ø shows in the list; the macro needs no diameter — the drill is on the centreline and only Z cuts.', section: 'TOOL & CUT' },
 ];
 
 export const CDRILL_STRUCT_BINDINGS = [
