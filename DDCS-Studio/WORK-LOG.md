@@ -5897,3 +5897,77 @@ http://127.0.0.1:8765 and came alive — "live — connected to \\10.0.0.50\cncd
 with zero configuration (screenshot _t1325-gateway-console.png). That is the user's blocked case, unblocked.
 
 GATE: 16 gateway/bridge/send/client specs + 71 smoke, green.
+
+---
+
+## t1327 — the gateway state contract, and the sentence that could not be read back
+
+### (1) THE STATE CONTRACT — three faults, one shape
+
+All three audit findings were a tab showing something it could not know:
+- **FILES** kept its last successful CNCDISK listing when the poll failed. `onPoll` did `catch { return; }` — it never
+  touched the list — so rows naming files on a controller that is not there stayed on screen with view and **DELETE**
+  still armed. That delete fires at whatever gateway answers next. THAT is where the phantom listing comes from.
+- **SEND** stayed fully armed with no gateway, so the failure arrived as an exception AFTER the click, on the one
+  screen where the click means "push this at my machine".
+- **TRACKING** said IDLE while UNREACHABLE. Different facts: idle is "I asked and there is no job", unreachable is
+  "I could not ask". Saying the calm one when the true one is unknown is the envelope check's cry-wolf pointed the
+  other way — a false reassurance rather than a false alarm.
+
+So the states are DECLARED once, in `ui/gateway/state.js`, with what each tab may show in each — rather than seven
+views each inventing an answer. The rule the contract encodes: **stale data is never shown as live**; a tab either
+has an answer from THIS state or says it has none. What survives an unreachable tick is only what belongs to the
+operator and needs no machine to be true — the Send tab's staged program, which they can prepare and edit with the
+machine off. That exception is written down (`keeps:`) rather than left as an accident of which code path ran.
+
+Send is greyed WITH ITS REASON on the control (postGating's rule, never a hidden button) and the offline half stays
+explicitly enabled: drop, Use current Studio program, the job name, the beacon settings.
+
+**THE DISCRIMINATION CHECK MATTERED HERE.** My first Files assert was "a fresh profile with no gateway shows zero
+rows" — which passes with or without the fix, because a fresh profile has no rows either way. It proved nothing.
+The phantom only appears when a gateway ANSWERED and then went away, so the real assert connects to the live
+gateway on this machine, sees 7 rows, then fails the transport underneath the open page and requires them GONE.
+Stash-verified: without the fix those 7 rows linger with their deletes armed.
+
+The connected direction is asserted too, and it SKIPS with a named reason if no local gateway is up rather than
+passing on an empty screen.
+
+### (2) THE FAQ COMMA — a sentence that could not be read back
+
+`settings-done-faq` failed alone and passed in-suite. The cause is structural, not flaky: the contents sentence
+joined the store labels with `, ` while one label contains its own comma — "Window layout (which panes are open,
+their sizes)" — so nothing reading the sentence back can tell a separator from a label's punctuation, and the
+1:1 check split that one row into two and failed on a registry that was perfectly correct.
+
+Fixed at the SENTENCE: joined with a middot, declared as `CONTENTS_SEP` and exported so the spec splits on the very
+separator the writer used instead of re-typing it. The spec also now asserts the separator is a character no label
+contains, and that a label really does contain a comma — so the reason this is not a comma is itself pinned.
+
+Given the declared-state treatment as asked: it now opens the panel and WAITS for the entry to exist rather than
+reading whatever an earlier test had already rendered. Run both ways, both green: alone (1 passed / whole file 8
+passed) and in-suite with its settings+help neighbours (37 passed).
+
+### (3) THE LATHE TOOLS IN THE FAQ
+
+They ride the `settings` row, whose label is "Settings + tool table" — so the registry-derived sentence already
+names them, which is the whole point of deriving it. What was worth checking is that the label still reads like
+something a person recognises as their tools; asserted, along with the answer carrying it.
+
+### REPORTED, NOT FIXED — a workspace-open order dependency that is not mine
+
+While gating I found `workspace-save-open-1225`, `workspace-manager-1223`, `workspace-manager-truth-1231` and
+`workspace-roundtrip` failing in a selected run (9 failures). Bisected against the session's own history: they pass
+at 43fc12f8 (session start) and fail from the t1323 release onward — so NOT from t1325 or this turn. The mechanism
+is identified: `#ddcs-busy-overlay` (added with the "an open takes the screen centre" change) is deliberately never
+cleared on success, because success means the page reloads out from under it. In a test the reload is stubbed, so
+the overlay outlives the open and intercepts the next click — `waiting for locator('#wsmPickFolder')` … `<div
+id="ddcs-busy-overlay"> intercepts pointer events`. The full suite is green because the order masks it. This is the
+same in-suite/alone hygiene class the advisor flagged for the FAQ spec, in a different family; left for routing
+rather than absorbed into a UI-class turn.
+
+**A PROCESS NOTE WORTH KEEPING:** the bisect itself cost me an edit. `git checkout <old> -- DDCS-Studio/web` then
+`git checkout HEAD -- DDCS-Studio/web` restores the whole tree from HEAD, which silently discarded an UNCOMMITTED
+change in that path (the helpPanel join). It surfaced as a spec failing on an export that was on disk ten minutes
+earlier. Stash before bisecting a path that holds uncommitted work, or bisect in a worktree.
+
+GATE: fast tier — 60 gateway/settings/help/bridge/send/client specs + 71 smoke, green.
