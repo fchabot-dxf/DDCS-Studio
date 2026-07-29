@@ -14,7 +14,7 @@
 import { initCube, cubeFaceAt, highlightCubeFace, pickCube } from './navCube.js';
 import { setupJogPendant } from './jogPendant.js';
 import { profileFromBar, carveSegment, carveBore, profileOutline } from '../data/latheProfile.js';
-import { viewFor } from './viewScope.js';   // t1295 — the start orientation is scoped to the machine KIND   // t1283 — turned work carves as a PROFILE, not a heightmap
+import { viewFor, orbitUpFor, orbitTargetFor } from './viewScope.js';   // t1295 — the start orientation is scoped to the machine KIND; t1321 — so are the orbit's up and target   // t1283 — turned work carves as a PROFILE, not a heightmap
 import { toolHalfProfile } from './toolProfile.js';
 import { PartFrame, partZeroShift } from './sceneFrame.js';
 import { getRotaryAxes } from '../ui/settingsPanel.js';
@@ -692,11 +692,17 @@ export class GcodeViz3D {
         const sty = new THREE.CylinderGeometry(rsty, rsty, styL, 16); sty.rotateX(Math.PI / 2); sty.translate(0, 0, 2 * rball + styL / 2);
         const body = new THREE.CylinderGeometry(rbody, rbody, bodyL, 20); body.rotateX(Math.PI / 2); body.translate(0, 0, 2 * rball + styL + bodyL / 2);
         grp.add(part(ball, 0xff2a44, 1, 'ruby'), part(sty, 0xffab40, 0.95, 'tool'), part(body, 0x9aa6b2, 0.9, 'collet'));
-        if (tool.probeAxis === 'x') grp.rotation.y = Math.PI / 2;   // …stands off in +X, over the round
+        // t1321 — an OD stylus stands off along the DECLARED toolpost side: +X is the front post at centre height (the
+        // default), and a top post is the same stand-off rotated over the bar. The face probe (axis 'z') comes down
+        // the bed either way — the post does not change which end of the bar its face is.
+        if (tool.probeAxis === 'x') { grp.rotation.y = Math.PI / 2; if (this._toolPostSide() === 'top') grp.rotation.z = Math.PI / 2; }
         grp.renderOrder = 25; grp.visible = !!this._animOn;
         this._animParts = { ruby: grp.children[0], tool: grp.children[1], collet: grp.children[2], spindle: grp.children[2] };
         this._animTool = grp; this._applyPartVis(); this.partFrame.add(grp);
     }
+
+    /** t1321 — the declared toolpost side: 'front' (the flat-bed default — the tool comes in at centre height) or 'top'. */
+    _toolPostSide() { try { return (window.ddcsToolPost && window.ddcsToolPost()) || 'front'; } catch (_) { return 'front'; } }
 
     _buildLatheTool(tool) {
         const THREE = this.THREE;
@@ -713,6 +719,11 @@ export class GcodeViz3D {
             const insert = new THREE.BoxGeometry(2.4, 2.4, 2.4); insert.translate(1.2, 0, 0);
             const holder = new THREE.BoxGeometry(48, w, w); holder.translate(24 + 2.4, 0, 0);
             grp.add(part(insert, 0xffab40, 0.95), part(holder, 0x9aa6b2, 0.9));
+            // t1321 — WHERE THE TOOLPOST IS, per the machine (user ruling). The holder is authored coming in along +X;
+            // a FRONT post (the flat-bed default) is exactly that — the tool at centre height, reaching in from the
+            // side — and a TOP post is the same holder rolled a quarter turn so it comes down from above. The declared
+            // camera keeps a front tool in view rather than hidden behind the bar.
+            if (this._toolPostSide() === 'top') grp.rotation.z = Math.PI / 2;
         }
         grp.renderOrder = 25; grp.visible = !!this._animOn;
         this._animParts = { tool: grp.children[0], collet: grp.children[1], spindle: grp.children[1] };
@@ -2467,9 +2478,17 @@ export class GcodeViz3D {
         // only ever stand on END — the one view of a lathe nobody has. Rolling up to +X lays the bed across the screen
         // with the cross-slide up: where the turner actually stands. Only while the view direction is not near ±X,
         // where an X up-vector would be parallel to the look and the camera would degenerate.
-        const latheRoll = (() => { try { return !!(window.ddcsIsLathe && window.ddcsIsLathe()); } catch (_) { return false; } })();
-        if (latheRoll && Math.abs(sinPhi * Math.cos(this.theta)) < 0.98) this.camera.up.set(1, 0, 0);
+        // t1321 — THE UP IS DECLARED PER KIND and does not change while you drag. It used to swap to the meridian
+        // whenever the view came within ~11° of the cross-slide, and that swap is what the user felt as a corkscrew:
+        // the scene snapped mid-orbit. viewScope owns the kind's framing, so it owns this too.
+        const kindNow = (() => { try { return (window.ddcsIsLathe && window.ddcsIsLathe()) ? 'lathe' : 'mill'; } catch (_) { return 'mill'; } })();
+        const up = orbitUpFor(kindNow);
+        if (up) this.camera.up.set(up.x, up.y, up.z).normalize();
         else this.camera.up.set(-Math.cos(this.phi) * Math.cos(this.theta), -Math.cos(this.phi) * Math.sin(this.theta), sinPhi);
+        // t1321 — …and it turns around the BAR, not the mill's floor origin: left-right walks around the work instead
+        // of swinging it across the screen. Only the radial pair is centred; the Z the framing chose is kept.
+        const ot = orbitTargetFor(kindNow, this.target, this._stock);
+        if (ot !== this.target) this.target.set(ot.x, ot.y, ot.z);
         this.camera.position.set(this.target.x + x, this.target.y + y, this.target.z + z);
         this.camera.lookAt(this.target);
         if (this.camera.isOrthographicCamera) {

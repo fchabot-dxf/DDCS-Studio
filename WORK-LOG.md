@@ -20332,3 +20332,43 @@ the block counts match — so it is value fidelity, not structure. Pinned as a c
 
 Gate: smoke 71/71; the new spec 4/4; the round-trip sweep (every spec touching stackToWorkspace/workspaceToStack,
 plus the matrix, the both-paths guard and the two corner-drag specs) 76/76.
+
+---
+
+## t1321 — the lathe feels right (two user reports); the fidelity half is NOT done
+
+### (1) The orbit rolls with the world
+
+The corkscrew was the UP VECTOR SNAPPING MID-DRAG. `up` was set to the cross-slide only while the view direction
+stayed ~11° clear of it, and reverted to the mill's meridian otherwise — so orbiting through those angles flipped the
+whole scene. It is declared per kind now, at the seam that already owns the kind's framing (`viewScope`): a lathe's
+up is the cross-slide, always, with a 0.001 Z bias so `lookAt` cannot degenerate when you orbit round to look along
+it. No threshold, so nothing flips.
+
+The orbit also turns around the BAR: `orbitTargetFor` centres the radial pair on the centreline (keeping the Z the
+framing chose), so left-right walks around the work instead of swinging it across the screen. Asserted with real
+simulated drags: up unchanged through both a horizontal and a vertical drag, the camera keeping its radius from the
+centreline and its place along the bed. **The mill is untouched and asserted so** — its up is still the meridian and
+still tracks the drag.
+
+### (2) The toolpost side is a machine fact
+
+USER RULING, reversing the earlier default: on a flat-bed lathe the tool comes in FROM THE SIDE at centre height.
+`toolPost: 'front' | 'top'` rides the workspace record beside the chuck — **front is the default** — and travels in
+the `.ddcs` (asserted through a build/restore round trip). The 3D hangs the turning tool at the declared side; the
+centre drill stays on centre either way; the OD stylus stands off at the declared side.
+
+**Two things deliberately unchanged, and the code says why:** the 2D half-profile keeps its XZ drawing convention (a
+drawing does not move because the machine does, and X-up is what keeps the handles readable), and **the EMIT is
+untouched** — X is the radius wherever the post sits, and a toolpost that changed the G-code would be a machine fact
+leaking into the part. Asserted: the emitted program is byte-identical on a front and a top machine.
+
+### (3) Value fidelity — NOT STARTED, and why
+
+The 11 ops whose round-tripped TEXT differs are untouched this turn. Root-causing them by class is an open-ended
+investigation across a third of the registered ops, and the two user-live reports above are what the dispatch put
+first. The count line in `roundtrip-whole-program-1319` still reads ≤11 — unchanged, not silently moved. Flagged for
+its own turn rather than half-done at the end of this one.
+
+Gate: smoke 71/71; the new spec 4/4; the lathe family + stock + round-trip + taper specs 147/147. Screenshots:
+scratchpad/s1321-post-front.png and s1321-post-top.png.

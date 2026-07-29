@@ -41,12 +41,13 @@ export const MACHINE_KINDS = ['mill', 'lathe'];
 export const DEFAULT_KIND = 'mill';
 const cleanKind = (k) => (MACHINE_KINDS.includes(k) ? k : DEFAULT_KIND);
 const cleanChuck = (c) => (['spindle', 'axis'].includes(c) ? c : 'spindle');
+const cleanPost = (p) => (['front', 'top'].includes(p) ? p : 'front');
 
 /** THE machine record for this workspace: { name, controllerId, kind }. Never null — an un-named workspace is legal (''). */
 export function getMachine() {
     const m = readJSON(MACHINE_KEY);
     if (m && typeof m === 'object') {
-        return { name: String(m.name || ''), controllerId: m.controllerId || liveControllerId(), kind: cleanKind(m.kind), chuck: cleanChuck(m.chuck) };
+        return { name: String(m.name || ''), controllerId: m.controllerId || liveControllerId(), kind: cleanKind(m.kind), chuck: cleanChuck(m.chuck), toolPost: cleanPost(m.toolPost) };
     }
     return { name: '', controllerId: liveControllerId(), kind: DEFAULT_KIND };   // derived, NOT written — writing on read would mask a real save
 }
@@ -67,6 +68,24 @@ export const chuckMode = (m = getMachine()) => (CHUCK_MODES.includes(m && m.chuc
 export const chuckIsAxis = (m = getMachine()) => m.kind === 'lathe' && chuckMode(m) === 'axis';
 
 /**
+ * t1321 — WHERE THE TOOL COMES FROM, declared on the machine (USER RULING, reversing the earlier default).
+ *
+ * A flat-bed lathe carries its toolpost at the FRONT, at centre height: the tool comes in from the side, not down
+ * from above. That is what the user's machine does, so it is the default — and it is a MACHINE FACT, like the chuck,
+ * so it rides the workspace record and travels in the .ddcs rather than being guessed per op.
+ *
+ * TWO THINGS IT DELIBERATELY DOES NOT TOUCH:
+ *   · THE EMIT. X is the RADIUS wherever the post sits — the program is identical on a front or a top post, and a
+ *     toolpost that changed the G-code would be a machine fact leaking into the part.
+ *   · THE 2D HALF-PROFILE. That is a DRAWING, and its XZ convention (Z across, radius up) is what keeps the handles
+ *     readable; a drawing does not move because the machine does.
+ * It changes exactly one thing: where the 3D hangs the tool.
+ */
+export const TOOL_POSTS = ['front', 'top'];
+export const DEFAULT_TOOL_POST = 'front';
+export const toolPostSide = (m = getMachine()) => (TOOL_POSTS.includes(m && m.toolPost) ? m.toolPost : DEFAULT_TOOL_POST);
+
+/**
  * Persist the record. `applyController` (default true) also RETARGETS this workspace's live controller/dialect — the
  * active controller profile, the variable family that follows it, and the UI refresh + broadcast that make the change
  * visible. This is the ONE way to change this workspace's controller, so an open, an import and the Settings dropdown
@@ -81,6 +100,7 @@ export function setMachine(next, applyController = true) {
         // ([[one-workspace-one-machine]]: the file IS the machine, and what kind of machine is part of that).
         kind: cleanKind((next && next.kind) || cur.kind),
         chuck: cleanChuck((next && next.chuck) || cur.chuck),
+        toolPost: cleanPost((next && next.toolPost) || cur.toolPost),
     };
     try { localStorage.setItem(MACHINE_KEY, JSON.stringify(rec)); } catch (_) {}
     if (applyController && rec.controllerId) {
@@ -130,6 +150,7 @@ export function envelopeSummary(m) {
 if (typeof window !== 'undefined') {
     window.ddcsGetMachine = getMachine;
     window.ddcsIsLathe = isLathe;   // t1281 — the 3D reads the KIND to pick a turner's camera; the record is the one source
+    window.ddcsToolPost = toolPostSide;   // t1321 — where the tool comes from; the 3D asks, the emit never does
     window.ddcsSetMachine = setMachine;
     window.ddcsSetMachineName = setMachineName;
 }

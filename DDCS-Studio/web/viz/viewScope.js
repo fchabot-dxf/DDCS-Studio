@@ -70,3 +70,31 @@ export function withSavedView(settingsView, kind, theta, phi) {
     byKind[k] = { theta, phi };
     return { ...(settingsView || {}), byKind };
 }
+
+/**
+ * t1321 — WHICH WAY IS UP WHILE YOU ORBIT, per kind (user: "orbiting is weird since the roll").
+ *
+ * The camera framed the bed horizontal, but the ORBIT never rolled with it: `up` was pinned to the meridian and only
+ * swapped to +X while the view direction stayed clear of it — so a horizontal drag walked the camera around the mill's
+ * up and, at the angles where the swap fired, the whole scene snapped. That snap is the corkscrew.
+ *
+ * A lathe's up is the CROSS-SLIDE, always — no threshold, so nothing flips mid-drag. The tiny Z bias keeps it from
+ * being exactly parallel to the view direction when you orbit round to look along the cross-slide (a parallel up is
+ * what makes lookAt degenerate); it is far too small to see and it never changes.
+ *
+ * @returns {{x:number,y:number,z:number}|null} null = the mill's meridian up, untouched
+ */
+export function orbitUpFor(kind) {
+    return (kind === 'lathe') ? { x: 1, y: 0, z: 0.001 } : null;
+}
+
+/**
+ * WHAT THE ORBIT TURNS AROUND. A mill orbits its work on the table; a lathe orbits THE BAR, whose centreline is the
+ * one line every lathe fact is measured from — so left-right walks around the bar instead of swinging the bar itself
+ * across the screen. The Z stays wherever the framing put it (the bar's middle); only the radial pair is centred.
+ */
+export function orbitTargetFor(kind, target, stock) {
+    if (kind !== 'lathe') return target;
+    const bar = stock && stock.shape === 'cylinder' && stock.axis === 'z';
+    return bar ? { x: 0, y: 0, z: (target && target.z) || 0 } : target;
+}
