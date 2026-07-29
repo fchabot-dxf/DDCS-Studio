@@ -64,7 +64,9 @@ test('THE HEADER SPEAKS, AND THE LOOPS COUNT THEMSELVES', async ({ page }) => {
     expect(r.body).toMatch(/IF #43 LE 0 GOTO 91/);
     expect(r.body, 'with a named error, not a silent halt').toMatch(/ERROR: stepover \/ stepdown/);
     // THE BAND IS DECLARED AS DATA, so the collision guard reads it instead of re-deriving it from the text
-    expect(r.band, 'the scratch band is declared on the atom').toEqual([[40, 49]]);
+    // t1343 — the band extended DOWN to #34 for the helix recurrence's rotating vector, temp and counters. Still
+    // one declared contiguous range, still clear of camMacroKit's kit band (#27–#33) and the probe temps (#50–#61).
+    expect(r.band, 'the scratch band is declared on the atom').toEqual([[34, 49]]);
 });
 
 test('EVERY SCRATCH VAR IS ASSIGNED IN ONE PLACE — t1325’s lesson, asserted not remembered', async ({ page }) => {
@@ -210,20 +212,22 @@ test('THE COVERED ENVELOPE IS DECLARED — and everything outside it is named, n
     // THE DEFAULT IS COVERED — which is why the bridge could prove the common case end to end
     expect(r.dflt.covered, 'a both-ways parallel plunge raster is inside the proven envelope').toBe(true);
     expect(r.empty.covered, 'and so is an unset config, because those ARE the defaults').toBe(true);
-    expect(r.concentric.covered, 't1333 — concentric rings are covered now, proven move-for-move').toBe(true);
+    expect(r.concentric.covered, 't1333 — concentric rings, proven move-for-move').toBe(true);
     expect(r.oneway.covered, 'and one-way was never a gap: the op hard-codes both-ways').toBe(true);
+    expect(r.ramp.covered, 't1339 — the ramp descent').toBe(true);
+    expect(r.helix.covered, 't1345 — and the helix, within one emit quantum').toBe(true);
     // EVERYTHING ELSE IS OUTSIDE IT, AND SAYS WHY. A bare `false` here would be the silent drop this exists to prevent.
     // t1333 — RESTATED: concentric closed this turn, and one-way was never a real gap (the op hard-codes
     // both-ways — see the correction above). What is left outside the envelope is the descent and the pause.
-    // t1335 — RESTATED again: the confirm cadence closed this turn (M00 after every Nth level but the last), so it
-    // moved to the covered side. The DESCENT is the one name left.
-    expect(r.confirm.covered, 'the confirm cadence is covered now').toBe(true);
+    // t1345 — RESTATED once more, and finally: the descent closed too, so nothing is outside.
+    expect(r.confirm.covered, 'the confirm cadence is covered').toBe(true);
     for (const k of ['ramp', 'helix']) {
-        expect(r[k].covered, `${k} is outside the proven envelope`).toBe(false);
-        expect(r[k].why, `${k} says why, in words a reader can act on`).toBeTruthy();
-        expect(r[k].why.length, `${k}'s reason is a sentence, not a token`).toBeGreaterThan(20);
+        expect(r[k].covered, `${k} is covered now — the envelope is empty`).toBe(true);
+        // t1345 — the reason is now EMPTY for every one of them, because there is no gap left to explain. The
+        // requirement it encoded (a refusal must say why, never a bare false) held for every day one existed.
+        expect(r[k].why, `${k} has no gap left to name`).toBe('');
     }
-    expect(r.helix.why).toMatch(/descent/i);
+    expect(r.helix.why, 'nothing left to name').toBe('');
 });
 
 test('THE GAP IS REAL, MEASURED — the uncovered cases are different programs, not near-misses', async ({ page }) => {
@@ -249,7 +253,9 @@ test('THE GAP IS REAL, MEASURED — the uncovered cases are different programs, 
     // t1333 — RESTATED: concentric was 50-vs-36 when the atom could not walk rings. It walks them now, so the two
     // AGREE — the gap closed rather than the assert being dropped, which is what closing a gap should look like.
     expect(r.concentric.parametric, `concentric now agrees: literal ${r.concentric.literal} vs ${r.concentric.parametric}`).toBe(r.concentric.literal);
-    expect(Math.abs(r.helix.literal - r.helix.parametric), 'and a helix descent by more still').toBeGreaterThan(20);
+    // t1345 — RESTATED, the concentric pattern again: the helix gap closed, so this flips from "differs by a lot"
+    // to equality. Every measured gap in this arc has ended as an assert that changed sides.
+    expect(r.helix.parametric, `the helix now agrees too: literal ${r.helix.literal} vs ${r.helix.parametric}`).toBe(r.helix.literal);
 });
 
 /**
@@ -337,13 +343,13 @@ test('THE ENVELOPE SHRANK — concentric and one-way are inside it now, and what
     expect(r.concentric.covered, 'concentric rings are covered now').toBe(true);
     expect(r.oneway.covered, 'and the one-way raster').toBe(true);
     expect(r.otherway.covered, 'including its from-the-far-side variant').toBe(true);
-    // STILL OUT, AND SAYING SO — the predicate ends the turn naming exactly what remains, not empty
-    expect(r.ramp.covered).toBe(false);
-    expect(r.helix.covered).toBe(false);
-    // t1335 — the confirm cadence flipped to covered this turn; the assert moved sides rather than being deleted
-    expect(r.confirm.covered, 'confirm-every-N is in').toBe(true);
-    for (const k of ['ramp', 'helix']) {
-        expect(r[k].why, `${k} still names its own gap`).toBeTruthy();
+    // t1345 — FLIPPED, the last of them: the descent closed, so the predicate is empty and every one of these is in.
+    // The history is the point — each line here named a real gap on the day it was written.
+    expect(r.ramp.covered, 'the ramp descent closed at t1339').toBe(true);
+    expect(r.helix.covered, 'and the helix at t1343-45').toBe(true);
+    expect(r.confirm.covered, 'the confirm cadence at t1335').toBe(true);
+    for (const k of ['ramp', 'helix', 'confirm']) {
+        expect(r[k].why, `${k} names no gap any more`).toBe('');
     }
 });
 
@@ -422,9 +428,9 @@ test('CONFIRM-EVERY IS INSIDE THE ENVELOPE NOW — and only the descent is left'
     expect(r.confirm.covered, 'the confirm cadence is covered now').toBe(true);
     expect(r.confirm.why, 'so it names no gap').toBe('');
     // THE ENVELOPE DOES NOT END EMPTY, and says exactly what is left and why
-    expect(r.ramp.covered).toBe(false);
-    expect(r.helix.covered).toBe(false);
-    expect(r.ramp.why, 'the descent is the one remaining name').toMatch(/descent/i);
+    expect(r.ramp.covered, 'closed at t1339').toBe(true);
+    expect(r.helix.covered, 'closed at t1343-45').toBe(true);
+    expect(r.ramp.why, 'and names no remaining gap').toBe('');
 });
 
 /**
@@ -494,4 +500,80 @@ test('THE ENTRY GATE — a ramp slot refuses the knobs that would kink its desce
         expect(r[entry].depth.exposable, `${entry}: and so is the depth`).not.toBe(false);
     }
     expect(r.reason, 'the reason says what and why, not just no').toMatch(/entry geometry.*baked when built/i);
+});
+
+/**
+ * t1345 — THE HELIX BRIDGE, and THE ARC'S LEDGER ENTRY.
+ *
+ * ── THE ONE STATED EXCEPTION TO THE MIGRATION'S "EXACT" CLAIM ────────────────────────────────────────────────────
+ * Everything else in this migration is move-for-move identical to the literal emitter. The HELIX ENTRY is not, and
+ * this is the amendment to the safety argument, recorded here rather than buried:
+ *
+ *   The helix entry differs from the literal by at most ONE EMIT QUANTUM (0.001mm) per point, ALWAYS TOWARD THE
+ *   IDEAL, because the literal applies r3() to every point as it generates it and reproducing that mid-generation
+ *   rounding would gate a strictly better number behind ROUND — a function this controller has not been verified
+ *   to have.
+ *
+ * The tolerance is one quantum because the emit expresses three decimals: two programs whose points sit within one
+ * quantum are indistinguishable at the only precision the machine is ever told about. The measured worst case is
+ * 0.00028mm — 3.5× inside it.
+ *
+ * The tolerance licenses MAGNITUDE ONLY. Count and order are still exact, and "closer to the ideal" is asserted as
+ * arithmetic rather than left as an editorial claim.
+ */
+test('THE HELIX BRIDGE — within one emit quantum, never farther from the ideal, and structurally identical', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+        const { traceToolpath } = await import('/engine/trace.js');
+        const NL = String.fromCharCode(10);
+        const cfg = { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, entry: 'helix', helixDia: 8, helixPitch: 1 };
+        const cuts = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => ({ x: s.x2, y: s.y2, z: s.z2 }));
+        const lit = cuts(String(emitProgram(surfacingStack(cfg))));
+        const par = cuts(['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL));
+        // THE IDEAL — the unrounded mathematics both are approximating. 24 segments per rev about the area centre.
+        const cx = cfg.w / 2, cy = cfg.h / 2, R = cfg.helixDia / 2, SEG = 24;
+        const ideal = [];
+        for (let k = 1; k <= SEG; k++) { const a = k * 2 * Math.PI / SEG; ideal.push({ x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }); }
+        const d = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+        const rows = ideal.map((I, i) => ({ gap: d(par[i], lit[i]), parErr: d(par[i], I), litErr: d(lit[i], I) }));
+        return { nLit: lit.length, nPar: par.length, rows, sameOrder: JSON.stringify(lit.map((p) => [+p.x.toFixed(2), +p.y.toFixed(2)])) === JSON.stringify(par.map((p) => [+p.x.toFixed(2), +p.y.toFixed(2)])) };
+    });
+    // (3) STRUCTURE IS STILL EXACT — the tolerance licenses magnitude, never a different program
+    expect(r.nPar, `same number of cutting moves: literal ${r.nLit}, parametric ${r.nPar}`).toBe(r.nLit);
+    // (1) WITHIN ONE EMIT QUANTUM at every point of the descent
+    const worst = Math.max(...r.rows.map((x) => x.gap));
+    expect(worst, `worst point-to-point gap ${worst.toFixed(6)}mm must be within one 0.001mm emit quantum`).toBeLessThanOrEqual(0.001);
+    // (2) AND ALWAYS TOWARD THE IDEAL — the declared sentence made checkable. The parametric point is never farther
+    // from the unrounded mathematics than the literal's rounded one is.
+    for (let i = 0; i < r.rows.length; i++) {
+        const { parErr, litErr } = r.rows[i];
+        // …allowing the recurrence its OWN DERIVED DRIFT (1e-6mm at 9 decimals with a per-revolution re-seed). At a
+        // point where the literal's rounding happens to land exactly on the ideal, the parametric sits 7e-9 away —
+        // its accumulated rotation error, three orders inside the bound and six orders inside an emit quantum.
+        // Comparing at 1e-12 would be comparing two numbers that are both zero at every precision that exists.
+        expect(parErr, `point ${i + 1}: parametric ${parErr.toFixed(9)} from the ideal, literal ${litErr.toFixed(9)} — never farther beyond the derived drift`)
+            .toBeLessThanOrEqual(litErr + 1e-6);
+    }
+    // …and it is strictly better SOMEWHERE, or the claim would be vacuously true of an identical emit
+    expect(r.rows.some((x) => x.parErr < x.litErr - 1e-6), 'and strictly closer at least once — the claim is not vacuous').toBe(true);
+});
+
+test('THE ENVELOPE IS EMPTY — every strategy and every descent is covered, and it is earned', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfaceRasterCovers, surfaceRasterGap } = await import('/wizards/ops/surfaceraster.js');
+        const CASES = [
+            {}, { strategy: 'concentric' }, { direction: 'oneway' }, { confirmEvery: 3 },
+            { entry: 'ramp', rampAngle: 3 }, { entry: 'helix', helixDia: 8, helixPitch: 1 },
+        ];
+        return CASES.map((c) => ({ c, covered: surfaceRasterCovers(c), why: surfaceRasterGap(c) }));
+    });
+    // EARNED, not declared: each of these was closed by its own bridge, in its own turn, against hand-derived truths.
+    for (const row of r) {
+        expect(row.covered, `covered: ${JSON.stringify(row.c)}`).toBe(true);
+        expect(row.why, `and names no remaining gap: ${JSON.stringify(row.c)}`).toBe('');
+    }
 });
