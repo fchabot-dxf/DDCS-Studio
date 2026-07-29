@@ -6492,3 +6492,52 @@ unjudged criterion is exactly the unearned empty I declined last turn.
 
 GATE: fast tier — 167 cam/surfacing specs + 71 smoke, green; 28/28 in the pilot spec (unchanged: the helix's own
 bridges await the tolerance ruling).
+
+---
+
+## t1345 — the helix bridge, and the envelope earns its empty
+
+### THE BRIDGE, all three parts as ruled
+
+1. **Within one emit quantum** — worst point-to-point gap across the descent, asserted ≤ 0.001mm. Measured 0.00028.
+2. **Never farther from the ideal** — both the literal and the parametric are measured against the UNROUNDED
+   mathematics, and the parametric is required to be no farther at every point. The editorial sentence "closer to
+   the ideal than the literal" is now arithmetic. Plus a non-vacuity check: it must be strictly closer somewhere,
+   or the claim would be trivially true of an identical emit.
+3. **Structure exact** — the count and order are still compared without tolerance. The tolerance licenses magnitude
+   only; a different program is still a different program.
+
+**One honest adjustment inside (2).** At the point where the literal's rounding happens to land exactly on the
+ideal, the parametric sits 7.4e−9 away — its own accumulated rotation drift. Comparing at 1e−12 would have been
+comparing two numbers that are zero at every precision that exists, so the assert allows the recurrence its OWN
+DERIVED DRIFT (1e−6, from t1341's derivation), which is still three orders inside the bound and six orders inside
+an emit quantum. That number is not a fudge — it is the bound this arc derived and then had to honour.
+
+### THE LEDGER ENTRY, written where the bridge lives
+
+The migration's EXACT claim has one stated exception, recorded in the spec rather than buried:
+
+> The helix entry differs from the literal by at most ONE EMIT QUANTUM (0.001mm) per point, ALWAYS TOWARD THE
+> IDEAL, because the literal applies r3() to every point as it generates it, and reproducing that mid-generation
+> rounding would gate a strictly better number behind ROUND — a function this controller has not been verified
+> to have.
+
+### THE ENVELOPE IS EMPTY, AND EARNED
+
+`surfaceRasterCovers` returns true for everything the surfacing wizard can emit; `surfaceRasterGap` returns ''.
+Every strategy (parallel, concentric), every descent (plunge, ramp, helix) and the confirm cadence were closed by
+their own bridge, in their own turn, against hand-derived truths — plus one that turned out never to be a gap.
+
+**Every one of those closures was an assert that FLIPPED SIDES, never one that was deleted.** The concentric
+50-vs-36 became an equality; the confirm exclusion became an inclusion; "the descent is the one remaining name"
+became "names no remaining gap". The specs still read as the history of what was once true, which is why the empty
+envelope is checkable rather than announced.
+
+### FLAGGED FOR THE FULL SUITE
+
+The SWITCH half is untouched, as instructed — not folded into this turn. It is ready to start on an empty envelope:
+surfacingStack through the proven atom everywhere, the generator retiring, the old emitter dying after the guard,
+twin identity-bindings, pendant mirror stability, the register remainder, the iron rule restated, and the
+screenshots. That half wants the advisor's full suite before it ships.
+
+GATE: fast tier — 171 cam/surfacing specs + 71 smoke, green; 32/32 in the pilot spec.
