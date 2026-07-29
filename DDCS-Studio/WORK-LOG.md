@@ -6569,3 +6569,115 @@ this arc can hand it over in — and it is the same judgement the arc has used t
 rather than to the code: do not begin what cannot be finished safely, and say so instead of discovering it later.
 
 Also untouched, as instructed: the stock-parking investigation still rides the mailbox for a lighter turn.
+
+---
+
+## t1349 — the switch's FIRST step lands; the switch itself is BLOCKED on a premise that does not hold
+
+The dispatch's landing order says bindings by identity FIRST, then the stack re-point. Step one is done and proven.
+Step two cannot start, and the reason is not budget this time — it is a measured fact about the two folds that wrap
+the raster, which no bridge in this arc has ever run the parametric body through.
+
+### (1) THE BINDINGS NAME THEIR BLOCK BY IDENTITY — landed, and deliberately EMIT-NEUTRAL
+
+Surfacing's twin bound its sockets by a hand-counted flat index into `surfacingStack`'s pre-order (`0 progstart · 1
+wcs · 2 placeonstock · 3 stepdown · 4 surfacefill · 5 progend`) plus a second hand-count, `WRAP_PREFIX_COUNT = 4`,
+for the user_root/panel/sim/param_group wrapper. Both are silent when wrong — the shipped corner break was exactly
+that, an off-by-one that mis-bound every socket after it.
+
+They are `deriveBindings` specs now: each names the SOLE block of its type, and the scan re-finds the flat index over
+the freshly-flattened stack, so the wrapper prefix falls out for free and both hand-counts are gone.
+
+**Why this had to be first, in the switch's own terms:** the re-point collapses `stepdown{ surfacefill }` into ONE
+block, so every index from 3 down moves and `progend` goes 5→4. Under hand-counted indices that is not a break, it
+is a SILENT RE-AIM — ten bindings quietly pointing at whatever now sits at their old position, with a green fast tier
+that would not say so. Under identity it is nothing at all.
+
+**The assert is the part worth reading, because the obvious version of it proves nothing.** Re-running the derivation
+on the unchanged stack passes identically for hand-counted indices. So the new test really MOVES the shape — it
+inserts a block ahead of the body — and then requires two things: that every binding's index really did shift by one
+(or the invariant would be trivially true), and that not one binding changed the block TYPE or socket KEY it aims at.
+That pair is an independent truth about where a param lands, not the number the derivation happened to return. The
+ambiguity guard is asserted too: a second `surfacefill` in the stack THROWS rather than binding to the first.
+
+Emit-neutral, as intended: the as-data sweep is still byte-identical to `surfacingStack` across placement offsets,
+size, stepover, parallel/concentric, depth, feeds, WCS and stock-attach, and the wiring assert still routes all 24
+params to the sockets `surfacingStack` routes them to.
+
+### (2) THE DERIVATION DROPPED A DECLARATION, and the live form said so
+
+Converting surfacing surfaced a real defect in the SHARED helper: `deriveBindings` is an allow-list, and `gate` was
+not on it. Surfacing's WCS binding carries `gate: { param: 'zMode', is: 'skim' }` — so with the conversion in,
+**selecting Skim no longer greyed the WCS field in the running form.** Not a spec detail; the symptom the test drives.
+
+Fixed where the drop is, not where it showed: `gate` is carried like `when`, `widgetConfig`, `optionGate` and
+`defaultLive` before it — the same class of bug each of those carries was written for, which is now four.
+
+### (3) THE GATE: the envelope is empty about the BODY, and the switch does not emit the body bare
+
+This is the finding, and I measured it before believing it.
+
+Every bridge in the pilot frames the parametric raster at the WCS origin: `['G90', ...surfaceRasterLines(cfg), 'M30']`.
+That is the right frame for proving a raster, and it is why `surfaceRasterCovers` is honestly empty. But
+`surfacingStack` never emits the body bare — it wraps it in `placeonstock` (Normal) or `skim` (Skim Z-mode), and
+**both folds work by rewriting the emitted TEXT**: `translateProgram` adds a shift to each axis word,
+`relativizeProgram` rewrites each absolute word as a delta from the running position. Exact on a list of numbers.
+Blind to `X[0 + #40]` and `Y#47`.
+
+Measured, at a 200×150 face shifted by (50, 25):
+
+- **A HALF-SHIFTED MOVE, which is worse than an unshifted one.** `G0 X0 Y#47` becomes `G0 X50 Y#47` — X takes the
+  shift, Y is a register and does not. The row's near end moves and its far end does not: a sheared raster, cut.
+- **The shift reaches into a comment.** `numAfter` is case-insensitive, so the header's `tool Ø 12 x 60%` reads as an
+  X word and the stepover comment is rewritten to `X110%` — the program now states something false about the tool.
+- **Skim removes a retract.** The inter-level `G0 Z5` relativizes to `G0 Z0`, because the delta is computed against a
+  position the loop never actually holds. **The tool would not lift between depth levels.**
+
+All three are pinned as an executable test that DOCUMENTS A DEFECT and should fail the day the folds learn to carry a
+parametric body (the t1315/t1317 precedent). `surfaceRasterCovers` now states its scope in the code, because an empty
+envelope that is silently body-only is precisely the kind of thing the next worker would build on.
+
+### WHAT THE SWITCH NEEDS DECIDED — two forks, one of which is not mine
+
+**Fork A — how a parametric body gets PLACED.** The decision sieve settles this one, so I am recording the call
+rather than asking: gate 4 (valid-by-construction, complexity in the form/atom and not the engine) eliminates
+"teach `translateProgram` to rewrite expressions" — that is making the shared engine smarter to fit one atom, and it
+still cannot serve `rotate`, where the axes couple and a Y-only move needs a modal X that is a runtime value. What
+survives is the atom ABSORBING the shift it already has params for (`x`, `y` are its x0/y0), declared on the block so
+the place fold passes the shift in instead of rewriting text. It needs a `z0` the atom does not have yet, for `offZ`.
+
+**Fork B — Skim, and this one is a value/cost call, not a principle.** Relativizing a loop is not a text problem at
+all: the deltas depend on runtime values, so there is nothing to rewrite. The options, with what each really costs:
+
+1. **Skim stays LITERAL, Normal goes parametric** — declared, with its reason (opCamMap already forks skim to
+   `universal` for the same reason). The cost is not "two paths" in the abstract: `applySkimStructure` is a
+   postInstantiate that today swaps `placeonstock`→`skim` at the same index *because the flat indices stay parallel*.
+   Under the switch it would also have to swap `surfaceraster`→`stepdown{ surfacefill }` and carry the already-
+   substituted socket values across. That is real machinery, and it is the thing the switch exists to remove.
+2. **A parametric skim body** — a G91-relative emit written as such, not transformed into one. Correct and one-source,
+   but it is a new emit shape with its own equivalence bridge, i.e. its own turn.
+3. Dropping Skim is not on the table — it is a shipped feature.
+
+I have not chosen B, and I am not going to in a work log. It changes what "the old emitter dies" means and it changes
+the twin's structural fork, so it wants the same ruling the helix tolerance got.
+
+### WHAT I DID NOT DO, AND WHY
+
+No re-point, no generator retirement, no both-paths guard, no register remainder, no screenshots — all of that sits
+behind the two forks. Building the Fork-A seam alone would be an unused mechanism in the engine with no consumer
+until the re-point lands, which is machinery ahead of its case.
+
+The literal builder is also still exactly where it was, and it should stay until the switch actually lands: the
+pilot's bridge reads the literal via `surfacingStack(cfg)`, so **re-pointing that function without first giving the
+bridge its own reference makes every equivalence test compare the parametric emit to itself and pass vacuously.**
+Whoever takes the switch should move the bridge onto a named test-only reference in the same act.
+
+Housekeeping, for the record: one smoke re-run was launched from the git root rather than `DDCS-Studio/`, which wrote
+playwright artifacts into the repo-root `tests/` — a directory that already holds two tracked python tests. Clearing
+them deleted those two; both were restored from HEAD, verified byte-identical and with their original line endings.
+Net change to that directory: none.
+
+GATE: fast tier — 71 smoke green; 213 across surfacing/cam/as-data/corner-data/atc-in-place/round-trip green,
+including the pilot at 33/33 (was 32, +1 for the fold defect) and the as-data spec at 2/2 (+1 for the identity
+non-vacuity assert). Nothing emit-class changed this turn, so there is nothing here that needs the full suite —
+the switch still does, when it lands.
