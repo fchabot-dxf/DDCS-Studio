@@ -6988,3 +6988,86 @@ GATE: fast tier — 71 smoke green; 262 across surfacing/cam/as-data/guard/parki
 corner-data/depth-entry green; the pilot spec at 63/63 (was 46: +15 skim bridges, +1 restated pin, +1 priming sweep).
 Emit-class but still pre-consumer — nothing re-points, `applySkimStructure` and the stack are untouched, and the
 fold-side lands with the switch exactly as the placement seam does.
+
+---
+
+## t1357 — the switch's green baseline: four restatements, one real regression, and a suite that now says 1926
+
+The point of the turn was a number. It is **1926 passed · 6 skipped · 0 failed · 0 flaky**, 15.8 minutes, whole suite.
+
+### THE TRIAGE — four RESTATE, one REAL REGRESSION, and one that was never failing
+
+**pane-splitter-790 (×2) — RESTATE.** The locators said `.viz-pane-splitter` and meant "the ratio handle", which was
+true until t1239 added a SECOND handle below the last pane that shares the class because it shares the grip language.
+Playwright's strict mode was right to fail: the selector had become ambiguous, and the `page.evaluate` half of the
+same spec was quietly reading whichever element came first in the DOM. The ratio handle is named by what
+distinguishes it (`:not(.viz-pane-sizer)`), and a new test states what the ambiguity was hiding — two handles, two
+different controls, the ratio one BETWEEN the panes and the sizer BELOW them, each addressable, each with its own
+aria-label so the ambiguity cannot creep back through the accessibility layer either.
+
+**minimap-replace-865 (×2) — RESTATE.** The spec asserted a `.follow-toggle` button in the editor chrome. It does not
+exist anywhere in the app — because **t1287, a USER ruling, deliberately removed it**: "a preference that looks like
+a tool invites people to treat it as one", and it crowded a corner already holding the file and copy buttons. It is a
+Settings checkbox now, on the same `ddcs_follow_exec` pref, the same auto-scroll machinery, the same in-text
+highlight. So t865's claim — the minimap is gone AND its replacement exists — is intact; what the spec had baked in
+was an assumption about WHERE the control lives, which was never t865's point. Restated: the old floating toggle is
+asserted ABSENT (t1287's ruling, now pinned), the pref is asserted to exist, toggle and default OFF, and the
+behavioural test drives the pref through the seam the checkbox writes. Every behavioural assert is untouched — the
+no-jump rule, the scroll-into-view, the tracking, the off-again — because that is the content.
+
+**stock-spill-792 — RESTATE, and this one needed measuring before I could tell.** It asserted the four stock fields
+were ABSENT FROM THE DOM, and it was failing, so the honest question was whether the spill was back. Measured:
+`stockW` renders at **0×0 inside a `display:none` ancestor**, while `stockAttach` and `pathDatum` render at 273×29
+with no hidden ancestor. The fields are not on screen — t792's ruling holds exactly as written — and what changed is
+the MECHANISM: `formHidden` renders into a hidden wrapper now instead of omitting, so the placement wiring can keep
+writing through it. A "not in the DOM" assert was testing an implementation detail free to change, in the name of a
+user-facing rule that had not. Restated as the rule: the param EXISTS and is BOUND, it is NOT VISIBLE, and — a new
+assert, because "nothing is lost" deserves proving rather than repeating — the PlaceOnStock block still RECEIVES the
+numbers (250/175/32 in, 250/175/32 out).
+
+**collapsible-panes-752 — REAL REGRESSION, and it gets a fix.** The header genuinely overflows at 360px:
+`scrollWidth` 385 against 360, a 25px spill, with `#btn-clear`'s right edge at 385. Two things caused it.
+
+The mechanical one: the ladder's last rung was losing. `.app-header.hy-controls .hdr-tabs .tab` (stage 6, the tier
+reached only when everything else has already yielded) and `.app-header.is-tiny .hdr-tabs .tab` inside the ≤600px
+phone block carry the SAME specificity — and the phone block comes later in the file. So on a phone the tightest tier
+was being widened back out by the tier above it. A ladder only means something if its last rung is the last word.
+
+The budgetary one: t1255 gave `#btn-clear` a ≥44px touch target *by ruling* — it is the one DESTRUCTIVE control in
+the header, and a cramped target there buys mis-taps — and made room by surrendering the wordmark. That was tuned at
+390px. At 360 there are 30 fewer pixels and nothing left to surrender except the 194px tab row, so the tabs yield.
+They are labels beside an icon and stay legible and hittable; nothing else in the row could give 25px without taking
+back a ruling made for a better reason than fitting.
+
+Worth recording: **undo and redo were never actually off-screen** (305→322 and 323→340). The test's headline claim
+held; it was the overflow assert beside it that was failing. The header still scrolled horizontally with an icon
+clipped, which is a real defect, so it is fixed rather than narrowed.
+
+**io-panel-resize — NOT FAILING.** It passes standalone and passed in the full run. It was on the list of six from a
+combined run at t1353; the actual six are pane-splitter ×2, minimap ×2, collapsible ×1, stock-spill ×1.
+
+### ONE FLAKE, NAMED — because a baseline used as a gate has to be honest about it
+
+`collapsible-panes-752` → "collapsed the 3D pane folds to a SLIM bar" failed ONCE in five consecutive runs and
+passed the other four, including three back-to-back after the header fix. It is not caused by this turn's change
+(the change is scoped to `.app-header` inside a phone media query; that test drives wizard panes). It did not fire in
+the full suite. It is intermittent, and a switch gate that reads "unchanged or better" should know it exists rather
+than discover it as a mystery red.
+
+### THE BASELINE
+
+    1926 passed · 6 skipped · 0 failed · 0 flaky        15.8 min, full suite, exit 0
+
+The six skips are DECLARED and conditional, not silent reds: two in `gateway-state-contract-1327` (conditional on a
+local gateway answering on 8765), `middle-animator` and `middle-viz` (`test.fixme()` plus jog-selector conditionals),
+`preview-step-dro` (conditional on a panel host), and two parked outright (`project-drawer-smoke`,
+`standalone-download`). The only "flaky/retry" strings in the log are Playwright's internal "retrying click action"
+inside tests that passed — no test-level retries, no flaky bucket.
+
+One methodology note against over-claiming: a smoke run overlapped the first minute of the full run. That can only
+make flakes MORE likely, not less, so a clean result under it is stronger rather than weaker — but the number stands
+on its own and can be re-taken cleanly if the switch wants it.
+
+GATE: fast tier — 71 smoke green; the five triaged specs green (pane-splitter 4/4 · minimap 4/4 · stock-spill 2/2 ·
+collapsible 8/8 · io-panel-resize 2/2); and the full suite at the figure above. One SOURCE file changed all turn
+(`styles.css`, the header ladder); everything else is spec restatement.
