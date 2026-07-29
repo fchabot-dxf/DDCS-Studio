@@ -7146,3 +7146,142 @@ starts from a proven design with a named inventory instead of an empty page.
 
 GATE: main line unchanged and green — the surfacing/cam/form/stepover/depth-entry families re-run at 87/87 after the
 restore, on the 1926 baseline commit. Nothing shipped this turn; nothing broken either.
+
+---
+
+## t1361 — the switch finishes its measurement, its restatements and its guard; two register items are MEASURED, not built
+
+### STEP 1 — form-kernel-720's cc-attach was a REAL fold-seam defect
+
+Measured first, because everything downstream waited on it. The twin placed its face at **X50** where the built-in
+placed it at **X25** — a 200×150 stock, a 150×100 face, cc-attach.
+
+`surfacefill` DECLARED an `extent`, and the place fold reads that (`liveExtent`) IN PREFERENCE to placeonstock's
+frozen `bminX..bmaxX` snapshot. Collapsing `stepdown{ surfacefill }` into `surfaceraster` left the declaration
+behind, so the placement silently fell back to whatever size the snapshot was frozen at — for the twin, the
+template's default 100, giving (200−100)/2 = 50 against the correct (200−150)/2 = 25.
+
+**A missing declaration, not a missing patch.** The atom declares its own footprint now. The built-in is unmoved:
+its snapshot was already built from the same w/h, so live and frozen agreed there — which is exactly why only the
+twin showed it. Every caller whose live w/h can differ from the snapshot was affected: the data twin (frozen at the
+defaults) and the Blocks canvas (editing w/h does not rewrite the parent's snapshot).
+
+### STEP 2 — FOURTEEN reds, not eleven, so each was triaged rather than blanket-restated
+
+The inventory said eleven; the family run said fourteen. Three of the extra were in `blocks-hover` and
+`studio-to-blocks`, which t1359's sweep had not covered. Every one was measured before it was touched — the
+form-kernel result is what that discipline is for.
+
+**Ten were mechanical restatements**, each keeping its history in the comment: the binding count 24→25 (a SPLIT —
+the flat stepover millimetre retires and the two knobs it is DERIVED from are bound, which is what the macro header
+re-derives at the machine); the skim shape's marker moving from `G91` to the live-frame read on both sides of the
+CAM comparison; `surfacefill`→`surfaceraster` in the twin's socket lookups, the CAM re-derivation and the Blocks
+leaf; the Blocks projection asserting `#40=123` and `#42=7` (the width and depth are named header vars now, not
+literals in every row).
+
+**Three turned out to be guarding nothing, and were repaired rather than restated** — the finding, not the fix:
+
+- the **ambiguity guard** appended a duplicate `surfacefill` to prove two matched blocks THROW. A surfacing stack no
+  longer holds one, so it matched ONCE, threw nothing, and the assert below it was passing on an empty condition.
+- the **stored-millimetre recovery case** was built as `{...defaultParams(twin), stepover: 9.6}`. That was faithful
+  while the twin's only stepover knob WAS a millimetre; the twin now carries its own percentage, so the spread fed
+  seedFromOp an explicit 60% with a stray mm beside it — exercising the seed-the-intent path, not the recovery. It
+  is written as a pre-split op actually looks now (a millimetre, no percentage anywhere), and recovers 80% correctly.
+- the **vacuity guard** looked for a literal `G1 Z-`, which no parametric plunge can produce. Widened to the fed
+  descent by the level register, which a program that cuts nothing still cannot fake.
+
+**Two needed a new reading rather than a new string, because the old one had stopped discriminating:**
+
+- **the depth-entry ramp** was counted as `( ramp )` LINES — three lines for three levels. One ramp is written now,
+  inside the loop the machine runs once per level. Read from the EXECUTED toolpath instead: 3 descents, each with a
+  real XY run, each at exactly tan(5°). The helix got the stronger form for free — 144 descending segments is 3
+  levels × 2 revolutions × 24, so the PITCH is visible in the count.
+- **the cam-enum arms** were told apart by `stats.absolute`, true for Normal and false for the G91 Skim. The skim
+  body is absolute in a frame it READS, so that flag is now true for both and separates nothing. Replaced with the
+  property that always mattered: each arm is run twice with the controller's live-position registers seeded to
+  different points — the Normal arm ignores the jog, the Skim arm's cut extents follow it by exactly 30mm.
+  (First attempt measured `minX` and got 0 for both: the opening Z move happens before the tool has travelled in
+  XY, so it sits at X0 in both arms. Cut extents only.)
+
+**One test moved subject.** `blocks-hover`'s INNERMOST-resolution test needs a leaf whose lines are a strict subset
+of its container's. Surfacing stopped being one: measured, `placeonstock`, the op block and `surfaceraster` own the
+IDENTICAL 47 lines, because the place fold hands the atom its frame instead of wrapping text around it. There is
+nothing to be innermost OF — it would have passed on a vacuous premise. Seeded from a POCKET, which kept the shape
+(stepdown 192 ⊃ pocketfill 189). The other tests in that file keep the surfacing seed.
+
+### STEP 3 — the both-paths guard was WRITTEN, because the one that was recorded had never been written
+
+t1359's log records a no-app-import assert as landed, and `surfacingWizard.js`'s own comment claimed one existed.
+Measured: the identifier appeared in no spec at all. So the guard is new, not cited:
+(a) scans every `.js` under `web/`, comments and strings stripped, and fails if any file so much as names
+`surfacingLiteralStack` (only its defining file may); (b) requires every route that builds a surfacing op — the
+built-in stack, the twin, and `SurfacingWizard.generate` which is what the STUDIO form calls — to come out carrying
+`surfaceraster` and neither `stepdown` nor `surfacefill`, in Normal, Skim and placed; and asserts the literal is
+still there and still the OLD shape, since the bridges' whole value is that it is.
+
+**Proven non-vacuous**: planted a `web/` file importing it and watched the guard fail naming the offender, then
+removed it. The source comment now cites the guard that exists.
+
+### STEP 4 — the register, four items closed and two measured
+
+`tests/surfacing-register-remainder-1361.spec.js`:
+
+1. **Pendant mirror stability** — the slot's ten params in order, mirrors consecutive, `stepoverPct` still at index 4
+   where the millimetre sat, the tail untouched. A pendant number on a setup sheet still means what it meant.
+2. **Old files rebuild through the new builder** — a pre-switch marker rebuilds parametric with its framing intact;
+   a marker written today re-emits byte-for-byte; a `.wiz` def survives a write/read round trip.
+3. **Per-line annotations under loops** — every executed move carries a source line, every one of those is a real
+   line of the program, and one line accounts for many executions. The line→move map is one-to-MANY now, which is
+   the class of thing that bites a highlight, a step, or a progress fraction.
+4. **The trace step-cap** — a hand-broken infinite loop RETURNS with `stats.capped` and its bounded prefix drawn; it
+   does not freeze the tab. And a real 200×150 raster at 0.4 finishes well under the cap, so the cap is a warning
+   and not a ceiling on real work.
+
+**A NAMED GAP found while closing (2), pinned rather than patched.** An op saved BEFORE the split stored a flat
+`stepover` millimetre. The CAM path recovers it (9.6mm → 80% of the Ø12 the slot carries — asserted). The TWIN'S OWN
+BUILD PATH does not: the bindings write `stepoverPct` from its default 60 and the stored millimetre reaches no
+socket, so a rebuilt program cuts 7.2mm where the saved one cut 9.6mm. Closing it needs a declared param migration
+on the def — a contract change, so a GATE. Under the no-legacy-burden ruling it may be intentionally out of scope
+(no install base, so no such saved op exists). **Advisor's call.** Asserted as it behaves so it cannot drift while
+the ruling is pending.
+
+**NOT BUILT, measured and scoped instead — the honest half:**
+
+- **Executed-move-fraction progress.** The bar is `(lineIndex + 1) / totalLines` (createPreviewPanel `setProgress`),
+  one source with the "Running line N/total" counter. Under the row loop the line index walks BACKWARD: measured at
+  **41 reversals over 89 moves, worst single jump 38.8% of the bar**. A fraction of moves executed cannot decrease —
+  asserted as the criterion, already true of the formula. Building it means giving the panel the total from the
+  pre-run trace plus a per-move counter through the play loop AND the looped-replay reset: a real change to a live
+  UI, and not something to start at the end of a long turn. The defect is pinned as a COUNT so it cannot grow, in
+  t1329's "the gap is real, measured" shape — and when it is fixed that half is DELETED, not restated.
+- **Step-mode on a revisited line, DRO per execution.** Could not be driven headlessly: `#viz3d-panel-host .pp-step`
+  never becomes clickable in this environment — the same panel-host condition the 1926 baseline's declared
+  `preview-step-dro` skip names. Unverified, and saying so rather than claiming it.
+- **The one-time hash churn**: `defVOf('user_surfacing_data')` reads **1** — the def is at its first version and the
+  switch did not bump it, so there is no churn to state. Recorded because its absence is the answer.
+
+### STEP 5 — the iron rule holds, and three of four screenshots
+
+**The round-trip diff count is exactly 11 — unchanged, not grown.** Extracted by temporarily tightening the assert
+to 0 and reading the list back (then reverting): `atc_warmup · atc_length · atc_check · drill · bore · middle ·
+rotary_center · rotary_clock · comm · lathe_faceprobe · lathe_odprobe`. **`user_surfacing_data` is not among them** —
+surfacing round-trips byte-for-byte. **0 blocks lost** (the same spec's block-count claim, green).
+
+Screenshots in `scratchpad/`: `s1361-1-wizard-emit-editor.png` (the parametric emit in the editor),
+`s1361-2-cam-slot-pendant-table.png`, `s1361-3-blocks-surfaceraster.png`. **The fourth — mid-play highlight
+mid-loop — was NOT captured**, blocked on the same panel-host condition as the step/DRO item above.
+
+**Seen in shot 1 and reported rather than absorbed:** the editor shows a **"can't verify" badge and 9 linter
+warnings**, all of one kind — *"Line 11: space after GOTO ('GOTO 1') is accepted on the DDCS Expert — emit 'GOTO1' /
+'GOTO[expr]' for portability"*. The atom emits `GOTO 91` with a space. It is accepted on the target controller and
+is a portability advisory, not an error — but it is user-visible on every surfacing op, and it is the linter's own
+word against the emitter's, so it wants a ruling rather than a quiet edit.
+
+### Not in this dispatch, flagged: `surfacingSlot`
+
+t1359 listed "the `surfacingSlot` retirement" as outstanding; the t1361 dispatch does not, so it was not done.
+`millToSlot.surfacingSlot` still exists and still generates its own live macro (its WHILE-loop raster is asserted by
+`cam-substack`). The both-paths guard is scoped to `surfacingLiteralStack` as the dispatch specified.
+
+GATE: fast tier. Every touched spec plus the round-trip and parametric families — **114/114**. Smoke **71/71**.
+Full suite NOT run: that is the advisor's merge gate on this branch against 1926/6/0, per the dispatch.
