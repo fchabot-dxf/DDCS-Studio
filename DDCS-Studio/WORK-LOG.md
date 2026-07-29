@@ -7935,3 +7935,138 @@ whole-program-1319, safetraverse-nested), tool-change, safe-Z retract, op-params
 (cam-toolpath-feed-expose, time-estimate-844, feeds-speeds-867) which are the ones most likely to care about an F word
 reappearing. FULL SUITE NOT RUN — the advisor's merge gate; emit-class, so it wants the ceiling before release. Seat B's
 lane untouched.
+
+---
+
+## t1379 (seat A) — THE DRILL FAMILY MAP, and its first atom: the peck cycle
+
+Step 1 said measure before building and say the map first. The map is below, it says the family is THREE slices, and per
+the dispatch's own fallback I landed the map plus the first atom and am flagging the rest. One structural finding came
+out of the build that removes an option from the next slice's design space.
+
+### THE MAP, MEASURED (not estimated)
+
+Per-hole cycle, lines emitted:
+
+    peck    depth 20 / peck 2      30 lines      (10 pecks x 3)
+    peck    depth 5  / peck 5       3 lines      (one peck)
+    bore    step, depth 10 / 0.5   44 lines      (20 passes x 2 + framing)
+    bore    helix, depth 10 / 0.5 485 lines      (20 turns x 24 segments)
+    tap                             16 lines     FIXED - no loop at all
+
+Whole programs, through the real wizard stack:
+
+    drill  single         38 lines        bolt-24  751 lines      (depth 20 / peck 2)
+    bore   single step    52              bolt-24 1087
+    bore   single helix  493              bolt-24 11671   <- the largest unroll in the app
+
+Stack shapes, measured: `drill` -> [progstart, wcs, placeonstock, array, drill, progend] and the helical method is the
+same shape with `bore` in place of `drill`. **`tap` -> [progstart, wcs, placeonstock, tap, progend] — NO array at all.**
+
+### THE MAP'S THREE CONCLUSIONS
+
+**1. TAP IS OUT OF SCOPE, by reachability.** It has no pattern (nothing to repeat) and its cycle is a fixed 16 lines with
+no loop (M3, dwell, feed to depth, M4, feed out, M5). There is nothing to make parametric. Same class as t1333's finding
+that a one-way raster was never a surfacing gap: a config the op cannot reach is not a gap, and building for it would be
+machinery ahead of its case.
+
+**2. ONE ATOM, NOT SIBLINGS — and that is forced, not preferred.** A parametric pattern computes its points at RUNTIME,
+so there is nothing for a build-time container to stamp; the loop's body must BE the hole cycle, in one emitted body.
+Drill and bore share the identical outer structure and differ only in the per-hole body, which is exactly
+surfaceraster's shape (one shared header + one shared outer loop + a per-`strategy` inner walk). So the destination is
+ONE atom with a `cycle` param (peck | bore-step | bore-helix), not three atoms.
+
+**3. IT IS THREE SLICES.** The cycle (this turn), the bore cycles (ring-step + the 24-segment helix, which is where the
+11671 lines live), and the pattern loop with its five patterns — of which `rect` is the awkward one, because the literal
+builds its perimeter with a JS `Set` dedup across four edges and that does not translate to a macro walk unchanged.
+
+### WHAT LANDED: `holepeck`, the parametric peck cycle
+
+13 lines whatever the depth, bridged against the literal kernel at eight hand-derived peck boundaries — depth not a
+multiple of the bite, exact division, one peck, a bite larger than the depth, ten pecks, a 1mm sliver last bite, a
+sub-millimetre bite smaller than its own re-entry offset, and a non-default clearance. (position, feed, rapid/cut) per
+move, resolved through the engine. The frame (x/y/z0), the rotation and the feed criterion arrive by inheritance and are
+asserted, not assumed. Band #81-#87 declared as data, checked against every other atom's declared band for overlap.
+
+**WHY THE CYCLE FIRST, and it is not line count.** The blocker was already written down in opToSlot.js and opCamMap.js:
+the universal CAM path "cannot expose depth/peck AT ALL, because drill.js peckDrill drives a JS while loop that unrolls
+the peck sequence and bakes every Z literal at build time." The two knobs an operator most wants live on a drilling job
+are unreachable. This is the half that unblocks them, and it is the half that does not depend on how a pattern's points
+get computed — so it could be built while the pattern question was still open.
+
+**THE ROTATION IS TRIVIAL HERE, and the contrast is the useful part.** Surfacing needed a coupled affine printer because
+its coordinates carry runtime terms (a row's Y is a register), so a rotation had to mix the axes symbolically. A hole is
+ONE POINT of build-time constants: the rotation is applied before the coordinate is ever written, the emitted move is an
+ordinary pair of numbers, and the t1371 one-shot bound governs with nothing left to derive.
+
+**TWO HONEST NEGATIVES, asserted rather than glossed.** The parametric body is LONGER on a single-peck hole (13 lines
+against 3) — a loop has fixed overhead, exactly the surfacing pilot's finding, and the win is the live knobs not the byte
+count. And the first peck FEEDS FROM CLEARANCE, so it feeds through the air gap at the drilling feed: 7mm at 100mm/min on
+the default config, about four seconds per hole doing nothing. That is what the shipped literal does and so it is what
+this reproduces; a migration that quietly improved it would make its own bridge untrue. **Reported for a ruling** (the
+t1353 precedent: a defect in the literal needs its own decision before the atom declines to copy it).
+
+### THE FINDING: A FLOW-CARRYING BODY CANNOT BE STAMPED
+
+The obvious interim composition — leave `array` computing points in JavaScript and stamp the parametric cycle per hole —
+DOES NOT WORK. Only the first hole drills.
+
+I isolated the cause instead of assuming it, because two candidates were equally plausible:
+
+    two DO1 loops in one program        -> BOTH holes drill. Repeated loop pairs are fine.
+    two copies of the same N61/N62      -> only the FIRST. That is the cause.
+
+The second copy's `GOTO61` binds to the first copy's label and execution never reaches the later holes. It is the same
+class as the duplicate-N91 problem `uniquifySafeRetractLabels` exists for — except that mechanism uniquifies per BLOCK,
+and a stamped block is ONE block emitted N times, so it cannot reach this.
+
+**Not patched, and the reason is a ruling I do not own.** A label-free body is possible only by changing the MACHINING:
+the first peck's re-entry rapid would have to become unconditional, starting the first cut 0.5mm above the surface
+instead of feeding down from clearance. (`THEN` takes an assignment, not a move, so there is no third option.) That is
+the same air-feed observation above, arriving from the other direction — which is a reason to rule on it once rather than
+twice.
+
+**WHAT IT SETTLES for the next slice:** the pattern cannot stay a build-time container. A parametric pattern loop emits
+ONE body with ONE set of labels, so the collision disappears the moment the pattern folds into the atom. The family was
+already heading there; this turns a preference into a constraint, and it is asserted so it cannot silently change.
+
+### THE BOLT-CIRCLE DIGIT BOUND, DERIVED (step 2's homework, done — it does not depend on the build)
+
+The bolt circle rotates a vector once per hole: `v(k+1) = Rot(theta) . v(k)`, theta = 2pi/n, seeded at the start angle.
+That is a RECURRENCE, so it is in the helix's class (t1343) and not the one-shot rotation's (t1371) — the rounding error
+COMPOUNDS. Rounding c,s to d decimals gives each an error <= eps = 5*10^-(d+1), and the radial error grows by about
+2*eps*R per step, so over the n steps of one revolution the worst case is about `2*n*eps*R`.
+
+Requiring the t1371 criterion (<= 5*10^-4 mm, half the emit's own quantum):
+
+    n=24,  R=100mm  ->  d >= 6.7   -> 7 decimals
+    n=64,  R=250mm  ->  d >= 7.5   -> 8
+    n=200, R=500mm  ->  d >= 8.3   -> 9
+
+**NINE decimals**, covering n<=200 at R<=500mm — far beyond any real bolt circle. And six is NOT enough, which is the
+point of doing the arithmetic: at just n=24, R=100mm it gives 2.4*10^-3 mm, over two emit quanta. Note also that
+re-seeding — the helix's other safeguard — does NOT help here: a bolt circle makes exactly ONE revolution, so n steps is
+the whole of it and there is nothing to re-seed to.
+
+**AND I ELIMINATED THE ALTERNATIVE RATHER THAN OFFERING IT AS A FORK.** Since the count is baked, the emitter knows every
+hole's angle at build time, so baking an exact per-hole point (or unit vector times a live radius register) looked like a
+way to get zero compounding and keep the radius live. It does not survive costing: the cycle body cannot be shared across
+baked points without either unrolling it per hole (about 408 lines for a 24-hole bolt circle at depth 20 / peck 2, against
+about 25 for the recurrence) or holding a 2n-entry register table read by indirect `#[expr]` addressing — 48 registers for
+24 holes, which collides with every declared band in the app. So the dispatched recurrence is right, and it is now right
+for a measured reason rather than by analogy to the helix.
+
+### NOT DONE, AND FLAGGED
+
+The bore cycles and the pattern loop. The atom that landed is `holepeck` rather than the eventual one-atom-with-a-cycle-
+param, because a pilot proves one mechanism at a time (the corner-gated-pilot rule) and the pattern's shape was still
+open when this turn started. Folding it into the shared atom is a rename plus a `cycle` branch once the second cycle
+exists — cheap, and better done when there is a second case to shape it.
+
+PRE-CONSUMER, asserted: `drillStack` still builds the literal child, no registered op builder reaches the new atom, and
+the switch is next turn's job exactly as surfacing did it.
+
+GATE (fast tier): smoke **71/71**. Touched area **130/130** — the new bridge file (13), op-params-complete, the
+round-trip family, the three scratch-band specs, blocks-roundtrip, the four drill specs, plus the feed criterion and the
+whole surfacing bridge set (the new atom joins the same registry, so a band or palette mistake would surface there).
+FULL SUITE NOT RUN — the advisor's merge gate. Seat B's lane untouched.
