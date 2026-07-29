@@ -6373,3 +6373,68 @@ thing to fix — naming that is better than editing the nearest plausible file.
 
 GATE: fast tier — 195 surfacing/cam/roundtrip specs + 71 smoke, green. 29/29 in the pilot spec. The envelope still
 names the helix, correctly.
+
+---
+
+## t1341 — the gate and the lint land; the helix's drift bound derived but not built
+
+### THE PENDANT GATE — both entry modes, narrow on purpose
+
+A CAM slot whose entry ramps or helixes marks `stepoverPct` and `stepdown` bake-only, with the reason on the
+control. A plunge slot keeps them fully exposable: a straight drop has no geometry to kink.
+
+The gate is DELIBERATELY NARROW and the spec asserts that too — feed and depth stay the operator's on a ramp slot.
+A blanket lockdown would have been easier to write and would have taken away knobs that are perfectly safe.
+
+The reasoning lives at the gate, not only in this log: the baking is right on the wizard path (fixed text, build
+values, consistent forever — which is what makes the equivalence bridge true) and wrong under a pendant, so the
+gate belongs to the slot rather than to the emitter.
+
+### THE LINT — the shipping citation, and three states kept apart
+
+`ddcs_lint.py`'s taxonomy was already honest about trig being open. What it lacked is the thing that changes its
+priority: **Studio already emits ATAN to real machines** (`probeToSlot.js:538`, the alignment slot's
+`#54=ATAN[#52]/[#53]`). A user's alignment result depends on a function nobody has verified the controller has. So
+V13 is no longer a curiosity — if it comes back NO for ATAN, that slot has been emitting a wrong angle or an
+unparseable macro.
+
+Three states are now named, because collapsing them is how the "ABS is the only demonstrated function" claim
+happened in the first place:
+- DEMONSTRATED-in-corpus — seen in the 59 captured factory macros
+- SHIPPED-by-Studio — we emit it to real machines and have never confirmed acceptance (ATAN). **The riskiest of the
+  three, because it looks like usage without being evidence.**
+- UNVERIFIED — claimed by the community reference, never seen, never run
+
+And SQRT is called out specifically: the libm import table does hold it, so of the four it has the strongest
+indirect case — which matters because the ramp's improvement path needs exactly that.
+
+**V13 already exercises all four** (COS/SIN/SQRT/ATAN) with per-function readable slots at #601–#605 and an explicit
+"note which line number it names" instruction for the parse-error case. No extension needed; item 3's verification
+was a check, and it passed.
+
+### THE HELIX — the drift bound, derived here so the next turn does not re-derive it
+
+Not built. The derivation is the deliverable and it is worth stating even unbuilt:
+
+The literal emits `n = round(max(1, depth/pitch) · 24)` points, point k at angle `k·2π/24`, radius R about the area
+centre, z linear in k. The recurrence rotates a vector by θ = 15° per step: `x' = x·c − y·s`, `y' = x·s + y·c`.
+
+Rounding c and s to d decimals gives each matrix entry an error ≤ 5·10^−(d+1). Per step the radial error grows by
+roughly 2·ε·R; over one revolution (24 steps, the re-seed interval) the worst case is ≈ 48·ε·R.
+
+At R = 50mm — larger than any realistic surfacing helix — that is:
+- **6 decimals: ≈ 1.2 × 10⁻³ mm.** Right at the emit's own 0.001mm rounding, so a coordinate could tip to the wrong
+  third decimal. NOT enough, and this is precisely the t1339 cosine-digits lesson repeating one level up: a rotation
+  constant is multiplied EVERY segment, so it needs more headroom than a one-shot unit vector did.
+- **9 decimals: ≈ 1.2 × 10⁻⁶ mm.** Three orders below the emit's rounding — safe with room to spare.
+
+So the bound to assert is: with 9-decimal constants and a per-revolution re-seed, the recurrence's radial error at
+the last segment of the deepest realistic descent stays below 10⁻⁵ mm, i.e. two orders under the 0.001mm the emit
+can even express. Re-seeding alone would NOT have been sufficient at 6 decimals; digits and re-seeding are two
+separate requirements and the bound needs both, which is what the ruling asked to be accounted for.
+
+### ENVELOPE
+
+Still names the helix. Not asserted empty, because it is not empty — one entry mode remains.
+
+GATE: fast tier — 169 cam/surfacing specs + 71 smoke, green; 30/30 in the pilot spec; the lint file parses and runs.
