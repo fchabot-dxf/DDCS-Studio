@@ -79,7 +79,13 @@ test('accepting lands the swap whole — and never downloads a file nobody asked
     const after = await liveState(page);
     expect(downloaded, 'the silent safety download is GONE — an unasked-for file is not consent').toBe(false);
     expect(after.safety, 'and nothing pretended to export one').toBeNull();
-    expect(after.machine, 'the workspace became the imported machine').toEqual({ name: 'Imported Rig', controllerId: 'ddcs-v41' });
+    // t1369 — THE IDENTITY IS ASSERTED, NOT THE RECORD'S EXACT SHAPE. This was `toEqual`, which demands the machine
+    // record hold EXACTLY the two keys the import declares — so it broke the moment the record grew kind/chuck/
+    // toolPost (the lathe work), none of which the import is about. Stale by construction: any field ever added to a
+    // machine fails it. What must be true is that the imported IDENTITY landed and nothing of the old machine
+    // survived it, and both are still checked — the second one explicitly, so this cannot pass on a partial swap.
+    expect(after.machine, 'the workspace became the imported machine').toMatchObject({ name: 'Imported Rig', controllerId: 'ddcs-v41' });
+    expect(JSON.stringify(after.machine), 'and nothing of the machine it replaced survived the swap').not.toMatch(/before|Bee|previous/i);
     expect(after.controller, 'including its LIVE controller — the emit follows the imported machine').toBe('ddcs-v41');
     expect(after.envX, 'and the envelope full-swapped in').toBe(642);
 });

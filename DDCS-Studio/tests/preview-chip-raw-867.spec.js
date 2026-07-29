@@ -27,14 +27,21 @@ test('the chip shows "N · raw" (one source with the executing index), long line
     });
 
     // wait until the chip is showing a TRIMMED long executing line ("N · … " ending in an ellipsis)
+    // t1369 — THE CHIP FORMAT HAS A DECLARED OPTIONAL TAIL, and this regex did not know about it. fmtExecLine builds
+    // `N · <raw, trimmed>` and then appends `  [tag]` whenever calcTagOf finds one for the line — so the ellipsis is
+    // NOT the last character of the chip, and an `…$` anchor can never match a tagged line. The sample program here
+    // is all `G1 … F450`, which tags as [set], so the wait could only ever time out: stale by construction, and it
+    // fails on any machine whose settings produce a tag rather than being about this branch at all.
+    // The claim is unchanged — a trimmed long line, ellipsis and all — read against the format as it is declared.
     await page.waitForFunction(() => {
         const s = document.querySelector('.__chip .pp-status');
-        return s && /^\d+ · .*…$/.test(s.textContent);
+        return s && /^\d+ · .*…(\s+\[[^\]]+\])?$/.test(s.textContent);
     }, null, { timeout: 15000 });
     const snap = await page.evaluate(() => {
         const s = document.querySelector('.__chip .pp-status');
         const text = s.textContent;
-        const m = text.match(/^(\d+) · (.*)$/);
+        // strip the DECLARED trailing `  [tag]` before treating the rest as the raw source line (see the wait above)
+        const m = text.match(/^(\d+) · (.*?)(?:\s+\[[^\]]+\])?$/);
         const n = m ? +m[1] : 0, chipRaw = m ? m[2] : '';
         return { text, n, chipRaw, progLine: String(window.__lines[n - 1] || '').trim() };
     });

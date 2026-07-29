@@ -7503,3 +7503,65 @@ Nothing in `web/` changed for this one — the pane sizing was never wrong. The 
 
 GATE: collapsible-panes 80/80 at repeat-each=10; mill-entry 3/3; the surfacing / bridge / round-trip / pane-sizer
 families 81/81; smoke 71/71. Full suite NOT run — the advisor's merge gate.
+
+---
+
+## t1369 (seat A) — the two MAIN defects: the version-bump lead was WRONG, and both were stale-by-construction asserts
+
+### The lead did not survive its own test
+
+The dispatch's hypothesis was sharp and worth checking first: both specs green at `dd4fd752`, both red at
+`0e1ba782`, and the only source diff between those trees is the version string (`index.html` ×2 + `version.json`).
+There ARE two version-coupled surfaces that could plausibly have done it — the reload-nudge toast, and a **dev-only
+persistent red "stale page — reload" banner** that fires on localhost when the served `version.json` is newer than
+the loaded page's baked `.ver` chip, which is exactly the kind of thing that swallows a click in a spec.
+
+So I checked it rather than reasoning from it: restored `web/` to `dd4fd752` and ran both. **Both still fail.** The
+tree is not the variable — the ENVIRONMENT is. They are red here at every tree and green there at some, which is
+why they looked like a branch effect from one side and a baseline effect from the other.
+
+That is a better position than it sounds: deterministic here means root-causeable here.
+
+### preview-chip-raw-867 — the chip format has a DECLARED tail the spec did not know about
+
+Sampled what the chip actually says during a run:
+
+    "4 · G1 X2 Y2 F450 ( pass 2 — a deliberately long traili…  [set]"
+
+The spec waits for `/^\d+ · .*…$/` — the `$` requires the ellipsis to be the LAST character. `fmtExecLine` builds
+`N · <raw, trimmed>` and then appends `  [tag]` whenever `calcTagOf` finds one. The sample program this test writes
+is forty `G1 … F450` lines, every one of which tags as `[set]`, so the ellipsis is never last and the wait could
+only ever run out its 15 seconds.
+
+**Stale by construction, and not about this branch at all** — it fails wherever the settings produce a tag. The
+claim is unchanged (a long line trimmed with an ellipsis); it is now read against the format as the source declares
+it, tail included, and the raw-line comparison strips that declared tail before matching. 852ms, green.
+
+**The fix is in the SPEC, deliberately**: `viz/createPreviewPanel.js` is seat B's this cycle, and the format is
+right — it was the reading that was wrong.
+
+### import-safety-1219 — an exact-equality assert on a record that was always going to grow
+
+    Expected: { name, controllerId }
+    Received: { name, controllerId, kind: 'mill', chuck: 'spindle', toolPost: 'front' }
+
+`toEqual` demands the machine record hold EXACTLY the two keys the import declares. The record grew three fields
+with the lathe work — none of which the import is about — and the assert broke on all three. Any field ever added
+to a machine would do the same.
+
+Restated to what must actually be true: the imported IDENTITY landed (`toMatchObject`), **and** nothing of the
+machine it replaced survived, asserted explicitly so it cannot pass on a partial swap. The neighbouring asserts on
+the live controller and the envelope are untouched.
+
+### What this says about both
+
+Neither was a defect in the app. Both were specs pinned to an incidental SHAPE — a string's last character, a
+record's exact key set — instead of to the rule they were guarding. That is the same failure mode as the eleven
+restatements of the switch, arriving from the other direction: there the shape changed under the spec, here the
+spec had encoded a shape that was never load-bearing.
+
+GATE: both specs green, plus the two previously-flaky neighbours re-run in the same pass (middle-superset,
+collapsible-panes) and mill-entry — **17/17**. Smoke **71/71**. Full suite NOT run — the advisor's gate; exit
+criterion 1945/6/0 is in reach on this evidence.
+
+**Seat B boundary respected**: nothing under `viz/`, camera, canvas or workspace-name was touched.
