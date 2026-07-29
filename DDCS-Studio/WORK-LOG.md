@@ -7565,3 +7565,72 @@ collapsible-panes) and mill-entry — **17/17**. Smoke **71/71**. Full suite NOT
 criterion 1945/6/0 is in reach on this evidence.
 
 **Seat B boundary respected**: nothing under `viz/`, camera, canvas or workspace-name was touched.
+
+---
+
+## t1371 (seat A) — REACHABILITY done, and it corrects the dispatch's assumed mechanism; the build is PARKED on that correction
+
+Step 1 was "reachability first", and it earned its place: what it found changes where the angle has to enter.
+
+### WHAT ROTATES A SURFACING PROGRAM, MEASURED
+
+Driving the real Transform modal on a real surfacing program:
+
+    stack after Transform-rotate 12°:  [ xform, progstart, op, progend ]
+    the xform it writes:               { angle: 12, pivotX: 0, pivotY: 0 }
+
+- **The pivot is the DATUM (0,0)**, written by the modal itself — not a per-op pivot.
+- **The `xform` is a FLAT PROGRAM-LEVEL SIBLING at the top of the stack.** It is not a wrapper and the op is not
+  inside it. `applyProgramTransform` reads it in `emitMapped` and rewrites the WHOLE emitted program's text after
+  every op has emitted.
+- The surfacing stack carries no rotation of its own: `[progstart, wcs, placeonstock, surfaceraster, progend]`,
+  and in skim `[progstart, wcs, skim, surfaceraster, progend]`. Both can carry a program xform; nothing prevents it.
+- **MIRROR:** `applySetupFlips` mirrors a named setup's own line range, and it needs a `setup` block with a `flip`
+  child. **No wizard emits one** — grepped: nothing under `web/wizards/` builds `setup`/`flip`. But both blocks ARE
+  in the PALETTE, so mirror is **hand-authorable in Blocks and not reachable from any wizard flow**. That is the
+  precise statement; "unreachable" alone would have been wrong.
+
+### THE CORRECTION — placement CANNOT be the seam the dispatch describes
+
+The dispatch's mechanism is "placement gains `angle` (+ pivot) beside x0/y0/z0", by analogy with t1351. The analogy
+does not hold, and the measurement above is why:
+
+**Placement is a WRAPPER whose fold hands params to the child it wraps. The rotation is a SIBLING that is not in
+the atom's subtree at all.** A placement fold never sees the xform, so it has nothing to pass down. Worse, the two
+are not even co-present: a SKIM surfacing program has `skim{ surfaceraster }` and **no `placeonstock` at all** —
+so a rotation routed through placement could not reach the skim body, which is exactly one of the configs step 3
+asks for bridges on.
+
+The seam therefore has to be one level up. The angle must reach `emit()` as program CONTEXT so an absorbing atom
+can bake it, **and `applyProgramTransform` must then skip the lines those atoms already rotated** while still
+rotating everything else — the progstart clearance moves, the progend retract, and any literal op in the same
+program. That last part is the real work and the real risk: the pass currently rewrites a flat line list, so it
+needs to become range-aware (which lines belong to an absorbing atom), and `opRanges` already exists for the flip
+pass, so there is a precedent to read rather than invent.
+
+**This is a different change from the one dispatched, in a different file, with a whole-program blast radius —
+so it is flagged rather than built.** Picking it silently would have been the exact thing this arc keeps refusing.
+
+### THE DIGIT BOUND, DERIVED (step 2's homework, done — it does not depend on the seam)
+
+Per point the rotation is `x' = x0 + c·ex − s·ey`, `y' = y0 + s·ex + c·ey`: **two multiplies by a baked constant and
+one add, ONCE per coordinate.** There is no recurrence — nothing is fed back — so the helix's compounding argument
+(t1343, where 24 steps forced 9 decimals) does not apply.
+
+Rounding c and s to d decimals gives each an error ≤ 5·10^−(d+1). The coordinate error is bounded by
+`(|ex| + |ey|)·5·10^−(d+1)`. Taking |ex|,|ey| ≤ 500mm — well beyond any real faced area:
+
+    d = 6  →  1000 · 5·10⁻⁷  =  5·10⁻⁴ mm   ← half the emit's own 0.001mm quantum: cannot tip a rounded digit
+    d = 9  →  1000 · 5·10⁻¹⁰ =  5·10⁻⁷ mm
+
+**Six decimals is sufficient and provable**, exactly as the dispatch suspected: the t1339 one-shot rule governs
+here, not the helix's recurrence rule. (For scale, the ramp's unit vector already uses 6 for the same reason.)
+
+### WHAT IS NOT DONE
+
+The mechanism, the bridges (0/90/odd/negative/composed/skim), and the family-A flips are all untouched — they all
+sit downstream of the seam decision. The refuse-guard and the t1365 restatements stay exactly as they are, so the
+tree is unchanged and green.
+
+GATE: nothing built, nothing to gate. The tree is quiet at the shipped V2026.07.29.6 line; no source file was
+modified this turn. Seat B's lane untouched.
