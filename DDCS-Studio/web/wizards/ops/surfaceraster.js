@@ -72,7 +72,12 @@ export function surfaceRasterLines(p = {}) {
         `${V.step}=[${r3(tool)} * ${r3(pct)} / 100]   ( stepover mm = tool Ø ${r3(tool)} x ${r3(pct)}% — the CAM derives it the same way )`,
         `IF ${V.step} LE 0 GOTO 91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
         `IF ${V.stepdown} LE 0 GOTO 91`,
-        `${V.rows}=FUP[${V.h} / ${V.step}]   ( row count, counted from the area — not written out by hand )`,
+        // THE ROW COUNT, and it is NOT `h / step` rounded up. Rows sit at step/2 + i·step, so the count is how many of
+        // those land INSIDE the area: FIX[(h − step/2) / step] + 1. The two formulas agree at 150/7.2 and 40/5 and
+        // disagree at 60/7.2 (8 rows, not 9) — a whole extra pass off the far edge, cutting air. The first five
+        // equivalence configs all happened to be ones where the wrong formula coincides, which is exactly why the
+        // sixth exists: a bridge is only as good as the configs you point it at.
+        `${V.rows}=[FIX[[${V.h} - ${V.step} / 2] / ${V.step}] + 1]   ( rows that FIT: the last one lands inside the area, not past it )`,
         `IF ${V.rows} LT 1 THEN ${V.rows}=1   ( a face narrower than one stepover is still one row )`,
         '',
         `${V.z}=0   ( the level being cut )`,
@@ -124,6 +129,36 @@ export function surfaceRasterLines(p = {}) {
         '#1505=1   ;ERROR: stepover / stepdown must be greater than zero',
         'N92',
     ];
+}
+
+/**
+ * WHAT THIS ATOM COVERS — declared, because the switch-over depends on it and a silent gap here would DROP FEATURES.
+ *
+ * The wizard offers more than one raster: concentric rings, a ramp or helix descent instead of a plunge, a one-way
+ * raster, and a confirm-every-N-passes halt. This atom implements the DEFAULT and most common one — a both-ways
+ * parallel raster that plunges — and the equivalence bridge only ever proved THAT. Measured against the literal
+ * emitter, the others differ by a lot (concentric 50 cutting moves vs 36; helix 80 vs 36): they are different
+ * toolpaths, not rounding.
+ *
+ * So the boundary is a predicate rather than a comment: a caller asks whether a config is inside the proven envelope
+ * instead of assuming it is. Retiring the literal emitter means closing this gap first — every `false` below is a
+ * feature that would otherwise vanish on the day the old path dies.
+ */
+export function surfaceRasterCovers(p = {}) {
+    const strategy = p.strategy || 'parallel';
+    const entry = p.entry || 'plunge';
+    const direction = p.direction || 'bothways';
+    const confirmEvery = Number(p.confirmEvery) || 0;
+    return strategy === 'parallel' && entry === 'plunge' && direction === 'bothways' && confirmEvery === 0;
+}
+
+/** Why a config is outside the envelope, in the words a reader needs — never a bare false. */
+export function surfaceRasterGap(p = {}) {
+    if ((p.strategy || 'parallel') !== 'parallel') return 'concentric rings are a different toolpath — the parametric raster walks rows';
+    if ((p.entry || 'plunge') !== 'plunge') return `a ${p.entry} descent adds moves the row loop does not make`;
+    if ((p.direction || 'bothways') !== 'bothways') return 'a one-way raster lifts and returns between rows';
+    if (Number(p.confirmEvery) > 0) return 'a confirm-every-N halt is a machine pause between levels';
+    return '';
 }
 
 export const surfaceRasterBlock = {

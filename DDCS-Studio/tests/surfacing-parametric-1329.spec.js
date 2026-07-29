@@ -27,6 +27,11 @@ const CONFIGS = [
     { name: 'SINGLE PASS — the depth is exactly one stepdown', w: 80, h: 40, depth: 0.5, stepdown: 0.5, toolDia: 10, stepoverPct: 50, feed: 800, plunge: 150, clearance: 4 },
     { name: 'depth NOT a multiple of stepdown — the last bite is clamped', w: 100, h: 60, depth: 1.1, stepdown: 0.4, toolDia: 8, stepoverPct: 45, feed: 700, plunge: 140, clearance: 6 },
     { name: 'exact division — rows divide evenly, the easy case kept honest', w: 96, h: 72, depth: 1.0, stepdown: 0.5, toolDia: 12, stepoverPct: 50, feed: 1000, plunge: 200, clearance: 5 },
+    // t1331 — THE CONFIG THAT CAUGHT THE ROW-COUNT FORMULA. 60 / 7.2 is 8.33: rounding up gives 9 rows and the ninth
+    // sits at 61.2, off the far edge, cutting air. The true count is how many rows at step/2 + i·step FIT INSIDE the
+    // area. The five configs above all happen to be ones where the two formulas agree — which is precisely how a
+    // bridge with a well-chosen-looking config set can still pass over a real bug.
+    { name: 'ROW COUNT — 60 / 7.2 rounds up to a row that does not fit', w: 100, h: 60, depth: 1.0, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 },
 ];
 
 test('THE HEADER SPEAKS, AND THE LOOPS COUNT THEMSELVES', async ({ page }) => {
@@ -47,7 +52,7 @@ test('THE HEADER SPEAKS, AND THE LOOPS COUNT THEMSELVES', async ({ page }) => {
         expect(line, `every header var says what it is: ${line}`).toMatch(/\(.*\)|;/);
     }
     // THE COUNT IS DERIVED, not written out — this is the difference between a program and a transcript
-    expect(r.body, 'rows are counted from the area and the stepover').toMatch(/#45=FUP\[#41 \/ #44\]/);
+    expect(r.body, 'rows are counted from the area and the stepover — the ones that FIT').toMatch(/#45=\[FIX\[\[#41 - #44 \/ 2\] \/ #44\] \+ 1\]/);
     expect(r.body, 'and the stepover is itself derived from tool Ø × %, the same way the CAM does it').toMatch(/#44=\[12 \* 60 \/ 100\]/);
     // THE LOOPS: depth outside, rows inside — the parting-peck shape
     expect(r.body, 'a depth loop').toMatch(/WHILE \[#46 LT #42\] DO1/);
@@ -173,4 +178,69 @@ test('THE EMIT IS A FIXED SIZE — the literal one grows with the job, this one 
     expect(r.newBig, `parametric: ${r.newSmall} lines small → ${r.newBig} big`).toBe(r.newSmall);
     // …which is the point: on a real job it is orders of magnitude smaller, and it stays READABLE
     expect(r.newBig).toBeLessThan(r.oldBig / 20);
+});
+
+/**
+ * t1331 — THE COVERAGE BOUNDARY, declared and asserted rather than discovered on the day the old emitter dies.
+ *
+ * The switch-over cannot retire the literal emitter yet, and this is why, in numbers: the wizard offers concentric
+ * rings, ramp and helix descents, a one-way raster and a confirm-every-N halt, and the parametric atom implements
+ * the default both-ways parallel plunge raster. Those others are DIFFERENT TOOLPATHS — concentric emits 50 cutting
+ * moves where the raster emits 36, helix 80 — not rounding differences that could be waved through.
+ *
+ * Asserting the boundary is what stops it being forgotten: the day someone teaches the atom concentric rings, this
+ * spec fails and tells them to move the line.
+ */
+test('THE COVERED ENVELOPE IS DECLARED — and everything outside it is named, not silently dropped', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfaceRasterCovers, surfaceRasterGap } = await import('/wizards/ops/surfaceraster.js');
+        const base = { strategy: 'parallel', entry: 'plunge', direction: 'bothways', confirmEvery: 0 };
+        const probe = (extra) => ({ covered: surfaceRasterCovers({ ...base, ...extra }), why: surfaceRasterGap({ ...base, ...extra }) });
+        return {
+            dflt: probe({}),
+            empty: { covered: surfaceRasterCovers({}), why: surfaceRasterGap({}) },   // an unset config is the default
+            concentric: probe({ strategy: 'concentric' }),
+            ramp: probe({ entry: 'ramp' }),
+            helix: probe({ entry: 'helix' }),
+            oneway: probe({ direction: 'oneway' }),
+            confirm: probe({ confirmEvery: 2 }),
+        };
+    });
+    // THE DEFAULT IS COVERED — which is why the bridge could prove the common case end to end
+    expect(r.dflt.covered, 'a both-ways parallel plunge raster is inside the proven envelope').toBe(true);
+    expect(r.empty.covered, 'and so is an unset config, because those ARE the defaults').toBe(true);
+    // EVERYTHING ELSE IS OUTSIDE IT, AND SAYS WHY. A bare `false` here would be the silent drop this exists to prevent.
+    for (const k of ['concentric', 'ramp', 'helix', 'oneway', 'confirm']) {
+        expect(r[k].covered, `${k} is outside the proven envelope`).toBe(false);
+        expect(r[k].why, `${k} says why, in words a reader can act on`).toBeTruthy();
+        expect(r[k].why.length, `${k}'s reason is a sentence, not a token`).toBeGreaterThan(20);
+    }
+    expect(r.concentric.why).toMatch(/different toolpath/i);
+    expect(r.helix.why).toMatch(/descent/i);
+});
+
+test('THE GAP IS REAL, MEASURED — the uncovered cases are different programs, not near-misses', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+        const { traceToolpath } = await import('/engine/trace.js');
+        const NL = String.fromCharCode(10);
+        const base = { w: 100, h: 60, depth: 1.0, stepdown: 0.5, toolDia: 12, stepoverPct: 60, stepover: 7.2, feed: 900, plunge: 180, clearance: 5 };
+        const cuts = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).length;
+        const pair = (extra) => {
+            const cfg = { ...base, ...extra };
+            return { literal: cuts(String(emitProgram(surfacingStack(cfg)))), parametric: cuts(['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL)) };
+        };
+        return { covered: pair({}), concentric: pair({ strategy: 'concentric' }), helix: pair({ entry: 'helix', helixDia: 8, helixPitch: 1 }) };
+    });
+    // INSIDE the envelope the two agree exactly — that is the whole equivalence argument, restated on this config
+    expect(r.covered.parametric, `covered: literal ${r.covered.literal} vs parametric ${r.covered.parametric}`).toBe(r.covered.literal);
+    // OUTSIDE it they are not close, which is the point: switching wholesale would not be a small regression, it
+    // would be a different cut. The numbers are in the spec so nobody has to take the boundary on trust.
+    expect(r.concentric.literal, `concentric literal ${r.concentric.literal} vs raster ${r.concentric.parametric}`).not.toBe(r.concentric.parametric);
+    expect(Math.abs(r.concentric.literal - r.concentric.parametric), 'concentric differs by a lot, not a rounding').toBeGreaterThan(5);
+    expect(Math.abs(r.helix.literal - r.helix.parametric), 'and a helix descent by more still').toBeGreaterThan(20);
 });
