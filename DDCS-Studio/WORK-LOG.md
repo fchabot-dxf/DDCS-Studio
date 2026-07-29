@@ -5971,3 +5971,93 @@ change in that path (the helpPanel join). It surfaced as a spec failing on an ex
 earlier. Stash before bisecting a path that holds uncommitted work, or bisect in a worktree.
 
 GATE: fast tier — 60 gateway/settings/help/bridge/send/client specs + 71 smoke, green.
+
+---
+
+## t1329 — item 0 (the overlay), and the surfacing pilot's emit + its equivalence bridge
+
+### ITEM 0 — the busy overlay: TWO causes, and the dispatched premise was half wrong
+
+The dispatch said to fix this in the TEST SEAM because the product behaviour is correct. One half of it was a test
+seam. The other half was a real product bug, and saying so is the point of confirming a premise before acting on it.
+
+**(a) THE TEST SEAM, as dispatched.** `busyOverlay` is deliberately never dismissed on success — success means
+`location.reload()` takes the page, overlay included. The harness (`window.__ddcsNoReload`) stands in for that
+reload, and a stand-in that skips the navigation must also do what the navigation does. Both no-reload branches now
+call `clearBusyOverlay()`. No real user is affected: the product path still reloads.
+
+**(b) A REAL PRODUCT BUG the seam was hiding.** The overlay is `z-index:100000` and is raised on the CLICK (t1283).
+The unsaved-work prompt — Save and continue / Discard / Cancel — is `z-index:20000` and appears AFTER it, from
+inside the open path. So with unsaved work, clicking a workspace card put a spinner **on top of the question the
+user had to answer**: the buttons unreachable, the open apparently hung. It is also untrue — nothing is being opened
+while we are still asking. `threeWay` now stands the glyph down for the duration and brings it back only if the
+answer proceeds (Cancel removes it: nothing is loading).
+
+**(c) A THIRD, UNRELATED FAILURE in the same run, kept apart from the other two.** `workspace-roundtrip`'s machine
+record assert failed because `toolPost` joined the record at t1321 and the RECORD constant was never updated. That
+assert says in its own comment that it is deliberately full rather than loosened "so the next field added has to be
+stated here too" — it has now done that job three times. Restated, not loosened.
+
+Both ways green, per spec: workspace-save-open-1225 8, workspace-manager-1223 6, workspace-manager-truth-1231 11,
+workspace-roundtrip 7 — each alone; and 94 passed in-suite with the settings/help/backup/folder/loading family.
+
+### THE PILOT — surfacing emits parametric
+
+`wizards/ops/surfaceraster.js`: a header of named #vars, a depth loop, and a row loop that counts itself
+(`#45=FUP[#41 / #44]`). The stepover is derived from tool Ø × % by the SAME expression the CAM slot uses, so the two
+cannot disagree; a caller still carrying a flat mm has its pct recovered against the tool it will run, exactly as
+opCamMap does it.
+
+**WHY A NEW ATOM rather than making `stepdown` + `surfacefill` parametric:** those are SHARED — pocket, slot and
+contour emit through them, so changing them would re-emit every one of those ops in the same breath as the pilot.
+That is what a pilot exists to avoid: prove the mechanism once, on one op, and let the family inherit deliberately.
+
+**THE SCRATCH BAND IS DECLARED** (`RASTER_SCRATCH`, #40–#49) on the atom, where universalScratch already reads every
+atom's own declaration — t1325's lesson, where a hand-picked var was silently overwritten by the kit's row count.
+Asserted: no var outside the band, and every HEADER var assigned exactly once.
+
+### THE EQUIVALENCE BRIDGE EARNED ITS KEEP THREE TIMES IN ONE SITTING
+
+It is not a formality. Written first, it caught three real defects in my own emit that no amount of reading would
+have found:
+
+1. **Rows at the wrong Y.** I wrote `y = i * step`; the real raster is `step/2 + i * step`. That half-step is what
+   makes the tool's SWATH cover the area instead of running its centre along the boundary.
+2. **Lifting between rows.** I retracted to clearance and re-plunged every row. The real raster STAYS DOWN and steps
+   over as a cutting move — one plunge per level. A different program entirely: more air, more plunges, more wear.
+3. **The direction carried across levels.** I flipped `dir` continuously; the machine restarts each level at the
+   near corner going +X. With 21 rows (odd) that means level 2 ran backwards from the far end. Caught at move 42 of
+   84 — precisely the kind of thing nobody finds by reading G-code.
+
+Also caught: `[#49 LT 0]` inside an expression, which I expected to evaluate 0/1 and which the tracer read as a
+plain `1`, putting the first plunge a millimetre off the corner. A conditional belongs in an IF on this controller.
+
+All five discriminating configs now execute IDENTICALLY, move for move, through the sim: uneven rows, single row,
+single pass, depth-not-a-multiple-of-stepdown, and exact division.
+
+**AND ONE CLAIM I HAD TO WITHDRAW:** "the parametric emit is shorter" is false on a small face — a loop has fixed
+overhead. The true property is that its length is CONSTANT while the literal one grows with the job (asserted: 80×40
+vs 600×400 gives the same body, against a literal emit that grows more than twentyfold).
+
+### THE IRON RULE — stated before and after
+
+Round-trip diff count BEFORE: **11** differs, 0 blocks lost. AFTER: **11** differs, 0 lost — the same eleven ops,
+none of them surfacing. Nothing broke and nothing grew.
+
+### FLAGGED AND SPLIT — what this turn did NOT do, and why
+
+The pilot's remaining mechanisms are deliberately not half-built:
+- **ONE SOURCE (retiring the surface generator; the slot installing the wizard emit).** This re-points
+  `surfacingStack` at the new atom, which shifts the data-op twin's binding indices and the CAM seed with them. It
+  is a mechanical change ON TOP OF a proven emit — but only now is the emit proven, which was the precondition.
+- **The old emitter's death**, which the bridge licenses but which must follow the switch-over, not precede it.
+- **The register**: old-file import, per-line annotations under loops, the step-cap against a hand-broken infinite
+  loop, the one-time hash churn, and the line-coupled sim UI (progress must read the executed-move fraction, not
+  the line index — a loop makes those different numbers).
+- **Screenshots** of the wizard/slot/Blocks with the new emit, which belong with the switch-over that makes them show
+  something different.
+
+The dispatch said to flag and split rather than thin the mechanisms. The emit and its proof are whole; the wiring is
+the next turn's, on a base that is now provably safe.
+
+GATE: fast tier — 249 surfacing/workspace/cam/blocks/roundtrip specs + 71 smoke, green.
