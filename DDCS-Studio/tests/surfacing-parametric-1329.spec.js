@@ -210,13 +210,16 @@ test('THE COVERED ENVELOPE IS DECLARED — and everything outside it is named, n
     // THE DEFAULT IS COVERED — which is why the bridge could prove the common case end to end
     expect(r.dflt.covered, 'a both-ways parallel plunge raster is inside the proven envelope').toBe(true);
     expect(r.empty.covered, 'and so is an unset config, because those ARE the defaults').toBe(true);
+    expect(r.concentric.covered, 't1333 — concentric rings are covered now, proven move-for-move').toBe(true);
+    expect(r.oneway.covered, 'and one-way was never a gap: the op hard-codes both-ways').toBe(true);
     // EVERYTHING ELSE IS OUTSIDE IT, AND SAYS WHY. A bare `false` here would be the silent drop this exists to prevent.
-    for (const k of ['concentric', 'ramp', 'helix', 'oneway', 'confirm']) {
+    // t1333 — RESTATED: concentric closed this turn, and one-way was never a real gap (the op hard-codes
+    // both-ways — see the correction above). What is left outside the envelope is the descent and the pause.
+    for (const k of ['ramp', 'helix', 'confirm']) {
         expect(r[k].covered, `${k} is outside the proven envelope`).toBe(false);
         expect(r[k].why, `${k} says why, in words a reader can act on`).toBeTruthy();
         expect(r[k].why.length, `${k}'s reason is a sentence, not a token`).toBeGreaterThan(20);
     }
-    expect(r.concentric.why).toMatch(/different toolpath/i);
     expect(r.helix.why).toMatch(/descent/i);
 });
 
@@ -240,7 +243,103 @@ test('THE GAP IS REAL, MEASURED — the uncovered cases are different programs, 
     expect(r.covered.parametric, `covered: literal ${r.covered.literal} vs parametric ${r.covered.parametric}`).toBe(r.covered.literal);
     // OUTSIDE it they are not close, which is the point: switching wholesale would not be a small regression, it
     // would be a different cut. The numbers are in the spec so nobody has to take the boundary on trust.
-    expect(r.concentric.literal, `concentric literal ${r.concentric.literal} vs raster ${r.concentric.parametric}`).not.toBe(r.concentric.parametric);
-    expect(Math.abs(r.concentric.literal - r.concentric.parametric), 'concentric differs by a lot, not a rounding').toBeGreaterThan(5);
+    // t1333 — RESTATED: concentric was 50-vs-36 when the atom could not walk rings. It walks them now, so the two
+    // AGREE — the gap closed rather than the assert being dropped, which is what closing a gap should look like.
+    expect(r.concentric.parametric, `concentric now agrees: literal ${r.concentric.literal} vs ${r.concentric.parametric}`).toBe(r.concentric.literal);
     expect(Math.abs(r.helix.literal - r.helix.parametric), 'and a helix descent by more still').toBeGreaterThan(20);
+});
+
+/**
+ * t1333 — COVERAGE: CONCENTRIC RINGS and the ONE-WAY RASTER, each with its own bridge.
+ *
+ * The configs are chosen ADVERSARIALLY, at the boundaries where the formulas can disagree, not in the interiors
+ * where they cannot — the lesson from the row-count bug, where five reasonable-looking configs all happened to sit
+ * where a wrong formula coincides with the right one.
+ */
+const RING_CONFIGS = [
+    // the middle closes EXACTLY on a ring boundary: h = 2·k·step, where the k-th ring has zero height and must not
+    // be walked at all (the literal kernel breaks on `bx-ax < 1e-6`; the count must agree without being told)
+    { name: 'RINGS — the middle collapses exactly on a boundary', w: 100, h: 28.8, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 },
+    // a face so small only ONE ring fits
+    { name: 'RINGS — a single ring, the middle closes immediately', w: 40, h: 12, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 },
+    // the inset does NOT divide the short side evenly — the common case, and the one where an off-by-one hides
+    { name: 'RINGS — inset does not divide the short side evenly', w: 120, h: 65, depth: 1.0, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 },
+    // square: both sides run out together
+    { name: 'RINGS — square, both sides close at once', w: 80, h: 80, depth: 0.5, stepdown: 0.5, toolDia: 10, stepoverPct: 50, feed: 800, plunge: 150, clearance: 4 },
+];
+
+
+const bridge = (page, cfg) => page.evaluate(async (cfg) => {
+    const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+    const { emitProgram } = await import('/blocks/blockEmitter.js');
+    const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+    const { traceToolpath } = await import('/engine/trace.js');
+    const NL = String.fromCharCode(10);
+    const oldText = String(emitProgram(surfacingStack(cfg)));
+    const newText = ['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL);
+    const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid)
+        .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3)]);
+    return { oldCut: cut(oldText), newCut: cut(newText) };
+}, cfg);
+
+for (const cfg of RING_CONFIGS) {
+    test(`EQUIVALENCE (concentric) — ${cfg.name}`, async ({ page }) => {
+        await boot(page);
+        const r = await bridge(page, { ...cfg, strategy: 'concentric' });
+        expect(r.oldCut.length, 'the literal ring kernel cuts something').toBeGreaterThan(0);
+        expect(r.newCut.length, `same number of cutting moves (literal ${r.oldCut.length}, parametric ${r.newCut.length})`).toBe(r.oldCut.length);
+        expect(r.newCut, 'and every cutting move is identical, in order — rings included').toEqual(r.oldCut);
+    });
+}
+
+/**
+ * t1333 — A CORRECTION TO MY OWN t1331 FINDING, asserted so it cannot drift back.
+ *
+ * t1331 listed `direction: 'oneway'` as one of four uncovered gaps, measured by handing the param to both emitters.
+ * That measurement was wrong about the OP: `surfacingStack` hard-codes `direction: 'bothways'` on the fill block, so
+ * no surfacing config can reach a one-way raster. A parametric one-way walk was written for it and then DELETED —
+ * machinery for a case this op does not have. What follows pins the reason, so nobody re-adds it from the old note.
+ */
+test('ONE-WAY IS NOT A SURFACING GAP — the op hard-codes both-ways, so no config reaches it', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const flat = (st, out = []) => { for (const b of (st || [])) { out.push(b); flat(b.children, out); flat(b.uiChildren, out); } return out; };
+        // ask the op for a one-way raster, the way my t1331 measurement did…
+        const asked = flat(surfacingStack({ w: 100, h: 60, direction: 'oneway' })).find((b) => b.type === 'surfacefill');
+        const dflt = flat(surfacingStack({ w: 100, h: 60 })).find((b) => b.type === 'surfacefill');
+        return { asked: asked && asked.params.direction, dflt: dflt && dflt.params.direction };
+    });
+    // …and the op ignores it. The param never reaches the emit, so there was never a gap to close.
+    expect(r.dflt, 'surfacing always fills both ways').toBe('bothways');
+    expect(r.asked, 'asking for one-way changes nothing — the op does not offer it').toBe('bothways');
+});
+
+
+test('THE ENVELOPE SHRANK — concentric and one-way are inside it now, and what remains is NAMED', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfaceRasterCovers, surfaceRasterGap } = await import('/wizards/ops/surfaceraster.js');
+        const probe = (extra) => ({ covered: surfaceRasterCovers(extra), why: surfaceRasterGap(extra) });
+        return {
+            concentric: probe({ strategy: 'concentric' }),
+            oneway: probe({ direction: 'oneway' }),
+            otherway: probe({ direction: 'otherway' }),
+            ramp: probe({ entry: 'ramp' }),
+            helix: probe({ entry: 'helix' }),
+            confirm: probe({ confirmEvery: 2 }),
+        };
+    });
+    // CLOSED THIS TURN — proven move-for-move above, so the predicate stops excluding them
+    expect(r.concentric.covered, 'concentric rings are covered now').toBe(true);
+    expect(r.oneway.covered, 'and the one-way raster').toBe(true);
+    expect(r.otherway.covered, 'including its from-the-far-side variant').toBe(true);
+    // STILL OUT, AND SAYING SO — the predicate ends the turn naming exactly what remains, not empty
+    expect(r.ramp.covered).toBe(false);
+    expect(r.helix.covered).toBe(false);
+    expect(r.confirm.covered).toBe(false);
+    for (const k of ['ramp', 'helix', 'confirm']) {
+        expect(r[k].why, `${k} still names its own gap`).toBeTruthy();
+        expect(r[k].why, `${k} says it was split, not forgotten`).toMatch(/split/i);
+    }
 });
