@@ -9,6 +9,7 @@
  * The data layer (buildBackup/previewBackup/restoreBackup/safetyExport) lives in data/backup.js — this is only its UI.
  */
 import { previewBackup, restoreBackup, safetyExport, exportEverything } from '../data/backup.js';
+import { clearBusyOverlay } from './busyRow.js';   // t1329 — the no-reload stub must clear what a reload would
 import { dlgNotice } from './dialog.js';
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -80,7 +81,7 @@ function renderRestoreModal(obj, pv) {
             const res = await restoreBackup(obj, sel);
             close();
             await dlgNotice(`Restored ${res.restored.length} store${res.restored.length !== 1 ? 's' : ''}. The app will reload to apply the changes.`);
-            if (!window.__ddcsNoReload) location.reload();
+            if (!window.__ddcsNoReload) location.reload(); else clearBusyOverlay();   // t1329 — the stub does what the reload does
         } catch (e) { btn.disabled = false; btn.textContent = 'Restore selected'; dlgNotice('Restore failed: ' + ((e && e.message) || e)); }
     });
     return ov;

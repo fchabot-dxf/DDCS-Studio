@@ -175,10 +175,12 @@ test('restoring a workspace ADOPTS the file\'s controller (the file is the machi
   });
 
   // t1267 — the record gained `kind` (mill | lathe); t1277 — and `chuck` (spindle | axis), because polygon turning
-  // needs the chuck commanded to an angle and that is a fact about the machine, not about the op. The file IS the
-  // machine, so both ride in it. Asserted in FULL rather than loosened, so the next field added to the record has to
-  // be stated here too — which is the point of this assertion, and it has now done that job twice.
-  const RECORD = { name: 'Shop Bee', controllerId: 'ddcs-v41', kind: 'mill', chuck: 'spindle' };
+  // needs the chuck commanded to an angle and that is a fact about the machine, not about the op. t1321 — and
+  // `toolPost` (front | top), the user's ruling that their tool comes from the side at centre height: also a fact
+  // about the machine, so it rides in the file too. The file IS the machine, so all of them ride in it. Asserted in
+  // FULL rather than loosened, so the next field added to the record has to be stated here too — which is the point
+  // of this assertion, and it has now done that job THREE times (this line is the third).
+  const RECORD = { name: 'Shop Bee', controllerId: 'ddcs-v41', kind: 'mill', chuck: 'spindle', toolPost: 'front' };
   expect(r.inFile, 'the .ddcs carries the machine record as a declared store').toEqual(RECORD);
   expect(r.before.controller, 'the browser really was on a different controller first').toBe('ddcs-expert-m350');
   expect(r.after.machine, 'the restored machine record is the FILE\'s').toEqual(RECORD);

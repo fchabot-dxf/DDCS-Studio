@@ -68,6 +68,19 @@ export const isBusy = (el) => !!(el && el.classList.contains(BUSY));
  * @param {string} label  what is being opened, in the user's words
  * @returns {() => void} a dismiss, for the failure path (where a named refusal becomes the feedback instead)
  */
+/**
+ * t1329 — WHAT THE RELOAD WOULD HAVE DONE. The overlay above is deliberately never dismissed on success, because
+ * success means `location.reload()` takes the whole page — including it. The test harness stands in for that reload
+ * (`window.__ddcsNoReload`), and a stand-in that skips the navigation must also do what the navigation does, or the
+ * overlay outlives the open and intercepts the next click. That is a faithfulness bug in the STUB, not in the app:
+ * no real user ever sees this overlay linger, so the product's behaviour is unchanged and stays.
+ */
+export function clearBusyOverlay() {
+    if (typeof document === 'undefined') return;
+    const el = document.getElementById('ddcs-busy-overlay');
+    if (el) el.remove();
+}
+
 export function busyOverlay(label) {
     if (typeof document === 'undefined') return () => {};
     const prev = document.getElementById('ddcs-busy-overlay');

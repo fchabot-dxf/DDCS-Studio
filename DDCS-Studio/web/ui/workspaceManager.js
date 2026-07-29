@@ -26,7 +26,7 @@ import { setMachineName, envelopeSummary } from '../data/workspaceMachine.js';  
 import { dlgNotice, dlgConfirm } from './dialog.js';
 import { CONTROLLER_PROFILES } from '../shared/js/profiles/controllerProfiles.js';
 import { getAccount, connect, disconnect } from './cloudAccount.js';   // t1233 — the SAME sign-in Settings and the drawer use
-import { busyRow, busyOverlay } from './busyRow.js';   // t1257 — feedback on the row you clicked, the instant you click it
+import { busyRow, busyOverlay, clearBusyOverlay } from './busyRow.js';   // t1257 — feedback on the row you clicked, the instant you click it
 
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const hasFSA = () => typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
@@ -53,6 +53,15 @@ export async function confirmDiscardBuffer(what) {
 /** A three-way ask (Save and continue / Discard / Cancel) — dialog.js is two-way, so this is its own small overlay. */
 function threeWay(message) {
     return new Promise((resolve) => {
+        // t1329 — THE GLYPH STANDS DOWN WHILE WE ASK. The centred "Opening…" overlay is raised on the CLICK (t1283)
+        // and sits at z-index 100000; this prompt is at 20000 and appears AFTER it, so with unsaved work the user was
+        // shown a spinner covering the very question they had to answer — Save / Discard / Cancel unreachable, the
+        // open apparently hung. It is also simply untrue: while this prompt is up nothing is being opened yet.
+        // So the overlay is hidden for the duration and restored if the answer lets the open proceed.
+        const busy = document.getElementById('ddcs-busy-overlay');
+        const prevDisplay = busy ? busy.style.display : null;
+        if (busy) busy.style.display = 'none';
+        const restoreBusy = (proceeding) => { if (busy) busy.style.display = proceeding ? (prevDisplay || '') : 'none'; if (busy && !proceeding) busy.remove(); };
         const ov = document.createElement('div');
         // NOT `app-dialog`: that class belongs to ui/dialog.js, and borrowing it made this overlay answerable by
         // anything that drives dialogs generically (the test helper did exactly that, clicking the last button).
@@ -65,7 +74,13 @@ function threeWay(message) {
                 <button type="button" class="toolbar-btn settings-io" data-w3="discard">Discard changes</button>
                 <button type="button" class="toolbar-btn settings-io" data-w3="save" style="border-color:var(--accent);">Save and continue</button>
             </div></div>`;
-        const done = (v) => { ov.remove(); document.removeEventListener('keydown', onKey, true); resolve(v); };
+        const done = (v) => {
+            ov.remove(); document.removeEventListener('keydown', onKey, true);
+            // cancel means no open is happening, so the glyph goes away entirely rather than sitting over a screen
+            // where nothing is loading; the other two answers continue into the open, so it comes back.
+            restoreBusy(v !== 'cancel');
+            resolve(v);
+        };
         const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); done('cancel'); } };
         ov.addEventListener('click', (e) => { const b = e.target.closest('[data-w3]'); if (b) done(b.dataset.w3); else if (e.target === ov) done('cancel'); });
         document.addEventListener('keydown', onKey, true);
@@ -189,7 +204,9 @@ async function openWorkspaceObject(obj, fileName, label, { handle = null, place 
     markWorkspaceSavedToFile(fileName, place);
     try { await markItemsSavedToFile(); } catch (_) {}   // t1309 — the opened file is the new per-program baseline
     await adoptSaveHandle(handle || null);          // …and Save writes THIS file (a cloud open has no local handle)
-    if (!window.__ddcsNoReload) location.reload();
+    // t1329 — the reload takes the page, overlay and all. When the harness stands in for it, stand in FULLY:
+    // otherwise the centred open glyph survives an open that 'succeeded' and blocks the next click.
+    if (!window.__ddcsNoReload) location.reload(); else clearBusyOverlay();
     return true;
 }
 
