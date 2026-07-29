@@ -27,7 +27,10 @@ import { num } from './util.js';
  * #50–#61, and clear of the dialect/atom injections universalScratch aggregates in the low teens. Declared here as
  * data so the collision guard reads it instead of re-deriving it from the emitted text.
  */
-export const RASTER_SCRATCH = [[40, 49]];
+// t1343 — EXTENDED DOWN to #34 for the helix recurrence, which needs a rotating vector (2), a temp for the rotate
+// (1) and its own segment counter (1) on top of the header. #34–#39 is the gap between camMacroKit's kit band
+// (#27–#33) and this atom's original #40–#49 — still clear of the probe temps at #50–#61.
+export const RASTER_SCRATCH = [[34, 49]];
 
 const V = {
     w: '#40',        // area X (tool-centre sweep)
@@ -47,6 +50,8 @@ V.run = '#49';
 // The ring walk reuses one of the same slots for its inset: a ring and a row are never walked at the same time, so
 // a separate var would be a second name for one register.
 const RING_INSET = V.y;
+// t1343 — the helix recurrence's own registers, in the extended band.
+const HX = { vx: '#34', vy: '#35', tmp: '#36', k: '#37', segs: '#38', rev: '#39' };
 
 /**
  * The parametric body for a whole surfacing op: header, depth loop, and the strategy's own inner walk.
@@ -70,7 +75,8 @@ export function surfaceRasterLines(p = {}) {
     // THE STRATEGY DECIDES THE WALK, under the SAME header and the SAME depth loop — the loop that counts levels
     // does not care what happens inside it, which is why adding a strategy is a new walk and not a new emitter.
     const stepBaked = tool * pct / 100;   // the stepover AT BUILD VALUES — what the baked ramp geometry is computed for
-    const opts = { x0, y0, w, h, feed, plunge, clr, r3, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3), stepBaked };
+    const opts = { x0, y0, w, h, feed, plunge, clr, r3, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
+        helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1), toolDia: tool, stepBaked };
     const walk = (p.strategy === 'concentric') ? ringWalk(opts) : rowWalk(opts);
 
     return [
@@ -121,13 +127,15 @@ export function surfaceRasterLines(p = {}) {
  * own comment says so too), so a surfacing op CANNOT emit a one-way raster and no user config reaches it. A
  * parametric one-way walk was written and then deleted — machinery for a case this op does not have.
  */
-function rowWalk({ x0, y0, w, h, feed, plunge, clr, r3, entry, rampAngle, stepBaked }) {
+function rowWalk({ x0, y0, w, h, feed, plunge, clr, r3, entry, rampAngle, helixDia, helixPitch, toolDia, stepBaked }) {
     void clr;
     // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP walks toward the area centre at the declared
     // angle and comes back. See rampLines for why toC and 1/tan are BAKED and what that costs.
     const descent = (entry === 'ramp')
         ? rampLines({ x0, y0, w, h, feed, plunge, rampAngle, stepBaked, r3 })
-        : [`    G1 Z[0 - ${V.z}] F${r3(plunge)}   ( the ONE plunge of this level )`];
+        : (entry === 'helix')
+            ? helixLines({ x0, y0, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3 })
+            : [`    G1 Z[0 - ${V.z}] F${r3(plunge)}   ( the ONE plunge of this level )`];
     const count = [
         // THE ROW COUNT — not h/step rounded up. Rows sit at step/2 + i·step, so the count is how many of THOSE land
         // inside the area. The two formulas agree at 150/7.2 and 40/5 and disagree at 60/7.2 (8 rows, not 9), where
@@ -214,6 +222,70 @@ function rampLines({ x0, y0, w, h, feed, plunge, rampAngle, stepBaked, r3 }) {
         '    N41',
         `    G1 Z[0 - ${V.z}] F${r3(plunge)}   ( the ramp did not fit — straight plunge )`,
         '    N42',
+    ];
+}
+
+/**
+ * THE HELIX DESCENT — a descending helix at the area centre, then a cut back to the row start at depth.
+ *
+ * IT IS A POLYLINE, NOT AN ARC, and that is deliberate for the MIGRATION: the literal kernel emits 24 straight G1
+ * segments per revolution, so matching it move-for-move keeps the safety argument mechanical. Emitting true G2/G3
+ * arcs is better G-code and the tracer handles variable-fed arcs (measured at t1335) — it is the improvement turn's
+ * job, with its own criteria, not a rider on a migration.
+ *
+ * ── THE ROTATION RECURRENCE, AND WHY 9 DECIMALS ──────────────────────────────────────────────────────────────────
+ * Trig is UNVERIFIED on this controller, so the macro cannot call COS/SIN. Instead Studio bakes cos/sin of ONE
+ * segment angle and the loop rotates a vector: x' = x·c − y·s, y' = x·s + y·c — four multiplies and two adds.
+ *
+ * A rotation constant is multiplied EVERY segment, so its rounding error COMPOUNDS. Rounding c,s to d decimals
+ * gives each entry an error ≤ 5·10^−(d+1); the radial error grows by roughly 2·ε·R per step, so over one revolution
+ * (24 steps) the worst case is ≈ 48·ε·R. At R = 50mm — larger than any realistic surfacing helix:
+ *     6 decimals → ≈ 1.2e−3 mm   AT the emit's own 0.001mm rounding: a coordinate can tip to the wrong 3rd decimal
+ *     9 decimals → ≈ 1.2e−6 mm   three orders below what the emit can express
+ * So 9 it is. And the vector is RE-SEEDED at the start of every revolution, which caps the compounding at 24 steps
+ * no matter how deep the descent runs. THE TWO ARE SEPARATE REQUIREMENTS: re-seeding alone still leaves 1.2e−3 at
+ * 6 decimals, and 9 decimals alone would drift without bound on a deep descent. The bound holds only with both.
+ */
+function helixLines({ x0, y0, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3 }) {
+    const SEG = 24, theta = 2 * Math.PI / SEG;
+    // NINE decimals — see the derivation above. r3 would be catastrophic here for exactly the reason t1339 found
+    // one level down, and 6 is not enough either.
+    const d9 = (n) => Number(n.toFixed(9));
+    const c = d9(Math.cos(theta)), sn = d9(Math.sin(theta));
+    const cx = x0 + w / 2, cy = y0 + h / 2;
+    const sx = x0, sy = y0 + stepBaked / 2;             // the row start the descent returns to
+    const inrad = Math.min(w, h) / 2;                   // rect inradius, the literal's own clamp source
+    const wantR = helixDia > 0 ? helixDia / 2 : Math.max(0.1, toolDia) / 2;
+    const R = Math.max(0.2, Math.min(wantR, inrad - 0.01));
+    const pitch = Math.max(0.1, helixPitch);
+    return [
+        `    ${HX.segs}=[FUP[${V.stepdown} / ${r3(pitch)}] * ${SEG}]   ( segments: ${SEG} per rev, at ${r3(pitch)}mm per rev )`,
+        `    IF ${HX.segs} LT ${SEG} THEN ${HX.segs}=${SEG}   ( never less than one revolution )`,
+        `    G0 X${r3(cx + R)} Y${r3(cy)}   ( the helix starts on its own radius, at the area centre )`,
+        `    G0 Z[0 - ${V.z} + ${V.stepdown}]   ( the floor this level starts from )`,
+        `    ${HX.vx}=${r3(R)}   ( the rotating vector, re-seeded every revolution so the drift cannot accumulate )`,
+        `    ${HX.vy}=0`,
+        `    ${HX.k}=0`,
+        `    ${HX.rev}=0`,
+        `    WHILE [${HX.k} LT ${HX.segs}] DO3   ( one straight segment per step — a polyline helix, as the literal is )`,
+        `      ${HX.k}=[${HX.k} + 1]`,
+        `      ${HX.rev}=[${HX.rev} + 1]`,
+        // RE-SEED: at the top of each new revolution the vector returns to its exact starting value, so the
+        // compounding above can never run past 24 steps however deep the descent goes.
+        `      IF ${HX.rev} LE ${SEG} GOTO 51`,
+        `      ${HX.rev}=1`,
+        `      ${HX.vx}=${r3(R)}   ( re-seed )`,
+        `      ${HX.vy}=0`,
+        '      N51',
+        `      ${HX.tmp}=[${HX.vx} * ${c} - ${HX.vy} * ${sn}]   ( rotate by ${r3(360 / SEG)}deg: 4 multiplies, 2 adds, no trig )`,
+        `      ${HX.vy}=[${HX.vx} * ${sn} + ${HX.vy} * ${c}]`,
+        `      ${HX.vx}=${HX.tmp}`,
+        `      G1 X[${r3(cx)} + ${HX.vx}] Y[${r3(cy)} + ${HX.vy}] Z[0 - ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}] F${r3(feed)}`,
+        '    END3',
+        `    G1 X${r3(sx)} Y${r3(sy)} Z[0 - ${V.z}] F${r3(feed)}   ( helix — out to the row start, now at depth )`,
+        `    IF ${V.z} GT 0 GOTO 52`,
+        `    G1 Z[0 - ${V.z}] F${r3(plunge)}`,
+        '    N52',
     ];
 }
 
