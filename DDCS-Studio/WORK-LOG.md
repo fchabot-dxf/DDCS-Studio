@@ -5860,3 +5860,40 @@ leaves `settings.machine.wcs` byte-identical. One controller, one G54 table; the
 stored offsets.
 
 GATE: fast tier — 308 touched specs (tool*/lathe*/cam*/surfacing*/stepover*) + 71 smoke, green.
+
+### AMENDMENT 2 (USER, BLOCKED LIVE) — the web app reaches a local gateway, and the UI stops lying about it
+
+Landed as its own commit, per the amendment's "split it out and land it FIRST".
+
+TWO FAULTS, one behaviour. (1) "Local (this PC)" polled the PAGE'S OWN ORIGIN — on pages.dev there is no gateway
+there and never will be, so the mode could only ever fail on a hosted page; the concept predates the web deploy.
+(2) The Status message said "connect one in the Console tab (a local daemon or a service URL)" while the Console had
+NO daemon field — the only URL box lived behind the CLOUD radio, together with a button labelled "use local
+gateway". To reach a local daemon you had to declare yourself a cloud user.
+
+THE FIX, as one declared behaviour:
+- **The unreachable tick goes looking.** `probeLocalGateway()` walks the registered loopback ports and adopts a
+  gateway that ANSWERS ITS DESCRIPTOR. Reachability is not identity — adopting whatever accepts a socket on 8765
+  would point the app at a stranger and call it the user's machine, so a non-descriptor response is refused
+  (asserted). Loopback is mixed-content exempt, so an https page may call it, and the gateway already sends CORS.
+- **The ports are ONE declaration.** `GATEWAY_PORTS` moved from an inline const in admin.js to service.js, so the
+  Console's serve-port picker and the probe scan the same registered set and cannot drift.
+- **Adopted ≠ typed.** Two keys, deliberately: an explicit URL must WIN, must survive a failed probe, and clearing
+  it must return to AUTO rather than to nothing — one key holding both cannot express "cleared, now auto again".
+  The client seam's precedence is `?api=` > typed > adopted > same-origin, so the exe and the gateway-served console
+  are untouched (neither ever has an adopted base — asserted).
+- **The Console gains the field the message promised**, in LOCAL mode where the message sends you, with a state line
+  that is never silent: "Looking for a gateway on 127.0.0.1 (ports …)" or "Found automatically: <base>".
+- **The message became a path**, not a description of one: it links to the Console and focuses the field. Proven to
+  the pixel rather than left as two surfaces that merely agree in wording.
+
+**A THIRD FAULT FOUND WHILE FIXING THE SECOND, same family one level down:** the mode was INFERRED from "is there a
+base", so typing a LOCAL daemon URL flipped the UI into Cloud mode — and the field the Status message points at is
+in Local mode, so following the app's own advice hid the box you had just used. That is what the focus assert
+caught. The mode is now its own stored fact, with the old derivation as the fallback so nobody's saved service moves.
+
+VERIFIED AGAINST THE REAL MACHINE, not just the spec: with the keys cleared, the panel auto-adopted
+http://127.0.0.1:8765 and came alive — "live — connected to \\10.0.0.50\cncdisk", DDCS V4.1 from the controller —
+with zero configuration (screenshot _t1325-gateway-console.png). That is the user's blocked case, unblocked.
+
+GATE: 16 gateway/bridge/send/client specs + 71 smoke, green.
