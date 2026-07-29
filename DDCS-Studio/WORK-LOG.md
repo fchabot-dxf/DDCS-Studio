@@ -6188,3 +6188,63 @@ G2/G3 with I/J under #vars, and whether the tracer handles that — a finding to
 its own turn rather than the tail of this one. The switch-over remains out by design.
 
 GATE: fast tier — 184 surfacing/cam/roundtrip specs + 71 smoke, green. 18/18 in the pilot spec.
+
+---
+
+## t1335 — reachability as method, the confirm cadence closed, and a helix finding that changes the plan
+
+### THE REACHABILITY RULE, applied first as instructed
+
+Before building anything: ramp, helix and confirmEvery all DO reach the emit — `surfacingStack` passes `entry`,
+`rampAngle`, `helixDia`, `helixPitch` through to the fill block and `confirmEvery` to the stepdown. Unlike
+`direction`, which it swallows. Asserted the same way the one-way correction was, so the check is now a habit with
+a test behind it rather than a lesson in a work log.
+
+### CONFIRM-EVERY-N — closed
+
+M00 after every Nth level EXCEPT the last, guarded by `IF #46 GE #42`. A pause after the final pass would halt the
+program on a finished part — the one case where the operator has nothing to do.
+
+**The pause word is matched, not modernised.** The literal path emits `M00   ( pause - press Cycle Start to resume )`
+and so does this: the machine's own convention is not something to improve while passing through. Measured from the
+literal emit rather than assumed from the dispatch's "M0/M1".
+
+The cadence is a divisibility test — `[#48 / N − FIX[#48 / N]] GT 0.001` — because this dialect has no MOD. Bridged
+at N=1, N=2, N=3 (= the total) and N=9 (> the total).
+
+### THE HELIX FINDING — reported, not coded around
+
+Two measurements, and together they change the plan:
+
+**(a) The tracer is FINE.** An arc whose endpoint AND centre offset come from #vars — `G2 X#41 Y0 I#40 J0` — traces
+point-for-point identically to the literal `G2 X20 Y0 I10 J0`. 37 points each. So nothing about parametric arcs is
+blocked by the sim, and that answer outlives surfacing: any future parametric arc user is safe. Asserted, so a
+regression there would be caught by this spec rather than by a wrong part.
+
+**(b) But the literal helix does not emit arcs at all.** `levelEntry('helix')` builds `helixPoints(...)` at 24
+segments per revolution and emits them as a chain of `G1 X.. Y.. Z..` moves. It is a POLYLINE APPROXIMATION of a
+helix, not a G2/G3 arc.
+
+So "move-for-move equivalence" is the wrong criterion for the helix, and this is a decision rather than a defect:
+
+1. **Match the polyline** — emit the same 24-segment approximation from a macro loop (the dialect has SIN/COS, so it
+   is possible). The bridge passes unchanged, and we have faithfully reproduced an approximation of a curve in a
+   language that can describe the curve exactly.
+2. **Emit true arcs** — G2/G3 with I/J, which the tracer handles and which is better G-code by every measure. The
+   bridge then CANNOT compare move-for-move, because the two are deliberately different; it needs a declared
+   substitute (the descent's endpoints, the radius envelope, the depth reached per revolution).
+
+I did not choose. Option 2 is plainly the better program and option 1 is the one that keeps the safety argument
+mechanical — and trading a proof shape for output quality is exactly the kind of call that should be made out loud,
+the way the coverage call was.
+
+### THE ENVELOPE
+
+`surfaceRasterCovers` now excludes exactly one thing: a non-plunge DESCENT. Every closed gap this arc has been an
+assert FLIPPED to the covered side (concentric 50-vs-36 → equality; confirm → covered) rather than deleted.
+
+RAMP is not built. It is arithmetic and I have the exact kernel (`run = drop / tan(angle)`, toward the area centre,
+degrading to a plunge with its reason when the run does not fit), but it belongs with the helix decision — they are
+one field on the form, and shipping half a descent would leave the envelope naming a mode that half-works.
+
+GATE: fast tier — 191 surfacing/cam/roundtrip specs + 71 smoke, green. 25/25 in the pilot spec.
