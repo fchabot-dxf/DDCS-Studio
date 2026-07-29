@@ -37,6 +37,27 @@ THE EXPRESSION VOCABULARY, as the evidence actually supports it:
     community document is not a test we ran. `verify/V13_trig.nc` exists to settle it on the machine; until
     someone runs it, trig WARNS (with both sides in the message) rather than erroring. An ERROR here would mean
     "will fail to parse or freeze the controller", and we do not know that.
+
+    t1341 - AND STUDIO ALREADY SHIPS ONE OF THEM, which moves V13 from curiosity to SAFETY. The alignment CAM
+    slot emits ATAN into a macro that runs on real machines: web/data/probeToSlot.js:538 writes
+        #54=ATAN[#52]/[#53]   ;angle (deg) = atan2(delta, span)
+    So this is no longer a question about a language feature we might one day want. A user's alignment result
+    depends on ATAN working, and nobody has verified that it does. If V13 comes back NO for ATAN, that slot is
+    emitting a macro whose angle is wrong or whose parse fails - which is why V13 should be run before any further
+    trig-dependent work, not after it.
+
+    THREE DISTINCT STATES, kept apart because collapsing them is how the earlier "ABS is the only demonstrated
+    function" claim happened:
+      DEMONSTRATED-in-corpus - seen in the 59 captured factory macros (ABS, the comparison words, IF/GOTO/WHILE)
+      SHIPPED-by-Studio      - Studio emits it to real machines but nobody has confirmed the controller accepts
+                               it (ATAN, via the alignment slot above) - the riskiest state of the three, because
+                               it looks like usage without being evidence
+      UNVERIFIED             - claimed by the community reference, never seen and never run (COS/SIN/SQRT/...)
+    A lint may report which state a function is in. It may NOT report a capability it has not observed.
+
+    SQRT SPECIFICALLY: the libm import table above DOES hold sqrt, so of the four it has the strongest indirect
+    case - relevant because the surfacing ramp's improvement path (a live, pendant-true entry geometry) needs a
+    square root at the machine, and today bakes its geometry instead precisely because SQRT is unverified.
   CONTROL FLOW     IF [...] GOTO<n>                DEMONSTRATED
                    WHILE [...] DO<n>               DEMONSTRATED (35 uses)
   WORD OPERATORS   EQ                              VERIFIED on machine (V10_operators.nc, 2026-06-23)

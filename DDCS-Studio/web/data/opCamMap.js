@@ -63,6 +63,24 @@ export function enumClassOf(b) {
 
 /** A def's BUILD-TIME enums as table rows: {key,label,value,options:[{value,label}]}. `params` supplies the op's current
  *  pick (else the binding default). Empty for a def with no structural enums — which is every op but Surfacing today. */
+/**
+ * t1341 — THE ENTRY GATE. A ramp or helix descent has GEOMETRY, and part of that geometry is baked at build time
+ * (the distance to the area centre, the rotation constants) because computing it live would need a square root or
+ * trig the controller has not been verified to have — see wizards/ops/surfaceraster.js.
+ *
+ * That baking is exactly right on the WIZARD path: the text is fixed at build values and stays consistent forever.
+ * It is NOT safe under a pendant. If an operator dials the stepover-% or the stepdown on a slot whose entry ramps,
+ * the raster re-derives around a descent that does not — a KINKED entry, and a possible gouge. So a slot with a
+ * ramp or helix entry marks exactly those two knobs BAKE-ONLY, with the reason on the control, and a plunge-entry
+ * slot keeps them fully exposable because a straight plunge has no geometry to kink.
+ *
+ * The improvement turn (pendant-true entries: the +X declared run vector, or live SQRT once V13 settles it) is what
+ * LIFTS this gate, and it does so with its own proof rather than by relaxing this one.
+ */
+export const ENTRY_GEOMETRY_KNOBS = ['stepoverPct', 'stepdown'];
+export const ENTRY_GATE_REASON = 'changes the entry geometry, which this descent bakes at build — baked when built';
+export const entryHasGeometry = (params) => { const e = (params && params.entry) || 'plunge'; return e === 'ramp' || e === 'helix'; };
+
 export function buildEnumFields(def, params) {
     const p = params || {};
     return ((def && def.bindings) || []).filter((b) => enumClassOf(b) === 'build').map((b) => {
@@ -381,6 +399,14 @@ export function seedFromOp(op) {
         else { const opVal = readParam(f.key); value = opVal !== undefined ? opVal : f.def; meta = { type: f.type }; }   // op value via alias, else the generator default
         return { key: f.key, label: f.label, def: f.def, value, exposed: true, bakeable: !nb.includes(f.key), ...meta };
     });
+    // t1341 — THE ENTRY GATE, applied to the generator arm's own fields: a ramp/helix slot cannot expose the knobs
+    // that move the descent's baked geometry. Grey with the reason, never hidden (postGating's rule).
+    if (entryHasGeometry(params)) {
+        for (const f of fields) {
+            if (!ENTRY_GEOMETRY_KNOBS.includes(f.key)) continue;
+            f.exposable = false; f.exposed = false; f._exposeTip = ENTRY_GATE_REASON;
+        }
+    }
     // t1323 — a BUILD enum lives on the DEF, not on the generator's field list, so it is appended on the generator arm too.
     // On this arm it is always sitting at the value that KEEPS this camType (a shape-forking pick routed to universal
     // above), so the row states the shape being built and stays greyed — informative, never a control that lies.

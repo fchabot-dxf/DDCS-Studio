@@ -460,3 +460,38 @@ test('THE RAMP BAKES ONLY WHAT CANNOT MOVE — and says what that costs', async 
     expect(body, 'a ramp that cannot fit degrades').toMatch(/GOTO 41/);
     expect(body, 'to a straight plunge, named').toMatch(/the ramp did not fit — straight plunge/);
 });
+
+/**
+ * t1341 — THE PENDANT GATE. The descent bakes part of its geometry (see rampLines); that is safe on the wizard
+ * path, where the text is fixed forever at build values, and unsafe under a pendant that can move the knobs the
+ * raster re-derives from. So a ramp/helix slot refuses to expose them — greyed with the reason, never hidden.
+ */
+test('THE ENTRY GATE — a ramp slot refuses the knobs that would kink its descent', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { seedFromOp, ENTRY_GEOMETRY_KNOBS, ENTRY_GATE_REASON } = await import('/data/opCamMap.js');
+        const base = { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, rpm: 12000 };
+        const pick = (params) => {
+            const s = seedFromOp({ opType: 'surfacing', params });
+            const out = {};
+            for (const f of (s.fields || [])) out[f.key] = { exposable: f.exposable, exposed: f.exposed, tip: f._exposeTip };
+            return out;
+        };
+        return { plunge: pick(base), ramp: pick({ ...base, entry: 'ramp', rampAngle: 3 }), helix: pick({ ...base, entry: 'helix', helixDia: 8, helixPitch: 1 }), knobs: ENTRY_GEOMETRY_KNOBS, reason: ENTRY_GATE_REASON };
+    });
+    // A PLUNGE SLOT KEEPS FULL EXPOSURE — a straight drop has no geometry to kink, so nothing is taken away
+    for (const k of r.knobs) {
+        expect(r.plunge[k].exposable, `${k} stays exposable on a plunge slot`).not.toBe(false);
+    }
+    // A RAMP OR HELIX SLOT REFUSES EXACTLY THOSE TWO, with the reason ON the control
+    for (const entry of ['ramp', 'helix']) {
+        for (const k of r.knobs) {
+            expect(r[entry][k].exposable, `${entry}: ${k} is refused`).toBe(false);
+            expect(r[entry][k].tip, `${entry}: ${k} carries the reason`).toBe(r.reason);
+        }
+        // …and NOTHING ELSE is taken away: the gate is narrow, not a blanket lockdown of the slot
+        expect(r[entry].feed.exposable, `${entry}: the feed is still the operator's`).not.toBe(false);
+        expect(r[entry].depth.exposable, `${entry}: and so is the depth`).not.toBe(false);
+    }
+    expect(r.reason, 'the reason says what and why, not just no').toMatch(/entry geometry.*baked when built/i);
+});
