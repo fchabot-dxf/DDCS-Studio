@@ -6681,3 +6681,108 @@ GATE: fast tier — 71 smoke green; 213 across surfacing/cam/as-data/corner-data
 including the pilot at 33/33 (was 32, +1 for the fold defect) and the as-data spec at 2/2 (+1 for the identity
 non-vacuity assert). Nothing emit-class changed this turn, so there is nothing here that needs the full suite —
 the switch still does, when it lands.
+
+---
+
+## t1351 — the atom absorbs its frame (Part 1 lands); Part 2 held, because the ground truth offers a third design
+
+Part 1 is done and bridged. Part 2 is NOT started, and this time the reason is neither budget nor a broken premise:
+the M350's own dumped macros contain a fact that makes the ruled design one of three rather than the only one, and
+picking between them is a machine question I cannot answer from a desk.
+
+### REACHABILITY, asked before building — both answers, both asserted
+
+**(a) Skim COMBINED with a ramp/helix entry IS reachable.** The built-in STUDIO form collects neither `zMode` nor the
+depth-entry cluster — but the TWIN's form, which is the one that opens in place, carries all of them (28 fields), and
+the stack really builds it: a skim + ramp config emits a G91 program with a ramp descent inside it. So a skim body
+that covered only the plunge descent would drop features an operator can already select. Asserted, not assumed.
+
+**(b) `surfacingStack` emits no rotation of its own — but the PROGRAM-LEVEL one reaches it, and it is worse than the
+translate.** `applyProgramTransform` rotates every line of the emitted program when an `xform` is declared. Measured
+on the parametric body at 30°: because rotation COUPLES X and Y, `rotateProgram` rewrites a move with BOTH words —
+so against expressions it does not fail to apply, it APPENDS. `G0 X0 Y#47` becomes `G0 X0 Y#47 Y0`: a second Y word
+the controller obeys. A cutting move gains an uncommanded `Y0`. The header comment gains a real axis word after its
+closing bracket. **That is injected motion, not a missed shift.** Flagged for its own ruling, not built for, per the
+dispatch. The two-sided flip is the same class failing the other way: `mirrorProgram` about X touches NOTHING in the
+parametric body (`mirrored=0`) — a silently unmirrored second side.
+
+### PART 1 — the frame is a param now, and the bridge caught something real
+
+`x0`/`y0` were always in the emitted expressions; `z0` is new and is what completes the frame — the surface the
+depths are measured down from. Every Z in the body reads `[z0 - #46]` and both clearance rapids read `z0 + clearance`.
+At the zero frame every expression collapses to exactly its old text, asserted byte-for-byte across all six
+strategy × descent combinations, so absorbing a frame costs nothing when there is no frame.
+
+Bridged against the SHIPPING placed program (`surfacingStack` at that placement — literal raster, translated by the
+place fold), at five placements × two strategies. `translateProgram` is exact on a list of numbers, which is exactly
+why it is the right reference here and the wrong mechanism there.
+
+**With no Z frame the two are identical move for move** — including the rows whose Y is a register, which is where
+t1349 measured the shear.
+
+**With a Z frame they diverge in exactly one move, and the parametric is the safe one.** The literal's opening
+clearance rapid comes from `progstart`, which sits OUTSIDE `placeonstock` and therefore never learns about `offZ`: it
+rapids to an absolute `Z<clearance>` whatever surface the op was placed on. Measured at `offZ` 6 with a 5mm
+clearance, **the shipping program rapids to Z5 with the faced surface at Z6 — it traverses to the first row one
+millimetre inside the material, then "plunges" upward to Z5.6.** The atom measures clearance from the surface it
+faces, because that is what the word means, so its first plunge starts higher and ends in the same place.
+
+I did not smooth that into an equality and I did not fix it: it is a shipping defect in the literal path, reachable
+from both forms (`offZ` is a bound param and `sf_offZ` is on the built-in form), and it is emit-class in its own
+right. **FLAGGED.** The bridge asserts the exact relationship instead — every cut ENDS where the literal's ends, one
+move differs, and at a positive `offZ` the atom starts strictly higher and never inside the work.
+
+Also closed while editing that declaration: `surfaceRasterBlock` declared 13 fields while `lines()` read 18. `entry`,
+`rampAngle`, `helixDia`, `helixPitch` and `confirmEvery` were missing entirely — inert today because the atom is not
+yet a registered block, and a guaranteed feature drop the day it round-trips through the canvas.
+
+### PART 2 — HELD, and this is the reason
+
+The ruling was the natively-relative body, and the reasoning behind it is right: a loop's deltas are runtime values,
+so there is nothing in the text to relativize. What has changed is not that argument but the option set.
+
+**`#792` — the live Z position in the ACTIVE WCS — is read inside a macro by the factory's own `gotozero.nc`:**
+
+> `IF #569<#792 GOTO1`
+
+That is macro USAGE on the real controller, from the captured SYSDISK dump — the standard the register-name memory
+demands, and the one `#1504` never met. If `#790` and `#791` hold the same way for X and Y, then **skim does not need
+a second emitter at all**: the atom reads the jog position into its frame registers at the top and runs its ORDINARY
+absolute body over a runtime `x0/y0/z0`. Skim × concentric, skim × ramp and skim × helix would all fall out of the
+code that already exists and is already bridged, instead of each needing its own G91 derivation and its own bridge.
+
+**But `#790` and `#791` appear in no captured factory macro.** Same documented family, contiguous numbering, Z proven
+— and still inference for X and Y. This arc's own discipline on unverified controller functions is settled (SQRT,
+ROUND, the trig, V13): do not build on one, write the program that settles it and let the machine answer.
+
+So I wrote it rather than just naming it: `bridge/controllers/expert-m350/verify/V14_wcs_pos.nc`, in V13's style —
+motion-free, sentinel-seeded, with the read-the-result table including what it means if the values match the MACHINE
+DRO instead of the WCS. `V7_read_dro.nc` does not answer this; it reads `#880-#882`, the machine frame, and a skim op
+needs the WCS one. FINDINGS carries the open action with `#792` tagged CONFIRMED and `#790`/`#791` TO TEST.
+
+Building the G91 body now would have been three or four turns of derivation that one two-second macro might make
+unnecessary — and building the runtime-frame version now would be building on exactly the kind of assumption this
+arc has twice refused to make.
+
+### RESTATED, NEVER DELETED
+
+The t1349 fold-defect pin is restated as the dispatch asked, and the split in it is the point: the PLACEMENT half is
+answered — not because the fold learned to carry parametric text, but because it stopped being asked to. The SKIM
+half is still the pinned defect, and its retract assert still reads as a no-op rather than flipping to an equality.
+
+The envelope grew and re-opened in the same edit. It covers the PLACED program now (proven, not widened by comment),
+and it NAMES skim again with the runtime-value reason in the words a reader needs. That is not a regression: t1345's
+empty was measured on the body alone, where skim never appears. An envelope that can only shrink is one nobody
+re-scopes.
+
+**Registers: nothing to extend, stated rather than skipped.** `z0` is baked into the emitted expressions at build
+time, not held in a register, so `RASTER_SCRATCH` is unchanged at `[[34, 49]]` and the band map needs no new data.
+The existing every-var-inside-the-declared-band assert still passes, which is what makes that claim checkable.
+
+GATE: fast tier — 71 smoke green; 236 across surfacing/cam/as-data/corner-data/atc-in-place/round-trip/depth-entry
+green, the pilot spec at 46/46 (was 33: +12 placement bridges, +2 reachability, +1 envelope scope). Emit-class but
+pre-consumer — nothing re-points yet, so the full suite remains the switch's gate rather than this turn's.
+
+One process note: a mid-turn failure of the new envelope test was a STALE mem-server serving a preloaded copy of the
+edited module, not a real failure — it passed on a fresh server. Worth remembering that the preload makes a green or
+red run only as current as the server that started it.
