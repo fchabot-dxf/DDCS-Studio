@@ -6322,3 +6322,54 @@ sim-executed polyline-vs-arc comparison inside a stated tolerance — an improve
 ### STATE
 
 No code changed this turn. The envelope still names the descent, correctly. 25/25 in the pilot spec, unchanged.
+
+---
+
+## t1339 — the ramp lands migration-true; the helix and the gate are split
+
+### THE RAMP — centre-ward, with only what cannot move baked
+
+Per the ruling. `1/tan(angle)` is baked because the angle is a form field, not a pendant knob; `toC` and the unit
+vector toward the centre are baked because computing them live needs SQRT, which is UNVERIFIED on this controller.
+The run itself stays LIVE off the per-level bite (`#49 = #43 · invTan`), so the ramp still follows the depth loop.
+
+The honest degrade survives the migration intact: when the run needed exceeds the distance to the centre, the tool
+plunges instead and the program SAYS so — the literal kernel's behaviour, not a new one.
+
+Bridged at the edges named: a 0.5° ramp that cannot fit (degrades), a 30° ramp that fits easily, and the ordinary 3°
+on a real face. All three execute move-for-move against the literal at build values.
+
+**A DIRECTION COSINE NEEDS MORE DIGITS THAN A COORDINATE.** The 3° case failed by 0.01mm on the ramp midpoint's Y —
+8.03 against 8.04 — because I rounded the baked unit vector to 3 decimals like every other number in the emit. A
+unit vector is MULTIPLIED by the run, so its rounding error is scaled by that run; 6 decimals keeps the product
+inside the emit's own rounding. Invisible in the text, caught by the bridge, and the kind of thing that would have
+shown up as a barely-off entry witness mark on a real part.
+
+### THE HAZARD REASONING, carried in the code
+
+The ruling's analysis is written where the baking happens, not just here: a baked `toC` under a pendant-edited
+stepover gives a KINKED entry, and that can only happen where a pendant edits the knob. The wizard path emits fixed
+text at build values and is consistent forever — which is exactly what makes the bridge true. So the hazard belongs
+to the CAM SLOT, and the slot gates it.
+
+### SPLIT — the helix and the pendant gate
+
+Not built this turn: the helix recurrence and the slot's bake-only gate for ramp/helix entries.
+
+The helix wants the rotation recurrence with a per-revolution re-seed and a hand-derived drift bound — the bound is
+the point of it, and deriving it properly is a piece of work, not a footnote. The gate is small but belongs WITH the
+helix, because it must cover both entry modes at once: shipping it for ramp alone would leave a helix slot exposing
+the very knobs the gate exists to refuse.
+
+The TODO for the improvement turn is now written beside the ramp, as instructed: the +X declared run vector or
+live-SQRT if V13 proves it, plus the true-arc helix with start/end points, radius envelope and depth-per-revolution.
+
+### THE TAXONOMY FIX — not found, and I looked
+
+Item 4 asked me to find where the ABS-only/trig-error claim lives and reconcile it. I searched the repo for
+`NOTRIG`, for trig error codes, and through the linter: it is not in `web/shared/js/validate/`. If it lives
+bridge-side (`ddcs_lint`) it is outside this repo's tree as checked out here. Not fixed, because I could not find the
+thing to fix — naming that is better than editing the nearest plausible file.
+
+GATE: fast tier — 195 surfacing/cam/roundtrip specs + 71 smoke, green. 29/29 in the pilot spec. The envelope still
+names the helix, correctly.
