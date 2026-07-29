@@ -221,9 +221,15 @@ if (typeof window !== 'undefined') {
     // for a workspace that has never held a bar.
     let _lastKind = null;
     try { _lastKind = isLathe() ? 'lathe' : 'mill'; } catch (_) { _lastKind = 'mill'; }
-    window.addEventListener('ddcs:machine-changed', () => {
+    window.addEventListener('ddcs:machine-changed', (e) => {
         try {
             const now = isLathe() ? 'lathe' : 'mill';
+            // t1353 — A WORKSPACE OPEN IS NOT A KIND SWITCH, and this listener could not previously tell them apart.
+            // On an open the file's own stock + slots have ALREADY been restored, so parking "what we are leaving"
+            // files the INCOMING workspace's stock under the OUTGOING kind — and the save that follows flushes the
+            // stale in-memory settings straight over the ones the restore just wrote, losing the file's declared bar.
+            // The kind is simply adopted: nothing to carry across, because nothing is being left behind.
+            if (e && e.detail && e.detail.restoring) { _lastKind = now; return; }
             if (now !== _lastKind) { applyStockForKind(_lastKind); _lastKind = now; }
             else applyLatheWorkspaceStock();
         } catch (_) {}

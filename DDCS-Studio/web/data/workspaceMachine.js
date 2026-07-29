@@ -90,8 +90,15 @@ export const toolPostSide = (m = getMachine()) => (TOOL_POSTS.includes(m && m.to
  * active controller profile, the variable family that follows it, and the UI refresh + broadcast that make the change
  * visible. This is the ONE way to change this workspace's controller, so an open, an import and the Settings dropdown
  * all land in the same state. (The Settings dropdown passes false: it has already applied the controller itself.)
+ *
+ * t1353 — `opts.restoring` DECLARES THAT THIS IS A WORKSPACE OPEN, NOT A KIND SWITCH, and it rides on the event so
+ * listeners can tell the two apart. They are opposite situations wearing the same shape: a SWITCH means "the same
+ * workspace is now a different machine — carry my work across", while an OPEN means "this is a different workspace
+ * entirely — its state has already arrived, do not carry anything into it." A listener that cannot tell them apart
+ * reacts to an open by migrating the OLD session's state over the file's, which is how a lathe file's own bar ended
+ * up replaced by the default one. See the stock-parking spec for the measurement.
  */
-export function setMachine(next, applyController = true) {
+export function setMachine(next, applyController = true, opts = {}) {
     const cur = getMachine();
     const rec = {
         name: String((next && next.name) != null ? next.name : cur.name),
@@ -113,7 +120,7 @@ export function setMachine(next, applyController = true) {
             window.dispatchEvent(new CustomEvent('ddcs:settings-changed'));
         } catch (_) {}
     }
-    try { window.dispatchEvent(new CustomEvent('ddcs:machine-changed', { detail: rec })); } catch (_) {}
+    try { window.dispatchEvent(new CustomEvent('ddcs:machine-changed', { detail: { ...rec, restoring: !!(opts && opts.restoring) } })); } catch (_) {}
     return rec;
 }
 

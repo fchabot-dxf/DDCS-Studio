@@ -18,12 +18,69 @@ const numAfter = (line, letter) => {
 };
 
 /**
+ * t1353 — THE PARAMETRIC-MOTION PREDICATE. One source, declared beside the transforms that consult it.
+ *
+ * Every transform in this file works the same way: find a number after an axis letter, replace it with another number.
+ * That is exact on a program whose coordinates ARE numbers, and it is the wrong tool entirely on one whose coordinates
+ * are macro registers or expressions — `G0 X0 Y#47`, `G1 X[0 + #40] F900`. The failure is not that the rewrite
+ * declines to apply. Measured at t1351:
+ *   TRANSLATE — rewrites the X and leaves the register Y: a HALF-SHIFTED move, so the raster shears.
+ *   ROTATE    — couples X and Y, so it APPENDS the word it could not replace: `G0 X0 Y#47` becomes `... Y#47 Y0`,
+ *               a second Y the controller obeys. That is UNCOMMANDED MOTION on a cutting line.
+ *   MIRROR    — about X it matches nothing at all, so a two-sided setup cuts the same side twice.
+ *
+ * So the transforms REFUSE such a program instead of half-transforming it. The predicate is deliberately BROAD: an
+ * axis or arc-offset word followed by `#` or `[` anywhere in the program. A false positive costs a refusal with a
+ * reason on it; a false negative costs a wrong part. Modal-position tracking means one unrewritable word poisons
+ * every later line, so program scope — not line scope — is the honest unit.
+ *
+ * IT TRACKS THE SAME EXEMPTIONS THE TRANSFORMS DO, and that is not a nicety — it is what keeps the guard from
+ * refusing programs that were never at risk. G53 machine-frame moves and G91 INCREMENTAL regions are already returned
+ * untouched by every transform above, so a register inside one cannot be half-rewritten.
+ *
+ * That exemption is load-bearing: measured across the registered ops, 24 of 54 emit a register axis word, ALL of them
+ * the probe idiom `G31 X#8 F#3` — and every one sits inside a G91 region. Without the modal tracking this predicate
+ * would refuse every probing program in the app, including the alignment rotation that exists to rotate one. With it,
+ * the count of absolute register lines in corner/edge/middle/alignment is ZERO, and the guard costs those ops nothing.
+ * A broad predicate is the safe default; a broad one that fires on the innocent is just a broken feature.
+ *
+ * @returns {{line: string, index: number, why: string}|null} the first offending line, or null when it is safe
+ */
+export function parametricMotion(gcode) {
+    const lines = String(gcode == null ? '' : gcode).split(/\r?\n/);
+    let abs = true;
+    for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
+        if (/\bG91\b/.test(raw)) abs = false;                    // incremental: every transform leaves it alone
+        if (/\bG90\b/.test(raw)) abs = true;
+        if (!abs || /\bG53\b/.test(raw)) continue;               // machine-frame / incremental: never transformed anyway
+        const code = raw.replace(/\([^)]*\)/g, '').replace(/;.*$/, '');   // a comment is not motion
+        const m = code.match(/\b([XYZIJKR])\s*([[#])/i);
+        if (!m) continue;
+        return {
+            line: raw, index: i,
+            why: `line ${i + 1} moves ${m[1].toUpperCase()} to a ${m[2] === '#' ? 'macro register' : 'runtime expression'}`
+                + ' — its value is not known until the machine runs it, so it cannot be shifted, rotated or mirrored as text.',
+        };
+    }
+    return null;
+}
+
+/** The refusal a transform returns instead of a half-applied program: the text UNCHANGED, plus the reason. */
+function refuse(gcode, hit, what, extra) {
+    return { text: String(gcode == null ? '' : gcode), refused: `${what} refused: ${hit.why}`, refusedAt: hit.index, ...extra };
+}
+
+/**
  * @param {string} gcode
  * @param {number} angleDeg  CCW degrees
  * @param {number} [px=0] @param {number} [py=0]  pivot (part datum) in the program frame
  * @returns {{ text:string, hadIncremental:boolean, rotated:number }}
  */
 export function rotateProgram(gcode, angleDeg, px = 0, py = 0) {
+    // t1353 — REFUSE rather than half-rotate. Rotation couples the axes, so a word it cannot replace is APPENDED
+    // (measured: `G0 X0 Y#47` → `... Y#47 Y0`, uncommanded motion on a cutting line).
+    { const hit = parametricMotion(gcode); if (hit) return refuse(gcode, hit, 'rotate', { hadIncremental: false, rotated: 0 }); }
     const th = (Number(angleDeg) || 0) * Math.PI / 180, cos = Math.cos(th), sin = Math.sin(th);
     const rotPt = (x, y) => [px + (x - px) * cos - (y - py) * sin, py + (x - px) * sin + (y - py) * cos];
     const rotVec = (i, j) => [i * cos - j * sin, i * sin + j * cos];
@@ -77,6 +134,9 @@ export function rotateProgram(gcode, angleDeg, px = 0, py = 0) {
  * @returns {{ text:string, mirrored:number }}
  */
 export function mirrorProgram(gcode, axis, sx = 0, sy = 0, sz = 0) {
+    // t1353 — REFUSE rather than half-mirror. A mirror that matches nothing is the worst outcome here: the second
+    // setup would cut the FIRST side again, on a part that has already been flipped in the fixture.
+    { const hit = parametricMotion(gcode); if (hit) return refuse(gcode, hit, 'mirror', { mirrored: 0 }); }
     const isX = String(axis || 'X').toUpperCase() === 'X';   // flip ABOUT X -> reflect Y; flip ABOUT Y -> reflect X
     sx = Number(sx) || 0; sy = Number(sy) || 0; sz = Number(sz) || 0;
     let abs = true, mirrored = 0;
@@ -137,6 +197,10 @@ export function relativizeProgram(gcode) {
 }
 
 export function translateProgram(gcode, dx = 0, dy = 0, dz = 0) {
+    // t1353 — REFUSE rather than half-shift. Measured: the X of a row start takes the shift and its register Y does
+    // not, so the raster shears. (The parametric surfacing atom no longer needs this path — it absorbs its own frame
+    // — but the guard has to exist BEFORE the switch makes such bodies reachable, not after.)
+    { const hit = parametricMotion(gcode); if (hit) return refuse(gcode, hit, 'translate', { hadIncremental: false, moved: 0 }); }
     dx = Number(dx) || 0; dy = Number(dy) || 0; dz = Number(dz) || 0;
     let abs = true, hadIncremental = false, moved = 0;
     const out = String(gcode == null ? '' : gcode).split(/\r?\n/).map((raw) => {

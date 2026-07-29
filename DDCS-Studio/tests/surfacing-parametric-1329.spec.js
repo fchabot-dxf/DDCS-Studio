@@ -503,12 +503,15 @@ test('THE ENTRY GATE — a ramp slot refuses the knobs that would kink its desce
 });
 
 /**
- * t1345 — THE HELIX BRIDGE, and THE ARC'S LEDGER ENTRY.
+ * t1345 · CONSOLIDATED t1353 — THE HELIX BRIDGE, and THE ARC'S LEDGER.
  *
- * ── THE ONE STATED EXCEPTION TO THE MIGRATION'S "EXACT" CLAIM ────────────────────────────────────────────────────
- * Everything else in this migration is move-for-move identical to the literal emitter. The HELIX ENTRY is not, and
- * this is the amendment to the safety argument, recorded here rather than buried:
+ * ══ THE MIGRATION'S STATED EXCEPTIONS TO ITS "EXACT" CLAIM ═══════════════════════════════════════════════════════
+ * Everything in this migration is move-for-move identical to the literal emitter EXCEPT the two entries below. They
+ * live together, in one block, deliberately: the value of a stated exception is that a reader can find ALL of them
+ * in one place and count them. An exception recorded next to whichever test happened to discover it is an exception
+ * that gets missed. Both are RULED, not assumed, and each points at the bridge that asserts it.
  *
+ * ── EXCEPTION 1 (t1343/t1345) — THE HELIX ENTRY, by at most one emit quantum ─────────────────────────────────────
  *   The helix entry differs from the literal by at most ONE EMIT QUANTUM (0.001mm) per point, ALWAYS TOWARD THE
  *   IDEAL, because the literal applies r3() to every point as it generates it and reproducing that mid-generation
  *   rounding would gate a strictly better number behind ROUND — a function this controller has not been verified
@@ -516,10 +519,24 @@ test('THE ENTRY GATE — a ramp slot refuses the knobs that would kink its desce
  *
  * The tolerance is one quantum because the emit expresses three decimals: two programs whose points sit within one
  * quantum are indistinguishable at the only precision the machine is ever told about. The measured worst case is
- * 0.00028mm — 3.5× inside it.
+ * 0.00028mm — 3.5× inside it. It licenses MAGNITUDE ONLY: count and order are still exact, and "closer to the ideal"
+ * is asserted as arithmetic rather than left as an editorial claim. Asserted by: THE HELIX BRIDGE, immediately below.
  *
- * The tolerance licenses MAGNITUDE ONLY. Count and order are still exact, and "closer to the ideal" is asserted as
- * arithmetic rather than left as an editorial claim.
+ * ── EXCEPTION 2 (t1351/t1353) — THE FIRST PLUNGE'S APPROACH HEIGHT, under a non-zero offZ ────────────────────────
+ *   With a placement offZ, the atom's first plunge STARTS higher than the literal's — and the atom is the correct
+ *   one. The literal's opening clearance rapid comes from progstart, which sits OUTSIDE placeonstock and so never
+ *   learns about offZ: it rapids to an absolute Z<clearance> whatever surface the op was placed on. Measured at
+ *   offZ 6 with a 5mm clearance, the shipping literal rapids to Z5 with the faced surface at Z6 — traversing to the
+ *   first row one millimetre INSIDE the material. The atom measures clearance from the surface it faces.
+ *
+ * THIS ONE IS NOT A TOLERANCE, and that is why it is worded differently. It is not a rounding artefact and not a
+ * magnitude the two paths merely disagree about: it is a DEFECT IN THE LITERAL that the migration declines to
+ * reproduce. USER/ADVISOR RULING (t1353): the atom is sanctioned — clearance measured from the surface it faces is
+ * what the word means — and the literal is NOT patched in the interim, because the switch retires that emitter and
+ * carries the fix with it. Every cut still ENDS where the literal's ends; exactly one move differs.
+ * Asserted by: the PLACEMENT bridges (`PLACEMENT (…) — NON-ZERO offZ …` and the negative/off-grid frames).
+ *
+ * ══ Two exceptions, both stated, both bridged. A third would need its own ruling before it could be added here. ══
  */
 test('THE HELIX BRIDGE — within one emit quantum, never farther from the ideal, and structurally identical', async ({ page }) => {
     await boot(page);
@@ -642,29 +659,34 @@ test('t1349→t1351 — the folds cannot carry parametric text: PLACEMENT answer
         const body = surfaceRasterLines({ w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 });
         const before = body.join(NL).split(NL);
         const diff = (after) => before.map((b, i) => [b, after[i]]).filter(([b, a]) => b !== a);
+        const tr = translateProgram(before.join(NL), 50, 25, 0);
         return {
-            translated: diff(translateProgram(before.join(NL), 50, 25, 0).text.split(NL)),
+            translated: diff(tr.text.split(NL)),
+            translateRefused: tr.refused || '',
+            translateMoved: tr.moved,
             relativized: diff(relativizeProgram(before.join(NL)).text.split(NL)),
             // the axis words a numeric regex is blind to — an expression or a bare register
             invisible: before.filter((l) => /[XYZ]\s*[[#]/.test(l)).length,
         };
     });
 
-    // (1) HALF A SHIFT IS NOT A SHIFT. The row start moves in X and NOT in Y, because its Y is a register (`Y#47`).
-    // A raster whose near end moves and whose far end does not is a sheared program, not a placed one.
-    const halfShifted = r.translated.find(([b]) => /G0 X0 Y#47/.test(b));
-    expect(halfShifted, 'the row-start rapid is rewritten').toBeTruthy();
-    expect(halfShifted[1], 'X takes the shift and Y — a register — does not: a HALF-SHIFTED move').toMatch(/X50 Y#47/);
-    expect(r.invisible, 'and these axis words are invisible to the rewrite entirely').toBeGreaterThan(4);
+    // (1) FLIPPED at t1353 — THE HALF-SHIFT IS GONE, AND NOT BECAUSE THE REWRITE GOT CLEVERER.
+    //
+    // This assert used to require the damage: `G0 X0 Y#47` → `G0 X50 Y#47`, the X taking the shift while the register
+    // Y did not, shearing the raster. It now requires the REFUSAL. translateProgram consults the declared
+    // parametricMotion predicate and returns the program UNTOUCHED with a reason, so there is no half-shifted move to
+    // find — and the comment it used to rewrite to a false "X110%" arrives intact too, for the same one reason.
+    expect(r.translateRefused, 'the translate REFUSES a parametric program, with a reason on the refusal').toMatch(/refused:/);
+    expect(r.translateRefused, 'and the reason names the register, not just "unsupported"').toMatch(/macro register|runtime expression/);
+    expect(r.translated, 'NOT ONE LINE is rewritten — refusing is all-or-nothing, never partial').toEqual([]);
+    expect(r.translateMoved, 'and it reports having moved nothing').toBe(0);
+    expect(r.invisible, 'the axis words a numeric regex cannot see are still there — the predicate is not vacuous').toBeGreaterThan(4);
 
-    // (2) THE SHIFT ALSO REACHES INTO A COMMENT. `numAfter` is case-insensitive, so the header's "tool Ø 12 x 60%"
-    // reads as an X word and the stepover comment is rewritten to say something false about the tool.
-    const comment = r.translated.find(([b]) => /stepover mm = tool/.test(b));
-    expect(comment, 'the stepover header comment is rewritten').toBeTruthy();
-    expect(comment[1], 'the "x 60%" in the comment was taken for an X word').toMatch(/X110%/);
-
-    // (3) SKIM IS WORSE THAN WRONG NUMBERS — it removes a retract. The inter-level `G0 Z5` becomes `G0 Z0`, because
-    // the delta is computed against a position the loop never actually holds. The tool would not lift between levels.
+    // (2) STILL PINNED — SKIM. `relativizeProgram` is deliberately NOT guarded yet: its ruling is a natively-relative
+    // body (or a runtime frame — FINDINGS/V14), and until that lands, skim surfacing keeps the literal emitter, so
+    // there is no parametric program reaching this fold in the app. The measurement stays executable meanwhile: the
+    // inter-level `G0 Z5` relativizes to `G0 Z0` — the tool would not lift between depth levels. This one SHOULD fail
+    // and be restated the day the skim body lands.
     const retract = r.relativized.find(([b]) => /clear of the work before the next level/.test(b));
     expect(retract, 'the inter-level clearance retract is rewritten').toBeTruthy();
     expect(retract[1], 'the retract between depth levels becomes a NO-OP — the tool never lifts').toMatch(/G0 Z0\b/);
@@ -797,22 +819,31 @@ test('t1351 REACHABILITY (b) — surfacingStack emits no rotation, but the PROGR
         const body = surfaceRasterLines({ w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 });
         const before = body.join(NL).split(NL);
         const changed = (after) => before.map((b, i) => [b, after[i]]).filter(([b, a]) => b !== a);
+        const rot = rotateProgram(before.join(NL), 30, 0, 0);
+        const mir = mirrorProgram(before.join(NL), 'X', 200, 150, 25);
         return {
             types,
-            rotated: changed(rotateProgram(before.join(NL), 30, 0, 0).text.split(NL)),
-            mirroredX: mirrorProgram(before.join(NL), 'X', 200, 150, 25).mirrored,
+            rotated: changed(rot.text.split(NL)), rotRefused: rot.refused || '', rotCount: rot.rotated,
+            mirrored: changed(mir.text.split(NL)), mirRefused: mir.refused || '', mirroredX: mir.mirrored,
         };
     });
     // The op's OWN stack carries no rotation — so nothing surfacing builds needs a rotated frame.
     expect(r.types, 'surfacingStack emits no rotate/xform of its own').not.toContain('rotate');
     expect(r.types, 'nor a program-transform declaration').not.toContain('xform');
-    // But the program-level declaration rotates EVERY line of the emitted program (applyProgramTransform), so it does
-    // reach a surfacing op sitting in such a program. Measured, so the flag is not a guess:
-    const dupY = r.rotated.find(([, a]) => /Y#47 Y0/.test(a));
-    expect(dupY, 'a rotated row-start gains a SECOND Y word — the register Y, then a literal Y0 the controller obeys').toBeTruthy();
-    const cutMove = r.rotated.find(([b]) => /^\s*G1 X0 F900/.test(b));
-    expect(cutMove[1], 'and a cutting move gains an uncommanded Y0').toMatch(/Y0\s*$/);
-    // The two-sided flip is the same class, failing the other way: about X it matches NOTHING, so a mirrored setup
-    // would cut the same side twice rather than cut the wrong place.
-    expect(r.mirroredX, 'mirror about X touches no word of the parametric body at all — a silent no-op').toBe(0);
+
+    // FLIPPED at t1353 — the program-level rotation still REACHES a surfacing op (applyProgramTransform rotates every
+    // line of the emitted program), and that has not changed. What changed is what it DOES when it gets there.
+    //
+    // It used to APPEND: `G0 X0 Y#47` became `G0 X0 Y#47 Y0`, because rotation couples the axes and rewrites a move
+    // with BOTH words — so a word it could not replace was added alongside the one it could. A second Y the
+    // controller obeys, on a cutting line, is uncommanded motion, which is why this was flagged rather than absorbed
+    // like the placement was. Now it refuses the whole program and touches nothing.
+    expect(r.rotRefused, 'a rotation REFUSES a parametric program, with its reason').toMatch(/rotate refused:/);
+    expect(r.rotated, 'and appends nothing — no line is touched at all').toEqual([]);
+    expect(r.rotCount, 'nothing rotated').toBe(0);
+    // The two-sided flip failed the OTHER way — about X it matched nothing, so a mirrored setup would have cut the
+    // first side twice on an already-flipped part. Silence is the worst refusal, so now it says so out loud.
+    expect(r.mirRefused, 'the mirror refuses too, rather than silently not mirroring').toMatch(/mirror refused:/);
+    expect(r.mirrored, 'touching nothing').toEqual([]);
+    expect(r.mirroredX, 'and reporting zero mirrored words — the same number as before, now with a reason attached').toBe(0);
 });

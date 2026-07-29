@@ -123,6 +123,22 @@ export function placeShiftOfStack(blocks, bboxOverride = null) {
     return placeShiftFromParams(resolveParams(place.params, scope), bboxOverride || liveExtent(place.children, scope));
 }
 
+/**
+ * t1353 — A REFUSED TRANSFORM MUST NOT VANISH. The whole-program transforms refuse a program carrying parametric
+ * motion (registers/expressions in absolute axis words) rather than half-applying one — see parametricMotion in
+ * data/rotateProgram.js for the three measured failure modes. Refusing is the safe act; refusing INVISIBLY is not,
+ * because the caller asked for a placement/rotation/mirror and would otherwise believe it happened.
+ *
+ * This is the console for now, deliberately: measured across every registered op there is currently NO absolute
+ * register axis word anywhere, so the guard cannot fire in the running app until the switch makes parametric bodies
+ * reachable. A preflight/lint surface is the right home the moment it CAN fire — building that UI for a condition
+ * nothing can reach yet would be machinery ahead of its case.
+ */
+function reportRefusal(res, what) {
+    if (res && res.refused) { try { console.warn('[DDCS] ' + what + ' skipped — ' + res.refused); } catch (_) { /* no console */ } }
+    return res;
+}
+
 /** Recursive fold → tagged lines. `anc` = ancestry of block ids; `scope` = the variable environment. */
 function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dialect = DEFAULT_DIALECT) {
     const def = BLOCKS[block.type];
@@ -222,7 +238,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         // so the placement tracks the pattern (one source of truth). Falls back to the snapshot for un-migrated ops.
         const s = placeShiftFromParams(p, liveExtent(block.children, scope));
         if (!s.x && !s.y && !s.z) return inner;
-        const moved = translateProgram(inner.map((t) => t.line).join('\n'), s.x, s.y, s.z).text.split('\n');
+        const moved = reportRefusal(translateProgram(inner.map((t) => t.line).join('\n'), s.x, s.y, s.z), 'place-on-stock').text.split('\n');
         return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 translate)
     }
 
@@ -231,7 +247,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect)));
         const ang = num(p.angle, 0), px = num(p.pivotX, 0), py = num(p.pivotY, 0);
         if (!ang) return inner;                // 0° → pass through untouched
-        const moved = rotateProgram(inner.map((t) => t.line).join('\n'), ang, px, py).text.split('\n');
+        const moved = reportRefusal(rotateProgram(inner.map((t) => t.line).join('\n'), ang, px, py), 'rotate block').text.split('\n');
         return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 rotate)
     }
 
@@ -373,7 +389,7 @@ function applyEntryWaypoint(T, blocks) {
 function applyProgramTransform(T, blocks) {
     const { angle, pivotX, pivotY } = programRotation(blocks);
     if (!angle) return;   // 0° / none → the emit is byte-identical to the un-rotated program
-    const rotated = rotateProgram(T.map((t) => t.line).join('\n'), angle, pivotX, pivotY).text.split('\n');
+    const rotated = reportRefusal(rotateProgram(T.map((t) => t.line).join('\n'), angle, pivotX, pivotY), 'program rotation').text.split('\n');
     for (let i = 0; i < T.length && i < rotated.length; i++) T[i].line = rotated[i];
 }
 
@@ -392,7 +408,7 @@ function applySetupFlips(T, opRanges, blocks, settings) {
         if (s == null || e <= s) return;                          // an empty setup → nothing to mirror
         const seg = [];
         for (let k = s; k < e; k++) seg.push(T[k].line);
-        const out = mirrorProgram(seg.join('\n'), axis, stock.x, stock.y, stock.z).text.split('\n');
+        const out = reportRefusal(mirrorProgram(seg.join('\n'), axis, stock.x, stock.y, stock.z), 'two-sided flip').text.split('\n');
         for (let k = s; k < e && (k - s) < out.length; k++) T[k].line = out[k - s];   // rewrite in place (length-preserving)
     });
 }

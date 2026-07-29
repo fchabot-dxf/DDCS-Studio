@@ -2201,6 +2201,12 @@ button.primary:hover {
 /* t1239 — the SECOND handle, below the feature canvas: it resizes the whole visual block (the handle above shares the
    space between the two previews). Always available — it is not part of the two-pane ratio, so no split-on gate. */
 .viz-split > .viz-pane-sizer { display: flex; flex: 0 0 6px; }
+/* t1353 (user-live) — THE VISUAL BLOCK IS A CONTROL SURFACE, NOT PROSE. A drag that missed the handle fell through to
+   TEXT SELECTION, and the sweep painted the selection wash across the form and both preview canvases — which is the
+   "the preview goes grey while dragging" the user reported. Nothing in here is text anybody reads by selecting it
+   (a status line, a legend, two canvases), so the surface declines to be selected and a near-miss does nothing at
+   all instead of doing something alarming. The FORM keeps its selectable text; this is scoped to the visual. */
+.wiz-visual { user-select: none; -webkit-user-select: none; }
 .viz-pane-splitter:focus-visible { outline: none; }
 .viz-pane-splitter:focus-visible .viz-pane-splitter-grip { background: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
 

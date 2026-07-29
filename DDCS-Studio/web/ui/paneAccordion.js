@@ -162,13 +162,54 @@ function updateSplitOn(split) {
  * the last pane and moves the whole visual block's HEIGHT, so the canvas can be resized from both of its edges. The
  * two are different quantities on purpose (a share vs a size) and each persists on its own.
  */
+/**
+ * t1353 (user-live) — HOW TALL THE VISUAL BLOCK IS ALLOWED TO GET, ASKED OF THE CONTAINER RATHER THAN OF A CONSTANT.
+ *
+ * VIZH_MAX is 900px, and 900 is not a fact about anybody's screen. Measured on a 1000px viewport: the visual's own
+ * host (`.wiz-2pane`) runs 90→890, so the real ceiling is 800 — and a down-drag to the constant pushed the block to
+ * 990, a hundred pixels PAST its host, which is what put the 2D canvas and the sizer itself under the CANCEL/INSERT
+ * footer. The host does not grow to accommodate it (height:100%), so the overflow is invisible to the layout and
+ * only shows up as a handle you can no longer reach.
+ *
+ * So the ceiling is DERIVED at the moment it is needed: the host's bottom minus the visual's top, less the room any
+ * sibling BELOW the visual still needs (the stacked/mobile layout puts the controls there; the side-by-side one has
+ * nothing below, and the loop then contributes zero). VIZH_MAX stays as the absolute sanity bound above that.
+ *
+ * An unmeasurable host — a hidden wizard, zero rects — yields the constant rather than a garbage clamp, so the
+ * cross-wizard sync below can safely walk every mounted visual including the ones nobody can see.
+ */
+function visualMaxHeight(visual) {
+    const host = visual && visual.parentElement;
+    if (!host) return VIZH_MAX;
+    const hb = host.getBoundingClientRect(), vb = visual.getBoundingClientRect();
+    if (!(hb.height > 0) || !(vb.width > 0)) return VIZH_MAX;   // not laid out / not visible → no opinion
+    let below = 0;
+    for (const sib of host.children) {
+        if (sib === visual) continue;
+        const sb = sib.getBoundingClientRect();
+        if (sb.height > 0 && sb.top >= vb.top + 1) below += sb.height;   // stacked layout: that room is spoken for
+    }
+    return Math.max(VIZH_MIN, Math.min(VIZH_MAX, Math.floor(hb.bottom - vb.top - below)));
+}
+
 function applyVisualHeight(h) {
     const px = h === undefined ? getVisualHeight() : h;
+    let healed = null;
     document.querySelectorAll('.wiz-visual').forEach((v) => {
         if (px == null) { v.style.removeProperty('height'); v.style.removeProperty('flex'); return; }
-        v.style.height = px + 'px';
+        // THE STORED VALUE HEALS. A 900 persisted before this fix (or saved on a taller window, or on a screen that
+        // has since been resized) must not reopen every wizard with its handle buried — so a visual that cannot take
+        // the stored height takes what it can, and the smallest such fit is written back below. Reopening broken is
+        // the part the user actually felt: the clamp alone would fix the drag and leave the damage in localStorage.
+        const cap = visualMaxHeight(v);
+        const fit = Math.min(px, cap);
+        if (fit < px) healed = healed == null ? fit : Math.min(healed, fit);
+        v.style.height = fit + 'px';
         v.style.flex = '0 0 auto';   // an explicit height only means something once it stops flexing
     });
+    // Persist the heal AFTER the layout pass, and only from a measurable visual. setVisualHeight no-ops on an
+    // unchanged value, and re-entering here with the healed number clamps to itself — so this settles, it does not loop.
+    if (healed != null && healed !== px) setVisualHeight(healed);
 }
 
 function addVisualSizer(split) {
@@ -181,7 +222,8 @@ function addVisualSizer(split) {
     sp.innerHTML = '<span class="viz-pane-splitter-grip" aria-hidden="true"></span>';
     split.appendChild(sp);   // BELOW the last pane (the feature canvas)
 
-    const heightAt = (y) => Math.max(VIZH_MIN, Math.min(VIZH_MAX, Math.round(y - visual.getBoundingClientRect().top)));
+    // The ceiling is asked of the container at DRAG TIME, not read from a constant — see visualMaxHeight.
+    const heightAt = (y) => Math.max(VIZH_MIN, Math.min(visualMaxHeight(visual), Math.round(y - visual.getBoundingClientRect().top)));
     let dragging = false, stopFollow = null;
     const onMove = (e) => { if (!dragging) return; e.preventDefault(); applyVisualHeight(heightAt(e.clientY)); };
     const onUp = (e) => {

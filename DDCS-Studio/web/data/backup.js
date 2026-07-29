@@ -65,7 +65,10 @@ export const BACKUP_STORES = [
     // Every surface reads this one string, so the wording improves everywhere at once.
     { id: 'machine', label: 'Machine identity (name + controller)', unit: 'machine',
       read: () => { try { return getMachine(); } catch (_) { return undefined; } },
-      write: (val) => { try { if (val) setMachine(val, true); } catch (_) {} },
+      // t1353 — DECLARED AS A RESTORE, not a kind switch. This row runs AFTER `settings` has been written, so any
+      // listener that reacts by migrating session state writes the OUTGOING workspace over the incoming file (settings
+      // live in an in-memory object; a listener's save() flushes the stale one straight over the restored key).
+      write: (val) => { try { if (val) setMachine(val, true, { restoring: true }); } catch (_) {} },
       clear: () => localStorage.removeItem(MACHINE_KEY),   // no record → getMachine() derives the default one
       count: (v) => (v && (v.name || v.controllerId) ? 1 : 0) },
     // t1223 — the legacy `profiles` row is GONE ([[no-legacy-burden]]). It kept a pre-t1217 profile library readable so
