@@ -41,6 +41,9 @@ const V = {
     i: '#48',        // row / ring index
     dir: '#49',      // +1 / −1 — which way this row runs (both-ways raster only)
 };
+// t1339 — the ramp's run length. It shares the direction slot: a ramp happens at the FIRST row of a level, before
+// any direction flip has been read, so the two never overlap.
+V.run = '#49';
 // The ring walk reuses one of the same slots for its inset: a ring and a row are never walked at the same time, so
 // a separate var would be a second name for one register.
 const RING_INSET = V.y;
@@ -66,7 +69,8 @@ export function surfaceRasterLines(p = {}) {
 
     // THE STRATEGY DECIDES THE WALK, under the SAME header and the SAME depth loop — the loop that counts levels
     // does not care what happens inside it, which is why adding a strategy is a new walk and not a new emitter.
-    const opts = { x0, y0, w, h, feed, plunge, clr, r3 };
+    const stepBaked = tool * pct / 100;   // the stepover AT BUILD VALUES — what the baked ramp geometry is computed for
+    const opts = { x0, y0, w, h, feed, plunge, clr, r3, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3), stepBaked };
     const walk = (p.strategy === 'concentric') ? ringWalk(opts) : rowWalk(opts);
 
     return [
@@ -117,8 +121,13 @@ export function surfaceRasterLines(p = {}) {
  * own comment says so too), so a surfacing op CANNOT emit a one-way raster and no user config reaches it. A
  * parametric one-way walk was written and then deleted — machinery for a case this op does not have.
  */
-function rowWalk({ x0, y0, feed, plunge, clr, r3 }) {
+function rowWalk({ x0, y0, w, h, feed, plunge, clr, r3, entry, rampAngle, stepBaked }) {
     void clr;
+    // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP walks toward the area centre at the declared
+    // angle and comes back. See rampLines for why toC and 1/tan are BAKED and what that costs.
+    const descent = (entry === 'ramp')
+        ? rampLines({ x0, y0, w, h, feed, plunge, rampAngle, stepBaked, r3 })
+        : [`    G1 Z[0 - ${V.z}] F${r3(plunge)}   ( the ONE plunge of this level )`];
     const count = [
         // THE ROW COUNT — not h/step rounded up. Rows sit at step/2 + i·step, so the count is how many of THOSE land
         // inside the area. The two formulas agree at 150/7.2 and 40/5 and disagree at 60/7.2 (8 rows, not 9), where
@@ -144,7 +153,7 @@ function rowWalk({ x0, y0, feed, plunge, clr, r3 }) {
         '    N17',
         `    G0 X[${r3(x0)} + ${V.w}] Y${V.y}`,
         '    N18',
-        `    G1 Z[0 - ${V.z}] F${r3(plunge)}   ( the ONE plunge of this level )`,
+        ...descent,
         '    GOTO 14',
         '    N13',
         `    G1 Y${V.y} F${r3(feed)}   ( step over at depth — the tool does not lift between rows )`,
@@ -159,6 +168,53 @@ function rowWalk({ x0, y0, feed, plunge, clr, r3 }) {
         `    ${V.i}=[${V.i} + 1]`,
         '  END2',
     ] };
+}
+
+/**
+ * THE RAMP DESCENT — toward the area centre, at the declared angle, then back to the start.
+ *
+ * WHAT IS BAKED AND WHY (the t1339 ruling, with its reasoning so the next reader does not have to reconstruct it):
+ * the run needed is `drop / tan(angle)` and the midpoint is `start + (run / toC) · (centre − start)`. `tan(angle)`
+ * is a build-time number — the angle is a form field, not a pendant knob — so `1/tan` is baked. `toC`, the distance
+ * from the ramp start to the centre, is ALSO baked, and that one has a cost worth naming: the ramp start sits at
+ * `y0 + step/2`, and `step` is the DERIVED stepover a pendant can change. Computing toC live would need SQRT, which
+ * is UNVERIFIED on this controller (the linter's word list is an allow-list, not evidence; ATAN ships in the
+ * alignment probe but proves only itself — V13_trig.nc is the decider).
+ *
+ * SO THE HAZARD IS REAL BUT BOUNDED: a baked toC under a pendant-edited stepover gives a kinked entry. It cannot
+ * happen on the WIZARD path — that text is fixed at build values and consistent forever, which is what makes the
+ * equivalence bridge true. It can only happen where a pendant edits the knob, i.e. a CAM SLOT — so the slot GATES
+ * those knobs bake-only rather than this code guessing (see the entry gate in opCamMap).
+ *
+ * TODO (improvement turn, post-switch): pendant-TRUE entries — the +X declared run vector (no square root at all,
+ * the literal kernel already supports it via runX/runY) or live-SQRT if V13 proves it; plus the true-arc helix with
+ * start/end points, radius envelope and depth-per-revolution as the substitute criteria. That turn lifts the gate.
+ */
+function rampLines({ x0, y0, w, h, feed, plunge, rampAngle, stepBaked, r3 }) {
+    const ang = Math.min(45, Math.max(0.5, rampAngle));
+    const invTan = 1 / Math.tan(ang * Math.PI / 180);
+    // the ramp starts where the plunge would: the first row, at build values
+    const sx = x0, sy = y0 + stepBaked / 2;
+    const cx = x0 + w / 2, cy = y0 + h / 2;
+    const toC = Math.hypot(cx - sx, cy - sy);
+    const ux = toC > 1e-9 ? (cx - sx) / toC : 0, uy = toC > 1e-9 ? (cy - sy) / toC : 0;
+    // A DIRECTION COSINE NEEDS MORE DIGITS THAN A COORDINATE. Rounded to 3 decimals like everything else, the ramp's
+    // midpoint landed 0.01mm off the literal's — invisible in the text, caught by the bridge. A unit vector is
+    // multiplied by the run, so its error is scaled: 6 decimals keeps the product inside the emit's own rounding.
+    const u6 = (n) => Math.round(n * 1e6) / 1e6;
+    return [
+        `    ${V.run}=[${V.stepdown} * ${r3(invTan)}]   ( ramp run = bite / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
+        // THE HONEST DEGRADE, kept from the literal kernel: when the run to the centre is longer than the distance
+        // available, a ramp cannot be cut and the tool plunges instead — with the reason in the program, not silently.
+        `    IF ${V.run} GT ${r3(toC)} GOTO 41   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
+        `    G0 Z[0 - ${V.z} + ${V.stepdown}]   ( down to the floor this level starts from )`,
+        `    G1 X[${r3(sx)} + ${V.run} * ${u6(ux)}] Y[${r3(sy)} + ${V.run} * ${u6(uy)}] Z[0 - ${V.z}] F${r3(feed)}   ( ramp )`,
+        `    G1 X${r3(sx)} Y${r3(sy)} F${r3(feed)}   ( back to the row start, now at depth )`,
+        '    GOTO 42',
+        '    N41',
+        `    G1 Z[0 - ${V.z}] F${r3(plunge)}   ( the ramp did not fit — straight plunge )`,
+        '    N42',
+    ];
 }
 
 /**

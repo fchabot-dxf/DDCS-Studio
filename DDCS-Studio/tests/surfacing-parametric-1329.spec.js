@@ -426,3 +426,37 @@ test('CONFIRM-EVERY IS INSIDE THE ENVELOPE NOW — and only the descent is left'
     expect(r.helix.covered).toBe(false);
     expect(r.ramp.why, 'the descent is the one remaining name').toMatch(/descent/i);
 });
+
+/**
+ * t1339 — THE RAMP DESCENT, migration-true at build values.
+ */
+const RAMP_CONFIGS = [
+    { name: 'RAMP — a shallow angle needs more run than the area gives (degrades to plunge, with its reason)', w: 40, h: 30, depth: 1.0, stepdown: 0.5, rampAngle: 0.5, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 },
+    { name: 'RAMP — a steep angle fits easily', w: 200, h: 150, depth: 1.0, stepdown: 0.5, rampAngle: 30, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 },
+    { name: 'RAMP — the ordinary 3 degrees on a real face', w: 200, h: 150, depth: 0.8, stepdown: 0.4, rampAngle: 3, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 },
+];
+
+for (const cfg of RAMP_CONFIGS) {
+    test(`EQUIVALENCE (ramp) — ${cfg.name}`, async ({ page }) => {
+        await boot(page);
+        const r = await bridge(page, { ...cfg, entry: 'ramp' });
+        expect(r.oldCut.length, 'the literal ramp path cuts something').toBeGreaterThan(0);
+        expect(r.newCut.length, `same number of cutting moves (literal ${r.oldCut.length}, parametric ${r.newCut.length})`).toBe(r.oldCut.length);
+        expect(r.newCut, 'and every cutting move is identical, in order — the ramp included').toEqual(r.oldCut);
+    });
+}
+
+test('THE RAMP BAKES ONLY WHAT CANNOT MOVE — and says what that costs', async ({ page }) => {
+    await boot(page);
+    const body = await page.evaluate(async () => {
+        const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+        return surfaceRasterLines({ w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, entry: 'ramp', rampAngle: 3, feed: 900, plunge: 180, clearance: 5 }).join('\n');
+    });
+    // THE RUN IS LIVE off the per-level bite; only the TANGENT is baked, because the angle is a form field and not a
+    // knob anyone can turn at the machine.
+    expect(body, 'the run is computed from the live bite').toMatch(/#49=\[#43 \* [\d.]+\]/);
+    expect(body, 'and the tangent is baked, with the reason on the line').toMatch(/tangent is baked; the angle is a form field/);
+    // THE HONEST DEGRADE survives the migration: when the run does not fit, the tool plunges and the program says so
+    expect(body, 'a ramp that cannot fit degrades').toMatch(/GOTO 41/);
+    expect(body, 'to a straight plunge, named').toMatch(/the ramp did not fit — straight plunge/);
+});
