@@ -579,22 +579,61 @@ test('THE ENVELOPE IS EMPTY — every strategy and every descent is covered, and
 });
 
 /**
- * t1349 — THE ENVELOPE IS ABOUT THE BODY. THE TWO FOLDS THAT WRAP IT DO NOT SURVIVE IT — and that is what actually
- * blocks the switch.
+ * t1351 — THE ENVELOPE'S SCOPE GREW, AND IT RE-OPENED ONE NAME. Both halves matter.
  *
- * Every bridge in this file frames the parametric body at the WCS origin: `['G90', ...surfaceRasterLines(cfg), 'M30']`.
- * That is the right frame for proving the RASTER, and it is why the envelope above is honestly empty. But the real
- * stack does not run the body bare — `surfacingStack` wraps it in `placeonstock` (Normal) or `skim` (Skim Z-mode),
- * and BOTH of those folds work by REWRITING THE EMITTED TEXT: `translateProgram` adds a shift to each axis word,
- * `relativizeProgram` rewrites each absolute word as a delta from the running position.
+ * GREW: it used to be honest only about the bare body. The atom now carries its own frame, so a PLACED op is inside
+ * it — proven by the placement bridges above, not by widening a comment.
+ *
+ * RE-OPENED: SKIM is named again. That is not the envelope regressing — it is the envelope finally being asked the
+ * right question. t1345's empty was measured on the body alone, where skim never appears; at full-program scope skim
+ * is a genuinely different emit and pretending otherwise is how a feature vanishes on the day the old path dies.
+ * An envelope that can only ever shrink is one nobody re-scopes, and this arc's rule is the opposite: every `false`
+ * here is a promise that something still needs its bridge.
+ */
+test('t1351 — the envelope covers the PLACED program, and names SKIM as the one that still needs its own body', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfaceRasterCovers, surfaceRasterGap } = await import('/wizards/ops/surfaceraster.js');
+        const probe = (c) => ({ covered: surfaceRasterCovers(c), why: surfaceRasterGap(c) });
+        return {
+            placed: probe({ x: 50, y: 25, z0: 3 }),
+            placedConcentric: probe({ x: -30, y: -12, z0: -2, strategy: 'concentric' }),
+            skim: probe({ zMode: 'skim' }),
+            skimRamp: probe({ zMode: 'skim', entry: 'ramp', rampAngle: 3 }),
+            normal: probe({ zMode: 'normal' }),
+        };
+    });
+    // PLACED is in, at both strategies and at a real three-axis frame.
+    expect(r.placed.covered, 'a placed op is inside the envelope').toBe(true);
+    expect(r.placed.why, 'and names no gap').toBe('');
+    expect(r.placedConcentric.covered, 'concentric too, at a negative frame').toBe(true);
+    expect(r.normal.covered, 'an explicit Normal Z-mode is in').toBe(true);
+    // SKIM is out, and says WHY in the words a reader needs — never a bare false.
+    expect(r.skim.covered, 'skim is NOT covered').toBe(false);
+    expect(r.skim.why, 'and the reason names the runtime-value problem, not just "unsupported"').toMatch(/runtime values/);
+    expect(r.skimRamp.covered, 'skim with a ramp descent is out for the same reason').toBe(false);
+});
+
+/**
+ * t1349 → RESTATED t1351 — WHY THE ATOM ABSORBS ITS OWN FRAME.
+ *
+ * This began as "the folds block the switch". Half of it is now ANSWERED rather than fixed, and the distinction is
+ * the whole ruling: the placement fold never learned to carry parametric text — it STOPPED BEING ASKED TO. The atom
+ * takes the shift as params (x0/y0/z0) and emits it into its own expressions, proven by the PLACEMENT bridges above.
+ * So what follows is no longer a blocker for placement; it is the MEASUREMENT that says why absorbing beats rewriting,
+ * kept executable so the reasoning cannot rot into a comment nobody re-checks.
+ *
+ * THE SKIM HALF IS STILL OPEN, and still blocks. `relativizeProgram` is not a rewrite that could be taught better:
+ * the deltas of a loop are runtime values, so there is nothing in the text to rewrite. That is why the ruling for
+ * skim is a natively-relative body (or a runtime frame read from the controller — see FINDINGS / V14_wcs_pos.nc),
+ * and why the retract assert below is still the pinned defect rather than a flipped equality.
  *
  * A literal raster is a list of numbers, so a text rewrite is exact on it. A parametric raster is expressions and
  * macro registers, and a numeric regex cannot see them — so the rewrite lands on SOME of the axis words and not
  * others, which is worse than landing on none. These asserts record the measured behaviour, at the values it was
- * measured with. THEY DOCUMENT A DEFECT: the day the placement fold learns to carry a parametric body, this test
- * SHOULD fail and be restated as the fixed truth (the t1315/t1317 precedent).
+ * measured with, and the skim ones SHOULD fail and be restated the day the skim body lands (t1315/t1317 precedent).
  */
-test('t1349 — THE PLACEMENT AND SKIM FOLDS CANNOT CARRY A PARAMETRIC BODY (documents a defect; fix it and restate)', async ({ page }) => {
+test('t1349→t1351 — the folds cannot carry parametric text: PLACEMENT answered by absorption, SKIM still open', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
@@ -629,4 +668,151 @@ test('t1349 — THE PLACEMENT AND SKIM FOLDS CANNOT CARRY A PARAMETRIC BODY (doc
     const retract = r.relativized.find(([b]) => /clear of the work before the next level/.test(b));
     expect(retract, 'the inter-level clearance retract is rewritten').toBeTruthy();
     expect(retract[1], 'the retract between depth levels becomes a NO-OP — the tool never lifts').toMatch(/G0 Z0\b/);
+});
+
+/**
+ * t1351 PART 1 — THE ATOM ABSORBS ITS PLACEMENT, and the bridge is against the SHIPPING placed program.
+ *
+ * The ruling (Fork A): the placement stops being applied to the emitted TEXT and becomes PARAMS the body already
+ * speaks — x0/y0 were always there, z0 is new. The FOLD side (placeonstock passing values instead of rewriting)
+ * lands with the re-point; what is proven here is that the atom, given the shift as params, emits the same cut the
+ * literal path emits when placeonstock translates it.
+ *
+ * The reference is deliberately NOT a hand-built expectation: it is `surfacingStack` at that placement, which is the
+ * program that ships today — literal raster, translated by the place fold. translateProgram is EXACT on a list of
+ * numbers, which is precisely why it is trustworthy here and untrustworthy on the parametric body.
+ */
+const PLACEMENTS = [
+    // the config t1349 measured the corruption at, now required to agree
+    { name: 'the measured 200x150 at (50, 25)', dx: 50, dy: 25, dz: 0 },
+    { name: 'NON-ZERO offZ — the frame the atom had no param for until now', dx: 0, dy: 0, dz: 3 },
+    { name: 'a NEGATIVE shift on all three axes', dx: -30, dy: -12, dz: -2 },
+    { name: 'all three at once, off-grid', dx: 17.5, dy: -6.25, dz: 1.5 },
+    { name: 'ZERO shift — the degenerate anchor', dx: 0, dy: 0, dz: 0 },
+];
+
+for (const P of PLACEMENTS) {
+    for (const strategy of ['parallel', 'concentric']) {
+        test(`PLACEMENT (${strategy}) — ${P.name}`, async ({ page }) => {
+            await boot(page);
+            const r = await page.evaluate(async ({ P, strategy }) => {
+                const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+                const { emitProgram } = await import('/blocks/blockEmitter.js');
+                const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+                const { traceToolpath } = await import('/engine/trace.js');
+                const NL = String.fromCharCode(10);
+                const base = { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, strategy };
+
+                // THE SHIPPING PATH: the literal raster, PLACED by the fold (originX/originY/offZ → placementShift).
+                const literal = String(emitProgram(surfacingStack({ ...base, originX: P.dx, originY: P.dy, offZ: P.dz })));
+                // THE ATOM PATH: the same shift handed in as params, absorbed into the emitted expressions.
+                const parametric = ['G90', ...surfaceRasterLines({ ...base, x: P.dx, y: P.dy, z0: P.dz }), 'M30'].join(NL);
+
+                const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid)
+                    .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3)]);
+
+                return {
+                    litCut: cut(literal), parCut: cut(parametric),
+                    // the degenerate anchor, asserted as TEXT: a zero frame must change nothing at all
+                    bareIdentical: surfaceRasterLines(base).join(NL) === surfaceRasterLines({ ...base, x: 0, y: 0, z0: 0 }).join(NL),
+                    // the header comment states a fact about the TOOL; the text rewrite mangled it (t1349), params cannot
+                    header: (surfaceRasterLines({ ...base, x: P.dx, y: P.dy, z0: P.dz }).find((l) => /stepover mm = tool/.test(l)) || ''),
+                };
+            }, { P, strategy });
+
+            expect(r.litCut.length, 'the placed literal really cuts').toBeGreaterThan(0);
+            expect(r.parCut.length, `same number of cutting moves (literal ${r.litCut.length}, parametric ${r.parCut.length})`).toBe(r.litCut.length);
+            expect(r.bareIdentical, 'the ZERO frame is byte-identical to the bare body — placement adds nothing when there is none').toBe(true);
+            // …and the comment arrives intact, saying the true thing about the tool.
+            expect(r.header, 'the stepover header comment is untouched by placement').toMatch(/tool Ø 12 x 60%/);
+
+            // EVERY CUT ENDS WHERE THE LITERAL'S DOES — the geometry claim, and the one the t1349 shear broke.
+            expect(r.parCut.map((m) => m.slice(3)), 'every cutting move ENDS at the literal’s point, in order').toEqual(r.litCut.map((m) => m.slice(3)));
+
+            const differing = r.litCut.map((m, i) => i).filter((i) => JSON.stringify(r.litCut[i]) !== JSON.stringify(r.parCut[i]));
+            if (!P.dz) {
+                // NO Z FRAME → POINT FOR POINT, IN ORDER. This is the migration claim proper, and it covers the rows
+                // whose Y is a register — exactly where the text rewrite produced a half-shifted move and sheared the raster.
+                expect(differing, 'with no Z frame the two are identical move for move').toEqual([]);
+            } else {
+                // A Z FRAME DIVERGES IN EXACTLY ONE PLACE, AND THE PARAMETRIC IS THE SAFE ONE.
+                //
+                // The literal's opening clearance rapid comes from PROGSTART, which sits OUTSIDE placeonstock and so
+                // never learns about offZ: it rapids to an absolute Z<clearance> whatever surface the op was placed on.
+                // The atom measures its clearance from the surface it faces (z0 + clearance), because that is what the
+                // word means. So the first plunge STARTS higher on the atom path and ends in the same place.
+                //
+                // THAT DIFFERENCE IS NOT A ROUNDING ARTEFACT AND IT IS NOT THE ATOM'S BUG — measured at offZ 6 with a
+                // 5mm clearance, the shipping literal rapids to Z5 with the faced surface at Z6 and traverses to the
+                // first row ONE MILLIMETRE INSIDE THE MATERIAL, then "plunges" upward to Z5.6. Flagged for its own
+                // ruling; asserted here so the difference is stated rather than smoothed over.
+                expect(differing, 'exactly one move differs, and it is the first plunge').toEqual([0]);
+                expect(r.parCut[0].slice(0, 2), 'which starts at the same XY').toEqual(r.litCut[0].slice(0, 2));
+                expect(r.parCut[0][2], 'the atom approaches from surface + clearance').toBeCloseTo(P.dz + 5, 3);
+                expect(r.litCut[0][2], 'the literal approaches from an offZ-blind absolute clearance').toBeCloseTo(5, 3);
+                if (P.dz > 0) expect(r.parCut[0][2], 'so at a positive offZ the atom starts strictly higher — never inside the work').toBeGreaterThan(r.litCut[0][2]);
+            }
+        });
+    }
+}
+
+/**
+ * t1351 REACHABILITY — asked BEFORE building, because building for an unreachable case is machinery and missing a
+ * reachable one is a dropped feature. Both answers are asserted here rather than remembered.
+ */
+test('t1351 REACHABILITY (a) — SKIM combined with a ramp/helix entry IS reachable, so the skim body must cover it', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfacingDataDef } = await import('/blocks/dataOps/surfacingData.js');
+        const def = surfacingDataDef();
+        const params = (def.bindings || []).map((b) => b.param);
+        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        // and it is not merely a form pairing — the stack really builds it
+        const txt = String(emitProgram(surfacingStack({ w: 80, h: 40, depth: 0.8, stepdown: 0.4, toolDia: 8, stepoverPct: 50, zMode: 'skim', entry: 'ramp', rampAngle: 3, feed: 800, plunge: 150, clearance: 4 })));
+        return { hasZMode: params.includes('zMode'), hasEntry: params.includes('entry'), hasRamp: params.includes('rampAngle'), hasHelix: params.includes('helixPitch'), skimRamp: /G91/.test(txt) && /ramp/i.test(txt) };
+    });
+    // The TWIN's form (the shipped in-place surfacing form) carries the Z-mode AND the depth-entry cluster, so an
+    // operator can select Skim and Ramp together. This is why part 2 covers the descents rather than excluding them.
+    expect(r.hasZMode, 'the form offers Z-mode').toBe(true);
+    expect(r.hasEntry && r.hasRamp && r.hasHelix, 'and the depth-entry cluster alongside it').toBe(true);
+    expect(r.skimRamp, 'and the stack really emits a RELATIVE program with a ramp descent in it').toBe(true);
+});
+
+/**
+ * (b) ROTATION — surfacingStack does NOT rotate, but the PROGRAM-LEVEL declaration reaches it, and the damage is a
+ * different and worse class than the translate. FLAGGED FOR ITS OWN RULING, deliberately NOT built for: rotation
+ * couples X and Y, so rotateProgram rewrites a move with BOTH words — and against expressions and registers that
+ * does not fail to apply, it APPENDS. A duplicate `Y0` on a cutting move is uncommanded motion, not a missed shift.
+ */
+test('t1351 REACHABILITY (b) — surfacingStack emits no rotation, but the PROGRAM-level one reaches the body (flagged, not built)', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { rotateProgram, mirrorProgram } = await import('/data/rotateProgram.js');
+        const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+        const NL = String.fromCharCode(10);
+        const flat = (bs, out = []) => { for (const b of (bs || [])) { if (!b) continue; out.push(b.type); flat(b.children, out); } return out; };
+        const types = flat(surfacingStack({ w: 100, h: 80, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, originX: 20, offZ: 2 }));
+        const body = surfaceRasterLines({ w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 });
+        const before = body.join(NL).split(NL);
+        const changed = (after) => before.map((b, i) => [b, after[i]]).filter(([b, a]) => b !== a);
+        return {
+            types,
+            rotated: changed(rotateProgram(before.join(NL), 30, 0, 0).text.split(NL)),
+            mirroredX: mirrorProgram(before.join(NL), 'X', 200, 150, 25).mirrored,
+        };
+    });
+    // The op's OWN stack carries no rotation — so nothing surfacing builds needs a rotated frame.
+    expect(r.types, 'surfacingStack emits no rotate/xform of its own').not.toContain('rotate');
+    expect(r.types, 'nor a program-transform declaration').not.toContain('xform');
+    // But the program-level declaration rotates EVERY line of the emitted program (applyProgramTransform), so it does
+    // reach a surfacing op sitting in such a program. Measured, so the flag is not a guess:
+    const dupY = r.rotated.find(([, a]) => /Y#47 Y0/.test(a));
+    expect(dupY, 'a rotated row-start gains a SECOND Y word — the register Y, then a literal Y0 the controller obeys').toBeTruthy();
+    const cutMove = r.rotated.find(([b]) => /^\s*G1 X0 F900/.test(b));
+    expect(cutMove[1], 'and a cutting move gains an uncommanded Y0').toMatch(/Y0\s*$/);
+    // The two-sided flip is the same class, failing the other way: about X it matches NOTHING, so a mirrored setup
+    // would cut the same side twice rather than cut the wrong place.
+    expect(r.mirroredX, 'mirror about X touches no word of the parametric body at all — a silent no-op').toBe(0);
 });

@@ -611,5 +611,13 @@ section) — so once indices are known, "push config to the controller" becomes 
       wrote no offset and **moved the axis** (X 5.000→73.286). Do NOT narrow `W-G10` — **harden it: forbid
       `G10 L20/L2` with axis words.** Still open: re-examine why `key-5/6.nc` & `3D PROBE G55.nc` use it (latent
       bug vs zero-distance context). See the "V1 RESULT" section above.
+- [ ] **[TO TEST] Can a macro read the live WORKPIECE-coordinate position (`#790` X / `#791` Y / `#792` Z)?**
+      `#792` is **[CONFIRMED]** by the factory's own `gotozero.nc` (`IF #569<#792 GOTO1`) — macro usage, not just a
+      variable-list name. `#790`/`#791` appear in **no** captured factory macro: same documented family, contiguous
+      numbering, Z proven, X/Y still inference. Note `V7_read_dro.nc` does **not** answer this — it reads `#880-#882`,
+      the *machine* DRO; `#790-#792` are the position in the *active WCS*, which is the frame a jog-referenced
+      (skim) op needs. Run `verify/V14_wcs_pos.nc` (motion-free) and record the result here.
+      **Why it matters:** if X/Y read true, a parametric op can carry a runtime frame in registers and reuse its
+      ordinary absolute body for skim, instead of needing a second G91-relative emitter.
 - [ ] Find the system var holding the live alarm code → log *which* error.
 - [ ] Port the V4.1 `M47` dispatcher to `sysstart.nc` here (file-reload trick over SMB) — **safety first** (E-stop).
