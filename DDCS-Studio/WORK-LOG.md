@@ -6786,3 +6786,109 @@ pre-consumer — nothing re-points yet, so the full suite remains the switch's g
 One process note: a mid-turn failure of the new envelope test was a STALE mem-server serving a preloaded copy of the
 edited module, not a real failure — it passed on a fresh server. Worth remembering that the preload makes a green or
 red run only as current as the server that started it.
+
+---
+
+## t1353 — the lighter turn: a sizer that stays reachable, a guard that refuses, and a stock leak whose cause was not where it showed
+
+Four parts, all landed. The third one turned out to be bigger than the symptom that was reported, and the second one
+turned out to need a narrower predicate than the flag that asked for it.
+
+### (1) THE BOTTOM SIZER — measured first, because the constant was the whole bug
+
+`VIZH_MAX` was 900px, and 900 is not a fact about anybody's screen. Measured on a 1000px viewport: the visual's host
+runs 90→890, so the real ceiling is 800 — and a down-drag to the constant put the block at 990, **a hundred pixels
+past its host**, which is what pushed the 2D canvas and the sizer itself under the CANCEL/INSERT footer. The host has
+`height:100%` and does not grow, so the overflow was invisible to the layout and showed up only as a handle nobody
+could reach again.
+
+The ceiling is DERIVED now, at the moment it is needed: the host's bottom minus the visual's top, less the room any
+sibling BELOW the visual still needs (the stacked layout puts the controls there; side-by-side has nothing below and
+that loop contributes zero). An unmeasurable host — a hidden wizard, zero rects — yields the constant rather than a
+garbage clamp, so the cross-wizard sync can safely walk every mounted visual.
+
+**And the stored value HEALS, which is the half the user actually felt.** A clamp alone fixes the drag and leaves the
+900 in localStorage forever, so every wizard still reopens with the handle buried. `applyVisualHeight` now gives each
+visual what it can take and writes the smallest such fit back. Seeded with a poisoned 900, the twin reopens at 800
+with the handle reachable and nothing dragged first.
+
+The second root was separate: a drag that missed fell through to TEXT SELECTION, and the sweep painted the selection
+wash across the form and both canvases — **that wash is the "grey"**. The visual block declines to be selected now;
+nothing in it is text anybody reads by selecting it, and the form keeps its selectable text.
+
+**The hit target was NOT the 6px the flag assumed** — measured 29px, because the sizer already inherits the splitter's
+::before overlay. It is biased upward, since the handle sits flush with the block's bottom edge and there is no room
+below to claim; the realistic miss is from above anyway. So I did not widen it: the only thing widening could do here
+is steal drags from the 2D canvas's own handles. Pinned at ≥24px so a future CSS change cannot quietly return it to 6.
+
+### (2) THE TRANSFORM REFUSE-GUARD — and the exemption that makes it usable
+
+`parametricMotion` is one declared predicate beside the transforms that consult it: an axis or arc-offset word
+followed by `#` or `[`. rotate, mirror and translate refuse such a program outright, returning it untouched with the
+reason attached — all-or-nothing, because a partially-transformed program is worse than an untransformed one: it
+looks like it worked.
+
+**The measurement that changed the design.** A predicate that only asked "is there a register in an axis word" would
+have been correct and useless: 24 of the 54 registered ops emit one, every single one the probe idiom `G31 X#8 F#3`.
+Refusing those would have broken every probing program in the app — including the alignment rotation that exists to
+rotate one. But every one of those registers sits inside a **G91** region, and every transform already returns G91
+and G53 lines untouched, so they were never at risk of a half-rewrite. The predicate tracks the same modal state the
+transforms do, and the measured count of absolute register lines across corner/edge/middle/alignment is **zero** —
+the guard costs those ops nothing. That exemption is asserted, with a non-vacuity check that they really do emit
+probe moves, so nobody later widens it into a blanket refusal.
+
+A refusal must not vanish, either: the four call sites in the emitter report it rather than silently no-op-ing. The
+console is deliberate for now — the guard cannot fire in the running app until the switch makes parametric bodies
+reachable, and building a preflight surface for an unreachable condition is machinery ahead of its case.
+
+The reachability-(b) asserts are FLIPPED, not deleted: they used to require the damage (`G0 X0 Y#47` → `... Y#47 Y0`,
+an uncommanded second Y on a cutting line) and now require the refusal. The t1349 translate half flips the same way.
+**The skim half stays pinned** — `relativizeProgram` is deliberately unguarded, because its ruling is a natively-
+relative body and until that lands there is no parametric program reaching that fold.
+
+### (3) STOCK-PARKING — HYPOTHESIS B, and the cause is not the stock
+
+Hypothesis A (pre-fix damage preserved in stored state) **DIED**: the leak reproduces from a clean state, so no
+historical damage is needed to explain it. Hypothesis B lives, and the path is not where the symptom is.
+
+A workspace open restores `settings` FIRST (which carries `stock` and `stockByKind`) and the `machine` row SECOND.
+The machine row calls `setMachine`, which fires `ddcs:machine-changed`, which runs `applyStockForKind` — and that
+parks "what we are leaving" into the outgoing kind's slot. **On an open there is nothing being left**: settings have
+already been replaced, so the listener migrates the incoming workspace's state as though it were the outgoing one.
+
+And the damage is larger than a mis-filed slot. Settings live in an IN-MEMORY object; the restore writes localStorage.
+So when the listener finishes and calls `ddcsSaveSettings()`, it flushes the STALE in-memory settings straight over
+the ones the restore just wrote. Measured, through the real open flow including its reload: opening a lathe workspace
+whose file declares a Ø33 bar left the app showing **the DEFAULT Ø25 bar** — the file's declared bar silently
+discarded, which is precisely the t1313 rule ("a declared bar is never silently retyped") being broken by the open.
+
+My first attempt at this test passed, and was wrong: it skipped the reload, so it measured a state the user never
+sees. The real flow reloads, and the reload is what makes the clobbered settings the ones the app then runs on.
+
+**The fix is at the seam, not the symptom:** `setMachine` takes `opts.restoring` and puts it on the event, so a
+listener can tell a workspace OPEN from a kind SWITCH. They are opposite situations wearing the same shape — a switch
+means "carry my work across", an open means "its state has already arrived, carry nothing into it". The parking
+listener adopts the kind and returns. The file's Ø33 bar now survives the open and the mill slot is untouched.
+
+The kind-switch feature itself is asserted separately and still works both ways: leaving the mill parks its box,
+returning restores it, and a declared bar survives the round trip unretyped.
+
+### (4) THE LEDGER, CONSOLIDATED
+
+The offZ divergence joins the helix entry in ONE block, as ruled. Worded differently on purpose: the helix is a
+TOLERANCE (one emit quantum, always toward the ideal), while offZ is not a tolerance at all — it is a defect in the
+literal that the migration declines to reproduce, sanctioned by ruling, with the literal deliberately left unpatched
+because the switch retires that emitter and carries the fix. Each names the bridge that asserts it. Two exceptions,
+both stated, both bridged; a third would need its own ruling before it could be added.
+
+### PRE-EXISTING FAILURES, REPORTED NOT FIXED
+
+Six tests across five specs fail on this tree and **also fail with my changes stashed** — I checked rather than
+assumed, twice, because three of them sit in exactly the files I was working in:
+`pane-splitter-790` (a strict-mode locator that now matches both the ratio splitter and the sizer — they share a
+class), `collapsible-panes-752`, `io-panel-resize`, `minimap-replace-865` (2), `stock-spill-792`
+("user_pocket_data: stockW left the form"). None is mine and none is touched. They look like a turn of their own.
+
+GATE: fast tier — 71 smoke green; 235 across surfacing/cam/as-data/guard/sizer/parking/round-trip/atc-in-place/
+corner-data green; 230 across lathe/workspace/backup/persistence/placement/alignment green. Nothing emit-class: the
+guard refuses rather than rewrites, and the three new specs are all behavioural.
