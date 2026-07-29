@@ -130,6 +130,12 @@ test('AND NOTHING IS LOST FROM ANY OP — the whole registered family round-trip
     // trip for reasons that predate this turn (verified by stash: the same ops differ without this change). Nothing
     // is lost — the block counts match — so it is a value-fidelity question, not a structural one. Pinned as a
     // COUNT so it cannot quietly grow, and so the day it is fixed this line is what gets updated.
+    //
+    // t1377 — MEASURED AGAIN, and the number did not move: still exactly 11, and the SAME eleven (atc warmup/length/
+    // check, drill, bore, middle, rotary centre/clock, comm, the two lathe probes). The modal-feed fold learning flow
+    // put two F words back into surfacing's emit, and surfacing is NOT in this list either before or after — the
+    // round-trip reproduces it byte-for-byte, because gcodeToStack's backfill reads an explicit F as happily as an
+    // inherited one. The iron rule holds: the count may only shrink, and it shrank by nothing rather than growing.
     const differs = r.filter((x) => !x.same).map((x) => x.op);
     expect(differs.length, `pre-existing text differences, unchanged in kind: ${JSON.stringify(differs)}`).toBeLessThanOrEqual(11);
 });

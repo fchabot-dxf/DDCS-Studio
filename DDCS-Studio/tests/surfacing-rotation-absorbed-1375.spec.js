@@ -83,7 +83,9 @@ const bridge = (page, cfg) => page.evaluate(async (cfg) => {
     const { emitProgram, emitMapped } = await import('/blocks/blockEmitter.js');
     const { makeXform } = await import('/blocks/programFraming.js');
     const { traceToolpath } = await import('/engine/trace.js');
-    const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => [s.x2, s.y2, s.z2]);
+    // t1377 — the FEED rides in the tuple. A rotation is a planar map: it must not change how fast anything cuts, and
+    // that is now measured rather than assumed (the modal-feed fold's flow blindness lived in exactly this gap).
+    const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => [s.x2, s.y2, s.z2, +Number(s.feed || 0).toFixed(3)]);
     const xf = makeXform({ angle: cfg.angle, pivotX: cfg.pivotX || 0, pivotY: cfg.pivotY || 0 });
     const p = { ...cfg };
     const litRes = emitMapped([xf, ...surfacingLiteralStack(p)]);
@@ -99,6 +101,11 @@ const bridge = (page, cfg) => page.evaluate(async (cfg) => {
 function measure(r, angle, pivotX = 0, pivotY = 0) {
     const th = angle * Math.PI / 180, c = Math.cos(th), s = Math.sin(th);
     let vsLit = 0, vsExact = 0, litVsExact = 0, worstZ = 0;
+    // t1377 — the FEEDS are compared EXACTLY, and against BOTH truths: the literal reference and this program
+    // unrotated. A feed is not a position, so it gets no quantum tolerance.
+    const feedsOf = (xs) => xs.map((m) => m[3]);
+    const feedVsLit = JSON.stringify(feedsOf(r.par)) === JSON.stringify(feedsOf(r.lit));
+    const feedVsFlat = JSON.stringify(feedsOf(r.par)) === JSON.stringify(feedsOf(r.flat));
     for (let i = 0; i < Math.min(r.par.length, r.lit.length); i++) {
         vsLit = Math.max(vsLit, Math.abs(r.par[i][0] - r.lit[i][0]), Math.abs(r.par[i][1] - r.lit[i][1]));
         worstZ = Math.max(worstZ, Math.abs(r.par[i][2] - r.lit[i][2]));
@@ -110,7 +117,7 @@ function measure(r, angle, pivotX = 0, pivotY = 0) {
         vsExact = Math.max(vsExact, Math.abs(r.par[i][0] - ex), Math.abs(r.par[i][1] - ey));
         if (i < r.lit.length) litVsExact = Math.max(litVsExact, Math.abs(r.lit[i][0] - ex), Math.abs(r.lit[i][1] - ey));
     }
-    return { vsLit, vsExact, litVsExact, worstZ };
+    return { vsLit, vsExact, litVsExact, worstZ, feedVsLit, feedVsFlat };
 }
 
 for (const A of ANGLES) {
@@ -126,6 +133,10 @@ for (const A of ANGLES) {
             // (B) AGAINST THE SHIPPING LITERAL REFERENCE, per axis, inside the emit's own precision
             expect(m.vsLit, `worst per-axis gap vs the literal ${m.vsLit.toFixed(6)}mm — within one 0.001mm emit quantum`).toBeLessThanOrEqual(0.001);
             expect(m.worstZ, 'Z is untouched by a planar rotation').toBeLessThanOrEqual(0.001);
+            // (B2) t1377 — AND THE FEEDS ARE EXACT, against both truths. A rotation is a planar map: it may move a point
+            // and it may never change how fast the tool gets there.
+            expect(m.feedVsLit, 'every move carries the literal reference\'s feed, exactly').toBe(true);
+            expect(m.feedVsFlat, 'and the same feed it carries unrotated — a rotation changes no speed').toBe(true);
             // (C) AGAINST AN EXACT ROTATION — the sharp one, and the one no pre-existing divergence can excuse
             expect(m.vsExact, `worst per-axis gap vs an EXACT rotation ${m.vsExact.toFixed(6)}mm`).toBeLessThanOrEqual(0.001);
             // …AND NEVER FARTHER FROM IT THAN THE LITERAL IS (the t1345 pattern): being inside a bound is not enough if
@@ -179,6 +190,8 @@ for (const entry of ['plunge', 'ramp', 'helix']) {
         expect(m.vsLit, `placed AND rotated: worst per-axis vs the literal ${m.vsLit.toFixed(6)}mm`).toBeLessThanOrEqual(0.001);
         expect(m.vsExact, `and vs an EXACT rotation ${m.vsExact.toFixed(6)}mm — the shift and the angle compose`).toBeLessThanOrEqual(0.001);
         expect(m.worstZ, 'Z untouched').toBeLessThanOrEqual(0.001);
+        expect(m.feedVsLit, 'and the feeds are exactly the literal\'s (t1377)').toBe(true);
+        expect(m.feedVsFlat, 'and unchanged by the rotation').toBe(true);
     });
 }
 
@@ -196,8 +209,10 @@ const mixed = (page, angle) => page.evaluate(async (angle) => {
     const { emitMapped } = await import('/blocks/blockEmitter.js');
     const { makeXform } = await import('/blocks/programFraming.js');
     const { traceToolpath } = await import('/engine/trace.js');
+    // t1377 — (position, FEED). It matters most here: the two ops are configured with DIFFERENT feeds, so the seam
+    // between a text-rotated op and a rotation-absorbed one is checked on speed as well as place.
     const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid)
-        .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3)]);
+        .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3), +Number(s.feed || 0).toFixed(3)]);
     // TWO DIFFERENT AREAS, so the two ops are distinguishable in the resolved path and neither can stand in for the other
     const A = { w: 60, h: 40, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 };
     const B = { w: 30, h: 20, depth: 0.5, stepdown: 0.5, toolDia: 8, stepoverPct: 50, feed: 700, plunge: 150, clearance: 5, originX: 100, originY: 10, attach: 'll' };

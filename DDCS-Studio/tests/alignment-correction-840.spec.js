@@ -38,10 +38,11 @@ async function seedProgram(page, wiz = 'surfacing') {
     await page.waitForTimeout(350);
 }
 
-/** The RESOLVED XY of every cutting move, as the engine runs the program — registers and expressions included. */
+/** The RESOLVED XY of every cutting move, as the engine runs the program — registers and expressions included.
+ *  t1377 — the FEED comes with it: an alignment rotation must land the geometry somewhere else at the SAME speed. */
 const cutPairs = (page) => page.evaluate(async () => {
     const { traceToolpath } = await import('/engine/trace.js');
-    return (traceToolpath(window.ddcsGetBlockGcode()).segments || []).filter((s) => !s.rapid).map((s) => [s.x2, s.y2]);
+    return (traceToolpath(window.ddcsGetBlockGcode()).segments || []).filter((s) => !s.rapid).map((s) => [s.x2, s.y2, +Number(s.feed || 0).toFixed(3)]);
 });
 
 test('type the measured angle → the program rotates by it ABOUT THE DATUM (numeric), badge + declared xform; ✕ → byte-identical', async ({ page }) => {
@@ -79,6 +80,7 @@ test('type the measured angle → the program rotates by it ABOUT THE DATUM (num
         const [x, y] = basePairs[i];
         expect(rotPairs[i][0], `pt ${i} X rotated about the datum`).toBeCloseTo(x * c - y * s, 2);
         expect(rotPairs[i][1], `pt ${i} Y rotated about the datum`).toBeCloseTo(x * s + y * c, 2);
+        expect(rotPairs[i][2], `pt ${i} runs at the SAME FEED — the correction moves the part, not the speed (t1377)`).toBe(basePairs[i][2]);
     }
 
     // (c) the program BADGE shows it

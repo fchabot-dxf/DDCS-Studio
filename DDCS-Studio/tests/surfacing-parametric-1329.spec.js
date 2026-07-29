@@ -114,9 +114,13 @@ for (const cfg of CONFIGS) {
             const moves = (nc) => (traceToolpath(nc).segments || [])
                 .filter((s) => !s.rapid || true)
                 .map((s) => [+s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3), !!s.rapid]);
+            // t1377 — THE FEED JOINS THE TUPLE. Every comparison in this file walked positions only, and a whole class
+            // of defect lived in that gap: the modal-feed fold was blind to flow, so the first row of every depth level
+            // executed at the PLUNGE feed and every bridge here passed. A move is WHERE and HOW FAST; comparing only
+            // where is comparing half a program.
             const cut = (nc) => (traceToolpath(nc).segments || [])
                 .filter((s) => !s.rapid)
-                .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3)]);
+                .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3), +Number(s.feed || 0).toFixed(3)]);
             return { oldLines: oldText.split(NL).length, newLines: newText.split(NL).length,
                 oldCut: cut(oldText), newCut: cut(newText), oldAll: moves(oldText).length, newAll: moves(newText).length };
         }, cfg);
@@ -286,8 +290,9 @@ const bridge = (page, cfg) => page.evaluate(async (cfg) => {
     const NL = String.fromCharCode(10);
     const oldText = String(emitProgram(surfacingLiteralStack(cfg)));
     const newText = ['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL);
+    // t1377 — (position, FEED) per move: see the note on the first bridge above. A move is where AND how fast.
     const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid)
-        .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3)]);
+        .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3), +Number(s.feed || 0).toFixed(3)]);
     return { oldCut: cut(oldText), newCut: cut(newText) };
 }, cfg);
 
@@ -380,7 +385,7 @@ test('THE TRACER EXECUTES VARIABLE-FED ARCS — measured, because a gap there wo
     const r = await page.evaluate(async () => {
         const { traceToolpath } = await import('/engine/trace.js');
         const NL = String.fromCharCode(10);
-        const pts = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => [+s.x2.toFixed(2), +s.y2.toFixed(2)]);
+        const pts = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => [+s.x2.toFixed(2), +s.y2.toFixed(2), +Number(s.feed || 0).toFixed(3)]);   // t1377 — feed included: a var-fed arc must also arrive at the right SPEED
         return {
             literal: pts(['G90', 'G0 X0 Y0', 'G1 Z-1 F100', 'G2 X20 Y0 I10 J0 F200', 'M30'].join(NL)),
             fromVars: pts(['G90', '#40=10', '#41=20', 'G0 X0 Y0', 'G1 Z-1 F100', 'G2 X#41 Y0 I#40 J0 F200', 'M30'].join(NL)),
@@ -555,7 +560,7 @@ test('THE HELIX BRIDGE — within one emit quantum, never farther from the ideal
         const { traceToolpath } = await import('/engine/trace.js');
         const NL = String.fromCharCode(10);
         const cfg = { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, entry: 'helix', helixDia: 8, helixPitch: 1 };
-        const cuts = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => ({ x: s.x2, y: s.y2, z: s.z2 }));
+        const cuts = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => ({ x: s.x2, y: s.y2, z: s.z2, f: +Number(s.feed || 0).toFixed(3) }));
         const lit = cuts(String(emitProgram(surfacingLiteralStack(cfg))));
         const par = cuts(['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL));
         // THE IDEAL — the unrounded mathematics both are approximating. 24 segments per rev about the area centre.
@@ -564,10 +569,17 @@ test('THE HELIX BRIDGE — within one emit quantum, never farther from the ideal
         for (let k = 1; k <= SEG; k++) { const a = k * 2 * Math.PI / SEG; ideal.push({ x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }); }
         const d = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
         const rows = ideal.map((I, i) => ({ gap: d(par[i], lit[i]), parErr: d(par[i], I), litErr: d(lit[i], I) }));
-        return { nLit: lit.length, nPar: par.length, rows, sameOrder: JSON.stringify(lit.map((p) => [+p.x.toFixed(2), +p.y.toFixed(2)])) === JSON.stringify(par.map((p) => [+p.x.toFixed(2), +p.y.toFixed(2)])) };
+        // t1377 — THE FEED IS NOT PART OF THE TOLERANCE. The quantum exception below licenses POSITION magnitude only;
+        // a feed is exact or it is wrong, so it is compared separately and exactly.
+        const feeds = (xs) => xs.map((p) => p.f);
+        return { nLit: lit.length, nPar: par.length, rows, litFeeds: feeds(lit), parFeeds: feeds(par),
+            sameOrder: JSON.stringify(lit.map((p) => [+p.x.toFixed(2), +p.y.toFixed(2)])) === JSON.stringify(par.map((p) => [+p.x.toFixed(2), +p.y.toFixed(2)])) };
     });
     // (3) STRUCTURE IS STILL EXACT — the tolerance licenses magnitude, never a different program
     expect(r.nPar, `same number of cutting moves: literal ${r.nLit}, parametric ${r.nPar}`).toBe(r.nLit);
+    // (4) t1377 — AND EVERY MOVE'S FEED IS EXACTLY THE LITERAL'S. No tolerance: the descent's plunge feed and the
+    // raster's cutting feed both differ by an order of magnitude, so a confusion between them is not a rounding.
+    expect(r.parFeeds, 'every cutting move carries the same feed as the literal path').toEqual(r.litFeeds);
     // (1) WITHIN ONE EMIT QUANTUM at every point of the descent
     const worst = Math.max(...r.rows.map((x) => x.gap));
     expect(worst, `worst point-to-point gap ${worst.toFixed(6)}mm must be within one 0.001mm emit quantum`).toBeLessThanOrEqual(0.001);
@@ -741,8 +753,9 @@ for (const P of PLACEMENTS) {
                 // THE ATOM PATH: the same shift handed in as params, absorbed into the emitted expressions.
                 const parametric = ['G90', ...surfaceRasterLines({ ...base, x: P.dx, y: P.dy, z0: P.dz }), 'M30'].join(NL);
 
+                // t1377 — (position, FEED) per move, as everywhere else in this file now.
                 const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid)
-                    .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3)]);
+                    .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3), +Number(s.feed || 0).toFixed(3)]);
 
                 return {
                     litCut: cut(literal), parCut: cut(parametric),
@@ -907,8 +920,10 @@ for (const J of SKIM_JOGS) {
                     ...surfaceRasterLines({ ...base, zMode: 'skim' }), 'M30'].join(NL);
 
                 const segs = (nc) => (traceToolpath(nc).segments || []);
+                // t1377 — the FEED rides along: it is frame-independent, so it needs no origin subtraction and a
+                // skim body that cut at the wrong speed would now show up here.
                 const cutFrom = (nc, ox, oy, oz) => segs(nc).filter((s) => !s.rapid)
-                    .map((s) => [+(s.x2 - ox).toFixed(3), +(s.y2 - oy).toFixed(3), +(s.z2 - oz).toFixed(3)]);
+                    .map((s) => [+(s.x2 - ox).toFixed(3), +(s.y2 - oy).toFixed(3), +(s.z2 - oz).toFixed(3), +Number(s.feed || 0).toFixed(3)]);
                 // the literal is already relative to the jog; the parametric is absolute in the jog frame
                 const lit = cutFrom(literal, 0, 0, 0);
                 const par = cutFrom(parametric, J.jx, J.jy, J.jz);

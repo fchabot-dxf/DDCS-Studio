@@ -7825,3 +7825,113 @@ emitter-shape (roundtrip-1319, op-params, place-on-stock, placement-rollout, mil
 cam-scratch-*, cam-universal-scratch, cam-slot-sim/roundtrip) **49/49**. Screenshots of the real app before/after the
 modal rotation in scratchpad/s1375-before.png and s1375-final.png. FULL SUITE NOT RUN — the advisor's merge gate; this
 is emit-class, so it wants the 1945/6/0 ceiling before release. Seat B's lane untouched.
+
+---
+
+## t1377 (seat A) — THE MODAL-FEED GATE: the fold learns flow, and the bridges learn feeds
+
+The defect was mine to find and the advisor's to rule on; this closes both halves. The instance is fixed, and the
+BLINDNESS that let it ship for six turns is closed with it.
+
+### THE MECHANISM — barriers, chosen because soundness has to come from construction
+
+`applyModalFeed` carried the modal feed along the LINE LIST. That is exact for a program that runs top to bottom, which
+every program was while the kernels unrolled their geometry in JavaScript. The parametric family brought flow and the
+walk never learned about it.
+
+The fix is a DECLARED barrier list (`FEED_BARRIERS`, exported so the spec reads the same declaration rather than a copy
+of it): a label, a jump, a conditional, a loop head, a loop back edge, oword flow, and a subprogram call or return. At
+any of those the feed becomes UNKNOWN and the next motion states its F explicitly.
+
+**Why a list and not a smarter tracker.** A tracker that reasoned about the control-flow graph would be right where I
+had thought about it and quietly wrong where I had not. Barriers make it sound BY CONSTRUCTION: no fold ever crosses a
+control-flow edge, so redundancy holds on every path — including paths no test traces. Deliberately conservative: an
+unnecessary barrier costs one redundant F word, a missing one costs a move at the wrong feed. The list is data beside
+the fold because it will grow — a post that gains a flow form gains a line here, not a special case inside the walk.
+
+The fold also DECLARES what it did: each folded line records the F it lost, and `emitMapped` exposes `feedFolds`. Same
+reason as t1375's `absorbed` map — a pass that rewrites the program says so, and the invariant it claims becomes
+measurable instead of trusted.
+
+### THE CRITERION — traced through execution, with a negative control so it has teeth
+
+The dispatch's criterion, implemented literally: re-insert every F the fold declares it dropped, trace BOTH programs
+through the engine (which follows the jumps), and require every move to agree on (position, feed). Run over 13 programs
+chosen to span the flow forms the barrier list names — six surfacing variants (plunge, ramp, helix, concentric, the
+confirm cadence, skim), two literal cutting ops as controls, three probe macros, a stamped pattern and engraving.
+
+**The teeth are proven separately, and that mattered.** My first version demanded every program have folded something,
+which is wrong: a program that is nearly all flow correctly folds NOTHING now, and nine tests failed saying so. Demanding
+folds>0 would also have been the wrong guard even where it passed, because a criterion that only fires on folded lines
+proves nothing about a fold that does too much. So the harness's teeth are a NEGATIVE CONTROL instead: the OLD linear
+rule is reproduced in the spec, applied to the same programs, and required to FAIL the criterion — executing a move at a
+feed the program never gave it. The criterion is not something any fold would pass.
+
+The instance is pinned as itself too: on a three-level raster every XY cutting move must run at the cutting feed, with
+the plunge keeping its own slower one. Asserted on resolved motion, not on the presence of an F word, because the F word
+was never the thing that was wrong.
+
+### THE FEED DIMENSION JOINS THE BRIDGES — the class, not the instance
+
+Every equivalence comparison that walks resolved moves now carries (position, feed): the main surfacing bridge, the
+concentric bridge, the placement bridges, the skim bridges, the helix bridge, the var-fed-arc tracer check, the rotation
+bridges, the mixed-program seam, and the two family-A rotation specs. Six comparison helpers across four files.
+
+Two deliberate distinctions in how it was added. **The helix bridge compares feeds EXACTLY while its positions keep the
+ruled one-quantum tolerance** — a feed is not a rounding, and the descent's plunge feed and the raster's cutting feed
+differ by an order of magnitude, so a confusion between them could never be a near-miss. **The skim bridge's feed needs
+no frame subtraction** — a feed is frame-independent, which is exactly why a skim body cutting at the wrong speed would
+previously have passed every one of those twenty-five bridges.
+
+The rotation bridges gained a second feed truth as well: the feeds must match the literal reference AND the same program
+unrotated. A rotation is a planar map — it may move a point and may never change how fast the tool gets there.
+
+### THE OTHER NON-POSITION WORDS — the CHECK, answered by measurement
+
+Asked properly: the feed was invisible because a PASS folded it and the comparisons read positions only. So the question
+is whether any pass rewrites another non-position word, and whether the compared programs differ in one.
+
+Measured, both halves. `applyModalFeed` is the only pass that folds anything — the others insert lines, rewrite
+coordinates, or comment a line out. Asserted where folding is busiest (the literal surfacing program, 174 folds on
+pocket, dozens here): the S and M words are IDENTICAL before and after the fold runs, so nothing but F is removed. And
+the two compared surfacing programs carry the same S and M words in the same order, asserted rather than assumed, so a
+future divergence surfaces as a failure instead of passing through a position-only comparison. No S/M defect exists
+today; the absence is now asserted rather than believed.
+
+### THE BYTE FALLOUT, MEASURED OP BY OP — and it is one op, two lines
+
+I expected this to be the expensive part and it is not, which is worth recording because the reason is informative.
+Swept every registered builder, reproducing the old rule in the test and diffing:
+
+    surfacing      flow  2 lines moved   folds 2 -> 0
+    pocket         ----  0               folds 174 -> 174
+    contour        ----  0               folds 9 -> 9
+    every other op ----  0               folds unchanged
+
+**Only surfacing moved, by exactly the two lines that were executing at the wrong feed.** The probe macros carry more
+flow than any cutting op and moved NOTHING — because they feed from registers (`F#3`), which already reset the tracker,
+so there was never a fold there to correct. That is why the defect was confined to the parametric cutting family.
+
+The claim is asserted, not just measured once: every flow-FREE op must be byte-for-byte what the old rule produced, and
+every changed op must keep MORE F words, never fewer. Both hold across the family. `slot` folds nothing and that is not a
+regression — its feeds ALTERNATE (a plunge then a cut, once per level) so no F ever repeated the one before it; the spec
+records that so a future reader does not go hunting for a regression that never happened.
+
+**THE IRON RULE HOLDS, re-measured rather than assumed.** The round-trip text-difference count is still exactly 11 and
+the SAME eleven ops; surfacing is not among them before or after, because gcodeToStack's backfill reads an explicit F as
+happily as an inherited one. 0 blocks lost. I checked the number rather than trusting the `<=11` bound, since a bound
+passing is not the same as a count not growing.
+
+### THE REAL SYMPTOM, IN THE APP
+
+The defect was found through the app's own time estimate and that is where it is confirmed fixed: a default surfacing
+program reads **≈40 s where it read ≈67 s**, and the distinct XY cutting feeds went from `[200, 2000]` to `[2000]`. A
+40% overstatement of cutting time, because the first row of every level really was crawling. Screenshot in
+scratchpad/s1377-fixed.png.
+
+GATE (fast tier): smoke **71/71**. The touched area **173/173** — the new criterion file (17), every pre-existing
+surfacing bridge now carrying feeds, the rotation family, both family-A specs, the round-trips (gcode-to-stack,
+whole-program-1319, safetraverse-nested), tool-change, safe-Z retract, op-params, and the feed/time specs
+(cam-toolpath-feed-expose, time-estimate-844, feeds-speeds-867) which are the ones most likely to care about an F word
+reappearing. FULL SUITE NOT RUN — the advisor's merge gate; emit-class, so it wants the ceiling before release. Seat B's
+lane untouched.

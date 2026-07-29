@@ -165,7 +165,7 @@ test('a PARAMETRIC program ROTATES — the atom absorbs the angle, and the toolp
     expect(base, 'the seed really is the parametric surfacing body').toContain('SURFACING, parametric');
     const cutOf = async () => page.evaluate(async () => {
         const { traceToolpath } = await import('/engine/trace.js');
-        return (traceToolpath(window.ddcsGetBlockGcode()).segments || []).filter((s) => !s.rapid).map((s) => [s.x2, s.y2, s.z2]);
+        return (traceToolpath(window.ddcsGetBlockGcode()).segments || []).filter((s) => !s.rapid).map((s) => [s.x2, s.y2, s.z2, +Number(s.feed || 0).toFixed(3)]);   // t1377 — feed included: a rotation must not change how fast anything cuts
     });
     const before = await cutOf();
     expect(before.length, 'the parametric program resolves to real cutting moves').toBeGreaterThan(4);
@@ -191,6 +191,7 @@ test('a PARAMETRIC program ROTATES — the atom absorbs the angle, and the toolp
         expect(turned[i][0], `cut ${i} X turned 12° about the datum`).toBeCloseTo(x * c - y * s, 2);
         expect(turned[i][1], `cut ${i} Y turned 12° about the datum`).toBeCloseTo(x * s + y * c, 2);
         expect(turned[i][2], `cut ${i} Z is untouched by a planar rotation`).toBeCloseTo(z, 3);
+        expect(turned[i][3], `cut ${i} runs at the SAME FEED — a rotation moves a point, never a speed (t1377)`).toBe(before[i][3]);
     }
     // (4) AND CLEARING IT IS STILL BYTE-IDENTICAL — the 0° fold, which is what keeps the mechanism invisible until asked for.
     await page.click('#xform-badge .xform-badge-x');

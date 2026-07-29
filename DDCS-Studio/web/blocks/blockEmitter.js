@@ -420,7 +420,11 @@ export function emitMapped(blocks, settings = {}) {
     // t1375 — the ABSORBED range map, exposed rather than kept private: it is the emitter's own declaration of which
     // lines already carry the program rotation, so a caller (and the coherence spec) can read it instead of guessing.
     const absorbed = []; T.forEach((t, i) => { if (t.rot) absorbed.push(i); });
-    return { text: lines.join('\n'), lines, map: T.map((t) => t.src), absorbed };
+    // t1377 — WHAT THE MODAL-FEED FOLD DROPPED, per surviving line. Same reason as `absorbed` above: a pass that
+    // rewrites the program declares what it did, so the invariant it claims can be MEASURED. Re-inserting every entry
+    // here must give a program whose traced feeds are identical — which is exactly what feed-modal-1377 does.
+    const feedFolds = []; T.forEach((t, i) => { if (t.foldedF != null) feedFolds.push({ line: i, f: t.foldedF }); });
+    return { text: lines.join('\n'), lines, map: T.map((t) => t.src), absorbed, feedFolds };
 }
 
 /** t726 P2b — find the DECLARED entry-point marker anywhere in the stack (a childless `entry` block). */
@@ -624,18 +628,61 @@ function applySerialLibrary(T, dialect) {
     T.splice(0, T.length, ...bump, ...body, ...lib);
 }
 
+/**
+ * t1377 — THE DECLARED BARRIER FORMS: lines the modal feed cannot be carried across.
+ *
+ * A fold is only sound where the current feed is knowable, and it is knowable only while control reaches a line from
+ * the line ABOVE it. Each form below breaks that: a label can be entered from any jump, a conditional has two
+ * successors, a loop head is re-entered from its own back edge, and a subprogram runs code this pass cannot see. So the
+ * feed is treated as UNKNOWN on the far side of one, and the next motion states its F explicitly.
+ *
+ * DECLARED AS DATA, beside the fold that reads it, because the set will grow: a post that gains a new flow form gains a
+ * barrier here rather than a special case inside the walk. Deliberately CONSERVATIVE — a barrier that was not strictly
+ * necessary costs one redundant F word, and a missing one costs a move executed at the wrong feed.
+ */
+export const FEED_BARRIERS = [
+    /^N\d+\b/,          // a label — the target of a GOTO, so it is reachable from anywhere in the program
+    /\bGOTO\b/,         // a jump — the line after it is reached only by NOT taking a preceding branch
+    /^IF\b/,            // a conditional — two successors, and the feed may differ down each
+    /\bWHILE\b/,        // a loop head, re-entered from its ENDn back edge
+    /^END\d+\b/,        // the back edge itself — the line after it is the loop's exit path
+    /^o\d+\b/,          // oword flow (if / else / endif) on the posts that use it
+    /\bM9[89]\b/,       // a subprogram call or return — the callee's own feeds are invisible here
+];
+
 /** Feedrate is modal in G-code: once set it sticks until changed. The kernels emit F on every cutting line
  *  (simple + always correct); this folds out an F *attached to a motion word* that merely repeats the current
  *  modal feed — the way a CAM post does — so a 150-pass fill shows F once per change, not 150 times. Only a
  *  plain-number F folds; an F#var / F[expr] (probe feeds) is kept and clears tracking so the next numeric F
- *  always shows. gcodeToStack mirrors this (backfills the modal feed) so the round-trip stays byte-exact. */
+ *  always shows. gcodeToStack mirrors this (backfills the modal feed) so the round-trip stays byte-exact.
+ *
+ *  ── t1377 — IT FOLLOWS EXECUTION NOW, NOT TEXT ────────────────────────────────────────────────────────────────────
+ *  This walked the line list and folded any F equal to the previous one. That is exact for a program that runs
+ *  top-to-bottom, which every program was while the kernels unrolled their geometry in JavaScript. The parametric
+ *  family brought FLOW, and a text walk cannot see it. Measured on the shipped surfacing emit (t1375, found by looking
+ *  at the app's own time estimate, not by any test): the plunge sets F200, `GOTO14` jumps the first row of every depth
+ *  level straight past the only F2000, and the row's cut had its F folded away — so the first row of every level cut at
+ *  the PLUNGE feed. Ten times slow. Clean G-code, wrong part.
+ *
+ *  The fix is the barrier list above rather than a smarter tracker: the fold now carries the feed only along a straight
+ *  run of lines, and every place control can enter from elsewhere resets it to unknown. That is sound by CONSTRUCTION —
+ *  no fold ever crosses a control-flow edge, so redundancy holds on every path, not merely on the path a test happened
+ *  to trace. The traced criterion in feed-modal-1377 then checks the implementation against execution.
+ *
+ *  Each folded line records the F it lost (`foldedF`), which emitMapped exposes: the pass declares what it did, so the
+ *  invariant can be MEASURED (re-insert every dropped F and the traced feeds must be identical) instead of trusted.
+ */
 function applyModalFeed(T) {
     let modalF = null;
     for (const t of T) {
+        const code = String(t.line || '').replace(/\([^)]*\)/g, '').replace(/;.*$/, '').trim();   // a comment is not flow
+        // A barrier resets the tracker but is NOT skipped: should a flow line ever carry an F of its own, `modalF` is
+        // null by then so it is kept — which is the safe outcome either way.
+        if (code && FEED_BARRIERS.some((re) => re.test(code))) modalF = null;
         const m = t.line.match(/ F(-?\d+(?:\.\d+)?)\b/);   // F attached to a motion line (leading space), not a bare "F300"
         if (m) {
             const f = Number(m[1]);
-            if (modalF !== null && f === modalF) t.line = t.line.slice(0, m.index) + t.line.slice(m.index + m[0].length);
+            if (modalF !== null && f === modalF) { t.line = t.line.slice(0, m.index) + t.line.slice(m.index + m[0].length); t.foldedF = f; }
             else modalF = f;
         } else if (/ F[#[]/.test(t.line)) {
             modalF = null;   // a #var/[expr] feed — can't fold; force the next numeric F to show
