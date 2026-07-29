@@ -60,8 +60,8 @@ test('THE HEADER SPEAKS, AND THE LOOPS COUNT THEMSELVES', async ({ page }) => {
     expect(r.body.indexOf('DO2')).toBeGreaterThan(r.body.indexOf('DO1'));
     expect(r.body.indexOf('END2')).toBeLessThan(r.body.indexOf('END1'));
     // A ZERO STEPOVER DIVIDES BY ZERO and a zero stepdown loops forever — refused cleanly, not left to the machine
-    expect(r.body).toMatch(/IF #44 <= 0 GOTO 91/);
-    expect(r.body).toMatch(/IF #43 <= 0 GOTO 91/);
+    expect(r.body).toMatch(/IF #44 <= 0 GOTO91/);
+    expect(r.body).toMatch(/IF #43 <= 0 GOTO91/);
     expect(r.body, 'with a named error, not a silent halt').toMatch(/ERROR: stepover \/ stepdown/);
     // THE BAND IS DECLARED AS DATA, so the collision guard reads it instead of re-deriving it from the text
     // t1343 — the band extended DOWN to #34 for the helix recurrence's rotating vector, temp and counters. Still
@@ -97,14 +97,14 @@ for (const cfg of CONFIGS) {
     test(`EQUIVALENCE — ${cfg.name}`, async ({ page }) => {
         await boot(page);
         const r = await page.evaluate(async (cfg) => {
-            const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+            const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
             const { emitProgram } = await import('/blocks/blockEmitter.js');
             const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
             const { traceToolpath } = await import('/engine/trace.js');
             const NL = String.fromCharCode(10);
 
             // THE OLD PATH, exactly as it ships today: the literal unrolled raster.
-            const oldText = String(emitProgram(surfacingStack(cfg)));
+            const oldText = String(emitProgram(surfacingLiteralStack(cfg)));
             // THE NEW PATH: the parametric body, run through the same tracer. Framed the same way (absolute, at the
             // WCS origin) so the comparison is about the RASTER and nothing else.
             const newText = ['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL);
@@ -161,15 +161,15 @@ test('THE SIM EXECUTES THE LOOP — the moves come from running it, not from rea
 test('THE EMIT IS A FIXED SIZE — the literal one grows with the job, this one does not', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
         const { emitProgram } = await import('/blocks/blockEmitter.js');
         const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
         const NL = String.fromCharCode(10);
         const small = { w: 80, h: 40, depth: 0.5, stepdown: 0.5, toolDia: 10, stepoverPct: 50, feed: 800, plunge: 150, clearance: 4 };
         const big = { ...small, w: 600, h: 400, depth: 3, stepdown: 0.3 };
         return {
-            oldSmall: String(emitProgram(surfacingStack(small))).split(NL).length,
-            oldBig: String(emitProgram(surfacingStack(big))).split(NL).length,
+            oldSmall: String(emitProgram(surfacingLiteralStack(small))).split(NL).length,
+            oldBig: String(emitProgram(surfacingLiteralStack(big))).split(NL).length,
             newSmall: surfaceRasterLines(small).length,
             newBig: surfaceRasterLines(big).length,
         };
@@ -233,7 +233,7 @@ test('THE COVERED ENVELOPE IS DECLARED — and everything outside it is named, n
 test('THE GAP IS REAL, MEASURED — the uncovered cases are different programs, not near-misses', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
         const { emitProgram } = await import('/blocks/blockEmitter.js');
         const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
         const { traceToolpath } = await import('/engine/trace.js');
@@ -242,7 +242,7 @@ test('THE GAP IS REAL, MEASURED — the uncovered cases are different programs, 
         const cuts = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).length;
         const pair = (extra) => {
             const cfg = { ...base, ...extra };
-            return { literal: cuts(String(emitProgram(surfacingStack(cfg)))), parametric: cuts(['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL)) };
+            return { literal: cuts(String(emitProgram(surfacingLiteralStack(cfg)))), parametric: cuts(['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL)) };
         };
         return { covered: pair({}), concentric: pair({ strategy: 'concentric' }), helix: pair({ entry: 'helix', helixDia: 8, helixPitch: 1 }) };
     });
@@ -279,12 +279,12 @@ const RING_CONFIGS = [
 
 
 const bridge = (page, cfg) => page.evaluate(async (cfg) => {
-    const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+    const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
     const { emitProgram } = await import('/blocks/blockEmitter.js');
     const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
     const { traceToolpath } = await import('/engine/trace.js');
     const NL = String.fromCharCode(10);
-    const oldText = String(emitProgram(surfacingStack(cfg)));
+    const oldText = String(emitProgram(surfacingLiteralStack(cfg)));
     const newText = ['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL);
     const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid)
         .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3)]);
@@ -312,11 +312,11 @@ for (const cfg of RING_CONFIGS) {
 test('ONE-WAY IS NOT A SURFACING GAP — the op hard-codes both-ways, so no config reaches it', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
         const flat = (st, out = []) => { for (const b of (st || [])) { out.push(b); flat(b.children, out); flat(b.uiChildren, out); } return out; };
         // ask the op for a one-way raster, the way my t1331 measurement did…
-        const asked = flat(surfacingStack({ w: 100, h: 60, direction: 'oneway' })).find((b) => b.type === 'surfacefill');
-        const dflt = flat(surfacingStack({ w: 100, h: 60 })).find((b) => b.type === 'surfacefill');
+        const asked = flat(surfacingLiteralStack({ w: 100, h: 60, direction: 'oneway' })).find((b) => b.type === 'surfacefill');
+        const dflt = flat(surfacingLiteralStack({ w: 100, h: 60 })).find((b) => b.type === 'surfacefill');
         return { asked: asked && asked.params.direction, dflt: dflt && dflt.params.direction };
     });
     // …and the op ignores it. The param never reaches the emit, so there was never a gap to close.
@@ -359,10 +359,10 @@ test('THE ENVELOPE SHRANK — concentric and one-way are inside it now, and what
 test('REACHABILITY — the op really can emit these, unlike direction', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
         const flat = (st, out = []) => { for (const b of (st || [])) { out.push(b); flat(b.children, out); flat(b.uiChildren, out); } return out; };
-        const fill = (p) => flat(surfacingStack(p)).find((b) => b.type === 'surfacefill');
-        const down = (p) => flat(surfacingStack(p)).find((b) => b.type === 'stepdown');
+        const fill = (p) => flat(surfacingLiteralStack(p)).find((b) => b.type === 'surfacefill');
+        const down = (p) => flat(surfacingLiteralStack(p)).find((b) => b.type === 'stepdown');
         return {
             ramp: fill({ w: 100, h: 60, entry: 'ramp', rampAngle: 3 }).params.entry,
             helix: fill({ w: 100, h: 60, entry: 'helix', helixDia: 8, helixPitch: 1 }).params.entry,
@@ -396,19 +396,19 @@ for (const N of [1, 2, 3, 9]) {
     test(`CONFIRM EVERY ${N} — the pause lands on the right levels and never on the last`, async ({ page }) => {
         await boot(page);
         const r = await page.evaluate(async ({ N }) => {
-            const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+            const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
             const { emitProgram } = await import('/blocks/blockEmitter.js');
             const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
             const NL = String.fromCharCode(10);
             // depth 1.5 / stepdown 0.5 = 3 levels, so N=1,2,3 and N>total are all distinguishable
             const cfg = { w: 100, h: 60, depth: 1.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, confirmEvery: N };
             const count = (t) => (t.match(/^\s*M0+\b/gm) || []).length;
-            return { literal: count(String(emitProgram(surfacingStack(cfg)))), parametric: surfaceRasterLines(cfg).join(NL) };
+            return { literal: count(String(emitProgram(surfacingLiteralStack(cfg)))), parametric: surfaceRasterLines(cfg).join(NL) };
         }, { N });
         // THE WORD IS THE MACHINE'S, matched not modernised: M00 with the operator sentence the literal path uses
         expect(r.parametric, 'the pause is M00, the same word the literal path emits').toMatch(/M00\s+\( pause - press Cycle Start to resume \)/);
         // …and it is GUARDED so the last level never pauses — a halt on a finished part is a call to the shop floor
-        expect(r.parametric, 'the last pass is exempted').toMatch(/IF #46 >= #42 GOTO 31/);
+        expect(r.parametric, 'the last pass is exempted').toMatch(/IF #46 >= #42 GOTO31/);
         // the cadence test is a modulo written as "does N divide the level index" — no MOD in this dialect
         expect(r.parametric, 'and the cadence is a real divisibility test, not an unrolled list').toMatch(/FIX\[#48 \/ /);
     });
@@ -463,7 +463,7 @@ test('THE RAMP BAKES ONLY WHAT CANNOT MOVE — and says what that costs', async 
     expect(body, 'the run is computed from the live bite').toMatch(/#49=\[#43 \* [\d.]+\]/);
     expect(body, 'and the tangent is baked, with the reason on the line').toMatch(/tangent is baked; the angle is a form field/);
     // THE HONEST DEGRADE survives the migration: when the run does not fit, the tool plunges and the program says so
-    expect(body, 'a ramp that cannot fit degrades').toMatch(/GOTO 41/);
+    expect(body, 'a ramp that cannot fit degrades').toMatch(/GOTO41/);
     expect(body, 'to a straight plunge, named').toMatch(/the ramp did not fit — straight plunge/);
 });
 
@@ -541,14 +541,14 @@ test('THE ENTRY GATE — a ramp slot refuses the knobs that would kink its desce
 test('THE HELIX BRIDGE — within one emit quantum, never farther from the ideal, and structurally identical', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
         const { emitProgram } = await import('/blocks/blockEmitter.js');
         const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
         const { traceToolpath } = await import('/engine/trace.js');
         const NL = String.fromCharCode(10);
         const cfg = { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, entry: 'helix', helixDia: 8, helixPitch: 1 };
         const cuts = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => ({ x: s.x2, y: s.y2, z: s.z2 }));
-        const lit = cuts(String(emitProgram(surfacingStack(cfg))));
+        const lit = cuts(String(emitProgram(surfacingLiteralStack(cfg))));
         const par = cuts(['G90', ...surfaceRasterLines(cfg), 'M30'].join(NL));
         // THE IDEAL — the unrounded mathematics both are approximating. 24 segments per rev about the area centre.
         const cx = cfg.w / 2, cy = cfg.h / 2, R = cfg.helixDia / 2, SEG = 24;
@@ -721,7 +721,7 @@ for (const P of PLACEMENTS) {
         test(`PLACEMENT (${strategy}) — ${P.name}`, async ({ page }) => {
             await boot(page);
             const r = await page.evaluate(async ({ P, strategy }) => {
-                const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+                const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
                 const { emitProgram } = await import('/blocks/blockEmitter.js');
                 const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
                 const { traceToolpath } = await import('/engine/trace.js');
@@ -729,7 +729,7 @@ for (const P of PLACEMENTS) {
                 const base = { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, strategy };
 
                 // THE SHIPPING PATH: the literal raster, PLACED by the fold (originX/originY/offZ → placementShift).
-                const literal = String(emitProgram(surfacingStack({ ...base, originX: P.dx, originY: P.dy, offZ: P.dz })));
+                const literal = String(emitProgram(surfacingLiteralStack({ ...base, originX: P.dx, originY: P.dy, offZ: P.dz })));
                 // THE ATOM PATH: the same shift handed in as params, absorbed into the emitted expressions.
                 const parametric = ['G90', ...surfaceRasterLines({ ...base, x: P.dx, y: P.dy, z0: P.dz }), 'M30'].join(NL);
 
@@ -791,10 +791,10 @@ test('t1351 REACHABILITY (a) — SKIM combined with a ramp/helix entry IS reacha
         const { surfacingDataDef } = await import('/blocks/dataOps/surfacingData.js');
         const def = surfacingDataDef();
         const params = (def.bindings || []).map((b) => b.param);
-        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
         const { emitProgram } = await import('/blocks/blockEmitter.js');
         // and it is not merely a form pairing — the stack really builds it
-        const txt = String(emitProgram(surfacingStack({ w: 80, h: 40, depth: 0.8, stepdown: 0.4, toolDia: 8, stepoverPct: 50, zMode: 'skim', entry: 'ramp', rampAngle: 3, feed: 800, plunge: 150, clearance: 4 })));
+        const txt = String(emitProgram(surfacingLiteralStack({ w: 80, h: 40, depth: 0.8, stepdown: 0.4, toolDia: 8, stepoverPct: 50, zMode: 'skim', entry: 'ramp', rampAngle: 3, feed: 800, plunge: 150, clearance: 4 })));
         return { hasZMode: params.includes('zMode'), hasEntry: params.includes('entry'), hasRamp: params.includes('rampAngle'), hasHelix: params.includes('helixPitch'), skimRamp: /G91/.test(txt) && /ramp/i.test(txt) };
     });
     // The TWIN's form (the shipped in-place surfacing form) carries the Z-mode AND the depth-entry cluster, so an
@@ -813,12 +813,12 @@ test('t1351 REACHABILITY (a) — SKIM combined with a ramp/helix entry IS reacha
 test('t1351 REACHABILITY (b) — surfacingStack emits no rotation, but the PROGRAM-level one reaches the body (flagged, not built)', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
         const { rotateProgram, mirrorProgram } = await import('/data/rotateProgram.js');
         const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
         const NL = String.fromCharCode(10);
         const flat = (bs, out = []) => { for (const b of (bs || [])) { if (!b) continue; out.push(b.type); flat(b.children, out); } return out; };
-        const types = flat(surfacingStack({ w: 100, h: 80, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, originX: 20, offZ: 2 }));
+        const types = flat(surfacingLiteralStack({ w: 100, h: 80, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, originX: 20, offZ: 2 }));
         const body = surfaceRasterLines({ w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 });
         const before = body.join(NL).split(NL);
         const changed = (after) => before.map((b, i) => [b, after[i]]).filter(([b, a]) => b !== a);
@@ -861,7 +861,7 @@ test('t1351 REACHABILITY (b) — surfacingStack emits no rotation, but the PROGR
  * body runs over them. Skim × concentric, skim × ramp and skim × helix came along for free — no second emitter, no
  * per-descent G91 derivation, and every bridge already written keeps applying.
  *
- * THE REFERENCE is the shipping skim path: `surfacingStack({zMode:'skim'})`, which is the literal raster put through
+ * THE REFERENCE is the shipping skim path: `surfacingLiteralStack({zMode:'skim'})`, which is the literal raster put through
  * `relativizeProgram` — G91 deltas from the jog start. The parametric body is absolute in a frame the machine fills
  * in, so the two are compared in the ONE frame they share: distance travelled FROM THE JOG POINT.
  */
@@ -883,7 +883,7 @@ for (const J of SKIM_JOGS) {
         test(`SKIM BRIDGE — ${S.name} — ${J.name}`, async ({ page }) => {
             await boot(page);
             const r = await page.evaluate(async ({ J, S }) => {
-                const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+                const { surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
                 const { emitProgram } = await import('/blocks/blockEmitter.js');
                 const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
                 const { traceToolpath } = await import('/engine/trace.js');
@@ -892,7 +892,7 @@ for (const J of SKIM_JOGS) {
 
                 // THE SHIPPING SKIM PATH: literal raster, relativized by the skim fold. G91 from the jog start, so its
                 // traced coordinates ARE the distance travelled from that point.
-                const literal = String(emitProgram(surfacingStack({ ...base, zMode: 'skim' })));
+                const literal = String(emitProgram(surfacingLiteralStack({ ...base, zMode: 'skim' })));
                 // THE ATOM PATH: absolute, in the frame the machine supplies. The seeds MODEL the controller's read —
                 // this is the sim standing in for #790/#791/#792, never the WCS table.
                 const parametric = ['G90', `#790=${J.jx}`, `#791=${J.jy}`, `#792=${J.jz}`,
@@ -910,7 +910,7 @@ for (const J of SKIM_JOGS) {
                 return {
                     lit, par,
                     litRapidZ: rapidZs(literal, 0), parRapidZ: rapidZs(parametric, J.jz),
-                    hasFrameRead: /#62=#790/.test(parametric), sentinel: /IF #62 == -99999 GOTO 93/.test(parametric),
+                    hasFrameRead: /#62=#790/.test(parametric), sentinel: /IF #62 == -99999 GOTO93/.test(parametric),
                 };
             }, { J, S });
 

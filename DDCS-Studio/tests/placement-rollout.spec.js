@@ -49,8 +49,17 @@ test('surfacing: attach corner moves the pass onto the stock + a PlaceOnStock bl
     return document.getElementById('wiz_surfacing_code').textContent;
   }, attach);
 
-  const near = maxX(await code('nn')), far = maxX(await code('pp'));
-  expect(far, 'attaching to the far corner pushes the faced area toward the far stock edge').toBeGreaterThan(near + 30);
+  // t1365 — MEASURED FROM THE EXECUTED PATH, not from the literal text. `maxX` scans for `X<number>`, which found the
+  // far edge of the pass while surfacing unrolled every row. The parametric body writes that edge as `X[50 + #40]` —
+  // the area width is a header var — so the text scan saw only the frame's 50 and the pass looked as if it had barely
+  // moved. The claim is about WHERE THE TOOL GOES, so it is read off the toolpath the program actually walks.
+  const farthestX = (nc) => page.evaluate(async (g) => {
+    const { traceToolpath } = await import('/engine/trace.js');
+    const xs = (traceToolpath(g).segments || []).flatMap((s) => [s.x1, s.x2]).filter((v) => Number.isFinite(v));
+    return xs.length ? Math.max(...xs) : NaN;
+  }, nc);
+  const near = await farthestX(await code('nn')), far = await farthestX(await code('pp'));
+  expect(far, `attaching to the far corner pushes the faced area toward the far stock edge (near ${near}, far ${far})`).toBeGreaterThan(near + 30);
 
   const types = await page.evaluate(async () => {
     await window.ddcsStudio.wizardManager.insert();

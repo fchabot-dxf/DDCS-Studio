@@ -31,11 +31,14 @@ export const LATHE_GROUP = 'lathe';
  */
 export const FACING_BINDING_SPECS = [
     { param: 'allowance', match: { type: 'assign', var: FACING_VARS.allowance }, key: 'value', type: 'number',
-      label: 'Material to remove', section: 'GEOMETRY', default: FACING_DEFAULTS.allowance },
+      label: 'Material to remove', section: 'GEOMETRY', default: FACING_DEFAULTS.allowance,
+      help: 'Total stock to take off the face (mm), measured along Z from where the face is now. The op makes as many passes as it needs to remove this much at the depth per pass below.' },
     { param: 'doc', match: { type: 'assign', var: FACING_VARS.doc }, key: 'value', type: 'number',
-      label: 'Depth per pass', section: 'GEOMETRY', default: FACING_DEFAULTS.doc },
+      label: 'Depth per pass', section: 'GEOMETRY', default: FACING_DEFAULTS.doc,
+      help: 'How deep each facing pass cuts (mm). Smaller is gentler on the tool and the finish; the last pass is clamped so the total never overshoots the material to remove.' },
     { param: 'xStart', match: { type: 'assign', var: FACING_VARS.xStart }, key: 'value', type: 'number',
-      label: 'Start X (radius + clearance)', section: 'GEOMETRY', default: 12 },
+      label: 'Start X (radius + clearance)', section: 'GEOMETRY', default: 12,
+      help: 'Where each pass begins in X — the bar RADIUS plus a little clearance (mm), not the diameter. Start outside the material so the tool enters air, never the corner of the stock.' },
     { param: 'feed', match: { type: 'assign', var: FACING_VARS.feed }, key: 'value', type: 'number',
       label: 'Feed', section: 'TOOL & CUT', default: FACING_DEFAULTS.feed },
 ];

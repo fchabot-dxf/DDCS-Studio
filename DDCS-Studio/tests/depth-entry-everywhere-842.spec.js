@@ -31,24 +31,50 @@ function assertRampSlope(lines, angle, nLevels) {
 }
 
 // ---------------- SURFACING (rides fillStrategy; ramp toward-centre like pocket) ----------------
+/**
+ * t1361 — READ FROM THE MOTION, NOT FROM THE TEXT. Surfacing emits its raster PARAMETRICALLY now: one ramp is written,
+ * inside the depth loop, and the machine runs it once per level. `assertRampSlope` counts `( ramp )` LINES, so it read
+ * "3 ramps" as "3 lines" and would now see one — a spec measuring the emitter's shape rather than the tool's path.
+ *
+ * The rule it was guarding is untouched and is asserted here directly: EVERY level descends by ramping, and no ramp is
+ * steeper than the declared angle. Both are read off the EXECUTED toolpath, which is the thing that was ever really
+ * meant, and which is true of a loop and a list alike. (SLOT and CONTOUR below still emit literal descents and keep
+ * the text helper — this is surfacing's reading changing, not the trio's rule.)
+ */
 test('SURFACING plunge = byte-identical; ramp descends ≤ angle; helix fits + pitch', async ({ page }) => {
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async () => {
         const { surfacingStack } = await import('/wizards/surfacingWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { traceToolpath } = await import('/engine/trace.js');
         const base = { w: 120, h: 100, toolDia: 12, depth: 6, stepdown: 2, strategy: 'parallel', feed: 800, plunge: 200 };
         const noEntry = emitMapped(surfacingStack(base)).text;
         const plunge = emitMapped(surfacingStack({ ...base, entry: 'plunge' })).text;
-        const ramp = emitMapped(surfacingStack({ ...base, entry: 'ramp', rampAngle: 5 })).text.split('\n');
-        const helix = emitMapped(surfacingStack({ ...base, entry: 'helix', helixPitch: 1.5 })).text.split('\n');
-        return { same: noEntry === plunge, plungeClean: !/\( ramp|\( helix/.test(plunge), ramp, helix };
+        const ramp = emitMapped(surfacingStack({ ...base, entry: 'ramp', rampAngle: 5 })).text;
+        const helix = emitMapped(surfacingStack({ ...base, entry: 'helix', helixPitch: 1.5 })).text;
+        // every CUTTING move that loses height — a plunge has no XY run, a ramp/helix does.
+        const descents = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid && s.z2 < s.z1 - 1e-9)
+            .map((s) => ({ run: Math.hypot(s.x2 - s.x1, s.y2 - s.y1), drop: s.z1 - s.z2 }));
+        return { same: noEntry === plunge, plungeClean: !/\( ramp|\( helix/.test(plunge),
+            rampEmits: /\( ramp \)/.test(ramp), helixEmits: /\( helix/.test(helix),
+            rampDescents: descents(ramp), helixDescents: descents(helix) };
     });
     expect(r.same, 'entry:plunge == no entry field (byte-identical)').toBe(true);
     expect(r.plungeClean, 'plunge emits no ramp/helix').toBe(true);
-    assertRampSlope(r.ramp, 5, 3);                                   // depth 6 / stepdown 2 = 3 levels
-    const hi = r.helix.findIndex((l) => l.includes('( helix )'));
-    expect(hi, 'surfacing helix emits').toBeGreaterThan(0);
+    // RAMP — depth 6 / stepdown 2 = 3 levels, so the loop ramps three times when it RUNS.
+    expect(r.rampEmits, 'surfacing ramp emits').toBe(true);
+    expect(r.rampDescents.length, 'a ramp per depth level (3), counted by executing the loop').toBe(3);
+    const tanMax = Math.tan(5.01 * Math.PI / 180);
+    for (const d of r.rampDescents) {
+        expect(d.run, 'the descent really ramps (it travels in XY), it does not plunge').toBeGreaterThan(0);
+        expect(d.drop, 'the ramp descends').toBeGreaterThan(0);
+        expect(d.drop / d.run, `slope ${(d.drop / d.run).toFixed(4)} ≤ tan(5°)`).toBeLessThanOrEqual(tanMax);
+    }
+    // HELIX — and the PITCH is visible in the count: 1.5mm/rev over a 2mm bite is FUP(2/1.5)=2 revs, 24 segments a
+    // rev, three levels = 144 descending segments. A plunge or a single lead-in could not produce that number.
+    expect(r.helixEmits, 'surfacing helix emits').toBe(true);
+    expect(r.helixDescents.length, 'the helix descends as 2 revolutions x 24 segments, per level (pitch 1.5 over a 2mm bite)').toBe(144);
 });
 
 test('SURFACING twin: user_surfacing_data controls entry through the binding + 3-value dropdown', async ({ page }) => {
@@ -62,12 +88,15 @@ test('SURFACING twin: user_surfacing_data controls entry through the binding + 3
         const base = { w: 120, h: 100, toolDia: 12, depth: 6, stepdown: 2, strategy: 'parallel' };
         const plunge = emitMapped(build({ ...base })).text;
         const ramp = emitMapped(build({ ...base, entry: 'ramp', rampAngle: 5 })).text;
-        const fill = flattenBlocks(build({ ...base, entry: 'ramp' })).find((b) => b && b.type === 'surfacefill');
+        // t1361 — the twin's body block is `surfaceraster` now; `surfacefill` is not in a surfacing stack any more, so
+        // this lookup found nothing and the socket assert below was reading undefined. Same binding, same socket key,
+        // the block it lands on is the one the switch collapsed the pair into.
+        const fill = flattenBlocks(build({ ...base, entry: 'ramp' })).find((b) => b && b.type === 'surfaceraster');
         return { plungeClean: !/\( ramp|\( helix/.test(plunge), rampHas: ramp.includes('( ramp )'), fillEntry: fill && fill.params && fill.params.entry };
     });
     expect(r.plungeClean, 'twin plunge byte path clean').toBe(true);
-    expect(r.rampHas, 'twin ramp: the binding writes surfacefill.entry → ramp emits').toBe(true);
-    expect(r.fillEntry, 'surfacefill carries entry=ramp (round-trip)').toBe('ramp');
+    expect(r.rampHas, 'twin ramp: the binding writes surfaceraster.entry → ramp emits').toBe(true);
+    expect(r.fillEntry, 'surfaceraster carries entry=ramp (round-trip)').toBe('ramp');
 });
 
 // ---------------- SLOT (own descent; ramp along its LENGTH; helix needs width > tool) ----------------

@@ -39,7 +39,13 @@ test('(1) every mill twin: unset → no waypoint; moved → G0 through the decla
             const moved = emitMapped(bld({ entryX: 77, entryY: -33 })).text;
             const movedLines = moved.split('\n');
             const wi = movedLines.findIndex((l) => /G0 X77 Y-33\s+\( entry \)/.test(l));
-            const firstCut = movedLines.findIndex((l) => /\bG0\b/.test(l) && /X-?\d/.test(l) && /Y-?\d/.test(l) && !/\( entry \)/.test(l));
+            // t1365 — AN AXIS WORD IS NOT ALWAYS A NUMBER ANY MORE. This looked for `X<digit> Y<digit>`, which is what a
+            // positioning move looked like while every op unrolled its geometry in JavaScript. Surfacing's parametric
+            // body writes `G0 X0 Y#47` — the row's Y is a register the machine fills in — so the old reading found NO
+            // first cut at all (index -1) and the "waypoint comes before it" check silently could not hold. The rule
+            // is unchanged; what widened is what counts as an axis word: a number, a register, or an expression.
+            const AXIS = (ax) => new RegExp(`${ax}\\s*(-?\\d|#|\\[)`);
+            const firstCut = movedLines.findIndex((l) => /\bG0\b/.test(l) && AXIS('X').test(l) && AXIS('Y').test(l) && !/\( entry \)/.test(l));
             out[op] = { unsetNoWaypoint: !/\( entry \)/.test(unset), movedHasWaypoint: wi >= 0, waypointBeforeCut: wi >= 0 && firstCut >= 0 && wi < firstCut };
         }
         return out;

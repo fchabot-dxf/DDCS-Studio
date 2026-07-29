@@ -18,6 +18,7 @@
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from './probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from './millToSlot.js';
 import { slotFromOp } from './opToSlot.js';
+import { stepoverPctOf } from '../wizards/ops/surfaceraster.js';   // t1363 — the ONE reading of a stored stepover
 import { stepoverMm } from '../wizards/ops/pocketfill.js';   // t1043 — the CANONICAL exported stepoverPct->mm: max(0.2, max(0.1,toolDia)*stepoverPct/100). surfacingWizard.js:24-27 computes the identical formula inline (its absent-param defaults differ — 12/60 vs 6/40 — but are unreachable when the op provides toolDia+pct); the seed test verifies surface stepover == the real surfacingStack value.
 import { builtinTypeForTwin } from '../blocks/wizardLibrary.js';   // t1049 — the DECLARED twin->built-in bridge (inverts opensAs->type/variant). Real programs use data-op TWINS (user_surfacing_data …), not the bare built-in optypes.
 import { getUserDef, camFieldsFromStack, flattenBlocks } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback; t1095 — the block-native pendant-field rows (S2); t1101 — flatten for the S4b identity re-derive
@@ -175,16 +176,15 @@ const DERIVE = {
     // t1325 — the surface generator's field is now the PERCENTAGE (the mm is derived in its macro header). Seeding it
     // reads the op's own intent where the op has it (the built-in stores stepoverPct), and RECOVERS it from the twin's
     // flat mm where it does not — pct = mm / toolØ · 100, computed ONCE here rather than left to drift.
-    surface: { stepoverPct: (p, toolDia) => {
-        const pct = Number(p.stepoverPct);
-        if (Number.isFinite(pct) && pct > 0) return pct;
-        // THE TWIN HAS NO toolDia AT ALL — it precomputes a flat mm — so the recovery uses the tool Ø the SLOT will
-        // actually carry (the op's, else the generator field's own default). Recovering against anything else changes
-        // the cut: a 9.6mm stepover is 80% of the Ø12 default, and calling it 60% would quietly widen the raster.
-        const mm = Number(p.stepover), d = Number(toolDia);
-        if (Number.isFinite(mm) && mm > 0 && Number.isFinite(d) && d > 0) return Math.round((mm / d) * 1000) / 10;
-        return 60;   // neither number anywhere → the CAM convention, not a guess
-    } },
+    // t1363 — ONE SOURCE: this now CALLS the atom's declared `stepoverPctOf` instead of restating it. The recovery
+    // still runs against the tool Ø the SLOT will actually carry (the op's, else the generator field's own default),
+    // which is what the override argument is for — recovering against anything else changes the cut: a 9.6mm stepover
+    // is 80% of the Ø12 default, and calling it 60% would quietly widen the raster.
+    // ONE BEHAVIOUR CHANGE, deliberate: a typed `stepoverPct` of 0 used to be treated here as ABSENT and silently
+    // replaced by 60, while both emitters treated it as a real zero and let the program refuse at its own
+    // `IF #44 <= 0 GOTO 91` guard. That was the dual reading; the emitters' rule wins, because a silent 60 is a
+    // raster the operator never asked for and a loud refusal is not.
+    surface: { stepoverPct: (p, toolDia) => stepoverPctOf(p, toolDia) },
 };
 
 // NON_BAKEABLE[camType] = generator field keys that MUST be Expose-only (Bake greyed). t1047 amend (user + advisor

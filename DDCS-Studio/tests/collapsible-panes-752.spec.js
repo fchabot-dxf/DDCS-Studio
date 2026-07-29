@@ -50,9 +50,32 @@ test.describe('collapse gives the form the space (mobile) — the surviving pane
     await strip(page, 'contour', 'preview3d').click();
     // wait for the collapse ANIMATION to actually finish (attribute flips instantly, height settles up to ~350ms) —
     // under workers=2 load a bare attribute-wait measured mid-animation (~184px). Mirror the height-settle guard.
-    await page.waitForFunction(() => { const el = document.querySelector('#wiz_contour [data-viz-pane="preview3d"]'); return el.getAttribute('data-collapsed') === '1' && el.getBoundingClientRect().height < 40; }, null, { timeout: 3000 });
+    //
+    // t1367 — THE GUARD MUST NOT RELEASE ABOVE THE NUMBER THE ASSERT DEMANDS. It waited for `< 40` and the assert
+    // below requires `<= 28`, so there was a 12px window in which the wait was satisfied by a strip that was still
+    // shrinking — and the assert then read it mid-flight (measured: 30.31px). That gap is the whole flake: on a
+    // fast machine the height usually raced past it, on a slower or loaded one it lands there every time, which is
+    // why this read as intermittent here and as a DETERMINISTIC red on the advisor's machine. Waiting on the same
+    // threshold the assert uses makes the two agree: it either settles to the strip or it times out honestly, and a
+    // real regression now shows up as a timeout instead of a coin flip.
+    // Waiting on a NUMBER presupposes the answer twice over, so this waits for the height to STOP CHANGING instead:
+    // the attribute flipped, and the measured height is the same across three consecutive animation frames. That is
+    // what "settled" actually means, it cannot release mid-flight, and it does not quietly encode the very value the
+    // assert is there to check.
+    await page.waitForFunction(() => {
+        const el = document.querySelector('#wiz_contour [data-viz-pane="preview3d"]');
+        if (!el || el.getAttribute('data-collapsed') !== '1') return false;
+        const h = el.getBoundingClientRect().height;
+        const w = window;
+        // Discard the PRE-ANIMATION PLATEAU: the attribute flips instantly, so the first frames still read the
+        // expanded height and three of them in a row look perfectly "stable" (measured: it settled at 206, the full
+        // height, and asserted against that). Only start counting once the pane is genuinely collapsing.
+        if (h >= 100) { w.__settle = []; return false; }
+        w.__settle = (w.__settle || []).concat(h).slice(-3);
+        return w.__settle.length === 3 && w.__settle.every((v) => Math.abs(v - h) < 0.01);
+    }, null, { timeout: 5000, polling: 'raf' });
     const h3Collapsed = (await p3.boundingBox()).height;
-    expect(h3Collapsed, 'collapsed the 3D pane folds to a SLIM bar (just the chevron, ≤~28px)').toBeLessThanOrEqual(28);
+    expect(h3Collapsed, `collapsed the 3D pane folds to a SLIM bar (just the chevron, ≤~28px) — settled at ${h3Collapsed}`).toBeLessThanOrEqual(28);
     expect(h3Expanded - h3Collapsed, 'collapsing frees the 3D height').toBeGreaterThan(100);
 
     // the OTHER pane keeps its size (mobile: fixed height, not grown), and the visual total shrinks → form gains

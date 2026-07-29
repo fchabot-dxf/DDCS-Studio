@@ -9,11 +9,19 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-async function seedProgram(page) {
-    await page.evaluate(async () => {
+/**
+ * t1365 — SEEDED FROM A POCKET, because this file is about the XFORM and surfacing stopped being a program a
+ * whole-program rotation can act on. Surfacing emits PARAMETRICALLY now, and t1353's guard REFUSES to text-rotate a
+ * program carrying parametric motion rather than half-applying one (it measured the failure: rotation couples the
+ * axes, so a move it can only half-rewrite gains a second axis word — uncommanded motion on a cutting line). Refusing
+ * is the shipped truth; the rotation machinery is not surfacing-specific, so it is demonstrated on a literal op that
+ * still rotates, and the refusal gets its own test at the bottom of this file.
+ */
+async function seedProgram(page, wiz = 'pocket') {
+    await page.evaluate(async (w) => {
         window.ddcsLoadBlockStack([]);
-        window.openWiz('surfacing', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
-    });
+        window.openWiz(w, undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
+    }, wiz);
     await page.waitForTimeout(350);
 }
 
@@ -118,4 +126,40 @@ test('the xform renders + round-trips through the Blocks workspace (Blocks-edita
     expect(rt, 'the xform round-trips through the Blocks workspace (renders + editable, not dropped)').not.toBeNull();
     expect(rt.angle, 'angle survives the Blocks round-trip').toBeCloseTo(15, 3);
     expect(rt.pivotX, 'pivotX survives the Blocks round-trip').toBeCloseTo(3, 3);
+});
+
+/**
+ * t1365 — AND THE REFUSAL IS THE OTHER HALF OF THE SAME TRUTH. A program carrying a PARAMETRIC body cannot be
+ * text-rotated: the rotation rewrites a move with BOTH axis words, and on `G0 X0 Y#47` it can only replace the X —
+ * so it used to APPEND, giving the controller a second Y on a cutting line (t1353's measurement). It refuses the
+ * whole program now and touches nothing, and it SAYS SO rather than failing silently, because the operator asked
+ * for a rotation and would otherwise believe it happened.
+ *
+ * This is the flow that narrows: a program containing a surfacing op cannot be aligned by the Transform / Align
+ * rotate today. The improvement turn absorbs rotation INTO the atom (a declared frame angle, the same way placement
+ * and the skim frame were absorbed) — at which point this test's second half becomes "it rotates", not "it refuses".
+ */
+test('a PARAMETRIC program refuses the rotation, with its reason, and is left byte-identical', async ({ page }) => {
+    page.on('dialog', (d) => d.accept());
+    const warnings = [];
+    page.on('console', (m) => { if (m.type() === 'warning') warnings.push(m.text()); });
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz && window.ddcsGetBlockProgram && window.ddcsGetBlockGcode && window.ddcsAlignRotate);
+    await seedProgram(page, 'surfacing');
+
+    const base = await page.evaluate(() => window.ddcsGetBlockGcode());
+    expect(base, 'the seed really is the parametric surfacing body').toContain('SURFACING, parametric');
+
+    await page.evaluate(() => window.ddcsAlignRotate());
+    await page.waitForSelector('[data-pane="align"] [data-ang]', { state: 'visible', timeout: 8000 });
+    await page.fill('[data-pane="align"] [data-ang]', '12');
+    await page.dispatchEvent('[data-pane="align"] [data-ang]', 'input');
+    await page.click('[data-pane="align"] [data-rgo]');
+    await page.waitForTimeout(350);
+
+    // THE PROGRAM IS UNTOUCHED — not half-rotated, not silently partly-rewritten.
+    const after = await page.evaluate(() => window.ddcsGetBlockGcode());
+    expect(after, 'a parametric program comes back byte-identical — nothing was half-applied').toBe(base);
+    // …AND THE REASON IS SAID OUT LOUD. Silence is the worst refusal.
+    expect(warnings.join(' | '), `the refusal names itself (saw: ${warnings.join(' | ')})`).toMatch(/rotate.*(refused|skipped)/i);
 });

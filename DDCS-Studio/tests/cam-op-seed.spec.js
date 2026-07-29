@@ -27,8 +27,11 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
     const drill = seedFromOp(op('drill', P_DRILL));
     const slot = seedFromOp(op('slot', { ax: 0, ay: 0, bx: 100, by: 0, depth: 8, stepdown: 2, feed: 600, clearance: 5, rpm: 8000, width: 10, toolDia: 6 }));
 
-    // the wizard's ACTUAL absolute stepover for the surface sample (the surfacefill block's stepover param)
-    const wizFill = find(surfacingStack(P_SURF), 'surfacefill');
+    // the wizard's ACTUAL absolute stepover for the surface sample. t1361 — the switch retires the `surfacefill`
+    // block AND its flat mm socket: `surfaceraster` carries the two knobs the millimetre is DERIVED from, which is
+    // the same derivation the macro header does at the machine. So the wizard's mm is read the way the wizard now
+    // holds it — as the product — and the assert below still compares the slot against it, unchanged in substance.
+    const wizFill = find(surfacingStack(P_SURF), 'surfaceraster');
 
     return {
       camType: { pocket: pocket.camType, surface: surface.camType, corner: corner.camType, drill: drill.camType, slot: slot.camType,
@@ -57,7 +60,7 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
         // t1325 — the surface field is now the PERCENTAGE (see the restated assert below); its mm is derived in the macro
         surfStepoverPct: byKey(surface, 'stepoverPct').value, surfStepoverGone: !surface.fields.some((f) => f.key === 'stepover'),
         surfToolDia: byKey(surface, 'toolDia').value,
-        wizStepover: wizFill && wizFill.params.stepover, expectPocketStepover: stepoverMm(P_POCKET) },
+        wizStepover: wizFill && (wizFill.params.toolDia * wizFill.params.stepoverPct / 100), expectPocketStepover: stepoverMm(P_POCKET) },
       bake: {
         cornerCorner: byKey(corner, 'corner').bakeable, cornerSeq: byKey(corner, 'seq').bakeable, cornerRetract: byKey(corner, 'retract').bakeable,
         surfStepdown: byKey(surface, 'stepdown').bakeable, surfDepth: byKey(surface, 'depth').bakeable, drillPosX: byKey(drill, 'posX').bakeable },

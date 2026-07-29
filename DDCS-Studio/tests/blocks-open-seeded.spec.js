@@ -40,5 +40,7 @@ test('Blocks tab renders a non-empty program on open (no swallowed showBlocks Re
   const types = await page.evaluate(() => (window.__blkws ? window.__blkws.getAllBlocks().map((b) => b.type) : []));
 
   expect(showFails, 'showBlocks() ran without throwing into its catch (renderFromModel/getProjection in scope)').toEqual([]);
-  expect(types, 'the seeded program rendered into the Blocks workspace').toEqual(expect.arrayContaining(['stepdown']));
+  // t1365 — the seed is a surfacing op, and surfacing is ONE atom now: the switch collapsed `stepdown{ surfacefill }`
+  // into `surfaceraster`, which carries the depth loop itself. Same claim about the same tab, naming the block there.
+  expect(types, 'the seeded program rendered into the Blocks workspace').toEqual(expect.arrayContaining(['surfaceraster']));
 });

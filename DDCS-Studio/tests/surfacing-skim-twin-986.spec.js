@@ -1,9 +1,11 @@
 // t986 — the surfacing DATA-OP twin (opensAs) must emit Skim BYTE-IDENTICAL to the built-in surfacingStack(skim), via
 // the applySkimStructure postInstantiate (progstart drops the absolute clearance + placeonstock→skim). The crash-guard
-// (NO absolute Z before G91) MUST hold on the twin too. Normal stays byte-identical.
+// MUST hold on the twin too. Normal stays byte-identical.
+// t1361 — the guard's GATE was G91 and is now the frame read + its sentinel refusal; the rule it enforces (no Z move
+// before the op's reference exists) is the same one, restated to what establishes that reference today.
 import { test, expect } from '@playwright/test';
 
-test('twin Skim == built-in Skim byte-identical; crash-guard holds (no abs Z before G91); Normal byte-identical', async ({ page }) => {
+test('twin Skim == built-in Skim byte-identical; crash-guard holds (no Z before the frame is read); Normal byte-identical', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const r = await page.evaluate(async () => {
@@ -23,23 +25,33 @@ test('twin Skim == built-in Skim byte-identical; crash-guard holds (no abs Z bef
     const skim = emitEquivalence(surfacingStack, dataBuilder, skimSweep);
     // NORMAL still byte-parity (absent + explicit)
     const normal = emitEquivalence(surfacingStack, dataBuilder, [S({}), S({ zMode: 'normal' })]);
-    // the CRASH-GUARD on the TWIN: no absolute Z move before the G91
+    // t1361 — THE CRASH-GUARD, ON ITS NEW GATE. The rule has not moved: the tool must not make a Z move before the
+    // reference this whole op is measured from EXISTS. What changed is what establishes it. A G91 wrapper used to
+    // make the jog point the origin by arithmetic; the atom now READS the live position into #62-#64 and REFUSES
+    // (GOTO93, tool still up) if the read did not land — so the gate is the last sentinel check, and there is no
+    // G91 anywhere by design (t1355: relativizing a LOOP has nothing in the text to rewrite).
+    // The Z test is also WIDENED, and that matters: the old `Z-?\d` only saw a literal, and every Z in this body is
+    // now an expression (`Z[#64 + 5]`). Left as it was, the guard would have gone quiet exactly when the emit changed.
     const twinSkim = emitMapped(dataBuilder(S({ zMode: 'skim' }))).text;
     const lines = twinSkim.split('\n').map((l) => l.trim());
-    const g91 = lines.findIndex((l) => /^G91\b/.test(l));
-    const preZ = lines.slice(0, g91).filter((l) => /^G[0-3]\b/.test(l) && /Z-?\d/.test(l));
-    const firstZafter = lines.slice(g91 + 1).find((l) => /Z-?\d/.test(l));
+    const gate = lines.map((l, i) => (/^IF #6[234] == -99999 GOTO93\b/.test(l) ? i : -1)).filter((i) => i >= 0).pop();
+    const preZ = lines.slice(0, gate + 1).filter((l) => /^G[0-3]\b/.test(l) && /Z/.test(l));
+    const firstZafter = lines.slice(gate + 1).find((l) => /^G[0-3]\b/.test(l) && /Z/.test(l));
+    const noG91 = !lines.some((l) => /^G91\b/.test(l));
     return {
       skimPass: skim.pass, skimDiff: skim.firstDiff && { params: skim.firstDiff.params, a: skim.firstDiff.a.slice(0, 400), b: skim.firstDiff.b.slice(0, 400) },
       normalPass: normal.pass, normalDiff: normal.firstDiff && { a: normal.firstDiff.a.slice(0, 300), b: normal.firstDiff.b.slice(0, 300) },
-      g91, preZ, firstZafter,
+      gate, preZ, firstZafter, noG91,
     };
   });
   expect(r.skimPass, `twin Skim == built-in Skim (diff: ${JSON.stringify(r.skimDiff)})`).toBe(true);
   expect(r.normalPass, `twin Normal byte-identical (diff: ${JSON.stringify(r.normalDiff)})`).toBe(true);
-  expect(r.g91, 'twin Skim emits G91').toBeGreaterThan(0);
-  expect(r.preZ, `twin crash-guard: NO absolute Z before G91 (found: ${r.preZ.join(' | ')})`).toEqual([]);
-  expect(r.firstZafter, 'first Z after G91 is the +5 clearance lift').toMatch(/G0 Z5\b/);
+  expect(r.gate, 'twin Skim refuses on an unread frame before it moves').toBeGreaterThan(0);
+  expect(r.noG91, 'twin Skim needs no G91 — the body is absolute in the frame it read').toBe(true);
+  expect(r.preZ, `twin crash-guard: NO Z move before the frame is proven read (found: ${r.preZ.join(' | ')})`).toEqual([]);
+  // …and the lift is a REAL one now: relative to the touched surface the operator jogged to, not a bare G0 Z5 that
+  // a G91 wrapper turned into a delta (t1349 pinned that collapsing to `G0 Z0` — the tool never lifting).
+  expect(r.firstZafter, 'first Z after the gate is the +5 clearance lift above the read surface').toMatch(/^G0 Z\[#64 \+ 5\]/);
 });
 
 test('Skim round-trips through the op marker — byte-identical re-emit', async ({ page }) => {

@@ -9,11 +9,23 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-async function seedProgram(page) {
-    await page.evaluate(async () => {
+/**
+ * t1365 — SEEDED FROM A POCKET. This file measures that a typed alignment angle really ROTATES THE GEOMETRY about the
+ * datum, which needs a program made of absolute XY numbers to rotate. Surfacing stopped being one: it emits a
+ * parametric raster whose moves are expressions (`G0 X[0 + #40] Y#47`), so a text rotation cannot act on it at all —
+ * t1353's guard refuses the whole program rather than half-applying one — and this seed left only 2 literal XY moves
+ * where the assert needs more than 2. The alignment CORRECTION is not surfacing-specific, so it is measured on a
+ * literal op; the parametric refusal is covered by transform-declared-736's own refusal test.
+ *
+ * THE FLOW THIS NARROWS, stated plainly: a program containing a surfacing op cannot be alignment-rotated today. The
+ * improvement turn absorbs rotation into the atom (a declared frame angle, as placement and the skim frame already
+ * are), which is why that turn takes rotation FIRST.
+ */
+async function seedProgram(page, wiz = 'pocket') {
+    await page.evaluate(async (w) => {
         window.ddcsLoadBlockStack([]);
-        window.openWiz('surfacing', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
-    });
+        window.openWiz(w, undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
+    }, wiz);
     await page.waitForTimeout(350);
 }
 

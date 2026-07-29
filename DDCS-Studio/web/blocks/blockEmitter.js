@@ -139,6 +139,18 @@ function reportRefusal(res, what) {
     return res;
 }
 
+/** t1359 — the SOLE wrapped child that declares it absorbs its own frame (`absorbsPlacement`), or null. One source,
+ *  read by both the place fold and the skim fold, so the two cannot disagree about which children are self-framing.
+ *  Deliberately strict: exactly ONE child, declaring it. A mixed body (a self-framing atom beside a literal one) has
+ *  no single right answer — the shift would have to be both passed and painted — so it falls through to the text
+ *  rewrite, which is what those literal atoms have always used and still works for them. */
+function absorbingChild(children) {
+    const list = (children || []).filter(Boolean);
+    if (list.length !== 1) return null;
+    const d = BLOCKS[list[0].type];
+    return (d && d.absorbsPlacement) ? list[0] : null;
+}
+
 /** Recursive fold → tagged lines. `anc` = ancestry of block ids; `scope` = the variable environment. */
 function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dialect = DEFAULT_DIALECT) {
     const def = BLOCKS[block.type];
@@ -238,6 +250,17 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         // so the placement tracks the pattern (one source of truth). Falls back to the snapshot for un-migrated ops.
         const s = placeShiftFromParams(p, liveExtent(block.children, scope));
         if (!s.x && !s.y && !s.z) return inner;
+        // t1359 — A CHILD THAT DECLARES `absorbsPlacement` TAKES THE SHIFT AS PARAMS, and the text is left alone.
+        // translateProgram finds a number after an axis letter and writes a different number back: exact on a literal
+        // toolpath, destructive on a parametric one. t1349 measured `G0 X0 Y#47` becoming `G0 X50 Y#47` — the X
+        // shifted, the register Y not, the raster sheared. So placed geometry is told WHERE IT IS instead of being
+        // moved afterwards. (The literal atoms keep the rewrite below; nothing about them changed.)
+        const absorber = absorbingChild(block.children);
+        if (absorber) {
+            const framed = { ...absorber, params: { ...(absorber.params || {}),
+                x: num((absorber.params || {}).x, 0) + s.x, y: num((absorber.params || {}).y, 0) + s.y, z0: num((absorber.params || {}).z0, 0) + s.z } };
+            return emit(framed, dx, dy, own, scope, dialect);
+        }
         const moved = reportRefusal(translateProgram(inner.map((t) => t.line).join('\n'), s.x, s.y, s.z), 'place-on-stock').text.split('\n');
         return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 translate)
     }
@@ -255,6 +278,16 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const inner = [];                      // relativizeProgram the whole thing (abs → G91 deltas from the jog origin
         (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect)));   // 0,0,0) and wrap G91 … G90. The G53 retract sits OUTSIDE (footer, machine frame).
         const clr = r3(num(p.clearance, 5));
+        // t1359 — A CHILD THAT ABSORBS ITS FRAME IS TOLD THE MODE instead of having its text relativized. Relativizing
+        // a LOOP is not a harder version of relativizing a list — the deltas are runtime values, so there is nothing in
+        // the text to rewrite (t1349 pinned the inter-level retract collapsing to `G0 Z0`: the tool never lifting).
+        // The atom reads the live jog position into its own registers and emits ABSOLUTE moves in that frame, so no
+        // G91 wrapper is needed or wanted: the program is already relative to wherever the operator jogged to.
+        const skimAbsorber = absorbingChild(block.children);
+        if (skimAbsorber) {
+            const framed = { ...skimAbsorber, params: { ...(skimAbsorber.params || {}), zMode: 'skim', clearance: num(p.clearance, 5) } };
+            return emit(framed, dx, dy, own, scope, dialect);
+        }
         const rel = relativizeProgram([`G0 Z${clr}   ( clearance )`, ...inner.map((t) => t.line)].join('\n')).text.split('\n');
         const out = [tag('G91   ( skim - X/Y/Z relative to the jog start )', own), tag(rel[0], own)];   // G91 + the relativized clearance lift (own provenance)
         for (let i = 0; i < inner.length; i++) { const t = inner[i]; out.push(t.cap ? { line: rel[i + 1], src: t.src, cap: t.cap } : { line: rel[i + 1], src: t.src }); }   // relativized body, provenance kept
@@ -378,9 +411,46 @@ function applyEntryWaypoint(T, blocks) {
     const e = findEntryBlock(blocks); if (!e || !e.params) return;
     const ex = num(e.params.entryX, NaN), ey = num(e.params.entryY, NaN);
     if (!Number.isFinite(ex) || !Number.isFinite(ey)) return;   // unset → the cut owns its entry
+    // t1365 — A DECLARED ENTRY POINT MUST NOT SILENTLY DO NOTHING. `firstRapidXY` reads the program's own cut entry by
+    // matching literal numbers after X and Y, which is what every rapid looked like while ops unrolled their geometry
+    // in JavaScript. A parametric body opens with `G0 X0 Y#47` — the row's Y is a register the machine fills in — so
+    // that returned null and the whole pass RETURNED: the operator dragged the entry square, the emit ignored it, and
+    // nothing said so. Measured on surfacing, and it would meet every op the parametric family takes next.
+    //
+    // The ε-compare is what genuinely cannot be done against a runtime value: there is no way to know at build time
+    // whether the declared point is already where the cut starts. So the two cases split by what is KNOWABLE — a
+    // literal entry keeps the exact behaviour it has always had (byte-identical), and an unresolvable one honours the
+    // declaration, because the operator asked for the waypoint and a rapid to it is the safe act.
     const cut = firstRapidXY(T.map((t) => t.line).join('\n'));
-    if (!cut || (Math.abs(ex - cut.x) < 1e-3 && Math.abs(ey - cut.y) < 1e-3)) return;   // within ε → byte-identical
-    T.splice(cut.index, 0, { line: `G0 X${r3(ex)} Y${r3(ey)}   ( entry )`, src: e.id ? [e.id] : null });   // one waypoint at clearance, before the cut
+    if (cut) {
+        if (Math.abs(ex - cut.x) < 1e-3 && Math.abs(ey - cut.y) < 1e-3) return;   // within ε → byte-identical
+        T.splice(cut.index, 0, { line: `G0 X${r3(ex)} Y${r3(ey)}   ( entry )`, src: e.id ? [e.id] : null });   // one waypoint at clearance, before the cut
+        return;
+    }
+    // NOT IN A JOG-RELATIVE OP. A skim program is measured from wherever the operator jogged to, so an ABSOLUTE entry
+    // point has nothing to be absolute against — routing through one would drive the tool to a machine position the
+    // op never meant. The skim fold is a declared block, so this asks the stack rather than sniffing the text.
+    if (hasSkimFold(blocks)) return;
+    // the first rapid carrying BOTH axes in ANY form (a number, a register, or an expression) is the cut entry.
+    const AX = (ax) => new RegExp(`${ax}\\s*(-?\\d|#|\\[)`);
+    const idx = T.findIndex((t) => /\bG0\b/.test(t.line) && AX('X').test(t.line) && AX('Y').test(t.line));
+    if (idx < 0) return;
+    T.splice(idx, 0, { line: `G0 X${r3(ex)} Y${r3(ey)}   ( entry )`, src: e.id ? [e.id] : null });
+}
+
+/** t1365 — does this program carry a SKIM fold (a whole-op jog-relative frame)? Declared, not sniffed. */
+function hasSkimFold(blocks) {
+    const walk = (bs) => {
+        for (const b of (bs || [])) {
+            if (!b) continue;
+            const d = BLOCKS[b.type];
+            if (d && d.kind === 'skim') return true;
+            if (b.uiChildren && walk(b.uiChildren)) return true;
+            if (b.children && walk(b.children)) return true;
+        }
+        return false;
+    };
+    return walk(blocks);
 }
 
 /** t736 — THE DECLARED PROGRAM ROTATION: a flat `xform` sibling declares {angle,pivotX,pivotY}; rotate EVERY emitted

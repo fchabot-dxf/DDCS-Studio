@@ -86,8 +86,12 @@ test('surfacing-as-data: byte-identical G-code to surfacingStack across a param 
       resolves: typeof dataBuilder === 'function',
       main: { pass: main.pass, count: main.count, firstDiff: main.firstDiff && { params: main.firstDiff.params, a: main.firstDiff.a.slice(0, 600), b: main.firstDiff.b.slice(0, 600) } },
       clearancePass: clearance.pass,
-      sampleHasFill: /G1 X-?\d/.test(sampleText),    // real lateral clearing passes
-      sampleHasPlunge: /G1 Z-/.test(sampleText),     // plunge to a cut depth
+      sampleHasFill: /G1 X-?[\d[]/.test(sampleText),    // real lateral clearing passes (a literal X, or an expression)
+      // t1361 — THE PLUNGE IS STILL A PLUNGE; only its DEPTH stopped being a literal. This guard exists to catch a
+      // vacuously empty emit, and `G1 Z-` was how a descent looked when JavaScript wrote every level out. The atom
+      // cuts to the level the machine is holding in #46, so the honest form of the same question is "is there a FED
+      // Z move that descends by the level register" — which a program that cuts nothing still cannot fake.
+      sampleHasPlunge: /G1 Z\[[^\]]*- #46\] F/.test(sampleText),   // plunge to the cut depth, now register-driven
     };
   });
 
@@ -96,7 +100,10 @@ test('surfacing-as-data: byte-identical G-code to surfacingStack across a param 
   expect(r.independentPath, 'data builder is NOT surfacingStack (independent code path)').toBe(true);
   expect(r.pristine, 'lives in the user layer; built-in BUILDERS/SCHEMA untouched').toBe(true);
   // Every binding wired to the same socket surfacingStack routes its param to.
-  expect(r.bindingCount, 'all surfacing params are bound (t842 +4 depth-entry; t996 +1 rpm → progstart; t1031 +1 confirmEvery → stepdown)').toBe(24);
+  // t1361 — 24 → 25, and the +1 is a SPLIT, not a new knob: the switch retires the flat `stepover` millimetre and
+  // binds the two things it was derived FROM (toolDia + stepoverPct), because those are what the macro header
+  // re-derives at the machine. One binding out, two in.
+  expect(r.bindingCount, 'all surfacing params are bound (t842 +4 depth-entry; t996 +1 rpm → progstart; t1031 +1 confirmEvery → the raster; t1361 stepover mm → toolDia + stepoverPct)').toBe(25);
   expect(r.wiringFails, 'every binding routes to the same socket surfacingStack uses').toEqual([]);
   // The core claim: byte-identical across the whole sweep (placement offsets, size, parallel/concentric, depth, stock-attach).
   if (!r.main.pass) console.log('FIRST DIFF @', JSON.stringify(r.main.firstDiff && r.main.firstDiff.params) + '\n--- surfacingStack ---\n' + (r.main.firstDiff && r.main.firstDiff.a) + '\n--- data def ---\n' + (r.main.firstDiff && r.main.firstDiff.b));
@@ -146,14 +153,17 @@ test('t1349 — a shape change MOVES every index and re-aims NO binding (identit
 
     // AND THE AMBIGUITY GUARD: two blocks of a matched type must THROW, not silently take the first one.
     const dup = buildSurfacingTwinStack();
-    dup[0].children = [...dup[0].children, { type: 'surfacefill', params: { w: 1, h: 1 } }];
+    // t1361 — the duplicate has to be a type the stack ACTUALLY holds, or this guard stops guarding: after the switch
+    // a stray `surfacefill` is the ONLY one in a surfacing stack, so it matched once, threw nothing, and the assert
+    // below would have been passing on an empty condition. `surfaceraster` is the block the body is made of now.
+    dup[0].children = [...dup[0].children, { type: 'surfaceraster', params: { w: 1, h: 1 } }];
     let ambiguous = null;
     try { surfacingBindingsFor(dup); } catch (e) { ambiguous = String(e.message || e); }
 
     return { base, after, ambiguous, params: Object.keys(base) };
   });
 
-  expect(r.params.length, 'the whole binding set is under test').toBe(24);
+  expect(r.params.length, 'the whole binding set is under test (t1361: 25 — the flat stepover mm split into toolDia + stepoverPct)').toBe(25);
   // EVERY index really moved — otherwise the invariant below would be trivially true.
   const movedBy = r.params.map((p) => r.after[p].at - r.base[p].at);
   expect([...new Set(movedBy)], 'the shape change shifted every body binding by exactly one').toEqual([1]);

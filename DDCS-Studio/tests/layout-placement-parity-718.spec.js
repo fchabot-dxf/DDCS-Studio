@@ -22,7 +22,15 @@ async function openTwin(page, opType, cfg) {
 
 // The feature (previewGeometry) world bbox (calibrated off the stock rect: world 0..200 x 0..150, datum nnp) + the emit
 // toolpath bbox parsed from the code — the two things that MUST coincide once the previewGeometry is placed.
-const measure = (page) => page.evaluate(() => {
+/**
+ * t1365 — THE "TOOLPATH" SIDE IS NOW THE TOOLPATH. It used to be a TEXT SCAN for `X<number>` over the emitted code,
+ * which was the same thing while every op wrote its geometry out as literals. A parametric body writes the far edge
+ * of the pass as `X[25 + #40]` — a build-time frame plus a runtime width — so the scan saw only the frame's 25 and
+ * put the "toolpath" centre 75mm from where the tool actually goes. It is EXECUTED now, and scoped to the CUTTING
+ * moves, which is what the drawn feature is supposed to coincide with (a rapid to clearance is not the feature).
+ */
+const measure = (page) => page.evaluate(async () => {
+    const { traceToolpath } = await import('/engine/trace.js');
     const st = document.querySelector('#wiz_user .fc-stock').getBoundingClientRect();
     const sx = st.width / 200, sy = st.height / 150, left = st.left, bottom = st.bottom;
     const feats = [...document.querySelectorAll('#wiz_user .fc-path, #wiz_user .fc-guide')];
@@ -30,7 +38,13 @@ const measure = (page) => page.evaluate(() => {
     const fc = u ? { minX: (u.left - left) / sx, maxX: (u.right - left) / sx, minY: (bottom - u.bottom) / sy, maxY: (bottom - u.top) / sy } : null;
     const code = document.querySelector('#wiz_user_code').textContent || '';
     let mnX = 1e9, mxX = -1e9, mnY = 1e9, mxY = -1e9;
-    for (const ln of code.split('\n')) { const mx = ln.match(/X(-?\d+\.?\d*)/), my = ln.match(/Y(-?\d+\.?\d*)/); if (mx) { mnX = Math.min(mnX, +mx[1]); mxX = Math.max(mxX, +mx[1]); } if (my) { mnY = Math.min(mnY, +my[1]); mxY = Math.max(mxY, +my[1]); } }
+    for (const s of (traceToolpath(code).segments || [])) {
+        if (s.rapid) continue;   // the CUT is the feature; a clearance rapid is not part of what is drawn
+        for (const [x, y] of [[s.x1, s.y1], [s.x2, s.y2]]) {
+            if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+            mnX = Math.min(mnX, x); mxX = Math.max(mxX, x); mnY = Math.min(mnY, y); mxY = Math.max(mxY, y);
+        }
+    }
     const tr = mxX > -1e9 ? { minX: mnX, maxX: mxX, minY: mnY, maxY: mxY } : null;
     const ctr = (b) => b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : null;
     return { fc, tr, fcC: ctr(fc), trC: ctr(tr), nfeat: feats.length };

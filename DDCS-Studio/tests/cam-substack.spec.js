@@ -64,14 +64,22 @@ test('S1b subStackToSlot — a standard sub-unit stays LIVE (generator loop) + c
             derivedStepover: derived.stepover, derivedDepth: derived.depth,
             body: slot.body, nfields: slot.fields.length,
             stepoverVar: byKey.stepoverPct ? byKey.stepoverPct.var : null,   // t1325 — the surface generator's knob is the PERCENTAGE now; the mm is derived in the macro
+            derivedToolDia: derived.toolDia, derivedStepoverPct: derived.stepoverPct,   // t1361 — the two sockets the mm is derived from
             cfeed: byKey.cfeed || null, cz: byKey.cz || null,
             macro,
         };
     });
 
     // (1) the re-derivation recovered the surfacing params from the sub-stack sockets (one-source, not a snapshot)
-    expect(r.derivedStepover, 'stepover re-derived from surfacefill.stepover socket').toBe(7.2);
-    expect(r.derivedDepth, 'depth re-derived from stepdown.to socket').toBe(0.5);
+    // t1361 — READ FROM THE SOCKETS THAT EXIST. The re-derivation itself is generic (it walks the def's bindings), so
+    // nothing about it changed; what changed is which sockets surfacing HAS. The flat `surfacefill.stepover` mm is
+    // gone — `surfaceraster` carries the tool Ø and the percentage — and the depth moved from `stepdown.to` onto the
+    // same atom. The recovered stepover is still the SAME 7.2mm, one derivation removed, which is the whole claim:
+    // the sub-unit reads its parameters from the stack rather than from a snapshot taken beside it.
+    expect(r.derivedToolDia, 'tool Ø re-derived from the surfaceraster socket').toBe(12);
+    expect(r.derivedStepoverPct, 'stepover % re-derived from the surfaceraster socket').toBe(60);
+    expect(r.derivedToolDia * r.derivedStepoverPct / 100, 'and it is the same 7.2mm the flat socket used to hold').toBeCloseTo(7.2, 6);
+    expect(r.derivedDepth, 'depth re-derived from the surfaceraster depth socket').toBe(0.5);
 
     // (2) the surfacing sub-unit stays LIVE — the generator's runtime WHILE raster loop is intact, NOT unrolled
     expect(r.body, 'Z-layer WHILE loop').toMatch(/WHILE #\d+ LT #\d+ DO1/);

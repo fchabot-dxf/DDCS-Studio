@@ -558,7 +558,16 @@ export function instantiate(def, params) {
     // travelApproach) for any absent param BEFORE prune. A bool guard tolerates undefined (whenOk coerces !!undefined=false),
     // but an ENUM guard needs the value (undefined === 'auto' is false → the arm would drop). Value bindings are untouched
     // (their absence is handled per-binding below). A legacy def (no structural bindings) → this is a no-op → byte-identical.
-    const p = withGuardDefaults(def, params);
+    // t1363 — THE ONE DECLARED NORMALIZATION, at the single point params enter a build. A def may declare
+    // `normalizeParams(params)` to fold a stored value into the sockets it is actually bound to, BEFORE any binding
+    // reads it. Surfacing is the case that forced it: an op stored before the stepover split carries a flat `stepover`
+    // millimetre, and the twin binds `stepoverPct` — so the stored millimetre reached no socket at all and the binding
+    // default quietly cut a different raster than the saved op did, while the wizard stack and the CAM seed both
+    // recovered it correctly. Two paths reading one stored value differently is the split the parametric switch exists
+    // to kill, so the recovery happens ONCE, here, for every path that builds through a def.
+    // A def with no hook is untouched → byte-identical for every existing user op.
+    const normalized = (typeof def.normalizeParams === 'function' && params) ? def.normalizeParams(params) : params;
+    const p = withGuardDefaults(def, normalized);
     const clone = JSON.parse(JSON.stringify(def.template || []));
     // t469 — inject DERIVED guard keys (e.g. pocket's `_tooSmall`, computed from the geometry) so a guard can key on a value
     // that is NOT any single user param. ONE-SOURCE: the derive lives on the def (registered via setUserDeriveGuards), run
@@ -636,7 +645,7 @@ export function validateUserOp(def) {
  * from the file. A foreign opType has no local behaviour to restore, and the import SAYS SO rather than losing it
  * silently (the file names which hooks its author had; see wizardToFile).
  */
-export const OP_CODE_HOOKS = ['postInstantiate', 'deriveGuards', 'simStartsProvider', 'previewGeometry', 'simGcode', 'statusHint'];
+export const OP_CODE_HOOKS = ['postInstantiate', 'deriveGuards', 'simStartsProvider', 'previewGeometry', 'simGcode', 'statusHint', 'normalizeParams'];
 const LOCAL_HOOKS = new Map();   // opType → { hookName: fn } — survives deleteUserOp, because the APP still knows it
 
 /** Which code hooks this app has for `opType` (empty = it is a stranger here). */
