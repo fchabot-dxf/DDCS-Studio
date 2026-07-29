@@ -2,6 +2,7 @@
 // Studio: drop a .nc OR pull the current Studio editor program, optionally instrument it with beacons for
 // progress tracking, then submitJob to the gateway queue. A WRITE op — the operator still presses Cycle Start.
 import { el, toast } from '../util.js';
+import { contractFor, isUnreachable } from '../state.js';   // t1327 — the declared connection-state contract
 import { instrument, DEFAULTS } from '../../../shared/js/instrument/instrument.js';
 import { dlgConfirm, dlgNotice } from '../../dialog.js';
 import { checkEnvelope } from '../../../engine/envelopeCheck.js';   // t838 — pre-flight before the push
@@ -137,8 +138,26 @@ export default {
       }
     };
 
+    // t1327 — THE STATE BANNER. Send stayed fully armed with no gateway, so the failure arrived as an exception
+    // AFTER the click, on the one screen where the click means "push this at my machine". The contract says this tab
+    // KEEPS its staged text — the operator's own program, which they can prepare and edit with the machine off — and
+    // DISARMS the send, greying it with the reason on the control (postGating's rule, not a hidden button).
+    const banner = el('div', { class: 'gw-state-banner', 'data-gw-state': '', style: 'display:none' });
+    this.applyState = (desc) => {
+      const c = contractFor('send');
+      const out = isUnreachable(desc);
+      banner.style.display = out ? '' : 'none';
+      banner.setAttribute('data-gw-state', out ? 'unreachable' : 'connected');
+      banner.textContent = out ? c.reason : '';
+      btn.disabled = out || !file.text;                         // staging stays usable; SENDING is what needs a machine
+      btn.title = out ? c.reason : '';
+      // the offline half stays live on purpose — dropping a file, using the Studio program, naming the job
+      for (const elm of [drop, useStudio, nameField, beacons, count, pacing, varN, markerV, markerN]) elm.disabled = false;
+    };
+
     ctx.root.append(el('section', { class: 'block' },
       el('div', { class: 'section-label' }, 'Send a program'),
+      banner,
       drop, input,
       el('div', { class: 'row', style: 'margin-top:10px' }, useStudio),
       el('div', { class: 'row', style: 'margin-top:12px' },
@@ -150,5 +169,11 @@ export default {
         'Beacons ON instruments the job for progress tracking; OFF = deliver-only (probe / util macros). '
         + 'The operator presses Cycle Start at the machine.')));
     sync();
+    this.applyState(ctx.desc !== undefined ? ctx.desc : (ctx.status && ctx.status.descriptor));
+  },
+
+  // the poll is where the state actually changes; the banner and the button follow it rather than the mount alone
+  async onPoll(ctx) {
+    if (this.applyState) this.applyState(ctx.desc !== undefined ? ctx.desc : (ctx.status && ctx.status.descriptor));
   },
 };

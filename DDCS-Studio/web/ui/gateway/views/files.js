@@ -1,5 +1,7 @@
 // files.js — the CNCDISK explorer: list the controller's files, view G-code (preview-block), delete (safe).
+// t1327 — it obeys the declared connection-state contract: no gateway → no rows (gateway/state.js).
 import { el, toast } from "../util.js";
+import { stateNote } from "../state.js";   // t1327 — the one wording for "nothing here is live"
 import { dlgConfirm, dlgPrompt, dlgNotice } from '../../dialog.js';   // in-app dialogs (t684 d — no bare confirm/prompt/alert)
 
 export default {
@@ -39,7 +41,15 @@ export default {
 
   async onPoll(ctx) {
     let idx;
-    try { idx = await ctx.client.listFiles(); } catch { return; }
+    // t1327 — THE PHANTOM LISTING'S ROOT. This used to `return` on a failed poll, leaving the LAST SUCCESSFUL listing
+    // on screen — rows naming files on a controller that is not there, with view and DELETE still armed. A delete
+    // clicked from that state fires at whatever gateway answers next. The contract (gateway/state.js) says this tab
+    // CLEARS when unreachable: a tab either has an answer from the current state or it says it has none.
+    try { idx = await ctx.client.listFiles(); }
+    catch {
+      this.list.replaceChildren(el("div", { class: "section-label" }, "CNCDISK"), stateNote(el, "files"));
+      return;
+    }
     const c = this.list;
     c.replaceChildren(el("div", { class: "section-label" }, "CNCDISK · " + (idx.path || "")));
     if (idx.error) { c.append(el("div", { class: "muted" }, "unreachable: " + idx.error)); return; }

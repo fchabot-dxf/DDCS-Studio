@@ -61,7 +61,13 @@ const lk = (id, text) => `<a href="#" class="help-link" data-help-link="${id}">$
  * to update — the FAQ would then confidently name nine things while the file carried ten. So the sentence reads the
  * same declared rows the file is built from: add a store and this answer names it, with no edit here at all.
  */
-const ddcsContents = () => BACKUP_STORES.map((s) => s.label).join(', ');
+// t1327 — JOINED WITH A MIDDOT, not a comma. A label carries its own comma ("Window layout (which panes are open,
+// their sizes)"), so a comma-joined sentence is STRUCTURALLY AMBIGUOUS: nothing reading it back can tell a separator
+// from a label's punctuation, and the spec that checks this answer against the registry split that one row into two
+// and failed on a registry that was perfectly correct. The separator has to be a character the labels cannot
+// contain. The typography is better anyway.
+export const CONTENTS_SEP = ' · ';
+const ddcsContents = () => BACKUP_STORES.map((s) => s.label).join(CONTENTS_SEP);
 
 const FAQ_HTML = `
     <div class="settings-section">

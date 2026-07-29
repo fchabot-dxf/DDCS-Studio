@@ -98,5 +98,6 @@ async function poll() {
         catch { /* the probe is best-effort; a failed one must never break the tick */ }
     }
     ctx.status = deriveStatus(ctx.client, desc);
+    ctx.desc = desc;   // t1327 — the raw descriptor, so a view reads the CONNECTION STATE from one obvious place
     if (active.onPoll) { try { await active.onPoll(ctx); } catch { /* transient */ } }
 }

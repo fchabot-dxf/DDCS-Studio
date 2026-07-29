@@ -229,13 +229,22 @@ test('every registered FAQ link opens its surface — and every registry entry i
 test('the .ddcs contents answer matches the BACKUP_STORES registry, 1:1 and in order', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1' && window.ddcsStudio, null, { timeout: 15000 });
+  // t1327 — DECLARED STATE (t1303 hygiene). This passed inside the suite and failed alone, which means it was reading
+  // state an earlier test had left behind rather than state it asked for. A test that only agrees with itself in one
+  // running order is not asserting the thing it names. So: open the panel, then WAIT for the entry to actually exist
+  // before reading it, instead of assuming a render that a previous test happened to have already done.
   await page.evaluate(async () => { (await import('/ui/helpPanel.js')).openHelp(); });
+  await page.waitForFunction(() => {
+    const d = [...document.querySelectorAll('#help_faq details')];
+    return d.some((x) => /What exactly is inside a \.ddcs file/.test(x.querySelector('summary').textContent));
+  }, null, { timeout: 10000 });
 
   const r = await page.evaluate(async () => {
     const { BACKUP_STORES } = await import('/data/backup.js');
+    const { CONTENTS_SEP } = await import('/ui/helpPanel.js');
     const entry = [...document.querySelectorAll('#help_faq details')]
       .find((d) => /What exactly is inside a \.ddcs file/.test(d.querySelector('summary').textContent));
-    return { labels: BACKUP_STORES.map((s) => s.label), text: entry ? entry.textContent : '' };
+    return { labels: BACKUP_STORES.map((s) => s.label), text: entry ? entry.textContent : '', sep: CONTENTS_SEP };
   });
 
   expect(r.labels.length, 'the registry is populated').toBeGreaterThan(5);
@@ -244,7 +253,19 @@ test('the .ddcs contents answer matches the BACKUP_STORES registry, 1:1 and in o
   // …and the answer names NOTHING ELSE as a store: the rendered list is exactly the registry's, in its order
   const listed = (r.text.match(/Everything this workspace is, in one file: ([^.]+)\./) || [])[1];
   expect(listed, 'the sentence carries the derived list').toBeTruthy();
-  expect(listed.split(', ').map((x) => x.trim()), 'exactly the declared rows, in registry order').toEqual(r.labels);
+  // t1327 — SPLIT ON THE SEPARATOR THE SENTENCE DECLARES, imported rather than re-typed here. A comma could not do
+  // this job: two labels contain one ("Window layout (which panes are open, their sizes)"), so a comma-split turned
+  // that single row into two and the 1:1 check failed on a registry that was perfectly correct.
+  expect(r.sep, 'the separator is declared by the module that writes the sentence').toBeTruthy();
+  expect(r.labels.some((l) => l.includes(',')), 'and it has to be, because a label really does contain a comma').toBe(true);
+  expect(r.labels.some((l) => l.includes(r.sep.trim())), 'while no label contains the separator').toBe(false);
+  expect(listed.split(r.sep).map((x) => x.trim()), 'exactly the declared rows, in registry order').toEqual(r.labels);
+  // t1327 — THE LATHE TOOLS RIDE A ROW, so the registry-derived sentence already names them: they entered the .ddcs
+  // at t1325 on the settings row, which is exactly why that answer is derived rather than transcribed. What is worth
+  // checking is that the row's LABEL still reads like something a person would recognise as their tools.
+  const toolRow = r.labels.find((l) => /tool table/i.test(l));
+  expect(toolRow, `a row names the tool table in human words: ${JSON.stringify(r.labels)}`).toBeTruthy();
+  expect(r.text, 'and the answer carries it, with no edit needed when a new tool field appears').toContain(toolRow);
 });
 
 test('the file-kinds answer says which file is SOURCE and which is BAKED', async ({ page }) => {
