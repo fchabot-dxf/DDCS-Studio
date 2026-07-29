@@ -139,6 +139,18 @@ function reportRefusal(res, what) {
     return res;
 }
 
+/** t1359 — the SOLE wrapped child that declares it absorbs its own frame (`absorbsPlacement`), or null. One source,
+ *  read by both the place fold and the skim fold, so the two cannot disagree about which children are self-framing.
+ *  Deliberately strict: exactly ONE child, declaring it. A mixed body (a self-framing atom beside a literal one) has
+ *  no single right answer — the shift would have to be both passed and painted — so it falls through to the text
+ *  rewrite, which is what those literal atoms have always used and still works for them. */
+function absorbingChild(children) {
+    const list = (children || []).filter(Boolean);
+    if (list.length !== 1) return null;
+    const d = BLOCKS[list[0].type];
+    return (d && d.absorbsPlacement) ? list[0] : null;
+}
+
 /** Recursive fold → tagged lines. `anc` = ancestry of block ids; `scope` = the variable environment. */
 function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dialect = DEFAULT_DIALECT) {
     const def = BLOCKS[block.type];
@@ -238,6 +250,17 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         // so the placement tracks the pattern (one source of truth). Falls back to the snapshot for un-migrated ops.
         const s = placeShiftFromParams(p, liveExtent(block.children, scope));
         if (!s.x && !s.y && !s.z) return inner;
+        // t1359 — A CHILD THAT DECLARES `absorbsPlacement` TAKES THE SHIFT AS PARAMS, and the text is left alone.
+        // translateProgram finds a number after an axis letter and writes a different number back: exact on a literal
+        // toolpath, destructive on a parametric one. t1349 measured `G0 X0 Y#47` becoming `G0 X50 Y#47` — the X
+        // shifted, the register Y not, the raster sheared. So placed geometry is told WHERE IT IS instead of being
+        // moved afterwards. (The literal atoms keep the rewrite below; nothing about them changed.)
+        const absorber = absorbingChild(block.children);
+        if (absorber) {
+            const framed = { ...absorber, params: { ...(absorber.params || {}),
+                x: num((absorber.params || {}).x, 0) + s.x, y: num((absorber.params || {}).y, 0) + s.y, z0: num((absorber.params || {}).z0, 0) + s.z } };
+            return emit(framed, dx, dy, own, scope, dialect);
+        }
         const moved = reportRefusal(translateProgram(inner.map((t) => t.line).join('\n'), s.x, s.y, s.z), 'place-on-stock').text.split('\n');
         return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 translate)
     }
@@ -255,6 +278,16 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const inner = [];                      // relativizeProgram the whole thing (abs → G91 deltas from the jog origin
         (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect)));   // 0,0,0) and wrap G91 … G90. The G53 retract sits OUTSIDE (footer, machine frame).
         const clr = r3(num(p.clearance, 5));
+        // t1359 — A CHILD THAT ABSORBS ITS FRAME IS TOLD THE MODE instead of having its text relativized. Relativizing
+        // a LOOP is not a harder version of relativizing a list — the deltas are runtime values, so there is nothing in
+        // the text to rewrite (t1349 pinned the inter-level retract collapsing to `G0 Z0`: the tool never lifting).
+        // The atom reads the live jog position into its own registers and emits ABSOLUTE moves in that frame, so no
+        // G91 wrapper is needed or wanted: the program is already relative to wherever the operator jogged to.
+        const skimAbsorber = absorbingChild(block.children);
+        if (skimAbsorber) {
+            const framed = { ...skimAbsorber, params: { ...(skimAbsorber.params || {}), zMode: 'skim', clearance: num(p.clearance, 5) } };
+            return emit(framed, dx, dy, own, scope, dialect);
+        }
         const rel = relativizeProgram([`G0 Z${clr}   ( clearance )`, ...inner.map((t) => t.line)].join('\n')).text.split('\n');
         const out = [tag('G91   ( skim - X/Y/Z relative to the jog start )', own), tag(rel[0], own)];   // G91 + the relativized clearance lift (own provenance)
         for (let i = 0; i < inner.length; i++) { const t = inner[i]; out.push(t.cap ? { line: rel[i + 1], src: t.src, cap: t.cap } : { line: rel[i + 1], src: t.src }); }   // relativized body, provenance kept

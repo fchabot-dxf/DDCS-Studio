@@ -19,8 +19,23 @@ export function surfacingBBox(params = {}) {
     return { minX: ox, maxX: ox + num(params.w, 100), minY: oy, maxY: oy + num(params.h, 80) };
 }
 
-/** Surfacing params → [ StepDown{ StepOver(Region) } ]. The one source of truth for both displays. */
-export function surfacingStack(params = {}) {
+/**
+ * t1359 — THE MIGRATION'S GROUND TRUTH, KEPT ALIVE ON PURPOSE AND CALLED BY NOTHING THAT SHIPS.
+ *
+ * This IS the old literal emitter: StepDown{ SurfaceFill } unrolled in JavaScript, every row at every depth as a
+ * literal G1. `surfacingStack` no longer builds it — the parametric atom does — and it is preserved here under a
+ * name that says what it is for, because of a trap that would otherwise close silently:
+ *
+ *   THE EQUIVALENCE BRIDGES READ THE LITERAL THROUGH THIS FUNCTION. Re-pointing `surfacingStack` without first
+ *   giving them their own reference would make every one of them compare the parametric emit TO ITSELF — and pass.
+ *   The whole safety argument of this arc would go vacuous in the exact moment it was supposed to be cashed in,
+ *   with a green suite saying nothing at all.
+ *
+ * So it is moved FIRST, in the same act as the re-point, and it stays: the bridges keep executing the comparison
+ * that licensed the migration, for as long as anyone might need to re-check it. The `assert-no-app-import` test
+ * beside the bridges is what keeps it TEST-ONLY — nothing under web/ may import it, and that is checked, not asked.
+ */
+export function surfacingLiteralStack(params = {}) {
     const tool = Math.max(0.1, num(params.toolDia, 12));
     // stepover: the FORM precomputes tool·% → a flat `stepover` (the data-def binds that one socket); the math is the
     // legacy fallback for the toolDia/% form path. strategy: take the socket value directly (the form's 'raster' → parallel).
@@ -50,6 +65,59 @@ export function surfacingStack(params = {}) {
         return [makeStart({ ...params, skim: true }), wcs, makeSkim(params, down), makeEnd(params)];
     }
     return [makeStart(params), wcs, makePlace(params, { minX: 0, maxX: w, minY: 0, maxY: h }, down), makeEnd(params)];   // local 0-based bbox snapshot (live-extent overrides it)
+}
+
+/**
+ * t1359 — THE SWITCH. Surfacing params → the PARAMETRIC atom, wrapped by the same framing as before.
+ *
+ *   [ progstart · wcs · placeonstock{ surfaceraster } · progend ]        (Normal)
+ *   [ progstart(skim) · wcs · skim{ surfaceraster } · progend ]          (Skim)
+ *
+ * ONE BLOCK where there were two. `stepdown{ surfacefill }` collapsed into a single `surfaceraster` that carries the
+ * depth loop, the row/ring walk, the descent and the confirm cadence itself — so the whole raster is a program the
+ * MACHINE derives rather than a transcript this file writes out. Change the tool Ø on the pendant and the rows
+ * re-count at the controller.
+ *
+ * THE FRAME IS PASSED, NOT PAINTED ON. `placeonstock` hands x0/y0/z0 into the atom's params (it declares
+ * `absorbsPlacement`), and the `skim` fold hands it `zMode` so the atom reads the live jog position into its own
+ * registers. Neither fold rewrites the emitted text any more, which is the whole reason this could land: t1349
+ * measured what a text rewrite does to `X[0 + #40]` and `Y#47` — a half-shifted move and a corrupted comment.
+ *
+ * `stepdown` and `surfacefill` are NOT retired: pocket, slot and contour still emit through them. What retired is
+ * surfacing's use of them, and the second source that used to shadow this one (millToSlot's `surfacingSlot`).
+ *
+ * The equivalence bridges compare this against `surfacingLiteralStack` above — the old emitter, kept as the named
+ * test-only reference so the comparison stays real.
+ */
+export function surfacingStack(params = {}) {
+    const tool = Math.max(0.1, num(params.toolDia, 12));
+    // The stepover reaches the atom as the two knobs it derives from (tool Ø + %), because that is what the header
+    // re-derives at the machine. A caller carrying a flat mm (the twin's stored socket) is recovered against the tool
+    // it will run — the SAME recovery opCamMap does, so a stored millimetre cannot mean two things.
+    const pct = (params.stepoverPct != null && params.stepoverPct !== '')
+        ? num(params.stepoverPct, 60)
+        : (num(params.stepover, 0) > 0 ? Math.round((num(params.stepover, 0) / tool) * 1000) / 10 : 60);
+    const w = num(params.w, 100), h = num(params.h, 80);
+
+    const raster = newBlock('surfaceraster');
+    raster.params = {
+        x: 0, y: 0, z0: 0,                       // the op's own frame; the folds pass the real one in
+        w, h, depth: num(params.depth, 0.5), stepdown: num(params.stepdown, 0.5),
+        toolDia: tool, stepoverPct: pct,
+        feed: num(params.feed, 2000), plunge: num(params.plunge, 200), clearance: num(params.clearance, 5),
+        strategy: (params.strategy === 'concentric') ? 'concentric' : 'parallel', direction: 'bothways',
+        entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3),
+        helixDia: num(params.helixDia, 0), helixPitch: num(params.helixPitch, 1),
+        confirmEvery: num(params.confirmEvery, 0),
+    };
+
+    const wcs = newBlock('wcs'); wcs.params = { wcs: params.wcs || 'active' };   // 'active' emits nothing
+    if (params.zMode === 'skim') {
+        // SKIM: no placement — the jog IS the reference. `skim` sits exactly where `placeonstock` does so the flat
+        // block indices stay parallel between the two modes (the twin mirrors this shape through applySkimStructure).
+        return [makeStart({ ...params, skim: true }), wcs, makeSkim(params, raster), makeEnd(params)];
+    }
+    return [makeStart(params), wcs, makePlace(params, { minX: 0, maxX: w, minY: 0, maxY: h }, raster), makeEnd(params)];
 }
 
 export class SurfacingWizard {

@@ -470,4 +470,12 @@ export const surfaceRasterBlock = {
     fields: ['x', 'y', 'z0', 'w', 'h', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
     scratch: RASTER_SCRATCH,   // read by universalScratch.opBands() — the band is data, not a comment
     lines: (p) => surfaceRasterLines(p),
+    // t1359 — THE LEAF CONTRACT. blockEmitter's default leaf path calls def.emit(p, dx, dy, dialect); `lines` above is
+    // the pure body other readers use. dx/dy are the STAMP offsets a container (Array/Path) applies to a child — zero
+    // for surfacing, which is never stamped, but folded into the frame rather than ignored so the atom stays correct
+    // if it is ever placed under one.
+    emit: (p, dx = 0, dy = 0) => surfaceRasterLines({ ...p, x: num(p.x, 0) + (Number(dx) || 0), y: num(p.y, 0) + (Number(dy) || 0) }),
+    // t1359 — THE DECLARED PLACEMENT SEAM. This atom takes its frame as PARAMS; the place fold reads this and passes
+    // x0/y0/z0 in instead of rewriting the emitted text (which cannot work on expressions — t1349 measured it).
+    absorbsPlacement: true,
 };

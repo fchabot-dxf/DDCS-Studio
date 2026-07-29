@@ -37,7 +37,7 @@ import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, SURFACING_STRATEGY_
 /** Author defaults — match surfacingStack's own num() fallbacks (+ flat stepover/strategy) so the seeded template == the
  *  true default stack. stepover 7.2 == the default tool·% (Ø12 · 60%); strategy 'parallel' == the form's default 'raster'. */
 export const SURFACING_DEFAULTS = {
-    w: 100, h: 80, stepover: 7.2, strategy: 'parallel', depth: 0.5, stepdown: 0.5,
+    w: 100, h: 80, toolDia: 12, stepoverPct: 60, strategy: 'parallel', depth: 0.5, stepdown: 0.5,
     entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1,   // t842 — depth entry (plunge default = byte-identical)
     clearance: 5, feed: 2000, plunge: 200, wcs: 'active', zMode: 'normal',   // t986 — zMode: Normal (absolute WCS) | Skim (whole-op G91 relative to the jog)
     // placement (makePlace) — region is local-0-based, so originX/originY are the placement offset (offX/offY) like drill.
@@ -78,24 +78,25 @@ const SURFACING_BINDING_SPECS = [
     { param: 'stockZ', formHidden: true, match: { type: 'placeonstock' }, key: 'stockZ', type: 'number', default: SURFACING_DEFAULTS.stockZ },
     { param: 'offZ', match: { type: 'placeonstock' }, key: 'offZ', type: 'number', default: SURFACING_DEFAULTS.offZ },
     // depth pass (stepdown)
-    { param: 'depth', match: { type: 'stepdown' }, key: 'to', type: 'number', default: SURFACING_DEFAULTS.depth, units: 'mm' },
-    { param: 'stepdown', match: { type: 'stepdown' }, key: 'by', type: 'number', default: SURFACING_DEFAULTS.stepdown, units: 'mm' },
-    { param: 'confirmEvery', match: { type: 'stepdown' }, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
+    { param: 'depth', match: { type: 'surfaceraster' }, key: 'depth', type: 'number', default: SURFACING_DEFAULTS.depth, units: 'mm' },
+    { param: 'stepdown', match: { type: 'surfaceraster' }, key: 'stepdown', type: 'number', default: SURFACING_DEFAULTS.stepdown, units: 'mm' },
+    { param: 'confirmEvery', match: { type: 'surfaceraster' }, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
     // geometry + cut (the surfacefill leaf)
-    { param: 'w', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", match: { type: 'surfacefill' }, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w, units: 'mm' },
-    { param: 'h', help: "Height of the faced area (Y).", match: { type: 'surfacefill' }, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h, units: 'mm' },
-    { param: 'stepover', help: "Distance between parallel passes (mm). Smaller = finer finish, slower.", match: { type: 'surfacefill' }, key: 'stepover', type: 'number', default: SURFACING_DEFAULTS.stepover, units: 'mm' },
-    { param: 'strategy', help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", match: { type: 'surfacefill' }, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
-    { param: 'feed', match: { type: 'surfacefill' }, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed, units: 'mm/min' },
-    { param: 'plunge', match: { type: 'surfacefill' }, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge, units: 'mm/min' },
+    { param: 'w', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", match: { type: 'surfaceraster' }, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w, units: 'mm' },
+    { param: 'h', help: "Height of the faced area (Y).", match: { type: 'surfaceraster' }, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h, units: 'mm' },
+    { param: 'toolDia', help: "Cutter diameter (mm). The stepover is derived from it at the machine, so changing the tool on the pendant re-derives the raster.", match: { type: 'surfaceraster' }, key: 'toolDia', type: 'number', default: SURFACING_DEFAULTS.toolDia, units: 'mm' },
+    { param: 'stepoverPct', help: "Stepover as a PERCENTAGE of the cutter. The intent is the percentage; the millimetre is only its consequence, and the macro header re-derives it — which is why a stored mm is not bound here.", match: { type: 'surfaceraster' }, key: 'stepoverPct', type: 'number', default: SURFACING_DEFAULTS.stepoverPct, units: '%' },
+    { param: 'strategy', help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", match: { type: 'surfaceraster' }, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
+    { param: 'feed', match: { type: 'surfaceraster' }, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed, units: 'mm/min' },
+    { param: 'plunge', match: { type: 'surfaceraster' }, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge, units: 'mm/min' },
     // t996 — RPM binding → the framing progstart. SOCKET-HELD: blank → the socket keeps the spindleHeadPatch Head
     // default (byte-identical); a typed value / a picked tool's library rpm OVERRIDES it (rpm>0 → M3 S<rpm> + spindleHeadPatch yields).
     { param: 'rpm', match: { type: 'progstart' }, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },
     // t842 — DEPTH ENTRY cluster (per-level descent + its per-mode when-gated fields; toward-centre ramp like pocket — an area fill)
-    { param: 'entry', match: { type: 'surfacefill' }, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
-    { param: 'rampAngle', match: { type: 'surfacefill' }, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
-    { param: 'helixDia', match: { type: 'surfacefill' }, key: 'helixDia', type: 'number', default: SURFACING_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the area.' },
-    { param: 'helixPitch', match: { type: 'surfacefill' }, key: 'helixPitch', type: 'number', default: SURFACING_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler.' },
+    { param: 'entry', match: { type: 'surfaceraster' }, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
+    { param: 'rampAngle', match: { type: 'surfaceraster' }, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
+    { param: 'helixDia', match: { type: 'surfaceraster' }, key: 'helixDia', type: 'number', default: SURFACING_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the area.' },
+    { param: 'helixPitch', match: { type: 'surfaceraster' }, key: 'helixPitch', type: 'number', default: SURFACING_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler.' },
 ];
 
 /** The body bindings for a surfacing twin, derived BY IDENTITY over the ALREADY-WRAPPED stack — so the
