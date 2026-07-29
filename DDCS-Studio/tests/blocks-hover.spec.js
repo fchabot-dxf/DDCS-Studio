@@ -9,13 +9,13 @@ import { test, expect } from '@playwright/test';
  */
 test.use({ viewport: { width: 1400, height: 1000 } });
 
-async function seedAndOpen(page) {
+async function seedAndOpen(page, wiz = 'surfacing') {
   page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.openWiz && window.updateWiz && window.insertWiz && window.closeWiz && window.showApp && window.ddcsGetBlockProgram);
-  await page.evaluate(async () => {
-    window.openWiz('surfacing', undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
-  });
+  await page.evaluate(async (w) => {
+    window.openWiz(w, undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
+  }, wiz);
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks(false).length > 0, { timeout: 8000 });
   await page.waitForTimeout(400);
@@ -34,10 +34,20 @@ async function seedAndOpen(page) {
   }, { timeout: 8000 });
 }
 
+/**
+ * t1361 — SEEDED FROM A POCKET, because this test needs a stack that NESTS. It asserts INNERMOST resolution, which
+ * requires a leaf whose emitted lines are a strict subset of its container's — and surfacing stopped being one: the
+ * parametric switch collapsed `stepdown{ surfacefill }` into a single `surfaceraster`, and the placement fold hands
+ * that atom its frame instead of wrapping text around it, so `placeonstock`, the op block and the raster now own the
+ * IDENTICAL 47 lines (measured). Nothing to be innermost OF — the test would have passed on a vacuous premise.
+ * Pocket kept the shape (stepdown 192 lines ⊃ pocketfill 189), so the property is asserted where it still exists.
+ * The other tests in this file keep the surfacing seed — hover/select are not surfacing-specific, but this one needs
+ * real nesting to mean anything.
+ */
 test('block hover warms its lines (lighter, no scroll), resolves the INNERMOST block, clears on exit', async ({ page }) => {
   const errs = [];
   page.on('pageerror', (e) => errs.push(String(e)));
-  await seedAndOpen(page);
+  await seedAndOpen(page, 'pocket');
 
   const r = await page.evaluate(() => {
     const ws = window.__blkws, out = document.getElementById('blk-gcode'), host = document.querySelector('.blk-bk-host');
@@ -104,12 +114,12 @@ test('selecting a leaf atom boxes its value tokens; selecting a container does n
   await seedAndOpen(page);
   const ids = await page.evaluate(() => {
     const ws = window.__blkws;
-    const leaf = ws.getAllBlocks(false).find((b) => b.type === 'surfacefill');
+    const leaf = ws.getAllBlocks(false).find((b) => b.type === 'surfaceraster');   // t1361 — surfacing's leaf atom since the switch
     // a TRUE statement container = a MODEL block with statement children (getChildren counts shadow values, so use the model)
     const cont = (function find(bs) { for (const b of (bs || [])) { if (b && b.children && b.children.length) return b.id; const f = find(b && b.children); if (f) return f; } return null; })(window.ddcsGetBlockProgram());
     return { leaf: leaf ? leaf.id : null, cont };
   });
-  expect(ids.leaf, 'found the surfacefill leaf').toBeTruthy();
+  expect(ids.leaf, 'found the surfaceraster leaf').toBeTruthy();
 
   await page.evaluate((id) => window.__blkws.getBlockById(id).select(), ids.leaf);
   await page.waitForTimeout(120);

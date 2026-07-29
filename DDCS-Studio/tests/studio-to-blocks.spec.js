@@ -25,9 +25,14 @@ test('Blocks tab opens the active cutting op (surfacing) as Blockly blocks with 
     types: window.__blkws.getAllBlocks().map((b) => b.type),
     code: document.getElementById('blk-gcode').textContent,
   }));
-  expect(r.types, 'workspace has the surfacing op stack').toContain('stepdown');
-  expect(r.types).toEqual(expect.arrayContaining(['progstart', 'surfacefill', 'progend']));   // surfacing = flat SurfaceFill (no Region socket)
-  expect(r.code, 'emitted G-code reflects the edited width').toContain('X123');
+  // t1361 — surfacing is ONE atom now: `stepdown{ surfacefill }` collapsed into `surfaceraster`, which carries the
+  // depth loop and the row walk itself. The Blocks tab renders it like any other atom (it is in the PALETTE, so it
+  // gets its Blockly def with the rest) — this is the same claim about the same tab, naming the block that is there.
+  expect(r.types, 'workspace has the surfacing op stack').toContain('surfaceraster');
+  expect(r.types).toEqual(expect.arrayContaining(['progstart', 'surfaceraster', 'progend']));
+  // …and the width reaches the emit. It is a NAMED HEADER VAR rather than a literal in every row now, which is the
+  // point of the switch: one place says 123, and the machine counts the rows from it.
+  expect(r.code, 'emitted G-code reflects the edited width').toContain('#40=123');
 });
 
 test('Blocks tab opens a snippet op (WCS) emitted bare — no program framing', async ({ page }) => {
@@ -58,18 +63,20 @@ test('Blocks → STUDIO reverse sync: editing a Blockly block re-projects the co
   await page.evaluate(() => window.ddcsStudio.wizardManager.update());
 
   await openBlocks(page);
-  // edit the StepDown depth (TO socket = a math_number shadow) → 7
+  // t1361 — edit the depth on the block that owns it now: `surfaceraster`'s DEPTH socket (a math_number shadow, the
+  // same shape StepDown's TO socket was). The op's depth pass lives inside the one atom since the switch.
   await page.evaluate(() => {
     const ws = window.__blkws;
-    const blk = ws.getAllBlocks().find((b) => b.type === 'stepdown');
-    const tgt = blk && blk.getInput('TO') && blk.getInput('TO').connection.targetBlock();
+    const blk = ws.getAllBlocks().find((b) => b.type === 'surfaceraster');
+    const tgt = blk && blk.getInput('DEPTH') && blk.getInput('DEPTH').connection.targetBlock();
     if (tgt) tgt.setFieldValue('7', 'NUM');
   });
   await page.waitForTimeout(200);
 
-  // The projection (block G-code, which the Studio editor mirrors) now cuts down to the new depth.
+  // The projection (block G-code, which the Studio editor mirrors) now cuts down to the new depth — as the header var
+  // the depth loop reads, which is where a depth lives in a program the machine derives.
   const proj = await page.evaluate(() => window.ddcsGetBlockGcode());
-  expect(proj, 'block edit re-projected to a deeper Step Down (z=-7)').toContain('z=-7');
+  expect(proj, 'block edit re-projected to a deeper cut (#42 = the total depth)').toContain('#42=7');
   // editor is the live projection of the (edited) block program
   const editor = await page.evaluate(() => window.ddcsStudio.editorManager.getValue());
   expect(editor).toBe(proj);

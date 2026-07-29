@@ -83,18 +83,29 @@ test('NO SILENT RASTER CHANGE — a slot saved with a stored mm still cuts that 
         const uo = await import('/blocks/userOps.js');
         // (a) the BUILT-IN op, which always stored the intent — it seeds straight through
         const builtin = seedFromOp({ opType: 'surfacing', params: { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 16, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, rpm: 12000 } });
-        // (b) the TWIN, which stores a FLAT mm and has no toolDia at all — the recovery case
-        const twin = seedFromOp({ opType: 'user_surfacing_data', params: { ...uo.defaultParams(uo.getUserDef('user_surfacing_data')), stepover: 9.6 } });
+        // (b) t1361 — AN OP SAVED BEFORE THE SPLIT: the recovery case, written as one of those actually looks.
+        // This used to be built as `{...defaultParams(twin), stepover: 9.6}`, which was faithful while the twin's
+        // only stepover knob WAS a flat millimetre. The switch gives the twin toolDia + stepoverPct of its own, so
+        // that spread now hands seedFromOp an EXPLICIT 60% with a stray mm beside it — and seeding the explicit
+        // intent over a leftover is correct behaviour, not the recovery. The op that needs recovering is one whose
+        // params predate the split: a mm, and no percentage anywhere.
+        const preSplit = { w: 100, h: 80, stepover: 9.6, strategy: 'parallel', depth: 0.5, stepdown: 0.5, feed: 2000, plunge: 200, clearance: 5, wcs: 'active' };
+        const twin = seedFromOp({ opType: 'user_surfacing_data', params: preSplit });
+        // …and the live twin, which now carries the intent itself, must seed it straight through like the built-in.
+        const live = seedFromOp({ opType: 'user_surfacing_data', params: { ...uo.defaultParams(uo.getUserDef('user_surfacing_data')), toolDia: 16, stepoverPct: 60 } });
         const pick = (s) => { const g = (k) => (s.fields || []).find((f) => f.key === k); return { pct: g('stepoverPct').value, dia: g('toolDia').value }; };
-        return { builtin: pick(builtin), twin: pick(twin) };
+        return { builtin: pick(builtin), twin: pick(twin), live: pick(live) };
     });
     // the built-in's intent is carried, not re-derived
     expect(r.builtin.pct).toBe(60);
     expect(r.builtin.dia * r.builtin.pct / 100, 'Ø16 at 60% is the 9.6mm it always cut').toBeCloseTo(9.6, 6);
-    // THE MIGRATION PROPERTY: the twin's stored 9.6mm is recovered as a percentage OF THE TOOL Ø THE SLOT CARRIES,
+    // THE MIGRATION PROPERTY: the stored 9.6mm is recovered as a percentage OF THE TOOL Ø THE SLOT CARRIES,
     // so multiplying back gives the same millimetre. Recovering against any other number would change the cut.
     expect(r.twin.pct, 'a 9.6mm stepover is 80% of the Ø12 this slot carries').toBe(80);
     expect(r.twin.dia * r.twin.pct / 100, 'and it still cuts 9.6mm — the same raster, expressed the new way').toBeCloseTo(9.6, 6);
+    // …and the post-switch twin no longer needs recovering at all — it stores the intent, so it seeds like the built-in.
+    expect(r.live.pct, 'a twin saved AFTER the split carries its own percentage').toBe(60);
+    expect(r.live.dia * r.live.pct / 100, 'Ø16 at 60% — the intent seeded straight through, not re-derived').toBeCloseTo(9.6, 6);
 });
 
 test('AND A SAVED SLOT MIGRATES ONCE — the stored mm becomes a pct, and the pendant layout does not shift', async ({ page }) => {

@@ -469,6 +469,16 @@ export const surfaceRasterBlock = {
     defaults: { x: 0, y: 0, z0: 0, w: 100, h: 80, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 },
     fields: ['x', 'y', 'z0', 'w', 'h', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
     scratch: RASTER_SCRATCH,   // read by universalScratch.opBands() — the band is data, not a comment
+    // t1361 — THE DECLARED FOOTPRINT, and the ONE thing the collapse dropped. `surfacefill` declared an `extent` and
+    // the place fold reads it (liveExtent) IN PREFERENCE to placeonstock's frozen bminX..bmaxX snapshot; folding
+    // stepdown{surfacefill} into this atom left the declaration behind, so a placed op silently fell back to whatever
+    // size the snapshot was frozen at. Measured, not inferred: a twin at w=150 on a 200 stock, cc-attach, placed its
+    // face at X50 — the shift computed for the template's default 100 — against the built-in's X25. Every caller whose
+    // live w/h can differ from the snapshot hits it (the data twin, whose template IS frozen at the defaults, and the
+    // Blocks canvas, where editing w/h does not rewrite the parent's snapshot).
+    // The rect is the tool-CENTRE sweep at the atom's own local frame, exactly the bbox surfacefill's region contour
+    // gave for shape:'rect' — so the built-in is unmoved (its snapshot was already built from the same w/h).
+    extent: (p) => ({ minX: num(p.x, 0), maxX: num(p.x, 0) + num(p.w, 100), minY: num(p.y, 0), maxY: num(p.y, 0) + num(p.h, 80) }),
     lines: (p) => surfaceRasterLines(p),
     // t1359 — THE LEAF CONTRACT. blockEmitter's default leaf path calls def.emit(p, dx, dy, dialect); `lines` above is
     // the pure body other readers use. dx/dy are the STAMP offsets a container (Array/Path) applies to a child — zero

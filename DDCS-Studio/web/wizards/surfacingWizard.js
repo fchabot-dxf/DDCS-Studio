@@ -32,8 +32,13 @@ export function surfacingBBox(params = {}) {
  *   with a green suite saying nothing at all.
  *
  * So it is moved FIRST, in the same act as the re-point, and it stays: the bridges keep executing the comparison
- * that licensed the migration, for as long as anyone might need to re-check it. The `assert-no-app-import` test
- * beside the bridges is what keeps it TEST-ONLY — nothing under web/ may import it, and that is checked, not asked.
+ * that licensed the migration, for as long as anyone might need to re-check it.
+ *
+ * WHAT KEEPS IT TEST-ONLY: `tests/surfacing-both-paths-1361.spec.js` (a) scans every .js under web/ and fails if any
+ * of them so much as names this function, and (b) requires every route that builds a surfacing op — this stack, the
+ * data twin, and the wizard the STUDIO form calls — to come out carrying `surfaceraster` and neither `stepdown` nor
+ * `surfacefill`. Nothing under web/ may reach this, and that is CHECKED, not asked. (t1361 — this paragraph used to
+ * cite an `assert-no-app-import` test that had never been written; the guard described here is the one that exists.)
  */
 export function surfacingLiteralStack(params = {}) {
     const tool = Math.max(0.1, num(params.toolDia, 12));

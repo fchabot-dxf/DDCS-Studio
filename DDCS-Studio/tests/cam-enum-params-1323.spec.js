@@ -91,13 +91,18 @@ test('AND THE MACRO CARRIES THE SKIM SHAPE — the whole point: the right number
         const own = (zMode) => String(emitProgram(builderOf('user_surfacing_data')({ ...P, zMode })));
         return { skimBody: slot('skim').body, normBody: slot('normal').body, ownSkim: own('skim'), ownNormal: own('normal') };
     });
-    // The skim shape is a whole-op RELATIVE program: G91 in, G90 back out. That is what postInstantiate builds…
-    expect(r.ownSkim, 'the op’s own skim emit is relative').toMatch(/G91/);
-    expect(r.ownNormal, 'and its normal emit is not').not.toMatch(/G91/);
+    // t1361 — SAME RULE, NEW SIGNATURE. The skim shape used to be a G91 wrapper; it is now a program that READS the
+    // live work position into #62-#64 and runs its ordinary absolute body in that frame (t1355 — there is nothing in
+    // a loop's text for a relativizer to rewrite). So the token that says "this is the skim program" is the frame
+    // read, not G91, and that is what both sides are matched on. What is being asserted is unchanged.
+    const SKIM_SHAPE = /#62=#790/;
+    // The skim shape is what postInstantiate builds…
+    expect(r.ownSkim, 'the op’s own skim emit reads the live frame').toMatch(SKIM_SHAPE);
+    expect(r.ownNormal, 'and its normal emit does not').not.toMatch(SKIM_SHAPE);
     // …and the CAM slot's macro must carry the same shape. Before this turn the unroll called instantiate directly, so
     // postInstantiate never ran and a skim slot emitted the NORMAL program — the right numbers, the wrong shape.
-    expect(r.skimBody, 'the skim SLOT macro is relative').toMatch(/G91/);
-    expect(r.normBody, 'the normal slot macro is not — the two are genuinely different programs').not.toMatch(/G91/);
+    expect(r.skimBody, 'the skim SLOT macro reads the live frame too').toMatch(SKIM_SHAPE);
+    expect(r.normBody, 'the normal slot macro does not — the two are genuinely different programs').not.toMatch(SKIM_SHAPE);
     expect(r.skimBody === r.normBody, 'so the build enum actually changed the built program').toBe(false);
 });
 
@@ -190,16 +195,27 @@ test('EXPOSE AS BRANCH — ONE installed macro, and the SIM executes each arm to
         const f = (slot.fields || []).find((x) => x.key === 'zMode');
         // RUN THE ONE INSTALLED MACRO TWICE, differing ONLY in the pendant number the operator would dial in: replace
         // the canonical read (#var=#mirror) with the value, exactly as the controller would have loaded it.
-        const run = (n) => {
-            const nc = slot.body.split(NL).map((l) => l.indexOf(f.var + '=#') === 0 ? (f.var + '=' + n) : l).join(NL);
+        // t1361 — THE ARMS ARE TOLD APART BY WHERE THEY CUT, not by a mode flag. `stats.absolute` used to separate
+        // them because Skim was a G91 walk; the skim arm is absolute now too (it reads the live position into
+        // registers and cuts absolutely in THAT frame — t1355), so that flag says "true" for both and discriminates
+        // nothing. What still differs is the only thing that ever mattered: the NORMAL arm is anchored to the WCS and
+        // ignores where the operator is standing, while the SKIM arm follows the jog. So each arm is run twice, with
+        // the controller's live-position registers seeded to two different points, and the paths are compared.
+        const run = (n, jog) => {
+            const nc = [`#790=${jog}`, `#791=${jog}`, `#792=${jog}`,
+                ...slot.body.split(NL).map((l) => l.indexOf(f.var + '=#') === 0 ? (f.var + '=' + n) : l)].join(NL);
             const t = traceToolpath(nc);
-            // stats.absolute is the ENGINE'S OWN verdict on the shape it just executed: "the program established an
-            // absolute position, so it is start-INDEPENDENT". Normal is absolute; Skim is a relative walk from the jog.
-            // The two arms trace the SAME geometry from the origin — the difference is the FRAME, so the frame is what
-            // this asserts. (Same declared flag the pre-flight extent check reads.)
-            return { segs: (t.segments || []).length, absolute: !!(t.stats && t.stats.absolute) };
+            const segs = (t.segments || []);
+            // the CUT extents, not every segment: the opening Z move happens before the tool has travelled in XY, so
+            // it sits at X0 in both arms and would mask the very shift being measured.
+            const cuts = segs.filter((s) => !s.rapid);
+            const xs = cuts.flatMap((s) => [s.x1, s.x2]).filter((v) => Number.isFinite(v));
+            const ys = cuts.flatMap((s) => [s.y1, s.y2]).filter((v) => Number.isFinite(v));
+            return { segs: segs.length, cuts: cuts.length, absolute: !!(t.stats && t.stats.absolute),
+                minX: xs.length ? +Math.min(...xs).toFixed(3) : null, minY: ys.length ? +Math.min(...ys).toFixed(3) : null };
         };
-        return { field: f && { idx: f.idx, var: f.var, min: f.min, max: f.max, def: f.def }, body: slot.body, arm0: run(0), arm1: run(1) };
+        return { field: f && { idx: f.idx, var: f.var, min: f.min, max: f.max, def: f.def }, body: slot.body,
+            arm0: run(0, 0), arm1: run(1, 0), arm0Jogged: run(0, 30), arm1Jogged: run(1, 30) };
     });
     // THE PENDANT KNOB: a real slot param, 0..1, so the shape is picked at the machine.
     expect(r.field, 'the branch gets its own pendant param').toBeTruthy();
@@ -210,12 +226,16 @@ test('EXPOSE AS BRANCH — ONE installed macro, and the SIM executes each arm to
     // ONE MACRO, BOTH ARMS, jumped by the mirror — the corner generator's own IF/GOTO pattern, built from the def.
     expect(r.body, 'the jump onto the second arm').toContain('IF ' + r.field.var + ' EQ 1 GOTO 810');
     expect(r.body, 'the label it jumps to').toContain('N810');
-    expect(r.body, 'and the skim arm really is in there').toMatch(/G91/);
+    expect(r.body, 'and the skim arm really is in there').toMatch(/#62=#790/);   // t1361 — the frame read IS the skim arm now (was G91)
     // AND IT EXECUTES: the sim runs that one macro at each pendant value and walks a DIFFERENT program each time.
     expect(r.arm0.segs, 'arm 0 executes real motion').toBeGreaterThan(0);
     expect(r.arm1.segs, 'arm 1 executes real motion').toBeGreaterThan(0);
-    expect(r.arm0.absolute, `pendant 0 executes the NORMAL arm — an absolute, WCS-referenced program: ${JSON.stringify(r.arm0)}`).toBe(true);
-    expect(r.arm1.absolute, `pendant 1 executes the SKIM arm — a relative walk from wherever it is jogged: ${JSON.stringify(r.arm1)}`).toBe(false);
+    // PENDANT 0 — the NORMAL arm: anchored to the WCS, so moving the operator moves nothing.
+    expect(r.arm0Jogged.minX, `pendant 0 is WCS-referenced — jogging elsewhere does not move it: ${JSON.stringify([r.arm0, r.arm0Jogged])}`).toBe(r.arm0.minX);
+    expect(r.arm0Jogged.minY, 'in Y as well').toBe(r.arm0.minY);
+    // PENDANT 1 — the SKIM arm: the face is cut wherever the tool was jogged to, so a 30mm move takes the path with it.
+    expect(r.arm1Jogged.minX, `pendant 1 follows the jog — 30mm across is 30mm of toolpath: ${JSON.stringify([r.arm1, r.arm1Jogged])}`).toBeCloseTo(r.arm1.minX + 30, 3);
+    expect(r.arm1Jogged.minY, 'in Y as well').toBeCloseTo(r.arm1.minY + 30, 3);
 });
 
 test('AND THE BRANCH IS REFUSED WHEN IT WOULD BLOAT — the arm budget, with its reason shown', async ({ page }) => {
