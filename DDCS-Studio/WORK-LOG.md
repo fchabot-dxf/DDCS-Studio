@@ -5650,3 +5650,117 @@ BUT the GEOMETRY the check depends on is UNRELIABLE from checkEnvelope:
 - **1329 passed / 0 failed / 4 skipped** (12.4m) — the 5 regen'd specs + the new per-post anchor all green; the flip is surgical (the first enumeration gate showed EXACTLY these 5 emit specs affected, no .png/visual goldens). No isolation flakes.
 
 ### NEXT: RELEASE the whole clearance bundle (clean full gate). No release before this flip is verified — it is (pending the gate line).
+
+---
+
+## t1323 — three user reports: the pill's own space, the envelope's cry-wolf, and the enum the CAM table never drew
+
+Three items from live user reports, plus four mid-turn amendments that changed item 3 substantially. One item is
+FLAGGED AND SPLIT rather than thinned (see the end).
+
+### (1) The editor pill covered line 1
+
+The floating time-estimate chip sits `position:absolute; top:8px` inside `.editor-container`, and the code started
+14px down — so the estimate sat ON the first line. Two controls owning the same pixels; the same rule the header
+chevron settled at t1303.
+
+**The design call: the code moves, not the pill.** Docking it into a chrome row was the alternative and it loses —
+the editor's chrome is its four CORNERS (Transform, Make, file, copy), there is no toolbar with a free slot, and an
+estimate of *this program* belongs over the code it describes rather than in a strip. So the code takes a reserved
+inset, declared once as `--editor-chip-inset` and applied to BOTH layers (the textarea and its highlight overlay) —
+they must shift together or every syntax glow would sit a line off.
+
+**Two things cost time and are worth recording:**
+- The rule LOOKED right and did nothing. `.editor-container #editor` and the per-theme `[data-theme=...] #editor`
+  rules carry the SAME specificity, and the theme rules come later in the file, so the later one won. It only works
+  at the END of styles.css, and the comment there says so — otherwise the next person moves it back.
+- The inset was measured, not guessed. First try 36px: line 1 moved from 118 to 140 while the chip spans 112-143 —
+  still a 3px overlap. The chip sits 8px down and stands ~31px tall, so 46px is the number, with breathing room.
+
+Asserted by GEOMETRY (editor-chip-space-1323), not by a class name or a pixel constant: read both rects at 1400 and
+390 and require they do not intersect, plus a check that the chip is actually VISIBLE (a hidden chip trivially never
+overlaps — that assert would be vacuous) and that BOTH layers took the same inset. The temporary probe that measured
+the pre-fix state reported overlap:true at both widths, which is the discrimination evidence.
+
+### (2) The envelope check cried wolf on jog-start programs
+
+A correct skim program — jog to the corner, then a G91 body — drew a COLUMN of red 'over' badges. The checker had
+anchored the relative walk at the workspace origin and measured that invented anchor against the machine box.
+
+**The anchor was the proxy.** The hazard for a walk from an unknown start is not "is this point outside" — no point
+has a known position — it is whether the SWEEP FITS THE TRAVEL AT ALL. So: EXTENT (the bounding box of the walk, a
+DIFFERENCE, so the unknown anchor cancels) vs the envelope SPAN.
+- fits  -> no per-line anything, and ONE calm note: "needs 100.0 x 54.0 x 10.5 mm of travel from that start".
+- wider -> red, naming the axis and BOTH numbers, and belonging to the WHOLE PROGRAM (line: null) rather than to any
+  line, because no line is guilty when there is no anchor.
+
+**The predicate was already declared** — `stats.absolute` is the engine's own "the program established an absolute
+position (a G90 move, a homing; deliberately NOT a bare G53 excursion) -> the path is start-INDEPENDENT". The same
+flag the preview uses to decide whether moving the operator start drags the path. Nothing new to sniff.
+
+Details worth keeping: probe segments are INCLUDED in the extent (unlike the per-point test, where a trip-dependent
+end cannot be judged) because under-stating the clearance is the dangerous direction. A whole-program violation has
+no line to annotate, so it gets the chip instead — a red verdict that draws NOTHING would be worse than the cry-wolf
+it replaced. violationsBySetup skips line-less violations explicitly (it would have skipped them by accident via
+map[-1]; an accident is not a decision).
+
+The green-with-a-note case is the only green that is not silent, and it uses a neutral preflight-info chip —
+deliberately not green and not amber, because it is information, not a verdict. An anchored program that fits still
+says nothing at all; that is asserted, so this turn cannot be read as having spent green's silence.
+
+Stash-verified: all four asserts fail without the change, and the first one fails on its FIRST assert (annots), i.e.
+the user's column of red badges reproduces exactly.
+
+### (3) CAM slot enum params — and the amendment that changed the ruling mid-turn
+
+The param table walked only value params, so Surfacing's zMode had NO ROW, and a skim CAM slot could not be built.
+
+**The class was already declared, at every param.** A binding carries `blockIndex` — the socket its value lands in.
+A STRUCTURAL binding has blockIndex == null: no socket, so there is physically nowhere for a runtime value to go; it
+can only fork the build. So enumClassOf only NAMES what was already written down; it is not a new flag.
+
+**Then the user amended, and the amendment reversed my ruling** (recorded because the reasoning matters): a build
+enum is NOT bake-only, because the macro can carry EVERY arm and IF/GOTO on the pendant mirror — which is exactly
+what the corner generator has always done by hand (IF #seq EQ 1 GOTO 20). So THREE declared dispositions:
+BAKE / EXPOSE AS VALUE / EXPOSE AS BRANCH. A second amendment set the default: **BAKE**, because a macro should not
+carry possibility-space unless someone asks for it, and the default must be VISIBLE (Bake preselected).
+
+Implemented: buildEnumFields yields the arms and whether they fit BRANCH_ARM_CAP (3 — a branch duplicates the whole
+body per arm); over budget -> branch REFUSED with its reason ON the control, Bake as the honest fallback.
+Branch-expose builds the arm ladder in stackToSlot with a pendant param, a label-to-number mapping comment (a bare
+0/1 on a controller screen means nothing), and one bodyFor() call per arm.
+
+Note exposed:false is stated POSITIVELY in makeAuthOp for build enums on BOTH arms — the generator arm's empty map
+means all-exposed, so silence would have opted every slot into carrying every arm. That is the amendment's
+default-to-bake, and it would have inverted itself by omission.
+
+**Two correctness problems found on the way, both silent-wrong-program class:**
+- stackToSlot called instantiate directly, so postInstantiate never ran — the hook where a structural param RESHAPES
+  the stack. A skim slot emitted the NORMAL program: the right numbers in the wrong shape. It now applies the def's
+  OWN hook (not a registry lookup, which could resolve a differently-customized def of the same opType).
+- The reload path. manifestToAuthOp re-seeds with CAM_SEED_PARAMS, and a build enum is DISCRIMINATING (camTypeOf
+  reads it to choose the arm), so a saved Skim slot would have re-hydrated on the Normal arm and quietly rebuilt the
+  wrong shape. The bake is already its carrier — no new manifest field — but it must be re-supplied BEFORE the seed.
+  The in-table flip re-seeds through the same path, so picking a shape the current generator cannot express moves the
+  ARM too, instead of showing Skim while building Normal.
+
+A skim surfacing routes to the UNIVERSAL unroll (surfacingSlot emits one fixed absolute shape) — the same ruling
+already encoded for pocket-polygon and single-axis middle. That keeps the skim shape's source SINGLE: skimStructure's
+postInstantiate, never a second hand-written macro here that could drift from it.
+
+Asserting the arms: the sim EXECUTES the one installed macro at each pendant value. The two arms trace the same
+GEOMETRY from the origin — the difference is the FRAME — so the assert reads stats.absolute (arm 0 absolute, arm 1
+relative), the same declared flag item (2) uses. A segment-count assert would have passed vacuously; it did, and was
+replaced.
+
+### FLAGGED AND SPLIT — the stepover-percentage amendment
+
+Amendments 3 and 4 (stepover as a % of tool dia, derived IN THE MACRO HEADER from both mirrors, the pct itself a
+first-class exposable CAM row, plus a migration that computes the pct once from existing stored mm and an assert that
+a pre-existing slot emits the same rows before and after) is a feature of its own size: wizard form + derived display,
+generator header change, CAM row semantics, and a migration with a no-silent-raster-change guarantee. The amendment
+says explicitly not to thin the enum work for it, so it is NOT started — flagged for its own turn.
+
+GATE: fast tier — 185 touched specs (cam*/preflight/envelope/spindle/soft-limit/honest-mach/setup-sheet/universal/
+substack/editor-chip) + 71 smoke, all green. The CAM-slot half is emit-adjacent and now touches stackToSlot's emit
+path, so the advisor's full suite on acceptance is worth it.
