@@ -753,6 +753,9 @@ body[data-theme="studio"] .app-header { background: var(--sv-3, #b6b1a5) !import
 .editor-container .preflight-badge-label:hover { filter: brightness(1.07); }
 .editor-container .preflight-green  .preflight-badge-label { background: #1f9d57; color: #052; border-color: color-mix(in srgb, #34d399 55%, #000); }
 .editor-container .preflight-amber  .preflight-badge-label { background: #f0b429; color: #1a1200; border-color: color-mix(in srgb, #f0b429 55%, #000); }
+/* t1323 — the INFO chip: a jog-start program that fits, stating the travel it needs. Deliberately NOT green and not
+   amber — it is neither a pass badge nor a warning, so it reads as a neutral note in the editor's own chrome colours. */
+.editor-container .preflight-info   .preflight-badge-label { background: color-mix(in srgb, var(--panel, #23262b) 88%, #fff); color: var(--fg, #d7dae0); border-color: color-mix(in srgb, var(--fg, #d7dae0) 22%, transparent); font-weight: 500; }
 .editor-container .preflight-red    .preflight-badge-label { background: #e5484d; color: #2a0407; border-color: color-mix(in srgb, #ff5964 55%, #000); box-shadow: 0 2px 10px rgba(0,0,0,.5), 0 0 0 3px color-mix(in srgb, #ff5964 30%, transparent); }
 .editor-container .preflight-pop {
     margin-top: 6px; min-width: 210px; max-width: 330px; max-height: 42vh; overflow: auto;
@@ -5748,3 +5751,15 @@ input.psrc-ctrl, select.psrc-ctrl { color: #0277bd; font-style: italic; }
     background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.18); color: #e6edf5; font-size: 13px; }
 .saved-pop-ok:hover { background: rgba(255, 255, 255, 0.16); }
 
+
+/* t1323 (USER SCREENSHOT) — THE TIME CHIP GETS ITS OWN SPACE. It floats at the top of the editor while the code
+   started 14px down, so the estimate sat ON line 1 — two controls owning the same pixels, the rule the header
+   chevron settled at t1303. Docking it into a chrome row was the alternative and it loses: the editor's chrome is
+   its corners (file, copy, Make, Transform), and an estimate of THIS program belongs over the code it describes.
+   So the code moves down by exactly the chip's height instead, applied to BOTH layers — the textarea and its
+   highlight overlay shift together, or every glow would sit a line off.
+   It lives at the END of the file deliberately: the per-theme editor rules carry the same specificity, and the last
+   one wins. Written earlier in the file it looked right and changed nothing. */
+.editor-container { --editor-chip-inset: 46px; }   /* the chip sits 8px down and stands ~31px tall — measured, not guessed, plus breathing room */
+.editor-container #editor,
+.editor-container #editor-highlight { padding-top: var(--editor-chip-inset); }

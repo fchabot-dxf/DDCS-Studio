@@ -22,6 +22,7 @@ import { instantiate, camFieldsFromStack } from '../blocks/userOps.js';    // fi
 import { emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from '../wizards/previewEmit.js';
 import { classifyExposable } from './exposeClassifier.js';
+import { buildEnumFields } from './opCamMap.js';   // t1323 — the def's BUILD-time enums (their arms + whether they fit the branch budget)
 import { nextLocalVar } from './camScratch.js';             // t1083 (slice B) — the one minting helper, shared with every generator arm
 import { universalBands } from './universalScratch.js';    // t1085 (slice C) — the band emitMapped injects underneath us, aggregated from each atom's/post's OWN declaration
 
@@ -95,8 +96,59 @@ export function stackToSlot(def, decl = {}, used = new Set(), varOffset = 0) {
         }
         // else — leave unset → instantiate uses the binding default
     });
-    const stack = instantiate(def, tokenParams);                        // tokens land at their sockets (userOps.js:442-447)
-    const body = emitMapped(stack, activeDialectOpts()).text;           // #var → F#n / Z#n verbatim (util.js val)
+    // t1323 — THE STRUCTURAL PARAMS, and then the SHAPE HOOK. A structural binding has no socket, so the loop above never
+    // gave it a token — but postInstantiate reads it off the params, not off a block, so without it the fork silently took
+    // its default arm. Thread the slot's declared pick (else the binding default, which is what instantiate would have used).
+    // Each one is either BAKED to a single pick (the default) or EXPOSED AS A BRANCH (every arm built, chosen at the
+    // machine). Baked picks go straight into tokenParams; branch params are collected and expanded below.
+    const branches = [];
+    (def.bindings || []).forEach((b) => {
+        if (!b || b.param == null || b.blockIndex != null) return;
+        const d = decl[b.param];
+        const bf = buildEnumFields(def, {}).find((f) => f.key === b.param);
+        if (d && d.exposed === true && bf && bf.branchable) { branches.push({ b, arms: bf.buildEnum, label: bf.label }); return; }
+        tokenParams[b.param] = (d && d.value !== undefined && d.value !== '') ? d.value : b.default;
+    });
+    const raw = instantiate(def, tokenParams);                          // tokens land at their sockets (userOps.js:442-447)
+    // …then the def's OWN postInstantiate — the hook where a structural param RESHAPES the stack (Surfacing's zMode:'skim'
+    // swaps placeonstock→skim and drops progstart's absolute clearance). Unrolling the raw instantiate emitted the NORMAL
+    // shape for a skim op: the right numbers in the wrong program. This is the same call the registered builder makes, run
+    // on THIS def (never a registry lookup that could resolve a differently-customized def of the same opType). A def with
+    // no hook — every op but Surfacing today, and any def loaded from JSON before reconcileCodeHooks — is untouched.
+    const stack = (typeof def.postInstantiate === 'function') ? def.postInstantiate(raw, tokenParams) : raw;
+    // The same instantiate+reshape for ONE combination of the structural params — the arm builder for the branch below.
+    const bodyFor = (extra) => {
+        const tp = { ...tokenParams, ...extra };
+        const r2 = instantiate(def, tp);
+        const s2 = (typeof def.postInstantiate === 'function') ? def.postInstantiate(r2, tp) : r2;
+        return emitMapped(s2, activeDialectOpts()).text;
+    };
+    let body = emitMapped(stack, activeDialectOpts()).text;             // #var → F#n / Z#n verbatim (util.js val)
+    if (branches.length) {
+        // THE RUNTIME BRANCH (t1323 amendment). Exactly the shape the corner generator has always used by hand
+        // (`IF #seq EQ 1 GOTO 20`), built here from the def instead: one pendant param, every arm emitted, an IF/GOTO
+        // ladder jumping to the arm the operator picked at the machine. ONE branch enum per slot — a second would
+        // multiply the arms and the body with them, which is the bloat BRANCH_ARM_CAP exists to refuse.
+        const br = branches[0];
+        const bidx = nextParam(taken); if (bidx != null) taken.add(bidx);
+        cur = nextLocalVar(cur + 1, avoid);
+        const sel = '#' + cur;
+        const armLabel = (i) => 800 + i * 10;                           // clear of the 1..30 range the hand-written generators use
+        const endLabel = 890;
+        fields.push({ key: br.b.param, idx: bidx, var: sel, label: br.label, units: '',
+            def: Math.max(0, br.arms.findIndex((a) => String(a.value) === String(br.b.default))), min: 0, max: br.arms.length - 1,
+            type: 0, exposable: true });
+        // THE PENDANT SHEET NEEDS THE MAPPING — a bare 0/1 on a controller screen means nothing on its own.
+        const lines = ['( ' + br.label + ': ' + br.arms.map((a, i) => i + ' = ' + a.label).join(', ') + ' )'];
+        br.arms.forEach((a, i) => { if (i > 0) lines.push('IF ' + sel + ' EQ ' + i + ' GOTO ' + armLabel(i)); });
+        br.arms.forEach((a, i) => {
+            if (i > 0) lines.push('N' + armLabel(i));
+            lines.push('( ' + br.label + ' = ' + a.label + ' )', bodyFor({ [br.b.param]: a.value }));
+            if (i < br.arms.length - 1) lines.push('GOTO ' + endLabel);
+        });
+        lines.push('N' + endLabel);
+        body = lines.join('\n');
+    }
     const reads = fields.map(readLine);                                 // canonical reads, prepended (generator parity)
     return { name: def.label || def.opType, fields, body: reads.length ? reads.join('\n') + '\n\n' + body : body };
 }

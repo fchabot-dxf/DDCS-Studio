@@ -17,7 +17,7 @@ import { openIconEditor, autoIconLayers, autoGlyphLayers, imageTileLayer } from 
 import { slotFromOp } from '../data/opToSlot.js';
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from '../data/probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from '../data/millToSlot.js';
-import { seedFromOp, camTypeOf, isCamableType, glyphForOp } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. (t1131 S6 — isCamGeneratorTwin dropped with the settings Customize-op picker; the op-menu Customize still uses it in opContextMenu.js). t1175/t1177 — glyphForOp resolves the auto-glyph default icon (camType-first, opType for universal).
+import { seedFromOp, camTypeOf, isCamableType, glyphForOp, buildEnumFields } from '../data/opCamMap.js';   // t1045 S1c — seed a CAM slot's expose/bake table from a program op. (t1131 S6 — isCamGeneratorTwin dropped with the settings Customize-op picker; the op-menu Customize still uses it in opContextMenu.js). t1175/t1177 — glyphForOp resolves the auto-glyph default icon (camType-first, opType for universal).
 import { stackToSlot } from '../data/stackToSlot.js';   // U3 — the UNIVERSAL build arm: a non-generator op's def → a CAM slot (geometry baked, value params exposed)
 import { subStackToSlot, walkParts } from '../data/subStackToSlot.js';
 import { fieldVarCollisions, collisionMessage, maxLocalVar, bandsFor } from '../data/camScratch.js';   // t1081 — the DECLARED generator scratch bands + the build guard that refuses a slot whose form values land inside them   // S4 — a forked op containing an opunit: the standard part stays LIVE, custom atoms exposed; walkParts detects it
@@ -1234,6 +1234,10 @@ function homingPostIsExpert() {
             // UNIVERSAL default: value params (exposable) start EXPOSED (positive, not by-absence — the generator path's
             // empty-map default means all-exposed, but stackToSlot needs an explicit expose flag); geometry params start
             // BAKED to the op's own value (a #var can't ride through them). The generator path keeps its empty exposed/baked.
+            // t1323 (USER ruling) — a BUILD enum defaults to BAKE on BOTH arms: a macro should not carry possibility-space
+            // unless someone deliberately asks for it. Stated POSITIVELY (exposed=false), because the generator arm's empty
+            // map means all-exposed, so silence here would opt every slot into carrying every arm.
+            if (f._branch) { const k = fkeyOf(f); exposed[k] = false; baked[k] = f.value; return; }
             if (seed.universal) { const k = fkeyOf(f); if (f.exposable) exposed[k] = true; else { exposed[k] = false; baked[k] = f.value; } }
         });
         return { opType: op.opType, camType: seed.camType, variant: variantForCam(seed.camType, op.params || {}), fields: seed.fields, values, exposed, baked, label: op.label || op.opType, universal: !!seed.universal, defV: defVOf(op.opType) };
@@ -1255,6 +1259,11 @@ function homingPostIsExpert() {
     function manifestToAuthOp(m) {
         if (!m || !m.opType) return null;
         const seedParams = CAM_SEED_PARAMS[m.type] ? CAM_SEED_PARAMS[m.type](m.variant) : {};
+        // t1323 — a BUILD enum is DISCRIMINATING (camTypeOf reads it to choose the arm: a Skim surfacing routes to the
+        // universal unroll because the surface generator has no skim shape). It is ALWAYS baked, so the stored bake is
+        // already its carrier — no new manifest field. It must be re-supplied BEFORE the seed, or a saved Skim slot would
+        // re-hydrate on the Normal arm and quietly rebuild the wrong program shape the next time it is touched.
+        for (const f of buildEnumFields(getUserDef(m.opType))) { const v = m.baked && m.baked[f.key]; if (v !== undefined && v !== '') seedParams[f.key] = v; }
         const a = makeAuthOp({ opType: m.opType, params: seedParams });
         if (!a) return null;
         if (m.variant != null && m.variant !== '') a.variant = m.variant;
@@ -1298,19 +1307,27 @@ function homingPostIsExpert() {
                     // S4 — a sub-stack part's value is the pendant DEFAULT re-derived from the op's definition on every build; editing it here
                     // would be a no-op (subStackToSlot re-derives from the def), so show it read-only. Modal editing of part defaults is a follow-on.
                     ? `<span style="font-size:11.5px;" title="Pendant default, derived from the op's definition — customize the op to change it">${camEsc(String(val))}</span>`
+                    // t1323 — a BUILD-TIME enum (zMode): the pick that decides which PROGRAM gets built. Same dropdown, but
+                    // its values are the def's own STRINGS, never ints — nothing on the pendant reads it at run time.
+                    : f.buildEnum
+                        ? `<select class="cbm-val cbm-build" data-oi="${oi}" data-fkey="${camEsc(fk)}" style="min-width:118px;"${baked ? '' : ' disabled title="Exposed as a branch — the macro carries every arm; the operator picks at the machine"'}>${f.buildEnum.map((o) => `<option value="${camEsc(String(o.value))}"${String(o.value) === String(val) ? ' selected' : ''}>${camEsc(o.label)}</option>`).join('')}</select>`
                     : f.enum
                         ? `<select class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(fk)}" style="min-width:118px;">${f.enum.map((o) => `<option value="${o.value}"${o.value === Number(val) ? ' selected' : ''}>${camEsc(o.label)}</option>`).join('')}</select>`
                         : numeric
                             ? `<input class="cbm-val" data-oi="${oi}" data-fkey="${camEsc(fk)}" type="number" value="${val}" style="width:72px;">`
                             : `<span style="color:var(--text-dim); font-size:11px;" title="baked string/enum value (read-only)">${camEsc(String(val))}</span>`;
-                const slotCell = baked ? `baked = ${f.enum ? (enumOpt ? enumOpt.label + ' (' + val + ')' : val) : val}` : (idx != null ? `#${idx} → #${slotPack.mirrorVar(idx)}` : '—');
+                const buildOpt = f.buildEnum && f.buildEnum.find((o) => String(o.value) === String(val));   // t1323 — the friendly label of the shape being baked
+                const slotCell = (f.buildEnum && baked) ? `built as ${buildOpt ? buildOpt.label : val}`
+                    : f.buildEnum ? (idx != null ? `#${idx} → #${slotPack.mirrorVar(idx)} · ${f.buildEnum.map((o, i) => i + '=' + o.label).join(' ')}` : 'branch')
+                    : baked ? `baked = ${f.enum ? (enumOpt ? enumOpt.label + ' (' + val + ')' : val) : val}` : (idx != null ? `#${idx} → #${slotPack.mirrorVar(idx)}` : '—');
                 const bakeTip = f.bakeable ? '' : ` title="${camEsc(f._bakeTip || 'Guard / branch param — must stay operator-set (Expose-only)')}"`;   // S4 — a sub-stack part carries its own reason on _bakeTip
                 const canExpose = f.exposable !== false;   // U3 — universal GEOMETRY params (exposable===false) can't carry a #var → Expose disabled, Bake-forced (mirrors the bakeable greying)
-                const exposeTip = canExpose ? '' : ' title="Geometry / fold-driven — a #var cannot ride through the emit; bake it"';
+                // t1323 — the reason rides the control in BOTH states: greyed (why you cannot) and offered (what it does).
+                const exposeTip = f._exposeTip ? ` title="${camEsc(f._exposeTip)}"` : (canExpose ? '' : ' title="Geometry / fold-driven — a #var cannot ride through the emit; bake it"');   // t1323 — a field may carry its OWN reason (a build enum's "changes the program shape"); postGating's rule: grey it and SAY WHY
                 return `<tr data-oi="${oi}" data-fkey="${camEsc(fk)}">
                     <td style="padding:2px 6px;">${camEsc(f.label || f.key)}</td>
                     <td>${valCell}</td>
-                    <td style="white-space:nowrap;"><label${exposeTip} style="margin-right:8px;${canExpose ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(fk)}" data-oi="${oi}" data-fkey="${camEsc(fk)}" data-mode="expose"${baked ? '' : ' checked'}${canExpose ? '' : ' disabled'}> Expose</label><label${bakeTip} style="${f.bakeable ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(fk)}" data-oi="${oi}" data-fkey="${camEsc(fk)}" data-mode="bake"${baked ? ' checked' : ''}${f.bakeable ? '' : ' disabled'}> Bake</label></td>
+                    <td style="white-space:nowrap;"><label${exposeTip} style="margin-right:8px;${canExpose ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(fk)}" data-oi="${oi}" data-fkey="${camEsc(fk)}" data-mode="expose"${baked ? '' : ' checked'}${canExpose ? '' : ' disabled'}> ${f._branch ? 'Expose as branch' : 'Expose'}</label><label${bakeTip} style="${f.bakeable ? '' : 'color:var(--text-dim);'}"><input type="radio" class="cbm-eb" name="eb_${oi}_${camEsc(fk)}" data-oi="${oi}" data-fkey="${camEsc(fk)}" data-mode="bake"${baked ? ' checked' : ''}${f.bakeable ? '' : ' disabled'}> Bake</label></td>
                     <td style="color:var(--text-dim); font-size:10px; white-space:nowrap;">${camEsc(slotCell)}</td>
                 </tr>`;
             };
@@ -1395,6 +1412,20 @@ function homingPostIsExpert() {
             const t = e.target;
             if (t.classList.contains('cbm-eb') && t.checked) { cbmToggle(+t.dataset.oi, t.dataset.fkey, t.dataset.mode); return; }
             if (t.tagName === 'SELECT' && t.classList.contains('cbm-val')) {   // ENUM pick → store the int (+ keep any baked literal in sync)
+                // t1323 — a BUILD enum's value is a def STRING ('skim'), not an int: parseInt would store NaN and the slot
+                // would build the default shape. It is always baked (never exposable), so it only ever writes the literal.
+                if (t.classList.contains('cbm-build')) {
+                    const oi = +t.dataset.oi, a = _authoring.ops[oi], key = t.dataset.fkey;
+                    a.values[key] = { ...(a.values[key] || {}), def: t.value };
+                    a.baked[key] = t.value;
+                    // …and RE-SEED, because this pick can change the ARM itself (Normal → the surface generator's compact
+                    // macro; Skim → the universal unroll of the reshaped stack). Leaving the arm behind would show a Skim
+                    // pick while building the Normal macro — the exact silent-wrong-program this row exists to prevent.
+                    const re = manifestToAuthOp(toManifest(a));
+                    if (re) { re.label = a.label; _authoring.ops[oi] = re; }
+                    renderCbmTable();
+                    return;
+                }
                 const a = _authoring.ops[+t.dataset.oi], key = t.dataset.fkey, iv = parseInt(t.value, 10);
                 const row = camRowBlock(a.opType, key);
                 if (row) { if (row.params.mode === 'bake') row.params.baked = String(iv); else row.params.dflt = String(iv); renderCbmTable(); return; }   // S4a — write the enum int to the block

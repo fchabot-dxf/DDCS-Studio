@@ -97,6 +97,16 @@ export function checkEnvelope(program, settings) {
     const worst = new Map();
     let uncheckedProbes = 0;
 
+    // t1323 (USER SCARE) — THE ANCHOR QUESTION, asked before any point is judged. A program with no absolute move never
+    // says WHERE it starts: it is a walk from wherever the operator jogged to. The trace anchors such a walk at the work
+    // origin because it must draw it SOMEWHERE — and the check then measured that arbitrary anchor against the machine
+    // box and painted a column of red 'over' badges on a perfectly correct skim program. The anchor was the proxy; the
+    // hazard is whether the SWEEP FITS THE TRAVEL AT ALL.
+    // The predicate is DECLARED, not sniffed: stats.absolute is the engine's own "the program established an absolute
+    // position (a G90 move, a homing, and deliberately NOT a bare G53 excursion) → the path is start-INDEPENDENT". One
+    // source, the same flag the preview uses to decide whether moving the operator start drags the path.
+    const anchored = !!(trace && trace.stats && trace.stats.absolute);
+
     const testPoint = (workPt, line) => {
         for (const ax of ['x', 'y', 'z']) {
             const mach = (workPt[ax] || 0) + (wo[ax] || 0);   // work coords are already mm-scaled → machine = work + wcsOffset
@@ -111,14 +121,42 @@ export function checkEnvelope(program, settings) {
         }
     };
 
+    // THE EXTENT — the bounding box of the walk itself, in mm per axis. A DIFFERENCE, so the unknown anchor cancels out:
+    // this number is true no matter where the operator started. Probe segments are INCLUDED here (unlike the per-point
+    // test, where their trip-dependent end cannot be judged) because an under-stated clearance is the dangerous
+    // direction — the note must never promise the program needs less room than it does.
+    const ext = { x: [Infinity, -Infinity], y: [Infinity, -Infinity], z: [Infinity, -Infinity] };
+    const grow = (p) => { for (const ax of ['x', 'y', 'z']) { const v = p[ax] || 0; if (v < ext[ax][0]) ext[ax][0] = v; if (v > ext[ax][1]) ext[ax][1] = v; } };
+
     for (const seg of segments) {
+        grow({ x: seg.x1, y: seg.y1, z: seg.z1 });
+        grow({ x: seg.x2, y: seg.y2, z: seg.z2 });
         if (seg.probe || seg.type === 'probe') { uncheckedProbes++; continue; }   // G31 stops trip-dependently → not statically checkable
+        if (!anchored) continue;   // t1323 — an unknown anchor makes a per-POINT verdict meaningless; the extent below is the honest one
         const line = seg.line != null ? seg.line : 0;
         testPoint({ x: seg.x1, y: seg.y1, z: seg.z1 }, line);   // both endpoints — the extreme of a straight/chord segment is at a vertex
         testPoint({ x: seg.x2, y: seg.y2, z: seg.z2 }, line);
     }
 
-    const violations = Array.from(worst.values()).sort((a, b) => a.line - b.line || (b.overshoot - a.overshoot));
+    const extent = segments.length
+        ? { x: Math.max(0, ext.x[1] - ext.x[0]), y: Math.max(0, ext.y[1] - ext.y[0]), z: Math.max(0, ext.z[1] - ext.z[0]) }
+        : null;
+
+    // t1323 — THE RELATIVE VERDICT: extent vs the envelope SPAN, per axis. Red ONLY when the sweep cannot fit the travel
+    // ANYWHERE — that is a fact about the program, true at every start, and it belongs to the whole program rather than to
+    // any one line (line: null; the per-line annotator skips it and the popover states it once). If every axis fits, the
+    // program is fine from SOME start and the honest output is a single calm clearance note — never a column of alarms.
+    const extentViol = [];
+    if (!anchored && extent) {
+        for (const ax of ['x', 'y', 'z']) {
+            const { lo, hi } = spans[ax];
+            const span = hi - lo;                     // an unbounded end (the ±9999 no-limit sentinel) → Infinity → never flagged
+            if (!(extent[ax] > span + EPS)) continue;
+            extentViol.push({ line: null, axis: ax.toUpperCase(), kind: 'travel-extent', needed: extent[ax], span, overshoot: extent[ax] - span });
+        }
+    }
+
+    const violations = extentViol.concat(Array.from(worst.values()).sort((a, b) => a.line - b.line || (b.overshoot - a.overshoot)));
 
     // t937 B2b-3 — THROUGH-STOCK, added ALONGSIDE (the envelope trace + loop + violations above are UNTOUCHED, byte-identical).
     // A SEPARATE, stock-aware trace (the envelope trace stays deliberately stock-blind so its result can't shift): probe G31s
@@ -180,5 +218,7 @@ export function checkEnvelope(program, settings) {
     // UNCHANGED. When spindleViol is empty this is byte-identical to before (concat of [] is a no-op).
     const all = spindleViol.concat(violations).concat(stockViol);
     const status = all.length ? 'red' : 'green';
-    return { status, violations: all, uncheckedProbes, reason: '', softLimitsEnforced };
+    // t1323 — anchor + extent ride the result so the UI can WORD the clearance note from one source instead of re-tracing.
+    // anchor: 'absolute' = the program says where it is (today's per-line truth) · 'relative' = a walk from an unknown start.
+    return { status, violations: all, uncheckedProbes, reason: '', softLimitsEnforced, anchor: segments.length ? (anchored ? 'absolute' : 'relative') : null, extent };
 }

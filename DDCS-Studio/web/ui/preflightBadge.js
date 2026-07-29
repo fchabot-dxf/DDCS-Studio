@@ -27,6 +27,15 @@ function softLimitNote(res) {
     if (res.softLimitsEnforced === true && (res.violations || []).some((v) => v.kind === 'soft-limit')) return 'Soft limits are enabled on your controller — it will stop at the envelope, but the breach still halts the job mid-run.';
     return '';
 }
+// t1323 — THE ONE CALM NOTE. A program with no absolute anchor (a jog-start skim: the operator positions the tool, then
+// the body walks relatively) cannot be judged line by line — there is no line that is "over" anything, because there is no
+// declared start. What IS true, and useful, is how much room the walk needs. Said ONCE, in the editor's quiet slot, in the
+// operator's own terms: "needs 100 × 54 × 10.5 mm of travel from wherever you start it". Never a badge per line.
+function clearanceNote(res) {
+    if (!res || res.anchor !== 'relative' || !res.extent) return '';
+    const e = res.extent;
+    return `Starts from wherever you jog it — needs ${fmt(e.x)} × ${fmt(e.y)} × ${fmt(e.z)} mm of travel (X × Y × Z) from that start.`;
+}
 function probeNote(res) {
     if (!res.uncheckedProbes) return '';
     const n = res.uncheckedProbes;
@@ -50,10 +59,15 @@ function renderPop(res) {
         const ul = document.createElement('ul'); ul.className = 'preflight-pop-list';
         for (const v of res.violations) {
             const li = document.createElement('li');
-            li.className = 'preflight-row'; li.setAttribute('data-line', v.line);
-            li.textContent = v.kind === 'no-spindle' ? `line ${v.line} · cuts with the spindle OFF (no M3)` : v.kind === 'through-stock' ? `line ${v.line} · crosses the stock` : v.kind === 'soft-limit' ? `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over${res.softLimitsEnforced === false ? ' · UNGUARDED — the machine will NOT stop' : ''}` : `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over`;
-            li.title = 'Jump to this line';
-            li.addEventListener('click', () => { if (_mgr && _mgr.revealLine) _mgr.revealLine(v.line); pop.hidden = true; });
+            li.className = 'preflight-row'; li.setAttribute('data-line', v.line == null ? '' : v.line);
+            // t1323 — a travel-extent breach belongs to the WHOLE PROGRAM (no anchor → no guilty line), so it reads as a
+            // fact about the program and is not clickable-to-a-line. Every other kind keeps its line, unchanged.
+            li.textContent = v.kind === 'travel-extent' ? `the whole program · needs ${fmt(v.needed)} mm of ${v.axis} travel, the machine has ${fmt(v.span)} mm`
+                : v.kind === 'no-spindle' ? `line ${v.line} · cuts with the spindle OFF (no M3)` : v.kind === 'through-stock' ? `line ${v.line} · crosses the stock` : v.kind === 'soft-limit' ? `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over${res.softLimitsEnforced === false ? ' · UNGUARDED — the machine will NOT stop' : ''}` : `line ${v.line} · ${v.axis} · ${fmt(v.overshoot)} mm over`;
+            if (v.line != null) {
+                li.title = 'Jump to this line';
+                li.addEventListener('click', () => { if (_mgr && _mgr.revealLine) _mgr.revealLine(v.line); pop.hidden = true; });
+            }
             ul.appendChild(li);
         }
         pop.appendChild(ul);
@@ -77,7 +91,9 @@ function renderAnnotations(res) {
     if (!res || res.status !== 'red' || !res.violations.length) return;
     const notes = [probeNote(res), softLimitNote(res)].filter(Boolean).join('\n');   // caveats ride the annotation title (no chip in RED)
     const byLine = new Map();   // a line can breach multiple edges → one annotation listing them
-    for (const v of res.violations) { if (!byLine.has(v.line)) byLine.set(v.line, []); byLine.get(v.line).push(v); }
+    // t1323 — a whole-program violation (travel-extent: no anchor, so no guilty line) has no row to annotate; it is stated
+    // ONCE in the popover instead. Annotating it on line 1 would be the same cry-wolf in a smaller font.
+    for (const v of res.violations) { if (v.line == null) continue; if (!byLine.has(v.line)) byLine.set(v.line, []); byLine.get(v.line).push(v); }
     for (const [line, vs] of byLine) {
         const span = overlay.querySelector(`.g-line[data-line-index="${line - 1}"]`);   // violation `line` is 1-based; data-line-index is 0-based
         if (!span) continue;
@@ -100,9 +116,18 @@ function render() {
     try { res = checkEnvelope(prog, settings()); } catch (_) { badge.hidden = true; renderAnnotations(null); return; }
     lastResult = res;
     if (res.status === 'red') {
-        // RED — NO chip; the per-line inline annotations ARE the diagnostic (one per bad line).
-        badge.hidden = true; pop.hidden = true;
+        // RED — the per-line inline annotations ARE the diagnostic (one per bad line), so normally no chip.
         renderAnnotations(res);
+        // t1323 — EXCEPT a whole-program breach (a relative walk WIDER than the travel): it has no line to annotate, and a
+        // red verdict that draws nothing is worse than the cry-wolf it replaced. It gets the chip it has no other home for.
+        const wholeProgram = res.violations.some((v) => v.line == null);
+        badge.hidden = !wholeProgram; pop.hidden = true;
+        if (wholeProgram) {
+            badge.className = 'preflight-badge preflight-red';
+            label.textContent = '⚠ needs more travel than the machine has';
+            label.title = res.violations.filter((v) => v.line == null).map((v) => `${v.axis}: needs ${fmt(v.needed)} mm, the machine has ${fmt(v.span)} mm`).join('\n');
+            renderPop(res);
+        }
     } else if (res.status === 'amber') {
         // AMBER (can't verify) — keep a SMALL chip (there are no lines to annotate); the popover carries the reason.
         renderAnnotations(null);
@@ -111,9 +136,21 @@ function render() {
         label.title = [res.reason, probeNote(res), softLimitNote()].filter(Boolean).join('\n\n');
         renderPop(res);
     } else {
-        // GREEN — nothing (silence).
-        badge.hidden = true; pop.hidden = true;
+        // GREEN — silence, with ONE exception (t1323): a jog-start program fits, but only from a start the operator
+        // chooses, so the useful thing to say is how much room to leave. A quiet neutral chip, one sentence, no alarm
+        // colour — it is information, not a warning, and an anchored program still says nothing at all.
         renderAnnotations(null);
+        const note = clearanceNote(res);
+        pop.hidden = true;
+        badge.hidden = !note;
+        if (note) {
+            badge.className = 'preflight-badge preflight-info';
+            const e = res.extent;
+            label.textContent = `↔ needs ${fmt(e.x)} × ${fmt(e.y)} × ${fmt(e.z)} mm`;
+            label.title = note;
+            renderPop({ ...res, violations: [] });
+            pop.insertBefore(Object.assign(document.createElement('div'), { className: 'preflight-pop-note', textContent: note }), pop.firstChild.nextSibling);
+        }
     }
 }
 

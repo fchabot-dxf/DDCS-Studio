@@ -26,6 +26,61 @@ import { classifyExposable } from './exposeClassifier.js';   // U1 — per-bindi
 // The clean 1:1 opType -> CAM generator type. pocket/drill are the DEFAULT arm; their variant arms are gated in camTypeOf.
 export const OPTYPE_TO_CAM = { surfacing: 'surface', corner: 'corner', edge: 'edge', slot: 'slot', pocket: 'pocket', drill: 'drill' };
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// t1323 (USER SCREENSHOT) — THE TWO ENUM CLASSES. The param table walked only value fields, so a dropdown param had no row
+// at all: on Surfacing, zMode (Normal | Skim) was simply MISSING, and the footer already promised enum support. But the two
+// kinds of enum are not one feature — they differ in WHAT READS THE VALUE, and that decides everything else:
+//
+//   VALUE enum   (corner, wcs, axis, dir…)  the MACRO reads it as a number at RUN time → the pendant can hold it → the
+//                                           full Expose treatment: a friendly label picks it, the slot stores its int.
+//   BUILD enum   (zMode)                    it changes the PROGRAM'S SHAPE — the G91 wrap either exists in the emitted
+//                                           macro or it does not. No number on a pendant can conjure a line that was
+//                                           never built → BAKE-ONLY: pick the mode the slot bakes, Expose greyed WITH
+//                                           its reason (postGating's rule: grey and say why, never hide).
+//
+// AND THE CLASS IS ALREADY DECLARED — it is not a new flag and not a guess. A def's binding carries `blockIndex`: the
+// socket its value lands in. A STRUCTURAL binding has blockIndex == null, i.e. NO SOCKET — so there is physically nowhere
+// for a runtime value to go; it can only fork the build. That is the whole distinction, already written down at every
+// param, so this only names it.
+// t1323 AMENDED (USER, live) — a build enum is NOT bake-only after all. It has THREE declared dispositions, because the
+// macro can carry BOTH arms and jump between them on the pendant mirror numeral — the runtime-branch pattern the corner
+// generator has always used (`IF #seq EQ 1 GOTO 20`), generalized:
+//   BAKE            frozen at build; the slot contains ONE shape.                                   ← THE DEFAULT
+//   EXPOSE AS VALUE the macro reads it as a number at run time (value enums only — they have a socket).
+//   EXPOSE AS BRANCH the macro carries EVERY arm and IF/GOTOs on the mirror, so the shape is chosen AT THE MACHINE.
+// DEFAULT = BAKE, per the user's ruling: a macro should not carry possibility-space unless someone asks for it. Branch
+// is a per-param, per-slot OPT-IN, and it is REFUSED (with its reason shown) when the arms would bloat the macro.
+export const BUILD_ENUM_REASON = 'changes the program shape — pick the shape the slot bakes, or expose it as a runtime branch';
+// The arm budget: a branch duplicates the WHOLE op body once per arm, so 2–3 is a readable macro and more is bloat.
+export const BRANCH_ARM_CAP = 3;
+export const branchRefusal = (n) => `${n} arms would duplicate the program ${n} times — too big for one macro; bake the shape instead`;
+
+/** The enum class of a def binding: 'value' (a socket carries it at runtime) | 'build' (no socket → it forks the build). */
+export function enumClassOf(b) {
+    if (!b || b.type !== 'enum') return null;
+    return b.blockIndex != null ? 'value' : 'build';
+}
+
+/** A def's BUILD-TIME enums as table rows: {key,label,value,options:[{value,label}]}. `params` supplies the op's current
+ *  pick (else the binding default). Empty for a def with no structural enums — which is every op but Surfacing today. */
+export function buildEnumFields(def, params) {
+    const p = params || {};
+    return ((def && def.bindings) || []).filter((b) => enumClassOf(b) === 'build').map((b) => {
+        const opts = ((b.widgetConfig && b.widgetConfig.options) || []).map((o) => Array.isArray(o) ? { value: o[1], label: o[0] } : { value: o, label: String(o) });
+        const value = (p[b.param] !== undefined && p[b.param] !== '') ? p[b.param] : b.default;
+        const arms = opts.length ? opts : [{ value: b.default, label: String(b.default) }];
+        // BRANCHABLE = the arms fit the budget. Not branchable → Expose greyed with the REFUSAL as its reason (never
+        // hidden: postGating's rule). Branchable → Expose is offered but NOT preselected; `exposed:false` is the
+        // declared default, so a slot only carries both arms when someone deliberately ticks it.
+        const branchable = arms.length > 1 && arms.length <= BRANCH_ARM_CAP;
+        return { key: b.param, label: b.label || b.param, def: b.default, value, units: '', type: 'enum',
+            buildEnum: arms, branchable,
+            exposed: false, exposable: branchable, bakeable: true,
+            _exposeTip: branchable ? 'Expose as a BRANCH: the macro carries every arm and jumps on the pendant number, so the shape is chosen at the machine' : branchRefusal(arms.length),
+            _branch: true };
+    });
+}
+
 // t1175 AUTO-GLYPH — camType (camTypeOf) -> the tileset glyph id (web/assets/svg/tileset.svg) that pictures that op. A fresh
 // CAM slot's default icon is this glyph, centred, with no name text. An unmapped camType (e.g. substack) resolves to null →
 // the icon editor falls back to the slot-name text, so it never breaks.
@@ -156,7 +211,14 @@ export function camTypeOf(op) {
     const p = (op && op.params) || {};
     const { baseType: t, variant } = baseOf(op && op.opType);
     switch (t) {
-        case 'surfacing': return { camType: 'surface' };
+        case 'surfacing':
+            // t1323 — the BUILD enum decides the ARM. surfacingSlot emits ONE fixed macro shape (absolute, WCS-referenced);
+            // Skim is a whole-op G91 program that does not exist in it. Same ruling as pocket-polygon and single-axis middle
+            // below: a variant the generator cannot express routes to the UNIVERSAL unroll, which builds from the op's own
+            // stack — so the skim shape has exactly ONE source (skimStructure's postInstantiate), never a second macro here
+            // that could drift from it.
+            if (p.zMode === 'skim') return { universal: true, reason: 'Skim surfacing is a whole-op RELATIVE (G91) program shape the surface generator cannot express → universal (unrolls the skim stack as built)' };
+            return { camType: 'surface' };
         case 'corner': return { camType: 'corner' };
         case 'edge': return { camType: 'edge' };
         case 'slot': return { camType: 'slot' };
@@ -272,7 +334,9 @@ function seedUniversal(op, reason) {
     } else {
         fields = valueBindings.map((b) => fieldFor(b));
     }
-    return { camType: 'universal', universal: true, fields };
+    // t1323 — the BUILD-time enums ride ALONGSIDE the value fields (they are rows, not sockets): the operator sees which
+    // shape the slot bakes, greyed out of Expose with its reason, instead of a param that silently does not exist.
+    return { camType: 'universal', universal: true, fields: fields.concat(buildEnumFields(def, params)) };
 }
 
 /**
@@ -301,5 +365,8 @@ export function seedFromOp(op) {
         else { const opVal = readParam(f.key); value = opVal !== undefined ? opVal : f.def; meta = { type: f.type }; }   // op value via alias, else the generator default
         return { key: f.key, label: f.label, def: f.def, value, exposed: true, bakeable: !nb.includes(f.key), ...meta };
     });
-    return { camType, fields };
+    // t1323 — a BUILD enum lives on the DEF, not on the generator's field list, so it is appended on the generator arm too.
+    // On this arm it is always sitting at the value that KEEPS this camType (a shape-forking pick routed to universal
+    // above), so the row states the shape being built and stays greyed — informative, never a control that lies.
+    return { camType, fields: fields.concat(buildEnumFields(getUserDef(op && op.opType), params)) };
 }

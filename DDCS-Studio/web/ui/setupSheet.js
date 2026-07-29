@@ -137,6 +137,7 @@ export function violationsBySetup(verdict, groups) {
     const proj = (window.ddcsGetProjection && window.ddcsGetProjection()) || null;
     if (!verdict || !groups || !proj || !proj.map) return bySetup;
     for (const v of (verdict.violations || [])) {
+        if (v.line == null) continue;   // t1323 — a whole-program breach (travel-extent) belongs to no setup; the footer verdict carries it
         const anc = proj.map[(v.line | 0) - 1];
         const topId = anc && anc[0];
         const g = groups.find((grp) => grp.id === topId);
