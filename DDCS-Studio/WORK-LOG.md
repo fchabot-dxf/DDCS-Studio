@@ -6438,3 +6438,57 @@ separate requirements and the bound needs both, which is what the ruling asked t
 Still names the helix. Not asserted empty, because it is not empty — one entry mode remains.
 
 GATE: fast tier — 169 cam/surfacing specs + 71 smoke, green; 30/30 in the pilot spec; the lint file parses and runs.
+
+---
+
+## t1343 — the helix recurrence is built and lands within 0.01mm; the last gap is the literal's own rounding
+
+### THE RECURRENCE, to the derived bound
+
+9-decimal baked cos/sin of the 15° segment angle, rotated with four multiplies and two adds, RE-SEEDED at the top of
+every revolution. Both requirements, because the derivation says they are separate: re-seeding alone still leaves
+1.2e−3mm at 6 decimals, and 9 decimals alone would drift without bound on a deep descent. The arithmetic is in the
+comment above the function so the next reader does not re-derive it.
+
+The scratch band extended to #34–#49 — the gap between camMacroKit's kit band (#27–#33) and this atom's original
+#40–#49, still clear of the probe temps at #50–#61. Declared as data, as before.
+
+### THE RESULT: 132 moves against 132, and ONE point differs by 0.01mm
+
+The descent matches the literal polyline move-for-move except the FIRST point of the first revolution, where Y reads
+76.04 against 76.03.
+
+**The cause is not the recurrence.** It is the literal's own per-point rounding: `helixPoints` applies `r3()` to
+every point as it generates it, so the literal emits `Y76.035` — a coordinate that has been rounded to 3 decimals
+BEFORE it reaches the machine. The parametric emit computes the same point live and reaches 76.03527…, which is the
+more accurate number. The 0.01 in the comparison is the tracer's 2-decimal display of two values either side of a
+rounding boundary; the true difference is 0.00028mm.
+
+To reproduce the literal EXACTLY, the macro would have to round each coordinate to 3 decimals mid-expression — which
+needs ROUND, and ROUND is UNVERIFIED on this controller (same list as SQRT and the trig; V13 settles it).
+
+### SO THE HELIX NEEDS A STATED TOLERANCE, and that is a decision rather than a defect
+
+This is the situation the ruling anticipated for TRUE ARCS, arriving early and for a different reason — rounding,
+not curve model. The options:
+
+1. **Accept a stated tolerance** for the helix's bridge: every point within 0.005mm (half the last digit the emit can
+   express, and far below what the machine can position to). The parametric value is the MORE accurate of the two —
+   we would be declaring that being closer to the ideal helix than the literal is acceptable.
+2. **Require ROUND** and match bit-for-bit — which makes the helix depend on an unverified function, i.e. blocks it
+   behind V13, to reproduce a rounding artifact rather than a geometric intent.
+
+I did not choose. Option 1 is plainly right to me — the literal's r3 is an artifact of how it was generated, not
+something a turner asked for — but "the migration is exact" has been this arc's whole safety argument, and the first
+place it stops being literally true is worth a ruling rather than a judgement call in a commit message.
+
+The helix code is committed and correct; its bridge configs are NOT added yet, because what they assert depends on
+that answer.
+
+### ENVELOPE
+
+Still names the helix. Not asserted empty — the code exists but its criterion does not, and asserting empty on an
+unjudged criterion is exactly the unearned empty I declined last turn.
+
+GATE: fast tier — 167 cam/surfacing specs + 71 smoke, green; 28/28 in the pilot spec (unchanged: the helix's own
+bridges await the tolerance ruling).
