@@ -411,9 +411,46 @@ function applyEntryWaypoint(T, blocks) {
     const e = findEntryBlock(blocks); if (!e || !e.params) return;
     const ex = num(e.params.entryX, NaN), ey = num(e.params.entryY, NaN);
     if (!Number.isFinite(ex) || !Number.isFinite(ey)) return;   // unset → the cut owns its entry
+    // t1365 — A DECLARED ENTRY POINT MUST NOT SILENTLY DO NOTHING. `firstRapidXY` reads the program's own cut entry by
+    // matching literal numbers after X and Y, which is what every rapid looked like while ops unrolled their geometry
+    // in JavaScript. A parametric body opens with `G0 X0 Y#47` — the row's Y is a register the machine fills in — so
+    // that returned null and the whole pass RETURNED: the operator dragged the entry square, the emit ignored it, and
+    // nothing said so. Measured on surfacing, and it would meet every op the parametric family takes next.
+    //
+    // The ε-compare is what genuinely cannot be done against a runtime value: there is no way to know at build time
+    // whether the declared point is already where the cut starts. So the two cases split by what is KNOWABLE — a
+    // literal entry keeps the exact behaviour it has always had (byte-identical), and an unresolvable one honours the
+    // declaration, because the operator asked for the waypoint and a rapid to it is the safe act.
     const cut = firstRapidXY(T.map((t) => t.line).join('\n'));
-    if (!cut || (Math.abs(ex - cut.x) < 1e-3 && Math.abs(ey - cut.y) < 1e-3)) return;   // within ε → byte-identical
-    T.splice(cut.index, 0, { line: `G0 X${r3(ex)} Y${r3(ey)}   ( entry )`, src: e.id ? [e.id] : null });   // one waypoint at clearance, before the cut
+    if (cut) {
+        if (Math.abs(ex - cut.x) < 1e-3 && Math.abs(ey - cut.y) < 1e-3) return;   // within ε → byte-identical
+        T.splice(cut.index, 0, { line: `G0 X${r3(ex)} Y${r3(ey)}   ( entry )`, src: e.id ? [e.id] : null });   // one waypoint at clearance, before the cut
+        return;
+    }
+    // NOT IN A JOG-RELATIVE OP. A skim program is measured from wherever the operator jogged to, so an ABSOLUTE entry
+    // point has nothing to be absolute against — routing through one would drive the tool to a machine position the
+    // op never meant. The skim fold is a declared block, so this asks the stack rather than sniffing the text.
+    if (hasSkimFold(blocks)) return;
+    // the first rapid carrying BOTH axes in ANY form (a number, a register, or an expression) is the cut entry.
+    const AX = (ax) => new RegExp(`${ax}\\s*(-?\\d|#|\\[)`);
+    const idx = T.findIndex((t) => /\bG0\b/.test(t.line) && AX('X').test(t.line) && AX('Y').test(t.line));
+    if (idx < 0) return;
+    T.splice(idx, 0, { line: `G0 X${r3(ex)} Y${r3(ey)}   ( entry )`, src: e.id ? [e.id] : null });
+}
+
+/** t1365 — does this program carry a SKIM fold (a whole-op jog-relative frame)? Declared, not sniffed. */
+function hasSkimFold(blocks) {
+    const walk = (bs) => {
+        for (const b of (bs || [])) {
+            if (!b) continue;
+            const d = BLOCKS[b.type];
+            if (d && d.kind === 'skim') return true;
+            if (b.uiChildren && walk(b.uiChildren)) return true;
+            if (b.children && walk(b.children)) return true;
+        }
+        return false;
+    };
+    return walk(blocks);
 }
 
 /** t736 — THE DECLARED PROGRAM ROTATION: a flat `xform` sibling declares {angle,pivotX,pivotY}; rotate EVERY emitted
