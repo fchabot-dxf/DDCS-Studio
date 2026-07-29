@@ -611,7 +611,50 @@ section) — so once indices are known, "push config to the controller" becomes 
       wrote no offset and **moved the axis** (X 5.000→73.286). Do NOT narrow `W-G10` — **harden it: forbid
       `G10 L20/L2` with axis words.** Still open: re-examine why `key-5/6.nc` & `3D PROBE G55.nc` use it (latent
       bug vs zero-distance context). See the "V1 RESULT" section above.
-- [ ] **[TO TEST] Can a macro read the live WORKPIECE-coordinate position (`#790` X / `#791` Y / `#792` Z)?**
+- [x] ~~**[TO TEST] Can a macro read the live WORKPIECE-coordinate position?**~~ — **ANSWERED 2026-07-29 by CORPUS,
+      ahead of the machine visit.** `#790`-`#794` = live WORK positions X/Y/Z/A/B, **[COMMUNITY-ATTESTED]** (real
+      `.tap` save/restores, the spec table, the user's own live monitoring); the factory `gotozero.nc` independently
+      proves `#792`=Z (`IF #569<#792 GOTO1`). Canonical: `#790`=X, `#791`=Y. `verify/V14_wcs_pos.nc` is now a
+      machine-visit CONFIRMATION rather than a gate.
+      **CORRECTION (t1355): `#880`-`#882` is NOT "V7-proven".** V7 is still listed under *Left to do* in
+      [`verify/HANDOFF.md`](verify/HANDOFF.md) — never run; its values are recorded only as "seen incidentally
+      (Mach 5/−5/−5)". Studio's skim frame therefore uses the **WCS** trio, and the reasoning is not
+      attested-vs-proven but WHERE the unproven part sits: a machine-frame origin would force every cutting move into
+      `G53`, which is demonstrated here only as `G53 <axis>#var` — one axis, a variable, a rapid, in a footer
+      (V3a/V3b). Literal-coordinate `G53` is **INCONCLUSIVE** (V3c/V3d aborted at a guard, then deliberately not
+      pursued because "the dialect emits `#var`, never bare literals") — and a raster is full of literal coordinates
+      and `G1` feed moves. A bad register read happens before any motion and a sentinel refuses it; a mis-executed
+      cutting form happens with the tool down. See `wizards/ops/surfaceraster.js` (SKIM_FRAME) for the recorded sieve.
+
+### Comparator + control-flow forms — the FACTORY MACRO CORPUS, swept 2026-07-29 (t1355)
+
+Swept: v4.1 `macroMillCylinder.nc` / `macroMillRect.nc`, dm500 `slib.nc`, Expert `slib-g.nc` / `slib-m.nc`, the
+Expert SYSDISK capture and the CAM-menu install set. Counts are occurrences in factory-authored code only (our own
+`verify/*.nc` deliberately excluded — probes we wrote are not evidence about the firmware).
+
+| Form | Factory count | Tier |
+|---|---|---|
+| `==` | 190 | **[DEMONSTRATED]** |
+| `>` | 50 | **[DEMONSTRATED]** |
+| `<` | 20 | **[DEMONSTRATED]** |
+| `<=` | 12 | **[DEMONSTRATED]** |
+| `>=` | 6 | **[DEMONSTRATED]** |
+| `NE` | 25 | **[DEMONSTRATED]** |
+| `LT` / `GT` / `LE` / `GE` / `EQ` | **0** | not in factory code |
+
+- **`WHILE … DOn` / `ENDn` is factory-demonstrated**, in BOTH spacings: `WHILE #1<=#108 DO2` and
+  `WHILE [#2 <= #1301] DO1`. The bracketed, spaced form Studio emits needs no compromise to sit on the evidence.
+- **`IF … THEN` is NOT in the factory corpus** — but it is **[LIVE-SHIPPED]**: `data/camMacroKit.js:50` `wcsBase()`
+  emits `IF #71 EQ 0 THEN #71=#578` at the head of **every probe CAM slot** (`probeToSlot.js` lines 156/226/285/344/426
+  — corner, edge, middle/inside, boss, alignment), shipped in `1c69fa65` on **2026-06-20** and run live on the machine
+  by the user since. Same tier for the word `EQ` and for `LE` (`millToSlot.js` `IF #22 LE 0 GOTO`).
+- **ACTION TAKEN (t1355):** the *pre-consumer* parametric emitter (`wizards/ops/surfaceraster.js`) moved all four of
+  its word comparators onto the demonstrated symbols. The flag named two (`LT`/`GT`); the sweep showed `LE`/`GE` sat
+  in the same zero-evidence class, so all four moved — leaving two would have kept the risk while looking handled.
+  The **live-shipped** CAM slots were deliberately NOT rewritten: they are proven by use, and churning working
+  macros to chase a stronger tier is risk taken for tidiness.
+
+- [ ] **[TO TEST · superseded above, kept for the machine visit] `#790` X / `#791` Y / `#792` Z**
       `#792` is **[CONFIRMED]** by the factory's own `gotozero.nc` (`IF #569<#792 GOTO1`) — macro usage, not just a
       variable-list name. `#790`/`#791` appear in **no** captured factory macro: same documented family, contiguous
       numbering, Z proven, X/Y still inference. Note `V7_read_dro.nc` does **not** answer this — it reads `#880-#882`,

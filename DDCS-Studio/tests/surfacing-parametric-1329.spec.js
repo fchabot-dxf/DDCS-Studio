@@ -55,18 +55,18 @@ test('THE HEADER SPEAKS, AND THE LOOPS COUNT THEMSELVES', async ({ page }) => {
     expect(r.body, 'rows are counted from the area and the stepover — the ones that FIT').toMatch(/#45=\[FIX\[\[#41 - #44 \/ 2\] \/ #44\] \+ 1\]/);
     expect(r.body, 'and the stepover is itself derived from tool Ø × %, the same way the CAM does it').toMatch(/#44=\[12 \* 60 \/ 100\]/);
     // THE LOOPS: depth outside, rows inside — the parting-peck shape
-    expect(r.body, 'a depth loop').toMatch(/WHILE \[#46 LT #42\] DO1/);
-    expect(r.body, 'with the row loop nested inside it').toMatch(/WHILE \[#48 LT #45\] DO2/);
+    expect(r.body, 'a depth loop').toMatch(/WHILE \[#46 < #42\] DO1/);
+    expect(r.body, 'with the row loop nested inside it').toMatch(/WHILE \[#48 < #45\] DO2/);
     expect(r.body.indexOf('DO2')).toBeGreaterThan(r.body.indexOf('DO1'));
     expect(r.body.indexOf('END2')).toBeLessThan(r.body.indexOf('END1'));
     // A ZERO STEPOVER DIVIDES BY ZERO and a zero stepdown loops forever — refused cleanly, not left to the machine
-    expect(r.body).toMatch(/IF #44 LE 0 GOTO 91/);
-    expect(r.body).toMatch(/IF #43 LE 0 GOTO 91/);
+    expect(r.body).toMatch(/IF #44 <= 0 GOTO 91/);
+    expect(r.body).toMatch(/IF #43 <= 0 GOTO 91/);
     expect(r.body, 'with a named error, not a silent halt').toMatch(/ERROR: stepover \/ stepdown/);
     // THE BAND IS DECLARED AS DATA, so the collision guard reads it instead of re-deriving it from the text
     // t1343 — the band extended DOWN to #34 for the helix recurrence's rotating vector, temp and counters. Still
     // one declared contiguous range, still clear of camMacroKit's kit band (#27–#33) and the probe temps (#50–#61).
-    expect(r.band, 'the scratch band is declared on the atom').toEqual([[34, 49]]);
+    expect(r.band, 'the scratch band is declared on the atom — t1355 adds the skim frame trio').toEqual([[34, 49], [62, 64]]);
 });
 
 test('EVERY SCRATCH VAR IS ASSIGNED IN ONE PLACE — t1325’s lesson, asserted not remembered', async ({ page }) => {
@@ -408,7 +408,7 @@ for (const N of [1, 2, 3, 9]) {
         // THE WORD IS THE MACHINE'S, matched not modernised: M00 with the operator sentence the literal path uses
         expect(r.parametric, 'the pause is M00, the same word the literal path emits').toMatch(/M00\s+\( pause - press Cycle Start to resume \)/);
         // …and it is GUARDED so the last level never pauses — a halt on a finished part is a call to the shop floor
-        expect(r.parametric, 'the last pass is exempted').toMatch(/IF #46 GE #42 GOTO 31/);
+        expect(r.parametric, 'the last pass is exempted').toMatch(/IF #46 >= #42 GOTO 31/);
         // the cadence test is a modulo written as "does N divide the level index" — no MOD in this dialect
         expect(r.parametric, 'and the cadence is a real divisibility test, not an unrolled list').toMatch(/FIX\[#48 \/ /);
     });
@@ -625,10 +625,13 @@ test('t1351 — the envelope covers the PLACED program, and names SKIM as the on
     expect(r.placed.why, 'and names no gap').toBe('');
     expect(r.placedConcentric.covered, 'concentric too, at a negative frame').toBe(true);
     expect(r.normal.covered, 'an explicit Normal Z-mode is in').toBe(true);
-    // SKIM is out, and says WHY in the words a reader needs — never a bare false.
-    expect(r.skim.covered, 'skim is NOT covered').toBe(false);
-    expect(r.skim.why, 'and the reason names the runtime-value problem, not just "unsupported"').toMatch(/runtime values/);
-    expect(r.skimRamp.covered, 'skim with a ramp descent is out for the same reason').toBe(false);
+    // FLIPPED at t1355 — SKIM IS IN. It was named a gap at t1351 with the runtime-value reason, and it closed the
+    // way every gap in this arc has closed: the assert changed SIDES rather than being deleted. And it closed by
+    // becoming the SAME body over a runtime frame, so skim × ramp came with it for free rather than needing its own
+    // turn — which is why both of these flip together.
+    expect(r.skim.covered, 'skim is covered now — the same body, over a frame the machine supplies').toBe(true);
+    expect(r.skim.why, 'and names no remaining gap').toBe('');
+    expect(r.skimRamp.covered, 'skim with a ramp descent came along with it').toBe(true);
 });
 
 /**
@@ -846,4 +849,157 @@ test('t1351 REACHABILITY (b) — surfacingStack emits no rotation, but the PROGR
     expect(r.mirRefused, 'the mirror refuses too, rather than silently not mirroring').toMatch(/mirror refused:/);
     expect(r.mirrored, 'touching nothing').toEqual([]);
     expect(r.mirroredX, 'and reporting zero mirrored words — the same number as before, now with a reason attached').toBe(0);
+});
+
+/**
+ * t1355 — THE SKIM BODY, and it is the SAME body over a runtime frame.
+ *
+ * The earlier ruling was a natively-relative (G91) emit, because a loop's deltas are runtime values and there is
+ * nothing in the text to relativize. That is still true — what changed is that it turned out not to be necessary.
+ * #790/#791/#792 hold the live position in the ACTIVE WCS ([COMMUNITY-ATTESTED]; the factory's own gotozero.nc
+ * proves #792). So the atom reads the jog position into three LOCAL registers at the top and its ORDINARY ABSOLUTE
+ * body runs over them. Skim × concentric, skim × ramp and skim × helix came along for free — no second emitter, no
+ * per-descent G91 derivation, and every bridge already written keeps applying.
+ *
+ * THE REFERENCE is the shipping skim path: `surfacingStack({zMode:'skim'})`, which is the literal raster put through
+ * `relativizeProgram` — G91 deltas from the jog start. The parametric body is absolute in a frame the machine fills
+ * in, so the two are compared in the ONE frame they share: distance travelled FROM THE JOG POINT.
+ */
+const SKIM_JOGS = [
+    { name: 'at the WCS origin', jx: 0, jy: 0, jz: 0 },
+    { name: 'a NEGATIVE jog point', jx: -40, jy: -25, jz: -12 },
+    { name: 'an OFF-GRID jog point', jx: 17.5, jy: -6.25, jz: 3.5 },
+];
+const SKIM_SHAPES = [
+    { name: 'parallel · plunge · MULTI-LEVEL', cfg: { strategy: 'parallel', entry: 'plunge', depth: 1.2, stepdown: 0.4 } },
+    { name: 'parallel · ramp', cfg: { strategy: 'parallel', entry: 'ramp', rampAngle: 3, depth: 0.8, stepdown: 0.4 } },
+    { name: 'parallel · helix', cfg: { strategy: 'parallel', entry: 'helix', helixDia: 8, helixPitch: 1, depth: 0.8, stepdown: 0.4 } },
+    { name: 'CONCENTRIC · plunge', cfg: { strategy: 'concentric', entry: 'plunge', depth: 0.8, stepdown: 0.4 } },
+    { name: 'single level, single row', cfg: { strategy: 'parallel', entry: 'plunge', depth: 0.5, stepdown: 0.5, h: 5 } },
+];
+
+for (const J of SKIM_JOGS) {
+    for (const S of SKIM_SHAPES) {
+        test(`SKIM BRIDGE — ${S.name} — ${J.name}`, async ({ page }) => {
+            await boot(page);
+            const r = await page.evaluate(async ({ J, S }) => {
+                const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+                const { emitProgram } = await import('/blocks/blockEmitter.js');
+                const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+                const { traceToolpath } = await import('/engine/trace.js');
+                const NL = String.fromCharCode(10);
+                const base = { w: 120, h: 60, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, ...S.cfg };
+
+                // THE SHIPPING SKIM PATH: literal raster, relativized by the skim fold. G91 from the jog start, so its
+                // traced coordinates ARE the distance travelled from that point.
+                const literal = String(emitProgram(surfacingStack({ ...base, zMode: 'skim' })));
+                // THE ATOM PATH: absolute, in the frame the machine supplies. The seeds MODEL the controller's read —
+                // this is the sim standing in for #790/#791/#792, never the WCS table.
+                const parametric = ['G90', `#790=${J.jx}`, `#791=${J.jy}`, `#792=${J.jz}`,
+                    ...surfaceRasterLines({ ...base, zMode: 'skim' }), 'M30'].join(NL);
+
+                const segs = (nc) => (traceToolpath(nc).segments || []);
+                const cutFrom = (nc, ox, oy, oz) => segs(nc).filter((s) => !s.rapid)
+                    .map((s) => [+(s.x2 - ox).toFixed(3), +(s.y2 - oy).toFixed(3), +(s.z2 - oz).toFixed(3)]);
+                // the literal is already relative to the jog; the parametric is absolute in the jog frame
+                const lit = cutFrom(literal, 0, 0, 0);
+                const par = cutFrom(parametric, J.jx, J.jy, J.jz);
+
+                // the inter-level clearance rapid, as a height ABOVE the jog surface — the pinned no-op's replacement
+                const rapidZs = (nc, oz) => [...new Set(segs(nc).filter((s) => s.rapid).map((s) => +(s.z2 - oz).toFixed(3)))];
+                return {
+                    lit, par,
+                    litRapidZ: rapidZs(literal, 0), parRapidZ: rapidZs(parametric, J.jz),
+                    hasFrameRead: /#62=#790/.test(parametric), sentinel: /IF #62 == -99999 GOTO 93/.test(parametric),
+                };
+            }, { J, S });
+
+            expect(r.lit.length, 'the shipping skim path cuts').toBeGreaterThan(0);
+            expect(r.par.length, `same number of cutting moves (literal ${r.lit.length}, parametric ${r.par.length})`).toBe(r.lit.length);
+            // MOVE FOR MOVE, measured from the jog point in both. The frame is the only thing that differs, and it
+            // cancels — which is the whole claim.
+            expect(r.par, 'every cutting move is the same distance from the jog start, in order').toEqual(r.lit);
+            // THE FRAME IS READ, not assumed, and guarded before any motion.
+            expect(r.hasFrameRead, 'the body reads the live position').toBe(true);
+            expect(r.sentinel, 'and refuses if it did not arrive').toBe(true);
+            // AND THE TOOL REALLY LIFTS between levels — t1349 pinned the relativized literal collapsing this to a
+            // no-op (`G0 Z5` → `G0 Z0`). The parametric body clears to a REAL height above the touched surface.
+            expect(Math.max(...r.parRapidZ), 'the clearance rapid is a real lift above the jog surface').toBeCloseTo(5, 3);
+        });
+    }
+}
+
+/**
+ * t1349's SKIM PIN, RESTATED — the defect it documented is now the thing that is fixed, so it flips.
+ *
+ * It pinned `relativizeProgram` collapsing the inter-level retract to `G0 Z0`: the tool never lifting between depth
+ * levels, because the delta was computed against a position the loop never actually holds. That is still exactly
+ * what the text rewrite does — and it no longer matters, because nothing asks it to. The skim body is emitted
+ * relative to a frame the machine supplies, so the retract is written as a height and stays one.
+ */
+test('t1349 → t1355 — the skim retract is a REAL lift now, because nothing relativizes a loop any more', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+        const { relativizeProgram } = await import('/data/rotateProgram.js');
+        const NL = String.fromCharCode(10);
+        const cfg = { w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 };
+        const body = surfaceRasterLines(cfg);
+        const skimBody = surfaceRasterLines({ ...cfg, zMode: 'skim' });
+        const relLine = relativizeProgram(body.join(NL)).text.split(NL)
+            .find((l) => /clear of the work before the next level/.test(l)) || '';
+        return {
+            // what the OLD path did to the placed body (unchanged, and now unused for skim)
+            relativized: relLine,
+            // what the skim body itself emits
+            skimRetract: skimBody.find((l) => /clear of the work before the next level/.test(l)) || '',
+            skimFirstClear: skimBody.find((l) => /clear before the first plunge/.test(l)) || '',
+        };
+    });
+    // The text rewrite still ruins it — that has not changed and is not being fixed.
+    expect(r.relativized, 'relativizeProgram still collapses the retract (unchanged, and no longer asked)').toMatch(/G0 Z0\b/);
+    // But the skim body emits a real height above the frame, so the tool lifts.
+    expect(r.skimRetract, 'the skim body clears to frame + clearance, not to zero').toMatch(/G0 Z\[#64 \+ 5\]/);
+    expect(r.skimFirstClear, 'and so does the opening clear').toMatch(/G0 Z\[#64 \+ 5\]/);
+});
+
+/**
+ * THE PRIMING RULE, SWEPT rather than remembered (CORE_TRUTH 4): the variable-priming freeze concerns PERSISTENT
+ * targets. This asserts the frame registers are ordinary locals and — more usefully — that no emitter in the app
+ * writes a persistent variable directly from a system one, which is the shape the rule actually warns about.
+ */
+test('t1355 — the frame lands in LOCALS, and nothing anywhere writes persistent-direct-from-system', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfaceRasterLines, RASTER_SCRATCH } = await import('/wizards/ops/surfaceraster.js');
+        const ob = await import('/blocks/opBuilders.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const NL = String.fromCharCode(10);
+        const skim = surfaceRasterLines({ w: 80, h: 40, depth: 0.8, stepdown: 0.4, toolDia: 8, stepoverPct: 50, zMode: 'skim' });
+        // every op's emit, swept for `#<persistent> = #<system>`
+        const offenders = [];
+        for (const opType of Object.keys(ob.BUILDERS || {})) {
+            let txt = '';
+            try { txt = String(emitProgram(ob.builderOf(opType)({}))); } catch (_) { continue; }
+            txt.split(NL).forEach((l, i) => {
+                const m = l.match(/^\s*#(\d+)\s*=\s*#(\d+)\s*(?:\(|;|$)/);
+                if (!m) return;
+                const tgt = Number(m[1]), src = Number(m[2]);
+                // THE HAZARD, SPECIFIED: a PERSISTENT target written straight from a SYSTEM register. Both halves
+                // matter. My first version tested the target alone and flagged alignment's `#1510=#52` — which is
+                // the operator-MESSAGE argument idiom (`#1510`/`#1511` feed the `#1505=-5000(...)` report) sourced
+                // from a LOCAL probe temp. Reporting a measurement is not the freeze this rule is about, and a
+                // predicate that cannot tell them apart would have made the assert noise nobody trusts.
+                const isSystemSrc = (src >= 790 && src <= 794) || (src >= 880 && src <= 884);   // live position families
+                if (tgt >= 1153 && isSystemSrc) offenders.push(`${opType}:${i + 1} ${l.trim()}`);
+            });
+        }
+        return { band: RASTER_SCRATCH, frameTargets: skim.filter((l) => /^#6[234]=#79\d/.test(l)).map((l) => l.split('=')[0]), offenders };
+    });
+    // the frame trio is declared in the band, and every one of them is a LOCAL (far below the #1153+ persistent range)
+    expect(r.frameTargets.sort(), 'the three frame registers are the declared ones').toEqual(['#62', '#63', '#64']);
+    for (const t of r.frameTargets) expect(Number(t.slice(1)), `${t} is a local, not a persistent target`).toBeLessThan(1153);
+    expect(r.band, 'and they are declared as band DATA, not left implicit').toEqual([[34, 49], [62, 64]]);
+    // the rule the freeze is actually about, asserted across every registered op rather than remembered
+    expect(r.offenders, 'no emitter writes a persistent variable straight from a system one').toEqual([]);
 });

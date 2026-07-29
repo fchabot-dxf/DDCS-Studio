@@ -19,6 +19,21 @@
  * ── THE FRAME ────────────────────────────────────────────────────────────────────────────────────────────────────
  * The area is the TOOL-CENTRE sweep (no radius inset — the tool overhangs the edge and faces the whole top), which
  * is what the literal emitter has always done; the equivalence bridge proves that has not changed.
+ *
+ * ── THE COMPARATORS ARE SYMBOLS, AND THAT IS AN EVIDENCE DECISION (t1355) ────────────────────────────────────────
+ * This body used the WORD forms (LT/GT/LE/GE). Swept against the factory macro corpus — the v4.1 firmware's
+ * macroMillCylinder/macroMillRect, dm500's slib, the Expert's slib-g/slib-m — the counts are:
+ *     SYMBOLS:  ==  190 · >  50 · <  20 · <=  12 · >=  6      ← every comparator this body needs, demonstrated
+ *     WORDS:    NE  25  ← and NOTHING else. No LT, no GT, no LE, no GE, no EQ anywhere in factory code.
+ * So all four were swapped, not the two that were flagged: LE and GE sat in exactly the same undemonstrated class as
+ * LT and GT, and leaving them would have kept the risk while looking like it had been dealt with.
+ *
+ * THE BRACKETED, SPACED SHAPE IS DEMONSTRATED TOO — the factory writes both `WHILE #1<=#108 DO2` and
+ * `WHILE [#2 <= #1301] DO1`, so the readable form this body already used needs no compromise to sit on the evidence.
+ *
+ * (Our own shipped CAM slots still emit the spaced WORD forms — `IF #22 LE 0 GOTO`, `IF #71 EQ 0 THEN` — and those
+ * are proven a different way: the user runs them live. They are NOT changed here; this is the pre-consumer emitter,
+ * and rewriting working live macros to chase a stronger tier would be risk taken for tidiness.)
  */
 import { num } from './util.js';
 
@@ -30,7 +45,32 @@ import { num } from './util.js';
 // t1343 — EXTENDED DOWN to #34 for the helix recurrence, which needs a rotating vector (2), a temp for the rotate
 // (1) and its own segment counter (1) on top of the header. #34–#39 is the gap between camMacroKit's kit band
 // (#27–#33) and this atom's original #40–#49 — still clear of the probe temps at #50–#61.
-export const RASTER_SCRATCH = [[34, 49]];
+// t1355 — THE SKIM FRAME's three registers, declared as part of the same band data. #62-#64 sits in the gap between
+// the probe temps (#50-#61) and camMacroKit's WCS pair (#70-#71) — unclaimed by any band in camScratch.js. They are
+// plain LOCALS: far below the #1153+ persistent range the priming freeze concerns, so reading a system register into
+// one carries none of that hazard (CORE_TRUTH 4).
+export const RASTER_SCRATCH = [[34, 49], [62, 64]];
+
+/**
+ * THE LIVE WORK POSITION, read at the top of a SKIM program. #790/#791/#792 are the active-WCS X/Y/Z
+ * ([COMMUNITY-ATTESTED]; the factory's own gotozero.nc proves #792 with `IF #569<#792 GOTO1`).
+ *
+ * WHY THE WCS FRAME AND NOT THE MACHINE FRAME (#880-#882) — the sieve, recorded because it looks like the safer
+ * option and is not. Taking machine coordinates would force EVERY cutting move into G53, and G53 is proven here only
+ * as `G53 <axis>#var`: one axis, a variable, a rapid, in a program footer (V3a/V3b on machine 2026-06-19).
+ * Literal-coordinate G53 is INCONCLUSIVE — V3c/V3d aborted at a guard and were deliberately not pursued because
+ * "the dialect emits #var, never bare literals" — and a raster is full of literal coordinates and G1 feed moves.
+ * Meanwhile #880-#882 is NOT V7-proven: V7 is still in the verify HANDOFF's "Left to do" table, its values only
+ * "seen incidentally".
+ *
+ * So the choice is not attested-vs-proven, it is WHERE the unproven part sits. The WCS frame puts it on a register
+ * READ, at the top, before any motion — where a sentinel can catch it and refuse. The machine frame would put it in
+ * the G-code FORM of every cutting move, where a controller that mis-executes it does so with the tool down.
+ * A bad read is detectable; a mis-executed cutting form is not. Gate 1 (safety) decides, and it decides for the WCS.
+ */
+const SKIM_FRAME = { x: '#62', y: '#63', z: '#64' };
+const FRAME_SRC = { x: '#790', y: '#791', z: '#792' };
+const FRAME_SENTINEL = '-99999';
 
 const V = {
     w: '#40',        // area X (tool-centre sweep)
@@ -78,39 +118,88 @@ export function surfaceRasterLines(p = {}) {
     const r3 = (n) => Math.round(n * 1000) / 1000;
     const zTop = r3(z0);   // the surface this op faces from — 0 in the op's own frame, the placement's offZ when placed
 
+    /**
+     * t1355 — ONE BODY, TWO FRAMES. Every coordinate below is "the op's origin PLUS an offset". What changes between
+     * the placed body and the SKIM body is only what the origin IS: a build-time number, or a register the machine
+     * fills in at run time from wherever the operator jogged to.
+     *
+     * `ax(rel)` folds the sum at build time when the origin is a number — so a placed op emits `X3.6`, byte-for-byte
+     * what it emitted before this existed. When the origin is a REGISTER the sum cannot be folded, so it stays an
+     * expression the controller evaluates: `X[#35 + 3.6]`. `axE()` is the same idea for an offset that is itself a
+     * runtime term (`#40`, `#44`), which is why the placed body already wrote `X[0 + #40]`.
+     *
+     * All the build-time GEOMETRY is frame-independent and needs no version: a distance-to-centre, a unit vector, a
+     * ring inset and the rotation constants are the same numbers wherever the origin sits. That is what makes this a
+     * substitution rather than a second emitter.
+     */
+    const skim = String(p.zMode || '') === 'skim';
+    const F = skim ? { ...SKIM_FRAME, live: true } : { x: String(r3(x0)), y: String(r3(y0)), z: String(zTop), live: false };
+    const ax = (rel = 0) => (F.live ? (rel ? `[${F.x} + ${r3(rel)}]` : `${F.x}`) : `${r3(x0 + rel)}`);
+    const ay = (rel = 0) => (F.live ? (rel ? `[${F.y} + ${r3(rel)}]` : `${F.y}`) : `${r3(y0 + rel)}`);
+    const az = (rel = 0) => (F.live ? (rel ? `[${F.z} + ${r3(rel)}]` : `${F.z}`) : `${r3(z0 + rel)}`);
+    // origin + a build-time offset + a RUNTIME term. The offset folds into the origin when the origin is a number,
+    // so a placed body keeps writing `[103.6 + #49 * 0.8]` rather than growing a `0 +` nobody asked for.
+    const axE = (rel, expr) => (F.live ? (rel ? `[${F.x} + ${r3(rel)} + ${expr}]` : `[${F.x} + ${expr}]`) : `[${r3(x0 + rel)} + ${expr}]`);
+    const ayE = (rel, expr) => (F.live ? (rel ? `[${F.y} + ${r3(rel)} + ${expr}]` : `[${F.y} + ${expr}]`) : `[${r3(y0 + rel)} + ${expr}]`);
+    const azE = (expr) => `[${F.z} ${expr}]`;        // expr carries its own sign, e.g. '- #46'
+
     // THE STRATEGY DECIDES THE WALK, under the SAME header and the SAME depth loop — the loop that counts levels
     // does not care what happens inside it, which is why adding a strategy is a new walk and not a new emitter.
     const stepBaked = tool * pct / 100;   // the stepover AT BUILD VALUES — what the baked ramp geometry is computed for
-    const opts = { x0, y0, zTop, w, h, feed, plunge, clr, r3, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
+    const opts = { x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
         helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1), toolDia: tool, stepBaked };
     const walk = (p.strategy === 'concentric') ? ringWalk(opts) : rowWalk(opts);
 
+    // THE SKIM PREAMBLE. Seed an impossible value, read the frame, then REFUSE if it did not arrive — before any
+    // motion at all. A position of 0 is perfectly legal (the operator may jog to the WCS origin), so the sentinel is
+    // a value no axis can hold rather than a falsy test: the thing being detected is "the read did not happen".
+    const preamble = !skim ? [] : [
+        '( ---- SKIM: the frame is READ from the machine, never assumed ---- )',
+        `${SKIM_FRAME.x}=${FRAME_SENTINEL}   ( sentinel: no axis can be here, so an unread frame is visible )`,
+        `${SKIM_FRAME.y}=${FRAME_SENTINEL}`,
+        `${SKIM_FRAME.z}=${FRAME_SENTINEL}`,
+        `${SKIM_FRAME.x}=${FRAME_SRC.x}   ( live work X — wherever the operator jogged to )`,
+        `${SKIM_FRAME.y}=${FRAME_SRC.y}   ( live work Y )`,
+        `${SKIM_FRAME.z}=${FRAME_SRC.z}   ( live work Z — the touched surface )`,
+        `IF ${SKIM_FRAME.x} == ${FRAME_SENTINEL} GOTO 93   ( no frame -> refuse, with the tool still up )`,
+        `IF ${SKIM_FRAME.y} == ${FRAME_SENTINEL} GOTO 93`,
+        `IF ${SKIM_FRAME.z} == ${FRAME_SENTINEL} GOTO 93`,
+        '',
+    ];
+    const refusal = !skim ? [] : [
+        'GOTO 94',
+        'N93',
+        '#1505=1   ;ERROR: could not read the live position - skim needs the jog frame',
+        'N94',
+    ];
+
     return [
+        ...preamble,
         '( ---- SURFACING, parametric. Every var below speaks; change one and the loops re-derive. ---- )',
         `${V.w}=${r3(w)}   ( area X — the tool-CENTRE sweep, so the tool overhangs the edge )`,
         `${V.h}=${r3(h)}   ( area Y )`,
         `${V.depth}=${r3(depth)}   ( total depth to face off )`,
         `${V.stepdown}=${r3(stepdown)}   ( bite per level )`,
         `${V.step}=[${r3(tool)} * ${r3(pct)} / 100]   ( stepover mm = tool Ø ${r3(tool)} x ${r3(pct)}% — the CAM derives it the same way )`,
-        `IF ${V.step} LE 0 GOTO 91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
-        `IF ${V.stepdown} LE 0 GOTO 91`,
+        `IF ${V.step} <= 0 GOTO 91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
+        `IF ${V.stepdown} <= 0 GOTO 91`,
         ...walk.count,
         '',
         `${V.z}=0   ( the level being cut )`,
-        `G0 Z${r3(z0 + clr)}   ( clear before the first plunge )`,
-        `WHILE [${V.z} LT ${V.depth}] DO1   ( depth: one pass per level, the last bite clamped to the total )`,
+        `G0 Z${az(clr)}   ( clear before the first plunge )`,
+        `WHILE [${V.z} < ${V.depth}] DO1   ( depth: one pass per level, the last bite clamped to the total )`,
         `  ${V.z}=[${V.z} + ${V.stepdown}]`,
-        `  IF ${V.z} GT ${V.depth} THEN ${V.z}=${V.depth}`,
+        `  IF ${V.z} > ${V.depth} THEN ${V.z}=${V.depth}`,
         ...walk.body,
-        `  G0 Z${r3(z0 + clr)}   ( clear of the work before the next level )`,
+        `  G0 Z${az(clr)}   ( clear of the work before the next level )`,
         // t1335 — CONFIRM EVERY N LEVELS. The pause word is M00 with the operator sentence the literal path already
         // uses, matched rather than modernised: the machine's own convention is not something to improve in passing.
         // It fires after every Nth level EXCEPT the last — a pause after the final pass would stop the program on a
         // finished part. `#48` is free here: the row/ring index is spent by the time the level ends.
         ...(confirmEvery > 0 ? [
             `  ${V.i}=[${V.z} / ${V.stepdown}]   ( which level just finished )`,
-            `  IF ${V.z} GE ${V.depth} GOTO 31   ( the last pass needs no pause — the part is done )`,
-            `  IF [${V.i} / ${r3(confirmEvery)} - FIX[${V.i} / ${r3(confirmEvery)}]] GT 0.001 GOTO 31   ( not an Nth level )`,
+            `  IF ${V.z} >= ${V.depth} GOTO 31   ( the last pass needs no pause — the part is done )`,
+            `  IF [${V.i} / ${r3(confirmEvery)} - FIX[${V.i} / ${r3(confirmEvery)}]] > 0.001 GOTO 31   ( not an Nth level )`,
             '  M00   ( pause - press Cycle Start to resume )',
             '  N31',
         ] : []),
@@ -119,6 +208,7 @@ export function surfaceRasterLines(p = {}) {
         'N91',
         '#1505=1   ;ERROR: stepover / stepdown must be greater than zero',
         'N92',
+        ...refusal,
     ];
 }
 
@@ -133,50 +223,50 @@ export function surfaceRasterLines(p = {}) {
  * own comment says so too), so a surfacing op CANNOT emit a one-way raster and no user config reaches it. A
  * parametric one-way walk was written and then deleted — machinery for a case this op does not have.
  */
-function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, entry, rampAngle, helixDia, helixPitch, toolDia, stepBaked }) {
+function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry, rampAngle, helixDia, helixPitch, toolDia, stepBaked }) {
     void clr;
     // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP walks toward the area centre at the declared
     // angle and comes back. See rampLines for why toC and 1/tan are BAKED and what that costs.
     const descent = (entry === 'ramp')
-        ? rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3 })
+        ? rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3, F, ax, ay, az, axE, ayE, azE })
         : (entry === 'helix')
-            ? helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3 })
-            : [`    G1 Z[${zTop} - ${V.z}] F${r3(plunge)}   ( the ONE plunge of this level )`];
+            ? helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3, F, ax, ay, az, axE, ayE, azE })
+            : [`    G1 Z${azE('- ' + V.z)} F${r3(plunge)}   ( the ONE plunge of this level )`];
     const count = [
         // THE ROW COUNT — not h/step rounded up. Rows sit at step/2 + i·step, so the count is how many of THOSE land
         // inside the area. The two formulas agree at 150/7.2 and 40/5 and disagree at 60/7.2 (8 rows, not 9), where
         // rounding up puts a row at 61.2 — off the far edge of a 60mm face, cutting air.
         `${V.n}=[FIX[[${V.h} - ${V.step} / 2] / ${V.step}] + 1]   ( rows that FIT: the last lands inside the area, not past it )`,
-        `IF ${V.n} LT 1 THEN ${V.n}=1   ( a face narrower than one stepover is still one row )`,
+        `IF ${V.n} < 1 THEN ${V.n}=1   ( a face narrower than one stepover is still one row )`,
     ];
-    const rowY = `    ${V.y}=[${r3(y0)} + ${V.step} / 2 + ${V.i} * ${V.step}]`;
+    const rowY = `    ${V.y}=${ayE(0, `${V.step} / 2 + ${V.i} * ${V.step}`)}`;
     return { count, body: [
         `  ${V.i}=0`,
         // EVERY LEVEL STARTS AT THE NEAR CORNER, going +X. Carrying the direction over from the previous level looked
         // tidier and is not what the machine does — with an odd row count level 2 would start at the far end and run
         // backwards. The equivalence bridge caught it at move 42 of 84.
         `  ${V.dir}=1   ( the raster restarts at the near corner for each level )`,
-        `  WHILE [${V.i} LT ${V.n}] DO2   ( rows: counted above, so the area and the stepover decide how many )`,
+        `  WHILE [${V.i} < ${V.n}] DO2   ( rows: counted above, so the area and the stepover decide how many )`,
         rowY,
-        `    IF ${V.i} GT 0 GOTO 13   ( already down: step over at depth rather than lifting between rows )`,
-        // WHICH END TO START AT — asked as a BRANCH, not as a comparison inside an expression. `[#49 LT 0]` looked
+        `    IF ${V.i} > 0 GOTO 13   ( already down: step over at depth rather than lifting between rows )`,
+        // WHICH END TO START AT — asked as a BRANCH, not as a comparison inside an expression. `[#49 < 0]` looked
         // like it would evaluate 0/1 and the tracer read it as a plain 1, putting the first plunge off the corner.
-        `    IF ${V.dir} LT 0 GOTO 17`,
-        `    G0 X${r3(x0)} Y${V.y}`,
+        `    IF ${V.dir} < 0 GOTO 17`,
+        `    G0 X${ax()} Y${V.y}`,
         '    GOTO 18',
         '    N17',
-        `    G0 X[${r3(x0)} + ${V.w}] Y${V.y}`,
+        `    G0 X${axE(0, V.w)} Y${V.y}`,
         '    N18',
         ...descent,
         '    GOTO 14',
         '    N13',
         `    G1 Y${V.y} F${r3(feed)}   ( step over at depth — the tool does not lift between rows )`,
         '    N14',
-        `    IF ${V.dir} LT 0 GOTO 15`,
-        `    G1 X[${r3(x0)} + ${V.w}] F${r3(feed)}`,
+        `    IF ${V.dir} < 0 GOTO 15`,
+        `    G1 X${axE(0, V.w)} F${r3(feed)}`,
         '    GOTO 16',
         '    N15',
-        `    G1 X${r3(x0)} F${r3(feed)}`,
+        `    G1 X${ax()} F${r3(feed)}`,
         '    N16',
         `    ${V.dir}=[0 - ${V.dir}]`,
         `    ${V.i}=[${V.i} + 1]`,
@@ -204,7 +294,7 @@ function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, entry, rampAngle, 
  * the literal kernel already supports it via runX/runY) or live-SQRT if V13 proves it; plus the true-arc helix with
  * start/end points, radius envelope and depth-per-revolution as the substitute criteria. That turn lifts the gate.
  */
-function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3 }) {
+function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3, F, ax, ay, az, axE, ayE, azE }) {
     const ang = Math.min(45, Math.max(0.5, rampAngle));
     const invTan = 1 / Math.tan(ang * Math.PI / 180);
     // the ramp starts where the plunge would: the first row, at build values
@@ -220,13 +310,13 @@ function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3 
         `    ${V.run}=[${V.stepdown} * ${r3(invTan)}]   ( ramp run = bite / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
         // THE HONEST DEGRADE, kept from the literal kernel: when the run to the centre is longer than the distance
         // available, a ramp cannot be cut and the tool plunges instead — with the reason in the program, not silently.
-        `    IF ${V.run} GT ${r3(toC)} GOTO 41   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
-        `    G0 Z[${zTop} - ${V.z} + ${V.stepdown}]   ( down to the floor this level starts from )`,
-        `    G1 X[${r3(sx)} + ${V.run} * ${u6(ux)}] Y[${r3(sy)} + ${V.run} * ${u6(uy)}] Z[${zTop} - ${V.z}] F${r3(feed)}   ( ramp )`,
-        `    G1 X${r3(sx)} Y${r3(sy)} F${r3(feed)}   ( back to the row start, now at depth )`,
+        `    IF ${V.run} > ${r3(toC)} GOTO 41   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
+        `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( down to the floor this level starts from )`,
+        `    G1 X${axE(sx - x0, `${V.run} * ${u6(ux)}`)} Y${ayE(sy - y0, `${V.run} * ${u6(uy)}`)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( ramp )`,
+        `    G1 X${ax(sx - x0)} Y${ay(sy - y0)} F${r3(feed)}   ( back to the row start, now at depth )`,
         '    GOTO 42',
         '    N41',
-        `    G1 Z[${zTop} - ${V.z}] F${r3(plunge)}   ( the ramp did not fit — straight plunge )`,
+        `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}   ( the ramp did not fit — straight plunge )`,
         '    N42',
     ];
 }
@@ -252,7 +342,7 @@ function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3 
  * no matter how deep the descent runs. THE TWO ARE SEPARATE REQUIREMENTS: re-seeding alone still leaves 1.2e−3 at
  * 6 decimals, and 9 decimals alone would drift without bound on a deep descent. The bound holds only with both.
  */
-function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3 }) {
+function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3, F, ax, ay, az, axE, ayE, azE }) {
     const SEG = 24, theta = 2 * Math.PI / SEG;
     // NINE decimals — see the derivation above. r3 would be catastrophic here for exactly the reason t1339 found
     // one level down, and 6 is not enough either.
@@ -266,19 +356,19 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
     const pitch = Math.max(0.1, helixPitch);
     return [
         `    ${HX.segs}=[FUP[${V.stepdown} / ${r3(pitch)}] * ${SEG}]   ( segments: ${SEG} per rev, at ${r3(pitch)}mm per rev )`,
-        `    IF ${HX.segs} LT ${SEG} THEN ${HX.segs}=${SEG}   ( never less than one revolution )`,
-        `    G0 X${r3(cx + R)} Y${r3(cy)}   ( the helix starts on its own radius, at the area centre )`,
-        `    G0 Z[${zTop} - ${V.z} + ${V.stepdown}]   ( the floor this level starts from )`,
+        `    IF ${HX.segs} < ${SEG} THEN ${HX.segs}=${SEG}   ( never less than one revolution )`,
+        `    G0 X${ax(cx + R - x0)} Y${ay(cy - y0)}   ( the helix starts on its own radius, at the area centre )`,
+        `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( the floor this level starts from )`,
         `    ${HX.vx}=${r3(R)}   ( the rotating vector, re-seeded every revolution so the drift cannot accumulate )`,
         `    ${HX.vy}=0`,
         `    ${HX.k}=0`,
         `    ${HX.rev}=0`,
-        `    WHILE [${HX.k} LT ${HX.segs}] DO3   ( one straight segment per step — a polyline helix, as the literal is )`,
+        `    WHILE [${HX.k} < ${HX.segs}] DO3   ( one straight segment per step — a polyline helix, as the literal is )`,
         `      ${HX.k}=[${HX.k} + 1]`,
         `      ${HX.rev}=[${HX.rev} + 1]`,
         // RE-SEED: at the top of each new revolution the vector returns to its exact starting value, so the
         // compounding above can never run past 24 steps however deep the descent goes.
-        `      IF ${HX.rev} LE ${SEG} GOTO 51`,
+        `      IF ${HX.rev} <= ${SEG} GOTO 51`,
         `      ${HX.rev}=1`,
         `      ${HX.vx}=${r3(R)}   ( re-seed )`,
         `      ${HX.vy}=0`,
@@ -286,11 +376,11 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
         `      ${HX.tmp}=[${HX.vx} * ${c} - ${HX.vy} * ${sn}]   ( rotate by ${r3(360 / SEG)}deg: 4 multiplies, 2 adds, no trig )`,
         `      ${HX.vy}=[${HX.vx} * ${sn} + ${HX.vy} * ${c}]`,
         `      ${HX.vx}=${HX.tmp}`,
-        `      G1 X[${r3(cx)} + ${HX.vx}] Y[${r3(cy)} + ${HX.vy}] Z[${zTop} - ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}] F${r3(feed)}`,
+        `      G1 X${axE(cx - x0, HX.vx)} Y${ayE(cy - y0, HX.vy)} Z${azE(`- ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}`)} F${r3(feed)}`,
         '    END3',
-        `    G1 X${r3(sx)} Y${r3(sy)} Z[${zTop} - ${V.z}] F${r3(feed)}   ( helix — out to the row start, now at depth )`,
-        `    IF ${V.z} GT 0 GOTO 52`,
-        `    G1 Z[${zTop} - ${V.z}] F${r3(plunge)}`,
+        `    G1 X${ax(sx - x0)} Y${ay(sy - y0)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( helix — out to the row start, now at depth )`,
+        `    IF ${V.z} > 0 GOTO 52`,
+        `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}`,
         '    N52',
     ];
 }
@@ -300,12 +390,12 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
  * shrunk by `inset` on every side, and the walk stops when a ring would collapse. The tool steps to the next ring on
  * a DIAGONAL CUTTING move and never lifts within a level — one plunge, like the both-ways raster.
  */
-function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3 }) {
+function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE }) {
     void clr;
-    const inX = `[${r3(x0)} + ${RING_INSET}]`;
-    const inY = `[${r3(y0)} + ${RING_INSET}]`;
-    const outX = `[${r3(x0)} + ${V.w} - ${RING_INSET}]`;
-    const outY = `[${r3(y0)} + ${V.h} - ${RING_INSET}]`;
+    const inX = axE(0, RING_INSET);
+    const inY = ayE(0, RING_INSET);
+    const outX = axE(0, `${V.w} - ${RING_INSET}`);
+    const outY = ayE(0, `${V.h} - ${RING_INSET}`);
     return {
         count: [
             // THE RING COUNT — how many insets fit before the SHORTER side closes. The shorter side is resolved here
@@ -313,15 +403,15 @@ function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3 }) {
             // −0.001 is the collapse BOUNDARY, not a fudge: at h exactly 2·k·step the k-th ring has zero height, and
             // the literal kernel does not walk it either (its `bx-ax < 1e-6` break is the same test).
             `${V.n}=[FIX[[${r3(Math.min(w, h))} - 0.001] / [2 * ${V.step}]] + 1]   ( rings that FIT before the middle closes )`,
-            `IF ${V.n} LT 1 THEN ${V.n}=1`,
+            `IF ${V.n} < 1 THEN ${V.n}=1`,
         ],
         body: [
             `  ${RING_INSET}=0   ( how far in this ring sits )`,
             `  ${V.i}=0`,
-            `  WHILE [${V.i} LT ${V.n}] DO2   ( rings, inward )`,
-            `    IF ${V.i} GT 0 GOTO 21`,
+            `  WHILE [${V.i} < ${V.n}] DO2   ( rings, inward )`,
+            `    IF ${V.i} > 0 GOTO 21`,
             `    G0 X${inX} Y${inY}`,
-            `    G1 Z[${zTop} - ${V.z}] F${r3(plunge)}   ( the ONE plunge of this level )`,
+            `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}   ( the ONE plunge of this level )`,
             '    GOTO 22',
             '    N21',
             `    G1 X${inX} Y${inY} F${r3(feed)}   ( diagonal step in to the next ring, still cutting )`,
@@ -360,22 +450,15 @@ export function surfaceRasterCovers(p = {}) {
     // placement applied to its text afterwards, and the placement bridges prove the absorbed frame equals the shipping
     // placed literal move for move. So a PLACED surfacing op is inside the envelope.
     //
-    // SKIM IS THE ONE REMAINING NAME, and it is named rather than assumed: a skim op is whole-op G91, which is not a
-    // rewrite of this body but a different one (or the same one over a runtime frame — FINDINGS / V14_wcs_pos.nc).
-    // Every `false` here is a feature that would VANISH the day the old path dies, so it stays false until its bridge.
-    return String(p.zMode || '') !== 'skim';
+    // t1355 — SKIM CLOSES, and it closed the way the last three did: by becoming the SAME body, not a second one.
+    // The atom reads the jog frame into three registers at the top and its ordinary absolute body runs over them, so
+    // every strategy and every descent came along for free rather than each needing its own G91 derivation. The
+    // envelope is empty again, now at FULL-PROGRAM scope — body, placement AND Z-mode.
+    return true;
 }
 
 /** Why a config is outside the envelope, in the words a reader needs — never a bare false. */
-export function surfaceRasterGap(p = {}) {
-    if (String(p.zMode || '') === 'skim') {
-        return 'Skim Z-mode is a whole-op RELATIVE (G91) program, and a loop\'s deltas are runtime values — so it is a '
-            + 'natively-relative body to write, not a transform of this one. Until that body exists (or the controller '
-            + 'is proven to expose the live WCS position, which would let this body run over a runtime frame), a skim '
-            + 'surfacing op must keep the literal emitter.';
-    }
-    return '';
-}
+export function surfaceRasterGap() { return ''; }
 
 export const surfaceRasterBlock = {
     type: 'surfaceraster', label: 'Surface Raster (parametric)', kind: 'leaf', category: 'Transforms',
