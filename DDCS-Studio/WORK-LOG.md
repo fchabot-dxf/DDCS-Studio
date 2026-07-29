@@ -6135,3 +6135,56 @@ correctness one.
 
 GATE: fast tier — 216 surfacing/cam/blocks/roundtrip specs + 71 smoke, green. Round-trip diff count unchanged at 11,
 0 blocks lost (nothing was switched, so nothing could move it).
+
+---
+
+## t1333 — coverage: concentric rings walked parametrically, and one "gap" that was never there
+
+### CONCENTRIC RINGS — closed, proven at four adversarial boundaries
+
+`ringWalk` emits the inset-rectangle walk the literal `concentricRect` kernel does: each ring is the area shrunk by
+`inset` on every side, the tool steps inward on a DIAGONAL cutting move and never lifts within a level, and the ring
+count is derived — `FIX[(min(w,h) − 0.001) / (2·step)] + 1`.
+
+The `− 0.001` is the COLLAPSE BOUNDARY, not a fudge: at h exactly 2·k·step the k-th ring has zero height, and the
+literal kernel does not walk it either (its `bx-ax < 1e-6` break is the same test, expressed the other way round).
+That is the first bridge config, chosen for exactly that reason.
+
+Bridge configs, all executing move-for-move against the literal kernel:
+- the middle collapsing EXACTLY on a ring boundary (h = 28.8 = 2·2·7.2)
+- a single ring, the middle closing immediately (40 × 12)
+- inset NOT dividing the short side evenly (120 × 65) — the common case, where an off-by-one hides
+- square, both sides closing at once (80 × 80)
+
+It matched on the first run, which is worth recording alongside the raster's three failures: the ring walk is pure
+arithmetic with one termination rule, and that is exactly why it was straightforward.
+
+### ONE-WAY — NOT A GAP, and the correction is mine to make
+
+t1331 listed `direction: 'oneway'` as one of four uncovered gaps. That measurement was wrong about the OP, not
+about the emit: I handed `direction: 'oneway'` to both emitters and compared, but `surfacingStack` hard-codes
+`direction: 'bothways'` on the fill block — the twin's own comment says so too. No surfacing config can reach a
+one-way raster, so there was never a gap to close.
+
+I had written the parametric one-way walk before checking, and then DELETED it: machinery for a case this op does
+not have. The finding is now asserted — the spec asks the op for one-way and shows it returns both-ways — so nobody
+re-adds it from the old note.
+
+**The lesson generalises past this turn:** a coverage gap measured by feeding a parameter to two emitters is only
+real if the OP can actually produce that parameter. Three of my four t1331 gaps were real; the fourth was an
+artifact of the measurement.
+
+### THE ENVELOPE, restated rather than dropped
+
+`surfaceRasterCovers` no longer mentions strategy or direction. What remains outside it is genuinely two things,
+each still naming itself: the DESCENT (ramp / helix) and the confirm-every-N pause. The t1331 assert that measured
+concentric at 50-vs-36 cutting moves is restated as an EQUALITY — the gap closed, rather than the assert being
+deleted, which is what closing a gap should look like.
+
+### SPLIT, per the dispatch's two-and-two clause
+
+Ramp/helix and confirm-every-N are not started. Ramp/helix carries the arc question the dispatch flagged (helix as
+G2/G3 with I/J under #vars, and whether the tracer handles that — a finding to report if it does not), which wants
+its own turn rather than the tail of this one. The switch-over remains out by design.
+
+GATE: fast tier — 184 surfacing/cam/roundtrip specs + 71 smoke, green. 18/18 in the pilot spec.
