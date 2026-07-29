@@ -182,10 +182,54 @@ export function applyLatheWorkspaceStock() {
     return true;
 }
 
+/**
+ * t1321 (USER) — THE WORKSPACE REMEMBERS A STOCK PER KIND, the same way it remembers a view per kind.
+ *
+ * Switching back to a mill left the LATHE's bar in the workspace stock — so the mill scene drew a cylinder, with the
+ * chuck and the turning tool that follow a bar. The stock is a fact about the WORK, and the work is different on the
+ * two machines, so one slot could only ever be wrong for whichever kind you were not looking at.
+ *
+ * NOTHING IS DESTROYED. The record you are leaving is parked in its own slot and the incoming kind's record is
+ * restored, so a bar survives a trip through a mill workspace exactly as it was — which is also what keeps the t1313
+ * rule true (a user's declared bar is never silently retyped).
+ */
+const STOCK_BY_KIND = 'stockByKind';
+const MILL_DEFAULT_STOCK = { x: 100, y: 80, z: 20, shape: 'boss', datum: 'nnp', pin: 'origin', show: true };
+
+export function applyStockForKind(prevKind) {
+    if (typeof window === 'undefined' || !window.ddcsGetSettings) return false;
+    let s = null;
+    try { s = window.ddcsGetSettings(); } catch (_) { return false; }
+    if (!s) return false;
+    const kind = isLathe() ? 'lathe' : 'mill';
+    const from = prevKind || (kind === 'lathe' ? 'mill' : 'lathe');
+    if (from === kind) return false;
+    const slots = { ...(s[STOCK_BY_KIND] || {}) };
+    if (s.stock) slots[from] = { ...s.stock };            // park what we are leaving, untouched
+    const kept = slots[kind];
+    if (kept) s.stock = { ...kept };                       // …and take back what this kind had
+    else if (kind === 'mill') s.stock = { ...MILL_DEFAULT_STOCK };   // a mill that has never had one gets its box
+    s[STOCK_BY_KIND] = slots;
+    try { window.ddcsSaveSettings && window.ddcsSaveSettings(); } catch (_) {}
+    if (kind === 'lathe') applyLatheWorkspaceStock();      // …and a lathe with no remembered bar is given one
+    return true;
+}
+
 if (typeof window !== 'undefined') {
     // …applied when the workspace BECOMES a lathe, and once at boot for one that already is (app.js).
-    window.addEventListener('ddcs:machine-changed', () => { try { applyLatheWorkspaceStock(); } catch (_) {} });
+    // t1321 — the kind switch swaps the stock slot FIRST (so a mill gets its own box back), then the lathe seed runs
+    // for a workspace that has never held a bar.
+    let _lastKind = null;
+    try { _lastKind = isLathe() ? 'lathe' : 'mill'; } catch (_) { _lastKind = 'mill'; }
+    window.addEventListener('ddcs:machine-changed', () => {
+        try {
+            const now = isLathe() ? 'lathe' : 'mill';
+            if (now !== _lastKind) { applyStockForKind(_lastKind); _lastKind = now; }
+            else applyLatheWorkspaceStock();
+        } catch (_) {}
+    });
     window.ddcsApplyLatheStock = applyLatheWorkspaceStock;
+    window.ddcsApplyStockForKind = applyStockForKind;
 }
 
 /**

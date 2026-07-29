@@ -20394,3 +20394,20 @@ back in it.
 
 Gate after the amendments: smoke 71/71; the parting/drill, world, program-grain, feel and persistence specs 41/41
 plus the two repaired ones.
+
+**AMENDMENT 4 (t1321, user live) — the kind switch left the lathe world behind.** Switching back to a mill still drew
+the bar, because the BAR had been written into the one workspace stock slot. The stock is a fact about the WORK, and
+the work differs between the two machines, so a single slot could only ever be wrong for whichever kind you were not
+looking at.
+
+Scoped per kind now, mirroring the per-kind views: `stockByKind` parks the record you are leaving and restores the
+one the incoming kind had. **Nothing is destroyed** — a bar survives a trip through a mill workspace exactly as it
+was left (Ø33 × 70 + 2 asserted back), which is also what keeps the t1313 rule true. A mill that has never held a
+stock gets its box.
+
+And the furniture followed a beat late: the chuck mesh was only ever disposed INSIDE the bar branch of `setStock`, so
+a mill scene kept a chuck floating in it — the furniture outliving the fact it belonged to. Disposed before the
+branch now, so any stock that is not a bar has none. Asserted both ways (no chuck, no turning tool in the mill scene;
+the bar and its chuck back on return).
+
+Gate after amendment 4: smoke 71/71; the whole lathe family + stock + program-grain 149/149.

@@ -141,3 +141,41 @@ test('THE BLADE WIDTH IS DRAGGABLE — the far wall writes the field, and the em
     expect(emit.three).toMatch(/^#144=3\b/);
     expect(emit.five, 'the emitted kerf is the dragged number').toMatch(/^#144=5\b/);
 });
+
+test('THE STOCK IS SCOPED PER KIND — a mill gets its box back, and the bar survives untouched (t1321 user)', async ({ page }) => {
+    // USER, live: switching back to a mill still showed the lathe world, because the BAR was written into the one
+    // workspace stock slot. The stock is a fact about the WORK, and the work differs between the two machines.
+    await boot(page, { kind: 'mill' });
+    const millBox = await page.evaluate(() => ({ ...window.ddcsGetSettings().stock }));
+    expect(millBox.shape, 'a mill starts with its box').toMatch(/boss|pocket/);
+    // …to a lathe, and give the bar a size the user would notice
+    await page.evaluate(async () => {
+        const M = await import('/data/workspaceMachine.js');
+        M.setMachine({ kind: 'lathe', chuck: 'axis' }, false);
+        await new Promise((r) => setTimeout(r, 200));
+        const { barStock } = await import('/data/stockShape.js');
+        window.ddcsGetSettings().stock = barStock({ diameter: 33, stickOut: 70, allowance: 2 }, window.ddcsGetSettings().stock);
+        window.ddcsSaveSettings && window.ddcsSaveSettings();
+    });
+    await page.waitForTimeout(300);
+    // …back to the mill: the box returns, and the lathe furniture goes with the bar
+    await page.evaluate(async () => { const M = await import('/data/workspaceMachine.js'); M.setMachine({ kind: 'mill' }, false); });
+    await page.waitForTimeout(600);
+    await page.click('#view-toggle');
+    await page.waitForTimeout(1300);
+    const back = await page.evaluate(() => {
+        const v = window.__ddcsLastViz, s = window.ddcsGetSettings().stock;
+        return { shape: s.shape, x: s.x, y: s.y, z: s.z, chuck: !!v._latheChuck, tool: v._simTool && v._simTool.type };
+    });
+    expect(back.shape, 'the mill has its own box again').toBe(millBox.shape);
+    expect([back.x, back.y, back.z], 'exactly the one it had').toEqual([millBox.x, millBox.y, millBox.z]);
+    expect(back.chuck, 'and no chuck in a mill scene').toBe(false);
+    expect(back.tool, 'nor a turning tool').not.toBe('turning');
+    // …and NOTHING WAS DESTROYED: back on the lathe, the bar is exactly as it was left
+    await page.evaluate(async () => { const M = await import('/data/workspaceMachine.js'); M.setMachine({ kind: 'lathe', chuck: 'axis' }, false); });
+    await page.waitForTimeout(500);
+    const bar = await page.evaluate(() => ({ ...window.ddcsGetSettings().stock }));
+    expect(bar.diameter, 'the declared bar came back untouched').toBe(33);
+    expect(bar.z, 'stick-out and raw end included').toBe(72);
+    expect(bar.origin).toBe('finished-face');
+});

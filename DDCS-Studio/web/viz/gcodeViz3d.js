@@ -1553,6 +1553,14 @@ export class GcodeViz3D {
             // t1283 — THE CHUCK IS PART OF A LATHE BAR, not an op's opt-in: the stock declares a grip end (its −Z),
             // so it gets the chuck whenever it is drawn. One chuck concept, the rotary rig's own render, told which
             // way this one lies and that this bar has no tailstock behind it.
+            // t1321 — THE CHUCK LEAVES WITH THE BAR. It was only ever disposed INSIDE the bar branch, so a workspace
+            // switched back to a mill kept a chuck floating in its scene: the furniture outlived the fact it belonged
+            // to. Disposed here, before the branch, so any stock that is not a bar has none.
+            if (!(stock.axis === 'z' && stock.origin === 'finished-face') && this._latheChuck) {
+                pg.remove(this._latheChuck);
+                this._latheChuck.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+                this._latheChuck = null; this._latheChuckSpan = null;
+            }
             if (stock.axis === 'z' && stock.origin === 'finished-face') {
                 const face = Number(stock.faceZ) || 0, halfL = stock.z / 2;
                 // t1285 — THE LATHE CHUCK IS ITS OWN RIG. Built through the same render (one chuck concept) but kept
