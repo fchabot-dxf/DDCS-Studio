@@ -577,3 +577,56 @@ test('THE ENVELOPE IS EMPTY — every strategy and every descent is covered, and
         expect(row.why, `and names no remaining gap: ${JSON.stringify(row.c)}`).toBe('');
     }
 });
+
+/**
+ * t1349 — THE ENVELOPE IS ABOUT THE BODY. THE TWO FOLDS THAT WRAP IT DO NOT SURVIVE IT — and that is what actually
+ * blocks the switch.
+ *
+ * Every bridge in this file frames the parametric body at the WCS origin: `['G90', ...surfaceRasterLines(cfg), 'M30']`.
+ * That is the right frame for proving the RASTER, and it is why the envelope above is honestly empty. But the real
+ * stack does not run the body bare — `surfacingStack` wraps it in `placeonstock` (Normal) or `skim` (Skim Z-mode),
+ * and BOTH of those folds work by REWRITING THE EMITTED TEXT: `translateProgram` adds a shift to each axis word,
+ * `relativizeProgram` rewrites each absolute word as a delta from the running position.
+ *
+ * A literal raster is a list of numbers, so a text rewrite is exact on it. A parametric raster is expressions and
+ * macro registers, and a numeric regex cannot see them — so the rewrite lands on SOME of the axis words and not
+ * others, which is worse than landing on none. These asserts record the measured behaviour, at the values it was
+ * measured with. THEY DOCUMENT A DEFECT: the day the placement fold learns to carry a parametric body, this test
+ * SHOULD fail and be restated as the fixed truth (the t1315/t1317 precedent).
+ */
+test('t1349 — THE PLACEMENT AND SKIM FOLDS CANNOT CARRY A PARAMETRIC BODY (documents a defect; fix it and restate)', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+        const { translateProgram, relativizeProgram } = await import('/data/rotateProgram.js');
+        const NL = String.fromCharCode(10);
+        const body = surfaceRasterLines({ w: 200, h: 150, depth: 0.8, stepdown: 0.4, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 });
+        const before = body.join(NL).split(NL);
+        const diff = (after) => before.map((b, i) => [b, after[i]]).filter(([b, a]) => b !== a);
+        return {
+            translated: diff(translateProgram(before.join(NL), 50, 25, 0).text.split(NL)),
+            relativized: diff(relativizeProgram(before.join(NL)).text.split(NL)),
+            // the axis words a numeric regex is blind to — an expression or a bare register
+            invisible: before.filter((l) => /[XYZ]\s*[[#]/.test(l)).length,
+        };
+    });
+
+    // (1) HALF A SHIFT IS NOT A SHIFT. The row start moves in X and NOT in Y, because its Y is a register (`Y#47`).
+    // A raster whose near end moves and whose far end does not is a sheared program, not a placed one.
+    const halfShifted = r.translated.find(([b]) => /G0 X0 Y#47/.test(b));
+    expect(halfShifted, 'the row-start rapid is rewritten').toBeTruthy();
+    expect(halfShifted[1], 'X takes the shift and Y — a register — does not: a HALF-SHIFTED move').toMatch(/X50 Y#47/);
+    expect(r.invisible, 'and these axis words are invisible to the rewrite entirely').toBeGreaterThan(4);
+
+    // (2) THE SHIFT ALSO REACHES INTO A COMMENT. `numAfter` is case-insensitive, so the header's "tool Ø 12 x 60%"
+    // reads as an X word and the stepover comment is rewritten to say something false about the tool.
+    const comment = r.translated.find(([b]) => /stepover mm = tool/.test(b));
+    expect(comment, 'the stepover header comment is rewritten').toBeTruthy();
+    expect(comment[1], 'the "x 60%" in the comment was taken for an X word').toMatch(/X110%/);
+
+    // (3) SKIM IS WORSE THAN WRONG NUMBERS — it removes a retract. The inter-level `G0 Z5` becomes `G0 Z0`, because
+    // the delta is computed against a position the loop never actually holds. The tool would not lift between levels.
+    const retract = r.relativized.find(([b]) => /clear of the work before the next level/.test(b));
+    expect(retract, 'the inter-level clearance retract is rewritten').toBeTruthy();
+    expect(retract[1], 'the retract between depth levels becomes a NO-OP — the tool never lifts').toMatch(/G0 Z0\b/);
+});

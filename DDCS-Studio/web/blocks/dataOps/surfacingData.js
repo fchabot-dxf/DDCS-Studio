@@ -31,7 +31,7 @@ import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing p
 import { applySkimStructure } from './skimStructure.js';   // t986 — the Skim Z-mode structural fork (whole-op G91 relative to the jog); Normal = byte-identical
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
-import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
+import { entryBindingsFor, toolBindingsFor, deriveBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings); t1349 — the BODY bindings are by identity too
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, SURFACING_STRATEGY_OPTIONS, ENTRY_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options (were undeclared → empty dropdowns); t842 ENTRY_OPTIONS
 
 /** Author defaults — match surfacingStack's own num() fallbacks (+ flat stepover/strategy) so the seeded template == the
@@ -44,46 +44,67 @@ export const SURFACING_DEFAULTS = {
     originX: 0, originY: 0, stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, offZ: 0,
 };
 
-// Flatten (pre-order) of surfacingStack's [progstart, wcs, placeonstock{ stepdown{ surfacefill } }, progend]:
-//   0 progstart · 1 wcs · 2 placeonstock · 3 stepdown · 4 surfacefill · 5 progend
-// (clearance is deliberately NOT bound — frontier #3 fan-out to progstart + the surfacefill leaf. surfacefill's
-//  shape/x/y/z/direction stay at their constants: shape='rect', x=y=0 [local], z='z', direction='bothways'.)
-const SURFACING_EXEC_BINDINGS = [
-    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, section: 'COORDINATES',
+/**
+ * t1349 — THE BINDINGS NAME THEIR BLOCK BY IDENTITY, NOT BY POSITION.
+ *
+ * They used to be a hand-counted flat index into surfacingStack's pre-order — `0 progstart · 1 wcs · 2 placeonstock ·
+ * 3 stepdown · 4 surfacefill · 5 progend` — plus a `WRAP_PREFIX_COUNT = 4` for the user_root/panel/sim/param_group
+ * prefix. Two hand-counts, both silent when wrong: the shipped corner break (deriveBindings' own header) was exactly
+ * that, an off-by-one that mis-bound every socket after it.
+ *
+ * WHY NOW, specifically: the parametric switch COLLAPSES `stepdown{ surfacefill }` into one block, so every index from
+ * 3 down moves and `progend` goes 5→4. Under hand-counted indices that is a silent re-aim of ten bindings onto the
+ * wrong sockets; under identity it is nothing at all — the scan re-finds each block by what it IS. This is the change
+ * landing FIRST for that reason, and it is deliberately EMIT-NEUTRAL: the same params reach the same sockets, proven
+ * byte-identical by the as-data equivalence sweep. It is a prerequisite of the switch, not a piece of it.
+ *
+ * Each spec below matches the SOLE block of its type in the surfacing template — asserted by deriveBindings itself,
+ * which throws at build time on a zero or ambiguous match rather than binding to whatever landed at that index.
+ *
+ * (clearance is still deliberately NOT bound — frontier #3 fan-out to progstart + the fill leaf. surfacefill's
+ *  shape/x/y/z/direction stay at their constants: shape='rect', x=y=0 [local], z='z', direction='bothways'.)
+ */
+const SURFACING_BINDING_SPECS = [
+    { param: 'wcs', match: { type: 'wcs' }, key: 'wcs', type: 'enum', default: SURFACING_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, section: 'COORDINATES',
         gate: { param: 'zMode', is: 'skim', tip: 'Skim faces RELATIVE to the jog start — there is no WCS frame to select.' } },   // t986 — grey (data-op-gated) in Skim
-    // placement scalars (block 2, placeonstock) — origin owned by the placement now (region is local-0-based)
-    { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: SURFACING_DEFAULTS.originX },
-    { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: SURFACING_DEFAULTS.originY },
-    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: SURFACING_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: SURFACING_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'stockDatum', formHidden: true, blockIndex: 2, key: 'stockDatum', type: 'enum', default: SURFACING_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
-    { param: 'stockW', formHidden: true, blockIndex: 2, key: 'stockW', type: 'number', default: SURFACING_DEFAULTS.stockW },
-    { param: 'stockH', formHidden: true, blockIndex: 2, key: 'stockH', type: 'number', default: SURFACING_DEFAULTS.stockH },
-    { param: 'stockZ', formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: SURFACING_DEFAULTS.stockZ },
-    { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: SURFACING_DEFAULTS.offZ },
-    // depth pass (block 3, stepdown)
-    { param: 'depth', blockIndex: 3, key: 'to', type: 'number', default: SURFACING_DEFAULTS.depth, units: 'mm' },
-    { param: 'stepdown', blockIndex: 3, key: 'by', type: 'number', default: SURFACING_DEFAULTS.stepdown, units: 'mm' },
-    { param: 'confirmEvery', blockIndex: 3, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
-    // geometry + cut (block 4, the surfacefill leaf)
-    { param: 'w', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", blockIndex: 4, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w, units: 'mm' },
-    { param: 'h', help: "Height of the faced area (Y).", blockIndex: 4, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h, units: 'mm' },
-    { param: 'stepover', help: "Distance between parallel passes (mm). Smaller = finer finish, slower.", blockIndex: 4, key: 'stepover', type: 'number', default: SURFACING_DEFAULTS.stepover, units: 'mm' },
-    { param: 'strategy', help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", blockIndex: 4, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
-    { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed, units: 'mm/min' },
-    { param: 'plunge', blockIndex: 4, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge, units: 'mm/min' },
-    // t996 — RPM binding → the framing progstart (block 0). SOCKET-HELD: blank → the socket keeps the spindleHeadPatch
-    // Head default (byte-identical); a typed value / a picked tool's library rpm OVERRIDES it (rpm>0 → M3 S<rpm> + spindleHeadPatch yields).
-    { param: 'rpm', blockIndex: 0, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },
+    // placement scalars (placeonstock) — origin owned by the placement now (region is local-0-based)
+    { param: 'originX', match: { type: 'placeonstock' }, key: 'offX', type: 'number', default: SURFACING_DEFAULTS.originX },
+    { param: 'originY', match: { type: 'placeonstock' }, key: 'offY', type: 'number', default: SURFACING_DEFAULTS.originY },
+    { param: 'stockAttach', match: { type: 'placeonstock' }, key: 'stockAttach', type: 'enum', default: SURFACING_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'pathDatum', match: { type: 'placeonstock' }, key: 'pathDatum', type: 'enum', default: SURFACING_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'stockDatum', formHidden: true, match: { type: 'placeonstock' }, key: 'stockDatum', type: 'enum', default: SURFACING_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
+    { param: 'stockW', formHidden: true, match: { type: 'placeonstock' }, key: 'stockW', type: 'number', default: SURFACING_DEFAULTS.stockW },
+    { param: 'stockH', formHidden: true, match: { type: 'placeonstock' }, key: 'stockH', type: 'number', default: SURFACING_DEFAULTS.stockH },
+    { param: 'stockZ', formHidden: true, match: { type: 'placeonstock' }, key: 'stockZ', type: 'number', default: SURFACING_DEFAULTS.stockZ },
+    { param: 'offZ', match: { type: 'placeonstock' }, key: 'offZ', type: 'number', default: SURFACING_DEFAULTS.offZ },
+    // depth pass (stepdown)
+    { param: 'depth', match: { type: 'stepdown' }, key: 'to', type: 'number', default: SURFACING_DEFAULTS.depth, units: 'mm' },
+    { param: 'stepdown', match: { type: 'stepdown' }, key: 'by', type: 'number', default: SURFACING_DEFAULTS.stepdown, units: 'mm' },
+    { param: 'confirmEvery', match: { type: 'stepdown' }, key: 'confirmEvery', type: 'number', default: 0, label: 'Confirm every N passes', help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
+    // geometry + cut (the surfacefill leaf)
+    { param: 'w', help: "Width of the faced area (X). The tool overhangs the edge by its radius.", match: { type: 'surfacefill' }, key: 'w', type: 'number', default: SURFACING_DEFAULTS.w, units: 'mm' },
+    { param: 'h', help: "Height of the faced area (Y).", match: { type: 'surfacefill' }, key: 'h', type: 'number', default: SURFACING_DEFAULTS.h, units: 'mm' },
+    { param: 'stepover', help: "Distance between parallel passes (mm). Smaller = finer finish, slower.", match: { type: 'surfacefill' }, key: 'stepover', type: 'number', default: SURFACING_DEFAULTS.stepover, units: 'mm' },
+    { param: 'strategy', help: "Facing pattern: Raster = parallel zig-zag; Concentric = spiral.", match: { type: 'surfacefill' }, key: 'strategy', type: 'enum', default: SURFACING_DEFAULTS.strategy, widget: 'dropdown', widgetConfig: { options: SURFACING_STRATEGY_OPTIONS } },
+    { param: 'feed', match: { type: 'surfacefill' }, key: 'feed', type: 'number', default: SURFACING_DEFAULTS.feed, units: 'mm/min' },
+    { param: 'plunge', match: { type: 'surfacefill' }, key: 'plunge', type: 'number', default: SURFACING_DEFAULTS.plunge, units: 'mm/min' },
+    // t996 — RPM binding → the framing progstart. SOCKET-HELD: blank → the socket keeps the spindleHeadPatch Head
+    // default (byte-identical); a typed value / a picked tool's library rpm OVERRIDES it (rpm>0 → M3 S<rpm> + spindleHeadPatch yields).
+    { param: 'rpm', match: { type: 'progstart' }, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },
     // t842 — DEPTH ENTRY cluster (per-level descent + its per-mode when-gated fields; toward-centre ramp like pocket — an area fill)
-    { param: 'entry', blockIndex: 4, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
-    { param: 'rampAngle', blockIndex: 4, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
-    { param: 'helixDia', blockIndex: 4, key: 'helixDia', type: 'number', default: SURFACING_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the area.' },
-    { param: 'helixPitch', blockIndex: 4, key: 'helixPitch', type: 'number', default: SURFACING_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler.' },
+    { param: 'entry', match: { type: 'surfacefill' }, key: 'entry', type: 'enum', default: SURFACING_DEFAULTS.entry, widget: 'dropdown', widgetConfig: { options: ENTRY_OPTIONS }, label: 'Depth Entry', help: 'How the tool descends to each depth level. Plunge = straight down. Ramp = a linear descent at ≤ the ramp angle. Helix = a descending helix at the helix Ø, pitch mm/rev (clamped to fit).' },
+    { param: 'rampAngle', match: { type: 'surfacefill' }, key: 'rampAngle', type: 'number', default: SURFACING_DEFAULTS.rampAngle, label: 'Ramp Angle', units: '°', when: { param: 'entry', is: 'ramp' }, help: 'Max descent angle of the ramp (degrees from horizontal). Too shallow for the area degrades to a plunge, with the reason.' },
+    { param: 'helixDia', match: { type: 'surfacefill' }, key: 'helixDia', type: 'number', default: SURFACING_DEFAULTS.helixDia, label: 'Helix Ø', units: 'mm', when: { param: 'entry', is: 'helix' }, help: 'Diameter of the descending helix (mm). 0 = auto (the tool Ø). Clamped so the helix + tool stays inside the area.' },
+    { param: 'helixPitch', match: { type: 'surfacefill' }, key: 'helixPitch', type: 'number', default: SURFACING_DEFAULTS.helixPitch, label: 'Helix Pitch', units: 'mm/rev', when: { param: 'entry', is: 'helix' }, help: 'How far the helix descends per full revolution (mm/rev). Smaller = gentler.' },
 ];
 
-const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
-export const SURFACING_BINDINGS = SURFACING_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
+/** The body bindings for a surfacing twin, derived BY IDENTITY over the ALREADY-WRAPPED stack — so the
+ *  user_root/panel/sim/param_group prefix falls out for free (the old hand-kept WRAP_PREFIX_COUNT = 4). */
+export function surfacingBindingsFor(stack) { return deriveBindingsFor(stack, SURFACING_BINDING_SPECS); }
+
+/** Derived over the CANONICAL stack — the same one surfacingDataDef builds, so this export is the def's own binding
+ *  set (the as-data spec iterates it to prove each param reaches the socket surfacingStack routes it to). */
+export const SURFACING_BINDINGS = surfacingBindingsFor(buildSurfacingTwinStack());
 
 // t986 — the STRUCTURAL Z-mode toggle (NO value socket): it drives the applySkimStructure postInstantiate fork, not a
 // block param. Grouped in a COORDINATES section with the WCS dropdown; Skim greys the WCS (structGate below → data-op-gated).
@@ -111,11 +132,13 @@ export function surfacingPreviewGeometry(p) {
     return { paths, handles, bbox: { minX: ox, maxX: ox + w, minY: oy, maxY: oy + h } };
 }
 
-/** Build the surfacing-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. The template
- *  is surfacingStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
-export function surfacingDataDef() {
+/** The CANONICAL wrapped twin stack — surfacingStack(defaults) inside the user_root/panel/sim/param_group wrapper.
+ *  ONE builder, so the stack the bindings are DERIVED over is literally the stack the def is BUILT from: an identity
+ *  binding is only as good as the agreement between those two, and a second hand-copy here would reintroduce by the
+ *  back door exactly the drift the identity match removes. (A function declaration — it is called at module init.) */
+export function buildSurfacingTwinStack() {
     const exec = surfacingStack(SURFACING_DEFAULTS);
-    const stack = [{
+    return [{
         type: 'user_root',
         params: {},
         uiChildren: [
@@ -129,7 +152,13 @@ export function surfacingDataDef() {
         ],
         children: appendToolSel(appendEntry(exec)),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
     }];
-    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, [...toolBindingsFor(stack), ...SURFACING_STRUCT, ...SURFACING_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
+}
+
+/** Build the surfacing-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. The template
+ *  is surfacingStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
+export function surfacingDataDef() {
+    const stack = buildSurfacingTwinStack();
+    const def = userOpFromStack('surfacing_data', 'Surfacing (data)', stack, [...toolBindingsFor(stack), ...SURFACING_STRUCT, ...surfacingBindingsFor(stack), ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = surfacingPreviewGeometry;   // t716 — per-feature 2D handles (region extent) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)
     def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1025 — the depth ruler strip down the LEFT of the 2D plan (reuses zRulerStrip, like pocket)

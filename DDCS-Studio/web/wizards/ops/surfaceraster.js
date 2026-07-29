@@ -350,6 +350,12 @@ export function surfaceRasterCovers() {
     // t1345 — EMPTY, and earned: every strategy (parallel, concentric), every descent (plunge, ramp, helix) and the
     // confirm cadence were each closed by their own bridge, in their own turn, against hand-derived truths. Nothing
     // the surfacing wizard can emit falls outside this atom now.
+    //
+    // t1349 — ITS SCOPE IS THE BODY, and that was never stated. Every bridge frames this body BARE, at the WCS origin.
+    // The real stack wraps it in `placeonstock` (Normal) or `skim` (Skim Z-mode), and both folds work by REWRITING THE
+    // EMITTED TEXT — which is exact on a list of numbers and blind to `X[0 + #40]` / `Y#47`. So an empty envelope here
+    // is NOT a licence to re-point surfacingStack: what the switch still needs is a way for those folds to carry a
+    // parametric body, and that is a separate, measured gap (surfacing-parametric-1329.spec.js pins it).
     return true;
 }
 

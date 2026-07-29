@@ -108,3 +108,60 @@ test('surfacing-as-data: byte-identical G-code to surfacingStack across a param 
   // STILL-OPEN frontier — clearance fans out to two sockets, unbound here, so varying it MUST diverge.
   expect(r.clearancePass, 'frontier: clearance fans out to progstart + the leaf, unbound here (varying it diverges)').toBe(false);
 });
+
+/**
+ * t1349 — THE BINDINGS ARE POSITION-INDEPENDENT, and this asserts it the only way that is not vacuous: by MOVING
+ * every body block and requiring each param to land on the same block TYPE and the same socket KEY anyway.
+ *
+ * A test that merely re-ran the derivation on the unchanged stack would pass identically for hand-counted indices —
+ * it would prove nothing. The property the parametric switch depends on is that a change to the stack's SHAPE (it
+ * collapses `stepdown{ surfacefill }` into one block, so every index from 3 down moves) cannot silently re-aim a
+ * binding at whatever now sits at its old index. So the shape is really changed here, and the invariant checked is
+ * param → (block type, socket key) — an independent truth, not the number the derivation happens to return.
+ */
+test('t1349 — a shape change MOVES every index and re-aims NO binding (identity, not position)', async ({ page }) => {
+  await page.goto('http://localhost:3211');
+  await page.waitForFunction(() => window.ddcsGetBlockProgram);
+
+  const r = await page.evaluate(async () => {
+    const { buildSurfacingTwinStack, surfacingBindingsFor } = await import('/blocks/dataOps/surfacingData.js');
+    const { flattenBlocks } = await import('/blocks/userOps.js');
+
+    // param → the block TYPE + socket KEY it resolves to, over a given stack. The invariant.
+    const aimOf = (stack) => {
+      const flat = flattenBlocks(stack);
+      const out = {};
+      for (const b of surfacingBindingsFor(stack)) out[b.param] = { type: (flat[b.blockIndex] || {}).type, key: b.key, at: b.blockIndex };
+      return out;
+    };
+
+    const base = aimOf(buildSurfacingTwinStack());
+
+    // THE SHAPE CHANGE: a block ahead of the body, so every body index shifts by one — the same class of move the
+    // switch makes when two blocks become one. (An unregistered filler type: flattenBlocks walks structure, and the
+    // point is the POSITION shift, not what the filler emits.)
+    const shifted = buildSurfacingTwinStack();
+    shifted[0].children = [{ type: '__filler__', params: {} }, ...shifted[0].children];
+    const after = aimOf(shifted);
+
+    // AND THE AMBIGUITY GUARD: two blocks of a matched type must THROW, not silently take the first one.
+    const dup = buildSurfacingTwinStack();
+    dup[0].children = [...dup[0].children, { type: 'surfacefill', params: { w: 1, h: 1 } }];
+    let ambiguous = null;
+    try { surfacingBindingsFor(dup); } catch (e) { ambiguous = String(e.message || e); }
+
+    return { base, after, ambiguous, params: Object.keys(base) };
+  });
+
+  expect(r.params.length, 'the whole binding set is under test').toBe(24);
+  // EVERY index really moved — otherwise the invariant below would be trivially true.
+  const movedBy = r.params.map((p) => r.after[p].at - r.base[p].at);
+  expect([...new Set(movedBy)], 'the shape change shifted every body binding by exactly one').toEqual([1]);
+  // …AND NOT ONE BINDING CHANGED WHAT IT AIMS AT.
+  for (const p of r.params) {
+    expect(r.after[p].type, `${p} still resolves to a ${r.base[p].type} block`).toBe(r.base[p].type);
+    expect(r.after[p].key, `${p} still drives the "${r.base[p].key}" socket`).toBe(r.base[p].key);
+  }
+  // A duplicate is an authoring error, and it says so loudly rather than binding to the first hit.
+  expect(r.ambiguous, 'two blocks of a matched type THROW at build time').toMatch(/matched 2 blocks/);
+});

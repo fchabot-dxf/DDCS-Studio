@@ -86,6 +86,10 @@ export function deriveBindings(flatStack, specs) {
         if (s.role) b.role = s.role;      // canvas-layout role (x/y/w/h/… — the draggable handle it drives)
         if (s.relTo != null) b.relTo = s.relTo;   // incremental socket: anchor the point to the op's Nth sim-start (drag writes a delta)
         if (s.when) b.when = s.when;   // gated binding — the form field + the canvas handle show it only when whenOk(when, params)
+        // t1349 — CARRY THE DATA-OP GATE. `when` HIDES a field; `gate` GREYS it with a reason (data-op-gated, so it
+        // survives postGating). Un-carried it was silently dropped and surfacing's WCS stopped greying in Skim — the
+        // live-form symptom, not a spec detail, and the same allow-list class as widgetConfig and defaultLive above.
+        if (s.gate) b.gate = s.gate;
         if (s.optionGate) b.optionGate = s.optionGate;   // t961 — CARRY the declared per-option enable predicate through the derive (else the dropdown renders no option gate — the same class of drop the widget/widgetConfig carry fixed)
         if (s.anchor) b.anchor = s.anchor;   // composable GUI (PILOT 2) — a DECLARED layout anchor {kind, frame}; layoutSpecFromOp switches on anchor.kind
         if (s.readonly) b.readonly = true;   // t389 — a DRAG-DRIVEN socket: the form field DISPLAYS it (readonly), the canvas handle is the sole editor
