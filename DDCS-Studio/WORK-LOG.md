@@ -7452,3 +7452,54 @@ here, twice).
 GATE: fast tier — the three families plus the surfacing/bridge/round-trip families, **108 passed / 1 failed**, and
 that one is `alignment-correction-840`'s 5-second boot wait timing out under a 15-file parallel run: **3/3 green in
 isolation**, immediately re-run. Smoke **71/71**. Full suite NOT run — the advisor's merge gate.
+
+---
+
+## t1367 — one red was MY OWN LOST WORK, the other was a settle guard racing its own assert
+
+### RED 1 — the entry-point fix was never in the commit, and that is my mistake
+
+t1365's log and commit message both say the `applyEntryWaypoint` fix landed. **It did not.** I made it, ran
+`mill-entry-726` green (3/3), and then — while measuring `field-help-798` against the branch point — ran
+`git checkout 0e1ba782 -- web` and `git checkout HEAD -- web` to compare and restore. The fix was still
+UNCOMMITTED at that moment, so HEAD did not contain it and the restore silently reverted it. The specs and the
+work-log went in describing a source change that was no longer on disk.
+
+The advisor's re-gate caught it exactly right: *"the spec whose subject you fixed THIS turn."*
+
+Re-applied unchanged and committed IMMEDIATELY, before anything else this turn. The lesson is specific and worth
+keeping: **a branch-point comparison must not straddle uncommitted work** — either commit first, or compare in a
+worktree. `git checkout HEAD -- <path>` is a destructive restore, and it does not care that the thing it is
+overwriting was the point of the turn.
+
+### RED 2 — collapsible-panes-752: the settle guard released ABOVE the number the assert demanded
+
+Not a flake, and it did not need filing. It needed reading.
+
+    settle guard waited for:   height < 40      ← released here
+    the assert required:       height <= 28
+                               └──── a 12px window where the wait passes and the assert then fails
+
+Caught in the act at **30.31px**. A previous turn added that guard for exactly this class (its own comment says a
+bare attribute-wait measured mid-animation at ~184px) — it closed the gross case and left the narrow one. On a fast
+machine the height usually raced through the window; on a slower or loaded one it lands there every time, which is
+precisely why this read as intermittent here and as a DETERMINISTIC red on the advisor's machine. Same defect, two
+symptoms.
+
+**Waiting on a number was the wrong fix, and I proved that on myself.** My first attempt tightened the guard to
+`<= 28`; the flake became an honest 3s timeout, which is better but still red — the strip does not always reach 28.
+So the guard now waits for the height to STOP CHANGING (identical across three consecutive animation frames), which
+is what "settled" means and does not presuppose the value the assert exists to check.
+
+**That needed one more correction, also caught by measuring rather than assuming.** The first stability version
+settled at **206** — the full expanded height. The attribute flips instantly, so the earliest frames still read the
+pre-animation plateau and three of them in a row look perfectly stable. The wait now discards any reading above
+100px before it starts counting, so the plateau cannot be mistaken for the destination.
+
+Result: **80/80 across ten repeats** (it flaked at two repeats before), and the assert message now carries the
+settled height so the next reader gets the number rather than a boolean.
+
+Nothing in `web/` changed for this one — the pane sizing was never wrong. The spec was measuring it too early.
+
+GATE: collapsible-panes 80/80 at repeat-each=10; mill-entry 3/3; the surfacing / bridge / round-trip / pane-sizer
+families 81/81; smoke 71/71. Full suite NOT run — the advisor's merge gate.
