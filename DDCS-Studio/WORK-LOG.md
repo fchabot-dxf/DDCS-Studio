@@ -7370,3 +7370,85 @@ and writing it would have meant forcing the retirement to make it pass.
 
 GATE: fast tier. Touched + bridge + CAM families **118/118**; the remaining surfacingSlot-touching specs **27/27**;
 smoke **71/71**. Full suite NOT run — the advisor's merge gate on this branch against 1926/6/0.
+
+---
+
+## t1365 — the twelve reds: eight restated, ONE was a real feature loss, three are not the branch's
+
+### FAMILY B first, because it challenged a claim of mine — and the claim measured out CORRECT
+
+The dispatch said measure, not guess, so the measurement is the whole answer: **every registered op emitted with its
+defaults, on the branch and at the branch point (0e1ba782), and diffed.** 32 ops compared. **Exactly one changed:
+`user_surfacing_data`.** Every other op is byte-for-byte identical.
+
+So neither change reached outside surfacing. The GOTO de-spacing touched only `surfaceraster.js` strings, and that
+atom is used by nothing else (the both-paths guard asserts it). The `normalizeParams` hook is `normalized === params`
+by identity when a def has no hook — and now measured, not argued.
+
+**The two Family B specs are not text ripple:**
+- `middle-superset` — the 14336-combo byte sweep is **GREEN on the branch**, run twice (2/2 both times).
+- `preview-chip-raw-867` — red, and **red at the branch point too**. I restored `web/` to 0e1ba782 and ran it: same
+  failure. It builds its OWN synthetic program (`G21 G90`, 40 literal G1 lines) and never touches surfacing; it
+  times out waiting 15s for a live animation to reach a trimmed long line. Load-sensitive, and not the branch's.
+
+### FAMILY A — the guard collision, restated to the shipped truth
+
+`transform-declared-736` and `alignment-correction-840` both **seeded their program from a surfacing op**, which is
+why they collided: the rotation machinery is not surfacing-specific, but their subject had become the one op a text
+rotation cannot act on. Seeded from a POCKET now, and the refusal gets its own test rather than being implied:
+a parametric program comes back **byte-identical** (nothing half-applied) **and the reason is emitted**, captured
+from the console — because silence is the worst refusal.
+
+**THE FLOW THIS NARROWS, exactly:** a program containing a surfacing op cannot be rotated by ⟳ Transform or by the
+Alignment-fix angle. Any other program still rotates. That is why the improvement turn takes rotation FIRST —
+absorbing it into the atom as a declared frame angle, the way placement and the skim frame already are.
+
+`import-safety-1219` was flagged with a question mark, and the mark was right: it **fails at the branch point too**
+(measured the same way). Its assert is about a machine record swap and touches nothing this branch changed.
+
+### FAMILY C — five restatements and ONE REAL DEFECT
+
+Four were the shape change, read honestly: `blocks-open-seeded` and `blocks-edit-reconcile` name `surfaceraster`
+where they named `stepdown`; `placement-rollout` and `layout-placement-parity-718` stop reading the toolpath out of
+the TEXT and **execute it instead**.
+
+That last pair is worth naming as a class, because it is the same mistake twice: both scanned the emit for
+`X<number>`. Surfacing writes the far edge of its pass as `X[25 + #40]` — a build-time frame plus a runtime width —
+so the scan saw only the frame's 25 and reported the faced area as barely having moved (parity: "toolpath" centre
+25 against a drawn centre of 100, when 100 was the correct one). Both now measure the CUTTING moves of the executed
+path, which is what a drawn feature is supposed to coincide with. The tighter contour EXTENT repro (ε=1.0mm) passes
+under the stricter reading too.
+
+**`mill-entry-726` was NOT a stale assert — it was a silent feature loss, and it is fixed in the source.**
+
+`firstRapidXY` finds the program's own cut entry by matching literal numbers after X and Y. A parametric body opens
+with `G0 X0 Y#47`, so it returned **null**, and `applyEntryWaypoint` returned with it: **an operator could drag the
+entry square on a surfacing op and the emit would silently ignore it.** Same class as the t1361 cc-attach defect —
+a reader that assumed literal text.
+
+The fix splits on what is KNOWABLE. A literal cut entry keeps exactly the behaviour it has always had, ε-compare and
+all (byte-identical for every existing op). An unresolvable one cannot be ε-compared against a runtime value, so the
+declaration is HONOURED — the operator asked for the waypoint, and a rapid to it is the safe act.
+
+**With one guard, and it is a safety one:** a SKIM program is measured from wherever the operator jogged to, so an
+absolute entry point has nothing to be absolute against — routing through one would drive the tool to a machine
+position the op never meant. `hasSkimFold(blocks)` asks the STACK for the declared skim fold rather than sniffing
+the text, and skips the waypoint there. Flagging that as a design point: whether an entry point should mean anything
+at all in a jog-relative op is a question I answered conservatively (it does not), and the advisor may want it ruled.
+
+`field-help-798`: the gaps were **not surfacing's** — its new fields (`stepoverPct`, `toolDia`) already carry help.
+The eleven missing were LATHE fields, and the spec **fails identically at the branch point**. Written anyway, per
+the ruling that help gets written and not excepted: facing's material-to-remove / depth-per-pass / start-X (with the
+RADIUS-not-diameter warning that field actually needs), and the four probe fields on both lathe probes — retract,
+fast find, slow touch (naming which one decides accuracy) and the port (naming what happens if it is wrong: the
+touch is never seen and the tool keeps driving).
+
+### The tally
+
+Twelve reds: **eight restated or fixed on the branch, one real defect fixed in the source, three are not the
+branch's** (`preview-chip-raw-867`, `import-safety-1219` — both red at the branch point; `middle-superset` — green
+here, twice).
+
+GATE: fast tier — the three families plus the surfacing/bridge/round-trip families, **108 passed / 1 failed**, and
+that one is `alignment-correction-840`'s 5-second boot wait timing out under a 15-file parallel run: **3/3 green in
+isolation**, immediately re-run. Smoke **71/71**. Full suite NOT run — the advisor's merge gate.

@@ -35,13 +35,17 @@ export const FACE_PROBE_BINDING_SPECS = [
       label: 'Max seek', section: 'PROBE', default: FACE_PROBE_DEFAULTS.maxDist,
       help: 'How far to travel before calling it a miss. Jog close first; this is a safety limit, not an approach.' },
     { param: 'retract', match: { type: 'assign', var: V.retract }, key: 'value', type: 'number',
-      label: 'Retract between touches', section: 'PROBE', default: FACE_PROBE_DEFAULTS.retract },
+      label: 'Retract between touches', section: 'PROBE', default: FACE_PROBE_DEFAULTS.retract,
+      help: 'How far the probe backs off (mm) after the fast find, before creeping in again at the slow feed. Big enough to clear the surface, small enough that the slow touch is short.' },
     { param: 'feedFast', match: { type: 'assign', var: V.feedFast }, key: 'value', type: 'number',
-      label: 'Fast find feed', section: 'PROBE', default: FACE_PROBE_DEFAULTS.feedFast },
+      label: 'Fast find feed', section: 'PROBE', default: FACE_PROBE_DEFAULTS.feedFast,
+      help: 'Feed for the FIRST approach (mm/min) — it only has to find the surface roughly, so it can be quick. The measurement comes from the slow touch, not this one.' },
     { param: 'feedSlow', match: { type: 'assign', var: V.feedSlow }, key: 'value', type: 'number',
-      label: 'Slow touch feed', section: 'PROBE', default: FACE_PROBE_DEFAULTS.feedSlow },
+      label: 'Slow touch feed', section: 'PROBE', default: FACE_PROBE_DEFAULTS.feedSlow,
+      help: 'Feed for the SECOND, measuring touch (mm/min). This is the number that decides accuracy — slower gives a more repeatable trigger point.' },
     { param: 'port', match: { type: 'assign', var: V.port }, key: 'value', type: 'number',
-      label: 'Probe port', section: 'PROBE', default: FACE_PROBE_DEFAULTS.port },
+      label: 'Probe port', section: 'PROBE', default: FACE_PROBE_DEFAULTS.port,
+      help: 'Which controller input the probe is wired to. Must match the physical port, or the touch is never seen and the tool keeps driving.' },
 ];
 
 /** WHERE THE ANSWER GOES — no socket of its own: it reaches the base compute AND the write address. */
