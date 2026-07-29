@@ -102,6 +102,29 @@ const SKIM_FRAME = { x: '#62', y: '#63', z: '#64' };
 const FRAME_SRC = { x: '#790', y: '#791', z: '#792' };
 const FRAME_SENTINEL = '-99999';
 
+/**
+ * t1375 — WHEN THIS ATOM CAN ABSORB A DECLARED PROGRAM ROTATION, and the REASON when it cannot.
+ *
+ * Declared here because the atom owns what its frame MEANS, and read from this one place TWICE: the emitter asks it
+ * before passing the angle down, and the body asks it again so a direct caller cannot route around it.
+ *
+ * SKIM IS REFUSED. A skim body is measured from wherever the operator jogged to — it reads the live work position into
+ * three registers and runs its ordinary absolute body over them. A program rotation is about the PART DATUM. Rotating
+ * a jog-referenced body about the datum mixes two frames that have no fixed relationship, so the result is not "less
+ * accurate", it is meaningless. Refusing is the same honesty as skipping the entry waypoint on a skim program (t1365).
+ *
+ * AND IT COSTS NOTHING AGAINST THE PATH IT REPLACED, which is the part worth recording: a LITERAL skim program is
+ * G91-wrapped, and every whole-program transform returns G91 regions untouched — so the text rotation never rotated a
+ * skim body either. This is parity with the shipped literal emitter, not a narrowing.
+ */
+export function surfaceRasterAbsorbsRotation(p = {}) {
+    if (String(p.zMode || '') === 'skim') {
+        return 'a skim body is measured from wherever the operator jogged to, so it has no datum frame — rotating it '
+            + 'about the part datum would mix two frames (the literal skim path is G91 and was never rotated either)';
+    }
+    return true;
+}
+
 const V = {
     w: '#40',        // area X (tool-centre sweep)
     h: '#41',        // area Y
@@ -114,9 +137,22 @@ const V = {
     i: '#48',        // row / ring index
     dir: '#49',      // +1 / −1 — which way this row runs (both-ways raster only)
 };
-// t1339 — the ramp's run length. It shares the direction slot: a ramp happens at the FIRST row of a level, before
-// any direction flip has been read, so the two never overlap.
-V.run = '#49';
+// t1339 — the ramp's run length, originally sharing the DIRECTION slot (#49) on the grounds that "a ramp happens at
+// the FIRST row of a level, before any direction flip has been read, so the two never overlap."
+//
+// t1375 — THEY DO OVERLAP, and the sharing only ever worked by an invariant nobody had written down. The ramp writes
+// its run into #49 on row 0; every row after that reads #49 as the direction. It survived because the only thing ever
+// read was the SIGN — `IF #49 < 0` — and negating ±run once per row alternates exactly as negating ±1 does. So the
+// register held two different quantities at once and the program was correct by a property of the tests applied to it.
+//
+// The moment anything needed the direction's VALUE (the rotated step-over does: it selects a row end arithmetically
+// rather than by branching) the collision surfaced as a 416mm error. That is a MISSING DECLARATION, not a patch: the
+// two quantities are separated, and #49 now means what its comment says it means.
+//
+// #34 IS FREE FOR IT BY CONSTRUCTION — that slot belongs to the DESCENT, and a descent is exactly one of plunge / ramp
+// / helix, so the ramp's run and the helix's rotating vector can never be live in the same program. That is a sharing
+// justified by mutual exclusion, which is what the old comment claimed and this one can actually stand behind.
+V.run = '#34';
 // The ring walk reuses one of the same slots for its inset: a ring and a row are never walked at the same time, so
 // a separate var would be a second name for one register.
 const RING_INSET = V.y;
@@ -171,11 +207,82 @@ export function surfaceRasterLines(p = {}) {
     const ayE = (rel, expr) => (F.live ? (rel ? `[${F.y} + ${r3(rel)} + ${expr}]` : `[${F.y} + ${expr}]`) : `[${r3(y0 + rel)} + ${expr}]`);
     const azE = (expr) => `[${F.z} ${expr}]`;        // expr carries its own sign, e.g. '- #46'
 
+    /**
+     * ── t1375 — THE PROGRAM ROTATION, ABSORBED ───────────────────────────────────────────────────────────────────
+     *
+     * A declared program-level rotation used to be applied to the emitted TEXT after every op had emitted, and that
+     * cannot act on a body whose coordinates are registers: rotation COUPLES the axes, so a move it can only
+     * half-rewrite gains a second axis word — uncommanded motion on a cutting line (t1353's measurement). So the angle
+     * arrives as a PARAM, exactly as the placement frame and the skim mode already do, and this body bakes it.
+     *
+     * WHY SIX DECIMALS, AND NOT THE HELIX'S NINE (derived t1371): per coordinate the rotation is two multiplies by a
+     * baked constant and one add, ONCE — `x' = x0 + c·ex − s·ey` — with no recurrence, so nothing compounds. Rounding
+     * c,s to d decimals bounds the coordinate error by `(|ex|+|ey|)·5·10^−(d+1)`; at 500mm offsets, far beyond any
+     * faced area, d=6 gives 5·10⁻⁴ mm — HALF the emit's own 0.001mm quantum, so it cannot tip a rounded digit. The
+     * helix needs nine because its constants multiply a vector that is fed back 24 times; these multiply once.
+     */
+    const rotA = num(p.rotAngle, 0);
+    const d6 = (n) => Number(n.toFixed(6));
+    const rot = (rotA && surfaceRasterAbsorbsRotation(p) === true)
+        ? { c: d6(Math.cos(rotA * Math.PI / 180)), s: d6(Math.sin(rotA * Math.PI / 180)), px: num(p.rotPivotX, 0), py: num(p.rotPivotY, 0) }
+        : null;
+
+    /**
+     * ONE MOVE, TWO FRAMES — the rotation twin of the origin substitution above.
+     *
+     * `mv()` prints the X and Y words of one move. Each axis arrives declared TWICE on the same line: the word this
+     * body has always emitted, and the same coordinate as an AFFINE FORM — a build-time constant plus runtime terms,
+     * each a register times a build-time coefficient. Unrotated, the declared word is printed verbatim, so every
+     * existing config is byte-identical and this is a no-op. Rotated, only the affine form can say what happens,
+     * because the axes stop being independent:
+     *
+     *     X' = px + (Cx−px)·c − (Cy−py)·s   +   Σ (c·pᵢ − s·qᵢ)·tᵢ
+     *     Y' = py + (Cx−px)·s + (Cy−py)·c   +   Σ (s·pᵢ + c·qᵢ)·tᵢ
+     *
+     * The pivot moves the POINT, so it belongs to the constant; a runtime term is a VECTOR from that point, so it
+     * rotates WITHOUT the pivot and its two coefficients simply mix. The machine still evaluates the same SHAPE it
+     * already did — `[<number> + #reg * <number> - #reg * <number>]`, the class of the shipped `[103.6 + #49 * 0.8]`
+     * (a build constant times a register, summed) — so nothing here reaches for an unproven controller form.
+     *
+     * A term may be absent from one axis: a row's Y offset does not move X at 0°, its coefficient there is zero, and
+     * the rotation is what gives it one. That is exactly why a SINGLE-AXIS move has to grow its partner — a straight
+     * step in this body's frame is a diagonal in the rotated one — so every call passes both axes' forms even where
+     * only one word is emitted today.
+     */
+    const TM = (reg, k = 1) => ({ reg, k });                    // a runtime term: a register × a build-time coefficient
+    const AX = (word, c, terms = []) => ({ word, c, terms });    // one axis of a move: today's word + its affine form
+    const rotTerms = (X, Y, xAxis) => {
+        const order = [], seen = new Set(), px = new Map(), qy = new Map();
+        const bump = (m, t) => { if (!seen.has(t.reg)) { seen.add(t.reg); order.push(t.reg); } m.set(t.reg, (m.get(t.reg) || 0) + t.k); };
+        X.terms.forEach((t) => bump(px, t)); Y.terms.forEach((t) => bump(qy, t));
+        return order.map((reg) => {
+            const a = px.get(reg) || 0, b = qy.get(reg) || 0;
+            return { reg, k: d6(xAxis ? rot.c * a - rot.s * b : rot.s * a + rot.c * b) };
+        }).filter((t) => t.k !== 0);
+    };
+    const rotWord = (X, Y, xAxis) => {
+        const cx = X.c - rot.px, cy = Y.c - rot.py;
+        const k0 = xAxis ? rot.px + cx * rot.c - cy * rot.s : rot.py + cx * rot.s + cy * rot.c;
+        const terms = rotTerms(X, Y, xAxis);
+        // A ROTATED ORIGIN INSIDE AN EXPRESSION IS AN INTERMEDIATE, NOT A COORDINATE — the same distinction t1339 drew
+        // for the ramp's direction cosine, caught the same way. Alone in an axis word it IS the coordinate the machine
+        // moves to, so it takes the emit's own 0.001mm quantum. Inside brackets the machine adds a runtime term to it,
+        // so rounding it first pushes that half-quantum into the SUM: measured on a pivot away from the datum, every
+        // point landed one quantum off the literal truth until this carried six decimals like every other coefficient.
+        if (!terms.length) return `${r3(k0)}`;
+        return `[${d6(k0)}${terms.map((t) => (t.k === 1 ? ` + ${t.reg}` : t.k === -1 ? ` - ${t.reg}`
+            : (t.k > 0 ? ` + ${t.reg} * ${t.k}` : ` - ${t.reg} * ${-t.k}`))).join('')}]`;
+    };
+    const mv = (X, Y) => (rot
+        ? `X${rotWord(X, Y, true)} Y${rotWord(X, Y, false)}`
+        : [X.word != null ? `X${X.word}` : null, Y.word != null ? `Y${Y.word}` : null].filter(Boolean).join(' '));
+
     // THE STRATEGY DECIDES THE WALK, under the SAME header and the SAME depth loop — the loop that counts levels
     // does not care what happens inside it, which is why adding a strategy is a new walk and not a new emitter.
     const stepBaked = tool * pct / 100;   // the stepover AT BUILD VALUES — what the baked ramp geometry is computed for
     const opts = { x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
-        helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1), toolDia: tool, stepBaked };
+        helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1), toolDia: tool, stepBaked,
+        rot, mv, AX, TM };   // t1375 — the rotation goes through the ONE move printer, so each walk declares points, not words
     const walk = (p.strategy === 'concentric') ? ringWalk(opts) : rowWalk(opts);
 
     // THE SKIM PREAMBLE. Seed an impossible value, read the frame, then REFUSE if it did not arrive — before any
@@ -251,15 +358,39 @@ export function surfaceRasterLines(p = {}) {
  * own comment says so too), so a surfacing op CANNOT emit a one-way raster and no user config reaches it. A
  * parametric one-way walk was written and then deleted — machinery for a case this op does not have.
  */
-function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry, rampAngle, helixDia, helixPitch, toolDia, stepBaked }) {
+function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry, rampAngle, helixDia, helixPitch, toolDia, stepBaked, rot, mv, AX, TM }) {
     void clr;
     // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP walks toward the area centre at the declared
     // angle and comes back. See rampLines for why toC and 1/tan are BAKED and what that costs.
     const descent = (entry === 'ramp')
-        ? rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3, F, ax, ay, az, axE, ayE, azE })
+        ? rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM })
         : (entry === 'helix')
-            ? helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3, F, ax, ay, az, axE, ayE, azE })
+            ? helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM })
             : [`    G1 Z${azE('- ' + V.z)} F${r3(plunge)}   ( the ONE plunge of this level )`];
+    // THE THREE POINTS THIS WALK VISITS, declared once as X/Y pairs so the rotation reads them rather than the text.
+    // NEAR/FAR are the row's two ends; ROW is the row's Y, which the body has already computed into #47 as an ABSOLUTE
+    // (unrotated) coordinate — so its affine form is a bare register with no constant, and #47 keeps meaning exactly
+    // what it means today whether the program rotates or not.
+    const NEAR_X = () => AX(ax(), x0, []);
+    const FAR_X = () => AX(axE(0, V.w), x0, [TM(V.w)]);
+    const ROW_Y = (word = V.y) => AX(word, 0, [TM(V.y)]);
+    /**
+     * THE STEP-OVER'S X — a value only a ROTATED build has to name. Unrotated, the step over at depth is a Y-only move
+     * and leaving X modal is what keeps the tool down. Rotated, that same straight step is a DIAGONAL, so X must be
+     * written; and where the previous row's cut ENDED is a runtime fact — `#49` has already flipped, so dir<0 means the
+     * row before ran +X and finished at the FAR end.
+     *
+     * IT IS ARITHMETIC, NOT A BRANCH, and that was a correction made after measuring what a branch costs here. A branch
+     * puts a second entry point in front of the line, and `applyModalFeed` folds F words with a LINEAR text walk: the F
+     * on the branch-taken path gets dropped and that row then cuts at whatever feed was last set — the plunge feed. (That
+     * fold is ALREADY branch-blind on the plunge→first-row path, which is a separate pre-existing defect recorded in the
+     * work log; adding a second instance of it would have been building on top of it.)
+     *
+     * `#49` is only ever ±1 — seeded 1, negated once per row — so `w·(1−dir)/2` picks the end with no comparison inside
+     * an expression, which is the construct t1339 found the tracer read wrong. It flattens to two products of exactly the
+     * kind this body already emits (`#48 * #44`), so it needs no form the controller has not already been given.
+     */
+    const END_X = () => AX(null, x0, [TM(V.w, 0.5), TM(`${V.w} * ${V.dir}`, -0.5)]);
     const count = [
         // THE ROW COUNT — not h/step rounded up. Rows sit at step/2 + i·step, so the count is how many of THOSE land
         // inside the area. The two formulas agree at 150/7.2 and 40/5 and disagree at 60/7.2 (8 rows, not 9), where
@@ -280,21 +411,22 @@ function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE
         // WHICH END TO START AT — asked as a BRANCH, not as a comparison inside an expression. `[#49 < 0]` looked
         // like it would evaluate 0/1 and the tracer read it as a plain 1, putting the first plunge off the corner.
         `    IF ${V.dir} < 0 GOTO17`,
-        `    G0 X${ax()} Y${V.y}`,
+        `    G0 ${mv(NEAR_X(), ROW_Y())}`,
         '    GOTO18',
         '    N17',
-        `    G0 X${axE(0, V.w)} Y${V.y}`,
+        `    G0 ${mv(FAR_X(), ROW_Y())}`,
         '    N18',
         ...descent,
         '    GOTO14',
         '    N13',
-        `    G1 Y${V.y} F${r3(feed)}   ( step over at depth — the tool does not lift between rows )`,
+        // THE STEP OVER AT DEPTH — ONE line in both builds (see END_X above for why it is arithmetic and not a branch).
+        `    G1 ${mv(END_X(), ROW_Y())} F${r3(feed)}   ( step over at depth — the tool does not lift between rows )`,
         '    N14',
         `    IF ${V.dir} < 0 GOTO15`,
-        `    G1 X${axE(0, V.w)} F${r3(feed)}`,
+        `    G1 ${mv(FAR_X(), ROW_Y(null))} F${r3(feed)}`,
         '    GOTO16',
         '    N15',
-        `    G1 X${ax()} F${r3(feed)}`,
+        `    G1 ${mv(NEAR_X(), ROW_Y(null))} F${r3(feed)}`,
         '    N16',
         `    ${V.dir}=[0 - ${V.dir}]`,
         `    ${V.i}=[${V.i} + 1]`,
@@ -322,7 +454,7 @@ function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE
  * the literal kernel already supports it via runX/runY) or live-SQRT if V13 proves it; plus the true-arc helix with
  * start/end points, radius envelope and depth-per-revolution as the substitute criteria. That turn lifts the gate.
  */
-function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3, F, ax, ay, az, axE, ayE, azE }) {
+function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
     const ang = Math.min(45, Math.max(0.5, rampAngle));
     const invTan = 1 / Math.tan(ang * Math.PI / 180);
     // the ramp starts where the plunge would: the first row, at build values
@@ -334,14 +466,21 @@ function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3,
     // midpoint landed 0.01mm off the literal's — invisible in the text, caught by the bridge. A unit vector is
     // multiplied by the run, so its error is scaled: 6 decimals keeps the product inside the emit's own rounding.
     const u6 = (n) => Math.round(n * 1e6) / 1e6;
+    // t1375 — the ramp's two points, declared. `toC` is a DISTANCE and the run is measured along the ramp, so both are
+    // rotation-invariant and the guard above needs no version. What rotates is the ramp's DIRECTION — and because the
+    // unit vector is a build-time coefficient on a runtime run length, the rotation folds straight into that
+    // coefficient: one number per axis, exactly the shape the unrotated line already emits.
+    const RAMP_X = AX(axE(sx - x0, `${V.run} * ${u6(ux)}`), sx, [TM(V.run, u6(ux))]);
+    const RAMP_Y = AX(ayE(sy - y0, `${V.run} * ${u6(uy)}`), sy, [TM(V.run, u6(uy))]);
+    const START_X = AX(ax(sx - x0), sx, []), START_Y = AX(ay(sy - y0), sy, []);
     return [
         `    ${V.run}=[${V.stepdown} * ${r3(invTan)}]   ( ramp run = bite / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
         // THE HONEST DEGRADE, kept from the literal kernel: when the run to the centre is longer than the distance
         // available, a ramp cannot be cut and the tool plunges instead — with the reason in the program, not silently.
         `    IF ${V.run} > ${r3(toC)} GOTO41   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
         `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( down to the floor this level starts from )`,
-        `    G1 X${axE(sx - x0, `${V.run} * ${u6(ux)}`)} Y${ayE(sy - y0, `${V.run} * ${u6(uy)}`)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( ramp )`,
-        `    G1 X${ax(sx - x0)} Y${ay(sy - y0)} F${r3(feed)}   ( back to the row start, now at depth )`,
+        `    G1 ${mv(RAMP_X, RAMP_Y)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( ramp )`,
+        `    G1 ${mv(START_X, START_Y)} F${r3(feed)}   ( back to the row start, now at depth )`,
         '    GOTO42',
         '    N41',
         `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}   ( the ramp did not fit — straight plunge )`,
@@ -370,7 +509,7 @@ function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3,
  * no matter how deep the descent runs. THE TWO ARE SEPARATE REQUIREMENTS: re-seeding alone still leaves 1.2e−3 at
  * 6 decimals, and 9 decimals alone would drift without bound on a deep descent. The bound holds only with both.
  */
-function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3, F, ax, ay, az, axE, ayE, azE }) {
+function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
     const SEG = 24, theta = 2 * Math.PI / SEG;
     // NINE decimals — see the derivation above. r3 would be catastrophic here for exactly the reason t1339 found
     // one level down, and 6 is not enough either.
@@ -382,10 +521,17 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
     const wantR = helixDia > 0 ? helixDia / 2 : Math.max(0.1, toolDia) / 2;
     const R = Math.max(0.2, Math.min(wantR, inrad - 0.01));
     const pitch = Math.max(0.1, helixPitch);
+    // t1375 — the helix's points. The rotating vector (#34,#35) is a VECTOR from the area centre, so under rotation its
+    // two registers mix into each axis with the same coefficients everything else uses — the recurrence itself is
+    // untouched, and its 9-decimal constants keep serving the only thing that compounds.
+    const ENTRY_X = AX(ax(cx + R - x0), cx + R, []), ENTRY_Y = AX(ay(cy - y0), cy, []);
+    const ARC_X = AX(axE(cx - x0, HX.vx), cx, [TM(HX.vx)]);
+    const ARC_Y = AX(ayE(cy - y0, HX.vy), cy, [TM(HX.vy)]);
+    const OUT_X = AX(ax(sx - x0), sx, []), OUT_Y = AX(ay(sy - y0), sy, []);
     return [
         `    ${HX.segs}=[FUP[${V.stepdown} / ${r3(pitch)}] * ${SEG}]   ( segments: ${SEG} per rev, at ${r3(pitch)}mm per rev )`,
         `    IF ${HX.segs} < ${SEG} THEN ${HX.segs}=${SEG}   ( never less than one revolution )`,
-        `    G0 X${ax(cx + R - x0)} Y${ay(cy - y0)}   ( the helix starts on its own radius, at the area centre )`,
+        `    G0 ${mv(ENTRY_X, ENTRY_Y)}   ( the helix starts on its own radius, at the area centre )`,
         `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( the floor this level starts from )`,
         `    ${HX.vx}=${r3(R)}   ( the rotating vector, re-seeded every revolution so the drift cannot accumulate )`,
         `    ${HX.vy}=0`,
@@ -404,9 +550,9 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
         `      ${HX.tmp}=[${HX.vx} * ${c} - ${HX.vy} * ${sn}]   ( rotate by ${r3(360 / SEG)}deg: 4 multiplies, 2 adds, no trig )`,
         `      ${HX.vy}=[${HX.vx} * ${sn} + ${HX.vy} * ${c}]`,
         `      ${HX.vx}=${HX.tmp}`,
-        `      G1 X${axE(cx - x0, HX.vx)} Y${ayE(cy - y0, HX.vy)} Z${azE(`- ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}`)} F${r3(feed)}`,
+        `      G1 ${mv(ARC_X, ARC_Y)} Z${azE(`- ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}`)} F${r3(feed)}`,
         '    END3',
-        `    G1 X${ax(sx - x0)} Y${ay(sy - y0)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( helix — out to the row start, now at depth )`,
+        `    G1 ${mv(OUT_X, OUT_Y)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( helix — out to the row start, now at depth )`,
         `    IF ${V.z} > 0 GOTO52`,
         `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}`,
         '    N52',
@@ -418,12 +564,15 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
  * shrunk by `inset` on every side, and the walk stops when a ring would collapse. The tool steps to the next ring on
  * a DIAGONAL CUTTING move and never lifts within a level — one plunge, like the both-ways raster.
  */
-function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE }) {
-    void clr;
-    const inX = axE(0, RING_INSET);
-    const inY = ayE(0, RING_INSET);
-    const outX = axE(0, `${V.w} - ${RING_INSET}`);
-    const outY = ayE(0, `${V.h} - ${RING_INSET}`);
+function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
+    void clr; void rot;
+    // t1375 — a ring's four corners, declared as X/Y pairs. The inset (#47) walks INWARD on both axes at once, so
+    // under rotation it lands on both with mixed coefficients — which is why the pairs are declared together rather
+    // than each axis owning its own string.
+    const IN_X = () => AX(axE(0, RING_INSET), x0, [TM(RING_INSET)]);
+    const IN_Y = () => AX(ayE(0, RING_INSET), y0, [TM(RING_INSET)]);
+    const OUT_X = () => AX(axE(0, `${V.w} - ${RING_INSET}`), x0, [TM(V.w), TM(RING_INSET, -1)]);
+    const OUT_Y = () => AX(ayE(0, `${V.h} - ${RING_INSET}`), y0, [TM(V.h), TM(RING_INSET, -1)]);
     return {
         count: [
             // THE RING COUNT — how many insets fit before the SHORTER side closes. The shorter side is resolved here
@@ -438,16 +587,16 @@ function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, ax
             `  ${V.i}=0`,
             `  WHILE [${V.i} < ${V.n}] DO2   ( rings, inward )`,
             `    IF ${V.i} > 0 GOTO21`,
-            `    G0 X${inX} Y${inY}`,
+            `    G0 ${mv(IN_X(), IN_Y())}`,
             `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}   ( the ONE plunge of this level )`,
             '    GOTO22',
             '    N21',
-            `    G1 X${inX} Y${inY} F${r3(feed)}   ( diagonal step in to the next ring, still cutting )`,
+            `    G1 ${mv(IN_X(), IN_Y())} F${r3(feed)}   ( diagonal step in to the next ring, still cutting )`,
             '    N22',
-            `    G1 X${outX} Y${inY} F${r3(feed)}`,
-            `    G1 X${outX} Y${outY} F${r3(feed)}`,
-            `    G1 X${inX} Y${outY} F${r3(feed)}`,
-            `    G1 X${inX} Y${inY} F${r3(feed)}`,
+            `    G1 ${mv(OUT_X(), IN_Y())} F${r3(feed)}`,
+            `    G1 ${mv(OUT_X(), OUT_Y())} F${r3(feed)}`,
+            `    G1 ${mv(IN_X(), OUT_Y())} F${r3(feed)}`,
+            `    G1 ${mv(IN_X(), IN_Y())} F${r3(feed)}`,
             `    ${RING_INSET}=[${RING_INSET} + ${V.step}]`,
             `    ${V.i}=[${V.i} + 1]`,
             '  END2',
@@ -516,4 +665,12 @@ export const surfaceRasterBlock = {
     // t1359 — THE DECLARED PLACEMENT SEAM. This atom takes its frame as PARAMS; the place fold reads this and passes
     // x0/y0/z0 in instead of rewriting the emitted text (which cannot work on expressions — t1349 measured it).
     absorbsPlacement: true,
+    // t1375 — THE DECLARED ROTATION SEAM, the same shape one level up: the emitter asks this before handing the angle
+    // down as `rotAngle`/`rotPivotX`/`rotPivotY`, and the atom answers `true` or says why not (skim).
+    //
+    // THOSE THREE ARE DELIBERATELY NOT `fields`/`defaults`, and that is the opposite call from t1361's z0. A placement
+    // frame is a fact about THIS op and belongs on it. A program rotation is a fact about the PROGRAM — it is declared
+    // ONCE, by the flat `xform` sibling, and re-read at every emit. Storing a copy on the block would create a second
+    // source for one angle, which is the split this whole arc exists to remove; so the atom reads it and never keeps it.
+    absorbsRotation: (p) => surfaceRasterAbsorbsRotation(p),
 };

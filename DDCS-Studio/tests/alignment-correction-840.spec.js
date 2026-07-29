@@ -20,8 +20,17 @@ test.use({ viewport: { width: 1400, height: 1000 } });
  * THE FLOW THIS NARROWS, stated plainly: a program containing a surfacing op cannot be alignment-rotated today. The
  * improvement turn absorbs rotation into the atom (a declared frame angle, as placement and the skim frame already
  * are), which is why that turn takes rotation FIRST.
+ *
+ * t1375 — SEEDED FROM SURFACING AGAIN, because that turn happened and the narrowing is over: the atom absorbs the
+ * declared angle and bakes it into the coordinates it emits. The paragraph above is kept, not tidied, because it
+ * records why the seed moved and what re-opened it.
+ *
+ * AND THE MEASUREMENT MOVED WITH IT, which is the part worth reading. `xyPairs` read positions out of the TEXT with a
+ * regex — the only thing that works on a literal program and the wrong instrument for a parametric one, where a
+ * coordinate is an expression the machine resolves. The engine resolves it instead, so the assert now compares the
+ * MOTION rather than the characters. That is a stronger test on the literal path too: it measures where the tool goes.
  */
-async function seedProgram(page, wiz = 'pocket') {
+async function seedProgram(page, wiz = 'surfacing') {
     await page.evaluate(async (w) => {
         window.ddcsLoadBlockStack([]);
         window.openWiz(w, undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
@@ -29,19 +38,11 @@ async function seedProgram(page, wiz = 'pocket') {
     await page.waitForTimeout(350);
 }
 
-// The running absolute (X,Y) after each XY-affecting move (skip G91/G53). Single-axis moves keep the other axis — so a
-// base G1 X20 and its rotated two-axis form give comparable positions. Same length + order in base + rotated.
-const xyPairs = (g) => {
-    let x = 0, y = 0; const out = [];
-    for (const l of g.split('\n')) {
-        if (/\bG91\b/.test(l) || /\bG53\b/.test(l)) continue;
-        const mx = l.match(/(?:^|\s)X(-?\d+\.?\d*)/), my = l.match(/(?:^|\s)Y(-?\d+\.?\d*)/);
-        if (!mx && !my) continue;
-        if (mx) x = parseFloat(mx[1]); if (my) y = parseFloat(my[1]);
-        out.push([x, y]);
-    }
-    return out;
-};
+/** The RESOLVED XY of every cutting move, as the engine runs the program — registers and expressions included. */
+const cutPairs = (page) => page.evaluate(async () => {
+    const { traceToolpath } = await import('/engine/trace.js');
+    return (traceToolpath(window.ddcsGetBlockGcode()).segments || []).filter((s) => !s.rapid).map((s) => [s.x2, s.y2]);
+});
 
 test('type the measured angle → the program rotates by it ABOUT THE DATUM (numeric), badge + declared xform; ✕ → byte-identical', async ({ page }) => {
     page.on('dialog', (d) => d.accept());
@@ -51,8 +52,8 @@ test('type the measured angle → the program rotates by it ABOUT THE DATUM (num
 
     const base = await page.evaluate(() => window.ddcsGetBlockGcode());
     expect(base.trim().length, 'the seed program emitted G-code').toBeGreaterThan(0);
-    const basePairs = xyPairs(base);
-    expect(basePairs.length, 'the program has absolute XY moves to rotate').toBeGreaterThan(2);
+    const basePairs = await cutPairs(page);
+    expect(basePairs.length, 'the program has cutting moves to rotate').toBeGreaterThan(2);
 
     // open the Transform modal → the Alignment-fix tab → type the measured angle → apply
     await page.evaluate(() => window.ddcsAlignRotate());
@@ -70,10 +71,9 @@ test('type the measured angle → the program rotates by it ABOUT THE DATUM (num
     expect(decl.p.pivotY, 'pivot Y = the datum (0)').toBeCloseTo(0, 6);
     expect(decl.first, 'program-level (top of stack)').toBe('xform');
 
-    // (b) NUMERIC: every emitted XY endpoint = the base one rotated 1.25° CCW about the origin
-    const rotated = await page.evaluate(() => window.ddcsGetBlockGcode());
-    const rotPairs = xyPairs(rotated);
-    expect(rotPairs.length).toBe(basePairs.length);
+    // (b) NUMERIC: every RESOLVED cutting endpoint = the base one rotated 1.25° CCW about the origin
+    const rotPairs = await cutPairs(page);
+    expect(rotPairs.length, 'a rotation is not a different program — same cutting-move count').toBe(basePairs.length);
     const th = 1.25 * Math.PI / 180, c = Math.cos(th), s = Math.sin(th);
     for (let i = 0; i < basePairs.length; i++) {
         const [x, y] = basePairs[i];

@@ -46,13 +46,18 @@ const numAfter = (line, letter) => {
  *
  * @returns {{line: string, index: number, why: string}|null} the first offending line, or null when it is safe
  */
-export function parametricMotion(gcode) {
+export function parametricMotion(gcode, absorbed = null) {
     const lines = String(gcode == null ? '' : gcode).split(/\r?\n/);
+    const baked = absorbed instanceof Set ? absorbed : (Array.isArray(absorbed) ? new Set(absorbed) : null);
     let abs = true;
     for (let i = 0; i < lines.length; i++) {
         const raw = lines[i];
         if (/\bG91\b/.test(raw)) abs = false;                    // incremental: every transform leaves it alone
         if (/\bG90\b/.test(raw)) abs = true;
+        // t1375 — AN ABSORBED LINE IS ALREADY ROTATED, by the atom that emitted it, and the EMITTER declares which
+        // lines those are (it does not re-scan the text to find out — a map inferred from output is the double-rotate
+        // hazard). Its parametric axis words are therefore not a refusal reason: they are the mechanism working.
+        if (baked && baked.has(i)) continue;
         if (!abs || /\bG53\b/.test(raw)) continue;               // machine-frame / incremental: never transformed anyway
         const code = raw.replace(/\([^)]*\)/g, '').replace(/;.*$/, '');   // a comment is not motion
         const m = code.match(/\b([XYZIJKR])\s*([[#])/i);
@@ -72,22 +77,66 @@ function refuse(gcode, hit, what, extra) {
 }
 
 /**
+ * t1375 — THE SEAM WHERE AN ABSORBED RANGE MEETS TEXT THAT STILL ROTATES, and the one thing that can go wrong there.
+ *
+ * An absorbed op leaves the tool at a coordinate only the MACHINE knows (its moves are registers). Rotation couples the
+ * axes, so a following PARTIAL move — one that names X but not Y — is rewritten with both, filling the missing axis
+ * from the tracked modal position. After an absorbed range there is no such position: using the last literal one would
+ * place the move somewhere the program never asked for, silently. This is the gap-or-overlap the mixed program hides,
+ * so it is found UP FRONT and refuses the whole program rather than being discovered a line at a time.
+ *
+ * A full XY pair re-establishes the position, which is why an ordinary op following a surfacing op is fine: every
+ * toolpath opens with a two-axis rapid to where it starts.
+ */
+function unseededPartial(lines, baked) {
+    let abs = true, known = true;
+    for (let i = 0; i < lines.length; i++) {
+        const raw = lines[i];
+        if (/\bG91\b/.test(raw)) abs = false;
+        if (/\bG90\b/.test(raw)) abs = true;
+        const X = numAfter(raw, 'X'), Y = numAfter(raw, 'Y');
+        if (baked && baked.has(i)) { if (/\b[XY]/i.test(raw.replace(/\([^)]*\)/g, ''))) known = false; continue; }
+        if (!abs || /\bG53\b/.test(raw)) continue;
+        if (!X && !Y) continue;
+        if (X && Y) { known = true; continue; }                  // a full pair re-seeds the modal position
+        if (!known) {
+            return { line: raw, index: i,
+                why: `line ${i + 1} moves only ${X ? 'X' : 'Y'}, and the op before it baked its own rotation — so the `
+                    + 'other axis is a value only the machine knows. Rotation couples the axes, so completing this move '
+                    + 'from a stale position would send it somewhere the program never asked for.' };
+        }
+    }
+    return null;
+}
+
+/**
  * @param {string} gcode
  * @param {number} angleDeg  CCW degrees
  * @param {number} [px=0] @param {number} [py=0]  pivot (part datum) in the program frame
- * @returns {{ text:string, hadIncremental:boolean, rotated:number }}
+ * @param {{absorbed?: number[]|Set<number>}} [opts]  t1375 — line indices whose EMITTER already baked this rotation in
+ *        (declared at emit time by the atom that did it; never inferred from the text). Those lines pass through
+ *        untouched, their registers are not a refusal reason, and the position they leave cannot seed a partial move.
+ * @returns {{ text:string, hadIncremental:boolean, rotated:number, absorbed:number }}
  */
-export function rotateProgram(gcode, angleDeg, px = 0, py = 0) {
+export function rotateProgram(gcode, angleDeg, px = 0, py = 0, opts = {}) {
+    const baked = (opts && opts.absorbed) ? (opts.absorbed instanceof Set ? opts.absorbed : new Set(opts.absorbed)) : null;
+    const allLines = String(gcode == null ? '' : gcode).split(/\r?\n/);
     // t1353 — REFUSE rather than half-rotate. Rotation couples the axes, so a word it cannot replace is APPENDED
     // (measured: `G0 X0 Y#47` → `... Y#47 Y0`, uncommanded motion on a cutting line).
-    { const hit = parametricMotion(gcode); if (hit) return refuse(gcode, hit, 'rotate', { hadIncremental: false, rotated: 0 }); }
+    { const hit = parametricMotion(gcode, baked); if (hit) return refuse(gcode, hit, 'rotate', { hadIncremental: false, rotated: 0, absorbed: 0 }); }
+    // t1375 — and refuse the SEAM case too: a partial move that would have to be completed from a position an absorbed
+    // op left at runtime. Whole-program, up front, for the same all-or-nothing reason.
+    if (baked) { const hit = unseededPartial(allLines, baked); if (hit) return refuse(gcode, hit, 'rotate', { hadIncremental: false, rotated: 0, absorbed: 0 }); }
     const th = (Number(angleDeg) || 0) * Math.PI / 180, cos = Math.cos(th), sin = Math.sin(th);
     const rotPt = (x, y) => [px + (x - px) * cos - (y - py) * sin, py + (x - px) * sin + (y - py) * cos];
     const rotVec = (i, j) => [i * cos - j * sin, i * sin + j * cos];
-    let curX = 0, curY = 0, abs = true, hadIncremental = false, rotated = 0;
-    const out = String(gcode == null ? '' : gcode).split(/\r?\n/).map((raw) => {
+    let curX = 0, curY = 0, abs = true, hadIncremental = false, rotated = 0, absorbed = 0;
+    const out = allLines.map((raw, idx) => {
         if (/\bG91\b/.test(raw)) abs = false;
         if (/\bG90\b/.test(raw)) abs = true;
+        // ALREADY ROTATED BY ITS EMITTER — pass it through verbatim. This is the whole of "the pass never re-scans":
+        // it reads the declaration it was given and does nothing to those lines.
+        if (baked && baked.has(idx)) { absorbed += 1; return raw; }
         const X = numAfter(raw, 'X'), Y = numAfter(raw, 'Y');
         const I = numAfter(raw, 'I'), J = numAfter(raw, 'J');
         if (!X && !Y && !I && !J) return raw;            // no planar geometry → pass through (Z, M-codes, …)
@@ -110,7 +159,7 @@ export function rotateProgram(gcode, angleDeg, px = 0, py = 0) {
         }
         return line;
     });
-    return { text: out.join('\n'), hadIncremental, rotated };
+    return { text: out.join('\n'), hadIncremental, rotated, absorbed };
 }
 
 /**

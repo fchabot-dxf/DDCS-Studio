@@ -460,7 +460,15 @@ test('THE RAMP BAKES ONLY WHAT CANNOT MOVE — and says what that costs', async 
     });
     // THE RUN IS LIVE off the per-level bite; only the TANGENT is baked, because the angle is a form field and not a
     // knob anyone can turn at the machine.
-    expect(body, 'the run is computed from the live bite').toMatch(/#49=\[#43 \* [\d.]+\]/);
+    //
+    // t1375 — THE RUN MOVED FROM #49 TO #34, and pinning the register here is what caught it, so the pin stays. #49 was
+    // shared with the row DIRECTION on the grounds that the two never overlap; they do, and the sharing only ever
+    // worked because nothing read more than #49's SIGN. The rotated step-over needs the direction's value, so the two
+    // quantities are separated. #34 belongs to the DESCENT, and a descent is exactly one of plunge/ramp/helix, so the
+    // ramp's run and the helix's rotating vector can never be live together — a sharing that mutual exclusion actually
+    // justifies. The ramp's resolved motion is unchanged, which the EQUIVALENCE (ramp) bridges above assert.
+    expect(body, 'the run is computed from the live bite').toMatch(/#34=\[#43 \* [\d.]+\]/);
+    expect(body, 'and the DIRECTION slot is no longer overwritten by it — #49 is only ever ±1').not.toMatch(/#49=\[#43 \*/);
     expect(body, 'and the tangent is baked, with the reason on the line').toMatch(/tangent is baked; the angle is a form field/);
     // THE HONEST DEGRADE survives the migration: when the run does not fit, the tool plunges and the program says so
     expect(body, 'a ramp that cannot fit degrades').toMatch(/GOTO41/);

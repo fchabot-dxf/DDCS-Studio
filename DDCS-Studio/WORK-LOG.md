@@ -7681,3 +7681,147 @@ the atom can own BOTH axes' runtime terms symbolically and a text rewrite never 
 
 No source file was touched. The refuse-guard, the t1365 restatements and the shipped V2026.07.29.6 line all stand
 exactly as they are, so the tree is quiet and green. Seat B's lane untouched.
+
+---
+
+## t1375 (seat A) — ROTATION IS ABSORBED: a surfacing program can be aligned again
+
+The dispatch was fully specified and the seam was already blessed, so this entry is mostly about the two things the
+build found that the design could not have known — both caught by LOOKING at the emitted program rather than by a
+green test.
+
+### THE MECHANISM
+
+`emit()` gained a 7th argument, `ctx` — the PROGRAM-level declarations an atom may absorb. The rotation is the first,
+and context is the only way it could reach the atom: t1371 measured that the `xform` is a flat SIBLING of the ops, so
+no fold contains it and no fold could pass it down (which is why the dispatched placement analogy did not hold).
+`emitMapped` reads `programRotation(blocks)` once and threads it; the leaf path asks the atom's declared
+`absorbsRotation` and, on a yes, hands the angle in as params exactly as the placement frame already arrives.
+
+**The atom's change is ONE printer.** `mv(X, Y)` prints a move's two axis words. Each axis arrives declared twice on
+the same line: the word this body has always emitted, and the same coordinate as an AFFINE FORM — a build-time constant
+plus runtime terms, each a register times a build-time coefficient. Unrotated it prints the declared word verbatim, so
+the mechanism is invisible and the 0 degree emit is byte-identical. Rotated, only the affine form can express what
+happens, because the axes stop being independent:
+
+    X' = px + (Cx-px)c - (Cy-py)s + SUM (c*pi - s*qi)*ti
+    Y' = py + (Cx-px)s + (Cy-py)c + SUM (s*pi + c*qi)*ti
+
+The pivot moves the POINT so it belongs to the constant; a runtime term is a VECTOR from that point, so it rotates
+without the pivot and its two coefficients simply mix. Every emitted expression keeps the shape the controller was
+already given — a number plus register-times-number terms, the class of the shipped `[103.6 + #49 * 0.8]`. Nothing here
+reaches for a form that is not already in the running product.
+
+**The declaration is what made this small.** Because a move declares its POINT rather than its text, all four walks —
+row, ring, ramp, helix — went through the same printer with no per-site rotation logic, and the emitted program under
+rotation has exactly the same lines and the same labels as without it. Only the coordinates differ.
+
+**The range map is a per-line STAMP, not indices.** The absorbing leaf's lines are tagged `rot`, and
+`applyProgramTransform` reads that tag. Riding the line RECORD is what makes it survive the later passes that splice
+lines in (`applyEntryWaypoint`) and rebuild the array (`applyToolChanges`) — a numeric range would have shifted out of
+alignment, which is precisely the drift that produces a double-rotate. `emitMapped` now returns `absorbed` so the
+declaration is inspectable rather than private. `rotateProgram` takes it as `opts.absorbed`: those lines pass through
+untouched, their registers are not a refusal reason, and — new guard — a PARTIAL move following an absorbed range is
+refused up front, because rotation completes a one-axis move from the tracked position and an absorbed op left the tool
+at a coordinate only the machine knows.
+
+### WHAT I FOUND BY LOOKING — (1) A PRE-EXISTING WRONG FEED IN THE SHIPPED EMIT. FLAGGED, NOT FIXED.
+
+After the first working version I screenshotted the real app and the estimate had gone from ~67s to ~2min. A rotation
+cannot change a path's length, so something was wrong. `applyModalFeed` folds F words with a LINEAR TEXT WALK and is
+blind to `GOTO`/`N` control flow. In the SHIPPED parametric surfacing body:
+
+    G1 Z[0 - #46] F200      <- the plunge sets modal F200
+    GOTO14                   <- the FIRST row of every level jumps from here...
+    N13
+    G1 Y#47 F2000            <- ...straight past the only F2000
+    N14
+    IF #49 < 0 GOTO15
+    G1 X[0 + #40]            <- F folded away -> this cut runs at F200
+
+**The first row of every level cuts at the PLUNGE feed — a 10x slow cut, in V2026.07.29.6, today.** Not dangerous
+(slow, never fast) but wrong. It is a REGRESSION FROM THE PARAMETRIC SWITCH: the literal emitter unrolls straight-line
+code, so a linear fold was always correct for it; flow arrived with the parametric family and the fold never learned
+about it. The equivalence bridges could not see it — they compare positions, and a feed is not a position.
+
+NOT FIXED HERE, deliberately: making the fold branch-aware (reset the modal F at a label / after a jump) changes the
+emitted bytes of EVERY program carrying flow — probe macros, the safe-retract guards, the whole parametric family — and
+the suite is full of byte-identity asserts. That is a gate, not a rider on this turn. It wants its own dispatch, and it
+should probably come with a FEED dimension added to the bridges, since a whole class of defect is currently invisible
+to them.
+
+What this turn owed was not to make it worse, and my first version did: the rotated step-over was written as a BRANCH
+(the row's end is a runtime fact), which put a second entry point in front of the F2000 and gave the dir<0 rows the
+plunge feed too. So the branch was replaced by arithmetic — w*(1-dir)/2, no comparison inside an expression (the
+construct t1339 found the tracer read wrong), flattening to two products of the kind this body already emits. One line,
+its F intact, no new labels. **The estimate is now ~67s rotated and unrotated — which is also a free correctness check,
+since a rotation must not change cutting time.**
+
+### WHAT I FOUND BY LOOKING — (2) #49 HELD TWO QUANTITIES AT ONCE. FIXED, because the task needed it.
+
+The arithmetic step-over then produced a 416mm error on ramp configs. `V.run` and `V.dir` were the SAME register:
+t1339 shared them on the grounds that "a ramp happens at the FIRST row of a level, before any direction flip has been
+read, so the two never overlap." **They do overlap.** The ramp writes its run into #49 on row 0 and every row after
+reads #49 as the direction. It has always worked because the only thing ever read was the SIGN — `IF #49 < 0` — and
+negating +/-run alternates exactly as negating +/-1 does. The register held two different quantities simultaneously and
+the program was correct by a property of the tests applied to it, not by design.
+
+The rotated step-over is the first thing to need the direction's VALUE, and it surfaced immediately as 416mm. This is a
+MISSING DECLARATION rather than a patch, so the two quantities are separated: the ramp's run takes **#34**, which
+belongs to the DESCENT — and a descent is exactly one of plunge/ramp/helix, so the ramp's run and the helix's rotating
+vector can never be live in the same program. That is a sharing mutual exclusion actually justifies, which is what the
+old comment claimed and the new one can stand behind. Resolved motion is unchanged (the ramp bridges assert it move for
+move); the register name was pinned by a spec, which is what caught it, so the pin stays with its history.
+
+### THE CRITERION HAD TO BE CORRECTED TOO, and that is worth more than the bridge it fixed
+
+The bridges first compared resolved points for EXACT equality at three decimals and passed at four of five angles. The
+fifth failed, and the criterion was the thing that was wrong: **exact agreement between two correctly-rounded programs
+is not something either can promise.** Both express coordinates to 0.001mm, so each sits within half a quantum of the
+truth, and when the truth lands near a rounding boundary they fall on opposite sides. Measured: my point 0.0001mm from
+the ideal printed -1.468 where the literal printed -1.467. So each config is now measured three ways, none
+boundary-sensitive: count and order EXACT; per-axis within one emit quantum of the literal reference; and per-axis
+against an EXACT rotation computed in the test of the same program unrotated — that last one has no literal in it, so it
+isolates this turn's work from every divergence that predates it, and it is additionally required never to be FARTHER
+from the exact rotation than the literal is (the t1345 pattern). The derived 6-decimal bound gets its own sharp test at
+half a quantum on the plunge raster, where the derivation applies cleanly.
+
+Same correction one level down: rounding the rotated ORIGIN to 3 decimals inside a bracketed expression pushed a half
+quantum into the SUM the machine computes, and every point on an off-datum pivot landed a quantum off. A constant inside
+an expression is an INTERMEDIATE, not a coordinate — the same distinction t1339 drew for the ramp's direction cosine —
+so it carries six decimals; alone in an axis word it IS the coordinate and keeps the emit's own quantum.
+
+### THE REST OF THE DISPATCH
+
+**SKIM x ROTATION REFUSED, with its reason**, declared on the atom and read twice from that one place so a direct
+caller cannot route around it. The reason is a frame mix, not a precision loss: a skim body is measured from wherever
+the operator jogged to, and rotating it about the part datum relates two frames that have no fixed relationship. **And
+it costs nothing against the path it replaced** — a literal skim program is G91-wrapped and every whole-program
+transform returns G91 untouched, so the text rotation never rotated a skim body either. Parity, asserted, not a
+narrowing.
+
+**MIRROR stays refused**, with the precise statement rather than "unreachable": swept every registered op builder — no
+wizard flow builds a `setup` or a `flip`, while both blocks ARE in the palette, so a mirror is hand-authorable in Blocks
+and cannot arrive from a form. Machinery for a flow that does not exist would be machinery ahead of its case.
+
+**THE FLIPS.** transform-declared-736 and alignment-correction-840 are seeded from surfacing again, both keeping their
+t1365 paragraphs because those recorded why the seed moved. 736's refusal test became a rotation test — the real
+gesture, through the actual Transform modal, asserting the resolved toolpath turns by the angle asked for about the
+datum and that clearing it returns the exact original bytes. 840's measurement moved with it: `xyPairs` read positions
+out of the TEXT with a regex, which is the wrong instrument for a program whose coordinates are expressions, so it
+compares resolved MOTION now — a stronger test on the literal path too.
+
+**MIXED PROGRAM (the config that earns the mechanism):** a literal op beside the parametric one under one xform,
+measured against an all-literal equivalent of the same program. The absorbed map is EXACTLY the parametric op's lines
+read from the emitter's own line-to-block ancestry (no gap, no overlap), nothing is refused, and both ops land where the
+all-literal rotation puts them. **The coherence test then breaks the map on purpose** — dropping one line that really
+carries a baked coordinate — and the pass REFUSES rather than rotating it twice. Under-claiming is the only drift that
+can occur (the stamp is applied to the atom's own emitted lines, so it cannot name a line the atom never wrote), and it
+is loud.
+
+GATE (fast tier): smoke **71/71**. Surfacing + transform + two-sided + alignment families **110/110**, which includes
+every pre-existing ramp/helix/skim/concentric/placement bridge unchanged plus the 18 new tests. Scratch-band + CAM +
+emitter-shape (roundtrip-1319, op-params, place-on-stock, placement-rollout, mill-entry, blocks-roundtrip,
+cam-scratch-*, cam-universal-scratch, cam-slot-sim/roundtrip) **49/49**. Screenshots of the real app before/after the
+modal rotation in scratchpad/s1375-before.png and s1375-final.png. FULL SUITE NOT RUN — the advisor's merge gate; this
+is emit-class, so it wants the 1945/6/0 ceiling before release. Seat B's lane untouched.

@@ -151,8 +151,25 @@ function absorbingChild(children) {
     return (d && d.absorbsPlacement) ? list[0] : null;
 }
 
-/** Recursive fold → tagged lines. `anc` = ancestry of block ids; `scope` = the variable environment. */
-function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dialect = DEFAULT_DIALECT) {
+/**
+ * t1375 — THE PROGRAM ROTATION AN ATOM WILL ABSORB, or null.
+ *
+ * The rotation reaches emit() as program CONTEXT because that is the only level it exists at: the `xform` is a flat
+ * SIBLING of the ops, not a wrapper, so no fold contains it and no fold could pass it down (t1371 measured this — it is
+ * why the placement analogy did not hold). The atom DECLARES whether it can absorb one and says why not when it cannot;
+ * a refusal is reported rather than swallowed, and the whole-program pass then refuses the parametric text as well, so
+ * the program comes back untouched instead of half-rotated.
+ */
+function rotationAbsorbedBy(def, p, ctx) {
+    if (!ctx || !ctx.angle || !def || !def.absorbsRotation) return null;
+    const can = typeof def.absorbsRotation === 'function' ? def.absorbsRotation(p) : def.absorbsRotation;
+    if (can !== true) { reportRefusal({ refused: String(can || 'this op does not absorb a program rotation') }, 'rotation absorption'); return null; }
+    return { rotAngle: ctx.angle, rotPivotX: ctx.pivotX, rotPivotY: ctx.pivotY };
+}
+
+/** Recursive fold → tagged lines. `anc` = ancestry of block ids; `scope` = the variable environment;
+ *  `ctx` = PROGRAM-level declarations an atom may absorb (t1375 — the rotation; null for a bare fold). */
+function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dialect = DEFAULT_DIALECT, ctx = null) {
     const def = BLOCKS[block.type];
     const own = [...anc, block.id];            // this block's full ancestry (drives the line→source map)
 
@@ -162,20 +179,20 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     // active post can't run commented out. The op is always kept in the stack.
     if (block.type === 'op') {
         const out = [];
-        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
+        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
         return out;
     }
 
     // Custom-op authoring containers are transparent at emit time: they only group metadata and execution blocks.
     if (block.type === 'user_root') {
         const out = [];
-        (block.uiChildren || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
-        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
+        (block.uiChildren || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
+        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
         return out;
     }
     if (block.type === 'param_group' || block.type === 'guard' || block.type === 'section' || block.type === 'setup' || block.type === 'safetraverse' || block.type === 'opunit') {   // t130 — section is transparent (emit its children in order); guard is normally pruned pre-emit; t879 — setup is the two-sided section derivative; t901 — safetraverse is a transparent BUNDLE (emits its composed children: lift + shaped travel + return) → byte-identical to the inline safeTraverseStack it wraps; t1063 — opunit is a DECLARED sub-unit boundary (transparent → byte-identical to the standard atoms loose)
         const out = [];
-        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
+        (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
         return out;
     }
 
@@ -197,7 +214,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
             const k = from + s * by;
             const child = Object.create(scope); child[name] = k;          // child scope: index visible, doesn't leak out
             out.push(tag(`( ${def.label} ${name}=${r3(k)} )`, own));
-            (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
+            (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect, ctx)));
         }
         return out;
     }
@@ -205,7 +222,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
     if (def.kind === 'cond') {                 // IF: run the body once, only when the condition resolves true
         const on = resolveBool(block.params.cond, scope);
         const out = [tag(`( ${def.label} ${on ? 'true' : 'false'} )`, own)];
-        if (on) (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect)));
+        if (on) (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
         return out;
     }
 
@@ -218,7 +235,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         levels.forEach((L, i) => {
             const child = Object.create(scope); child.z = -L; child.by = by;   // t804 — expose `by` too: the fill's depth-entry (ramp/helix) descends exactly one level
             out.push(tag(`( ${def.label} z=${r3(-L)} )`, own));
-            (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
+            (block.children || []).forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect, ctx)));
             // t1031 — pause & confirm after every Nth pass, but NOT after the last (the op is done → no point pausing)
             if (confirmEvery > 0 && (i + 1) % confirmEvery === 0 && i + 1 < levels.length) {
                 BLOCKS.pauseconfirm.emit({}, dx, dy, dialect).forEach((ln) => out.push(tag(ln, own)));
@@ -234,7 +251,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         if ((block.children || []).length && def.segments) {           // body present → run it once per pass with {x0,y0,x1,y1} in scope
             def.segments(p).forEach((seg) => {
                 const child = Object.create(scope); Object.assign(child, seg);
-                block.children.forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect)));
+                block.children.forEach((c) => out.push(...emit(c, dx, dy, own, child, dialect, ctx)));
             });
         } else def.lines(p, z).forEach((ln) => out.push(tag(ln, own)));   // empty body → auto-cut the passes
         out.push(tag(`G0 Z${r3(num(p.clearance, 5))}   ( retract )`, own));
@@ -245,7 +262,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 
     if (def.kind === 'place') {                // PLACE ON STOCK: emit the wrapped op, then TRANSLATE its output so
         const inner = [];                      // the path's datum corner lands on the stock-attach corner (+ offset).
-        (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect)));
+        (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
         // Prefer the wrapped geometry's LIVE declared extent (recomputed from params) over the frozen bbox snapshot —
         // so the placement tracks the pattern (one source of truth). Falls back to the snapshot for un-migrated ops.
         const s = placeShiftFromParams(p, liveExtent(block.children, scope));
@@ -259,7 +276,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         if (absorber) {
             const framed = { ...absorber, params: { ...(absorber.params || {}),
                 x: num((absorber.params || {}).x, 0) + s.x, y: num((absorber.params || {}).y, 0) + s.y, z0: num((absorber.params || {}).z0, 0) + s.z } };
-            return emit(framed, dx, dy, own, scope, dialect);
+            return emit(framed, dx, dy, own, scope, dialect, ctx);
         }
         const moved = reportRefusal(translateProgram(inner.map((t) => t.line).join('\n'), s.x, s.y, s.z), 'place-on-stock').text.split('\n');
         return inner.map((t, i) => (t.cap ? { line: moved[i], src: t.src, cap: t.cap } : { line: moved[i], src: t.src }));   // keep each line's provenance (1:1 translate)
@@ -267,7 +284,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 
     if (def.kind === 'rotate') {               // ROTATE / ALIGN: emit the wrapped op(s), then rotate every absolute XY
         const inner = [];                      // move + arc I/J about the pivot (rotateProgram). The atom behind ⟳ Align.
-        (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect)));
+        (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect, ctx)));
         const ang = num(p.angle, 0), px = num(p.pivotX, 0), py = num(p.pivotY, 0);
         if (!ang) return inner;                // 0° → pass through untouched
         const moved = reportRefusal(rotateProgram(inner.map((t) => t.line).join('\n'), ang, px, py), 'rotate block').text.split('\n');
@@ -276,7 +293,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 
     if (def.kind === 'skim') {                 // SKIM Z-MODE: emit the wrapped body, prepend a clearance LIFT, then
         const inner = [];                      // relativizeProgram the whole thing (abs → G91 deltas from the jog origin
-        (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect)));   // 0,0,0) and wrap G91 … G90. The G53 retract sits OUTSIDE (footer, machine frame).
+        (block.children || []).forEach((c) => inner.push(...emit(c, dx, dy, own, scope, dialect, ctx)));   // 0,0,0) and wrap G91 … G90. The G53 retract sits OUTSIDE (footer, machine frame).
         const clr = r3(num(p.clearance, 5));
         // t1359 — A CHILD THAT ABSORBS ITS FRAME IS TOLD THE MODE instead of having its text relativized. Relativizing
         // a LOOP is not a harder version of relativizing a list — the deltas are runtime values, so there is nothing in
@@ -286,7 +303,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         const skimAbsorber = absorbingChild(block.children);
         if (skimAbsorber) {
             const framed = { ...skimAbsorber, params: { ...(skimAbsorber.params || {}), zMode: 'skim', clearance: num(p.clearance, 5) } };
-            return emit(framed, dx, dy, own, scope, dialect);
+            return emit(framed, dx, dy, own, scope, dialect, ctx);
         }
         const rel = relativizeProgram([`G0 Z${clr}   ( clearance )`, ...inner.map((t) => t.line)].join('\n')).text.split('\n');
         const out = [tag('G91   ( skim - X/Y/Z relative to the jog start )', own), tag(rel[0], own)];   // G91 + the relativized clearance lift (own provenance)
@@ -315,7 +332,7 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
             if (skip.has(i + 1)) return;
             (block.children || []).forEach((c) => {
                 out.push(tag(`( ${def.label} ${i + 1} @ ${pt.x},${pt.y} )`, own));
-                out.push(...emit(c, dx + pt.x, dy + pt.y, own, scope, dialect));
+                out.push(...emit(c, dx + pt.x, dy + pt.y, own, scope, dialect, ctx));
             });
         });
         return out;
@@ -329,12 +346,19 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
         pts.forEach((pt) => (block.children || []).forEach((c) => {
             const cd = BLOCKS[c.type];
             if (cd && cd.step) out.push(tag(cd.step(resolveParams(c.params, scope), pt), [...own, c.id]));  // step swept point
-            else out.push(...emit(c, pt.x, pt.y, own, scope, dialect));                                     // fallback: stamp
+            else out.push(...emit(c, pt.x, pt.y, own, scope, dialect, ctx));                                // fallback: stamp
         }));
         out.push(tag(`G0 Z${clr}   ( retract )`, own));
         return out;
     }
 
+    // t1375 — AN ATOM THAT ABSORBS THE PROGRAM ROTATION is TOLD the angle and bakes it into the coordinates it emits,
+    // the same seam the placement frame and the skim mode already use. Its lines are then STAMPED `rot` — that stamp IS
+    // the range map applyProgramTransform reads, declared by the emitter at the moment of emitting rather than
+    // reconstructed from the text afterwards, and it rides the line RECORD so the later passes that splice lines in
+    // cannot shift it out of alignment.
+    const rotAbs = rotationAbsorbedBy(def, p, ctx);
+    if (rotAbs) return def.emit({ ...p, ...rotAbs }, dx, dy, dialect).map((ln) => ({ ...tag(ln, own, block.params && block.params.cap), rot: true }));
     return def.emit(p, dx, dy, dialect).map((ln) => tag(ln, own, block.params && block.params.cap));   // leaf / move standalone (dialect = active profile; carry a declared cap requirement)
 }
 
@@ -380,7 +404,10 @@ export function emitMapped(blocks, settings = {}) {
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
     const T = [];
     const opRanges = [];                  // t772 P2 — each top-level block = one op; record its [start,end) line range as emitted
-    (blocks || []).forEach((b) => { const s = T.length; T.push(...emit(b, 0, 0, [], scope, dialect)); opRanges.push([s, T.length]); });
+    // t1375 — the PROGRAM-level declarations an atom may absorb, read once and threaded down. The rotation is the first:
+    // it is a flat sibling of the ops, so context is the only way it can reach the atom that bakes it.
+    const ctx = { ...programRotation(blocks) };
+    (blocks || []).forEach((b) => { const s = T.length; T.push(...emit(b, 0, 0, [], scope, dialect, ctx)); opRanges.push([s, T.length]); });
     applySetupFlips(T, opRanges, blocks, settings);   // t879 — the two-sided FLIP: mirror each setup-section's own line range (BEFORE tool/entry insert, so opRanges is fresh; mirrorProgram is 1:1 so ranges stay valid). No setup+flip → byte-identical.
     applyToolChanges(T, opRanges, dialect);   // t772 P2 — the DECLARED tool change: per op range, read its @TOOL marker, track the loaded tool, inject the arm (ATC/manual/none) ONLY on a difference. No tool declared → byte-identical.
     applyEntryWaypoint(T, blocks);        // t726 P2b — the DECLARED mill entry point: route the opening rapid through it (no-op unless it moves the cut entry)
@@ -390,7 +417,10 @@ export function emitMapped(blocks, settings = {}) {
     applyCapGating(T, dialect);           // comment out lines the active post can't run (honest per-line gating)
     balanceOwords(T, dialect);            // oword posts: drop orphan o<n> if/endif so structured flow is well-formed
     const lines = T.map((t) => t.line);
-    return { text: lines.join('\n'), lines, map: T.map((t) => t.src) };
+    // t1375 — the ABSORBED range map, exposed rather than kept private: it is the emitter's own declaration of which
+    // lines already carry the program rotation, so a caller (and the coherence spec) can read it instead of guessing.
+    const absorbed = []; T.forEach((t, i) => { if (t.rot) absorbed.push(i); });
+    return { text: lines.join('\n'), lines, map: T.map((t) => t.src), absorbed };
 }
 
 /** t726 P2b — find the DECLARED entry-point marker anywhere in the stack (a childless `entry` block). */
@@ -459,7 +489,13 @@ function hasSkimFold(blocks) {
 function applyProgramTransform(T, blocks) {
     const { angle, pivotX, pivotY } = programRotation(blocks);
     if (!angle) return;   // 0° / none → the emit is byte-identical to the un-rotated program
-    const rotated = reportRefusal(rotateProgram(T.map((t) => t.line).join('\n'), angle, pivotX, pivotY), 'program rotation').text.split('\n');
+    // t1375 — RANGE-AWARE, on the opRanges precedent. The lines an absorbing atom already rotated carry the emitter's
+    // own `rot` stamp; this pass reads that stamp and leaves those lines alone. It NEVER re-scans the text to work out
+    // what was rotated — a map inferred from output is exactly how a range drifts and a line gets rotated twice, and a
+    // double-rotated coordinate is a plausible-looking wrong part rather than an error.
+    const absorbed = []; T.forEach((t, i) => { if (t.rot) absorbed.push(i); });
+    const res = reportRefusal(rotateProgram(T.map((t) => t.line).join('\n'), angle, pivotX, pivotY, { absorbed }), 'program rotation');
+    const rotated = res.text.split('\n');
     for (let i = 0; i < T.length && i < rotated.length; i++) T[i].line = rotated[i];
 }
 

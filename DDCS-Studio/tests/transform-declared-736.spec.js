@@ -16,8 +16,16 @@ test.use({ viewport: { width: 1400, height: 1000 } });
  * axes, so a move it can only half-rewrite gains a second axis word — uncommanded motion on a cutting line). Refusing
  * is the shipped truth; the rotation machinery is not surfacing-specific, so it is demonstrated on a literal op that
  * still rotates, and the refusal gets its own test at the bottom of this file.
+ *
+ * t1375 — SEEDED FROM SURFACING AGAIN, and the paragraph above is kept rather than tidied away because it was true for
+ * exactly as long as it was written to be. The rotation is no longer applied to a parametric op's TEXT: the angle
+ * reaches the atom as program context and the atom BAKES it into the coordinates it emits, while
+ * applyProgramTransform stays range-aware and still rotates everything around it. So the narrowed flow re-opens — a
+ * program containing a surfacing op can be aligned again — and the refusal test at the bottom of this file became a
+ * rotation test. The GUARD keeps its meaning: it still refuses a skim-rotation and any hand-authored parametric text
+ * no atom claimed (see surfacing-rotation-absorbed-1375).
  */
-async function seedProgram(page, wiz = 'pocket') {
+async function seedProgram(page, wiz = 'surfacing') {
     await page.evaluate(async (w) => {
         window.ddcsLoadBlockStack([]);
         window.openWiz(w, undefined, true); window.updateWiz(); await window.insertWiz(); window.closeWiz && window.closeWiz();
@@ -135,11 +143,17 @@ test('the xform renders + round-trips through the Blocks workspace (Blocks-edita
  * whole program now and touches nothing, and it SAYS SO rather than failing silently, because the operator asked
  * for a rotation and would otherwise believe it happened.
  *
- * This is the flow that narrows: a program containing a surfacing op cannot be aligned by the Transform / Align
- * rotate today. The improvement turn absorbs rotation INTO the atom (a declared frame angle, the same way placement
- * and the skim frame were absorbed) — at which point this test's second half becomes "it rotates", not "it refuses".
+ * t1375 — FLIPPED, exactly as that note said it would be: "at which point this test's second half becomes 'it
+ * rotates', not 'it refuses'." The rotation is no longer done to the parametric text at all — the angle reaches the
+ * atom as program context and the atom bakes it into the coordinates it emits. So this now measures the REAL GESTURE
+ * end to end: type an angle into the Transform modal on a parametric surfacing program, and the geometry turns.
+ *
+ * IT IS ASSERTED AGAINST THE GEOMETRY, NOT THE TEXT. The emitted coordinates are expressions the machine resolves, so
+ * "did it rotate" cannot be read off the G-code with a regex. The engine resolves both programs and every cutting
+ * point of the rotated one must be the un-rotated point turned 12° about the datum — an independent truth, computed
+ * here rather than taken from the thing under test.
  */
-test('a PARAMETRIC program refuses the rotation, with its reason, and is left byte-identical', async ({ page }) => {
+test('a PARAMETRIC program ROTATES — the atom absorbs the angle, and the toolpath really turns', async ({ page }) => {
     page.on('dialog', (d) => d.accept());
     const warnings = [];
     page.on('console', (m) => { if (m.type() === 'warning') warnings.push(m.text()); });
@@ -149,6 +163,12 @@ test('a PARAMETRIC program refuses the rotation, with its reason, and is left by
 
     const base = await page.evaluate(() => window.ddcsGetBlockGcode());
     expect(base, 'the seed really is the parametric surfacing body').toContain('SURFACING, parametric');
+    const cutOf = async () => page.evaluate(async () => {
+        const { traceToolpath } = await import('/engine/trace.js');
+        return (traceToolpath(window.ddcsGetBlockGcode()).segments || []).filter((s) => !s.rapid).map((s) => [s.x2, s.y2, s.z2]);
+    });
+    const before = await cutOf();
+    expect(before.length, 'the parametric program resolves to real cutting moves').toBeGreaterThan(4);
 
     await page.evaluate(() => window.ddcsAlignRotate());
     await page.waitForSelector('[data-pane="align"] [data-ang]', { state: 'visible', timeout: 8000 });
@@ -157,9 +177,23 @@ test('a PARAMETRIC program refuses the rotation, with its reason, and is left by
     await page.click('[data-pane="align"] [data-rgo]');
     await page.waitForTimeout(350);
 
-    // THE PROGRAM IS UNTOUCHED — not half-rotated, not silently partly-rewritten.
+    // (1) THE EMIT CHANGED — the rotation is no longer turned away at the door.
     const after = await page.evaluate(() => window.ddcsGetBlockGcode());
-    expect(after, 'a parametric program comes back byte-identical — nothing was half-applied').toBe(base);
-    // …AND THE REASON IS SAID OUT LOUD. Silence is the worst refusal.
-    expect(warnings.join(' | '), `the refusal names itself (saw: ${warnings.join(' | ')})`).toMatch(/rotate.*(refused|skipped)/i);
+    expect(after, 'the rotation reached a parametric program (it is not byte-identical any more)').not.toBe(base);
+    // (2) NOTHING WAS REFUSED, and the absence is asserted rather than assumed.
+    expect(warnings.join(' | '), `no refusal on a datum-framed parametric program (saw: ${warnings.join(' | ')})`).not.toMatch(/(rotate|rotation).*(refused|skipped)/i);
+    // (3) AND THE GEOMETRY TURNED BY THE ANGLE ASKED FOR, about the datum, point for point.
+    const turned = await cutOf();
+    expect(turned.length, 'same number of cutting moves — a rotation is not a different program').toBe(before.length);
+    const th = 12 * Math.PI / 180, c = Math.cos(th), s = Math.sin(th);
+    for (let i = 0; i < before.length; i++) {
+        const [x, y, z] = before[i];
+        expect(turned[i][0], `cut ${i} X turned 12° about the datum`).toBeCloseTo(x * c - y * s, 2);
+        expect(turned[i][1], `cut ${i} Y turned 12° about the datum`).toBeCloseTo(x * s + y * c, 2);
+        expect(turned[i][2], `cut ${i} Z is untouched by a planar rotation`).toBeCloseTo(z, 3);
+    }
+    // (4) AND CLEARING IT IS STILL BYTE-IDENTICAL — the 0° fold, which is what keeps the mechanism invisible until asked for.
+    await page.click('#xform-badge .xform-badge-x');
+    await page.waitForTimeout(350);
+    expect(await page.evaluate(() => window.ddcsGetBlockGcode()), 'clearing the rotation returns the exact original bytes').toBe(base);
 });
