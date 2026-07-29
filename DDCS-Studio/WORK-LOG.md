@@ -7634,3 +7634,50 @@ tree is unchanged and green.
 
 GATE: nothing built, nothing to gate. The tree is quiet at the shipped V2026.07.29.6 line; no source file was
 modified this turn. Seat B's lane untouched.
+
+---
+
+## t1373 (seat A) — PARKED BEFORE STARTING, with the design specified; capacity, not doubt
+
+The dispatch is fully specified, every ruling is one I can act on, and the seam is the one I proposed. What is
+missing is working room: this build spans the atom's rotation math, threading program context through `emit()`, an
+emitter-declared range map, a range-aware `applyProgramTransform`, six bridge configs, the skim refusal, two spec
+flips and a mirror assert — on emit code that drives a real machine, gated by a full suite.
+
+**The park is BEFORE the first edit, deliberately.** t1359 parked a working mechanism mid-act and that was accepted
+as the right call; this is the cheaper version of the same judgment. A half-restated spec goes red and says so. A
+half-absorbed rotation does not: it emits clean G-code that cuts the part in the wrong place, and the one thing
+this arc has never done is ship that.
+
+### What the next session starts from (all measured, none of it needing redoing)
+
+**The seam, blessed:** the declared `xform` reaches `emit()` as program context; an atom declaring rotation-
+absorption bakes it; `applyProgramTransform` becomes range-aware.
+
+**The reachability (t1371, measured):** the Transform modal writes a flat program-level `xform` sibling at the top
+of the stack, pivot at the datum (0,0). Surfacing's stack is `[progstart, wcs, placeonstock, surfaceraster,
+progend]`, and in skim `[progstart, wcs, skim, surfaceraster, progend]` — no `placeonstock` at all, which is what
+killed the placement seam. Mirror needs a `setup`+`flip` pair that no wizard emits (palette-only).
+
+**The digit bound, derived and blessed:** per coordinate the rotation is two baked multiplies and an add, ONCE, with
+no recurrence — `x' = x0 + c·ex − s·ey`, `y' = y0 + s·ex + c·ey`. Error ≤ `(|ex|+|ey|)·5·10^−(d+1)`; at 500mm
+offsets **d=6 gives 5·10⁻⁴ mm, half the emit's own 0.001 quantum.** Six decimals, not the helix's nine.
+
+**The shape of the atom's change:** `ax`/`ay`/`axE`/`ayE` already centralise every coordinate this body emits, and
+they already fold a build-time offset into a runtime term. Rotation goes in THERE — one place — which is also why
+the atom can own BOTH axes' runtime terms symbolically and a text rewrite never could.
+
+### The two hazards to hold, named now so they are not discovered late
+
+1. **Double-rotate.** If the emitter-declared range map drifts from what was actually emitted, an absorbed range
+   gets rotated twice and the error is a plausible-looking wrong part. The ruling already says the map is declared
+   at emit time and never re-scanned — the assert that makes it real is map-vs-emit coherence, checked directly
+   rather than trusted.
+2. **The mixed-program seam.** A literal op beside the parametric one is the case where a gap or an overlap of one
+   line hides: the framing and the literal rotate as text, the atom bakes, and the two must meet exactly. That
+   bridge config is the one that earns the mechanism.
+
+### Not done
+
+No source file was touched. The refuse-guard, the t1365 restatements and the shipped V2026.07.29.6 line all stand
+exactly as they are, so the tree is quiet and green. Seat B's lane untouched.
