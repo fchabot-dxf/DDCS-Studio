@@ -6892,3 +6892,99 @@ class), `collapsible-panes-752`, `io-panel-resize`, `minimap-replace-865` (2), `
 GATE: fast tier — 71 smoke green; 235 across surfacing/cam/as-data/guard/sizer/parking/round-trip/atc-in-place/
 corner-data green; 230 across lathe/workspace/backup/persistence/placement/alignment green. Nothing emit-class: the
 guard refuses rather than rewrites, and the three new specs are all behavioural.
+
+---
+
+## t1355 — the skim body, and it turned out to be the SAME body
+
+Both parts landed. Each corrected a premise in its own dispatch, and in both cases the correction made the work
+smaller rather than larger.
+
+### (1) THE COMPARATORS — the flag named two, the corpus named four
+
+Swept the factory macro corpus properly: the v4.1 firmware's `macroMillCylinder.nc` / `macroMillRect.nc`, dm500's
+`slib.nc`, the Expert's `slib-g.nc` / `slib-m.nc`, the SYSDISK capture and the CAM-menu install set — factory-authored
+code only, with our own `verify/*.nc` excluded, because probes we wrote are not evidence about the firmware. (My
+first sweep counted 2 `GT` hits and both were in our own V12; that is exactly the trap the exclusion exists for.)
+
+    SYMBOLS   ==  190 · >  50 · <  20 · <=  12 · >=  6
+    WORDS     NE  25   ← and nothing else. No LT, no GT, no LE, no GE, no EQ in factory code at all.
+
+So **all four** word comparators moved to symbols, not the two that were flagged: `LE` and `GE` sat in exactly the
+same zero-evidence class as `LT` and `GT`, and swapping half would have kept the risk while looking like it had been
+dealt with. The bracketed, spaced shape needed no compromise — the factory writes both `WHILE #1<=#108 DO2` and
+`WHILE [#2 <= #1301] DO1`, so the readable form the body already used is itself demonstrated.
+
+**The live CAM slots were deliberately NOT touched.** They emit the spaced word forms (`IF #22 LE 0 GOTO`,
+`IF #71 EQ 0 THEN`) and are proven a different way: the user runs them. Rewriting working macros to chase a stronger
+evidence tier is risk taken for tidiness. FINDINGS carries the table, and the IF-THEN citation is specific rather
+than gestured at: `data/camMacroKit.js:50` `wcsBase()`, at the head of every probe CAM slot (`probeToSlot.js`
+156/226/285/344/426 — corner, edge, middle, boss, alignment), shipped in `1c69fa65` on 2026-06-20.
+
+### (2) THE SIEVE — the dispatch's "zero assumptions" option had the most
+
+The two frames were offered as attested (WCS `#790/#791/#792`) versus V7-PROVEN with zero assumptions (machine
+`#880-#882`). **The second half of that is not so, and it is worth correcting in the record: V7 has never been run.**
+It is still sitting in `verify/HANDOFF.md` under *Left to do*, its values noted only as "seen incidentally".
+
+But the register read was never the interesting part. Taking machine coordinates would force EVERY CUTTING MOVE into
+`G53`, and `G53` is demonstrated here only as `G53 <axis>#var` — one axis, a variable, a rapid, in a program footer
+(V3a/V3b, on machine 2026-06-19). Literal-coordinate `G53` is INCONCLUSIVE: V3c/V3d aborted at a guard and were then
+deliberately not pursued *because* "the dialect emits `#var`, never bare literals". A raster is nothing but literal
+coordinates and `G1` feed moves.
+
+So the choice is not attested-versus-proven. It is WHERE the unproven part sits. **The WCS frame puts it on a
+register READ, at the top, before any motion — where a sentinel catches it and refuses. The machine frame would put
+it in the G-code FORM of every cutting move, where a controller that mis-executes it does so with the tool down.**
+A bad read is detectable; a mis-executed cutting form is not. Gate 1 decides, and it decides for the WCS.
+
+### (3) THE SKIM BODY — one body, two frames
+
+Every coordinate this atom emits was already "origin plus offset". The only thing that changes for skim is what the
+origin IS: a build-time number, or a register the machine fills in. So the body did not fork — `ax/ay/az` fold the
+sum when the origin is a number (a placed op emits `X3.6`, byte-for-byte as before) and leave it as an expression
+when the origin is a register (`X[#63 + 3.6]`). All the build-time geometry — distance-to-centre, the ramp's unit
+vector, the ring inset, the helix rotation constants — is frame-independent and needed no second version. **That is
+what made skim × concentric, skim × ramp and skim × helix arrive for free instead of each needing its own G91
+derivation and its own turn.**
+
+The refactor was proven behaviour-neutral before the skim frame was wired at all: the placed bridges stayed green at
+46/46. The one thing they caught was worth having — my first pass folded the ramp's `step/2` Y offset into the
+runtime term instead of the origin, and the ramp bridge failed on MOVES, not text. A cosmetic version of the same
+slip in the helix passed, because the bridges compare motion and `[0 + 100 + #34]` evaluates the same as `[100 + #34]`;
+I folded that one too rather than leave the emit carrying a `0 +` nobody asked for.
+
+**The frame is READ, not assumed, and refused if it does not arrive.** `#62/#63/#64` are seeded to −99999 — a value
+no axis can hold, because a position of 0 is perfectly legal (the operator may jog to the WCS origin), so the thing
+being detected is "the read did not happen" rather than "the value looks falsy". Three checks, then a refusal with
+the tool still up. The registers are declared as band DATA alongside the rest (`[[34,49],[62,64]]`), in the gap
+between the probe temps and camMacroKit's WCS pair, unclaimed by any band in camScratch.js — and they are plain
+locals, far below the `#1153+` range the priming freeze concerns.
+
+**BRIDGED 15 WAYS**: three jog points (origin, negative, off-grid) × five shapes (multi-level plunge, ramp, helix,
+concentric, single-row/single-level), each against the SHIPPING skim path — the literal raster relativized by the
+skim fold — compared in the one frame the two share: distance travelled from the jog point. Move for move, in order.
+
+**And t1349's skim pin flipped.** It documented `relativizeProgram` collapsing the inter-level retract to `G0 Z0` —
+the tool never lifting between depth levels. That is still exactly what the text rewrite does, and it no longer
+matters, because nothing asks it to: the skim body writes the retract as a height above the frame and it stays one.
+The restated test asserts both halves, so the old behaviour is still visible as the reason the new one exists.
+
+### THE PRIMING SWEEP — specified, after I proxied it and got it wrong
+
+The rule is about a PERSISTENT target written straight from a SYSTEM register. My first version tested the target
+number alone and flagged alignment's `#1510=#52`, `#1511=#53`, `#1512=#54` — which is the operator-MESSAGE argument
+idiom feeding `#1505=-5000(...)`, sourced from LOCAL probe temps. Reporting a measurement is not the freeze this
+rule warns about. Narrowed to what it actually means (target ≥ 1153 AND source in the live-position families), the
+sweep across every registered op returns clean — and it now says something true rather than something noisy.
+
+### THE ENVELOPE
+
+`surfaceRasterCovers` is empty again, and this time at FULL-PROGRAM scope — body, placement AND Z-mode. Its history
+reads as three assertions that changed sides rather than three that were deleted: concentric, the helix, and now
+skim. `surfaceRasterGap` is back to a bare `''` with nothing left to name.
+
+GATE: fast tier — 71 smoke green; 262 across surfacing/cam/as-data/guard/parking/sizer/round-trip/atc-in-place/
+corner-data/depth-entry green; the pilot spec at 63/63 (was 46: +15 skim bridges, +1 restated pin, +1 priming sweep).
+Emit-class but still pre-consumer — nothing re-points, `applySkimStructure` and the stack are untouched, and the
+fold-side lands with the switch exactly as the placement seam does.
