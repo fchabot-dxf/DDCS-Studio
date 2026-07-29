@@ -12,10 +12,10 @@ const openBoth = async (page, type) => {
   await page.waitForSelector(`#wiz_${type}`, { state: 'visible', timeout: 8000 }).catch(() => {});
   await page.waitForFunction((t) => {
     const s = document.querySelector(`#wiz_${t} .wiz-visual .viz-split`);
-    return s && s.querySelector(':scope > .viz-pane-splitter') && s.getAttribute('data-split-on') === '1';
+    return s && s.querySelector(':scope > .viz-pane-splitter:not(.viz-pane-sizer)') && s.getAttribute('data-split-on') === '1';
   }, type, { timeout: 8000 });
 };
-const splitBox = (page, type) => page.locator(`#wiz_${type} .wiz-visual .viz-split > .viz-pane-splitter`).boundingBox();
+const splitBox = (page, type) => page.locator(`#wiz_${type} .wiz-visual .viz-split > .viz-pane-splitter:not(.viz-pane-sizer)`).boundingBox();
 const ratio = (page) => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--pane-ratio').trim());
 const bodyH = (page, type, kind) => page.evaluate(([t, k]) => Math.round(document.querySelector(`#wiz_${t} [data-viz-pane="${k}"] > .wiz-pane-body`).getBoundingClientRect().height), [type, kind]);
 
@@ -31,7 +31,7 @@ test.describe('desktop', () => {
     const b = await splitBox(page, 'contour');
     // ≥44px effective grab (the ::before overlay extends the slim visual bar to 44px)
     const grab = await page.evaluate(() => {
-      const sp = document.querySelector('#wiz_contour .wiz-visual .viz-split > .viz-pane-splitter');
+      const sp = document.querySelector('#wiz_contour .wiz-visual .viz-split > .viz-pane-splitter:not(.viz-pane-sizer)');
       const cs = getComputedStyle(sp, '::before');
       const own = sp.getBoundingClientRect().height;
       return Math.round(own + Math.abs(parseFloat(cs.top)) + Math.abs(parseFloat(cs.bottom)));
@@ -74,7 +74,7 @@ test.describe('desktop', () => {
     await page.waitForFunction(() => document.querySelector('#wiz_contour [data-viz-pane="preview3d"]').getAttribute('data-collapsed') === '1');
     const r = await page.evaluate(() => {
       const s = document.querySelector('#wiz_contour .wiz-visual .viz-split');
-      const sp = s.querySelector(':scope > .viz-pane-splitter');
+      const sp = s.querySelector(':scope > .viz-pane-splitter:not(.viz-pane-sizer)');
       return { splitOn: s.getAttribute('data-split-on'), visible: getComputedStyle(sp).display !== 'none' };
     });
     expect(r.splitOn, 'the split is off when a pane is collapsed').toBe('0');
@@ -103,5 +103,48 @@ test.describe('mobile 390px', () => {
     // dragging DOWN grows the TOP pane + shrinks the bottom (contour = 2D on top) → the 3D body rebalanced away from 200
     expect(Math.abs(h3 - 200), 'the touch-drag rebalanced the panes (3D body moved off the even split)').toBeGreaterThan(20);
     await page.evaluate(async () => { const m = await import('/ui/panePrefs.js'); m.setPaneRatio(0.5); });
+  });
+});
+
+/**
+ * t1357 — RESTATED, NOT REPAIRED. This spec's locators used to say `.viz-pane-splitter` and mean "the ratio handle",
+ * which was true right up until t1239 added a SECOND handle below the last pane — the visual-height sizer, which
+ * shares the class because it shares the grip language. Playwright's strict mode then failed the spec, and it was
+ * right to: the selector had become ambiguous, and the older assertions were reading whichever element happened to
+ * come first in the DOM.
+ *
+ * So the locators name the ratio handle by what distinguishes it (`:not(.viz-pane-sizer)`), and this test states the
+ * thing the ambiguity was hiding: there are TWO handles, they are different controls, and each is reachable on its
+ * own. The failure was never a regression — it was a feature the spec had not been told about.
+ */
+test.describe('the two handles are distinct controls', () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test('the RATIO handle sits between the panes; the SIZER sits below them; both are addressable', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsStudio && window.openWiz);
+    await openBoth(page, 'contour');
+
+    const r = await page.evaluate(() => {
+      const split = document.querySelector('#wiz_contour .wiz-visual .viz-split');
+      const ratio = split.querySelector(':scope > .viz-pane-splitter:not(.viz-pane-sizer)');
+      const sizer = split.querySelector(':scope > .viz-pane-sizer');
+      const panes = [...split.querySelectorAll(':scope > [data-viz-pane]')].map((p) => p.getBoundingClientRect());
+      const rb = ratio.getBoundingClientRect(), sb = sizer.getBoundingClientRect();
+      const top = Math.min(...panes.map((p) => p.top)), bottom = Math.max(...panes.map((p) => p.bottom));
+      return {
+        both: !!ratio && !!sizer, distinct: ratio !== sizer,
+        ratioBetween: rb.top > top && rb.bottom < bottom,     // between the two panes
+        sizerBelow: sb.top >= bottom - 1,                      // below the last one
+        ratioLabel: ratio.getAttribute('aria-label'), sizerLabel: sizer.getAttribute('aria-label'),
+      };
+    });
+    expect(r.both, 'both handles are present').toBe(true);
+    expect(r.distinct, 'and they are different elements').toBe(true);
+    expect(r.ratioBetween, 'the ratio handle sits BETWEEN the panes (it rebalances them)').toBe(true);
+    expect(r.sizerBelow, 'the sizer sits BELOW the last pane (it resizes the whole block)').toBe(true);
+    // …and they say which is which, so the ambiguity cannot come back silently through the accessibility layer either
+    expect(r.ratioLabel).toMatch(/rebalance/i);
+    expect(r.sizerLabel).toMatch(/resize/i);
   });
 });

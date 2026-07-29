@@ -4967,6 +4967,20 @@ button.io-led:hover { border-color: #5a7a9c; color: #cfe3f5; }
        the 17px undo/redo beside it — would put mis-taps on the one DESTRUCTIVE control in the header. */
     .app-header .brand .logo { width: 34px; }
     .app-header.is-tiny .hdr-tabs .tab { padding: 0 7px; }
+    /* t1357 — STAGE 6 HAS TO WIN HERE, and it was losing. `.app-header.is-tiny .hdr-tabs .tab` above and the stage-6
+       `.app-header.hy-controls .hdr-tabs .tab` carry the SAME specificity, and this block comes later in the file — so
+       inside a phone media query the tightest tier was being widened back out by the tier above it. The ladder only
+       means anything if its last rung is the last word, so stage 6 is restated here with the class that makes it so.
+
+       WHY THE ROOM HAD TO COME FROM THE TABS. Measured at 360px: the header summed to 385 — a 25px overflow, with
+       #btn-clear's right edge at 385. The t1255 ruling above is not negotiable (Clear keeps a ≥44px target because it
+       is the one DESTRUCTIVE control in the header, and a cramped target there buys mis-taps), the wordmark is already
+       surrendered, and undo/redo are 17px each. The tab row was 194px of the 360 available. So the tabs yield — they
+       are labels beside an icon, and they stay legible and hittable at this padding; nothing else in the row can give
+       25px without taking back a ruling that was made for a better reason than fitting. */
+    .app-header.is-tiny.hy-controls .hdr-tabs .tab { padding: 0 2px; }
+    .app-header.is-tiny.hy-controls .hdr-tabs { gap: 0; }
+    .app-header.is-tiny.hy-controls { gap: 2px; }
 }
 
 /* Floating Copy-program button, top-right of the editor (mirrors the bottom-left ⟳ Transform overlay). Clear of

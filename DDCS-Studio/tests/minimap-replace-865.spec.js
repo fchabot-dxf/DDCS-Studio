@@ -23,9 +23,26 @@ test.describe('t865 minimap → progress bar + follow toggle', () => {
             return el ? parseFloat(getComputedStyle(el).paddingRight) : 999;
         });
         expect(padRight, 'the editor text layer carries no minimap right-inset (full-width)').toBeLessThan(40);
-        // the replacement mounted: the ⤓ follow toggle exists in the editor chrome
-        await expect(page.locator('.follow-toggle')).toHaveCount(1);
-        await expect(page.locator('.follow-toggle')).toHaveText('⤓');
+        // ── t1357 RESTATED — the replacement is still there, and it MOVED ──────────────────────────────────────
+        // This asserted a `.follow-toggle` button in the editor chrome. t1287 (a USER ruling) took that floating
+        // button away: "a preference that looks like a tool invites people to treat it as one", and it crowded a
+        // corner already holding the file and copy buttons. It is a SETTINGS checkbox now. Nothing else moved — the
+        // same `ddcs_follow_exec` pref, the same auto-scroll machinery, the same in-text highlight.
+        //
+        // So the t865 claim is unchanged and still asserted: the minimap is gone AND its replacement exists. What is
+        // dropped is the assumption about WHERE the control lives, which was never t865's point.
+        await expect(page.locator('.follow-toggle'), 'the old floating toggle is gone (t1287 moved it to Settings)').toHaveCount(0);
+        const follow = await page.evaluate(async () => {
+            const m = await import('/ui/panePrefs.js');
+            const before = m.getFollowExecOn();
+            m.setFollowExecOn(true); const on = m.getFollowExecOn();
+            m.setFollowExecOn(false); const off = m.getFollowExecOn();
+            m.setFollowExecOn(before);
+            return { on, off, defaultOff: before === false };
+        });
+        expect(follow.on, 'the follow-execution preference still exists and turns ON').toBe(true);
+        expect(follow.off, '…and OFF').toBe(false);
+        expect(follow.defaultOff, '…and is still OFF by default (the no-jump rule holds for everyone who has not opted in)').toBe(true);
     });
 
     test('the preview PROGRESS BAR renders + fills during play, ONE SOURCE with the "Running line N/total" counter', async ({ page }) => {
@@ -73,7 +90,12 @@ test.describe('t865 minimap → progress bar + follow toggle', () => {
     test('the FOLLOW toggle: OFF keeps the editor put (no-jump rule holds); ON scrolls the running line into view and tracks it', async ({ page }) => {
         await page.setViewportSize({ width: 1200, height: 800 });
         await page.goto('http://localhost:3211');
-        await page.waitForFunction(() => window.ddcsStudio && window.editorManager && document.querySelector('.follow-toggle'), null, { timeout: 15000 });
+        // t1357 — driven through the PREF (the seam the Settings checkbox writes), because the floating button the
+        // original clicked was removed by t1287. Every behavioural assert below is untouched: that is the content.
+        await page.waitForFunction(() => window.ddcsStudio && window.editorManager, null, { timeout: 15000 });
+        const setFollow = (on) => page.evaluate(async (v) => { const m = await import('/ui/panePrefs.js'); m.setFollowExecOn(v); }, on);
+        const followOn = () => page.evaluate(async () => (await import('/ui/panePrefs.js')).getFollowExecOn());
+        await setFollow(false);
         // a long program so scrolling is meaningful; confirm the editor is actually scrollable
         const scrollable = await page.evaluate(() => {
             const prog = Array.from({ length: 220 }, (_, i) => `G1 X${i} Y${i} F600`).join('\n');
@@ -92,9 +114,10 @@ test.describe('t865 minimap → progress bar + follow toggle', () => {
         });
         expect(offTop, 'follow OFF → the editor stays put on a far running line (no jump)').toBeLessThan(30);
 
-        // turn follow ON via the real button → it jumps to the CURRENT active line immediately
-        await page.locator('.follow-toggle').click();
-        await expect(page.locator('.follow-toggle')).toHaveClass(/on/);
+        // turn follow ON → it jumps to the CURRENT active line immediately
+        await setFollow(true);
+        expect(await followOn(), 'the pref reads back ON').toBe(true);
+        await page.evaluate(() => window.editorManager.setActiveLine(180));
         const onTop = await page.evaluate(() => document.getElementById('editor').scrollTop);
         expect(onTop, 'follow ON → the editor scrolled the running line (180) into view').toBeGreaterThan(offTop + 200);
 
@@ -106,8 +129,8 @@ test.describe('t865 minimap → progress bar + follow toggle', () => {
         expect(upTop, 'follow ON → a new running line near the top scrolls the editor back up (tracks)').toBeLessThan(onTop - 200);
 
         // turn it OFF again → a far running line no longer moves the editor
-        await page.locator('.follow-toggle').click();
-        await expect(page.locator('.follow-toggle')).not.toHaveClass(/on/);
+        await setFollow(false);
+        expect(await followOn(), 'the pref reads back OFF').toBe(false);
         const offAgain = await page.evaluate(() => {
             const before = document.getElementById('editor').scrollTop;
             window.editorManager.setActiveLine(200);
