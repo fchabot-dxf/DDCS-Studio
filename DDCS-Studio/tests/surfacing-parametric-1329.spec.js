@@ -215,7 +215,10 @@ test('THE COVERED ENVELOPE IS DECLARED — and everything outside it is named, n
     // EVERYTHING ELSE IS OUTSIDE IT, AND SAYS WHY. A bare `false` here would be the silent drop this exists to prevent.
     // t1333 — RESTATED: concentric closed this turn, and one-way was never a real gap (the op hard-codes
     // both-ways — see the correction above). What is left outside the envelope is the descent and the pause.
-    for (const k of ['ramp', 'helix', 'confirm']) {
+    // t1335 — RESTATED again: the confirm cadence closed this turn (M00 after every Nth level but the last), so it
+    // moved to the covered side. The DESCENT is the one name left.
+    expect(r.confirm.covered, 'the confirm cadence is covered now').toBe(true);
+    for (const k of ['ramp', 'helix']) {
         expect(r[k].covered, `${k} is outside the proven envelope`).toBe(false);
         expect(r[k].why, `${k} says why, in words a reader can act on`).toBeTruthy();
         expect(r[k].why.length, `${k}'s reason is a sentence, not a token`).toBeGreaterThan(20);
@@ -337,9 +340,89 @@ test('THE ENVELOPE SHRANK — concentric and one-way are inside it now, and what
     // STILL OUT, AND SAYING SO — the predicate ends the turn naming exactly what remains, not empty
     expect(r.ramp.covered).toBe(false);
     expect(r.helix.covered).toBe(false);
-    expect(r.confirm.covered).toBe(false);
-    for (const k of ['ramp', 'helix', 'confirm']) {
+    // t1335 — the confirm cadence flipped to covered this turn; the assert moved sides rather than being deleted
+    expect(r.confirm.covered, 'confirm-every-N is in').toBe(true);
+    for (const k of ['ramp', 'helix']) {
         expect(r[k].why, `${k} still names its own gap`).toBeTruthy();
-        expect(r[k].why, `${k} says it was split, not forgotten`).toMatch(/split/i);
     }
+});
+
+/**
+ * t1335 — REACHABILITY FIRST (the rule the one-way correction turned into a method), then the pause.
+ */
+test('REACHABILITY — the op really can emit these, unlike direction', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+        const flat = (st, out = []) => { for (const b of (st || [])) { out.push(b); flat(b.children, out); flat(b.uiChildren, out); } return out; };
+        const fill = (p) => flat(surfacingStack(p)).find((b) => b.type === 'surfacefill');
+        const down = (p) => flat(surfacingStack(p)).find((b) => b.type === 'stepdown');
+        return {
+            ramp: fill({ w: 100, h: 60, entry: 'ramp', rampAngle: 3 }).params.entry,
+            helix: fill({ w: 100, h: 60, entry: 'helix', helixDia: 8, helixPitch: 1 }).params.entry,
+            confirm: down({ w: 100, h: 60, confirmEvery: 2 }).params.confirmEvery,
+        };
+    });
+    // Each of these DOES reach the emit — checked before building for them, which is what the one-way artifact taught.
+    expect(r.ramp, 'a ramp entry reaches the fill block').toBe('ramp');
+    expect(r.helix, 'and a helix entry').toBe('helix');
+    expect(r.confirm, 'and the confirm cadence reaches the stepdown').toBe(2);
+});
+
+test('THE TRACER EXECUTES VARIABLE-FED ARCS — measured, because a gap there would outlive surfacing', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { traceToolpath } = await import('/engine/trace.js');
+        const NL = String.fromCharCode(10);
+        const pts = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => [+s.x2.toFixed(2), +s.y2.toFixed(2)]);
+        return {
+            literal: pts(['G90', 'G0 X0 Y0', 'G1 Z-1 F100', 'G2 X20 Y0 I10 J0 F200', 'M30'].join(NL)),
+            fromVars: pts(['G90', '#40=10', '#41=20', 'G0 X0 Y0', 'G1 Z-1 F100', 'G2 X#41 Y0 I#40 J0 F200', 'M30'].join(NL)),
+        };
+    });
+    // A NEGATIVE FINDING WOULD HAVE BEEN THE REPORT. It is positive: an arc whose endpoint AND centre offset come
+    // from #vars traces exactly as the literal one does, so nothing in the parametric arc idea is blocked by the sim.
+    expect(r.literal.length, 'the literal arc traces as a real curve').toBeGreaterThan(20);
+    expect(r.fromVars, 'and the variable-fed arc is identical, point for point').toEqual(r.literal);
+});
+
+for (const N of [1, 2, 3, 9]) {
+    test(`CONFIRM EVERY ${N} — the pause lands on the right levels and never on the last`, async ({ page }) => {
+        await boot(page);
+        const r = await page.evaluate(async ({ N }) => {
+            const { surfacingStack } = await import('/wizards/surfacingWizard.js');
+            const { emitProgram } = await import('/blocks/blockEmitter.js');
+            const { surfaceRasterLines } = await import('/wizards/ops/surfaceraster.js');
+            const NL = String.fromCharCode(10);
+            // depth 1.5 / stepdown 0.5 = 3 levels, so N=1,2,3 and N>total are all distinguishable
+            const cfg = { w: 100, h: 60, depth: 1.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5, confirmEvery: N };
+            const count = (t) => (t.match(/^\s*M0+\b/gm) || []).length;
+            return { literal: count(String(emitProgram(surfacingStack(cfg)))), parametric: surfaceRasterLines(cfg).join(NL) };
+        }, { N });
+        // THE WORD IS THE MACHINE'S, matched not modernised: M00 with the operator sentence the literal path uses
+        expect(r.parametric, 'the pause is M00, the same word the literal path emits').toMatch(/M00\s+\( pause - press Cycle Start to resume \)/);
+        // …and it is GUARDED so the last level never pauses — a halt on a finished part is a call to the shop floor
+        expect(r.parametric, 'the last pass is exempted').toMatch(/IF #46 GE #42 GOTO 31/);
+        // the cadence test is a modulo written as "does N divide the level index" — no MOD in this dialect
+        expect(r.parametric, 'and the cadence is a real divisibility test, not an unrolled list').toMatch(/FIX\[#48 \/ /);
+    });
+}
+
+test('CONFIRM-EVERY IS INSIDE THE ENVELOPE NOW — and only the descent is left', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfaceRasterCovers, surfaceRasterGap } = await import('/wizards/ops/surfaceraster.js');
+        return {
+            confirm: { covered: surfaceRasterCovers({ confirmEvery: 3 }), why: surfaceRasterGap({ confirmEvery: 3 }) },
+            ramp: { covered: surfaceRasterCovers({ entry: 'ramp' }), why: surfaceRasterGap({ entry: 'ramp' }) },
+            helix: { covered: surfaceRasterCovers({ entry: 'helix' }), why: surfaceRasterGap({ entry: 'helix' }) },
+        };
+    });
+    // FLIPPED TO COVERED, the concentric pattern — the assert changed sides rather than being deleted
+    expect(r.confirm.covered, 'the confirm cadence is covered now').toBe(true);
+    expect(r.confirm.why, 'so it names no gap').toBe('');
+    // THE ENVELOPE DOES NOT END EMPTY, and says exactly what is left and why
+    expect(r.ramp.covered).toBe(false);
+    expect(r.helix.covered).toBe(false);
+    expect(r.ramp.why, 'the descent is the one remaining name').toMatch(/descent/i);
 });

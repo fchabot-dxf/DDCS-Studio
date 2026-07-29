@@ -61,6 +61,7 @@ export function surfaceRasterLines(p = {}) {
         : (num(p.stepover, 0) > 0 ? Math.round((num(p.stepover, 0) / tool) * 1000) / 10 : 60);
     const feed = num(p.feed, 2000), plunge = num(p.plunge, 200), clr = num(p.clearance, 5);
     const x0 = num(p.x, 0), y0 = num(p.y, 0);
+    const confirmEvery = Math.max(0, Math.round(num(p.confirmEvery, 0)));
     const r3 = (n) => Math.round(n * 1000) / 1000;
 
     // THE STRATEGY DECIDES THE WALK, under the SAME header and the SAME depth loop — the loop that counts levels
@@ -86,6 +87,17 @@ export function surfaceRasterLines(p = {}) {
         `  IF ${V.z} GT ${V.depth} THEN ${V.z}=${V.depth}`,
         ...walk.body,
         `  G0 Z${r3(clr)}   ( clear of the work before the next level )`,
+        // t1335 — CONFIRM EVERY N LEVELS. The pause word is M00 with the operator sentence the literal path already
+        // uses, matched rather than modernised: the machine's own convention is not something to improve in passing.
+        // It fires after every Nth level EXCEPT the last — a pause after the final pass would stop the program on a
+        // finished part. `#48` is free here: the row/ring index is spent by the time the level ends.
+        ...(confirmEvery > 0 ? [
+            `  ${V.i}=[${V.z} / ${V.stepdown}]   ( which level just finished )`,
+            `  IF ${V.z} GE ${V.depth} GOTO 31   ( the last pass needs no pause — the part is done )`,
+            `  IF [${V.i} / ${r3(confirmEvery)} - FIX[${V.i} / ${r3(confirmEvery)}]] GT 0.001 GOTO 31   ( not an Nth level )`,
+            '  M00   ( pause - press Cycle Start to resume )',
+            '  N31',
+        ] : []),
         'END1',
         'GOTO 92',
         'N91',
@@ -194,6 +206,10 @@ function ringWalk({ x0, y0, w, h, feed, plunge, clr, r3 }) {
 /**
  * WHAT THIS ATOM COVERS — declared, because the switch-over depends on it and a silent gap here would DROP FEATURES.
  *
+ * t1335: the confirm-every-N pause is in (M00 after every Nth level except the last, the literal path's own word).
+ * What remains is the DESCENT alone — see the note on helix in the work log: the literal helix is a 24-segment G1
+ * POLYLINE, not an arc, so "move-for-move" is the wrong criterion for it until we choose what it should emit.
+ *
  * t1333: CONCENTRIC rings are now walked parametrically and proven move-for-move against the literal kernel. The
  * one-way raster turned out NOT to be a gap at all — surfacing hard-codes both-ways, so no config reaches it (see
  * rowWalk). What remains is genuinely two things: the DESCENT (ramp / helix) and the confirm-every-N pause.
@@ -203,13 +219,12 @@ function ringWalk({ x0, y0, w, h, feed, plunge, clr, r3 }) {
  * feature that would otherwise vanish on the day the old path dies.
  */
 export function surfaceRasterCovers(p = {}) {
-    return (p.entry || 'plunge') === 'plunge' && !(Number(p.confirmEvery) > 0);
+    return (p.entry || 'plunge') === 'plunge';
 }
 
 /** Why a config is outside the envelope, in the words a reader needs — never a bare false. */
 export function surfaceRasterGap(p = {}) {
     if ((p.entry || 'plunge') !== 'plunge') return `a ${p.entry} descent adds moves the walk does not make — split to its own turn, with the arc question`;
-    if (Number(p.confirmEvery) > 0) return 'a confirm-every-N halt is a machine pause between levels — split to its own turn';
     return '';
 }
 
