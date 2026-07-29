@@ -2,7 +2,7 @@
 // beacons) with a clear connection status. On the CLOUD console it's read-only (the cloud can't reach
 // into the gateway — configure it on the machine PC). A form view: mounted on tab click, not polled.
 import { el, toast } from "../util.js";
-import { getService, setService } from "../service.js";
+import { getService, setService, GATEWAY_PORTS, DEFAULT_LOCAL_BASE } from "../service.js";
 
 export default {
   id: "admin",
@@ -36,16 +36,43 @@ export default {
         + "allowed even from HTTPS; the gateway already sends CORS). Other PC / remote: the gateway needs HTTPS "
         + "or a tunnel (browsers block an HTTPS page → http:// on a LAN IP)."));
 
+    // t1325 (USER, blocked live) — THE DAEMON URL FIELD THE STATUS MESSAGE ALREADY PROMISED. Status says "connect
+    // one in the Console tab (a local daemon or a service URL)" and, until now, the only URL box lived behind the
+    // CLOUD radio — so in Local mode there was nothing to type into, and reaching a local daemon from a hosted page
+    // meant picking "Cloud service" and then clicking a button labelled "use local gateway". The message and the
+    // controls now describe the same thing.
+    const daemonIn = el("input", { type: "text", id: "gw-daemon-url", value: svc.typed, placeholder: DEFAULT_LOCAL_BASE + "  (leave empty to find it automatically)", style: "width:100%" });
+    const daemonState = el("div", { class: "hint", id: "gw-daemon-state" });
+    const setDaemonState = () => {
+        const cur = getService();
+        daemonState.textContent = cur.typed
+            ? "Using the address you entered."
+            : cur.adopted
+                ? "Found automatically: " + cur.adopted + " — type an address above to override it."
+                : "Looking for a gateway on 127.0.0.1 (ports " + GATEWAY_PORTS.join(", ") + ") while this page is open. "
+                  + "Loopback works even from an https:// page, so a gateway running on this PC is reached with no setup.";
+    };
+    setDaemonState();
+    const localFields = el("div", { class: "block" },
+        el("div", { style: "margin-top:8px" }, el("span", { class: "label" }, "Daemon URL"), daemonIn),
+        daemonState);
+
     const local = el("input", { type: "radio", name: "gw-svc" }); local.checked = svc.mode === "local";
     const cloud = el("input", { type: "radio", name: "gw-svc" }); cloud.checked = svc.mode === "cloud";
-    const sync = () => cloudFields.classList.toggle("hidden", !cloud.checked);
+    const sync = () => {
+        cloudFields.classList.toggle("hidden", !cloud.checked);
+        localFields.classList.toggle("hidden", !local.checked);
+    };
     local.onchange = cloud.onchange = sync;
 
     const gdrive = el("button", { class: "op-btn", disabled: "" }, "🔗 Connect Google Drive (OAuth) — coming soon");
 
     const apply = el("button", { class: "primary" }, "Apply");
     apply.onclick = () => {
-      setService(cloud.checked ? { base: baseIn.value.trim(), token: tokIn.value.trim() } : {});
+      // LOCAL with a typed daemon URL is still an explicit base — the same seam, just named for what it is here.
+      // Empty returns to auto (setService clears the adopted one too, so the next probe re-decides).
+      setService(cloud.checked ? { mode: 'cloud', base: baseIn.value.trim(), token: tokIn.value.trim() }
+                               : { mode: 'local', base: daemonIn.value.trim() });
       toast("Service updated — reloading");
       setTimeout(() => location.reload(), 400);
     };
@@ -57,6 +84,7 @@ export default {
         + "Optionally point it at a cloud service (your own Cloudflare / self-host endpoint now; OAuth'd cloud "
         + "storage like Google Drive later). Clearing it returns to local."),
       el("label", { class: "row", style: "gap:6px;cursor:pointer;margin-top:8px" }, local, "Local (this PC) — autonomous"),
+      localFields,
       el("label", { class: "row", style: "gap:6px;cursor:pointer" }, cloud, "Cloud service"),
       cloudFields,
       el("div", { class: "row", style: "margin-top:8px" }, gdrive),
@@ -172,7 +200,7 @@ export default {
     };
     // Serve port (desktop exe): which loopback port the app uses — limited to our registered ports so the
     // OAuth JS-origin list still covers it. Takes effect on the next launch (fairy_gateway._preferred_port).
-    const PORTS = [8765, 8766, 8767, 8768, 8769];
+    const PORTS = GATEWAY_PORTS;   // t1325 — one source: the same registered ports the loopback auto-probe scans
     const portSel = el("select", {}, PORTS.map((p) => el("option", { value: String(p) }, String(p))));
     portSel.value = String(cfg.port || 8765);
     const save = el("button", { class: "primary" }, "Save");

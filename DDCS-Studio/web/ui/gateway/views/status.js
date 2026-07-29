@@ -32,7 +32,15 @@ export default {
     this.desc.replaceChildren(el('div', { class: 'section-label' }, 'Controller'));
     if (!d) {
       this.desc.append(
-        el('div', { class: 'muted' }, 'No gateway answering. Connect one in the Console tab (a local daemon or a service URL), or:'),
+        // t1325 — THE MESSAGE IS NOW A PATH, not a description of one. It named the Console tab while the Console had
+        // no daemon field to name; the field exists now, so the sentence CARRIES you there and focuses it. A message
+        // that tells you where to go should be the thing that takes you.
+        el('div', { class: 'muted' },
+          'No gateway answering — still looking on this PC. ',
+          el('a', { href: '#', class: 'gw-link', id: 'gw-goto-console',
+                    onclick: (e) => { e.preventDefault(); if (window.ddcsGatewayGoConsole) window.ddcsGatewayGoConsole(); } },
+             'Enter a daemon URL in the Console tab'),
+          ' if it is somewhere else, or:'),
         el('a', { class: 'op-btn', href: EXE_DOWNLOAD_URL, target: '_blank', rel: 'noopener',
                   style: 'margin-top:10px;display:inline-block;text-decoration:none' }, '⬇ Get DDCS Studio for desktop'));
     } else {

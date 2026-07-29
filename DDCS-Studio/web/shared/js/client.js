@@ -13,7 +13,10 @@ function resolveBase(opts) {
   try {
     const q = new URLSearchParams(location.search).get("api");
     if (q != null) { localStorage.setItem("ddcs_api", q); return q; }
-    return localStorage.getItem("ddcs_api") || "";
+    // t1325 — PRECEDENCE, and it matters: ?api= (this load) > ddcs_api (what the user TYPED) > ddcs_api_auto (a
+    // loopback gateway the app FOUND for itself) > "" (same origin — the exe and the gateway-served console, whose
+    // behaviour is unchanged because neither ever has an adopted base).
+    return localStorage.getItem("ddcs_api") || localStorage.getItem("ddcs_api_auto") || "";
   } catch { return ""; }
 }
 
