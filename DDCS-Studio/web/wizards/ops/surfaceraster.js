@@ -34,8 +34,38 @@
  * (Our own shipped CAM slots still emit the spaced WORD forms — `IF #22 LE 0 GOTO`, `IF #71 EQ 0 THEN` — and those
  * are proven a different way: the user runs them live. They are NOT changed here; this is the pre-consumer emitter,
  * and rewriting working live macros to chase a stronger tier would be risk taken for tidiness.)
+ *
+ * ── GOTO IS WRITTEN WITHOUT A SPACE (t1363 ruling) ───────────────────────────────────────────────────────────────
+ * `GOTO91`, not `GOTO 91`. V11 proved the spaced form parses on the Expert, so this is not a correctness fix — but
+ * the linter flags every spaced GOTO as a portability advisory (W-GOTOSPACE), and this body emits enough of them
+ * that a plain surfacing op arrived in the editor carrying NINE user-visible warnings and a "can't verify" badge.
+ * The no-space form is the factory-demonstrated one (the factory's own gotozero.nc writes `IF #569<#792 GOTO1`),
+ * so adopting it costs nothing and buys back a clean verify. The engine reads both — its matcher is `GOTO\s*(\d+)` —
+ * so this moves TEXT only; the bridges re-ran and the resolved motion is unchanged, which is the whole check.
  */
 import { num } from './util.js';
+
+/**
+ * t1363 — THE ONE READING OF A STORED STEPOVER, declared here because this atom owns what a stepover MEANS.
+ *
+ * The intent is the PERCENTAGE and the millimetre is its consequence — the macro header re-derives the mm at the
+ * machine from the tool Ø and the percentage. An op stored before that split carries a flat `stepover` millimetre
+ * and no percentage, so it has to be recovered; and the recovery was hand-rolled in FOUR places (surfacingStack,
+ * this atom's body, opCamMap's surface DERIVE, opSession's reverse-sync), which had already drifted: the emitters
+ * treated a typed `0` as a real zero (the program then refuses loudly at its own guard) while opCamMap treated it
+ * as absent and silently seeded 60. Two paths reading one stored value differently is precisely the split the
+ * parametric switch exists to kill, so there is now one function and every reader calls it.
+ *
+ * PRESENT WINS. A percentage that is there — including a deliberate 0 — is the operator's intent and is used as
+ * given; only a genuinely absent one falls back to recovering the stored millimetre against the tool it will run.
+ * `toolDia` may be overridden by a caller that knows the tool the SLOT will carry rather than the op's own.
+ */
+export function stepoverPctOf(p = {}, toolDia) {
+    if (p.stepoverPct != null && p.stepoverPct !== '') return num(p.stepoverPct, 60);
+    const tool = Math.max(0.1, num(toolDia != null && toolDia !== '' ? toolDia : p.toolDia, 12));
+    const mm = num(p.stepover, 0);
+    return mm > 0 ? Math.round((mm / tool) * 1000) / 10 : 60;
+}
 
 /**
  * THE BAND. #40–#49: clear of the mill kit's #20–#33 (camMacroKit's caller/kit split), clear of the probe temps at
@@ -101,12 +131,10 @@ export function surfaceRasterLines(p = {}) {
     const w = num(p.w, 100), h = num(p.h, 80);
     const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
     const tool = Math.max(0.1, num(p.toolDia, 12));
-    // ONE DERIVATION, shared with the CAM slot: stepover is tool Ø × %. When a caller still carries a flat mm (the
-    // data-op twin does), the pct is recovered from it against the tool it will run — the same recovery opCamMap
-    // does, so the two paths cannot disagree about what a stored millimetre meant.
-    const pct = (p.stepoverPct != null && p.stepoverPct !== '')
-        ? num(p.stepoverPct, 60)
-        : (num(p.stepover, 0) > 0 ? Math.round((num(p.stepover, 0) / tool) * 1000) / 10 : 60);
+    // ONE DERIVATION, shared with the CAM slot and the wizard stack: stepover is tool Ø × %. A caller still carrying
+    // a flat mm has it recovered against the tool it will run — through `stepoverPctOf` above, which is now the only
+    // place that rule is written down (t1363).
+    const pct = stepoverPctOf(p, tool);
     const feed = num(p.feed, 2000), plunge = num(p.plunge, 200), clr = num(p.clearance, 5);
     // t1351 — THE ATOM CARRIES ITS OWN FRAME. x0/y0 were always here; z0 is new, and it is what makes the frame
     // COMPLETE: the surface the depths are measured down from. Together they are the placement shift, absorbed as
@@ -161,13 +189,13 @@ export function surfaceRasterLines(p = {}) {
         `${SKIM_FRAME.x}=${FRAME_SRC.x}   ( live work X — wherever the operator jogged to )`,
         `${SKIM_FRAME.y}=${FRAME_SRC.y}   ( live work Y )`,
         `${SKIM_FRAME.z}=${FRAME_SRC.z}   ( live work Z — the touched surface )`,
-        `IF ${SKIM_FRAME.x} == ${FRAME_SENTINEL} GOTO 93   ( no frame -> refuse, with the tool still up )`,
-        `IF ${SKIM_FRAME.y} == ${FRAME_SENTINEL} GOTO 93`,
-        `IF ${SKIM_FRAME.z} == ${FRAME_SENTINEL} GOTO 93`,
+        `IF ${SKIM_FRAME.x} == ${FRAME_SENTINEL} GOTO93   ( no frame -> refuse, with the tool still up )`,
+        `IF ${SKIM_FRAME.y} == ${FRAME_SENTINEL} GOTO93`,
+        `IF ${SKIM_FRAME.z} == ${FRAME_SENTINEL} GOTO93`,
         '',
     ];
     const refusal = !skim ? [] : [
-        'GOTO 94',
+        'GOTO94',
         'N93',
         '#1505=1   ;ERROR: could not read the live position - skim needs the jog frame',
         'N94',
@@ -181,8 +209,8 @@ export function surfaceRasterLines(p = {}) {
         `${V.depth}=${r3(depth)}   ( total depth to face off )`,
         `${V.stepdown}=${r3(stepdown)}   ( bite per level )`,
         `${V.step}=[${r3(tool)} * ${r3(pct)} / 100]   ( stepover mm = tool Ø ${r3(tool)} x ${r3(pct)}% — the CAM derives it the same way )`,
-        `IF ${V.step} <= 0 GOTO 91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
-        `IF ${V.stepdown} <= 0 GOTO 91`,
+        `IF ${V.step} <= 0 GOTO91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
+        `IF ${V.stepdown} <= 0 GOTO91`,
         ...walk.count,
         '',
         `${V.z}=0   ( the level being cut )`,
@@ -198,13 +226,13 @@ export function surfaceRasterLines(p = {}) {
         // finished part. `#48` is free here: the row/ring index is spent by the time the level ends.
         ...(confirmEvery > 0 ? [
             `  ${V.i}=[${V.z} / ${V.stepdown}]   ( which level just finished )`,
-            `  IF ${V.z} >= ${V.depth} GOTO 31   ( the last pass needs no pause — the part is done )`,
-            `  IF [${V.i} / ${r3(confirmEvery)} - FIX[${V.i} / ${r3(confirmEvery)}]] > 0.001 GOTO 31   ( not an Nth level )`,
+            `  IF ${V.z} >= ${V.depth} GOTO31   ( the last pass needs no pause — the part is done )`,
+            `  IF [${V.i} / ${r3(confirmEvery)} - FIX[${V.i} / ${r3(confirmEvery)}]] > 0.001 GOTO31   ( not an Nth level )`,
             '  M00   ( pause - press Cycle Start to resume )',
             '  N31',
         ] : []),
         'END1',
-        'GOTO 92',
+        'GOTO92',
         'N91',
         '#1505=1   ;ERROR: stepover / stepdown must be greater than zero',
         'N92',
@@ -248,23 +276,23 @@ function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE
         `  ${V.dir}=1   ( the raster restarts at the near corner for each level )`,
         `  WHILE [${V.i} < ${V.n}] DO2   ( rows: counted above, so the area and the stepover decide how many )`,
         rowY,
-        `    IF ${V.i} > 0 GOTO 13   ( already down: step over at depth rather than lifting between rows )`,
+        `    IF ${V.i} > 0 GOTO13   ( already down: step over at depth rather than lifting between rows )`,
         // WHICH END TO START AT — asked as a BRANCH, not as a comparison inside an expression. `[#49 < 0]` looked
         // like it would evaluate 0/1 and the tracer read it as a plain 1, putting the first plunge off the corner.
-        `    IF ${V.dir} < 0 GOTO 17`,
+        `    IF ${V.dir} < 0 GOTO17`,
         `    G0 X${ax()} Y${V.y}`,
-        '    GOTO 18',
+        '    GOTO18',
         '    N17',
         `    G0 X${axE(0, V.w)} Y${V.y}`,
         '    N18',
         ...descent,
-        '    GOTO 14',
+        '    GOTO14',
         '    N13',
         `    G1 Y${V.y} F${r3(feed)}   ( step over at depth — the tool does not lift between rows )`,
         '    N14',
-        `    IF ${V.dir} < 0 GOTO 15`,
+        `    IF ${V.dir} < 0 GOTO15`,
         `    G1 X${axE(0, V.w)} F${r3(feed)}`,
-        '    GOTO 16',
+        '    GOTO16',
         '    N15',
         `    G1 X${ax()} F${r3(feed)}`,
         '    N16',
@@ -310,11 +338,11 @@ function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3,
         `    ${V.run}=[${V.stepdown} * ${r3(invTan)}]   ( ramp run = bite / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
         // THE HONEST DEGRADE, kept from the literal kernel: when the run to the centre is longer than the distance
         // available, a ramp cannot be cut and the tool plunges instead — with the reason in the program, not silently.
-        `    IF ${V.run} > ${r3(toC)} GOTO 41   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
+        `    IF ${V.run} > ${r3(toC)} GOTO41   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
         `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( down to the floor this level starts from )`,
         `    G1 X${axE(sx - x0, `${V.run} * ${u6(ux)}`)} Y${ayE(sy - y0, `${V.run} * ${u6(uy)}`)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( ramp )`,
         `    G1 X${ax(sx - x0)} Y${ay(sy - y0)} F${r3(feed)}   ( back to the row start, now at depth )`,
-        '    GOTO 42',
+        '    GOTO42',
         '    N41',
         `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}   ( the ramp did not fit — straight plunge )`,
         '    N42',
@@ -368,7 +396,7 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
         `      ${HX.rev}=[${HX.rev} + 1]`,
         // RE-SEED: at the top of each new revolution the vector returns to its exact starting value, so the
         // compounding above can never run past 24 steps however deep the descent goes.
-        `      IF ${HX.rev} <= ${SEG} GOTO 51`,
+        `      IF ${HX.rev} <= ${SEG} GOTO51`,
         `      ${HX.rev}=1`,
         `      ${HX.vx}=${r3(R)}   ( re-seed )`,
         `      ${HX.vy}=0`,
@@ -379,7 +407,7 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
         `      G1 X${axE(cx - x0, HX.vx)} Y${ayE(cy - y0, HX.vy)} Z${azE(`- ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}`)} F${r3(feed)}`,
         '    END3',
         `    G1 X${ax(sx - x0)} Y${ay(sy - y0)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( helix — out to the row start, now at depth )`,
-        `    IF ${V.z} > 0 GOTO 52`,
+        `    IF ${V.z} > 0 GOTO52`,
         `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}`,
         '    N52',
     ];
@@ -409,10 +437,10 @@ function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, ax
             `  ${RING_INSET}=0   ( how far in this ring sits )`,
             `  ${V.i}=0`,
             `  WHILE [${V.i} < ${V.n}] DO2   ( rings, inward )`,
-            `    IF ${V.i} > 0 GOTO 21`,
+            `    IF ${V.i} > 0 GOTO21`,
             `    G0 X${inX} Y${inY}`,
             `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}   ( the ONE plunge of this level )`,
-            '    GOTO 22',
+            '    GOTO22',
             '    N21',
             `    G1 X${inX} Y${inY} F${r3(feed)}   ( diagonal step in to the next ring, still cutting )`,
             '    N22',

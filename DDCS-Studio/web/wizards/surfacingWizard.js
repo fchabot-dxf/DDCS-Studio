@@ -12,6 +12,7 @@ import { activeDialectOpts } from './previewEmit.js';
 import { recordOp } from '../blocks/opRecord.js';
 import { makeStart, makeEnd, makePlace, makeSkim } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
+import { stepoverPctOf } from './ops/surfaceraster.js';   // t1363 — the ONE reading of a stored stepover (see its declaration)
 
 /** The faced area's footprint on the stock — shared by the stack (PlaceOnStock snapshot) + the 2D view. */
 export function surfacingBBox(params = {}) {
@@ -97,11 +98,10 @@ export function surfacingLiteralStack(params = {}) {
 export function surfacingStack(params = {}) {
     const tool = Math.max(0.1, num(params.toolDia, 12));
     // The stepover reaches the atom as the two knobs it derives from (tool Ø + %), because that is what the header
-    // re-derives at the machine. A caller carrying a flat mm (the twin's stored socket) is recovered against the tool
-    // it will run — the SAME recovery opCamMap does, so a stored millimetre cannot mean two things.
-    const pct = (params.stepoverPct != null && params.stepoverPct !== '')
-        ? num(params.stepoverPct, 60)
-        : (num(params.stepover, 0) > 0 ? Math.round((num(params.stepover, 0) / tool) * 1000) / 10 : 60);
+    // re-derives at the machine. A caller carrying a flat mm (an op stored before the split) is recovered against the
+    // tool it will run — through the atom's own declared `stepoverPctOf` (t1363), so a stored millimetre cannot mean
+    // two things depending on which path read it.
+    const pct = stepoverPctOf(params, tool);
     const w = num(params.w, 100), h = num(params.h, 80);
 
     const raster = newBlock('surfaceraster');

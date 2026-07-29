@@ -26,6 +26,8 @@
  * (emit-equivalence sweep + structural binding-wiring). Stage 6 authors the template independently (self-host); not this one.
  */
 import { surfacingStack } from '../../wizards/surfacingWizard.js';
+import { stepoverPctOf } from '../../wizards/ops/surfaceraster.js';   // t1363 — the ONE reading of a stored stepover
+import { num } from '../../wizards/ops/util.js';
 import { userOpFromStack } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { applySkimStructure } from './skimStructure.js';   // t986 — the Skim Z-mode structural fork (whole-op G91 relative to the jog); Normal = byte-identical
@@ -166,5 +168,15 @@ export function surfacingDataDef() {
     // t945 spindleHeadPatch (blank progstart → live Head) THEN t986 applySkimStructure (Skim: progstart drops the absolute
     // clearance + placeonstock→skim). Normal/absent zMode → both are no-ops → BYTE-IDENTICAL to the frozen template.
     def.postInstantiate = (stack, resolved) => applySkimStructure(spindleHeadPatch(stack), resolved);
+    // t1363 — ONE SOURCE for a stored stepover. An op saved before the split carries a flat `stepover` millimetre and
+    // no percentage; the twin binds `stepoverPct`, so without this the millimetre reached NO socket and the binding
+    // default cut 7.2mm where the saved op cut 9.6. The recovery is not restated here — it is the atom's own declared
+    // `stepoverPctOf`, the same one surfacingStack and opCamMap call, so the twin cannot read a stored value
+    // differently from the path it is proven byte-identical against.
+    def.normalizeParams = (params) => {
+        if (!params || params.stepoverPct != null && params.stepoverPct !== '') return params;
+        if (!(num(params.stepover, 0) > 0)) return params;   // nothing stored to recover → untouched
+        return { ...params, stepoverPct: stepoverPctOf(params) };
+    };
     return def;
 }

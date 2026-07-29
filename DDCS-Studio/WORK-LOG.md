@@ -7285,3 +7285,88 @@ t1359 listed "the `surfacingSlot` retirement" as outstanding; the t1361 dispatch
 
 GATE: fast tier. Every touched spec plus the round-trip and parametric families — **114/114**. Smoke **71/71**.
 Full suite NOT run: that is the advisor's merge gate on this branch against 1926/6/0, per the dispatch.
+
+---
+
+## t1363 — two rulings applied, the third STOPS at its own escape clause
+
+### RULING 1 — the stored stepover becomes ONE SOURCE
+
+The recovery was hand-rolled in **four** places, and they had already drifted. `surfacingStack`, the atom's body and
+`opCamMap`'s surface DERIVE each restated `pct = mm / toolØ · 100`; `opSession`'s reverse-sync computes its own
+variant again. The drift was real, not theoretical: **the two emitters treated a typed `stepoverPct` of 0 as a real
+zero** — the program then refuses loudly at its own `IF #44 <= 0 GOTO91` guard — **while opCamMap treated it as
+absent and silently seeded 60**. One stored value, two readings, one of them quietly cutting a raster nobody asked
+for.
+
+`stepoverPctOf(params, toolDia?)` is now declared once, on the atom, because the atom owns what a stepover MEANS.
+`surfacingStack`, `surfaceRasterLines` and `opCamMap` all call it. **PRESENT WINS** — a percentage that is there,
+including a deliberate 0, is the operator's intent; only a genuinely absent one recovers the stored millimetre. The
+emitters' rule won over the CAM one deliberately: a silent 60 is a raster the operator never asked for, a loud
+refusal is not. The `toolDia` override stays, because the CAM seed must recover against the tool the SLOT will
+carry, not the op's own.
+
+**The twin build path now routes through it too**, via the ONE declared normalization the ruling allows.
+`instantiate` gained a `normalizeParams(params)` def hook applied at the single point params enter a build, before
+any binding reads them — the same declared-hook pattern `postInstantiate`/`deriveGuards` already use, added to
+`OP_CODE_HOOKS` so it survives the JSON round trip like the rest. A def without one is untouched, so every other
+user op is byte-identical.
+
+**The assert the ruling asked for is in**: a pre-switch stored op now emits `#44=[12 * 80 / 100]` — the same 9.6mm it
+was saved cutting, not the 7.2mm the binding default gave — **and the wizard stack and the twin emit that op
+byte-for-byte identically**. That last one is what makes it one source rather than two recoveries that agree today.
+
+### RULING 2 — the emitter adopts `GOTO91`
+
+All 21 emitted GOTOs in the atom lost their space. Checked first that this is safe: the engine's matcher is
+`GOTO\s*(\d+)` — the space has been optional since t638, when V4.1's no-space form turned out to be what silently
+no-op'd in the sim. So the controller reads both and the sim reads both.
+
+**Text moved; motion did not.** The bridges were re-run and 21 of them went red — every one a spec asserting the
+SPACED text (`IF #44 <= 0 GOTO 91`, the ramp's `GOTO 41`, the skim sentinel's `GOTO 93`), and not one a motion
+divergence. Restated; the equivalence and SKIM BRIDGE families are 67/67, which is the check that matters: those
+compare EXECUTED moves, so they would have caught a real change and did not.
+
+**Verified on the real symptom, not the test.** A surfacing op inserted in the running app: the editor's warning bar
+is **gone** — no "DDCS check: 9 warnings", no "space after GOTO" anywhere in the page. `scratchpad/s1361-1` is
+refreshed and shows the clean editor with `GOTO91` / `GOTO13` / `GOTO17`.
+
+One honest correction to my own t1361 report: the amber **"can't verify" chip is still there, and it is NOT the
+GOTO warnings** — it was present in the t1361 screenshot alongside the warning bar and is a separate signal. I
+reported the two together last turn; only the warning bar was the GOTO noise.
+
+### RULING 3 — surfacingSlot retirement STOPS at the escape clause the ruling itself set
+
+*"If retirement turns out non-trivial (real consumers beyond surfacing), STOP and flag rather than forcing."* It is,
+so this is the flag. The ownership-vs-sharing test, run before touching anything:
+
+**It is not unconsumed.** Three live survivors run THROUGH it — `opCamMap`'s `GEN.surface` (every surfacing op that
+becomes a CAM slot), `subStackToSlot`'s `CAM_GEN.surface` (a surfacing sub-unit inside a composed stack), and
+`macrosApp` — plus **8 spec files**.
+
+**And it is not a duplicate of the atom — it is a different CONTRACT**, measured rather than assumed:
+
+- **Pendant contract.** The slot is `#1..#10` fed from the `#2600..#2609` mirrors, each carrying a
+  `;name =default [min~max]` range declaration the pendant reads. The atom has no such surface at all.
+- **Different scratch band.** The slot works in `#20-#26` — camMacroKit's caller/kit band — against the atom's
+  `#40-#49`. `cam-scratch-alloc` and `cam-scratch-guard` pin that allocation.
+- **Different comparator style, by RULING.** The slot emits the WORD forms (`WHILE #1 LT #2`); the atom emits
+  symbols. t1355 ring-fenced exactly this: shipped CAM slots keep the word forms because *the user runs them live*,
+  and "rewriting working live macros to chase a stronger tier would be risk taken for tidiness." Retiring the slot
+  onto the atom reverses that ruling for macros already on the machine.
+
+So this is not a deletion — it is replacing the CAM slot contract for surfacing, and it **collides head-on with the
+mirror-stability item accepted last turn**: that asserts the ten params keep their consecutive mirrors and that
+`stepoverPct` stays at index 4, precisely so a number written on a setup sheet still means what it meant. Routing
+CAM emission through the one builder cannot honour that map by accident.
+
+**Nothing was deleted.** The one-source work of Ruling 1 is what actually closes the split the retirement was aimed
+at — `opCamMap` no longer holds its own reading of a stored stepover, so the CAM path and the wizard path can no
+longer disagree about what a saved op cuts, which was the concrete harm. What remains is two GENERATORS with
+different pendant contracts, which is a design decision about the CAM slot format, not a leftover.
+
+**The both-paths guard did NOT gain the CAM-routes-through-the-one-builder assert**, because it is not true today
+and writing it would have meant forcing the retirement to make it pass.
+
+GATE: fast tier. Touched + bridge + CAM families **118/118**; the remaining surfacingSlot-touching specs **27/27**;
+smoke **71/71**. Full suite NOT run — the advisor's merge gate on this branch against 1926/6/0.

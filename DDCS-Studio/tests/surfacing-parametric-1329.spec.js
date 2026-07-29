@@ -60,8 +60,8 @@ test('THE HEADER SPEAKS, AND THE LOOPS COUNT THEMSELVES', async ({ page }) => {
     expect(r.body.indexOf('DO2')).toBeGreaterThan(r.body.indexOf('DO1'));
     expect(r.body.indexOf('END2')).toBeLessThan(r.body.indexOf('END1'));
     // A ZERO STEPOVER DIVIDES BY ZERO and a zero stepdown loops forever — refused cleanly, not left to the machine
-    expect(r.body).toMatch(/IF #44 <= 0 GOTO 91/);
-    expect(r.body).toMatch(/IF #43 <= 0 GOTO 91/);
+    expect(r.body).toMatch(/IF #44 <= 0 GOTO91/);
+    expect(r.body).toMatch(/IF #43 <= 0 GOTO91/);
     expect(r.body, 'with a named error, not a silent halt').toMatch(/ERROR: stepover \/ stepdown/);
     // THE BAND IS DECLARED AS DATA, so the collision guard reads it instead of re-deriving it from the text
     // t1343 — the band extended DOWN to #34 for the helix recurrence's rotating vector, temp and counters. Still
@@ -408,7 +408,7 @@ for (const N of [1, 2, 3, 9]) {
         // THE WORD IS THE MACHINE'S, matched not modernised: M00 with the operator sentence the literal path uses
         expect(r.parametric, 'the pause is M00, the same word the literal path emits').toMatch(/M00\s+\( pause - press Cycle Start to resume \)/);
         // …and it is GUARDED so the last level never pauses — a halt on a finished part is a call to the shop floor
-        expect(r.parametric, 'the last pass is exempted').toMatch(/IF #46 >= #42 GOTO 31/);
+        expect(r.parametric, 'the last pass is exempted').toMatch(/IF #46 >= #42 GOTO31/);
         // the cadence test is a modulo written as "does N divide the level index" — no MOD in this dialect
         expect(r.parametric, 'and the cadence is a real divisibility test, not an unrolled list').toMatch(/FIX\[#48 \/ /);
     });
@@ -463,7 +463,7 @@ test('THE RAMP BAKES ONLY WHAT CANNOT MOVE — and says what that costs', async 
     expect(body, 'the run is computed from the live bite').toMatch(/#49=\[#43 \* [\d.]+\]/);
     expect(body, 'and the tangent is baked, with the reason on the line').toMatch(/tangent is baked; the angle is a form field/);
     // THE HONEST DEGRADE survives the migration: when the run does not fit, the tool plunges and the program says so
-    expect(body, 'a ramp that cannot fit degrades').toMatch(/GOTO 41/);
+    expect(body, 'a ramp that cannot fit degrades').toMatch(/GOTO41/);
     expect(body, 'to a straight plunge, named').toMatch(/the ramp did not fit — straight plunge/);
 });
 
@@ -910,7 +910,7 @@ for (const J of SKIM_JOGS) {
                 return {
                     lit, par,
                     litRapidZ: rapidZs(literal, 0), parRapidZ: rapidZs(parametric, J.jz),
-                    hasFrameRead: /#62=#790/.test(parametric), sentinel: /IF #62 == -99999 GOTO 93/.test(parametric),
+                    hasFrameRead: /#62=#790/.test(parametric), sentinel: /IF #62 == -99999 GOTO93/.test(parametric),
                 };
             }, { J, S });
 

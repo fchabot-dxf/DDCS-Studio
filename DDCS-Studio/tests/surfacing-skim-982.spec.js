@@ -45,7 +45,7 @@ test('Skim is ABSOLUTE in a frame the machine supplies — no G91, a REAL lift, 
   // THE FRAME IS READ, and read BEFORE anything moves.
   const readAt = lines.findIndex((l) => /^#62=#790/.test(l));
   expect(readAt, 'the live work X is read into the frame register').toBeGreaterThan(-1);
-  const guardAt = lines.findIndex((l) => /^IF #62 == -99999 GOTO 93/.test(l));
+  const guardAt = lines.findIndex((l) => /^IF #62 == -99999 GOTO93/.test(l));
   expect(guardAt, 'and the program refuses if it did not arrive').toBeGreaterThan(readAt);
 
   // THE CRASH-GUARD, CARRIED OVER (t984 — the advisor's dump caught the original). Its point was never "G91": it was

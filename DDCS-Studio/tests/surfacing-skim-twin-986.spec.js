@@ -28,13 +28,13 @@ test('twin Skim == built-in Skim byte-identical; crash-guard holds (no Z before 
     // t1361 — THE CRASH-GUARD, ON ITS NEW GATE. The rule has not moved: the tool must not make a Z move before the
     // reference this whole op is measured from EXISTS. What changed is what establishes it. A G91 wrapper used to
     // make the jog point the origin by arithmetic; the atom now READS the live position into #62-#64 and REFUSES
-    // (GOTO 93, tool still up) if the read did not land — so the gate is the last sentinel check, and there is no
+    // (GOTO93, tool still up) if the read did not land — so the gate is the last sentinel check, and there is no
     // G91 anywhere by design (t1355: relativizing a LOOP has nothing in the text to rewrite).
     // The Z test is also WIDENED, and that matters: the old `Z-?\d` only saw a literal, and every Z in this body is
     // now an expression (`Z[#64 + 5]`). Left as it was, the guard would have gone quiet exactly when the emit changed.
     const twinSkim = emitMapped(dataBuilder(S({ zMode: 'skim' }))).text;
     const lines = twinSkim.split('\n').map((l) => l.trim());
-    const gate = lines.map((l, i) => (/^IF #6[234] == -99999 GOTO 93\b/.test(l) ? i : -1)).filter((i) => i >= 0).pop();
+    const gate = lines.map((l, i) => (/^IF #6[234] == -99999 GOTO93\b/.test(l) ? i : -1)).filter((i) => i >= 0).pop();
     const preZ = lines.slice(0, gate + 1).filter((l) => /^G[0-3]\b/.test(l) && /Z/.test(l));
     const firstZafter = lines.slice(gate + 1).find((l) => /^G[0-3]\b/.test(l) && /Z/.test(l));
     const noG91 = !lines.some((l) => /^G91\b/.test(l));

@@ -46,6 +46,7 @@ test('(2) a marked .nc and a shared .wiz def rebuild through the NEW builder —
         const { builderOf } = await import('/blocks/opBuilders.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { markerLine, parseMarker } = await import('/blocks/opSchema.js');
+        const { surfacingStack } = await import('/wizards/surfacingWizard.js');
         registerUserOp(SD.surfacingDataDef());
         const build = builderOf(SD.SURFACING_DATA_OPTYPE);
         const types = (s) => flattenBlocks(s).map((b) => b && b.type).filter(Boolean);
@@ -73,6 +74,11 @@ test('(2) a marked .nc and a shared .wiz def rebuild through the NEW builder —
             // what the pre-switch millimetre resolves to once rebuilt (see the NAMED GAP below)
             rebuiltStepLine: rebuiltTxt.split('\n').find((l) => l.indexOf('#44=') === 0) || '',
             markerRoundTrips: e1 === e2,
+            // t1363 — the SAME pre-switch stored op down BOTH paths: the built-in stack and the twin.
+            preSwitchBothPaths: emitMapped(surfacingStack({ ...preSwitch,
+                spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} })).text
+                === emitMapped(build({ ...parsed.params,
+                spindle: (window.ddcsGetSettings && window.ddcsGetSettings().spindle) || {} })).text,
             wizRoundTrips: !!(backDef && backDef.opType === SD.SURFACING_DATA_OPTYPE
                 && (backDef.template || []).length === (SD.surfacingDataDef().template || []).length),
             wizSupported: !!(fileText && backDef),
@@ -99,8 +105,15 @@ test('(2) a marked .nc and a shared .wiz def rebuild through the NEW builder —
      * project's no-legacy-burden ruling this may be intentionally out of scope — there is no install base, and a
      * pre-switch saved twin does not exist in the wild. That is the advisor's call, not this spec's.
      */
-    expect(r.rebuiltStepLine, 'PENDING RULING: a pre-switch stored millimetre is not recovered on the twin build path')
-        .toContain('#44=[12 * 60 / 100]');
+    // t1363 RULING APPLIED — ONE SOURCE, not a migration. The twin build path now routes the stored millimetre
+    // through the SAME declared `stepoverPctOf` the wizard stack and opCamMap call (a single declared
+    // `normalizeParams` on the def, at the one point params enter a build). A 9.6mm stepover stored against the
+    // Ø12 this op runs is 80%, and 80% of Ø12 is the same 9.6mm — so the rebuilt program cuts what the saved one cut.
+    expect(r.rebuiltStepLine, 'a pre-switch stored millimetre is recovered on the twin build path too')
+        .toContain('#44=[12 * 80 / 100]');
+    // AND THE TWO PATHS AGREE BYTE-FOR-BYTE on that same stored op — the assert the ruling asked for. This is the
+    // property that makes it one source rather than two recoveries that happen to match today.
+    expect(r.preSwitchBothPaths, 'the wizard stack and the twin emit the SAME program for a pre-switch stored op').toBe(true);
 });
 
 // ── (3) PER-LINE ANNOTATIONS UNDER LOOPS ────────────────────────────────────────────────────────────────────────
