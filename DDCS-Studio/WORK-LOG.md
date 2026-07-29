@@ -6061,3 +6061,77 @@ The dispatch said to flag and split rather than thin the mechanisms. The emit an
 the next turn's, on a base that is now provably safe.
 
 GATE: fast tier — 249 surfacing/workspace/cam/blocks/roundtrip specs + 71 smoke, green.
+
+---
+
+## t1331 — the switch-over, stopped at a real blocker: a row-count bug and the coverage boundary
+
+The switch is NOT landed, and this entry is mostly about why — with the evidence, because the decision it needs is
+the advisor's.
+
+### A REAL BUG IN THE PARAMETRIC EMIT, found while preparing the switch
+
+The row count was `FUP[h / step]`. The true rule is how many rows at `step/2 + i·step` FIT INSIDE the area:
+`FIX[(h − step/2) / step] + 1`.
+
+At h=60, step=7.2 the wrong formula gives 9 rows and puts the ninth at y=61.2 — **past the far edge of a 60mm face,
+cutting air**. The two formulas agree at 150/7.2, 40/5, 72/6 and 5/7.2, which is precisely why all five of t1329's
+equivalence configs passed over it. A bridge is only as good as the configs it is pointed at; the sixth config now
+exists and fails without the fix.
+
+Fixed, and the config that exposes it is now permanent.
+
+### THE BLOCKER: the parametric atom covers the DEFAULT raster, not the whole wizard
+
+Measured against the literal emitter on the same config (cutting moves):
+
+| config | literal | parametric |
+|---|---|---|
+| parallel + plunge (the default) | 32 | 32 ✓ identical |
+| concentric rings | 50 | 36 |
+| helix descent | 80 | 36 |
+| ramp descent | 34 | 36 |
+| one-way raster | 32 | 36 |
+| confirm-every-2 | 32 | 36 |
+
+These are DIFFERENT TOOLPATHS, not rounding. Switching `surfacingStack` wholesale would silently delete concentric
+facing, ramp and helix entry, the one-way raster and the confirm-every-N halt — features the wizard offers today.
+
+So the envelope is now DECLARED (`surfaceRasterCovers`) with a per-case reason (`surfaceRasterGap`), and asserted
+with those numbers in the spec, so the boundary cannot be forgotten and moving it is a deliberate act.
+
+### WHY I DID NOT SWITCH ANYWAY, BEHIND THE PREDICATE
+
+Branching the stack on the config — parametric when covered, literal otherwise — was the obvious way to land it, and
+it is a trap: the stack SHAPE would then depend on the config. Today the twin binds by flat index
+(`0 progstart · 1 wcs · 2 placeonstock · 3 stepdown · 4 surfacefill · 5 progend`), and the parametric atom collapses
+blocks 3+4 into one. A shape that varies per config means those indices are not a fact about the op any more, and the
+CAM seed, the form and the round-trip all read them.
+
+That is the same class as the t1315 snapshot lesson: the fix is to derive the bindings by IDENTITY rather than
+index, which the dispatch also asks for (item 3) — but doing it under a config-dependent shape means proving the
+twin against BOTH shapes, and the register items (pendant mirror stability especially) then have to be proven twice
+over as well.
+
+**The clean order is: close the coverage gap first, then switch once, with one stable shape.** Two increments, each
+provable; not one increment that is provable only for the configs a user happens to pick.
+
+### WHAT THIS TURN LEAVES
+
+- the row-count fix (a genuine defect that would have cut air off the edge of every face whose height is not a
+  near-multiple of the stepover)
+- the declared, asserted, measured coverage boundary
+- the equivalence bridge extended to 6 configs, all green
+
+NOT done, and deliberately not half-done: the switch itself, the generator's retirement, the twin's binding
+regeneration, pendant mirror stability, the remaining register items and the screenshots. Every one of them is
+downstream of the coverage decision above.
+
+**THE DECISION THE ADVISOR OWNS:** extend the atom to cover concentric + ramp/helix + one-way + confirm-every (four
+more toolpaths, each needing its own bridge configs), or rule that surfacing's parametric emit is DEFAULT-ONLY and
+the other strategies keep the literal path permanently — in which case the generator does not retire and "one
+source" is knowingly traded for coverage. I have not made that call because it is a capability question, not a
+correctness one.
+
+GATE: fast tier — 216 surfacing/cam/blocks/roundtrip specs + 71 smoke, green. Round-trip diff count unchanged at 11,
+0 blocks lost (nothing was switched, so nothing could move it).
