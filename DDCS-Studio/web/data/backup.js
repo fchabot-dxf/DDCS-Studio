@@ -93,7 +93,7 @@ export const BACKUP_STORES = [
     // silence the user asked us to fix. `items` is the whole declaration: how to enumerate the store's items and how
     // to mark each one. A hash of the item's own content, not a rev counter — the counter would mean every writer has
     // to remember to bump it, and a marker nobody can forget to maintain is worth more than a cheaper comparison.
-    { id: 'projects', label: 'Saved programs', async: true, count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects',
+    { id: 'projects', label: 'Saved programs (projects)', async: true, count: (v) => (Array.isArray(v) ? v.filter((e) => e && e.type === 'project').length : 0), unit: 'projects',
       items: {
           one: 'program', many: 'programs',
           marks: (v) => {

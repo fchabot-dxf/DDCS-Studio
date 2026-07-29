@@ -188,3 +188,29 @@ test('THE REAL FLOW — three programs, edit one, press save: the popup names ex
     });
     expect(again, 'a second save does not re-report what the first one wrote').toBe(false);
 });
+
+test('A FIRST SAVE SAYS JUST THE NAME — no third line at all (t1321 user ruling)', async ({ page }) => {
+    await boot(page);
+    // no baseline: the save wrote everything, and the ABSENCE of a change list is the honest display
+    const r = await page.evaluate(() => {
+        window.ddcsAnnounceSaved({ ok: true, name: 'shop.ddcs', changed: null });
+        const ov = document.getElementById('fileSaveSaid');
+        const what = ov.querySelector('.saved-pop-what');
+        return { text: ov.textContent, whatShown: !!what.offsetParent, whatText: what.textContent };
+    });
+    expect(r.text, 'the file it went to').toContain('shop.ddcs');
+    expect(r.whatShown, 'and no third line').toBe(false);
+    expect(r.whatText, 'not even an empty one carrying old words').toBe('');
+    expect(r.text, 'and nothing claiming what was written').not.toMatch(/whole workspace|Everything saved/);
+    // …the other two cases are untouched
+    const others = await page.evaluate(() => {
+        document.getElementById('fileSaveSaid')?.remove();
+        window.ddcsAnnounceSaved({ ok: true, name: 'shop.ddcs', changed: [] });
+        const a = document.getElementById('fileSaveSaid').textContent;
+        document.getElementById('fileSaveSaid')?.remove();
+        window.ddcsAnnounceSaved({ ok: true, name: 'shop.ddcs', changed: [{ id: 'settings', label: 'Settings + tool table', unit: 'tools', count: 4 }] });
+        return { already: a, listed: document.getElementById('fileSaveSaid').textContent };
+    });
+    expect(others.already, 'already-saved still says so — silence must never read as "nothing changed"').toMatch(/Nothing had changed/);
+    expect(others.listed, 'and a change list still lists').toContain('Settings + tool table (4 tools)');
+});

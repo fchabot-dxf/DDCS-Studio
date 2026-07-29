@@ -225,8 +225,11 @@ test('THE GROOVE HANDLES move the EMIT — the face along Z, the floor corner in
     expect(r.afterPos.bladeZ, 'and the blade followed it, still a kerf behind').toBe(-25);
     expect(r.afterFloor.dFloor, 'the floor drag wrote a DIAMETER, in the units the field speaks').toBe('6');
     expect(r.afterFloor.floorR, 'which is a radius of 3 to the machine — never the diameter').toBe(3);
-    expect(r.partHandles, 'a part-off drags position only: its floor is the centre, and a handle that always reads zero is a fake control')
-        .toEqual(['partPos']);
+    // t1321 (user) — the BLADE WIDTH is a real control on a part-off too: the kerf is the blade, and where the far
+    // wall sits is a size you set. What stays absent is the FLOOR handle — a part-off cuts to the centre, and a
+    // handle that always reads zero is a fake control. That was and is the point of this line.
+    expect(r.partHandles, 'position and the blade — but no floor, which would always read zero')
+        .toEqual(['partPos', 'partWidth']);
 });
 
 test('THE DRILL DEPTH HANDLE moves the EMIT, and never leaves the centreline', async ({ page }) => {

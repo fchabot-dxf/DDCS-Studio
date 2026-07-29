@@ -79,7 +79,12 @@ function announceSaved(res) {
     // for every other store.
     const bit = (c) => changeLabel(c);
     // the count QUALIFIES the store, never replaces it: naming alone once read "4 tools" for a machine-envelope edit
-    const what = !Array.isArray(changed) ? 'The whole workspace was written.'
+    // t1321 (USER) — A FIRST SAVE SAYS JUST THE NAME. There is no baseline to compare against, so there is no change
+    // list to show — and the ABSENCE of one is the honest display for a full first write. Saying "the whole workspace
+    // was written" was true but read like machinery; replacing it with a cheerier line would have been the same
+    // mistake in nicer words. The other two cases keep theirs: a change list when there is one, and the already-saved
+    // line when nothing moved (the t1287 honesty case — silence must never be read as "nothing changed").
+    const what = !Array.isArray(changed) ? ''
         : changed.length ? changed.map(bit).join(' · ')
         : 'Nothing had changed since the last save.';
     const title = (Array.isArray(changed) && !changed.length) ? 'Already saved' : 'Saved';
@@ -98,7 +103,8 @@ function announceSaved(res) {
     </div>`;
     ov.querySelector('.saved-pop-title').textContent = title;
     ov.querySelector('.saved-pop-name').textContent = res.name ? '“' + res.name + '”' : '';
-    ov.querySelector('.saved-pop-what').textContent = what;
+    // …and an EMPTY line is not rendered at all: the first-save popup is the title and the filename, nothing else.
+    { const el = ov.querySelector('.saved-pop-what'); el.textContent = what; el.style.display = what ? '' : 'none'; }
     const close = () => { ov.remove(); document.removeEventListener('keydown', onEsc, true); };
     const onEsc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
     ov.addEventListener('click', close);        // anywhere: the card, the backdrop, the button — all dismiss

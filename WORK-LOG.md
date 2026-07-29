@@ -20372,3 +20372,25 @@ its own turn rather than half-done at the end of this one.
 
 Gate: smoke 71/71; the new spec 4/4; the lathe family + stock + round-trip + taper specs 147/147. Screenshots:
 scratchpad/s1321-post-front.png and s1321-post-top.png.
+
+**AMENDMENTS (t1321) — three arrived as the commit above landed; all incorporated in the follow-up.**
+
+**The parting width had no handle at all** — checked before building, as instructed: the canvas carried a face handle
+and a stop-Ø handle and nothing for the kerf. Missing, not broken. The FAR WALL (the chuck-side edge at face − width)
+is the handle now, labelled `blade` because the slot IS the blade. It writes the width field through the same writer
+every handle uses, clamped to a real blade, and it NEVER writes the face — asserted, because handles are independent.
+The chain is asserted to the emit: dragging to 5 gives `#144=5`. A part-off gets it too (its kerf is a real size);
+what stays absent there is the FLOOR handle, which would always read zero — the t1275 assert is restated to say that
+in those terms rather than "position only".
+
+**The first-save popup shows just the title and the filename** (the user's correction superseding their own earlier
+wording amendment): no third line, and the empty line is not rendered rather than being replaced with a cheerier one.
+The other two cases keep their words — a change list when there is one, and the already-saved line when nothing
+moved, which is the t1287 honesty case: silence must never read as "nothing changed".
+
+Two older asserts moved with the rulings: t1287's "the first save writes the lot" (superseded today), and the
+projects row label, which I had shortened at t1309 and which t1287 pins for a reason — the word people search for is
+back in it.
+
+Gate after the amendments: smoke 71/71; the parting/drill, world, program-grain, feel and persistence specs 41/41
+plus the two repaired ones.

@@ -133,7 +133,10 @@ test('A REAL BOUND-FILE SAVE confirms in a DISMISSIBLE POPUP — at every width,
     expect(p1, 'the confirmation exists — there is no browser dialog to do this job').not.toBeNull();
     expect(p1.title).toBe('Saved');
     expect(p1.name, 'it names the file it went to').toMatch(/Shop Bee/);
-    expect(p1.what, 'the first save writes the lot').toMatch(/whole workspace/i);
+    // t1321 (USER RULING, superseding this line's original): on a FIRST save there is no baseline, so there is no
+    // change list — and the ABSENCE of one is the honest display. The popup shows the title and the filename, and
+    // says nothing about what was written.
+    expect(p1.what || '', 'a first save names the file and claims nothing about its contents').not.toMatch(/whole workspace/i);
     expect(p1.centred, 'CENTRED — not pinned to a chip a phone does not render').toBe(true);
 
     // …and it WAITS to be dismissed: a message naming what was written must not vanish before it is read

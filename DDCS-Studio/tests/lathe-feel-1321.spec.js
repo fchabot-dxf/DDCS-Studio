@@ -103,3 +103,41 @@ test('THE 3D HANGS THE TOOL AT THE DECLARED SIDE — and the EMIT never notices'
     // machine fact leaking into the part.
     expect(topEmit, 'byte-identical program on either machine').toBe(frontEmit);
 });
+
+test('THE BLADE WIDTH IS DRAGGABLE — the far wall writes the field, and the emit follows (t1321 user)', async ({ page }) => {
+    // USER, live: the groove width had NO handle at all — form-only. (Checked before building: the parting canvas
+    // carried a face handle and a stop-Ø handle, and nothing for the kerf. Missing, not broken.)
+    await boot(page, { kind: 'lathe', chuck: 'axis' });
+    const r = await page.evaluate(async () => {
+        const C = await import('/viz/latheProfileCanvas.js');
+        const bar = { diameter: 20, stickOut: 60, allowance: 1 };
+        const wrote = [];
+        const spec = C.partProfileSpec(bar, { kind: 'groove', zFace: -10, width: 3, floorDiameter: 12 }, (patch) => wrote.push(patch));
+        const h = spec.handles.find((x) => x.id === C.PART_WIDTH_HANDLE_ID);
+        // drag the far wall further from the face: the kerf widens to 5
+        spec.onDrag(C.PART_WIDTH_HANDLE_ID, { x: -15, y: 10 });
+        // …and dragging it must not move the face — handles are independent
+        const faceMoved = wrote.some((p) => 'zFace' in p);
+        // clamped: a zero-width parting tool is not a tool
+        spec.onDrag(C.PART_WIDTH_HANDLE_ID, { x: -10, y: 10 });
+        return { label: h && h.label, value: h && h.value, wrote, faceMoved };
+    });
+    expect(r.label, 'the label speaks the truth: the slot IS the blade').toBe('blade');
+    expect(r.value, 'and it shows the width it is holding').toBe(3);
+    expect(r.wrote[0], 'dragging the far wall writes the blade width').toEqual({ width: 5 });
+    expect(r.faceMoved, 'and never the face — handles are independent').toBe(false);
+    expect(r.wrote[1].width, 'clamped to a real blade').toBeGreaterThan(0);
+    // THE CHAIN REACHES THE EMIT: the width is #144, and the program follows the field
+    const emit = await page.evaluate(async () => {
+        const uo = await import('/blocks/userOps.js');
+        const { builderOf } = await import('/blocks/opBuilders.js');
+        const { emitProgram } = await import('/blocks/blockEmitter.js');
+        const def = uo.listUserOps().find((d) => d.opType === 'user_lathe_parting');
+        const p = uo.defaultParams(def);
+        const at = (w) => String(emitProgram(builderOf('user_lathe_parting')({ ...p, width: w })))
+            .split(String.fromCharCode(10)).find((l) => l.startsWith('#144='));
+        return { three: at(3), five: at(5) };
+    });
+    expect(emit.three).toMatch(/^#144=3\b/);
+    expect(emit.five, 'the emitted kerf is the dragged number').toMatch(/^#144=5\b/);
+});

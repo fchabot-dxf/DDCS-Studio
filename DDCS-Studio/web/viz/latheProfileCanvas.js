@@ -221,6 +221,9 @@ export function odProfileSpec(bar, od, onChange) {
 export const PART_POS_HANDLE_ID = 'partPos';
 /** The bottom of the slot: how deep the plunge goes, said as a diameter. */
 export const PART_FLOOR_HANDLE_ID = 'partFloor';
+/** t1321 (user) — THE BLADE'S WIDTH, dragged on the wall it cuts. The slot IS the blade, so the far wall — the
+ *  chuck-side edge, at face − width — is the width made visible; there was no handle for it at all (form-only). */
+export const PART_WIDTH_HANDLE_ID = 'partWidth';
 /** The bottom of the hole, on the centreline. */
 export const DRILL_DEPTH_HANDLE_ID = 'drillDepth';
 
@@ -254,12 +257,20 @@ export function partProfileSpec(bar, part, onChange) {
         ],
         handles: [
             { id: PART_POS_HANDLE_ID, x: zToCanvas(zFace), y: barR, kind: 'size', axis: 'x', teal: true, label: 'face', value: zFace },
+            // …the FAR WALL is the blade's width: drag it and the kerf widens. It sits at the same Z as the stop-Ø
+            // handle but up on the bar's surface, so the two never fight for the same grab.
+            { id: PART_WIDTH_HANDLE_ID, x: zToCanvas(zBlade), y: barR, kind: 'size', axis: 'x', teal: true,
+              label: 'blade', value: r3(width) },
             ...(groove ? [{ id: PART_FLOOR_HANDLE_ID, x: zToCanvas(zBlade), y: floorR, kind: 'size', axis: 'y', teal: true,
                             label: 'stop Ø', value: o.floorDiameter }] : []),
         ],
         onDrag: (id, world) => {
             if (typeof onChange !== 'function') return;
             if (id === PART_POS_HANDLE_ID) { onChange({ zFace: r3(canvasToZ(world.x)) }); return; }
+            // t1321 — the width is the distance from the FACE to this wall. HANDLES ARE INDEPENDENT: this writes the
+            // blade width alone and never the face, so widening the kerf does not walk the slot along the bar.
+            // Clamped to a real blade: a zero-width parting tool is not a tool.
+            if (id === PART_WIDTH_HANDLE_ID) { onChange({ width: r3(Math.max(0.2, zFace - canvasToZ(world.x))) }); return; }
             // …clamped INSIDE the bar and at the centre: a groove wider than the bar is not a groove, and one that
             // passes the centreline is a part-off wearing a groove's name.
             if (id === PART_FLOOR_HANDLE_ID) onChange({ floorDiameter: r3(diameterOf(Math.min(Math.max(0, world.y), barR - 0.001))) });
