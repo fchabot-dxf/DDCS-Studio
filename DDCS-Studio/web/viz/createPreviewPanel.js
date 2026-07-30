@@ -414,14 +414,24 @@ export function createPreviewPanel(container, opts = {}) {
     // tests, comments) where nothing moves, and a chip that only ever showed a line read as a frozen sim. A small tag
     // says which kind of line you are on, so "nothing moved" becomes "nothing was SUPPOSED to move". Display only — it
     // reads the same raw line the chip already shows and changes no semantics.
+    /**
+     * ⚠ t1395 — THREE OF THESE PATTERNS CONTAINED A LITERAL BACKSPACE (0x08) WHERE `\b` WAS MEANT, and had since well
+     * before the drill arc. A `\b` written through any quoting layer that eats escapes becomes the control character it
+     * names, and the result LOOKS right in every log and diff — which is why it survived so long.
+     *
+     * The effect was not subtle once traced: `/\x08G0?[0-3]\x08/` can never match, so ordinary motion fell through to the
+     * `[MG]\d` catch-all and every G0/G1 line was tagged **`set`** — "a mode with no motion" — while the tool was moving.
+     * G31/G38 probes got the same wrong tag, and M98/M99 lost `flow` to `set` too. Since the chip shows the executing
+     * line, that mislabelled most of a running program. Found by the t1393 sweep for stray 0x08 bytes.
+     */
     const calcTagOf = (raw) => {
         const t = String(raw == null ? '' : raw).trim();
         if (!t) return '';
         if (/^\s*[(;]/.test(t)) return 'note';                       // a comment
-        if (/^\s*(IF|WHILE|GOTO|END\d|DO\d|M9[89])/i.test(t)) return 'flow';   // a branch / loop / call
+        if (/^\s*(IF|WHILE|GOTO|END\d|DO\d|M9[89])\b/i.test(t)) return 'flow';   // a branch / loop / call
         if (/^\s*#\s*\d+\s*=/.test(t) || /^\s*#\s*\[/.test(t)) return 'calc';   // a register assignment
-        if (/G3[18]/i.test(t)) return '';                        // a probe IS motion
-        if (/G0?[0-3]|G53/i.test(t)) return '';            // ordinary motion — no tag
+        if (/\bG3[18]\b/i.test(t)) return '';                        // a probe IS motion
+        if (/\bG0?[0-3]\b|\bG53\b/i.test(t)) return '';            // ordinary motion — no tag
         if (/^\s*[MG]\d/i.test(t)) return 'set';                     // a mode / M-code with no motion
         return '';
     };
