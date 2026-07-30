@@ -9033,3 +9033,86 @@ dispatch — RECT pocket — already scopes this, and saying it out loud keeps i
 ### NO GATE RUN
 
 Nothing was changed, so there is nothing to gate. Scratch spec deleted; tree carries only the advisor's two docs.
+
+## t1399 (seat A) — STEP 0: surfacing's knobs become reachable, and three of the dispatch's premises were wrong
+
+Committed `53417148`, green. **Step 1 is PARKED at its own boundary** — step 0 was specified as "its own commit, green
+before step 1", and step 1 is a full emit-class act (frozen reference, relationship bridge, a 2→1 stack change, the
+reconciler sweep). The capacity rule says park fresh rather than half-land, and this is the cleanest seam there is.
+
+### THE GAP STEP 0 CLOSED
+
+Surfacing has emitted parametrically since t1359 — its loops read `#42`/`#43` AT THE MACHINE — but nothing could hand
+those registers a value: the seeds printed through `r3(num(...))`, which turns a `#var` into NaN and then into the
+default. Exactly the gap the drill family had until t1389, on a different atom. Since T3 re-points the pocket's rect fill
+through this atom, **a pocket can only be as live as the atom it reuses**, which is why the user's "is surfacing even
+done?" was the right question at the right moment.
+
+    feed / plunge      → val() at their print sites (each is ONLY a bare `F<word>`; neither is read by any arithmetic
+                         in the file — checked by sweeping every use, not assumed)
+    depth / stepdown   → the seed is a live WORD or the old NUMBER, never a plain val()
+
+### THE CARE IS IN THAT SECOND LINE, AND MEASURING IS WHAT CAUGHT IT
+
+My first cut used a plain `val()` on both seeds. `stepdown` is floored at `Math.max(0.01, …)` BEFORE printing, so that
+would have emitted `#43=0` for a typed zero where this file has always emitted `#43=0.01` — a byte change AND a
+behaviour change (0.01 crawls; 0 hits the refusal). A HEAD-worktree diff caught it, not reasoning. The fix is the
+holecycle shape from t1389: **a live word rides; a number takes the identical old path, floor included.** The floor is a
+BUILD-time protection for a baked zero and cannot apply to a value that does not exist yet.
+
+### THREE PREMISES IN THE DISPATCH TURNED OUT WRONG — all three checked before relying on them
+
+1. **"@work already nulls-when-live — assert that."** It did not. Only `holeCycleWorkSteps` got t1383's rule at t1389;
+   surfacing never did, because until this turn none of its inputs COULD be live. So it was ADDED, not asserted — and it
+   checks EVERY input it multiplies rather than the two this turn moved, so a later knob cannot slip past a check written
+   for today's set. (A live FEED keeps the declaration: it multiplies nothing.)
+2. **The zero-advance refusal.** I went looking to ADD one, on the assumption that a live stepdown could spin the
+   controller forever. It was already there — `IF #43 <= 0 GOTO91`, four lines below the seed, reading the REGISTER at
+   run time. Written for a baked zero, it covers a dialled one unchanged. So this atom needed no new refusal, only the
+   check that the existing one reaches the new path. I nearly reported a safety finding that did not exist; reading the
+   actual lines instead of my grep's misses is what stopped it.
+3. **"atomRoles is RIGHT about surfacing"** — my own claim, at t1389. The table had no surfaceraster row at all: every
+   key fell to `DEFAULT_ROLE` and read 'geometry'. Safe, but by accident rather than by decision, and I recorded the
+   accident as though the table had an opinion. It has one now, per key, with each baked key carrying the BUILD-TIME
+   reason it bakes.
+
+### THE AMENDMENT, ABSORBED AT THE PRE-COMMIT POLL
+
+Two amendments landed while I was working — which is exactly why the poll sits at the commit boundary. The FULL-DEPTH
+region (stepdown ≥ depth → one level, low stepover) is now pinned on both strategies and every entry: one level cuts at
+exactly ONE Z (a body carrying a multi-level assumption would show intermediate floors), a stepdown PAST the depth
+CLAMPS rather than overshoots, ramp and helix descend the whole way in one go, and the region is reachable from the
+pendant. The second amendment ruled OUT a wizard preset for it — per-wizard setting persistence already covers the
+workflow — so nothing was built; this is coverage of a capability the val() knobs made dial-able.
+
+### BYTE-IDENTICAL, MEASURED TWICE, IN A HEAD WORKTREE
+
+**26/26** configs — placement, negative frames, rotation, skim, both strategies, all three entries, confirm-every,
+fractional feeds — plus the edges the floor exists for (zero / negative / sub-floor stepdown all still `0.01`, zero depth
+still `0`). Then **8/8** more for the amendment's full-depth region, diffed the same way rather than argued from the
+first sweep.
+
+I also reverted an embellishment of my own: I had added "— LIVE" to the two EMITTED comments. That is a byte change, and
+"byte-identical for numerics" was the promise, so the shipped comment text stands unchanged and the liveness is
+documented in the source instead. If the emitted comment should say LIVE, that is a deliberate one-line change, not a
+rider on this one.
+
+### ONE ASSERT INVERTED, WITH ITS HISTORY
+
+t1389's "surfacing's feed stays baked by ROLE, not by the fold" was precise, and it named this act as the follow-up. This
+IS that act, so the role half flips while the structural half — the fold blocks nothing — stands. Keeping both visible is
+what stops "exposable" from quietly coming to mean "the fold was lifted".
+
+### GATE (fast tier)
+
+New spec **5/5**. The surfacing family **93/93** (7 specs). smoke **71/71**. CAM + pocket + drill arc + the iron rule
+**58/58**. **227 tests, 0 failures.** IRON RULE **11/11**, the same eleven, 0 blocks lost.
+
+Both diagnostic worktrees removed; scratch specs deleted; process tree clean.
+
+### WHAT STEP 1 STARTS FROM
+
+The fill arm: `place{ stepdown{ pocketfill } }` → `place{ surfaceraster }` over the INSET rect (tool/2 − wallOffset, the
+measured inset math), with the full relationship-class bridge against a frozen `/_test/` literal `fillStrategy` — my
+t1397 sample decided the SHAPE only, and the spec must say so. Depth and stepdown are live knobs on that arm as of this
+commit, which is what makes the re-point worth doing.
