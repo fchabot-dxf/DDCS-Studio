@@ -104,21 +104,24 @@ const POCKET_BINDING_SPECS = [
     ...leafPair('toolDia', 'toolDia', 'number', { default: POCKET_DEFAULTS.toolDia, label: 'Tool Ø', section: T }),
     ...leafPair('wallOffset', 'wallOffset', 'number', { default: POCKET_DEFAULTS.wallOffset, label: 'Wall Offset ±', section: T, help: 'Signed wall offset (mm): + cuts OVERSIZE (walls out), − cuts UNDERSIZE / leaves stock. 0 = the exact typed size.' }),
     ...leafPair('feed', 'feed', 'number', { default: POCKET_DEFAULTS.feed, label: 'Feed', section: T }),
-    // depth pass (stepdown, clearing arm) + the drill arm (tooSmall) carry the SAME params at different keys
+    // depth pass (stepdown, clearing arm) + the TOO-SMALL arm carry the SAME params at different keys.
+    // t1391 — the too-small arm's leaf is `holecycle` now, not the literal `drill`: pocket's fallback re-points through the
+    // parametric family so that atom can retire. Every key carries straight over (depth/peck/feed/clearance all exist on
+    // holecycle), which is why this is a target change and not a re-spec.
     { param: 'depth', type: 'number', units: 'mm', key: 'to', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.depth, label: 'Depth', section: T },
-    { param: 'depth', type: 'number', units: 'mm', key: 'depth', match: { type: 'drill' }, optional: true },
+    { param: 'depth', type: 'number', units: 'mm', key: 'depth', match: { type: 'holecycle' }, optional: true },
     { param: 'stepdown', type: 'number', units: 'mm', key: 'by', match: { type: 'stepdown' }, optional: true, default: POCKET_DEFAULTS.stepdown, label: 'Step Down', section: T },
-    { param: 'stepdown', type: 'number', units: 'mm', key: 'peck', match: { type: 'drill' }, optional: true },
+    { param: 'stepdown', type: 'number', units: 'mm', key: 'peck', match: { type: 'holecycle' }, optional: true },
     { param: 'confirmEvery', type: 'number', key: 'confirmEvery', match: { type: 'stepdown' }, optional: true, default: 0, label: 'Confirm every N passes', section: T, help: 'Pause + show a message + halt (M0) after every N depth passes (not the last) so you can clear chips / check the part, then press Cycle Start. 0 = off. A MACHINE pause — not visible in the sim.' },   // t1031
-    // plunge → both leaves + the drill's FEED (drill plunges at the plunge feed); clearance → progstart + both leaves + drill
+    // plunge → both leaves + the HOLE's feed (the fallback plunges at the plunge feed); clearance → progstart + both leaves + the hole
     { param: 'plunge', type: 'number', units: 'mm/min', key: 'plunge', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.plunge, label: 'Plunge', section: T },
     { param: 'plunge', type: 'number', units: 'mm/min', key: 'plunge', match: { type: 'pocketwall' }, optional: true },
-    { param: 'plunge', type: 'number', units: 'mm/min', key: 'feed', match: { type: 'drill' }, optional: true },
+    { param: 'plunge', type: 'number', units: 'mm/min', key: 'feed', match: { type: 'holecycle' }, optional: true },
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'progstart' }, default: POCKET_DEFAULTS.clearance, label: 'Clearance', section: T },
     { param: 'rpm', type: 'number', key: 'rpm', match: { type: 'progstart' }, label: 'Spindle RPM', section: T, help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart (no default → socket-held: blank keeps the Head)
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'pocketfill' }, optional: true },
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'pocketwall' }, optional: true },
-    { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'drill' }, optional: true },
+    { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'holecycle' }, optional: true },
     // t726 P2b — the entry-point declaration. IN the bindingSpecs (not entryBindingsFor) so it RE-DERIVES over the PRUNED
     // stack each instantiate (pocket's entry index shifts with strategy/tooSmall — a static superset index would miss).
     { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
@@ -239,12 +242,14 @@ export function pocketDataDef() {
     def.bindingSpecs = POCKET_BINDING_SPECS;                       // re-derive value sockets BY IDENTITY over the PRUNED stack each build
     def.deriveGuards = (p) => ({ _tooSmall: pocketTooSmall(p || {}), _rest: restValid(p || {}) && !pocketTooSmall(p || {}) });   // t871 — _rest: a valid smaller rest tool on a cornered pocket (GEOMETRY-DERIVED, injected before prune)
     def.postInstantiate = (stack, resolved) => {                  // rewrite the DERIVED sockets the frozen superset baked at DEFAULT geometry
-        const { cx, cy } = pocketDrillCentre(resolved || {});     // the drill arm's plunge point (geometry-derived)
+        const { cx, cy } = pocketDrillCentre(resolved || {});     // the too-small arm's plunge point (geometry-derived)
         const bb = pocketBBox(resolved || {});                    // the PlaceOnStock footprint bbox (drives placementShift's corner; baked-stale otherwise → a phantom shift)
         const r = resolved || {};
         for (const b of flattenBlocks(stack)) {
             if (!b || !b.params) continue;
-            if (b.type === 'drill') { b.params.x = cx; b.params.y = cy; }
+            // t1391 — x0/y0, NOT x/y: holecycle ABSORBS the placement, so the place fold hands it the shift through x/y.
+            // Writing the centre there would collide with the placement; x0/y0 is the pattern's own origin (see pocketWizard).
+            if (b.type === 'holecycle') { b.params.x0 = cx; b.params.y0 = cy; }
             else if (b.type === 'placeonstock') { b.params.bminX = bb.minX; b.params.bmaxX = bb.maxX; b.params.bminY = bb.minY; b.params.bmaxY = bb.maxY; }
             else if (b.type === 'pocketrest') {   // t871 — the rest leaf is frozen at DEFAULT geometry in the superset; rewrite ALL its params from the resolved op (one source, no fan-out bindings)
                 for (const k of ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'restDia', 'restStepover', 'depth', 'feed', 'plunge', 'clearance']) if (r[k] !== undefined) b.params[k] = r[k];

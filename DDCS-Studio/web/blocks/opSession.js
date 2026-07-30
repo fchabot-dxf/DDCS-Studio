@@ -102,7 +102,11 @@ const RECONCILERS = {
     },
     pocket(prog) {
         const down = find(prog, 'stepdown');
-        if (!down || !Array.isArray(down.children)) return null;   // too-small fallback (drill) → no reverse
+        // t1391 — the too-small fallback has no `stepdown` (it is a single plunge, not a depth walk), so this declines on
+        // that arm and always has. The re-point of that arm from the literal `drill` leaf to `holecycle` does not change
+        // that: the arm is identified by the ABSENCE of the depth loop, never by the hole leaf's type. Swept as a tenant
+        // reader in the same act rather than left to be discovered.
+        if (!down || !Array.isArray(down.children)) return null;   // too-small fallback → no reverse (no depth loop to read)
         // The FLAT pocketfill atom (E0 region-pill→flat reframe, mirroring contourfill): the TYPED geometry + the tool/
         // wallOffset ride the block directly (no Region socket), so read the flat dims straight — the atom applies the
         // inset internally. stepoverPct is now carried as-is (no un-deriving from the absolute stepover).

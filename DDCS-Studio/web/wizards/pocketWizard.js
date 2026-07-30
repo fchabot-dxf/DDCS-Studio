@@ -102,7 +102,25 @@ export function pocketStack(params = {}, opts = {}) {
     const geom = { shape, originX: ox, originY: oy, w: num(params.w, 80), h: num(params.h, 60), dia: num(params.dia, 50), sides: num(params.sides, 6), wallOffset: num(params.wallOffset, 0), toolDia: num(params.toolDia, 6) };
     const fillLeaf = (strat) => { const b = newBlock('pocketfill'); b.params = { ...geom, stepoverPct: num(params.stepoverPct, 40), strategy: strat, direction: params.direction || 'bothways', entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3), helixDia: num(params.helixDia, 0), helixPitch: num(params.helixPitch, 1), by: 'by', z: 'z', feed, plunge, clearance: clr }; return b; };   // strat: parallel (raster) | concentric (spiral); direction (t800 P6); entry (t804 P?) = per-level descent, params.entry || plunge → byte-identical; by='by' resolves the StepDown step from scope
     const wallLeaf = () => { const b = newBlock('pocketwall'); b.params = { ...geom, z: 'z', feed, plunge, clearance: clr }; return b; };
-    const drillPlace = () => { const hole = newBlock('drill'); hole.params = { x: cx, y: cy, depth, peck: by, feed: plunge, clearance: clr }; return makePlace(params, bbox, hole); };
+    /**
+     * ── THE TOO-SMALL FALLBACK, RE-POINTED THROUGH holecycle (t1391, ruled) ────────────────────────────────────────
+     *
+     * A pocket narrower than its tool cannot be cleared, so it becomes a single plunge. That plunge used to be the literal
+     * `drill` leaf — which made pocket the last consumer of an atom the whole drill arc had otherwise retired, and the
+     * reason `drill.js` could not die. The fork was ruled: NOT a second single-hole emitter beside the parametric family
+     * (that hand-rolls exactly what the arc unified), but the family's own `holecycle` degenerated to one hole.
+     *
+     * ⚠ THE CENTRE GOES IN x0/y0, NOT x/y, AND THAT IS NOT COSMETIC. For the literal leaf, `x`/`y` WERE the hole's
+     * position and the place fold rewrote its emitted text. `holecycle` declares `absorbsPlacement`, so the fold hands it
+     * the shift THROUGH `x`/`y` as params instead — writing the plunge centre there would collide with the placement.
+     * `x0`/`y0` are the pattern's own origin, which folds into the frame at build time, so the hole lands at the centre
+     * AND the placement still applies on top. (`postInstantiate` in pocketData writes the same two keys, for the same reason.)
+     */
+    const drillPlace = () => {
+        const hole = newBlock('holecycle');
+        hole.params = { pattern: 'single', cycle: 'peck', x0: cx, y0: cy, depth, peck: by, feed: plunge, clearance: clr };
+        return makePlace(params, bbox, hole);
+    };
     const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
     // t871 — the REST section rides INSIDE the main clear's ONE placeonstock (a second place would duplicate the placement
     // bindings): a StepDown of the pocketrest leaf, preceded by a STATIC marker comment (so the twin freezes byte-identically

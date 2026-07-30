@@ -40,9 +40,23 @@ test('cutting wizards emit through their block stacks (deterministic + correct)'
 
     const pc = { shape: 'circle', dia: 50, toolDia: 6, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5, strategy: 'raster' };
     out.pocketCircleArc = /G3 /.test(new PocketWizard().generate(pc));
+
+    /**
+     * t1391 — THE TOO-SMALL FALLBACK NOW GOES THROUGH holecycle, so its plunge is an EXPRESSION, not a baked depth.
+     *
+     * This asserted `/G1 Z-3/` — a literal negative depth. Pocket's too-small arm re-points through the parametric family
+     * (so `drill.js` could retire), which seeds the depth into a register (`#81=3`) and feeds against it
+     * (`G1 Z[0 - #83] F150`). The CLAIM is unchanged — a pocket narrower than its tool becomes a single plunge with no arc
+     * wall — so it is asserted where that is now visible: one hole in the parametric header, the depth reaching the
+     * register, a Z FEED move driven by a register, and still no arc.
+     */
     const tiny = { shape: 'circle', dia: 4, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 };
     const tinyTxt = new PocketWizard().generate(tiny);
-    out.pocketTinyGuard = /G1 Z-3/.test(tinyTxt) && !/G3 /.test(tinyTxt);
+    const tinyHeader = /parametric: 1 hole \(single\) x peck/.test(tinyTxt);
+    const tinyDepthSeed = /^#81=3/m.test(tinyTxt);
+    const tinyZFeed = /G1 Z\[[^\]]*#\d+[^\]]*\] F/.test(tinyTxt);
+    const tinyNoArc = !/G3 /.test(tinyTxt);
+    out.pocketTiny = { tinyHeader, tinyDepthSeed, tinyZFeed, tinyNoArc };
 
     const sl = { ax: 0, ay: 0, bx: 60, by: 0, toolDia: 6, width: 14, stepoverPct: 40, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5 };
     out.slot = { det: det(SlotWizard, sl), cuts: cuts(new SlotWizard().generate(sl)) };
@@ -58,7 +72,11 @@ test('cutting wizards emit through their block stacks (deterministic + correct)'
     expect(r[k].cuts, `${k} must produce cutting passes`).toBeGreaterThan(0);
   }
   expect(r.pocketCircleArc, 'circle pocket finishes with a G3 arc wall').toBe(true);
-  expect(r.pocketTinyGuard, 'tiny pocket falls back to a single plunge (no arc)').toBe(true);
+  // Asserted PART BY PART rather than as one boolean: a composed `a && b && c` reports only "false" and says nothing
+  // about which half of the claim broke, which cost real time when this assert first went red at t1391.
+  expect(r.pocketTiny, 'tiny pocket falls back to a single parametric plunge, no arc (t1391: through holecycle)').toEqual({
+    tinyHeader: true, tinyDepthSeed: true, tinyZFeed: true, tinyNoArc: true,
+  });
   expect(r.drill.holes, 'drill grid 3x2 = 6 holes').toBe(6);
   expect(r.drillSkip, 'skip 2,5 → 4 holes').toBe(4);
 });
