@@ -10503,3 +10503,166 @@ findings from a fresh seat too.
 ### NO GATE RUN
 
 Nothing changed. Tree carries only the advisor's two docs plus the analytics agent's two root files; proc tree clean.
+
+## t1429 (seat A, fresh) — THE DELEGATION LANDED: the rect pocket's clearing body IS the raster atom
+
+Studio held TWO clearing emitters. It holds one now. `pocketSlot` no longer hand-writes a raster — it seeds
+`surfaceRasterLines` with LIVE registers and composes the wall after it. Both ruled blockers are closed, a THIRD
+(measured this turn) is closed, the honesty lock went red and came back green, and driving the real modal found a
+fourth defect that no unit assertion in this act would have caught.
+
+### THE TWO RULED BLOCKERS
+
+**1 — CLEARANCE.** `geoTerm`, exactly the shape t1425 built for w/h/inset. A numeric clearance takes the identical old
+path (`az(clr)`, same fold, same bytes); a register rides the frame's own Z printer. One refinement the emit asked for:
+a retract measured from a ZERO surface prints `G0 Z#9`, not `G0 Z[0 + #9]` — the sum is correct and it is noise, and it
+would have sat one line from the same program's `G0 Z#9` where the slot writes its own wall retract. A placed or skim
+body keeps the sum, because there the surface is a real term. **`clearance` is deliberately NOT in `BAKES_GEOMETRY`:**
+it is Z, and what a ramp or helix bakes is XY, so a dialled retract does not refuse either descent. Asserted.
+
+**2 — STEPOVER.** `POCKET_FIELDS.stepover` becomes `stepoverPct` (default 40 = the op's own
+`POCKET_DEFAULTS.stepoverPct`), option (b) as ruled. `DERIVE.pocket` now seeds the percentage through `stepoverPctOf`
+instead of pre-multiplying a millimetre the atom would only divide back out. `cpocket` is untouched — `ringClear` still
+steps in millimetres, and a migration keyed on a name rather than on the thing that changed is what corrupts a
+neighbour (the t1325 comment's own warning), so the `values.stepover` to `values.stepoverPct` recovery in
+`manifestToAuthOp` gained `pocket` and NOT `cpocket`.
+
+### BLOCKER 3, MEASURED THIS TURN — THE ROW AXIS
+
+Both mill slots have always exposed *"which axis the clearing rows run along"* (macrosApp's `SECOND_CTL`) and
+`rasterClear` has always honoured it. **The atom ran rows along X and nothing said so** — the fact lived only in the
+letters `X` and `Y` inside `rowWalk`. Delegating without it would have replaced a `rows parallel Y` pick with `rows
+parallel X`: t1422's class of defect, one layer up, on a build-time pick the operator can see.
+
+**I built it rather than flagging it, and the reason is that it needed no ruling.** The two live options that DID need
+one — drop the dropdown, or refuse `rows parallel Y` at pack — both cost a shipped capability, which is yours. Teaching
+the atom the axis costs nothing visible: no surface moves, no knob goes dark, the baked corpus is byte-identical, and
+the walk axis stops being an unstated assumption and becomes declared data. If you would rather have had the fork, say
+so and I will unpick it — but I judged an unruled capability ADDITION to be inside "the act MAY reopen the atom".
+
+It resolves in ONE place into the five things that actually differ (which span a row runs along, which one it counts
+rows across, which printer each uses, and which order the pair reaches `mv`); nothing downstream branches on it again,
+because a second branch is how the row and the step-over come to disagree about which way is which.
+
+**IT IS NOT AN ENVELOPE AXIS, and that is measured, not convenient.** `direction` earned its rows in
+`SURFACE_RASTER_PROVEN` by being a genuinely different body (11 lines per pass against 20). A row axis is the SAME body
+transposed — proven move-for-move: the `y` walk on (x,y,w,h) cuts the `x` walk on (y,x,h,w) with X and Y exchanged,
+across three directions x three rects. **The HELIX is exempt and says why:** its descent is a circle of FIXED
+handedness about the area centre, so transposing it exactly would mean mirroring the descent's cut direction — a
+handedness nobody asked to change. It is the same helix whichever way the rows run; only its starting phase differs.
+Plunge and ramp transpose exactly (18/18); helix does not, and I declined to make it by flipping its rotation.
+
+### THE SEAM THE PICKS TRAVEL ON — and the second lie it would have installed
+
+`strategy` already reached the generator: it is a BUILD enum, so `makeAuthOp` bakes it and `declFromOp` puts it in
+`decl`. **`direction` and `entry` did not** — they bind to a socket on the fill leaf, so they are VALUE enums and
+`buildEnumFields` never made a row for them. Honest-by-omission was the right reading while the macro ignored them
+(t1414 measured that and deliberately removed a sentence it had drafted); it stops being right the moment the macro
+bakes them.
+
+And removing `GENERATOR_IGNORES.pocket.strategy` alone would have made it BRANCHABLE — that flag is gated on
+`!ignored` — so the row would have offered *"Expose as a BRANCH: the macro carries every arm and jumps on the pendant
+number"*, which is exactly what a BAKED pick does not do, and nothing anywhere implements branch generation. **One lie
+swapped for another.** So the third disposition t1323 named and never declared is declared now: `GENERATOR_BAKES_PICK`,
+keyed (camType, param), which does both jobs at once — it makes the row exist, and it keeps the row un-branchable with
+a true reason.
+
+**A DISPOSITION CAN DEPEND ON ANOTHER PICK, and the lock caught that on the first run.** I declared `pocket.direction`
+BAKED flatly; the sweep went red with *"the macro does NOT carry this pick"* — correct, because with the SPIRAL
+strategy the packed body is identical across all three direction arms: **rings have no scan direction.** The atom has
+declared that asymmetry since t1418 (`SURFACE_RASTER_AXES.concentric` omits the axis), so the CAM row now READS that
+declaration rather than restating it, and a table entry may be a FUNCTION of the params. The spiral arm's sentence
+names the setting to change to get the pick back (the t1410 pattern). Both resolvers are the only supported reading —
+a raw key lookup returns a truthy function and calls every conditional row a liar in both directions, which is what
+the spec did before I fixed it there too.
+
+### THE WALL MOVED, AND THE STRATEGY DECIDES WHETHER IT EXISTS
+
+It used to be emitted INSIDE `rasterClear`'s Z loop — fill(L1), wall(L1), fill(L2)... The atom owns the depth loop now,
+so a wall interleaved inside a loop this file no longer controls is not expressible: it is its own depth loop after the
+clear. Not a new decision — t1405's rough-all-then-wall, arriving at the slot for the same mechanical reason. And it
+follows the strategy, because that is what carrying a pick means: a spiral's outermost ring already IS the wall (the
+op's own help says so), so a second pass would be a wasted one.
+
+### THREE THINGS THE COMPOSITION FORCED, each because the alternative was silent
+
+1. **THE POSITIVE GUARDS.** The atom's own refusals (`IF #44 <= 0 GOTO91`) set `#1505` and then CONTINUE — right for a
+   body that ends a wizard program, and WRONG inside a slot, where the next thing after the atom is the wall: a tripped
+   guard would flag the error and then cut the wall anyway. That is the fall-through t1077 built `errorEnd` to stop. So
+   the slot refuses FIRST, before any motion, on `M30` — same four checks and same wording as the surface slot's N7,
+   plus the tool diameter, because the pocket derives BOTH its inset and its stepover from it. The atom's guards become
+   unreachable belt-and-braces rather than the last line of defence.
+2. **THE BAND UNION.** The atom's `#34-#49/#62-#64` are written DURING a pocket part now, so a field var landing in them
+   is the `#20 = rpm` to `M3 S0` failure that module exists for. `bandsFor('pocket')` IMPORTS `RASTER_SCRATCH` rather
+   than restating it (the atom's dependency closure is three leaf modules, so `data/` keeps its leaf property — which is
+   NOT true of `universalScratch`, and that distinction is the whole reason this one is affordable). **t1425's PROOF 4
+   moved with the fact:** its subject was the hand-written mill scratch the atom sits beside, which is
+   `bandsFor('surface')`, untouched — the original claim is unchanged and still true there, and the new containment is
+   asserted directly.
+3. **THE RAMP LEAD-IN IS GONE, and I think that is the fix rather than the cost.** `rasterClear` ramped into every layer
+   whatever the op's Depth Entry said, so `entry` reached the macro nowhere — a descent the operator never selected.
+   The common (plunge) case now descends the way the wizard's own preview has always shown it. A ramp/helix pick can
+   NOT be honoured against a pendant-dialled area, so the atom's own honest degrade fires: a plunge, with the reason
+   printed on the descent line. **No new refusal machinery** — the envelope has no channel to a generator, and the row's
+   sentence is the pack-time surface instead: it says the slot plunges before a chip is cut. Flagging it because it is a
+   behaviour change on a shipped slot even though I believe it is the right one.
+
+### AND THE ONE THAT ONLY THE REAL APP FOUND
+
+I built the modal screenshot for the dispatch's item 6 and it showed **Direction: "Zig-zag (both ways)"** on an op
+carrying `oneway` — while `makeAuthOp` had already baked `oneway` into the manifest and the macro was cutting the
+one-way walk. `cbmVal` fell back to the BINDING DEFAULT for any non-numeric value, so the table and the built body
+disagreed. **`strategy` hid it:** my op's pick happened to equal the def default, so those two agreed by luck.
+Harmless while the only build enums were surfacing's `zMode` (whose other arm routes to the universal generator) and a
+one-option `material`; the moment a generator BAKES a pick it is exactly the class of lie this act is closing — and
+worse, touching the select would have stored the DISPLAYED value and silently rewritten the operator's choice. Fixed
+(`values[fk]` still wins where it exists, so no numeric row moved) and re-shot: the modal reads One-way climb, "built
+as One-way climb", and the packed macro cuts it.
+
+**Worth recording that a unit assertion would not have caught it in either direction** — `seedFromOp` was right the
+whole time, and `cam-row-honesty` asserts the SEED. Only the rendered pixel disagreed.
+
+### THE PROOFS (tests/pocket-delegation-1429.spec.js, 20 tests)
+
+**A** the baked emit is well-formed across the 288-config cross-product, and an ABSENT `rowAxis` emits byte-for-byte
+what an explicit `x` emits on every one of them (plus the old-vs-new sweep against HEAD offline: 288 configs, **0
+differences**, `@work` and `flowLabels` identical on every one).
+**B** a dialled clearance drives every retract, on 4 walks: baked and live cut the SAME path at clearance **12** —
+deliberately not the default 5, because 5 is what the defect emitted and a test at the default cannot tell them apart.
+The atom's default appears nowhere in a live emit; a dialled retract refuses neither descent.
+**C** rows parallel Y is rows parallel X transposed — 6 tests x 3 rects, with the premise (they really are different
+programs before the swap) asserted first so it cannot pass vacuously.
+**D** the packed clear phase resolves to the wizard-path atom, move for move, on **12** combinations (both strategies x
+three directions x both row axes), sliced per phase (t1406's shape) and seeded with pendant values deliberately unlike
+the field defaults, so a register that fails to reach the body shows up as a different cut and not as a coincidence.
+**E** NO KNOB GOES DARK: every POCKET_FIELDS knob changes the TRACED motion; `rpm` is the one exemption and is asserted
+on the S word instead of skipped. A text-presence test would have passed on both of this act's defects.
+**F** all three picks reach the macro; a ramp degrades in the open and names itself; the spiral has no wall pass; the
+guards refuse at the top.
+**G** the pocket declares the atom band it now writes, and a pocket built at a HIGH varOffset — the case that would
+actually have collided — mints no field var inside it.
+
+### GATE (fast tier)
+
+CAM + pocket + surfacing + raster + slot **373/373**. Smoke **71/71**. Blocks round-trips + whole-program round-trip
+**8/8** (iron rule intact). Two specs moved WITH the fact rather than around it: `cam-op-seed` (the pocket's mm field
+is gone — restated as the pct, with pct times tool diameter still equal to the canonical `stepoverMm`, which is the
+property that ever mattered) and `raster-live-geometry-1425` PROOF 4. `cam-row-honesty-1414` went RED on the
+delegation commit and GREEN when `GENERATOR_IGNORES.pocket.strategy` came out — the red-then-green that spec was
+written to produce, and it now locks the third disposition too.
+
+### SEEN, NOT INFERRED
+
+`scratchpad/1429-modal-spiral-oneway.png` — the real Build CAM slot modal on a spiral / one-way pocket: Stepover reads
+**45 [%]**, and the three new rows read **Spiral (concentric)** / **One-way climb** / **Plunge (straight)**, each with
+"Expose as branch" DISABLED and the right-hand column stating *built as ...*. The packed bodies from that same run:
+a spiral op packs `( Rectangular pocket — concentric-ring clear, layer by layer )` and a raster/one-way op packs the
+lift / rapid-back / re-plunge / *"every row cut the SAME way — a consistent climb cut"* walk.
+
+### WHAT THIS DELIBERATELY DID NOT DO
+
+`surfacingSlot` still runs `rasterClear` — it is the next delegation, not a rider on this one, and `rasterClear` stays
+for it and for `cpocket`'s neighbourhood. No branch-expose machinery was built (the refusal is declared instead). The
+helix's row-axis phase is named, not changed. Composed multi-part slots still let two generator bodies write the same
+`N8`/`N9` labels — pre-existing (nothing uniquifies labels on the slot path, unlike the block emitter's
+`uniquifyFlowLabels`), unchanged here, and worth a turn of its own.
