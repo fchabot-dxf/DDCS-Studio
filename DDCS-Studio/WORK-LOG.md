@@ -10117,3 +10117,73 @@ the op params, to show the hard-code holds.
 refused. The literal `pocketfill`/`stepover` kernels are untouched; they still serve every refused arm. The concentric
 @work over-declaration is named, not fixed. And the boundary did not get weaker: shape, too-small, rest and the
 envelope all still refuse, asserted in the emitted program per clause.
+
+## t1420 (seat A) — THE ONE RED IN t1418's RADIUS: a spec pinned direction to a block name, not to the emit
+
+Your full suite found it: **2129 passed / 1 failed**, `clearing-cluster-800.spec.js` P6.3. Deterministic in isolation,
+reproduced before touching anything. No product change this turn — the product was right and the reading was stale.
+
+### THE DIAGNOSIS, AND WHY IT IS THE ACT SUCCEEDING RATHER THAN BREAKING
+
+P6.3 built a rect · raster · **oneway** pocket and read `flattenBlocks(stack).find(b => b.type === 'pocketfill')`,
+then asserted `fill.params.direction === 'oneway'`. That was the right reading for exactly as long as every rect
+pocket cleared through that leaf. t1406 re-pointed the both-ways rect arm at `surfaceraster`; t1418 taught the atom
+all three directions — so that config now has **no `pocketfill` in it at all** and the assert read `undefined`.
+
+`undefined` is the tell worth naming: it is not "the direction was lost", it is "the thing I asked for is not there".
+A spec that identifies an arm by a block that moved is exactly the t1387 failure class, and this is the second time
+this arc has hit it (t1406's own reconciler finding was the first). The block name was never the property.
+
+### THE RESTATEMENT — asserted against the arm that EMITS, on BOTH arms
+
+The property is: *a direction the operator picks survives params → stack → Blocks, and the Blocks surface offers the
+three honest values rather than free text.* So P6.3 now checks
+
+  · the **parametric** arm — `surfaceraster` carries `direction: 'oneway'`, **and** that arm really has no `pocketfill`
+    leaf (asserted directly, so the reason the old read went `undefined` is recorded rather than implied);
+  · a **literal** arm that still builds one — a circle pocket's `pocketfill` carries it, unchanged;
+  · the Blockly bridge renders `direction` as a **dropdown** with `['bothways','oneway','otherway']` on **both** block
+    types.
+
+Checking both arms is the part that makes it durable: the day the boundary moves again this test says WHICH arm
+moved instead of reading `undefined` and blaming the round-trip.
+
+**THE BLOCKS HALF NEEDED NO PRODUCT CHANGE, AND I CHECKED RATHER THAN ASSUMED IT.** `SELECTS` in
+`blocks/blockly/bridge.js` is keyed by FIELD NAME, not by `(type, field)` — so `direction` was already a populated
+dropdown on `surfaceraster` the moment the atom listed the field. One registration, both surfaces. Worth asserting
+explicitly, because "wire the Blockly round-trip in new features" is a standing rule and "it happened to already
+work" is not the same as knowing it does.
+
+### THE SIBLING SWEEP — you asked; it found WORDS, not asserts
+
+P6.1 (form order) and P6.2 (emit honesty) both pass and both still mean what they meant. What moved is WHO honours
+the word: on the rect/raster arm it is no longer `stepover.js fillStrategy` unrolling passes in JS, it is the
+`surfaceraster` macro's own row walk. And `spiralIgnores` is no longer "the kernel dispatches to `concentricRect`
+before reading direction" but the atom's declared axis set — which is the same underlying fact on both sides, and a
+better statement of it. I corrected those comments and the two assertion messages, and **left every criterion
+untouched**: a passing assert is not an excuse to rewrite it, and these were already about the EMIT rather than the
+path, which is why they survived the re-point at all.
+
+`oneHasLift` deserves one note: it counts `G0 Z` occurrences, and post-t1406 that is ONE retract line inside the
+macro's row loop rather than one per unrolled pass. The comparison still holds and still means "one-way lifts", but
+the number is now a line count, not a move count. Recorded so nobody reads it as a move census later.
+
+### AND A REPO-WIDE SWEEP FOR THE SAME PIN CLASS, because your full run can only catch REDS
+
+A spec can also pass for the wrong reason. Every other test reading `'pocketfill'` by name, checked:
+
+  · `depth-entry-804` — already accepts either type (`surfaceraster || pocketfill`). Correct.
+  · `shape-types` — polygon/ellipse only, permanently the literal arm. Correct.
+  · `pocket-offset` — the rest-tool arm, which I re-pointed at t1418. Correct.
+  · `pocket-data-emit` — its `stepArm` counter counts `pocketfill` across a 96-case sweep and asserts `> 0`. It passes
+    HONESTLY (non-rect big pockets still build the leaf), but its message says "the STEPOVER arm for big pockets",
+    which has been imprecise since **t1406**, not t1418 — a big RECT pocket is now on the atom and lands in neither
+    counter. The load-bearing assertions there (`armWrong === 0`, `diffs === 0`) are untouched by any of this.
+    **NOT EDITED** — outside the dispatched task and outside my act's radius, and quietly widening a turn is how a
+    one-red fix becomes an unreviewed diff. Reported instead; yours to rule.
+
+### GATE (fast tier, exactly the one you named)
+
+`clearing-cluster-800` **4/4** (was 3 passed / 1 failed). The pocket family + the two other `pocketfill` readers +
+t1418's own spec, re-run together: **90/90** across 15 specs. Smoke **71/71**. No product file touched this turn —
+the diff is one spec file — so the t1418 byte-identity evidence stands unchanged and needed no re-measurement.
