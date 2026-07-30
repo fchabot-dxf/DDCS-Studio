@@ -43,7 +43,7 @@
  * so adopting it costs nothing and buys back a clean verify. The engine reads both — its matcher is `GOTO\s*(\d+)` —
  * so this moves TEXT only; the bridges re-ran and the resolved motion is unchanged, which is the whole check.
  */
-import { num, val } from './util.js';   // t1399 — val() at the seeds: a #var survives to the register, so the knob is reachable
+import { num, val, r3 } from './util.js';   // t1399 — val() at the seeds: a #var survives to the register, so the knob is reachable   // t1425 — r3 from the one source (this file carried an identical local copy)
 import { affineFrame } from './affineFrame.js';   // t1381 — the coordinate/rotation printers, one source (drill shares them)
 import { workMarker } from '../../engine/declaredWork.js';   // t1383 — this body DECLARES how much it executes (its preview was truncating silently)
 
@@ -90,6 +90,47 @@ export function rasterDirectionOf(p = {}) {
  * silently showing a fraction of the toolpath). An unknown word is NOT one-way, exactly as the emitter treats it.
  */
 export function rasterIsOneWay(direction) { return direction === 'oneway' || direction === 'otherway'; }
+
+/**
+ * ── t1425 — A GEOMETRY INPUT THAT MAY BE A PENDANT REGISTER, AND THE ONE PLACE THEIR ARITHMETIC COMBINES ─────────
+ *
+ * THE DEFECT THIS CLOSES, MEASURED AT t1422 BEFORE ANY OF IT WAS BUILT. A CAM slot holds its geometry in REGISTERS
+ * (`pocketSlot` reads `#26xx` into locals and its hand-written raster consumes them: `#22=[<tool>/2]`,
+ * `#24=[#20+<w>-#22]`). This atom held its geometry in BUILD-TIME NUMBERS. Handing the former to the latter did not
+ * fail loudly — `num(word, default)` returns the DEFAULT — so a pendant W of 80 emitted `#40=94`, a 2.4mm stepover
+ * emitted `#44=[12 * 60 / 100]` = 7.2, and a live `inset` collapsed to 0, dropping the tool-radius inset so the
+ * pocket came out OVERSIZE BY A FULL TOOL Ø while the header called itself SURFACING. Clean-looking G-code that cuts
+ * a different part, which is this project's gate-1 defect.
+ *
+ * SO A GEOMETRY INPUT IS READ ONCE, HERE, AND CARRIES BOTH FORMS. `live` says which it is; `w` is the word to print
+ * (the register, or the number already rounded); `n` is the build-time value, floored, for the arithmetic that
+ * genuinely cannot wait for the machine. A numeric input takes the IDENTICAL old path — same floor, same rounding —
+ * which is what makes the byte-identity of every existing program a property of the code rather than a hope.
+ *
+ * THIS IS t1399's SHAPE, NOT A NEW ONE. That turn made `depth`/`stepdown` word-or-number seeds and wrote
+ * `surfaceRasterWorkSteps` to null out on live `w`/`h`/`toolDia`/`stepoverPct`/`stepover` — inputs nothing could set
+ * live yet. The check was written for this continuation; it is cited and asserted rather than re-derived.
+ */
+export const liveWordOf = (v) => { const t = String(v == null ? '' : v).trim(); return /^(#|\[)/.test(t) ? t : null; };
+
+/** A geometry input → { live, w (the word to print), n (the build-time value, floored) }. */
+function geoTerm(v, dflt, floor = null) {
+    const word = liveWordOf(v);
+    const n = floor == null ? num(v, dflt) : Math.max(floor, num(v, dflt));
+    return { live: !!word, w: word || String(r3(n)), n };
+}
+
+/**
+ * `a + k·b`, folded to a NUMBER when neither side is live — so the baked path prints exactly what it always printed
+ * and never grows a `+ 0` nobody asked for. A zero numeric term drops out entirely for the same reason.
+ */
+function geoSum(a, b, k = 1) {
+    if (!a.live && !b.live) return { live: false, w: String(r3(a.n + k * b.n)), n: a.n + k * b.n };
+    if (!b.live && b.n === 0) return a;
+    const mag = Math.abs(k);
+    const term = mag === 1 ? b.w : `${r3(mag)} * ${b.w}`;
+    return { live: true, w: `[${a.w} ${k < 0 ? '-' : '+'} ${term}]`, n: NaN };
+}
 
 /**
  * THE BAND. #40–#49: clear of the mill kit's #20–#33 (camMacroKit's caller/kit split), clear of the probe temps at
@@ -142,6 +183,15 @@ const FRAME_SENTINEL = '-99999';
  * skim body either. This is parity with the shipped literal emitter, not a narrowing.
  */
 export function surfaceRasterAbsorbsRotation(p = {}) {
+    // t1425 — A LIVE-GEOMETRY FRAME REFUSES ROTATION, for a mechanical reason rather than a conceptual one. The
+    // rotation printer mixes each axis's BUILD-TIME constant (`X.c`) into the other axis; when the origin is a
+    // register there is no such constant, so the rotated word would silently drop it. Skim already refuses for its
+    // own (frame-mixing) reason; this is the second way the constant can fail to exist, and it is refused the same
+    // way rather than emitted half-applied — which is precisely t1353's measurement of what a half-rewrite does.
+    if (surfaceRasterLiveInputs(p).length) {
+        return 'a dialled geometry input makes the origin a register, and a program rotation mixes the build-time '
+            + 'constant of each axis into the other — there is no such constant to mix, so the rotation cannot be baked';
+    }
     if (String(p.zMode || '') === 'skim') {
         return 'a skim body is measured from wherever the operator jogged to, so it has no datum frame — rotating it '
             + 'about the part datum would mix two frames (the literal skim path is G91 and was never rotated either)';
@@ -178,6 +228,7 @@ const LABEL_DEFAULTS = {
     rowNearLabel: 15, rowEndLabel: 16,               // rowWalk: which end this row runs to
     rowFarLabel: 17, rowStartLabel: 18,              // rowWalk: which end this row starts at
     ringStepLabel: 21, ringCutLabel: 22,             // ringWalk: first ring vs the diagonal step in
+    ringMinLabel: 23,                                // t1425 — ringWalk: the SHORTER side, resolved at RUN time when w/h are live
     confirmLabel: 31,                                // the confirm-every-N pause skip
     rampPlungeLabel: 41, rampEndLabel: 42,           // the ramp's honest degrade to a plunge
     helixReseedLabel: 51, helixEndLabel: 52,         // the helix re-seed + its final plunge guard
@@ -305,22 +356,46 @@ export function surfaceRasterLines(p = {}) {
      * computed, which is the one source for what a pocket's inset MEANS (t1402: the dispatch's `r + wallOffset` and
      * the shipped `r − wallOffset` disagree in sign, and the shipped one is the one that has always run).
      */
-    const inset = Math.max(0, num(p.inset, 0));
+    /**
+     * ── t1425 — THE GEOMETRY TERMS. Each is a register OR a build-time number; see geoTerm for the defect ─────────
+     * Every `.n` below is EXACTLY the number this file computed before (same defaults, same floors), so the baked
+     * path is unchanged by construction; `.w` is what the seed prints, which is the only thing a live input moves.
+     */
+    const iT = geoTerm(p.inset, 0, 0);
+    const xT = geoTerm(p.x, 0), yT = geoTerm(p.y, 0);
+    const wT0 = geoTerm(p.w, 100), hT0 = geoTerm(p.h, 80);
+    const toolT = geoTerm(p.toolDia, 12, 0.1);
+    // the WALKED rect: the declared one held `inset` inside on both sides
+    const wT = geoSum(wT0, iT, -2), hT = geoSum(hT0, iT, -2);
+    const inset = iT.n;
+    const insetOn = iT.live || iT.n > 0;
+    // A REGISTER IS NAMED, never printed as though it were a millimetre value ("the #22mm inset" reads as 22mm).
+    // The NUMERIC wording is byte-for-byte what this file has always emitted -- caught by the identity sweep when a
+    // first cut reworded both at once, which is exactly what that sweep is for.
+    const insetHeld = iT.live ? `the ${iT.w} inset` : `${iT.w}mm`;
+    const insetSay = iT.live ? `${iT.w} inset` : `${iT.w}mm inset`;   // a live inset IS an inset — reading `> 0` off a register gave 0 and silently faced the part
     const LBL = labelsOf(p);   // t1408 — the emitter's per-program label assignment (the legacy numbers when called direct)
-    const w = num(p.w, 100) - 2 * inset, h = num(p.h, 80) - 2 * inset;
+    const w = wT.n, h = hT.n;
     const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
-    const tool = Math.max(0.1, num(p.toolDia, 12));
+    const tool = toolT.n;
     // ONE DERIVATION, shared with the CAM slot and the wizard stack: stepover is tool Ø × %. A caller still carrying
     // a flat mm has it recovered against the tool it will run — through `stepoverPctOf` above, which is now the only
     // place that rule is written down (t1363).
     const pct = stepoverPctOf(p, tool);
+    // t1425 — the stepover's two words, on the SAME liveWord-or-number pattern the depth/stepdown seeds have used
+    // since t1399. `stepoverPctOf` stays purely numeric (four build-time readers depend on that, t1363) — the live
+    // case is a seed decision, not a second reading of what a stepover MEANS.
+    const pctW = liveWordOf(p.stepoverPct) || String(r3(pct));
+    const stepLive = toolT.live || !!liveWordOf(p.stepoverPct);
     // t1399 — feed AND plunge ride val(): each appears ONLY as a bare `F<word>` interpolation (checked - neither is
     // read by any arithmetic, they are threaded through as opts and printed), so a #var survives and a literal still
     // prints exactly what r3() printed. `plunge` is not in the dispatch's example list, but it is the same construct
     // and the dispatch's CRITERION is the walk's arithmetic - which neither touches. Applying the rule, not the list.
     const feed = val(p.feed, 2000), plunge = val(p.plunge, 200), clr = num(p.clearance, 5);
-    /** A live word (#var / [expr]) or null - the one place this file decides 'is this knob dialled or typed'. */
-    const liveWord = (v) => { const t = String(v == null ? '' : v).trim(); return /^(#|\[)/.test(t) ? t : null; };
+    // t1425 — this was a local copy of the same test; it is now `liveWordOf` at module scope, because the envelope's
+    // live-geometry refusal has to ask the identical question and two copies of "is this knob dialled or typed" is
+    // exactly the split this file keeps closing.
+    const liveWord = liveWordOf;
 
     // t1351 — THE ATOM CARRIES ITS OWN FRAME. x0/y0 were always here; z0 is new, and it is what makes the frame
     // COMPLETE: the surface the depths are measured down from. Together they are the placement shift, absorbed as
@@ -329,9 +404,11 @@ export function surfaceRasterLines(p = {}) {
     // below collapses to exactly what it emitted before, which the bridge asserts byte-for-byte.
     // t1404 — x0/y0 are the WALK's origin, so the inset moves them in on both axes. `extent` below still reads the
     // block's own x/y/w/h, which is what keeps the declared footprint the GIVEN rect. At inset=0 these are unchanged.
-    const x0 = num(p.x, 0) + inset, y0 = num(p.y, 0) + inset, z0 = num(p.z0, 0);
+    // t1425 — the WALK's origin: the op's own frame moved IN by the inset. Both may now be registers, so the origin
+    // is a word-or-number like everything else; `.n` is the number this line always produced.
+    const oxT = geoSum(xT, iT), oyT = geoSum(yT, iT);
+    const x0 = oxT.n, y0 = oyT.n, z0 = num(p.z0, 0);
     const confirmEvery = Math.max(0, Math.round(num(p.confirmEvery, 0)));
-    const r3 = (n) => Math.round(n * 1000) / 1000;
     const zTop = r3(z0);   // the surface this op faces from — 0 in the op's own frame, the placement's offZ when placed
 
     /**
@@ -368,8 +445,26 @@ export function surfaceRasterLines(p = {}) {
     // t1381 — the printers below now come from `affineFrame`, ONE source shared with the drill family's folded atom
     // (which needs the identical axis mix for the identical reason: its pattern points are runtime registers). The
     // arithmetic is unchanged and asserted byte-identical; only its home moved. See affineFrame.js for the derivation.
+    /**
+     * ── t1425 — THE FRAME MAY NOW BE RUNTIME FOR A SECOND REASON ─────────────────────────────────────────────────
+     *
+     * `affineFrame`'s live frame is EXISTING machinery, not new: it is how SKIM has read `#62/#63/#64` since t1355.
+     * A live geometry origin is the same shape with a different source — the slot's `#20/#21` offset registers plus a
+     * live tool-radius inset — so this reaches for the precedent rather than a second mechanism.
+     *
+     * ⚠ SKIM IS LEFT EXACTLY AS IT WAS, INCLUDING A GAP IT ALREADY HAD. A skim frame drops x0/y0 entirely — `ax()`
+     * returns `#62`, never `#62 + x0` — so a skim body with an INSET has always ignored that inset. Folding the inset
+     * in is arguably the more correct reading, and the first cut of this change did exactly that; the byte-identity
+     * sweep caught it as a real difference on `skim × inset 3` and it is NOT this act's to make. The combination is
+     * unreachable in the product (surfacing is the only op that skims and it never insets; a pocket insets and never
+     * skims), so it is recorded as a named pre-existing gap and REFUSED in the live-geometry envelope rather than
+     * quietly changed here. Preserving it keeps proof 1 — the baked path byte-identical — an honest claim.
+     */
+    const frameXW = skim ? SKIM_FRAME.x : oxT.w;
+    const frameYW = skim ? SKIM_FRAME.y : oyT.w;
+    const liveFrame = skim || oxT.live || oyT.live;
     const { F, ax, ay, az, axE, ayE, azE, TM, AX, mv, rot } = affineFrame({
-        x0, y0, zTop, live: skim ? SKIM_FRAME : null,
+        x0, y0, zTop, live: liveFrame ? { x: frameXW, y: frameYW, z: skim ? SKIM_FRAME.z : String(zTop) } : null,
         rotAngle: rotA, rotPivotX: num(p.rotPivotX, 0), rotPivotY: num(p.rotPivotY, 0),
         absorbs: surfaceRasterAbsorbsRotation(p) === true,
     });
@@ -380,6 +475,8 @@ export function surfaceRasterLines(p = {}) {
     const opts = { x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
         helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1), toolDia: tool, stepBaked,
         direction: rasterDirectionOf(p),   // t1418 — the row walk reads it; ringWalk does not, and SURFACE_RASTER_AXES says so
+        wT, hT, geoLive: wT.live || hT.live,   // t1425 — the ring count resolves its min at RUN time when either side is live
+        liveGap: surfaceRasterLiveGap(p),      // t1425 — a descent that bakes geometry degrades honestly rather than baking against a dial
         rot, mv, AX, TM, LBL };   // t1375 — the rotation goes through the ONE move printer, so each walk declares points, not words
     const walk = (p.strategy === 'concentric') ? ringWalk(opts) : rowWalk(opts);
 
@@ -417,10 +514,10 @@ export function surfaceRasterLines(p = {}) {
         // treats a wrong operator message as a gate-1 defect rather than a cosmetic one (t1404's collapse guard got
         // its own label for exactly this reason), and the man reading the program at the pendant cannot see which
         // wizard produced it. Keyed on `inset > 0` so the surfacing path is untouched and asserted byte-identical.
-        `( ---- ${inset > 0 ? 'AREA CLEARING' : 'SURFACING'}, parametric. Every var below speaks; change one and the loops re-derive.`
+        `( ---- ${insetOn ? 'AREA CLEARING' : 'SURFACING'}, parametric. Every var below speaks; change one and the loops re-derive.`
             + `${surfaceRasterWorkSteps(p) == null ? '' : ' · ' + workMarker(surfaceRasterWorkSteps(p))} ---- )`,
-        `${V.w}=${r3(w)}   ( area X — ${inset > 0 ? `the tool-CENTRE sweep, held ${r3(inset)}mm inside the declared edge` : 'the tool-CENTRE sweep, so the tool overhangs the edge'} )`,
-        `${V.h}=${r3(h)}   ( area Y )`,
+        `${V.w}=${wT.w}   ( area X — ${insetOn ? `the tool-CENTRE sweep, held ${insetHeld} inside the declared edge` : 'the tool-CENTRE sweep, so the tool overhangs the edge'} )`,
+        `${V.h}=${hT.w}   ( area Y )`,
         // ── t1399 — THE TWO LIVE KNOBS, and the seed is a WORD-OR-NUMBER rather than a plain val() ─────────────────
         // A live `#var` rides verbatim; a numeric takes the SAME path it always did, floor included. That distinction is
         // not pedantry: `stepdown` is floored at 0.01 before printing, so a plain `val()` would have emitted `#43=0` for
@@ -431,17 +528,19 @@ export function surfaceRasterLines(p = {}) {
         // THE LIVE CASE IS SAFE BY A GUARD THAT WAS ALREADY HERE: `IF #43 <= 0 GOTO91` sits four lines below and reads the
         // REGISTER at run time. It was written for a baked zero and covers a dialled one unchanged — so unlike holecycle,
         // this atom needed no new refusal, only the check that the existing one reaches the new path.
-        `${V.depth}=${liveWord(p.depth) || r3(depth)}   ( total depth to ${inset > 0 ? 'clear' : 'face off'} )`,
+        `${V.depth}=${liveWord(p.depth) || r3(depth)}   ( total depth to ${insetOn ? 'clear' : 'face off'} )`,
         `${V.stepdown}=${liveWord(p.stepdown) || r3(stepdown)}   ( bite per level )`,
-        `${V.step}=[${r3(tool)} * ${r3(pct)} / 100]   ( stepover mm = tool Ø ${r3(tool)} x ${r3(pct)}% — the CAM derives it the same way )`,
+        // t1425 — the composition is UNCHANGED (`[tool * pct / 100]`, the shape the CAM slot derives too); only the
+        // two operands may now be registers, so dialling either at the machine re-derives the stepover there.
+        `${V.step}=[${toolT.w} * ${pctW} / 100]   ( stepover mm = tool Ø ${toolT.w} x ${pctW}% — the CAM derives it the same way )`,
         `IF ${V.step} <= 0 GOTO${LBL.errLabel}   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
         `IF ${V.stepdown} <= 0 GOTO${LBL.errLabel}`,
         // t1404 — AN INSET CAN EAT THE AREA, and a collapsed rect walks an inverted ring rather than failing loudly.
         // Emitted only when an inset is actually declared, so the zero case stays byte-identical; and it gets its own
         // label + message because refusing through GOTO91 would tell the operator the STEPOVER was zero, which is a
         // wrong operator message — the thing this project treats as seriously as wrong motion.
-        ...(inset > 0 ? [
-            `IF ${V.w} <= 0 GOTO${LBL.insetErrLabel}   ( the ${r3(inset)}mm inset leaves no width to clear )`,
+        ...(insetOn ? [
+            `IF ${V.w} <= 0 GOTO${LBL.insetErrLabel}   ( the ${insetSay} leaves no width to clear )`,
             `IF ${V.h} <= 0 GOTO${LBL.insetErrLabel}`,
         ] : []),
         ...walk.count,
@@ -469,10 +568,10 @@ export function surfaceRasterLines(p = {}) {
         `N${LBL.errLabel}`,
         '#1505=1   ;ERROR: stepover / stepdown must be greater than zero',
         `N${LBL.okLabel}`,
-        ...(inset > 0 ? [
+        ...(insetOn ? [
             `GOTO${LBL.insetOkLabel}`,
             `N${LBL.insetErrLabel}`,
-            `#1505=1   ;ERROR: the ${r3(inset)}mm inset leaves no area to clear - the tool is too large for this feature`,
+            `#1505=1   ;ERROR: the ${insetSay} leaves no area to clear - the tool is too large for this feature`,
             `N${LBL.insetOkLabel}`,
         ] : []),
         ...refusal,
@@ -522,6 +621,24 @@ export function surfaceRasterLines(p = {}) {
  * (all of parallel, and concentric×plunge) unchanged.
  */
 function descentLines(o) {
+    /**
+     * t1425 — THE HONEST DEGRADE, and why it exists beside a refusal that should already have caught this.
+     *
+     * The ENVELOPE refuses ramp/helix with dialled geometry (surfaceRasterLiveGap), and every consumer asks it. But
+     * `surfaceRasterLines` is also callable directly, and this atom's own convention is that the emitter emits and
+     * the envelope refuses — which is right for `strategy: 'adaptive'` (you get the parallel walk, nothing moves
+     * wrongly) and NOT right here: a ramp built from default w/h against a pendant-dialled rect would cut a real
+     * descent in the wrong place. So the emitter degrades to the plunge it can always do correctly, and SAYS SO in
+     * the program. That is the literal kernel's own pattern — `( ramp Xdeg needs Ymm, first move Zmm -> plunge )` —
+     * applied to a build-time impossibility instead of a run-time one.
+     */
+    const bakeGap = o.liveGap;
+    if (bakeGap && (o.entry === 'ramp' || o.entry === 'helix')) {
+        return [
+            `    ( ${o.entry} entry degraded to a plunge - its geometry is baked and this area is dialled )`,
+            `    G1 Z${o.azE('- ' + V.z)} F${o.plunge}   ( the ONE plunge of this level )`,
+        ];
+    }
     if (o.entry === 'ramp') return rampLines(o);
     if (o.entry === 'helix') return helixLines(o);
     return [`    G1 Z${o.azE('- ' + V.z)} F${o.plunge}   ( the ONE plunge of this level )`];
@@ -797,11 +914,26 @@ function ringWalk(o) {
     const OUT_Y = () => AX(ayE(0, `${V.h} - ${RING_INSET}`), y0, [TM(V.h), TM(RING_INSET, -1)]);
     return {
         count: [
-            // THE RING COUNT — how many insets fit before the SHORTER side closes. The shorter side is resolved here
+            // THE RING COUNT — how many insets fit before the SHORTER side closes. The shorter side WAS resolved here
             // rather than in the macro because it is a fact about the AREA, not a dial the operator turns. The
             // −0.001 is the collapse BOUNDARY, not a fudge: at h exactly 2·k·step the k-th ring has zero height, and
             // the literal kernel does not walk it either (its `bx-ax < 1e-6` break is the same test).
-            `${V.n}=[FIX[[${r3(Math.min(w, h))} - 0.001] / [2 * ${V.step}]] + 1]   ( rings that FIT before the middle closes )`,
+            //
+            // t1425 — AND THE MOMENT THE AREA *IS* A DIAL, THAT REASONING INVERTS. A pendant W/H makes the shorter
+            // side a runtime fact, so it is resolved at run time: three lines, ONE comparison, and NO new register —
+            // the min lands in `#45` itself and is then overwritten by the count computed from it. A separate temp
+            // would have had to come from the descent's band (#34-#39), and a helix descent runs inside this very
+            // walk, which is exactly the kind of sharing-by-unwritten-invariant t1375 spent a turn undoing.
+            // The BAKED path below is untouched and asserted byte-identical.
+            ...(o.geoLive ? [
+                `${V.n}=${V.w}`,
+                `IF ${V.h} >= ${V.w} GOTO${LBL.ringMinLabel}   ( the ring count is driven by the SHORTER side )`,
+                `${V.n}=${V.h}`,
+                `N${LBL.ringMinLabel}`,
+                `${V.n}=[FIX[[${V.n} - 0.001] / [2 * ${V.step}]] + 1]   ( rings that FIT before the middle closes )`,
+            ] : [
+                `${V.n}=[FIX[[${r3(Math.min(w, h))} - 0.001] / [2 * ${V.step}]] + 1]   ( rings that FIT before the middle closes )`,
+            ]),
             `IF ${V.n} < 1 THEN ${V.n}=1`,
         ],
         body: [
@@ -920,6 +1052,78 @@ export const SURFACE_RASTER_PROVEN = {
 export const SURFACE_RASTER_IGNORES = {};
 
 /**
+ * ── t1425 — WHAT EACH (strategy, entry) STILL BAKES, AND THEREFORE CANNOT TAKE FROM A PENDANT ────────────────────
+ *
+ * The seeds, the frame and the inset all ride registers now, and the ring count resolves its own min at run time —
+ * so PLUNGE, on either walk, has nothing left baked and honours a live geometry input end to end. The two DESCENTS
+ * are different, and the difference is not effort but evidence:
+ *
+ *   RAMP bakes the distance from its start to the area centre — a HYPOTENUSE. Computing it at the machine needs
+ *   SQRT, which is UNVERIFIED on this controller: the linter's word list is an allow-list, not evidence, and ATAN
+ *   shipping in the alignment probe proves only itself (t1339 wrote this down; V13_trig.nc is the decider). The
+ *   alternative that needs no square root at all — the +X declared run vector the literal kernel already supports
+ *   via runX/runY — is the deferred improvement turn's job, with its own proof, and it is what LIFTS this row.
+ *
+ *   HELIX bakes the rect inradius that CLAMPS its radius, and that radius then seeds the rotating vector whose
+ *   9-decimal constants are the whole reason the descent stays inside one emit quantum (t1343).
+ *
+ * DECLARED AS DATA because the next act reads it: the slot delegation must know, from a table rather than from
+ * reading three walks, which combinations it may pack live and which it must refuse. Refusing at PACK time in these
+ * words is the whole point — never at the machine, with the tool down.
+ *
+ * ⚠ THE COST OF THIS ROW IS ALMOST NOTHING, which is why refusing beats half-building. `POCKET_FIELDS` carries no
+ * descent control at all, so a packed pocket's entry is whatever the op held at pack time and a pocket op defaults
+ * to `plunge`. Nobody can dial into a refused combination from the pendant, because no control reaches it.
+ *
+ * `direction` is NOT an axis here: what a descent bakes is the same whichever way the rows run. (The one-way mirror
+ * moves the descent's START to the far end, which is a term in the same already-baked rect, not a new bake.)
+ */
+const BAKES_GEOMETRY = ['w', 'h', 'inset', 'toolDia', 'stepoverPct', 'stepover'];
+export const SURFACE_RASTER_BAKES = {
+    'parallel/plunge': { inputs: [], why: '' },
+    'concentric/plunge': { inputs: [], why: '' },
+    'parallel/ramp': { inputs: BAKES_GEOMETRY, why: 'a ramp bakes the distance from its start to the area centre — a hypotenuse, and SQRT is unverified on this controller (t1339). The run-vector alternative that needs no square root is the deferred improvement turn' },
+    'concentric/ramp': { inputs: BAKES_GEOMETRY, why: 'a ramp bakes the distance from the ring corner to the area centre — a hypotenuse, and SQRT is unverified on this controller (t1339)' },
+    'parallel/helix': { inputs: BAKES_GEOMETRY, why: 'a helix bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector the descent depends on (t1343)' },
+    'concentric/helix': { inputs: BAKES_GEOMETRY, why: 'a helix bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector the descent depends on (t1343)' },
+};
+
+/**
+ * Which geometry inputs of THIS config are live (dialled), in declaration order. One reading, shared by the envelope
+ * refusal, the emitter's honest degrade and the specs — so none of them can disagree about what "live" means here.
+ */
+export function surfaceRasterLiveInputs(p = {}) {
+    return BAKES_GEOMETRY.filter((k) => liveWordOf(p[k]) != null)
+        .concat(liveWordOf(p.x) != null ? ['x'] : []).concat(liveWordOf(p.y) != null ? ['y'] : []);
+}
+
+/**
+ * Why this config's LIVE geometry cannot be honoured, in the words a reader needs — or '' when it can.
+ *
+ * Two refusals, both narrow and both named:
+ *   the DESCENT   ramp/helix bake the walked rect and the stepover (SURFACE_RASTER_BAKES, above).
+ *   SKIM          a skim frame deliberately drops the op's own origin — `ax()` returns the jog register, never the
+ *                 register plus x0 — so an inset given to a skim body has ALWAYS been ignored. That is a pre-existing
+ *                 gap, unreachable in the product (surfacing is the only op that skims and never insets; a pocket
+ *                 insets and never skims), and this act declines to change it silently under cover of a different
+ *                 feature. It is refused here instead, so a live input can never land somewhere that quietly drops it.
+ */
+export function surfaceRasterLiveGap(p = {}) {
+    const live = surfaceRasterLiveInputs(p);
+    if (!live.length) return '';
+    if (String(p.zMode || '') === 'skim') {
+        return `a skim body reads its frame from wherever the operator jogged to and drops the op's own origin, so a `
+            + `dialled ${live.join('/')} would be silently ignored — skim takes build-time geometry only`;
+    }
+    const strategy = String(p.strategy == null ? '' : p.strategy).trim() || 'parallel';
+    const entry = String(p.entry == null ? '' : p.entry).trim() || 'plunge';
+    const row = SURFACE_RASTER_BAKES[`${strategy}/${entry}`];
+    if (!row) return '';   // an unknown combination is refused by the envelope table itself, in its own words
+    const hit = live.filter((k) => row.inputs.includes(k));
+    return hit.length ? `${entry} cannot take a dialled ${hit.join('/')} — ${row.why}` : '';
+}
+
+/**
  * (strategy, direction, entry) → the table's key, over whichever axes THIS strategy reads (SURFACE_RASTER_AXES).
  *
  * ABSENT falls to the default (the block's own `parallel`/`bothways`/`plunge`) — an unset config IS the defaults, and
@@ -945,11 +1149,17 @@ function surfaceRasterCombo(p = {}) {
  * level, not a walk or a descent.
  */
 export function surfaceRasterCovers(p = {}) {
+    // t1425 — a LIVE-GEOMETRY refusal is part of the envelope, not a second gate beside it: the question the table
+    // answers is "may this config be emitted", and a dialled input the walk bakes is as much a no as an unbridged
+    // descent. Folding it in here is what lets the next act's delegation ask ONE predicate.
+    if (surfaceRasterLiveGap(p)) return false;
     return Object.prototype.hasOwnProperty.call(SURFACE_RASTER_PROVEN, surfaceRasterCombo(p));
 }
 
 /** Why a config is outside the envelope, in the words a reader needs — never a bare false. */
 export function surfaceRasterGap(p = {}) {
+    const liveGap = surfaceRasterLiveGap(p);
+    if (liveGap) return liveGap;
     const k = surfaceRasterCombo(p);
     if (Object.prototype.hasOwnProperty.call(SURFACE_RASTER_PROVEN, k)) return '';
     return `${k} has no equivalence bridge — no turn has measured this walk/descent pair against the literal kernel, `
@@ -986,15 +1196,22 @@ export const surfaceRasterBlock = {
     flowLabels: (p = {}) => {
         const out = ['errLabel', 'okLabel'];
         if (String(p.zMode || '') === 'skim') out.push('skimErrLabel', 'skimOkLabel');
-        if (Math.max(0, num(p.inset, 0)) > 0) out.push('insetErrLabel', 'insetOkLabel');
-        if (String(p.strategy || '') === 'concentric') out.push('ringStepLabel', 'ringCutLabel');
+        if (liveWordOf(p.inset) || Math.max(0, num(p.inset, 0)) > 0) out.push('insetErrLabel', 'insetOkLabel');   // t1425 — a LIVE inset is an inset
+        if (String(p.strategy || '') === 'concentric') {
+            out.push('ringStepLabel', 'ringCutLabel');
+            // t1425 — the runtime shorter-side branch exists only when the area is dialled
+            if (liveWordOf(p.w) || liveWordOf(p.h) || liveWordOf(p.inset)) out.push('ringMinLabel');
+        }
         // t1418 — the ONE-WAY row walk writes TWO of the six. Four of them exist only to choose which END a row runs
         // to, and a one-way walk has no end to choose. Declaring all six anyway would reserve four numbers no branch
         // in this body can reach — the exact thing this declaration's own rule forbids.
         else if (rasterIsOneWay(rasterDirectionOf(p))) out.push('rowStepLabel', 'rowCutLabel');
         else out.push('rowStepLabel', 'rowCutLabel', 'rowNearLabel', 'rowEndLabel', 'rowFarLabel', 'rowStartLabel');
         if (Math.max(0, Math.round(num(p.confirmEvery, 0))) > 0) out.push('confirmLabel');
-        const entry = String(p.entry || 'plunge');
+        // t1425 — A DEGRADED DESCENT WRITES NO LABELS, and following that here is the declaration's own rule, not a
+        // nicety: when dialled geometry forces the honest degrade the body emits a plunge and a comment, so
+        // declaring the ramp/helix pairs would reserve four numbers nothing in this config can reach.
+        const entry = surfaceRasterLiveGap(p) ? 'plunge' : String(p.entry || 'plunge');
         if (entry === 'ramp') out.push('rampPlungeLabel', 'rampEndLabel');
         if (entry === 'helix') out.push('helixReseedLabel', 'helixEndLabel');
         return out;
@@ -1008,7 +1225,12 @@ export const surfaceRasterBlock = {
     // Blocks canvas, where editing w/h does not rewrite the parent's snapshot).
     // The rect is the tool-CENTRE sweep at the atom's own local frame, exactly the bbox surfacefill's region contour
     // gave for shape:'rect' — so the built-in is unmoved (its snapshot was already built from the same w/h).
-    extent: (p) => ({ minX: num(p.x, 0), maxX: num(p.x, 0) + num(p.w, 100), minY: num(p.y, 0), maxY: num(p.y, 0) + num(p.h, 80) }),
+    // t1425 — NULL WHEN THE FOOTPRINT CANNOT BE KNOWN, the same rule `surfaceRasterWorkSteps` follows: a dialled
+    // x/y/w/h has no build-time value, and `num(word, default)` would hand the place fold a footprint computed from
+    // this atom's DEFAULTS — the exact silent substitution t1422 measured one level down. `liveExtent` already treats
+    // a falsy answer as "unmeasurable" and keeps the frozen snapshot, so the honest answer is one the caller handles.
+    extent: (p) => (['x', 'y', 'w', 'h'].some((k) => liveWordOf(p[k]) != null) ? null
+        : { minX: num(p.x, 0), maxX: num(p.x, 0) + num(p.w, 100), minY: num(p.y, 0), maxY: num(p.y, 0) + num(p.h, 80) }),
     lines: (p) => surfaceRasterLines(p),
     // t1359 — THE LEAF CONTRACT. blockEmitter's default leaf path calls def.emit(p, dx, dy, dialect); `lines` above is
     // the pure body other readers use. dx/dy are the STAMP offsets a container (Array/Path) applies to a child — zero

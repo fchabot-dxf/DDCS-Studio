@@ -60,13 +60,28 @@ export const d6 = (n) => Number(n.toFixed(6));
  */
 export function affineFrame({ x0 = 0, y0 = 0, zTop = 0, live = null, rotAngle = 0, rotPivotX = 0, rotPivotY = 0, absorbs = true } = {}) {
     const F = live ? { ...live, live: true } : { x: String(r3(x0)), y: String(r3(y0)), z: String(zTop), live: false };
-    const ax = (rel = 0) => (F.live ? (rel ? `[${F.x} + ${r3(rel)}]` : `${F.x}`) : `${r3(x0 + rel)}`);
-    const ay = (rel = 0) => (F.live ? (rel ? `[${F.y} + ${r3(rel)}]` : `${F.y}`) : `${r3(y0 + rel)}`);
-    const az = (rel = 0) => (F.live ? (rel ? `[${F.z} + ${r3(rel)}]` : `${F.z}`) : `${r3(Number(zTop) + rel)}`);
+    /**
+     * t1425 — A LIVE FRAME MAY CARRY A PLAIN NUMBER ON ONE AXIS, and folding it is what keeps that emit readable.
+     *
+     * Until now a live frame meant SKIM, whose three axes are always registers (`#62/#63/#64`), so this never arose.
+     * A live-GEOMETRY frame can be mixed: a slot's X/Y are registers while its Z surface is still the build-time 0.
+     * Without this fold every Z word would come out `[0 + 5]` — correct, and noise on every line of the program.
+     * Existing callers are untouched by construction: `#62` is not a number, so nothing folds that did not before.
+     */
+    const NUMWORD = /^-?\d*\.?\d+$/;
+    const fold = (word, rel) => (NUMWORD.test(word)
+        ? `${r3(Number(word) + rel)}`
+        : (rel ? `[${word} + ${r3(rel)}]` : `${word}`));
+    const ax = (rel = 0) => (F.live ? fold(F.x, rel) : `${r3(x0 + rel)}`);
+    const ay = (rel = 0) => (F.live ? fold(F.y, rel) : `${r3(y0 + rel)}`);
+    const az = (rel = 0) => (F.live ? fold(F.z, rel) : `${r3(Number(zTop) + rel)}`);
     // origin + a build-time offset + a RUNTIME term. The offset folds into the origin when the origin is a number,
     // so a placed body keeps writing `[103.6 + #49 * 0.8]` rather than growing a `0 +` nobody asked for.
-    const axE = (rel, expr) => (F.live ? (rel ? `[${F.x} + ${r3(rel)} + ${expr}]` : `[${F.x} + ${expr}]`) : `[${r3(x0 + rel)} + ${expr}]`);
-    const ayE = (rel, expr) => (F.live ? (rel ? `[${F.y} + ${r3(rel)} + ${expr}]` : `[${F.y} + ${expr}]`) : `[${r3(y0 + rel)} + ${expr}]`);
+    const foldE = (word, rel, expr) => (NUMWORD.test(word)
+        ? `[${r3(Number(word) + rel)} + ${expr}]`
+        : (rel ? `[${word} + ${r3(rel)} + ${expr}]` : `[${word} + ${expr}]`));
+    const axE = (rel, expr) => (F.live ? foldE(F.x, rel, expr) : `[${r3(x0 + rel)} + ${expr}]`);
+    const ayE = (rel, expr) => (F.live ? foldE(F.y, rel, expr) : `[${r3(y0 + rel)} + ${expr}]`);
     const azE = (expr) => `[${F.z} ${expr}]`;        // expr carries its own sign, e.g. '- #46'
 
     const rot = (rotAngle && absorbs === true)

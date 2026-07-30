@@ -10288,3 +10288,130 @@ reaches them.
 *(Recorded here because the pass-back note lost this paragraph to shell backtick substitution — the hazard my own
 notes already warn about, hit anyway by writing `entry` in backticks inside a double-quoted --note. Fixed by
 carrying the point in the log, where it belongs, and re-passing.)*
+
+## t1425 (seat A) — THE ATOM LEARNS LIVE GEOMETRY: w/h/tool/stepover/frame/inset all ride registers now
+
+The C-split's first half. `surfaceraster` held its geometry in build-time numbers; a CAM slot holds its in registers.
+That gap was measured at t1422 and it did not fail loudly — `num(word, default)` returns the DEFAULT, so a pendant
+W of 80 emitted `#40=94`, a 2.4mm stepover emitted `7.2`, and a live `inset` collapsed to 0, dropping the tool-radius
+inset so a pocket came out oversize by a full tool Ø while the header called itself SURFACING. **That whole class is
+closed.** The slot delegation is the next act; this one teaches and PROVES the substrate alone.
+
+### WHAT NOW RIDES A REGISTER, AND THE ONE DECLARATION IT ALL READS
+
+`geoTerm` reads a geometry input ONCE and carries both forms: `live` (which it is), `w` (the word to print — the
+register, or the number already rounded) and `n` (the build-time value, floored). `geoSum` combines two of them and
+**folds to a plain number when neither is live**, which is what makes the byte-identity of every existing program a
+property of the code rather than a hope: the baked path literally cannot take a different branch.
+
+    #40=[#4 - 2 * #6]   ( area X — the tool-CENTRE sweep, held the #6 inset inside the declared edge )
+    #41=[#5 - 2 * #6]
+    #42=#7 · #43=#8
+    #44=[#9 * #10 / 100]   ( stepover mm = tool Ø #9 x #10% )
+    G0 X[#2 + #6] Y#47  ·  G1 X[[#2 + #6] + #40] F#11
+
+`stepoverPctOf` stays purely NUMERIC. Four build-time readers depend on that (t1363 unified them), and the live case
+is a SEED decision, not a second reading of what a stepover means — so the seed asks `liveWordOf(p.stepoverPct) ||
+r3(pct)`, exactly the pattern `depth`/`stepdown` have used since t1399. No second source.
+
+**THE FRAME REACHED FOR AN EXISTING MECHANISM.** `affineFrame`'s live frame is how SKIM has read `#62/#63/#64` since
+t1355; a live geometry origin is the same shape with a different source, so it uses that rather than a second one.
+The one addition is a numeric FOLD inside the printer: a live frame can now be MIXED (X/Y registers, Z still the
+build-time 0), and without folding, every Z word would come out `[0 + 5]`. Existing callers are untouched by
+construction — `#62` is not a number, so nothing folds that did not before.
+
+### THE CONCENTRIC RING COUNT NOW RESOLVES ITS OWN SHORTER SIDE
+
+The old line baked `min(w,h)`, and the reason given was that the shorter side is *"a fact about the AREA, not a dial
+the operator turns."* **The moment the area IS a dial, that reasoning inverts.** So when either side is live:
+
+    #45=#40 · IF #41 >= #40 GOTO23 · #45=#41 · N23 · #45=[FIX[[#45 - 0.001] / [2 * #44]] + 1]
+
+Three lines, ONE comparison, **no new register** — the min lands in `#45` itself and is then overwritten by the count
+computed from it. A separate temp would have had to come from the descent's band (#34-#39), and a helix descent runs
+inside this very walk: that is the sharing-by-unwritten-invariant t1375 spent a turn undoing. One new flow label
+(`ringMinLabel`), declared, and declared ONLY when the branch is actually written.
+
+### WHAT STILL BAKES IS A TABLE, AND IT REFUSES RATHER THAN GUESSING
+
+`SURFACE_RASTER_BAKES`, keyed (strategy, entry), read by the envelope — and by the next act's delegation, which is
+why it is data rather than three walks to re-read. **PLUNGE bakes nothing on either walk.** Both descents do, and for
+reasons that are EVIDENCE rather than effort:
+
+  · **ramp** bakes the distance from its start to the area centre — a hypotenuse. Live, that needs SQRT, which is
+    UNVERIFIED on this controller (t1339 wrote it down; the linter's word list is an allow-list, not evidence). The
+    +X run-vector alternative that needs no square root is the deferred improvement turn, and it is what LIFTS the row.
+  · **helix** bakes the rect inradius that clamps its radius, and that radius seeds the rotating vector whose
+    9-decimal constants keep the descent inside one emit quantum (t1343).
+
+`direction` is deliberately NOT an axis of this table: what a descent bakes is the same whichever way the rows run.
+
+**AND THE REFUSAL IS CHEAP, by the smaller fact from t1422** — `POCKET_FIELDS` carries no descent control, so a packed
+pocket's entry is whatever the op held and a pocket op defaults to plunge. Nobody can dial into a refused combination
+because no control reaches it. Baked-geometry ramp/helix (the wizard path) is untouched and still fully covered.
+
+### THREE THINGS I ADDED BEYOND THE DISPATCH, EACH BECAUSE THE ALTERNATIVE WAS SILENT AND WRONG
+
+1. **ROTATION REFUSES A LIVE FRAME.** The rotation printer mixes each axis's BUILD-TIME constant into the other; with
+   a register origin there is no such constant, so the rotated word would silently drop it — t1353's half-rewrite,
+   exactly. Skim already refuses for its own reason; this is the second way the constant can fail to exist and it is
+   refused the same way rather than emitted half-applied.
+2. **THE HONEST DEGRADE.** The envelope refuses ramp/helix with dialled geometry and every consumer asks it — but
+   `surfaceRasterLines` is callable directly, and this atom's convention (the emitter emits, the envelope refuses) is
+   right for `strategy: 'adaptive'` and NOT right here: a ramp built from default w/h against a dialled rect would
+   cut a real descent in the wrong place. So it degrades to the plunge it can always do correctly and SAYS SO in the
+   program — the literal kernel's own `( ramp … -> plunge )` pattern, applied to a build-time impossibility.
+   `flowLabels` follows: a degraded descent declares none of the labels it no longer writes.
+3. **`extent` RETURNS NULL WHEN LIVE.** `num(word, default)` would have handed the place fold a footprint computed
+   from this atom's DEFAULTS — the same silent substitution one level down. `liveExtent` already treats a falsy
+   answer as unmeasurable and keeps the frozen snapshot, so the honest answer is one the caller already handles.
+
+### TWO THINGS MY OWN BYTE-IDENTITY SWEEP CAUGHT IN MY WORK — both worth recording
+
+1. **SKIM × INSET.** My first cut folded the inset into the skim frame, which is arguably the more correct reading —
+   and the sweep flagged it as a real difference. A skim frame deliberately DROPS the op origin (`ax()` returns the
+   jog register, never register + x0), so a skim body with an inset has ALWAYS ignored that inset. It is a
+   pre-existing gap, **unreachable in the product** (surfacing is the only op that skims and never insets; a pocket
+   insets and never skims), and it is not this act's to change under cover of a different feature. Reverted to the
+   exact old behaviour and **refused** in the live-geometry envelope instead, so a live input can never land
+   somewhere that quietly drops it. Keeping proof 1 an honest claim is worth more than the drive-by fix.
+2. **A REWORDED COMMENT IS A BYTE CHANGE.** Naming the inset register properly (`#22mm` reads as 22 millimetres) also
+   reworded the NUMERIC sentence. Caught, split into two wordings, baked text restored exactly. Small, and exactly
+   what the sweep is for.
+
+### THE FOUR PROOFS
+
+1. **THE BAKED PATH IS BYTE-IDENTICAL.** 576 configs — both walks × three descents × all three directions × skim ×
+   inset × rotation × confirm cadence × a placed origin — emitted through the HEAD file and the new one side by side:
+   **0 differences**, with `surfaceRasterWorkSteps` and `flowLabels` identical on every one. In-app, the 288-config
+   cross-product is additionally asserted well-formed and always work-declaring.
+2. **A LIVE-SEEDED EMIT CUTS THE SAME PATH.** The one that matters, and it is about MOTION, not text: seed the
+   registers the way a slot does (a read-line per field into a local — t1410's indirection chain) and trace both.
+   **Same cuts AND same rapids, move for move, across 10 configurations** — both one-way walks, both concentric
+   min-branches (w<h and h<w, so the runtime comparison is exercised in both directions), a non-dividing stepover, a
+   one-row area, a clamped last bite and a zero inset. `@work` is asserted null on the live side (t1399 wrote that
+   check for exactly this continuation, when nothing could set these live) and non-null on the baked one.
+3. **THE REMAINING BAKES ARE DECLARED**, per (strategy, entry), with plunge empty on both walks, each descent naming
+   what it bakes and why, and each still fully covered with BAKED geometry.
+4. **THE BANDS ARE DISJOINT** — the atom's #34-49/#62-64 against `bandsFor('pocket')`'s #20-33, pinned as an assert
+   because the atom's body is about to land inside a slot's program beside that generator's own scratch.
+
+### SEEN, NOT INFERRED
+
+`scratchpad/1425-live-seeded-traced.png` — the real app, the editor holding the fully live-seeded macro (every
+geometry input a register: `#40=[#4 - 2 * #6]`, `#44=[#9 * #10 / 100]`, `G0 X[#2 + #6]`), traced in the 3D preview.
+`scratchpad/1425-live-seeded-plan.png` is the same program in plan view, where the app's OWN status line reads
+**"108 cuts · 109 rapids"** — the same numbers the bridge asserts against the baked emit. Framing note, honestly: both
+views are scaled to the default 300mm stock rather than the 90mm program, so the path is small in frame; the status
+line is the readable evidence and the bridge is the decisive one.
+
+### GATE (fast tier)
+
+New spec **13/13**. Surfacing family + envelope + pocket bridges **180/180** across 14 specs. Pocket + CAM + iron rule
+**45/45**. Iron rule **11/11, the same eleven**. Smoke **71/71**.
+
+### WHAT THIS DELIBERATELY DID NOT DO
+
+No slot was touched — `pocketSlot` still runs its hand-written `rasterClear`, so nothing in the product changed
+behaviour and the delegation is the next act, now with regression-free substrate. The ramp's SQRT and the helix's
+inradius are refused, not built. The skim×inset gap is named, not fixed. `stepoverPctOf` stays numeric.
