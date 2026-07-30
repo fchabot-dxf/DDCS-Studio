@@ -10904,3 +10904,71 @@ knob-binding / setup-sheet / time-estimate) **49/49**. Iron rule **11/11**, same
 
 NOT released: the dispatch reads "MY FULL SUITE gates; release on green", and the full suite is the advisor's to run.
 The tree is release-ready and the V-bump is one command away — say the word.
+
+## t1435 (seat A) — THE RADIUS RED: the universal mint moved because a declaration worked; and the scope answer is GLOBAL
+
+**The red is the aggregator doing its job, not a break.** `wallfinish` declares `[[11, 14]]` at the injection site;
+`universalScratch.opBands()` reads every palette atom's declaration; so a universal slot's field vars now step over
+#11-#14 too. The spec pinned the OLD skip list as a literal, which is exactly what a pinned list is for — it caught a
+real movement and made me state whether the movement was intended.
+
+**MEASURED, NOT GUESSED.** The 7th..12th field vars move from #11..#16 to #15/#16/#18/#19/#20/#21. The **first six are
+unchanged** (#1-#4, then #7/#8), so every universal op with six or fewer exposed params renumbers by nothing at all —
+the same narrowing slice B's own release note made. Past six params they shift up by four. I re-pinned the literal list
+rather than relaxing it to the invariant, because the invariant alone ("no field var lands in the band") would pass on
+a mint that skipped half the register file; the list is what catches an accidental WIDENING.
+
+### THE SCOPE QUESTION, ANSWERED: GLOBAL, AND GLOBAL BY ARCHITECTURE
+
+`opBands()` unions **every palette atom's** declaration, never the atoms present in one stack. That is not an accident
+of the union and it is not new — t1085 slice C wrote the reason down at the module header, and it still holds:
+
+> a custom op's stack is **USER-EDITABLE AFTER THE SLOT IS MINTED**.
+
+Mint per-stack and the numbering is correct only until somebody drops a Wall Finish block into the op — at which point
+the wall body writes #11-#14 over four field vars, silently, in a slot that may already be installed on the controller.
+**Re-minting on edit does not rescue it**: renumbering an installed slot's field vars moves pendant knobs an operator
+has already learned, and it cannot reach a `macro_camN.nc` copied to the machine weeks ago. Wrong-by-omission here
+re-introduces precisely the defect slice C closed; wrong-by-over-avoidance costs four registers. So it is not "global
+because the union was convenient" — it is global because the avoid set has to be stable against edits to the very thing
+it protects.
+
+**THE TRADE IS NOW A TEST, not a paragraph.** A new case builds a 12-param op out of `feed` + `move` ONLY — neither
+declares any scratch, and no wall is anywhere near it — and asserts the aggregate still covers #11-#14 and the mint
+still steps over it. That is the over-broad half of the decision stated as an assertion, so narrowing it later is a
+deliberate act with the reasoning in front of it rather than an optimisation that looks free.
+
+### AND THERE IS A THIRD OPTION THE QUESTION DID NOT NAME — for the advisor to rule
+
+The dispatch offered per-program vs global. There is a cheaper one that makes the trade **disappear** instead of
+justifying it: **re-band the wall atom HIGH.** Measured today, the free scratch space is
+
+    #1-#4 · #7-#8 · #15-#16 · #18-#19 · #74 · #79-#80 · #98        (14 registers, 7 runs)
+
+which contains exactly four HIGH numbers: **#74 · #79 · #80 · #98**. Declaring `wallfinish.scratch` as
+`[[74,74],[79,80],[98,98]]` returns #11-#14 to the mint's low range at no cost to the wall. Multi-run bands are
+precedented and cheap — `holecycle` declares three runs, `surfaceraster` two — and the mint only walks up from #1, so a
+band at #74 is reached only by an op with ~60 exposed params.
+
+**I did not take it, and the reason is scope rather than doubt.** It changes emitted G-code (the wall's register names),
+so it moves the golden's seven entries again and needs its own re-gate; and the band placement is a call I already
+reported and you already dispatched against. It is also worth saying that the low run reads better at the pendant — a
+clean #11-#14 against four scattered numbers — so this is a real trade and not a free win. Yours.
+
+⚠ ONE CAVEAT ON MY OWN t1431 SCOUT: that entry listed `#74` in the free set AND wrote "#71-#74 TAKEN". Both cannot be
+true. Today's measured union puts #74 free (`KIT_WCS` is `[[70,71],[73,73]]`, `ALIGN_SPAN` is `[[70,72]]` — neither
+reaches 74), so the FREE reading is the correct one and the "TAKEN" clause was loose. Recording the contradiction
+because a re-band would rest on it, and t1431's own lesson was that the aggregators are not the whole truth about
+ownership.
+
+### THE SECOND FAILURE — the ledger flake, confirmed, and flakier than "passes isolated"
+
+`sim-anim-refresh` **failed on my FIRST isolated run**, then passed 3/3 on re-runs. So your read is right — it is the
+standing load flake — but the honest data point is that isolated is not a reliable discriminator for it: one isolated
+run can catch it. Nothing in this act touches the drill grid it asserts.
+
+### GATE (fast tier)
+
+cam-universal-scratch + cam-scratch-alloc + cam-scratch-guard **10/10** · the wider CAM tier (op-seed / substack /
+arm-classify / row-honesty / sim-seed / enum-params) **25/25** · smoke **71/71**. Test-only change — no product file
+moved, so no emitted G-code moved and the golden is untouched.
