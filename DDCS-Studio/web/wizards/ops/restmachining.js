@@ -115,6 +115,49 @@ export function restRegion(p) {
 /** The rest stepover (mm) — restStepover % of the rest tool Ø (mirrors the main stepoverPct). */
 export const restStepMm = (p) => Math.max(0.15, num(p.restDia, 0) * Math.max(1, num(p.restStepover, 40)) / 100);
 
+/**
+ * ── t1431 — WHY THE REST WALK STAYS LITERAL, DECLARED AS DATA ─────────────────────────────────────────────────────
+ *
+ * The parametric family reached this atom and STOPPED HERE, and the boundary is written down rather than left to be
+ * rediscovered — the same reason `SURFACE_RASTER_BAKES` is a table: the next act (and the pocketfill retirement behind
+ * it) must know which walks may become runtime loops from a declaration, not by reading three kernels.
+ *
+ * ── THE OBSTRUCTION IS SQRT, AND IT IS MEASURED RATHER THAN ESTIMATED ─────────────────────────────────────────────
+ * `maskToCorners` keeps only the part of each scanline span within radius R of a pocket CORNER, and the boundary of a
+ * circle crossed by a horizontal line is `dx = sqrt(R² − dy²)` — one square root per (row, corner) pair in range. On an
+ * 80×60 rect cleared Ø6 then Ø3, ONE depth level takes **8 of them**; the count is itself derived from the row count,
+ * which a live stepover moves. And the region those spans are clipped to is bounded by FILLET ARCS (the r1/r2
+ * cleared-region rings, 44 tessellated points each here), whose scanline crossings are the same square root again.
+ *
+ * SQRT IS UNVERIFIED ON THIS CONTROLLER. That is t1339's standing finding, unchanged: the linter's word list is an
+ * ALLOW-LIST, not evidence, and ATAN shipping in the alignment probe proves only itself. It is the same evidence that
+ * keeps the raster atom's ramp baking its distance-to-centre — so this is not a new limit, it is the SAME limit
+ * reaching a second walk, and one turn lifts both.
+ *
+ * ⚠ AND THE CHEAP DODGE IS NOT AVAILABLE, which is worth recording so nobody re-proposes it. Masking to a SQUARE
+ * around each corner (|dx| ≤ R and |dy| ≤ R) needs no square root — and it is a DIFFERENT CUT: a larger corner region,
+ * with the small tool re-cutting air along the diagonals. That is a geometry change to a shipped feature wearing a
+ * port's clothes, which this project refuses on principle (t1425 reverted a strictly-more-correct skim×inset fold for
+ * exactly this reason). Rest stays literal, whole, and correct until the evidence changes.
+ *
+ * WHAT LIFTS IT: V13_trig.nc settling SQRT on the machine — the same decider named in the ramp's row. Nothing else.
+ */
+export const REST_PARAMETRIC_GAP = 'the rest walk clips each scanline span to a CIRCLE around every pocket corner, and '
+    + 'a horizontal line crossing a circle needs sqrt(R^2 - dy^2) — once per row per corner, plus the same root again at '
+    + 'the fillet arcs that bound the cleared-region rings. SQRT is unverified on this controller (t1339; V13_trig.nc is '
+    + 'the decider), which is the evidence that already keeps the raster ramp baking its distance-to-centre. Masking to a '
+    + 'square instead would need no root and would cut a different part, so rest stays literal until the evidence changes';
+
+/**
+ * Why THIS pocket's rest pass cannot be a runtime macro loop — or '' when there is no rest pass to port at all.
+ *
+ * It is keyed on `restValid` and NOT on the numbers: the obstruction lives in the walk, not in any particular pocket's
+ * dimensions, so a caller cannot dial its way past it. `tests/rest-parametric-boundary-1431.spec.js` MEASURES the claim
+ * (it counts the real square roots on the real walk) rather than asserting the sentence — so the day the walk stops
+ * needing them the spec goes red and this declaration has to come out, exactly as the cam-row-honesty lock works.
+ */
+export function restParametricGap(p = {}) { return restValid(p) ? REST_PARAMETRIC_GAP : ''; }
+
 /** THE REST leaf (kind:'leaf') — loops its OWN depth levels (depth/by) and rasters the corner slivers with the rest tool
  *  at each. A leaf (not a stepdown-fill) so the pocket keeps ITS single StepDown (a 2nd one would collide the depth
  *  binding). Carries the flat geometry + toolDia (r1) + restDia (r2) + restStepover + depth/by. */
