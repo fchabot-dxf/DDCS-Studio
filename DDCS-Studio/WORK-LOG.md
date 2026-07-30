@@ -9896,3 +9896,59 @@ deleted; proc tree clean.
 The macros are untouched — no generator gained an arm, no G-code changed. A spiral rect pocket still packs a raster
 slot; the difference is that it now SAYS so. Closing the capability gap is the ruled C-act (pocket's clearing body
 delegating to the atom), and B (a second hand-written concentric arm) stays eliminated by one-source.
+
+## t1416 (seat A) — DIRECTION-TAUGHT: PARKED ON CAPACITY, with the footnote cleared and the act SCOUTED
+
+**No emit changed.** I am calling capacity on this one rather than starting it, and using the turn for the two things
+that make the next session's act fast and safe instead.
+
+### WHY PARKED — the call, stated plainly
+
+This is my sixth act in one session and the first emit-class one since the re-point. Teaching a walk a new direction
+and bridging it is precisely the class where a subtle error ships wrong motion, and the project's own rule is that
+parking fresh beats half-landing. I flagged at t1414 that the next emit-class act wanted a fresh seat; that judgement
+has not changed because the queue reordered. **Nothing is half-built** — the tree carries a regenerated screenshot and
+this entry.
+
+### THE FOOTNOTE IS CLEARED
+
+`scratchpad/1414-cam-rows-honest.png` regenerated after the `branchRefusal` fix. The `material` row now reads
+*"only one option — there is nothing to branch between; the slot bakes it"* instead of the old *"1 arms would
+duplicate the program 1 times"*. The picture and the product agree again.
+
+### THE SCOUT — measured, so the act starts from numbers rather than a blank page
+
+The literal `fillStrategy` at all three directions, 80×60, Ø6 @40%, depth 3 / stepdown 1.5 (3 levels), fill phase only:
+
+    direction    cuts   rapids   row cuts   the row directions, in order
+    bothways      92       6        46      + - + - + - + - + - + - + - + - + - + - + - + +  - + - …
+    oneway        92      94        46      + + + + + + + + + + + + + + + + + + + + + + + + + …
+    otherway      92      94        46      - - - - - - - - - - - - - - - - - - - - - - - - - …
+
+Four facts fall out, and each one is something the act would otherwise have to discover mid-build:
+
+1. **The ROW SET does not change.** 46 row cuts either way — same rows, same Y positions, same extents. Only how the
+   tool travels BETWEEN them differs. So the new walk is a travel change, not a geometry change, and the bridge can
+   assert the row set identical across directions as a strong invariant.
+2. **The cut COUNT is identical (92) for a different reason each time**, which is a trap worth naming: both-ways is
+   46 rows + 46 step-overs-at-depth; one-way is 46 rows + 46 PLUNGES. A bridge comparing only cut counts would pass
+   on a walk that never lifted. The discriminator is the RAPIDS — 6 vs 94 — and the row directions.
+3. **One-way costs 94 rapids against 6.** Every row lifts to clearance and rapids back before re-plunging. That is
+   the honest cost of a consistent climb cut, and it is what `@work` must follow (dispatch item 7): the per-pass line
+   count grows by the lift/rapid/plunge triple and loses the step-over line.
+4. **`otherway` is the mirror, and it is a FORK THE DISPATCH DOES NOT SETTLE.** The literal has three directions;
+   `pocketRasterGap`'s clause refuses everything that is not `bothways`, so teaching only `oneway` leaves the clause
+   HALF-empty and a conventional-cut pocket still on the literal arm. Either the act teaches both (the walk is the
+   same, mirrored — cheap) and the clause empties fully, or it teaches one and the boundary must be re-worded to name
+   `otherway` specifically rather than reading as "one-way is handled". **Not mine to pick; raised before it becomes a
+   discovery at the end of the act.**
+
+### WHAT THE ACT STARTS FROM
+
+The envelope rows to earn are `(parallel × oneway) × {plunge, ramp, helix}` — three, or six if `otherway` is taught in
+the same act. `SURFACE_RASTER_IGNORES.direction` comes out only when the walk genuinely reads it, and the both-ways
+byte-identity assertion is the guard that says the default path did not move.
+
+### NO GATE RUN
+
+Nothing changed but a screenshot. Scratch spec deleted; proc tree clean.
