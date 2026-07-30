@@ -28,6 +28,19 @@
  * needs those wizards/ops + dialect files to declare the scratch they inject.
  */
 
+/**
+ * t1429 — THE ATOM'S OWN BAND, READ FROM THE ATOM. `pocketSlot`'s clearing body is no longer hand-written: it is
+ * `surfaceRasterLines`, emitted INSIDE the slot's program, so that atom's registers are now written DURING a pocket
+ * part. A field var landing in them is the exact hazard this module exists for (a form value overwritten by the
+ * generator's own maths, emitting clean G-code that cuts a different part), so the band has to be part of the pocket's
+ * declaration — and it is IMPORTED rather than restated, because a copied band is a copy that drifts.
+ *
+ * The atom's dependency closure is three leaf modules (util, affineFrame, declaredWork — none of them import anything
+ * from `data/`), so this costs the layer nothing. That is NOT true of `universalScratch`, whose aggregation this file's
+ * header explains it cannot take; the distinction is a leaf constant against a module that reads the whole registry.
+ */
+import { RASTER_SCRATCH } from '../wizards/ops/surfaceraster.js';
+
 // A band is an inclusive [lo, hi] pair of macro-variable NUMBERS (the `#` is implied).
 // Citations are to the assignment that proves the number is written.
 const MILL_OWN = [[20, 26]];        // millToSlot: #20/#21 origin, #22 tool radius, #23-#26 x0/x1/y0/y1 (pocket :74-82, cpocket :111-114, surfacing :142-149)
@@ -43,7 +56,9 @@ const OPTOSLOT_PAT = [[50, 54]];    // opToSlot pattern loops + the STANDALONE s
 /** camType → the scratch band(s) that generator writes. Keys are the CAM_GEN keys + the slotFromOp types. */
 export const SCRATCH_BANDS = {
     surface: [...MILL_OWN, ...KIT_RASTER],
-    pocket: [...MILL_OWN, ...KIT_RASTER],
+    // t1429 — the rect pocket writes its own #20-#26, the kit's #27-#33 (the wall pass's depth loop) AND the raster
+    // atom's #34-#49/#62-#64, because its clearing body IS that atom now.
+    pocket: [...MILL_OWN, ...KIT_RASTER, ...RASTER_SCRATCH],
     cpocket: [...MILL_OWN, ...KIT_RASTER],   // circlePocketSlot writes #20-#22 then ringClear's #27/#28/#29/#33
     corner: [...KIT_WCS, ...PROBE_SIGNS, ...PROBE_RCOMP],
     edge: [...PROBE_TEMPS, ...KIT_WCS, ...PROBE_SIGNS],

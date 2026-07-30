@@ -1263,7 +1263,11 @@ function homingPostIsExpert() {
         // universal unroll because the surface generator has no skim shape). It is ALWAYS baked, so the stored bake is
         // already its carrier — no new manifest field. It must be re-supplied BEFORE the seed, or a saved Skim slot would
         // re-hydrate on the Normal arm and quietly rebuild the wrong program shape the next time it is touched.
-        for (const f of buildEnumFields(getUserDef(m.opType))) { const v = m.baked && m.baked[f.key]; if (v !== undefined && v !== '') seedParams[f.key] = v; }
+        // t1429 — the camType is passed now, because a DECLARED BAKED PICK (opCamMap's GENERATOR_BAKES_PICK) is a row
+        // only on the generator that bakes it. Without it a re-hydrated pocket slot re-seeded its Strategy/Direction/
+        // Entry rows at the DEF defaults while the stored bake still drove the macro — the table and the built body
+        // disagreeing, which is the exact class of lie the honesty lock exists to catch.
+        for (const f of buildEnumFields(getUserDef(m.opType), undefined, m.type)) { const v = m.baked && m.baked[f.key]; if (v !== undefined && v !== '') seedParams[f.key] = v; }
         // t1325 MIGRATION — a slot SAVED before the stepover became a percentage stored `stepover` in MM. That key no
         // longer names a field, so it would be dropped on re-hydration and the slot would silently rebuild at the
         // default 60% — a changed raster on a program the user already trusts. Recover the pct from the pair they
@@ -1273,7 +1277,10 @@ function homingPostIsExpert() {
         // POCKET slot — whose stepover is still a legitimate millimetre — and rewrote a valid 3.6mm into a different
         // number entirely. A migration keyed on a NAME rather than on the thing that actually changed is a migration
         // that corrupts its neighbours.
-        if (m.type === 'surface' && m.values && m.values.stepover && !m.values.stepoverPct) {
+        // t1429 — the POCKET joins the surface arm, because the pocket's field is the one that changed THIS turn (the
+        // ruled blocker 2). The warning above still governs: this is keyed on the generators whose stepover really
+        // became a percentage, and `cpocket` is deliberately NOT one of them — its millimetre is still a millimetre.
+        if ((m.type === 'surface' || m.type === 'pocket') && m.values && m.values.stepover && !m.values.stepoverPct) {
             const mm = Number(m.values.stepover.def), d = Number((m.values.toolDia || {}).def);
             if (Number.isFinite(mm) && mm > 0 && Number.isFinite(d) && d > 0) {
                 m.values.stepoverPct = { ...m.values.stepover, def: Math.round((mm / d) * 1000) / 10 };
@@ -1301,7 +1308,17 @@ function homingPostIsExpert() {
         const row = camRowBlock(a.opType, fk);   // S4a — a cam_table op reads its value from the block (dflt when exposed, baked literal when baked); empty inherits the field default below
         if (row) { const v = row.params.mode === 'bake' ? row.params.baked : row.params.dflt; if (v !== '' && v != null) return v; }
         const ov = a.values[fk]; if (ov && ov.def != null) return ov.def;
-        const f = a.fields.find((x) => fkeyOf(x) === fk); return f ? (typeof f.value === 'number' ? f.value : f.def) : '';
+        // t1429 — A NON-NUMERIC VALUE USED TO FALL BACK TO THE BINDING DEFAULT, and that was a row displaying something
+        // other than what gets built. FOUND BY LOOKING AT THE MODAL, not by reading the code: a pocket op carrying
+        // `direction: oneway` rendered "Zig-zag (both ways)" while `makeAuthOp` had already baked `oneway` into the
+        // manifest and the macro was cutting the one-way walk. `strategy` hid it — the op's pick happened to equal the
+        // def default, so the two agreed by luck. It was harmless while the only build enums were surfacing's zMode
+        // (whose other arm routes to the universal generator) and one-option `material`; the moment a generator BAKES
+        // a pick, the table and the macro have to say the same thing — and worse, touching the select would have
+        // stored the displayed value and silently rewritten the operator's choice.
+        // `values[fk]` above still wins where it exists (a tuned numeric), so no numeric row moves.
+        const f = a.fields.find((x) => fkeyOf(x) === fk);
+        return f ? ((f.value != null && f.value !== '') ? f.value : f.def) : '';
     };
     function renderCbmTable() {
         const el = document.getElementById('cbm_table'); if (!el) return;   // modal is on document.body, not #macros-app (q is root-scoped)

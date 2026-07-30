@@ -56,7 +56,11 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
         cornerMaxProbe: byKey(corner, 'maxProbe').value, cornerTravel: byKey(corner, 'travel').value, cornerFast: byKey(corner, 'fast').value,
         cornerSeq: byKey(corner, 'seq').value, cornerCorner: byKey(corner, 'corner').value, cornerRetract: byKey(corner, 'retract').value,
         drillPosX: byKey(drill, 'posX').value, drillDia: byKey(drill, 'dia').value, pocketToolDia: byKey(pocket, 'toolDia').value, surfDepth: byKey(surface, 'depth').value,
-        pocketStepover: byKey(pocket, 'stepover').value,
+        // t1429 — the RECT POCKET's field is the percentage now too (the ruled blocker 2): its clearing body is the
+        // raster atom, which composes `#44 = [tool Ø × % / 100]` and had no live-mm path at all, so a dialled mm was
+        // DROPPED and 60% used instead. Same restatement t1325 made for the surface arm, for the same reason.
+        pocketStepoverPct: byKey(pocket, 'stepoverPct').value,
+        pocketStepoverGone: !pocket.fields.some((f) => f.key === 'stepover'),
         // t1325 — the surface field is now the PERCENTAGE (see the restated assert below); its mm is derived in the macro
         surfStepoverPct: byKey(surface, 'stepoverPct').value, surfStepoverGone: !surface.fields.some((f) => f.key === 'stepover'),
         surfToolDia: byKey(surface, 'toolDia').value,
@@ -84,8 +88,12 @@ test('seedFromOp: camType forks + aliased/derived values + non-bakeable guards +
   expect(r.val.cornerMaxProbe).toBe(80); expect(r.val.cornerTravel).toBe(40); expect(r.val.cornerFast).toBe(250);
   expect(r.val.cornerSeq, 'seq enum XY -> int 1 (S1d)').toBe(1); expect(r.val.cornerCorner, 'corner enum FR -> int 2 (S1d)').toBe(2); expect(r.val.cornerRetract).toBe(4);
   expect(r.val.drillPosX).toBe(10); expect(r.val.drillDia).toBe(60); expect(r.val.pocketToolDia).toBe(8); expect(r.val.surfDepth).toBe(0.8);
-  // DERIVED stepover == the canonical stepoverMm (pocket, unchanged — only the SURFACE generator moved)
-  expect(r.val.pocketStepover, 'pocket stepover == stepoverMm(op)').toBe(r.val.expectPocketStepover);
+  // t1429 — the pocket follows the surface, and the PROPERTY THAT MATTERED survives one step removed, exactly as it
+  // did there: the mm field is gone, the intent (45%) is the field, and pct × the tool Ø the slot carries still
+  // equals the canonical `stepoverMm` — the same cut, expressed the way the macro re-derives it at the machine.
+  expect(r.val.pocketStepoverGone, 'the mm field is gone from the rect pocket generator — the % replaced it').toBe(true);
+  expect(r.val.pocketStepoverPct, 'the pocket field is the intent: 45%').toBe(45);
+  expect(r.val.pocketToolDia * r.val.pocketStepoverPct / 100, 'NO SILENT RASTER CHANGE — it still cuts stepoverMm(op)').toBe(r.val.expectPocketStepover);
   // t1325 — PREMISE CHANGED BY RULING, restated rather than deleted. This used to assert that the surface generator
   // seeded an absolute stepover in MM equal to the wizard's own (16 · 60% = 9.6). Stepover is now declared as the
   // PERCENTAGE and the mm is derived in the macro header from the two pendant knobs, so that mm is no longer a field
@@ -150,7 +158,7 @@ test('S1 fix: data-op TWINS are CAM-able and seed correct values', async ({ page
       camType: { surf: surf.camType, pocket: pocket.camType, corner: corner.camType, bore: bore.camType },
       contourUniversal: !!seedFromOp(op('user_contour_data', {})).universal,   // U2 — the contour twin now routes to the universal unroll path (has a def to unroll)
       surf: { stepoverPct: byKey(surf, 'stepoverPct').value, toolDia: byKey(surf, 'toolDia').value, depth: byKey(surf, 'depth').value, w: byKey(surf, 'w').value },
-      pocket: { stepover: byKey(pocket, 'stepover').value, toolDia: byKey(pocket, 'toolDia').value, depth: byKey(pocket, 'depth').value },
+      pocket: { stepoverPct: byKey(pocket, 'stepoverPct').value, toolDia: byKey(pocket, 'toolDia').value, depth: byKey(pocket, 'depth').value },
       corner: { corner: byKey(corner, 'corner').value, probeZ: byKey(corner, 'probeZ').value, wcs: byKey(corner, 'wcs').value, maxProbe: byKey(corner, 'maxProbe').value },
       bore: { holeDia: byKey(bore, 'holeDia').value, posX: byKey(bore, 'posX').value, camType: bore.camType },
     };
@@ -166,8 +174,10 @@ test('S1 fix: data-op TWINS are CAM-able and seed correct values', async ({ page
   expect(r.surf.stepoverPct, 'the twin’s flat 9.6mm recovers as 80% of the Ø12 the slot carries').toBe(80);
   expect(r.surf.toolDia * r.surf.stepoverPct / 100, 'NO SILENT RASTER CHANGE — it still cuts 9.6mm').toBe(9.6);
   expect(r.surf.depth).toBe(0.8); expect(r.surf.w).toBe(200);
-  // pocket twin: derives stepover from stepoverPct+toolDia (both present)
-  expect(r.pocket.stepover, 'pocket twin derives 8*45/100 = 3.6').toBe(3.6);
+  // pocket twin: t1429 — the twin already STORES the percentage, so the seed reads its intent straight through the
+  // one source instead of pre-multiplying it into a millimetre the atom would only divide back out. Same 3.6mm cut.
+  expect(r.pocket.stepoverPct, 'pocket twin seeds its own 45%').toBe(45);
+  expect(r.pocket.toolDia * r.pocket.stepoverPct / 100, 'which is the 8·45% = 3.6mm it always cut').toBe(3.6);
   expect(r.pocket.toolDia).toBe(8); expect(r.pocket.depth).toBe(5);
   // corner twin: probeZ read from probeZFirst; enums -> ints
   expect(r.corner.corner, 'FR -> 2').toBe(2);

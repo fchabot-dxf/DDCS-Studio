@@ -18,7 +18,7 @@
 import { cornerSlot, edgeSlot, probeZSlot, insideCentreSlot, bossCentreSlot, alignmentSlot } from './probeToSlot.js';
 import { pocketSlot, circlePocketSlot, surfacingSlot } from './millToSlot.js';
 import { slotFromOp } from './opToSlot.js';
-import { stepoverPctOf } from '../wizards/ops/surfaceraster.js';   // t1363 — the ONE reading of a stored stepover
+import { stepoverPctOf, SURFACE_RASTER_AXES } from '../wizards/ops/surfaceraster.js';   // t1363 — the ONE reading of a stored stepover   // t1429 — and the ONE reading of which axes each clearing walk actually looks at, now that the pocket's macro IS that walk
 import { stepoverMm } from '../wizards/ops/pocketfill.js';   // t1043 — the CANONICAL exported stepoverPct->mm: max(0.2, max(0.1,toolDia)*stepoverPct/100). surfacingWizard.js:24-27 computes the identical formula inline (its absent-param defaults differ — 12/60 vs 6/40 — but are unreachable when the op provides toolDia+pct); the seed test verifies surface stepover == the real surfacingStack value.
 import { builtinTypeForTwin } from '../blocks/wizardLibrary.js';   // t1049 — the DECLARED twin->built-in bridge (inverts opensAs->type/variant). Real programs use data-op TWINS (user_surfacing_data …), not the bare built-in optypes.
 import { getUserDef, camFieldsFromStack, flattenBlocks } from '../blocks/userOps.js';           // U2 — the LIVE def registry (template + bindings) for the UNIVERSAL fallback; t1095 — the block-native pendant-field rows (S2); t1101 — flatten for the S4b identity re-derive
@@ -109,9 +109,33 @@ export const entryHasGeometry = (params) => { const e = (params && params.entry)
  * C-act lands and the clearing body delegates to the atom, this spec goes RED and the row must come out. The row can
  * never lag the macro in either direction, which is the only version of "honest" that survives the next act.
  */
+/**
+ * ── t1429 — A DISPOSITION CAN DEPEND ON ANOTHER PICK, and the pocket is where that became true ────────────────────
+ *
+ * `direction` is carried by the RASTER walk and meaningless to the CONCENTRIC one — rings have no scan direction, and
+ * the atom has declared that asymmetry since t1418 (`SURFACE_RASTER_AXES.concentric` simply omits the axis, precisely
+ * so the envelope table cannot grow six rows nobody measured). The CAM row has to say the same thing or the two will
+ * drift, so it READS that declaration rather than restating it — and a table entry may therefore be a FUNCTION of the
+ * op's params, resolved through `generatorIgnores`/`generatorBakesPick` and never by looking the key up raw.
+ *
+ * The sentence follows the t1410 pattern: a row that cannot carry a pick says WHICH setting to change to get it back.
+ */
+const pocketReadsDirection = (p) => (SURFACE_RASTER_AXES[String((p || {}).strategy) === 'spiral' ? 'concentric' : 'parallel'] || []).includes('direction');
+
 export const GENERATOR_IGNORES = {
+    // t1429 — `pocket.strategy` CAME OUT, and the red-then-green is this act's proof. The row said *"a Spiral pick is
+    // NOT carried into it — the pack builds the raster either way"*, which was true of a hand-written raster and is a
+    // lie about a body that delegates to the atom. The lock in cam-row-honesty-1414 went red on the delegation commit
+    // (the macro grew the capability, so the table was hiding it) and green again when this line was deleted —
+    // which is the whole reason that spec asserts BOTH directions. `cpocket` stays: its macro is still `ringClear`.
+    // The three picks the pocket now carries are declared in GENERATOR_BAKES_PICK below, because "carried" and
+    // "branchable" are different claims and collapsing them is how the row would start lying the other way.
     pocket: {
-        strategy: 'This slot\'s macro cuts a RASTER clear + wall finish, layer by layer. A Spiral (concentric) pick is NOT carried into it — the pack builds the raster either way.',
+        // …and ONE of them is carried conditionally, which the lock caught on the first run: with the SPIRAL strategy
+        // the packed body is identical across all three direction arms, because rings have no scan direction. The
+        // honest row is therefore per-pick rather than per-generator.
+        direction: (p) => (pocketReadsDirection(p) ? ''
+            : 'This slot\'s macro cuts a CONCENTRIC-RING clear, and rings have no scan direction — a Zig-zag / One-way pick is NOT carried into it. Set Strategy to Raster and this pick starts driving the walk.'),
     },
     // The SWEEP that came with this fix found three more of the same class — reported rather than assumed, and each
     // sentence names what its macro actually does rather than what its row promised.
@@ -143,14 +167,71 @@ export const GENERATOR_IGNORES = {
  */
 
 /** The declared sentence for a (camType, param) the generator's macro ignores, or '' when it carries it. */
-export function generatorIgnores(camType, param) {
-    return (GENERATOR_IGNORES[camType] && GENERATOR_IGNORES[camType][param]) || '';
+// t1429 — an entry may be a FUNCTION of the op's params (see `pocketReadsDirection`), so it is always RESOLVED here.
+// A caller that reads the table key directly gets a truthy function and calls every conditional row a liar; the
+// cam-row-honesty sweep did exactly that on the first run, which is why the resolver is the only supported reading.
+export function generatorIgnores(camType, param, params) {
+    const e = GENERATOR_IGNORES[camType] && GENERATOR_IGNORES[camType][param];
+    return (typeof e === 'function' ? e(params || {}) : e) || '';
 }
+
+/**
+ * ── t1429 — WHAT A GENERATOR **BAKES** FROM THE OP'S PICK. The third disposition, declared ────────────────────────
+ *
+ * t1323 named three dispositions for a pick — BAKE, EXPOSE AS VALUE, EXPOSE AS BRANCH — and only two of them had a
+ * declaration. "Carried" was inferred from the ABSENCE of a GENERATOR_IGNORES row, which conflates two different
+ * facts, and the pocket delegation is what made the conflation bite in BOTH directions at once:
+ *
+ *   1. `direction` and `entry` are VALUE enums on the def (they bind to a socket on the fill leaf), so
+ *      `buildEnumFields` never made a row for them and the pocket table had nothing to say about picks its macro now
+ *      genuinely bakes. Honest-by-omission was the right reading while the macro ignored them (t1414 measured that and
+ *      deliberately removed a sentence it had drafted); it stops being right the moment the macro carries them.
+ *   2. `strategy` leaving GENERATOR_IGNORES would have made it BRANCHABLE — `branchable` is gated on `!ignored` — so
+ *      the row would offer *"Expose as a BRANCH: the macro carries every arm and jumps on the pendant number"*, which
+ *      is precisely what a BAKED pick does not do. Removing one lie would have installed another in its place.
+ *
+ * So the fact is declared positively, keyed (camType, param), in the words the operator can act on: the slot contains
+ * the shape you picked, and picking differently means building a different slot. A baked pick is CARRIED (no
+ * GENERATOR_IGNORES row — the body really does differ per arm, which cam-row-honesty asserts) and NOT branchable.
+ */
+export const GENERATOR_BAKES_PICK = {
+    pocket: {
+        strategy: 'BAKED into this slot: the pack builds the clearing walk you pick here — Spiral (concentric) cuts rings inward with no separate wall pass, Raster cuts parallel passes then a wall finish. The macro contains ONE of them, so a different pick means building a different slot.',
+        direction: (p) => (pocketReadsDirection(p)
+            ? 'BAKED into this slot: Zig-zag links its passes at depth; One-way lifts, rapids back and re-plunges for every pass so the cut direction stays consistent. The macro contains ONE of them.'
+            : ''),   // …and on the SPIRAL arm it is not baked at all — it is ignored, and GENERATOR_IGNORES says so
+        entry: 'BAKED into this slot: the pack descends with a straight PLUNGE. Ramp and Helix compute their geometry from a fixed area, and this slot\'s area is a pendant knob — so a ramp/helix pick degrades to a plunge, and the macro SAYS so on the line where it descends.',
+    },
+};
+
+/** The declared sentence for a (camType, param) the generator BAKES from the op's pick, or '' when it does not. */
+export function generatorBakesPick(camType, param, params) {
+    const e = GENERATOR_BAKES_PICK[camType] && GENERATOR_BAKES_PICK[camType][param];
+    return (typeof e === 'function' ? e(params || {}) : e) || '';
+}
+
+/** Is this param declared as a pick the generator bakes AT ALL (whatever the current arms resolve to)? */
+export const generatorPicksParam = (camType, param) => !!(GENERATOR_BAKES_PICK[camType] && GENERATOR_BAKES_PICK[camType][param]);
 
 export function buildEnumFields(def, params, camType) {
     const p = params || {};
-    return ((def && def.bindings) || []).filter((b) => enumClassOf(b) === 'build').map((b) => {
-        const ignored = camType ? generatorIgnores(camType, b.param) : '';
+    // t1429 — a BUILD enum has no socket, so it can only fork the build and always belongs here. A declared BAKED PICK
+    // is a VALUE enum the generator nevertheless bakes, so it belongs here TOO — and it is taken once, from the binding
+    // that DECLARES it (the one carrying the dropdown's options): a param is commonly bound twice, once at the wizard
+    // leaf that declares it and once at the atom that consumes it, and the second is wiring with no options to offer.
+    const seen = new Set();
+    return ((def && def.bindings) || []).filter((b) => {
+        if (!b || b.type !== 'enum' || seen.has(b.param)) return false;
+        const build = enumClassOf(b) === 'build';
+        // the ROW's existence is unconditional (`generatorPicksParam`), even where the SENTENCE is conditional: a row
+        // that appeared only on the arm that carries it would vanish exactly when the operator needs to be told why.
+        if (!build && !(camType && generatorPicksParam(camType, b.param))) return false;
+        if (!build && !((b.widgetConfig && b.widgetConfig.options) || []).length) return false;
+        seen.add(b.param);
+        return true;
+    }).map((b) => {
+        const ignored = camType ? generatorIgnores(camType, b.param, p) : '';
+        const bakedPick = camType ? generatorBakesPick(camType, b.param, p) : '';
         const opts = ((b.widgetConfig && b.widgetConfig.options) || []).map((o) => Array.isArray(o) ? { value: o[1], label: o[0] } : { value: o, label: String(o) });
         const value = (p[b.param] !== undefined && p[b.param] !== '') ? p[b.param] : b.default;
         const arms = opts.length ? opts : [{ value: b.default, label: String(b.default) }];
@@ -160,12 +241,15 @@ export function buildEnumFields(def, params, camType) {
         // t1414 — A PICK THE MACRO IGNORES CANNOT BE BRANCHED EITHER, and that is not a second decision: branching
         // means "the macro carries every arm and jumps on the pendant number", which is precisely what a macro that
         // ignores the pick does not do. Offering Expose here would have been a second lie stacked on the first.
-        const branchable = arms.length > 1 && arms.length <= BRANCH_ARM_CAP && !ignored;
+        // t1429 — …and neither can a pick the pack BAKES, for the same reason stated the other way round: the macro
+        // carries exactly ONE arm, chosen at build. Offering the branch radio would be a control that does nothing.
+        const branchable = arms.length > 1 && arms.length <= BRANCH_ARM_CAP && !ignored && !bakedPick;
         return { key: b.param, label: b.label || b.param, def: b.default, value, units: '', type: 'enum',
             buildEnum: arms, branchable,
             exposed: false, exposable: branchable, bakeable: true,
-            _exposeTip: ignored || (branchable ? 'Expose as a BRANCH: the macro carries every arm and jumps on the pendant number, so the shape is chosen at the machine' : branchRefusal(arms.length)),
+            _exposeTip: ignored || bakedPick || (branchable ? 'Expose as a BRANCH: the macro carries every arm and jumps on the pendant number, so the shape is chosen at the machine' : branchRefusal(arms.length)),
             ...(ignored ? { _notCarried: ignored } : {}),
+            ...(bakedPick ? { _bakedPick: bakedPick } : {}),
             _branch: true };
     });
 }
@@ -239,7 +323,10 @@ export const PARAM_ALIAS = {
 // DERIVE[camType][fieldKey] = (op.params) -> value. For fields with NO direct op source (pocket/surface/cpocket store
 // stepoverPct %, the generator wants absolute stepover mm). Mirrors the wizard one-source via the exported stepoverMm.
 const DERIVE = {
-    pocket: { stepover: stepoverMm },     // pocket twin keeps stepoverPct + toolDia → derive
+    // t1429 — the rect pocket's field is the PERCENTAGE now (the macro derives the mm, as the surface slot has since
+    // t1325), so its seed reads the op's own intent through the SAME one source instead of pre-multiplying it into a
+    // millimetre the atom would only have to divide back out. `cpocket` is untouched: `ringClear` still steps in mm.
+    pocket: { stepoverPct: (p, toolDia) => stepoverPctOf(p, toolDia) },
     cpocket: { stepover: stepoverMm },
     // surfacing: the BUILT-IN op stores stepoverPct+toolDia (derive); the data-op TWIN precomputes a FLAT `stepover` and has
     // NO stepoverPct/toolDia (surfacingData.js) — so use the flat value if present, else derive. Mirrors surfacingWizard.js:27.

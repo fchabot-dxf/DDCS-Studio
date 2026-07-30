@@ -226,17 +226,23 @@ test('PROOF 3 — the remaining bakes are declared per (strategy, entry), and re
  * The atom's body is about to land INSIDE a slot's program, beside that generator's own scratch. t1422 measured the
  * two bands as disjoint; this pins it, because the failure mode is the one `camScratch` exists for — a generator
  * overwriting a variable another part is mid-way through reading, which emits clean G-code that cuts a different part.
+ *
+ * ⚠ t1429 — THE SUBJECT MOVED, SO THE ASSERTION DID. The delegation landed: the pocket's clearing body IS this atom,
+ * so `bandsFor('pocket')` now deliberately CONTAINS the atom's band (a form field must be minted clear of registers
+ * the pocket's own body writes — that union is the fix, and `pocket-delegation-1429` asserts it directly). What this
+ * proof was actually about is the HAND-WRITTEN mill scratch the atom's body sits beside, which is `bandsFor('surface')`
+ * — the same `#20-#33` this turn left untouched. Asserted against that, the original claim is unchanged and still true.
  */
-test('PROOF 4 — the atom band and the pocket slot band are disjoint', async ({ page }) => {
+test('PROOF 4 — the atom band and the hand-written mill scratch are disjoint', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { RASTER_SCRATCH } = await import('/wizards/ops/surfaceraster.js');
         const { bandsFor } = await import('/data/camScratch.js');
         const spread = (bands) => { const s = new Set(); for (const [lo, hi] of bands) for (let n = lo; n <= hi; n++) s.add(n); return s; };
-        const atom = spread(RASTER_SCRATCH), pocket = spread(bandsFor('pocket'));
-        return { atom: [...atom], pocket: [...pocket], overlap: [...atom].filter((n) => pocket.has(n)) };
+        const atom = spread(RASTER_SCRATCH), mill = spread(bandsFor('surface'));
+        return { atom: [...atom], mill: [...mill], overlap: [...atom].filter((n) => mill.has(n)) };
     });
     expect(r.atom.length, 'the atom declares a real band').toBeGreaterThan(0);
-    expect(r.pocket.length, 'and so does the pocket slot').toBeGreaterThan(0);
-    expect(r.overlap, `no register is claimed by both (atom ${JSON.stringify(r.atom)} vs pocket ${JSON.stringify(r.pocket)})`).toEqual([]);
+    expect(r.mill.length, 'and so does the mill kit').toBeGreaterThan(0);
+    expect(r.overlap, `no register is claimed by both (atom ${JSON.stringify(r.atom)} vs mill ${JSON.stringify(r.mill)})`).toEqual([]);
 });
