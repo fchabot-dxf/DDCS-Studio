@@ -14,7 +14,20 @@
  * Compositions: drill = array(bore) [proven byte-identical], helical probe = helix(probe).
  * STUDIO presets are higher-level stacks of these. To add a primitive: ops/<name>.js + register here.
  */
-import { drillBlock, peckDrill } from './drill.js';
+// t1391 — `drill` AND `bore` RETIRED here, and this closes the drill arc. Both were the LITERAL kernels: a JS loop that
+// unrolled the peck ladder / the ring-step walk and baked every Z at build time. `holecycle` replaced them with a body the
+// controller walks at run time, which is what made total depth (#81) and the bite (#82) knobs an operator can turn on the
+// pendant mid-program — the capability opToSlot recorded as impossible precisely BECAUSE of these two loops.
+//
+// The deletion waited for its premise to be true. t1389's ownership test (re-run AT the deletion, not inherited) found
+// POCKET still building a `drill` for its too-small fallback, so t1391 act 1 moved that tenant onto holecycle first; only
+// then were both atoms pure leaves. Their two specs retired with them: `peck-drill` and `bore-glow-cap`, both subsumed by
+// holecycle's own 48 bridges plus its asserted no-runaway property (a loop that is EMITTED cannot explode the way an
+// unrolled one could, which is why bore's runaway cap has no successor).
+//
+// THE BRIDGES DO NOT LOSE THEIR REFERENCE: the kernels live on, frozen, at tests/support/served/literalHoleReference.js
+// (served only to tests). That was landed in the SAME act as the switch precisely so this deletion could not make 48
+// equivalence tests silently compare the new path against itself. History in git; reasoning in the t1391 WORK-LOG.
 // t1383 — `holepeck` RETIRED here (t1379's peck-only cycle). It was fully superseded by `holecycle` and a pure leaf: only
 // this registry imported it, no builder reached it, and holecycle never did. Its 8 bridges retired WITH it because
 // holecycle's own 48 strictly subsume them (same criterion, same literal side, peck plus two bore cycles plus all five
@@ -22,7 +35,6 @@ import { drillBlock, peckDrill } from './drill.js';
 // pre-consumer. History in git; the reasoning in the t1383 WORK-LOG.
 import { holeCycleBlock } from './holecycle.js';   // t1381 — the FOLDED drill family: pattern x cycle, one body
 import { tapBlock } from './tap.js';   // t776 — the TAP primitive (floating-holder pitch-locked cycle + a gated rigid variant)
-import { boreBlock, helicalBore } from './bore.js';
 import { lineBlock, lineCut } from './line.js';
 import { slotBlock, slotPath } from './slot.js';
 import { contourBlock } from './contour.js';
@@ -96,7 +108,7 @@ import { evalExpr } from './expr.js';
 export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
     moveBlock, arcBlock, probeBlock, machineMoveBlock, safeRetractBlock, safeTraverseBlock, safeHopBlock, clearLiftBlock, homeBlock, pathModeBlock,   // Move (+ G53 machine-coord move + machine-frame safe-Z retract + safetraverse bundle + clearance-hop + clearlift folding atom + G28 home + G64/G61 path mode)
-    lineBlock, slotBlock, boreBlock, drillBlock, holeCycleBlock, tapBlock, contourBlock, contourFillBlock, pocketFillBlock, pocketWallBlock, pocketRestBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + tap + contour/profile [contour=region-socket for pocket-wall; contourfill/pocketfill/pocketwall=flat for the twins] + native canned cycles G81-85/G80)
+    lineBlock, slotBlock, holeCycleBlock, tapBlock, contourBlock, contourFillBlock, pocketFillBlock, pocketWallBlock, pocketRestBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + tap + contour/profile [contour=region-socket for pocket-wall; contourfill/pocketfill/pocketwall=flat for the twins] + native canned cycles G81-85/G80)
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, surfaceRasterBlock, stepdownBlock, placeOnStockBlock, rotateBlock, skimBlock, entryBlock, toolSelBlock, xformBlock, setupBlock, flipBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align + skim relative Z-mode + entry-point + tool-select marker + declared program rotation + two-sided setup boundary + flip sibling)
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, wcsBaseIntoBlock, wcsWriteBlock, wcsZeroBlock, toolOffsetBlock,   // Coordinates (WCS select + dist-mode + G17-19 plane + work-offset/probe-family base+indirect-write/WCS-zero-at-current/tool-table write)
@@ -122,5 +134,8 @@ export const CATEGORIES = ['Shapes', 'Move', 'Toolpaths', 'Transforms', 'Spindle
 export const BLOCKS = Object.fromEntries(PALETTE.map((d) => [d.type, d]));
 
 // Kernels + expression evaluator re-exported for STUDIO presets / direct callers.
-export { peckDrill, helicalBore, lineCut, slotPath, fillStrategy, patternPoints, helixPoints, evalExpr };
+// t1391 — `peckDrill` and `helicalBore` are GONE from this list with their modules. Their reachability was checked the
+// same way the blocks' was: nothing in web/ imported either name from here (only prose comments named them), so the
+// re-export was the last thing keeping them addressable.
+export { lineCut, slotPath, fillStrategy, patternPoints, helixPoints, evalExpr };
 export { depthLevels } from '../clearing.js';   // StepDown's level list, used by the emit fold

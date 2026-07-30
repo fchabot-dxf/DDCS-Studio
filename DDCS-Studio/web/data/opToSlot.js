@@ -68,7 +68,7 @@ const STANDALONE = {
 // `single` (t1089) is the DEGENERATE pattern: count 1, at the anchor. It adds NO pattern fields — posX/posY already ARE
 // the hole position — so the slot is posX/posY + the hole fields + feed/clearance/rpm. It exists so the DEFAULT drill twin
 // (DRILL_DEFAULTS.pattern === 'single') reaches this GENERATOR instead of the universal unroll: the universal arm cannot
-// expose depth/peck at all (drill.js peckDrill drives a JS while loop, so the peck sequence is unrolled and every Z baked
+// expose depth/peck at all (drill.js peckDrill DROVE a JS while loop — retired t1391 — so the peck sequence was unrolled and every Z baked
 // at BUILD), whereas here they are live #2600 knobs driven by a MACRO loop the operator can actually turn.
 const PATTERN_FIELDS = { single: [], circle: ['dia', 'count', 'startAngle'], grid: ['cols', 'rows', 'dx', 'dy'], line: ['count', 'spacing', 'angle'], rect: ['w', 'h', 'nx', 'ny'] };
 const HOLE_FIELDS = { drill: ['holeDia', 'depth', 'peck'], bore: ['holeDia', 'toolDia', 'depth', 'pitch'] };

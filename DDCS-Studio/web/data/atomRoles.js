@@ -39,8 +39,10 @@ export const ATOM_ROLES = {
     //   geometry: it is a Z WORD that shiftZ (the zOff path-offset) rewrites, so exposing it as a #var would change zOff's
     //   behaviour — GATED to the advisor rather than flipped (t1091 WORK-LOG). —
     line: { x0: 'geometry', y0: 'geometry', x1: 'geometry', y1: 'geometry', depth: 'geometry', stepdown: 'geometry', feed: 'value', clearance: 'geometry' },
-    drill: { x: 'geometry', y: 'geometry', depth: 'geometry', peck: 'geometry', feed: 'value', clearance: 'geometry', zOff: 'geometry' },
-    bore: { x: 'geometry', y: 'geometry', holeDia: 'geometry', toolDia: 'geometry', depth: 'geometry', pitch: 'geometry', feed: 'value', clearance: 'geometry', ramp: 'other', zOff: 'geometry' },
+    // t1391 — the `drill` and `bore` rows are GONE with their atoms. Their `feed: 'value'` is what t1389's holecycle row
+    // had to preserve deliberately (an unlisted successor would have silently de-classified the family's one live knob);
+    // the rest were 'geometry' because those kernels ran every number through num() into a JS loop, which is exactly the
+    // property `holecycle` replaced and why its depth/peck/pitch could become 'value' at all.
     helix: { cx: 'geometry', cy: 'geometry', radius: 'geometry', depth: 'geometry', pitch: 'geometry', startAngle: 'geometry', seg: 'geometry', clearance: 'geometry' },
     dwell: { sec: 'geometry' },
 

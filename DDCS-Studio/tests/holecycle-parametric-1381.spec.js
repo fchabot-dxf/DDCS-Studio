@@ -188,7 +188,10 @@ test('THE R-PLANE — the first approach is a rapid to surface+margin, and every
     await boot(page);
     const r = await page.evaluate(async (CAP) => {
         const { holeCycleLines, APPROACH } = await import('/wizards/ops/holecycle.js');
-        const { peckDrill } = await import('/wizards/ops/drill.js');
+        // t1391 act 2 — the FROZEN reference, not the live module: `ops/drill.js` is retired. The frozen copy is what the
+        // R-plane relationship has always been measured against in spirit (it is the literal kernel verbatim as of t1383),
+        // and pointing here is what keeps this bridge non-vacuous now that the original is gone.
+        const { refPeckDrill: peckDrill } = await import('/_test/literalHoleReference.js');
         const { traceToolpath } = await import('/engine/trace.js');
         const NL = String.fromCharCode(10);
         const R = (n) => +Number(n).toFixed(3);
@@ -538,10 +541,17 @@ test('THE LINE COUNT is fixed — and on a shallow single hole that means LONGER
     const r = await page.evaluate(async () => {
         const { holeCycleLines } = await import('/wizards/ops/holecycle.js');
         const { newBlock, emitProgram } = await import('/blocks/blockEmitter.js');
+        // t1391 act 2 — the FROZEN refs, because the live literals are retired. This test measures the LINE COUNT the
+        // parametric body replaced, so it needs the thing that was replaced: the registry cannot supply it any more, and
+        // asking it to would either throw (as it did the moment the atoms went) or, worse, quietly resolve to the new path
+        // and compare it against itself. The frozen reference exists for exactly this.
+        const { installLiteralHoleRefs } = await import('/_test/literalHoleReference.js');
+        const { BLOCKS } = await import('/wizards/ops/index.js');
+        installLiteralHoleRefs(BLOCKS);
         const NL = String.fromCharCode(10);
         const lit = (cfg, bored) => {
             const arr = newBlock('array'); arr.params = { ...arr.params, ...cfg, pattern: cfg.pattern || 'single' };
-            const c = newBlock(bored ? 'bore' : 'drill'); c.params = { ...c.params, ...cfg, x: 0, y: 0 };
+            const c = newBlock(bored ? 'bore_ref' : 'drill_ref'); c.params = { ...c.params, ...cfg, x: 0, y: 0 };
             arr.children = [c];
             return String(emitProgram([arr])).split(NL).length;
         };

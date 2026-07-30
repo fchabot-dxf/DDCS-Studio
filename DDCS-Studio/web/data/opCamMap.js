@@ -261,7 +261,7 @@ export function camTypeOf(op) {
         case 'drill': {
             // t1089 — pattern 'single' now routes to the GENERATOR like every other pattern. It used to fall through to the
             // universal unroll (the t1043 S1 gap: slotFromOp had no 'single'), which was the WORST arm for it — measured at
-            // t1087, the universal path cannot expose depth/peck AT ALL, because drill.js peckDrill drives a JS `while` loop
+            // t1087, the universal path could not expose depth/peck AT ALL, because drill.js peckDrill drove a JS `while` loop
             // that unrolls the peck sequence and bakes every Z literal at build time. A single hole is just a degenerate
             // pattern (count 1 at the anchor), so opToSlot declares it and depth/peck become live #2600 knobs driven by a
             // MACRO loop instead. NB this is the DEFAULT drill pattern (DRILL_DEFAULTS.pattern === 'single'), so it is the

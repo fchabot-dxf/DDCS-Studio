@@ -24,14 +24,17 @@ test('U1 classifier: feed/coord/Z expose; a drill depth (loop bound) + an under-
             { param: 'mfeed', blockIndex: 2, key: 'feed' },
         ]);
 
-        // (b) DRILL — depth/peck/coords run num() (a JS peck loop / pre-rounded) → bake-only; but FEED is pure `F${feed}`
-        //     interpolation (t1091 num→val) → exposable. flatten: user_root(0), drill(1).
-        const drill = mk('u1_drill', [{ type: 'user_root', params: {}, children: [
-            { type: 'drill', params: { x: 0, y: 0, depth: 5, peck: 5, feed: 100 } },
+        // (b) THE HOLE FAMILY — t1391 replaced the retired literal `drill` fixture with `holecycle`, and the case it makes is
+        //     now the sharper one: FEED and DEPTH both ride val() into their register seeds (t1389 put the knobs within
+        //     reach), while the pattern ORIGIN is still folded at build time and bakes. So the same test still shows both
+        //     halves — a value param exposes, a geometry param does not — on the atom that actually ships.
+        //     flatten: user_root(0), holecycle(1).
+        const drill = mk('u1_hole', [{ type: 'user_root', params: {}, children: [
+            { type: 'holecycle', params: { pattern: 'single', cycle: 'peck', x0: 0, y0: 0, depth: 5, peck: 5, feed: 100, clearance: 5 } },
         ] }], [
             { param: 'dfeed', blockIndex: 1, key: 'feed' },
             { param: 'ddepth', blockIndex: 1, key: 'depth' },
-            { param: 'dx', blockIndex: 1, key: 'x' },
+            { param: 'dx', blockIndex: 1, key: 'x0' },
         ]);
 
         // (c) UNDER STEPDOWN — a value Move sits under a depth fold; its coords are re-emitted per level, a #var can't ride.
@@ -76,9 +79,13 @@ test('U1 classifier: feed/coord/Z expose; a drill depth (loop bound) + an under-
 
     // (b) t1091 — a drill FEED now rides val() (pure F# interpolation) → EXPOSABLE; depth (a JS loop bound) and the
     //     pre-rounded coord X stay num()-consumed → BAKE-ONLY, even though they emit real words
-    expect(r.drill.dfeed, 'drill feed rides val() now → exposable').toMatchObject({ exposable: true, role: 'value' });
-    expect(r.drill.ddepth, 'drill depth drives the peck loop → bake-only').toMatchObject({ exposable: false, role: 'geometry' });
-    expect(r.drill.dx).toMatchObject({ exposable: false, role: 'geometry' });
+    expect(r.drill.dfeed, 'the hole feed rides val() → exposable').toMatchObject({ exposable: true, role: 'value' });
+    // t1391 — WAS "drill depth drives the peck loop → bake-only", which was true of the LITERAL kernel: its depth was a JS
+    // loop bound, so a #var became NaN. The parametric body's depth is a REGISTER SEED the macro's own loop reads, so
+    // t1389's ruling put `val()` on it and the knob became reachable. The claim inverts because the mechanism did.
+    expect(r.drill.ddepth, 'the hole depth is a register seed now → EXPOSABLE (t1389 ruling 2)').toMatchObject({ exposable: true, role: 'value' });
+    // …and the geometry half of the case still stands: the pattern origin folds at build time and bakes.
+    expect(r.drill.dx, 'the pattern origin is folded at build time → still bake-only').toMatchObject({ exposable: false, role: 'geometry' });
 
     // (c) the stepdown's OWN driver is geometry; a VALUE move under it is fold-blocked (role stays 'value', exposable false)
     expect(r.step.sto).toMatchObject({ exposable: false });
@@ -120,11 +127,18 @@ test('U1 emit-probe (dev-time guard): each declared role matches the real emit �
             ['arc', 'x', 'value'], ['arc', 'i', 'value'],
             ['spindle', 'rpm', 'value'],
             ['probe', 'to', 'value'], ['probe', 'level', 'geometry'],
-            // t1091 — feed FLIPPED to value in these three kernels (num→val): it is pure `F${feed}` interpolation, so a #var
-            // now rides. The guard below re-proves this against the REAL emit. Coords + depth stay geometry (loop bounds /
-            // pre-rounded). clearance stays geometry (a Z word shiftZ rewrites — gated, not flipped).
-            ['drill', 'x', 'geometry'], ['drill', 'feed', 'value'], ['drill', 'depth', 'geometry'], ['drill', 'clearance', 'geometry'],
-            ['bore', 'holeDia', 'geometry'], ['bore', 'feed', 'value'], ['bore', 'clearance', 'geometry'],
+            // t1091 — feed FLIPPED to value in the cutting kernels (num→val): it is pure `F${feed}` interpolation, so a #var
+            // rides. The guard here re-proves it against the REAL emit.
+            //
+            // t1391 — the `drill` and `bore` probes are GONE WITH THEIR ATOMS and `holecycle` takes their place, which makes
+            // this guard STRONGER rather than merely current: depth and peck are the two knobs t1389 flipped to 'value' by
+            // putting `val()` on the #81/#82 seeds, and this is the probe that proves the flip against the emit instead of
+            // against the table. A `#var` must genuinely reach the register seed — the whole point of the ruling.
+            ['holecycle', 'feed', 'value'], ['holecycle', 'depth', 'value'], ['holecycle', 'peck', 'value'],
+            // …and the line the flip did NOT cross, probed on params that are really USED at these defaults (an unused param
+            // would satisfy "the #var must not leak" for free, which would make the geometry half of this guard vacuous):
+            // clearance is a Z word the frame printer folds, x0 is the pattern origin folded at build time.
+            ['holecycle', 'clearance', 'geometry'], ['holecycle', 'x0', 'geometry'],
             ['line', 'x0', 'geometry'], ['line', 'feed', 'value'], ['line', 'clearance', 'geometry'],
             ['dwell', 'sec', 'geometry'],
         ];

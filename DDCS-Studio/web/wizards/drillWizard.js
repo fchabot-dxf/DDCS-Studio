@@ -4,7 +4,8 @@
  * REWRITTEN AS A BLOCK STACK: the wizard's only implementation is `drillStack(params)` → [ Array{ Drill | Bore } ]
  * — an Array container (patternPoints) stamping a hole leaf (peck Drill, or helical Bore) at each point, with
  * `skip` omitting holes by 1-based number. The wizard form and the Blocks view are two editors of this one
- * stack; the kernels (patternPoints / peckDrill / helicalBore) live in ops/ and are shared.
+ * stack; the pattern kernel (patternPoints) lives in ops/ and is shared. The hole KERNELS are gone as of t1391 —
+ * `peckDrill` / `helicalBore` unrolled their loops in JS and baked every Z; `holecycle` walks the same shapes at RUN time.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';

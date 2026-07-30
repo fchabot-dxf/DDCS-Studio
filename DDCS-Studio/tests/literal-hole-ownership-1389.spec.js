@@ -90,12 +90,13 @@ test('THE TENANT MOVED OUT — the fallback emits the PARAMETRIC body, not the l
  * AND THE PAIR IS NOW UNBLOCKED — nothing reaches either literal atom, from any builder or any registered user op.
  * This is the precondition act 2 needs, asserted BEFORE the deletion rather than assumed by it.
  */
-test('THE PAIR IS UNBLOCKED — nothing reaches drill or bore from any builder or user op', async ({ page }) => {
+test('THE PAIR IS RETIRED — nothing reaches them, and both are gone BOTH WAYS', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { BUILDERS, builderOf } = await import('/blocks/opBuilders.js');
         const uo = await import('/blocks/userOps.js');
-        const { BLOCKS } = await import('/wizards/ops/index.js');
+        const ops = await import('/wizards/ops/index.js');
+        const { BLOCKS } = ops;
         const flat = (st, o = []) => { for (const b of (st || [])) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
         const reach = [];
         for (const [op, build] of Object.entries(BUILDERS)) {
@@ -104,11 +105,30 @@ test('THE PAIR IS UNBLOCKED — nothing reaches drill or bore from any builder o
         for (const def of uo.listUserOps()) {
             try { const t = flat(builderOf(def.opType)(uo.defaultParams(def))); if (t.includes('drill') || t.includes('bore')) reach.push('userOp:' + def.opType); } catch (_) { /* needs params */ }
         }
-        return { reach, boreRegistered: !!BLOCKS.bore, drillRegistered: !!BLOCKS.drill };
+        return {
+            reach,
+            // BOTH WAYS, the holepeck pattern: unregistered AND the module no longer resolving. An unregistered-but-present
+            // module is exactly how a superseded atom comes back to life through a stray import.
+            boreRegistered: !!BLOCKS.bore, drillRegistered: !!BLOCKS.drill,
+            drillResolves: await import('/wizards/ops/drill.js').then(() => true, () => false),
+            boreResolves: await import('/wizards/ops/bore.js').then(() => true, () => false),
+            // …and the KERNEL RE-EXPORTS, checked the same way: the registry was the last thing keeping the two functions
+            // addressable, so their absence from it is part of the retirement rather than a detail of it.
+            peckDrillExported: typeof ops.peckDrill !== 'undefined',
+            helicalBoreExported: typeof ops.helicalBore !== 'undefined',
+            // The successor is of course still there — otherwise "both gone" would be satisfied by having broken the family.
+            holeCycleRegistered: !!BLOCKS.holecycle,
+            // A palette with no literal hole entries, which is the user-visible half.
+            palette: Object.keys(BLOCKS).filter((k) => /^(drill|bore|holepeck)$/.test(k)),
+        };
     });
     expect(r.reach, 'no builder and no registered user op reaches either literal atom').toEqual([]);
-    // Still registered at the END of act 1 — the deletion is act 2's own reviewed commit, and these two lines are what
-    // flip there. Asserted rather than left implicit so the two acts stay distinguishable in the history.
-    expect(r.drillRegistered, 'drill is still registered — act 1 extracted the tenant, act 2 does the deletion').toBe(true);
-    expect(r.boreRegistered, 'and so is bore').toBe(true);
+    expect(r.drillRegistered, 'the literal drill is out of the palette registry').toBe(false);
+    expect(r.boreRegistered, 'and so is the literal bore').toBe(false);
+    expect(r.drillResolves, 'drill.js no longer resolves — no stray import can revive it').toBe(false);
+    expect(r.boreResolves, 'nor does bore.js').toBe(false);
+    expect(r.peckDrillExported, 'peckDrill is no longer re-exported from the ops registry').toBe(false);
+    expect(r.helicalBoreExported, 'nor is helicalBore').toBe(false);
+    expect(r.palette, 'the palette carries no literal hole atom at all — drill, bore and holepeck are all retired').toEqual([]);
+    expect(r.holeCycleRegistered, 'while the successor is registered — the family did not break, it converged').toBe(true);
 });
