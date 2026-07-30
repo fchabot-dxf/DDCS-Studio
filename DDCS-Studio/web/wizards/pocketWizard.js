@@ -15,7 +15,7 @@ import { num } from './ops/util.js';
 import { regionDesc } from './ops/region.js';
 import { restValid } from './ops/restmachining.js';   // t871 — REST MACHINING: append a corner-clear pass with a smaller 2nd tool
 import { pocketInsetMm } from './ops/pocketfill.js';   // t1406 — the ONE reading of how far in a pocket's tool centre sits
-import { surfaceRasterCovers, surfaceRasterGap, SURFACE_RASTER_IGNORES } from './ops/surfaceraster.js';   // t1406 — the atom's own declared envelope decides whether this pocket may ride it
+import { surfaceRasterCovers, surfaceRasterGap } from './ops/surfaceraster.js';   // t1406 — the atom's own declared envelope decides whether this pocket may ride it
 
 /** The TRUE pocket region (rect = corner+size, circle/polygon = centre±R, ellipse = centre±(rx,ry)) — the size you
  *  type, before insetting. Shape-centred at (originX, originY) except rect (its corner). */
@@ -94,22 +94,30 @@ export function pocketRasterStrategy(params = {}) { return (params.strategy || '
  *   too small    A pocket narrower than its tool is a single plunge, not a raster; that arm re-pointed at t1391.
  *   rest tool    Ruled untouched this act. Its corner-clear rides INSIDE the clearing place, and the clearing place
  *                must now hold the atom ALONE (absorbingChild is strict, and a mixed body shears a macro — t1349).
- *   direction    The atom's walk is ALWAYS both-ways (SURFACE_RASTER_IGNORES.direction — #49 seeded 1, negated every
- *                row, no branch). A one-way RASTER therefore keeps its literal fill rather than silently emitting a
- *                zig-zag: an operator picks one-way to get a consistent climb cut, and both-ways is not that.
- *                A SPIRAL pocket stays eligible whatever `direction` holds, because concentric rings ignore it on BOTH
- *                sides — `fillStrategy` dispatches to `concentricRect` before it ever reads `direction`.
  *   envelope     Whatever the atom's OWN table has not earned (surfaceRasterCovers) is refused in its own words. This
  *                is a second consumer of that table, which is exactly what a table is for.
+ *
+ * ── t1418 — THE `direction` CLAUSE IS GONE, AND ITS REMOVAL IS THE POINT ──────────────────────────────────────────
+ * It read: *"the atom's walk is ALWAYS both-ways, so a one-way RASTER keeps its literal fill rather than silently
+ * emitting a zig-zag — an operator picks one-way to get a consistent climb cut, and both-ways is not that."* That
+ * narrowing was correct and it was always meant to be temporary: the atom now walks all three direction words, so
+ * the clause has nothing left to refuse and keeping it would refuse a capability that exists.
+ *
+ * IT EMPTIED FULLY, NOT HALFWAY. Teaching only `oneway` would have left `otherway` — a conventional cut — on the
+ * literal arm while a clause reading "one-way keeps its literal fill" no longer described what happened. `direction`
+ * now reaches the atom through the envelope like every other axis (SURFACE_RASTER_AXES), so an unknown direction word
+ * still refuses, in the atom's own words, from the same table.
+ *
+ * A SPIRAL pocket is unaffected and always was: concentric rings ignore `direction` on BOTH sides — `fillStrategy`
+ * dispatches to `concentricRect` before it ever reads it — which is why the atom's axis declaration gives concentric
+ * no direction axis at all rather than three identical rows.
  */
 export function pocketRasterGap(params = {}) {
     const shape = params.shape || 'rect';
     if (shape !== 'rect') return `a ${shape} pocket clears through a JS contour walk, not the atom's analytic rectangle`;
     if (pocketTooSmall(params)) return 'a pocket narrower than its tool is a single centre plunge, not a raster';
     if (restValid(params)) return 'a rest pass rides inside the clearing place, and that place must hold the atom alone';
-    if ((params.strategy || 'spiral') === 'raster' && (params.direction || 'bothways') !== 'bothways')
-        return `a one-way raster keeps its literal fill — ${SURFACE_RASTER_IGNORES.direction}`;
-    const probe = { strategy: pocketRasterStrategy(params), entry: params.entry || 'plunge' };
+    const probe = { strategy: pocketRasterStrategy(params), direction: params.direction || 'bothways', entry: params.entry || 'plunge' };
     return surfaceRasterCovers(probe) ? '' : surfaceRasterGap(probe);
 }
 
@@ -158,8 +166,14 @@ export function pocketStack(params = {}, opts = {}) {
      * outline and `inset` moves only the WALK. The VALUE is never re-derived here: `pocketInsetMm` is the same one
      * source `pocketInsetRegion` uses, so the wall and the fill still trace boundaries that agree by construction.
      *
-     * `direction` is deliberately NOT passed. The atom ignores it, so the ARM is narrowed to both-ways instead (see
-     * pocketRasterGap) and the socket keeps its own default — never a one-way request answered with a zig-zag.
+     * t1418 — `direction` IS PASSED NOW. It used to be pinned to `'bothways'` here because the atom ignored the word,
+     * and the arm was narrowed to match (see pocketRasterGap) so a one-way request was never answered with a zig-zag.
+     * The atom walks all three words, so pinning it would now be the lie the pin existed to prevent.
+     *
+     * IT IS CARRIED AT BUILD, NOT LIVE, and that is a real property rather than a caveat: `direction` selects which
+     * WALK gets written into the macro text, so it is spent before any register exists. A pendant `#var` cannot reach
+     * it — `atomRoles` says `other` (a discrete selector) and the t1418 spec asserts a register in this socket does
+     * NOT come out as one. What it stopped being is ARM-DECIDING: it no longer decides literal-vs-parametric.
      */
     const rasterLeaf = (strat) => {
         const b = newBlock('surfaceraster');
@@ -169,7 +183,7 @@ export function pocketStack(params = {}, opts = {}) {
             depth, stepdown: by,                            // the atom owns the depth loop now — no enclosing StepDown
             toolDia: num(params.toolDia, 6), stepoverPct: num(params.stepoverPct, 40),
             feed, plunge, clearance: clr,
-            strategy: strat, direction: 'bothways',
+            strategy: strat, direction: params.direction || 'bothways',
             entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3),
             helixDia: num(params.helixDia, 0), helixPitch: num(params.helixPitch, 1),
             confirmEvery: num(params.confirmEvery, 0),

@@ -70,6 +70,28 @@ export function stepoverPctOf(p = {}, toolDia) {
 }
 
 /**
+ * t1418 — THE ONE READING OF A STORED DIRECTION, declared beside the stepover's for the same reason: three readers
+ * ask this question (the walk, the work declaration, the envelope key) and three hand-rolled `String(p.direction ||
+ * 'bothways')` expressions is exactly how two of them drift apart.
+ *
+ * ABSENT IS THE DEFAULT, UNKNOWN IS KEPT VERBATIM. An unset config IS the block's declared `bothways`, so it resolves;
+ * a word this atom has never heard of stays as it was written, so it misses the envelope table and REFUSES there
+ * rather than being quietly folded into the walk it most resembles. That asymmetry-free handling is t1404's ruling on
+ * `strategy`/`entry` applied to the axis this turn adds, in the same act that adds it.
+ */
+export function rasterDirectionOf(p = {}) {
+    return String(p.direction == null ? '' : p.direction).trim() || 'bothways';
+}
+
+/**
+ * Does this resolved direction select the ONE-WAY walk? Asked by the walk itself and by the work declaration, from
+ * this one place — because those two answering differently is not a cosmetic drift: the declaration would then size
+ * the tracer's cap for a body the emitter did not write, and t1383 measured what an undersized cap does (a preview
+ * silently showing a fraction of the toolpath). An unknown word is NOT one-way, exactly as the emitter treats it.
+ */
+export function rasterIsOneWay(direction) { return direction === 'oneway' || direction === 'otherway'; }
+
+/**
  * THE BAND. #40–#49: clear of the mill kit's #20–#33 (camMacroKit's caller/kit split), clear of the probe temps at
  * #50–#61, and clear of the dialect/atom injections universalScratch aggregates in the low teens. Declared here as
  * data so the collision guard reads it instead of re-deriving it from the emitted text.
@@ -249,7 +271,13 @@ export function surfaceRasterWorkSteps(p = {}) {
     const passes = concentric
         ? Math.max(1, Math.floor((Math.min(w, h) - 0.001) / (2 * step)) + 1)
         : Math.max(1, Math.floor((h - step / 2) / step) + 1);
-    const PER_PASS = concentric ? 14 : 20;   // the ring / row body's own line count, branches included
+    // t1418 — THE ROW COUNT IS THE SAME IN EVERY DIRECTION (the scout's first fact: 46 rows either way, same Y, same
+    // extents) — a one-way walk is a TRAVEL change, not a geometry change. What DOES move is the per-pass body, and
+    // it moves DOWN, not up: the one-way row spends three lines on the lift/rapid/plunge triple but loses all four
+    // of the both-ways walk's end-choosing branches plus its step-over and its `#49` flip. Counted off the emitted
+    // body rather than guessed — t1416's scout predicted 22 by assuming the branches survived; they do not, and the
+    // t1418 spec asserts this number against the real line count so the two can never drift.
+    const PER_PASS = concentric ? 14 : (rasterIsOneWay(rasterDirectionOf(p)) ? 11 : 20);
     // THE DESCENT is per LEVEL, not per pass, and only the helix is large: it is a 24-segment-per-revolution polyline.
     const entry = String(p.entry || '');
     const helixSegs = entry === 'helix'
@@ -351,6 +379,7 @@ export function surfaceRasterLines(p = {}) {
     const stepBaked = tool * pct / 100;   // the stepover AT BUILD VALUES — what the baked ramp geometry is computed for
     const opts = { x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
         helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1), toolDia: tool, stepBaked,
+        direction: rasterDirectionOf(p),   // t1418 — the row walk reads it; ringWalk does not, and SURFACE_RASTER_AXES says so
         rot, mv, AX, TM, LBL };   // t1375 — the rotation goes through the ONE move printer, so each walk declares points, not words
     const walk = (p.strategy === 'concentric') ? ringWalk(opts) : rowWalk(opts);
 
@@ -451,15 +480,29 @@ export function surfaceRasterLines(p = {}) {
 }
 
 /**
- * THE PARALLEL RASTER — rows across the area.
+ * THE PARALLEL RASTER — rows across the area, in the DIRECTION the op asks for (t1418).
  *
- * It keeps the tool DOWN: cut across, step over AT DEPTH, come back — one plunge per level.
+ * BOTH-WAYS keeps the tool DOWN: cut across, step over AT DEPTH, come back — one plunge per level.
+ * ONE-WAY cuts every row the same way: lift to clearance, rapid back to this row's start, re-plunge, cut. That costs
+ * a lift/rapid/plunge triple per row and buys a consistent climb (`oneway`) or conventional (`otherway`) cut, which
+ * is the entire reason an operator picks it.
  *
- * THERE IS NO ONE-WAY VARIANT HERE, and that is a correction to my own earlier finding rather than an omission.
- * t1331 listed `direction: 'oneway'` as an uncovered gap, measured from a test that passed the param straight to
- * both emitters. It is not a gap: `surfacingStack` hard-codes `direction: 'bothways'` on the fill block (the twin's
- * own comment says so too), so a surfacing op CANNOT emit a one-way raster and no user config reaches it. A
- * parametric one-way walk was written and then deleted — machinery for a case this op does not have.
+ * ── WHY THIS EXISTS NOW, AFTER BEING DELETED ONCE ────────────────────────────────────────────────────────────────
+ * t1331 listed `direction: 'oneway'` as an uncovered gap; t1333 corrected that to "not a gap" because `surfacingStack`
+ * hard-codes `bothways`, and the parametric one-way walk written then was DELETED as machinery for a case the op did
+ * not have. That was right for surfacing and it stopped being right at t1406, when a POCKET — which has a real
+ * `direction` param the operator sets — started riding this atom. t1406 handled it by NARROWING: a one-way pocket kept
+ * its literal fill and `pocketRasterGap` said so. This turn closes the capability instead of routing around it, so the
+ * boundary clause empties and the atom carries the literal's whole three-word vocabulary.
+ *
+ * ── THE MIRROR IS THE SAME WALK WITH A SIGN, MEASURED BEFORE IT WAS BUILT (t1416's scout) ────────────────────────
+ * `otherway` is `oneway` with the row's two ends swapped — nothing else differs, which is why both are taught in one
+ * act rather than one being taught and the other left to re-word the boundary around. The scout's numbers on the
+ * literal (80×60, Ø6 @40%, 3 levels): both-ways 92 cuts / 6 rapids, one-way 92 cuts / 94 rapids, 46 row cuts either
+ * way. THE ROW SET DOES NOT MOVE — same rows, same Y, same extents; only the travel between them changes. And the
+ * equal CUT COUNT is a trap worth naming: both-ways is 46 rows + 46 step-overs-at-depth, one-way is 46 rows + 46
+ * PLUNGES, so a bridge comparing only cut counts would pass on a walk that never lifted. The discriminator is the
+ * RAPIDS and the row directions, and the t1418 spec asserts those rather than the count.
  */
 /**
  * THE LEVEL'S DESCENT — ONE SOURCE, ASKED BY BOTH WALKS (t1404).
@@ -485,12 +528,19 @@ function descentLines(o) {
 }
 
 function rowWalk(o) {
-    const { x0, y0, w, h, feed, plunge, clr, r3, F, ax, axE, ayE, stepBaked, mv, AX, TM, LBL } = o;
-    void clr;
+    const { x0, y0, w, h, feed, plunge, clr, r3, F, ax, az, axE, ayE, azE, stepBaked, mv, AX, TM, LBL } = o;
+    // t1418 — WHICH WALK. Anything that is not one of the two one-way words is the both-ways raster, which mirrors
+    // exactly how `strategy` already resolves (anything not 'concentric' is the row walk) — the ENVELOPE is what
+    // refuses an unknown word, not the emitter, so the two axes stay symmetric (the t1404 lesson).
+    const reverse = o.direction === 'otherway';
+    const oneWay = rasterIsOneWay(o.direction);
     // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP walks toward the area centre at the declared
     // angle and comes back. See rampLines for why toC and 1/tan are BAKED and what that costs.
     // t1404 — the row start is handed DOWN now (it was assumed inside the descent builders); the value is unchanged.
-    const descent = descentLines({ ...o, sx: x0, sy: y0 + stepBaked / 2 });
+    // t1418 — an `otherway` level starts at the FAR end, so that is where its descent happens and returns to. This is
+    // the literal's own rule: `onewayMoves` hands `entryOrPlunge` the row's `xs`, which is `xhi` when reversed. At
+    // bothways/oneway the expression collapses to `x0` — byte-identical, asserted.
+    const descent = descentLines({ ...o, sx: reverse ? x0 + w : x0, sy: y0 + stepBaked / 2 });
     // THE THREE POINTS THIS WALK VISITS, declared once as X/Y pairs so the rotation reads them rather than the text.
     // NEAR/FAR are the row's two ends; ROW is the row's Y, which the body has already computed into #47 as an ABSOLUTE
     // (unrotated) coordinate — so its affine form is a bare register with no constant, and #47 keeps meaning exactly
@@ -523,6 +573,48 @@ function rowWalk(o) {
         `IF ${V.n} < 1 THEN ${V.n}=1   ( a face narrower than one stepover is still one row )`,
     ];
     const rowY = `    ${V.y}=${ayE(0, `${V.step} / 2 + ${V.i} * ${V.step}`)}`;
+
+    /**
+     * ── t1418 — THE ONE-WAY WALK. Every row cut the same way; the tool LIFTS between them ─────────────────────────
+     *
+     * `#49` is not written at all here, and that absence is deliberate rather than an oversight: there is no direction
+     * to flip, so the register that means "which way this row runs" would be a value nothing reads. The both-ways walk
+     * keeps it, and the two never coexist.
+     *
+     * THE SHAPE IS THE LITERAL'S, LINE FOR LINE. `onewayMoves` descends at the FIRST row of the level and then, for
+     * every row after it, emits exactly `G0 Z<clr>` · `G0 X<start> Y<row>` · `G1 Z<depth> F<plunge>` before the cut —
+     * a plain plunge, never the ramp/helix. That is why the descent stays where it is (per LEVEL, at row 0) and the
+     * inter-row triple below is a bare plunge: matching the reference means matching that asymmetry, not tidying it.
+     *
+     * IT NEEDS TWO LABELS, NOT SIX. The both-ways walk spends four of its six on choosing an END (`IF #49 < 0 …`);
+     * with no flip there is nothing to choose, so `flowLabels` declares only the two this body writes. A label
+     * reserved for a branch this config cannot take is a number nobody can account for (holecycle's own rule).
+     */
+    if (oneWay) {
+        const FROM = () => (reverse ? FAR_X() : NEAR_X());
+        const TO = () => (reverse ? NEAR_X() : FAR_X());
+        return { count, body: [
+            `  ${V.i}=0`,
+            `  WHILE [${V.i} < ${V.n}] DO2   ( rows: counted above, so the area and the stepover decide how many )`,
+            rowY,
+            `    IF ${V.i} > 0 GOTO${LBL.rowStepLabel}   ( already down: only the FIRST row of a level gets the descent )`,
+            `    G0 ${mv(FROM(), ROW_Y())}`,
+            ...descent,
+            `    GOTO${LBL.rowCutLabel}`,
+            `    N${LBL.rowStepLabel}`,
+            // THE COST OF ONE-WAY, in three lines: the tool lifts clear, rapids back to this row's start and drops
+            // again. The both-ways walk links at depth in ONE line instead — that is the whole trade, and it is what
+            // the operator buys when they pick a consistent cut direction over the fastest travel.
+            `    G0 Z${az(clr)}   ( lift: a one-way pass never links at depth )`,
+            `    G0 ${mv(FROM(), ROW_Y())}   ( rapid back to this row's start — the same end as every other row )`,
+            `    G1 Z${azE('- ' + V.z)} F${plunge}   ( re-plunge at this level's floor )`,
+            `    N${LBL.rowCutLabel}`,
+            `    G1 ${mv(TO(), ROW_Y(null))} F${feed}   ( every row cut the SAME way — a consistent ${reverse ? 'conventional' : 'climb'} cut )`,
+            `    ${V.i}=[${V.i} + 1]`,
+            '  END2',
+        ] };
+    }
+
     return { count, body: [
         `  ${V.i}=0`,
         // EVERY LEVEL STARTS AT THE NEAR CORNER, going +X. Carrying the direction over from the previous level looked
@@ -742,8 +834,9 @@ function ringWalk(o) {
  * POLYLINE, not an arc, so "move-for-move" is the wrong criterion for it until we choose what it should emit.
  *
  * t1333: CONCENTRIC rings are now walked parametrically and proven move-for-move against the literal kernel. The
- * one-way raster turned out NOT to be a gap at all — surfacing hard-codes both-ways, so no config reaches it (see
- * rowWalk). What remains is genuinely two things: the DESCENT (ramp / helix) and the confirm-every-N pause.
+ * one-way raster read as "not a gap" — surfacing hard-codes both-ways, so no config reached it — which was true of
+ * SURFACING and stopped being true at t1406, when a pocket with a real `direction` param started riding this atom.
+ * t1418 closed it: the row walk reads all three direction words and the table carries the six rows that earned it.
  *
  * The boundary is a predicate rather than a comment: a caller asks whether a config is inside the proven envelope
  * instead of assuming it is. Retiring the literal emitter means closing what is left — every `false` below is a
@@ -766,10 +859,43 @@ function ringWalk(o) {
  * names it, instead of inheriting a `true` that was about somebody else's feature. The cost of the table is one line
  * per combination; the cost of the constant was a shipped op that plunged when the operator asked it to ramp.
  */
+/**
+ * ── t1418 — WHICH AXES EACH WALK ACTUALLY READS, DECLARED ────────────────────────────────────────────────────────
+ *
+ * `direction` became a third axis this turn, and the naive move — key every row `strategy/direction/entry` — would
+ * have MANUFACTURED SIX FALSE ROWS: `concentric/oneway/plunge`, `concentric/otherway/ramp` and the rest, each reading
+ * like a bridged combination when the rings have no direction to bridge. `ringWalk` never looks at the word, and
+ * neither does the reference (`fillStrategy` dispatches to `concentricRect` BEFORE it reads `direction`), so the two
+ * agree for every direction — which makes "concentric covers all directions" true and "concentric/oneway was
+ * measured" a lie. A table whose rows are the turn that earned them cannot afford rows nobody earned.
+ *
+ * So the axis set is DATA, per strategy, and the key is built from it. Adding a walk that reads a fourth thing is a
+ * line here plus its rows, and a walk that stops reading one is a line here plus the rows that must come out.
+ *
+ * ⚠ IT IS NOT THE ASYMMETRY t1404 WARNED ABOUT, and the distinction is worth stating because it looks alike. That
+ * one folded an UNKNOWN `strategy` to a known arm while keeping an unknown `entry` verbatim, so `adaptive` read as
+ * proven. Here every axis a strategy reads is still normalised identically, and an unknown STRATEGY falls to the
+ * parallel axis set — so `adaptive/bothways/plunge` misses the table and refuses, exactly as before.
+ */
+export const SURFACE_RASTER_AXES = {
+    parallel: ['strategy', 'direction', 'entry'],
+    concentric: ['strategy', 'entry'],   // rings ignore `direction` on BOTH sides — measured at t1406, unchanged here
+};
+
 export const SURFACE_RASTER_PROVEN = {
-    'parallel/plunge': 't1329 — the first bridge, move for move against the literal raster',
-    'parallel/ramp': 't1339 — the ramp descent, baked toC + 1/tan',
-    'parallel/helix': 't1345 — the 24-segment polyline helix, within one emit quantum',
+    'parallel/bothways/plunge': 't1329 — the first bridge, move for move against the literal raster',
+    'parallel/bothways/ramp': 't1339 — the ramp descent, baked toC + 1/tan',
+    'parallel/bothways/helix': 't1345 — the 24-segment polyline helix, within one emit quantum',
+    // t1418 — the six the one-way walk earned, each measured per-phase against the frozen literal's `onewayMoves`.
+    // They are SIX and not three because the mirror is the same walk with its two ends swapped: teaching one and
+    // leaving the other would have left a conventional-cut pocket on the literal arm while the boundary's wording
+    // read as though one-way were handled.
+    'parallel/oneway/plunge': 't1418 — the one-way walk, against the literal onewayMoves (lift · rapid · re-plunge)',
+    'parallel/oneway/ramp': 't1418 — likewise; the descent is per LEVEL, at row 0, exactly as the reference does it',
+    'parallel/oneway/helix': 't1418 — likewise, inside the whole-revolution agreement the t1406 ledger names',
+    'parallel/otherway/plunge': 't1418 — the mirror: every row starts at the FAR end, including the level descent',
+    'parallel/otherway/ramp': 't1418 — likewise',
+    'parallel/otherway/helix': 't1418 — likewise',
     'concentric/plunge': 't1333 — inward rings, proven on four adversarial ring boundaries',
     'concentric/ramp': 't1404 — the descent the rings never had (the t1402 defect)',
     'concentric/helix': 't1404 — likewise; both now run the SAME descentLines both walks ask for',
@@ -778,25 +904,28 @@ export const SURFACE_RASTER_PROVEN = {
 /**
  * WHAT THE ATOM DOES NOT READ, declared rather than left to be re-discovered.
  *
- * `direction` is the live one: the walk is ALWAYS both-ways (`#49` is seeded 1 and negated once per row,
- * unconditionally), so a caller asking for one-way gets both-ways. That has never been a gap because no surfacing
- * config can set it — `surfacingStack` hard-codes `direction: 'bothways'` — which is exactly why the envelope calls
- * one-way covered and why that verdict is still right for THIS op. It stops being right the moment a caller with a
- * real `direction` param emits through this atom (pocket has one), so the fact is written down HERE, next to the
- * table, rather than living in a work-log entry somebody would have to find. Same class as the defect above; caught
- * before it shipped rather than after.
+ * ── IT IS EMPTY NOW, AND THAT IS THE DECLARATION DOING ITS JOB (t1418) ───────────────────────────────────────────
+ * t1404 put ONE fact here: the walk was always both-ways, `#49` seeded 1 and negated every row with no branch, so a
+ * caller asking for one-way got both-ways. It was written down precisely so the next caller with a real `direction`
+ * param would find it instead of rediscovering it the way t1402 rediscovered the missing ring descent — and it
+ * worked: t1406 read this line and NARROWED the pocket's arm rather than shipping a zig-zag against the request.
+ *
+ * This turn the walk genuinely reads `direction`, so the entry is GONE rather than reworded. A declaration built to
+ * be removed has to actually be removable, and the spec asserts BOTH halves of that — the key is absent AND the walk
+ * now branches — because an empty table proves nothing on its own.
+ *
+ * The export stays as the slot for the next such fact. Empty says "nothing is ignored", which is a claim; absent
+ * would say nothing at all, and the next reader would have to re-derive it from three walks.
  */
-export const SURFACE_RASTER_IGNORES = {
-    direction: 'the walk is always both-ways — #49 is seeded 1 and negated every row, with no branch on direction',
-};
+export const SURFACE_RASTER_IGNORES = {};
 
 /**
- * (strategy, entry) → the table's key.
+ * (strategy, direction, entry) → the table's key, over whichever axes THIS strategy reads (SURFACE_RASTER_AXES).
  *
- * ABSENT falls to the default (the block's own `parallel`/`plunge`) — an unset config IS the defaults, and those are
- * proven. An UNKNOWN value is kept verbatim so it misses the table and refuses.
+ * ABSENT falls to the default (the block's own `parallel`/`bothways`/`plunge`) — an unset config IS the defaults, and
+ * those are proven. An UNKNOWN value is kept verbatim so it misses the table and refuses.
  *
- * THE TWO AXES ARE NORMALISED THE SAME WAY, and getting that wrong once is why this comment exists: the first cut
+ * THE AXES ARE NORMALISED THE SAME WAY, and getting that wrong once is why this comment exists: the first cut
  * folded any non-'concentric' strategy to 'parallel' (mirroring what the emitter DOES) while keeping an unknown
  * entry verbatim. That asymmetry made `strategy: 'adaptive'` read as PROVEN — the operator asks for one thing, the
  * atom silently does another, and the predicate calls it covered. That is the t1402 defect exactly, rebuilt in the
@@ -805,8 +934,8 @@ export const SURFACE_RASTER_IGNORES = {
  */
 function surfaceRasterCombo(p = {}) {
     const strategy = String(p.strategy == null ? '' : p.strategy).trim() || 'parallel';
-    const entry = String(p.entry == null ? '' : p.entry).trim() || 'plunge';
-    return `${strategy}/${entry}`;
+    const by = { strategy, direction: rasterDirectionOf(p), entry: String(p.entry == null ? '' : p.entry).trim() || 'plunge' };
+    return (SURFACE_RASTER_AXES[strategy] || SURFACE_RASTER_AXES.parallel).map((a) => by[a]).join('/');
 }
 
 /**
@@ -859,6 +988,10 @@ export const surfaceRasterBlock = {
         if (String(p.zMode || '') === 'skim') out.push('skimErrLabel', 'skimOkLabel');
         if (Math.max(0, num(p.inset, 0)) > 0) out.push('insetErrLabel', 'insetOkLabel');
         if (String(p.strategy || '') === 'concentric') out.push('ringStepLabel', 'ringCutLabel');
+        // t1418 — the ONE-WAY row walk writes TWO of the six. Four of them exist only to choose which END a row runs
+        // to, and a one-way walk has no end to choose. Declaring all six anyway would reserve four numbers no branch
+        // in this body can reach — the exact thing this declaration's own rule forbids.
+        else if (rasterIsOneWay(rasterDirectionOf(p))) out.push('rowStepLabel', 'rowCutLabel');
         else out.push('rowStepLabel', 'rowCutLabel', 'rowNearLabel', 'rowEndLabel', 'rowFarLabel', 'rowStartLabel');
         if (Math.max(0, Math.round(num(p.confirmEvery, 0))) > 0) out.push('confirmLabel');
         const entry = String(p.entry || 'plunge');

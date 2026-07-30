@@ -9952,3 +9952,168 @@ byte-identity assertion is the guard that says the default path did not move.
 ### NO GATE RUN
 
 Nothing changed but a screenshot. Scratch spec deleted; proc tree clean.
+
+## t1418 (seat A) — DIRECTION-TAUGHT: the atom walks all three directions, and the one-way clause empties FULLY
+
+The row walk reads `direction`. `oneway` and `otherway` both land, so `pocketRasterGap`'s one-way clause comes out
+whole rather than being re-worded around a half-taught capability, and `SURFACE_RASTER_IGNORES.direction` — the
+declaration t1404 wrote specifically so this act would be deliberate — is REMOVED.
+
+### THE FORK WAS RULED BOTH WAYS, AND THE MIRROR REALLY IS FREE
+
+t1416 raised it: teaching only `oneway` leaves a conventional-cut pocket on the literal arm while the boundary's
+wording reads as though one-way were handled. The advisor ruled both. It cost two lines in the walk — `reverse` picks
+which end is the row's START and which is its END — because that is genuinely all the mirror is. The literal says the
+same thing: `onewayMoves(rows, ctx, reverse)` swaps `xlo`/`xhi` and changes nothing else.
+
+### THE WALK, AND THE ONE THING I ALMOST GOT WRONG
+
+    IF #48 > 0 GOTO13          ( already down: only the FIRST row of a level gets the descent )
+    G0 <start end> Y#47
+    ...descent                 ( plunge / ramp / helix — per LEVEL, at row 0 )
+    GOTO14
+    N13
+    G0 Z<clr>                  ( lift: a one-way pass never links at depth )
+    G0 <start end> Y#47        ( rapid back — the same end as every other row )
+    G1 Z[0 - #46] F<plunge>    ( re-plunge at this level's floor )
+    N14
+    G1 <far end> F<feed>       ( every row cut the SAME way )
+
+The inter-row triple is a BARE PLUNGE, never the ramp or the helix, and that asymmetry is the reference's, not a
+simplification: `onewayMoves` calls `entryOrPlunge` only while `!started`, then emits a plain `G0 Z clr` · `G0 X Y` ·
+`G1 Z F` for every row after. Matching a reference means matching it where it is asymmetric.
+
+For `otherway` the level's DESCENT also moves — it starts and returns to the FAR end, because the literal hands
+`entryOrPlunge` the row's `xs`, which is `xhi` when reversed. That is one expression (`reverse ? x0 + w : x0`) and it
+collapses to `x0` for the other two directions, which is what keeps both-ways byte-identical.
+
+`#49` is not written at all on the one-way path. There is no direction to flip, so the register that means "which way
+this row runs" would hold a value nothing reads.
+
+### WHAT I DECLARED RATHER THAN HAND-ROLLED
+
+**`rasterDirectionOf` / `rasterIsOneWay`.** Three readers ask "which direction is this?" — the walk, the @work
+declaration and the envelope key. Three hand-rolled `String(p.direction || 'bothways')` expressions is how two of them
+drift; and the drift here is not cosmetic. If the work declaration answered "one-way" where the emitter wrote
+both-ways, the tracer's cap would be sized for a body nobody emitted, which is exactly t1383's shipped defect (a
+preview silently drawing a fraction of the path). I wrote the second helper only after noticing my first cut compared
+`=== 'bothways'` in one place and `oneway || otherway` in the other — an unknown word would have split them.
+
+**`SURFACE_RASTER_AXES` — which axes each walk READS.** This is the declaration I am most sure about, and it started
+as a mistake. The obvious move is to key every row `strategy/direction/entry`. That MANUFACTURES SIX FALSE ROWS:
+`concentric/oneway/plunge` and its five siblings, each reading like a bridged combination when the rings have no
+direction to bridge — `ringWalk` never looks at the word and neither does `fillStrategy` (it dispatches to
+`concentricRect` before it reads `direction`). A table whose rows are *the turn that earned them* cannot afford rows
+nobody earned; that is the whole difference between this table and the `return true` it replaced at t1404. So the axis
+set is DATA per strategy and the key is built from it: parallel reads three axes, concentric two, twelve rows total.
+
+It is NOT the asymmetry t1404 warned against — that one folded an unknown *strategy* to a known arm while keeping an
+unknown *entry* verbatim, so `adaptive` read as proven. Here every axis a strategy reads is normalised identically and
+an unknown strategy still falls to the parallel axis set, so `adaptive/bothways/plunge` misses the table and refuses.
+Asserted directly, because the two really do look alike.
+
+### THE CRITERION IS NOT THE CUT COUNT — the scout's trap, cashed
+
+t1416 measured that both-ways and one-way cut the SAME 92 moves for different reasons (46 rows + 46 step-overs vs 46
+rows + 46 plunges), so a bridge comparing counts would pass on a walk that never lifted. The new spec asserts the two
+discriminators as PREMISES before it claims equivalence: every row's signed direction is one value (+1 for oneway, −1
+for otherway, and the literal agrees), and the rapid count exceeds the row count. Then the t1406 relationship class
+runs on top: same cutting floors, same SET of cutting moves per level, within the 0.001mm emit quantum.
+
+**Twenty-two bridge configs** — both words × plunge/ramp/helix × wallOffset in both signs × a non-dividing row count ×
+a one-row pocket × a clamped last bite × a non-multiple depth × a placed frame. All green against the frozen
+`/_test/literalPocketFill.js`.
+
+### TWO CORRECTIONS THE FIRST RUN FORCED — both in my own test scaffolding, both worth recording
+
+1. **A DESCENT'S RETURN LEG IS A HORIZONTAL CUT TOO.** My first `rowDirs` read "every horizontal cut at a level
+   floor", and the ramp/helix bridges failed: a ramp cuts back from its midpoint to the row start at depth, a helix
+   cuts out from the area centre, both horizontally and both in the direction OPPOSITE the row they are entering. A
+   perfectly consistent one-way walk looked like it changed direction. A row is a FULL-WIDTH traverse and a descent's
+   return leg cannot be (its run is bounded by the distance to the centre), so the criterion now says so explicitly.
+   Worth naming because the failure looked like a product defect and was a reader defect.
+2. **A RING IS NOT A ROW.** My @work calibration differenced the declaration across one extra *row*, using the row
+   formula for both walks — so on concentric it grew `h` past 80 and the ring count (driven by the SHORTER side) never
+   moved, giving a per-pass count of 0. Each walk is now differenced by its own count formula.
+
+### @work — ELEVEN, NOT THE TWENTY-TWO THE SCOUT PREDICTED
+
+t1416 predicted 22 per pass (20 + the lift/rapid/plunge triple − the step-over line) on the assumption that the
+both-ways walk's end-choosing branches survived. They do not: with no direction to flip there is nothing to choose, so
+four branch lines, the step-over and the `#49` negation all go. The real body is **eleven**. The spec recovers the
+declared number by differencing `surfaceRasterWorkSteps` across one extra pass and compares it to the emitted row body
+measured between `DO2` and `END2`, so neither side can drift from the other — 20/20 both-ways, 11/11 each one-way.
+
+**AND IT SURFACED A PRE-EXISTING ONE.** Building that calibration showed `PER_PASS = 14` for concentric against an
+emitted ring body of **12**. It has been 14 since t1329 and it is in the SAFE direction (the cap overstates, so the
+tracer draws the whole path and more). NOT FIXED — moving it would move the declared work of every shipped spiral
+pocket and every concentric surfacing op, which is a different act with its own bridge. Asserted with its numbers, plus
+the universal safety property (declared >= measured) on every walk, so it is a recorded fact rather than a memory.
+
+### FLOW LABELS — the one-way walk declares TWO of the six
+
+Four of the six row labels exist only to choose which END a row runs to. `flowLabels` now declares only the two the
+one-way body writes, and the spec asserts BOTH directions of that on the emitted text per direction × descent: every
+declared row label is emitted, and no undeclared one is. This is the first config in this atom to declare a SHORTER
+list than the walk beside it, which is why it got its own assertion rather than riding the existing one.
+
+### `direction` IS CARRIED AT BUILD, NOT LIVE — and it stopped being ARM-DECIDING
+
+It selects which WALK gets written into the macro text, so it is spent before any register exists. `atomRoles` keeps
+saying `other`, and that is now MORE true than when the atom ignored the word. Asserted as G-code rather than as a
+role lookup: a #var in the socket never reaches the emitted program and the body comes out both-ways (the default —
+the safe answer, and the same one an unknown word gets), while a real one-way word DOES emit a different program, so
+the comparison is not vacuous. Separately asserted: `pocketRasterGap` returns '' for all three words, so the param no
+longer decides which emitter runs. Those two are easy to conflate and they fail differently.
+
+The form binding followed: `direction` gained a bare `surfaceraster` row beside its literal-arm one (the same shape
+`entry` already had — the UI metadata stays on the canonical literal row, so one control keeps one source of words).
+Without it a form edit would have reached the literal arm and silently died on the parametric one.
+
+### FOUR SPECS SAID THE OPPOSITE, BY DESIGN — updated, not deleted
+
+Each locked the narrowing this act removes. None was weakened:
+
+  · **1406's named boundary** dropped its two one-way arms; its byte-identity check moved to the ENVELOPE clause (an
+    unbridged entry), which is the remaining refusal the frozen reference can build IDENTICALLY. I first tried the
+    rest-tool arm and it FAILED — the frozen composition carries no `pocketrest` leaf, so byte-identity there would
+    have measured the freeze's scope rather than the boundary. Checked, not assumed.
+  · **1404's envelope** now asks the table through the same key builder the table uses, so its claim ("every strategy
+    × entry the app can ask for is claimed by name") survives the re-key unchanged; the whole-table shape assertion
+    moved to the act that owns the new axis. Its `ignores.direction` assertion is INVERTED to assert the key is gone.
+  · **1410's per-arm classifier** asserted a one-way pocket exposed nothing. It now exposes the same four pendant
+    knobs as any parametric arm — and the classifier needed no change to follow, because it classifies the arm the
+    build actually builds. That is this act's visible payoff at that level. A refused arm (rest, circle) is still
+    asserted there so "the clause emptied" cannot read as "the boundary stopped being enforced".
+  · **pocket-offset** used `direction: 'oneway'` as its literal-arm example; it uses a rest tool now — still rect, so
+    the same three numbers, and a real operator config rather than a synthetic one.
+
+### SEEN, NOT INFERRED
+
+`scratchpad/1418-oneway-pocket-midplay.png` — the real app, pocket wizard, **Direction = "One-way climb"**, PAUSED at
+47.1% on line 32, which the status bar shows as `G0 X3 Y#47 ( rapid back to this row's start — the… )`: the sim is
+frozen on the new one-way line itself, tool lifted in the air above the rows cut so far.
+
+`scratchpad/1418-bothways-rows-2d.png` beside `1418-oneway-rows-2d.png` is the contrast, and it carries the claim
+better than either alone: both-ways is ONE continuous blue serpentine with no rapids inside the pocket; one-way is
+blue rows with a yellow rapid return on every single one. Cross-check from the same pictures — the emitted program is
+78 lines both-ways against 68 one-way, and 10 is exactly the 9-line body difference plus the dropped `#49=1` seed.
+
+### GATE (fast tier)
+
+New spec **29/29**. The four updated specs **48/48** re-run together. Pocket + surfacing families + the iron rule
+**127/127** across 20 specs (one failure found and fixed: pocket-offset, above). Expose/honesty re-run **67/67**.
+Iron rule **11/11, the same eleven**. Smoke **71/71**.
+
+**BOTH-WAYS BYTE IDENTITY, measured against HEAD rather than asserted:** the atom at 96 configs — both strategies ×
+three descents × skim × inset × rotation × confirm cadence — emitted through the OLD and NEW files side by side, with
+`direction` absent and explicitly `bothways`: **192 emits, 0 differences**, and `surfaceRasterWorkSteps` +
+`flowLabels` unchanged on every one. Surfacing is additionally proven through its OWN stack, with a stray `oneway` in
+the op params, to show the hard-code holds.
+
+### WHAT THIS DELIBERATELY DID NOT DO
+
+`ringWalk` is untouched and still ignores `direction` — on BOTH sides, which is why that is covered rather than
+refused. The literal `pocketfill`/`stepover` kernels are untouched; they still serve every refused arm. The concentric
+@work over-declaration is named, not fixed. And the boundary did not get weaker: shape, too-small, rest and the
+envelope all still refuse, asserted in the emitted program per clause.

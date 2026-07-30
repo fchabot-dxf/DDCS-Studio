@@ -151,21 +151,26 @@ const POCKET_BINDING_SPECS = [
      * carries the geometry, the depth walk and the descent. These rows are the same params landing on that block
      * instead, so a form edit reaches the emit in EITHER state without the form knowing which one it is in.
      *
-     * THREE PARAMS DELIBERATELY HAVE NO ROW HERE, and each absence is a decision rather than an omission:
+     * TWO PARAMS DELIBERATELY HAVE NO ROW HERE, and each absence is a decision rather than an omission:
      *   shape / dia / sides   the arm is rect-only by predicate — a non-rect pocket prunes to the literal arm, where
      *                         those sockets exist. A row here would bind a socket that cannot exist.
      *   wallOffset            it has no socket on the atom AT ALL: it is folded with toolDia into ONE number, `inset`.
      *                         A derived socket that no single param drives is exactly what `postInstantiate` is for
      *                         (the drill centre and the place bbox are already there) — so `inset` is written from the
      *                         resolved params through `pocketInsetMm`, the same one source the literal arm reads.
-     *   direction             the atom ignores it and the arm is narrowed to both-ways, so binding it would write a
-     *                         value nothing reads and make a one-way request LOOK honoured. It stays on the literal
-     *                         arm's leaf, where it is real.
+     *
+     * t1418 — `direction` MOVED OUT OF THAT LIST AND INTO THE ROWS BELOW. It was excluded because the atom ignored the
+     * word: binding it would have written a value nothing read and made a one-way request LOOK honoured. The atom now
+     * walks all three directions, so the exclusion would have the opposite effect — a form edit that reached the
+     * literal arm and silently died on the parametric one. The row is bare (no widget/label/help) for the same reason
+     * `entry`'s is: the UI metadata lives on the literal-arm row above, which is the CANONICAL binding stack the form
+     * is derived over, and duplicating it would create a second source for one control's words.
      */
     { param: 'w', type: 'number', key: 'w', match: { type: 'surfaceraster' }, optional: true },
     { param: 'h', type: 'number', key: 'h', match: { type: 'surfaceraster' }, optional: true },
     { param: 'toolDia', type: 'number', key: 'toolDia', match: { type: 'surfaceraster' }, optional: true },
     { param: 'stepoverPct', type: 'number', key: 'stepoverPct', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'direction', type: 'enum', key: 'direction', match: { type: 'surfaceraster' }, optional: true },   // t1418 — the atom walks it now
     { param: 'entry', type: 'enum', key: 'entry', match: { type: 'surfaceraster' }, optional: true },
     { param: 'rampAngle', type: 'number', key: 'rampAngle', match: { type: 'surfaceraster' }, optional: true },
     { param: 'helixDia', type: 'number', key: 'helixDia', match: { type: 'surfaceraster' }, optional: true },

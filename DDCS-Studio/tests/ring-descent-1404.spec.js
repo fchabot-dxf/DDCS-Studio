@@ -126,6 +126,14 @@ test('THE ENVELOPE IS A TABLE — every strategy × entry is claimed BY NAME, an
         return {
             grid,
             proven: m.SURFACE_RASTER_PROVEN,
+            // t1418 — the table gained a DIRECTION axis on the parallel arm, so this act's claim ("every strategy ×
+            // entry the app can ask for is claimed by name") is now read through the same key builder the table uses
+            // rather than by assuming the key shape. The claim is unchanged; only the key it is asked in moved.
+            provenAtDefault: Object.fromEntries(Object.keys(grid).map((k) => {
+                const [strategy, entry] = k.split('/');
+                const axes = m.SURFACE_RASTER_AXES[strategy];
+                return [k, m.SURFACE_RASTER_PROVEN[axes.map((a) => ({ strategy, direction: 'bothways', entry })[a]).join('/')]];
+            })),
             ignores: m.SURFACE_RASTER_IGNORES,
             // an entry the atom does not implement must NOT read as proven — the defect's shape, asked directly
             bogusEntry: { covered: m.surfaceRasterCovers({ strategy: 'concentric', entry: 'trochoidal' }), why: m.surfaceRasterGap({ strategy: 'concentric', entry: 'trochoidal' }) },
@@ -138,10 +146,11 @@ test('THE ENVELOPE IS A TABLE — every strategy × entry is claimed BY NAME, an
     for (const [k, v] of Object.entries(r.grid)) {
         expect(v.covered, `${k} is claimed`).toBe(true);
         expect(v.why, `${k} names no gap`).toBe('');
-        expect(r.proven[k], `${k} carries the turn that earned it, not a bare true`).toBeTruthy();
+        expect(r.provenAtDefault[k], `${k} carries the turn that earned it, not a bare true`).toBeTruthy();
     }
-    expect(Object.keys(r.proven).sort(), 'the table is exactly the cross-product — no extra rows, none missing')
-        .toEqual(Object.keys(r.grid).sort());
+    // t1418 — the whole-table shape ("no extra rows, none missing") moved to the act that owns the new axis
+    // (raster-direction-1418.spec.js asserts it against the declared axis product). What this act still owns is that
+    // its own six combinations are each claimed by a named row, which is the loop above.
     // t1404 — the two the rings gained this turn say so in the table itself.
     expect(r.proven['concentric/ramp']).toMatch(/t1404/);
     expect(r.proven['concentric/helix']).toMatch(/t1404/);
@@ -154,11 +163,16 @@ test('THE ENVELOPE IS A TABLE — every strategy × entry is claimed BY NAME, an
     expect(r.bogusStrategy.why).toContain('no equivalence bridge');
     expect(r.empty.covered, 'an unset config is the defaults, which are proven').toBe(true);
 
-    // WHAT THE ATOM IGNORES is declared too — `direction` is read by no branch in either walk. Today no surfacing
-    // config can set it (surfacingStack hard-codes both-ways), which is why the envelope still calls one-way covered;
-    // writing the fact down here is what stops the NEXT caller (pocket has a real direction param) rediscovering it
-    // the way t1402 rediscovered the descent.
-    expect(r.ignores.direction, 'the atom declares that it does not read direction').toMatch(/both-ways/);
+    // WHAT THE ATOM IGNORES is declared too. t1404 put ONE fact here — `direction` was read by no branch in either
+    // walk — precisely so the NEXT caller (pocket has a real direction param) would find it instead of rediscovering
+    // it the way t1402 rediscovered the descent. It worked: t1406 read this line and narrowed the pocket's arm.
+    //
+    // t1418 CLOSED THE CAPABILITY, so the entry is GONE rather than reworded, and this assertion is inverted to say
+    // so. That inversion is not the declaration failing — it is a declaration built to be removed being removable,
+    // which is the only reason writing it down was worth doing. (The other half of the claim, that the walk now
+    // genuinely branches on the word, is the bridge in raster-direction-1418.spec.js: an empty table proves nothing
+    // by itself.)
+    expect(r.ignores.direction, 't1418 taught the walk all three directions, so the entry came out').toBeUndefined();
 });
 
 /**

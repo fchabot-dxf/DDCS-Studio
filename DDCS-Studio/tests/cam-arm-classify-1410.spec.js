@@ -28,7 +28,17 @@ const boot = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 };
 
-test('PER-ARM — a rect/both-ways pocket exposes its depth walk; a one-way one does not, and says why', async ({ page }) => {
+/**
+ * ── t1418 — THE ONE-WAY ARM MOVED SIDES, AND THAT IS THE ACT'S VISIBLE PAYOFF HERE ────────────────────────────────
+ * This test used to assert that a one-way pocket sat on the LITERAL fill and therefore exposed nothing, carrying
+ * `pocketRasterGap`'s "a one-way raster keeps its literal fill — the walk is always both-ways" as its reason. t1418
+ * taught the atom all three directions, so that clause emptied and a one-way pocket rides the parametric arm like any
+ * other. The per-arm claim is unchanged and is what makes the change VISIBLE at this level: the arm you are on decides
+ * what you may expose, so closing a capability in the atom hands four real pendant knobs to an arm that had none.
+ * A refused arm is still asserted here (circle, rest) so "the boundary emptied" cannot be confused with "the boundary
+ * stopped being enforced".
+ */
+test('PER-ARM — a rect pocket exposes its depth walk in every direction; a refused arm does not, and says why', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { pocketDataDef, POCKET_DEFAULTS } = await import('/blocks/dataOps/pocketData.js');
@@ -40,6 +50,7 @@ test('PER-ARM — a rect/both-ways pocket exposes its depth walk; a one-way one 
             spiral: classifyExposable(def, P),
             raster: classifyExposable(def, { ...P, strategy: 'raster' }),
             oneway: classifyExposable(def, { ...P, strategy: 'raster', direction: 'oneway' }),
+            otherway: classifyExposable(def, { ...P, strategy: 'raster', direction: 'otherway' }),
             circle: classifyExposable(def, { ...P, shape: 'circle', dia: 50 }),
             rest: classifyExposable(def, { ...P, restDia: 3 }),
             tiny: classifyExposable(def, { ...P, w: 4, h: 4 }),
@@ -48,6 +59,7 @@ test('PER-ARM — a rect/both-ways pocket exposes its depth walk; a one-way one 
         return {
             expo: Object.fromEntries(Object.entries(arms).map(([k, c]) => [k, expo(c)])),
             onewayWhy: arms.oneway.depth && arms.oneway.depth.reason,
+            restWhy: arms.rest.depth && arms.rest.depth.reason,
             circleWhy: arms.circle.depth && arms.circle.depth.reason,
             spiralWhy: arms.spiral.depth && arms.spiral.depth.reason,
             abstractWhy: arms.noParams.depth && arms.noParams.depth.reason,
@@ -57,8 +69,12 @@ test('PER-ARM — a rect/both-ways pocket exposes its depth walk; a one-way one 
     // THE PARAMETRIC ARMS expose the four knobs the atom genuinely carries — and NOTHING else.
     expect(r.expo.spiral, 'a spiral rect pocket exposes the atom\'s live registers').toEqual(['depth', 'feed', 'plunge', 'stepdown']);
     expect(r.expo.raster, 'and so does a both-ways raster one').toEqual(['depth', 'feed', 'plunge', 'stepdown']);
-    // EVERY ARM ON THE LITERAL FILL exposes nothing — its numbers all go through num() into a JS loop.
-    for (const k of ['oneway', 'circle', 'rest'])
+    // t1418 — AND SO DO THE TWO ONE-WAY ARMS NOW. They were on the literal fill until the atom learned the walk; the
+    // classifier needed no change to follow, because it classifies the arm the build actually builds.
+    expect(r.expo.oneway, 'a one-way raster pocket rides the atom now, so its depth walk is exposable').toEqual(['depth', 'feed', 'plunge', 'stepdown']);
+    expect(r.expo.otherway, 'and so does the mirror').toEqual(['depth', 'feed', 'plunge', 'stepdown']);
+    // EVERY ARM STILL ON THE LITERAL FILL exposes nothing — its numbers all go through num() into a JS loop.
+    for (const k of ['circle', 'rest'])
         expect(r.expo[k], `the ${k} arm is on the literal fill — nothing to expose`).toEqual([]);
     /**
      * …EXCEPT THE TOO-SMALL ARM, and that is a FINDING rather than a leak. A pocket narrower than its tool is not a
@@ -72,8 +88,8 @@ test('PER-ARM — a rect/both-ways pocket exposes its depth walk; a one-way one 
         .toEqual(['depth', 'plunge', 'stepdown']);
     // …AND THE WHY IS THE BOUNDARY'S OWN WORDS, not a generic grey. This is the operator-facing half: it names the
     // setting to change to get the knob back.
-    expect(r.onewayWhy, 'the one-way refusal carries pocketRasterGap\'s own sentence').toContain('a one-way raster keeps its literal fill');
-    expect(r.onewayWhy, 'including the reason the atom cannot serve it').toContain('always both-ways');
+    expect(r.onewayWhy, 'the one-way arm now says it rides through, like every other parametric arm').toContain('rides through emit');
+    expect(r.restWhy, 'a rest-tool pocket carries pocketRasterGap\'s own sentence').toContain('a rest pass rides inside the clearing place');
     expect(r.circleWhy, 'and a circle pocket names ITS boundary').toContain('JS contour walk');
     expect(r.spiralWhy, 'while the exposable arm just says it rides through').toContain('rides through emit');
     // FAIL-CLOSED WITHOUT PARAMS — asked in the abstract, a guarded def still exposes nothing. The relaxation is

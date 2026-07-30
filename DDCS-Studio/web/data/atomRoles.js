@@ -99,6 +99,12 @@ export const ATOM_ROLES = {
      *     confirmEvery    a build-time modulo that decides which levels emit a pause
      *     x / y / z0 / rotAngle / rotPivotX / rotPivotY   the FRAME, folded into every coordinate at build
      *     strategy / direction / entry / zMode  discrete selectors, never operator-tuned values
+     *
+     *   t1418 — `direction` IS READ BY THE WALK NOW (the row walk emits a one-way body for oneway/otherway), and the
+     *   role is UNCHANGED because being read is not the question the role answers. It selects which walk gets WRITTEN,
+     *   at build, so it is spent before any register exists: a #var there would be compared against the two one-way
+     *   words, match neither, and silently produce the both-ways body. `other` says exactly that, and it says it more
+     *   truthfully now than when the atom ignored the word entirely.
      */
     surfaceraster: {
         feed: 'value', plunge: 'value', depth: 'value', stepdown: 'value',   // t1399 — the four the seeds now carry

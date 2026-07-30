@@ -202,10 +202,17 @@ for (const cfg of SWEEP) {
 /**
  * THE BOUNDARY IS A REFUSAL, AND THE REFUSED ARMS ARE UNTOUCHED. Every clause of `pocketRasterGap` is a promise that
  * something keeps its literal fill; this is that promise cashed, per clause, in the emitted program rather than in the
- * predicate's own words. (The one-way case is checked byte-for-byte against the frozen reference — the strongest form
- * available, since that arm is rect and the reference can build it.)
+ * predicate's own words.
+ *
+ * ── t1418 — THE TWO ONE-WAY ARMS CAME OUT OF THIS LIST, DELIBERATELY ──────────────────────────────────────────────
+ * They were here because the atom's walk was always both-ways, so a one-way raster kept its literal fill and was
+ * asserted byte-identical to the frozen reference. t1418 taught the walk all three directions, so the clause emptied
+ * and both arms now RIDE the atom — this test asserting them refused would now be asserting the narrowing rather than
+ * the boundary. Their replacement is stronger, not weaker: `raster-direction-1418.spec.js` bridges each of them
+ * against the same frozen `onewayMoves` reference, per phase, across the three descents. The clauses left here are
+ * the ones that still refuse, and t1418's own boundary test re-asserts every one of them beside the two that moved.
  */
-test('THE NAMED BOUNDARY — every refused arm still emits the literal fill, and one-way is byte-identical', async ({ page }) => {
+test('THE NAMED BOUNDARY — every refused arm still emits the literal fill', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async ({ base, PROGRAMS }) => {
         const { pocketStack, pocketRasterGap } = await import('/wizards/pocketWizard.js');
@@ -219,18 +226,22 @@ test('THE NAMED BOUNDARY — every refused arm still emits the literal fill, and
             return { name, gap: pocketRasterGap(p), fill: t.includes('pocketfill'), raster: t.includes('surfaceraster') };
         };
         const arms = [
-            arm('one-way raster', { strategy: 'raster', direction: 'oneway' }),
-            arm('other-way raster', { strategy: 'raster', direction: 'otherway' }),
             arm('circle', { shape: 'circle', dia: 50 }),
             arm('polygon', { shape: 'polygon', dia: 50, sides: 6 }),
             arm('ellipse', { shape: 'ellipse', w: 80, h: 60 }),
             arm('a valid rest tool', { restDia: 3 }),
             arm('too small for its tool', { w: 4, h: 4, toolDia: 6 }),
+            arm('an entry no turn has bridged', { strategy: 'raster', entry: 'trochoidal' }),
         ];
-        // the one-way arm, byte-for-byte against the FROZEN literal
-        const oneway = { ...base, strategy: 'raster', direction: 'oneway' };
-        const { literal, para } = await programs(oneway, "both");
-        return { arms, onewayIdentical: literal === para, onewaySample: para.split(String.fromCharCode(10)).slice(0, 6) };
+        // A REFUSED arm, byte-for-byte against the FROZEN literal — the strongest form available. It is asserted on
+        // the ENVELOPE clause (an entry no turn has bridged), because that is the one remaining refusal the frozen
+        // reference can build IDENTICALLY: it is rect, and the reference's own `entryOrPlunge` degrades an unknown
+        // descent to the plunge exactly as the live leaf does. (The rest-tool arm is rect too but adds a `pocketrest`
+        // leaf the frozen composition does not carry, so byte-identity there would be measuring the freeze's scope
+        // rather than the boundary — checked, not assumed.)
+        const unproven = { ...base, strategy: 'raster', entry: 'trochoidal' };
+        const { literal, para } = await programs(unproven, "both");
+        return { arms, unprovenIdentical: literal === para, unprovenSample: para.split(String.fromCharCode(10)).slice(0, 6) };
     }, { base: BASE, PROGRAMS });
 
     for (const a of r.arms) {
@@ -241,7 +252,7 @@ test('THE NAMED BOUNDARY — every refused arm still emits the literal fill, and
     for (const a of r.arms.filter((x) => x.name !== 'too small for its tool')) {
         expect(a.fill, `${a.name} still emits through the literal pocketfill`).toBe(true);
     }
-    expect(r.onewayIdentical, `a one-way raster pocket is BYTE-IDENTICAL to the frozen literal (first lines: ${JSON.stringify(r.onewaySample)})`).toBe(true);
+    expect(r.unprovenIdentical, `a refused (unbridged-entry) raster pocket is BYTE-IDENTICAL to the frozen literal (first lines: ${JSON.stringify(r.unprovenSample)})`).toBe(true);
 });
 
 /**
@@ -440,10 +451,14 @@ test('THE RECONCILER — a parametric pocket reverse-syncs, and wallOffset survi
 /**
  * FOUR FIELDS THE PARAMETRIC ARM HAS NO SOCKET FOR — and the form still offers every one of them.
  *
- * `shape`, `dia`, `sides` and `wallOffset` exist only on the literal leaf; `direction` is deliberately unbound on the
- * atom. That is exactly why the twin's CANONICAL binding stack is pinned to the literal arm: derive the form over the
- * parametric one and the wizard would silently lose four controls. Asserted on the def the app registers, because
- * "the reasoning says it is fine" is not the same as looking.
+ * `shape`, `dia`, `sides` and `wallOffset` exist only on the literal leaf. That is exactly why the twin's CANONICAL
+ * binding stack is pinned to the literal arm: derive the form over the parametric one and the wizard would silently
+ * lose four controls. Asserted on the def the app registers, because "the reasoning says it is fine" is not the same
+ * as looking.
+ *
+ * t1418 — `direction` was a FIFTH such field and is no longer one: the atom walks it, so it gained a bare
+ * surfaceraster row beside the literal one (the UI metadata stays on the literal row, which is the canonical stack).
+ * It is still listed below because the claim here is about the FORM, and the form must offer it in either state.
  */
 test('THE FORM KEEPS EVERY FIELD — the canonical binding stack is pinned to the literal arm on purpose', async ({ page }) => {
     await boot(page);

@@ -27,11 +27,14 @@ test('pocket wall offset resizes the tool-centre region (+ bigger, − leaves st
     };
     return {
       zero: regionW(0), big: regionW(2), small: regionW(-2),
-      litZero: regionW(0, { direction: 'oneway' }), litBig: regionW(2, { direction: 'oneway' }), litSmall: regionW(-2, { direction: 'oneway' }),
+      // t1418 — the LITERAL arm used to be picked with `direction: 'oneway'`, which stopped being a literal arm the
+      // moment the atom learned the walk. A rest tool is the replacement: still RECT (so the three numbers below are
+      // the same three), still refused, and a real operator config rather than a synthetic one.
+      litZero: regionW(0, { restDia: 3 }), litBig: regionW(2, { restDia: 3 }), litSmall: regionW(-2, { restDia: 3 }),
     };
   });
   expect(r.zero.via, 'a both-ways raster pocket rides the atom').toBe('surfaceraster');
-  expect(r.litZero.via, 'a one-way one keeps the literal leaf — the named boundary').toBe('pocketfill');
+  expect(r.litZero.via, 'a rest-tool one keeps the literal leaf — the named boundary').toBe('pocketfill');
   for (const [tag, got] of [['parametric', [r.zero, r.big, r.small]], ['literal', [r.litZero, r.litBig, r.litSmall]]]) {
     const [zero, big, small] = got;
     // tool Ø6 → r3. exact: inset 3 → region 80−6 = 74, x = 3.
