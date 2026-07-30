@@ -40,7 +40,47 @@ export function stackToSlot(def, decl = {}, used = new Set(), varOffset = 0) {
     const taken = new Set(used);
     const fields = [];
     const tokenParams = {};
-    const cls = classifyExposable(def);                                 // U1 — per-binding { exposable, role, reason } (declare+structure)
+    /**
+     * t1410 — CLASSIFY THE ARM THIS SLOT WILL ACTUALLY BUILD. `instantiate(def, tokenParams)` below prunes a guarded
+     * def to ONE arm, and until now the classifier was asked about the guarded SUPERSET — which it fails closed on,
+     * exposing nothing at all from corner/pocket/edge/middle. So the params are resolved FIRST, from exactly the two
+     * places `tokenParams` draws them (the caller's `decl` value, else the binding default), and handed to the
+     * classifier.
+     *
+     * ⚠ THIS ORDERING IS ONLY SOUND BECAUSE THE ARM-DECIDING PARAMS ARE THEMSELVES BAKE-ONLY. If a knob the guards
+     * read could be EXPOSED, its token here would be a `#var` string, the arm would be decided by a value that does
+     * not exist until the machine reads it, and the slot would carry one arm's body under another arm's fields. That
+     * condition is measured and pinned by a guard (tests/cam-arm-classify-1410.spec.js), not assumed — which is why
+     * this comment names it rather than the code quietly relying on it.
+     */
+    const armParams = {};
+    (def.bindings || []).forEach((b) => {
+        if (!b || b.param == null) return;
+        const d = decl[b.param];
+        armParams[b.param] = (d && d.value !== undefined && d.value !== '') ? d.value : b.default;
+    });
+    /**
+     * ⚠ A BUILD ENUM EXPOSED AS A BRANCH IS A SECOND WAY THE ARM CAN MOVE, and it is not covered by "the arm-deciding
+     * params are bake-only" — a branch param is BINDINGLESS, so the classifier never sees it at all. The slot then
+     * carries EVERY arm (`bodyFor` re-instantiates per pick) while the fields were classified for one of them. On a
+     * def whose arms differ structurally that is a `#var` landing in a `num()` socket on the arm nobody classified:
+     * the token becomes NaN and the socket silently takes its default — the exact failure the U1 gate exists to stop.
+     *
+     * So a knob is exposable only if it is exposable on EVERY arm this slot will carry. The intersection is the whole
+     * rule, and it degenerates to today's single classification when nothing branches (every existing slot).
+     */
+    const branchPicks = (def.bindings || [])
+        .filter((b) => b && b.param != null && b.blockIndex == null && decl[b.param] && decl[b.param].exposed === true)
+        .map((b) => { const bf = buildEnumFields(def, {}).find((f) => f.key === b.param); return (bf && bf.branchable) ? { param: b.param, arms: bf.buildEnum } : null; })
+        .filter(Boolean);
+    const armSets = branchPicks.reduce((acc, br) => acc.flatMap((base) => br.arms.map((a) => ({ ...base, [br.param]: a.value }))), [armParams]);
+    const perArm = armSets.map((ap) => classifyExposable(def, ap));
+    const cls = {};
+    for (const k of Object.keys(perArm[0] || {})) {
+        const rows = perArm.map((c) => c[k]).filter(Boolean);
+        const all = rows.length === perArm.length && rows.every((v) => v.exposable);
+        cls[k] = all ? rows[0] : (rows.find((v) => !v.exposable) || { exposable: false, role: 'unknown', reason: `${k} is not exposable on every arm this slot carries — bake-only` });
+    }
     // Only VALUE bindings (a real socket, blockIndex != null) can carry a #var; structural bindings drive guards, not emit.
     let cur = varOffset;
     // t1085 slice C — mint AROUND everything the emit path injects beneath this slot. Unlike a generator arm (whose scratch is

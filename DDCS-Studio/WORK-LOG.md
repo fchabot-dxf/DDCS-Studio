@@ -9639,3 +9639,92 @@ Two reasons, and the first is the real one:
 
 …and `classifyExposable` on the pocket twin returns an EMPTY exposable set today, which is the limitation Part 2
 exists to remove. **The safety condition HOLDS: no pendant edit can flip which arm a packed program came from.**
+
+## t1410 (seat A) — THE CAM TABLE TELLS THE TRUTH PER-ARM; and the sweep found a second door
+
+Committed green. One deliverable is NOT done and is named at the end rather than glossed.
+
+### THE SEAM — the follow-on the code had already written down for itself
+
+`classifyExposable` answered "expose NOTHING" for every guarded twin — corner, pocket, edge, middle — and its own
+comment stated the reason and the fix in the same breath: a guarded def's frozen `blockIndex` is computed over a
+canonical-pruned stack, so a lookup against the guarded SUPERSET misaligns and could read fold-membership the
+*dangerous* way. Fail closed **"until this classifier mirrors that prune"**. This act is that mirror.
+
+It is an **EXTRACTION, not a second implementation.** `resolveArm(def, params)` is the prune + binding re-derivation
+lifted out of `instantiate`, and both now call it — so the classifier classifies the very stack the build builds. A
+classifier that re-derived the arm could drift from the arm actually built, which is the class of split this whole arc
+exists to remove. (One real change fell out of the extraction: the derive hook now falls back to `def.deriveGuards`
+when the registry has no entry, so a def that is built but not yet REGISTERED — exactly what a classifier holds —
+resolves its own derived guards instead of silently pruning to the wrong arm.)
+
+### THE ORDERING IS SOUND ONLY BECAUSE OF THE SAFETY CONDITION — pinned as a PROPERTY, not a list
+
+"Resolve the arm, then classify it" is circular unless the arm is decided WITHOUT consulting the classification. The
+guard walks **every exposable param**, perturbs it across values a pendant could plausibly send (`0`, `0.001`, `1000`,
+`-5`, a `#var`, empty) on four different arms, and requires `pocketRasterGap`'s answer to be unmoved. Then it checks
+from the other end — every input the predicate reads is bake-only or has no socket. A list of param names would have
+been a second source that drifts the moment the predicate grows a clause; the property does not.
+
+### ⚠ THE SWEEP FOUND A SECOND DOOR, and it was open before this act
+
+A **BUILD ENUM exposed as a BRANCH** (t1323: every arm emitted, the operator picks at the machine) moves the arm too —
+and it is invisible to the condition above, because a branch param is BINDINGLESS and the classifier never sees it.
+The slot would carry every arm while its fields were classified for one of them; on a def whose arms differ
+structurally that is a `#var` landing in a `num()` socket — NaN, the socket silently takes its default, the operator's
+knob does nothing. Exactly what the U1 gate exists to prevent, through a door it did not know about.
+
+**The rule that closes it is the smallest one available: a knob is exposable only if it is exposable on EVERY arm the
+slot carries.** It degenerates to a single classification when nothing branches — which is every slot built today, and
+why the whole CAM family (56 tests) stayed green. I found this because the polygon assertion failed with `strategy` in
+the exposable set and I went to look instead of loosening the assertion.
+
+### WHAT THE OPERATOR SEES
+
+`def.armGap(params)` — pocket's is `pocketRasterGap`, the SAME one-source predicate the build and the `_para` guard
+read — so a greyed knob's `_exposeTip` (the title macrosApp puts on the Expose control) now says *"a one-way raster
+keeps its literal fill — the walk is always both-ways…"* instead of a generic "geometry / fold-driven". That is the
+half that matters at the pendant: it names the setting to change to get the knob back.
+
+### MEASURED, PER ARM
+
+    spiral / raster (rect, both-ways)   depth · stepdown · feed · plunge   EXPOSABLE
+    one-way · circle · rest             nothing                            + the boundary's own words
+    too-small                           depth · stepdown · plunge          ← a FINDING, not a leak (below)
+    asked with NO params                nothing                            fail-closed, unchanged
+
+**The too-small arm is a finding worth its line.** A pocket narrower than its tool is not a clearing — t1391
+re-pointed it through `holecycle`, whose depth/peck/feed have been live registers since t1389, under a place that
+absorbs. Per-arm classification hands that arm three real pendant knobs it could never have had while the def was
+fail-closed. Asserted EXACTLY rather than loosely, because "some arm exposes something" is the shape a genuine leak
+would also take: `feed` is absent (the hole's feed IS `plunge`), and nothing geometric appears.
+
+### THE BUILT SLOT — and the shape is the generator convention, not the dispatch's literal
+
+    #2=#2601 ;Depth        the canonical read-line stackToSlot prepends per field
+    #42=#2                 the atom's depth register, seeded from the slot's LOCAL var
+
+The dispatch asked for `#42=#2601`. The product deliberately emits the INDIRECTION — the local `#n` reads the #2600
+mirror, exactly as every hand-written generator's `v[key]` does, which is what lets Refresh-fields re-derive them. So
+the chain asserted is `#42 → #n → #2601`; asserting the literal mirror would have been asserting a shape the product
+does not emit. Every X/Y/Z/I/J is byte-identical to the all-baked slot (the place fold absorbed, it did not rewrite),
+and `@work` is OMITTED once depth/stepdown are live — t1383's rule surviving the exposure.
+
+### ⚠ THE REACH IS NARROWER THAN "THE CAM MODAL", and this is the one to read
+
+`camTypeOf` routes a RECT pocket to the hand-written `pocketSlot` generator, whose fields come from its own macro SPEC
+and never consult the classifier. **So the Expose half of this act does not appear in a rect pocket's CAM modal at
+all** — it appears on the classifier-driven arm: `stackToSlot` (universal / sub-stack), which is what a polygon or
+ellipse pocket, a forked op, or a sub-stack composition builds through. Asserted as a fact (`THE REACH` test) rather
+than left as an assumption about a modal.
+
+**NOT DONE: the screenshot of the CAM table both ways.** Reaching the slot's field table is several steps into the
+Macros → CAM pack builder, and the finding above changes what the screenshot should even be OF — a rect pocket's table
+would show the generator arm and prove nothing about this act. Naming it rather than substituting a picture of the
+wrong surface.
+
+### GATE (fast tier)
+
+New spec **6/6**. CAM family **56/56** across 17 specs. Pocket + arc families **48/48**. Guarded twins (corner /
+middle) green. Smoke **71/71**. Surfacing + drill **124/124**. Iron rule **11/11, the same eleven**. Version sync 6/6.
+**~300 tests, 0 failures.** Scratch specs deleted; proc tree clean.

@@ -342,16 +342,23 @@ function seedUniversal(op, reason) {
     if (!def) return { unsupported: reason || `no registered def for "${op && op.opType}" — cannot build a universal slot` };
     const valueBindings = (def.bindings || []).filter((b) => b && b.blockIndex != null);   // structural (guard) bindings have no socket
     if (!valueBindings.length) return { unsupported: reason || `"${op && op.opType}" has no value bindings to expose or bake` };
-    const cls = classifyExposable(def);
     const params = (op && op.params) || {};
+    // t1410 — the op's OWN params decide which arm a guarded def will build, so the classification is asked about that
+    // arm rather than about the guarded superset (which fails closed and exposes nothing). Same call `stackToSlot` makes.
+    const cls = classifyExposable(def, params);
     const fieldFor = (b, over) => {                                     // one seed field; `over` = the cam_field row overriding label/mode/value (S2)
         const raw = params[b.param];
         const value = (over && over.mode === 'bake' && over.baked != null) ? over.baked
             : (raw !== undefined && raw !== '') ? raw : (over && over.dflt != null ? over.dflt : b.default);
         const exposable = !!(cls[b.param] && cls[b.param].exposable);
+        // t1410 — THE WHY, CARRIED. macrosApp shows `_exposeTip` on the Expose control and otherwise falls back to a
+        // generic "geometry / fold-driven". The classifier already computes the real reason per param — including the
+        // ARM's own words when the op sits on a poorer one — so a greyed knob can say WHICH setting to change to get
+        // it back, instead of leaving the operator to guess.
+        const tip = (!exposable && cls[b.param] && cls[b.param].reason) ? { _exposeTip: cls[b.param].reason } : {};
         return { key: b.param, label: (over && over.label) || b.label || b.param, def: (over && over.dflt != null) ? over.dflt : b.default,
             value, units: (over && over.units != null) ? over.units : (b.units || ''), type: b.type,
-            exposed: over ? (over.mode !== 'bake') : true, bakeable: true, exposable };   // over-mode drives expose/bake; else exposed by default
+            exposed: over ? (over.mode !== 'bake') : true, bakeable: true, exposable, ...tip };   // over-mode drives expose/bake; else exposed by default
     };
     // t1095 (block-native params S2) — ADDITIVE-BY-FALLBACK. A cam_table in the template makes its cam_field ROWS the field
     // declaration: seed order = block order, expose/bake = the row mode, label/units/default from the row (binding = wiring).

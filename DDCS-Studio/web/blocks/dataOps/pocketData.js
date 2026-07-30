@@ -19,7 +19,7 @@
  * state (each block type appears at most once). Proven byte-identical to pocketStack across strategy × tooSmall (BOTH states)
  * × the 4 shapes × a scalar sweep + cross-dialect (tests/pocket-data-emit.spec.js).
  */
-import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox, pocketRidesRaster } from '../../wizards/pocketWizard.js';
+import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox, pocketRidesRaster, pocketRasterGap } from '../../wizards/pocketWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { deriveBindingsFor, mergeBindingsByParam, TOOL_BINDING_SPECS } from './deriveBindings.js';
@@ -325,6 +325,14 @@ export function pocketDataDef() {
         }
         return spindleHeadPatch(stack);   // t945 — after the derived-socket rewrite, fill the blank framing progstart's rpm/dir/spin-up from the live Head → M3 (was a DEAD spindle)
     };
+    /**
+     * t1410 — THE BOUNDARY'S OWN WORDS, for the CAM table's why-column. `classifyExposable` reads this when it has
+     * resolved the arm: '' when the op rides the parametric atom, else the reason it does not — `pocketRasterGap`,
+     * the SAME one-source predicate the concrete build and the `_para` guard read. So a one-way raster pocket's greyed
+     * Expose control says "a one-way raster keeps its literal fill — the walk is always both-ways…" instead of a
+     * generic "geometry / fold-driven", and the operator learns which knob to change to get the knob back.
+     */
+    def.armGap = (p) => pocketRasterGap(p || {});
     def.previewGeometry = pocketPreviewGeometry;   // t716 — per-feature 2D handles (shape boundary + pos/size per kind) via the declared hook
     def.entryPoint = ENTRY_POINT;   // t726 P2b — the emitting-square entry marker (replaces the sim-only ○)
     def.zRuler = { depthParam: 'depth', stepParam: 'stepdown' };   // t1021 — DECLARE the depth ruler (a vertical strip down the LEFT of the 2D plan): depth/stepdown drive the floor + the depthLevels ticks. Display/input only.

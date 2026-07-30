@@ -566,16 +566,7 @@ export function instantiate(def, params) {
     // recovered it correctly. Two paths reading one stored value differently is the split the parametric switch exists
     // to kill, so the recovery happens ONCE, here, for every path that builds through a def.
     // A def with no hook is untouched → byte-identical for every existing user op.
-    const normalized = (typeof def.normalizeParams === 'function' && params) ? def.normalizeParams(params) : params;
-    const p = withGuardDefaults(def, normalized);
-    const clone = JSON.parse(JSON.stringify(def.template || []));
-    // t469 — inject DERIVED guard keys (e.g. pocket's `_tooSmall`, computed from the geometry) so a guard can key on a value
-    // that is NOT any single user param. ONE-SOURCE: the derive lives on the def (registered via setUserDeriveGuards), run
-    // once here, added to the prune params only. No hook → pruneGuards(clone, p) exactly as before (byte-identical).
-    const derive = getUserDeriveGuards(def.opType);
-    pruneGuards(clone, derive ? { ...p, ...derive(p) } : p);
-    const flat = flattenBlocks(clone);
-    const bindings = def.bindingSpecs ? deriveBindings(flat, def.bindingSpecs) : (def.bindings || []);
+    const { clone, flat, bindings, p } = resolveArm(def, params);
     for (const b of bindings) {
         const blk = flat[b.blockIndex];
         if (blk && blk.params && (b.key in blk.params)) {
@@ -583,6 +574,38 @@ export function instantiate(def, params) {
         }
     }
     return clone;
+}
+
+/**
+ * t1410 — THE ARM A GIVEN PARAMS SET WILL BUILD: the prune + the binding re-derivation, extracted from `instantiate`
+ * so a SECOND reader can ask the same question and get the same answer.
+ *
+ * The reader that forced it is `exposeClassifier`. It classifies a def's knobs against `def.template` — the guarded
+ * SUPERSET — and its own comment records why it then refuses to classify a guarded def at all: the frozen blockIndex
+ * is computed over a canonical-pruned stack, so `flat[blockIndex]` MISALIGNS against the superset and could misread
+ * fold-membership in the dangerous direction. It fails closed ("expose NOTHING") and names the fix in the same breath:
+ * *"until this classifier mirrors that prune"*. This is that mirror, and it is an EXTRACTION rather than a second
+ * implementation on purpose — a classifier that re-derived the arm could drift from the arm actually built, which is
+ * precisely the class of split this whole arc exists to remove.
+ *
+ * Returns the pruned clone, its flatten, the bindings resolved against it, and the guard-defaulted params.
+ */
+export function resolveArm(def, params) {
+    // t1363 — the ONE declared normalization, at the single point params enter a build (see instantiate's note).
+    const normalized = (typeof def.normalizeParams === 'function' && params) ? def.normalizeParams(params) : params;
+    const p = withGuardDefaults(def, normalized);
+    const clone = JSON.parse(JSON.stringify(def.template || []));
+    // t469 — inject DERIVED guard keys (e.g. pocket's `_tooSmall`, computed from the geometry) so a guard can key on a value
+    // that is NOT any single user param. ONE-SOURCE: the derive lives on the def (registered via setUserDeriveGuards), run
+    // once here, added to the prune params only. No hook → pruneGuards(clone, p) exactly as before (byte-identical).
+    // t1410 — the derive hook is read from the REGISTRY first (as it always was) and from the def as a fallback, so a
+    // def that has been built but not yet registered — exactly what a classifier or a preview holds — still resolves
+    // its own derived guards instead of silently pruning to the wrong arm.
+    const derive = getUserDeriveGuards(def.opType) || (typeof def.deriveGuards === 'function' ? def.deriveGuards : null);
+    pruneGuards(clone, derive ? { ...p, ...derive(p) } : p);
+    const flat = flattenBlocks(clone);
+    const bindings = def.bindingSpecs ? deriveBindings(flat, def.bindingSpecs) : (def.bindings || []);
+    return { clone, flat, bindings, p };
 }
 
 // A STRUCTURAL binding (no blockIndex — drives guards via the prune params, not a value socket) supplies its default when
