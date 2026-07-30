@@ -19,7 +19,7 @@ import { userOpFromStack } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
-import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
+import { entryBindingsFor, toolBindingsFor, deriveBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity; t1385 — the WHOLE map is by identity now (positional cannot survive the holecycle collapse)
 import { drillPatternGeometry } from './drillData.js';   // t716 — the SHARED drill/bore pattern previewGeometry (bore adds the Ø handle)
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, DRILL_PATTERN_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options
 
@@ -35,62 +35,64 @@ export const BORE_DEFAULTS = {
 
 const RAMP_OPTIONS = [['Ring-step (G3 circle)', 'step'], ['Helix (linearized)', 'helix']];
 
-// Flatten (pre-order) of drillStack's [progstart, wcs, placeonstock{array{bore}}, progend]:
-//   0 progstart · 1 wcs · 2 placeonstock · 3 array · 4 bore · 5 progend
-// (clearance NOT bound — frontier #3 fan-out to progstart + the bore leaf; method NOT bound — baked helical. The bbox
-//  snapshot on block 2 is recomputed LIVE by the place fold from the array's params → placement is fully bindable.)
-const BORE_EXEC_BINDINGS = [
-    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: BORE_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS } },
-    // placement scalars (block 2, placeonstock)
-    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: BORE_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: BORE_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'stockDatum', formHidden: true, blockIndex: 2, key: 'stockDatum', type: 'enum', default: BORE_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
-    { param: 'stockW', formHidden: true, blockIndex: 2, key: 'stockW', type: 'number', default: BORE_DEFAULTS.stockW },
-    { param: 'stockH', formHidden: true, blockIndex: 2, key: 'stockH', type: 'number', default: BORE_DEFAULTS.stockH },
-    { param: 'stockZ', formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: BORE_DEFAULTS.stockZ },
-    { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: BORE_DEFAULTS.originX },
-    { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: BORE_DEFAULTS.originY },
-    { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: BORE_DEFAULTS.offZ, label: 'Z offset', units: 'mm', section: 'GEOMETRY', help: 'Shift the whole pattern up or down in Z from the datum.' },
-    // pattern + geometry (block 3, the `array` container — patternPoints reads these scalars at emit)
-    { param: 'pattern', blockIndex: 3, key: 'pattern', type: 'enum', default: BORE_DEFAULTS.pattern, widget: 'dropdown', widgetConfig: { options: DRILL_PATTERN_OPTIONS } },
-    { param: 'x0', blockIndex: 3, key: 'x0', type: 'number', default: BORE_DEFAULTS.x0, label: 'Pattern origin X', units: 'mm', section: 'GEOMETRY', help: 'The pattern local X origin (usually 0 — the Origin X placement positions it on the stock).' },
-    { param: 'y0', blockIndex: 3, key: 'y0', type: 'number', default: BORE_DEFAULTS.y0, label: 'Pattern origin Y', units: 'mm', section: 'GEOMETRY', help: 'The pattern local Y origin (usually 0 — the Origin Y placement positions it on the stock).' },
+/**
+ * The binding map, BY IDENTITY (t1385) — the same conversion drillData got, and for the same reason: the drill switch
+ * merges the `array` container and its `bore` leaf into ONE `holecycle` block, and a hand-counted blockIndex cannot
+ * survive a 2-into-1 collapse. `match: {type}` names the target; `deriveBindings` scans for its flat index. The old
+ * `WRAP_PREFIX_COUNT = 4` is gone rather than moved — deriving over the already-wrapped stack absorbs it.
+ *
+ * THE FLATTEN, for reading (no row depends on these numbers any more):
+ *   0 user_root · 1 panel · 2 sim · 3 param_group · 4 progstart · 5 wcs · 6 placeonstock · 7 array · 8 bore ·
+ *   9 progend · 10 entry · 11 toolsel
+ * (clearance NOT bound — frontier #3 fan-out to progstart + the bore leaf; method NOT bound — baked helical. The bbox
+ *  snapshot is recomputed LIVE by the place fold from the array's params → placement is fully bindable.)
+ */
+const BORE_BINDING_SPECS = [
+    { param: 'wcs', match: { type: 'wcs' }, key: 'wcs', type: 'enum', default: BORE_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS } },
+    // placement scalars (the placeonstock C-block)
+    { param: 'stockAttach', match: { type: 'placeonstock' }, key: 'stockAttach', type: 'enum', default: BORE_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'pathDatum', match: { type: 'placeonstock' }, key: 'pathDatum', type: 'enum', default: BORE_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'stockDatum', formHidden: true, match: { type: 'placeonstock' }, key: 'stockDatum', type: 'enum', default: BORE_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
+    { param: 'stockW', formHidden: true, match: { type: 'placeonstock' }, key: 'stockW', type: 'number', default: BORE_DEFAULTS.stockW },
+    { param: 'stockH', formHidden: true, match: { type: 'placeonstock' }, key: 'stockH', type: 'number', default: BORE_DEFAULTS.stockH },
+    { param: 'stockZ', formHidden: true, match: { type: 'placeonstock' }, key: 'stockZ', type: 'number', default: BORE_DEFAULTS.stockZ },
+    { param: 'originX', match: { type: 'placeonstock' }, key: 'offX', type: 'number', default: BORE_DEFAULTS.originX },
+    { param: 'originY', match: { type: 'placeonstock' }, key: 'offY', type: 'number', default: BORE_DEFAULTS.originY },
+    { param: 'offZ', match: { type: 'placeonstock' }, key: 'offZ', type: 'number', default: BORE_DEFAULTS.offZ, label: 'Z offset', units: 'mm', section: 'GEOMETRY', help: 'Shift the whole pattern up or down in Z from the datum.' },
+    // pattern + geometry (the `array` container — patternPoints reads these scalars at emit). THIS CLUSTER AND THE
+    // CUT PARAMS BELOW are the two the drill switch merges into one `holecycle` block — hence matched by type.
+    { param: 'pattern', match: { type: 'array' }, key: 'pattern', type: 'enum', default: BORE_DEFAULTS.pattern, widget: 'dropdown', widgetConfig: { options: DRILL_PATTERN_OPTIONS } },
+    { param: 'x0', match: { type: 'array' }, key: 'x0', type: 'number', default: BORE_DEFAULTS.x0, label: 'Pattern origin X', units: 'mm', section: 'GEOMETRY', help: 'The pattern local X origin (usually 0 — the Origin X placement positions it on the stock).' },
+    { param: 'y0', match: { type: 'array' }, key: 'y0', type: 'number', default: BORE_DEFAULTS.y0, label: 'Pattern origin Y', units: 'mm', section: 'GEOMETRY', help: 'The pattern local Y origin (usually 0 — the Origin Y placement positions it on the stock).' },
     // t722 P2a — per-PATTERN field visibility + labels (mirrors drillData): grid → cols/rows/dx/dy · circle → dia/startAngle/
     // count · line → spacing/angle/count · rect → w/h/nx/ny (`count` shared by circle + line).
-    { param: 'cols', blockIndex: 3, key: 'cols', type: 'number', default: BORE_DEFAULTS.cols, when: { param: 'pattern', is: 'grid' }, label: 'Columns', section: 'GEOMETRY' },
-    { param: 'rows', blockIndex: 3, key: 'rows', type: 'number', default: BORE_DEFAULTS.rows, when: { param: 'pattern', is: 'grid' }, label: 'Rows', section: 'GEOMETRY' },
-    { param: 'dx', blockIndex: 3, key: 'dx', type: 'number', default: BORE_DEFAULTS.dx, when: { param: 'pattern', is: 'grid' }, label: 'X pitch', section: 'GEOMETRY' },
-    { param: 'dy', blockIndex: 3, key: 'dy', type: 'number', default: BORE_DEFAULTS.dy, when: { param: 'pattern', is: 'grid' }, label: 'Y pitch', section: 'GEOMETRY' },
-    { param: 'count', blockIndex: 3, key: 'count', type: 'number', default: BORE_DEFAULTS.count, when: { param: 'pattern', in: ['circle', 'line'] }, label: 'Count', section: 'GEOMETRY' },
-    { param: 'spacing', blockIndex: 3, key: 'spacing', type: 'number', default: BORE_DEFAULTS.spacing, when: { param: 'pattern', is: 'line' }, label: 'Spacing', section: 'GEOMETRY' },
-    { param: 'angle', blockIndex: 3, key: 'angle', type: 'number', default: BORE_DEFAULTS.angle, when: { param: 'pattern', is: 'line' }, label: 'Angle°', section: 'GEOMETRY' },
-    { param: 'dia', help: "Bolt-circle diameter — holes sit evenly on this circle.", blockIndex: 3, key: 'dia', type: 'number', units: 'mm', default: BORE_DEFAULTS.dia, when: { param: 'pattern', is: 'circle' }, label: 'Circle Ø', section: 'GEOMETRY' },
-    { param: 'startAngle', blockIndex: 3, key: 'startAngle', type: 'number', default: BORE_DEFAULTS.startAngle, when: { param: 'pattern', is: 'circle' }, label: 'Start angle°', section: 'GEOMETRY' },
-    { param: 'w', blockIndex: 3, key: 'w', type: 'number', units: 'mm', default: BORE_DEFAULTS.w, when: { param: 'pattern', is: 'rect' }, label: 'Width', section: 'GEOMETRY' },
-    { param: 'h', blockIndex: 3, key: 'h', type: 'number', units: 'mm', default: BORE_DEFAULTS.h, when: { param: 'pattern', is: 'rect' }, label: 'Height', section: 'GEOMETRY' },
-    { param: 'nx', blockIndex: 3, key: 'nx', type: 'number', default: BORE_DEFAULTS.nx, when: { param: 'pattern', is: 'rect' }, label: 'X count', section: 'GEOMETRY' },
-    { param: 'ny', blockIndex: 3, key: 'ny', type: 'number', default: BORE_DEFAULTS.ny, when: { param: 'pattern', is: 'rect' }, label: 'Y count', section: 'GEOMETRY' },
-    { param: 'skip', help: "1-based hole numbers to omit (as shown in the preview), e.g. 5, 9.", blockIndex: 3, key: 'skip', type: 'string', default: BORE_DEFAULTS.skip },
-    // cut params (block 4, the helical `bore` leaf) — the DIFFERENCE from drillData: holeDia/toolDia/pitch/ramp, NOT peck
-    { param: 'depth', blockIndex: 4, key: 'depth', type: 'number', units: 'mm', default: BORE_DEFAULTS.depth, label: 'Depth', section: 'TOOL & CUT' },
-    { param: 'holeDia', help: "Target bored hole Ø (mm) — must be ≥ the tool Ø.", blockIndex: 4, key: 'holeDia', type: 'number', units: 'mm', default: BORE_DEFAULTS.holeDia, label: 'Hole Ø', section: 'TOOL & CUT' },
-    { param: 'toolDia', blockIndex: 4, key: 'toolDia', type: 'number', units: 'mm', default: BORE_DEFAULTS.toolDia, label: 'Tool Ø', section: 'TOOL & CUT' },
-    { param: 'pitch', help: "Z step per full circle (mm).", blockIndex: 4, key: 'pitch', type: 'number', default: BORE_DEFAULTS.pitch, label: 'Pitch (Z / pass)', section: 'TOOL & CUT' },
-    { param: 'ramp', blockIndex: 4, key: 'ramp', type: 'enum', default: BORE_DEFAULTS.ramp, widget: 'dropdown', widgetConfig: { options: RAMP_OPTIONS }, label: 'Ramp', help: 'Ring-step: plunge the pitch then a full G3 circle, repeat (the proven Expert form). Helix: continuous descent, linearized to G1 chords (the Expert has no proven helical G3).', section: 'TOOL & CUT' },
-    { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', units: 'mm/min', default: BORE_DEFAULTS.feed, label: 'Feed', section: 'TOOL & CUT' },
-    { param: 'rpm', blockIndex: 0, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', section: 'TOOL & CUT', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
+    { param: 'cols', match: { type: 'array' }, key: 'cols', type: 'number', default: BORE_DEFAULTS.cols, when: { param: 'pattern', is: 'grid' }, label: 'Columns', section: 'GEOMETRY' },
+    { param: 'rows', match: { type: 'array' }, key: 'rows', type: 'number', default: BORE_DEFAULTS.rows, when: { param: 'pattern', is: 'grid' }, label: 'Rows', section: 'GEOMETRY' },
+    { param: 'dx', match: { type: 'array' }, key: 'dx', type: 'number', default: BORE_DEFAULTS.dx, when: { param: 'pattern', is: 'grid' }, label: 'X pitch', section: 'GEOMETRY' },
+    { param: 'dy', match: { type: 'array' }, key: 'dy', type: 'number', default: BORE_DEFAULTS.dy, when: { param: 'pattern', is: 'grid' }, label: 'Y pitch', section: 'GEOMETRY' },
+    { param: 'count', match: { type: 'array' }, key: 'count', type: 'number', default: BORE_DEFAULTS.count, when: { param: 'pattern', in: ['circle', 'line'] }, label: 'Count', section: 'GEOMETRY' },
+    { param: 'spacing', match: { type: 'array' }, key: 'spacing', type: 'number', default: BORE_DEFAULTS.spacing, when: { param: 'pattern', is: 'line' }, label: 'Spacing', section: 'GEOMETRY' },
+    { param: 'angle', match: { type: 'array' }, key: 'angle', type: 'number', default: BORE_DEFAULTS.angle, when: { param: 'pattern', is: 'line' }, label: 'Angle°', section: 'GEOMETRY' },
+    { param: 'dia', help: "Bolt-circle diameter — holes sit evenly on this circle.", match: { type: 'array' }, key: 'dia', type: 'number', units: 'mm', default: BORE_DEFAULTS.dia, when: { param: 'pattern', is: 'circle' }, label: 'Circle Ø', section: 'GEOMETRY' },
+    { param: 'startAngle', match: { type: 'array' }, key: 'startAngle', type: 'number', default: BORE_DEFAULTS.startAngle, when: { param: 'pattern', is: 'circle' }, label: 'Start angle°', section: 'GEOMETRY' },
+    { param: 'w', match: { type: 'array' }, key: 'w', type: 'number', units: 'mm', default: BORE_DEFAULTS.w, when: { param: 'pattern', is: 'rect' }, label: 'Width', section: 'GEOMETRY' },
+    { param: 'h', match: { type: 'array' }, key: 'h', type: 'number', units: 'mm', default: BORE_DEFAULTS.h, when: { param: 'pattern', is: 'rect' }, label: 'Height', section: 'GEOMETRY' },
+    { param: 'nx', match: { type: 'array' }, key: 'nx', type: 'number', default: BORE_DEFAULTS.nx, when: { param: 'pattern', is: 'rect' }, label: 'X count', section: 'GEOMETRY' },
+    { param: 'ny', match: { type: 'array' }, key: 'ny', type: 'number', default: BORE_DEFAULTS.ny, when: { param: 'pattern', is: 'rect' }, label: 'Y count', section: 'GEOMETRY' },
+    { param: 'skip', help: "1-based hole numbers to omit (as shown in the preview), e.g. 5, 9.", match: { type: 'array' }, key: 'skip', type: 'string', default: BORE_DEFAULTS.skip },
+    // cut params (the helical `bore` leaf) — the DIFFERENCE from drillData: holeDia/toolDia/pitch/ramp, NOT peck
+    { param: 'depth', match: { type: 'bore' }, key: 'depth', type: 'number', units: 'mm', default: BORE_DEFAULTS.depth, label: 'Depth', section: 'TOOL & CUT' },
+    { param: 'holeDia', help: "Target bored hole Ø (mm) — must be ≥ the tool Ø.", match: { type: 'bore' }, key: 'holeDia', type: 'number', units: 'mm', default: BORE_DEFAULTS.holeDia, label: 'Hole Ø', section: 'TOOL & CUT' },
+    { param: 'toolDia', match: { type: 'bore' }, key: 'toolDia', type: 'number', units: 'mm', default: BORE_DEFAULTS.toolDia, label: 'Tool Ø', section: 'TOOL & CUT' },
+    { param: 'pitch', help: "Z step per full circle (mm).", match: { type: 'bore' }, key: 'pitch', type: 'number', default: BORE_DEFAULTS.pitch, label: 'Pitch (Z / pass)', section: 'TOOL & CUT' },
+    { param: 'ramp', match: { type: 'bore' }, key: 'ramp', type: 'enum', default: BORE_DEFAULTS.ramp, widget: 'dropdown', widgetConfig: { options: RAMP_OPTIONS }, label: 'Ramp', help: 'Ring-step: plunge the pitch then a full G3 circle, repeat (the proven Expert form). Helix: continuous descent, linearized to G1 chords (the Expert has no proven helical G3).', section: 'TOOL & CUT' },
+    { param: 'feed', match: { type: 'bore' }, key: 'feed', type: 'number', units: 'mm/min', default: BORE_DEFAULTS.feed, label: 'Feed', section: 'TOOL & CUT' },
+    { param: 'rpm', match: { type: 'progstart' }, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', section: 'TOOL & CUT', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
 ];
 
-const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
-export const BORE_BINDINGS = BORE_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
-
-export const BORE_DATA_OPTYPE = 'user_bore_data';
-
-/** Build the bore-as-data def — the template is drillStack(BORE_DEFAULTS) (method='helical' → the bore leaf); the
- *  hand-authored BINDINGS map is the independent artifact, proven byte-identical + binding-wiring by tests/bore-as-data.spec.js. */
-export function boreDataDef() {
-    const exec = drillStack(BORE_DEFAULTS);
-    const stack = [{
+/** The WRAPPED template — factored out of `boreDataDef` (t1385) so the derivation and the def read the SAME stack. */
+function boreDataStack(p = BORE_DEFAULTS) {
+    return [{
         type: 'user_root',
         params: {},
         uiChildren: [
@@ -98,8 +100,18 @@ export function boreDataDef() {
             { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
             { type: 'param_group', params: { group: 'Bore' }, children: [] },
         ],
-        children: appendToolSel(appendEntry(exec)),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
+        children: appendToolSel(appendEntry(drillStack(p))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing)
     }];
+}
+
+export const BORE_BINDINGS = deriveBindingsFor(boreDataStack(BORE_DEFAULTS), BORE_BINDING_SPECS);
+
+export const BORE_DATA_OPTYPE = 'user_bore_data';
+
+/** Build the bore-as-data def — the template is drillStack(BORE_DEFAULTS) (method='helical' → the bore leaf); the
+ *  hand-authored BINDINGS map is the independent artifact, proven byte-identical + binding-wiring by tests/bore-as-data.spec.js. */
+export function boreDataDef() {
+    const stack = boreDataStack(BORE_DEFAULTS);   // t1385 — ONE stack builder, shared with the binding derivation above
     const def = userOpFromStack('bore_data', 'Bore (data)', stack, [...toolBindingsFor(stack), ...BORE_BINDINGS, ...entryBindingsFor(stack)], 'form3d+2d', null, 'mill_datawiz');
     def.previewGeometry = (p) => drillPatternGeometry(p, true);   // t716 — bore pattern + pos + pattern handles + a draggable Ø (holeDia)
     def.entryPoint = ENTRY_POINT;   // t726 P2b - the emitting-square entry marker (replaces the sim-only circle)

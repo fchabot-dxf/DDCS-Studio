@@ -43,7 +43,7 @@ import { userOpFromStack } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726 P2b - the declared mill entry point
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a - the declared tool-selection marker
-import { entryBindingsFor, toolBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity (into def.bindings, not the exported EXEC bindings)
+import { entryBindingsFor, toolBindingsFor, deriveBindingsFor } from './deriveBindings.js';   // t726 P2b entry / t768 P1a tool — by identity; t1385 — the WHOLE map is by identity now (positional cannot survive the holecycle collapse)
 import { WCS_OPTIONS, XY_DATUM_OPTIONS, STOCK_DATUM_OPTIONS, DRILL_PATTERN_OPTIONS } from './wizardOptions.js';   // t720 P1 — SHARED enum options (were undeclared → empty dropdowns)
 
 /** The author defaults — match drillStack's own num() fallbacks so the seeded template == the true default stack. */
@@ -56,53 +56,92 @@ export const DRILL_DEFAULTS = {
     stockAttach: '', pathDatum: '', stockDatum: 'nnp', stockW: 0, stockH: 0, stockZ: 0, originX: 0, originY: 0, offZ: 0,
 };
 
-// The hand-authored binding map: each drill param → its (blockIndex, key) socket in the flattened default template.
-// Flatten (pre-order) of drillStack's [progstart, wcs, placeonstock{array{drill}}, progend]:
-//   0 progstart · 1 wcs · 2 placeonstock · 3 array · 4 drill · 5 progend
-// (clearance is deliberately NOT bound — frontier #3; method is NOT bound — frontier #1. The placeonstock bbox
-//  snapshot on block 2 is NO LONGER a frontier — the place fold recomputes it LIVE from the array's params, so
-//  placement is fully bindable now; only the 4 bbox-snapshot keys (bminX..) stay vestigial/ignored.)
-const DRILL_EXEC_BINDINGS = [
-    { param: 'wcs', blockIndex: 1, key: 'wcs', type: 'enum', default: DRILL_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS } },
-    // placement scalars (block 2, placeonstock) — now correct because the bbox tracks the pattern live (array.extent)
-    { param: 'stockAttach', blockIndex: 2, key: 'stockAttach', type: 'enum', default: DRILL_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'pathDatum', blockIndex: 2, key: 'pathDatum', type: 'enum', default: DRILL_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
-    { param: 'stockDatum', formHidden: true, blockIndex: 2, key: 'stockDatum', type: 'enum', default: DRILL_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
-    { param: 'stockW', formHidden: true, blockIndex: 2, key: 'stockW', type: 'number', default: DRILL_DEFAULTS.stockW },
-    { param: 'stockH', formHidden: true, blockIndex: 2, key: 'stockH', type: 'number', default: DRILL_DEFAULTS.stockH },
-    { param: 'stockZ', formHidden: true, blockIndex: 2, key: 'stockZ', type: 'number', default: DRILL_DEFAULTS.stockZ },
-    { param: 'originX', blockIndex: 2, key: 'offX', type: 'number', default: DRILL_DEFAULTS.originX },
-    { param: 'originY', blockIndex: 2, key: 'offY', type: 'number', default: DRILL_DEFAULTS.originY },
-    { param: 'offZ', blockIndex: 2, key: 'offZ', type: 'number', default: DRILL_DEFAULTS.offZ, label: 'Z offset', units: 'mm', section: 'GEOMETRY', help: 'Shift the whole pattern up or down in Z from the datum.' },
-    // pattern + geometry (block 3, the `array` container — patternPoints reads these scalars at emit)
-    { param: 'pattern', blockIndex: 3, key: 'pattern', type: 'enum', default: DRILL_DEFAULTS.pattern, widget: 'dropdown', widgetConfig: { options: DRILL_PATTERN_OPTIONS } },
-    { param: 'x0', blockIndex: 3, key: 'x0', type: 'number', default: DRILL_DEFAULTS.x0, label: 'Pattern origin X', units: 'mm', section: 'GEOMETRY', help: 'The pattern local X origin (usually 0 — the Origin X placement positions it on the stock).' },
-    { param: 'y0', blockIndex: 3, key: 'y0', type: 'number', default: DRILL_DEFAULTS.y0, label: 'Pattern origin Y', units: 'mm', section: 'GEOMETRY', help: 'The pattern local Y origin (usually 0 — the Origin Y placement positions it on the stock).' },
+/**
+ * The binding map: each drill param → the socket it drives, named BY IDENTITY (t1385).
+ *
+ * ── WHY THESE STOPPED BEING POSITIONAL ────────────────────────────────────────────────────────────────────────────
+ * Until t1385 every row carried a hand-counted `blockIndex` into the flattened template, plus a `WRAP_PREFIX_COUNT`
+ * offset for the four presentation blocks. That worked only because the flatten's shape was frozen — and the drill
+ * switch breaks exactly that: re-pointing through `holecycle` MERGES the `array` container and its `drill` leaf into
+ * ONE block, so the two indices those rows point at (the 15-row pattern/geometry cluster and the cut params) collapse
+ * into one and every index after them shifts. A positional map cannot survive a 2-into-1 collapse; an identity map
+ * does not notice it.
+ *
+ * So `match: {type}` names the target and `deriveBindings` re-finds its flat index by scanning. That is not a new
+ * mechanism — it is the dataOps norm this twin had simply never been migrated to: `surfacingData` uses it 14x and is
+ * the op that ALREADY survived this same switch, `centerDrillData` derives at module level exactly as below, and
+ * `assign`-targeting specs use it 107x. Deriving over the ALREADY-WRAPPED stack is also what makes the old
+ * `WRAP_PREFIX_COUNT` hand-count disappear rather than move.
+ *
+ * The CONVERSION'S OWN TEST is that nothing moved: every derived (param, key, blockIndex, default) equals what the
+ * positional map produced, and both twins' emit is byte-identical — see tests/drill-bindings-identity-1385.spec.js.
+ *
+ * THE FLATTEN, for reading (no row depends on these numbers any more):
+ *   0 user_root · 1 panel · 2 sim · 3 param_group · 4 progstart · 5 wcs · 6 placeonstock · 7 array · 8 drill ·
+ *   9 progend · 10 entry · 11 toolsel
+ * (clearance is deliberately NOT bound — frontier #3; method is NOT bound — frontier #1. The placeonstock bbox
+ *  snapshot is NO LONGER a frontier — the place fold recomputes it LIVE from the array's params, so placement is
+ *  fully bindable; only the 4 bbox-snapshot keys (bminX..) stay vestigial/ignored.)
+ */
+export const DRILL_BINDING_SPECS = [
+    { param: 'wcs', match: { type: 'wcs' }, key: 'wcs', type: 'enum', default: DRILL_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS } },
+    // placement scalars (the placeonstock C-block) — correct because the bbox tracks the pattern live (array.extent)
+    { param: 'stockAttach', match: { type: 'placeonstock' }, key: 'stockAttach', type: 'enum', default: DRILL_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'pathDatum', match: { type: 'placeonstock' }, key: 'pathDatum', type: 'enum', default: DRILL_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS } },
+    { param: 'stockDatum', formHidden: true, match: { type: 'placeonstock' }, key: 'stockDatum', type: 'enum', default: DRILL_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS } },
+    { param: 'stockW', formHidden: true, match: { type: 'placeonstock' }, key: 'stockW', type: 'number', default: DRILL_DEFAULTS.stockW },
+    { param: 'stockH', formHidden: true, match: { type: 'placeonstock' }, key: 'stockH', type: 'number', default: DRILL_DEFAULTS.stockH },
+    { param: 'stockZ', formHidden: true, match: { type: 'placeonstock' }, key: 'stockZ', type: 'number', default: DRILL_DEFAULTS.stockZ },
+    { param: 'originX', match: { type: 'placeonstock' }, key: 'offX', type: 'number', default: DRILL_DEFAULTS.originX },
+    { param: 'originY', match: { type: 'placeonstock' }, key: 'offY', type: 'number', default: DRILL_DEFAULTS.originY },
+    { param: 'offZ', match: { type: 'placeonstock' }, key: 'offZ', type: 'number', default: DRILL_DEFAULTS.offZ, label: 'Z offset', units: 'mm', section: 'GEOMETRY', help: 'Shift the whole pattern up or down in Z from the datum.' },
+    // pattern + geometry (the `array` container — patternPoints reads these scalars at emit). THIS CLUSTER AND THE CUT
+    // PARAMS BELOW are the two the drill switch merges into one `holecycle` block, which is why they are matched by type.
+    { param: 'pattern', match: { type: 'array' }, key: 'pattern', type: 'enum', default: DRILL_DEFAULTS.pattern, widget: 'dropdown', widgetConfig: { options: DRILL_PATTERN_OPTIONS } },
+    { param: 'x0', match: { type: 'array' }, key: 'x0', type: 'number', default: DRILL_DEFAULTS.x0, label: 'Pattern origin X', units: 'mm', section: 'GEOMETRY', help: 'The pattern local X origin (usually 0 — the Origin X placement positions it on the stock).' },
+    { param: 'y0', match: { type: 'array' }, key: 'y0', type: 'number', default: DRILL_DEFAULTS.y0, label: 'Pattern origin Y', units: 'mm', section: 'GEOMETRY', help: 'The pattern local Y origin (usually 0 — the Origin Y placement positions it on the stock).' },
     // t722 P2a — per-PATTERN field visibility (map the real fields): grid → cols/rows/dx/dy · circle → dia/startAngle/count ·
     // line → spacing/angle/count · rect → w/h/nx/ny (`count` is shared by circle + line). + labels (were cryptic param names).
-    { param: 'cols', blockIndex: 3, key: 'cols', type: 'number', default: DRILL_DEFAULTS.cols, when: { param: 'pattern', is: 'grid' }, label: 'Columns', section: 'GEOMETRY' },
-    { param: 'rows', blockIndex: 3, key: 'rows', type: 'number', default: DRILL_DEFAULTS.rows, when: { param: 'pattern', is: 'grid' }, label: 'Rows', section: 'GEOMETRY' },
-    { param: 'dx', blockIndex: 3, key: 'dx', type: 'number', default: DRILL_DEFAULTS.dx, when: { param: 'pattern', is: 'grid' }, label: 'X pitch', section: 'GEOMETRY' },
-    { param: 'dy', blockIndex: 3, key: 'dy', type: 'number', default: DRILL_DEFAULTS.dy, when: { param: 'pattern', is: 'grid' }, label: 'Y pitch', section: 'GEOMETRY' },
-    { param: 'count', blockIndex: 3, key: 'count', type: 'number', default: DRILL_DEFAULTS.count, when: { param: 'pattern', in: ['circle', 'line'] }, label: 'Count', section: 'GEOMETRY' },
-    { param: 'spacing', blockIndex: 3, key: 'spacing', type: 'number', default: DRILL_DEFAULTS.spacing, when: { param: 'pattern', is: 'line' }, label: 'Spacing', section: 'GEOMETRY' },
-    { param: 'angle', blockIndex: 3, key: 'angle', type: 'number', default: DRILL_DEFAULTS.angle, when: { param: 'pattern', is: 'line' }, label: 'Angle°', section: 'GEOMETRY' },
-    { param: 'dia', help: "Bolt-circle diameter — holes sit evenly on this circle.", blockIndex: 3, key: 'dia', type: 'number', units: 'mm', default: DRILL_DEFAULTS.dia, when: { param: 'pattern', is: 'circle' }, label: 'Circle Ø', section: 'GEOMETRY' },
-    { param: 'startAngle', blockIndex: 3, key: 'startAngle', type: 'number', default: DRILL_DEFAULTS.startAngle, when: { param: 'pattern', is: 'circle' }, label: 'Start angle°', section: 'GEOMETRY' },
-    { param: 'w', blockIndex: 3, key: 'w', type: 'number', units: 'mm', default: DRILL_DEFAULTS.w, when: { param: 'pattern', is: 'rect' }, label: 'Width', section: 'GEOMETRY' },
-    { param: 'h', blockIndex: 3, key: 'h', type: 'number', units: 'mm', default: DRILL_DEFAULTS.h, when: { param: 'pattern', is: 'rect' }, label: 'Height', section: 'GEOMETRY' },
-    { param: 'nx', blockIndex: 3, key: 'nx', type: 'number', default: DRILL_DEFAULTS.nx, when: { param: 'pattern', is: 'rect' }, label: 'X count', section: 'GEOMETRY' },
-    { param: 'ny', blockIndex: 3, key: 'ny', type: 'number', default: DRILL_DEFAULTS.ny, when: { param: 'pattern', is: 'rect' }, label: 'Y count', section: 'GEOMETRY' },
-    { param: 'skip', help: "1-based hole numbers to omit (as shown in the preview), e.g. 5, 9.", blockIndex: 3, key: 'skip', type: 'string', default: DRILL_DEFAULTS.skip },
-    // cut params (block 4, the peck `drill` leaf)
-    { param: 'depth', blockIndex: 4, key: 'depth', type: 'number', units: 'mm', default: DRILL_DEFAULTS.depth },
-    { param: 'peck', help: "Peck increment (mm) — full retract to clearance each peck to clear chips.", blockIndex: 4, key: 'peck', type: 'number', default: DRILL_DEFAULTS.peck },
-    { param: 'feed', blockIndex: 4, key: 'feed', type: 'number', units: 'mm/min', default: DRILL_DEFAULTS.feed },
-    { param: 'rpm', blockIndex: 0, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
+    { param: 'cols', match: { type: 'array' }, key: 'cols', type: 'number', default: DRILL_DEFAULTS.cols, when: { param: 'pattern', is: 'grid' }, label: 'Columns', section: 'GEOMETRY' },
+    { param: 'rows', match: { type: 'array' }, key: 'rows', type: 'number', default: DRILL_DEFAULTS.rows, when: { param: 'pattern', is: 'grid' }, label: 'Rows', section: 'GEOMETRY' },
+    { param: 'dx', match: { type: 'array' }, key: 'dx', type: 'number', default: DRILL_DEFAULTS.dx, when: { param: 'pattern', is: 'grid' }, label: 'X pitch', section: 'GEOMETRY' },
+    { param: 'dy', match: { type: 'array' }, key: 'dy', type: 'number', default: DRILL_DEFAULTS.dy, when: { param: 'pattern', is: 'grid' }, label: 'Y pitch', section: 'GEOMETRY' },
+    { param: 'count', match: { type: 'array' }, key: 'count', type: 'number', default: DRILL_DEFAULTS.count, when: { param: 'pattern', in: ['circle', 'line'] }, label: 'Count', section: 'GEOMETRY' },
+    { param: 'spacing', match: { type: 'array' }, key: 'spacing', type: 'number', default: DRILL_DEFAULTS.spacing, when: { param: 'pattern', is: 'line' }, label: 'Spacing', section: 'GEOMETRY' },
+    { param: 'angle', match: { type: 'array' }, key: 'angle', type: 'number', default: DRILL_DEFAULTS.angle, when: { param: 'pattern', is: 'line' }, label: 'Angle°', section: 'GEOMETRY' },
+    { param: 'dia', help: "Bolt-circle diameter — holes sit evenly on this circle.", match: { type: 'array' }, key: 'dia', type: 'number', units: 'mm', default: DRILL_DEFAULTS.dia, when: { param: 'pattern', is: 'circle' }, label: 'Circle Ø', section: 'GEOMETRY' },
+    { param: 'startAngle', match: { type: 'array' }, key: 'startAngle', type: 'number', default: DRILL_DEFAULTS.startAngle, when: { param: 'pattern', is: 'circle' }, label: 'Start angle°', section: 'GEOMETRY' },
+    { param: 'w', match: { type: 'array' }, key: 'w', type: 'number', units: 'mm', default: DRILL_DEFAULTS.w, when: { param: 'pattern', is: 'rect' }, label: 'Width', section: 'GEOMETRY' },
+    { param: 'h', match: { type: 'array' }, key: 'h', type: 'number', units: 'mm', default: DRILL_DEFAULTS.h, when: { param: 'pattern', is: 'rect' }, label: 'Height', section: 'GEOMETRY' },
+    { param: 'nx', match: { type: 'array' }, key: 'nx', type: 'number', default: DRILL_DEFAULTS.nx, when: { param: 'pattern', is: 'rect' }, label: 'X count', section: 'GEOMETRY' },
+    { param: 'ny', match: { type: 'array' }, key: 'ny', type: 'number', default: DRILL_DEFAULTS.ny, when: { param: 'pattern', is: 'rect' }, label: 'Y count', section: 'GEOMETRY' },
+    { param: 'skip', help: "1-based hole numbers to omit (as shown in the preview), e.g. 5, 9.", match: { type: 'array' }, key: 'skip', type: 'string', default: DRILL_DEFAULTS.skip },
+    // cut params (the peck `drill` leaf)
+    { param: 'depth', match: { type: 'drill' }, key: 'depth', type: 'number', units: 'mm', default: DRILL_DEFAULTS.depth },
+    { param: 'peck', help: "Peck increment (mm) — full retract to clearance each peck to clear chips.", match: { type: 'drill' }, key: 'peck', type: 'number', default: DRILL_DEFAULTS.peck },
+    { param: 'feed', match: { type: 'drill' }, key: 'feed', type: 'number', units: 'mm/min', default: DRILL_DEFAULTS.feed },
+    { param: 'rpm', match: { type: 'progstart' }, key: 'rpm', type: 'number', socketHeld: true, label: 'Spindle RPM', help: "Spindle speed (RPM). Blank = the machine Head default; picking a tool fills this from the library." },   // t996 — rpm → progstart
 ];
 
-const WRAP_PREFIX_COUNT = 4;   // user_root + panel + sim + param_group
-export const DRILL_BINDINGS = DRILL_EXEC_BINDINGS.map((b) => ({ ...b, blockIndex: b.blockIndex + WRAP_PREFIX_COUNT }));
+/** The WRAPPED template — factored out of `drillDataDef` (t1385) so the binding derivation below and the def itself read
+ *  the SAME stack. Without that they could disagree, which is the whole failure mode identity bindings exist to prevent.
+ *  Mirrors `centerDrillData`'s `cdrillDataStack`. */
+function drillDataStack(p = DRILL_DEFAULTS) {
+    return [{
+        type: 'user_root',
+        params: {},
+        uiChildren: [
+            { type: 'panel', params: { panel: 'form3d+2d' } },   // t716 — the FeatureCanvas 2D with the hole pattern + pos + pattern-size handles (previewGeometry)
+            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
+            { type: 'param_group', params: { group: 'Drill' }, children: [] },
+        ],
+        children: appendToolSel(appendEntry(drillStack(p))),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing)
+    }];
+}
+
+// The old `WRAP_PREFIX_COUNT = 4` offset is GONE, not moved: deriving over the already-wrapped stack finds the four
+// presentation blocks by scanning, so the hand-count that used to encode them has nothing left to encode.
+export const DRILL_BINDINGS = deriveBindingsFor(drillDataStack(DRILL_DEFAULTS), DRILL_BINDING_SPECS);
 
 // t867 — FEEDS & SPEEDS: the material picker + advisory "Suggest feed" button (the feedsuggest composite widget). A
 // bindingless binding (no socket) next to Feed — drives NO G-code, so unset = byte-identical; a picked material round-
@@ -145,21 +184,7 @@ export function drillPatternGeometry(p, boreDia) {
 /** Build the drill-as-data def: a fresh { opType, label, template, bindings } ready for registerUserOp. The template
  *  is drillStack(defaults) with ids stripped (userOpFromStack does both) — the canonical valid-by-construction stack. */
 export function drillDataDef() {
-    const exec = drillStack(DRILL_DEFAULTS);
-    const stack = [{
-        type: 'user_root',
-        params: {},
-        uiChildren: [
-            { type: 'panel', params: { panel: 'form3d+2d' } },   // t716 — the FeatureCanvas 2D with the hole pattern + pos + pattern-size handles (previewGeometry)
-            { type: 'sim', params: { rotary: false, machine: false, magazine: false } },
-            {
-                type: 'param_group',
-                params: { group: 'Drill' },
-                children: [],
-            },
-        ],
-        children: appendToolSel(appendEntry(exec)),   // t726 P2b entry + t768 P1a tool marker appended (both emit nothing; no body-index shift)
-    }];
+    const stack = drillDataStack(DRILL_DEFAULTS);   // t1385 — ONE stack builder, shared with the binding derivation above
     // t867 — the feeds-helper sits right after Feed (it fills that field).
     const baseBindings = [...toolBindingsFor(stack), ...DRILL_BINDINGS, ...entryBindingsFor(stack)];
     const fdAt = baseBindings.findIndex((b) => b.param === 'feed');
