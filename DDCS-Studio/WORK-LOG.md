@@ -9728,3 +9728,88 @@ wrong surface.
 New spec **6/6**. CAM family **56/56** across 17 specs. Pocket + arc families **48/48**. Guarded twins (corner /
 middle) green. Smoke **71/71**. Surfacing + drill **124/124**. Iron rule **11/11, the same eleven**. Version sync 6/6.
 **~300 tests, 0 failures.** Scratch specs deleted; proc tree clean.
+
+## t1412 (seat A) — THE REACH GAP: DIAGNOSED, AND THE ACT'S PREMISE DOES NOT HOLD
+
+**No code changed.** The dispatch asked me to diagnose first and to propose with evidence before building if the
+diagnosis argued for a different shape. It does — in a stronger way than "delegate the field list": **step 2 of the
+act is already true, step 2's stated mechanism is the re-route step 1 forbids, and the measurement found a different
+defect that is live in released code.**
+
+### FINDING 1 — THERE IS NO MISSING-KNOB GAP. The fields have always been there.
+
+`pocketSlot` allocates its own `POCKET_FIELDS` and every one is already a pendant field with its own read-line:
+
+    #1=#2600 Width · #2=#2601 Height · #3=#2602 Depth · #4=#2603 Stepdown · #5=#2604 Stepover
+    #6=#2605 Tool Ø · #7=#2606 Feed · #8=#2607 Plunge · #9=#2608 Clearance · #10=#2609 RPM
+
+and `depth` genuinely drives the macro's depth loop — `WHILE #28 LT #3 DO1`, `IF #28 GT #3 THEN #28=#3`. So "the field
+table GAINS depth / stepdown / feed" describes something that has shipped since the generator was written. My t1410
+REACH finding said the knobs "do not appear in the modal a plain rect pocket opens"; that was **right about the
+classifier and wrong about the operator's experience**, and this correction is mine to make: the operator has always
+had those dials on a rect pocket. What does not reach that modal is the ATOM — not the knobs.
+
+### FINDING 2 — "REACHING THE ATOM'S REGISTERS" IS THE RE-ROUTE, NOT AN ALIGNMENT
+
+Measured: `usesAtomRegs: false`. The generator's macro is `rasterClear` over `#20-#33`; the atom's body is `#40-#49`.
+The two are independent programs. Making the generator's fields "reach the atom's registers through the generator's
+own v[key] convention" is not a spec change — it is **replacing the macro with the atom's**, which is exactly the
+re-route step 1 rules out. There is no version of step 2 that is both non-re-routing and non-trivial.
+
+**And the one-source instinct the dispatch offered as the alternative does not fit either.** Delegating the FIELD LIST
+to the classifier would align a list that already matches; it would not touch the thing that actually differs, which
+is the body. The genuine one-source question here is about the MACRO, not the fields — see finding 3.
+
+### 🔴 FINDING 3 — THE REAL DEFECT, MEASURED: the slot ignores strategy and direction while the modal states them
+
+    pocketSlot body, strategy 'spiral'  vs  'raster'      IDENTICAL
+    pocketSlot body, direction bothways vs  'oneway'      IDENTICAL
+    pocketSlot body, entry plunge       vs  'ramp'        differs (the t1341 entry gate + ramp lead-in DO reach it)
+
+The macro's own first line is `( Rectangular pocket — raster clear … + wall finish … )`. So **a concentric/spiral
+pocket packs into a CAM slot that cuts a RASTER**, and a one-way pocket packs into one that cuts both-ways — while
+`seedFromOp` appends a greyed `strategy` row displaying the operator's pick. `opCamMap`'s own comment sets the
+standard that row is failing: *"the row states the shape being built and stays greyed — informative, never a control
+that lies."* For pocket it lies, because `strategy` does not fork the camType (spiral and raster both route to
+`pocket`) and the single macro only does one of them.
+
+This is live in released code and it is not something t1406-t1410 introduced — it predates the whole re-point. The
+severity is the same class as t1402's ring defect: the operator asks for one thing, the machine does another, and the
+surface says the thing that was asked.
+
+### FINDING 4 — the too-small arm's three knobs, since the dispatch asked which way they fell
+
+They do not arise here at all. `pocketSlot` has no too-small ARM — it has a runtime guard (`IF #24 LE #23 GOTO 8` →
+`#1505=1 ;ERROR: pocket smaller than the tool`), so a too-small rect pocket packs a slot that REFUSES at the machine
+rather than one that plunges. The three holecycle knobs are a property of the classifier arm (`stackToSlot`), which a
+rect pocket never takes. Worth stating plainly: on this arm the answer is "neither — the arm does not exist".
+
+### FINDING 5 — @work
+
+`hasWork: false`. The generator's macro has never carried a `@work` marker (it is not emitted through the atom path
+that declares one), so "@work stays honest in the packed macro" has nothing to hold onto on this arm. Nothing to
+assert; nothing to fix.
+
+### THE PROPOSAL — three options, and the trade is real
+
+- **A — MAKE THE ROW TRUE (smallest).** The greyed `strategy` row says what the macro DOES ("this slot cuts a raster
+  clear; the spiral pick is not carried"), and the same for `direction`. Nothing about the G-code changes; the surface
+  stops lying. Cheap, honest, and it leaves a real capability gap the operator can now see.
+- **B — TEACH THE GENERATOR A CONCENTRIC ARM** (`ringClear` already exists — `circlePocketSlot` uses it) plus a
+  one-way raster arm. The row becomes true because the macro does what it says. This is a second hand-written copy of
+  walks the atom already emits — precisely the duplication t1397 refused for the wizard path — but it keeps the
+  per-type architecture intact, which is your ruling.
+- **C — THE RECT POCKET'S SLOT BECOMES THE ATOM'S BODY** (route rect through the classifier arm, or have `pocketSlot`
+  delegate its BODY while keeping its name/field labels). One source for the walk, the arm gating and `@work` all
+  arrive for free, and the knobs land on `#42/#43`. It is the re-route you excluded, so I am not proposing it as the
+  pick — but the diagnosis would be dishonest if it did not name that this is the only option that removes the
+  divergence rather than describing or duplicating it.
+
+**I lean A now, B or C as its own act** — A stops the lie today at near-zero risk, and it makes the size of the real
+gap visible so the B-vs-C call can be made on evidence rather than on my summary. But this is a product ruling about
+what a CAM slot promises, and it is yours.
+
+### NO GATE RUN
+
+Nothing changed, so there is nothing to gate. Scratch diagnostics deleted; tree carries only the advisor's docs;
+process tree clean.
