@@ -127,6 +127,46 @@ export function surfaceRasterAbsorbsRotation(p = {}) {
     return true;
 }
 
+/**
+ * ── t1408 — THE FLOW LABELS, DECLARED. A SHIPPED DEFECT, MEASURED, NOT A PRECAUTION ──────────────────────────────
+ *
+ * This body wrote its `N`/`GOTO` numbers as literals: 91-96 for the refusals, 13-18 / 21-22 / 31 / 41-42 / 51-52 for
+ * the walks and descents. That is safe for exactly one such body per program, and a program can hold two.
+ *
+ * WHAT IT COSTS, measured in the running app on RELEASED code (V2026.07.30.6) with no pocket involved at all:
+ * a program holding a DRILL op and a SURFACING op emits `N91`/`N92` TWICE — `holecycle` gets 91/92 from the emitter's
+ * label counter, and this body writes its own — and the SECOND body is then skipped entirely. Per-op time: drill 3.9s,
+ * surfacing **0**. Not a preview artifact: duplicate labels are ambiguous on the controller too, and an op that
+ * silently does not execute is the worst kind of wrong motion — the operator sees a program that looks complete.
+ *
+ * t1379 MEASURED THIS EXACT FAILURE ONE ATOM EARLIER — two hole ops, the second's GOTO bound to the first's N, every
+ * hole after the first silently undrilled — and t1381 built the answer: an atom DECLARES the labels it needs and the
+ * emitter assigns them uniquely per program. `holecycle` declares; this atom never did. So this is not a new
+ * mechanism, it is the mechanism reaching the atom that was missing from it.
+ *
+ * THE DEFAULTS BELOW ARE THE LEGACY NUMBERS, deliberately: a direct `surfaceRasterLines(p)` call carries no label
+ * params, so every bridge that reads this body straight is byte-for-byte unchanged. What moves is the EMITTED
+ * PROGRAM's numbering, which is what has to move for the numbers to be unique.
+ */
+const LABEL_DEFAULTS = {
+    errLabel: 91, okLabel: 92,                       // the stepover/stepdown refusal + its skip-over
+    skimErrLabel: 93, skimOkLabel: 94,               // the skim frame-read refusal
+    insetErrLabel: 95, insetOkLabel: 96,             // t1404 — the collapsed-inset refusal
+    rowStepLabel: 13, rowCutLabel: 14,               // rowWalk: step-over-at-depth / the cut
+    rowNearLabel: 15, rowEndLabel: 16,               // rowWalk: which end this row runs to
+    rowFarLabel: 17, rowStartLabel: 18,              // rowWalk: which end this row starts at
+    ringStepLabel: 21, ringCutLabel: 22,             // ringWalk: first ring vs the diagonal step in
+    confirmLabel: 31,                                // the confirm-every-N pause skip
+    rampPlungeLabel: 41, rampEndLabel: 42,           // the ramp's honest degrade to a plunge
+    helixReseedLabel: 51, helixEndLabel: 52,         // the helix re-seed + its final plunge guard
+};
+/** The label numbers this body will use: the emitter's per-program assignment, else the legacy default. */
+function labelsOf(p = {}) {
+    const out = {};
+    for (const k in LABEL_DEFAULTS) out[k] = num(p[k], LABEL_DEFAULTS[k]);
+    return out;
+}
+
 const V = {
     w: '#40',        // area X (tool-centre sweep)
     h: '#41',        // area Y
@@ -238,6 +278,7 @@ export function surfaceRasterLines(p = {}) {
      * the shipped `r − wallOffset` disagree in sign, and the shipped one is the one that has always run).
      */
     const inset = Math.max(0, num(p.inset, 0));
+    const LBL = labelsOf(p);   // t1408 — the emitter's per-program label assignment (the legacy numbers when called direct)
     const w = num(p.w, 100) - 2 * inset, h = num(p.h, 80) - 2 * inset;
     const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
     const tool = Math.max(0.1, num(p.toolDia, 12));
@@ -310,7 +351,7 @@ export function surfaceRasterLines(p = {}) {
     const stepBaked = tool * pct / 100;   // the stepover AT BUILD VALUES — what the baked ramp geometry is computed for
     const opts = { x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
         helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1), toolDia: tool, stepBaked,
-        rot, mv, AX, TM };   // t1375 — the rotation goes through the ONE move printer, so each walk declares points, not words
+        rot, mv, AX, TM, LBL };   // t1375 — the rotation goes through the ONE move printer, so each walk declares points, not words
     const walk = (p.strategy === 'concentric') ? ringWalk(opts) : rowWalk(opts);
 
     // THE SKIM PREAMBLE. Seed an impossible value, read the frame, then REFUSE if it did not arrive — before any
@@ -324,16 +365,16 @@ export function surfaceRasterLines(p = {}) {
         `${SKIM_FRAME.x}=${FRAME_SRC.x}   ( live work X — wherever the operator jogged to )`,
         `${SKIM_FRAME.y}=${FRAME_SRC.y}   ( live work Y )`,
         `${SKIM_FRAME.z}=${FRAME_SRC.z}   ( live work Z — the touched surface )`,
-        `IF ${SKIM_FRAME.x} == ${FRAME_SENTINEL} GOTO93   ( no frame -> refuse, with the tool still up )`,
-        `IF ${SKIM_FRAME.y} == ${FRAME_SENTINEL} GOTO93`,
-        `IF ${SKIM_FRAME.z} == ${FRAME_SENTINEL} GOTO93`,
+        `IF ${SKIM_FRAME.x} == ${FRAME_SENTINEL} GOTO${LBL.skimErrLabel}   ( no frame -> refuse, with the tool still up )`,
+        `IF ${SKIM_FRAME.y} == ${FRAME_SENTINEL} GOTO${LBL.skimErrLabel}`,
+        `IF ${SKIM_FRAME.z} == ${FRAME_SENTINEL} GOTO${LBL.skimErrLabel}`,
         '',
     ];
     const refusal = !skim ? [] : [
-        'GOTO94',
-        'N93',
+        `GOTO${LBL.skimOkLabel}`,
+        `N${LBL.skimErrLabel}`,
         '#1505=1   ;ERROR: could not read the live position - skim needs the jog frame',
-        'N94',
+        `N${LBL.skimOkLabel}`,
     ];
 
     return [
@@ -364,15 +405,15 @@ export function surfaceRasterLines(p = {}) {
         `${V.depth}=${liveWord(p.depth) || r3(depth)}   ( total depth to ${inset > 0 ? 'clear' : 'face off'} )`,
         `${V.stepdown}=${liveWord(p.stepdown) || r3(stepdown)}   ( bite per level )`,
         `${V.step}=[${r3(tool)} * ${r3(pct)} / 100]   ( stepover mm = tool Ø ${r3(tool)} x ${r3(pct)}% — the CAM derives it the same way )`,
-        `IF ${V.step} <= 0 GOTO91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
-        `IF ${V.stepdown} <= 0 GOTO91`,
+        `IF ${V.step} <= 0 GOTO${LBL.errLabel}   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
+        `IF ${V.stepdown} <= 0 GOTO${LBL.errLabel}`,
         // t1404 — AN INSET CAN EAT THE AREA, and a collapsed rect walks an inverted ring rather than failing loudly.
         // Emitted only when an inset is actually declared, so the zero case stays byte-identical; and it gets its own
         // label + message because refusing through GOTO91 would tell the operator the STEPOVER was zero, which is a
         // wrong operator message — the thing this project treats as seriously as wrong motion.
         ...(inset > 0 ? [
-            `IF ${V.w} <= 0 GOTO95   ( the ${r3(inset)}mm inset leaves no width to clear )`,
-            `IF ${V.h} <= 0 GOTO95`,
+            `IF ${V.w} <= 0 GOTO${LBL.insetErrLabel}   ( the ${r3(inset)}mm inset leaves no width to clear )`,
+            `IF ${V.h} <= 0 GOTO${LBL.insetErrLabel}`,
         ] : []),
         ...walk.count,
         '',
@@ -389,21 +430,21 @@ export function surfaceRasterLines(p = {}) {
         // finished part. `#48` is free here: the row/ring index is spent by the time the level ends.
         ...(confirmEvery > 0 ? [
             `  ${V.i}=[${V.z} / ${V.stepdown}]   ( which level just finished )`,
-            `  IF ${V.z} >= ${V.depth} GOTO31   ( the last pass needs no pause — the part is done )`,
-            `  IF [${V.i} / ${r3(confirmEvery)} - FIX[${V.i} / ${r3(confirmEvery)}]] > 0.001 GOTO31   ( not an Nth level )`,
+            `  IF ${V.z} >= ${V.depth} GOTO${LBL.confirmLabel}   ( the last pass needs no pause — the part is done )`,
+            `  IF [${V.i} / ${r3(confirmEvery)} - FIX[${V.i} / ${r3(confirmEvery)}]] > 0.001 GOTO${LBL.confirmLabel}   ( not an Nth level )`,
             '  M00   ( pause - press Cycle Start to resume )',
-            '  N31',
+            `  N${LBL.confirmLabel}`,
         ] : []),
         'END1',
-        'GOTO92',
-        'N91',
+        `GOTO${LBL.okLabel}`,
+        `N${LBL.errLabel}`,
         '#1505=1   ;ERROR: stepover / stepdown must be greater than zero',
-        'N92',
+        `N${LBL.okLabel}`,
         ...(inset > 0 ? [
-            'GOTO96',
-            'N95',
+            `GOTO${LBL.insetOkLabel}`,
+            `N${LBL.insetErrLabel}`,
             `#1505=1   ;ERROR: the ${r3(inset)}mm inset leaves no area to clear - the tool is too large for this feature`,
-            'N96',
+            `N${LBL.insetOkLabel}`,
         ] : []),
         ...refusal,
     ];
@@ -444,7 +485,7 @@ function descentLines(o) {
 }
 
 function rowWalk(o) {
-    const { x0, y0, w, h, feed, plunge, clr, r3, F, ax, axE, ayE, stepBaked, mv, AX, TM } = o;
+    const { x0, y0, w, h, feed, plunge, clr, r3, F, ax, axE, ayE, stepBaked, mv, AX, TM, LBL } = o;
     void clr;
     // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP walks toward the area centre at the declared
     // angle and comes back. See rampLines for why toC and 1/tan are BAKED and what that costs.
@@ -490,27 +531,27 @@ function rowWalk(o) {
         `  ${V.dir}=1   ( the raster restarts at the near corner for each level )`,
         `  WHILE [${V.i} < ${V.n}] DO2   ( rows: counted above, so the area and the stepover decide how many )`,
         rowY,
-        `    IF ${V.i} > 0 GOTO13   ( already down: step over at depth rather than lifting between rows )`,
+        `    IF ${V.i} > 0 GOTO${LBL.rowStepLabel}   ( already down: step over at depth rather than lifting between rows )`,
         // WHICH END TO START AT — asked as a BRANCH, not as a comparison inside an expression. `[#49 < 0]` looked
         // like it would evaluate 0/1 and the tracer read it as a plain 1, putting the first plunge off the corner.
-        `    IF ${V.dir} < 0 GOTO17`,
+        `    IF ${V.dir} < 0 GOTO${LBL.rowFarLabel}`,
         `    G0 ${mv(NEAR_X(), ROW_Y())}`,
-        '    GOTO18',
-        '    N17',
+        `    GOTO${LBL.rowStartLabel}`,
+        `    N${LBL.rowFarLabel}`,
         `    G0 ${mv(FAR_X(), ROW_Y())}`,
-        '    N18',
+        `    N${LBL.rowStartLabel}`,
         ...descent,
-        '    GOTO14',
-        '    N13',
+        `    GOTO${LBL.rowCutLabel}`,
+        `    N${LBL.rowStepLabel}`,
         // THE STEP OVER AT DEPTH — ONE line in both builds (see END_X above for why it is arithmetic and not a branch).
         `    G1 ${mv(END_X(), ROW_Y())} F${feed}   ( step over at depth — the tool does not lift between rows )`,
-        '    N14',
-        `    IF ${V.dir} < 0 GOTO15`,
+        `    N${LBL.rowCutLabel}`,
+        `    IF ${V.dir} < 0 GOTO${LBL.rowNearLabel}`,
         `    G1 ${mv(FAR_X(), ROW_Y(null))} F${feed}`,
-        '    GOTO16',
-        '    N15',
+        `    GOTO${LBL.rowEndLabel}`,
+        `    N${LBL.rowNearLabel}`,
         `    G1 ${mv(NEAR_X(), ROW_Y(null))} F${feed}`,
-        '    N16',
+        `    N${LBL.rowEndLabel}`,
         `    ${V.dir}=[0 - ${V.dir}]`,
         `    ${V.i}=[${V.i} + 1]`,
         '  END2',
@@ -537,7 +578,7 @@ function rowWalk(o) {
  * the literal kernel already supports it via runX/runY) or live-SQRT if V13 proves it; plus the true-arc helix with
  * start/end points, radius envelope and depth-per-revolution as the substitute criteria. That turn lifts the gate.
  */
-function rampLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, rampAngle, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
+function rampLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, rampAngle, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM, LBL = LABEL_DEFAULTS }) {
     const ang = Math.min(45, Math.max(0.5, rampAngle));
     const invTan = 1 / Math.tan(ang * Math.PI / 180);
     // t1404 — sx/sy (where the plunge WOULD have happened) is now GIVEN by the walk instead of assumed to be the first
@@ -561,14 +602,14 @@ function rampLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed,
         `    ${V.run}=[${V.stepdown} * ${r3(invTan)}]   ( ramp run = bite / tan(${r3(ang)}deg) — the tangent is baked; the angle is a form field, not a knob )`,
         // THE HONEST DEGRADE, kept from the literal kernel: when the run to the centre is longer than the distance
         // available, a ramp cannot be cut and the tool plunges instead — with the reason in the program, not silently.
-        `    IF ${V.run} > ${r3(toC)} GOTO41   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
+        `    IF ${V.run} > ${r3(toC)} GOTO${LBL.rampPlungeLabel}   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
         `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( down to the floor this level starts from )`,
         `    G1 ${mv(RAMP_X, RAMP_Y)} Z${azE(`- ${V.z}`)} F${feed}   ( ramp )`,
         `    G1 ${mv(START_X, START_Y)} F${feed}   ( back to the ${startLabel}, now at depth )`,
-        '    GOTO42',
-        '    N41',
+        `    GOTO${LBL.rampEndLabel}`,
+        `    N${LBL.rampPlungeLabel}`,
         `    G1 Z${azE(`- ${V.z}`)} F${plunge}   ( the ramp did not fit — straight plunge )`,
-        '    N42',
+        `    N${LBL.rampEndLabel}`,
     ];
 }
 
@@ -593,7 +634,7 @@ function rampLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed,
  * no matter how deep the descent runs. THE TWO ARE SEPARATE REQUIREMENTS: re-seeding alone still leaves 1.2e−3 at
  * 6 decimals, and 9 decimals alone would drift without bound on a deep descent. The bound holds only with both.
  */
-function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
+function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM, LBL = LABEL_DEFAULTS }) {
     const SEG = 24, theta = 2 * Math.PI / SEG;
     // NINE decimals — see the derivation above. r3 would be catastrophic here for exactly the reason t1339 found
     // one level down, and 6 is not enough either.
@@ -626,20 +667,20 @@ function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed
         `      ${HX.rev}=[${HX.rev} + 1]`,
         // RE-SEED: at the top of each new revolution the vector returns to its exact starting value, so the
         // compounding above can never run past 24 steps however deep the descent goes.
-        `      IF ${HX.rev} <= ${SEG} GOTO51`,
+        `      IF ${HX.rev} <= ${SEG} GOTO${LBL.helixReseedLabel}`,
         `      ${HX.rev}=1`,
         `      ${HX.vx}=${r3(R)}   ( re-seed )`,
         `      ${HX.vy}=0`,
-        '      N51',
+        `      N${LBL.helixReseedLabel}`,
         `      ${HX.tmp}=[${HX.vx} * ${c} - ${HX.vy} * ${sn}]   ( rotate by ${r3(360 / SEG)}deg: 4 multiplies, 2 adds, no trig )`,
         `      ${HX.vy}=[${HX.vx} * ${sn} + ${HX.vy} * ${c}]`,
         `      ${HX.vx}=${HX.tmp}`,
         `      G1 ${mv(ARC_X, ARC_Y)} Z${azE(`- ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}`)} F${feed}`,
         '    END3',
         `    G1 ${mv(OUT_X, OUT_Y)} Z${azE(`- ${V.z}`)} F${feed}   ( helix — out to the ${startLabel}, now at depth )`,
-        `    IF ${V.z} > 0 GOTO52`,
+        `    IF ${V.z} > 0 GOTO${LBL.helixEndLabel}`,
         `    G1 Z${azE(`- ${V.z}`)} F${plunge}`,
-        '    N52',
+        `    N${LBL.helixEndLabel}`,
     ];
 }
 
@@ -649,7 +690,7 @@ function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed
  * a DIAGONAL CUTTING move and never lifts within a level — one plunge, like the both-ways raster.
  */
 function ringWalk(o) {
-    const { x0, y0, w, h, feed, clr, r3, F, ax, axE, ayE, mv, AX, TM } = o;
+    const { x0, y0, w, h, feed, clr, r3, F, ax, axE, ayE, mv, AX, TM, LBL } = o;
     void clr; void F; void ax;
     // t1404 — THE DESCENT THE RINGS NEVER HAD. The outer ring's corner IS where the plunge happens (at i=0 the inset
     // register is 0, so IN_X/IN_Y are exactly x0/y0), so that is the point the ramp runs from and returns to — the same
@@ -675,13 +716,13 @@ function ringWalk(o) {
             `  ${RING_INSET}=0   ( how far in this ring sits )`,
             `  ${V.i}=0`,
             `  WHILE [${V.i} < ${V.n}] DO2   ( rings, inward )`,
-            `    IF ${V.i} > 0 GOTO21`,
+            `    IF ${V.i} > 0 GOTO${LBL.ringStepLabel}`,
             `    G0 ${mv(IN_X(), IN_Y())}`,
             ...descent,
-            '    GOTO22',
-            '    N21',
+            `    GOTO${LBL.ringCutLabel}`,
+            `    N${LBL.ringStepLabel}`,
             `    G1 ${mv(IN_X(), IN_Y())} F${feed}   ( diagonal step in to the next ring, still cutting )`,
-            '    N22',
+            `    N${LBL.ringCutLabel}`,
             `    G1 ${mv(OUT_X(), IN_Y())} F${feed}`,
             `    G1 ${mv(OUT_X(), OUT_Y())} F${feed}`,
             `    G1 ${mv(IN_X(), OUT_Y())} F${feed}`,
@@ -798,6 +839,33 @@ export const surfaceRasterBlock = {
     defaults: { x: 0, y: 0, z0: 0, w: 100, h: 80, inset: 0, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 },
     fields: ['x', 'y', 'z0', 'w', 'h', 'inset', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
     scratch: RASTER_SCRATCH,   // read by universalScratch.opBands() — the band is data, not a comment
+    /**
+     * ── t1408 — THE DECLARED FLOW LABELS. See LABEL_DEFAULTS for the defect this closes ──────────────────────────
+     *
+     * `uniquifyFlowLabels` (blockEmitter) assigns these per PROGRAM from one counter, so no two bodies — this atom
+     * twice, or this atom beside a `holecycle` — can write the same `N`. Measured before it was built: a drill op
+     * beside a surfacing op in RELEASED code emits `N91`/`N92` twice and the second op does not execute.
+     *
+     * A LABEL IS LISTED ONLY WHEN THE BODY ACTUALLY EMITS IT — the skim refusal only in skim, the inset refusal only
+     * with an inset, the ring pair only on `concentric`, the ramp/helix pairs only for that descent. That keeps the
+     * numbering tight and, as holecycle's own declaration says, keeps the declaration HONEST: a label reserved for a
+     * branch this config cannot take is a number nobody can account for.
+     *
+     * THE ORDER IS DELIBERATE. `errLabel`/`okLabel` lead, so the FIRST label-emitting body in a program still writes
+     * `N91`/`N92` — the numbers this atom has always written for its one refusal that every config carries.
+     */
+    flowLabels: (p = {}) => {
+        const out = ['errLabel', 'okLabel'];
+        if (String(p.zMode || '') === 'skim') out.push('skimErrLabel', 'skimOkLabel');
+        if (Math.max(0, num(p.inset, 0)) > 0) out.push('insetErrLabel', 'insetOkLabel');
+        if (String(p.strategy || '') === 'concentric') out.push('ringStepLabel', 'ringCutLabel');
+        else out.push('rowStepLabel', 'rowCutLabel', 'rowNearLabel', 'rowEndLabel', 'rowFarLabel', 'rowStartLabel');
+        if (Math.max(0, Math.round(num(p.confirmEvery, 0))) > 0) out.push('confirmLabel');
+        const entry = String(p.entry || 'plunge');
+        if (entry === 'ramp') out.push('rampPlungeLabel', 'rampEndLabel');
+        if (entry === 'helix') out.push('helixReseedLabel', 'helixEndLabel');
+        return out;
+    },
     // t1361 — THE DECLARED FOOTPRINT, and the ONE thing the collapse dropped. `surfacefill` declared an `extent` and
     // the place fold reads it (liveExtent) IN PREFERENCE to placeonstock's frozen bminX..bmaxX snapshot; folding
     // stepdown{surfacefill} into this atom left the declaration behind, so a placed op silently fell back to whatever

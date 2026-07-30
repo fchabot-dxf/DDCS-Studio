@@ -9537,3 +9537,105 @@ Scratch specs deleted; no worktrees left behind; process tree clean, 0 flagged.
 
 The literal `pocketfill`/`pocketwall` atoms do NOT retire — the one-way, non-rect, rest-tool and too-small arms still
 run through them, by ruling. Teaching the atom `direction` (which empties the one-way clause) is the named follow-up.
+
+## t1408 (seat A) — BOTH REDS WERE ONE DEFECT, AND IT WAS NOT THE POCKET'S
+
+Committed green. **Part 2 (the CAM table per-arm) is PARKED, deliberately** — with its safety condition MEASURED so
+the next act starts from a fact instead of a premise. See the end.
+
+### THE DIAGNOSIS — the advisor's instinct was right and its mechanism was wrong
+
+The dispatch guessed per-op attribution might be text- or line-range-derived and broken by a backward-jumping loop.
+It is not: `estimateProgram` already attributes from the TRACE — every traced segment carries its source line, and
+`secondsForLines` sums the op's lines. Nothing about that is text-derived.
+
+But the dispatch's real instruction — *"diagnose WHY drill/surfacing pass while the pocket breaks it; that difference
+IS the diagnosis"* — was exactly the right question, and the difference is one line of declaration:
+
+    holecycle      declares `flowLabels` → the emitter assigns its N/GOTO numbers UNIQUELY per program (t1381)
+    surfaceraster  declared nothing → it wrote 91/92, 13-18, 21-22, 31, 41-42, 51-52 as LITERALS
+
+Safe for exactly one such body per program. A program can hold two.
+
+### ⚠ THE DEFECT IS IN RELEASED CODE, AND IT IS NOT ABOUT THE POCKET AT ALL
+
+Measured in the running app, with the trace and the app's own estimator:
+
+    drill + surfacing   duplicate N91/N92  →  per-op time: drill 3.9s, surfacing **0**
+    surfacing + pocket  duplicate N91/N92  →  the pocket never executes
+
+**A DRILL op beside a SURFACING op — both shipped, both parametric for weeks, no pocket anywhere near it — emits a
+program in which the second op does not run.** `holecycle` takes 91/92 from the emitter's counter and this body
+writes its own; the second body's `GOTO` binds to the first body's `N` and the whole thing is jumped over.
+
+PROVEN PRE-EXISTING, not inherited from my own act: `git diff HEAD~2` on `surfaceraster.js` touches no label line, and
+t1406 touched neither `holecycle.js` nor `uniquifyFlowLabels`. What t1406 changed is REACH — a rect pocket now carries
+one of these bodies, so the collision moved from "two surfacing ops, which nobody builds" to ordinary programs.
+
+This is the worst shape of wrong motion: the operator reads a program that looks complete and a whole op silently
+does not happen. Gate 1 decides, and it decides for fixing it here rather than filing it.
+
+### THE FIX IS THE MECHANISM REACHING THE ATOM THAT WAS MISSING FROM IT
+
+t1379 measured this EXACT failure one atom earlier — two hole ops, every hole after the first silently undrilled — and
+t1381 built the answer: *an atom declares the labels it needs; the emitter assigns them.* So this is not a new
+mechanism and not a fourth branch. `surfaceraster` now declares `flowLabels`, and the body writes `${LBL.…}` instead
+of literals.
+
+**A LABEL IS CLAIMED ONLY WHEN THE BODY EMITS IT** — holecycle's own rule, kept: the skim pair only in skim, the inset
+pair only with an inset, the ring pair only on concentric, the row six only on parallel, ramp/helix only for that
+descent. A number reserved for a branch this config cannot take is a number nobody can account for.
+
+### WHAT MOVED, AND THE HALF THAT DELIBERATELY DID NOT
+
+    a DIRECT surfaceRasterLines(p) call   UNCHANGED, byte for byte — no label params, so the DEFAULTS print, and the
+                                          defaults ARE the legacy numbers (91/92, 13-18, 21-22, 31, 41-42, 51-52)
+    an EMITTED program                    renumbers — which is precisely what has to happen for the numbers to be unique
+
+That split is what keeps this arc's bridges honest: every equivalence test that reads the body straight is untouched,
+and the 192-test surfacing family went green without one edit. A single surfacing op still writes `N91`/`N92` for the
+refusal every config carries (the declaration is ORDERED so those lead); its row walk moves 13-18 → 93-98.
+
+**MULTI-DIGIT LABELS ARE DEMONSTRATED, NOT ASSUMED.** Three bodies push the counter past 99, and "does the controller
+take N100" is not a question to answer by reasoning. The DDCS community corpus writes `N100`, `N101`, `N1000` and
+`GOTO990`-`GOTO999`; the engine's matcher is `GOTO\s*(\d+)`, width-agnostic. Inside demonstrated form — recorded
+because a number that grows past a boundary is exactly what nobody re-checks.
+
+### THE GUARD IS THE SYMPTOM, NOT THE FIX
+
+`tests/flow-labels-unique-1408.spec.js` asserts that **both ops EXECUTE** — per-op seconds through the app's own
+estimator, the surface that read zero — across drill+surfacing, surfacing+pocket, pocket+pocket and a three-body
+program. "The labels look unique" would have been testing the fix against itself. It also pins the direct-call
+defaults and the declaration's per-config contents.
+
+### THE GOLDEN, AGAIN, THROUGH THE SAME GUARD
+
+14 entries re-recorded — the same 14 that ride the atom — with the hard check refusing anything else. **0 refused:** a
+literal pocket arm emits no flow labels at all, so it cannot move, and the check proves that rather than assuming it.
+
+### GATE (fast tier)
+
+The two reds **11/11**. New guard **6/6**. Surfacing + label-sensitive families **192/192** (13 specs, zero edits).
+Pocket + reconcile + CAM + estimate + sheet **96/96**. Smoke **71/71**. Iron rule **11/11, the same eleven**.
+Version sync 6/6. **~390 tests, 0 failures.** Worktree removed; scratch specs deleted; proc tree clean, 0 flagged.
+
+### PART 2 PARKED — with its safety condition MEASURED rather than assumed
+
+Two reasons, and the first is the real one:
+
+1. **Part 1 turned out to be a shipped-defect fix in a DIFFERENT op**, and it changes surfacing's emitted label
+   numbering. That is a bigger thing than "two reds" and it wants your eyes — including on the release shape (t1404's
+   precedent says a shipped-defect fix goes out on its own) — before a second contract-shaped change (the classifier
+   following the arm) is stacked on it.
+2. Part 2's safety condition is exactly the class where a rushed pass ships a wrong **Expose**, which is wrong G-code
+   at the pendant rather than a missing feature.
+
+**BUT THE CONDITION IS NOW A MEASUREMENT, so the next act does not have to open with one.** Every input
+`pocketRasterGap` reads, classified on the registered twin def:
+
+    shape · direction · entry · toolDia · wallOffset · w · h · dia · sides      present, exposable = FALSE
+    strategy · restDia                                                          not classified at all — bindingless
+                                                                                structural drivers with NO socket
+
+…and `classifyExposable` on the pocket twin returns an EMPTY exposable set today, which is the limitation Part 2
+exists to remove. **The safety condition HOLDS: no pendant edit can flip which arm a packed program came from.**
