@@ -132,3 +132,241 @@ test('THE REFERENCE CADENCE — retract-first, no trailing retract, and the STEP
     expect(r.pauses, 'the popup line precedes the M00, and the last level is never paused after')
         .toEqual(['#1505=-5000(Pause — check the part, then press Cycle Start to continue)', 'M00   ( pause - press Cycle Start to resume )']);
 });
+
+/**
+ * ── THE BRIDGE ────────────────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * The parametric wall lives in a place of its own — `place{ wallfinish }`, one self-framing child, so `absorbingChild`
+ * hands the atom its frame as PARAMS. That is the SAME shape the clearing place took at t1406, and the reason is the
+ * same: a mixed body paints the placement shift onto macro text and shears it (t1349).
+ *
+ * ⚠ THE PARAMETRIC SIDE IS BUILT HERE, AND ONLY UNTIL THE RE-POINT LANDS. At this commit `pocketStack` still emits the
+ * literal wall, so there is nothing shipping to read; the builder below is the exact composition the re-point will
+ * install, and the re-point's own commit replaces it with `pocketStack`'s real wall place so what is compared is the
+ * shipping composition rather than a test-only reconstruction of it.
+ */
+const PARA_WALL = `
+async (cfg) => {
+    const { newBlock, emitMapped } = await import('/blocks/blockEmitter.js');
+    const { makeStart, makeEnd, makePlace } = await import('/blocks/programFraming.js');
+    const { pocketInsetMm } = await import('/wizards/ops/pocketfill.js');
+    const n = (v, d) => { const x = Number(v); return isFinite(x) ? x : d; };
+    const wcs = newBlock('wcs'); wcs.params = { wcs: cfg.wcs || 'active' };
+    const wall = newBlock('wallfinish');
+    wall.params = {
+        x: n(cfg.originX, 0), y: n(cfg.originY, 0), z0: 0,
+        w: n(cfg.w, 80), h: n(cfg.h, 60), inset: pocketInsetMm(cfg),
+        depth: n(cfg.depth, 4), stepdown: n(cfg.stepdown, 1.5),
+        feed: n(cfg.feed, 2000), plunge: n(cfg.plunge, 150), clearance: n(cfg.clearance, 5),
+        confirmEvery: n(cfg.confirmEvery, 0),
+    };
+    const bb = { minX: n(cfg.originX, 0), maxX: n(cfg.originX, 0) + n(cfg.w, 80), minY: n(cfg.originY, 0), maxY: n(cfg.originY, 0) + n(cfg.h, 60) };
+    return emitMapped([makeStart(cfg), wcs, makePlace(cfg, bb, [wall], 'wall'), makeEnd(cfg)]).text;
+}`;
+
+/**
+ * Cutting moves IN EMIT ORDER, plus the horizontal cutting floors.
+ *
+ * ── ORDERED, NOT SORTED — a stronger criterion than the fill's, and it is available here ──────────────────────────
+ * t1406 compared SETS because the user ruled the fill/wall ORDER and a move-for-move comparison would have failed by
+ * construction. Nothing about the wall's own walk moves this act: it is the same ring, the same corners, the same
+ * direction, one level at a time. So the list is compared in order, and a walk that ran the ring the other way round
+ * — cutting the same rectangle with the opposite climb — would FAIL here where a set comparison would pass it.
+ *
+ * A purely vertical descent is still compared by where it ENDS, with its start height held to "never lower than the
+ * literal's" (t1406's rule, and its reason is unchanged: the start of a plunge is wherever the previous retract left
+ * the tool, which the frame absorption can legitimately raise).
+ */
+const WALL_CUTS = `
+(traceToolpath, nc) => {
+    const segs = (traceToolpath(nc).segments || []).filter((s) => !s.rapid);
+    const q = (n) => +Number(n).toFixed(3);
+    const cuts = segs.map((s) => ({
+        v: Math.abs(s.x1 - s.x2) < 1e-6 && Math.abs(s.y1 - s.y2) < 1e-6 && s.z1 > s.z2 + 1e-9,
+        t: [q(s.x1), q(s.y1), q(s.z1), q(s.x2), q(s.y2), q(s.z2), q(s.feed || 0)],
+    }));
+    const floors = [...new Set(segs.filter((s) => Math.abs(s.z1 - s.z2) < 1e-6).map((s) => q(s.z2).toFixed(2)))].sort();
+    return { cuts, floors };
+}`;
+
+/** The emit's own quantum. A coordinate may differ by one unit of it — never more. */
+const QUANTUM = 0.0015;
+
+/** Compare two ordered cut lists. Returns { ok, why, quantised }. */
+function compareCuts(lit, par) {
+    if (lit.length !== par.length) return { ok: false, why: `move count ${par.length} vs ${lit.length}`, quantised: 0 };
+    let quantised = 0;
+    for (let i = 0; i < lit.length; i++) {
+        const a = lit[i], b = par[i];
+        if (a.v !== b.v) return { ok: false, why: `move ${i}: one is a vertical descent and the other is not ([${b.t}] vs [${a.t}])`, quantised };
+        const idx = a.v ? [3, 4, 5, 6] : [0, 1, 2, 3, 4, 5, 6];
+        let near = false;
+        for (const k of idx) {
+            const d = Math.abs(a.t[k] - b.t[k]);
+            if (d > QUANTUM) return { ok: false, why: `move ${i} field ${k}: ${b.t[k]} vs ${a.t[k]} (Δ${d.toFixed(4)}) — [${b.t}] vs [${a.t}]`, quantised };
+            if (d > 0) near = true;
+        }
+        if (a.v && b.t[2] < a.t[2] - QUANTUM) return { ok: false, why: `move ${i}: the parametric plunge APPROACHES LOWER (from Z${b.t[2]} vs Z${a.t[2]})`, quantised };
+        if (near) quantised++;
+    }
+    return { ok: true, why: '', quantised };
+}
+
+for (const cfg of SWEEP) {
+    test(`THE BRIDGE — ${cfg.name}`, async ({ page }) => {
+        await boot(page);
+        const r = await page.evaluate(async ({ base, over, WALL_PROGRAMS, PARA_WALL, WALL_CUTS }) => {
+            const { traceToolpath } = await import('/engine/trace.js');
+            // eslint-disable-next-line no-eval
+            const programs = eval(WALL_PROGRAMS), para = eval(PARA_WALL), cuts = eval(WALL_CUTS);
+            const p = { ...base, ...over };
+            const lit = await programs(p, 'frozen'), par = await para(p);
+            return {
+                lit: cuts(traceToolpath, lit), par: cuts(traceToolpath, par),
+                // THE PREMISE: the parametric side really is a MACRO LOOP, not another unrolled transcript.
+                isMacro: /WHILE \[#13 < #11\] DO1/.test(par),
+                // …and it really is ONE ring in the text, whatever the level count — the thing a loop buys.
+                ringsInText: (par.match(/closed on the corner it started at/g) || []).length,
+                litRings: (lit.match(/^\( Step Down z=/gm) || []).length,
+            };
+        }, { base: BASE, over: cfg.p, WALL_PROGRAMS, PARA_WALL, WALL_CUTS });
+
+        expect(r.isMacro, 'the wall emitted as a MACRO loop, not an unrolled transcript').toBe(true);
+        expect(r.ringsInText, 'and ONE ring in the text however many levels it runs').toBe(1);
+        expect(r.lit.cuts.length, 'the literal wall cuts (two empty programs would agree perfectly)').toBeGreaterThan(0);
+        expect(r.litRings, 'at real depth levels').toBeGreaterThan(0);
+        // THE SAME CUTTING FLOORS — the runtime depth loop counted the same levels and clamped the last one the same way.
+        expect(r.par.floors, `the same cutting floors: literal ${JSON.stringify(r.lit.floors)} vs parametric ${JSON.stringify(r.par.floors)}`).toEqual(r.lit.floors);
+        // …AND THE SAME MOVES, IN THE SAME ORDER, at the same feeds.
+        const c = compareCuts(r.lit.cuts, r.par.cuts);
+        expect(c.ok, `the same cutting moves in the same order — ${c.why}`).toBe(true);
+        expect(c.quantised, `moves agreeing only to within the 0.001mm emit quantum: ${c.quantised} of ${r.lit.cuts.length}`).toBeLessThanOrEqual(r.lit.cuts.length);
+    });
+}
+
+/**
+ * THE CONFIRM CADENCE, asserted STRUCTURALLY — and the reason it cannot be asserted any other way is worth stating.
+ *
+ * `traceToolpath` does not record `M00` (checked — the tracer has no pause concept at all), so the RUNTIME cadence is
+ * not observable through the motion the bridge above compares. What IS observable, and is what the bridge above
+ * therefore proves, is that the confirm moves NOTHING: the traced motion at `confirmEvery: 2` is the literal's,
+ * move for move. The cadence itself is asserted here on the emitted arithmetic:
+ *   · the literal writes N pause PAIRS, one per qualifying level — an unrolled cadence.
+ *   · the parametric writes exactly ONE pair, inside the loop, behind two guards: a last-level skip and a FIX()
+ *     modulo on the operator's own N. That is `surfaceraster`'s proven form (t1335, swept again at t1406), reused
+ *     rather than re-derived, so what is checked here is that this atom really did reuse it.
+ */
+test('THE CONFIRM CADENCE — N unrolled pauses become one guarded pause per loop', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async ({ base, WALL_PROGRAMS, PARA_WALL }) => {
+        // eslint-disable-next-line no-eval
+        const programs = eval(WALL_PROGRAMS), para = eval(PARA_WALL);
+        const at = async (over) => {
+            const p = { ...base, ...over };
+            const lit = await programs(p, 'frozen'), par = await para(p);
+            return {
+                litPauses: (lit.match(/^M00\b/gm) || []).length,
+                parPauses: (par.match(/^\s*M00\b/gm) || []).length,
+                lastSkip: /IF #13 >= #11 GOTO\d+/.test(par),
+                modulo: (par.match(/IF \[#14 \/ ([\d.]+) - FIX\[#14 \/ [\d.]+\]\] > 0\.001/) || [])[1] || null,
+                levels: (lit.match(/^\( Step Down z=/gm) || []).length,
+            };
+        };
+        return {
+            every2of4: await at({ depth: 6, stepdown: 1.5, confirmEvery: 2 }),
+            every1of3: await at({ depth: 4.5, stepdown: 1.5, confirmEvery: 1 }),
+            off: await at({ depth: 6, stepdown: 1.5, confirmEvery: 0 }),
+        };
+    }, { base: BASE, WALL_PROGRAMS, PARA_WALL });
+
+    // the literal's unrolled cadence is the ground truth for what N means: every Nth level EXCEPT the last
+    expect([r.every2of4.levels, r.every2of4.litPauses], '4 levels, every 2nd, never the last → one pause (after level 2)').toEqual([4, 1]);
+    expect([r.every1of3.levels, r.every1of3.litPauses], '3 levels, every level, never the last → two pauses').toEqual([3, 2]);
+    // …and the parametric writes ONE pause behind the two guards that reproduce it
+    expect(r.every2of4.parPauses, 'the parametric writes exactly one M00 — inside the loop').toBe(1);
+    expect(r.every1of3.parPauses, 'likewise at every level').toBe(1);
+    expect(r.every2of4.lastSkip, 'guarded by the last-level skip').toBe(true);
+    expect(r.every2of4.modulo, 'and by a FIX() modulo on the operator\'s own N').toBe('2');
+    expect(r.every1of3.modulo, 'which follows N').toBe('1');
+    // OFF means OFF — no pause, no guard, no reserved label
+    expect([r.off.litPauses, r.off.parPauses], 'confirmEvery 0 emits no pause on either side').toEqual([0, 0]);
+    expect(r.off.lastSkip, 'and no last-level guard either').toBe(false);
+});
+
+/**
+ * THE DECLARED WORK IS THE BODY'S OWN COUNT, not a guess — the t1418 discipline, where a per-pass number that had
+ * been reasoned out came back LOWER than the reasoning when it was measured against the emitted body.
+ *
+ * `wallFinishWorkSteps` claims `12 + levels × 11` (+6 per level with a confirm). This counts what the emitter really
+ * writes per level so the claim and the body cannot drift; the tracer's cap is sized from it, and t1383 measured what
+ * an undersized cap does — a preview silently showing a fraction of the toolpath.
+ */
+test('THE DECLARED WORK — the per-level line count is measured against the emitted body, not reasoned', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { wallFinishLines, wallFinishWorkSteps } = await import('/wizards/ops/wallfinish.js');
+        // THE REAL POST, not a stub: the confirm's banner is the dialect's own form, so a body handed `{}` would be
+        // exercising a path the product never takes (and the first cut of this test did exactly that, and threw).
+        const { activeDialectOpts } = await import('/wizards/previewEmit.js');
+        const D = activeDialectOpts().dialect;
+        const base = { x: 0, y: 0, z0: 0, w: 80, h: 60, inset: 3, depth: 4, stepdown: 1.5, feed: 2000, plunge: 150, clearance: 5 };
+        // the lines BETWEEN `WHILE … DO1` and `END1` are the per-level body the loop executes
+        const inLoop = (p) => {
+            const L = wallFinishLines(p, D).filter((s) => s !== '');
+            const a = L.findIndex((s) => /^WHILE /.test(s)), b = L.findIndex((s) => /^END1$/.test(s));
+            return (b - a) - 1;
+        };
+        return {
+            perLevel: inLoop(base),
+            perLevelConfirm: inLoop({ ...base, confirmEvery: 2 }),
+            steps: wallFinishWorkSteps(base),
+            stepsConfirm: wallFinishWorkSteps({ ...base, depth: 6, confirmEvery: 2 }),
+            liveOmits: wallFinishWorkSteps({ ...base, depth: '#2601' }),
+        };
+    });
+    // 7 motion lines + 2 loop-bookkeeping lines inside the body; the declaration adds the WHILE and END1 the
+    // controller also executes each turn, which is where 9 becomes 11.
+    expect(r.perLevel, 'the emitted per-level body').toBe(9);
+    expect(r.perLevelConfirm - r.perLevel, 'a confirm adds six lines per level').toBe(6);
+    expect(r.steps, '3 levels: 12 + 3 × 11').toBe(12 + 3 * 11);
+    expect(r.stepsConfirm, '4 levels with a confirm: 12 + 4 × 17').toBe(12 + 4 * 17);
+    expect(r.liveOmits, 'and it is OMITTED, never guessed, once an input is dialled').toBe(null);
+});
+
+/**
+ * THE LIVE RING — a dialled geometry input reaches the corner, FLAT, and the rotation is refused rather than half-baked.
+ *
+ * This is what the atom exists for beyond tidiness: the CAM delegation ahead hands `inset` the `#22` its slot already
+ * computes and `w` a `#26xx`. Asserted on the emitted FORM as well as on the reachability, because the form is the
+ * part with an evidence question attached: nested brackets inside a coordinate word are not demonstrated anywhere in
+ * the factory corpus, and the first cut of this atom emitted them.
+ */
+test('THE LIVE RING — dialled corners are ONE flat bracket, and rotation refuses instead of dropping a constant', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { wallFinishLines, wallFinishAbsorbsRotation } = await import('/wizards/ops/wallfinish.js');
+        const { activeDialectOpts } = await import('/wizards/previewEmit.js');
+        const D = activeDialectOpts().dialect;
+        const base = { x: 0, y: 0, z0: 0, w: 80, h: 60, inset: 3, depth: 4, stepdown: 1.5, feed: 2000, plunge: 150, clearance: 5 };
+        const baked = wallFinishLines(base, D).join('\n');
+        const live = wallFinishLines({ ...base, w: '#2601', inset: '#22', depth: '#2603' }, D).join('\n');
+        const words = (t) => (t.match(/\b[XY](\[[^\]]*\]|#\d+|-?\d*\.?\d+)/g) || []);
+        return {
+            bakedWords: [...new Set(words(baked))].sort(),
+            liveWords: [...new Set(words(live))].sort(),
+            nested: (live.match(/[XY]\[[^\]]*\[/g) || []),
+            depthSeed: (live.match(/#11=\S+/) || [''])[0],
+            rotOk: wallFinishAbsorbsRotation(base),
+            rotLive: wallFinishAbsorbsRotation({ ...base, w: '#2601' }),
+        };
+    });
+    // the BAKED ring is the reference's own four corners, as plain coordinates
+    expect(r.bakedWords, 'a typed ring prints literal corners').toEqual(['X3', 'X77', 'Y3', 'Y57']);
+    // the LIVE ring: `x + inset` is a lone register (no bracket around nothing); `x + w − inset` is ONE bracket
+    expect(r.liveWords, 'a dialled ring prints flat, demonstrated forms').toEqual(['X#22', 'X[#2601 - #22]', 'Y#22', 'Y[60 - #22]']);
+    expect(r.nested, 'and NO coordinate word carries a nested bracket').toEqual([]);
+    expect(r.depthSeed, 'the depth register takes the #var verbatim').toBe('#11=#2603');
+    // the ROTATION SEAM: absorbed when every corner is a build-time constant, refused IN WORDS when one is not
+    expect(r.rotOk, 'a typed ring absorbs a program rotation').toBe(true);
+    expect(typeof r.rotLive === 'string' && /w/.test(r.rotLive), `a dialled ring refuses it, naming the input: "${r.rotLive}"`).toBe(true);
+});
