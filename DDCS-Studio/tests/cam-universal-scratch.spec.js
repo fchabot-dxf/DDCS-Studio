@@ -90,10 +90,77 @@ test('S5(3)C — a universal slot mints AROUND the injected band, and the small-
     expect(r.smallVars, 'a 4-param universal op keeps #1-#4 (unchanged numbering)').toEqual(['#1', '#2', '#3', '#4']);
     // the BIG case steps over the injected vars
     expect(r.bigVars.filter((v) => inB(num(v))), 'no field var lands on anything the emit path injects').toEqual([]);
-    expect(r.bigVars, 'and it skips exactly the declared numbers (#5/#6 probe port + tool radius, #9/#10 last retract)')
-        .toEqual(['#1', '#2', '#3', '#4', '#7', '#8', '#11', '#12', '#13', '#14', '#15', '#16']);
+    /**
+     * ── t1433 — THE SKIP LIST MOVED, BECAUSE A NEW ATOM DECLARED A LOW BAND ───────────────────────────────────────
+     *
+     * `wallfinish` (the rect pocket's parametric wall finish) declares `[[11, 14]]`, so the mint now steps over
+     * #11-#14 as well and the 7th..12th field vars land at #15/#16/#18/#19/#20/#21 where they used to take
+     * #11..#16. NOTHING IS BROKEN — this is the aggregator doing exactly its job, from a declaration made at the
+     * injection site, and the invariant above (no field var lands in the band) is what actually guards the emit.
+     * The literal list is re-pinned rather than relaxed to a predicate, because a list is what catches an accidental
+     * WIDENING of the avoid set; the predicate alone would pass on a mint that skipped half the register file.
+     *
+     * ── THE COST, MEASURED, AND WHERE IT DOES AND DOES NOT BITE ───────────────────────────────────────────────────
+     * The FIRST SIX field vars are unchanged (#1-#4, then #7/#8), so every universal op with six or fewer exposed
+     * params renumbers by nothing at all — the same narrowing slice B's release note made. Only ops past six params
+     * shift, and they shift UP by four.
+     */
+    expect(r.bigVars, 'it skips the declared numbers: #5/#6 probe port + tool radius, #9/#10 last retract, and t1433\'s #11-#14 wall band')
+        .toEqual(['#1', '#2', '#3', '#4', '#7', '#8', '#15', '#16', '#18', '#19', '#20', '#21']);
+    expect(r.bigVars.slice(0, 6), 'and the first SIX are unchanged — the cost bites only past six exposed params')
+        .toEqual(['#1', '#2', '#3', '#4', '#7', '#8']);
     expect(r.bigIdx[0], 'the #11xx pool allocation is untouched by the renumbering').toBe(1100);
     expect(r.allRead, 'every renumbered var is read from its own #2600 mirror').toBe(true);
+});
+
+/**
+ * ── THE AVOID SET IS GLOBAL, BY ARCHITECTURE — asserted so it cannot be quietly narrowed (t1433) ──────────────────
+ *
+ * THE QUESTION THIS ANSWERS: does a universal slot mint around `wallfinish`'s #11-#14 only when a wall body is
+ * actually in the program (per-program, tight), or always (global, safe but over-broad)? It is GLOBAL, and it is
+ * global on purpose — `opBands()` unions every palette atom's declaration, not the atoms present in one stack.
+ *
+ * THE REASON IS THE ONE t1085 slice C WROTE DOWN, and it still holds: a custom op's stack is USER-EDITABLE AFTER THE
+ * SLOT IS MINTED. Mint per-stack and the numbering is correct only until somebody drops a Wall Finish block into the
+ * op — at which point the wall body writes #11-#14 over four field vars, silently, in a slot that may already be
+ * installed on the controller. Re-minting on edit does not save it: renumbering an installed slot's field vars moves
+ * the pendant knobs an operator has already learned, and cannot reach a `macro_camN.nc` that was copied out weeks ago.
+ * Wrong-by-omission here re-introduces exactly the defect slice C closed; wrong-by-over-avoidance costs four registers.
+ *
+ * SO THE TRADE IS ASSERTED RATHER THAN ASSUMED: the band is avoided for a stack that contains NO wall block at all.
+ * That is the over-broad half of the decision, stated as a test, so narrowing it later is a deliberate act with this
+ * comment in front of it rather than an optimisation that looks free.
+ */
+test('S5(3)C — the avoid set is GLOBAL: a stack with no wall block still mints around the wall band', async ({ page }) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+    const r = await page.evaluate(async () => {
+        const { opBands } = await import('/data/universalScratch.js');
+        const { BLOCKS } = await import('/wizards/ops/index.js');
+        const { userOpFromStack } = await import('/blocks/userOps.js');
+        const { stackToSlot } = await import('/data/stackToSlot.js');
+        const covers = (bands, n) => bands.some(([lo, hi]) => n >= lo && n <= hi);
+        // a 12-param op built from `feed` + `move` ONLY — neither declares any scratch, and no wall is anywhere near it
+        const children = [{ type: 'feed', params: { rate: 200 } }];
+        const bindings = [{ param: 'feed', blockIndex: 1, key: 'rate', type: 'number', default: 200, label: 'Feed', units: 'mm/min' }];
+        for (let i = 0; i < 11; i++) {
+            children.push({ type: 'move', params: { mode: 'cut', x: i, y: i * 2, z: -i, feed: 400 + i } });
+            bindings.push({ param: 'z' + i, blockIndex: children.length, key: 'z', type: 'number', default: -i, label: 'D' + i, units: 'mm' });
+        }
+        const def = userOpFromStack('u_nowall', 'U NoWall', [{ type: 'user_root', params: {}, uiChildren: [], children }], bindings);
+        const decl = {}; bindings.forEach((b) => { decl[b.param] = { exposed: true }; });
+        const slot = stackToSlot(def, decl, new Set(), 0);
+        return {
+            declaresBand: BLOCKS.wallfinish.scratch,
+            noScratchInStack: !BLOCKS.feed.scratch && !BLOCKS.move.scratch,
+            aggregateCovers: [11, 12, 13, 14].filter((n) => covers(opBands(), n)),
+            vars: slot.fields.map((f) => f.var),
+        };
+    });
+    expect(r.declaresBand, 'the wall atom declares its band at the injection site').toEqual([[11, 14]]);
+    expect(r.noScratchInStack, 'and the op under test is built from atoms that declare NO scratch at all').toBe(true);
+    expect(r.aggregateCovers, 'yet the aggregate still covers #11-#14 — the union is over the PALETTE, not the stack').toEqual([11, 12, 13, 14]);
+    expect(r.vars.some((v) => ['#11', '#12', '#13', '#14'].includes(v)), 'so a wall-free op still steps over the wall band').toBe(false);
 });
 
 test('S5(3)C — the guard now BACKSTOPS the universal arm too (silent on real output, loud on a synthetic collision)', async ({ page }) => {
