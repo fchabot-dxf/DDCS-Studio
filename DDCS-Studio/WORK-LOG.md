@@ -10666,3 +10666,123 @@ for it and for `cpocket`'s neighbourhood. No branch-expose machinery was built (
 helix's row-axis phase is named, not changed. Composed multi-part slots still let two generator bodies write the same
 `N8`/`N9` labels — pre-existing (nothing uniquifies labels on the slot path, unlike the block emitter's
 `uniquifyFlowLabels`), unchanged here, and worth a turn of its own.
+
+## t1431 (seat A) — REST DIAGNOSED AND DECLARED; the wall is DESIGNED and MEASURED, and PARKED
+
+**Item 3 landed complete. Items 1/2/4 are measured, decided and handed over rather than half-built.** The band
+re-scout the dispatch asked for changed two answers, and the rest diagnosis it asked for came back NO — so the act is
+smaller than it looked, and the part I am parking is the emit-class part.
+
+### THE REST DIAGNOSIS — NO, AND THE REASON IS EVIDENCE
+
+`restLevelMoves` cannot become a runtime macro loop, and I counted it rather than judging it. Instrumenting `Math.sqrt`
+on the REAL walk (80x60 rect, Ø6 main / Ø3 rest, one depth level): **8 square roots**, all in `maskToCorners`. The mask
+keeps the part of each scanline span within radius R of a pocket CORNER, and a horizontal line crossing a circle is
+`dx = sqrt(R^2 - dy^2)` — once per (row, corner) pair in range, and the row count is itself derived from a stepover a
+pendant can move. The region those spans are clipped to is bounded by FILLET ARCS (the r1/r2 cleared-region rings, 44
+tessellated points each in the sample), whose scanline crossings are the same root again.
+
+**SQRT is unverified on this controller** — t1339's standing finding, unchanged, and the SAME evidence that keeps the
+raster atom's ramp baking its distance-to-centre. This is not a new limit; it is one limit reaching a second walk, and
+one turn (V13_trig.nc) lifts both rows together.
+
+**AND I RECORDED WHY THE CHEAP DODGE IS NOT AVAILABLE**, because it will be re-proposed otherwise: masking to a SQUARE
+around each corner needs no square root — and cuts a DIFFERENT PART (a larger corner region, the small tool re-cutting
+air along the diagonals). That is a geometry change wearing a port's clothes, which is exactly what t1425 reverted the
+skim x inset fold for. Rest stays literal, whole and correct until the evidence changes.
+
+So it is a NAMED boundary row, the contour precedent: `REST_PARAMETRIC_GAP` + `restParametricGap(p)`, declared beside
+the walk it describes. `''` means "there is no rest pass to port at all" (no tool declared / a smooth shape / a rest
+tool that is not smaller) — a different fact from "it cannot be ported", and it reads differently.
+
+**THE SPEC MEASURES THE CLAIM RATHER THAN ASSERTING THE SENTENCE.** A declaration about somebody else's kernel rots the
+moment that kernel changes, so `rest-parametric-boundary-1431` counts the real square roots on the real walk and
+requires the obstruction to still be there — the day it hits zero the spec goes RED and the row must come out. That is
+the `cam-row-honesty-1414` lock pointed at a boundary instead of at a row, and it is why the row cannot outlive its
+reason. A second test walks eight geometry variations in both directions and requires every one still refused: the
+obstruction is in the WALK, not in a pocket's numbers, so nothing can dial past it.
+
+### THE BAND RE-SCOUT — FOUR OF THE FIVE t1395 RUNS ARE GONE, AND SCRATCH IS SMALLER THAN IT LOOKS
+
+The dispatch was right to make me re-verify. Unioning every declaration that exists today (every `def.scratch`,
+`PROBE_SURFACE_SCRATCH`, every `camScratch` generator band, every `dialect.scratch`) against t1395's named runs:
+
+    #23-#29   TAKEN — the mill generators' own #20-#33 (surface / pocket / cpocket)
+    #51-#56   TAKEN — the probe temps #50-#61 (edge / zprobe / inside / boss / align / drill / bore / slot)
+    #58-#61   TAKEN — likewise
+    #71-#74   TAKEN — the WCS pair + the align span + the Expert post's own band
+    #11-#16   FREE — the one that survived
+
+Free runs in the whole space today: **#1-#4 · #7-#8 · #11-#16 · #18-#19 · #74 · #79-#80 · #98**, plus #103-#149 and
+#153-#160 *if those were scratch at all*.
+
+**THEY ARE NOT, AND THAT IS THE SECOND CORRECTION — against my own first read.** `varMap` is unambiguous: scratch is
+**#1-#99**. `#100-#549` is the PERSISTENT uservar pool (450 tracked slots; the probe radius lives at #110), so using
+#103-#149 as volatile scratch would clobber user state that survives a power cycle. Independently, V4.1 factory
+executable macros write #0-148 (the `ddcs-v41.js` missScratch note), so it is unsafe on the port target too. I had
+picked #103-#149 as "a wide clean run" off the code-declaration scan before reading the map — recording that because
+the aggregators are not the whole truth about ownership, and the next scout should read `varMap` FIRST.
+
+So the honest picture: **18 free scratch registers, fragmented**, and the dispatch's "declared multi-run band" was the
+right instinct at t1395. The wall needs 4 (depth · stepdown · level Z · the confirm index — the corners are
+expressions off the seeds, exactly as the raster atom does it), so **#11-#14 fits in ONE run** and no multi-run band is
+needed after all. Recorded rather than declared: an inert band with no atom to consume it is the one kind of
+declaration that cannot be checked.
+
+### THE WALL — DESIGNED, ITS REFERENCE MEASURED, AND PARKED
+
+Measured on the real emitted program (the t1406 stack at 80x60, Ø6, depth 4 / stepdown 1.5, confirmEvery 2), so the
+next seat bridges against a KNOWN cadence instead of discovering it:
+
+    ( Step Down z=-1.5 )        <- a per-level COMMENT carrying the literal Z
+    G0 Z5
+    G0 X3 Y3
+    G1 Z-1.5 F150
+    G1 X77 Y3 F2000
+    G1 X77 Y57                  <- modal-feed folding has already dropped the repeated F
+    G1 X3 Y57
+    G1 X3 Y3
+    ...
+    #1505=-5000(Pause - check the part, then press Cycle Start to continue)
+    M00   ( pause - press Cycle Start to resume )     <- after level 2, NOT after the last
+
+Four facts that would have been guessed wrong:
+1. **The confirm form is the STEPDOWN's, not the raster atom's.** It emits a `#1505=-5000(...)` popup line before the
+   `M00`; `surfaceraster`'s own confirm emits the `M00` alone. Copying the atom I know best would have changed the
+   operator's pause.
+2. **There is no per-level trailing retract** — the next level's own `G0 Z5` serves, and the last level's retract is
+   `progend`'s. A loop that adds one would add a rapid per level.
+3. **The per-level `( Step Down z=… )` comment cannot survive**, because in a runtime loop the level IS a register.
+   So the bridge criterion has to be the TRACED MOTION per level, never the text — which is what every raster bridge
+   already does, and it should be said out loud before someone writes a text diff.
+4. **The inset is ONE seed, not two.** `pocketInsetMm` = tool radius − wallOffset is the single declared source both
+   the fill and the wall already ask (t1402 measured the two readings disagreeing in SIGN), and the CAM slot's wall
+   section will hand it `#22` — the register it already computes. Taking `toolDia` and `wallOffset` separately and
+   re-deriving inside the atom would be a second reading of "how far in", which is precisely what that declaration
+   forbids. Flagging it because the dispatch named the two params and I am proposing the one they resolve to.
+
+**WHY IT IS PARKED RATHER THAN BUILT.** The atom body is small — the parked work is not the emitter, it is the
+RE-POINT: `pocketData`'s twin carries ~12 `match: {type:'pocketwall'}` binding specs plus a guarded superset that
+`pruneGuards` must collapse, and the wall place currently wraps `stepdown{pocketwall}` with the place fold rewriting
+its text, which has to become a one-child absorbing place like `rasterPlace`. That is t1406's fill re-point again, at
+full size. Doing the atom AND that in the tail of the seat that shipped the delegation is the shape we have twice
+refused. **Capacity is the honest half of the reason and I want it said plainly:** second emit-class act in this seat,
+and the first one was the largest CAM change since t1406.
+
+The clean seam is the one t1425 to t1429 already used: **teach the atom, bridge it, re-point next.** The first step of
+the next act is the FROZEN literal wall reference in `tests/support/served/` (the vacuity trap — a bridge built after
+the re-point compares the parametric emit to itself); the reference text is measured above, and freezing it BEFORE any
+re-point is provably safe.
+
+### NAMING — a granularity call I did not make unilaterally
+
+The fill's parametric counterpart is a separate generic atom (`surfaceraster`), not a parametric `pocketfill`, and the
+stack chooses between them via `pocketRidesRaster`. The wall should follow that precedent rather than forking inside
+`pocketwall` — which means a NEW atom needs a name, and naming one is a granularity decision this project asks to be
+surfaced rather than picked. My lean is `wallfinish` (it names the operation the codebase already calls it, and leaves
+the rect-only scope to the envelope, as `surfaceraster` does). `rectwall` states the scope in the name instead. Yours.
+
+### GATE (fast tier)
+
+pocket + rest + surfacing + cam-op-seed + cam-row-honesty **195/195**. Smoke **71/71**. New spec 2/2. Nothing else was
+touched: the change is additive (one declaration + one predicate beside the walk it describes), no emitted G-code moved.
