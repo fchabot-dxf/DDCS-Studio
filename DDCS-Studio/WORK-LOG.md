@@ -8070,3 +8070,177 @@ GATE (fast tier): smoke **71/71**. Touched area **130/130** — the new bridge f
 round-trip family, the three scratch-band specs, blocks-roundtrip, the four drill specs, plus the feed criterion and the
 whole surfacing bridge set (the new atom joins the same registry, so a band or palette mistake would surface there).
 FULL SUITE NOT RUN — the advisor's merge gate. Seat B's lane untouched.
+
+---
+
+## t1381 (seat A) — THE DRILL FAMILY FOLDS: three cycles, five patterns, one body
+
+Slices 2+3 of t1379's map, plus the R-plane ruling it asked for. The destination the map forced is one atom holding a
+PATTERN loop around a per-hole CYCLE, and that is what landed: `holecycle`, with `peck` / `bore-step` / `bore-helix`
+bodies and all five patterns computed at RUNTIME.
+
+### THE RULING, IMPLEMENTED, AND ITS EXACT RELATIONSHIP
+
+R-plane entry adopted. `APPROACH = 0.5` is declared beside the atom doing ONE job described two ways: on peck 2..n it is
+the re-entry above the last cut (the literal kernel's own value), and on peck 1 it is the reference plane the cycle
+rapids to — because the "last cut bottom" of the first peck IS the surface. So the rapid is unconditional and the
+`IF prev <= 0 GOTO61` branch is gone.
+
+The bridge asserts the RELATIONSHIP rather than equality, in the ruling's own terms: **exactly one extra rapid PER HOLE,
+each at surface+margin; every CUT identical in position and feed; every retract identical; the hole order identical.**
+Measured across the eight peck boundaries × eight patterns — 48 of 48 exact on that criterion.
+
+**One correction to the ruling's premise, and it matters for the next turn.** The ruling said the label-free body frees
+stamping. It does not, on its own: the ZERO-BITE REFUSAL also carries labels, so the body was never going to be
+label-free while it keeps an operator message. What actually makes the fold safe is the pattern being folded IN (one
+body, one label set) plus a DECLARED label seam for the two-ops-in-one-program case below. I kept the refusal rather than
+clamping to the literal's 0.1 floor: #82 is LIVE, so an operator can zero it on the pendant, and a silent 0.1mm peck is
+worse than a message.
+
+### THE PATTERN: ONE LOOP, FIVE FORMULAS — and the rect dedup is a RANGE, not a hash
+
+t1379 flagged `rect` as the awkward one because the literal dedups its perimeter with a JS Set and a hash does not
+translate to a macro walk. **It does not need to.** The only repeats are the four corners, which the vertical edges
+revisit at their first and last steps — so the dedup is exactly "walk the verticals from 1 to ny−2 instead of 0 to
+ny−1". Reproduced by CONSTRUCTION: no Set, no runtime test. Asserted — a 3×4 perimeter is 10 holes not 14, a 5×3 is 12,
+a 2×2 is the four corners, and no hole is drilled twice.
+
+Where the range formula and the hash genuinely DIVERGE is a degenerate rectangle (w=0 or h=0): coincident edges make the
+literal's rounded key collapse points this walk would still drill. That is NAMED in the envelope with the reason rather
+than left silently wrong — reproducing a hash's collapse would mean testing every point against every other at runtime.
+
+One loop over `k` was chosen over nested loops per pattern because the loop SHAPE would otherwise depend on the pattern,
+and then `skip`, the cycle body and the label set each get written more than once. `FIX` (integer truncation) does the
+grid's row/column split; it is demonstrated in the shipped surfacing body.
+
+`skip` is supported, and the subtlety is worth recording: the test jumps past the CYCLE but NOT past the bookkeeping,
+because the bolt circle carries its rotating vector between holes — a skip that also skipped the rotation would shift
+every hole after it. Asserted by skipping hole 1 of a bolt-6 and matching the literal's remaining five cuts exactly.
+
+### AN ERROR I MADE AND CAUGHT BEFORE IT SHIPPED: coefficient vs coordinate
+
+I first routed the pattern's baked constants through a 3-decimal rounder. That is right for a COORDINATE and wrong for a
+COEFFICIENT: a line pattern's spacing × cos(angle) rounded to 0.001 and then MULTIPLIED by hole index 10 is 5e-3 mm out
+— five emit quanta. Coefficients now carry nine decimals, coordinates three, and the distinction is written down where
+the two meet. Same class as t1339's direction cosine, and found by deriving the bound rather than eyeballing output.
+
+### THE AFFINE PRINTER IS NOW ONE SOURCE (gate G3), NOT A SECOND COPY
+
+A pattern's points are RUNTIME REGISTERS, so a rotation has to mix the axes symbolically — which is the mechanism
+`surfaceraster` grew over t1351/t1355/t1375. The choice was a second copy of `rotWord` or one shared printer, and what
+would drift in a copy is the arithmetic that decides where the tool goes (t1353 measured a half-rewritten move gaining an
+axis word = uncommanded motion on a cutting line). Extracted to `affineFrame.js`; surfacing imports it now.
+
+The safety argument for moving a SHIPPING emitter's math is byte-identical output, so that is what was measured:
+**16 configs byte-identical** — plain / placed / negative / rotated / rotated+placed / 90° / skim / skim+rot /
+concentric / concentric+rot / oneway / ramp / ramp+rot / helix / helix+rot+placed / confirmEvery.
+
+Rotation composed with every pattern: worst XY error 3.4e-5 mm on linear bodies — two orders inside the six-decimal
+one-shot bound — Z never moves, no feed changes, 0° byte-identical.
+
+### THE LABEL SEAM IS A DECLARATION NOW, NOT A SWITCH ON THREE TYPE NAMES
+
+t1379's finding was that a stamped flow-carrying body collides its labels. Folding the pattern in removes that for a
+pattern — but TWO HOLE OPS IN ONE PROGRAM is a completely ordinary program (a drill pass, then a bored hole) and would
+have collided one level up. The emitter has always uniquified labels, by a hand-written switch over three block types.
+An atom now DECLARES the label params it needs (def.flowLabels(params)) and the walker serves any atom that says so — a
+bug that is a missing declaration, not a missing fourth branch.
+
+Asserted: two hole ops drill all four holes (t1379 measured only the first); every GOTO binds exactly one N in the
+label-hungriest pair (rect + skip beside a helical bore); and the declaration asks for only what the body emits.
+
+**Byte-safety for the three types it replaced was measured, not assumed:** the whole builder corpus — 88 programs, 32 of
+them carrying a 9x forward-jump label, so the result is not vacuous — emits identically before and after.
+
+**One discrepancy DELIBERATELY preserved and recorded.** The old switch read params.clearMode RAW, so an ABSENT mode took
+its else branch and got ONE label, while clearModeOf resolves absent to 'hop' and would want TWO. Those differ, and the
+difference would shift every later label in the program, so the declaration reproduces what it found. The old count is
+arguably one short (the emit path DOES resolve absent to hop) — unreachable today because every caller passes the mode
+explicitly, and flagged rather than fixed as a rider on a refactor.
+
+### THREE THINGS REPORTED, NOT FIXED
+
+**1. THE TRACE CAP TRUNCATES A PARAMETRIC PREVIEW, and it is the sharpest finding of the turn.** The engine's runaway
+guard is max(program.length × 50, 5000) STEPS — sized by program LENGTH, the exact quantity a parametric loop collapses.
+Measured: a literal helical bore on a 24-hole bolt circle is ~11700 lines, so its cap is ~585k steps and it traces
+whole; the parametric body emitting the IDENTICAL path is 43 lines, gets the 5000 floor, and truncates at about a
+TWELFTH of it (117061 steps actually needed). stats.capped reports it and nothing reads it, so after the switch the
+2D/3D preview would silently draw a partial toolpath.
+
+NOT changed by default, because it is a trade rather than a free win: the low floor is what makes a genuinely runaway
+program give up in milliseconds, and the value-glow localizer probes many perturbed tokens per build (a ~1e6 sentinel
+depth is a legal-looking loop), so a large floor is paid on every localize. Measured cost of a generous floor: the worst
+realistic job (bolt-24 helix at d20/p0.25) needs 467k steps and 450ms. I added an OPT-IN seam (traceStepCap) with the
+default untouched, which is what lets the bridges tell the truth in the meantime. **This wants a ruling before the
+switch**, because the switch is what makes it user-visible.
+
+**2. A ROTATED ARC IS ONE QUANTUM, NOT HALF — isolated rather than assumed.** The bore cycles emit a G3 finish circle,
+and rotating it moves its I/J CENTRE VECTOR, which is itself a coordinate emitted at 0.001mm. Unrotated it is I-3 J0
+(exact); at 12.5° the exact vector is I-2.928888 J-0.649319 and the emit can only say I-2.929 J-0.649, so the tracer
+derives the whole circle from a centre up to half a quantum off. Isolated by running the SAME pattern at the SAME scale
+with a peck cycle — identical but for the arc — which measures 7.7e-6, while BOTH bore cycles measure the identical
+6.656e-4. Not a divergence from the literal: its text rewrite rounds I/J the same way. Recorded in the spec with two
+explicit bounds plus a guard that the linear cases stay orders inside theirs, so the split cannot become a fudge.
+
+**3. middle-superset E0 GATE IS TIMEOUT-MARGINAL, and it is NOT mine.** It failed in my 195-spec sweep, so I isolated it
+two ways rather than reporting a regression. (a) I benchmarked the walker I changed: 1.2µs per walk against the old
+0.2µs, i.e. ~15ms across the whole 14336-combo sweep, against a test that runs ~28–59s — 0.05%, which cannot tip a 60s
+cap. (b) Back-to-back ISOLATED runs: MINE passed at 58.9s and BASELINE TIMED OUT. The test sits on its own cap and flips
+either way under load (this box also carries the analytics agent and the advisor). Worth naming because the FULL SUITE is
+the advisor's merge gate and it will flake there.
+
+### THE BAND, AND A CORRECTION TO t1379'S OWN CLAIM
+
+14 registers over three declared runs: #81–#89, #75–#78, #65–#69. The fragmentation IS the occupancy map — #1–#99 is the
+whole of SCRATCH (#100+ is the persistent uservar pool an atom must never squat) and the free runs inside it are small.
+#81/#82 keep t1379's exact meanings on purpose: they are the two LIVE knobs an operator edits on the pendant. The three
+cycles' working registers OVERLAY each other, justified by mutual exclusion (surfaceraster's #34 precedent — a body
+emits exactly one cycle), not the kind of sharing t1375 had to undo where both quantities were live at once.
+
+**#88 IS FREE, and t1379's band comment said it was taken.** That claim was a misread of a STRING BUILD: the Expert
+dialect composes #880/#881 (the dual-gantry machine registers) by concatenating a slave index onto "#88", which greps as
+#88 and is not a variable at all. Checked before extending onto it. Separately, t1379's comment said the band was clear
+of everything either side — #90–#97 is in fact claimed by probeToSlot (declared in camScratch as PROBE_SIGNS), which is
+why this band stops at #89.
+
+### holepeck IS A NAMED KEEP, NOT A DELETION — the gate respected
+
+`holecycle` supersedes `holepeck` entirely, and t1379's own log planned the fold as "a rename plus a cycle branch". A
+rename means deleting the old name, and a deletion is a GATE. The ownership test is trivially empty (pure leaf: only
+ops/index.js imports it, no builder reaches it, and holecycle does not import it) — so it would be safe. I did not take
+it anyway, because it is not mine to take and the switch is where it naturally belongs.
+
+So: I REVERTED my R-plane edit to holepeck.js, leaving t1379's artifact exactly as shipped and its eight bridges green.
+The two atoms now declare OVERLAPPING bands (#81–#87 inside #81–#89), which is intrinsic to being a successor that
+deliberately inherits the live-knob registers. Excluded BY NAME on BOTH sides with the reason, and licensed by a
+PRE-CONSUMER assert on both, so the overlap cannot reach a program and stops being a silent pass the day anything
+re-points. **The switch's first act should be retiring holepeck + its spec.**
+
+One consequence to name: the palette carries two entries for one turn — "Drill (parametric)" and "Holes (parametric)".
+Neither is reachable from a wizard, so no user is offered a confusing choice, but it is a wart until the switch.
+
+### ENVIRONMENT: node_modules was EMPTY
+
+@playwright/test was not installed anywhere (no local, global or npx copy) — the suite could not run at all when I
+started. The browser cache was intact, so npm ci restored it in 4s. Recorded because a gate claim is worthless if the
+next session finds the same empty tree and assumes the numbers were fabricated.
+
+### GATE (fast tier)
+
+smoke **71/71**. The new spec **27/27**. Touched area **342/343 + 40/40**: the whole surfacing bridge set (the affine
+extraction), the safe-Z / retract / clearlift / traverse family (the label seam), the round-trips, op-params, the scratch
+and glow specs, the drill/bore/peck family, feeds and time-estimate, placement, and every in-place spec. Then a second
+sweep of the emitter/trace consumers (195 files): **472 passed, 2 skipped**, the 2 failures isolated above as the
+timeout-marginal test (baseline fails too) and one contention flake that passes in isolation.
+FULL SUITE NOT RUN — the advisor's merge gate; emit-class, so it wants the ceiling before release.
+
+Screenshot churn from the runs (66 tracked PNGs under scratchpad/ and tests/_) was REVERTED, not committed — the
+sanitation plan is about stopping exactly that growth.
+
+### CAPACITY
+
+This was a heavy turn and I used most of my room: the fold, the extraction, the label seam, three findings, and the
+isolation work behind each. I would NOT start the SWITCH in this seat — it is emit-class, it re-points shipping programs,
+and it wants the full suite plus the trace-cap ruling first. A fresh session starts from evidence: the atom and its 27
+bridges are on disk, the ledger has both exceptions stated, and the three reported items each carry their measurement.
+Seat B untouched. Tree clean apart from my intended files.

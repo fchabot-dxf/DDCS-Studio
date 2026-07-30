@@ -44,6 +44,7 @@
  * so this moves TEXT only; the bridges re-ran and the resolved motion is unchanged, which is the whole check.
  */
 import { num } from './util.js';
+import { affineFrame } from './affineFrame.js';   // t1381 — the coordinate/rotation printers, one source (drill shares them)
 
 /**
  * t1363 — THE ONE READING OF A STORED STEPOVER, declared here because this atom owns what a stepover MEANS.
@@ -197,15 +198,6 @@ export function surfaceRasterLines(p = {}) {
      * substitution rather than a second emitter.
      */
     const skim = String(p.zMode || '') === 'skim';
-    const F = skim ? { ...SKIM_FRAME, live: true } : { x: String(r3(x0)), y: String(r3(y0)), z: String(zTop), live: false };
-    const ax = (rel = 0) => (F.live ? (rel ? `[${F.x} + ${r3(rel)}]` : `${F.x}`) : `${r3(x0 + rel)}`);
-    const ay = (rel = 0) => (F.live ? (rel ? `[${F.y} + ${r3(rel)}]` : `${F.y}`) : `${r3(y0 + rel)}`);
-    const az = (rel = 0) => (F.live ? (rel ? `[${F.z} + ${r3(rel)}]` : `${F.z}`) : `${r3(z0 + rel)}`);
-    // origin + a build-time offset + a RUNTIME term. The offset folds into the origin when the origin is a number,
-    // so a placed body keeps writing `[103.6 + #49 * 0.8]` rather than growing a `0 +` nobody asked for.
-    const axE = (rel, expr) => (F.live ? (rel ? `[${F.x} + ${r3(rel)} + ${expr}]` : `[${F.x} + ${expr}]`) : `[${r3(x0 + rel)} + ${expr}]`);
-    const ayE = (rel, expr) => (F.live ? (rel ? `[${F.y} + ${r3(rel)} + ${expr}]` : `[${F.y} + ${expr}]`) : `[${r3(y0 + rel)} + ${expr}]`);
-    const azE = (expr) => `[${F.z} ${expr}]`;        // expr carries its own sign, e.g. '- #46'
 
     /**
      * ── t1375 — THE PROGRAM ROTATION, ABSORBED ───────────────────────────────────────────────────────────────────
@@ -222,60 +214,14 @@ export function surfaceRasterLines(p = {}) {
      * helix needs nine because its constants multiply a vector that is fed back 24 times; these multiply once.
      */
     const rotA = num(p.rotAngle, 0);
-    const d6 = (n) => Number(n.toFixed(6));
-    const rot = (rotA && surfaceRasterAbsorbsRotation(p) === true)
-        ? { c: d6(Math.cos(rotA * Math.PI / 180)), s: d6(Math.sin(rotA * Math.PI / 180)), px: num(p.rotPivotX, 0), py: num(p.rotPivotY, 0) }
-        : null;
-
-    /**
-     * ONE MOVE, TWO FRAMES — the rotation twin of the origin substitution above.
-     *
-     * `mv()` prints the X and Y words of one move. Each axis arrives declared TWICE on the same line: the word this
-     * body has always emitted, and the same coordinate as an AFFINE FORM — a build-time constant plus runtime terms,
-     * each a register times a build-time coefficient. Unrotated, the declared word is printed verbatim, so every
-     * existing config is byte-identical and this is a no-op. Rotated, only the affine form can say what happens,
-     * because the axes stop being independent:
-     *
-     *     X' = px + (Cx−px)·c − (Cy−py)·s   +   Σ (c·pᵢ − s·qᵢ)·tᵢ
-     *     Y' = py + (Cx−px)·s + (Cy−py)·c   +   Σ (s·pᵢ + c·qᵢ)·tᵢ
-     *
-     * The pivot moves the POINT, so it belongs to the constant; a runtime term is a VECTOR from that point, so it
-     * rotates WITHOUT the pivot and its two coefficients simply mix. The machine still evaluates the same SHAPE it
-     * already did — `[<number> + #reg * <number> - #reg * <number>]`, the class of the shipped `[103.6 + #49 * 0.8]`
-     * (a build constant times a register, summed) — so nothing here reaches for an unproven controller form.
-     *
-     * A term may be absent from one axis: a row's Y offset does not move X at 0°, its coefficient there is zero, and
-     * the rotation is what gives it one. That is exactly why a SINGLE-AXIS move has to grow its partner — a straight
-     * step in this body's frame is a diagonal in the rotated one — so every call passes both axes' forms even where
-     * only one word is emitted today.
-     */
-    const TM = (reg, k = 1) => ({ reg, k });                    // a runtime term: a register × a build-time coefficient
-    const AX = (word, c, terms = []) => ({ word, c, terms });    // one axis of a move: today's word + its affine form
-    const rotTerms = (X, Y, xAxis) => {
-        const order = [], seen = new Set(), px = new Map(), qy = new Map();
-        const bump = (m, t) => { if (!seen.has(t.reg)) { seen.add(t.reg); order.push(t.reg); } m.set(t.reg, (m.get(t.reg) || 0) + t.k); };
-        X.terms.forEach((t) => bump(px, t)); Y.terms.forEach((t) => bump(qy, t));
-        return order.map((reg) => {
-            const a = px.get(reg) || 0, b = qy.get(reg) || 0;
-            return { reg, k: d6(xAxis ? rot.c * a - rot.s * b : rot.s * a + rot.c * b) };
-        }).filter((t) => t.k !== 0);
-    };
-    const rotWord = (X, Y, xAxis) => {
-        const cx = X.c - rot.px, cy = Y.c - rot.py;
-        const k0 = xAxis ? rot.px + cx * rot.c - cy * rot.s : rot.py + cx * rot.s + cy * rot.c;
-        const terms = rotTerms(X, Y, xAxis);
-        // A ROTATED ORIGIN INSIDE AN EXPRESSION IS AN INTERMEDIATE, NOT A COORDINATE — the same distinction t1339 drew
-        // for the ramp's direction cosine, caught the same way. Alone in an axis word it IS the coordinate the machine
-        // moves to, so it takes the emit's own 0.001mm quantum. Inside brackets the machine adds a runtime term to it,
-        // so rounding it first pushes that half-quantum into the SUM: measured on a pivot away from the datum, every
-        // point landed one quantum off the literal truth until this carried six decimals like every other coefficient.
-        if (!terms.length) return `${r3(k0)}`;
-        return `[${d6(k0)}${terms.map((t) => (t.k === 1 ? ` + ${t.reg}` : t.k === -1 ? ` - ${t.reg}`
-            : (t.k > 0 ? ` + ${t.reg} * ${t.k}` : ` - ${t.reg} * ${-t.k}`))).join('')}]`;
-    };
-    const mv = (X, Y) => (rot
-        ? `X${rotWord(X, Y, true)} Y${rotWord(X, Y, false)}`
-        : [X.word != null ? `X${X.word}` : null, Y.word != null ? `Y${Y.word}` : null].filter(Boolean).join(' '));
+    // t1381 — the printers below now come from `affineFrame`, ONE source shared with the drill family's folded atom
+    // (which needs the identical axis mix for the identical reason: its pattern points are runtime registers). The
+    // arithmetic is unchanged and asserted byte-identical; only its home moved. See affineFrame.js for the derivation.
+    const { F, ax, ay, az, axE, ayE, azE, TM, AX, mv, rot } = affineFrame({
+        x0, y0, zTop, live: skim ? SKIM_FRAME : null,
+        rotAngle: rotA, rotPivotX: num(p.rotPivotX, 0), rotPivotY: num(p.rotPivotY, 0),
+        absorbs: surfaceRasterAbsorbsRotation(p) === true,
+    });
 
     // THE STRATEGY DECIDES THE WALK, under the SAME header and the SAME depth loop — the loop that counts levels
     // does not care what happens inside it, which is why adding a strategy is a new walk and not a new emitter.

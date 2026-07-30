@@ -31,6 +31,10 @@ export function traceToolpath(text, opts = {}) {
         createVarStore: opts.createVarStore || null,
     });
     eng._passStarts = opts.passStarts || null;   // Part 1: per-pass starts → the probe collision fires from each pass's start ②
+    // t1381 — raise the runaway-guard's step FLOOR for this call. A PARAMETRIC body is short and executes for a long
+    // time, so the length-proportional cap truncates it (see GcodeExecutionEngine.trace). Opt-in only: the default is
+    // untouched, so no preview changes behaviour and only a caller that knows it wants the whole path pays for it.
+    if (opts.traceStepCap) eng.traceStepCap = Number(opts.traceStepCap) || 0;
     const result = eng.trace(String(text || ''));
     // t937 — DECLARE-ON-THE-SEGMENT: when the caller supplies the block map (line → owning block-id ancestry, from the live
     // projection), stamp each segment with its owning block TYPES. A consumer (the through-stock pre-flight; later the 2D/3D

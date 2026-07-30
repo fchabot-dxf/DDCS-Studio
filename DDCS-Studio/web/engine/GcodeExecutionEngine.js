@@ -405,7 +405,18 @@ export class GcodeExecutionEngine {
         const sink = [];
         this._traceSink = sink;
         this.running = true;
-        const cap = Math.max(this.program.length * 50, 5000);   // bound a loop that never resolves
+        // Bound a loop that never resolves. SIZED BY PROGRAM LENGTH, and t1381 measured what that costs a PARAMETRIC
+        // body: the cap is proportional to the very quantity a loop collapses. A literal helical bore on a 24-hole bolt
+        // circle is ~11700 lines → a ~585k-step cap → it traces whole; the parametric body that emits the identical
+        // path is 43 lines → the 5000 floor → the trace TRUNCATES at about a twelfth of it (measured: 117061 steps
+        // actually needed) and the preview silently draws a partial toolpath. `stats.capped` reports it, nobody reads it.
+        //
+        // The DEFAULT is deliberately unchanged here, because raising it is a trade and not a free win: the floor is
+        // what makes a genuinely runaway program give up in milliseconds, and the value-glow localizer probes many
+        // perturbed tokens per build (a ~1e6 sentinel depth is a legal-looking loop), so a large floor is paid on every
+        // localize. That choice wants its own ruling. `traceStepCap` is the seam a caller uses to ask for a full trace
+        // when it needs the whole path — which is what the equivalence bridges need in order to tell the truth at all.
+        const cap = Math.max(this.program.length * 50, Number(this.traceStepCap) || 5000);
         let guard = 0;
         try {
             while (this.ip >= 0 && this.ip < this.program.length && guard++ < cap) {

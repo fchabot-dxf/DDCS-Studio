@@ -218,7 +218,14 @@ test('THE DECLARATIONS — band as data, a refused zero peck, and an envelope sc
         for (const l of lines) for (const m of l.matchAll(/#(\d+)/g)) used.add(Number(m[1]));
         // every OTHER atom's declared band, so a collision is measured rather than eyeballed
         const mine = JSON.stringify(HOLE_SCRATCH);
-        const others = opBands().filter((b) => JSON.stringify([b]) !== mine.slice(1, -1) && !(b[0] === 81 && b[1] === 87));
+        // t1381 — THE SUCCESSOR IS EXCLUDED, and the premise change is the reason rather than a weakening. `holecycle`
+        // folded the pattern into this cycle and DELIBERATELY inherits #81 (depth) and #82 (bite): those are the two
+        // LIVE KNOBS an operator edits on the pendant, so keeping their numbers stable across the fold is worth more
+        // than a non-overlapping band. It cannot reach a program — both atoms are pre-consumer, asserted by the
+        // PRE-CONSUMER bridges on both sides — and this atom retires when the switch re-points the drill family.
+        const successor = (await import('/wizards/ops/holecycle.js')).HOLE_SCRATCH;
+        const isSuccessor = (b) => successor.some(([lo, hi]) => b[0] === lo && b[1] === hi);
+        const others = opBands().filter((b) => JSON.stringify([b]) !== mine.slice(1, -1) && !(b[0] === 81 && b[1] === 87) && !isSuccessor(b));
         return {
             used: [...used].sort((a, b) => a - b), band: HOLE_SCRATCH,
             bandRegistered: JSON.stringify(opBands()).includes('81'),

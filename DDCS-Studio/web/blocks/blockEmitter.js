@@ -373,23 +373,26 @@ function emit(block, dx = 0, dy = 0, anc = [], scope = Object.create(null), dial
 // safe-Z retracts (per-wall retreats + the error handler), so give each a UNIQUE label in emit order (base 91, unused by any
 // wizard) — else duplicate N91s make the guard's GOTO ambiguous. Deterministic (walk order) → the twin + built-in match, and
 // this subsumes the cross-op accumulation case (offsetLabels no longer special-cases saferetract). Idempotent (re-run safe).
-function uniquifySafeRetractLabels(blocks) {
+// t1381 — READ FROM A DECLARATION, not from a switch on three type names. The mechanism above was a hand-written list,
+// and t1379 measured what that costs: the parametric drill cycle carries its own forward-jump labels, so a program
+// holding TWO hole ops emitted two copies of the same `N`, the second op's `GOTO` bound to the FIRST op's label, and
+// every hole after the first silently went undrilled. The fix is not a fourth branch — it is that an atom SAYS how many
+// labels it needs (`def.flowLabels(params)` → the param names to fill), and this walker serves any atom that says so.
+//
+// The three original types now declare exactly what they used to be given, in the same order, from the same counter —
+// asserted byte-identical on the programs that use them, because "the same numbers" is the whole safety argument.
+function uniquifyFlowLabels(blocks) {
     let n = 91;
-    // t913 — a `safehop` (the capped clearance hop, Expert) carries TWO forward-jump labels (its #520-guard + its cap check);
-    // they draw from the SAME counter so a program mixing retracts and hops never collides any N<label>. In the DEFAULT max
-    // mode there are NO safehop blocks, so the counter sees only saferetract → 91+ unchanged (byte-identical to B2a).
     const walk = (list) => {
         for (const b of (list || [])) {
             if (!b) continue;
-            if (b.type === 'saferetract') { b.params = { ...(b.params || {}), label: n++ }; }
-            else if (b.type === 'safehop') { b.params = { ...(b.params || {}), guardLabel: n++, capLabel: n++ }; }
-            // t931 — the clearlift FOLDING atom takes labels per its resolved clearMode: max → 1 (the #520 unset-guard, same as
-            // a saferetract → byte-identical), hop → 2 (guard + cap, like safehop), plane → 0 (no flow). One shared counter.
-            else if (b.type === 'clearlift') {
-                const m = b.params && b.params.clearMode;
-                if (m === 'plane') { /* no forward-jump labels */ }
-                else if (m === 'hop') { b.params = { ...(b.params || {}), guardLabel: n++, capLabel: n++ }; }
-                else { b.params = { ...(b.params || {}), guardLabel: n++ }; }
+            const def = BLOCKS[b.type];
+            const names = (def && typeof def.flowLabels === 'function') ? (def.flowLabels(b.params || {}) || [])
+                : (def && Array.isArray(def.flowLabels)) ? def.flowLabels : [];
+            if (names.length) {
+                const add = {};
+                for (const nm of names) add[nm] = n++;
+                b.params = { ...(b.params || {}), ...add };
             }
             if (b.children) walk(b.children);
             if (b.uiChildren) walk(b.uiChildren);
@@ -399,7 +402,7 @@ function uniquifySafeRetractLabels(blocks) {
 }
 
 export function emitMapped(blocks, settings = {}) {
-    uniquifySafeRetractLabels(blocks);   // t826 — unique safe-Z guard labels per program (base 91), before the fold
+    uniquifyFlowLabels(blocks);   // t826/t1381 — unique forward-jump labels per program (base 91), from each atom's own declaration
     const dialect = settings.dialect || getDialect(settings.profileId);   // active controller profile → its G-code forms
     const scope = Object.create(null);   // top-level variable environment, threaded across the stack
     const T = [];

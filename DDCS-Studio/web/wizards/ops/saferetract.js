@@ -34,6 +34,9 @@ export const safeHopBlock = {
     defaults: { hopDist: 15, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, guardLabel: 82, capLabel: 83 },
     fields: ['hopDist', 'saveVar', 'margin', 'guardLabel', 'capLabel'],
     scratch: [[95, 95]],   // t1085 — the saved-machine-Z var. The DIALECT's safeHop declares its own extra scratch (Expert #42/#43, V4.1 #190/#191)
+    // t913/t1381 — TWO forward-jump labels (the #520 guard + the cap check), drawn from the program-wide counter. This
+    // used to be a branch inside blockEmitter's uniquifier; it is a declaration now so the mechanism is not a type list.
+    flowLabels: () => ['guardLabel', 'capLabel'],
     emit: (p, dx, dy, dialect) => {
         const opts = {
             hopDist: r3(num(p.hopDist, 15)), saveVar: p.saveVar || '#95',
@@ -72,6 +75,7 @@ export const safeRetractBlock = {
     // for the DM500 degrade (the wizard's own safe-Z); label = the Expert unset-guard's forward-jump label.
     defaults: { margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', label: 91 }, fields: ['margin', 'workClear', 'label'],
     scratch: [[17, 17]],   // t1085 — the work-frame clearance var read on the DM500 degrade
+    flowLabels: () => ['label'],   // t826/t1381 — ONE forward-jump label (the Expert #520 unset-guard), program-unique
     emit: (p, dx, dy, dialect) => {
         const opts = { margin: r3(num(p.margin, -SAFEZ_MARGIN_DEFAULT)), workClear: p.workClear || '#17', label: num(p.label, 91) };
         const core = (dialect && typeof dialect.safeRetract === 'function')
@@ -97,6 +101,19 @@ export const clearLiftBlock = {
     defaults: { clearMode: 'hop', hopDist: 15, planeZ: 10, saveVar: '#95', margin: -SAFEZ_MARGIN_DEFAULT, workClear: '#17', guardLabel: 91, capLabel: 92 },   // t941 B2b-4 — default hop (a bare clearlift block; the callers pass clearMode explicitly)
     fields: ['clearMode', 'hopDist', 'planeZ', 'saveVar', 'margin', 'workClear', 'guardLabel', 'capLabel', 'planeFellBack'],
     scratch: [[17, 17], [95, 95]],   // t1085 — it resolves to the retract (#17) or the hop (#95) depending on clearMode, so it owns both
+    // t931/t1381 — labels per the clearMode: max → 1 (the #520 unset-guard, same as a saferetract), hop → 2 (guard +
+    // cap, like safehop), plane → 0 (no flow at all). Declared, so the count follows the mode it belongs to.
+    //
+    // ⚠ THE RAW PARAM, DELIBERATELY, not `clearModeOf(p.clearMode)`. This reproduces the uniquifier's own semantics
+    // EXACTLY — an ABSENT clearMode took its `else` branch and got ONE label, where `clearModeOf` would resolve absent
+    // to 'hop' and ask for two. Those differ, and the difference would shift every later label in the program, so the
+    // extraction keeps the behaviour it found. (Noted, not fixed: for a bare clearlift the emit path DOES resolve to
+    // hop and would want two, so the old count was one short — unreachable today because every caller passes the mode
+    // explicitly, and worth its own decision rather than a silent change riding along with a refactor.)
+    flowLabels: (p = {}) => {
+        const m = p.clearMode;
+        return m === 'plane' ? [] : m === 'hop' ? ['guardLabel', 'capLabel'] : ['guardLabel'];
+    },
     emit: (p, dx, dy, dialect) => {
         const mode = clearModeOf(p.clearMode);
         // t961 — the plane-guarantee backstop: when Plane was requested but not guaranteed (WCS!=Active or no Z-datum-first), the
