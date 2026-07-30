@@ -8895,3 +8895,70 @@ sibling specs the fixture class touches (s2/s4b/s4b-core/s5/s52/s53, scratch, op
 **IRON RULE: 11/11, the same eleven, 0 blocks lost.**
 
 Scratch specs deleted. Process tree clean. FULL SUITE NOT RUN — the advisor's merge gate.
+
+## t1395 (seat A) — THE RIDER LANDS; T3 PARKED FRESH, with its band measured
+
+The blessed rider is done and committed (`4e05b316`). **T3 is NOT started** — the dispatch recommends a fresh session
+for it and the standing capacity rule says park rather than half-land emit-class work. What I did instead of starting it
+is the one piece of scouting step 1 asks for and that commits nothing: the register band.
+
+### THE RIDER — calcTagOf's backspaces, and the symptom was worse than I reported
+
+Three of `calcTagOf`'s patterns carried a literal BACKSPACE (0x08) where `\b` was meant. I called it "cosmetic" when I
+flagged it at t1393. It is cosmetic in CONSEQUENCE but pervasive in REACH, and I should have traced it before
+characterising it: `/\x08G0?[0-3]\x08/` can never match, so ordinary motion fell through to the `[MG]\d` catch-all and
+**every G0/G1 line was tagged `set`** — "a mode with no motion" — while the tool was moving. G31/G38 probes got the same
+wrong tag; M98/M99 lost `flow`. The chip shows the executing line, so this mislabelled most of a running program, and the
+tag is the one thing on that chip that tells you whether "nothing moved" was SUPPOSED to happen.
+
+### ASSERTING IT CAUGHT A VACUITY IN MY OWN FIRST ATTEMPT
+
+Version one called `panel.seekLine(i)` and read the chip after each seek. All nine lines came back with no tag, and the
+three motion assertions PASSED. They passed because **seekLine does not paint the chip at all** — it sat on the summary
+("1 cuts · 1 probes · 1 rapids") for every line. The chip is written by `onLineChange`, which fires only while the sim is
+RUNNING. I found it by dumping the chip per line rather than trusting three green asserts.
+
+The spec now PLAYS the program, collects every chip painted, attributes each sample to its line by parsing the line
+NUMBER out of the chip text, and asserts each line was SEEN (`undefined`, not `''`) before reading its tag. That is the
+t1383 lesson one level in: a test that reads the right element at the wrong moment is still reading nothing.
+
+Scope is the five lines the defect touched. A bare `G90` or an `M30` costs the engine no time and can be stepped past
+between samples, so requiring all nine would make this a timing lottery rather than a test. Stable across three runs.
+
+**Plus a byte guard for the class:** no `.js` under `web/` or `tests/` may carry a literal 0x08. It costs nothing and
+cannot be fooled by how the source LOOKS, which is the entire problem — the defect survived years of diffs. The byte is
+written as a CODE POINT inside the guard; a literal one there would make it fail on itself.
+
+### T3 — PARKED, WITH THE BAND MEASURED (the one thing step 1 cannot start without)
+
+The dispatch asks the atom to declare a register band and to check that probeToSlot's #90-#97 and holecycle's #65-#89
+stay clear. That is a measurement, not a judgement, so I took it before parking — it is read-only and it de-risks the
+first hour of the next session.
+
+**#1-#99 is the whole of SCRATCH** (#100+ is the persistent uservar pool an atom must never squat). Counting only
+ATOM-declared bands — the ones that genuinely co-exist in one program — the taken set is:
+
+    (5,6) (6,6) (9,10) (17,17) (22,22) (30,31) (34,49) (50,50) (57,57) (62,64) (65,69) (70,70) (75,78) (81,89) (95,95) (99,99)
+
+leaving **49 free registers across 12 runs, largest run 7**:
+
+    #1-#4 (4)   #7-#8 (2)    #11-#16 (6)  #18-#21 (4)  #23-#29 (7)  #32-#33 (2)
+    #51-#56 (6) #58-#61 (4)  #71-#74 (4)  #79-#80 (2)  #90-#94 (5)  #96-#98 (3)
+
+**Two caveats that matter and are easy to miss.** `#90-#97` does NOT appear in `opBands()` because it is a CAM-SLOT band
+(camScratch's `PROBE_SIGNS`, probeToSlot's signs/targets) rather than an atom band — so the last two runs above are
+mostly spoken for and should be treated as taken, exactly as the dispatch warns. And holecycle's `#65-#89` is already
+excluded above.
+
+**The verdict: feasible, fragmented — the same situation holecycle was in, and it solved it the same way.** Discounting
+the #90-97 claim, the workable candidates are `#23-#29` (7), `#11-#16` (6), `#51-#56` (6), `#58-#61` (4), `#71-#74` (4)
+— about 27 registers from five runs. Surfacing's parametric body needed 19 (`#34-#49` plus `#62-#64`), and holecycle
+assembled its 14 from three runs, so a rect-pocket body has room. The band will be a multi-run declaration like
+holecycle's, not a single span, and the fragmentation IS the occupancy map rather than a preference.
+
+### GATE (fast tier)
+
+The new spec **2/2**, stable across three consecutive runs. smoke **71/71**. Preview + trace + declared-work + sim-anim
++ the two screenshot specs **22/22**. **95 tests, 0 failures.**
+
+Scratch specs deleted. Process tree clean. T3 starts from this file plus the recipe in NEXT-SESSION.
