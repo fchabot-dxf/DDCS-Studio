@@ -38,6 +38,21 @@ export const cycleForMethod = (method, ramp) => {
 };
 
 /**
+ * THE INVERSE, declared HERE beside its forward pair rather than hand-rolled at the one place that needs it (t1387).
+ *
+ * The block→form reverse-sync has to answer the opposite question: this stack says `cycle`, so what did the FORM say?
+ * Before the switch it read the answer off the block TYPE (a `bore` leaf meant helical), and the fold removed that
+ * signal — the two knobs are one now. Writing the mapping out again inside the reconciler would be a second copy of a
+ * two-way correspondence, which is exactly the thing that drifts: someone adds a fourth cycle, updates the forward
+ * table, and the form silently stops round-tripping. One pair, one place.
+ *
+ * It returns the WIZARD's vocabulary (`method` + `ramp`), because that is what the form's fields hold.
+ */
+export const methodRampForCycle = (cycle) => (cycle === 'bore-helix' ? { method: 'helical', ramp: 'helix' }
+    : cycle === 'bore-step' ? { method: 'helical', ramp: 'step' }
+        : { method: 'peck', ramp: 'step' });
+
+/**
  * Drill params → [ PlaceOnStock{ HoleCycle } ]. The one source of truth for both displays.
  *
  * ── THE SWITCH (t1385): array{drill|bore} → ONE holecycle ─────────────────────────────────────────────────────────

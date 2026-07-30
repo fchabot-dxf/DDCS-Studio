@@ -6,7 +6,29 @@ import { test, expect } from '@playwright/test';
 test.use({ viewport: { width: 1280, height: 900 } });
 
 const numsOf = (code, letter) => (code.match(new RegExp(letter + '\\s*(-?\\d*\\.?\\d+)', 'gi')) || []).map((t) => parseFloat(t.replace(new RegExp(letter, 'i'), '')));
-const xsOf = (code) => numsOf(code, 'X');
+
+/**
+ * ── t1385 — WHERE THE HOLES ARE IS MEASURED FROM THE TRACE, NOT SCRAPED FROM THE TEXT ─────────────────────────────
+ *
+ * `xsOf` pulled literal X words out of the G-code. That worked while the pattern was unrolled at build time — one `G0 X20`
+ * per hole. THE SWITCH walks the pattern at RUNTIME, so a hole's X is `X[0 + #75]`: no literal to scrape, an empty match
+ * array, and `Math.max()` of nothing is **-Infinity** (`Math.min()` → +Infinity). The asserts did not become wrong; they
+ * became unanswerable from text.
+ *
+ * Every one of them is a claim about WHERE THE TOOL GOES, so it is measured there — the engine resolves the registers and
+ * the assert reads the resulting CUT positions. That is the value against an independent truth. It is also stricter than
+ * the old scrape, which counted rapids, retracts and any incidental X word as if they were hole positions.
+ *
+ * ⚠ AND IT REPAIRS A SILENT VACUITY, not only the reds: the "hole diameter never moves the grid" assert compares
+ * `xsOf(wide)` with `xsOf(base)`. Post-switch both are the EMPTY ARRAY, so it passed while comparing nothing — it would
+ * have gone on passing if the diameter had moved every hole. Fixed here even though it was green.
+ */
+const cutXs = (page, code) => page.evaluate(async (text) => {
+    const { traceToolpath } = await import('/engine/trace.js');
+    const segs = (traceToolpath(text).segments || []).filter((s) => !s.rapid);
+    // The DISTINCT cut positions, rounded to the emit quantum — a hole is one position however many pecks reach it.
+    return [...new Set(segs.map((s) => (+s.x2.toFixed(3)) + 0))].sort((a, b) => a - b);
+}, code);
 
 async function setup(page) {
   await page.goto('http://localhost:3211');
@@ -33,26 +55,29 @@ test('default path datum follows the stock datum — a max-corner stock pulls th
   await setup(page);
   // Stock datum 'ppp' (max corner). pathDatum empty → follow the stock → the pattern's MAX corner lands on pos(0,0),
   // so the holes run -X onto the stock: X ∈ [-40, 0].
-  const xs = xsOf(await code(page, { stockDatum: 'ppp', pathDatum: '' }));
-  expect(Math.max(...xs)).toBeCloseTo(0, 1);
-  expect(Math.min(...xs)).toBeCloseTo(-40, 1);
+  const xs = await cutXs(page, await code(page, { stockDatum: 'ppp', pathDatum: '' }));
+  expect(xs.length, 'the traced path really cuts (an empty measurement is what -Infinity used to hide)').toBe(3);
+  expect(Math.max(...xs), "the pattern's MAX corner lands on pos(0,0)").toBeCloseTo(0, 1);
+  expect(Math.min(...xs), 'so the three holes run -X onto the stock').toBeCloseTo(-40, 1);
 });
 
 test('explicit path datum overrides — min-corner anchors the pattern +X off pos', async ({ page }) => {
   await setup(page);
   // Same max-corner stock, but pick 'nn' (min corner) → no shift, pattern runs +X: X ∈ [0, 40].
-  const xs = xsOf(await code(page, { stockDatum: 'ppp', pathDatum: 'nn' }));
-  expect(Math.min(...xs)).toBeCloseTo(0, 1);
-  expect(Math.max(...xs)).toBeCloseTo(40, 1);
+  const xs = await cutXs(page, await code(page, { stockDatum: 'ppp', pathDatum: 'nn' }));
+  expect(xs.length, 'three holes traced').toBe(3);
+  expect(Math.min(...xs), 'the min corner anchors at pos, so no shift').toBeCloseTo(0, 1);
+  expect(Math.max(...xs), 'and the pattern runs +X').toBeCloseTo(40, 1);
 });
 
 test('picking a stock-attach corner pulls the path to that corner of the stock', async ({ page }) => {
   await setup(page);
   // Min-corner stock datum, attach to the MAX corner ('pp'). pathDatum follows the attach, so the pattern's max
   // corner lands on the stock's max corner (100,80): the holes sit against the far edge, X ∈ [60, 100].
-  const xs = xsOf(await code(page, { stockDatum: 'nnp', stockAttach: 'pp' }));
-  expect(Math.max(...xs)).toBeCloseTo(100, 1);
-  expect(Math.min(...xs)).toBeCloseTo(60, 1);
+  const xs = await cutXs(page, await code(page, { stockDatum: 'nnp', stockAttach: 'pp' }));
+  expect(xs.length, 'three holes traced').toBe(3);
+  expect(Math.max(...xs), "the pattern's max corner lands on the stock's max corner").toBeCloseTo(100, 1);
+  expect(Math.min(...xs), 'so the holes sit against the far edge').toBeCloseTo(60, 1);
 });
 
 test('a signed Z offset shifts every Z move; hole diameter never moves the grid', async ({ page }) => {
@@ -64,7 +89,9 @@ test('a signed Z offset shifts every Z move; hole diameter never moves the grid'
   expect(Math.max(...numsOf(shifted, 'Z'))).toBeCloseTo(zBase + 3, 1);
   // Changing the hole diameter must NOT move the pattern (anchored on hole centres).
   const wide = await code(page, { stockDatum: 'nnp', holeDia: 20 });
-  expect(xsOf(wide)).toEqual(xsOf(base));
+  const baseXs = await cutXs(page, base), wideXs = await cutXs(page, wide);
+  expect(baseXs.length, 'the baseline really has hole positions to compare (this compared two EMPTY arrays before)').toBe(3);
+  expect(wideXs, 'a wider hole does not move the grid — anchored on hole CENTRES').toEqual(baseXs);
 });
 
 test('the placement persists through insert (baked into the block stack, not a post-translate)', async ({ page }) => {
@@ -76,13 +103,14 @@ test('the placement persists through insert (baked into the block stack, not a p
     const op = prog.find((b) => b && b.type === 'op' && b.opType === 'drill');
     if (!op) return null;
     const place = (op.children || []).find((c) => c.type === 'placeonstock');
-    const arr = place && (place.children || []).find((c) => c.type === 'array');
-    return { opAttach: op.params && op.params.stockAttach, blockAttach: place && place.params && place.params.stockAttach, hasArray: !!arr };
+    // t1385 — the wrapped child is the merged `holecycle`, not an `array` container (the switch folded the pattern in).
+    const hole = place && (place.children || []).find((c) => c.type === 'holecycle');
+    return { opAttach: op.params && op.params.stockAttach, blockAttach: place && place.params && place.params.stockAttach, hasHole: !!hole };
   });
   expect(res, 'a drill op was committed').toBeTruthy();
   expect(res.opAttach, 'op.params remembers the attach (wizard re-edit)').toBe('pp');
   expect(res.blockAttach, 'the PlaceOnStock C-block carries the attach (visible/editable in Blocks)').toBe('pp');
-  expect(res.hasArray, 'the pattern is wrapped inside the PlaceOnStock block').toBe(true);
+  expect(res.hasHole, 'the pattern is wrapped inside the PlaceOnStock block (t1385: the holecycle block, was the array)').toBe(true);
 });
 
 test('the form anchor pickers set the PATH and STOCK anchors (3×3 cells)', async ({ page }) => {

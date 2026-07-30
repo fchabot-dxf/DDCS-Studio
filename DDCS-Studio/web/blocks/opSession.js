@@ -20,6 +20,7 @@ import { builderOf, makeOp, _framed, _builderAtoms } from './opBuilders.js';   /
 import { flattenBlocks, listUserOps } from './userOps.js';   // ONE pre-order walk shared with devMode (group writeback indexes it); listUserOps → seed knob _expose from a data-op's bindings
 import { FN } from './blockly/bridge.js';   // t391 — the Blockly field name (uppercased) for the _expose knob key
 import { resolveMethod } from '../wizards/atcModel.js';   // fix B: resolve method (incl. legacy mode/magType) for the declared-param reconcile fallback
+import { methodRampForCycle } from '../wizards/drillWizard.js';   // t1387 — the DECLARED inverse of cycleForMethod: the merged hole block has no leaf TYPE to read method/ramp off
 // find() recurses into block children (incl. op-containers), so reconcilers locate their inner blocks
 // (e.g. a 'stepdown') whether or not the op is wrapped in an op-container.
 const find = (prog, type) => {
@@ -142,23 +143,36 @@ const RECONCILERS = {
         else { f.ct_w = p.w; f.ct_h = p.h; }   // rect + ellipse
         return Object.assign(f, placeFields(prog, 'ct_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper
     },
+    /**
+     * t1387 — READS THE MERGED BLOCK, and this was a REAL REGRESSION the switch caused, not a stale assertion.
+     *
+     * This reconciler opened with `find(prog, 'array')` and returned `null` when there was none. After t1385 there IS
+     * none — the pattern lives in `holecycle` — so it returned null, which the caller reads as "not a drill op, nothing
+     * to reverse-sync". The visible symptom: editing the PlaceOnStock anchor in Blocks no longer flowed back to the open
+     * wizard form. Attributed rather than assumed: the whole file passes at 15d155ca (the commit before the switch) and
+     * three tests fail at 7b3915ea, so the switch is the cause and this is a product FIX.
+     *
+     * The pattern half and the cut half now sit on ONE block, so `p` and `h` are the same params object. The method/ramp
+     * pair no longer has a block TYPE to read it off (a `bore` leaf used to mean helical), so it comes from the declared
+     * inverse in drillWizard — one two-way pair, one place.
+     */
     drill(prog) {
-        const arr = find(prog, 'array');
-        if (!arr || !arr.params) return null;
-        const p = arr.params, hole = arr.children && arr.children[0], wb = find(prog, 'wcs');
+        const hc = find(prog, 'holecycle');
+        if (!hc || !hc.params) return null;
+        const p = hc.params, wb = find(prog, 'wcs');
         const f = { d_pattern: p.pattern, d_originX: p.x0, d_originY: p.y0, d_skip: p.skip || '', d_wcs: (wb && wb.params && wb.params.wcs) || 'active' };
         if (p.pattern === 'circle') { f.d_dia = p.dia; f.d_count = p.count; f.d_startAngle = p.startAngle; }
         else if (p.pattern === 'line') { f.d_lcount = p.count; f.d_spacing = p.spacing; f.d_angle = p.angle; }
         else if (p.pattern === 'rect') { f.d_w = p.w; f.d_h = p.h; f.d_nx = p.nx; f.d_ny = p.ny; }
         else { f.d_cols = p.cols; f.d_rows = p.rows; f.d_dx = p.dx; f.d_dy = p.dy; }
-        if (hole && hole.params) {
-            const h = hole.params;
-            f.d_method = hole.type === 'bore' ? 'helical' : 'peck';
-            f.d_depth = h.depth; f.d_feed = h.feed; f.d_clearance = h.clearance;
-            if (hole.type === 'bore') { f.d_holeDia = h.holeDia; f.d_toolDia = h.toolDia; f.d_pitch = h.pitch; f.d_ramp = h.ramp; }
-            else f.d_peck = h.peck;
-        }
-        return Object.assign(f, placeFields(prog, 'd_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper, not the array
+        const { method, ramp } = methodRampForCycle(p.cycle);
+        f.d_method = method;
+        f.d_depth = p.depth; f.d_feed = p.feed; f.d_clearance = p.clearance;
+        // BOTH cut sets ride back, because the merged block carries both (drillStack writes both whatever the method), so
+        // switching method in the form must not find the other set blanked — the same reason the builder carries both.
+        if (method === 'helical') { f.d_holeDia = p.holeDia; f.d_toolDia = p.toolDia; f.d_pitch = p.pitch; f.d_ramp = ramp; }
+        else f.d_peck = p.peck;
+        return Object.assign(f, placeFields(prog, 'd_', 'originX', 'originY'));   // offset + anchors ride the PlaceOnStock wrapper, not the hole block
     },
     middle(prog) {
         // Reverse-sync the middle (pocket/boss centre) op from its block stack. Read the identity fields that are

@@ -1,7 +1,11 @@
 import { test, expect } from '@playwright/test';
 
-// The placement is a semantic block: opening a drill op in the Blocks tab shows a PlaceOnStock C-block wrapping the
-// Array{ Drill } — the intent (attach corner) lives in the block, visible + editable, not baked into numbers.
+// The placement is a semantic block: opening a drill op in the Blocks tab shows a PlaceOnStock C-block wrapping the hole
+// op — the intent (attach corner) lives in the block, visible + editable, not baked into numbers.
+//
+// t1385 (THE SWITCH) changed WHAT it wraps, not the property: the wrapped child was `Array{ Drill }` — a container plus a
+// literal leaf — and is now the single `holecycle` block, which walks the pattern at runtime. Every assert below keeps its
+// original claim and is measured against the new one-block shape.
 test.use({ viewport: { width: 1400, height: 1000 } });
 
 test('drill op surfaces the placement as a PlaceOnStock C-block wrapping the pattern', async ({ page }) => {
@@ -27,12 +31,32 @@ test('drill op surfaces the placement as a PlaceOnStock C-block wrapping the pat
     };
   });
   expect(r.types, 'the Blocks view has a PlaceOnStock block').toContain('placeonstock');
-  expect(r.types, 'wrapping the Array pattern').toContain('array');
+  // t1385 — WAS `toContain('array')`. The pattern is no longer a container wrapping a hole leaf; it IS the hole block.
+  // The claim ("the placement WRAPS the pattern") is unchanged, so it is asserted against what the pattern is now — and
+  // the absence of the old pair is asserted too, so this cannot pass on a stack that kept both.
+  expect(r.types, 'wrapping the pattern — now the one holecycle block').toContain('holecycle');
+  expect(r.types, 'and the old array container is gone').not.toContain('array');
   expect(r.isCblock, 'PlaceOnStock is a C-block (has a DO statement mouth)').toBe(true);
   expect(r.attach, 'the attach corner is carried IN the block (semantic)').toBe('pp');
 });
 
-const maxX = (s) => Math.max(...(s.match(/X\s*(-?\d*\.?\d+)/gi) || []).map((t) => parseFloat(t.replace(/X/i, ''))));
+/**
+ * t1385 — THE FAR-EDGE MEASUREMENT IS TRACED, NOT REGEXED.
+ *
+ * This was `Math.max(...text.match(/X\s*(-?\d*\.?\d+)/gi))` — literal X words scraped from the G-code. The switch walks
+ * the pattern at RUNTIME, so a hole's X is `X[0 + #75]`: there are no literal X numbers to scrape, the match array is
+ * empty, and `Math.max()` of nothing is **-Infinity**. The assert did not become wrong, it became unanswerable from text.
+ *
+ * The claim it makes is about WHERE THE TOOL GOES, so it is measured there: the furthest X at which the traced path
+ * CUTS. That is the value against an independent truth (the engine resolving the registers) rather than a proxy for it,
+ * and it is strictly better than the old scrape — which counted rapids, retracts and any stray X word equally.
+ */
+const maxCutX = (page) => page.evaluate(async () => {
+    const { traceToolpath } = await import('/engine/trace.js');
+    const segs = traceToolpath(window.ddcsGetBlockGcode() || '').segments || [];
+    const xs = segs.filter((s) => !s.rapid).flatMap((s) => [s.x1, s.x2]);
+    return xs.length ? Math.max(...xs) : null;
+});
 
 test('editing the PlaceOnStock attach corner in Blockly re-emits the placed G-code (snapshot survives)', async ({ page }) => {
   await page.goto('http://localhost:3211');
@@ -49,15 +73,19 @@ test('editing the PlaceOnStock attach corner in Blockly re-emits the placed G-co
   await page.evaluate(() => window.showApp('blocks'));
   await page.waitForFunction(() => window.__blkws && window.__blkws.getAllBlocks().length > 0);
   await page.waitForTimeout(150);
-  const before = await page.evaluate(() => window.ddcsGetBlockGcode());
+  const before = await maxCutX(page);
 
   // Change the attach corner to Front-left in Blockly (the snapshot — stock dims/bbox — must ride along for it to work).
   await page.evaluate(() => window.__blkws.getAllBlocks().find((b) => b.type === 'placeonstock').setFieldValue('nn', 'STOCKATTACH'));
   await page.waitForTimeout(200);
-  const after = await page.evaluate(() => window.ddcsGetBlockGcode());
+  const after = await maxCutX(page);
 
-  expect(maxX(before), "attached to the stock's far corner → holes reach the far edge").toBeCloseTo(100, 0);
-  expect(maxX(after), 'attached front-left → holes pull to the near corner (attach now takes effect)').toBeCloseTo(40, 0);
+  // The path really traced (a null here would mean the measurement found nothing, which is the failure mode the old
+  // regex hid behind -Infinity — it is worth distinguishing "moved to the wrong place" from "nothing was measured").
+  expect(before, 'the placed program traces cutting moves').not.toBeNull();
+  expect(after, 'and still does after the re-attach').not.toBeNull();
+  expect(before, "attached to the stock's far corner → holes reach the far edge").toBeCloseTo(100, 0);
+  expect(after, 'attached front-left → holes pull to the near corner (attach now takes effect)').toBeCloseTo(40, 0);
 });
 
 test('PlaceOnStock shows the inline 3×3 corner-grid fields, coloured per datum, click-to-pick', async ({ page }) => {

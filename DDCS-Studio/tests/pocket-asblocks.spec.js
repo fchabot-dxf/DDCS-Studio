@@ -11,9 +11,25 @@ test('cutting wizards emit through their block stacks (deterministic + correct)'
     const { PocketWizard } = await import('/wizards/pocketWizard.js');
     const { SlotWizard } = await import('/wizards/slotWizard.js');
     const { DrillWizard } = await import('/wizards/drillWizard.js');
+    const { traceToolpath } = await import('/engine/trace.js');
     const cuts = (t) => t.split('\n').filter((l) => /^G[123]\b/.test(l.trim())).length;
     const det = (W, p) => new W().generate(p) === new W().generate(p);
-    const holes = (t) => (t.match(/Array \d+ @/g) || []).length;
+    /**
+     * t1385 — COUNT THE HOLES DRILLED, not the `( Array N @ … )` STAMP COMMENTS.
+     *
+     * The old count read those comments, which the `array` CONTAINER emitted once per stamped point. The switch folded the
+     * pattern into `holecycle`, which walks it at runtime: there is no per-hole comment, so the count read 0 for every
+     * pattern — including the `skip` case, which made "skip omits holes" pass against 0 === 0.
+     *
+     * A hole is now counted where it is real: a DISTINCT XY position at which the traced path cuts DOWNWARD. That survives
+     * however the pattern is spelled, and it is what the assert always meant.
+     */
+    const holes = (t) => {
+        const segs = traceToolpath(t).segments || [];
+        const at = new Set();
+        for (const s of segs) if (!s.rapid && s.z2 < s.z1) at.add(`${(+s.x2.toFixed(3)) + 0},${(+s.y2.toFixed(3)) + 0}`);
+        return at.size;
+    };
     const out = {};
 
     const sp = { w: 100, h: 80, toolDia: 12, stepoverPct: 60, depth: 0.5, stepdown: 0.5, feed: 800, plunge: 200, clearance: 5, strategy: 'raster' };

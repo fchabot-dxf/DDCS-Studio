@@ -8512,3 +8512,97 @@ CAM + blocks + surfacing + palette + registry **89/89**. **226 tests, 0 failures
 merge gate; this is emit-class and re-points every shipping drill and bore program.
 
 Screenshots under `test-results/t1385-shots/` (gitignored, so no PNG churn). Scratch specs deleted. Process tree clean.
+
+## t1387 (seat A) — THE SWITCH'S RADIUS: ten reds grounded, and ONE of them was a real regression
+
+All ten green. Nine were restatements; **one was a product defect the switch introduced**, and telling them apart was
+the whole job — the advisor's dispatch explicitly asked which, and the answer is not guessable from the assert text.
+
+### THE ONE PRODUCT FIX — the block→form reverse-sync was BROKEN, not stale
+
+`place-on-stock-block`'s fourth test ("editing the PlaceOnStock anchor in Blocks flows back to the wizard form") failed
+with `Expected "pp", Received ""`. That reads exactly like a stale assertion, so I diagnosed instead of restating.
+
+Two measurements decided it. **First, which LEG breaks:** the block→stack leg works (the program's
+`placeonstock.params.stockAttach` really does go `"" → "pp"`, and the test's own children-only `find` returns it), while
+the block→FORM leg does not — the wizard element exists but its value stays `""`. **Second, WHOSE fault:** I built a
+worktree at `15d155ca`, the commit immediately before the switch, and ran the whole file there. **All four pass
+pre-switch; three fail post-switch.** So the switch is the cause and this is a FIX.
+
+The cause is one line. `RECONCILERS.drill` opened with `find(prog, 'array')` and returned `null` when there was none —
+and after the fold there is none, so it returned "not a drill op, nothing to reverse-sync". Every drill field silently
+stopped flowing back from Blocks to the form; the anchor was just the one a test happened to watch.
+
+Repaired by reading the merged block. The interesting part is `method`/`ramp`: the reconciler used to read them off the
+block TYPE (a `bore` leaf meant helical), and the fold removed that signal. So `methodRampForCycle` is declared **beside
+`cycleForMethod` in drillWizard** rather than hand-rolled at the single call site — a two-way correspondence written
+twice is the thing that drifts, and the drift here would be a form that silently stops round-tripping when someone adds
+a fourth cycle.
+
+### THE ADVISOR'S FINDING, VERIFIED BEFORE NARROWING — and it was over-broad, not a product bug
+
+`tool-change-772`'s NONE-mode test used bare `/#1505/` as its proxy for "an HMI prompt is present". `#1505` is the
+Expert's OPERATOR MESSAGE register — a shared resource — and the parametric body now writes it for the zero-bite
+refusal. I emitted all three modes plus an op with **no tool declared at all**:
+
+    none          #1505=1   ;ERROR: peck …           the ONLY hit — the body's refusal. No prompt. CORRECT.
+    manual        #1505=1(Load T3 - 6mm ballnose)    the real prompt
+                  IF #1505==0 GOTO2                  its confirm read-back
+    atc           the refusal only                  (ATC arms with T3 M6; it does not prompt)
+    no tool       the refusal only                  → proves the line is the BODY's, not tool-change machinery
+
+So the ATC path is unchanged: an over-broad proxy. Narrowed to the prompt's distinguishing SHAPE — a message PAYLOAD in
+parentheses, `#1505=<n>(…)`, which the refusal's `;`-comment form can never match. The `||` was also split, because two
+claims joined by `or` hide which one broke.
+
+**AND THE MORE DANGEROUS ONE IN THAT FILE WAS PASSING.** The MANUAL-mode test asserts the prompt IS present using the
+same bare proxy — so once the refusal supplied a `#1505` it passed unconditionally, and would have gone on passing if the
+prompt were deleted outright. Narrowed in the same act though nothing was red. A test that fails for the wrong reason
+costs an hour; one that passes for the wrong reason costs the feature.
+
+### THE NINE RESTATEMENTS — one cause, four shapes
+
+Every red traces to the same root: **the pattern is walked at RUNTIME, so per-hole facts are no longer in the text.**
+
+- **`-Infinity` / `+Infinity`** (`wizard-pathdatum` ×3). `xsOf` scraped literal X words; a hole's X is now `X[0 + #75]`,
+  the match array is empty, and `Math.max()` of nothing is `-Infinity`. The asserts did not become wrong — they became
+  *unanswerable from text*. Each is a claim about where the tool GOES, so each now measures the distinct traced CUT
+  positions. Stricter than the scrape, which counted rapids and retracts as hole positions too.
+- **Counting stamp comments** (`pocket-asblocks`). `( Array N @ … )` was the container's per-point comment; the count read
+  0. Holes are counted where they are real: distinct XY positions the path cuts downward at.
+- **Pinning the old shape** (`place-on-stock-block` ×1, `wizard-pathdatum` ×1). `toContain('array')` / `hasArray`. The
+  claim ("the placement WRAPS the pattern") is unchanged; the pattern is now one block. I also assert the old container is
+  ABSENT, so neither can pass on a stack that somehow kept both.
+- **A proxy the fold inverted** (`sim-anim-refresh`). It proved "the sim re-pathed" by watching `program.length` GROW.
+  The fold makes length FIXED — a 2×2 grid and a 6×4 grid both emit 36 lines, and only the loop bound changes. Length was
+  only ever a proxy for "a different program is loaded", so the assert now reads the bound: 4 → 24. Sharper than the old
+  check, which a re-path onto some *other* 36-line program would have satisfied. And the fixed length is now asserted
+  explicitly, so nobody "fixes" this back to a growth comparison.
+
+### TWO SILENT VACUITIES REPAIRED THAT WERE NOT ON THE LIST
+
+Both were GREEN, which is why they are worth recording: the reds announce themselves, these do not.
+1. `wizard-pathdatum`'s "hole diameter never moves the grid" compared `xsOf(wide)` with `xsOf(base)` — post-switch both
+   are the empty array, so it passed while comparing nothing.
+2. `pocket-asblocks`'s "skip 2,5 → 4 holes" compared a text count of 0 against... it asserted `.toBe(4)` and so was red;
+   but the sibling `drill.holes` count meant the skip case could only ever have agreed by accident. Both now count traced
+   positions, and the skip case genuinely asserts 4 out of 6.
+
+### ONE FLAKE, NAMED
+
+The first combined run of the five files reported 20/1. Three subsequent combined runs and every isolated per-file run
+are green (21/21 ×3). Four Playwright workers on a box also carrying the advisor session and the analytics agent — the
+same contention class t1381 measured on middle-superset. Recorded rather than smoothed over; I could not attribute it to
+a specific test because it did not recur.
+
+### GATE (fast tier)
+
+The ten files **21/21** (×3 consecutive, after the one flake above). smoke **71/71**. Drill family + iron rule **72/72**.
+The reverse-sync consumers I could have broken with the product fix — studio-to-blocks, slot-array, shape-types,
+sim-start-block, contour, atc-roundtrip, atc-inline-onesource, middle-crossover — **31/31**. **195 tests, 0 failures.**
+
+**IRON RULE: 11/11, the same eleven, 0 blocks lost.** Unmoved by this turn.
+
+The diagnostic worktree at `15d155ca` was created for the attribution measurement and REMOVED. Scratch specs deleted.
+Process tree clean. The three rulings in hand are untouched — the dispatch says not to start them while the gate is red,
+and they are next now that it is green.

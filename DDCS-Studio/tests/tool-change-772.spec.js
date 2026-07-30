@@ -26,6 +26,34 @@ const emitProgram = (page, tools, mode, dialectKey) => page.evaluate(async ({ to
 
 const count = (s, re) => (s.match(re) || []).length;
 
+/**
+ * ── THE ATC PROMPT'S SHAPE, not the register's NAME (t1387) ────────────────────────────────────────────────────────
+ *
+ * These tests used bare `/#1505/` as their proxy for "an HMI prompt is present". `#1505` is the DDCS Expert's OPERATOR
+ * MESSAGE register — a shared resource, not a tool-change feature — and the drill family's parametric body now uses it
+ * too, for its zero-bite refusal: `#1505=1   ;ERROR: peck must be greater than zero` (t1385, the switch). So the proxy
+ * started matching a line that has nothing to do with tool changing.
+ *
+ * DIAGNOSED BEFORE NARROWING, because the alternative was a real product defect and the two look identical from the
+ * assert. Emitted all three modes plus an op with NO tool declared at all:
+ *     none          #1505=1   ;ERROR: peck …           ← the body's refusal, the ONLY hit. No prompt. CORRECT.
+ *     manual        #1505=1(Load T3 - 6mm ballnose)    ← the real prompt
+ *                   IF #1505==0 GOTO2                  ← its confirm read-back
+ *                   #1505=1   ;ERROR: peck …           ← plus the same refusal
+ *     atc           the refusal only (ATC arms with `T3 M6`, it does not prompt)
+ *     no tool at all  the refusal only — which proves the line is the BODY's, independent of tool changing
+ * So NONE mode emits no prompt and the ATC path is unchanged: an OVER-BROAD PROXY, not a product bug.
+ *
+ * The prompt's distinguishing SHAPE is a MESSAGE PAYLOAD in parentheses — `#1505=<n>(…)`. The refusal writes a bare
+ * value with a `;` comment and can never match that. Narrowed to the shape, these asserts say what they always meant.
+ *
+ * ⚠ AND THE MANUAL-MODE ASSERT WAS THE MORE DANGEROUS OF THE TWO, though it was PASSING: it asserts the prompt IS
+ * present, so once the refusal tail supplied a `#1505` it passed no matter what — it would have gone on passing if the
+ * prompt were deleted outright. A test that fails for the wrong reason costs an hour; one that passes for the wrong
+ * reason costs the feature. Narrowed in the same act, even though nothing was red.
+ */
+const HMI_PROMPT = /#1505=-?\d+\s*\(/;
+
 test('a two-op SAME-tool program emits ONE arm (op-1) + zero for op-2; no @TOOL marker leaks', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram && window.ddcsGetSettings);
@@ -49,7 +77,8 @@ test('MANUAL mode emits the confirm prompt per post — Expert HMI prompt, V4.1 
   const expert = await emitProgram(page, [3], 'manual', 'ddcs-expert-m350');
   const v41 = await emitProgram(page, [3], 'manual', 'ddcs-v41');
   expect(/Load T3/.test(expert), 'the operator instruction names the tool').toBe(true);
-  expect(/#1505/.test(expert), 'Expert renders a scripted HMI prompt').toBe(true);
+  expect(HMI_PROMPT.test(expert), 'Expert renders a scripted HMI prompt — by its PAYLOAD shape, not the register name').toBe(true);
+  expect(/#1505=-?\d+\(Load T3/.test(expert), 'and the prompt carries the tool in its payload (so this cannot pass on an unrelated #1505)').toBe(true);
   expect(/T3 M6/.test(expert), 'manual mode does NOT call the ATC macro').toBe(false);
   expect(/Load T3/.test(v41), 'V4.1 still names the tool').toBe(true);
   expect(/\bM0\b/.test(v41), 'off-HMI it degrades to an M0 that BLOCKS until Cycle Start').toBe(true);
@@ -61,7 +90,12 @@ test('NONE mode emits an honest comment only — no macro, no prompt', async ({ 
   const g = await emitProgram(page, [3], 'none', 'ddcs-expert-m350');
   expect(/no changer configured/i.test(g), 'the honest no-changer note').toBe(true);
   expect(/load .*T3/i.test(g), 'it still tells the operator which tool').toBe(true);
-  expect(/T3 M6/.test(g) || /#1505/.test(g), 'no ATC macro and no HMI prompt').toBe(false);
+  // SPLIT, because the two claims fail for different reasons and an `||` hides which one broke.
+  expect(/T3 M6/.test(g), 'no ATC macro in NONE mode').toBe(false);
+  expect(HMI_PROMPT.test(g), 'and no HMI prompt — matched by the prompt SHAPE, so the body\'s own #1505 refusal cannot trip it').toBe(false);
+  // …and the register IS present, from the drill body's refusal tail. Asserted so this test records WHY the old bare
+  // `/#1505/` proxy went red at t1385 — otherwise the next reader re-widens it and re-lives the diagnosis.
+  expect(/#1505=1\s+;ERROR/.test(g), 'the #1505 that IS here is the parametric body\'s zero-bite refusal, not a prompt').toBe(true);
 });
 
 test('an op with NO declared tool is byte-identical (no arm, no marker) — the goldens hold', async ({ page }) => {
