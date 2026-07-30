@@ -9236,3 +9236,104 @@ Scratch probe deleted; process tree clean; no worktrees left behind.
 were the honest cost of not building on a wrong premise. Whatever the ruling, the act that follows is emit-class
 (frozen reference + relationship bridge + a 2→1 stack change + the reconciler sweep) and **wants a fresh session** —
 parking is the right call here rather than starting that on a half-tank.
+
+
+## t1404 (seat A) — T3 ACT A: the rings descend, the envelope stops lying, and the inset seam lands
+
+Released **V2026.07.30.6** — this is a shipped-defect fix, so it goes out rather than waiting for the arc.
+
+### THE FIX
+
+`ringWalk` never destructured `entry`/`rampAngle`/`helixDia`/`helixPitch`; only `rowWalk` did. So `strategy:'concentric'`
+with a ramp or helix entry emitted a straight PLUNGE, in released code. The correction is small and the shape of it is
+the point:
+
+    rampLines / helixLines   take sx,sy — the descent's start-and-return point — instead of ASSUMING the row start
+    descentLines(o)          ONE chooser both walks ask by name
+    rowWalk                  sx,sy = x0, y0 + stepBaked/2   (unchanged value)
+    ringWalk                 sx,sy = x0, y0                 (the outer ring's corner, where the plunge already was)
+
+**Why a named function and not a fixed branch.** Sitting inline in `rowWalk` is precisely *how* the rings shipped with
+no descent. A walk cannot forget a descent it has to ask for by name. The literal kernel had this right from the
+beginning — `entryOrPlunge(ctx, x, y, plungeLines)` in clearing.js is called by `concentricRect` and the row fill
+alike, with each walk's own start point. This is that shape, parametric; I found it while reading the reference and
+copied its structure rather than inventing one.
+
+### THE BLAST RADIUS, MEASURED IN A HEAD WORKTREE — NOT ARGUED
+
+54 configs (both strategies × all three entries × plain / rotated / skim / confirm-every / a tiny area / deeper depth /
+stepover / ramp angle / helix Ø): **36 byte-identical, and the 18 that changed were EXACTLY `concentric/ramp` and
+`concentric/helix`.** That is the whole claim a fix has to make — the broken combinations change, and their byte change
+IS the fix; nothing else moves. Re-run after the comment change below, same result.
+
+### TWO CORRECTIONS TO MY OWN t1402 REPORT
+
+1. **Reachability was stated too loosely.** I wrote that the combination is "reachable from the form", citing
+   surfacingWizard.js passing both params through. The pass-through is real, but the STUDIO surfacing form has **no
+   entry control at all** (`surfacingView.js` reads `sf_strategy`; there is no `sf_entry`). The defect is reachable
+   from the **data twin's** form — `user_surfacing_data` carries both as dropdown widgets (`data-param="strategy"`
+   → parallel|concentric, `data-param="entry"` → plunge|ramp|helix, verified in the live DOM) — and from the Blocks
+   canvas and a CAM slot. Still a real GUI, still shipped; but the surface is the wizards-as-data one, not the legacy
+   form, and the severity claim should say which.
+2. **`parallel × helix` differs from the literal by 0.001mm in Z** on some segments. Pre-existing, not mine —
+   parallel/helix is byte-identical across this change. It is one unit of the emit's own rounding, arising from a
+   different accumulation in the literal's polyline. NAMED here and asserted as a bound in the ring-helix test rather
+   than papered over with a loose `toEqual`; the t1329 bridge only ever compared helix *counts*, which is why it never
+   surfaced.
+
+### THE ENVELOPE IS A TABLE NOW — and the first version of it rebuilt the very bug it exists to stop
+
+`surfaceRasterCovers` was `return true` and `surfaceRasterGap` was `return ''`. Both were honest summaries of their
+moment; a constant cannot stay true. Coverage is now DATA — `SURFACE_RASTER_PROVEN`, one row per (strategy, entry) with
+the turn that earned it — so a new strategy or descent is a row somebody has to add, and until they do the predicate
+refuses and says why.
+
+**The mistake worth recording:** my first cut normalised any non-`concentric` strategy to `parallel` (mirroring what
+the emitter *does*) while keeping an unknown *entry* verbatim. That asymmetry made `strategy:'adaptive'` read as
+PROVEN — operator asks for one thing, atom silently does another, predicate calls it covered. **The t1402 defect,
+rebuilt inside the function written to prevent it**, and my own spec caught it. "What will actually run is proven" is a
+true statement and the wrong question; the question is whether what runs is what was ASKED for. Both axes now: absent →
+the default (proven), unknown → verbatim → refuses.
+
+I also declared `SURFACE_RASTER_IGNORES.direction` — the walk is *always* both-ways (`#49` seeded 1, negated every row,
+no branch). That has never been a gap because `surfacingStack` hard-codes both-ways, which is why the envelope still
+calls one-way covered and why that verdict stands for THIS op. It stops being right the moment a caller with a real
+`direction` param emits through the atom — **pocket has one** — so the fact is written next to the table instead of
+living in a work-log entry the next act would have to find. Same class as the descent; caught before it ships.
+
+### THE INSET SEAM
+
+`inset` (default 0): the walk offsets in on all four sides, `extent` keeps declaring the GIVEN rect. That split is the
+answer to t1402's finding-3 — when the two were one declaration, the place fold aligned the tool-centre sweep where it
+should have aligned the pocket, and a placed pocket slid by exactly the tool radius. Footprint and walk now agree by
+construction rather than by the caller remembering. Its VALUE is never re-derived here; the consumer passes what
+`pocketInsetRegion` already computed.
+
+Three things landed WITH it rather than after: `@work` reads the inset area (it multiplies rows, so the given rect
+would over-declare) and omits when the inset is live; `atomRoles` gets an `inset: 'geometry'` row **the turn the key is
+born** — t1399's lesson applied on time rather than two turns late; and a collapse guard on its own label with its own
+message, emitted only when `inset > 0` so the zero case stays byte-identical. That last one is deliberate: refusing
+through `GOTO91` would have told the operator the STEPOVER was zero, and a wrong operator message is a gate-1 defect in
+this project, not a cosmetic one.
+
+### SEEN, NOT INFERRED
+
+Screenshot of the data twin at concentric + ramp: both the 3D and the 2D preview now show a **diagonal running from the
+corner into the centre of the rings**. That line is the descent — before this change it did not exist, because a plunge
+has no XY extent. `scratchpad/1404-twin-concentric-ramp.png`.
+
+### GATE (fast tier)
+
+New spec **15/15**. Surfacing family **115/115** (10 specs). Smoke **71/71**. Every spec touching the other changed
+files — atomRoles / declaredWork / opCamMap consumers, CAM, blocks round-trip, pocket, drill arc — **111/111**.
+Iron rule **4/4: 11/11 text diffs, the same eleven, 0 blocks lost.** Version sync **6/6**. **301 tests, 0 failures.**
+
+HEAD worktree removed; scratch specs deleted; process tree clean. FULL SUITE NOT RUN — that is the advisor's merge gate.
+
+### WHAT THE RE-POINT ACT STARTS FROM
+
+The atom now (a) descends on rings, (b) takes an inset without lying about its footprint, and (c) refuses an
+unmeasured combination by name. The open item I did NOT act on, because it is the next act's design and the user has
+already ruled the order: `direction` is ignored by this atom and pocket has one — under ROUGH-ALL-THEN-WALL the fill's
+per-level cut SET is the criterion, so a one-way pocket fill would still emit both-ways and needs either its own row
+in the table or a walk that reads it. Flagged, not built.

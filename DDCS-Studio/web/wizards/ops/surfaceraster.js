@@ -194,8 +194,11 @@ export function surfaceRasterWorkSteps(p = {}) {
      * past a check written for today's set.
      */
     const live = (v) => /^(#|\[)/.test(String(v == null ? '' : v).trim());
-    if ([p.depth, p.stepdown, p.w, p.h, p.toolDia, p.stepoverPct, p.stepover, p.helixPitch].some(live)) return null;
-    const w = num(p.w, 100), h = num(p.h, 80);
+    if ([p.depth, p.stepdown, p.w, p.h, p.toolDia, p.stepoverPct, p.stepover, p.helixPitch, p.inset].some(live)) return null;
+    // t1404 — the pass counts below multiply the AREA, and the area the walk covers is the INSET one. Reading the
+    // given rect here would over-declare the work by two insets' worth of rows on every consumer that passes one.
+    const inset = Math.max(0, num(p.inset, 0));
+    const w = num(p.w, 100) - 2 * inset, h = num(p.h, 80) - 2 * inset;
     const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
     const tool = Math.max(0.1, num(p.toolDia, 12));
     const step = Math.max(0.01, tool * stepoverPctOf(p, tool) / 100);
@@ -217,7 +220,25 @@ export function surfaceRasterWorkSteps(p = {}) {
 }
 
 export function surfaceRasterLines(p = {}) {
-    const w = num(p.w, 100), h = num(p.h, 80);
+    /**
+     * ── t1404 — THE DECLARED INSET: the walk runs INSIDE the rect the op declares ────────────────────────────────
+     *
+     * Surfacing faces a top: the sweep IS the rect, the tool overhangs the edge, and `inset` stays 0 — every line
+     * below then collapses to exactly what it emitted before, asserted byte-for-byte. A POCKET is the other case:
+     * the op occupies its outline but the tool centre may only reach a radius inside it, so the thing walked and the
+     * thing occupied are two different rectangles.
+     *
+     * WHY A PARAM AND NOT "just pass the smaller rect": because `extent` — which the place fold reads in preference
+     * to its own frozen snapshot — would then declare the SMALL one, and t1402 measured what that does: a placed
+     * pocket slid by exactly the tool radius, because the placement aligned the tool-centre sweep where it should
+     * have aligned the pocket. Splitting them makes footprint and walk agree BY CONSTRUCTION rather than by the
+     * caller remembering: `extent` keeps declaring the GIVEN rect, the walk takes the inset one, and one number
+     * relates them. Its VALUE is never re-derived here — the consumer passes what `pocketInsetRegion` already
+     * computed, which is the one source for what a pocket's inset MEANS (t1402: the dispatch's `r + wallOffset` and
+     * the shipped `r − wallOffset` disagree in sign, and the shipped one is the one that has always run).
+     */
+    const inset = Math.max(0, num(p.inset, 0));
+    const w = num(p.w, 100) - 2 * inset, h = num(p.h, 80) - 2 * inset;
     const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
     const tool = Math.max(0.1, num(p.toolDia, 12));
     // ONE DERIVATION, shared with the CAM slot and the wizard stack: stepover is tool Ø × %. A caller still carrying
@@ -237,7 +258,9 @@ export function surfaceRasterLines(p = {}) {
     // PARAMS instead of applied to the emitted text afterwards (t1349 measured what the text rewrite does to
     // expressions and registers — a half-shifted move and a corrupted comment). At the zero frame every expression
     // below collapses to exactly what it emitted before, which the bridge asserts byte-for-byte.
-    const x0 = num(p.x, 0), y0 = num(p.y, 0), z0 = num(p.z0, 0);
+    // t1404 — x0/y0 are the WALK's origin, so the inset moves them in on both axes. `extent` below still reads the
+    // block's own x/y/w/h, which is what keeps the declared footprint the GIVEN rect. At inset=0 these are unchanged.
+    const x0 = num(p.x, 0) + inset, y0 = num(p.y, 0) + inset, z0 = num(p.z0, 0);
     const confirmEvery = Math.max(0, Math.round(num(p.confirmEvery, 0)));
     const r3 = (n) => Math.round(n * 1000) / 1000;
     const zTop = r3(z0);   // the surface this op faces from — 0 in the op's own frame, the placement's offZ when placed
@@ -336,6 +359,14 @@ export function surfaceRasterLines(p = {}) {
         `${V.step}=[${r3(tool)} * ${r3(pct)} / 100]   ( stepover mm = tool Ø ${r3(tool)} x ${r3(pct)}% — the CAM derives it the same way )`,
         `IF ${V.step} <= 0 GOTO91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
         `IF ${V.stepdown} <= 0 GOTO91`,
+        // t1404 — AN INSET CAN EAT THE AREA, and a collapsed rect walks an inverted ring rather than failing loudly.
+        // Emitted only when an inset is actually declared, so the zero case stays byte-identical; and it gets its own
+        // label + message because refusing through GOTO91 would tell the operator the STEPOVER was zero, which is a
+        // wrong operator message — the thing this project treats as seriously as wrong motion.
+        ...(inset > 0 ? [
+            `IF ${V.w} <= 0 GOTO95   ( the ${r3(inset)}mm inset leaves no width to clear )`,
+            `IF ${V.h} <= 0 GOTO95`,
+        ] : []),
         ...walk.count,
         '',
         `${V.z}=0   ( the level being cut )`,
@@ -361,6 +392,12 @@ export function surfaceRasterLines(p = {}) {
         'N91',
         '#1505=1   ;ERROR: stepover / stepdown must be greater than zero',
         'N92',
+        ...(inset > 0 ? [
+            'GOTO96',
+            'N95',
+            `#1505=1   ;ERROR: the ${r3(inset)}mm inset leaves no area to clear - the tool is too large for this feature`,
+            'N96',
+        ] : []),
         ...refusal,
     ];
 }
@@ -376,15 +413,36 @@ export function surfaceRasterLines(p = {}) {
  * own comment says so too), so a surfacing op CANNOT emit a one-way raster and no user config reaches it. A
  * parametric one-way walk was written and then deleted — machinery for a case this op does not have.
  */
-function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry, rampAngle, helixDia, helixPitch, toolDia, stepBaked, rot, mv, AX, TM }) {
+/**
+ * THE LEVEL'S DESCENT — ONE SOURCE, ASKED BY BOTH WALKS (t1404).
+ *
+ * WHY THIS FUNCTION EXISTS AT ALL, since it is a three-way ternary that used to sit inline in rowWalk: because sitting
+ * inline in rowWalk is precisely how `concentric` shipped with no descent. `ringWalk` never destructured
+ * `entry`/`rampAngle`/`helixDia`/`helixPitch` — so a ramp or helix SELECTION on the rings emitted a straight plunge,
+ * silently, in released code (measured at t1402: the literal cuts 2 ramping moves and 48 helical ones, the parametric
+ * cut zero). A walk cannot forget a descent it has to ASK for by name, which is the whole reason this is a named thing
+ * both callers reach rather than a branch one of them happens to contain.
+ *
+ * The literal kernel had this right from the start: `entryOrPlunge(ctx, x, y, plungeLines)` in clearing.js is called by
+ * concentricRect and the row fill ALIKE, with the walk's own start point. This is that shape, parametric.
+ *
+ * `sx`/`sy` is the ONLY thing that differs between the two walks — the point the descent starts from and returns to.
+ * The plunge case is byte-for-byte the line both walks emitted before, which is what keeps every working combination
+ * (all of parallel, and concentric×plunge) unchanged.
+ */
+function descentLines(o) {
+    if (o.entry === 'ramp') return rampLines(o);
+    if (o.entry === 'helix') return helixLines(o);
+    return [`    G1 Z${o.azE('- ' + V.z)} F${o.plunge}   ( the ONE plunge of this level )`];
+}
+
+function rowWalk(o) {
+    const { x0, y0, w, h, feed, plunge, clr, r3, F, ax, axE, ayE, stepBaked, mv, AX, TM } = o;
     void clr;
     // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP walks toward the area centre at the declared
     // angle and comes back. See rampLines for why toC and 1/tan are BAKED and what that costs.
-    const descent = (entry === 'ramp')
-        ? rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM })
-        : (entry === 'helix')
-            ? helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM })
-            : [`    G1 Z${azE('- ' + V.z)} F${plunge}   ( the ONE plunge of this level )`];
+    // t1404 — the row start is handed DOWN now (it was assumed inside the descent builders); the value is unchanged.
+    const descent = descentLines({ ...o, sx: x0, sy: y0 + stepBaked / 2 });
     // THE THREE POINTS THIS WALK VISITS, declared once as X/Y pairs so the rotation reads them rather than the text.
     // NEAR/FAR are the row's two ends; ROW is the row's Y, which the body has already computed into #47 as an ABSOLUTE
     // (unrotated) coordinate — so its affine form is a bare register with no constant, and #47 keeps meaning exactly
@@ -472,11 +530,12 @@ function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE
  * the literal kernel already supports it via runX/runY) or live-SQRT if V13 proves it; plus the true-arc helix with
  * start/end points, radius envelope and depth-per-revolution as the substitute criteria. That turn lifts the gate.
  */
-function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
+function rampLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, rampAngle, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
     const ang = Math.min(45, Math.max(0.5, rampAngle));
     const invTan = 1 / Math.tan(ang * Math.PI / 180);
-    // the ramp starts where the plunge would: the first row, at build values
-    const sx = x0, sy = y0 + stepBaked / 2;
+    // t1404 — sx/sy (where the plunge WOULD have happened) is now GIVEN by the walk instead of assumed to be the first
+    // row. It is the same fact the literal kernel passes to `levelEntry` as (x0,y0): a row walk hands its row start, a
+    // ring walk hands the outer ring's corner. Assuming it here is exactly what left rings with no descent at all.
     const cx = x0 + w / 2, cy = y0 + h / 2;
     const toC = Math.hypot(cx - sx, cy - sy);
     const ux = toC > 1e-9 ? (cx - sx) / toC : 0, uy = toC > 1e-9 ? (cy - sy) / toC : 0;
@@ -498,7 +557,7 @@ function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3,
         `    IF ${V.run} > ${r3(toC)} GOTO41   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
         `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( down to the floor this level starts from )`,
         `    G1 ${mv(RAMP_X, RAMP_Y)} Z${azE(`- ${V.z}`)} F${feed}   ( ramp )`,
-        `    G1 ${mv(START_X, START_Y)} F${feed}   ( back to the row start, now at depth )`,
+        `    G1 ${mv(START_X, START_Y)} F${feed}   ( back to the ${startLabel}, now at depth )`,
         '    GOTO42',
         '    N41',
         `    G1 Z${azE(`- ${V.z}`)} F${plunge}   ( the ramp did not fit — straight plunge )`,
@@ -527,14 +586,14 @@ function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3,
  * no matter how deep the descent runs. THE TWO ARE SEPARATE REQUIREMENTS: re-seeding alone still leaves 1.2e−3 at
  * 6 decimals, and 9 decimals alone would drift without bound on a deep descent. The bound holds only with both.
  */
-function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
+function helixLines({ x0, y0, sx, sy, startLabel = 'row start', zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
     const SEG = 24, theta = 2 * Math.PI / SEG;
     // NINE decimals — see the derivation above. r3 would be catastrophic here for exactly the reason t1339 found
     // one level down, and 6 is not enough either.
     const d9 = (n) => Number(n.toFixed(9));
     const c = d9(Math.cos(theta)), sn = d9(Math.sin(theta));
     const cx = x0 + w / 2, cy = y0 + h / 2;
-    const sx = x0, sy = y0 + stepBaked / 2;             // the row start the descent returns to
+    // t1404 — sx/sy: where the descent comes back OUT to, given by the walk (see rampLines).
     const inrad = Math.min(w, h) / 2;                   // rect inradius, the literal's own clamp source
     const wantR = helixDia > 0 ? helixDia / 2 : Math.max(0.1, toolDia) / 2;
     const R = Math.max(0.2, Math.min(wantR, inrad - 0.01));
@@ -570,7 +629,7 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
         `      ${HX.vx}=${HX.tmp}`,
         `      G1 ${mv(ARC_X, ARC_Y)} Z${azE(`- ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}`)} F${feed}`,
         '    END3',
-        `    G1 ${mv(OUT_X, OUT_Y)} Z${azE(`- ${V.z}`)} F${feed}   ( helix — out to the row start, now at depth )`,
+        `    G1 ${mv(OUT_X, OUT_Y)} Z${azE(`- ${V.z}`)} F${feed}   ( helix — out to the ${startLabel}, now at depth )`,
         `    IF ${V.z} > 0 GOTO52`,
         `    G1 Z${azE(`- ${V.z}`)} F${plunge}`,
         '    N52',
@@ -582,8 +641,13 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
  * shrunk by `inset` on every side, and the walk stops when a ring would collapse. The tool steps to the next ring on
  * a DIAGONAL CUTTING move and never lifts within a level — one plunge, like the both-ways raster.
  */
-function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM }) {
-    void clr; void rot;
+function ringWalk(o) {
+    const { x0, y0, w, h, feed, clr, r3, F, ax, axE, ayE, mv, AX, TM } = o;
+    void clr; void F; void ax;
+    // t1404 — THE DESCENT THE RINGS NEVER HAD. The outer ring's corner IS where the plunge happens (at i=0 the inset
+    // register is 0, so IN_X/IN_Y are exactly x0/y0), so that is the point the ramp runs from and returns to — the same
+    // point the literal kernel hands `entryOrPlunge` from `concentricRect`'s `first` branch.
+    const descent = descentLines({ ...o, sx: x0, sy: y0, startLabel: 'ring corner' });
     // t1375 — a ring's four corners, declared as X/Y pairs. The inset (#47) walks INWARD on both axes at once, so
     // under rotation it lands on both with mixed coefficients — which is why the pairs are declared together rather
     // than each axis owning its own string.
@@ -606,7 +670,7 @@ function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, ax
             `  WHILE [${V.i} < ${V.n}] DO2   ( rings, inward )`,
             `    IF ${V.i} > 0 GOTO21`,
             `    G0 ${mv(IN_X(), IN_Y())}`,
-            `    G1 Z${azE(`- ${V.z}`)} F${plunge}   ( the ONE plunge of this level )`,
+            ...descent,
             '    GOTO22',
             '    N21',
             `    G1 ${mv(IN_X(), IN_Y())} F${feed}   ( diagonal step in to the next ring, still cutting )`,
@@ -637,23 +701,83 @@ function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, ax
  * instead of assuming it is. Retiring the literal emitter means closing what is left — every `false` below is a
  * feature that would otherwise vanish on the day the old path dies.
  */
+/**
+ * ── t1404 — THE ENVELOPE IS A TABLE NOW, AND THAT IS THE WHOLE POINT ─────────────────────────────────────────────
+ *
+ * This predicate used to be `return true` and its partner `return ''`. Both were honest summaries of their moment:
+ * t1345 closed the last descent, t1355 closed skim, and "everything is covered" was, at the time, TRUE.
+ *
+ * A CONSTANT CANNOT STAY TRUE, and t1402 measured what that costs. `concentric` × `ramp|helix` was never bridged —
+ * every bridge that probed a descent probed it against `strategy: 'parallel'` — and `ringWalk` in fact emitted a
+ * straight PLUNGE for both. The predicate answered `true` for a combination nothing had ever measured, and it read
+ * exactly like the five answers that were earned. That is the same failure as t1399's atomRoles finding, one floor
+ * up: a default that LOOKS like a decision.
+ *
+ * So coverage is DATA, keyed by the two axes that select a code path, with the turn that earned each one. A new
+ * strategy or a new descent is a row someone has to add — and until they do, the predicate says "no bridge" and
+ * names it, instead of inheriting a `true` that was about somebody else's feature. The cost of the table is one line
+ * per combination; the cost of the constant was a shipped op that plunged when the operator asked it to ramp.
+ */
+export const SURFACE_RASTER_PROVEN = {
+    'parallel/plunge': 't1329 — the first bridge, move for move against the literal raster',
+    'parallel/ramp': 't1339 — the ramp descent, baked toC + 1/tan',
+    'parallel/helix': 't1345 — the 24-segment polyline helix, within one emit quantum',
+    'concentric/plunge': 't1333 — inward rings, proven on four adversarial ring boundaries',
+    'concentric/ramp': 't1404 — the descent the rings never had (the t1402 defect)',
+    'concentric/helix': 't1404 — likewise; both now run the SAME descentLines both walks ask for',
+};
+
+/**
+ * WHAT THE ATOM DOES NOT READ, declared rather than left to be re-discovered.
+ *
+ * `direction` is the live one: the walk is ALWAYS both-ways (`#49` is seeded 1 and negated once per row,
+ * unconditionally), so a caller asking for one-way gets both-ways. That has never been a gap because no surfacing
+ * config can set it — `surfacingStack` hard-codes `direction: 'bothways'` — which is exactly why the envelope calls
+ * one-way covered and why that verdict is still right for THIS op. It stops being right the moment a caller with a
+ * real `direction` param emits through this atom (pocket has one), so the fact is written down HERE, next to the
+ * table, rather than living in a work-log entry somebody would have to find. Same class as the defect above; caught
+ * before it shipped rather than after.
+ */
+export const SURFACE_RASTER_IGNORES = {
+    direction: 'the walk is always both-ways — #49 is seeded 1 and negated every row, with no branch on direction',
+};
+
+/**
+ * (strategy, entry) → the table's key.
+ *
+ * ABSENT falls to the default (the block's own `parallel`/`plunge`) — an unset config IS the defaults, and those are
+ * proven. An UNKNOWN value is kept verbatim so it misses the table and refuses.
+ *
+ * THE TWO AXES ARE NORMALISED THE SAME WAY, and getting that wrong once is why this comment exists: the first cut
+ * folded any non-'concentric' strategy to 'parallel' (mirroring what the emitter DOES) while keeping an unknown
+ * entry verbatim. That asymmetry made `strategy: 'adaptive'` read as PROVEN — the operator asks for one thing, the
+ * atom silently does another, and the predicate calls it covered. That is the t1402 defect exactly, rebuilt in the
+ * very function written to prevent it. "What will actually run is proven" is a true statement and the wrong
+ * question; the question is whether what runs is what was ASKED for.
+ */
+function surfaceRasterCombo(p = {}) {
+    const strategy = String(p.strategy == null ? '' : p.strategy).trim() || 'parallel';
+    const entry = String(p.entry == null ? '' : p.entry).trim() || 'plunge';
+    return `${strategy}/${entry}`;
+}
+
+/**
+ * Is this config inside the PROVEN envelope? Scope, accumulated by the turns named in the table: the body, the
+ * PLACED program (t1351 — the atom carries its own frame), and the SKIM Z-mode (t1355 — one body, two frames), for
+ * whichever (strategy, entry) row applies. The confirm cadence (t1335) rides every row: it is a wrapper around the
+ * level, not a walk or a descent.
+ */
 export function surfaceRasterCovers(p = {}) {
-    // t1345 — every strategy (parallel, concentric), every descent (plunge, ramp, helix) and the confirm cadence were
-    // each closed by their own bridge, in their own turn, against hand-derived truths.
-    // t1349 — the scope of that claim was the BODY, and saying so was the finding: every bridge frames this body BARE.
-    // t1351 — SCOPE EXTENDED TO THE PLACED PROGRAM. The atom now carries its own frame (x0/y0/z0) instead of having a
-    // placement applied to its text afterwards, and the placement bridges prove the absorbed frame equals the shipping
-    // placed literal move for move. So a PLACED surfacing op is inside the envelope.
-    //
-    // t1355 — SKIM CLOSES, and it closed the way the last three did: by becoming the SAME body, not a second one.
-    // The atom reads the jog frame into three registers at the top and its ordinary absolute body runs over them, so
-    // every strategy and every descent came along for free rather than each needing its own G91 derivation. The
-    // envelope is empty again, now at FULL-PROGRAM scope — body, placement AND Z-mode.
-    return true;
+    return Object.prototype.hasOwnProperty.call(SURFACE_RASTER_PROVEN, surfaceRasterCombo(p));
 }
 
 /** Why a config is outside the envelope, in the words a reader needs — never a bare false. */
-export function surfaceRasterGap() { return ''; }
+export function surfaceRasterGap(p = {}) {
+    const k = surfaceRasterCombo(p);
+    if (Object.prototype.hasOwnProperty.call(SURFACE_RASTER_PROVEN, k)) return '';
+    return `${k} has no equivalence bridge — no turn has measured this walk/descent pair against the literal kernel, `
+        + `so the emit is unproven for it (the known combinations are ${Object.keys(SURFACE_RASTER_PROVEN).join(', ')})`;
+}
 
 export const surfaceRasterBlock = {
     type: 'surfaceraster', label: 'Surface Raster (parametric)', kind: 'leaf', category: 'Transforms',
@@ -661,8 +785,11 @@ export const surfaceRasterBlock = {
     // this declaration entirely (entry/rampAngle/helixDia/helixPitch/confirmEvery) — a declaration that disagrees with
     // its own emitter is a feature DROP waiting for the day this atom round-trips through the canvas, so it is closed
     // here rather than left for the switch to discover. Defaults match the emitter's own num() fallbacks exactly.
-    defaults: { x: 0, y: 0, z0: 0, w: 100, h: 80, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 },
-    fields: ['x', 'y', 'z0', 'w', 'h', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
+    // t1404 — `inset` joins the declaration for the same reason z0 did at t1351: `lines()` reads it, so a declaration
+    // that omitted it would be a feature DROP the day this atom round-trips through the canvas. Default 0 = surfacing's
+    // own meaning, unchanged and asserted byte-identical.
+    defaults: { x: 0, y: 0, z0: 0, w: 100, h: 80, inset: 0, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 },
+    fields: ['x', 'y', 'z0', 'w', 'h', 'inset', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
     scratch: RASTER_SCRATCH,   // read by universalScratch.opBands() — the band is data, not a comment
     // t1361 — THE DECLARED FOOTPRINT, and the ONE thing the collapse dropped. `surfacefill` declared an `extent` and
     // the place fold reads it (liveExtent) IN PREFERENCE to placeonstock's frozen bminX..bmaxX snapshot; folding

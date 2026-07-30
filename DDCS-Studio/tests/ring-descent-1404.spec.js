@@ -1,0 +1,228 @@
+import { test, expect } from '@playwright/test';
+
+/**
+ * t1404 — THE RINGS DESCEND, THE ENVELOPE STOPS LYING, AND THE INSET SEAM LANDS.
+ *
+ * THE DEFECT THIS FIXES, stated so nobody has to reconstruct it. `surfacingStack` — the path that SHIPS — emitted a
+ * straight PLUNGE whenever `strategy: 'concentric'` was combined with `entry: 'ramp'` or `'helix'`. `ringWalk` never
+ * destructured entry/rampAngle/helixDia/helixPitch; only `rowWalk` did. Measured at t1402 against the literal
+ * emitter the bridges keep alive: the literal cut 2 ramping moves and 48 helical ones, the parametric cut ZERO.
+ *
+ * It matters because of WHY an operator picks a ramp: the endmill will not plunge. Getting a straight plunge is the
+ * exact failure that selection exists to prevent, so this is a wrong-motion defect, not a cosmetic one.
+ *
+ * WHY NOTHING CAUGHT IT — and this is the part the spec is really guarding. `surfaceRasterCovers` had been reduced
+ * to a bare `return true` (an honest summary of t1355's moment), and every bridge that probed a DESCENT probed it
+ * against `strategy: 'parallel'`. So `concentric × ramp` was never measured, and the predicate answered `true` for
+ * it in a voice indistinguishable from the five answers that were earned. Same class as t1399's atomRoles finding:
+ * a default that reads like a decision.
+ *
+ * So the first test below is the fix, and the rest are the reasons it cannot happen again.
+ */
+
+const boot = async (page) => {
+    await page.goto('http://localhost:3211');
+    await page.waitForFunction(() => window.ddcsGetBlockProgram);
+};
+
+const BASE = { w: 100, h: 60, depth: 1.0, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 900, plunge: 180, clearance: 5 };
+
+/** literal vs parametric, as (position, feed) per cut move — the t1329/t1377 comparator, unchanged. */
+const bridge = (page, cfg) => page.evaluate(async (cfg) => {
+    const { surfacingStack, surfacingLiteralStack } = await import('/wizards/surfacingWizard.js');
+    const { emitProgram } = await import('/blocks/blockEmitter.js');
+    const { traceToolpath } = await import('/engine/trace.js');
+    const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid)
+        .map((s) => [+s.x1.toFixed(3), +s.y1.toFixed(3), +s.z1.toFixed(3), +s.x2.toFixed(3), +s.y2.toFixed(3), +s.z2.toFixed(3), +Number(s.feed || 0).toFixed(3)]);
+    // A DESCENT move: cutting, changing Z, AND moving in XY. A straight plunge changes Z with no XY, so this counts
+    // exactly the thing the defect destroyed rather than counting moves in general.
+    const ramping = (rows) => rows.filter((r) => Math.abs(r[5] - r[2]) > 1e-6 && (Math.abs(r[3] - r[0]) > 1e-6 || Math.abs(r[4] - r[1]) > 1e-6)).length;
+    const L = cut(String(emitProgram(surfacingLiteralStack(cfg)))), P = cut(String(emitProgram(surfacingStack(cfg))));
+    return { L, P, lRamp: ramping(L), pRamp: ramping(P) };
+}, cfg);
+
+/**
+ * THE FIX, ON THE ADVERSARIAL CONFIGS RATHER THAN ONE SAMPLE. The ring boundaries are t1333's own choices — where a
+ * ring collapses exactly, where only one fits, where the inset does not divide the short side — because those are
+ * where a descent bolted onto the wrong ring would show up. A single interior config would pass either way.
+ */
+const RING_CONFIGS = [
+    { name: 'the middle collapses exactly on a boundary', extra: { w: 100, h: 28.8 } },
+    { name: 'a single ring, the middle closes immediately', extra: { w: 40, h: 12 } },
+    { name: 'inset does not divide the short side evenly', extra: { w: 120, h: 65, depth: 1.0 } },
+    { name: 'square — both sides close at once', extra: { w: 80, h: 80, toolDia: 10, stepoverPct: 50 } },
+    { name: 'many levels, so the descent repeats', extra: { depth: 3, stepdown: 0.4 } },
+    { name: 'a steep ramp angle', extra: { rampAngle: 20 } },
+];
+
+for (const c of RING_CONFIGS) {
+    test(`RINGS RAMP — ${c.name}`, async ({ page }) => {
+        await boot(page);
+        const r = await bridge(page, { ...BASE, strategy: 'concentric', entry: 'ramp', ...c.extra });
+        // THE DEFECT ITSELF: the literal descends, so the parametric must descend too. Asserting the COUNT of ramping
+        // moves (not just equality of the arrays) states the defect in its own terms — a regression that reverted the
+        // fix would show up here as `0`, naming what broke, rather than as an opaque array mismatch.
+        expect(r.lRamp, `the literal ramps on this config (else the config proves nothing)`).toBeGreaterThan(0);
+        expect(r.pRamp, `the parametric must ramp too — this is the t1402 defect`).toBe(r.lRamp);
+        expect(r.P, `and the whole toolpath agrees move for move`).toEqual(r.L);
+    });
+}
+
+test('RINGS HELIX — the descent the rings never had, move for move', async ({ page }) => {
+    await boot(page);
+    const r = await bridge(page, { ...BASE, strategy: 'concentric', entry: 'helix', helixDia: 8, helixPitch: 1 });
+    expect(r.lRamp, 'the literal helixes').toBeGreaterThan(0);
+    expect(r.pRamp, 'and so does the parametric now').toBe(r.lRamp);
+    // NOT `toEqual` on the arrays, and the reason is measured rather than waved through: parallel×helix ALREADY
+    // differs from the literal by 0.001mm in Z on some segments (measured at t1404 against HEAD — parallel/helix is
+    // byte-identical across this change, so the divergence predates it and is not this act's). It is one unit of the
+    // emit's own rounding on a polyline the literal builds by a different accumulation. Naming it beats either
+    // pretending equality or silently loosening the ring assert to hide it.
+    // Rounded before comparing: both sides are 3-decimal quantities, so their difference is only meaningful to about
+    // 1e-9 — a raw subtraction yields 0.0010000000000000009 and would fail a bound the values actually meet.
+    const worst = Math.max(...r.P.map((p, i) => Math.max(...p.map((v, j) => Math.abs(v - (r.L[i] || [])[j])))));
+    expect(r.P.length, 'same number of cut moves').toBe(r.L.length);
+    expect(+worst.toFixed(6), 'every coordinate within one unit of the emit rounding (0.001mm)').toBeLessThanOrEqual(0.001);
+});
+
+/**
+ * THE REGRESSION GUARD IN THE OTHER DIRECTION. The fix may change the two broken combinations and NOTHING else —
+ * that is what makes it a fix rather than a rewrite. Byte-identity against HEAD was measured directly in a worktree
+ * (36/54 configs unchanged; the 18 that changed were exactly concentric×ramp and concentric×helix, across rotation,
+ * skim, confirm-every, a tiny area, deeper depth, stepover, ramp angle and helix diameter). This is that claim
+ * expressed as a standing assert: every working combination still agrees with the literal move for move.
+ */
+const UNCHANGED = [
+    { name: 'parallel × plunge', cfg: { strategy: 'parallel', entry: 'plunge' } },
+    { name: 'parallel × ramp', cfg: { strategy: 'parallel', entry: 'ramp' } },
+    { name: 'concentric × plunge', cfg: { strategy: 'concentric', entry: 'plunge' } },
+    { name: 'concentric × plunge, rotated', cfg: { strategy: 'concentric', entry: 'plunge', rotAngle: 17, rotPivotX: 5, rotPivotY: -3 } },
+    { name: 'concentric × plunge, confirm every 2', cfg: { strategy: 'concentric', entry: 'plunge', confirmEvery: 2 } },
+];
+for (const u of UNCHANGED) {
+    test(`STILL EXACT — ${u.name}`, async ({ page }) => {
+        await boot(page);
+        const r = await bridge(page, { ...BASE, ...u.cfg });
+        expect(r.P, 'the fix touched only the two broken combinations').toEqual(r.L);
+    });
+}
+
+/**
+ * ── THE ENVELOPE ─────────────────────────────────────────────────────────────────────────────────────────────────
+ * The cross-product, in full. The old spec probed ramp and helix against a `strategy: 'parallel'` base and never
+ * combined them with concentric — which is precisely how the gap hid. Enumerating the product means a combination
+ * cannot be missed by being forgotten; it has to be listed to be claimed.
+ */
+test('THE ENVELOPE IS A TABLE — every strategy × entry is claimed BY NAME, and an unknown one refuses', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const m = await import('/wizards/ops/surfaceraster.js');
+        const grid = {};
+        for (const strategy of ['parallel', 'concentric']) {
+            for (const entry of ['plunge', 'ramp', 'helix']) {
+                grid[`${strategy}/${entry}`] = { covered: m.surfaceRasterCovers({ strategy, entry }), why: m.surfaceRasterGap({ strategy, entry }) };
+            }
+        }
+        return {
+            grid,
+            proven: m.SURFACE_RASTER_PROVEN,
+            ignores: m.SURFACE_RASTER_IGNORES,
+            // an entry the atom does not implement must NOT read as proven — the defect's shape, asked directly
+            bogusEntry: { covered: m.surfaceRasterCovers({ strategy: 'concentric', entry: 'trochoidal' }), why: m.surfaceRasterGap({ strategy: 'concentric', entry: 'trochoidal' }) },
+            bogusStrategy: { covered: m.surfaceRasterCovers({ strategy: 'adaptive', entry: 'plunge' }), why: m.surfaceRasterGap({ strategy: 'adaptive', entry: 'plunge' }) },
+            // the defaults still resolve to the proven corner
+            empty: { covered: m.surfaceRasterCovers({}), why: m.surfaceRasterGap({}) },
+        };
+    });
+    // ALL SIX are covered — and each is covered because a ROW SAYS SO, with the turn that earned it.
+    for (const [k, v] of Object.entries(r.grid)) {
+        expect(v.covered, `${k} is claimed`).toBe(true);
+        expect(v.why, `${k} names no gap`).toBe('');
+        expect(r.proven[k], `${k} carries the turn that earned it, not a bare true`).toBeTruthy();
+    }
+    expect(Object.keys(r.proven).sort(), 'the table is exactly the cross-product — no extra rows, none missing')
+        .toEqual(Object.keys(r.grid).sort());
+    // t1404 — the two the rings gained this turn say so in the table itself.
+    expect(r.proven['concentric/ramp']).toMatch(/t1404/);
+    expect(r.proven['concentric/helix']).toMatch(/t1404/);
+
+    // AND THE POINT OF A TABLE: something not in it REFUSES, with a reason. Under the old `return true` both of
+    // these read as proven — which is exactly how concentric×ramp shipped broken.
+    expect(r.bogusEntry.covered, 'an unimplemented descent is NOT inside the envelope').toBe(false);
+    expect(r.bogusEntry.why, 'and it says why, never a bare false').toContain('no equivalence bridge');
+    expect(r.bogusStrategy.covered, 'nor is an unimplemented strategy').toBe(false);
+    expect(r.bogusStrategy.why).toContain('no equivalence bridge');
+    expect(r.empty.covered, 'an unset config is the defaults, which are proven').toBe(true);
+
+    // WHAT THE ATOM IGNORES is declared too — `direction` is read by no branch in either walk. Today no surfacing
+    // config can set it (surfacingStack hard-codes both-ways), which is why the envelope still calls one-way covered;
+    // writing the fact down here is what stops the NEXT caller (pocket has a real direction param) rediscovering it
+    // the way t1402 rediscovered the descent.
+    expect(r.ignores.direction, 'the atom declares that it does not read direction').toMatch(/both-ways/);
+});
+
+/**
+ * ── THE INSET SEAM ───────────────────────────────────────────────────────────────────────────────────────────────
+ * Nothing in the app passes `inset` yet — the re-point consumes it next act. That is not dead code: it is a declared
+ * seam landing WITH its proof, which is the only way the consumer can rely on it without re-deriving it.
+ *
+ * The property that matters is the one t1402 measured the hard way: `extent` must keep declaring the GIVEN rect
+ * while the walk runs inside it. When the two were the same declaration, the place fold aligned the tool-centre
+ * sweep where it should have aligned the pocket, and a placed pocket slid by exactly the tool radius.
+ */
+test('INSET — the walk moves in, the declared footprint does NOT', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { emitProgram, newBlock } = await import('/blocks/blockEmitter.js');
+        const { BLOCKS } = await import('/wizards/ops/index.js');
+        const { traceToolpath } = await import('/engine/trace.js');
+        const P = { x: 10, y: 5, z0: 0, w: 80, h: 60, depth: 1, stepdown: 0.5, toolDia: 6, stepoverPct: 40, feed: 900, plunge: 180, clearance: 5, strategy: 'concentric', entry: 'plunge' };
+        const mk = (extra) => { const b = newBlock('surfaceraster'); b.params = { ...P, ...extra }; return b; };
+        const box = (nc) => {
+            const s = (traceToolpath(nc).segments || []).filter((x) => !x.rapid);
+            return { minX: +Math.min(...s.map((v) => Math.min(v.x1, v.x2))).toFixed(3), maxX: +Math.max(...s.map((v) => Math.max(v.x1, v.x2))).toFixed(3),
+                minY: +Math.min(...s.map((v) => Math.min(v.y1, v.y2))).toFixed(3), maxY: +Math.max(...s.map((v) => Math.max(v.y1, v.y2))).toFixed(3) };
+        };
+        const def = BLOCKS.surfaceraster;
+        const at = (n) => ({ extent: def.extent({ ...P, inset: n }), walk: box(String(emitProgram([mk({ inset: n })]))), text: String(emitProgram([mk({ inset: n })])) });
+        return { zero: at(0), three: at(3), collapse: at(45), fields: def.fields, defaults: def.defaults };
+    });
+    // THE DECLARED FOOTPRINT IS THE GIVEN RECT AT BOTH INSETS — this is the property that keeps a placed pocket put.
+    expect(r.zero.extent, 'extent = the given rect').toEqual({ minX: 10, maxX: 90, minY: 5, maxY: 65 });
+    expect(r.three.extent, 'and an inset does NOT shrink it — the op still occupies its outline').toEqual(r.zero.extent);
+    // THE WALK DOES MOVE IN, by exactly the inset on all four sides.
+    expect(r.zero.walk, 'inset 0 → the walk IS the rect (surfacing faces the whole top)').toEqual({ minX: 10, maxX: 90, minY: 5, maxY: 65 });
+    expect(r.three.walk, 'inset 3 → 3mm in on every side').toEqual({ minX: 13, maxX: 87, minY: 8, maxY: 62 });
+    // AND THE ZERO CASE ADDS NOTHING TO THE TEXT — no guard, no label, no comment. (Byte-identity against HEAD was
+    // measured in a worktree across 54 configs; this is the same promise stated where a reader will see it.)
+    expect(r.zero.text, 'inset 0 emits no inset machinery at all').not.toContain('GOTO95');
+    expect(r.three.text, 'a declared inset brings its own guard').toContain('GOTO95');
+    // A WRONG OPERATOR MESSAGE IS A DEFECT: an inset that eats the area must not refuse by blaming the stepover.
+    expect(r.collapse.text, 'the collapse refuses in its own words').toMatch(/inset leaves no area to clear/);
+    expect(r.collapse.text, 'and not by blaming a knob the operator did not touch')
+        .not.toMatch(/GOTO91\s*\(\s*the/);
+    // THE DECLARATION KNOWS ABOUT IT — an emitter that reads a key the block does not declare is a drop waiting to
+    // happen the day this atom round-trips through the canvas (the t1351 lesson about z0).
+    expect(r.fields, 'inset is a declared field').toContain('inset');
+    expect(r.defaults.inset, 'and defaults to 0 = surfacing unchanged').toBe(0);
+});
+
+test('INSET — @work declares the work over the INSET area, not the given one', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { surfaceRasterWorkSteps } = await import('/wizards/ops/surfaceraster.js');
+        const P = { x: 0, y: 0, w: 80, h: 60, depth: 1, stepdown: 0.5, toolDia: 6, stepoverPct: 40, feed: 900, plunge: 180, clearance: 5, strategy: 'parallel', entry: 'plunge' };
+        return {
+            given: surfaceRasterWorkSteps({ ...P, inset: 0 }),
+            insetted: surfaceRasterWorkSteps({ ...P, inset: 6 }),
+            // the SAME area expressed directly — the inset declaration must agree with the rect it walks
+            equivalent: surfaceRasterWorkSteps({ ...P, w: 68, h: 48, inset: 0 }),
+            liveInset: surfaceRasterWorkSteps({ ...P, inset: '#500' }),
+        };
+    });
+    expect(r.insetted, 'an inset shrinks the declared work — it walks a smaller area').toBeLessThan(r.given);
+    expect(r.insetted, 'and it declares exactly what the equivalent bare rect declares').toBe(r.equivalent);
+    // t1399's rule, applied to the new key the moment it exists rather than two turns later: an input that cannot be
+    // known at build time means the declaration is OMITTED, never written wrong.
+    expect(r.liveInset, 'a live inset makes the count unknowable → declare nothing').toBeNull();
+});

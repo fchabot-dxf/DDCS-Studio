@@ -106,6 +106,11 @@ export const ATOM_ROLES = {
         rampAngle: 'geometry', helixDia: 'geometry', helixPitch: 'geometry',
         clearance: 'geometry', confirmEvery: 'geometry',
         x: 'geometry', y: 'geometry', z0: 'geometry', rotAngle: 'geometry', rotPivotX: 'geometry', rotPivotY: 'geometry',
+        // t1404 — `inset` BAKES, and listing it is the t1399 lesson applied the moment the key is born rather than two
+        // turns later: it is subtracted from w/h and added to x0/y0 at BUILD time, so a #var here becomes NaN before any
+        // register exists. Its value comes from the consumer's own inset computation (pocketInsetRegion), which is
+        // itself built from toolDia and wallOffset — both already baked, for the same reason.
+        inset: 'geometry',
         strategy: 'other', direction: 'other', entry: 'other', zMode: 'other',
     },
 
