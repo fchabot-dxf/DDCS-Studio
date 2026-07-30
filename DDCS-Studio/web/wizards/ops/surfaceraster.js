@@ -340,9 +340,16 @@ export function surfaceRasterLines(p = {}) {
         ...preamble,
         // t1383 — the DECLARED work rides in this header (a token in a comment already emitted, so no line index moves).
         // t1399 — the token is OMITTED when the work cannot be known (a live depth/stepdown), never written wrong.
-        `( ---- SURFACING, parametric. Every var below speaks; change one and the loops re-derive.`
+        // ── t1406 — THE OPERATOR SENTENCE FOLLOWS THE JOB, and only when there IS a second job ──────────────────────
+        // At inset 0 every word below is the byte-for-byte text surfacing has always emitted. At inset > 0 the op is a
+        // POCKET, and two of these sentences would be lies on a machine: it is not "surfacing", and the tool most
+        // certainly does not overhang the edge — not overhanging it is the entire point of the inset. This project
+        // treats a wrong operator message as a gate-1 defect rather than a cosmetic one (t1404's collapse guard got
+        // its own label for exactly this reason), and the man reading the program at the pendant cannot see which
+        // wizard produced it. Keyed on `inset > 0` so the surfacing path is untouched and asserted byte-identical.
+        `( ---- ${inset > 0 ? 'AREA CLEARING' : 'SURFACING'}, parametric. Every var below speaks; change one and the loops re-derive.`
             + `${surfaceRasterWorkSteps(p) == null ? '' : ' · ' + workMarker(surfaceRasterWorkSteps(p))} ---- )`,
-        `${V.w}=${r3(w)}   ( area X — the tool-CENTRE sweep, so the tool overhangs the edge )`,
+        `${V.w}=${r3(w)}   ( area X — ${inset > 0 ? `the tool-CENTRE sweep, held ${r3(inset)}mm inside the declared edge` : 'the tool-CENTRE sweep, so the tool overhangs the edge'} )`,
         `${V.h}=${r3(h)}   ( area Y )`,
         // ── t1399 — THE TWO LIVE KNOBS, and the seed is a WORD-OR-NUMBER rather than a plain val() ─────────────────
         // A live `#var` rides verbatim; a numeric takes the SAME path it always did, floor included. That distinction is
@@ -354,7 +361,7 @@ export function surfaceRasterLines(p = {}) {
         // THE LIVE CASE IS SAFE BY A GUARD THAT WAS ALREADY HERE: `IF #43 <= 0 GOTO91` sits four lines below and reads the
         // REGISTER at run time. It was written for a baked zero and covers a dialled one unchanged — so unlike holecycle,
         // this atom needed no new refusal, only the check that the existing one reaches the new path.
-        `${V.depth}=${liveWord(p.depth) || r3(depth)}   ( total depth to face off )`,
+        `${V.depth}=${liveWord(p.depth) || r3(depth)}   ( total depth to ${inset > 0 ? 'clear' : 'face off'} )`,
         `${V.stepdown}=${liveWord(p.stepdown) || r3(stepdown)}   ( bite per level )`,
         `${V.step}=[${r3(tool)} * ${r3(pct)} / 100]   ( stepover mm = tool Ø ${r3(tool)} x ${r3(pct)}% — the CAM derives it the same way )`,
         `IF ${V.step} <= 0 GOTO91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,

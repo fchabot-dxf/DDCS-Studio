@@ -43,11 +43,18 @@ async function seedAndOpen(page, wiz = 'surfacing') {
  * Pocket kept the shape (stepdown 192 lines ⊃ pocketfill 189), so the property is asserted where it still exists.
  * The other tests in this file keep the surfacing seed — hover/select are not surfacing-specific, but this one needs
  * real nesting to mean anything.
+ *
+ * t1406 — AND NOW IT IS SEEDED FROM A CONTOUR, for the identical reason one turn later: a rect pocket's clearing
+ * re-pointed through `surfaceraster` too, so `place{ stepdown{ pocketfill } }` collapsed exactly as surfacing's did and
+ * the default (spiral) pocket has nothing left to be innermost OF. `contour` still emits `stepdown{ contourfill }` and
+ * is the nearest op that does. The pattern is worth naming rather than just following: every op this arc re-points
+ * loses its nesting, so a test whose premise IS nesting has to be re-homed each time — and it fails LOUDLY when the
+ * premise goes (the `hasLeaf` assertion), which is the only reason this has not silently become a no-op twice over.
  */
 test('block hover warms its lines (lighter, no scroll), resolves the INNERMOST block, clears on exit', async ({ page }) => {
   const errs = [];
   page.on('pageerror', (e) => errs.push(String(e)));
-  await seedAndOpen(page, 'pocket');
+  await seedAndOpen(page, 'contour');
 
   const r = await page.evaluate(() => {
     const ws = window.__blkws, out = document.getElementById('blk-gcode'), host = document.querySelector('.blk-bk-host');

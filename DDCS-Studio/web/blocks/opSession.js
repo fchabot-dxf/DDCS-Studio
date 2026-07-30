@@ -21,6 +21,7 @@ import { flattenBlocks, listUserOps } from './userOps.js';   // ONE pre-order wa
 import { FN } from './blockly/bridge.js';   // t391 — the Blockly field name (uppercased) for the _expose knob key
 import { resolveMethod } from '../wizards/atcModel.js';   // fix B: resolve method (incl. legacy mode/magType) for the declared-param reconcile fallback
 import { methodRampForCycle } from '../wizards/drillWizard.js';   // t1387 — the DECLARED inverse of cycleForMethod: the merged hole block has no leaf TYPE to read method/ramp off
+import { pocketWallOffsetFromInset } from '../wizards/ops/pocketfill.js';   // t1406 — the DECLARED inverse of pocketInsetMm: the re-pointed fill carries `inset`, not `wallOffset`
 // find() recurses into block children (incl. op-containers), so reconcilers locate their inner blocks
 // (e.g. a 'stepdown') whether or not the op is wrapped in an op-container.
 const find = (prog, type) => {
@@ -101,6 +102,38 @@ const RECONCILERS = {
         return Object.assign(f, placeFields(prog, 'sl_', 'offX', 'offY'));   // opt-in placement: A↔B stays absolute, offset/anchors ride the wrapper
     },
     pocket(prog) {
+        /**
+         * ── t1406 — THE RE-POINTED ARM READS FIRST, and it is a DIFFERENT SHAPE, not a variant of the old one ──────
+         *
+         * On the rect/eligible arm the clearing is ONE `surfaceraster` that owns its own depth loop; there is no
+         * `pocketfill` and (on spiral) no `stepdown` at all. The old reader below opens with `find(prog,'stepdown')`,
+         * so on the RASTER arm it would have found the WALL's stepdown and then failed to find a pocketfill — and on
+         * spiral it would have declined outright. Either way an edited parametric pocket would silently fail to
+         * reconcile, which is the failure mode t1387 named: a reader that identifies an arm by a block that moved.
+         *
+         * TWO VALUES ARE READ BACK THROUGH A DECLARED INVERSE rather than off the block, because the atom has no
+         * socket for them: `shape` is 'rect' by the arm's own predicate (nothing else reaches this stack), and
+         * `wallOffset` comes from `pocketWallOffsetFromInset` — the algebraic inverse of the one function that
+         * computed the inset. That is reading a declaration backwards, not inferring intent from output.
+         */
+        const sr = find(prog, 'surfaceraster');
+        if (sr && sr.params) {
+            const s = sr.params, wb0 = find(prog, 'wcs');
+            const wall = find(prog, 'stepdown');   // present on the raster arm only (the wall's own depth walk)
+            const f0 = {
+                p_wcs: (wb0 && wb0.params && wb0.params.wcs) || 'active',
+                p_shape: 'rect', p_toolDia: s.toolDia,
+                p_wallOffset: pocketWallOffsetFromInset(s.toolDia, s.inset),
+                p_depth: s.depth, p_stepdown: s.stepdown,
+                p_strategy: s.strategy === 'parallel' ? 'raster' : 'spiral',
+                p_stepoverPct: s.stepoverPct, p_entry: s.entry,
+                p_rampAngle: s.rampAngle, p_helixDia: s.helixDia, p_helixPitch: s.helixPitch,
+                p_feed: s.feed, p_plunge: s.plunge, p_clearance: s.clearance,
+                p_confirmEvery: wall && wall.params ? wall.params.confirmEvery : s.confirmEvery,
+                p_originX: s.x, p_originY: s.y, p_w: s.w, p_h: s.h,
+            };
+            return Object.assign(f0, placeFields(prog, 'p_', 'originX', 'originY'));
+        }
         const down = find(prog, 'stepdown');
         // t1391 — the too-small fallback has no `stepdown` (it is a single plunge, not a depth walk), so this declines on
         // that arm and always has. The re-point of that arm from the literal `drill` leaf to `holecycle` does not change

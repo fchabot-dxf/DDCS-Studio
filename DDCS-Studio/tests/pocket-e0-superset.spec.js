@@ -27,6 +27,18 @@ import fs from 'fs';
  * The regeneration copied each unchanged entry object verbatim and replaced only `emit` on the 40, with a hard check
  * that no non-`|tiny|` key could be written. So this file still holds the pre-E0 independent truth for every normal
  * pocket; only the arm the ruling moved has moved.
+ *
+ * ── t1406 — THE GOLDEN MOVED AGAIN, FOR 14 RECT ENTRIES, BY THE SAME DISCIPLINE ──────────────────────────────────
+ * A rect pocket's CLEARING now rides `surfaceraster` (the parametric atom surfacing already emits through), and the
+ * wall finish moved to after every fill level — both by ruling. So those emits changed, and the golden had to follow.
+ *
+ * THE SCOPE GUARD WAS THE PREDICATE ITSELF, not a key pattern, and that distinction caught something: my first cut
+ * allowed `rect|*|normal|*` — 12 keys — and the regeneration REFUSED two more, `rect|spiral|tiny|3` and
+ * `rect|raster|tiny|3`. They looked out of scope because they are the "tiny" size; they are not, because that scalar
+ * sets `wallOffset: 1.5`, which shrinks the inset to 1.5mm and leaves a 4mm pocket with 1mm of real walk. They are
+ * rect pockets that genuinely now ride the atom. A key-name pattern encoded my ASSUMPTION about which cases were
+ * too-small; asking `pocketRidesRaster` asked the product. 14 changed, 0 refused — and the remaining 82 entries still
+ * hold the pre-E0 independent truth, untouched by this act.
  */
 const GOLDEN = JSON.parse(fs.readFileSync('tests/fixtures/pocket-golden.json', 'utf8'));
 
@@ -34,7 +46,7 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
     await page.goto('http://localhost:3211');
     await page.waitForFunction(() => window.ddcsGetBlockProgram);
     const r = await page.evaluate(async (golden) => {
-        const { pocketStack, pocketTooSmall } = await import('/wizards/pocketWizard.js');
+        const { pocketStack, pocketTooSmall, pocketRidesRaster } = await import('/wizards/pocketWizard.js');
         const { pruneGuards } = await import('/blocks/whenGuard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
 
@@ -60,7 +72,11 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
             // (2) E0 GATE — prune(superset) == concrete
             const sup = pocketStack(p, { superset: true });
             supGuardMax = Math.max(supGuardMax, (JSON.stringify(sup).match(/"type":"guard"/g) || []).length);
-            pruneGuards(sup, { ...p, _tooSmall: pocketTooSmall(p) });   // inject the derived tooSmall key
+            // t1406 — EVERY derived guard key is injected EXPLICITLY, including the ones whose absence used to give the
+            // right answer by accident. `_rest` was never passed and read as undefined, which happened to falsify its
+            // `is:true` guard; `_para` has BOTH polarities in the superset, so an undefined value would falsify both and
+            // prune the clearing away entirely. Stating them is what makes this gate a test of prune rather than of luck.
+            pruneGuards(sup, { ...p, _tooSmall: pocketTooSmall(p), _rest: false, _para: pocketRidesRaster(p) });
             if (JSON.stringify(sup).includes('"type":"guard"')) leftoverGuards++;
             const pruned = emitMapped(sup).text;
             if (pruned !== concrete) { gateDiffs++; if (!firstGate) firstGate = { key, a: pruned.slice(0, 1400), b: concrete.slice(0, 1400) }; }

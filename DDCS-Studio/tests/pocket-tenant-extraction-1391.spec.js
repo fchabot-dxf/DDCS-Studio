@@ -106,6 +106,7 @@ test('THE NORMAL ARMS — every non-fallback pocket emits byte-identically (the 
     const r = await page.evaluate(async () => {
         const { pocketStack } = await import('/wizards/pocketWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { flattenBlocks } = await import('/blocks/userOps.js');
         const B = { toolDia: 6, depth: 4, stepdown: 1.5, feed: 600, plunge: 150, clearance: 5 };
         const out = {};
         for (const [k, p] of Object.entries({
@@ -119,8 +120,13 @@ test('THE NORMAL ARMS — every non-fallback pocket emits byte-identically (the 
             wallOff: { ...B, shape: 'rect', w: 80, h: 60, wallOffset: -0.5 },
             confirm: { ...B, shape: 'rect', w: 80, h: 60, confirmEvery: 2 },
         })) {
+            // t1406 — THE PROBE WAS A PROXY, AND THE PROXY BROKE. It matched the WORD "parametric" in the emitted
+            // header, which was a fair stand-in for the hole body while that body was the only parametric thing a
+            // pocket could contain. A rect pocket's CLEARING is parametric now, so the proxy started reporting a hole
+            // where there is none. The claim was never about a word: it is "no hole body", and the stack says that
+            // exactly. Asked of the structure, it cannot be broken by anything else's header text.
             const t = emitMapped(pocketStack(p)).text;
-            out[k] = { hasHole: /holecycle|parametric/.test(t), lines: t.split('\n').length, hash: t.length + ':' + (t.match(/G[123]/g) || []).length };
+            out[k] = { hasHole: flattenBlocks(pocketStack(p)).some((b) => b.type === 'holecycle'), lines: t.split('\n').length, hash: t.length + ':' + (t.match(/G[123]/g) || []).length };
         }
         return out;
     });

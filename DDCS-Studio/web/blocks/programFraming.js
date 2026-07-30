@@ -22,15 +22,18 @@ export function makeStart(params = {}) {
 /** Wrap an op's cutting block(s) in a PlaceOnStock atom that sits the op on the stock — its path-datum corner
  *  attaches to the chosen stock corner + signed offset (see ops/placeOnStock.js + ops/placement.js). The geometry
  *  bbox {minX,maxX,minY,maxY} + stock dims/datum are SNAPSHOTTED so the block is self-contained and stable, and the
- *  2D layout uses the SAME bbox so 2D and 3D agree. `children` may be one block or an array. */
-export function makePlace(params = {}, bbox, children) {
+ *  2D layout uses the SAME bbox so 2D and 3D agree. `children` may be one block or an array.
+ *  t1406 — `role` (default '') NAMES which phase of its op this placement frames, for an op placed more than once
+ *  (pocket: 'clear' + 'wall'). It emits nothing; it exists so a twin's binding spec can identify ONE of them. Omitting
+ *  it leaves the block exactly as it was — every other caller is unchanged. See ops/placeOnStock.js for the why. */
+export function makePlace(params = {}, bbox, children, role = '') {
     const bb = bbox || { minX: 0, maxX: 0, minY: 0, maxY: 0 };
     const b = newBlock('placeonstock');
     b.params = {
         stockAttach: params.stockAttach || '', pathDatum: params.pathDatum || '',
         offX: num(params.originX, 0), offY: num(params.originY, 0), offZ: num(params.offZ, 0), optIn: !!params.optIn,
         stockW: num(params.stockW, 0), stockH: num(params.stockH, 0), stockZ: num(params.stockZ, 0), stockDatum: params.stockDatum || 'nnp',
-        bminX: bb.minX, bmaxX: bb.maxX, bminY: bb.minY, bmaxY: bb.maxY,
+        bminX: bb.minX, bmaxX: bb.maxX, bminY: bb.minY, bmaxY: bb.maxY, role,
     };
     b.children = Array.isArray(children) ? children : [children];
     return b;

@@ -14,6 +14,8 @@ import { makeStart, makeEnd, makePlace } from '../blocks/programFraming.js';
 import { num } from './ops/util.js';
 import { regionDesc } from './ops/region.js';
 import { restValid } from './ops/restmachining.js';   // t871 — REST MACHINING: append a corner-clear pass with a smaller 2nd tool
+import { pocketInsetMm } from './ops/pocketfill.js';   // t1406 — the ONE reading of how far in a pocket's tool centre sits
+import { surfaceRasterCovers, surfaceRasterGap, SURFACE_RASTER_IGNORES } from './ops/surfaceraster.js';   // t1406 — the atom's own declared envelope decides whether this pocket may ride it
 
 /** The TRUE pocket region (rect = corner+size, circle/polygon = centre±R, ellipse = centre±(rx,ry)) — the size you
  *  type, before insetting. Shape-centred at (originX, originY) except rect (its corner). */
@@ -75,6 +77,45 @@ export function pocketDrillCentre(params = {}) {
     return d.kind === 'rect' ? { cx: d.x + d.w / 2, cy: d.y + d.h / 2 } : { cx: d.cx, cy: d.cy };
 }
 
+/** The atom's own strategy word for a pocket's strategy fork — raster → parallel rows, spiral → concentric rings.
+ *  ONE reading, so the eligibility predicate and the block it builds can never disagree about which walk will run. */
+export function pocketRasterStrategy(params = {}) { return (params.strategy || 'spiral') === 'raster' ? 'parallel' : 'concentric'; }
+
+/**
+ * ── t1406 — WHY A POCKET'S RECT CLEARING MAY NOT RIDE `surfaceraster`, IN WORDS ────────────────────────────────────
+ *
+ * Returns '' when the parametric arm applies, else the REASON — never a bare false. Every clause is a NARROWING, and
+ * the discipline behind that is the whole lesson of t1402/t1404: the question is never "will something run", it is
+ * "will what runs be what was ASKED for". Where the answer is no, the pocket keeps its literal fill, byte-identical,
+ * and the boundary says so by name instead of the atom quietly doing something adjacent.
+ *
+ *   shape        The atom walks a RECTANGLE. Circle / polygon / ellipse clear through JS contour walks
+ *                (concentricContour, a scanline over an offset polyline) — not analytic shapes a macro can count.
+ *   too small    A pocket narrower than its tool is a single plunge, not a raster; that arm re-pointed at t1391.
+ *   rest tool    Ruled untouched this act. Its corner-clear rides INSIDE the clearing place, and the clearing place
+ *                must now hold the atom ALONE (absorbingChild is strict, and a mixed body shears a macro — t1349).
+ *   direction    The atom's walk is ALWAYS both-ways (SURFACE_RASTER_IGNORES.direction — #49 seeded 1, negated every
+ *                row, no branch). A one-way RASTER therefore keeps its literal fill rather than silently emitting a
+ *                zig-zag: an operator picks one-way to get a consistent climb cut, and both-ways is not that.
+ *                A SPIRAL pocket stays eligible whatever `direction` holds, because concentric rings ignore it on BOTH
+ *                sides — `fillStrategy` dispatches to `concentricRect` before it ever reads `direction`.
+ *   envelope     Whatever the atom's OWN table has not earned (surfaceRasterCovers) is refused in its own words. This
+ *                is a second consumer of that table, which is exactly what a table is for.
+ */
+export function pocketRasterGap(params = {}) {
+    const shape = params.shape || 'rect';
+    if (shape !== 'rect') return `a ${shape} pocket clears through a JS contour walk, not the atom's analytic rectangle`;
+    if (pocketTooSmall(params)) return 'a pocket narrower than its tool is a single centre plunge, not a raster';
+    if (restValid(params)) return 'a rest pass rides inside the clearing place, and that place must hold the atom alone';
+    if ((params.strategy || 'spiral') === 'raster' && (params.direction || 'bothways') !== 'bothways')
+        return `a one-way raster keeps its literal fill — ${SURFACE_RASTER_IGNORES.direction}`;
+    const probe = { strategy: pocketRasterStrategy(params), entry: params.entry || 'plunge' };
+    return surfaceRasterCovers(probe) ? '' : surfaceRasterGap(probe);
+}
+
+/** Does this pocket's rect clearing ride the parametric atom? (The predicate half of pocketRasterGap — one source.) */
+export function pocketRidesRaster(params = {}) { return pocketRasterGap(params) === ''; }
+
 /**
  * Pocket params → its block stack. The one source of truth for both displays. E0 (t467): the pocket geometry rides
  * FLAT pocketfill/pocketwall leaves (region-pill→flat REFRAME, byte-identical to the stepover+contour region-socket
@@ -103,6 +144,54 @@ export function pocketStack(params = {}, opts = {}) {
     const fillLeaf = (strat) => { const b = newBlock('pocketfill'); b.params = { ...geom, stepoverPct: num(params.stepoverPct, 40), strategy: strat, direction: params.direction || 'bothways', entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3), helixDia: num(params.helixDia, 0), helixPitch: num(params.helixPitch, 1), by: 'by', z: 'z', feed, plunge, clearance: clr }; return b; };   // strat: parallel (raster) | concentric (spiral); direction (t800 P6); entry (t804 P?) = per-level descent, params.entry || plunge → byte-identical; by='by' resolves the StepDown step from scope
     const wallLeaf = () => { const b = newBlock('pocketwall'); b.params = { ...geom, z: 'z', feed, plunge, clearance: clr }; return b; };
     /**
+     * ── t1406 — THE RECT CLEARING, RE-POINTED THROUGH `surfaceraster` ─────────────────────────────────────────────
+     *
+     * `stepdown{ pocketfill }` — a JS transcript of every row at every level — becomes ONE atom that carries the depth
+     * loop, the row/ring walk and the descent itself. The pocket does not gain a second parametric raster; it asks the
+     * one the app already ships and proves (t1397 measured that a copy would start life identical, and what drifts in
+     * a copy is the arithmetic that decides where the tool goes).
+     *
+     * ⚠ THE GEOMETRY IS THE **GIVEN** RECT, AND THE INSET IS A SEPARATE NUMBER. Handing the atom the pre-inset
+     * rectangle would be the obvious move and it is measurably wrong: `extent` (which the place fold reads in
+     * preference to its frozen snapshot) would then declare the tool-centre sweep, and t1402 measured what that does —
+     * a placed pocket slides by exactly the tool radius. t1404 split the two, so `x/y/w/h` stay the pocket's own
+     * outline and `inset` moves only the WALK. The VALUE is never re-derived here: `pocketInsetMm` is the same one
+     * source `pocketInsetRegion` uses, so the wall and the fill still trace boundaries that agree by construction.
+     *
+     * `direction` is deliberately NOT passed. The atom ignores it, so the ARM is narrowed to both-ways instead (see
+     * pocketRasterGap) and the socket keeps its own default — never a one-way request answered with a zig-zag.
+     */
+    const rasterLeaf = (strat) => {
+        const b = newBlock('surfaceraster');
+        b.params = {
+            x: ox, y: oy, z0: 0,                            // the pocket's own outline; the place fold passes the real frame in
+            w: num(params.w, 80), h: num(params.h, 60), inset: pocketInsetMm(params),
+            depth, stepdown: by,                            // the atom owns the depth loop now — no enclosing StepDown
+            toolDia: num(params.toolDia, 6), stepoverPct: num(params.stepoverPct, 40),
+            feed, plunge, clearance: clr,
+            strategy: strat, direction: 'bothways',
+            entry: params.entry || 'plunge', rampAngle: num(params.rampAngle, 3),
+            helixDia: num(params.helixDia, 0), helixPitch: num(params.helixPitch, 1),
+            confirmEvery: num(params.confirmEvery, 0),
+        };
+        return b;
+    };
+    /** The clearing place: EXACTLY ONE child, so `absorbingChild` hands the atom its frame as params instead of
+     *  rewriting a macro body's text (t1349's shear). That is the whole reason the wall needs a place of its own. */
+    const rasterPlace = (strat) => makePlace(params, bbox, [rasterLeaf(strat)], 'clear');
+    /**
+     * The wall finish, in its own place — ROUGH ALL, THEN WALL (user ruling, t1405). The arm itself is UNCHANGED:
+     * the same `stepdown{ pocketwall }` with the same `to`/`by`/`confirmEvery`, literal, text-rewritten by the place
+     * fold exactly as it always has been. ONLY ITS POSITION MOVES — from interleaved (fill L1, wall L1, fill L2, …)
+     * to after every fill level. That is why the bridge's criterion is per-PHASE: the fill's cut set per level still
+     * equals the literal fill's per level, and the wall's per level still equals the literal wall's.
+     *
+     * `confirmEvery` rides here too, unchanged, rather than being moved wholesale to the fill. "Pause after every N
+     * depth passes" is a statement about a depth walk, and after the re-order there are two of them; giving the wall's
+     * walk a different cadence from the one the operator typed would be inventing a rule nobody asked for.
+     */
+    const wallPlace = () => { const down = newBlock('stepdown'); down.params = { to: depth, by, confirmEvery: num(params.confirmEvery, 0) }; down.children = [wallLeaf()]; return makePlace(params, bbox, [down], 'wall'); };
+    /**
      * ── THE TOO-SMALL FALLBACK, RE-POINTED THROUGH holecycle (t1391, ruled) ────────────────────────────────────────
      *
      * A pocket narrower than its tool cannot be cleared, so it becomes a single plunge. That plunge used to be the literal
@@ -119,7 +208,7 @@ export function pocketStack(params = {}, opts = {}) {
     const drillPlace = () => {
         const hole = newBlock('holecycle');
         hole.params = { pattern: 'single', cycle: 'peck', x0: cx, y0: cy, depth, peck: by, feed: plunge, clearance: clr };
-        return makePlace(params, bbox, hole);
+        return makePlace(params, bbox, hole, 'clear');   // t1406 — the too-small arm IS the clearing place for its state
     };
     const GUARD = (when, kids) => { const g = newBlock('guard'); g.params = { when }; g.children = kids; return g; };
     // t871 — the REST section rides INSIDE the main clear's ONE placeonstock (a second place would duplicate the placement
@@ -131,23 +220,39 @@ export function pocketStack(params = {}, opts = {}) {
         const note = newBlock('comment'); note.params = { text: 'REST — smaller tool clears the corners; change tools here' };
         return [note, restLeaf()];
     };
-    const clearPlace = (kids, restKids) => { const down = newBlock('stepdown'); down.params = { to: depth, by, confirmEvery: num(params.confirmEvery, 0) }; down.children = kids; return makePlace(params, bbox, restKids ? [down, ...restKids] : [down]); };   // t1031 — confirmEvery pause (0 = off → byte-identical)
+    const clearPlace = (kids, restKids) => { const down = newBlock('stepdown'); down.params = { to: depth, by, confirmEvery: num(params.confirmEvery, 0) }; down.children = kids; return makePlace(params, bbox, restKids ? [down, ...restKids] : [down], 'clear'); };   // t1031 — confirmEvery pause (0 = off → byte-identical)
 
     if (!superset) {   // concrete: the geometry-derived tooSmall + strategy select the arm directly
         if (tooSmall) return [makeStart(params), wcs, drillPlace(), makeEnd(params)];
+        // t1406 — the RE-POINTED arm. The predicate is the one source (pocketRasterGap); everything it refuses falls
+        // through to the literal build below, unchanged and byte-identical, which is what makes the boundary testable.
+        if (pocketRidesRaster(params)) {
+            const arm = [rasterPlace(raster ? 'parallel' : 'concentric')];
+            if (raster) arm.push(wallPlace());   // ROUGH ALL, THEN WALL — the finish follows every fill level
+            return [makeStart(params), wcs, ...arm, makeEnd(params)];
+        }
         const kids = [fillLeaf(raster ? 'parallel' : 'concentric')];
         if (raster) kids.push(wallLeaf());   // raster leaves the wall un-finished → a Contour(on) finish pass
         return [makeStart(params), wcs, clearPlace(kids, restValid(params) ? restInner() : null), makeEnd(params)];   // t871 — rest inside the ONE place (byte-identical when unset)
     }
-    // superset: BOTH forks present + guarded — tooSmall (drill vs clearing) on the derived `_tooSmall` key, strategy
-    // (parallel+wall vs concentric) on the real param. prune keeps one tooSmall arm + one strategy arm → concrete shape.
+    // superset: EVERY fork present + guarded — tooSmall (drill vs clearing) on the derived `_tooSmall` key, `_para`
+    // (t1406: does the rect clearing ride the atom) also derived, strategy (parallel+wall vs concentric) on the real
+    // param. prune keeps one arm at each fork → the concrete shape. `_para` sits INSIDE `_tooSmall:false` because a
+    // too-small pocket has no clearing at all: nesting it there keeps the two forks independent rather than crossed.
+    const strategyFork = (fillArm, wallArm) => [
+        GUARD({ param: 'strategy', is: 'raster' }, fillArm('parallel').concat(wallArm())),
+        GUARD({ param: 'strategy', is: 'spiral' }, fillArm('concentric')),
+    ];
     return [
         makeStart(params), wcs,
         GUARD({ param: '_tooSmall', is: true }, [drillPlace()]),
-        GUARD({ param: '_tooSmall', is: false }, [clearPlace([
-            GUARD({ param: 'strategy', is: 'raster' }, [fillLeaf('parallel'), wallLeaf()]),
-            GUARD({ param: 'strategy', is: 'spiral' }, [fillLeaf('concentric')]),
-        ], [GUARD({ param: '_rest', is: true }, restInner())])]),   // t871 — the rest corner-clear rides the SAME place, on the geometry-derived `_rest` guard (absent → byte-identical)
+        GUARD({ param: '_tooSmall', is: false }, [
+            GUARD({ param: '_para', is: true }, strategyFork((s) => [rasterPlace(s)], () => [wallPlace()])),
+            GUARD({ param: '_para', is: false }, [clearPlace(
+                strategyFork((s) => [fillLeaf(s)], () => [wallLeaf()]),
+                [GUARD({ param: '_rest', is: true }, restInner())],
+            )]),   // t871 — the rest corner-clear rides the SAME place, on the geometry-derived `_rest` guard (absent → byte-identical)
+        ]),
         makeEnd(params),
     ];
 }

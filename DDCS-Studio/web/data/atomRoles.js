@@ -179,7 +179,9 @@ export const ATOM_ROLES = {
     entry: { entryX: 'geometry', entryY: 'geometry' },   // a JS-compared waypoint (firstRapidXY within eps), never emitted raw
     // placeonstock (kind 'place') / stepdown ('depth') / array ('container') are ALSO BLOCKING_FOLD_KINDS, so their CHILDREN
     // are blocked regardless; these rows cover the folds' OWN params.
-    placeonstock: { offX: 'geometry', offY: 'geometry', offZ: 'geometry', stockW: 'geometry', stockH: 'geometry', stockZ: 'geometry', bminX: 'geometry', bmaxX: 'geometry', bminY: 'geometry', bmaxY: 'geometry', stockAttach: 'other', pathDatum: 'other', stockDatum: 'other', optIn: 'other' },
+    // t1406 — `role` joins the row THE TURN THE KEY IS BORN (t1399's lesson, applied on time): it is a build-time
+    // IDENTITY label a binding spec matches on, never emitted and never an operator value → 'other'.
+    placeonstock: { offX: 'geometry', offY: 'geometry', offZ: 'geometry', stockW: 'geometry', stockH: 'geometry', stockZ: 'geometry', bminX: 'geometry', bmaxX: 'geometry', bminY: 'geometry', bmaxY: 'geometry', stockAttach: 'other', pathDatum: 'other', stockDatum: 'other', optIn: 'other', role: 'other' },
     stepdown: { to: 'geometry', by: 'geometry', confirmEvery: 'geometry' },   // JS loop bound + step: the levels are unrolled at build
     array: { x0: 'geometry', y0: 'geometry', cols: 'geometry', rows: 'geometry', dx: 'geometry', dy: 'geometry', count: 'geometry', spacing: 'geometry', angle: 'geometry', dia: 'geometry', startAngle: 'geometry', w: 'geometry', h: 'geometry', nx: 'geometry', ny: 'geometry', pattern: 'other', skip: 'other' },   // patternPoints() computes every point in JS (num + Math.round/trig) and STAMPS the child per point
     contourfill: { x: 'geometry', y: 'geometry', w: 'geometry', h: 'geometry', dia: 'geometry', sides: 'geometry', tool: 'geometry', rampAngle: 'geometry', z: 'geometry', feed: 'geometry', plunge: 'geometry', clearance: 'geometry', shape: 'other', side: 'other', entry: 'other', by: 'other' },   // builds a JS contour region → every key runs num()

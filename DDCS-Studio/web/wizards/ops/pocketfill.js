@@ -27,12 +27,30 @@ export function trueRegionFromFlat(p) {
     return regionDesc({ shape: 'rect', x, y, w: num(p.w, 80), h: num(p.h, 60) });
 }
 
+/**
+ * HOW FAR IN A POCKET'S TOOL CENTRE MUST SIT — the NUMBER, declared on its own (t1406).
+ *
+ * It was always here, inline inside `pocketInsetRegion`. The re-point needs the same quantity as a scalar, because
+ * `surfaceraster` takes an `inset` PARAM (t1404) rather than a pre-inset rectangle — the atom keeps declaring the GIVEN
+ * rect as its footprint and offsets only the WALK. Two readings of "how far in" would be exactly the split t1402
+ * measured in the opposite direction (the dispatch's `r + wallOffset` against the shipped `r − wallOffset`; the shipped
+ * sign is the one that has always run), so there is ONE function and both callers ask it.
+ */
+export function pocketInsetMm(p) { return Math.max(0.1, num(p.toolDia, 6)) / 2 - num(p.wallOffset, 0); }
+
+/**
+ * The same relation READ BACKWARDS: the wall offset a given (toolDia, inset) pair came from. Not an inference from
+ * emitted output — it is the algebraic inverse of the one declaration above, so the two cannot drift. The reverse-sync
+ * needs it: on the re-pointed arm the block stack carries `inset` and `toolDia` and no `wallOffset` (the atom has no
+ * such concept), so reading an edited stack back into the form has to invert exactly this, and nothing else.
+ */
+export function pocketWallOffsetFromInset(toolDia, inset) { return Math.max(0.1, num(toolDia, 6)) / 2 - num(inset, 0); }
+
 /** The tool-CENTRE inset region a pocket clears: the true region inset by (toolRadius − wallOffset) — matching
  *  pocketWizard exactly (r = max(0.1,toolDia)/2, inset = r − wallOffset). ONE source for BOTH the clearing (pocketFill)
  *  and the wall (pocketWall) so they trace the identical boundary. Returns a descriptor (with .contour). */
 export function pocketInsetRegion(p) {
-    const r = Math.max(0.1, num(p.toolDia, 6)) / 2;
-    return offsetRegion(trueRegionFromFlat(p), -(r - num(p.wallOffset, 0)));
+    return offsetRegion(trueRegionFromFlat(p), -pocketInsetMm(p));
 }
 
 /** The absolute stepover (mm) from the % + tool — matching pocketWizard's `so` (max(0.2, tool·%/100)). Exported (t802) so

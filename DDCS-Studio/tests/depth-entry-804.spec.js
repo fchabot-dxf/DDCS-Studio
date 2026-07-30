@@ -24,34 +24,37 @@ test('PLUNGE (default) is byte-identical — no entry moves (the goldens guard t
   expect(r.clean, 'plunge emits no ramp/helix moves').toBe(true);
 });
 
+/**
+ * t1406 — READ FROM THE MOTION, NOT FROM THE TEXT. This counted lines carrying the `( ramp )` comment, three of them,
+ * one per level. A rect pocket's clearing is a MACRO now: it emits ONE ramp line inside a loop the machine runs three
+ * times, so the text count is 1 and the property — every level descends at ≤ the declared angle and reaches its cut Z —
+ * is exactly as true as it ever was. Counting emitted lines was always a proxy for counting descents; the tracer counts
+ * the descents themselves and gives the same answer on both arms.
+ */
 test('RAMP: every level descends at ≤ the declared angle and reaches the cut Z', async ({ page }) => {
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
   const angle = 5;
-  const lines = await page.evaluate(async (angle) => {
+  const ramps = await page.evaluate(async (angle) => {
     const { pocketStack } = await import('/wizards/pocketWizard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const { traceToolpath } = await import('/engine/trace.js');
     const p = { shape: 'rect', w: 120, h: 100, depth: 6, stepdown: 2, toolDia: 6, strategy: 'raster', entry: 'ramp', rampAngle: angle, feed: 600, plunge: 150 };
-    return emitMapped(pocketStack(p)).text.split('\n');
+    const nc = emitMapped(pocketStack(p)).text;
+    // A RAMP is the only move that descends WHILE travelling in XY. A plunge has no XY extent; a cut at depth has no
+    // Z extent. So this needs no comment to find it — which is the point.
+    return (traceToolpath(nc).segments || []).filter((s) => !s.rapid)
+      .filter((s) => s.z1 - s.z2 > 1e-6 && Math.hypot(s.x2 - s.x1, s.y2 - s.y1) > 1e-6)
+      .map((s) => ({ dist: +Math.hypot(s.x2 - s.x1, s.y2 - s.y1).toFixed(4), drop: +(s.z1 - s.z2).toFixed(4), z: +s.z2.toFixed(3) }));
   }, angle);
-  const ramps = [];
-  for (let i = 0; i < lines.length; i++) {
-    if (!lines[i].includes('( ramp )')) continue;
-    const to = XYZ(lines[i]);                          // G1 X Y Z ( ramp )
-    const prevZ = Z(lines[i - 1]);                     // G0 Z prevZ
-    const from = XYZ(lines[i - 2]);                    // G0 X x0 Y y0
-    ramps.push({ from, to, prevZ });
-  }
   expect(ramps.length, 'a ramp per depth level (6/2 = 3)').toBe(3);
   const tanMax = Math.tan((angle + 0.01) * Math.PI / 180);
   for (const rmp of ramps) {
-    const dist = Math.hypot(rmp.to.x - rmp.from.x, rmp.to.y - rmp.from.y);
-    const drop = rmp.prevZ - rmp.to.z;
-    expect(drop, 'the ramp descends into the level').toBeGreaterThan(0);
-    expect(drop / dist, `ramp slope ${(drop / dist).toFixed(4)} ≤ tan(${angle}°)`).toBeLessThanOrEqual(tanMax);
+    expect(rmp.drop, 'the ramp descends into the level').toBeGreaterThan(0);
+    expect(rmp.drop / rmp.dist, `ramp slope ${(rmp.drop / rmp.dist).toFixed(4)} ≤ tan(${angle}°)`).toBeLessThanOrEqual(tanMax);
   }
   // the ramps reach the three cut levels −2, −4, −6
-  expect(ramps.map((r) => r.to.z).sort((a, b) => b - a)).toEqual([-2, -4, -6]);
+  expect(ramps.map((r) => r.z).sort((a, b) => b - a)).toEqual([-2, -4, -6]);
 });
 
 test('HELIX: fits the pocket (radius+tool ≤ inradius) and descends at the declared pitch per rev', async ({ page }) => {
@@ -97,13 +100,18 @@ test('TWIN + FORM: user_pocket_data controls entry through the clearing-cluster 
     const plunge = emitMapped(build({ ...base })).text;
     const ramp = emitMapped(build({ ...base, entry: 'ramp', rampAngle: 5 })).text;
     const helix = emitMapped(build({ shape: 'circle', dia: 100, depth: 6, stepdown: 2, toolDia: 6, strategy: 'spiral', entry: 'helix', helixPitch: 1.5 })).text;
-    const fill = flattenBlocks(build({ ...base, entry: 'ramp' })).find((b) => b && b.type === 'pocketfill');
-    return { plungeClean: !/\( ramp|\( helix/.test(plunge), rampHas: ramp.includes('( ramp )'), helixHas: helix.includes('( helix )'), fillEntry: fill && fill.params && fill.params.entry, opts: fieldOptions({ type: 'pocketfill' }, 'entry') };
+    // t1406 — WHICHEVER LEAF THE ARM BUILT. A rect pocket's clearing rides `surfaceraster` now; a circle's still rides
+    // the literal `pocketfill`. The claim was never about a block TYPE — it is that the form's binding reaches the
+    // clearing leaf's `entry` socket — so it is asked of the leaf that is actually there.
+    const flat = flattenBlocks(build({ ...base, entry: 'ramp' }));
+    const fill = flat.find((b) => b && (b.type === 'surfaceraster' || b.type === 'pocketfill'));
+    return { plungeClean: !/\( ramp|\( helix/.test(plunge), rampHas: ramp.includes('( ramp )'), helixHas: helix.includes('( helix )'), fillType: fill && fill.type, fillEntry: fill && fill.params && fill.params.entry, opts: fieldOptions({ type: 'pocketfill' }, 'entry') };
   });
   expect(r.plungeClean, 'twin plunge (default): no entry moves — byte path unchanged').toBe(true);
-  expect(r.rampHas, 'twin ramp: the form binding writes pocketfill.entry → ramp emits').toBe(true);
+  expect(r.rampHas, 'twin ramp: the form binding writes the clearing leaf\'s entry → ramp emits').toBe(true);
   expect(r.helixHas, 'twin helix: helix emits').toBe(true);
-  expect(r.fillEntry, 'the pocketfill atom carries entry=ramp (params + Blocks round-trip)').toBe('ramp');
+  expect(r.fillType, 'a rect pocket clears through the parametric atom (t1406)').toBe('surfaceraster');
+  expect(r.fillEntry, 'and that leaf carries entry=ramp (params + Blocks round-trip)').toBe('ramp');
   expect(r.opts, 'the Blockly bridge renders entry as a 3-value dropdown').toEqual(['plunge', 'ramp', 'helix']);
 });
 

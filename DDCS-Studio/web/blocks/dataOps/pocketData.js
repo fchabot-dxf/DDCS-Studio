@@ -19,7 +19,7 @@
  * state (each block type appears at most once). Proven byte-identical to pocketStack across strategy × tooSmall (BOTH states)
  * × the 4 shapes × a scalar sweep + cross-dialect (tests/pocket-data-emit.spec.js).
  */
-import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox } from '../../wizards/pocketWizard.js';
+import { pocketStack, pocketTooSmall, pocketDrillCentre, pocketBBox, pocketRidesRaster } from '../../wizards/pocketWizard.js';
 import { userOpFromStack, flattenBlocks } from '../userOps.js';
 import { spindleHeadPatch } from './spindleHead.js';   // t945 — the framing progstart inherits the live machine Head spindle at build (the form's insert-time semantics), else the data-op cuts DEAD
 import { deriveBindingsFor, mergeBindingsByParam, TOOL_BINDING_SPECS } from './deriveBindings.js';
@@ -27,7 +27,7 @@ import { appendEntry, ENTRY_POINT } from '../../wizards/ops/entry.js';   // t726
 import { appendToolSel } from '../../wizards/ops/toolsel.js';   // t768 P1a — the declared tool-selection marker (toolNum binds via POCKET_BINDING_SPECS)
 import { pruneGuards } from '../whenGuard.js';
 import { regionDesc } from '../../wizards/ops/region.js';   // t716 — the true boundary ring (polygon/ellipse) for the 2D preview
-import { pocketInsetRegion, stepoverMm } from '../../wizards/ops/pocketfill.js';   // t802 — the tool-inset boundary + ring spacing (one source with the emit)
+import { pocketInsetRegion, stepoverMm, pocketInsetMm } from '../../wizards/ops/pocketfill.js';   // t802 — the tool-inset boundary + ring spacing (one source with the emit); t1406 — the inset NUMBER for the re-pointed arm's derived socket
 import { concentricRings } from '../../wizards/ops/contour.js';   // t802 — the inward offset rings the concentric emit cuts (draw them in the 2D preview)
 import { restValid, restRegion, restGreyReason } from '../../wizards/ops/restmachining.js';   // t871 — REST MACHINING: the _rest guard + the corner-sliver preview + the grey-out reason
 
@@ -68,23 +68,43 @@ const leafPair = (param, key, type, extra) => [
     { param, type, key, match: { type: 'pocketwall' }, optional: true },
 ];
 
+/**
+ * t1406 — THE TWO PLACES, DISCRIMINATED. A pocket on the re-pointed arm is placed TWICE: the clearing place must hold
+ * the `surfaceraster` atom ALONE (absorbingChild is strict, and a mixed body paints the shift onto macro text — the
+ * t1349 shear), so the wall finish moved into a place of its own. `deriveBindings` refuses a spec that matches two
+ * blocks, and that refusal is the safety feature t871 respected by keeping the rest section inside the single place.
+ * The answer is a DECLARED discriminator, not a relaxed matcher: every pocket place carries a `role`, and each spec
+ * names the one it drives. The wall's nine are OPTIONAL — that place exists only on the re-pointed raster arm.
+ */
+const placePair = (param, key, extra) => [
+    { param, type: 'number', key, match: { type: 'placeonstock', params: { role: 'clear' } }, ...extra },
+    { param, type: 'number', key, match: { type: 'placeonstock', params: { role: 'wall' } }, optional: true },
+];
+const placeEnumPair = (param, key, extra) => [
+    { param, type: 'enum', key, match: { type: 'placeonstock', params: { role: 'clear' } }, ...extra },
+    { param, type: 'enum', key, match: { type: 'placeonstock', params: { role: 'wall' } }, optional: true },
+];
+
 // ── VALUE bindingSpecs (identity-by-type over the pruned superset) ──────────────────────────────────────────────
 const POCKET_BINDING_SPECS = [
     { param: 'wcs', type: 'enum', key: 'wcs', match: { type: 'wcs' }, default: POCKET_DEFAULTS.wcs, widget: 'dropdown', widgetConfig: { options: WCS_OPTIONS }, label: 'WCS', section: G },
     // placement (placeonstock, always present) — origin ALSO rides the leaves (pocket geometry carries its origin)
-    { param: 'originX', type: 'number', key: 'offX', match: { type: 'placeonstock' }, default: POCKET_DEFAULTS.originX, label: 'Origin X', section: G },
-    { param: 'originY', type: 'number', key: 'offY', match: { type: 'placeonstock' }, default: POCKET_DEFAULTS.originY, label: 'Origin Y', section: G },
+    ...placePair('originX', 'offX', { default: POCKET_DEFAULTS.originX, label: 'Origin X', section: G }),
+    ...placePair('originY', 'offY', { default: POCKET_DEFAULTS.originY, label: 'Origin Y', section: G }),
     { param: 'originX', type: 'number', key: 'originX', match: { type: 'pocketfill' }, optional: true },
     { param: 'originX', type: 'number', key: 'originX', match: { type: 'pocketwall' }, optional: true },
     { param: 'originY', type: 'number', key: 'originY', match: { type: 'pocketfill' }, optional: true },
     { param: 'originY', type: 'number', key: 'originY', match: { type: 'pocketwall' }, optional: true },
-    { param: 'stockAttach', type: 'enum', key: 'stockAttach', match: { type: 'placeonstock' }, default: POCKET_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Attach to Stock', section: G },
-    { param: 'pathDatum', type: 'enum', key: 'pathDatum', match: { type: 'placeonstock' }, default: POCKET_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Path Datum', section: G },
-    { param: 'stockDatum', formHidden: true, type: 'enum', key: 'stockDatum', match: { type: 'placeonstock' }, default: POCKET_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS }, label: 'Stock Datum', section: G },
-    { param: 'stockW', formHidden: true, type: 'number', key: 'stockW', match: { type: 'placeonstock' }, default: POCKET_DEFAULTS.stockW, label: 'Stock W', section: G },
-    { param: 'stockH', formHidden: true, type: 'number', key: 'stockH', match: { type: 'placeonstock' }, default: POCKET_DEFAULTS.stockH, label: 'Stock H', section: G },
-    { param: 'stockZ', formHidden: true, type: 'number', key: 'stockZ', match: { type: 'placeonstock' }, default: POCKET_DEFAULTS.stockZ, label: 'Stock Z', section: G },
-    { param: 'offZ', type: 'number', key: 'offZ', match: { type: 'placeonstock' }, default: POCKET_DEFAULTS.offZ, label: 'Z Offset', section: G },
+    // t1406 — the re-pointed arm's atom carries the pocket's own outline as its frame (x/y/w/h) + a separate `inset`.
+    { param: 'originX', type: 'number', key: 'x', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'originY', type: 'number', key: 'y', match: { type: 'surfaceraster' }, optional: true },
+    ...placeEnumPair('stockAttach', 'stockAttach', { default: POCKET_DEFAULTS.stockAttach, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Attach to Stock', section: G }),
+    ...placeEnumPair('pathDatum', 'pathDatum', { default: POCKET_DEFAULTS.pathDatum, widget: 'dropdown', widgetConfig: { options: XY_DATUM_OPTIONS }, label: 'Path Datum', section: G }),
+    ...placeEnumPair('stockDatum', 'stockDatum', { formHidden: true, default: POCKET_DEFAULTS.stockDatum, widget: 'dropdown', widgetConfig: { options: STOCK_DATUM_OPTIONS }, label: 'Stock Datum', section: G }),
+    ...placePair('stockW', 'stockW', { formHidden: true, default: POCKET_DEFAULTS.stockW, label: 'Stock W', section: G }),
+    ...placePair('stockH', 'stockH', { formHidden: true, default: POCKET_DEFAULTS.stockH, label: 'Stock H', section: G }),
+    ...placePair('stockZ', 'stockZ', { formHidden: true, default: POCKET_DEFAULTS.stockZ, label: 'Stock Z', section: G }),
+    ...placePair('offZ', 'offZ', { default: POCKET_DEFAULTS.offZ, label: 'Z Offset', section: G }),
     // geometry (fan-out to both leaves)
     { param: 'shape', type: 'enum', key: 'shape', match: { type: 'pocketfill' }, optional: true, default: POCKET_DEFAULTS.shape, widget: 'dropdown', widgetConfig: { options: SHAPE_OPTIONS }, label: 'Shape', section: G },
     { param: 'shape', type: 'enum', key: 'shape', match: { type: 'pocketwall' }, optional: true },
@@ -124,6 +144,38 @@ const POCKET_BINDING_SPECS = [
     { param: 'clearance', type: 'number', units: 'mm', key: 'clearance', match: { type: 'holecycle' }, optional: true },
     // t726 P2b — the entry-point declaration. IN the bindingSpecs (not entryBindingsFor) so it RE-DERIVES over the PRUNED
     // stack each instantiate (pocket's entry index shifts with strategy/tooSmall — a static superset index would miss).
+    /**
+     * ── t1406 — THE RE-POINTED ARM'S SOCKETS, all OPTIONAL because the arm is one pruned state among several ───────
+     *
+     * On the parametric arm there is no `pocketfill` leaf and (on spiral) no `stepdown` either — one `surfaceraster`
+     * carries the geometry, the depth walk and the descent. These rows are the same params landing on that block
+     * instead, so a form edit reaches the emit in EITHER state without the form knowing which one it is in.
+     *
+     * THREE PARAMS DELIBERATELY HAVE NO ROW HERE, and each absence is a decision rather than an omission:
+     *   shape / dia / sides   the arm is rect-only by predicate — a non-rect pocket prunes to the literal arm, where
+     *                         those sockets exist. A row here would bind a socket that cannot exist.
+     *   wallOffset            it has no socket on the atom AT ALL: it is folded with toolDia into ONE number, `inset`.
+     *                         A derived socket that no single param drives is exactly what `postInstantiate` is for
+     *                         (the drill centre and the place bbox are already there) — so `inset` is written from the
+     *                         resolved params through `pocketInsetMm`, the same one source the literal arm reads.
+     *   direction             the atom ignores it and the arm is narrowed to both-ways, so binding it would write a
+     *                         value nothing reads and make a one-way request LOOK honoured. It stays on the literal
+     *                         arm's leaf, where it is real.
+     */
+    { param: 'w', type: 'number', key: 'w', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'h', type: 'number', key: 'h', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'toolDia', type: 'number', key: 'toolDia', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'stepoverPct', type: 'number', key: 'stepoverPct', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'entry', type: 'enum', key: 'entry', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'rampAngle', type: 'number', key: 'rampAngle', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'helixDia', type: 'number', key: 'helixDia', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'helixPitch', type: 'number', key: 'helixPitch', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'feed', type: 'number', key: 'feed', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'plunge', type: 'number', key: 'plunge', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'clearance', type: 'number', key: 'clearance', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'depth', type: 'number', key: 'depth', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'stepdown', type: 'number', key: 'stepdown', match: { type: 'surfaceraster' }, optional: true },
+    { param: 'confirmEvery', type: 'number', key: 'confirmEvery', match: { type: 'surfaceraster' }, optional: true },
     { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
     { param: 'entryY', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '' },
     // t768 P1a — the tool-selection declaration. IN the bindingSpecs (re-derived over the pruned stack each instantiate).
@@ -218,7 +270,14 @@ function pocketDataStack(defaults) {
 
 // The FORM bindings are DERIVED over a CANONICAL-pruned stack (raster + big pocket → every clearing socket present once)
 // then DEDUPED by param (fan-out yields N specs per param; the form wants ONE — keep the first, which carries the label).
-const CANONICAL_BIND = { ...POCKET_DEFAULTS, strategy: 'raster', _tooSmall: false, _rest: true, restDia: 3 };   // t871 — _rest+a real restDia so the pocketrest leaf is present → restDia/restStepover derive their bindings
+// t1406 — `_para: false` PINS THE CANONICAL STACK TO THE LITERAL ARM, and that is the deliberate call. The canonical
+// stack is what the FORM's labels/defaults derive from, and only the literal arm carries a socket for every param:
+// shape, Ø, sides and Wall Offset have none on the re-pointed arm (see the spec block above). Deriving the form over the
+// parametric arm would silently DROP four fields from the wizard — a feature loss dressed as a binding detail. The
+// parametric sockets are reached at instantiate instead, where bindingSpecs re-derive over the PRUNED stack per state.
+// (`_rest: true` already forces `_para` false via pocketRasterGap; it is written out so the canonical state is stated
+// rather than implied by another flag's side effect.)
+const CANONICAL_BIND = { ...POCKET_DEFAULTS, strategy: 'raster', _tooSmall: false, _rest: true, _para: false, restDia: 3 };   // t871 — _rest+a real restDia so the pocketrest leaf is present → restDia/restStepover derive their bindings
 function canonicalPrunedStack() { const c = JSON.parse(JSON.stringify(pocketDataStack(POCKET_DEFAULTS))); pruneGuards(c, CANONICAL_BIND); return c; }
 export const POCKET_BINDINGS = mergeBindingsByParam(deriveBindingsFor(canonicalPrunedStack(), POCKET_BINDING_SPECS));
 
@@ -240,7 +299,11 @@ export function pocketDataDef() {
     const def = userOpFromStack('pocket_data', 'Pocket (data)', pocketDataStack(POCKET_DEFAULTS),
         orderedBindings, 'form3d+2d');   // t726 P2b — entryX/entryY are in POCKET_BINDINGS (via the specs, re-derived by bindingSpecs)
     def.bindingSpecs = POCKET_BINDING_SPECS;                       // re-derive value sockets BY IDENTITY over the PRUNED stack each build
-    def.deriveGuards = (p) => ({ _tooSmall: pocketTooSmall(p || {}), _rest: restValid(p || {}) && !pocketTooSmall(p || {}) });   // t871 — _rest: a valid smaller rest tool on a cornered pocket (GEOMETRY-DERIVED, injected before prune)
+    // t1406 — `_para`: does this pocket's rect clearing ride `surfaceraster`? GEOMETRY- AND ENVELOPE-derived (shape,
+    // tool vs size, a rest tool, direction, and the atom's own PROVEN table), so it cannot be a plain param guard. The
+    // predicate is `pocketRasterGap`'s — ONE source shared with the concrete build, so the twin and the wizard can
+    // never disagree about which arm a given pocket is on. That agreement IS the byte-identity claim.
+    def.deriveGuards = (p) => ({ _tooSmall: pocketTooSmall(p || {}), _rest: restValid(p || {}) && !pocketTooSmall(p || {}), _para: pocketRidesRaster(p || {}) });   // t871 — _rest: a valid smaller rest tool on a cornered pocket (GEOMETRY-DERIVED, injected before prune)
     def.postInstantiate = (stack, resolved) => {                  // rewrite the DERIVED sockets the frozen superset baked at DEFAULT geometry
         const { cx, cy } = pocketDrillCentre(resolved || {});     // the too-small arm's plunge point (geometry-derived)
         const bb = pocketBBox(resolved || {});                    // the PlaceOnStock footprint bbox (drives placementShift's corner; baked-stale otherwise → a phantom shift)
@@ -251,6 +314,10 @@ export function pocketDataDef() {
             // Writing the centre there would collide with the placement; x0/y0 is the pattern's own origin (see pocketWizard).
             if (b.type === 'holecycle') { b.params.x0 = cx; b.params.y0 = cy; }
             else if (b.type === 'placeonstock') { b.params.bminX = bb.minX; b.params.bmaxX = bb.maxX; b.params.bminY = bb.minY; b.params.bmaxY = bb.maxY; }
+            // t1406 — `inset` is DERIVED from toolDia AND wallOffset together, so no single binding can drive it; it
+            // belongs here with the other derived sockets rather than being re-derived at emit. `pocketInsetMm` is the
+            // same one source the literal arm's `pocketInsetRegion` reads, so the two arms inset by the same number.
+            else if (b.type === 'surfaceraster') { b.params.inset = pocketInsetMm(r); }
             else if (b.type === 'pocketrest') {   // t871 — the rest leaf is frozen at DEFAULT geometry in the superset; rewrite ALL its params from the resolved op (one source, no fan-out bindings)
                 for (const k of ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'restDia', 'restStepover', 'depth', 'feed', 'plunge', 'clearance']) if (r[k] !== undefined) b.params[k] = r[k];
                 if (r.stepdown !== undefined) b.params.by = r.stepdown;

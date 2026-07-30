@@ -14,16 +14,28 @@ test('pocket: attach corner moves the cut onto the stock + a PlaceOnStock block 
   await page.evaluate(() => window.ddcsStudio.wizardManager.open('pocket'));
   await page.waitForSelector('#wiz_pocket', { state: 'visible' });
 
-  const code = (attach) => page.evaluate((a) => {
+  /**
+   * t1406 — MEASURED FROM THE TRACE, NOT FROM THE TEXT. `maxX` above scans literal `X<number>` words, which was the
+   * whole program when a pocket unrolled its raster in JavaScript. A rect pocket's clearing is a MACRO now and its
+   * ring coordinates are EXPRESSIONS over a register (`X[3 + #47]`) — there is no literal X in them to scan, so the
+   * text reading fell back to a handful of header numbers and reported no shift. (Surfacing's identical test still
+   * passes on the text, because its frame printer FOLDS a numeric origin at build time and emits literal words; the
+   * ring inset is a runtime register, so pocket's cannot fold. Same atom, different foldability — worth knowing.)
+   * Running the program answers the question the test is actually asking: where does the tool go.
+   */
+  const code = (attach) => page.evaluate(async (a) => {
     const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = String(v); };
     set('p_shape', 'rect'); set('p_w', 40); set('p_h', 30); set('p_originX', 0); set('p_originY', 0); set('p_toolDia', 6);
     set('p_stockAttach', a);
     window.ddcsStudio.wizardManager.update();
-    return document.getElementById('wiz_pocket_code').textContent;
+    const nc = document.getElementById('wiz_pocket_code').textContent;
+    const { traceToolpath } = await import('/engine/trace.js');
+    const segs = (traceToolpath(nc).segments || []).filter((s) => !s.rapid);
+    return Math.max(...segs.map((s) => Math.max(s.x1, s.x2)));
   }, attach);
 
-  const near = maxX(await code('nn'));   // attached at the near (min) corner
-  const far = maxX(await code('pp'));    // attached at the far (max) corner → cut shifts toward +X
+  const near = await code('nn');   // attached at the near (min) corner
+  const far = await code('pp');    // attached at the far (max) corner → cut shifts toward +X
   expect(far, 'attaching to the far corner pushes the pocket toward the far stock edge').toBeGreaterThan(near + 30);
 
   const types = await page.evaluate(async () => {

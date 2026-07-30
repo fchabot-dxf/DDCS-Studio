@@ -9337,3 +9337,203 @@ unmeasured combination by name. The open item I did NOT act on, because it is th
 already ruled the order: `direction` is ignored by this atom and pocket has one — under ROUGH-ALL-THEN-WALL the fill's
 per-level cut SET is the criterion, so a one-way pocket fill would still emit both-ways and needs either its own row
 in the table or a walk that reads it. Flagged, not built.
+
+## t1406 (seat A) — T3 THE RE-POINT: the shape, STATED BEFORE BUILDING
+
+The dispatch requires the shape to be on the record before a line is written, measured against three HARD
+constraints. Here it is, with the reasoning that picked it and the two shapes it beat.
+
+### THE SHAPE
+
+    ELIGIBLE ARM (rect · not-too-small · no rest tool · raster=>direction bothways · (strategy,entry) in SURFACE_RASTER_PROVEN):
+
+      spiral   [ progstart · wcs · place(role:'clear'){ surfaceraster(concentric) } · progend ]
+      raster   [ progstart · wcs · place(role:'clear'){ surfaceraster(parallel)  }
+                                 · place(role:'wall' ){ stepdown{ pocketwall }   } · progend ]
+
+    EVERYTHING ELSE — non-rect · a valid rest tool · one-way/other-way raster · too-small · an unproven
+    (strategy,entry) — is the UNCHANGED literal stack, byte-identical, asserted against the frozen reference.
+
+### WHY TWO PLACES, AGAINST EACH HARD CONSTRAINT
+
+1. **No macro body under a text-rewriting fold.** `place(role:'clear')` has EXACTLY ONE child — the atom — so
+   `absorbingChild` is non-null and the emitter hands it the shift as params. `absorbingChild` stays strict and
+   untouched; there is no mixed body anywhere. The wall's place holds only literal children, so it keeps the text
+   rewrite those atoms have always used. The two hazards never meet.
+2. **No conditional extent preference.** `liveExtent` is consulted exactly as it is today. It answers
+   `surfaceraster.extent`, which since t1404 declares the GIVEN rect — and for a rect pocket the given rect IS
+   `pocketBBox`, the same rectangle the frozen snapshot holds. The inset lives in its own param and moves the WALK
+   only. Nothing conditional; the two declarations already mean two different things.
+3. **Unambiguous twin bindings — t871's concern, answered not waved.** `placeonstock` gains a declared `role`
+   (default empty, so every other wizard is untouched); pocket passes 'clear' (the clearing/too-small place) and
+   'wall'. The twin's nine placement specs qualify their match with params:{role:'clear'} and a second, OPTIONAL
+   nine target role:'wall' — the `leafPair` idiom this file already uses for the two flat leaves. Two blocks, two
+   IDENTITIES, `deriveBindings` still requires exactly one hit per spec. The reason t871 put the rest section inside
+   the one place was precisely to avoid an ambiguous match; the discriminator is what removes that reason.
+
+### THE TWO SHAPES IT BEAT
+
+- **The wall arm absorbing the frame as params.** Even with `pocketwall` declaring `absorbsPlacement`, the place
+  would hold TWO children (the atom + the wall's stepdown) -> `absorbingChild` returns null -> the whole body, macro
+  included, goes through `translateProgram`. That is the t1349 shear, and constraint 1 forbids it. Relaxing
+  `absorbingChild` to "all children absorb" is the same relaxation the classifier is explicitly forbidden from
+  re-deriving (t1389), and `stepdown` cannot declare absorption on behalf of every op that uses it.
+- **Re-pointing only the spiral arm** (no wall -> one place -> no ambiguity at all). Cheapest by far, and rejected:
+  the user RULED the order (rough all, then wall) specifically so the raster arm can move. Taking the cheap half
+  would be scaling the act down, which is not mine to do.
+
+### WHAT `direction` DOES ON THIS ARM — the t1404 flag, discharged
+
+The atom IGNORES `direction` (`SURFACE_RASTER_IGNORES`). So the arm NARROWS rather than translating: a raster
+pocket asking for one-way keeps its literal fill, byte-identical, as a NAMED boundary. `direction` is deliberately
+NOT bound to the atom's socket in this arm — the socket keeps its `bothways` default and the arm predicate is what
+guarantees that is what the operator asked for. A SPIRAL pocket stays eligible whatever `direction` holds, because
+concentric rings ignore it on BOTH sides (`fillStrategy` dispatches to `concentricRect` before it ever reads
+`direction`) — the same answer from both paths, not a new divergence.
+
+### WHAT LANDED — and the seven things measurement changed on the way
+
+**The shape above is what was built, unmodified.** Below is what it cost and what it found.
+
+#### 1 · THE FROZEN REFERENCE, IN THIS ACT
+
+`/_test/literalPocketFill.js` — `fillStrategy` and everything a RECT pocket reaches through it (`scanlineFill`,
+`fillLevelMoves`, `onewayMoves`, `concentricRect`, `entryOrPlunge`/`levelEntry`, `helixPoints`), copied VERBATIM from
+the shipping source rather than retyped, plus the frozen COMPOSITION of the old arm. Non-rect branches THROW by name
+instead of answering for a shape nobody checked.
+
+⚠ **The literal atoms are NOT retiring, so a live reference would have been honest today** — `pocketfill` still emits
+for every refused arm. It is frozen anyway, because "as they ship TODAY" stops being true the moment somebody
+re-points `fillStrategy` itself, and the whole safety argument of this act would move silently underneath it.
+
+#### 2 · THE PER-PHASE CRITERION HAD TO BE BUILT, NOT ASSUMED — twice
+
+The ruling's words are "the fill's cut SET per level == the literal FILL's per level". My first comparator read whole
+PROGRAMS, and it failed on the raster arm at every level but the first. The cause was not the walk: in the shipped
+interleave the wall pass leaves the tool AT DEPTH, so the next level's fill plunged from the previous floor rather than
+from clearance. That start height is an artifact of the order the user ruled AWAY. So the comparison decomposes both
+sides by phase — the parametric side by dropping the other phase's place from the stack the wizard actually built.
+
+Then the same class again, from the frame: `progstart` emits its clearance OUTSIDE the place, so it is never
+Z-shifted, while the atom emits its own `G0 Z(clr+z0)` before the first plunge. With `offZ` the literal's FIRST plunge
+starts 2mm LOWER. Both differences make the approach HIGHER, never lower, so a vertical descent is compared by where
+it ENDS with "never lower than the literal's" asserted separately — named in the spec, not dropped.
+
+**And one mistake worth recording, because it disguised itself as a depth error.** The sort key included a vertical
+descent's start height while the comparison excluded it, so the two lists paired up differently and the report read
+"the parametric cuts at Z−1 where the literal cuts at Z+0.5" — a terrifying-looking depth divergence that was a
+sorting bug in the test. Sort on exactly the fields you compare.
+
+#### 3 · THE SWEEP — 20 configs, per phase, plus the wall byte-for-byte
+
+Both strategies × all three descents × full-depth / clamped-past / non-multiple depths × wallOffset ± × a bigger tool
+× row-count and ring-count boundaries × a one-row pocket × placed / stock-attached / Z-offset × confirm-every.
+**Every fill phase agrees move for move; every wall phase is BYTE-IDENTICAL to the frozen literal** — a stronger claim
+than the fill's, and exactly the ruling's words: the wall arm is structurally unchanged, only its position moves.
+
+#### 4 · A THIRD DIVERGENCE, FOUND BY SWEEPING RATHER THAN BY READING
+
+The dispatch named the sub-0.05 stepdown floor. Two more exist and both are now asserted with their numbers:
+
+    stepover floor     stepoverMm floors the mm at 0.2; the atom composes [tool*pct/100] with no floor
+    helix revolutions  the atom takes WHOLE revolutions (FUP); the literal rounds the SEGMENT count to nearest
+                       pitch 0.8 -> 315 literal / 324 parametric  ·  pitch 1.0 -> 288 / 324
+                       identical wherever stepdown/pitch is a whole number (0.5, 0.75, 1.5 all exact)
+
+**The helix one is PRE-EXISTING and NOT introduced here** — the atom has emitted `FUP` since t1345. It never surfaced
+because surfacing's own defaults (0.5 stepdown at 1mm/rev) sit inside the `max(1,…)` clamp where both agree; a
+pocket's stepdown is millimetres, so it walks straight out of that agreement. Same class as t1402's
+`concentric × ramp`: not a new bug, a combination nothing had ever measured. NOT fixed here — it would move
+surfacing's shipped emit, which is a different act with its own bridge.
+
+#### 5 · THE OPERATOR SENTENCE WAS WRONG, AND THAT IS A GATE-1 ITEM HERE
+
+The first working build emitted, on a pocket: `( ---- SURFACING, parametric … )` and `#40=74 ( area X — the
+tool-CENTRE sweep, so the tool overhangs the edge )`. The second is not a stylistic quibble — **not overhanging the
+edge is the entire point of the inset** — and the man reading the program at the pendant cannot see which wizard made
+it. At `inset > 0` the header now says AREA CLEARING, `#40` says "held 3mm inside the declared edge", and `#42` says
+"depth to clear". Keyed on the inset, so the surfacing path is untouched and asserted byte-identical.
+
+#### 6 · THE TWIN — and why the canonical binding stack is PINNED to the literal arm
+
+`_para` joins `_tooSmall`/`_rest` as a derived guard, reading `pocketRasterGap` — **the same predicate the concrete
+build uses**, so the twin and the wizard cannot disagree about which arm a pocket is on. That agreement IS the
+byte-identity claim, and `pocket-data-emit` (twin == builder across strategy × tooSmall × 4 shapes × scalars ×
+dialects) stayed green throughout without a single edit.
+
+`CANONICAL_BIND` keeps `_para: false` **on purpose**: only the literal arm carries a socket for `shape`, `dia`,
+`sides` and `wallOffset`, and the form's labels/defaults derive over the canonical stack. Deriving it over the
+parametric arm would have silently dropped four controls from the wizard. Asserted, not reasoned about — a test walks
+the registered def's bindings and requires all four by name.
+
+`inset` is written by `postInstantiate`, not by a binding, because it is derived from `toolDia` AND `wallOffset`
+together — the same slot the drill centre and the place bbox already use.
+
+#### 7 · THE FALLOUT WAS SEVEN SPECS, and five of them were PROXIES rather than properties
+
+Every one is repaired by asking the product instead of the text:
+
+    depth-entry-804 RAMP    counted lines carrying "( ramp )" — one per level. A macro emits ONE inside a loop.
+                            Now counts DESCENTS in the trace: the only move that drops Z while travelling in XY.
+    depth-entry-804 TWIN    read `pocketfill.entry`; asks whichever clearing leaf the arm actually built.
+    tenant-extraction-1391  probed the emitted WORD "parametric" as a stand-in for the hole body — and a rect
+                            pocket's CLEARING is parametric now. Asks the STACK for a `holecycle` block instead.
+    placement-rollout       scanned literal `X<number>` words; a ring's X is `X[3 + #47]`. Traces instead.
+                            (Surfacing's identical test still passes on the text: its frame printer FOLDS a numeric
+                            origin at build time. Same atom, different foldability — worth knowing.)
+    blocks-hover            needs a stack that NESTS, and was moved from surfacing to pocket at t1361 for exactly
+                            this reason. Pocket has now collapsed the same way → moved to `contour`. Every op this
+                            arc re-points loses its nesting; the `hasLeaf` assertion is what makes that LOUD.
+    pocket-offset           expresses the wallOffset property on BOTH arms now, off whichever leaf is present.
+    pocket-e0-superset      the golden moved for 14 entries (below) + `_para`/`_rest` are now injected EXPLICITLY
+                            (they were read as `undefined`, which happened to falsify the right guards).
+
+**THE GOLDEN REGENERATION CAUGHT MY OWN ASSUMPTION.** I scoped it to `rect|*|normal|*` — 12 keys — and the hard check
+REFUSED two more: `rect|spiral|tiny|3` and `rect|raster|tiny|3`. They look out of scope because they are the "tiny"
+size; they are not, because that scalar sets `wallOffset: 1.5`, which shrinks the inset to 1.5mm and leaves a 4mm
+pocket with 1mm of real walk. A key-name pattern encoded MY belief about which cases were too small; switching the
+guard to `pocketRidesRaster` asked the product. **14 changed, 0 refused, and the other 82 entries still hold the
+pre-E0 independent truth.**
+
+#### THE RECONCILER (t1387's sweep, in-act)
+
+`opSession.pocket` opened with `find(prog,'stepdown')` then looked for a `pocketfill` inside it. On the raster arm it
+would have found the WALL's stepdown and then failed; on spiral it would have declined outright — silently. The
+parametric arm reads first. `shape` is 'rect' by the arm's own predicate; `wallOffset` comes back through
+`pocketWallOffsetFromInset`, the **algebraic inverse of the one function that computed the inset** — a declaration
+read backwards, not intent inferred from output. Proven by the app's own symptom: a freshly inserted pocket does not
+false-glow as hand-edited, which only holds if the reverse-sync and the builder agree.
+
+#### THE CAM KNOB
+
+A `#var` written into a PLACED pocket's clearing socket comes out as `#42=#2601` / `#43=#2602` / `F#2603` with **every
+X/Y/Z/I/J byte-identical** — the proof that the place fold ABSORBED rather than rewrote. Structurally too:
+`blockedIndices` does not block the atom, because its place holds exactly one self-framing child.
+
+⚠ **ONE HONEST LIMIT, stated rather than glossed:** `classifyExposable` reads the twin's CANONICAL bindings, which are
+pinned to the literal arm (see 6), so it still reports pocket's depth as bake-only. Un-pinning it costs four form
+fields. The knob is real at the EMIT — which is what reaches the machine — and the classifier's reading is a follow-up
+that wants the form-vs-arm binding question answered properly, not a flag flipped.
+
+#### SEEN, NOT INFERRED
+
+`scratchpad/1406-pocket-wizard.png` — the spiral pocket: the full form (every field present, Wall Offset included),
+the 3D showing concentric rings inset from the stock edge, and the code preview reading `( ---- AREA CLEARING,
+parametric … @work 556 ---- )`. `scratchpad/1406-pocket-raster-3d.png` — the raster arm: parallel rows plus the wall
+trace, 153 cuts (138 fill + 15 wall, counted). `scratchpad/1406-pocket-blocks.png` — the Blocks view:
+`placeonstock` → `surfaceraster`, one block where there were two. Trace cap checked on all three, plus a 300×200 at
+0.3/10%: **26040 cuts, `capped` false** — the declared @work carries through the re-point.
+
+#### GATE (fast tier)
+
+New spec **27/27**. Pocket family **24/24** across 10 specs. Surfacing + parametric family **151/151** across 11.
+Smoke **71/71**. CAM family **40/40**. Blocks round-trip + reconcile **16/16**. The placeonstock-touching sweep
+**42/42**. Every spec I edited, re-run together: **67/67**. IRON RULE **11/11, the same eleven, 0 blocks lost**.
+Version sync **6/6 (V2026.07.30.6)**. **~440 tests, 0 failures. FULL SUITE NOT RUN — that is the advisor's merge gate.**
+
+Scratch specs deleted; no worktrees left behind; process tree clean, 0 flagged.
+
+#### WHAT THIS DID NOT DO
+
+The literal `pocketfill`/`pocketwall` atoms do NOT retire — the one-way, non-rect, rest-tool and too-small arms still
+run through them, by ruling. Teaching the atom `direction` (which empties the one-way clause) is the named follow-up.
