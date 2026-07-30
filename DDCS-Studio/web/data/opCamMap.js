@@ -54,7 +54,13 @@ export const OPTYPE_TO_CAM = { surfacing: 'surface', corner: 'corner', edge: 'ed
 export const BUILD_ENUM_REASON = 'changes the program shape — pick the shape the slot bakes, or expose it as a runtime branch';
 // The arm budget: a branch duplicates the WHOLE op body once per arm, so 2–3 is a readable macro and more is bloat.
 export const BRANCH_ARM_CAP = 3;
-export const branchRefusal = (n) => `${n} arms would duplicate the program ${n} times — too big for one macro; bake the shape instead`;
+// t1414 — A ONE-ARM ENUM IS NOT REFUSED FOR SIZE, and saying so was its own small lie. The screenshot of the honest
+// rows caught it: `material` (a single-option enum) read "1 arms would duplicate the program 1 times — too big for one
+// macro", which is broken grammar carrying a wrong reason. There is nothing to branch BETWEEN, which is a different
+// fact and the one the operator needs. Found while picturing this act's fix, and in exactly its class.
+export const branchRefusal = (n) => (n < 2
+    ? 'only one option — there is nothing to branch between; the slot bakes it'
+    : `${n} arms would duplicate the program ${n} times — too big for one macro; bake the shape instead`);
 
 /** The enum class of a def binding: 'value' (a socket carries it at runtime) | 'build' (no socket → it forks the build). */
 export function enumClassOf(b) {
@@ -82,20 +88,84 @@ export const ENTRY_GEOMETRY_KNOBS = ['stepoverPct', 'stepdown'];
 export const ENTRY_GATE_REASON = 'changes the entry geometry, which this descent bakes at build — baked when built';
 export const entryHasGeometry = (params) => { const e = (params && params.entry) || 'plunge'; return e === 'ramp' || e === 'helix'; };
 
-export function buildEnumFields(def, params) {
+/**
+ * ── t1414 — WHAT A PER-TYPE GENERATOR'S MACRO DOES **NOT** CARRY, declared ────────────────────────────────────────
+ *
+ * A build enum appears in the slot's table as a greyed, informative row, and this file's own rule for it is: *"the row
+ * states the shape being built and stays greyed — informative, never a control that lies."* For pocket it lied.
+ * Measured at t1412: `pocketSlot`'s packed body is BYTE-IDENTICAL for `strategy: 'spiral'` and `'raster'`, and
+ * identical again for `direction: 'bothways'` and `'oneway'` — the macro is one hand-written raster+wall — while the
+ * table displayed the operator's pick beside it. So a concentric pocket packed a slot that cuts a raster, and the
+ * surface said "Spiral". Same class as t1402's ring defect: asked for one thing, machine does another, surface agrees
+ * with the request.
+ *
+ * ONE SOURCE FOR THE SENTENCE, keyed by (camType, param), so every consumer of `buildEnumFields` says the same thing
+ * and a reader can see the whole set of divergences in one place instead of inferring it from nine macros.
+ *
+ * ⚠ THIS TABLE IS A STATEMENT ABOUT A MACRO, AND IT IS LOCKED TO ONE. `tests/cam-row-honesty-1414.spec.js` builds each
+ * generator at each arm of each build enum and requires the two to agree BOTH WAYS: a param listed here must produce
+ * an IDENTICAL body across its arms (or the row is now under-claiming — the macro grew a capability and the table
+ * hides it), and a param NOT listed must produce a DIFFERENT one (or a new liar has appeared). So when the ruled
+ * C-act lands and the clearing body delegates to the atom, this spec goes RED and the row must come out. The row can
+ * never lag the macro in either direction, which is the only version of "honest" that survives the next act.
+ */
+export const GENERATOR_IGNORES = {
+    pocket: {
+        strategy: 'This slot\'s macro cuts a RASTER clear + wall finish, layer by layer. A Spiral (concentric) pick is NOT carried into it — the pack builds the raster either way.',
+    },
+    // The SWEEP that came with this fix found three more of the same class — reported rather than assumed, and each
+    // sentence names what its macro actually does rather than what its row promised.
+    cpocket: {
+        strategy: 'This slot\'s macro cuts a CONCENTRIC-RING clear, layer by layer. A Raster pick is NOT carried into it — the pack builds the rings either way.',
+    },
+    corner: {
+        travelApproach: 'This slot\'s macro always AUTO-TRAVERSES between the two walls — it emits the move itself, with no operator reposition pause. A Manual pick is NOT carried into it.',
+        travelShape: 'This slot\'s macro traverses on ONE fixed path, emitted the same way for every pick. A different travel-shape pick is NOT carried into it.',
+    },
+};
+
+/**
+ * ── WHAT THE SWEEP CLEARED, and why each stayed out of the table (measured, not assumed) ──────────────────────────
+ *   corner.corner · corner.wcs · edge.axis · edge.dir · edge.wcs   the body genuinely DIFFERS per arm — carried.
+ *   corner.probeSeq                                                carried WITHOUT changing the body: the generator
+ *                                                                  owns a `seq` VALUE field the macro reads as a
+ *                                                                  number at run time. A body-only criterion called
+ *                                                                  this a liar on the first run; conflating the two
+ *                                                                  mechanisms is exactly how a sweep invents work.
+ *   surface.zMode                                                  out of scope: `camTypeOf` forks skim to the
+ *                                                                  UNIVERSAL arm, so this generator is never asked
+ *                                                                  for that arm. The fork is the honesty.
+ *   pocket.direction                                               NOT a build enum at all — it binds to a socket on
+ *                                                                  the fill leaf, so the rect pocket's table has no
+ *                                                                  direction row to lie with. (I had declared one
+ *                                                                  here and removed it: a sentence nothing reads is
+ *                                                                  worse than no sentence, because it looks handled.)
+ */
+
+/** The declared sentence for a (camType, param) the generator's macro ignores, or '' when it carries it. */
+export function generatorIgnores(camType, param) {
+    return (GENERATOR_IGNORES[camType] && GENERATOR_IGNORES[camType][param]) || '';
+}
+
+export function buildEnumFields(def, params, camType) {
     const p = params || {};
     return ((def && def.bindings) || []).filter((b) => enumClassOf(b) === 'build').map((b) => {
+        const ignored = camType ? generatorIgnores(camType, b.param) : '';
         const opts = ((b.widgetConfig && b.widgetConfig.options) || []).map((o) => Array.isArray(o) ? { value: o[1], label: o[0] } : { value: o, label: String(o) });
         const value = (p[b.param] !== undefined && p[b.param] !== '') ? p[b.param] : b.default;
         const arms = opts.length ? opts : [{ value: b.default, label: String(b.default) }];
         // BRANCHABLE = the arms fit the budget. Not branchable → Expose greyed with the REFUSAL as its reason (never
         // hidden: postGating's rule). Branchable → Expose is offered but NOT preselected; `exposed:false` is the
         // declared default, so a slot only carries both arms when someone deliberately ticks it.
-        const branchable = arms.length > 1 && arms.length <= BRANCH_ARM_CAP;
+        // t1414 — A PICK THE MACRO IGNORES CANNOT BE BRANCHED EITHER, and that is not a second decision: branching
+        // means "the macro carries every arm and jumps on the pendant number", which is precisely what a macro that
+        // ignores the pick does not do. Offering Expose here would have been a second lie stacked on the first.
+        const branchable = arms.length > 1 && arms.length <= BRANCH_ARM_CAP && !ignored;
         return { key: b.param, label: b.label || b.param, def: b.default, value, units: '', type: 'enum',
             buildEnum: arms, branchable,
             exposed: false, exposable: branchable, bakeable: true,
-            _exposeTip: branchable ? 'Expose as a BRANCH: the macro carries every arm and jumps on the pendant number, so the shape is chosen at the machine' : branchRefusal(arms.length),
+            _exposeTip: ignored || (branchable ? 'Expose as a BRANCH: the macro carries every arm and jumps on the pendant number, so the shape is chosen at the machine' : branchRefusal(arms.length)),
+            ...(ignored ? { _notCarried: ignored } : {}),
             _branch: true };
     });
 }
@@ -417,5 +487,6 @@ export function seedFromOp(op) {
     // t1323 — a BUILD enum lives on the DEF, not on the generator's field list, so it is appended on the generator arm too.
     // On this arm it is always sitting at the value that KEEPS this camType (a shape-forking pick routed to universal
     // above), so the row states the shape being built and stays greyed — informative, never a control that lies.
-    return { camType, fields: fields.concat(buildEnumFields(getUserDef(op && op.opType), params)) };
+    // t1414 — the camType is passed so the row can say what THIS generator's macro actually carries.
+    return { camType, fields: fields.concat(buildEnumFields(getUserDef(op && op.opType), params, camType)) };
 }

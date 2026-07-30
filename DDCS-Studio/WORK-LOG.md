@@ -9813,3 +9813,86 @@ what a CAM slot promises, and it is yours.
 
 Nothing changed, so there is nothing to gate. Scratch diagnostics deleted; tree carries only the advisor's docs;
 process tree clean.
+
+## t1414 (seat A) — OPTION A: THE ROW STOPS LYING, and the sweep found three more liars
+
+Committed green. The screenshot debt is CLEARED, on the surface that is finally the right one.
+
+### THE FIX — one declaration, one sentence per divergence
+
+`GENERATOR_IGNORES[camType][param]` states, in words a machinist can act on, what a per-type generator's macro does
+**not** carry. `buildEnumFields` reads it (given the camType, which `seedFromOp` now passes) and the row becomes:
+the pick still SHOWN (informative — postGating's rule is grey and say why, never hide), Expose **greyed**, and the
+`_exposeTip` — the string macrosApp puts on the control — carrying the sentence.
+
+**A pick the macro ignores cannot be BRANCHED either, and that is not a second decision.** "Branch" means *the macro
+carries every arm and jumps on the pendant number*, which is precisely what a macro ignoring the pick does not do.
+Offering Expose there would have stacked a second lie on the first.
+
+The sentence is stated the SAME WAY whichever way the op is set — it is a fact about the MACRO, not a warning that
+appears only on disagreement. A sentence that showed up only when the operator picked Spiral would be a scold; one
+that is always there is documentation.
+
+### THE SWEEP — every per-type generator, and the criterion had to be corrected TWICE
+
+    pocket.strategy         IGNORED  → declared    (the one t1412 caught)
+    cpocket.strategy        IGNORED  → declared    ← new: the ring-clear macro ignores a Raster pick the same way
+    corner.travelApproach   IGNORED  → declared    ← new: the macro always auto-traverses; Manual is not carried
+    corner.travelShape      IGNORED  → declared    ← new: one fixed traverse path, emitted the same way per pick
+    corner.corner · corner.wcs · edge.axis · edge.dir · edge.wcs      CARRIED (the body differs per arm) — clean
+    corner.probeSeq                                                   CARRIED — see below
+    surface.zMode                                                     OUT OF SCOPE — see below
+
+**Correction 1 — a pick can reach the macro WITHOUT changing its text.** My first criterion was body-differs-per-arm,
+and it called `corner.probeSeq` a liar. It is not: the generator owns a `seq` VALUE field the macro reads as a NUMBER
+at run time, so the body is identical BY DESIGN and the pick is fully carried. Conflating a runtime value field with
+a build fork is exactly how a sweep invents work.
+
+**Correction 2 — an arm that routes elsewhere is not this generator's lie.** The criterion also flagged
+`surface.zMode`, but `camTypeOf` forks skim to the UNIVERSAL arm — this generator is never asked for that arm, so
+comparing its body across one measures a question nobody asks. The fork IS the honesty. The sweep now filters arms by
+`camTypeOf` before comparing.
+
+**And one entry I declared before measuring, then removed:** `pocket.direction`. It binds to a socket on the fill leaf
+— a VALUE enum, not a build enum — so the rect pocket's table has no direction row at all. Honest by omission.
+A declaration nothing reads is worse than none, because it looks handled.
+
+### THE LOCK — the row may never lag the macro in either direction
+
+`tests/cam-row-honesty-1414.spec.js` builds every generator at every arm of every build enum and requires the
+declaration and the macro to agree BOTH WAYS:
+
+    declared ignored  ⇒ the bodies at its arms must be IDENTICAL   (else the row under-claims — the macro grew a
+                        capability and the table is now hiding it)
+    NOT declared      ⇒ the bodies must DIFFER, or a runtime VALUE field must carry it (else a new liar)
+
+So when the ruled **C-act** lands and pocket's clearing body delegates to the atom, `strategy` becomes genuinely
+carried, this spec goes **RED**, and the row must come out. That is the point: the declaration cannot rot quietly, in
+either direction. It is also the sweep, so a clean generator is reported as MEASURED clean rather than assumed clean.
+
+### 🔴 ONE MORE, FOUND BY PICTURING THE FIX
+
+Rendering the rows for the screenshot showed `material` (a single-option enum) reading **"1 arms would duplicate the
+program 1 times — too big for one macro"** — broken grammar carrying a wrong reason. A one-option enum is not refused
+for SIZE; there is nothing to branch between, which is a different fact and the one the operator needs.
+`branchRefusal(n)` now says so for `n < 2` and keeps the size refusal for a genuinely over-budget enum. Worth
+recording HOW it surfaced: from looking at the rendered rows, not from reading the code.
+
+### SEEN, NOT INFERRED
+
+`scratchpad/1414-cam-rows-honest.png` — the rect pocket's CAM field table rendered BOTH WAYS (strategy = Spiral and
+strategy = Raster), every row with its value, its Expose state and the exact tooltip string. The two strategy rows
+show the operator's differing pick and the identical, true sentence about the macro. **The screenshot debt from t1410
+is discharged here** rather than on the wrong surface.
+
+### GATE (fast tier)
+
+New spec **3/3**. CAM family + corner **69/69** across 20 specs. The mixed re-run (CAM + pocket + arc + iron rule)
+**72/72**. Smoke **71/71**. Iron rule **11/11, the same eleven**. Version sync 6/6 (V2026.07.30.8). Scratch specs
+deleted; proc tree clean.
+
+### WHAT THIS DELIBERATELY DID NOT DO
+
+The macros are untouched — no generator gained an arm, no G-code changed. A spiral rect pocket still packs a raster
+slot; the difference is that it now SAYS so. Closing the capability gap is the ruled C-act (pocket's clearing body
+delegating to the atom), and B (a second hand-written concentric arm) stays eliminated by one-source.
