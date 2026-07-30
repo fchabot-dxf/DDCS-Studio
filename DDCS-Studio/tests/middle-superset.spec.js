@@ -13,11 +13,33 @@ import { test, expect } from '@playwright/test';
  * Also folds in the transTraverse → safeTraverseStack `mode:'center'` dedup (the pre-declared byte-identical
  * extraction, previously ZERO callers): middle no longer hand-rolls the diagonal re-centre.
  */
-test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identical across the full 14336-combo structural sweep', async ({ page }) => {
+/**
+ * ── THE BUDGET IS DECLARED, AND SHARDED (t1383, ruled) ────────────────────────────────────────────────────────────
+ *
+ * This gate was TIMEOUT-MARGINAL against the suite's 60s per-test cap, and marginal in the worst way: it flipped either
+ * way under load, so it read as a flaky test when it was actually an honest one on too small a clock. t1381 isolated it
+ * two ways rather than reporting a regression — (a) the walker it was suspected of, benchmarked at 1.2µs vs 0.2µs per
+ * walk, i.e. ~15ms across the whole sweep, 0.05% of a ~58s test, which cannot tip a 60s cap; and (b) back-to-back
+ * ISOLATED runs, where the CHANGED tree passed at 58.9s and the BASELINE tree TIMED OUT. The cause was the clock.
+ *
+ * 14336 combos x (one deep clone + two full `emitMapped` builds) is simply a lot of work for one test. So the sweep is
+ * SPLIT into declared shards, each with a bounded budget, rather than one test given an ever-larger timeout — which
+ * would only postpone the same marginality. `SHARDS` is data: the loop below reads it, and the coverage test asserts the
+ * shards partition the sweep EXACTLY (disjoint, and summing to the full count), so sharding cannot quietly drop combos
+ * the way a hand-split range would. Raising the number is now the whole cost of making this faster.
+ */
+const SHARDS = 4;
+const EXPECTED_COMBOS = 14336;   // 2^8 * 7 wcs * 2 orders * 2 dir1 * 2 dir2 — asserted, not assumed
+
+for (let shard = 0; shard < SHARDS; shard++) {
+test(`E0 GATE [shard ${shard + 1}/${SHARDS}]: prune(middleStack superset) == concrete middleStack, byte-identical across the full ${EXPECTED_COMBOS}-combo structural sweep`, async ({ page }) => {
+  // A BOUNDED budget, not an open one: a shard measured at ~15s gets 4x headroom for a loaded box (this machine also
+  // carries the advisor session and the analytics agent, which is what made the unsharded test flip).
+  test.setTimeout(60_000);
   await page.goto('http://localhost:3211');
   await page.waitForFunction(() => window.ddcsGetBlockProgram);
 
-  const r = await page.evaluate(async () => {
+  const r = await page.evaluate(async ({ shard, SHARDS }) => {
     const { middleStack } = await import('/wizards/middleWizard.js');
     const { pruneGuards } = await import('/blocks/whenGuard.js');
     const { emitMapped } = await import('/blocks/blockEmitter.js');
@@ -51,7 +73,14 @@ test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identic
 
     const diffs = [];
     let leftoverGuards = 0;
-    for (const c of combos) {
+    let checked = 0;
+    // THE SHARD IS AN INTERLEAVE (index % SHARDS), not a contiguous block, so each shard samples the WHOLE structural
+    // space rather than one corner of it — a contiguous split would put every `featureType:'boss'` combo in the last
+    // shard, and a shard that fails would say much less about where the fault is.
+    for (let i = 0; i < combos.length; i++) {
+      if (i % SHARDS !== shard) continue;
+      const c = combos[i];
+      checked++;
       const pruned = JSON.parse(JSON.stringify(SUP));   // the caller clones; pruneGuards mutates in place
       pruneGuards(pruned, c);
       if (JSON.stringify(pruned).includes('"type":"guard"')) leftoverGuards++;
@@ -60,14 +89,33 @@ test('E0 GATE: prune(middleStack superset) == concrete middleStack, byte-identic
       if (a !== b) diffs.push({ c, a: a.slice(0, 1400), b: b.slice(0, 1400) });
     }
 
-    return { supGuardCount, comboCount: combos.length, diffCount: diffs.length, firstDiff: diffs[0] || null, leftoverGuards };
-  });
+    return { supGuardCount, comboCount: combos.length, checked, diffCount: diffs.length, firstDiff: diffs[0] || null, leftoverGuards };
+  }, { shard, SHARDS });
 
   expect(r.supGuardCount, 'the superset carries guard blocks (it IS a superset, not accidentally concrete)').toBeGreaterThan(10);
-  expect(r.comboCount, 'the full structural sweep is 2^8 * 7 * 2 orders * 2 dir1 * 2 dir2 = 14336 combos').toBe(14336);
+  expect(r.comboCount, 'the full structural sweep is 2^8 * 7 * 2 orders * 2 dir1 * 2 dir2 = 14336 combos').toBe(EXPECTED_COMBOS);
+  // THIS SHARD really did work — the guard against a sharding bug that silently checks nothing.
+  expect(r.checked, `shard ${shard + 1} covers its ${EXPECTED_COMBOS / SHARDS} combos`).toBe(EXPECTED_COMBOS / SHARDS);
   expect(r.leftoverGuards, 'prune leaves ZERO guard blocks (fully collapsed to the concrete shape)').toBe(0);
   if (r.firstDiff) console.log('FIRST DIFF @ ' + JSON.stringify(r.firstDiff.c) + '\n--- PRUNED SUPERSET ---\n' + r.firstDiff.a + '\n--- CONCRETE ---\n' + r.firstDiff.b);
   expect(r.diffCount, 'prune(superset) is BYTE-IDENTICAL to concrete middleStack for ALL structural combos (the E0 gate)').toBe(0);
+});
+}
+
+/**
+ * THE SHARDING ITSELF IS ASSERTED — the shards PARTITION the sweep: disjoint, and covering every combo exactly once.
+ *
+ * Without this, sharding is a way to make a gate faster by making it test less, and the failure would be invisible: each
+ * shard would pass, the suite would be green, and some region of the structural space would simply never be compared.
+ * Cheap to check (it is arithmetic over indices, no builds), so there is no excuse not to.
+ */
+test('E0 GATE sharding — the shards partition the sweep exactly once, with nothing dropped or doubled', async () => {
+  const seen = new Map();
+  for (let shard = 0; shard < SHARDS; shard++) {
+    for (let i = 0; i < EXPECTED_COMBOS; i++) if (i % SHARDS === shard) seen.set(i, (seen.get(i) || 0) + 1);
+  }
+  expect(seen.size, `every one of the ${EXPECTED_COMBOS} combos is claimed by some shard`).toBe(EXPECTED_COMBOS);
+  expect([...seen.values()].every((n) => n === 1), 'and by exactly one — the shards are disjoint').toBe(true);
 });
 
 /**

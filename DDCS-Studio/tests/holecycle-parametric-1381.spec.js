@@ -580,16 +580,13 @@ test('THE DECLARATIONS — bands as data with no overlap, a refused zero bite, a
             { pattern: 'line', count: 4, spacing: 20, angle: 30, cycle: 'bore-step', holeDia: 12, toolDia: 6, depth: 8, pitch: 0.5, feed: 120, clearance: 5 },
         ]) for (const l of holeCycleLines(cfg)) for (const m of l.matchAll(/#(\d+)/g)) used.add(Number(m[1]));
         const mine = JSON.stringify(HOLE_SCRATCH);
-        // ⚠ `holepeck`'s [81,87] IS EXCLUDED, and the reason is the point rather than a convenience. That atom is the one
-        // this one SUPERSEDES — t1379's peck-only cycle — and the overlap is deliberate: #81 (depth) and #82 (bite) keep
-        // their exact meanings, because they are the two LIVE KNOBS an operator edits on the pendant and their numbers
-        // are worth keeping stable across the fold. The overlap cannot reach a program: BOTH atoms are pre-consumer (the
-        // PRE-CONSUMER bridge asserts no builder reaches either), and `holepeck` is retired by the switch. Excluded BY
-        // NAME so the day something re-points to it, this stops being a silent pass.
-        const superseded = (await import('/wizards/ops/holepeck.js')).HOLE_SCRATCH;
-        const isMineOrSuperseded = (b) => HOLE_SCRATCH.some(([lo, hi]) => b[0] === lo && b[1] === hi)
-            || superseded.some(([lo, hi]) => b[0] === lo && b[1] === hi);
-        const others = opBands().filter((b) => !isMineOrSuperseded(b));
+        // ⚠ THE EXCLUSION IS GONE, and its absence is the assert (t1383). While `holepeck` existed the two atoms declared
+        // a DELIBERATE overlap — its [81,87] inside this one's [81,89] — because #81 (depth) and #82 (bite) are the two
+        // LIVE KNOBS an operator edits on the pendant and their numbers were worth keeping stable across the fold. That
+        // overlap was licensed only by BOTH being pre-consumer, which is a licence that expires the moment anything
+        // re-points. The switch retired `holepeck`, so there is no second claimant and no exclusion to carve out: the
+        // band check below now runs against the WHOLE registry with nothing forgiven.
+        const others = opBands().filter((b) => !HOLE_SCRATCH.some(([lo, hi]) => b[0] === lo && b[1] === hi));
         const guard = (cyc) => holeCycleLines({ pattern: 'single', cycle: cyc, depth: 8, peck: 2, pitch: 0.5, holeDia: 12, toolDia: 6, feed: 100, clearance: 5 });
         return {
             used: [...used].sort((a, b) => a - b), band: HOLE_SCRATCH, mine,
@@ -641,6 +638,7 @@ test('PRE-CONSUMER — the drill stack still builds the literal children; nothin
     const r = await page.evaluate(async () => {
         const { drillStack } = await import('/wizards/drillWizard.js');
         const { BUILDERS } = await import('/blocks/opBuilders.js');
+        const { BLOCKS } = await import('/wizards/ops/index.js');
         const flat = (st, o = []) => { for (const b of (st || [])) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
         const all = [];
         for (const [op, build] of Object.entries(BUILDERS)) { try { all.push({ op, types: flat(build({})) }); } catch (_) { /* needs params */ } }
@@ -648,17 +646,22 @@ test('PRE-CONSUMER — the drill stack still builds the literal children; nothin
             drill: flat(drillStack({})),
             helical: flat(drillStack({ method: 'helical' })),
             anyUser: all.filter((x) => x.types.includes('holecycle')).map((x) => x.op),
-            anyPeck: all.filter((x) => x.types.includes('holepeck')).map((x) => x.op),
+            // t1383 — the RETIREMENT, asserted at the registry rather than trusted to a note: the superseded atom is not
+            // registered at all any more, so nothing can reach it and the band overlap has no second claimant.
+            peckRegistered: !!BLOCKS.holepeck,
+            peckResolves: await import('/wizards/ops/holepeck.js').then(() => true, () => false),
         };
     });
     expect(r.drill, 'the peck drill stack is unchanged — array{drill}').toContain('drill');
     expect(r.drill, 'and does NOT yet carry the folded atom').not.toContain('holecycle');
     expect(r.helical, 'the helical method still builds a bore').toContain('bore');
     expect(r.anyUser, 'no registered op builder reaches the new atom yet — pre-consumer, by design').toEqual([]);
-    // …AND NEITHER DOES ANYTHING REACH THE ATOM THIS ONE SUPERSEDES. That is what licenses the band overlap between
-    // them (see THE DECLARATIONS): two atoms may share registers while NO program can contain either. When the switch
-    // re-points the drill family, `holepeck` retires — and this assert is what says so out loud in the meantime.
-    expect(r.anyPeck, 'holepeck is still pre-consumer too — it is superseded, and the switch retires it').toEqual([]);
+    // …AND THE ATOM THIS ONE SUPERSEDES IS GONE (t1383, the switch's first act). t1381 could only assert that nothing
+    // REACHED `holepeck`, which is what licensed the two atoms' deliberate #81-#87 band overlap. Retirement is the
+    // stronger statement and it is checked BOTH ways — unregistered, and the module itself no longer resolving — because
+    // an unregistered-but-present module is exactly how a superseded atom comes back to life via a stray import.
+    expect(r.peckRegistered, 'holepeck is no longer in the palette registry — retired, superseded by this atom').toBe(false);
+    expect(r.peckResolves, 'and its module is gone, so no stray import can revive the overlapping band').toBe(false);
 });
 
 /**

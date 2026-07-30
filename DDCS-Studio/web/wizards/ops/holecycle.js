@@ -43,6 +43,7 @@
 import { num, r3, val } from './util.js';
 import { affineFrame } from './affineFrame.js';
 import { patternPoints } from './array.js';
+import { workMarker } from '../../engine/declaredWork.js';   // t1383 — this body DECLARES how much it executes; the tracer's cap reads it
 
 /**
  * ── THE BAND ──────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -76,7 +77,9 @@ export const HOLE_SCRATCH = [[65, 69], [75, 78], [81, 89]];
  * the register-sharing t1375 had to UNDO, which shared two quantities that were both live at once.
  *
  * #81 and #82 keep t1379's exact meanings. That is deliberate: they are the two LIVE KNOBS an operator edits on the
- * pendant, so their numbers are the ones worth keeping stable across a rewrite.
+ * pendant, so their numbers are the ones worth keeping stable across a rewrite. That inheritance made this atom and
+ * `holepeck` declare an OVERLAPPING band for one turn, licensed only by both being pre-consumer; t1383 retired
+ * `holepeck`, so this band now has a single claimant and the spec's exclusion is gone with it.
  */
 const V = {
     depth: '#81',   // LIVE — total depth to drill / bore
@@ -314,6 +317,36 @@ function boreHelixCycle({ feed, clr, r, ENTRY, IJ, HELIX, azE, az }) {
 }
 
 /**
+ * ── HOW MUCH THIS BODY EXECUTES, DECLARED (t1383, ruled) ──────────────────────────────────────────────────────────
+ *
+ * The tracer's runaway guard used to be sized by program TEXT LENGTH, which is the one quantity a parametric body
+ * destroys: the 43-line body emitting a bolt-24 helix got the 5000-step floor and its preview truncated at a twelfth of
+ * the path (t1381 measured it; `stats.capped` said so and nothing read it). The fix is a DECLARATION, because this atom
+ * already computes every count involved — holes, passes, segments per revolution. It says so; the tracer reads it.
+ *
+ * THE UNITS ARE EXECUTED PROGRAM LINES, which is what the engine counts as a step (a comment line is a step too — the
+ * engine keeps a 1:1 line image for editor highlighting). Each cycle's `fixed`/`perTrip` are its OWN line counts, read
+ * off the bodies below; `trips` is its inner loop's trip count. The estimate is deliberately structural rather than
+ * exact — `WORK_MARGIN` absorbs the slack — but it is calibrated, not guessed: against t1381's two independent
+ * measurements it lands within ~1.3% (bolt-24 helix d20/p0.25: 461k declared vs 467k measured) and ~2% (the d10/p0.5
+ * case: 115k vs 117061). A declaration that drifts far from the truth now shows up as a preview that SAYS it truncated,
+ * which is the failure mode the ruling asked for instead of a silently short toolpath.
+ */
+export function holeCycleWorkSteps(p = {}) {
+    const cycle = cycleOf(p.cycle);
+    const depth = num(p.depth, 5);
+    const bite = cycle === 'peck' ? Math.max(0.1, num(p.peck, depth)) : Math.max(0.05, num(p.pitch, 0.5));
+    const n = holePatternPoints(p).length;
+    const passes = Math.max(1, Math.ceil(depth / Math.max(1e-6, bite)));
+    const W = cycle === 'peck' ? { fixed: 4, trips: passes, perTrip: 8 }
+        : cycle === 'bore-step' ? { fixed: 6, trips: passes, perTrip: 6 }
+            : { fixed: 12, trips: Math.max(SEG_PER_TURN, passes * SEG_PER_TURN), perTrip: 10 };
+    const PER_HOLE_OUTSIDE = 8;   // the pattern's step arithmetic, the skip tests, the advance, k++, END1, the WHILE re-eval
+    const PREAMBLE = 12;          // the header, the two live knobs, the zero-bite guard, the seed, k=0, and the refusal tail
+    return PREAMBLE + n * (PER_HOLE_OUTSIDE + W.fixed + W.trips * W.perTrip);
+}
+
+/**
  * The parametric body for a whole patterned drilling / boring op.
  *
  * @param {object} p  pattern + geometry + cycle params, the absorbed frame (x/y/z0) and rotation (rotAngle/rotPivotX/Y)
@@ -380,7 +413,11 @@ export function holeCycleLines(p = {}) {
         : body;
 
     const L = [
-        `( ---- ${bored ? 'BORE' : 'DRILL'}, parametric: ${pat.n} hole${pat.n === 1 ? '' : 's'} (${pattern}) x ${cycle} ---- )`,
+        // THE DECLARED WORK RIDES IN THIS HEADER (t1383) — a token in a comment the body already emits, rather than a new
+        // marker LINE, because a new line would shift every index in the emitter's line-aligned maps and perturb the
+        // round-trip diff of every program that grew one. `stripAnnotations` drops it with every other parenthetical, so
+        // no byte-equivalence bridge sees it.
+        `( ---- ${bored ? 'BORE' : 'DRILL'}, parametric: ${pat.n} hole${pat.n === 1 ? '' : 's'} (${pattern}) x ${cycle} · ${workMarker(holeCycleWorkSteps(p))} ---- )`,
         `${V.depth}=${r3(depth)}   ( total depth — LIVE: a pendant can turn this )`,
         `${V.bite}=${r3(bite)}   ( ${cycle === 'peck' ? 'bite per peck' : 'pitch per pass'} — LIVE )`,
         // The guard is the same class as the raster's zero-stepover refusal: a bite that never advances would loop

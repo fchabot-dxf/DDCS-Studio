@@ -15,8 +15,12 @@
  * STUDIO presets are higher-level stacks of these. To add a primitive: ops/<name>.js + register here.
  */
 import { drillBlock, peckDrill } from './drill.js';
-import { holePeckBlock } from './holepeck.js';   // t1379 — the PARAMETRIC peck cycle (pre-consumer: nothing re-points to it yet)
-import { holeCycleBlock } from './holecycle.js';   // t1381 — the FOLDED drill family: pattern x cycle, one body (pre-consumer)
+// t1383 — `holepeck` RETIRED here (t1379's peck-only cycle). It was fully superseded by `holecycle` and a pure leaf: only
+// this registry imported it, no builder reached it, and holecycle never did. Its 8 bridges retired WITH it because
+// holecycle's own 48 strictly subsume them (same criterion, same literal side, peck plus two bore cycles plus all five
+// patterns). Retiring it is also what dissolves the deliberate #81-#87 band overlap the two declared while both were
+// pre-consumer. History in git; the reasoning in the t1383 WORK-LOG.
+import { holeCycleBlock } from './holecycle.js';   // t1381 — the FOLDED drill family: pattern x cycle, one body
 import { tapBlock } from './tap.js';   // t776 — the TAP primitive (floating-holder pitch-locked cycle + a gated rigid variant)
 import { boreBlock, helicalBore } from './bore.js';
 import { lineBlock, lineCut } from './line.js';
@@ -92,7 +96,7 @@ import { evalExpr } from './expr.js';
 export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
     moveBlock, arcBlock, probeBlock, machineMoveBlock, safeRetractBlock, safeTraverseBlock, safeHopBlock, clearLiftBlock, homeBlock, pathModeBlock,   // Move (+ G53 machine-coord move + machine-frame safe-Z retract + safetraverse bundle + clearance-hop + clearlift folding atom + G28 home + G64/G61 path mode)
-    lineBlock, slotBlock, boreBlock, drillBlock, holePeckBlock, holeCycleBlock, tapBlock, contourBlock, contourFillBlock, pocketFillBlock, pocketWallBlock, pocketRestBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + tap + contour/profile [contour=region-socket for pocket-wall; contourfill/pocketfill/pocketwall=flat for the twins] + native canned cycles G81-85/G80)
+    lineBlock, slotBlock, boreBlock, drillBlock, holeCycleBlock, tapBlock, contourBlock, contourFillBlock, pocketFillBlock, pocketWallBlock, pocketRestBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + tap + contour/profile [contour=region-socket for pocket-wall; contourfill/pocketfill/pocketwall=flat for the twins] + native canned cycles G81-85/G80)
     arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, surfaceRasterBlock, stepdownBlock, placeOnStockBlock, rotateBlock, skimBlock, entryBlock, toolSelBlock, xformBlock, setupBlock, flipBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align + skim relative Z-mode + entry-point + tool-select marker + declared program rotation + two-sided setup boundary + flip sibling)
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, wcsBaseIntoBlock, wcsWriteBlock, wcsZeroBlock, toolOffsetBlock,   // Coordinates (WCS select + dist-mode + G17-19 plane + work-offset/probe-family base+indirect-write/WCS-zero-at-current/tool-table write)

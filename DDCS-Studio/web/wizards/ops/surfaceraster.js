@@ -45,6 +45,7 @@
  */
 import { num } from './util.js';
 import { affineFrame } from './affineFrame.js';   // t1381 — the coordinate/rotation printers, one source (drill shares them)
+import { workMarker } from '../../engine/declaredWork.js';   // t1383 — this body DECLARES how much it executes (its preview was truncating silently)
 
 /**
  * t1363 — THE ONE READING OF A STORED STEPOVER, declared here because this atom owns what a stepover MEANS.
@@ -164,6 +165,41 @@ const HX = { vx: '#34', vy: '#35', tmp: '#36', k: '#37', segs: '#38', rev: '#39'
  * The parametric body for a whole surfacing op: header, depth loop, and the strategy's own inner walk.
  * @param {object} p  w,h,depth,stepdown,toolDia,stepoverPct (or stepover mm),feed,plunge,clearance,x,y,strategy,direction
  */
+/**
+ * ── HOW MUCH THIS BODY EXECUTES, DECLARED (t1383, ruled) ──────────────────────────────────────────────────────────
+ *
+ * THIS ONE IS NOT A PRECAUTION — IT IS A SHIPPING DEFECT, MEASURED. t1381 reported the length-sized trace cap as a risk
+ * the drill switch would CREATE. It was already live here: this atom has emitted every surfacing program since t1359, it
+ * is ~49 lines whatever the area, so its cap was the 5000-step floor while the work is unbounded. Measured on the real
+ * bodies — a 0.1mm-stepdown 10%-stepover face needs 29376 steps and drew 17% of its path; a 600x400 at 0.2/15% needs
+ * 115698 and drew 4.3%. Both silently: `stats.capped` was true and nobody read it. So the preview a user checks a facing
+ * program against has been showing a fraction of the toolpath, with no indication it was partial.
+ *
+ * The counts are the ones the body ALREADY computes and emits (`#45` rows-or-rings, the depth loop's levels, the helix's
+ * segments-per-revolution) — which is why this is a declaration and not a new calculation.
+ */
+export function surfaceRasterWorkSteps(p = {}) {
+    const w = num(p.w, 100), h = num(p.h, 80);
+    const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
+    const tool = Math.max(0.1, num(p.toolDia, 12));
+    const step = Math.max(0.01, tool * stepoverPctOf(p, tool) / 100);
+    const levels = Math.max(1, Math.ceil(depth / stepdown));
+    // The SAME two count formulas the macro emits (see `count` in each walk) — rows that FIT, or rings before the middle
+    // closes — so a change to either shows up here rather than drifting out of sight.
+    const concentric = String(p.strategy || '') === 'concentric';
+    const passes = concentric
+        ? Math.max(1, Math.floor((Math.min(w, h) - 0.001) / (2 * step)) + 1)
+        : Math.max(1, Math.floor((h - step / 2) / step) + 1);
+    const PER_PASS = concentric ? 14 : 20;   // the ring / row body's own line count, branches included
+    // THE DESCENT is per LEVEL, not per pass, and only the helix is large: it is a 24-segment-per-revolution polyline.
+    const entry = String(p.entry || '');
+    const helixSegs = entry === 'helix'
+        ? Math.max(24, Math.ceil(stepdown / Math.max(0.001, num(p.helixPitch, 1))) * 24) * 10
+        : entry === 'ramp' ? 12 : 4;
+    const PER_LEVEL = 8;   // the level's own bookkeeping: the Z advance, the clamp, the confirm test, END1, the re-eval
+    return 16 + levels * (PER_LEVEL + helixSegs + passes * PER_PASS);
+}
+
 export function surfaceRasterLines(p = {}) {
     const w = num(p.w, 100), h = num(p.h, 80);
     const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
@@ -256,7 +292,8 @@ export function surfaceRasterLines(p = {}) {
 
     return [
         ...preamble,
-        '( ---- SURFACING, parametric. Every var below speaks; change one and the loops re-derive. ---- )',
+        // t1383 — the DECLARED work rides in this header (a token in a comment already emitted, so no line index moves).
+        `( ---- SURFACING, parametric. Every var below speaks; change one and the loops re-derive. · ${workMarker(surfaceRasterWorkSteps(p))} ---- )`,
         `${V.w}=${r3(w)}   ( area X — the tool-CENTRE sweep, so the tool overhangs the edge )`,
         `${V.h}=${r3(h)}   ( area Y )`,
         `${V.depth}=${r3(depth)}   ( total depth to face off )`,

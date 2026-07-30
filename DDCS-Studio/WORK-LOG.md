@@ -8244,3 +8244,131 @@ isolation work behind each. I would NOT start the SWITCH in this seat — it is 
 and it wants the full suite plus the trace-cap ruling first. A fresh session starts from evidence: the atom and its 27
 bridges are on disk, the ledger has both exceptions stated, and the three reported items each carry their measurement.
 Seat B untouched. Tree clean apart from my intended files.
+
+## t1383 (seat A) — THE THREE RULINGS LAND, and the trace cap turns out to be a SHIPPING defect, not a risk
+
+The dispatch ordered three rulings before the switch's recipe. All three landed and are verified. **THE SWITCH ITSELF IS
+PARKED, NOT STARTED** — capacity, plus one structural finding that changes its first step (both at the foot).
+
+### RULING 1 — holepeck retired, and the exclusion DISSOLVED rather than moved
+
+Taken as ruled. I re-ran the ownership test myself rather than inheriting t1381's claim: only `ops/index.js` imported it,
+no builder reached it, `holecycle` never did. A pure leaf, so nothing needed extracting first.
+
+The part worth recording is what happened to the SPEC. t1381 had to carve `holepeck`'s `[81,87]` out of the band-collision
+check, because the two atoms deliberately overlapped on #81/#82 (the live pendant knobs, kept stable across the fold) and
+that overlap was licensed ONLY by both being pre-consumer. Retiring the second claimant means the exclusion is not
+*moved*, it is **gone**: the band check now runs against the whole registry with nothing forgiven. So the assert got
+STRONGER, which is the right shape for a retirement — a deletion that makes a test weaker is a deletion covering itself.
+
+The retirement is asserted TWO ways, unregistered AND the module no longer resolving, because an unregistered-but-present
+module is exactly how a superseded atom comes back through a stray import. Its 8 bridges retired with it; `holecycle`'s 48
+strictly subsume them (same criterion, same literal side, peck plus two bore cycles plus all five patterns).
+
+### RULING 2 — THE TRACE CAP. Two corrections to the ruling's own premises, and both matter
+
+**FIRST CORRECTION, AND IT IS THE HEADLINE: this was never a risk the switch would create. It has been shipping since
+t1359.** t1381 (my own note) framed the length-sized cap as a defect the switch would make user-visible. But
+`surfaceraster` has emitted every surfacing program since t1359, it is ~49 lines whatever the area, and its work is
+unbounded — so it was already getting the 5000-step floor. Measured with the guard off, on the real bodies:
+
+    surfacing config                steps needed   old cap   fraction drawn
+    plain  (0.4 / 60% / 12mm)              588      5000     100%
+    fine   (0.1 / 10% / 6mm)            29,376      5000      17%
+    big    (600x400 / 0.2 / 15%)       115,698      5000     4.3%
+
+So the preview a user checks a facing program against before cutting has been drawing a fraction of the toolpath, with no
+indication it was partial. Not hypothetical, not pre-consumer. That is why surfacing declares its own work in this turn
+rather than being left to the fallback floor — and the ruling's own wording ("rows … pattern x levels") scopes it in.
+
+**SECOND CORRECTION: there was no trade-off to protect.** Both t1381 and the ruling hold that the value-glow localizer
+pays for a raised floor ("its speed is the point", "probes many perturbed tokens per build"). It does not. `opGlow.js`
+imports `emitMapped` and nothing else — it perturbs a param to a sentinel and RE-EMITS, diffing text. It never traces.
+Checked by reading its import list, not by reasoning about it. So the localizer's cost is entirely in emit (guarded
+already by its own line-count bail and `bore.js`'s runaway-pass guard) and the trace cap is not on its path at all. The
+trade the default was being protected from does not exist, which is why the fix could simply be honest. I left the
+localizer's own emit-side guards untouched.
+
+**THE CARRIER, and why it is a token and not a marker line.** The declaration has to reach the tracer, and the tracer is
+fed text by several hosts — a block emit, the CAM pendant, and the raw editor buffer a user types into. A side-channel
+object is therefore both extra plumbing at four call sites AND stale at the editor host, which has no emit to carry it;
+that is the gate-3 argument, and it is what "a declared quantity on the emit" already implies. So it rides in the text.
+
+What I did NOT do is add a marker LINE. The emitter's `map`, `absorbed` and `feedFolds` are all index-aligned, so a new
+line shifts every one of them and perturbs the round-trip diff of any program that grew one — on a turn where the iron
+rule is a gate, that is a self-inflicted wound. Instead the token widens a header comment the atom ALREADY emits. No new
+step, no index shift, and `stripAnnotations` (the equivalence harness's normalizer) drops it with every other
+parenthetical, so no byte-equivalence bridge can see it. Verified rather than assumed: t1381's 27 holecycle bridges and
+the 90-test surfacing family both still pass unchanged.
+
+Composition needed no mechanism — every `@work` token in the text SUMS, so two declaring ops in one program (a drill pass
+then a bored hole) is just addition.
+
+**THE DECLARATION IS CALIBRATED, and that is asserted, not claimed.** A declaration nobody checks against reality is a
+number that happens to be big enough today. So the spec runs each body with the guard off, counts the engine's REAL
+steps, and bounds the declaration from BOTH sides — it must cover the real work (its job) and must not exceed it absurdly
+(or the guard is useless). Against t1381's two independent measurements `holecycle` lands within ~1.3% (bolt-24 helix
+d20/p0.25: 461k declared vs 467k measured) and ~2% (115k vs 117061). Surfacing runs 1.04-1.54x across eight configs.
+
+**TWO BUGS I WROTE AND MY OWN TESTS CAUGHT.** Worth logging because both were invisible to the happy path.
+
+1. *The cap SOURCE label collapsed three cases into two.* I derived the label by comparing the winning cap NUMBER back
+   against the candidates — which mislabels every tie. A 5-line straight program's 250-by-length loses to the plain 5000
+   base floor, and got reported as `flow-floor` despite the text having no flow at all. The label is what the truncation
+   sentence reads to decide what to tell the user, so a wrong label is a wrong message. Fixed by having the branch that
+   DECIDES name itself, instead of reconstructing the decision from its result — the same declare-not-infer shape as the
+   thing this whole ruling is about, one level down.
+2. *The truncation message was written and then silently overwritten.* I first set it right after the trace. `setGcode`
+   ends on a summary `setStatus` ("N cuts / M rapids"), so the user saw `374999 cuts` and never the truncation. Found
+   ONLY because the spec asserts the DOM text rather than the trace result — asserting `stats.cappedWhy` would have
+   passed while the pixel stayed wrong, which is the exact failure mode the "verify the real symptom" rule names.
+   Moved to the one summary write, and it now **REPLACES** the counts rather than joining them: on a truncated path those
+   counts are a partial tally wearing the badge of a total, which is the same silent-partial defect one level along.
+
+Measured cost of the honest default: a genuine runaway still gives up in **611ms** (t1381 estimated ~450ms), and it is
+paid once per preview refresh, not per keystroke.
+
+### RULING 3 — middle-superset sharded, not just given a bigger clock
+
+Raising the timeout would postpone the same marginality; the work is genuinely 14336 x (a deep clone + two full
+`emitMapped` builds). So `SHARDS` is DATA and the loop reads it. Measured: **11.4-11.8s per shard against a 60s cap**
+(5x headroom), where before it was one test at 58.9s against 60s — headroom 1.02x, which is why it flipped under load.
+
+Two decisions inside it. The shard is an **interleave** (`i % SHARDS`), not a contiguous block, so each shard samples the
+whole structural space — a contiguous split would put every boss-featureType combo in the last shard and a failing shard
+would localise nothing. And the **sharding itself is asserted**: a test proves the shards partition the sweep exactly
+once, disjoint and complete. Without that, sharding is a way to make a gate faster by making it test less, and every
+shard would still pass while some region of the space was never compared. It is arithmetic over indices, so it costs 2ms.
+
+### THE SWITCH — PARKED BEFORE STARTING, with the finding that changes its first step
+
+**THE STRUCTURAL FINDING: the switch collapses TWO blocks into ONE, and the data twins bind POSITIONALLY.** `drillStack`
+builds `[progstart, wcs, placeonstock{array{drill|bore}}, progend]`, and `drillData.js` / `boreData.js` bind every param
+to a `blockIndex` in that flatten — `3` for the whole pattern/geometry cluster (15 bindings) and `4` for the cut params.
+Re-pointing through `holecycle` merges `array` + `drill` into ONE block, so blocks 3 and 4 become block 3 and every
+positional binding after it shifts. The dispatch's "bindings by identity are already the dataOps norm" is exactly right
+and it is not optional here — it is the only form that survives a 2-into-1 collapse. Confirmed the mechanism exists and
+has a worked precedent: `match: {type}` is used 107x for `assign` and **14x by `surfacingData`**, which is the op that
+already went through this same switch. The flatten-list COMMENTS in both twins become wrong in the same act.
+
+Blast radius measured: **111 specs** name `drillStack`/`peckDrill`/`helicalBore` or the `drill`/`bore` atom types, and
+**42 web call sites** reference those atom types.
+
+**CAPACITY, plainly.** This turn spent its room on three rulings, one of which turned out to be a live shipping defect
+that wanted measuring in two directions before it could be fixed honestly, plus two self-inflicted bugs found and fixed.
+The switch is emit-class, re-points every shipping drill and bore program, has a 111-spec radius, and wants the full
+suite. I would rather hand it a fresh session with the design on disk than start it here and leave it half-landed — which
+on emit-class work is strictly worse than either finishing or not starting. This is the same call t1381 made about the
+same act, and everything the next seat needs is now written down: the retirement done, the trace cap honest (so the
+switch's preview will tell the truth the moment it lands), the gate at a truthful ceiling, and the binding-form finding
+above naming the first concrete step.
+
+### GATE (fast tier)
+
+smoke **71/71**. New spec `declared-work-1383` **6/6**. Touched areas: holecycle bridges **27/27** (re-run after the work
+token — unchanged), the surfacing family **90/90** (5 specs: parametric, both-paths, as-data, rotation-absorbed, register
+remainder), middle-superset **6/6** sharded, trace/preview/glow/palette/registry **25/25**, the drill family + CAM scratch
+**35/35**. **260 tests, 0 failures.** FULL SUITE NOT RUN — the advisor's merge gate; with ruling 3 landed it now runs at a
+truthful ceiling rather than carrying a known flake.
+
+Scratch measurement spec deleted before the commit. Process tree clean.

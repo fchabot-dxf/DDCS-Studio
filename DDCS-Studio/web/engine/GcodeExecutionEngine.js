@@ -17,6 +17,7 @@ import { rayBox, rotaryAxisOf, stockProbeStop } from './probeGeometry.js';
 import { axisHomeMotion, limitSwitchTrips, axisSpan } from './limitSwitches.js';   // H1 (t481) home-end; H3 (t485) — the live home/limit trip model; t499 — axisSpan for the homing-seek envelope clamp
 import { passAnchorFor } from './passAnchor.js';   // t94/t107 — the probe-collision + DRO origin O is a pass's re-park draw-anchor (auto reposition): the RUNTIME END of the previous pass (t107 machine-faithful) via the published _passEnds, else the static previous START (t94)
 import { SAVE_PROBE_Z_MARK, RETURN_PROBE_Z_MARK } from '../data/simMarkers.js';   // t897 — the DECLARED save/return-Z markers a machine-lift traverse emits; the sim restores the saved scene-Z exactly (declare, not infer)
+import { traceCap, truncationReason } from './declaredWork.js';   // t1383 — the runaway guard sized by the program's DECLARED work, not by its text length (a loop collapses the text)
 
 // Machine-DRO register bases per dialect (X=base, Y=+1, Z=+2, A=+3): Expert #880, V4.1 #1500, DM500 #864, rs274 #5420.
 // read-machine (RM) reads ITS dialect's base; the sim populates them ALL (cheap, dialect-agnostic) so RM returns the real
@@ -405,18 +406,14 @@ export class GcodeExecutionEngine {
         const sink = [];
         this._traceSink = sink;
         this.running = true;
-        // Bound a loop that never resolves. SIZED BY PROGRAM LENGTH, and t1381 measured what that costs a PARAMETRIC
-        // body: the cap is proportional to the very quantity a loop collapses. A literal helical bore on a 24-hole bolt
-        // circle is ~11700 lines → a ~585k-step cap → it traces whole; the parametric body that emits the identical
-        // path is 43 lines → the 5000 floor → the trace TRUNCATES at about a twelfth of it (measured: 117061 steps
-        // actually needed) and the preview silently draws a partial toolpath. `stats.capped` reports it, nobody reads it.
-        //
-        // The DEFAULT is deliberately unchanged here, because raising it is a trade and not a free win: the floor is
-        // what makes a genuinely runaway program give up in milliseconds, and the value-glow localizer probes many
-        // perturbed tokens per build (a ~1e6 sentinel depth is a legal-looking loop), so a large floor is paid on every
-        // localize. That choice wants its own ruling. `traceStepCap` is the seam a caller uses to ask for a full trace
-        // when it needs the whole path — which is what the equivalence bridges need in order to tell the truth at all.
-        const cap = Math.max(this.program.length * 50, Number(this.traceStepCap) || 5000);
+        // Bound a loop that never resolves — from the program's DECLARED work, not from its text length (t1383, ruled).
+        // t1381 measured what length costs a PARAMETRIC body: the cap was proportional to the very quantity a loop
+        // collapses, so the 43-line body emitting a bolt-24 helix got the 5000 floor and truncated at a twelfth of the
+        // 117061 steps it needs, while the 11700-line literal emitting the IDENTICAL path traced whole. An atom that
+        // emits a loop knows its real counts and now declares them (engine/declaredWork.js); this reads the declaration.
+        // No declaration → the flow-aware floor, which is the honest fallback for text nobody declared (a hand-written
+        // macro, another CAM system's .nc). `traceStepCap` survives as the explicit caller override.
+        const { cap, declared, source: capSource } = traceCap(text, this.program.length, this.traceStepCap);
         let guard = 0;
         try {
             while (this.ip >= 0 && this.ip < this.program.length && guard++ < cap) {
@@ -428,7 +425,10 @@ export class GcodeExecutionEngine {
             this._traceSink = null;
             this.onLineChange = cb.line; this.onPositionChange = cb.pos; this.onStatus = cb.status; this.onWait = cb.wait;
         }
-        return this._buildTraceResult(sink, guard >= cap);
+        // t1383 — the truncation reports WHY, not just that. `capped` alone was the defect the ruling names: it was true,
+        // correct, and read by nobody, so a short toolpath looked like a finished one. A consumer that has to compose its
+        // own explanation from three engine internals will not bother; one that is handed the sentence will.
+        return this._buildTraceResult(sink, guard >= cap ? { cap, declared, source: capSource } : null);
     }
 
     _buildTraceResult(segments, capped) {
@@ -448,7 +448,10 @@ export class GcodeExecutionEngine {
             segments,
             bounds: segments.length ? b : null,
             passEnds: this._passEnds.slice(0, this._maxPass + 1),   // t107 — per-pass runtime world-ENDs (machine-faithful re-park anchors); preview-only
-            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, passSources: this._passSources.slice(0, this._maxPass + 1), skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, absolute: this.stats.absolute, dwellMs: this.stats.dwellMs, toolChanges: this.stats.toolChanges },
+            // `capped` stays a BOOLEAN (every existing reader asserts `.toBe(false)`); `cappedWhy` carries the sentence a
+            // surface can show, and `truncated()` is the ONE phrasing so the 2D panel, the 3D panel and any later host
+            // cannot describe the same truncation three different ways.
+            stats: { feed, rapid, probe, retract: 0, passes: this._maxPass + 1, passSources: this._passSources.slice(0, this._maxPass + 1), skipped: this.stats.skipped, drawable: segments.length > 0, capped: !!capped, cappedWhy: capped ? truncationReason(capped) : '', absolute: this.stats.absolute, dwellMs: this.stats.dwellMs, toolChanges: this.stats.toolChanges },
         };
     }
 

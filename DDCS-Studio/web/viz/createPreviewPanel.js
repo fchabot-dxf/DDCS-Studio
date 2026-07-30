@@ -948,7 +948,17 @@ export function createPreviewPanel(container, opts = {}) {
             // the carve field (through-holes) through the flip (onLineChange + carveMirrorField), so the caveat no longer holds.
         }
         const s = parsed.stats || {};
-        setStatus(!s.drawable ? 'No drawable moves' : [s.feed && `${s.feed} cuts`, s.probe && `${s.probe} probes`, s.rapid && `${s.rapid} rapids`].filter(Boolean).join(' · '));
+        // t1383 — A TRUNCATED PREVIEW SAYS SO (ruled). The tracer has always reported `stats.capped` and nothing ever read
+        // it, so a path cut short by the runaway guard was indistinguishable from a finished one — and this route is what a
+        // user checks a program against before cutting. The sentence comes from the engine (`cappedWhy`, one phrasing in
+        // declaredWork.js) so both views and any later host say the same thing, and it is an ERROR, not a warning.
+        //
+        // It REPLACES the move counts rather than joining them, and that is the honest choice: the counts below are of the
+        // moves that were TRACED, so on a truncated path they are a partial tally wearing the badge of a total — which is
+        // the same silent-partial defect one level along. It belongs at THIS write and not at the trace above, because this
+        // is the ONE summary status setGcode ends on; set earlier, it was simply overwritten here (measured, not assumed).
+        if (s.capped) setStatus(s.cappedWhy || 'Preview truncated — the path shown is INCOMPLETE.', true);
+        else setStatus(!s.drawable ? 'No drawable moves' : [s.feed && `${s.feed} cuts`, s.probe && `${s.probe} probes`, s.rapid && `${s.rapid} rapids`].filter(Boolean).join(' · '));
         syncJog();
         renderLegend(parsed);
         if (engine && engine.running) scheduleLiveRestart();   // live edit while playing → re-run on the new path
