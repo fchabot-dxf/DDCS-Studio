@@ -54,15 +54,17 @@ export const ATOM_ROLES = {
      *   `F${feed}`, no test, no arithmetic, no loop bound), and the parametric body emits it exactly the same way. Falling
      *   to the unlisted default would have QUIETLY de-classified a knob the family already had.
      *
-     *   THE ENTRY-GATE REASONING on the rest — the knobs the CAM note called impossible, and why they are still baked HERE
-     *   even though the macro loop now reads them from registers:
-     *     depth / peck / pitch  The BODY reads `#81`/`#82`, so the loop itself is genuinely live — but this atom still
-     *                           writes them with `r3(num(...))`, so a `#var` arriving in the PARAM is destroyed before it
-     *                           reaches the assign. Making them exposable is a change to the EMITTER (val() at the two
-     *                           assigns), not to this table, and it collides with the `@work` declaration: the trace cap's
-     *                           expected-execution-size is computed from depth/bite at BUILD time, so a live depth makes
-     *                           the declaration unknowable and it must then be OMITTED (falling back to the flow-aware
-     *                           floor) rather than declared wrong. That is a ruling, not a row — flagged in the t1385 log.
+     *   THE ENTRY-GATE REASONING, per key — expose where the value genuinely rides through, bake where a pendant edit
+     *   would kink the geometry:
+     *     depth / peck / pitch  EXPOSABLE as of t1389 (ruled). The body reads `#81`/`#82`, so the loop was always live;
+     *                           what blocked a knob was this atom seeding those registers through `r3(num(...))`, which
+     *                           destroys a `#var` before it arrives. `val()` at the two assigns fixed that, and it is the
+     *                           knob `opToSlot`/`opCamMap` recorded as impossible while the peck ladder was unrolled in
+     *                           JS. Two consequences are deliberate and live in holecycle.js: the build-time bite FLOOR
+     *                           does not apply to a live bite (the body's own `IF #82 <= 0` refusal covers it at run
+     *                           time — the mechanism was written for exactly this), and `@work` is OMITTED whenever one
+     *                           of these is live, because expected execution size cannot be known at build time and
+     *                           t1383's rule is never to declare wrong.
      *     holeDia / toolDia     The cut RADIUS is (holeDia-toolDia)/2, folded at build into the arc's I/J vector and the
      *                           entry offset. A pendant edit would move the entry without moving the arc it must close —
      *                           a kinked circle. BAKE, and this one is not a limitation to lift later.
@@ -73,7 +75,7 @@ export const ATOM_ROLES = {
      */
     holecycle: {
         feed: 'value',
-        depth: 'geometry', peck: 'geometry', pitch: 'geometry',
+        depth: 'value', peck: 'value', pitch: 'value',   // t1389 — the two live registers, reachable at last
         holeDia: 'geometry', toolDia: 'geometry',
         x: 'geometry', y: 'geometry', z0: 'geometry', x0: 'geometry', y0: 'geometry', clearance: 'geometry',
         cols: 'geometry', rows: 'geometry', dx: 'geometry', dy: 'geometry', count: 'geometry',

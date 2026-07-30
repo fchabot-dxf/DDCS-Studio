@@ -8606,3 +8606,111 @@ sim-start-block, contour, atc-roundtrip, atc-inline-onesource, middle-crossover 
 The diagnostic worktree at `15d155ca` was created for the attribution measurement and REMOVED. Scratch specs deleted.
 Process tree clean. The three rulings in hand are untouched — the dispatch says not to start them while the gate is red,
 and they are next now that it is green.
+
+## t1389 (seat A) — THE KNOBS GO LIVE; the retirement is BLOCKED, and the ownership test is why
+
+Rulings 1 and 2 landed and are verified. **Ruling 3 did NOT delete anything, and that is the ruling working rather than
+failing:** its required first step — re-run the ownership test AT the deletion instead of inheriting t1385's guard —
+found that one of the two atoms is not a leaf.
+
+### RULING 1 — the blanket relaxes BY DECLARATION, and it reads the EMITTER's OWN predicate
+
+The blanket's stated hazard is specific: a blocking fold rewrites its child's text with a numeric regex, `X#n` has no
+digit for that regex to bite on, so the intended translate is silently dropped and the exposed coordinate is WRONG. The
+hazard is the REWRITE, not the nesting — and a `place` fold whose sole child declares `absorbsPlacement` rewrites nothing.
+
+**The safety of this relaxation is that it does not re-derive the predicate.** `absorbingChild` (blockEmitter, t1359) is
+deliberately strict — EXACTLY ONE child, declaring it — because a mixed body has no single right answer and falls through
+to the text rewrite. A classifier that asked `children.some(...)` instead would relax precisely where the emitter still
+rewrites: over-exposure, which this file's own rule says emits wrong G-code while under-exposure only bakes. So the
+function is exported and the classifier calls it. One predicate, two callers. Asserted directly: a MIXED body's children
+are still blocked, a sole self-framing child's are not.
+
+Scoped to `place` on purpose. `rotate`/`skim`/`depth`/`fill`/`loop`/`container`/`path` are untouched, and a program-level
+rotation still blocks everything — extending this means proving another fold's own no-rewrite path first.
+
+**THE PROOF IS THE SYMPTOM, not a classifier reading** (which would test the change against itself): put a `#var` in the
+feed of a PLACED, stock-attached, off-origin bolt circle and every X/Y/Z/I/J is byte-identical to the baked program,
+in order, while the F words change. If the fold really were rewriting this body, the exposure would have dropped the
+translate and moved every coordinate. And the relaxation is keyed to the declaration — proven by TAKING THE DECLARATION
+AWAY and watching the knob go straight back to baked, then restoring it.
+
+**A CORRECTION TO THE RULING'S PREMISE ABOUT SURFACING.** The ruling expected surfacing's feed to un-bake as part of this
+act's evidence. The relaxation does reach surfacing — its blocked set is EMPTY now, from the same line of code, because it
+declares `absorbsPlacement` too — but its feed stays baked for a different and correct reason:
+
+    holecycle       const feed = val(p.feed, 100)    → emits `F#2601`        → role 'value'
+    surfaceraster   const feed = num(p.feed, 2000)   → emits `F${r3(feed)}`  → a #var is NaN → role 'geometry'
+
+`atomRoles` is RIGHT about surfacing, and this classifier change was never what stood between it and a live feed.
+Un-baking it means changing surfaceraster's emit to `val()` — the same class of act as ruling 2, on a different atom, not
+blessed here. Flagged, not slipped in. Both facts are asserted so neither can be mistaken for the other later.
+
+### RULING 2 — the two "LIVE" registers finally have a way to be reached
+
+`#81`/`#82` have been called LIVE since t1379 and that was true of the REGISTERS — the loop reads them. What was not true
+is that anything could hand them a live value: both seeds went out through `r3(num(...))`, which turns a `#var` into NaN
+and then into the default. `val()` at the two assigns is the whole fix, and the diff is exactly two lines (the seed, and
+the header dropping its token) — asserted line-by-line, because a knob leaking into geometry is the failure that matters.
+
+**THE BUILD-TIME FLOOR DOES NOT APPLY TO A LIVE BITE, and that is semantics rather than an omission.**
+`Math.max(0.1, …)` protects a BAKED zero from emitting a loop that never advances. A live bite cannot be clamped at build
+time — its value does not exist yet — and it does not need to be: the body already opens with `IF #82 <= 0 GOTO@E`, which
+refuses at RUN time with the reason in the program. That guard was written for exactly this case. So the live path is
+covered by the mechanism already there instead of by a clamp that would have to invent a number. A baked zero still
+floors at 0.1 — that path is unchanged, and both are asserted.
+
+**THE TRADE IS TAKEN AND NAMED: the preview stops declaring its work when a knob goes live.** `@work` is computed from
+depth and bite at build time, so once either is live the real count does not exist and any number written there would be
+a guess dressed as a declaration. `holeCycleWorkSteps` returns null and the token is OMITTED — t1383's own rule, never
+declare wrong. The fallback was already built and already measured: the flow-aware floor, sized to cover the worst
+realistic job, and it SAYS SO if it truncates. What is given up is narrow (a cap tailored to this program's work becomes
+the generic one); what is kept is that the preview never lies. The truncation phrasing was also corrected — "undeclared
+G-code" was accurate when only hand-written macros were undeclared; it now names the STATE ("declares no expected work —
+a hand-written macro, or a live pendant knob") rather than guessing at provenance.
+
+CAM rows flipped with the entry-gate reasoning rewritten to match reality. What did NOT flip is the point: `holeDia` and
+`toolDia` stay baked because the cut radius folds into the arc's I/J at build time, so a pendant edit would move the entry
+without moving the arc it must close — a kinked circle. The bolt-circle Ø stays baked because it multiplies baked trig.
+The line held; only what genuinely rides through moved.
+
+### RULING 3 — THE OWNERSHIP TEST RAN, AND IT FOUND A BLOCKER
+
+    bore  — NOTHING reaches it. No `newBlock('bore')` anywhere, no binding matching {type:'bore'}. A pure leaf.
+    drill — POCKET OWNS IT. pocketWizard.js:105 builds `newBlock('drill')` for the TOO-SMALL fallback (a pocket narrower
+            than its tool becomes a single plunge), and pocketData.js binds four params to match:{type:'drill'} and
+            mutates that block by type when it places the hole.
+
+**WHY t1385's GUARD MISSED IT, which is the lesson to keep:** that guard walked every registered builder called with `{}`
+— DEFAULT params. Pocket's drill child exists only on the too-small ARM, which defaults never reach. A guard that
+exercises one point in the parameter space cannot answer a question about the whole space, and "no builder reaches it"
+read as a complete answer while being a sampled one. This is exactly why the dispatch said to re-run the test AT the
+deletion rather than inherit it; that instruction earned its keep.
+
+So **nothing was deleted.** Retiring `drill` would force a change to a SURVIVOR's behaviour, which is the precise signal
+that an extraction was skipped — the prerequisite act is extracting pocket's tenant (either re-point its fallback to
+`holecycle` with pattern:'single', which is an emit-class change to a shipping op, or give pocket its own plunge). Both
+atoms are NAMED KEEPS. `bore` alone is provably clean, but the pair was blessed as a unit on a premise now false for one
+half, so splitting the scope is the advisor's call rather than mine to assume.
+
+**THE FINDING IS NOW EXECUTABLE, not prose.** `literal-hole-ownership-1389.spec.js` asserts the ownership across pocket's
+parameter space (normal arms carry no literal hole — which is why the old guard passed — while both too-small shapes and
+the guarded superset do), proves the RUNTIME dependency (the fallback emits BAKED Z steps and no loop, the literal
+kernel's signature, not the parametric body's), and records that `bore` is reachable by nothing. It fails the day someone
+deletes either atom without doing the extraction first, so the blocker lives in the suite rather than in a note.
+
+### SEEN
+
+The CAM knob table re-driven: **depth, peck and feed now read EXPOSE**, each with "rides through emit (val())" as its
+reason, while every baked row still carries the reason it is baked. That is the table `opToSlot` described as unable to
+expose depth/peck at all.
+
+### GATE (fast tier)
+
+smoke **71/71**. The three new specs + the drill arc + the iron rule **56/56**. CAM + pocket + surfacing + drill/bore
+twins + placement + pathdatum **109/109**. **236 tests, 0 failures.**
+
+**IRON RULE: 11/11, the same eleven, 0 blocks lost** — unmoved by the live knobs, which is the point: exposing a knob
+changed no round-trip.
+
+Scratch specs deleted. Process tree clean. FULL SUITE NOT RUN — the advisor's merge gate; ruling 2 is emit-class.

@@ -333,6 +333,22 @@ function boreHelixCycle({ feed, clr, r, ENTRY, IJ, HELIX, azE, az }) {
  * which is the failure mode the ruling asked for instead of a silently short toolpath.
  */
 export function holeCycleWorkSteps(p = {}) {
+    /**
+     * ── IT DECLARES ONLY WHEN IT CAN BE TRUE — returns null otherwise (t1389, ruled) ──────────────────────────────
+     *
+     * The trade is TAKEN and it is worth naming plainly: **the preview stops declaring its work the moment a knob goes
+     * live.** Expected execution size is computed here from depth and bite at BUILD time; once either is a `#var` the
+     * operator sets at the pendant, the real count does not exist yet and any number written here would be a guess
+     * dressed as a declaration. t1383's own principle decides it — never declare wrong — and the fallback is already
+     * built and already measured: an undeclared program that carries flow gets the FLOW-AWARE FLOOR, sized to cover the
+     * worst realistic job (a bolt-24 helix at 467k steps).
+     *
+     * What is actually given up is narrow: a program with a live depth loses a cap tailored to ITS work and takes the
+     * generic one. If it exceeds even that, the preview SAYS it truncated — the honesty landed in t1383 covers exactly
+     * this case, which is why taking the trade is safe rather than merely acceptable.
+     */
+    const live = (v) => /^(#|\[)/.test(String(v == null ? '' : v).trim());
+    if (live(p.depth) || live(p.peck) || live(p.pitch)) return null;
     const cycle = cycleOf(p.cycle);
     const depth = num(p.depth, 5);
     const bite = cycle === 'peck' ? Math.max(0.1, num(p.peck, depth)) : Math.max(0.05, num(p.pitch, 0.5));
@@ -362,6 +378,31 @@ export function holeCycleLines(p = {}) {
     const bite = cycle === 'peck'
         ? Math.max(0.1, num(p.peck, depth))
         : Math.max(0.05, num(p.pitch, 0.5));
+
+    /**
+     * ── THE TWO LIVE KNOBS BECOME REAL KNOBS (t1389, ruled) ───────────────────────────────────────────────────────
+     *
+     * `#81` and `#82` have always been described as LIVE — an operator turns them on the pendant mid-program — and that
+     * was true of the REGISTERS: the loop reads them, so re-seeding them changes the cut. What was NOT true is that a
+     * knob could reach them from Studio: both seeds went out through `r3(num(...))`, which turns a `#var` into NaN and
+     * then into the default. The CAM path could therefore never hand this body a live depth, which is exactly what
+     * `opToSlot`/`opCamMap` recorded as impossible. `val()` is the whole fix — it prints a `#var`/`[expr]` verbatim and
+     * rounds a literal, so the seed becomes `#81=#2601` and every consumer downstream is unchanged (they read `#81`).
+     *
+     * THE BUILD-TIME FLOOR DOES NOT APPLY TO A LIVE BITE, and that is a real semantic point rather than an omission.
+     * `Math.max(0.1, …)` protects a BAKED zero from emitting a loop that never advances. A live bite cannot be clamped at
+     * build time — its value does not exist yet — and it does not need to be: the body already opens with
+     * `IF #82 <= 0 GOTO@E`, which refuses at RUN time with the reason in the program. That guard was written for exactly
+     * this case (an operator zeroing a live knob), so the live path is covered by the mechanism already there, not by a
+     * clamp that would have to invent a number.
+     */
+    const liveWord = (v) => { const s = String(v == null ? '' : v).trim(); return /^(#|\[)/.test(s) ? s : null; };
+    const depthSeed = liveWord(p.depth) || r3(depth);
+    const biteSeed = (cycle === 'peck'
+        // peck's own default IS the depth, so a live depth with no peck set means "one peck, the whole depth" — carry the
+        // depth word through rather than silently baking 5mm underneath a live depth.
+        ? (liveWord(p.peck) || (p.peck == null || p.peck === '' ? liveWord(p.depth) : null))
+        : liveWord(p.pitch)) || r3(bite);
     const r = boreRadius(p);
     const coef = (n) => d9(n);                // multiplied by a runtime term → keeps its digits (see patternLines)
 
@@ -417,9 +458,12 @@ export function holeCycleLines(p = {}) {
         // marker LINE, because a new line would shift every index in the emitter's line-aligned maps and perturb the
         // round-trip diff of every program that grew one. `stripAnnotations` drops it with every other parenthetical, so
         // no byte-equivalence bridge sees it.
-        `( ---- ${bored ? 'BORE' : 'DRILL'}, parametric: ${pat.n} hole${pat.n === 1 ? '' : 's'} (${pattern}) x ${cycle} · ${workMarker(holeCycleWorkSteps(p))} ---- )`,
-        `${V.depth}=${r3(depth)}   ( total depth — LIVE: a pendant can turn this )`,
-        `${V.bite}=${r3(bite)}   ( ${cycle === 'peck' ? 'bite per peck' : 'pitch per pass'} — LIVE )`,
+        // …and it declares ONLY when it can be TRUE (t1389). `holeCycleWorkSteps` returns null the moment any input it
+        // multiplies is a live expression, and the token is then omitted entirely — see the note on that function.
+        `( ---- ${bored ? 'BORE' : 'DRILL'}, parametric: ${pat.n} hole${pat.n === 1 ? '' : 's'} (${pattern}) x ${cycle}`
+            + `${holeCycleWorkSteps(p) == null ? '' : ' · ' + workMarker(holeCycleWorkSteps(p))} ---- )`,
+        `${V.depth}=${depthSeed}   ( total depth — LIVE: a pendant can turn this )`,
+        `${V.bite}=${biteSeed}   ( ${cycle === 'peck' ? 'bite per peck' : 'pitch per pass'} — LIVE )`,
         // The guard is the same class as the raster's zero-stepover refusal: a bite that never advances would loop
         // forever. It refuses cleanly with the reason IN the program, because #82 is live and an operator can zero it.
         `IF ${V.bite} <= 0 GOTO@E   ( a zero bite never advances — refuse instead of looping forever )`,

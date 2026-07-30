@@ -144,7 +144,7 @@ function reportRefusal(res, what) {
  *  Deliberately strict: exactly ONE child, declaring it. A mixed body (a self-framing atom beside a literal one) has
  *  no single right answer — the shift would have to be both passed and painted — so it falls through to the text
  *  rewrite, which is what those literal atoms have always used and still works for them. */
-function absorbingChild(children) {
+export function absorbingChild(children) {
     const list = (children || []).filter(Boolean);
     if (list.length !== 1) return null;
     const d = BLOCKS[list[0].type];

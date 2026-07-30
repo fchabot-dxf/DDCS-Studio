@@ -16,6 +16,7 @@
 import { flattenBlocks } from '../blocks/userOps.js';
 import { BLOCKS } from '../wizards/ops/index.js';
 import { paramRole } from './atomRoles.js';
+import { absorbingChild } from '../blocks/blockEmitter.js';   // t1389 — the EMITTER's own self-framing predicate; the relaxation must not re-derive it
 
 // Folds whose emit applies a coordinate transform / per-instance offset to child output → a #var beneath them is mangled.
 // (loop is included per the F2 ruling: a socket under a loop may reference the loop index — a #var can't carry it — so the
@@ -44,13 +45,40 @@ export function blockedIndices(template) {
             if (!b) continue;                                   // flattenBlocks skips falsy the same way → indices align
             const myIndex = idx++;
             if (underFold) blocked.add(myIndex);
-            const childUnderFold = underFold || BLOCKING_FOLD_KINDS.has(foldKindOf(b));
+            const childUnderFold = underFold || (BLOCKING_FOLD_KINDS.has(foldKindOf(b)) && !foldIsAbsorbed(b));
             walk(b.uiChildren, childUnderFold);                 // MUST be uiChildren before children (flattenBlocks order)
             walk(b.children, childUnderFold);
         }
     };
     walk(template, false);
     return blocked;
+}
+
+/**
+ * ── t1389 — THE BLANKET RELAXES BY DECLARATION, and ONLY by declaration ───────────────────────────────────────────
+ *
+ * Read the hazard the blanket above names, precisely: a blocking fold is dangerous because its emit REWRITES ITS CHILD'S
+ * TEXT with a numeric regex, and `X#n` has no digit for that regex to match, so the intended translate is silently
+ * dropped and the exposed coordinate is WRONG. The hazard is the rewrite — not the nesting.
+ *
+ * A `place` fold whose sole child declares `absorbsPlacement` DOES NOT REWRITE ANYTHING. The emitter hands that child the
+ * shift as PARAMS and leaves its text alone (blockEmitter, t1359), so the atom bakes the frame into the coordinates it
+ * emits and a `#var` in some OTHER socket rides through untouched. The named hazard simply does not arise, and blocking
+ * there costs a real knob for no safety.
+ *
+ * ⚠ IT READS THE EMITTER'S OWN PREDICATE, not a re-derivation of it, and that is the whole safety of this relaxation.
+ * `absorbingChild` is deliberately STRICT — exactly ONE child, declaring it — because a mixed body (a self-framing atom
+ * beside a literal one) has no single right answer and falls through to the text rewrite. A classifier that re-derived
+ * "does this absorb?" as `children.some(...)` would relax exactly where the emitter still rewrites: over-exposure, which
+ * this file's own rule says emits wrong G-code (under-exposing only bakes). One predicate, two callers.
+ *
+ * SCOPED TO `place` ON PURPOSE. `rotate`/`skim`/`depth`/`fill`/`loop`/`container`/`path` are untouched: each either
+ * genuinely rewrites text or re-emits per instance, and a program-level rotation still blocks everything via
+ * PROGRAM_TRANSFORM_KINDS below. Extending this to another fold means proving that fold's own no-rewrite path first.
+ */
+function foldIsAbsorbed(b) {
+    if (foldKindOf(b) !== 'place') return false;
+    return !!absorbingChild(b && b.children);
 }
 
 /**

@@ -86,7 +86,11 @@ export function truncationReason({ cap, declared, source } = {}) {
     const n = Number(cap) || 0;
     return declared > 0
         ? `Preview truncated at ${n.toLocaleString()} steps — this program declared ${Number(declared).toLocaleString()} and ran past ${WORK_MARGIN}x that. The path shown is INCOMPLETE.`
-        : `Preview truncated at ${n.toLocaleString()} steps — ${source === 'flow-floor' ? 'this program loops further than the safety limit for undeclared G-code' : 'this program runs longer than its length allows for'}. The path shown is INCOMPLETE.`;
+        // t1389 — "undeclared G-code" was accurate while the only undeclared programs were hand-written ones. A Studio
+        // program with a LIVE knob is now undeclared too, and for a good reason: its work cannot be known at build time,
+        // so the emitter omits the marker rather than declare a number that the operator's next pendant edit falsifies.
+        // The phrasing therefore names the STATE (no declared work) instead of guessing at the program's provenance.
+        : `Preview truncated at ${n.toLocaleString()} steps — ${source === 'flow-floor' ? 'this program declares no expected work (a hand-written macro, or a live pendant knob) and loops past the safety limit' : 'this program runs longer than its length allows for'}. The path shown is INCOMPLETE.`;
 }
 
 /**
