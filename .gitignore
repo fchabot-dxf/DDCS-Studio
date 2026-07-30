@@ -42,3 +42,13 @@ client_secret_*.json
 .proc/
 .claude/
 .anim-captures/
+
+# t1381 sanitation — build outputs + test artifacts never tracked again
+/fairy.exe
+/dist/
+/build/
+__pycache__/
+/DDCS-Studio.exe
+*.exe.old
+DDCS-Studio/tests/*.png
+DDCS-Studio/scratchpad/

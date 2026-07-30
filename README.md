@@ -131,7 +131,6 @@ npm run start      # serves web/ on http://localhost:3000
 pwsh ./build_fairy.ps1          # PyInstaller one-file build → DDCS-Studio.exe
 ```
 
-**VS Code extension:** an experimental third shell in [`ddcs-vscode-extension/`](ddcs-vscode-extension/) — the same web app inside a VS Code webview (`DDCS: New Program`).
 
 > ⚠️ **Live-machine safety.** Generating and simulating is always safe and offline. *Running* drives real motion and outputs — verify in the simulator first, keep the operator at the machine, and treat anything that moves an axis or toggles an output as live. See [`docs/VERIFY-AT-MACHINE.md`](docs/VERIFY-AT-MACHINE.md).
 
@@ -151,7 +150,6 @@ DDCS-Studio/            The app — a monorepo of three shells over one web core
 bridge/                 The machine gateway + controller research
   bridge-app/           The Python gateway (server, transfer over SMB, Modbus, OAuth)
   controllers/<id>/     Per-controller dialect notes, FINDINGS, and real firmware dumps (ground truth)
-ddcs-vscode-extension/  Experimental VS Code webview shell
 docs/                   Design notes, plans, and the at-machine verification checklist
 fairy_gateway.py        Desktop / gateway entry point
 build_fairy.ps1         Windows exe build (PyInstaller)
