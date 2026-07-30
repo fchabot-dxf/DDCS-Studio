@@ -10415,3 +10415,91 @@ New spec **13/13**. Surfacing family + envelope + pocket bridges **180/180** acr
 No slot was touched — `pocketSlot` still runs its hand-written `rasterClear`, so nothing in the product changed
 behaviour and the delegation is the next act, now with regression-free substrate. The ramp's SQRT and the helix's
 inradius are refused, not built. The skim×inset gap is named, not fixed. `stepoverPctOf` stays numeric.
+
+## t1427 (seat A) — THE DELEGATION: PARKED, and the park carries the act's two blockers, measured
+
+**No product file touched.** I am parking this one, for the reason I gave at t1425 (emit-class, on the back of the
+largest atom change since t1351) — but the park is not the finding. **Your own hard requirement does not hold today,
+and I measured exactly where it fails**, so the fresh seat starts from a ruling and a mapping instead of a discovery.
+
+Your line was: *"NO knob the slot honours today goes dark (asserted: every POCKET_FIELDS knob drives traced motion)."*
+Two of them go dark, and both fail the same silent way t1422 found one layer down.
+
+### 🔴 BLOCKER 1 — `clearance` NEVER REACHES THE EMIT
+
+`POCKET_FIELDS.clearance` is a live register the slot honours today (`rasterClear` takes `clearance: v.clearance`).
+Seeded into the atom as `clearance: '#10'`, the emit is:
+
+    G0 Z5   ( clear before the first plunge )
+    G0 Z5   ( lift: a one-way pass never links at depth )
+    G0 Z5   ( clear of the work before the next level )
+
+`#10` appears nowhere. The atom reads `clr = num(p.clearance, 5)` and prints it through `az(clr)`, which is a
+build-time fold — so a pendant clearance of 12 emits retracts at 5. Not a refusal, not a NaN: the operator's retract
+height silently replaced by this atom's default, on every lift in the program.
+
+**The fix is small and it is the shape I just built.** `clearance` becomes a `geoTerm` and the retract prints as
+`[<zTop> + <clrWord>]` — the same word-or-number seam as w/h/inset, folding to today's number when numeric. I did
+not build it: it is a ruling about scope, not a detail, because it means this act reopens the atom.
+
+### 🔴 BLOCKER 2 — `stepover` IS MILLIMETRES ON THE SLOT AND A PERCENTAGE IN THE ATOM
+
+`POCKET_FIELDS.stepover` is a MM field (default 2.4). The atom composes `#44=[tool × pct / 100]` and has no live-mm
+path at all, so a live mm register is dropped and the recovery default (60%) is used instead:
+
+    slot passes stepover: '#5'      →   #44=[#9 * 60 / 100]      ← #5 never appears; 60% of the tool, not 2.4mm
+    slot passes stepoverPct: '#5'   →   #44=[#9 * #5 / 100]      ← works
+
+On a Ø6 tool that is 3.6mm where the operator typed 2.4 — a 50% coarser raster than the pendant says. **The worst of
+the two**, because the number on the screen and the number in the cut are both plausible.
+
+**TWO LEGITIMATE FIXES, AND THE SECOND HAS A PRECEDENT IN THIS EXACT PLACE:**
+  **(a)** the atom gains a live-mm seed (`#44 = <mm word>` when `stepover` is live). Smallest change; the slot's field
+  is untouched, so no shipped slot's form moves.
+  **(b)** `POCKET_FIELDS.stepover` becomes `stepoverPct`, which is **what t1325 already did to the SURFACE slot**, for
+  word-for-word this reason: *"expose Tool Ø as a pendant knob, dial it from 12 to 8 at the machine, and a 7.2mm
+  stepover silently becomes 90% of the new tool instead of the 60% that was meant. Two knobs that must agree is one
+  knob too many."* That argument applies to the pocket slot identically, and the pocket slot exposes Tool Ø too.
+  It changes a shipped slot's field, which is why it is yours to rule and not mine.
+
+I lean (b) on the merits and (a) on the blast radius; the pair is genuinely a fork rather than a preference.
+
+### 🟡 AND THE STRUCTURAL ANSWER YOU ASKED FOR: THE WALL **MUST** MOVE
+
+You said *"wall composes AFTER … (say if it must move)"*. It must. Today the wall is emitted INSIDE `rasterClear`'s
+Z loop (`if (wall) lines.push(…)` within the per-level body), so the packed slot runs fill(L1), wall(L1), fill(L2)…
+The atom OWNS the depth loop, so the wall cannot stay interleaved inside a loop it no longer controls: it becomes its
+own depth loop after the clear. That is not a new decision — it is exactly the re-order **t1405** ruled for the wizard
+path (rough all, then wall), arriving at the slot for the same mechanical reason.
+
+### 🟢 WHAT IS ALREADY CLEAR — the entry answer, and the seeding map
+
+**ENTRY.** `POCKET_FIELDS` carries no descent control, so a packed pocket's entry is whatever the op held and a pocket
+op defaults to `plunge`. `SURFACE_RASTER_BAKES['parallel/plunge']` and `['concentric/plunge']` both bake NOTHING, so
+the common path packs fully live. A ramp/helix OP refuses at pack in the table's words. Nothing to decide.
+
+**THE MAP** (verified against the emit, not inferred) — POCKET_FIELDS → the atom:
+
+    #20 / #21 origin  → x / y            live ✓        w      → w            live ✓
+    [toolDia/2]       → inset            live ✓        h      → h            live ✓
+    depth             → depth            live ✓        toolDia→ toolDia      live ✓
+    stepdown          → stepdown         live ✓        feed   → feed         live ✓
+    plunge            → plunge           live ✓        rpm    → spindleOn, outside the atom ✓
+    stepover (mm)     → ✗ BLOCKER 2                    clearance → ✗ BLOCKER 1
+    strategy/direction→ carried at BUILD from the op (the t1418 words)
+
+So ten of twelve are already proven live by t1425's bridge; the act's real content is the two above, the wall move,
+and the honesty flip.
+
+### WHY I PARKED RATHER THAN FIXING THE TWO AND CARRYING ON
+
+Either blocker reopens the atom, which makes this act "atom change + shipped-slot rewire + honesty flip" in one turn
+— the exact shape you and I both refused as option B at t1422. Blocker 2 additionally has a fork with user-visible
+consequences (a shipped slot's field changing units), and the ownership rule is that I flag those rather than pick.
+Capacity is the smaller half of the reason and I want that stated plainly rather than used as cover: this is my sixth
+act in the seat and two were heavy, so I would have wanted a fresh seat anyway — but I would be flagging these two
+findings from a fresh seat too.
+
+### NO GATE RUN
+
+Nothing changed. Tree carries only the advisor's two docs plus the analytics agent's two root files; proc tree clean.
