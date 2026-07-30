@@ -10786,3 +10786,121 @@ the rect-only scope to the envelope, as `surfaceraster` does). `rectwall` states
 
 pocket + rest + surfacing + cam-op-seed + cam-row-honesty **195/195**. Smoke **71/71**. New spec 2/2. Nothing else was
 touched: the change is additive (one declaration + one predicate beside the walk it describes), no emitted G-code moved.
+
+## t1433 (seat A, fresh) — THE WALL FINISH LANDED PARAMETRIC: freeze, atom, bridge, re-point — all four
+
+**The whole act, not a park.** The dispatch's four steps are four commits in the order it named them, and the ordering
+is the substance rather than tidiness: the freeze can only prove itself BEFORE the product moves.
+
+### 1 — THE FREEZE, AND WHY IT HAD TO BE FIRST
+
+`/_test/literalPocketWall.js`: `contourLevel` frozen verbatim, the `pocketwall_ref` leaf, and the frozen
+`place{ stepdown{ wall } }` composition. It **borrows** `entryOrPlunge` / `offsetRegion` / `refPocketInsetRegion` from
+the t1406 sibling instead of re-copying them — a second copy of a frozen kernel is not "more frozen", it is two
+baselines that can be edited apart, which is the one failure a reference cannot survive.
+
+The freeze's own proof is **byte-identity against the shipping `pocketwall`, across the whole sweep**, asserted at the
+commit where the two really are the same code. Land the freeze after the re-point and that test cannot exist. And the
+measured cadence is now four assertions rather than a work-log paragraph: retract LEADS the level, four ring cuts
+closing on the start corner, no per-level trailing retract, and the confirm is the STEPDOWN's form.
+
+**ONE CORRECTION TO MY OWN t1431 TRANSCRIPTION:** the pause banner carries an **em dash**, not a hyphen. The first cut
+of the test was written from the log and failed against the real bytes. Recording it because the whole reason to pin a
+reference is that transcriptions drift and measurements do not.
+
+### 2 — THE ATOM, AND THE ONE THING I DESIGNED WRONG FIRST
+
+`wallfinish`: header + runtime depth loop + one rect ring per level, band **#11-#14** declared as it lands, depth
+owned, `absorbsPlacement` + the rotation seam + `@work` + `flowLabels` all declared. The inset is the ONE seed as
+ruled. The confirm is **asked, not re-typed** — `pauseConfirmBlock.emit(…, dialect)`, the same call the depth fold
+makes — because the banner is DIALECT-DEPENDENT and a hard-coded Expert `#1505` would emit an unmapped register write
+on every port target ahead.
+
+**THE CORNERS WERE NESTED, AND THAT WAS AN EVIDENCE DEFECT, NOT AN AESTHETIC ONE.** The obvious build composes
+`surfaceraster`'s `geoSum` twice — the near corner, then the near corner plus the walked span — and it emits
+`X[[#2600 + #22] + [#2601 - 2 * #22]]`: **nested brackets inside a coordinate word**, a form nothing in the factory
+corpus demonstrates. `surfaceraster` never hits it because it SEEDS its spans into `#40`/`#41` first, so its one nested
+expression sits inside an assignment and every consumer reads a bare register. There is no free run left to do that
+here (#11-#16 is the one t1431's re-scout left standing, and #17 is taken).
+
+It did not need one. The far corner is algebraically `x + w − inset` — ONE bracket, three terms, exactly the shape the
+shipped CAM kit already writes as `#24=[#20+<w>-#22]`. Composing twice was re-deriving the same coordinate the long way
+round and paying for it in an unproven form. So the corners are declared as term lists and printed once, flat, and a
+lone register prints bare (`X#22`, not `X[#22]`). **Four registers because of that, not despite it.**
+
+**NO ENVELOPE TABLE, declared by absence.** One walk, one descent, no axes — `pocketwall` calls `contourLevel` with no
+`entry` in its ctx at all, so the contour kernel's ramp branch has never been reachable from a pocket wall. A PROVEN
+table would hold one row that can never refuse, which is precisely the kind of declaration nothing can check (t1431's
+own reason for not declaring an unconsumed band). And the CONSUMER needs no second fork either: the wall re-points on
+`_para`, the SAME guard the fill does, because `_para` is a superset of what this atom needs.
+
+### 3 — THE BRIDGE IS ORDERED, WHICH IS STRICTLY STRONGER THAN t1406's
+
+t1406 compared cut SETS because the user ruled the fill/wall order and move-for-move would have failed by construction.
+Nothing about the wall's own walk moves this act, so this bridge compares **in emit order**: a walk that ran the ring
+the other way round — the same rectangle, the opposite climb — FAILS here where a set comparison passes it. 12 configs,
+per level, against the frozen reference.
+
+**THE CONFIRM IS ASSERTED STRUCTURALLY AND THE LIMIT IS STATED.** `traceToolpath` has no pause concept at all
+(checked), so the runtime cadence is not observable through motion. What the bridge DOES prove is that the confirm
+moves nothing — traced motion at `confirmEvery: 2` is the literal's, move for move — and the cadence itself is asserted
+on the arithmetic, against the literal's own unrolled count as ground truth.
+
+### 4 — THE RE-POINT, AND THE TENANT READER IT WOULD HAVE BROKEN SILENTLY
+
+The wall place now holds `wallfinish` alone and ABSORBS; `pocketData` gains ten `wallfinish` rows plus the derived
+`inset` beside the fill's, from the same one source. The guarded superset needed **no restructuring** — `wallPlace()`
+only ever appeared inside `_para: true`, and the literal wall rides `wallLeaf()` inside the clearing place on the other
+arm, so the fork was already where it needed to be. Worth recording because I had budgeted for a collapse problem that
+did not exist.
+
+**THE RECONCILER SWEEP CAUGHT A REAL ONE.** `opSession`'s pocket reader took `confirmEvery` from
+`find(prog, 'stepdown')` — the WALL's own depth walk, the only StepDown left on this arm. That block is gone now. Left
+alone it would have fallen through to the raster atom's `confirmEvery`, which is the same NUMBER today (both seeded
+from one form field) and would have gone quietly wrong the day they were allowed to differ. t1387's rule, swept in-act.
+
+### 5 — THE GOLDEN MOVED, AND THE SCOPE AND THE DIFF AGREED EXACTLY
+
+7 keys in scope (`rect × raster × pocketRidesRaster`), 7 changed, **ZERO out of scope and ZERO in scope that did not
+change**. That two-sided agreement is the check: a key changing outside the predicate means something moved this act
+did not intend, and a key inside it that did NOT change means the predicate is wider than the re-point. The
+regeneration refuses to write unless the out-of-scope set is empty. The first write reformatted the whole file (indent
+2 against its own indent 1) — caught on the diffstat, redone preserving the format, so the diff is seven lines rather
+than a reformat hiding seven lines.
+
+Two sibling specs held byte-identity claims about the wall (t1406 and t1418). Both were RIGHT when written and both are
+retired to the per-level motion criterion, each with the reason inline — t1418's claim ("`direction` never reaches the
+wall") survives intact and is now stated on the motion instead of on the text.
+
+### 6 — THE SCREENSHOT FOUND SOMETHING THE SUITE DID NOT
+
+Looking at the running program (the eyeball doctrine) showed an ordinary pocket emitting `IF 18 <= 0 GOTO103` — a
+comparison of two BUILD-TIME CONSTANTS that can never be true — plus a four-line refusal and **two reserved flow
+labels**. Labels come from one per-program counter (t1408), so reserving them for an unreachable branch pushes every
+later body's numbers up for nothing. Every bridge was green through all of it.
+
+**But it is not dead in general, which is why the fix is a predicate and not a deletion.** The span is evaluated at
+BUILD time from whatever the block holds, and the wizard is not the only thing that fills a block: editing `w` to 4 on
+the Blocks canvas against a 3mm inset gives a span of −2 and an INVERTED ring — a real cut in the wrong place, with no
+`pocketTooSmall` upstream. There the constant comparison reads `IF -2 <= 0` and it fires. So `wallFinishNeedsRingGuard`
+emits it exactly where it can fire — a dialled span, or a baked span already non-positive — and the body, the labels
+and the `@work` header all ask that ONE predicate.
+
+The mid-play shot also proves the label uniquification across two parametric bodies in one program: the raster body
+takes N91-N99 and the wall's guards take GOTO101/GOTO103, no collision — the t1408 defect class, visibly not happening.
+
+### THE NAME IS STILL UNRULED — the one thing for the advisor
+
+t1431 surfaced `wallfinish` vs `rectwall` as the granularity call and the dispatch came back silent on it. I took the
+stated lean (`wallfinish` names the operation the codebase already uses; the rect-only scope lives in the envelope, as
+`surfaceraster` leaves it to `pocketRasterGap` rather than to a name) and flagged it in the atom's own header. It is a
+`sed` today — pre-release, no install base — and expensive once a saved workspace carries the type string.
+
+### GATE (fast tier) + WHY I DID NOT BUMP
+
+pocket + surfacing + raster + rest + CAM + blocks + round-trip **124/124** · smoke **71/71** · the pocket radius
+(canvas / depth / in-place / tenant-extraction / rest-machining / scratch-alloc / scratch-guard / op-params /
+knob-binding / setup-sheet / time-estimate) **49/49**. Iron rule **11/11**, same list, no growth, no pocket entry.
+
+NOT released: the dispatch reads "MY FULL SUITE gates; release on green", and the full suite is the advisor's to run.
+The tree is release-ready and the V-bump is one command away — say the word.
