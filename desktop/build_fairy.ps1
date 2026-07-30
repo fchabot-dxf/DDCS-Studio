@@ -25,7 +25,7 @@ param(
     [string]$TimestampUrl = "http://timestamp.digicert.com"   # RFC3161 timestamp server (keeps the signature valid past cert expiry)
 )
 $ErrorActionPreference = "Stop"
-$root = $PSScriptRoot
+$root = Split-Path $PSScriptRoot -Parent   # repo root (script lives in desktop/)
 
 # Locate signtool.exe (Windows SDK) - it is usually NOT on PATH.
 function Find-SignTool {
@@ -62,7 +62,7 @@ Push-Location $root
 try {
     $sep = ";"   # Windows PyInstaller --add-data "SRC;DEST" separator
     python -m PyInstaller --noconfirm --clean --onefile --noupx --name $Name `
-        --icon "ddcs.ico" `
+        --icon "desktop/ddcs.ico" `
         --paths "bridge/bridge-app" `
         --add-data "bridge/bridge-app/web/ui${sep}console" `
         --add-data "DDCS-Studio/web${sep}studio" `
@@ -73,7 +73,7 @@ try {
         --hidden-import serial `
         --exclude-module boto3 `
         --exclude-module botocore `
-        fairy_gateway.py
+        desktop/fairy_gateway.py
     if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed ($LASTEXITCODE)" }
     # A running exe can't be overwritten OR deleted on Windows - but it CAN be renamed. So if an instance
     # is open, move the old exe aside (it keeps running the renamed image) and drop the new build in place;
