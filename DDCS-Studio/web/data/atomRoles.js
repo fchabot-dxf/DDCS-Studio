@@ -75,6 +75,40 @@ export const ATOM_ROLES = {
      *     clearance             A Z WORD the frame printer folds; same call as every other kernel's clearance (t1091).
      *     the flow labels       Emitter-assigned per program (uniquifyFlowLabels), never operator values.
      */
+    /**
+     * — surfaceraster (t1399): the surfacing body, DECLARED at last. It was UNLISTED, so every key fell to DEFAULT_ROLE
+     *   and read 'geometry' — safe, but by accident rather than by decision, and t1389 recorded that accident as though
+     *   the table had an opinion ("atomRoles is RIGHT about surfacing"). It had none. This row is that opinion.
+     *
+     *   THE FOUR THAT ARE LIVE, and why each genuinely rides:
+     *     feed / plunge   Each appears ONLY as a bare `F<word>` — checked, not assumed: neither is read by any
+     *                     arithmetic in the file; both are threaded through as opts and printed. t1399 moved them to
+     *                     val(), so a #var survives and a literal prints exactly what r3() printed.
+     *     depth / stepdown  The body's loops read `#42`/`#43`, so the depth walk was always live at the MACHINE; what
+     *                     blocked a knob was the seed printing through r3(num(...)). Now the seed rides a live word and
+     *                     keeps the build-time floor for a typed number. The zero-advance hazard is covered by a guard
+     *                     that was already in the body — `IF #43 <= 0 GOTO91`, read from the REGISTER at run time.
+     *
+     *   THE ENTRY-GATE REASONING on the rest — every one BAKES because a #var would be destroyed at BUILD time, not
+     *   because it is unimportant:
+     *     w / h              read by JS at build (the ring count takes Math.min(w,h); the helix clamp takes the inradius)
+     *     toolDia / stepover / stepoverPct   the stepover mm is composed as `[tool * pct / 100]` from BAKED numbers, and
+     *                     the helix radius is clamped against the tool at build
+     *     rampAngle / helixDia / helixPitch  build-time trig and clamps decide whether the descent even fits
+     *     clearance       a Z word the frame printer folds — the same call every kernel's clearance gets (t1091)
+     *     confirmEvery    a build-time modulo that decides which levels emit a pause
+     *     x / y / z0 / rotAngle / rotPivotX / rotPivotY   the FRAME, folded into every coordinate at build
+     *     strategy / direction / entry / zMode  discrete selectors, never operator-tuned values
+     */
+    surfaceraster: {
+        feed: 'value', plunge: 'value', depth: 'value', stepdown: 'value',   // t1399 — the four the seeds now carry
+        w: 'geometry', h: 'geometry', toolDia: 'geometry', stepover: 'geometry', stepoverPct: 'geometry',
+        rampAngle: 'geometry', helixDia: 'geometry', helixPitch: 'geometry',
+        clearance: 'geometry', confirmEvery: 'geometry',
+        x: 'geometry', y: 'geometry', z0: 'geometry', rotAngle: 'geometry', rotPivotX: 'geometry', rotPivotY: 'geometry',
+        strategy: 'other', direction: 'other', entry: 'other', zMode: 'other',
+    },
+
     holecycle: {
         feed: 'value',
         depth: 'value', peck: 'value', pitch: 'value',   // t1389 — the two live registers, reachable at last

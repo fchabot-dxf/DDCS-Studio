@@ -43,7 +43,7 @@
  * so adopting it costs nothing and buys back a clean verify. The engine reads both — its matcher is `GOTO\s*(\d+)` —
  * so this moves TEXT only; the bridges re-ran and the resolved motion is unchanged, which is the whole check.
  */
-import { num } from './util.js';
+import { num, val } from './util.js';   // t1399 — val() at the seeds: a #var survives to the register, so the knob is reachable
 import { affineFrame } from './affineFrame.js';   // t1381 — the coordinate/rotation printers, one source (drill shares them)
 import { workMarker } from '../../engine/declaredWork.js';   // t1383 — this body DECLARES how much it executes (its preview was truncating silently)
 
@@ -179,6 +179,22 @@ const HX = { vx: '#34', vy: '#35', tmp: '#36', k: '#37', segs: '#38', rev: '#39'
  * segments-per-revolution) — which is why this is a declaration and not a new calculation.
  */
 export function surfaceRasterWorkSteps(p = {}) {
+    /**
+     * ── IT DECLARES ONLY WHEN IT CAN BE TRUE — returns null otherwise (t1399) ─────────────────────────────────────
+     *
+     * t1383 gave this function to surfacing and t1389 gave the null-when-live rule to `holeCycleWorkSteps`; surfacing
+     * never got it, because until this turn none of its inputs COULD be live. Making the depth/stepdown seeds reachable
+     * is exactly what creates the case, so the check lands in the same act rather than after someone reads a declared
+     * number that the operator has since dialled past.
+     *
+     * The rule is t1383's own: never declare wrong. Expected execution size is computed here at BUILD time from depth,
+     * stepdown and the area; once any of those is a `#var` the real count does not exist yet, so the marker is OMITTED
+     * and the tracer falls back to the flow-aware floor — which was sized for the worst realistic job and SAYS SO if it
+     * truncates. Every input it reads is checked, not just the two this turn makes live, so a later knob cannot slip
+     * past a check written for today's set.
+     */
+    const live = (v) => /^(#|\[)/.test(String(v == null ? '' : v).trim());
+    if ([p.depth, p.stepdown, p.w, p.h, p.toolDia, p.stepoverPct, p.stepover, p.helixPitch].some(live)) return null;
     const w = num(p.w, 100), h = num(p.h, 80);
     const depth = num(p.depth, 0.5), stepdown = Math.max(0.01, num(p.stepdown, 0.5));
     const tool = Math.max(0.1, num(p.toolDia, 12));
@@ -208,7 +224,14 @@ export function surfaceRasterLines(p = {}) {
     // a flat mm has it recovered against the tool it will run — through `stepoverPctOf` above, which is now the only
     // place that rule is written down (t1363).
     const pct = stepoverPctOf(p, tool);
-    const feed = num(p.feed, 2000), plunge = num(p.plunge, 200), clr = num(p.clearance, 5);
+    // t1399 — feed AND plunge ride val(): each appears ONLY as a bare `F<word>` interpolation (checked - neither is
+    // read by any arithmetic, they are threaded through as opts and printed), so a #var survives and a literal still
+    // prints exactly what r3() printed. `plunge` is not in the dispatch's example list, but it is the same construct
+    // and the dispatch's CRITERION is the walk's arithmetic - which neither touches. Applying the rule, not the list.
+    const feed = val(p.feed, 2000), plunge = val(p.plunge, 200), clr = num(p.clearance, 5);
+    /** A live word (#var / [expr]) or null - the one place this file decides 'is this knob dialled or typed'. */
+    const liveWord = (v) => { const t = String(v == null ? '' : v).trim(); return /^(#|\[)/.test(t) ? t : null; };
+
     // t1351 — THE ATOM CARRIES ITS OWN FRAME. x0/y0 were always here; z0 is new, and it is what makes the frame
     // COMPLETE: the surface the depths are measured down from. Together they are the placement shift, absorbed as
     // PARAMS instead of applied to the emitted text afterwards (t1349 measured what the text rewrite does to
@@ -293,11 +316,23 @@ export function surfaceRasterLines(p = {}) {
     return [
         ...preamble,
         // t1383 — the DECLARED work rides in this header (a token in a comment already emitted, so no line index moves).
-        `( ---- SURFACING, parametric. Every var below speaks; change one and the loops re-derive. · ${workMarker(surfaceRasterWorkSteps(p))} ---- )`,
+        // t1399 — the token is OMITTED when the work cannot be known (a live depth/stepdown), never written wrong.
+        `( ---- SURFACING, parametric. Every var below speaks; change one and the loops re-derive.`
+            + `${surfaceRasterWorkSteps(p) == null ? '' : ' · ' + workMarker(surfaceRasterWorkSteps(p))} ---- )`,
         `${V.w}=${r3(w)}   ( area X — the tool-CENTRE sweep, so the tool overhangs the edge )`,
         `${V.h}=${r3(h)}   ( area Y )`,
-        `${V.depth}=${r3(depth)}   ( total depth to face off )`,
-        `${V.stepdown}=${r3(stepdown)}   ( bite per level )`,
+        // ── t1399 — THE TWO LIVE KNOBS, and the seed is a WORD-OR-NUMBER rather than a plain val() ─────────────────
+        // A live `#var` rides verbatim; a numeric takes the SAME path it always did, floor included. That distinction is
+        // not pedantry: `stepdown` is floored at 0.01 before printing, so a plain `val()` would have emitted `#43=0` for
+        // a typed zero where this file has always emitted `#43=0.01` — a byte change AND a behaviour change (0.01 crawls,
+        // 0 hits the refusal). Measured against HEAD rather than assumed. The floor is a BUILD-time protection for a baked
+        // zero and cannot apply to a value that does not exist yet, which is exactly the holecycle precedent (t1389).
+        //
+        // THE LIVE CASE IS SAFE BY A GUARD THAT WAS ALREADY HERE: `IF #43 <= 0 GOTO91` sits four lines below and reads the
+        // REGISTER at run time. It was written for a baked zero and covers a dialled one unchanged — so unlike holecycle,
+        // this atom needed no new refusal, only the check that the existing one reaches the new path.
+        `${V.depth}=${liveWord(p.depth) || r3(depth)}   ( total depth to face off )`,
+        `${V.stepdown}=${liveWord(p.stepdown) || r3(stepdown)}   ( bite per level )`,
         `${V.step}=[${r3(tool)} * ${r3(pct)} / 100]   ( stepover mm = tool Ø ${r3(tool)} x ${r3(pct)}% — the CAM derives it the same way )`,
         `IF ${V.step} <= 0 GOTO91   ( a zero stepover divides by zero below; refuse cleanly instead of looping forever )`,
         `IF ${V.stepdown} <= 0 GOTO91`,
@@ -349,7 +384,7 @@ function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE
         ? rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM })
         : (entry === 'helix')
             ? helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, toolDia, stepBaked, r3, F, ax, ay, az, axE, ayE, azE, rot, mv, AX, TM })
-            : [`    G1 Z${azE('- ' + V.z)} F${r3(plunge)}   ( the ONE plunge of this level )`];
+            : [`    G1 Z${azE('- ' + V.z)} F${plunge}   ( the ONE plunge of this level )`];
     // THE THREE POINTS THIS WALK VISITS, declared once as X/Y pairs so the rotation reads them rather than the text.
     // NEAR/FAR are the row's two ends; ROW is the row's Y, which the body has already computed into #47 as an ABSOLUTE
     // (unrotated) coordinate — so its affine form is a bare register with no constant, and #47 keeps meaning exactly
@@ -403,13 +438,13 @@ function rowWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE
         '    GOTO14',
         '    N13',
         // THE STEP OVER AT DEPTH — ONE line in both builds (see END_X above for why it is arithmetic and not a branch).
-        `    G1 ${mv(END_X(), ROW_Y())} F${r3(feed)}   ( step over at depth — the tool does not lift between rows )`,
+        `    G1 ${mv(END_X(), ROW_Y())} F${feed}   ( step over at depth — the tool does not lift between rows )`,
         '    N14',
         `    IF ${V.dir} < 0 GOTO15`,
-        `    G1 ${mv(FAR_X(), ROW_Y(null))} F${r3(feed)}`,
+        `    G1 ${mv(FAR_X(), ROW_Y(null))} F${feed}`,
         '    GOTO16',
         '    N15',
-        `    G1 ${mv(NEAR_X(), ROW_Y(null))} F${r3(feed)}`,
+        `    G1 ${mv(NEAR_X(), ROW_Y(null))} F${feed}`,
         '    N16',
         `    ${V.dir}=[0 - ${V.dir}]`,
         `    ${V.i}=[${V.i} + 1]`,
@@ -462,11 +497,11 @@ function rampLines({ x0, y0, zTop, w, h, feed, plunge, rampAngle, stepBaked, r3,
         // available, a ramp cannot be cut and the tool plunges instead — with the reason in the program, not silently.
         `    IF ${V.run} > ${r3(toC)} GOTO41   ( ramp needs more run than the ${r3(toC)}mm to centre -> plunge )`,
         `    G0 Z${azE(`- ${V.z} + ${V.stepdown}`)}   ( down to the floor this level starts from )`,
-        `    G1 ${mv(RAMP_X, RAMP_Y)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( ramp )`,
-        `    G1 ${mv(START_X, START_Y)} F${r3(feed)}   ( back to the row start, now at depth )`,
+        `    G1 ${mv(RAMP_X, RAMP_Y)} Z${azE(`- ${V.z}`)} F${feed}   ( ramp )`,
+        `    G1 ${mv(START_X, START_Y)} F${feed}   ( back to the row start, now at depth )`,
         '    GOTO42',
         '    N41',
-        `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}   ( the ramp did not fit — straight plunge )`,
+        `    G1 Z${azE(`- ${V.z}`)} F${plunge}   ( the ramp did not fit — straight plunge )`,
         '    N42',
     ];
 }
@@ -533,11 +568,11 @@ function helixLines({ x0, y0, zTop, w, h, feed, plunge, helixDia, helixPitch, to
         `      ${HX.tmp}=[${HX.vx} * ${c} - ${HX.vy} * ${sn}]   ( rotate by ${r3(360 / SEG)}deg: 4 multiplies, 2 adds, no trig )`,
         `      ${HX.vy}=[${HX.vx} * ${sn} + ${HX.vy} * ${c}]`,
         `      ${HX.vx}=${HX.tmp}`,
-        `      G1 ${mv(ARC_X, ARC_Y)} Z${azE(`- ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}`)} F${r3(feed)}`,
+        `      G1 ${mv(ARC_X, ARC_Y)} Z${azE(`- ${V.z} + ${V.stepdown} - ${V.stepdown} * ${HX.k} / ${HX.segs}`)} F${feed}`,
         '    END3',
-        `    G1 ${mv(OUT_X, OUT_Y)} Z${azE(`- ${V.z}`)} F${r3(feed)}   ( helix — out to the row start, now at depth )`,
+        `    G1 ${mv(OUT_X, OUT_Y)} Z${azE(`- ${V.z}`)} F${feed}   ( helix — out to the row start, now at depth )`,
         `    IF ${V.z} > 0 GOTO52`,
-        `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}`,
+        `    G1 Z${azE(`- ${V.z}`)} F${plunge}`,
         '    N52',
     ];
 }
@@ -571,15 +606,15 @@ function ringWalk({ x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, ax
             `  WHILE [${V.i} < ${V.n}] DO2   ( rings, inward )`,
             `    IF ${V.i} > 0 GOTO21`,
             `    G0 ${mv(IN_X(), IN_Y())}`,
-            `    G1 Z${azE(`- ${V.z}`)} F${r3(plunge)}   ( the ONE plunge of this level )`,
+            `    G1 Z${azE(`- ${V.z}`)} F${plunge}   ( the ONE plunge of this level )`,
             '    GOTO22',
             '    N21',
-            `    G1 ${mv(IN_X(), IN_Y())} F${r3(feed)}   ( diagonal step in to the next ring, still cutting )`,
+            `    G1 ${mv(IN_X(), IN_Y())} F${feed}   ( diagonal step in to the next ring, still cutting )`,
             '    N22',
-            `    G1 ${mv(OUT_X(), IN_Y())} F${r3(feed)}`,
-            `    G1 ${mv(OUT_X(), OUT_Y())} F${r3(feed)}`,
-            `    G1 ${mv(IN_X(), OUT_Y())} F${r3(feed)}`,
-            `    G1 ${mv(IN_X(), IN_Y())} F${r3(feed)}`,
+            `    G1 ${mv(OUT_X(), IN_Y())} F${feed}`,
+            `    G1 ${mv(OUT_X(), OUT_Y())} F${feed}`,
+            `    G1 ${mv(IN_X(), OUT_Y())} F${feed}`,
+            `    G1 ${mv(IN_X(), IN_Y())} F${feed}`,
             `    ${RING_INSET}=[${RING_INSET} + ${V.step}]`,
             `    ${V.i}=[${V.i} + 1]`,
             '  END2',

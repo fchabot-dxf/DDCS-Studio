@@ -130,7 +130,7 @@ test('THE KEY — feed exposes under a place fold ONLY because the child declare
  *
  * The two claims that ARE this act's evidence for surfacing: the fold no longer blocks it, and its emit is untouched.
  */
-test('SURFACING INHERITS — the fold block is lifted; its feed stays baked by ROLE, not by the fold', async ({ page }) => {
+test('SURFACING INHERITS — the fold block is lifted, and (t1399) its role caught up so the feed exposes', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { classifyExposable, blockedIndices } = await import('/data/exposeClassifier.js');
@@ -154,11 +154,22 @@ test('SURFACING INHERITS — the fold block is lifted; its feed stays baked by R
     // THE INHERITANCE, measured: surfacing really is a place-wrapped self-framing atom, and NOTHING is fold-blocked now.
     expect(r.hasPlace && r.hasRaster, 'surfacing is a place-wrapped surfaceraster').toBe(true);
     expect(r.blocked, 'the place fold no longer blocks anything in surfacing — the same relaxation, same code').toEqual([]);
-    // THE CORRECTION, asserted so it cannot be mistaken for the fold blocking it again later.
-    expect(r.feed.exposable, "surfacing's feed is still baked — but NOT by the fold").toBe(false);
-    expect(r.feed.role, 'it is a geometry role, because surfaceraster emits F through r3(num(feed))').toBe('geometry');
-    expect(r.feed.reason, 'and the reason says role, not fold').toMatch(/geometry/i);
-    expect(r.feed.reason, 'no longer blaming a coordinate-transforming fold').not.toMatch(/fold/i);
-    expect(r.plunge.exposable, 'plunge likewise — the relaxation lifts the FOLD block, never a role').toBe(false);
+    /**
+     * ⚠ t1399 — THE SECOND HALF OF THIS TEST INVERTED, and the history is the point.
+     *
+     * t1389 asserted that surfacing's feed was still BAKED, and carefully distinguished WHY: not by the fold (this act
+     * had just lifted that) but by its ROLE — `surfaceraster` emitted `F` through `r3(num(feed))`, which destroys a
+     * `#var`. That was true and worth recording, and it named the follow-up act precisely.
+     *
+     * Step 0 of T3 IS that act: the pocket's rect fill re-points through this atom, and a pocket can only be as live as
+     * the atom it reuses, so feed/plunge/depth/stepdown moved onto the live-word path. So the role is no longer geometry
+     * and the assert flips. What does NOT change is the structural claim above — the fold blocks nothing — and keeping
+     * both halves visible is what stops "exposable" from silently coming to mean "the fold was lifted".
+     */
+    expect(r.feed.exposable, "surfacing's feed EXPOSES now — the role changed at t1399, the fold was already clear").toBe(true);
+    expect(r.feed.role, 'it is a value role: surfaceraster prints F through val() as of step 0').toBe('value');
+    expect(r.feed.reason, 'and the reason names the ride-through, not a fold').toMatch(/rides through/i);
+    expect(r.feed.reason, 'still not blaming a coordinate-transforming fold').not.toMatch(/fold/i);
+    expect(r.plunge.exposable, 'plunge moved with it — the same bare F word, the same act').toBe(true);
     expect(r.emitLen, 'and surfacing still emits a real body (its bridges are re-run in the gate)').toBeGreaterThan(20);
 });
