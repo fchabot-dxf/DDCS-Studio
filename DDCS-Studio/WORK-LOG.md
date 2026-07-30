@@ -10276,3 +10276,15 @@ diff. The measurement above is the deliverable; it is what makes the ruling chea
 ### NO GATE RUN
 
 Nothing changed. Tree carries only the advisor's two docs plus the analytics agent's two root files; proc tree clean.
+
+### ONE SMALLER FACT THE RULING MAY WANT TO FOLD IN
+
+`POCKET_FIELDS` has **no `entry` field at all** — the slot exposes w/h/depth/stepdown/stepover/toolDia/feed/plunge/
+clearance/rpm and nothing else. So a packed pocket's DESCENT is whatever the op carried at pack time, and a pocket
+op defaults to `plunge`. That is why refusing ramp/helix at pack is cheap rather than punitive: the common path is
+untouched, and an operator cannot dial into the refused combos from the pendant because there is no control that
+reaches them.
+
+*(Recorded here because the pass-back note lost this paragraph to shell backtick substitution — the hazard my own
+notes already warn about, hit anyway by writing `entry` in backticks inside a double-quoted --note. Fixed by
+carrying the point in the log, where it belongs, and re-passing.)*
