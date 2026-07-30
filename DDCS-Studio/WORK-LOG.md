@@ -8962,3 +8962,74 @@ The new spec **2/2**, stable across three consecutive runs. smoke **71/71**. Pre
 + the two screenshot specs **22/22**. **95 tests, 0 failures.**
 
 Scratch specs deleted. Process tree clean. T3 starts from this file plus the recipe in NEXT-SESSION.
+
+## t1397 (seat A) — T3 STOPPED AT ITS FIRST FORK, with the fork MEASURED: the rect fill already exists
+
+No code written. I grounded in the pocket kernels, found an architectural fork the dispatch's shape does not settle, and
+measured it rather than picking. **The measurement is decisive enough that building step 1 as dispatched would have
+produced a second copy of arithmetic the app already ships and proves.**
+
+### WHAT THE RECIPE ASSUMED, AND WHAT THE CODE SAYS
+
+The dispatch scopes T3 as "pocketfill (parallel + concentric) / pocketwall / pocketrest → parametric bodies", step 1
+being "ATOM(S) with the runtime loops". Reading the kernels first:
+
+`pocketFillBlock.lines` delegates to `fillStrategy`, which for a RECT region resolves to exactly two walks —
+`concentricRect(x0,y0,x1,y1,step,ctx)` for concentric, and `scanlineFill` + `fillLevelMoves`/`onewayMoves` for parallel.
+Those are the same two walks `surfaceraster` has emitted PARAMETRICALLY since t1359, over a rectangle, with a depth loop
+and the plunge/ramp/helix entries already in it.
+
+So the question is not "how do I write a parametric rect raster" — the app has one, with a 90-test family behind it.
+The question is whether a rect pocket IS surfacing over the INSET rect plus a wall pass.
+
+### THE MEASUREMENT
+
+Inset region for an 80×60 rect at tool Ø6, wallOffset 0 → a rect at (3,3) 74×54; stepover 2.4mm. One depth level at
+z=-1.5. Literal `fillStrategy` vs `surfaceRasterLines` over that same inset rect, both traced, cuts compared:
+
+    strategy      literal cuts   surfacing cuts   X range     Y range      first four cut points
+    parallel           46              46         identical   identical    identical
+    concentric         60              60         identical   identical    identical
+
+Ranges identical to the emit quantum on both axes, cut COUNTS equal, and the first four cut points equal. Surfacing's
+side carries `WHILE` (parametric); the literal side does not. On concentric it is 39 emitted lines against the literal's
+61 — the fold, already paid for.
+
+This is a single-config sample, not a bridge. It is enough to decide the SHAPE of the work, not enough to re-point
+anything — that would need the full relationship-class bridge the recipe calls for.
+
+### THE FORK, AND WHY I STOPPED INSTEAD OF CHOOSING
+
+**(A) A new `pocketcycle` atom** with its own runtime raster + concentric walks, its own multi-run band from the ~27
+registers I scouted at t1395, its own @work and refusals. This is what step 1 literally describes.
+
+**(B) The rect fill RE-POINTS through `surfaceraster`** (a pocket is surfacing over the inset rect), and the genuinely
+new parametric work shrinks to the WALL finish and rest machining.
+
+Gate G3 — one source, no duplicate — points hard at (B), and it is the same hazard t1381 cited when it extracted
+`affineFrame` instead of copying `rotWord`: *what drifts in a copy is the arithmetic that decides where the tool goes.*
+A second parametric rect raster is exactly that copy, and the measurement above says the two would start life identical.
+
+(B) also changes the band answer I scouted: if the fill reuses surfacing, it reuses surfacing's `#34-#49`/`#62-#64`, and
+the new declaration covers only the wall/rest — far less than the ~27 registers the multi-run plan assumed.
+
+**What (B) costs, stated so the trade is not hidden:** it couples two shipping ops through one atom — a surfacing change
+could then reach pockets — and surfaceraster owns its own DEPTH loop, while pocket's levels come from the enclosing
+StepDown. Reconciling that is real work: either the pocket arm gives up StepDown (the atom owns depth, as surfacing
+does), or surfaceraster grows a single-level mode. Neither is free, and which one is right is a design call about two
+shipping ops rather than a mechanical port.
+
+That is why this is the advisor's ruling and not mine to assume: the recipe says "adapt, don't re-derive", and the
+honest reading of the measurement is that adapting means REUSING the raster, which is a bigger structural change to two
+ops than step 1 as written.
+
+### WHAT IS NOT IN QUESTION
+
+Whichever way it goes, the non-rect shapes (circle / polygon / ellipse) stay literal for now and belong in a NAMED
+envelope gap, the way `holeCycleGap` names the degenerate rect: their fills are JS-computed contour walks
+(`concentricContour`, `scanlineFill` over an offset polyline), not analytic shapes a macro can walk. The title of the
+dispatch — RECT pocket — already scopes this, and saying it out loud keeps it a boundary rather than a gap.
+
+### NO GATE RUN
+
+Nothing was changed, so there is nothing to gate. Scratch spec deleted; tree carries only the advisor's two docs.
