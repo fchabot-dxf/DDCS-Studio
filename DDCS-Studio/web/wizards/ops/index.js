@@ -45,6 +45,7 @@ import { regionBlock } from './region.js';
 import { stepoverBlock, fillStrategy } from './stepover.js';
 import { surfaceFillBlock } from './surfaceFill.js';
 import { surfaceRasterBlock } from './surfaceraster.js';   // t1359 — the PARAMETRIC surfacing atom; surfacingStack emits through it now
+import { wallFinishBlock } from './wallfinish.js';   // t1433 — the PARAMETRIC wall-finish atom (the raster pocket's finish ring; band #11-#14)
 import { fillZigzagBlock, fillConcentricBlock } from './fill.js';
 import { fillTextBlock } from './fillText.js';
 import { stepdownBlock } from './stepdown.js';
@@ -109,7 +110,7 @@ export const PALETTE = [
     regionBlock,                                               // Shapes (boundary → fills/walls via a region socket)
     moveBlock, arcBlock, probeBlock, machineMoveBlock, safeRetractBlock, safeTraverseBlock, safeHopBlock, clearLiftBlock, homeBlock, pathModeBlock,   // Move (+ G53 machine-coord move + machine-frame safe-Z retract + safetraverse bundle + clearance-hop + clearlift folding atom + G28 home + G64/G61 path mode)
     lineBlock, slotBlock, holeCycleBlock, tapBlock, contourBlock, contourFillBlock, pocketFillBlock, pocketWallBlock, pocketRestBlock, drillCycleBlock, cancelCycleBlock,  // Toolpaths (feature presets + tap + contour/profile [contour=region-socket for pocket-wall; contourfill/pocketfill/pocketwall=flat for the twins] + native canned cycles G81-85/G80)
-    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, surfaceRasterBlock, stepdownBlock, placeOnStockBlock, rotateBlock, skimBlock, entryBlock, toolSelBlock, xformBlock, setupBlock, flipBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align + skim relative Z-mode + entry-point + tool-select marker + declared program rotation + two-sided setup boundary + flip sibling)
+    arrayBlock, helixBlock, fillZigzagBlock, fillConcentricBlock, fillTextBlock, stepoverBlock, surfaceFillBlock, surfaceRasterBlock, wallFinishBlock, stepdownBlock, placeOnStockBlock, rotateBlock, skimBlock, entryBlock, toolSelBlock, xformBlock, setupBlock, flipBlock,    // Transforms (stamp/sweep + lateral fills [zigzag/concentric/text] + depth-pass wrappers + place-on-stock + rotate/align + skim relative Z-mode + entry-point + tool-select marker + declared program rotation + two-sided setup boundary + flip sibling)
     spindleBlock, feedBlock, feedModeBlock, dwellBlock, coolantBlock, toolBlock,   // Spindle & Feed (spindle/feed/coolant/tool/dwell + G94/95 feed mode)
     wcsBlock, distModeBlock, planeBlock, setWorkOffsetBlock, wcsBaseIntoBlock, wcsWriteBlock, wcsZeroBlock, toolOffsetBlock,   // Coordinates (WCS select + dist-mode + G17-19 plane + work-offset/probe-family base+indirect-write/WCS-zero-at-current/tool-table write)
     progStartBlock, progEndBlock, endProgramBlock,             // Program (framing + end)

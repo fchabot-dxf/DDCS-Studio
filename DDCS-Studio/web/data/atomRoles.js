@@ -120,6 +120,39 @@ export const ATOM_ROLES = {
         strategy: 'other', direction: 'other', entry: 'other', zMode: 'other',
     },
 
+    /**
+     * — wallfinish (t1433): the parametric wall-finish ring. DECLARED IN THE ACT THAT BORNS THE ATOM, which is the
+     *   t1399 lesson applied on time rather than two turns later: an unlisted atom falls to DEFAULT_ROLE and reads
+     *   'geometry' — safe, but by accident, and an accident recorded as an opinion is worse than no row.
+     *
+     *   THE FOUR THAT ARE LIVE, and each for a checked reason rather than by analogy:
+     *     depth / stepdown  the loop reads `#11`/`#12` at the machine, and the seeds ride a live word verbatim. The
+     *                     zero-advance hazard is covered by `IF #12 <= 0 GOTO<err>`, which reads the REGISTER at run
+     *                     time — written for a baked zero, and it covers a dialled one unchanged.
+     *     feed / plunge   each appears ONLY as a bare `F<word>`; neither is read by any arithmetic in the body
+     *                     (checked, not assumed — the ring has no derived feed), so `val()` carries a #var through.
+     *
+     *   THE REST BAKE, and this atom's list is SHORTER than surfacing's for a real reason: it has no descent modes,
+     *   no strategy and no stepover, so the usual bake-because-trig cases simply do not exist here.
+     *     w / h / inset / x / y / z0   the FRAME and the ring's span. These are NOT baked in the sense of being
+     *                     destroyed — `geoTerm`/`geoSum` carry a register through into the corner EXPRESSION, and the
+     *                     CAM delegation will hand `#22` to `inset` exactly that way. What they are is ROTATION-
+     *                     INCOMPATIBLE: a dialled corner has no build-time constant for the rotation mix, so
+     *                     `wallFinishAbsorbsRotation` refuses. 'geometry' is the honest role for a key whose live
+     *                     form narrows what the atom can absorb.
+     *     clearance       a Z word the frame printer folds — the same call every kernel's clearance gets (t1091).
+     *     confirmEvery    a build-time modulo that decides which levels emit a pause.
+     *     rotAngle / rotPivotX / rotPivotY   the program rotation, baked into every coordinate at build.
+     *     the flow labels   emitter-assigned per program (uniquifyFlowLabels), never operator values.
+     */
+    wallfinish: {
+        feed: 'value', plunge: 'value', depth: 'value', stepdown: 'value',
+        w: 'geometry', h: 'geometry', inset: 'geometry',
+        x: 'geometry', y: 'geometry', z0: 'geometry', clearance: 'geometry', confirmEvery: 'geometry',
+        rotAngle: 'geometry', rotPivotX: 'geometry', rotPivotY: 'geometry',
+        errLabel: 'geometry', okLabel: 'geometry', ringErrLabel: 'geometry', ringOkLabel: 'geometry', confirmLabel: 'geometry',
+    },
+
     holecycle: {
         feed: 'value',
         depth: 'value', peck: 'value', pitch: 'value',   // t1389 — the two live registers, reachable at last
