@@ -92,6 +92,30 @@ export function rasterDirectionOf(p = {}) {
 export function rasterIsOneWay(direction) { return direction === 'oneway' || direction === 'otherway'; }
 
 /**
+ * ── t1429 — WHICH AXIS THE ROWS RUN ALONG, DECLARED. It was an UNSTATED ASSUMPTION, and that is the defect ────────
+ *
+ * This walk has always run its rows along X and stepped over in Y, and nothing said so — the fact lived only in the
+ * letters `X` and `Y` inside `rowWalk`. The CAM kit's own raster has ALWAYS declared it: `rasterClear({ dir })`
+ * swaps its row and step axes, and `pocketSlot`/`surfacingSlot` expose that pick as a build-time dropdown
+ * (macrosApp's `SECOND_CTL`: *"Raster direction — which axis the clearing rows run along"*). So the moment a slot
+ * delegates its clearing body to this atom, a `rows ∥ Y` pick would emit `rows ∥ X` — the operator's build-time
+ * choice silently replaced by this atom's assumption, which is t1422's class of defect one layer up again.
+ *
+ * IT IS NOT AN ENVELOPE AXIS, and that is a measured claim rather than a convenience. `direction` earned its place in
+ * SURFACE_RASTER_AXES because a one-way walk is a genuinely DIFFERENT body (11 lines per pass against 20). A row axis
+ * is the SAME body with its coordinate pair swapped: the `y` walk at (x,y,w,h) is the `x` walk at (y,x,h,w) with the
+ * X and Y words exchanged, which the transposition bridge asserts move-for-move. A table whose rows are the turn that
+ * earned them cannot afford six rows that say nothing a swap does not already prove.
+ *
+ * ABSENT IS 'x' — the assumption this makes explicit, so every existing config emits byte-for-byte what it did.
+ * Anything that is not 'y' is 'x', mirroring how `strategy` resolves: the ENVELOPE refuses unknown words, not the
+ * emitter (t1404's ruling, applied to the axis this turn adds, in the same act that adds it).
+ */
+export function rasterRowAxisOf(p = {}) {
+    return String(p.rowAxis == null ? '' : p.rowAxis).trim() === 'y' ? 'y' : 'x';
+}
+
+/**
  * ── t1425 — A GEOMETRY INPUT THAT MAY BE A PENDANT REGISTER, AND THE ONE PLACE THEIR ARITHMETIC COMBINES ─────────
  *
  * THE DEFECT THIS CLOSES, MEASURED AT t1422 BEFORE ANY OF IT WAS BUILT. A CAM slot holds its geometry in REGISTERS
@@ -319,9 +343,11 @@ export function surfaceRasterWorkSteps(p = {}) {
     // The SAME two count formulas the macro emits (see `count` in each walk) — rows that FIT, or rings before the middle
     // closes — so a change to either shows up here rather than drifting out of sight.
     const concentric = String(p.strategy || '') === 'concentric';
+    // t1429 — the row count is counted in the span the rows step ACROSS, which the row axis chooses. `concentric` has
+    // no rows to turn, so its shorter-side count is unaffected — the same asymmetry SURFACE_RASTER_AXES already declares.
     const passes = concentric
         ? Math.max(1, Math.floor((Math.min(w, h) - 0.001) / (2 * step)) + 1)
-        : Math.max(1, Math.floor((h - step / 2) / step) + 1);
+        : Math.max(1, Math.floor(((rasterRowAxisOf(p) === 'y' ? w : h) - step / 2) / step) + 1);
     // t1418 — THE ROW COUNT IS THE SAME IN EVERY DIRECTION (the scout's first fact: 46 rows either way, same Y, same
     // extents) — a one-way walk is a TRAVEL change, not a geometry change. What DOES move is the per-pass body, and
     // it moves DOWN, not up: the one-way row spends three lines on the lift/rapid/plunge triple but loses all four
@@ -391,7 +417,23 @@ export function surfaceRasterLines(p = {}) {
     // read by any arithmetic, they are threaded through as opts and printed), so a #var survives and a literal still
     // prints exactly what r3() printed. `plunge` is not in the dispatch's example list, but it is the same construct
     // and the dispatch's CRITERION is the walk's arithmetic - which neither touches. Applying the rule, not the list.
-    const feed = val(p.feed, 2000), plunge = val(p.plunge, 200), clr = num(p.clearance, 5);
+    const feed = val(p.feed, 2000), plunge = val(p.plunge, 200);
+    /**
+     * ── t1429 — THE RETRACT HEIGHT IS A GEOMETRY TERM TOO, and it was the ONE live knob still landing on the floor ──
+     *
+     * MEASURED at t1427, on the seeding the delegation is about to do: `POCKET_FIELDS.clearance` is a register the
+     * shipped slot honours today (`rasterClear` takes it), and handing it here as `clearance: '#10'` emitted
+     * `G0 Z5` — this atom's own DEFAULT — at every retract in the program, because `num(word, 5)` returns the
+     * default and `az()` folds it at build time. Not a refusal and not a NaN: an operator dialling a 12mm retract
+     * would have got 5mm on every lift. Exactly the silent substitution t1425 closed for w/h/tool/stepover/inset,
+     * one knob further down, and it is closed the same way rather than a second way.
+     *
+     * `clearance` is deliberately NOT in `BAKES_GEOMETRY`: it is a Z-only retract that no descent's baked geometry
+     * reads (a ramp bakes its run to the area CENTRE, a helix its inradius — both XY), so a dialled clearance is
+     * honoured on every (strategy, entry) row including the two that refuse a dialled area.
+     */
+    const clrT = geoTerm(p.clearance, 5);
+    const clr = clrT.n;
     // t1425 — this was a local copy of the same test; it is now `liveWordOf` at module scope, because the envelope's
     // live-geometry refusal has to ask the identical question and two copies of "is this knob dialled or typed" is
     // exactly the split this file keeps closing.
@@ -469,12 +511,21 @@ export function surfaceRasterLines(p = {}) {
         absorbs: surfaceRasterAbsorbsRotation(p) === true,
     });
 
+    // t1429 — THE ONE RETRACT WORD, printed once and read by every lift (the header's two and the one-way walk's).
+    // A NUMBER takes the identical old path — `az(clr)`, same fold, same bytes. A REGISTER rides the frame's own Z
+    // printer, so the retract reads `[<zTop> + <clr>]` and a placed op keeps its surface in the sum for free.
+    // …and a retract measured from a ZERO surface is just the retract: `G0 Z[0 + #9]` is correct and is noise, and it
+    // would sit one line from the same program's `G0 Z#9` where a slot writes its own. A placed or skim body keeps the
+    // sum, because there the surface is a real term.
+    const zClr = !clrT.live ? az(clr) : (F.z === '0' ? clrT.w : azE(`+ ${clrT.w}`));
+
     // THE STRATEGY DECIDES THE WALK, under the SAME header and the SAME depth loop — the loop that counts levels
     // does not care what happens inside it, which is why adding a strategy is a new walk and not a new emitter.
     const stepBaked = tool * pct / 100;   // the stepover AT BUILD VALUES — what the baked ramp geometry is computed for
-    const opts = { x0, y0, zTop, w, h, feed, plunge, clr, r3, F, ax, ay, az, axE, ayE, azE, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
+    const opts = { x0, y0, zTop, w, h, feed, plunge, clr, zClr, r3, F, ax, ay, az, axE, ayE, azE, entry: p.entry || 'plunge', rampAngle: num(p.rampAngle, 3),
         helixDia: num(p.helixDia, 0), helixPitch: num(p.helixPitch, 1), toolDia: tool, stepBaked,
         direction: rasterDirectionOf(p),   // t1418 — the row walk reads it; ringWalk does not, and SURFACE_RASTER_AXES says so
+        rowAxis: rasterRowAxisOf(p),       // t1429 — likewise: the ROW walk reads it, ringWalk has no rows to turn
         wT, hT, geoLive: wT.live || hT.live,   // t1425 — the ring count resolves its min at RUN time when either side is live
         liveGap: surfaceRasterLiveGap(p),      // t1425 — a descent that bakes geometry degrades honestly rather than baking against a dial
         rot, mv, AX, TM, LBL };   // t1375 — the rotation goes through the ONE move printer, so each walk declares points, not words
@@ -546,12 +597,12 @@ export function surfaceRasterLines(p = {}) {
         ...walk.count,
         '',
         `${V.z}=0   ( the level being cut )`,
-        `G0 Z${az(clr)}   ( clear before the first plunge )`,
+        `G0 Z${zClr}   ( clear before the first plunge )`,
         `WHILE [${V.z} < ${V.depth}] DO1   ( depth: one pass per level, the last bite clamped to the total )`,
         `  ${V.z}=[${V.z} + ${V.stepdown}]`,
         `  IF ${V.z} > ${V.depth} THEN ${V.z}=${V.depth}`,
         ...walk.body,
-        `  G0 Z${az(clr)}   ( clear of the work before the next level )`,
+        `  G0 Z${zClr}   ( clear of the work before the next level )`,
         // t1335 — CONFIRM EVERY N LEVELS. The pause word is M00 with the operator sentence the literal path already
         // uses, matched rather than modernised: the machine's own convention is not something to improve in passing.
         // It fires after every Nth level EXCEPT the last — a pause after the final pass would stop the program on a
@@ -645,7 +696,7 @@ function descentLines(o) {
 }
 
 function rowWalk(o) {
-    const { x0, y0, w, h, feed, plunge, clr, r3, F, ax, az, axE, ayE, azE, stepBaked, mv, AX, TM, LBL } = o;
+    const { x0, y0, w, h, feed, plunge, zClr, r3, F, ax, ay, axE, ayE, azE, stepBaked, mv, AX, TM, LBL } = o;
     // t1418 — WHICH WALK. Anything that is not one of the two one-way words is the both-ways raster, which mirrors
     // exactly how `strategy` already resolves (anything not 'concentric' is the row walk) — the ENVELOPE is what
     // refuses an unknown word, not the emitter, so the two axes stay symmetric (the t1404 lesson).
@@ -654,16 +705,39 @@ function rowWalk(o) {
     // t1339 — THE LEVEL'S DESCENT. Plunge is the straight drop; RAMP walks toward the area centre at the declared
     // angle and comes back. See rampLines for why toC and 1/tan are BAKED and what that costs.
     // t1404 — the row start is handed DOWN now (it was assumed inside the descent builders); the value is unchanged.
+    /**
+     * ── t1429 — THE ROW AXIS, resolved into the FIVE things that actually differ ──────────────────────────────────
+     *
+     * Rows ∥ Y is not a second walk and it is not a rotation: it is THIS walk with its coordinate pair swapped. So the
+     * axis is resolved ONCE, here, into the five names the body below reads — which span a row runs along, which one it
+     * counts rows across, which printer each uses, and which order the pair reaches `mv`. Nothing downstream branches
+     * on it again, because a second branch is how the row and the step-over come to disagree about which way is which.
+     *
+     * AT 'x' EVERY ONE OF THEM IS WHAT IT WAS, so the whole existing corpus is byte-identical by construction rather
+     * than by a promise — the identity sweep asserts it, and the transposition bridge asserts the 'y' walk cuts the
+     * 'x' walk's path on the transposed rect.
+     */
+    const yRows = o.rowAxis === 'y';
+    const SPAN = yRows ? V.h : V.w;        // the register a row's LENGTH is read from
+    const CROSS = yRows ? V.w : V.h;       // the register the rows step ACROSS — the one the row count is counted in
+    const a0 = yRows ? y0 : x0;            // the origin along the row axis
+    const alongAt = yRows ? ay : ax;       // origin + a build-time offset, on the ROW axis
+    const alongE = yRows ? ayE : axE;      // origin + a runtime term, on the ROW axis
+    const crossE = yRows ? axE : ayE;      // …and on the axis the rows step across (where #47 is computed)
+    /** One move's two axis forms in X,Y order — the ONLY place the row axis reaches the printer. */
+    const P = (along, across) => (yRows ? mv(across, along) : mv(along, across));
     // t1418 — an `otherway` level starts at the FAR end, so that is where its descent happens and returns to. This is
     // the literal's own rule: `onewayMoves` hands `entryOrPlunge` the row's `xs`, which is `xhi` when reversed. At
     // bothways/oneway the expression collapses to `x0` — byte-identical, asserted.
-    const descent = descentLines({ ...o, sx: reverse ? x0 + w : x0, sy: y0 + stepBaked / 2 });
+    const descent = descentLines({ ...o, ...(yRows
+        ? { sx: x0 + stepBaked / 2, sy: reverse ? y0 + h : y0 }
+        : { sx: reverse ? x0 + w : x0, sy: y0 + stepBaked / 2 }) });
     // THE THREE POINTS THIS WALK VISITS, declared once as X/Y pairs so the rotation reads them rather than the text.
-    // NEAR/FAR are the row's two ends; ROW is the row's Y, which the body has already computed into #47 as an ABSOLUTE
-    // (unrotated) coordinate — so its affine form is a bare register with no constant, and #47 keeps meaning exactly
-    // what it means today whether the program rotates or not.
-    const NEAR_X = () => AX(ax(), x0, []);
-    const FAR_X = () => AX(axE(0, V.w), x0, [TM(V.w)]);
+    // NEAR/FAR are the row's two ends; ROW is the row's cross-axis coordinate, which the body has already computed into
+    // #47 as an ABSOLUTE (unrotated) coordinate — so its affine form is a bare register with no constant, and #47 keeps
+    // meaning exactly what it means today whether the program rotates or not.
+    const NEAR_X = () => AX(alongAt(), a0, []);
+    const FAR_X = () => AX(alongE(0, SPAN), a0, [TM(SPAN)]);
     const ROW_Y = (word = V.y) => AX(word, 0, [TM(V.y)]);
     /**
      * THE STEP-OVER'S X — a value only a ROTATED build has to name. Unrotated, the step over at depth is a Y-only move
@@ -681,15 +755,17 @@ function rowWalk(o) {
      * an expression, which is the construct t1339 found the tracer read wrong. It flattens to two products of exactly the
      * kind this body already emits (`#48 * #44`), so it needs no form the controller has not already been given.
      */
-    const END_X = () => AX(null, x0, [TM(V.w, 0.5), TM(`${V.w} * ${V.dir}`, -0.5)]);
+    const END_X = () => AX(null, a0, [TM(SPAN, 0.5), TM(`${SPAN} * ${V.dir}`, -0.5)]);
     const count = [
         // THE ROW COUNT — not h/step rounded up. Rows sit at step/2 + i·step, so the count is how many of THOSE land
         // inside the area. The two formulas agree at 150/7.2 and 40/5 and disagree at 60/7.2 (8 rows, not 9), where
         // rounding up puts a row at 61.2 — off the far edge of a 60mm face, cutting air.
-        `${V.n}=[FIX[[${V.h} - ${V.step} / 2] / ${V.step}] + 1]   ( rows that FIT: the last lands inside the area, not past it )`,
+        // t1429 — counted in the CROSS span, which is `#41` for rows ∥ X and `#40` for rows ∥ Y. Same formula, and it
+        // has to move with the axis: counting rows in the span they RUN along would give a row count for the wrong side.
+        `${V.n}=[FIX[[${CROSS} - ${V.step} / 2] / ${V.step}] + 1]   ( rows that FIT: the last lands inside the area, not past it )`,
         `IF ${V.n} < 1 THEN ${V.n}=1   ( a face narrower than one stepover is still one row )`,
     ];
-    const rowY = `    ${V.y}=${ayE(0, `${V.step} / 2 + ${V.i} * ${V.step}`)}`;
+    const rowY = `    ${V.y}=${crossE(0, `${V.step} / 2 + ${V.i} * ${V.step}`)}`;
 
     /**
      * ── t1418 — THE ONE-WAY WALK. Every row cut the same way; the tool LIFTS between them ─────────────────────────
@@ -715,18 +791,18 @@ function rowWalk(o) {
             `  WHILE [${V.i} < ${V.n}] DO2   ( rows: counted above, so the area and the stepover decide how many )`,
             rowY,
             `    IF ${V.i} > 0 GOTO${LBL.rowStepLabel}   ( already down: only the FIRST row of a level gets the descent )`,
-            `    G0 ${mv(FROM(), ROW_Y())}`,
+            `    G0 ${P(FROM(), ROW_Y())}`,
             ...descent,
             `    GOTO${LBL.rowCutLabel}`,
             `    N${LBL.rowStepLabel}`,
             // THE COST OF ONE-WAY, in three lines: the tool lifts clear, rapids back to this row's start and drops
             // again. The both-ways walk links at depth in ONE line instead — that is the whole trade, and it is what
             // the operator buys when they pick a consistent cut direction over the fastest travel.
-            `    G0 Z${az(clr)}   ( lift: a one-way pass never links at depth )`,
-            `    G0 ${mv(FROM(), ROW_Y())}   ( rapid back to this row's start — the same end as every other row )`,
+            `    G0 Z${zClr}   ( lift: a one-way pass never links at depth )`,
+            `    G0 ${P(FROM(), ROW_Y())}   ( rapid back to this row's start — the same end as every other row )`,
             `    G1 Z${azE('- ' + V.z)} F${plunge}   ( re-plunge at this level's floor )`,
             `    N${LBL.rowCutLabel}`,
-            `    G1 ${mv(TO(), ROW_Y(null))} F${feed}   ( every row cut the SAME way — a consistent ${reverse ? 'conventional' : 'climb'} cut )`,
+            `    G1 ${P(TO(), ROW_Y(null))} F${feed}   ( every row cut the SAME way — a consistent ${reverse ? 'conventional' : 'climb'} cut )`,
             `    ${V.i}=[${V.i} + 1]`,
             '  END2',
         ] };
@@ -744,22 +820,22 @@ function rowWalk(o) {
         // WHICH END TO START AT — asked as a BRANCH, not as a comparison inside an expression. `[#49 < 0]` looked
         // like it would evaluate 0/1 and the tracer read it as a plain 1, putting the first plunge off the corner.
         `    IF ${V.dir} < 0 GOTO${LBL.rowFarLabel}`,
-        `    G0 ${mv(NEAR_X(), ROW_Y())}`,
+        `    G0 ${P(NEAR_X(), ROW_Y())}`,
         `    GOTO${LBL.rowStartLabel}`,
         `    N${LBL.rowFarLabel}`,
-        `    G0 ${mv(FAR_X(), ROW_Y())}`,
+        `    G0 ${P(FAR_X(), ROW_Y())}`,
         `    N${LBL.rowStartLabel}`,
         ...descent,
         `    GOTO${LBL.rowCutLabel}`,
         `    N${LBL.rowStepLabel}`,
         // THE STEP OVER AT DEPTH — ONE line in both builds (see END_X above for why it is arithmetic and not a branch).
-        `    G1 ${mv(END_X(), ROW_Y())} F${feed}   ( step over at depth — the tool does not lift between rows )`,
+        `    G1 ${P(END_X(), ROW_Y())} F${feed}   ( step over at depth — the tool does not lift between rows )`,
         `    N${LBL.rowCutLabel}`,
         `    IF ${V.dir} < 0 GOTO${LBL.rowNearLabel}`,
-        `    G1 ${mv(FAR_X(), ROW_Y(null))} F${feed}`,
+        `    G1 ${P(FAR_X(), ROW_Y(null))} F${feed}`,
         `    GOTO${LBL.rowEndLabel}`,
         `    N${LBL.rowNearLabel}`,
-        `    G1 ${mv(NEAR_X(), ROW_Y(null))} F${feed}`,
+        `    G1 ${P(NEAR_X(), ROW_Y(null))} F${feed}`,
         `    N${LBL.rowEndLabel}`,
         `    ${V.dir}=[0 - ${V.dir}]`,
         `    ${V.i}=[${V.i} + 1]`,
@@ -1009,6 +1085,9 @@ function ringWalk(o) {
  * proven. Here every axis a strategy reads is still normalised identically, and an unknown STRATEGY falls to the
  * parallel axis set — so `adaptive/bothways/plunge` misses the table and refuses, exactly as before.
  */
+// t1429 — `rowAxis` is deliberately NOT a fourth axis here, and the reason is in `rasterRowAxisOf`: a row axis is the
+// SAME body with its coordinate pair swapped (the transposition bridge asserts it move-for-move), where `direction`
+// earned its place by being a genuinely different body. Six rows nobody measured is exactly what this table refuses.
 export const SURFACE_RASTER_AXES = {
     parallel: ['strategy', 'direction', 'entry'],
     concentric: ['strategy', 'entry'],   // rings ignore `direction` on BOTH sides — measured at t1406, unchanged here
@@ -1175,8 +1254,11 @@ export const surfaceRasterBlock = {
     // t1404 — `inset` joins the declaration for the same reason z0 did at t1351: `lines()` reads it, so a declaration
     // that omitted it would be a feature DROP the day this atom round-trips through the canvas. Default 0 = surfacing's
     // own meaning, unchanged and asserted byte-identical.
-    defaults: { x: 0, y: 0, z0: 0, w: 100, h: 80, inset: 0, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 },
-    fields: ['x', 'y', 'z0', 'w', 'h', 'inset', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
+    // t1429 — `rowAxis` joins the declaration in the same act that teaches the walk to read it, for the reason z0 and
+    // `inset` did before it: `lines()` reads it, so a declaration that omitted it would be a feature DROP the day this
+    // atom round-trips through the canvas. Default 'x' = the assumption this act made explicit, asserted byte-identical.
+    defaults: { x: 0, y: 0, z0: 0, w: 100, h: 80, inset: 0, depth: 0.5, stepdown: 0.5, toolDia: 12, stepoverPct: 60, feed: 2000, plunge: 200, clearance: 5, strategy: 'parallel', direction: 'bothways', rowAxis: 'x', entry: 'plunge', rampAngle: 3, helixDia: 0, helixPitch: 1, confirmEvery: 0 },
+    fields: ['x', 'y', 'z0', 'w', 'h', 'inset', 'depth', 'stepdown', 'toolDia', 'stepoverPct', 'feed', 'plunge', 'clearance', 'strategy', 'direction', 'rowAxis', 'entry', 'rampAngle', 'helixDia', 'helixPitch', 'confirmEvery'],
     scratch: RASTER_SCRATCH,   // read by universalScratch.opBands() — the band is data, not a comment
     /**
      * ── t1408 — THE DECLARED FLOW LABELS. See LABEL_DEFAULTS for the defect this closes ──────────────────────────
