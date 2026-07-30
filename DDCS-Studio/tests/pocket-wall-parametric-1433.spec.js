@@ -140,28 +140,17 @@ test('THE REFERENCE CADENCE — retract-first, no trailing retract, and the STEP
  * hands the atom its frame as PARAMS. That is the SAME shape the clearing place took at t1406, and the reason is the
  * same: a mixed body paints the placement shift onto macro text and shears it (t1349).
  *
- * ⚠ THE PARAMETRIC SIDE IS BUILT HERE, AND ONLY UNTIL THE RE-POINT LANDS. At this commit `pocketStack` still emits the
- * literal wall, so there is nothing shipping to read; the builder below is the exact composition the re-point will
- * install, and the re-point's own commit replaces it with `pocketStack`'s real wall place so what is compared is the
- * shipping composition rather than a test-only reconstruction of it.
+ * THE PARAMETRIC SIDE IS THE SHIPPING COMPOSITION, decomposed by DROPPING the clearing place from the stack the
+ * wizard actually built — never by rebuilding it. What is compared is therefore the program a user gets with one
+ * phase hidden, not a test-only reconstruction of it (the literal side is decomposed the same way, by being a
+ * wall-only frozen stack to begin with).
  */
 const PARA_WALL = `
 async (cfg) => {
-    const { newBlock, emitMapped } = await import('/blocks/blockEmitter.js');
-    const { makeStart, makeEnd, makePlace } = await import('/blocks/programFraming.js');
-    const { pocketInsetMm } = await import('/wizards/ops/pocketfill.js');
-    const n = (v, d) => { const x = Number(v); return isFinite(x) ? x : d; };
-    const wcs = newBlock('wcs'); wcs.params = { wcs: cfg.wcs || 'active' };
-    const wall = newBlock('wallfinish');
-    wall.params = {
-        x: n(cfg.originX, 0), y: n(cfg.originY, 0), z0: 0,
-        w: n(cfg.w, 80), h: n(cfg.h, 60), inset: pocketInsetMm(cfg),
-        depth: n(cfg.depth, 4), stepdown: n(cfg.stepdown, 1.5),
-        feed: n(cfg.feed, 2000), plunge: n(cfg.plunge, 150), clearance: n(cfg.clearance, 5),
-        confirmEvery: n(cfg.confirmEvery, 0),
-    };
-    const bb = { minX: n(cfg.originX, 0), maxX: n(cfg.originX, 0) + n(cfg.w, 80), minY: n(cfg.originY, 0), maxY: n(cfg.originY, 0) + n(cfg.h, 60) };
-    return emitMapped([makeStart(cfg), wcs, makePlace(cfg, bb, [wall], 'wall'), makeEnd(cfg)]).text;
+    const { pocketStack } = await import('/wizards/pocketWizard.js');
+    const { emitMapped } = await import('/blocks/blockEmitter.js');
+    const keep = (b) => (b.type !== 'placeonstock' || b.params.role === 'wall');
+    return emitMapped(pocketStack(cfg).filter(keep)).text;
 }`;
 
 /**
@@ -219,9 +208,12 @@ for (const cfg of SWEEP) {
             const { traceToolpath } = await import('/engine/trace.js');
             // eslint-disable-next-line no-eval
             const programs = eval(WALL_PROGRAMS), para = eval(PARA_WALL), cuts = eval(WALL_CUTS);
+            const { pocketRasterGap } = await import('/wizards/pocketWizard.js');
             const p = { ...base, ...over };
             const lit = await programs(p, 'frozen'), par = await para(p);
             return {
+                gap: pocketRasterGap(p),
+                onAtom: /"type":"wallfinish"/.test(JSON.stringify((await import('/wizards/pocketWizard.js')).pocketStack(p))),
                 lit: cuts(traceToolpath, lit), par: cuts(traceToolpath, par),
                 // THE PREMISE: the parametric side really is a MACRO LOOP, not another unrolled transcript.
                 isMacro: /WHILE \[#13 < #11\] DO1/.test(par),
@@ -231,6 +223,9 @@ for (const cfg of SWEEP) {
             };
         }, { base: BASE, over: cfg.p, WALL_PROGRAMS, PARA_WALL, WALL_CUTS });
 
+        // THE PREMISE: this config really is on the re-pointed arm, and the wall it built really is the atom.
+        expect(r.gap, `this config rides the parametric arm (gap: "${r.gap}")`).toBe('');
+        expect(r.onAtom, 'and the wizard\'s own wall place carries `wallfinish`').toBe(true);
         expect(r.isMacro, 'the wall emitted as a MACRO loop, not an unrolled transcript').toBe(true);
         expect(r.ringsInText, 'and ONE ring in the text however many levels it runs').toBe(1);
         expect(r.lit.cuts.length, 'the literal wall cuts (two empty programs would agree perfectly)').toBeGreaterThan(0);
@@ -304,7 +299,7 @@ test('THE CONFIRM CADENCE — N unrolled pauses become one guarded pause per loo
 test('THE DECLARED WORK — the per-level line count is measured against the emitted body, not reasoned', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
-        const { wallFinishLines, wallFinishWorkSteps } = await import('/wizards/ops/wallfinish.js');
+        const { wallFinishLines, wallFinishWorkSteps, wallFinishNeedsRingGuard, wallFinishBlock } = await import('/wizards/ops/wallfinish.js');
         // THE REAL POST, not a stub: the confirm's banner is the dialect's own form, so a body handed `{}` would be
         // exercising a path the product never takes (and the first cut of this test did exactly that, and threw).
         const { activeDialectOpts } = await import('/wizards/previewEmit.js');
@@ -316,21 +311,42 @@ test('THE DECLARED WORK — the per-level line count is measured against the emi
             const a = L.findIndex((s) => /^WHILE /.test(s)), b = L.findIndex((s) => /^END1$/.test(s));
             return (b - a) - 1;
         };
+        const collapsed = { ...base, w: 4 };   // a 4mm span against a 3mm inset → −2: an INVERTED ring
         return {
             perLevel: inLoop(base),
             perLevelConfirm: inLoop({ ...base, confirmEvery: 2 }),
             steps: wallFinishWorkSteps(base),
             stepsConfirm: wallFinishWorkSteps({ ...base, depth: 6, confirmEvery: 2 }),
             liveOmits: wallFinishWorkSteps({ ...base, depth: '#2601' }),
+            // the ring guard's predicate, and the LABELS that follow it — one reading, three consumers
+            guard: { ok: wallFinishNeedsRingGuard(base), collapsed: wallFinishNeedsRingGuard(collapsed), live: wallFinishNeedsRingGuard({ ...base, w: '#2601' }) },
+            labels: { ok: wallFinishBlock.flowLabels(base), collapsed: wallFinishBlock.flowLabels(collapsed) },
+            okBody: wallFinishLines(base, D).join('\n'),
+            collapsedBody: wallFinishLines(collapsed, D).join('\n'),
         };
     });
     // 7 motion lines + 2 loop-bookkeeping lines inside the body; the declaration adds the WHILE and END1 the
     // controller also executes each turn, which is where 9 becomes 11.
     expect(r.perLevel, 'the emitted per-level body').toBe(9);
     expect(r.perLevelConfirm - r.perLevel, 'a confirm adds six lines per level').toBe(6);
-    expect(r.steps, '3 levels: 12 + 3 × 11').toBe(12 + 3 * 11);
-    expect(r.stepsConfirm, '4 levels with a confirm: 12 + 4 × 17').toBe(12 + 4 * 17);
+    expect(r.steps, '3 levels, no ring guard: 6 + 3 × 11').toBe(6 + 3 * 11);
+    expect(r.stepsConfirm, '4 levels with a confirm: 6 + 4 × 17').toBe(6 + 4 * 17);
     expect(r.liveOmits, 'and it is OMITTED, never guessed, once an input is dialled').toBe(null);
+
+    /**
+     * THE RING GUARD IS EMITTED EXACTLY WHERE IT CAN FIRE — found by reading the running program, not by reasoning.
+     * An ordinary pocket carried `IF 18 <= 0 GOTO103`, a comparison of two build-time constants, plus a four-line
+     * refusal and TWO reserved flow labels. Labels come from one per-program counter (t1408), so reserving them for
+     * an unreachable branch pushes every later body's numbers up for nothing.
+     */
+    expect(r.guard, 'the guard: skipped when the span is a positive constant, emitted when dialled or already collapsed')
+        .toEqual({ ok: false, collapsed: true, live: true });
+    expect(r.okBody.includes('GOTO103'), 'an ordinary ring carries no constant comparison').toBe(false);
+    expect(r.collapsedBody.includes('leaves no width to finish'), 'a collapsed ring refuses BEFORE any motion').toBe(true);
+    // ⚠ THE COLLAPSED CASE IS REACHABLE, which is why the guard is a predicate and not a deletion: `w: 4` against a
+    // 3mm inset is what editing the block on the Blocks canvas produces, with no `pocketTooSmall` upstream to catch it.
+    expect(r.labels.ok, 'and the label declaration follows the body exactly').toEqual(['errLabel', 'okLabel']);
+    expect(r.labels.collapsed, 'reserving the ring pair only where the body writes it').toEqual(['errLabel', 'okLabel', 'ringErrLabel', 'ringOkLabel']);
 });
 
 /**

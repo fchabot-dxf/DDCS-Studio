@@ -1,11 +1,19 @@
 /**
  * wizards/pocketWizard.js — pocket clearing generator (Mill group).
  *
- * REWRITTEN AS A BLOCK STACK: the wizard's only implementation is `pocketStack(params)` →
- * [ StepDown{ StepOver(Region) [+ Wall(Region)] } ]. The Region is the tool-CENTRE boundary (inset by the
- * tool radius) so the FINISHED pocket matches the size you type. Strategy raster → parallel rows + a Wall
- * finish; spiral → concentric rings (which reach the wall). A pocket smaller than the tool falls back to a
- * single centre plunge (peck). Form and Blocks view are two editors of this one stack.
+ * REWRITTEN AS A BLOCK STACK: the wizard's only implementation is `pocketStack(params)`. The walk is the tool-CENTRE
+ * boundary (inset by the tool radius) so the FINISHED pocket matches the size you type. Strategy raster → parallel
+ * rows + a Wall finish; spiral → concentric rings (which reach the wall). A pocket smaller than the tool falls back
+ * to a single centre plunge (peck). Form and Blocks view are two editors of this one stack.
+ *
+ * ── THE SHAPE IT BUILDS, AND WHY THERE ARE TWO OF THEM (t1406 · t1433) ────────────────────────────────────────────
+ * ELIGIBLE (rect, big enough, no rest tool, a bridged direction/descent — `pocketRidesRaster`):
+ *     Place'clear'{ surfaceraster }   [ + Place'wall'{ wallfinish } on raster ]
+ *   two parametric atoms, each ALONE in its own place so the placement is absorbed as params rather than painted
+ *   onto macro text (t1349's shear). Each owns its own depth loop; there is no StepDown on this arm at all.
+ * REFUSED (everything else):
+ *     Place'clear'{ StepDown{ pocketfill [+ pocketwall] [+ REST] } }
+ *   the literal transcript, byte-identical to what it has always emitted, which is what makes the boundary testable.
  */
 import { newBlock, emitMapped } from '../blocks/blockEmitter.js';
 import { activeDialectOpts } from './previewEmit.js';
@@ -194,17 +202,42 @@ export function pocketStack(params = {}, opts = {}) {
      *  rewriting a macro body's text (t1349's shear). That is the whole reason the wall needs a place of its own. */
     const rasterPlace = (strat) => makePlace(params, bbox, [rasterLeaf(strat)], 'clear');
     /**
-     * The wall finish, in its own place — ROUGH ALL, THEN WALL (user ruling, t1405). The arm itself is UNCHANGED:
-     * the same `stepdown{ pocketwall }` with the same `to`/`by`/`confirmEvery`, literal, text-rewritten by the place
-     * fold exactly as it always has been. ONLY ITS POSITION MOVES — from interleaved (fill L1, wall L1, fill L2, …)
-     * to after every fill level. That is why the bridge's criterion is per-PHASE: the fill's cut set per level still
-     * equals the literal fill's per level, and the wall's per level still equals the literal wall's.
+     * ── t1433 — THE WALL FINISH, RE-POINTED THROUGH `wallfinish` ───────────────────────────────────────────────────
      *
-     * `confirmEvery` rides here too, unchanged, rather than being moved wholesale to the fill. "Pause after every N
-     * depth passes" is a statement about a depth walk, and after the re-order there are two of them; giving the wall's
-     * walk a different cadence from the one the operator typed would be inventing a rule nobody asked for.
+     * `stepdown{ pocketwall }` — a JS transcript of the same ring at every level — becomes ONE atom that carries the
+     * depth loop and the ring. The place that holds it now ABSORBS (exactly one self-framing child), so the placement
+     * arrives as params instead of being painted onto the emitted text: the t1349 shear is not survivable by a body
+     * whose coordinates can be registers, and the CAM delegation ahead is what makes them registers.
+     *
+     * ⚠ THE GEOMETRY IS THE **GIVEN** RECT AND THE INSET IS A SEPARATE NUMBER, the identical split t1404 made for the
+     * fill and for the identical reason: `extent` (which the place fold reads in preference to its frozen snapshot)
+     * must keep declaring the pocket's own outline, or a placed pocket slides by the tool radius (t1402 measured it).
+     * The VALUE is never re-derived here — `pocketInsetMm` is the same one source `pocketInsetRegion` reads, so the
+     * wall and the fill still trace boundaries that agree by construction.
+     *
+     * `confirmEvery` rides here unchanged, and it is now the ATOM's own cadence register rather than a StepDown's.
+     * "Pause after every N depth passes" is a statement about a depth walk and after t1405's re-order there are two of
+     * them; giving the wall's walk a different cadence from the one the operator typed would invent a rule nobody
+     * asked for. (The reverse-sync reads it from here now — see opSession's pocket reader.)
+     *
+     * NO SECOND FORK. The wall re-points on `_para`, the SAME guard the fill does, because `_para` is a SUPERSET of
+     * what this atom needs: it already means rect, big enough for its tool, and no rest pass, and the two clauses it
+     * adds (a bridged direction, a bridged descent) are things the wall does not read. One fork in the stack instead
+     * of a crossed pair is what keeps the guarded superset collapsible.
      */
-    const wallPlace = () => { const down = newBlock('stepdown'); down.params = { to: depth, by, confirmEvery: num(params.confirmEvery, 0) }; down.children = [wallLeaf()]; return makePlace(params, bbox, [down], 'wall'); };
+    const wallPlace = () => {
+        const b = newBlock('wallfinish');
+        b.params = {
+            x: ox, y: oy, z0: 0,                            // the pocket's own outline; the place fold passes the real frame in
+            w: num(params.w, 80), h: num(params.h, 60), inset: pocketInsetMm(params),
+            depth, stepdown: by,                            // the atom owns the depth loop now — no enclosing StepDown
+            feed, plunge, clearance: clr,
+            confirmEvery: num(params.confirmEvery, 0),
+        };
+        return makePlace(params, bbox, [b], 'wall');
+    };
+    // (The REFUSED arms keep their literal wall exactly where it has always been — `wallLeaf()` inside the clearing
+    // place's own StepDown, below. There is no second wall PLACE on that side, and there never was.)
     /**
      * ── THE TOO-SMALL FALLBACK, RE-POINTED THROUGH holecycle (t1391, ruled) ────────────────────────────────────────
      *

@@ -151,6 +151,29 @@ export function wallFinishLiveInputs(p = {}) {
 }
 
 /**
+ * ── DOES THIS CONFIG NEED THE COLLAPSED-RING GUARD? — ONE reading, asked by the body, the labels AND the work count ─
+ *
+ * FOUND BY LOOKING AT THE RUNNING PROGRAM, not by reasoning about it: the first cut emitted the guard whenever an
+ * inset was declared, so a perfectly ordinary pocket carried `IF 18 <= 0 GOTO103` — a comparison of two build-time
+ * constants that can never be true — plus a four-line refusal block, plus TWO reserved flow labels. Labels are a
+ * scarce per-program resource assigned from one counter (t1408), so reserving two for a branch nothing can reach is
+ * not cosmetic: it pushes every later body's numbers up for nothing.
+ *
+ * ⚠ AND IT IS NOT DEAD IN GENERAL, which is why the answer is a predicate rather than a deletion. The span is
+ * evaluated at BUILD time from whatever the block holds, and the wizard is not the only thing that fills a block:
+ * editing `w` to 4 on the Blocks canvas with a 3mm inset gives a span of −2 and an INVERTED ring — a real cut, in the
+ * wrong place, with no `pocketTooSmall` upstream to catch it. There the constant comparison is `IF -2 <= 0` and it
+ * fires. So the guard is emitted exactly where it can fire: when the span is dialled (a run-time collapse), or when
+ * it is baked and already non-positive (a build-time one).
+ */
+export function wallFinishNeedsRingGuard(p = {}) {
+    const iT = geoTerm(p.inset, 0), wT0 = geoTerm(p.w, 80), hT0 = geoTerm(p.h, 60);
+    const wT = flatSum([[wT0, 1], [iT, -2]]), hT = flatSum([[hT0, 1], [iT, -2]]);
+    if (wT.live || hT.live) return true;
+    return wT.n <= 0 || hT.n <= 0;
+}
+
+/**
  * ── HOW MUCH THIS BODY EXECUTES, DECLARED (t1383's rule, t1399's null-when-live) ──────────────────────────────────
  *
  * The tracer's cap is sized from this; a body that is ~30 lines whatever the depth would otherwise get the 5000-step
@@ -167,7 +190,10 @@ export function wallFinishWorkSteps(p = {}) {
     const levels = Math.max(1, Math.ceil(depth / stepdown));
     const PER_LEVEL = 11;                                                    // 7 motion + 4 loop bookkeeping
     const CONFIRM = Math.max(0, Math.round(num(p.confirmEvery, 0))) > 0 ? 6 : 0;
-    return 12 + levels * (PER_LEVEL + CONFIRM);
+    // the header + the refusal tails — sized from the SAME predicate the body emits them under, so a config that
+    // drops the ring guard does not carry six phantom steps in its declaration
+    const HEADER = 6 + (wallFinishNeedsRingGuard(p) ? 6 : 0);
+    return HEADER + levels * (PER_LEVEL + CONFIRM);
 }
 
 /**
@@ -259,10 +285,11 @@ export function wallFinishLines(p = {}, dialect = null) {
      * with its own label so the operator is told which number is wrong — a wrong operator message is treated here as
      * seriously as wrong motion (t1404's ruling, applied at the moment the guard is born).
      *
-     * Emitted only where a collapse is actually possible — an inset, or a dialled span — so a plain unit ring keeps a
-     * tight body rather than carrying a guard nothing in it can trip.
+     * Emitted only where a collapse is actually possible (see `wallFinishNeedsRingGuard` for how the predicate was
+     * found — by reading the running program, not by reasoning), so an ordinary pocket keeps a tight body rather than
+     * carrying a constant comparison and two reserved labels for a branch nothing in it can trip.
      */
-    const guardRing = iT.live || iT.n !== 0 || wT0.live || hT0.live;
+    const guardRing = wallFinishNeedsRingGuard(p);
     const ringGuard = !guardRing ? [] : [
         `IF ${wT.live ? wT.w : r3(wT.n)} <= 0 GOTO${LBL.ringErrLabel}   ( the inset leaves no width to finish )`,
         `IF ${hT.live ? hT.w : r3(hT.n)} <= 0 GOTO${LBL.ringErrLabel}`,
@@ -319,8 +346,7 @@ export const wallFinishBlock = {
      */
     flowLabels: (p = {}) => {
         const out = ['errLabel', 'okLabel'];
-        const insetOn = liveWordOf(p.inset) || num(p.inset, 0) !== 0;
-        if (insetOn || liveWordOf(p.w) || liveWordOf(p.h)) out.push('ringErrLabel', 'ringOkLabel');
+        if (wallFinishNeedsRingGuard(p)) out.push('ringErrLabel', 'ringOkLabel');   // the SAME predicate the body asks
         if (Math.max(0, Math.round(num(p.confirmEvery, 0))) > 0) out.push('confirmLabel');
         return out;
     },

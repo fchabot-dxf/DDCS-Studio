@@ -39,6 +39,18 @@ import fs from 'fs';
  * rect pockets that genuinely now ride the atom. A key-name pattern encoded my ASSUMPTION about which cases were
  * too-small; asking `pocketRidesRaster` asked the product. 14 changed, 0 refused — and the remaining 82 entries still
  * hold the pre-E0 independent truth, untouched by this act.
+ *
+ * ── t1433 — THE GOLDEN MOVED A THIRD TIME, FOR SEVEN RASTER ENTRIES, BY THE SAME DISCIPLINE ──────────────────────
+ * A rect pocket's WALL FINISH now rides `wallfinish` — a runtime ring loop in a place of its own — where it was
+ * `stepdown{ pocketwall }`, a JS transcript of the same ring at every level. Only the RASTER arm has a wall at all,
+ * so the scope is `rect × raster × pocketRidesRaster`.
+ *
+ * THE SCOPE AND THE ACTUAL DIFF AGREED EXACTLY, and that agreement is the check rather than a formality: 7 keys in
+ * scope, 7 keys changed, ZERO changed outside the scope and ZERO in scope that did NOT change. A key changing outside
+ * the predicate would mean something moved that this act did not intend; a key inside it that did NOT change would
+ * mean the predicate is wider than the re-point. Both were measured before the file was written, and the regeneration
+ * refused to write unless the out-of-scope set was empty. The other 89 entries are byte-untouched — and the file's own
+ * indent-1/CRLF format was preserved, so the diff is seven lines rather than a reformat hiding seven lines.
  */
 const GOLDEN = JSON.parse(fs.readFileSync('tests/fixtures/pocket-golden.json', 'utf8'));
 
@@ -92,7 +104,10 @@ test('E0 GATE + FLATTEN: concrete == golden AND prune(superset) == concrete, byt
 
     expect(r.cases, 'the sweep is 4 shapes × 2 strategy × 2 size × 6 scalar = 96').toBe(96);
     expect(r.hasFillLeaf, 'the concrete rides the FLAT pocketfill leaf (region-pill→flat reframe)').toBe(true);
-    expect(r.hasWallLeaf, 'the raster wall rides the FLAT pocketwall leaf').toBe(true);
+    // t1433 — the flat `pocketwall` leaf is still REACHED, on every raster arm the parametric wall is refused on
+    // (circle / polygon / ellipse). The claim narrowed with the re-point rather than being deleted, because the leaf
+    // it names is still shipping and this sweep is still the thing that exercises it.
+    expect(r.hasWallLeaf, 'a REFUSED raster arm still rides the FLAT pocketwall leaf').toBe(true);
     expect(r.tooSmallSeen, 'the sweep exercises the tooSmall drill arm').toBeGreaterThan(0);
     expect(r.wallSeen, 'the sweep exercises the raster wall arm').toBeGreaterThan(0);
     expect(r.supGuardMax, 'the superset carries guards (tooSmall×2 + strategy×2 = 4)').toBeGreaterThanOrEqual(4);

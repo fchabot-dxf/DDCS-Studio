@@ -168,10 +168,8 @@ for (const cfg of SWEEP) {
                 litLevels: cutsByLevel(traceToolpath, fill.literal),
                 parLevels: cutsByLevel(traceToolpath, fill.para),
                 paraIsMacro: /WHILE \[#46 < #42\] DO1/.test(fill.para),
-                wallIdentical: wall ? wall.literal === wall.para : null,
-                wallCuts: wall ? cutsByLevel(traceToolpath, wall.para).cuts.length : 0,
-                wallLitFirstDiff: wall && wall.literal !== wall.para
-                    ? (() => { const a = wall.literal.split(String.fromCharCode(10)), b = wall.para.split(String.fromCharCode(10)); const i = a.findIndex((l, k) => l !== b[k]); return { i, a: a[i], b: b[i] }; })() : null,
+                wallLit: wall ? cutsByLevel(traceToolpath, wall.literal) : null,
+                wallPar: wall ? cutsByLevel(traceToolpath, wall.para) : null,
             };
         }, { base: BASE, over: cfg.p, PROGRAMS, CUTS_BY_LEVEL });
 
@@ -190,11 +188,24 @@ for (const cfg of SWEEP) {
         // own 0.001mm rounding (the literal accumulates in JS; the macro evaluates an expression at the controller),
         // and how many moves that touches is REPORTED so a future widening cannot hide inside the tolerance.
         expect(c.quantised, `moves agreeing only to within the 0.001mm emit quantum: ${c.quantised} of ${r.litLevels.cuts.length}`).toBeLessThanOrEqual(r.litLevels.cuts.length);
-        // THE WALL ARM IS STRUCTURALLY UNCHANGED — a stronger claim than the fill's, and the ruling's exact words:
-        // only its POSITION moves. So its phase is BYTE-IDENTICAL to the frozen literal, not merely equivalent.
+        /**
+         * ── THE WALL PHASE: WAS BYTE-IDENTICAL, IS NOW EQUIVALENT (t1433) ─────────────────────────────────────────
+         *
+         * This read `wall.literal === wall.para` and that was the right claim for t1406: the ruling moved only the
+         * wall's POSITION, so its emitted text really was unchanged. t1433 re-points the wall itself onto the
+         * `wallfinish` atom — a runtime ring loop — so a text comparison would now fail by construction, for the same
+         * reason the fill's did one act earlier. It is REPLACED by the same per-level criterion the fill carries here,
+         * not deleted: this test still owns the claim that the wall phase agrees, and the sweep it runs it over
+         * (ramp/helix descents, the placement matrix) is wider on this axis than the wall's own bridge.
+         *
+         * The STRONGER, ordered form of the claim — same moves in the same ORDER, which a set comparison cannot see —
+         * lives in `pocket-wall-parametric-1433.spec.js` against the frozen `/_test/literalPocketWall.js` reference.
+         */
         if (r.raster) {
-            expect(r.wallCuts, 'the wall phase cuts').toBeGreaterThan(0);
-            expect(r.wallIdentical, `the wall arm is byte-identical to the frozen literal${r.wallLitFirstDiff ? ` — first difference at line ${r.wallLitFirstDiff.i}: "${r.wallLitFirstDiff.a}" vs "${r.wallLitFirstDiff.b}"` : ''}`).toBe(true);
+            expect(r.wallPar.cuts.length, 'the wall phase cuts').toBeGreaterThan(0);
+            expect(r.wallPar.floors, `the wall walks the same cutting floors: literal ${JSON.stringify(r.wallLit.floors)} vs parametric ${JSON.stringify(r.wallPar.floors)}`).toEqual(r.wallLit.floors);
+            const wc = compareLevel(r.wallLit.cuts, r.wallPar.cuts);
+            expect(wc.ok, `the wall phase cuts the same set of moves, at the same feeds — ${wc.why}`).toBe(true);
         }
     });
 }
@@ -403,7 +414,11 @@ test('THE CLEARING PLACE HOLDS THE ATOM ALONE — absorbingChild is what makes t
     expect(r.spiral.roles, 'a spiral pocket is placed ONCE, as the clearing').toEqual(['clear']);
     expect(r.raster.roles, 'a raster pocket is placed twice — clearing, then wall').toEqual(['clear', 'wall']);
     expect(r.spiral.absorbs, 'and the clearing place absorbs (one self-framing child)').toEqual([true]);
-    expect(r.raster.absorbs, 'the clearing place absorbs; the wall place keeps the text rewrite its literal atoms have always used').toEqual([true, false]);
+    // t1433 — BOTH places absorb now. The wall place was `[true, false]` here because it still wrapped
+    // `stepdown{ pocketwall }`, a literal body the place fold could safely text-rewrite. The re-pointed wall is one
+    // self-framing atom, so it takes its frame as params like the clearing does — and it MUST, because a body whose
+    // coordinates can be registers is exactly what t1349 measured the text rewrite shearing.
+    expect(r.raster.absorbs, 'both places absorb — each holds exactly one self-framing atom').toEqual([true, true]);
     expect(r.raster.rasterBlocked, 'so the atom is NOT under a blocking fold — which is what makes its knobs reachable').toBe(false);
     expect(r.literal.roles, 'a refused (circle) pocket keeps its single clearing place, unchanged').toEqual(['clear']);
 });

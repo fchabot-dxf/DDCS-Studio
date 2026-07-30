@@ -150,8 +150,7 @@ for (const cfg of SWEEP) {
                 paraIsMacro: /WHILE \[#46 < #42\] DO1/.test(fill.para),
                 // the one-way body writes TWO row labels and never the four end-choosing ones
                 endLabels: /N1[5678]\b/.test(fill.para),
-                wallIdentical: wall.literal === wall.para,
-                wallCuts: read(traceToolpath, wall.para).cuts.length,
+                wallLit: read(traceToolpath, wall.literal), wallPar: read(traceToolpath, wall.para),
             };
         }, { base: BASE, over: cfg.p, PROGRAMS, READ });
 
@@ -180,9 +179,19 @@ for (const cfg of SWEEP) {
         // THE FOUR END-CHOOSING LABELS ARE NOT EMITTED — the flowLabels declaration and the body agree (see below).
         expect(r.endLabels, 'the one-way body writes none of the four end-choosing labels').toBe(false);
 
-        // THE WALL ARM IS UNCHANGED — direction never reached it, and a raster pocket still gets its wall finish.
-        expect(r.wallCuts, 'the wall phase cuts').toBeGreaterThan(0);
-        expect(r.wallIdentical, 'the wall arm is byte-identical to the frozen literal').toBe(true);
+        /**
+         * THE WALL ARM IS UNAFFECTED BY `direction` — which is the claim this test owns, and it survives t1433 intact.
+         *
+         * It read `wall.literal === wall.para`, byte-identity, because at t1418 the wall was still the literal
+         * `stepdown{ pocketwall }` on BOTH sides. t1433 re-points it onto the `wallfinish` atom, so the text differs
+         * by construction while the claim here — "a one-way or conventional pocket gets the SAME wall finish a
+         * both-ways one gets" — is unchanged and is now stated on the motion. `direction` still never reaches the
+         * wall: the atom has no such field at all.
+         */
+        expect(r.wallPar.cuts.length, 'the wall phase cuts').toBeGreaterThan(0);
+        expect(r.wallPar.floors, `the wall walks the same cutting floors: literal ${JSON.stringify(r.wallLit.floors)} vs parametric ${JSON.stringify(r.wallPar.floors)}`).toEqual(r.wallLit.floors);
+        const wc = compareLevel(r.wallLit.cuts, r.wallPar.cuts);
+        expect(wc.ok, `the wall phase cuts the same set of moves, whichever direction the fill ran — ${wc.why}`).toBe(true);
     });
 }
 

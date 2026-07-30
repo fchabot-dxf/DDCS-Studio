@@ -119,7 +119,16 @@ const RECONCILERS = {
         const sr = find(prog, 'surfaceraster');
         if (sr && sr.params) {
             const s = sr.params, wb0 = find(prog, 'wcs');
-            const wall = find(prog, 'stepdown');   // present on the raster arm only (the wall's own depth walk)
+            /**
+             * t1433 — THE CADENCE MOVED WITH THE WALL, and this reader is swept IN THE SAME ACT (t1387's rule).
+             *
+             * It used to read `find(prog, 'stepdown')` — the WALL's own depth walk, the only StepDown left on the
+             * re-pointed arm. That block is gone now: the wall is one `wallfinish` carrying its own loop. Left alone,
+             * this would have silently fallen back to the raster atom's `confirmEvery`, which is the same NUMBER
+             * today (both are seeded from the one form field) and would have gone quietly wrong the moment they were
+             * allowed to differ. Reading the block that actually holds the value is the only version that stays true.
+             */
+            const wall = find(prog, 'wallfinish');   // present on the raster arm only (the wall's own depth walk)
             const f0 = {
                 p_wcs: (wb0 && wb0.params && wb0.params.wcs) || 'active',
                 p_shape: 'rect', p_toolDia: s.toolDia,

@@ -181,6 +181,34 @@ const POCKET_BINDING_SPECS = [
     { param: 'depth', type: 'number', key: 'depth', match: { type: 'surfaceraster' }, optional: true },
     { param: 'stepdown', type: 'number', key: 'stepdown', match: { type: 'surfaceraster' }, optional: true },
     { param: 'confirmEvery', type: 'number', key: 'confirmEvery', match: { type: 'surfaceraster' }, optional: true },
+    /**
+     * ── t1433 — THE WALL'S OWN SOCKETS, on the re-pointed arm ─────────────────────────────────────────────────────
+     *
+     * `wallfinish` appears in exactly ONE pruned state (`_para: true` × `strategy: raster`), so every row is OPTIONAL
+     * and the `{type}` match is unique wherever it lands — the same contract the `surfaceraster` rows above sit under.
+     *
+     * THE ROWS THE WALL DOES NOT GET, each an absence with a reason rather than an omission:
+     *   shape / dia / sides   the arm is rect-only by predicate; the literal arm carries those sockets.
+     *   wallOffset            no socket on the atom at all — it is folded with `toolDia` into ONE number, `inset`,
+     *                         which `postInstantiate` writes from `pocketInsetMm`. The SAME derived-socket route the
+     *                         `surfaceraster` inset takes, from the SAME one source, which is what keeps the fill and
+     *                         the wall insetting by the same number rather than by two agreeing computations.
+     *   toolDia / stepoverPct the wall has no stepover and reads no tool: its ring is `inset` and nothing else.
+     *   direction / entry     the wall has one walk and one descent (see wallfinish.js) — there is nothing to select.
+     *
+     * `confirmEvery` LANDS HERE NOW as well as on the `stepdown`. Before the re-point the raster arm's cadence lived
+     * on the wall's StepDown; that block is gone from this arm, so a form edit would have reached nothing.
+     */
+    { param: 'originX', type: 'number', key: 'x', match: { type: 'wallfinish' }, optional: true },
+    { param: 'originY', type: 'number', key: 'y', match: { type: 'wallfinish' }, optional: true },
+    { param: 'w', type: 'number', key: 'w', match: { type: 'wallfinish' }, optional: true },
+    { param: 'h', type: 'number', key: 'h', match: { type: 'wallfinish' }, optional: true },
+    { param: 'depth', type: 'number', key: 'depth', match: { type: 'wallfinish' }, optional: true },
+    { param: 'stepdown', type: 'number', key: 'stepdown', match: { type: 'wallfinish' }, optional: true },
+    { param: 'feed', type: 'number', key: 'feed', match: { type: 'wallfinish' }, optional: true },
+    { param: 'plunge', type: 'number', key: 'plunge', match: { type: 'wallfinish' }, optional: true },
+    { param: 'clearance', type: 'number', key: 'clearance', match: { type: 'wallfinish' }, optional: true },
+    { param: 'confirmEvery', type: 'number', key: 'confirmEvery', match: { type: 'wallfinish' }, optional: true },
     { param: 'entryX', type: 'number', key: 'entryX', match: { type: 'entry' }, default: '' },
     { param: 'entryY', type: 'number', key: 'entryY', match: { type: 'entry' }, default: '' },
     // t768 P1a — the tool-selection declaration. IN the bindingSpecs (re-derived over the pruned stack each instantiate).
@@ -322,7 +350,10 @@ export function pocketDataDef() {
             // t1406 — `inset` is DERIVED from toolDia AND wallOffset together, so no single binding can drive it; it
             // belongs here with the other derived sockets rather than being re-derived at emit. `pocketInsetMm` is the
             // same one source the literal arm's `pocketInsetRegion` reads, so the two arms inset by the same number.
-            else if (b.type === 'surfaceraster') { b.params.inset = pocketInsetMm(r); }
+            // t1433 — the WALL's inset is the SAME derived socket, from the SAME one source. Written here beside the
+            // fill's rather than in a second place: two computations of "how far in" that merely agree today is
+            // exactly the split `pocketInsetMm` was declared to close (t1402 measured them disagreeing in SIGN).
+            else if (b.type === 'surfaceraster' || b.type === 'wallfinish') { b.params.inset = pocketInsetMm(r); }
             else if (b.type === 'pocketrest') {   // t871 — the rest leaf is frozen at DEFAULT geometry in the superset; rewrite ALL its params from the resolved op (one source, no fan-out bindings)
                 for (const k of ['shape', 'originX', 'originY', 'w', 'h', 'dia', 'sides', 'wallOffset', 'toolDia', 'restDia', 'restStepover', 'depth', 'feed', 'plunge', 'clearance']) if (r[k] !== undefined) b.params[k] = r[k];
                 if (r.stepdown !== undefined) b.params.by = r.stepdown;
