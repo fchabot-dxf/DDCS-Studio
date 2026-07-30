@@ -10187,3 +10187,92 @@ A spec can also pass for the wrong reason. Every other test reading `'pocketfill
 `clearing-cluster-800` **4/4** (was 3 passed / 1 failed). The pocket family + the two other `pocketfill` readers +
 t1418's own spec, re-run together: **90/90** across 15 specs. Smoke **71/71**. No product file touched this turn —
 the diff is one spec file — so the t1418 byte-identity evidence stands unchanged and needed no re-measurement.
+
+## t1422 (seat A) — OPTION C: STOPPED AT THE GATE. The delegation premise does not hold, measured
+
+**No product file touched. Nothing half-built.** The act as dispatched — "the CLEAR body sources from
+`surfaceRasterLines`, pendant fields seed the atom's registers via the v[key] indirection" — cannot be built as
+written, and the reason is not a detail: **the slot's geometry is REGISTERS by design and the atom's geometry is
+BAKED by design.** Delegating today does not fail loudly; it silently cuts a different part.
+
+### THE MEASUREMENT — what the atom does with the slot's own field vars, right now
+
+`pocketSlot`'s `v.w`/`v.h`/`v.stepover`/`v.toolDia` are locals read from the #2600 block (`readLine` emits
+`#n=#26xx ;label`), and today's hand-written `rasterClear` consumes every one as a register: `#22=[<tool>/2]`,
+`#24=[#20+<w>-#22]`. So a pendant W of 80 genuinely cuts 80 today. Passing those same words to the atom:
+
+    passed to surfaceRasterLines        the atom emits            what the pendant said
+    w: '#35'                            #40=94                    the field's W (silently num()'s default 100)
+    h: '#36'                            #41=74                    the field's H (default 80)
+    toolDia:'#37' stepoverPct:'#38'     #44=[12 * 60 / 100] = 7.2  the field's stepover, 2.4
+    inset: '#22'  (the tool radius)     inset 0 — THE RADIUS INSET VANISHES, and the header sentence flips back to
+                                        "SURFACING … the tool overhangs the edge". The pocket comes out OVERSIZE BY A
+                                        FULL TOOL Ø and the macro describes itself as facing.
+    x: '#20', y: '#21'                  0 — the slot's own "edit #20/#21 to offset" affordance dies silently
+
+`num(v, default)` on a non-numeric word returns the DEFAULT. Nothing throws, nothing refuses: clean-looking G-code
+that cuts the wrong part, which is this project's gate-1 defect and the exact failure `camScratch` was built after.
+
+Only `depth`, `stepdown`, `feed`, `plunge` ride live — t1399's four `value` roles, and precisely the four the
+dispatch names. Everything else is `geometry` in `atomRoles`, and that declaration is correct: the atom folds w/h,
+the frame and the inset into build-time arithmetic.
+
+### WHY THIS IS A GATE AND NOT A DETAIL I SHOULD HAVE SOLVED
+
+**Delegating without live-geometry work is a strict capability REGRESSION.** Today's pocket slot honours pendant
+W, H, stepover and tool Ø. The atom cannot. So the act would trade one lie (strategy/direction ignored — the thing
+we are removing) for four new ones (w/h/stepover/toolDia ignored), on the very knobs an operator reaches for at the
+machine. That is the same defect class in the same file, moved. I will not ship that as "delegation".
+
+### WHICH READS ARE GENUINELY BUILD-TIME (so live seeds alone do not fix it)
+
+The BODY is already fully parametric — `#45=[FIX[[#41 - #44 / 2] / #44] + 1]`, `G1 X[3 + #40]` — so for
+**parallel × plunge** only the three SEED lines bake, and live seeds would be the plain t1399 shape. The rest:
+
+  · **concentric ring count** bakes `Math.min(w,h)`: `#45=[FIX[[74 - 0.001] / [2 * #44]] + 1]`. Fixable at runtime in
+    ~4 lines with NO new register (compute the min into `#45` itself, then overwrite) + one flow label.
+  · **ramp** bakes `toC = hypot(cx-sx, cy-sy)`: `IF #34 > 59.082 GOTO41`. Live w/h makes that number wrong. Doing it
+    at runtime needs **SQRT, which is UNVERIFIED on this controller** — documented at t1339, and the +X run-vector
+    alternative is explicitly the deferred improvement turn's job.
+  · **helix** bakes the inradius clamp `min(w,h)/2` and the radius `R` (which seeds the rotation vector). Feasible,
+    but more than the ring-count trick.
+  · **the FRAME + inset** fold into every coordinate at build (`x0 = x + inset`). There IS a precedent path —
+    `affineFrame` already supports a live frame, which is how SKIM reads `#62/#63/#64` — so this is a known shape
+    rather than new machinery, but it is the atom's whole coordinate path, not a seed.
+
+**One thing that is genuinely encouraging and worth recording:** `surfaceRasterWorkSteps` ALREADY checks
+`p.w, p.h, p.toolDia, p.stepoverPct, p.stepover` for liveness and returns `null`. t1399 wrote that when nothing
+could set them live. The atom was designed for this continuation; it just has not had it yet.
+
+**And the register bands are clean** — the atom writes #34-#49 + #62-#64, `bandsFor('pocket')` is #20-#26 (mill own)
++ #27-#33 (kit raster). No overlap, so the collision guard is not a blocker whichever way this is ruled.
+
+### THE OPTIONS, and the one I eliminated
+
+**A — delegate now, mark w/h/stepover/toolDia BAKE-ONLY** through the existing t1341 entry-gate mechanism.
+**ELIMINATED, not offered as a choice.** It is a capability regression dressed as honesty: those four knobs work
+today. Greying them truthfully is better than lying, but losing them is worse than either, and the act's purpose is
+to make the slot MORE honest, not smaller.
+
+**B — teach the atom live geometry in this turn** (seeds + frame + inset + the ring-count min), refuse ramp/helix at
+PACK time in the envelope's words (dispatch item 5's own mechanism, lifted later by the deferred SQRT/run-vector
+turn), then rewire the slot and flip the honesty lock. Lands the whole intent with no regression — and it is the
+largest single change to this atom since t1351, touching every coordinate's build path, landing in the same turn as
+the slot rewiring and the honesty flip.
+
+**C — SPLIT (my recommendation).** This turn's successor teaches the atom live geometry and proves it alone: the
+baked path byte-identical (the guard that says nothing moved), a bridge showing a live-seeded emit resolves to the
+same motion as the baked one at the same values, and the bakes declared per (strategy, entry). THEN the slot
+delegation + `GENERATOR_IGNORES` removal + the red-then-green honesty proof as its own gated step. Same end state as
+B; each half independently verifiable; an emit-class geometry change does not share a turn with the honesty flip.
+
+### WHAT I DID NOT DO, DELIBERATELY
+
+I did not start the atom's live-geometry work "since it is needed under B and C anyway". It is ~40% of an uncertain
+design whose shape (how far the frame/inset go live, whether ramp refuses or bakes) is exactly what the ruling
+decides, and building substrate for a design that has not been chosen is how a scoped act becomes an unreviewed
+diff. The measurement above is the deliverable; it is what makes the ruling cheap.
+
+### NO GATE RUN
+
+Nothing changed. Tree carries only the advisor's two docs plus the analytics agent's two root files; proc tree clean.
