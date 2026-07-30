@@ -8714,3 +8714,96 @@ twins + placement + pathdatum **109/109**. **236 tests, 0 failures.**
 changed no round-trip.
 
 Scratch specs deleted. Process tree clean. FULL SUITE NOT RUN — the advisor's merge gate; ruling 2 is emit-class.
+
+## t1391 (seat A) — THE ARC CLOSES: the tenant moves out, then both literal kernels retire
+
+Two acts, two commits, act 2 only after act 1 was green. `1715d290` (the extraction) and `37bac84d` (the retirement).
+
+### ACT 1 — POCKET'S TENANT MOVES OUT
+
+Pocket's too-small fallback — a pocket narrower than its tool becomes a single plunge — was the last consumer of the
+literal `drill` leaf and the reason it could not retire. Ruled: not a second single-hole emitter beside the family the arc
+had just unified, but the family's own `holecycle` degenerated to one hole.
+
+**THE CENTRE GOES IN x0/y0, NOT x/y, and that is the whole subtlety of this act.** For the literal leaf, `x`/`y` WERE the
+hole's position and the place fold rewrote its emitted text. `holecycle` declares `absorbsPlacement`, so the fold hands it
+the shift THROUGH `x`/`y` as params — writing the plunge centre there would have collided with the placement, and the
+symptom would have been a plunge in the wrong place on any stock-attached pocket. `x0`/`y0` are the pattern's own origin,
+folded into the frame at build time, so the hole lands at the centre AND the placement still applies on top.
+`pocketData`'s `postInstantiate` writes the same two keys for the same reason.
+
+**THE BRIDGE IS THE SAME PROGRAM WITH THE LEAF SWAPPED**, and getting there took one wrong turn worth recording. My first
+version framed the frozen reference leaf on its own (`G90` + a clearance rapid + the leaf) and the rapid counts disagreed
+by TWO. That difference was the pocket program's own progstart/progend framing — not the kernel — and read exactly like a
+kernel divergence. So both sides are now built from the real `pocketStack` with `drill_ref` substituted for `holecycle` in
+one of them: the place fold, the framing and every emitter pass are shared, and only the leaf differs.
+
+The two leaves take the placement DIFFERENTLY (the literal is text-rewritten, holecycle absorbs), and that is not a
+confound — comparing the TRACED result is precisely what proves the two routes land in the same place.
+
+Across five configs (both shapes, deep ladders, and a PLACED one): every CUT identical in position and feed, exactly ONE
+extra rapid per hole (the R-plane entry — the family's declared ledger exception 1), every literal rapid still present.
+Not byte-equality: asserting that would be asserting the t1381 ruling had not happened.
+
+**TENANT READERS SWEPT IN THIS ACT.** Pocket's reverse-sync reconciler declines on this arm by the ABSENCE of a
+`stepdown` — no depth loop to read — never by the leaf's type, so its behaviour is unchanged and only its comment named
+`drill`. `pocketData`'s four `match:{type:'drill'}` bindings re-point with every key carrying straight over
+(depth/peck/feed/clearance all exist on holecycle), and the twin still emits exactly what its builder does.
+
+The arm now declares `@work` like every other holecycle program — asserted on the header rather than found in a later diff.
+
+### ACT 2 — BOTH LITERAL KERNELS RETIRE
+
+Ownership re-run once more AT this deletion: nothing in `web/` reaches either block or either kernel name. The only
+remaining `'drill'`/`'bore'` strings are other namespaces entirely — the WIZARD registry's `{type, variant}`, the tool
+catalogue's tool KINDS, a suggestion-history fixture — each checked rather than assumed.
+
+Both ways, the holepeck pattern: unregistered AND the modules no longer resolving, because an unregistered-but-present
+module is how a superseded atom returns through a stray import. The kernel RE-EXPORTS are checked the same way
+(`peckDrill`/`helicalBore` were the last thing keeping the two functions addressable). And the palette now carries NO
+literal hole atom at all — `drill`, `bore` and t1379's `holepeck` are all retired, one parametric successor in their
+place — paired with "holecycle IS registered", so "both gone" cannot be satisfied by having broken the family.
+
+**THE VACUITY TRAP FIRED, EXACTLY AS DESIGNED, AND THAT IS THE HEADLINE OF THIS ACT.** Two tests still needed the literal
+side. The line-count test — which measures the byte count the fold replaced — **THREW** the moment the atoms went:
+`unknown block type: drill`. That is the trap doing its job rather than a test silently resolving to the new path and
+comparing it against itself. Both now read the frozen `/_test/` reference, which was landed in the SAME act as the switch
+precisely so this deletion could not go quiet. Landing it early paid off here, three turns later.
+
+Two specs retired WITH the atoms, subsumed not dropped: `peck-drill` (holecycle's 48 bridges cover the ladder move-for-move)
+and `bore-glow-cap` (its property has no successor because it needs none — a loop that is EMITTED cannot explode the way an
+unrolled one could, and holecycle asserts that).
+
+**THE CLASSIFIER GUARD GOT STRONGER, not merely current.** `cam-expose-classify`'s emit-probe listed drill/bore; it now
+probes `holecycle`, including depth and peck — the two knobs t1389 flipped by putting `val()` on the #81/#82 seeds. So the
+flip is proven against the REAL EMIT (a `#var` must genuinely reach the register seed) instead of against the roles table.
+Its geometry half is probed on params that are really USED at those defaults, since an unused param satisfies "must not
+leak" for free and would make that half vacuous. One assert INVERTED with its reason recorded: "drill depth drives the
+peck loop → bake-only" was true of a JS loop bound; the parametric depth is a register seed, so it exposes.
+
+### A PROCESS FAILURE I CAUSED AND SHOULD NOT REPEAT
+
+One restatement cost far more than it should have. I edited a spec through a shell heredoc running Python, which emitted
+`SyntaxWarning: invalid escape sequence` — and silently wrote a CORRUPTED regex literal. The symptom was maddening: the
+four conditions of an `&&` chain each evaluated TRUE when computed on the next line, while the chain itself was FALSE.
+Two things fixed it and both are worth keeping: rewriting the file with the Write tool instead of patching it through a
+shell, and asserting the four parts as an OBJECT rather than one composed boolean — a composed `a && b && c` reports only
+"false" and says nothing about which half of the claim broke. This is the same family as the backtick-substitution trap
+from t1389's pass-back: shell-quoting layers silently mangle code, and the fix is not to route code through them.
+
+### SEEN
+
+The palette with no literal hole entries. And the too-small pocket emit beside its preview: `@work 120`, `#81=12 ( total
+depth — LIVE: a pendant can turn this )`, 12 cuts, traced whole — the one program in the app whose G-code this turn changed.
+
+### GATE (fast tier)
+
+**ACT 1:** smoke 71/71; pocket family + ownership + extraction + iron rule 16/16; holecycle/expose/live-knob/CAM/twins/
+placement/pathdatum 51/51.
+**ACT 2:** smoke 71/71; retirement + holecycle + pocket + palette + fixture users 60/60; the drill/CAM/placement/surfacing/
+roundtrip area 116/116; the two arc-closed screenshots 2/2.
+
+**IRON RULE: 11/11, the same eleven, 0 blocks lost.** It did not move across either act — the arc closes without touching
+it, which is the strongest thing that can be said about a change that deleted two shipping emitters.
+
+Scratch specs deleted. Process tree clean. FULL SUITE NOT RUN — the advisor's merge gate; both acts are emit-class.
