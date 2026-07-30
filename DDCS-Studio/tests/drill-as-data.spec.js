@@ -102,8 +102,15 @@ test('drill-as-data: the data def emits byte-identical G-code to drillStack acro
       clearancePass: clearance.pass,
       bboxOffsetPass: bboxOffset.pass,
       bboxShapePass: bboxShape.pass,
-      sampleHasArray: /\( Array \d+ @/.test(sampleText),
-      sampleHasMotion: /G1 Z-/.test(sampleText),
+      // t1385 — WAS `/\( Array \d+ @/`, the per-hole stamp comment the `array` CONTAINER emitted. The switch re-points
+      // drillStack through `holecycle`, which walks the pattern at RUNTIME instead of stamping at build time, so there is
+      // no per-hole comment to find. The replacement is a STRONGER non-vacuity signal than the old one: the emitted body
+      // must contain the pattern LOOP itself (a WHILE over the hole index), which is the thing the switch is about.
+      sampleHasPatternLoop: /WHILE \[#\d+ < \d+\] DO1/.test(sampleText) && /parametric/.test(sampleText),
+      // t1385 — WAS `/G1 Z-/`, a BAKED negative depth. The parametric body's plunge is an EXPRESSION over the live depth
+      // register (`G1 Z[0 - #83] F100`), because that is what makes the depth turnable on the pendant. Asserted with its
+      // feed attached, so this still means "a real cutting move" rather than merely "the letters G1 Z appear".
+      sampleHasMotion: /G1 Z\[[^\]]*#\d+[^\]]*\] F/.test(sampleText),
     };
   });
 
@@ -119,7 +126,7 @@ test('drill-as-data: the data def emits byte-identical G-code to drillStack acro
   expect(r.main.count, 'the sweep is substantial').toBeGreaterThan(15);
   expect(r.main.pass, 'drill-as-data == drillStack byte-for-byte across the sweep').toBe(true);
   // The emit is real (not vacuously empty).
-  expect(r.sampleHasArray, 'emits the array stamp markers').toBe(true);
+  expect(r.sampleHasPatternLoop, 'emits the parametric pattern loop (t1385: was the array stamp markers)').toBe(true);
   expect(r.sampleHasMotion, 'emits real plunge motion').toBe(true);
   // FRONTIER #2 — SOLVED: the placement now tracks the pattern live, so these previously-divergent cases CONVERGE.
   expect(r.bboxOffsetPass, 'frontier #2 SOLVED: an x0/y0 offset now emits byte-identical (live bbox)').toBe(true);

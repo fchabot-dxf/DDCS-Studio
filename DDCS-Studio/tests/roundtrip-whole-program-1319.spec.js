@@ -137,5 +137,9 @@ test('AND NOTHING IS LOST FROM ANY OP — the whole registered family round-trip
     // round-trip reproduces it byte-for-byte, because gcodeToStack's backfill reads an explicit F as happily as an
     // inherited one. The iron rule holds: the count may only shrink, and it shrank by nothing rather than growing.
     const differs = r.filter((x) => !x.same).map((x) => x.op);
+    // t1385 — PRINT THE NUMBER, always. The iron rule is "may only SHRINK from 11", and a rule about a trend is useless if
+    // the value is only visible when it breaks: a turn that shrank it had no way to say so, and a turn that left it at the
+    // ceiling looked the same as one that fixed something. Logged so the count and its members are in every run's output.
+    console.log(`IRON RULE — round-trip text differences: ${differs.length}/11 :: ${JSON.stringify(differs)}`);
     expect(differs.length, `pre-existing text differences, unchanged in kind: ${JSON.stringify(differs)}`).toBeLessThanOrEqual(11);
 });

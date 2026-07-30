@@ -38,19 +38,36 @@ test('GRID positions == hand-computed corners', async ({ page }) => {
     for (const [x, y] of [[0, 0], [40, 0], [0, 25], [40, 25]]) expect(has(x, y), `corner ${x},${y}`).toBe(true);
 });
 
-test('SINGLE = exactly one hole, byte-identical to a 1×1 grid at the same spot', async ({ page }) => {
+/**
+ * t1385 — RESTATED FROM A BYTE-GOLDEN TO A MOVE-GOLDEN, and the change is forced by the switch rather than chosen.
+ *
+ * This used to assert that SINGLE and a 1x1 GRID emit the same BYTES. That held while the pattern was walked at BUILD
+ * time: both stamped one literal hole at the same point, so the text was identical. `holecycle` walks the pattern at
+ * RUNTIME, so the two now emit different ARITHMETIC for the same lone point — `single` writes `ox=0 / oy=0`, the grid
+ * writes a FIX division for the row and column. Same hole, same motion, different words.
+ *
+ * The claim worth keeping is the one about the MACHINE, so it is asserted the way the whole drill arc asserts things
+ * (since t1329): the traced moves must be identical. A byte comparison here would now be testing how the pattern is
+ * SPELLED, which is exactly what the parametric family is allowed to change.
+ */
+test('SINGLE = exactly one hole, and it MOVES identically to a 1×1 grid at the same spot', async ({ page }) => {
     const single = await pp(page, { pattern: 'single', x0: 7, y0: 8 });
     expect(single).toEqual([{ x: 7, y: 8 }]);
-    // byte-golden: the drill emit for SINGLE == the emit for a 1-hole grid (same lone hole)
     const r = await page.evaluate(async () => {
         const { drillStack } = await import('/wizards/drillWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
+        const { traceToolpath } = await import('/engine/trace.js');
         const base = { toolDia: 6, holeDia: 6, depth: 10, peck: 3, x0: 7, y0: 8 };
+        const R = (n) => (+Number(n).toFixed(3)) + 0;   // normalise -0 (an expression can land on negative zero)
+        const moves = (t) => (traceToolpath(t).segments || []).map((s) => ({ x: R(s.x2), y: R(s.y2), z: R(s.z2), f: R(s.feed || 0), r: !!s.rapid }));
         const single = emitMapped(drillStack({ ...base, pattern: 'single' })).text;
         const grid1 = emitMapped(drillStack({ ...base, pattern: 'grid', cols: 1, rows: 1 })).text;
-        return { equal: single === grid1, holes: (single.match(/G0 X/g) || []).length };
+        const ms = moves(single), mg = moves(grid1);
+        return { sameMoves: JSON.stringify(ms) === JSON.stringify(mg), n: ms.length, cuts: ms.filter((m) => !m.r).length };
     });
-    expect(r.equal, 'single == a 1×1 grid (one hole)').toBe(true);
+    expect(r.n, 'the body really traced (not an empty program compared to another empty one)').toBeGreaterThan(3);
+    expect(r.cuts, 'and it really cuts').toBeGreaterThan(0);
+    expect(r.sameMoves, 'single and a 1×1 grid drive the machine identically (t1385: was a byte-golden)').toBe(true);
 });
 
 test('the LAYOUT draws N holes + the drag-translate pos handle (per pattern)', async ({ page }) => {

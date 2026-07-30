@@ -100,20 +100,61 @@ const BORE_FROZEN = [
     { param: 'rpm', key: 'rpm', blockIndex: 4, default: 0 },
 ];
 
-test('STEP 1 — every derived binding lands on the SAME socket the positional map did', async ({ page }) => {
+/**
+ * ⚠ RESTATED FOR THE SWITCH, WITH HISTORY (t1385). The tables above are the PRE-SWITCH positional map, and they are kept
+ * because they are the baseline the conversion was proven against — but the switch then DELIBERATELY moves two of those
+ * indices, and asserting the old numbers verbatim would now be asserting that the switch had not happened.
+ *
+ * So the check becomes the RELATIONSHIP the collapse creates, which is a stronger statement than either table alone:
+ *   • EVERY param survives, with the same key, in the same order  — nothing was lost or re-pointed in the move.
+ *   • Every default is unchanged                                  — the merge moved sockets, not values.
+ *   • The pattern cluster and the cut params, which sat on blocks 7 (`array`) and 8 (`drill`/`bore`), now resolve to ONE
+ *     AND THE SAME index — that IS the 2-into-1 collapse, measured rather than described.
+ *   • Nothing else moves: the framing sockets (progstart / wcs / placeonstock) keep their exact indices.
+ * The last two are what a positional map could not have expressed at all, which is the whole reason step 1 came first.
+ */
+test('THE SWITCH — every binding survives the 2-into-1 collapse: same params, same keys, sockets merged', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { DRILL_BINDINGS } = await import('/blocks/dataOps/drillData.js');
         const { BORE_BINDINGS } = await import('/blocks/dataOps/boreData.js');
+        const { flattenBlocks } = await import('/blocks/userOps.js');
+        const { drillDataDef } = await import('/blocks/dataOps/drillData.js');
+        const { boreDataDef } = await import('/blocks/dataOps/boreData.js');
         const slim = (bs) => bs.map((b) => ({ param: b.param, key: b.key, blockIndex: b.blockIndex, default: b.default }));
-        return { drill: slim(DRILL_BINDINGS), bore: slim(BORE_BINDINGS) };
+        return {
+            drill: slim(DRILL_BINDINGS), bore: slim(BORE_BINDINGS),
+            drillFlat: flattenBlocks(drillDataDef().template).map((b) => b.type),
+            boreFlat: flattenBlocks(boreDataDef().template).map((b) => b.type),
+        };
     });
+    // The flatten really did lose a block — the premise of everything below.
+    for (const [name, flat] of [['drill', r.drillFlat], ['bore', r.boreFlat]]) {
+        expect(flat, `${name}: the merged template carries holecycle`).toContain('holecycle');
+        expect(flat, `${name}: and no longer an array container`).not.toContain('array');
+        expect(flat.length, `${name}: one block shorter than the 12-block literal flatten`).toBe(11);
+    }
     for (const [name, got, want] of [['drill', r.drill, DRILL_FROZEN], ['bore', r.bore, BORE_FROZEN]]) {
         expect(got.length, `${name}: the same number of bindings — none dropped by a match that found nothing`).toBe(want.length);
         // ORDER matters too: the form renders in binding order, so a re-ordered map is a re-ordered form.
         expect(got.map((b) => b.param), `${name}: same params, same order`).toEqual(want.map((b) => b.param));
+        // `ramp` is the ONE key that legitimately changed: the bore leaf's `ramp` folded into the family's `cycle` knob.
+        const keyOf = (b) => (b.param === 'ramp' ? 'cycle' : b.key);
+        expect(got.map((b) => b.key), `${name}: same socket keys (ramp → cycle, the folded knob)`).toEqual(want.map(keyOf));
+        // Defaults unchanged — except `ramp`, whose VALUE moved into the cycle vocabulary with its label untouched.
         for (let i = 0; i < want.length; i++) {
-            expect(got[i], `${name}: binding "${want[i].param}" resolves to the identical socket`).toEqual(want[i]);
+            if (want[i].param === 'ramp') { expect(got[i].default, 'ramp now defaults to the cycle spelling').toBe('bore-step'); continue; }
+            expect(got[i].default, `${name}: "${want[i].param}" keeps its default across the switch`).toEqual(want[i].default);
+        }
+        // THE COLLAPSE, MEASURED: the two old body indices are now one.
+        const at = (p) => got.find((b) => b.param === p).blockIndex;
+        const oldAt = (p) => want.find((b) => b.param === p).blockIndex;
+        expect(at('pattern'), `${name}: the pattern cluster still sits where the array did`).toBe(oldAt('pattern'));
+        expect(at('depth'), `${name}: and the CUT params merged onto that same block (was ${oldAt('depth')})`).toBe(at('pattern'));
+        expect(oldAt('depth') - oldAt('pattern'), `${name}: which were two DIFFERENT blocks before`).toBe(1);
+        // …and the framing sockets did not budge.
+        for (const p of ['rpm', 'wcs', 'originX']) {
+            expect(at(p), `${name}: "${p}" (framing) keeps its exact index — the merge was local to the body`).toBe(oldAt(p));
         }
     }
 });

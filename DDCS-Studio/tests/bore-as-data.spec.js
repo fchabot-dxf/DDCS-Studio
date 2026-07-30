@@ -44,13 +44,17 @@ test('byte-diff ZERO: user_bore_data == drillStack(helical) across pattern × ra
         for (const profileId of ['grbl', 'rs274ngc']) for (const p of [D, { ...D, ramp: 'helix' }]) {
             if (emitMapped(build(p), { profileId }).text !== emitMapped(drillStack(p), { profileId }).text) dialectDiffs++;
         }
-        // WIRING — a sentinel cut param lands in the bore leaf (holeDia → the G0 bore-radius line, r=(holeDia-toolDia)/2)
-        const wire = /G0 X44\b/.test(emitMapped(build({ ...D, pattern: 'grid', cols: 1, rows: 1, x0: 0, y0: 0, holeDia: 94, toolDia: 6 })).text);   // r=(94-6)/2=44 → G0 X44
+        // WIRING — a sentinel cut param lands in the merged hole block (holeDia → the bore-radius entry, r=(holeDia-toolDia)/2).
+        // t1385: WAS `/G0 X44\b/`, a fully BAKED entry coordinate. The switch walks the pattern at runtime, so the hole's
+        // XY is `origin + register`: the radius is still baked (it is build-time geometry) but it is now a TERM in an
+        // expression — `G0 X[44 + #75] Y[0 + #76]`. The wiring claim is unchanged (the 44 must be there and must be the
+        // bore entry); only its spelling is, so the pattern matches the radius INSIDE the expression it now sits in.
+        const wire = /G0 X\[44 \+ #\d+\]/.test(emitMapped(build({ ...D, pattern: 'grid', cols: 1, rows: 1, x0: 0, y0: 0, holeDia: 94, toolDia: 6 })).text);   // r=(94-6)/2=44
         return { comboCount: combos.length, diffs, first, dialectDiffs, wire, registered: !!build };
     });
     expect(r.registered, 'user_bore_data registered').toBe(true);
     if (r.first) console.log('BORE DIFF @ ' + JSON.stringify(r.first.p) + ' line ' + r.first.line + '\n--TWIN--\n' + (r.first.twinCtx || []).join('\n') + '\n--BUILTIN--\n' + (r.first.builtinCtx || []).join('\n'));
     expect(r.diffs, 'byte-diff ZERO across pattern × ramp × cut × placement × wcs').toBe(0);
     expect(r.dialectDiffs, 'byte-diff ZERO cross-dialect (grbl + rs274)').toBe(0);
-    expect(r.wire, 'WIRING: holeDia=94 tool=6 → bore radius 44 lands (G0 X44)').toBe(true);
+    expect(r.wire, 'WIRING: holeDia=94 tool=6 → bore radius 44 lands (t1385: as a term in G0 X[44 + #reg])').toBe(true);
 });

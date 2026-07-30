@@ -12,17 +12,29 @@ test('(1) DRILL DEFAULT = single (one hole); explicit grid still six — saved p
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { DRILL_DEFAULTS } = await import('/blocks/dataOps/drillData.js');
         const { BORE_DEFAULTS } = await import('/blocks/dataOps/boreData.js');
+        const { traceToolpath } = await import('/engine/trace.js');
         const base = { toolDia: 6, holeDia: 6, depth: 10, peck: 3 };
+        // t1385 — COUNT THE HOLES DRILLED, not the `G0 X` LINES. The old proxy worked while the pattern was stamped at
+        // build time (six holes → six rapid lines); `holecycle` walks the pattern in a macro LOOP, so a 6-hole grid and a
+        // 1-hole single both emit exactly ONE `G0 X` line and the text count says 1 for everything. The claim being made
+        // here is about how many holes the machine drills, so it is now measured where that is actually visible: the
+        // DISTINCT XY positions at which the traced path cuts downward.
+        const holesIn = (text) => {
+            const segs = traceToolpath(text).segments || [];
+            const at = new Set();
+            for (const s of segs) if (!s.rapid && s.z2 < s.z1) at.add(`${(+s.x2.toFixed(3)) + 0},${(+s.y2.toFixed(3)) + 0}`);
+            return at.size;
+        };
         return {
             def: DRILL_DEFAULTS.pattern, bore: BORE_DEFAULTS.pattern,
-            defHoles: (emitMapped(drillStack({ ...base })).text.match(/G0 X/g) || []).length,
-            gridHoles: (emitMapped(drillStack({ ...base, pattern: 'grid' })).text.match(/G0 X/g) || []).length,
+            defHoles: holesIn(emitMapped(drillStack({ ...base })).text),
+            gridHoles: holesIn(emitMapped(drillStack({ ...base, pattern: 'grid' })).text),
         };
     });
     expect(r.def, 'drill DEFAULTS default = single').toBe('single');
     expect(r.bore, 'bore DEFAULTS default = single (coupled)').toBe('single');
     expect(r.defHoles, 'default drill = 1 hole').toBe(1);
-    expect(r.gridHoles, 'explicit grid still 6 (saved projects unaffected)').toBe(6);
+    expect(r.gridHoles, 'explicit grid still drills 6 holes (saved projects unaffected)').toBe(6);
 });
 
 test('(2) PULL-SEED: the dump G0-rate → geometry.rapidRate (Expert #63 index; V4.1/DM500 by-name resolver)', async ({ page }) => {

@@ -43,16 +43,27 @@ const bridge = (page, cfg) => page.evaluate(async ({ cfg, CAP }) => {
     const { newBlock, emitProgram } = await import('/blocks/blockEmitter.js');
     const { holeCycleLines } = await import('/wizards/ops/holecycle.js');
     const { traceToolpath } = await import('/engine/trace.js');
+    // ⚠ t1385 — THE LITERAL SIDE IS NOW A FROZEN, TEST-ONLY REFERENCE, and this is the act that closed the VACUITY TRAP.
+    // Until this turn the literal side was built from the live registry (`newBlock('drill'|'bore')`), which was exactly
+    // right while the registry still HELD those literal emitters. This turn re-points `drillStack` through `holecycle` and
+    // then retires them — at which point a registry-built literal side would either stop resolving or, far worse, resolve
+    // to the parametric path and compare it against ITSELF: 48 bridges passing while proving nothing. So the kernels move
+    // to `/_test/literalHoleReference.js` (served only to tests, importable by nothing in the app) IN THE SAME ACT as the
+    // re-point, never after it. Only the KERNEL ARITHMETIC is frozen — the container stamp, the placement fold and every
+    // emitter pass below still run for real, so this compares against the real emitter and a frozen kernel.
+    const { installLiteralHoleRefs } = await import('/_test/literalHoleReference.js');
+    const { BLOCKS } = await import('/wizards/ops/index.js');
+    installLiteralHoleRefs(BLOCKS);
     const NL = String.fromCharCode(10);
     const cyc = cfg.cycle || 'peck';
     const bored = cyc !== 'peck';
-    // THE LITERAL SIDE — the array container stamping the literal kernel, i.e. what drillStack builds today.
+    // THE LITERAL SIDE — the array container stamping the FROZEN literal kernel, i.e. what drillStack built before t1385.
     const arr = newBlock('array');
     arr.params = { pattern: cfg.pattern || 'single', x0: cfg.x0 || 0, y0: cfg.y0 || 0,
         cols: cfg.cols, rows: cfg.rows, dx: cfg.dx, dy: cfg.dy, count: cfg.count, spacing: cfg.spacing,
         angle: cfg.angle, dia: cfg.dia, startAngle: cfg.startAngle, w: cfg.w, h: cfg.h, nx: cfg.nx, ny: cfg.ny,
         skip: cfg.skip || '' };
-    const child = newBlock(bored ? 'bore' : 'drill');
+    const child = newBlock(bored ? 'bore_ref' : 'drill_ref');
     child.params = bored
         ? { x: 0, y: 0, holeDia: cfg.holeDia, toolDia: cfg.toolDia, depth: cfg.depth, pitch: cfg.pitch,
             ramp: cyc === 'bore-helix' ? 'helix' : 'step', feed: cfg.feed, clearance: cfg.clearance }
@@ -627,13 +638,18 @@ test('THE DECLARATIONS — bands as data with no overlap, a refused zero bite, a
 });
 
 /**
- * PRE-CONSUMER, ASSERTED — this turn adds an atom and changes no shipping program.
+ * ══ THE BOTH-PATHS GUARD (t1385) — WAS "PRE-CONSUMER", AND THE SWITCH IS WHAT INVERTED IT ════════════════════════
  *
- * The SWITCH is next turn's job, under the advisor's full suite (exactly as surfacing did it: atoms and bridges first,
- * re-point second). So the drill stack must still build the LITERAL children, and the assert is here rather than in a
- * note because "nothing re-points" is the kind of claim that quietly stops being true.
+ * t1381 asserted the opposite of this test: that NOTHING re-pointed, because the atom shipped a turn before its
+ * consumers. That claim was true then and is false now by design — this turn re-points `drillStack`. Rather than delete
+ * the test, it flips: the same walk over every registered builder now asserts the re-point HAPPENED and is COMPLETE.
+ *
+ * "BOTH PATHS" is the property that matters and it is easy to get half-right: `drillStack` serves the peck drill AND the
+ * helical bore, through the one `method` knob. A switch that re-pointed only the path its author happened to exercise
+ * would leave the other still building a literal leaf — emitting fine, passing its own specs, and silently missing the
+ * live pendant knobs the whole switch is for. So both are walked, and the literal leaf types must be absent from BOTH.
  */
-test('PRE-CONSUMER — the drill stack still builds the literal children; nothing re-points this turn', async ({ page }) => {
+test('THE BOTH-PATHS GUARD — peck AND helical both re-point through holecycle, and no builder keeps a literal leaf', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { drillStack } = await import('/wizards/drillWizard.js');
@@ -645,23 +661,59 @@ test('PRE-CONSUMER — the drill stack still builds the literal children; nothin
         return {
             drill: flat(drillStack({})),
             helical: flat(drillStack({ method: 'helical' })),
-            anyUser: all.filter((x) => x.types.includes('holecycle')).map((x) => x.op),
-            // t1383 — the RETIREMENT, asserted at the registry rather than trusted to a note: the superseded atom is not
-            // registered at all any more, so nothing can reach it and the band overlap has no second claimant.
+            helixRamp: flat(drillStack({ method: 'helical', ramp: 'helix' })),
+            cycles: {
+                peck: drillStack({}).length && JSON.stringify(drillStack({})).match(/"cycle":"([a-z-]+)"/)[1],
+                step: JSON.stringify(drillStack({ method: 'helical' })).match(/"cycle":"([a-z-]+)"/)[1],
+                helix: JSON.stringify(drillStack({ method: 'helical', ramp: 'helix' })).match(/"cycle":"([a-z-]+)"/)[1],
+            },
+            // Every registered builder, so a straggler that still stamps a literal hole leaf is named rather than missed.
+            keepsLiteral: all.filter((x) => x.types.includes('drill') || x.types.includes('bore')).map((x) => x.op),
+            reachesHoleCycle: all.filter((x) => x.types.includes('holecycle')).map((x) => x.op),
+            // t1383 — the RETIREMENT, asserted at the registry rather than trusted to a note.
             peckRegistered: !!BLOCKS.holepeck,
             peckResolves: await import('/wizards/ops/holepeck.js').then(() => true, () => false),
         };
     });
-    expect(r.drill, 'the peck drill stack is unchanged — array{drill}').toContain('drill');
-    expect(r.drill, 'and does NOT yet carry the folded atom').not.toContain('holecycle');
-    expect(r.helical, 'the helical method still builds a bore').toContain('bore');
-    expect(r.anyUser, 'no registered op builder reaches the new atom yet — pre-consumer, by design').toEqual([]);
-    // …AND THE ATOM THIS ONE SUPERSEDES IS GONE (t1383, the switch's first act). t1381 could only assert that nothing
-    // REACHED `holepeck`, which is what licensed the two atoms' deliberate #81-#87 band overlap. Retirement is the
-    // stronger statement and it is checked BOTH ways — unregistered, and the module itself no longer resolving — because
-    // an unregistered-but-present module is exactly how a superseded atom comes back to life via a stray import.
+    // BOTH PATHS re-pointed …
+    expect(r.drill, 'the peck drill stack builds the folded atom').toContain('holecycle');
+    expect(r.drill, 'and no longer an array container').not.toContain('array');
+    expect(r.drill, 'nor a literal drill leaf').not.toContain('drill');
+    expect(r.helical, 'the helical path re-points too — the half-switch this guard exists to catch').toContain('holecycle');
+    expect(r.helical, 'and drops the literal bore leaf').not.toContain('bore');
+    expect(r.helixRamp, 'including its helix ramp mode').toContain('holecycle');
+    // … each onto the RIGHT cycle, because re-pointing to the wrong one would still pass every structural assert above.
+    expect(r.cycles, 'method/ramp map onto the three declared cycles').toEqual({ peck: 'peck', step: 'bore-step', helix: 'bore-helix' });
+    // … and NOTHING is left behind. `tap` is untouched BY REACHABILITY and does not appear here: it builds a `tap` leaf,
+    // never a drill/bore one, so the switch cannot reach it (see THE TAP, below).
+    expect(r.keepsLiteral, 'no registered builder still stamps a literal drill/bore leaf').toEqual([]);
+    expect(r.reachesHoleCycle.length, 'and the folded atom now has real consumers — no longer pre-consumer').toBeGreaterThan(0);
+    // THE SUPERSEDED ATOM IS GONE (t1383), checked BOTH ways: an unregistered-but-present module is exactly how a
+    // superseded atom comes back to life via a stray import.
     expect(r.peckRegistered, 'holepeck is no longer in the palette registry — retired, superseded by this atom').toBe(false);
     expect(r.peckResolves, 'and its module is gone, so no stray import can revive the overlapping band').toBe(false);
+});
+
+/**
+ * THE TAP STAYS LITERAL, BY REACHABILITY — stated rather than left as an omission (dispatch).
+ *
+ * `tapStack` builds a `tap` leaf, which is its own kernel: a floating-holder pitch-locked cycle, not a member of the
+ * drill/bore family `holecycle` folds. The switch therefore cannot reach it — not "chose not to". The distinction is
+ * worth an assert because "we left tap alone" and "tap was never in scope" fail differently: the first is a gap someone
+ * should close, the second is a boundary someone should not cross without a reason.
+ */
+test('THE TAP — untouched by the switch, and it is REACHABILITY that says so', async ({ page }) => {
+    await boot(page);
+    const r = await page.evaluate(async () => {
+        const { tapStack } = await import('/wizards/tapWizard.js');
+        const { BLOCKS } = await import('/wizards/ops/index.js');
+        const flat = (st, o = []) => { for (const b of (st || [])) { if (!b) continue; o.push(b.type); flat(b.children, o); flat(b.uiChildren, o); } return o; };
+        return { tap: flat(tapStack({})), tapRegistered: !!BLOCKS.tap, cycles: (await import('/wizards/ops/holecycle.js')).CYCLES };
+    });
+    expect(r.tap, 'tap builds its own leaf').toContain('tap');
+    expect(r.tap, 'and never a hole-family atom — so the switch has nothing to re-point here').not.toContain('holecycle');
+    expect(r.tapRegistered, 'the tap atom stays registered — it is not superseded by anything').toBe(true);
+    expect(r.cycles, 'and the folded family declares three cycles, none of them a tap').toEqual(['peck', 'bore-step', 'bore-helix']);
 });
 
 /**

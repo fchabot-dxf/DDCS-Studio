@@ -38,6 +38,25 @@ const store = new Map();
   }
 })(ROOT);
 
+// t1385 — TEST-ONLY MODULES, served under `/_test/` and NOWHERE ELSE IN THE APP.
+//
+// The drill switch needs a FROZEN literal reference: once `drillStack` re-points through `holecycle` and the literal
+// `drill`/`bore` emitters retire, a bridge that still built its "literal side" from the registry would be comparing the
+// new path against ITSELF — the vacuity trap. The reference has to be an independent copy of the arithmetic being
+// replaced, and it must NOT ship, because nothing in the product may reach a frozen duplicate of a retired kernel.
+//
+// `web/` is the only thing the app can import, so a reference under `tests/` was previously unreachable from inside
+// page.evaluate. This mounts `tests/support/served/` at `/_test/` instead: importable by a spec, invisible to the app
+// (no product module resolves that prefix), and obvious at the import site that it is test scaffolding.
+const TEST_ROOT = path.resolve(__dirname, 'served');
+if (fs.existsSync(TEST_ROOT)) (function walkTest(dir) {
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, ent.name);
+    if (ent.isDirectory()) walkTest(full);
+    else store.set('/_test/' + path.relative(TEST_ROOT, full).split(path.sep).join('/'), { buf: fs.readFileSync(full), mtime: fs.statSync(full).mtime });
+  }
+})(TEST_ROOT);
+
 const server = http.createServer((req, res) => {
   let urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
   if (urlPath === '/' || urlPath.endsWith('/')) urlPath += 'index.html';
