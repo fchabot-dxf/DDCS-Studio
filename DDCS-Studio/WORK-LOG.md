@@ -9116,3 +9116,123 @@ The fill arm: `place{ stepdown{ pocketfill } }` → `place{ surfaceraster }` ove
 measured inset math), with the full relationship-class bridge against a frozen `/_test/` literal `fillStrategy` — my
 t1397 sample decided the SHAPE only, and the spec must say so. Depth and stepdown are live knobs on that arm as of this
 commit, which is what makes the re-point worth doing.
+
+
+## t1402 (seat A) — STEP 1 PARKED AT A GATE: the re-point is sound, and measuring it first found a SHIPPED defect
+
+**No code changed this turn.** The dispatch's core claim is TRUE and I measured it — but the arm it names is much
+narrower than the dispatch assumes, two blockers sit in front of it, and one of them is a defect in *released* code
+that has nothing to do with the pocket. Four findings, all measured in the running app, none inferred. Options at the
+end; I am not picking between them, because each is a contract-level call with a different risk profile.
+
+### ✅ FINDING 1 — THE RE-POINT WORKS. Move for move, on the arm the dispatch names.
+
+`place{ stepdown{ pocketfill } }` vs `place{ surfaceraster }` over `pocketInsetRegion`, cuts compared as
+`(x1,y1,z1,x2,y2,z2,feed)` per non-rapid segment — the t1329 comparator:
+
+    spiral plain            180 = 180 cuts, ZERO diffs
+    spiral wallOffset 0.5   180 = 180        spiral pct 25       270 = 270
+    spiral origin offset    180 = 180        spiral tool Ø10     105 = 105
+    spiral uneven 4/1.3     240 = 240        spiral square 80×80 240 = 240
+    spiral full-depth sd=5   60 =  60        spiral oneway       180 = 180
+
+I did **not** re-derive the inset — the dispatch says `toolDia/2 + wallOffset`, the shipped `pocketInsetRegion` is
+`−(r − wallOffset)` (the opposite wallOffset sign). I called the existing one source rather than inherit the sign
+question, and the wallOffset case above is what proves that was the right end to hold.
+
+### 🔴 FINDING 2 — A SHIPPED DEFECT, found on the way in. `concentric` + a ramp/helix entry does not descend.
+
+This is **not** about the pocket. It is `surfacingStack` — the parametric path that ships today (V2026.07.30.5) —
+against the literal emitter the bridges keep alive. Counting cut moves that change Z *while* moving in XY:
+
+    strategy   entry    literal cuts / RAMPING moves     parametric (SHIPS) cuts / RAMPING moves
+    parallel   ramp          34 / 2                           34 / 2      ✅ agree
+    parallel   helix         80 / 48                          80 / 48     ✅ agree
+    concentric plunge        50 / 0                           50 / 0      ✅ agree
+    concentric ramp          52 / 2                           50 / 0      ❌ NO RAMP — it plunges
+    concentric helix         98 / 48                          50 / 0      ❌ NO HELIX — it plunges
+
+The cause is one line: `rowWalk(...)` destructures `entry, rampAngle, helixDia, helixPitch`; **`ringWalk(...)` does
+not take them at all**. Rings never had a descent. Both `strategy` and `entry` are free params on the surfacing
+wizard (surfacingWizard.js:113-114 passes each straight through), so the combination is reachable from the form.
+
+**Why no test caught it.** `surfaceRasterCovers` was reduced to a bare `return true` and `surfaceRasterGap` to
+`return ''` when t1355 declared the envelope empty. The t1329 envelope spec probes `entry:'ramp'`/`'helix'` against
+`base = { strategy: 'parallel' }` — so `concentric × ramp` was never measured, and the predicate answers `true` for
+it without anything behind that answer. This is the same class as t1399's finding-3 (`atomRoles` had no surfacing row
+and every key fell to a default that *looked* like a decision): an unmeasured `true` reads exactly like a proven one.
+
+**Why it matters beyond tidiness:** an operator picks a ramp or helix entry *because* the endmill will not plunge.
+Getting a straight plunge is the failure that choice exists to prevent. I am flagging it, not fixing it — the fix is
+either "make the envelope honest" (a refusal) or "teach ringWalk to descend" (close the gap), and those are different
+acts with different risk. Not mine to pick.
+
+### 🔴 FINDING 3 — THE PLACEMENT MOVES THE POCKET. `extent` means something different inside a bigger op.
+
+`liveExtent` prefers a child's own declared `extent` over the place block's frozen bbox (t1361 added that preference
+deliberately, and for surfacing it is right). Today `place{ stepdown{ pocketfill } }` declares no extent anywhere, so
+the frozen `pocketBBox` — the TRUE pocket outline — decides. After the re-point, `surfaceraster.extent` answers, and
+it declares **the tool-centre sweep of the inset**, not the pocket:
+
+    frozen pocket bbox   0 … 80          surfaceraster extent   3 … 77     (Ø6 tool → 3mm inset)
+    place puts extent.min at originX  →  old shift 0, new shift −3
+
+Measured on `pocketStack`'s own default place params, no synthetic config: with `originX/originY = 12.5/−7.25` the
+first cut goes from `[15.5, −4.25]` to `[12.5, −7.25]` — the whole pocket slides by exactly the tool radius. That is
+wrong G-code on any placed or offset pocket, so it is a gate-1 blocker on the arm, not a polish item.
+
+The declaration is not wrong, it is *ambiguous*: for surfacing the atom IS the op, so its sweep is the op's
+footprint; for pocket the atom is an internal detail of an op whose footprint is the pocket outline. Re-using the
+atom inside a larger op is what separates the two meanings, and this is the first time anything has.
+
+### 🔴 FINDING 4 — ONLY ONE CHILD MAY ABSORB. The wall and rest arms cannot host the atom as written.
+
+`absorbingChild` is deliberately strict — *exactly one* child, declaring `absorbsPlacement` — and its own comment
+says why: a mixed body would need the shift both passed and painted. Two consequences the dispatch's
+"wall + rest arms UNTOUCHED" cannot both hold with:
+
+- **The raster arm has no `place{ stepdown{ pocketfill } }` to re-point.** One StepDown wraps the fill *and* the
+  wall, and the depth fold emits **all** children per level (blockEmitter.js:238), so today's order is
+  `fill(L1), wall(L1), fill(L2), wall(L2)…`. Pulling the fill out either takes the wall with it (the dispatch says
+  don't) or reorders to all-fill-then-all-wall — a real toolpath change, and it breaks the bridge's own criterion
+  ("cuts identical in position/feed *per level*").
+- **A rest section rides in the same place block** (`[down, ...restKids]`), so any pocket with a valid rest tool puts
+  a second child under the fold → no absorb → the shift is painted onto macro text, which is exactly the t1349 shear
+  (`G0 X0 Y#47` → `G0 X50 Y#47`, the X shifted and the register not).
+
+So the arm that can actually move today is **rect + spiral + entry=plunge + no rest** — and only once finding 3 is
+resolved.
+
+### 📌 THE FLOOR ITEM, now with numbers (raised, not picked — as instructed)
+
+`depthLevels` floors the step at `Math.max(0.05, …)`; the atom's runtime loop honours whatever `#43` holds, and its
+build-time seed floors at `Math.max(0.01, …)`. At `depth 0.1 / stepdown 0.03`: **120 cuts (2 levels) vs 240 (4
+levels)**. Not a rounding difference — a different program. Both floors are defensible and they disagree; the atom's
+is additionally unenforceable now that `#43` is live from the pendant, which is the part I think decides it, but it
+is a ruling either way.
+
+### THE OPTIONS ON FINDING 3 (the one that gates the re-point)
+
+- **A — the place keeps its frozen bbox for this arm.** Narrowest: `liveExtent` is not consulted when the parent
+  already carries a snapshot it trusts. Risk: reverses t1361's preference, which exists because the twin's frozen
+  template was placing a `w=150` face using a `w=100` snapshot. Would need to be conditional, and a conditional
+  preference is a second source of truth about footprints.
+- **B — the pocket hands the atom the TRUE rect and lets it inset.** Then `extent` and the pocket outline agree by
+  construction. Cost: the atom grows a pocket-shaped concern (it currently declares "no radius inset — the tool
+  overhangs the edge and faces the whole top", which is the *opposite* convention), so this changes what the atom
+  means rather than what it does.
+- **C — `extent` becomes two declarations**: the sweep (what the tool covers) and the footprint (what the op
+  occupies). Surfacing answers the same for both; pocket answers the outline for the second. Most honest, most work,
+  and by rule-of-three it is a 1-case abstraction today.
+
+I lean **C's shape via B's cost** — but this is a contract change to a seam three ops read, so it is yours.
+
+### GATE / STATE
+
+Nothing to gate — **no code changed**. Tree clean apart from your two docs and the analytics agent's two root files.
+Scratch probe deleted; process tree clean; no worktrees left behind.
+
+**CAPACITY, as a reportable fact:** this session has already been compacted once, and the four measurements above
+were the honest cost of not building on a wrong premise. Whatever the ruling, the act that follows is emit-class
+(frozen reference + relationship bridge + a 2→1 stack change + the reconciler sweep) and **wants a fresh session** —
+parking is the right call here rather than starting that on a half-tank.
