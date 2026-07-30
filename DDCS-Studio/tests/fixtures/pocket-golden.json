@@ -79,7 +79,7 @@
    "h": 4,
    "dia": 4
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "rect|spiral|tiny|1": {
   "p": {
@@ -91,7 +91,7 @@
    "toolDia": 10,
    "stepoverPct": 55
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "rect|spiral|tiny|2": {
   "p": {
@@ -103,7 +103,7 @@
    "depth": 9,
    "stepdown": 2
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-2 F150\nG0 Z5\nG0 Z-1.5\nG1 Z-4\nG0 Z5\nG0 Z-3.5\nG1 Z-6\nG0 Z5\nG0 Z-5.5\nG1 Z-8\nG0 Z5\nG0 Z-7.5\nG1 Z-9\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 64 ---- )\n#81=9   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=2   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "rect|spiral|tiny|3": {
   "p": {
@@ -129,7 +129,7 @@
    "plunge": 120,
    "clearance": 3
   },
-  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\nG0 X12 Y0\nG1 Z-1.5 F120\nG0 Z3\nG0 Z-1\nG1 Z-3\nG0 Z3\nG0 Z-2.5\nG1 Z-4\nG0 Z3\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[12 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F120   ( feed only the new increment )\n    G0 Z3   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "rect|spiral|tiny|5": {
   "p": {
@@ -141,7 +141,7 @@
    "wcs": "G55",
    "sides": 5
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "rect|raster|normal|0": {
   "p": {
@@ -223,7 +223,7 @@
    "h": 4,
    "dia": 4
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "rect|raster|tiny|1": {
   "p": {
@@ -235,7 +235,7 @@
    "toolDia": 10,
    "stepoverPct": 55
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "rect|raster|tiny|2": {
   "p": {
@@ -247,7 +247,7 @@
    "depth": 9,
    "stepdown": 2
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-2 F150\nG0 Z5\nG0 Z-1.5\nG1 Z-4\nG0 Z5\nG0 Z-3.5\nG1 Z-6\nG0 Z5\nG0 Z-5.5\nG1 Z-8\nG0 Z5\nG0 Z-7.5\nG1 Z-9\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 64 ---- )\n#81=9   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=2   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "rect|raster|tiny|3": {
   "p": {
@@ -273,7 +273,7 @@
    "plunge": 120,
    "clearance": 3
   },
-  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\nG0 X12 Y0\nG1 Z-1.5 F120\nG0 Z3\nG0 Z-1\nG1 Z-3\nG0 Z3\nG0 Z-2.5\nG1 Z-4\nG0 Z3\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[12 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F120   ( feed only the new increment )\n    G0 Z3   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "rect|raster|tiny|5": {
   "p": {
@@ -285,7 +285,7 @@
    "wcs": "G55",
    "sides": 5
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|spiral|normal|0": {
   "p": {
@@ -367,7 +367,7 @@
    "h": 4,
    "dia": 4
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|spiral|tiny|1": {
   "p": {
@@ -379,7 +379,7 @@
    "toolDia": 10,
    "stepoverPct": 55
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|spiral|tiny|2": {
   "p": {
@@ -391,7 +391,7 @@
    "depth": 9,
    "stepdown": 2
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-2 F150\nG0 Z5\nG0 Z-1.5\nG1 Z-4\nG0 Z5\nG0 Z-3.5\nG1 Z-6\nG0 Z5\nG0 Z-5.5\nG1 Z-8\nG0 Z5\nG0 Z-7.5\nG1 Z-9\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 64 ---- )\n#81=9   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=2   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|spiral|tiny|3": {
   "p": {
@@ -417,7 +417,7 @@
    "plunge": 120,
    "clearance": 3
   },
-  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\nG0 X12 Y0\nG1 Z-1.5 F120\nG0 Z3\nG0 Z-1\nG1 Z-3\nG0 Z3\nG0 Z-2.5\nG1 Z-4\nG0 Z3\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[12 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F120   ( feed only the new increment )\n    G0 Z3   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|spiral|tiny|5": {
   "p": {
@@ -429,7 +429,7 @@
    "wcs": "G55",
    "sides": 5
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|raster|normal|0": {
   "p": {
@@ -511,7 +511,7 @@
    "h": 4,
    "dia": 4
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|raster|tiny|1": {
   "p": {
@@ -523,7 +523,7 @@
    "toolDia": 10,
    "stepoverPct": 55
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|raster|tiny|2": {
   "p": {
@@ -535,7 +535,7 @@
    "depth": 9,
    "stepdown": 2
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-2 F150\nG0 Z5\nG0 Z-1.5\nG1 Z-4\nG0 Z5\nG0 Z-3.5\nG1 Z-6\nG0 Z5\nG0 Z-5.5\nG1 Z-8\nG0 Z5\nG0 Z-7.5\nG1 Z-9\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 64 ---- )\n#81=9   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=2   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|raster|tiny|3": {
   "p": {
@@ -561,7 +561,7 @@
    "plunge": 120,
    "clearance": 3
   },
-  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\nG0 X12 Y0\nG1 Z-1.5 F120\nG0 Z3\nG0 Z-1\nG1 Z-3\nG0 Z3\nG0 Z-2.5\nG1 Z-4\nG0 Z3\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[12 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F120   ( feed only the new increment )\n    G0 Z3   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "circle|raster|tiny|5": {
   "p": {
@@ -573,7 +573,7 @@
    "wcs": "G55",
    "sides": 5
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|spiral|normal|0": {
   "p": {
@@ -655,7 +655,7 @@
    "h": 4,
    "dia": 4
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|spiral|tiny|1": {
   "p": {
@@ -667,7 +667,7 @@
    "toolDia": 10,
    "stepoverPct": 55
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|spiral|tiny|2": {
   "p": {
@@ -679,7 +679,7 @@
    "depth": 9,
    "stepdown": 2
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-2 F150\nG0 Z5\nG0 Z-1.5\nG1 Z-4\nG0 Z5\nG0 Z-3.5\nG1 Z-6\nG0 Z5\nG0 Z-5.5\nG1 Z-8\nG0 Z5\nG0 Z-7.5\nG1 Z-9\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 64 ---- )\n#81=9   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=2   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|spiral|tiny|3": {
   "p": {
@@ -705,7 +705,7 @@
    "plunge": 120,
    "clearance": 3
   },
-  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\nG0 X12 Y0\nG1 Z-1.5 F120\nG0 Z3\nG0 Z-1\nG1 Z-3\nG0 Z3\nG0 Z-2.5\nG1 Z-4\nG0 Z3\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[12 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F120   ( feed only the new increment )\n    G0 Z3   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|spiral|tiny|5": {
   "p": {
@@ -717,7 +717,7 @@
    "wcs": "G55",
    "sides": 5
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|raster|normal|0": {
   "p": {
@@ -799,7 +799,7 @@
    "h": 4,
    "dia": 4
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|raster|tiny|1": {
   "p": {
@@ -811,7 +811,7 @@
    "toolDia": 10,
    "stepoverPct": 55
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|raster|tiny|2": {
   "p": {
@@ -823,7 +823,7 @@
    "depth": 9,
    "stepdown": 2
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-2 F150\nG0 Z5\nG0 Z-1.5\nG1 Z-4\nG0 Z5\nG0 Z-3.5\nG1 Z-6\nG0 Z5\nG0 Z-5.5\nG1 Z-8\nG0 Z5\nG0 Z-7.5\nG1 Z-9\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 64 ---- )\n#81=9   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=2   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|raster|tiny|3": {
   "p": {
@@ -849,7 +849,7 @@
    "plunge": 120,
    "clearance": 3
   },
-  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\nG0 X12 Y0\nG1 Z-1.5 F120\nG0 Z3\nG0 Z-1\nG1 Z-3\nG0 Z3\nG0 Z-2.5\nG1 Z-4\nG0 Z3\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[12 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F120   ( feed only the new increment )\n    G0 Z3   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "polygon|raster|tiny|5": {
   "p": {
@@ -861,7 +861,7 @@
    "wcs": "G55",
    "sides": 5
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|spiral|normal|0": {
   "p": {
@@ -943,7 +943,7 @@
    "h": 4,
    "dia": 4
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|spiral|tiny|1": {
   "p": {
@@ -955,7 +955,7 @@
    "toolDia": 10,
    "stepoverPct": 55
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|spiral|tiny|2": {
   "p": {
@@ -967,7 +967,7 @@
    "depth": 9,
    "stepdown": 2
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-2 F150\nG0 Z5\nG0 Z-1.5\nG1 Z-4\nG0 Z5\nG0 Z-3.5\nG1 Z-6\nG0 Z5\nG0 Z-5.5\nG1 Z-8\nG0 Z5\nG0 Z-7.5\nG1 Z-9\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 64 ---- )\n#81=9   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=2   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|spiral|tiny|3": {
   "p": {
@@ -993,7 +993,7 @@
    "plunge": 120,
    "clearance": 3
   },
-  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\nG0 X12 Y0\nG1 Z-1.5 F120\nG0 Z3\nG0 Z-1\nG1 Z-3\nG0 Z3\nG0 Z-2.5\nG1 Z-4\nG0 Z3\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[12 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F120   ( feed only the new increment )\n    G0 Z3   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|spiral|tiny|5": {
   "p": {
@@ -1005,7 +1005,7 @@
    "wcs": "G55",
    "sides": 5
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|raster|normal|0": {
   "p": {
@@ -1087,7 +1087,7 @@
    "h": 4,
    "dia": 4
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|raster|tiny|1": {
   "p": {
@@ -1099,7 +1099,7 @@
    "toolDia": 10,
    "stepoverPct": 55
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|raster|tiny|2": {
   "p": {
@@ -1111,7 +1111,7 @@
    "depth": 9,
    "stepdown": 2
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG0 X0 Y0\nG1 Z-2 F150\nG0 Z5\nG0 Z-1.5\nG1 Z-4\nG0 Z5\nG0 Z-3.5\nG1 Z-6\nG0 Z5\nG0 Z-5.5\nG1 Z-8\nG0 Z5\nG0 Z-7.5\nG1 Z-9\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 64 ---- )\n#81=9   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=2   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|raster|tiny|3": {
   "p": {
@@ -1137,7 +1137,7 @@
    "plunge": 120,
    "clearance": 3
   },
-  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\nG0 X12 Y0\nG1 Z-1.5 F120\nG0 Z3\nG0 Z-1\nG1 Z-3\nG0 Z3\nG0 Z-2.5\nG1 Z-4\nG0 Z3\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z3   ( clearance )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[12 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F120   ( feed only the new increment )\n    G0 Z3   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  },
  "ellipse|raster|tiny|5": {
   "p": {
@@ -1149,6 +1149,6 @@
    "wcs": "G55",
    "sides": 5
   },
-  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\nG0 X0 Y0\nG1 Z-1.5 F150\nG0 Z5\nG0 Z-1\nG1 Z-3\nG0 Z5\nG0 Z-2.5\nG1 Z-4\nG0 Z5\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
+  "emit": "G90   ( absolute )\nG0 Z5   ( clearance )\nG55   ( work offset )\n( ---- DRILL, parametric: 1 hole (single) x peck \u00b7 @work 48 ---- )\n#81=4   ( total depth \u2014 LIVE: a pendant can turn this )\n#82=1.5   ( bite per peck \u2014 LIVE )\nIF #82 <= 0 GOTO91   ( a zero bite never advances \u2014 refuse instead of looping forever )\n#89=0   ( the hole index )\nWHILE [#89 < 1] DO1   ( one pass per hole \u2014 the pattern is walked, not unrolled )\n  #75=0\n  #76=0\n  #83=0   ( how deep we have got )\n  #84=0   ( where the previous peck stopped )\n  G0 X[0 + #75] Y[0 + #76]\n  WHILE [#83 < #81] DO2   ( one peck per bite, the last clamped to the total )\n    #84=#83\n    #83=[#83 + #82]\n    IF #83 > #81 THEN #83=#81\n    G0 Z[0 - #84 + 0.5]   ( R plane: just above the last cut \u2014 the surface, on peck 1 )\n    G1 Z[0 - #83] F150   ( feed only the new increment )\n    G0 Z5   ( full retract \u2014 clear the chips )\n  END2\n  #89=[#89 + 1]\nEND1\nGOTO92\nN91\n#1505=1   ;ERROR: peck must be greater than zero\nN92\nM5   ( spindle off )\nM9   ( coolant off )\n#101 = 0   ( safe Z - G53 needs a variable )\nG53 Z#101   ( retract )\nM30"
  }
 }

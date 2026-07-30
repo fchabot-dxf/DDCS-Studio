@@ -15,7 +15,7 @@ test('U3 modal: a forked custom op → op-card Build CAM slot → value params e
         const stack = [{ type: 'user_root', params: {}, uiChildren: [{ type: 'param_group', params: { group: 'Cut' }, children: [] }], children: [
             { type: 'feed', params: { rate: 200 } },
             { type: 'move', params: { mode: 'cut', x: 10, y: 20, z: -3, feed: 500 } },
-            { type: 'drill', params: { x: 0, y: 0, depth: 5, peck: 5, feed: 100 } },
+            { type: 'holecycle', params: { pattern: 'single', cycle: 'peck', x0: 0, y0: 0, depth: 5, peck: 5, feed: 100 } },
         ] }];
         const bindings = [
             { param: 'frate', blockIndex: 2, key: 'rate', label: 'Feed', units: 'mm/min', type: 'number', default: 200 },
@@ -55,7 +55,7 @@ test('U3 modal: a forked custom op → op-card Build CAM slot → value params e
     // t1091 — drill FEED now rides val() → Expose ENABLED in the modal (pure F# interpolation). drill DEPTH drives the peck
     // loop → still geometry, Expose DISABLED + Bake forced (the greyed-geometry example this test guards).
     expect(by.dfeed, 'drill feed = value (t1091) → Expose enabled').toMatchObject({ exposeDisabled: false });
-    expect(by.ddepth, 'drill depth = geometry (loop bound) → Expose disabled, Bake forced').toMatchObject({ exposeDisabled: true, bakeChecked: true });
+    expect(by.ddepth, 'the hole depth is a register seed now → Expose ENABLED in the modal (t1391)').toMatchObject({ exposeDisabled: false });   // t1391 — the hole depth is a live #81 register seed now (t1389 val()), not a JS loop bound: the classifier's answer INVERTS with the mechanism
     // Bug #2 fix — a baked STRING param (mode) is Expose-disabled and its value cell is a READ-ONLY span (not a corruptible number input)
     expect(by.mmode, 'string mode param → Expose disabled, baked').toMatchObject({ exposeDisabled: true, bakeChecked: true });
     expect(out.modeValTag, 'baked string value → read-only SPAN, not an editable number input').toBe('SPAN');

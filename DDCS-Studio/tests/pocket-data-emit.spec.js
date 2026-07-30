@@ -34,12 +34,17 @@ test('user_pocket_data == built-in pocketStack, byte-identical across strategy �
             const twin = emitMapped(twinStack).text;
             const builtin = emitMapped(pocketStack(p)).text;
             if (twin !== builtin) { diffs++; if (!first) first = { p, twin: twin.slice(0, 1400), builtin: builtin.slice(0, 1400) }; }
-            // the derive-hook must select the arm: tooSmall → a drill block, big → a pocketfill block (assert the SELECTION)
+            // The derive-hook must select the arm: tooSmall → the HOLE block, big → a pocketfill block (assert the SELECTION).
+            //
+            // t1391 — this counted a `drill` block, and the too-small arm now builds `holecycle` (the tenant moved out so
+            // the literal atom could retire). DIAGNOSED BEFORE RESTATING, because twin==builder byte-identity is a LIVE
+            // product property and a lag would be a FIX: the sweep reported **96 cases, 0 diffs** with only this counter
+            // reading zero. So the product is sound and the counter was looking for a retired name.
             const isTiny = sz === 'tiny';
-            const hasDrill = hasType(twinStack, 'drill'), hasFill = hasType(twinStack, 'pocketfill');
+            const hasDrill = hasType(twinStack, 'holecycle'), hasFill = hasType(twinStack, 'pocketfill');
             if (hasDrill && !hasFill) drillArm++; else if (hasFill && !hasDrill) stepArm++;
             // the ARM must match the built-in's arm (independent: does the built-in emit a drill or a stepover for this p?)
-            const biDrill = hasType(pocketStack(p), 'drill');
+            const biDrill = hasType(pocketStack(p), 'holecycle');
             if (hasDrill !== biDrill) armWrong++;
         }
         return { registered: true, diffs, cases, first, drillArm, stepArm, armWrong };
@@ -48,7 +53,7 @@ test('user_pocket_data == built-in pocketStack, byte-identical across strategy �
     if (r.first) console.log('POCKET DIFF @ ' + JSON.stringify(r.first.p) + '\n--TWIN--\n' + r.first.twin + '\n--BUILTIN--\n' + r.first.builtin);
     console.log('POCKET E1: ' + JSON.stringify({ cases: r.cases, diffs: r.diffs, drillArm: r.drillArm, stepArm: r.stepArm, armWrong: r.armWrong }));
     expect(r.cases).toBe(96);
-    expect(r.drillArm, 'the derive-hook selects the DRILL-PLUNGE arm for tooSmall pockets').toBeGreaterThan(0);
+    expect(r.drillArm, 'the derive-hook selects the PLUNGE arm for tooSmall pockets (t1391: a holecycle single, was a literal drill)').toBeGreaterThan(0);
     expect(r.stepArm, 'the STEPOVER arm for big pockets').toBeGreaterThan(0);
     expect(r.armWrong, 'the twin selects the SAME arm as the built-in for every case (the tooSmall derive is correct)').toBe(0);
     expect(r.diffs, 'the twin emit is BYTE-IDENTICAL to pocketStack across the full sweep (byte-diff ZERO)').toBe(0);

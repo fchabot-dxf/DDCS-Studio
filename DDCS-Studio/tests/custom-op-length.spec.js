@@ -25,11 +25,15 @@ test('a length param is declarable (nlen roles decode + complete group) and drag
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
     localStorage.removeItem('ddcs_user_ops');
-    const template = [{ type: 'bore', params: {
+    // t1391 — the carrier leaf was the retired literal `bore`; it is `holecycle` now. The op TYPE was incidental (this
+    // spec is about the 2D LENGTH param + its drag), and the three keys carry over verbatim. A peck cycle is enough here
+    // because the dragged param is DEPTH, which reaches the emit on every cycle.
+    const template = [{ type: 'holecycle', params: {
+      pattern: 'single', cycle: 'peck',
       x: { type: 'param', params: { name: 'lx', value: 40, widget: 'nlen-x' } },
       y: { type: 'param', params: { name: 'ly', value: 30, widget: 'nlen-y' } },
       depth: { type: 'param', params: { name: 'll', value: 10, widget: 'nlen-l' } },
-      holeDia: 6, toolDia: 6, pitch: 0.5, ramp: 'step', feed: 120, clearance: 5,
+      peck: 2, holeDia: 6, toolDia: 6, pitch: 0.5, feed: 120, clearance: 5,
     } }];
     const bindings = U.extractParamBlocks(template, new Set(), true);
     U.createUserOp(U.userOpFromStack('lengthdrag', 'Length Drag', template, bindings, 'form2d'));

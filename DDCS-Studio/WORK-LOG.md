@@ -8807,3 +8807,91 @@ roundtrip area 116/116; the two arc-closed screenshots 2/2.
 it, which is the strongest thing that can be said about a change that deleted two shipping emitters.
 
 Scratch specs deleted. Process tree clean. FULL SUITE NOT RUN — the advisor's merge gate; both acts are emit-class.
+
+## t1393 (seat A) — THE RETIREMENT'S RADIUS: 13 reds, and the one that looked worst was the product working
+
+All 13 green. **Zero product changes** — every one was a fixture or a golden speaking the retired vocabulary. The
+lesson I owe: my t1391 ownership sweep grepped `web/` and stopped there. Product reachability was the right question for
+the DELETION, but a retired type also lives in test FIXTURES, and those are exactly as capable of pinning a dead name.
+A sweep that answers "can anything reach it?" must cover everything that can *build* it, not only everything that ships.
+
+### THE ONE THAT MIGHT HAVE BEEN REAL — diagnosed first, as instructed
+
+`pocket-data-emit` asserts `user_pocket_data == pocketStack` byte-identical across strategy × tooSmall × 4 shapes ×
+scalar. Twin==builder is a LIVE product property and a lag would have been a FIX, so I read the numbers before touching
+anything: **96 cases, 0 diffs, armWrong 0.** The byte-identity held completely. The single red was a COUNTER —
+`hasType(twinStack, 'drill')` — reading zero because the arm builds `holecycle` now. Product sound; the counter was
+looking for a retired name. Restated with the diagnosis recorded in the file so nobody re-derives it.
+
+### THE FIXTURE CLASS — six specs, one shape, and the asserts INVERT rather than relax
+
+`cam-toolpath-feed-expose`, `cam-block-native-params-s3/s4a`, `cam-universal-modal/route`, `custom-op-form2d-drag`,
+`custom-op-length` all built a synthetic stack containing `drill` or `bore`. Re-pointed to `holecycle`, and in most the
+kernel choice was incidental (they need "a toolpath leaf with a feed and a depth") — said so in each restatement.
+
+**Two were NOT incidental and needed the reason thought through:**
+- `custom-op-form2d-drag` drags a Ø ring bound to `holeDia`, and `holeDia` only reaches the emit on a BORE cycle. On a
+  peck cycle the diameter is inert and the "G-code re-rendered after the drag" assert would have passed or failed for a
+  reason unrelated to dragging. So that fixture carries `cycle:'bore-step'` deliberately.
+- `custom-op-length` drags DEPTH, which reaches the emit on every cycle, so a peck cycle is enough there.
+
+**The depth asserts INVERT, and that is the switch showing through rather than a loosened test.** Four specs asserted
+"drill depth = geometry (loop bound) → bake-only". On the literal kernel that was true: depth drove a JS loop, so a
+`#var` became NaN. On `holecycle` depth is the `#81` register seed t1389 put `val()` on, so the classifier's answer is
+EXPOSE. Each inversion carries its mechanism in the message. Two knock-ons followed and both are the same fact:
+`cam-block-native-params-s3`'s golden row for `ddepth` flips `bake`/`5` → `expose`/`''`, and `s4a`'s exposed-field list
+gains `ddepth` — kept EXACT (pre-order) rather than relaxed to a contains-check, so a stray field still fails there.
+
+One assert needed its EVIDENCE moved rather than its value: `cam-universal-route` proved "the op's depth 6 reached the
+emit, not the binding default 5" by matching `Z-6` — a baked Z from the unrolled ladder. The parametric body seeds `#81=6`
+and feeds against it, so the same fact is read at the seed, with a companion assert that `#81=5` is absent.
+
+### THE GOLDEN MOVED, AND THE SCOPE WAS MEASURED BEFORE AND RE-CHECKED AT THE WRITE
+
+`pocket-e0-superset` snapshots the pre-E0 pocket emit for 96 combos; 40 differed. A golden that is re-recorded whenever
+it goes red is not a golden, so the regeneration was done as a measurement:
+
+    40 changed — EVERY one a |tiny| (too-small) key
+    56 untouched byte-for-byte — NONE of them too-small
+
+I eyeballed the diff before writing: the literal ladder (`G1 Z-1.5 / Z-3 / Z-4` with `prev>0` re-entry rapids) becomes
+the parametric body — `#81=4`, `#82=1.5`, **the same three cut depths** reached by a macro loop, plus the unconditional
+R-plane rapid that is the family's declared ledger exception 1. Exactly the t1391 ruling and nothing else.
+
+The write itself preserved each unchanged entry object verbatim, replaced only `emit` on the 40, and carried a hard
+assertion that no non-`|tiny|` key could be written. The reasoning and both counts are recorded in the spec header, so
+the next reader can tell a ruled regeneration from a silent re-record.
+
+### A SECOND SELF-INFLICTED ESCAPE BUG — and this time it left a trap in the file
+
+I patched a spec through a shell heredoc running Python and wrote `"\\b"` inside a NON-raw string. Python turned that
+into a literal **backspace (0x08)**, so the regex read `/#81=6\x08/` and could never match. The symptom was a failure
+whose expected pattern *looked* correct in every log line. Same family as t1391's corrupted regex and t1389's
+backtick substitution — three different quoting layers, one root cause: **routing code through a shell.**
+
+So I stopped guessing and swept for it: a scan of every `.js` under `tests/` and `web/` for literal 0x08. My own two
+were the only ones I introduced — and the scan found seven more, which leads to the next section.
+
+### A PRE-EXISTING DEFECT FOUND BY THAT SWEEP — REPORTED, NOT FIXED (out of scope, gate was red)
+
+`web/viz/createPreviewPanel.js` carries **7 literal backspaces** in three regexes of `calcTagOf`:
+
+    /^\s*(IF|WHILE|GOTO|END\d|DO\d|M9[89])\x08/i     ← should be \b
+    /\x08G3[18]\x08/i                                 ← "a probe IS motion"
+    /\x08G0?[0-3]\x08|\x08G53\x08/i                   ← "ordinary motion — no tag"
+
+They can never match, so the preview's status-chip TAG for probe and motion lines is wrong (a probe line is not
+recognised as motion; ordinary motion is not recognised as untagged). Cosmetic, not a G-code defect. **Attributed, not
+assumed:** the same 7 are present at the t1383 release commit and six commits back, so this predates my work — my
+commit touched that file elsewhere. Left alone because the gate was red and this is unrelated to the 13; it is a
+one-character-class fix whenever you want it.
+
+### GATE (fast tier)
+
+The 13 (9 files) **19/19**. smoke **71/71**. Pocket family + drill arc + the shots + the iron rule **67/67**. The CAM
+sibling specs the fixture class touches (s2/s4b/s4b-core/s5/s52/s53, scratch, op-seed, drill-single-pattern) **35/35**.
+**192 tests, 0 failures.**
+
+**IRON RULE: 11/11, the same eleven, 0 blocks lost.**
+
+Scratch specs deleted. Process tree clean. FULL SUITE NOT RUN — the advisor's merge gate.

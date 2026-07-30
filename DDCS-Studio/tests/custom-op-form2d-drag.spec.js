@@ -76,11 +76,17 @@ test('Stage 3: a real authored 2D-circle op — dragging the RING (radial) handl
   await page.evaluate(async () => {
     const U = await import('/blocks/userOps.js');
     localStorage.removeItem('ddcs_user_ops');
-    const template = [{ type: 'bore', params: {
+    // t1391 — the carrier leaf was the retired literal `bore`; it is `holecycle` now. The op TYPE was always incidental
+    // here (this spec is about GUI param blocks and the drag re-render, not about which kernel cuts), so the same three
+    // keys — x, y, holeDia — carry over verbatim. `cycle:'bore-step'` is NOT incidental: holeDia only reaches the emit on
+    // a BORE cycle, and the assert below is that the G-code RE-RENDERS after the ring drag. On a peck cycle the diameter
+    // would be inert and the test would pass or fail for a reason that has nothing to do with dragging.
+    const template = [{ type: 'holecycle', params: {
+      pattern: 'single', cycle: 'bore-step',
       x: { type: 'param', params: { name: 'cx', value: 60, widget: 'ncirc-x' } },
       y: { type: 'param', params: { name: 'cy', value: 50, widget: 'ncirc-y' } },
       holeDia: { type: 'param', params: { name: 'cd', value: 30, widget: 'ncirc-d' } },
-      toolDia: 6, depth: 5, pitch: 0.5, ramp: 'step', feed: 120, clearance: 5,
+      toolDia: 6, depth: 5, pitch: 0.5, feed: 120, clearance: 5,
     } }];
     const bindings = U.extractParamBlocks(template, new Set(), true);
     U.createUserOp(U.userOpFromStack('circledrag', 'Circle Drag', template, bindings, 'form2d'));

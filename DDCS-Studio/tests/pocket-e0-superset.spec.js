@@ -12,6 +12,21 @@ import fs from 'fs';
  *      BOTH forks guarded — strategy (real param) + tooSmall (the GEOMETRY-DERIVED `_tooSmall` key, injected via
  *      pocketTooSmall) — and pruneGuards must collapse to the concrete shape byte-for-byte. If it does not, E0 STOPS
  *      here (this gate precedes E1/the twin + bindings).
+ *
+ * ── t1391 — THE GOLDEN MOVED, DELIBERATELY, FOR THE 40 TOO-SMALL CASES ONLY ──────────────────────────────────────
+ * A golden that is re-recorded whenever it goes red is not a golden. This one was regenerated because the emit it
+ * snapshots CHANGED BY RULING: pocket's too-small fallback (a pocket narrower than its tool → a single plunge) was the
+ * last consumer of the literal `drill` kernel, and the ruling re-pointed it through `holecycle` so that atom could
+ * retire. The literal ladder — baked `G1 Z-1.5 / Z-3 / Z-4` with `prev>0` re-entry rapids — becomes the parametric body:
+ * `#81=4` / `#82=1.5` seeded live, the same three cut depths reached by a macro loop, plus the unconditional R-plane
+ * rapid that is the drill family's declared ledger exception 1.
+ *
+ * THE SCOPE WAS MEASURED BEFORE THE REGENERATION AND RE-CHECKED AT THE WRITE, not asserted afterwards:
+ *   40 entries changed — EVERY ONE of them a `|tiny|` (too-small) key
+ *   56 entries byte-for-byte untouched — NONE of them too-small
+ * The regeneration copied each unchanged entry object verbatim and replaced only `emit` on the 40, with a hard check
+ * that no non-`|tiny|` key could be written. So this file still holds the pre-E0 independent truth for every normal
+ * pocket; only the arm the ruling moved has moved.
  */
 const GOLDEN = JSON.parse(fs.readFileSync('tests/fixtures/pocket-golden.json', 'utf8'));
 

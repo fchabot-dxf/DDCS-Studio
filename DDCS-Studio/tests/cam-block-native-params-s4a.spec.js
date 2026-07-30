@@ -16,7 +16,7 @@ async function registerWithCamTable(page) {
         const { camTableFromBindings } = await import('/data/opCamMap.js');
         const baseStack = [{ type: 'user_root', params: {}, children: [
             { type: 'feed', params: { rate: 200 } },
-            { type: 'drill', params: { x: 0, y: 0, depth: 5, peck: 2, feed: 300, clearance: 5 } },
+            { type: 'holecycle', params: { pattern: 'single', cycle: 'peck', x0: 0, y0: 0, depth: 5, peck: 2, feed: 300, clearance: 5 } },
         ] }];
         const baseBindings = [
             { param: 'frate', blockIndex: 1, key: 'rate', type: 'number', default: 200, label: 'Feed rate', units: 'mm/min' },
@@ -56,7 +56,7 @@ test('S4a — the modal READS the cam_table: frate/dfeed Expose (from the blocks
     // the expose/bake state is READ from the cam_field blocks (camTableFromBindings: exposable→expose, geometry→bake)
     expect(r.frate, 'feed rate — the block says expose').toMatchObject({ expose: true, bake: false });
     expect(r.dfeed, 'drill feed (value, t1091) — the block says expose').toMatchObject({ expose: true, bake: false });
-    expect(r.ddepth, 'drill depth (geometry) — the block says bake').toMatchObject({ expose: false, bake: true });
+    expect(r.ddepth, 'the hole depth is a register seed now — the block says EXPOSE (t1391)').toMatchObject({ expose: true, bake: false });   // t1391 — the hole depth is a live #81 register seed now (t1389 val()), not a JS loop bound: the classifier's answer INVERTS with the mechanism
 });
 
 test('S4a — flipping a radio MUTATES the cam_field block AND the built slot reflects it (expose→#2600, bake→inline)', async ({ page }) => {
@@ -74,7 +74,9 @@ test('S4a — flipping a radio MUTATES the cam_field block AND the built slot re
     // the FLIP mutated the block (one source) — not a parallel decl
     expect(afterFlip.frateMode, 'the frate cam_field block is now bake').toBe('bake');
     expect(afterFlip.dfeedMode, 'dfeed is untouched (still expose)').toBe('expose');
-    expect(afterFlip.ddepthMode, 'ddepth is untouched (still bake)').toBe('bake');
+    // t1391 — ddepth's OWN default is now 'expose' (the hole depth became a live register seed). The claim here is
+    // untouched-ness, not the value: flipping frate must not disturb its neighbours, whatever their modes happen to be.
+    expect(afterFlip.ddepthMode, 'ddepth is untouched by the frate flip (its own default is expose since t1389)').toBe('expose');
     // now BUILD and confirm the slot reflects the block: frate baked (no #2600), dfeed still exposed (#2600)
     await page.click('[data-act="cbm-build"]');
     await page.waitForFunction(() => !document.querySelector('.cam-auth-overlay'));
@@ -83,8 +85,11 @@ test('S4a — flipping a radio MUTATES the cam_field block AND the built slot re
         const s = pack.slots.slice(-1)[0] || {};
         return { keys: (s.fields || []).map((f) => f.key), body: s.body };
     });
-    // frate is now baked → NOT a field, NO #2600 mirror for it; dfeed stays exposed → a field + its mirror
-    expect(slot.keys, 'frate dropped from the fields (baked), dfeed remains exposed').toEqual(['dfeed']);
+    // frate is now baked -> NOT a field, NO #2600 mirror for it; dfeed stays exposed -> a field + its mirror.
+    // t1391 — ddepth JOINS the exposed fields, and that is the switch showing through rather than a loosened assert:
+    // the hole depth became a live #81 register seed (t1389 val()), so the classifier's default for it is expose. The
+    // list is kept EXACT (pre-order) rather than relaxed to a contains-check, so a future stray field still fails here.
+    expect(slot.keys, 'frate dropped from the fields (baked); dfeed + the now-exposable ddepth remain').toEqual(['ddepth', 'dfeed']);
     expect(slot.body, 'no #2600 mirror named Feed rate (frate is baked)').not.toMatch(/;Feed rate/);
     expect(slot.body, 'dfeed still reads its #2600 mirror').toMatch(/;Cut feed/);
     expect(slot.body, 'the baked frate inlines its literal feed (F200), no #var').toMatch(/F200\b/);

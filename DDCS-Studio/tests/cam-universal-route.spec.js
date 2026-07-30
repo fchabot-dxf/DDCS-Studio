@@ -17,7 +17,7 @@ test('U2 router: a forked custom op → {universal} seed with value params expos
         const stack = [{ type: 'user_root', params: {}, uiChildren: [{ type: 'param_group', params: { group: 'Cut' }, children: [] }], children: [
             { type: 'feed', params: { rate: 200 } },
             { type: 'move', params: { mode: 'cut', x: 10, y: 20, z: -3, feed: 500 } },
-            { type: 'drill', params: { x: 0, y: 0, depth: 5, peck: 5, feed: 100 } },
+            { type: 'holecycle', params: { pattern: 'single', cycle: 'peck', x0: 0, y0: 0, depth: 5, peck: 5, feed: 100 } },
         ] }];
         const bindings = [
             { param: 'frate', blockIndex: 2, key: 'rate', label: 'Feed', units: 'mm/min', type: 'number', default: 200 },
@@ -51,7 +51,7 @@ test('U2 router: a forked custom op → {universal} seed with value params expos
     expect(r.byKey.mz, 'plunge Z = value → exposable').toMatchObject({ exposable: true, value: -4 });
     // t1091 — drill FEED now rides val() (pure F# interpolation) → EXPOSABLE. drill DEPTH drives the peck loop → still geometry.
     expect(r.byKey.dfeed, 'drill feed = value (t1091 num→val) → exposable').toMatchObject({ exposable: true });
-    expect(r.byKey.ddepth, 'drill depth = geometry (loop bound) → bake-only').toMatchObject({ exposable: false });
+    expect(r.byKey.ddepth, 'the hole depth is a register seed now → exposable (t1391)').toMatchObject({ exposable: true });   // t1391 — the hole depth is a live #81 register seed now (t1389 val()), not a JS loop bound: the classifier's answer INVERTS with the mechanism
 
     // the premium path is untouched — corner still routes to its generator
     expect(r.cornerCt, 'a standard op keeps its premium generator').toMatchObject({ camType: 'corner' });
@@ -69,7 +69,7 @@ test('U3 universal build: stackToSlot unrolls the forked op — exposed value pa
         const stack = [{ type: 'user_root', params: {}, uiChildren: [{ type: 'param_group', params: { group: 'Cut' }, children: [] }], children: [
             { type: 'feed', params: { rate: 200 } },
             { type: 'move', params: { mode: 'cut', x: 10, y: 20, z: -3, feed: 500 } },
-            { type: 'drill', params: { x: 0, y: 0, depth: 5, peck: 5, feed: 100 } },
+            { type: 'holecycle', params: { pattern: 'single', cycle: 'peck', x0: 0, y0: 0, depth: 5, peck: 5, feed: 100 } },
         ] }];
         const bindings = [
             { param: 'frate', blockIndex: 2, key: 'rate', label: 'Feed', units: 'mm/min', type: 'number', default: 200 },
@@ -85,7 +85,7 @@ test('U3 universal build: stackToSlot unrolls the forked op — exposed value pa
             frate: { exposed: true, value: 250 },
             mz: { exposed: true, value: -4 },
             mx: { exposed: false, value: 15 },        // user chose to bake X
-            ddepth: { exposed: false, value: 6 },     // geometry, force-baked to the op's value
+            ddepth: { exposed: false, value: 6 },     // t1391 — exposABLE now, but the user CHOSE to bake it at the op's value
         };
         const slot = stackToSlot(def, decl);
         return { name: slot.name, nfields: slot.fields.length, keys: slot.fields.map((f) => f.key), body: slot.body,
@@ -99,8 +99,11 @@ test('U3 universal build: stackToSlot unrolls the forked op — exposed value pa
     expect(r.body, 'exposed feed → F#var').toMatch(/F#\d/);
     expect(r.body, 'exposed plunge Z → Z#var').toMatch(/Z#\d/);
     expect(r.body, 'baked X → literal 15').toContain('X15');
-    // the geometry drill depth baked to 6 (the op value) — the peck loop unrolled with depth 6, not the default 5
-    expect(r.body, 'the drill unrolled (baked geometry)').toMatch(/Z-6|Z-?6/);
+    // t1391 — THE CLAIM IS UNCHANGED, ITS EVIDENCE MOVED. This asserted `Z-6` because the literal kernel UNROLLED its peck
+    // ladder and baked each depth as a Z word. The parametric body seeds the depth into #81 and the loop feeds against it,
+    // so the same fact — the op's value 6 reached the emit rather than the binding default 5 — is read at the seed.
+    expect(r.body, 'the baked depth reached the emit as the register seed (6, not the default 5)').toMatch(/#81=6\b/);
+    expect(r.body, 'and not the binding default').not.toMatch(/#81=5\b/);
     // a real slot macro renders (reads + body)
     expect(r.macro).toContain('#2600');
     expect(r.macro, 'the exposed feed reads its mirror').toMatch(/#\d=#2600/);

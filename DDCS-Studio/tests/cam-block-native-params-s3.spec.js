@@ -9,11 +9,11 @@ import { test, expect } from '@playwright/test';
 const base = () => ({
     stack: [{ type: 'user_root', params: {}, children: [
         { type: 'feed', params: { rate: 200 } },
-        { type: 'drill', params: { x: 0, y: 0, depth: 5, peck: 2, feed: 300, clearance: 5 } },
+        { type: 'holecycle', params: { pattern: 'single', cycle: 'peck', x0: 0, y0: 0, depth: 5, peck: 2, feed: 300, clearance: 5 } },
     ] }],
     bindings: [
         { param: 'frate', blockIndex: 1, key: 'rate', type: 'number', default: 200, label: 'Feed rate', units: 'mm/min' },
-        { param: 'ddepth', blockIndex: 2, key: 'depth', type: 'number', default: 5, label: 'Depth', units: 'mm' },   // drill depth → geometry (loop bound) → BAKE
+        { param: 'ddepth', blockIndex: 2, key: 'depth', type: 'number', default: 5, label: 'Depth', units: 'mm' },   // t1391 — the hole depth: was a literal-kernel LOOP BOUND (bake), is now a live register seed (EXPOSE)
         { param: 'dfeed', blockIndex: 2, key: 'feed', type: 'number', default: 300, label: 'Cut feed', units: 'mm/min' },   // drill feed → value (t1091) → EXPOSE
     ],
 });
@@ -30,10 +30,15 @@ test('S3 — camTableFromBindings: one row per binding in PRE-ORDER, mode = clas
         return { type: ct.type, rows: ct.children.map((c) => ({ type: c.type, param: c.params.param, mode: c.params.mode, baked: c.params.baked, label: c.params.label })) };
     }, base.toString());
     expect(r.type).toBe('cam_table');
-    // pre-order, one per binding; exposable (feed) → expose, geometry (drill depth) → bake at the binding default
+    // Pre-order, one per binding; mode = the classifier's default for that param.
+    //
+    // t1391 — THE DEPTH ROW FLIPPED, and the flip is the point rather than a repair. The fixture used the retired literal
+    // `drill`, whose depth drove a JS loop and therefore BAKED. It is `holecycle` now, whose depth is the #81 register seed
+    // t1389 put val() on — so the classifier's default for it is EXPOSE, with an empty `baked`. The row order, the labels
+    // and the feed rows are untouched, which is what says only the depth SEMANTICS moved.
     expect(r.rows).toEqual([
         { type: 'cam_field', param: 'frate', mode: 'expose', baked: '', label: 'Feed rate' },
-        { type: 'cam_field', param: 'ddepth', mode: 'bake', baked: '5', label: 'Depth' },
+        { type: 'cam_field', param: 'ddepth', mode: 'expose', baked: '', label: 'Depth' },
         { type: 'cam_field', param: 'dfeed', mode: 'expose', baked: '', label: 'Cut feed' },
     ]);
 });
