@@ -8372,3 +8372,143 @@ remainder), middle-superset **6/6** sharded, trace/preview/glow/palette/registry
 truthful ceiling rather than carrying a known flake.
 
 Scratch measurement spec deleted before the commit. Process tree clean.
+
+## t1385 (seat A) — THE DRILL-FAMILY SWITCH: the pattern walks at RUNTIME, and the depth is a knob
+
+Two commits, each verified before the next started: the by-identity binding conversion (`15d155ca`) and the re-point
+itself (`7b3915ea`), plus the CAM knob declaration and the four screenshots below. Two items PARKED at the foot, both
+because they are gates rather than because they ran out of room.
+
+### STEP 1 — BY IDENTITY FIRST, AND THE PROOF IS THAT NOTHING MOVED
+
+The conversion had to precede the re-point for a reason that is arithmetic, not taste: the switch merges `array` and its
+`drill`/`bore` leaf into ONE block, so the two flat indices those bindings pointed at (7 for the 15-row pattern cluster,
+8 for the cut params) become one and everything after shifts. I captured the positional map's exact output BEFORE
+touching anything and froze it in the spec as data, then checked every derived row per-row and in order — because a
+silently re-pointed socket still looks like a working app while emitting subtly wrong G-code.
+
+**Every row landed identically except ONE, and that one is a convergence rather than a change.** `rpm` declares
+`socketHeld` with no default, so the positional map left `default: undefined`; `deriveBindings` reads an omitted default
+FROM THE SOCKET (its own declare-never-infer rule) and gives `default: 0`. I did not argue that this was harmless — I
+measured it against `surfacingData`, whose identical rpm row has shipped exactly that since t1349, and asserted the two
+are equal. Blank-still-means-Head-default because that comes from `socketHeld` plus `spindleHeadPatch`.
+
+Also added the assert the switch actually needed: shift the template by prepending a block, and every binding re-derives
+at +1. The old positional map would have pointed one block too early — silently, on every socket.
+
+### THE VACUITY TRAP, CLOSED IN THE SAME ACT
+
+Every bridge in this arc compares "the literal composition" against the parametric body, and the literal side was built
+from the LIVE REGISTRY. That was right while the registry held those emitters and becomes a trap the moment they retire:
+the bridges would resolve to the parametric path and compare it against ITSELF — 48 green tests proving nothing.
+
+So the kernels are frozen into `tests/support/served/literalHoleReference.js`. Getting it SERVED took a small piece of
+test infrastructure: the mem-server preloads `web/` and nothing else, so a reference under `tests/` was unreachable from
+inside `page.evaluate`. It now mounts `tests/support/served/` at `/_test/` — importable by a spec, resolvable by no
+product module, and obvious at the import site that it is scaffolding.
+
+**What is frozen is deliberately narrow.** The kernel ARITHMETIC being replaced (the peck ladder, the ring-step and helix
+walks, `patternPoints`) is a verbatim copy. Everything the switch is NOT changing — the container stamp, the placement
+fold, label uniquification, modal-feed folding, cap gating — still runs through the REAL emitter, because a reference
+that re-implemented those would have the bridges testing a second emitter and any drift between them would read as a
+drill-family regression. The refs install as ordinary leaf defs to get that for free.
+
+### THE RE-POINT, AND BOTH PATHS
+
+`drillStack` now builds ONE `holecycle` inside the same framing. `cycleForMethod` is the whole translation: peck →
+`peck`, helical → `bore-step`, helical+ramp-helix → `bore-helix`, asserted as a table rather than trusted to two nested
+ternaries. **Both paths**, because a switch that re-pointed only the one its author exercised would leave the other
+emitting fine, passing its own specs, and silently missing the live knobs the switch exists for.
+
+The tap is untouched BY REACHABILITY and that is asserted, not noted: `tapStack` builds a `tap` leaf, which none of the
+three cycles covers. "We left tap alone" and "tap was never in scope" fail differently — the first is a gap someone
+should close, the second a boundary someone should not cross.
+
+### A DEFECT I INTRODUCED, AND THE SWEEP THAT CAUGHT IT
+
+The bore twin's `ramp` binding substitutes its value VERBATIM into the merged block's `cycle` socket. Picking from the
+form is fine (its dropdown now offers the cycle spellings), but a caller passing the WIZARD's vocabulary — `ramp:'helix'`,
+which is exactly what an in-place open seeds from wizard params — wrote `cycle:'helix'`. `cycleOf` does not know that
+word, so it fell back to **peck**: a bore op silently emitting a drill cycle. It surfaced as 10 byte-diffs against
+`drillStack`, which is the equivalence sweep earning its keep.
+
+Fixed at `postInstantiate` (the declared seam for a resolved-at-insert value) rather than by teaching the atom the
+wizard's words. The atom keeps ONE vocabulary; the twin does the translating, because the twin is the one with two
+callers. `cycleForMethod` normalises both spellings at that one place.
+
+### FIVE ASSERTS RESTATED WITH HISTORY — every one because a LOOP changes what the text can say
+
+Not blanket-rewritten; each says what it used to claim and why the claim moved.
+1. `single == 1x1 grid` was a BYTE-golden. Two spellings of one point are now different arithmetic, so it is a
+   MOVE-golden — which is the claim it was always making about the machine.
+2. "explicit grid still 6" counted `G0 X` LINES. A loop emits one whatever the count, so the text said 1 for everything;
+   it now counts the DISTINCT XY positions the traced path cuts downward at.
+3. drill-as-data's non-vacuity check looked for the `( Array N @ )` stamp comment. It now requires the pattern LOOP
+   itself — a strictly stronger signal, and the thing the switch is about.
+4. Its plunge check wanted a baked `G1 Z-`; the parametric plunge is `G1 Z[0 - #83] F100`, asserted with its feed
+   attached so it still means "a real cutting move".
+5. Bore's wiring check wanted `G0 X44`; the radius is still baked but is now a TERM in `G0 X[44 + #75]`.
+
+### THE CAM KNOBS — DECLARED, WITH THE TWO REMAINING BLOCKERS MEASURED RATHER THAN CLAIMED
+
+`opToSlot`/`opCamMap` recorded that the universal path "cannot expose depth/peck AT ALL, because drill.js peckDrill
+drives a JS while loop". The runtime loop removes that cause. What I found on the way is that the exposure decision is a
+DECLARED table (`atomRoles.js`) and `holecycle` was not in it — so every key fell to `DEFAULT_ROLE`, which is safe but
+*accidentally* so, and it would have **quietly de-classified `feed`**: both literal rows declared `feed: 'value'` (t1091
+measured it — a bare `F${feed}`, no arithmetic, no loop bound) and the parametric body emits it the same way. So the row
+is declared, with entry-gate reasoning per key, and `feed` is a value again.
+
+**Two blockers remain, and both are gates, so they are reported with measurements instead of taken:**
+
+1. **`feed` is a value and still bakes**, and the reason is precise: `blockedIndices` blocks any socket under a `place`
+   fold because the fold REWRITES ITS TEXT. But `holecycle` declares `absorbsPlacement: true` — the fold hands it the
+   frame as PARAMS and never rewrites it, so the stated hazard does not apply. Lifting it is nearly one line, and it
+   relaxes SAFETY for every absorbing atom (surfacing too). `atomRoles`' own rule is that under-exposing only bakes while
+   over-exposing emits wrong G-code, so this is the advisor's call, not mine.
+2. **`depth`/`peck`/`pitch` need an EMITTER change, not a table row.** The body reads `#81`/`#82`, so the loop is
+   genuinely live — but the atom still writes those assigns with `r3(num(...))`, which destroys a `#var` before it
+   arrives. Using `val()` there is small. What it collides with is the `@work` declaration from t1383: expected execution
+   size is computed from depth and bite at BUILD time, so a LIVE depth makes the declaration unknowable. The honest
+   answer follows t1383's own principle — OMIT the marker in that case and let the flow-aware floor take over, never
+   declare a number that is wrong the moment the operator turns the knob — but "the preview stops declaring when you
+   expose a knob" is a trade someone should choose, not a thing I should quietly implement.
+
+### WHAT WAS SEEN, NOT JUST ASSERTED — and one thing looking saved me from mis-reporting
+
+Four screenshots, each driving the real app, each with the claim it is evidence for asserted beside it so a shot cannot
+pass while the thing it shows is broken. I looked at all four rather than trusting the asserts, and it mattered:
+
+The Blocks-tab shot showed a perfect single green "Holes (parametric)" block with the live projected body beside it — and
+a preview panel reading **"No drawable moves"**. That is either my screenshot outrunning the preview's refresh or a real
+regression in the surface users build ops in, and it is not a difference worth guessing at. So I asserted it: wait for
+the preview, then require a drawn path with real move counts. It passes in under three seconds — it was my timing — and
+the assert now stands so the same ambiguity cannot be waved away next time.
+
+The bolt-circle shot is the arc's payoff in one picture: **all 24 helical bores drawn complete, 13272 cuts · 74 rapids**,
+from a program of under 100 lines. That is the exact config t1381 measured as drawing a TWELFTH of itself in silence.
+The switch made the program short; t1383's declared work is what keeps the preview honest about it.
+
+### IRON RULE, AND @work
+
+**11/11, the same eleven, 0 blocks lost** — it did not shrink, but it did not grow. I also made the count LOG on every
+run: a rule about a trend is useless if the value only appears when it breaks, so a turn that shrank it had no way to say
+so and a turn sitting at the ceiling looked identical to one that fixed something.
+
+`@work` survives the switch (measured: 188 for a 4-hole peck grid, 146 for a bore, and present in the shipped bolt-circle
+emit), so t1383's truncation honesty is intact rather than quietly lost to the re-point.
+
+### PARKED, AND WHY — the literal emitters
+
+`drill.js` / `bore.js` are now DEAD by the both-paths guard's own assert: no registered builder reaches either. Retiring
+them is therefore a pure-leaf deletion, which is exactly what the dispatch ordered LAST — and a deletion is a gate. It
+also wants their `atomRoles` rows and their remaining references swept, which is the same act. Leaving them registered is
+the SAFE state: unreachable, asserted unreachable, and the frozen reference no longer depends on them either way.
+
+### GATE (fast tier)
+
+smoke **71/71**. Drill family **66/66** (holecycle bridges on the frozen reference + both-paths guard + tap, identity 4/4,
+the four screenshot tests, declared-work, drill/bore as-data, in-place, patterns, peck, riders, the iron-rule round-trip).
+CAM + blocks + surfacing + palette + registry **89/89**. **226 tests, 0 failures.** FULL SUITE NOT RUN — the advisor's
+merge gate; this is emit-class and re-points every shipping drill and bore program.
+
+Screenshots under `test-results/t1385-shots/` (gitignored, so no PNG churn). Scratch specs deleted. Process tree clean.

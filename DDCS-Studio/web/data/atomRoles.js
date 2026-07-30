@@ -44,6 +44,45 @@ export const ATOM_ROLES = {
     helix: { cx: 'geometry', cy: 'geometry', radius: 'geometry', depth: 'geometry', pitch: 'geometry', startAngle: 'geometry', seg: 'geometry', clearance: 'geometry' },
     dwell: { sec: 'geometry' },
 
+    /**
+     * — holecycle (t1385, THE SWITCH): the folded drill family. Declared because the switch made this atom the emitter for
+     *   every drill and bore program, and an UNLISTED atom silently takes DEFAULT_ROLE — safe, but accidentally so. This
+     *   row records that each key was LOOKED AT, which is the distinction this table exists to preserve.
+     *
+     *   `feed` IS THE ONE THAT CHANGES AN OUTCOME, and it is a regression this row repairs rather than a new capability:
+     *   the literal `drill`/`bore` rows both declared `feed: 'value'` (t1091 measured it — feed appears only as a bare
+     *   `F${feed}`, no test, no arithmetic, no loop bound), and the parametric body emits it exactly the same way. Falling
+     *   to the unlisted default would have QUIETLY de-classified a knob the family already had.
+     *
+     *   THE ENTRY-GATE REASONING on the rest — the knobs the CAM note called impossible, and why they are still baked HERE
+     *   even though the macro loop now reads them from registers:
+     *     depth / peck / pitch  The BODY reads `#81`/`#82`, so the loop itself is genuinely live — but this atom still
+     *                           writes them with `r3(num(...))`, so a `#var` arriving in the PARAM is destroyed before it
+     *                           reaches the assign. Making them exposable is a change to the EMITTER (val() at the two
+     *                           assigns), not to this table, and it collides with the `@work` declaration: the trace cap's
+     *                           expected-execution-size is computed from depth/bite at BUILD time, so a live depth makes
+     *                           the declaration unknowable and it must then be OMITTED (falling back to the flow-aware
+     *                           floor) rather than declared wrong. That is a ruling, not a row — flagged in the t1385 log.
+     *     holeDia / toolDia     The cut RADIUS is (holeDia-toolDia)/2, folded at build into the arc's I/J vector and the
+     *                           entry offset. A pendant edit would move the entry without moving the arc it must close —
+     *                           a kinked circle. BAKE, and this one is not a limitation to lift later.
+     *     the pattern geometry  Multiplied by BAKED trig (the bolt circle's rotation constants), so a #var cannot reach it
+     *                           without the controller having verified trig. Already stated as SCOPE in holecycle.js.
+     *     clearance             A Z WORD the frame printer folds; same call as every other kernel's clearance (t1091).
+     *     the flow labels       Emitter-assigned per program (uniquifyFlowLabels), never operator values.
+     */
+    holecycle: {
+        feed: 'value',
+        depth: 'geometry', peck: 'geometry', pitch: 'geometry',
+        holeDia: 'geometry', toolDia: 'geometry',
+        x: 'geometry', y: 'geometry', z0: 'geometry', x0: 'geometry', y0: 'geometry', clearance: 'geometry',
+        cols: 'geometry', rows: 'geometry', dx: 'geometry', dy: 'geometry', count: 'geometry',
+        spacing: 'geometry', angle: 'geometry', dia: 'geometry', startAngle: 'geometry',
+        w: 'geometry', h: 'geometry', nx: 'geometry', ny: 'geometry',
+        pattern: 'other', cycle: 'other', skip: 'other',
+        errLabel: 'geometry', errSkipLabel: 'geometry', skipLabel: 'geometry', reseedLabel: 'geometry', rectHLabel: 'geometry', rectVLabel: 'geometry',
+    },
+
     // — Program framing —
     progstart: { rpm: 'geometry', dir: 'other', spinUp: 'geometry', clearance: 'geometry', skim: 'other' },   // rpm STAYS geometry (contrast spindle.rpm): headerBlock tests `num(rpm)>0` to GATE the M3 (cuttingBlocks.js:23-25), so a #var → NaN>0 false → the spindle-on line is silently DROPPED. t1091 probe confirmed: injecting a #var deletes `M3 S…`. NOT pure interpolation.
     progend: { spindleOff: 'other', coolantOff: 'other', retract: 'other', park: 'other', retractZ: 'geometry', parkX: 'geometry', parkY: 'geometry', end: 'other' },
