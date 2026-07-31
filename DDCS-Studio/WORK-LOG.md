@@ -12595,3 +12595,95 @@ affected specs **34/34**. Branch tip carries the fix at `1ff965ba`.
 *(Method note for the next seat: the emit AND the tracer both import cleanly under plain `node` from the repo — no
 Playwright, no mem-server. Dumping a program and tracing its motion is seconds, not a suite run, and every finding
 above came out of that loop before a single spec was written. `node -e "import('file:///…/surfaceraster.js')"`.)*
+
+## t1487 (seat A) — C4's BRIDGES RESTATED, FOUR LOCKS INVERTED, AND A 26th FOUND BY WIDENING THE NET.
+
+### THE RULING, AND WHY IT MADE THE ACT SMALLER RATHER THAN BIGGER
+
+t1486 ruled **B: RESTATE, NEVER RETIRE**, with the arc's own precedent named (t1391 restated the drill bridges
+around the R-plane; t1406 restated the pocket bridges per PHASE). Nineteen bridges compared the parametric ramp
+against the LITERAL kernel's centre-ward ramp, move for move, and C4 supersedes that ramp on purpose.
+
+**The criterion is ONE idea, so it is declared once** — `tests/support/rampRelationship.js` — and not fifteen edited
+assertions. Fifteen hand-rolled copies of "what a ramp must still be" would drift the moment the next descent act
+touches one of them, and the drift would be invisible: each copy would still be green about its own version.
+
+**OUTSIDE the descent nothing moved, and that is measured, not assumed.** Every spec keeps its OWN comparator over
+the walk — t1404's exactness, t1406's per-phase quantum, the rotation bridge's per-move bound — and the module only
+takes the descent OUT so those comparators run over what is genuinely unchanged. On the ring configs that is 48 of
+52 cutting moves, byte-for-byte.
+
+**INSIDE it, the two ramps are the same ramp pointed a different way,** which turned out to be measurable rather
+than merely arguable. On `concentric × ramp`, 100×60 Ø12 @60%:
+
+    literal      (0,0,0) → (8.181, 4.909, −0.5)      toward the centre — run √(8.181² + 4.909²) = 9.540
+    parametric   (0,0,0) → (9.540, 0.000, −0.5)      along the row      — run                  = 9.540
+
+Same start · same drop · **same run LENGTH** · same feed · returns to the same point. The run length is the whole
+angle claim: the run is `drop / tan(angle)` on both sides, so equal drop with equal run **is** equal angle. That is
+a better assertion than the one it replaces — the old equality asserted a DIRECTION that was never what the operator
+set, and would have passed a ramp cutting at the wrong angle in the right direction.
+
+### ⚠ THE ONE THING THAT COULD HAVE GONE WRONG QUIETLY, AND THE GATE THAT STOPS IT
+
+`isRampMove` — cuts, changes Z, moves in XY — **also matches every segment of a HELIX.** An ungated split would have
+lifted the helix rows out of their move-for-move criterion too, silently, while every spec stayed green. The ruling
+is explicit that plunge and helix keep theirs untouched, so **every call site gates on `entry: 'ramp'`** and says
+why. On a plunge config the split is a no-op anyway; the gate is what makes that true of the helix as well.
+
+The module's own pairing has a second trap I hit before wiring anything to it: a multi-level program ramps from the
+SAME XY on every level, so matching the return move by XY alone hands level 2's ramp the level-1 return and reports
+a depth error. It takes Z. Found by running the module against `many levels` first — which is the only reason it did
+not surface later as a mystery.
+
+### THE PROVEN LEDGER — the restatement's other half
+
+The two envelope specs failed asking these rows for their PROVENANCE and not finding it: t1483 rewrote four ramp
+rows to name only the RESTATING turn, so `concentric/ramp` no longer said t1404 and the one-way rows no longer said
+t1418. That is exactly the "coverage LOST" reading the key-keeping exists to prevent, told by the value instead of
+by the key. **Each restated row now cites BOTH** — the turn that EARNED the coverage and the turn that restated its
+criterion — which is what makes those provenance assertions true again rather than weakened.
+
+### FOUR LOCKS INVERTED, each asserting the HELIX unmoved in the same breath
+
+Same shape t1483 used for the raster-live PROOF 3 transition, because a capability that lifted one descent and
+quietly carried the other would read identically from outside:
+
+- **the surfacing ENTRY GATE** — a ramp slot keeps its geometry knobs (it bakes nothing); a helix slot still refuses,
+  still with the reason on the control.
+- **pocket PROOF F** — a packed ramp is a REAL ramp now; a helix still degrades and still names itself.
+- **the capability arc's PREMISE 2** — it asserted the pre-C4 state ("the ramp still bakes its geometry — C4 is what
+  collapses this"), which was right for a design not yet built. C4 landed the way the design said it would, so the
+  arc now carries a `landed` field as DATA: the ramp half shipped, the helix half went a different road at
+  t1472/t1474. A design entry whose premise has been overtaken and does not say so is the same defect class as a
+  PROVEN row keeping a criterion it no longer meets.
+- **the SLOT BOUNDARY's descent clause** — and this one deserved care. `SLOT_RASTER_GAP` said "the atom ramps toward
+  the AREA CENTRE and helixes in the middle of the channel". C4 makes the first half false: the atom ramps along its
+  own row and its cross coordinate never drifts, exactly as a slot's does. **The boundary does not move** — the
+  clause survives on its HELIX half, and the ramp half only ever agreed with a slot that happens to be AXIS-ALIGNED,
+  which THE AXIS clause already covers. Three of the four still need a capability the atom does not declare. The
+  spec now asserts both: the retired half AND that the boundary still stands.
+
+### ⚠ A 26th, AND IT WAS AN OPERATOR-FACING SENTENCE
+
+My t1485 inventory scoped itself to specs that IMPORT the atom, and that was too narrow. Widening to everything
+reading `opCamMap` / `slot.js` / the capability arc turned up `cam-row-honesty-1414`, and behind it a live defect:
+`opCamMap`'s entry tip told the machinist **"a ramp/helix pick degrades to a plunge"**. Half of that stopped being
+true at t1483 and it is a sentence a human reads before cutting — gate-1 in this project, not a wording nit (t1404's
+collapse guard got its own label for exactly this reason). It is now a FUNCTION of the pick, the shape `direction`
+directly beside it already used, so the row says what THIS slot does.
+
+**The lesson for the next inventory: "specs that import the changed module" is not the blast radius. The blast
+radius is "specs that read anything the changed module's DECLARATIONS feed", and the operator-facing strings are
+the part nobody greps for.**
+
+### WHERE IT LANDED
+
+    parked branch 152795ab   26 failed · 291 passed     (the 33 specs that import the atom)
+    after t1485               25 failed · 302 passed
+    after t1487                0 failed · 327 passed
+    the wider slot/CAM net    the 26th, fixed — 145 passed across 20 specs
+
+**FULL SUITE ON THE MERGED BRANCH, before the merge back, since this turn IS the gate: 2283 passed, 6 skipped,
+0 failed (17.9m).** Nothing was dropped: every row that had coverage still has it, under a criterion that says what
+it actually checks.
