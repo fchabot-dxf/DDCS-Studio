@@ -1,0 +1,7 @@
+
+network.conf
+   L1: 无线密码
+   L2: 无线IP
+   L3: 有线IP
+   L4L 主机IP
+
