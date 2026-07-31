@@ -26,12 +26,35 @@ const boot = async (page) => {
     await page.waitForFunction(() => document.documentElement.dataset.ddcsReady === '1', null, { timeout: 20000 });
 };
 
-/** The too-small configs — both shapes, and depths that make the peck ladder non-trivial. */
+/**
+ * ── t1444 — THE FIXTURES MOVED TO EXACTLY TOOL-SIZED, AND THE ARM THEY TEST DID NOT MOVE AT ALL ───────────────────
+ *
+ * These were STRICTLY smaller than their tool (Ø4 on a Ø6, 4×4 on a Ø6…) and every one of them now REFUSES: the user
+ * ruled that a feature the tool cannot fit cuts nothing, because the plunge it used to emit made a hole the TOOL's
+ * size — a Ø6 hole where Ø4 was asked. That ruling did not retire the plunge arm; it NARROWED its domain to the case
+ * the arm was always correct for, a pocket the tool exactly fills. So every fixture moves to that case and this act's
+ * bridge, header and twin claims stay exactly as provable as they were — the same `holecycle` single, against the
+ * same frozen literal reference, with the same ledger EXCEPTION 1.
+ *
+ * Moving them is therefore NOT relaxing the test to make it green: the alternative was deleting five bridge cases
+ * that still cover a shipping arm. The strictly-smaller configs they vacated are not dropped either — they become
+ * `REFUSED` below, asserting the contract that replaced their old behaviour, so the file covers BOTH sides of the
+ * boundary the ruling drew rather than trading one for the other.
+ *
+ * Depths and feeds are untouched, so the peck ladder each one exercises is the same ladder.
+ */
 const TINY = {
+    circle: { shape: 'circle', dia: 6, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 },
+    circleDeep: { shape: 'circle', dia: 8, toolDia: 8, depth: 12, stepdown: 2.5, feed: 600, plunge: 180, clearance: 5 },
+    rect: { shape: 'rect', w: 6, h: 6, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 },
+    rectDeep: { shape: 'rect', w: 12, h: 8, toolDia: 8, depth: 10, stepdown: 3, feed: 500, plunge: 120, clearance: 8 },   // min side == tool, and still not square
+    placed: { shape: 'circle', dia: 6, toolDia: 6, depth: 6, stepdown: 2, feed: 600, plunge: 150, clearance: 5, stockAttach: 'pp', stockDatum: 'nnp', stockW: 200, stockH: 160, stockZ: 20, originX: 15, originY: -8 },
+};
+
+/** t1444 — the configs the fixtures above vacated: STRICTLY smaller than their tool, so they refuse instead. */
+const REFUSED = {
     circle: { shape: 'circle', dia: 4, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 },
-    circleDeep: { shape: 'circle', dia: 5, toolDia: 8, depth: 12, stepdown: 2.5, feed: 600, plunge: 180, clearance: 5 },
-    rect: { shape: 'rect', w: 4, h: 4, toolDia: 6, depth: 3, stepdown: 1, feed: 600, plunge: 150, clearance: 5 },
-    rectDeep: { shape: 'rect', w: 5, h: 3, toolDia: 8, depth: 10, stepdown: 3, feed: 500, plunge: 120, clearance: 8 },
+    rect: { shape: 'rect', w: 5, h: 3, toolDia: 8, depth: 10, stepdown: 3, feed: 500, plunge: 120, clearance: 8 },
     placed: { shape: 'circle', dia: 4, toolDia: 6, depth: 6, stepdown: 2, feed: 600, plunge: 150, clearance: 5, stockAttach: 'pp', stockDatum: 'nnp', stockW: 200, stockH: 160, stockZ: 20, originX: 15, originY: -8 },
 };
 
@@ -97,6 +120,47 @@ for (const [name, cfg] of Object.entries(TINY)) {
 }
 
 /**
+ * ── t1444 — THE OTHER SIDE OF THE BOUNDARY: what the vacated fixtures do NOW ──────────────────────────────────────
+ *
+ * The same shape the pocket golden's 40 exempt entries use, because it is the same fact: a pocket the tool cannot fit
+ * REFUSES, cuts nothing, and says why in the operator's own words. Asserted here rather than only in
+ * `tool-fit-refusal-1444` so this file still covers BOTH domains of the arm it is about — the plunge above, and the
+ * refusal that took the rest.
+ */
+for (const [name, cfg] of Object.entries(REFUSED)) {
+    test(`THE REFUSAL (${name}) — strictly smaller than its tool cuts NOTHING and says why (t1444)`, async ({ page }) => {
+        await boot(page);
+        const r = await page.evaluate(async (cfg) => {
+            const { pocketStack, pocketToolRefuses } = await import('/wizards/pocketWizard.js');
+            const { emitMapped } = await import('/blocks/blockEmitter.js');
+            const { traceToolpath } = await import('/engine/trace.js');
+            const txt = emitMapped(pocketStack(cfg)).text;
+            const t = traceToolpath(txt);
+            const segs = t.segments || [];
+            return { txt, refuses: pocketToolRefuses(cfg), why: t.stats.refusedWhy || '',
+                cuts: segs.filter((s) => !s.rapid).length,
+                // the OP's motion, separated from the PROGRAM's framing — see the note on the assertion below
+                xyMoves: segs.filter((s) => Math.abs(s.x1 - s.x2) > 1e-9 || Math.abs(s.y1 - s.y2) > 1e-9).length,
+                hasHoleCycle: /parametric: 1 hole/.test(txt) };
+        }, cfg);
+        expect(r.refuses, 'the config really is on the refusing side of the boundary').toBe(true);
+        expect(r.cuts, 'it cuts NOTHING').toBe(0);
+        /**
+         * ⚠ NOT "zero segments" — measured, and the distinction is this file's own (see the swap note above). A refused
+         * program still carries the FRAMING every program has: `G0 Z5` up to clearance and the `G53 Z` safe retract,
+         * two Z-ONLY rapids that `progstart`/`progend` emit outside the op entirely. The claim the ruling makes is
+         * about what the OP contributes, so that is what is asserted: no XY motion anywhere. Asserting zero segments
+         * would have been asserting that the program framing had been deleted too, which is neither true nor wanted.
+         */
+        expect(r.xyMoves, 'the OP contributes NO motion — the only segments are the program framing\'s Z-only rapids').toBe(0);
+        expect(r.hasHoleCycle, 'the plunge arm is NOT taken — that is the whole change').toBe(false);
+        expect(r.txt, 'the refusal is in the program, in the family\'s form').toMatch(/#1505\s*=\s*1/);
+        expect(r.why, 'and the engine reports the op\'s own sentence, with both numbers')
+            .toMatch(/No toolpath — the [\d.]+mm tool cannot fit the [\d.]+mm pocket/);
+    });
+}
+
+/**
  * THE NORMAL ARMS ARE BYTE-IDENTICAL — the fallback is the ONLY path this act may change.
  * Swept across shape × strategy × rest-tool, because "I only touched the tooSmall arm" is exactly the kind of claim that
  * is true of the code and false of the emit.
@@ -148,7 +212,7 @@ test('THE HEADER — the too-small arm now declares @work, and its trace is not 
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const { readDeclaredWork } = await import('/engine/declaredWork.js');
         const { traceToolpath } = await import('/engine/trace.js');
-        const txt = emitMapped(pocketStack({ shape: 'circle', dia: 4, toolDia: 6, depth: 12, stepdown: 0.5, feed: 600, plunge: 150, clearance: 5 })).text;
+        const txt = emitMapped(pocketStack({ shape: 'circle', dia: 6, toolDia: 6, depth: 12, stepdown: 0.5, feed: 600, plunge: 150, clearance: 5 })).text;   // t1444 — Ø == tool: the plunge arm's remaining domain (Ø4 refuses now)
         const tr = traceToolpath(txt);
         return {
             header: (txt.match(/^\( ---- DRILL.*$/m) || [])[0],
@@ -174,7 +238,7 @@ test('THE TWIN — pocket\'s four tenant bindings now resolve onto holecycle, an
         const { pocketStack } = await import('/wizards/pocketWizard.js');
         const { emitMapped } = await import('/blocks/blockEmitter.js');
         const def = pocketDataDef();
-        const tiny = { ...POCKET_DEFAULTS, shape: 'circle', dia: 4, toolDia: 6, depth: 3, stepdown: 1 };
+        const tiny = { ...POCKET_DEFAULTS, shape: 'circle', dia: 6, toolDia: 6, depth: 3, stepdown: 1 };   // t1444 — Ø == tool: still the plunge arm, so the four tenant bindings are still the thing under test
         const st = instantiate(def, tiny);
         const flat = flattenBlocks(st);
         const hc = flat.find((b) => b.type === 'holecycle');

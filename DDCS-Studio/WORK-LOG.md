@@ -11330,3 +11330,46 @@ would let the next op join the family without joining the law) · the two PREVIE
 
 new spec **5/5** · slot + pocket families + round-trip **58/58** with **IRON RULE 11/11, same list, no growth** ·
 drill + bore + text + declared-work **42/42** · surfacing + raster + rest + CAM **154/154** · smoke **71/71**.
+
+## t1446 (seat A) — GROUNDING t1391's SPEC UNDER THE t1444 LAW: the arm did not move, its DOMAIN did
+
+The full suite found the one file the t1444 radius sweep missed. Seven tests here, all the same cause: every fixture
+in `TINY` was STRICTLY smaller than its tool (Ø4 on a Ø6, 4×4 on a Ø6, 5×3 on a Ø8…), so every one of them now
+refuses. The sweep caught `pocket-data-emit`, `pocket-asblocks`, `cam-op-seed` and the golden because those name
+`tooSmall` in their own text; this file calls the same thing `TINY`, which is why a grep for the concept found it and
+a grep for the word did not.
+
+### THE RESTATEMENT — the fixtures moved, the claims did not
+
+The ruling did not retire the plunge arm; it NARROWED its domain to the case the arm was always correct for — a
+pocket the tool EXACTLY fills. So every fixture moves there (Ø4→Ø6, Ø5/Ø8→Ø8, 4×4→6×6, 5×3→**12×8** so the min side
+equals the tool and the rect stays non-square) and the act's three claims stay exactly as provable as they were: the
+same `holecycle` single, against the same **frozen** `/_test/` literal reference, with the same ledger EXCEPTION 1
+(one extra R-plane rapid, every cut identical). Depths and feeds untouched, so each case exercises the same peck
+ladder. **The bridge coverage is not lost — that was the point of moving the fixtures rather than deleting them.**
+
+### AND THE VACATED CONFIGS ARE NOT DROPPED — they assert what replaced them
+
+The old strictly-smaller values become a `REFUSED` table with the same new-contract shape the golden's 40 exemptions
+use: refuses · zero cuts · no motion · `stats.refusedWhy` carrying the op's own sentence · and the plunge arm
+explicitly NOT taken. So the file now covers BOTH sides of the boundary the ruling drew instead of trading one for
+the other.
+
+### ⚠ THE ASSERTION I GOT WRONG FIRST, AND WHAT MEASURING IT TAUGHT
+
+I wrote `expect(segs).toBe(0)` — "traces nothing at all, not even a rapid" — and it failed on all three. Measured
+rather than relaxed: a refused pocket program is
+
+    G90 · G0 Z5 (clearance) · #1505=1 ( ERROR: … ) · M5 · M9 · #101=0 · G53 Z#101 · M30
+
+Two segments, both **Z-only rapids**, both emitted by `progstart`/`progend` OUTSIDE the op. That is the FRAMING every
+program has, and this very file's own swap-note warns about exactly that confusion ("that difference was the FRAMING,
+not the cut"). The claim the ruling makes is about what the OP contributes, so that is what is asserted now: **no XY
+motion anywhere**. Asserting zero segments would have been asserting the program framing had been deleted too — not
+true, not wanted, and it would have made the test fail the day framing changed for unrelated reasons.
+
+### GATE (fast tier)
+
+`pocket-tenant-extraction-1391` **11/11** (5 bridge · 3 refusal · normal arms · header · twin) — which is exactly the
+11 the full suite reported. Pocket family + tool-fit + round-trip **93/93** with **IRON RULE 11/11, same list, no
+growth**. Smoke **71/71**. Test-only change: 1 file, +76/−0 lines of product code.
