@@ -12004,3 +12004,64 @@ dragging the preview's bottom-edge handle moves the handle into grey, canvas doe
 seam, verify at ~412px AND desktop, assert at the pixel), **2. the MOBILE CAM-BUILDER cleanup** (Build-CAM-slot page
 at phone width: tools to a horizontal row above a full-width canvas, panel below, field table scrolling in its own
 container; desktop asserted unmoved), **then** the remainder resumes at true-arc helix.
+
+## t1468 (seat A) — THE BOTTOM-HANDLE DEFECT: the drag wrote a height nothing consumed. Mobile-only, and measured before anything changed.
+
+### THE SEAM — diagnosed first, exactly as dispatched, and it is the first of the two hypotheses
+
+**NOT a re-render bug.** The bottom sizer resizes `.wiz-visual`. **Desktop's panes FLEX inside that height**, so the
+canvases follow for free and always have. **The mobile stack cannot flex** — the media query says why in its own
+words: the modal is `height:auto`, so the flex-grow chain has no free space and the visual would collapse to zero.
+Its pane bodies therefore carry an **explicit CSS height** — and that height was the **constant 400px**, split by
+the ratio. So on mobile the sizer wrote a number with **no consumer**.
+
+Measured at 412px on the real modal, before touching anything:
+
+    drag DOWN   visual 492 → 716     both pane bodies stayed at exactly 200 (400 total). 240px of bare panel.
+                                     The sizer did not even move — the panes content-size from the top, so the
+                                     extra height opened as free space BELOW the handle. **That band is the grey.**
+    drag UP     visual 492 → 286     bodies still 400 total → the panes OVERFLOWED the block that contains them and
+                                     covered the sizer. `elementFromPoint` stopped returning it, so the second
+                                     drag did nothing at all: **the gesture could not be undone.**
+    DESKTOP     visual 594 → 788     bodies 502 → 696, canvas bitmap 251 → 348. Correct, and correct before the fix.
+
+⚠ **SO THE DEFECT IS MOBILE-ONLY, AND I AM SAYING SO RATHER THAN CLAIMING THE DISPATCH'S "BOTH".** My first desktop
+run *looked* broken — visual 800 → 800, nothing moved — and the reason was that a 1400×1000 viewport puts the block
+**already at its derived ceiling** (t1353), so a down-drag is a correct no-op. Shrinking first and then growing
+showed desktop working perfectly. Reporting that as a second defect would have sent the next act hunting a bug that
+is not there; the desktop test in the spec now pins that behaviour so the distinction cannot decay.
+
+### THE FIX — the stacked total becomes the same quantity the handle already writes
+
+`--viz-stack-h`, declared in the CSS with the **old 400px as its default** (the never-dragged case keeps t790's
+meaning exactly), and filled in by `applyVisualHeight` — the **one** place that writes the visual's height, so every
+path gets it: the drag, the mount, the reload, the cross-wizard sync.
+
+**CHROME IS MEASURED, NOT COUNTED.** The gap between the block and its bodies is the split's gaps, two pane borders,
+the ratio splitter and the sizer itself — 92px at one width and something else at another. A formula reproducing
+that would be a second source that has to be kept in step with four CSS rules, so `stackChrome` asks the layout:
+`visual − Σbodies`. It is **stable rather than drifting** because the next pass reproduces exactly that difference
+(apply `fit`, bodies become `fit − chrome`, chrome measures back to the same number).
+
+**AND IT NEEDS NO MEDIA QUERY IN JS.** The rules that read the variable live inside `@media (max-width: 860px)`, so
+desktop simply ignores it. Branching in JS on 860px would have put the breakpoint in two places — the exact
+duplication that makes responsive bugs immortal.
+
+### GATE (fast tier) — and the reproduction is a picture, not an adjective
+
+new spec `pane-sizer-mobile-1468` **3/3**, and **MUTATION-TESTED**: pinning the CSS back to the constant turns
+**both phone tests RED and leaves the desktop one GREEN** — the exact shape the diagnosis predicts. The asserts are
+the symptom, not the arithmetic: the **canvas's own bitmap height** (97 → 194 at 412px — a number that only moves
+when something re-rendered) plus a **hit test** 12px inside the block's bottom edge, which must land in a preview
+rather than in the panel behind it.
+
+`scratchpad/t1468-phone-BROKEN.png` reproduces the user's screenshot by pinning `--viz-stack-h` to its constant —
+the same grey band, the same stranded handle — beside `t1468-phone-after.png`. **Eyeballed both.**
+
+Pane family `pane-sizer-1353` + `pane-splitter-790` + `collapsible-panes-752` + `polish-batch-1239` + the new spec
+**25/25**. **IRON RULE 11/11, same list, no growth.** Smoke **71/71**. Radius check against the flake ledger:
+`preview-chip-tag-1395` + `sim-anim-refresh` + `form-widgets` **9/9** — read-only, **not edited**; my radius does not
+reach them, so there is nothing to flag on that front.
+
+**RELEASE:** unlike t1466 this one IS user-visible on the live deploy, so it is worth a `.ver` bump — left to the
+advisor, whose full suite is the stated gate.

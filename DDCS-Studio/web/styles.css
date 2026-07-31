@@ -2244,10 +2244,18 @@ button.primary:hover {
        ITS height to the FORM below while the surviving pane keeps its size. */
     .wiz-2pane .wiz-visual .viz-split { flex-direction: column; }
     .wiz-2pane .wiz-visual .viz-split > .viz-container { flex: 0 0 auto; min-height: 0; }
-    .wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body { height: 200px; }   /* each stacked preview keeps a fixed size */
-    /* t790 — the ratio splits the FIXED total (2×200) so the splitter works stacked AND collapsing still frees the form. */
-    .wiz-2pane .wiz-visual [data-viz-pane="preview3d"] > .wiz-pane-body { height: calc(400px * var(--pane-ratio, 0.5)); }
-    .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(400px * (1 - var(--pane-ratio, 0.5))); }
+    /* t1468 (user defect) — THE STACKED TOTAL IS A VARIABLE, NOT A CONSTANT, and that is the whole bug. These heights
+       used to be a hard 400px, so the bottom sizer — which resizes `.wiz-visual` — wrote a height NOTHING DOWNSTREAM
+       CONSUMED here: dragging DOWN opened bare panel below the previews (the "grey"), and dragging UP pulled the
+       block in under its own pinned content until the handle was covered and could not be grabbed back. Desktop was
+       always fine because its panes FLEX inside the definite height. `--viz-stack-h` is that same quantity expressed
+       for the stacked layout — paneAccordion's applyVisualHeight (the ONE writer of the visual's height) derives it
+       as `height − chrome`, measured, so the two can never disagree. The 400px default is the never-dragged case and
+       keeps t790's meaning exactly. */
+    .wiz-2pane .wiz-visual [data-viz-pane] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) / 2); }
+    /* t790 — the ratio splits that total so the splitter works stacked AND collapsing still frees the form. */
+    .wiz-2pane .wiz-visual [data-viz-pane="preview3d"] > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * var(--pane-ratio, 0.5)); }
+    .wiz-2pane .wiz-visual [data-viz-pane="layout2d"]  > .wiz-pane-body { height: calc(var(--viz-stack-h, 400px) * (1 - var(--pane-ratio, 0.5))); }
     .wiz-2pane .wiz-visual .wiz-viz3d { flex: 1 1 auto; height: auto !important; min-height: 0; }
     /* Lock the preview at the top: it stays pinned while the form scrolls under it (single-column view). */
     .wiz-2pane > .wiz-visual {

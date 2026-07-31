@@ -192,11 +192,39 @@ function visualMaxHeight(visual) {
     return Math.max(VIZH_MIN, Math.min(VIZH_MAX, Math.floor(hb.bottom - vb.top - below)));
 }
 
+/**
+ * t1468 (user defect) — THE STACKED LAYOUT'S SHARE OF THE HEIGHT, DERIVED RATHER THAN PINNED.
+ *
+ * Desktop's panes FLEX inside the visual's definite height, so resizing the block resizes the canvases for free.
+ * The mobile stack cannot flex (the modal is height:auto — see the media query's own note), so its pane bodies carry
+ * an explicit CSS height, and that height was the CONSTANT 400px. The sizer therefore wrote a quantity NOTHING
+ * DOWNSTREAM CONSUMED: a down-drag opened bare panel below the previews — the "grey" the user reported — and an
+ * up-drag pulled the block in under its own pinned content until the pane covered the handle and the gesture could
+ * not be undone. Measured at 412px: visual 492→716 while both bodies stayed at exactly 200.
+ *
+ * So the CSS declares `--viz-stack-h` (defaulting to the same 400px for the never-dragged case) and this is the one
+ * place that fills it in. CHROME IS MEASURED, NOT COUNTED: the split's gaps, the two pane borders, the ratio
+ * splitter and the sizer itself come to 92px at one width and something else at another, and a formula that has to
+ * be kept in step with four CSS rules is a second source. `visual − bodies` asks the layout instead, and because the
+ * next pass reproduces exactly that difference the value is stable rather than drifting.
+ *
+ * Inert on desktop by construction: the rules that read the variable live inside the ≤860px media query, so nothing
+ * here needs to know which layout it is in — the CSS decides who consumes it.
+ */
+function stackChrome(v) {
+    const bodies = [...v.querySelectorAll('[data-viz-pane] > .wiz-pane-body')];
+    if (!bodies.length) return null;
+    const vh = v.getBoundingClientRect().height;
+    if (!(vh > 0)) return null;                                   // not laid out → no opinion, leave the default
+    const sum = bodies.reduce((a, b) => a + b.getBoundingClientRect().height, 0);
+    return Math.max(0, Math.round(vh - sum));
+}
+
 function applyVisualHeight(h) {
     const px = h === undefined ? getVisualHeight() : h;
     let healed = null;
     document.querySelectorAll('.wiz-visual').forEach((v) => {
-        if (px == null) { v.style.removeProperty('height'); v.style.removeProperty('flex'); return; }
+        if (px == null) { v.style.removeProperty('height'); v.style.removeProperty('flex'); v.style.removeProperty('--viz-stack-h'); return; }
         // THE STORED VALUE HEALS. A 900 persisted before this fix (or saved on a taller window, or on a screen that
         // has since been resized) must not reopen every wizard with its handle buried — so a visual that cannot take
         // the stored height takes what it can, and the smallest such fit is written back below. Reopening broken is
@@ -204,8 +232,11 @@ function applyVisualHeight(h) {
         const cap = visualMaxHeight(v);
         const fit = Math.min(px, cap);
         if (fit < px) healed = healed == null ? fit : Math.min(healed, fit);
+        // derive the stacked share from the CLAMPED height (never the request), BEFORE the write moves the rects
+        const chrome = stackChrome(v);
         v.style.height = fit + 'px';
         v.style.flex = '0 0 auto';   // an explicit height only means something once it stops flexing
+        if (chrome != null) v.style.setProperty('--viz-stack-h', Math.max(0, fit - chrome) + 'px');
     });
     // Persist the heal AFTER the layout pass, and only from a measurable visual. setVisualHeight no-ops on an
     // unchanged value, and re-entering here with the healed number clamps to itself — so this settles, it does not loop.
