@@ -166,6 +166,9 @@ test('THE ROW SAYS WHAT THE MACRO DOES — a spiral pocket now packs a spiral, a
             direction: row({ strategy: 'raster', direction: 'oneway' }, 'direction'),
             entryRow: row({ entry: 'ramp' }, 'entry'),
             stepdownRow: row({ entry: 'ramp' }, 'stepdown'),
+            // t1487 — the HELIX arm, read beside the ramp's so the two descents cannot be confused for one another
+            entryHelixRow: row({ entry: 'helix' }, 'entry'),
+            stepdownHelixRow: row({ entry: 'helix' }, 'stepdown'),
         };
     });
 
@@ -190,9 +193,23 @@ test('THE ROW SAYS WHAT THE MACRO DOES — a spiral pocket now packs a spiral, a
     // leaving the operator to find it by reading the descent line.
     expect(r.entryRow, 'entry has a row too').not.toBe(null);
     expect(r.entryRow._exposeTip, 'entry genuinely reaches the macro — no not-carried sentence').not.toMatch(/NOT carried/);
-    expect(r.entryRow._exposeTip, 'and it warns that a ramp/helix pick degrades, in the program, with the reason').toMatch(/degrades to a plunge/);
-    // …and the entry gate it drives still greys the two knobs its geometry bakes.
-    expect(r.stepdownRow.exposable, 'the t1341 entry gate is untouched').toBe(false);
+    /**
+     * ⚠ t1487 — THE RAMP HALF OF THIS ROW INVERTED, AND IT IS AN OPERATOR-FACING SENTENCE (ruled t1486).
+     *
+     * The row used to warn that a ramp/helix pick degrades to a plunge. After C4 (t1483/t1485) a RAMP bakes nothing
+     * — it runs along its own pass against LIVE span registers — so it is packed as a real ramp, and a row still
+     * warning about it would be telling the machinist something untrue about the program in their hand. The HELIX
+     * still bakes its inradius clamp (t1343), so its warning stands, and both arms are read HERE so a future change
+     * cannot quietly carry one with the other.
+     */
+    expect(r.entryRow._exposeTip, 'a RAMP pick is packed as a real ramp now — the row says so').toMatch(/pendant-true|re-derives it/);
+    expect(r.entryRow._exposeTip, 'and no longer warns that the ramp itself degrades').not.toMatch(/a ramp\/helix pick degrades/);
+    expect(r.entryHelixRow._exposeTip, 'a HELIX pick still degrades, and the row still warns with the reason').toMatch(/helix pick degrades to a plunge/);
+    expect(r.entryHelixRow._exposeTip, 'naming the clamp that keeps it there').toMatch(/inradius/);
+    // …and the entry gate it drives still greys the knobs whose geometry is ACTUALLY baked — the helix's, not the
+    // ramp's. t1483 narrowed the gate; this is the row-honesty half of the same narrowing.
+    expect(r.stepdownRow.exposable, 'a RAMP slot keeps its stepdown — nothing of its geometry is baked').not.toBe(false);
+    expect(r.stepdownHelixRow.exposable, 'a HELIX slot is still gated: the t1341 gate is narrowed, not lifted').toBe(false);
 });
 
 /**

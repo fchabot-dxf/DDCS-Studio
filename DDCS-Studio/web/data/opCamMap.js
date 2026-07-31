@@ -214,7 +214,20 @@ export const GENERATOR_BAKES_PICK = {
         direction: (p) => (pocketReadsDirection(p)
             ? 'BAKED into this slot: Zig-zag links its passes at depth; One-way lifts, rapids back and re-plunges for every pass so the cut direction stays consistent. The macro contains ONE of them.'
             : ''),   // …and on the SPIRAL arm it is not baked at all — it is ignored, and GENERATOR_IGNORES says so
-        entry: 'BAKED into this slot: the pack descends with a straight PLUNGE. Ramp and Helix compute their geometry from a fixed area, and this slot\'s area is a pendant knob — so a ramp/helix pick degrades to a plunge, and the macro SAYS so on the line where it descends.',
+        /**
+         * ⚠ t1487 — THIS SENTENCE WAS TOLD TO AN OPERATOR AND HALF OF IT STOPPED BEING TRUE, which this project
+         * treats as a gate-1 defect rather than a wording nit (t1404's collapse guard got its own label for exactly
+         * this reason). It read "a ramp/helix pick degrades to a plunge". After C4 (t1483/t1485) a RAMP runs along
+         * its own pass against LIVE span registers with its start on the live row register — it bakes nothing, so it
+         * is packed as a REAL ramp. The HELIX is unchanged: it still bakes the rect inradius that clamps its radius
+         * (t1343), so it still degrades and still says so.
+         *
+         * It becomes a FUNCTION of the pick, which is the shape `direction` one line above already uses — the row
+         * says what THIS slot does, rather than one sentence covering two descents that no longer behave alike.
+         */
+        entry: (p) => (String(p && p.entry) === 'helix'
+            ? 'BAKED into this slot: a Helix computes its geometry from a fixed area — the rect inradius clamps its radius — and this slot\'s area is a pendant knob, so a helix pick degrades to a plunge, and the macro SAYS so on the line where it descends.'
+            : 'BAKED into this slot: the pack descends the way you pick here. A straight PLUNGE and a RAMP are both pendant-true — the ramp runs along its own pass against the live area registers, so dialling the area re-derives it (C4) — while a HELIX still bakes the inradius that clamps its radius, so a helix pick degrades to a plunge and the macro says so where it descends.'),
     },
 };
 

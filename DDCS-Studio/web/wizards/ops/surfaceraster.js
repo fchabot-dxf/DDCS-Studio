@@ -1244,20 +1244,24 @@ export const SURFACE_RASTER_PROVEN = {
     // purpose, so they are proven by RELATIONSHIP now — byte-identity everywhere outside the descent, and inside it
     // the angle, the drop, the start, the return to it and the honest degrade. Keys unchanged: the combinations are
     // still covered, and a ledger that dropped them would read as coverage LOST.
-    'parallel/bothways/ramp': 't1483 — the DECLARED run vector along the row (was t1339 baked toC); relationship-bridged',
+    // t1487 — EACH RESTATED ROW CITES BOTH TURNS: the one that EARNED the coverage and the one that restated its
+    // criterion. t1483 wrote only the restating turn, and that read as though the earlier proof had been dropped —
+    // the exact "coverage LOST" the key-keeping was meant to prevent, and the two envelope specs said so by asking
+    // these rows for their provenance and not finding it.
+    'parallel/bothways/ramp': 't1339 earned it (the ramp descent); t1485 restated the criterion — a DECLARED run vector along the row retires the baked toC; relationship-bridged',
     'parallel/bothways/helix': 't1345 — the 24-segment polyline helix, within one emit quantum',
     // t1418 — the six the one-way walk earned, each measured per-phase against the frozen literal's `onewayMoves`.
     // They are SIX and not three because the mirror is the same walk with its two ends swapped: teaching one and
     // leaving the other would have left a conventional-cut pocket on the literal arm while the boundary's wording
     // read as though one-way were handled.
     'parallel/oneway/plunge': 't1418 — the one-way walk, against the literal onewayMoves (lift · rapid · re-plunge)',
-    'parallel/oneway/ramp': 't1483 — likewise, along the row; the descent is still per LEVEL at row 0',
+    'parallel/oneway/ramp': 't1418 earned it (the one-way walk, descent per LEVEL at row 0); t1485 restated the criterion — the run vector runs along the row; relationship-bridged',
     'parallel/oneway/helix': 't1418 — likewise, inside the whole-revolution agreement the t1406 ledger names',
     'parallel/otherway/plunge': 't1418 — the mirror: every row starts at the FAR end, including the level descent',
-    'parallel/otherway/ramp': 't1483 — likewise, and the vector takes the MIRROR sign so the ramp runs into the area',
+    'parallel/otherway/ramp': 't1418 earned it (the mirror, every row from the FAR end); t1485 restated the criterion — the vector takes the MIRROR sign so the ramp runs INTO the area; relationship-bridged',
     'parallel/otherway/helix': 't1418 — likewise',
     'concentric/plunge': 't1333 — inward rings, proven on four adversarial ring boundaries',
-    'concentric/ramp': 't1483 — along +X from the ring corner, the direction the ring walk itself leaves on',
+    'concentric/ramp': 't1404 earned it (the descent the rings never had — the t1402 defect); t1485 restated the criterion — along +X from the ring corner, the direction the ring walk itself leaves on; relationship-bridged',
     'concentric/helix': 't1404 — likewise; both now run the SAME descentLines both walks ask for',
 };
 

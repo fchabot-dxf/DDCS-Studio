@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { rampDescentRelationship, splitRampDescent, cutBox } from './support/rampRelationship.js';
 
 /**
  * t1375 — THE PROGRAM ROTATION IS ABSORBED BY THE ATOM, so a surfacing program can be aligned again.
@@ -85,7 +86,10 @@ const bridge = (page, cfg) => page.evaluate(async (cfg) => {
     const { traceToolpath } = await import('/engine/trace.js');
     // t1377 — the FEED rides in the tuple. A rotation is a planar map: it must not change how fast anything cuts, and
     // that is now measured rather than assumed (the modal-feed fold's flow blindness lived in exactly this gap).
-    const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => [s.x2, s.y2, s.z2, +Number(s.feed || 0).toFixed(3)]);
+    // t1487 — the tuple carries its START too. Everything below reads the ENDPOINT (fields 3-5) and the feed (6),
+    // exactly as it read fields 0-2 and 3 before; the start is what lets the ramp relationship ask where a descent
+    // begins and whether it returns there, which an endpoint cannot answer.
+    const cut = (nc) => (traceToolpath(nc).segments || []).filter((s) => !s.rapid).map((s) => [s.x1, s.y1, s.z1, s.x2, s.y2, s.z2, +Number(s.feed || 0).toFixed(3)]);
     const xf = makeXform({ angle: cfg.angle, pivotX: cfg.pivotX || 0, pivotY: cfg.pivotY || 0 });
     const p = { ...cfg };
     const litRes = emitMapped([xf, ...surfacingLiteralStack(p)]);
@@ -98,24 +102,27 @@ const bridge = (page, cfg) => page.evaluate(async (cfg) => {
 }, cfg);
 
 /** The three measurements above, as numbers — computed in the test, never taken from the thing under test. */
-function measure(r, angle, pivotX = 0, pivotY = 0) {
+function measure(r, angle, pivotX = 0, pivotY = 0, skip = new Set()) {
     const th = angle * Math.PI / 180, c = Math.cos(th), s = Math.sin(th);
     let vsLit = 0, vsExact = 0, litVsExact = 0, worstZ = 0;
     // t1377 — the FEEDS are compared EXACTLY, and against BOTH truths: the literal reference and this program
     // unrotated. A feed is not a position, so it gets no quantum tolerance.
-    const feedsOf = (xs) => xs.map((m) => m[3]);
+    const feedsOf = (xs) => xs.filter((_, i) => !skip.has(i)).map((m) => m[6]);
     const feedVsLit = JSON.stringify(feedsOf(r.par)) === JSON.stringify(feedsOf(r.lit));
     const feedVsFlat = JSON.stringify(feedsOf(r.par)) === JSON.stringify(feedsOf(r.flat));
+    // t1487 — `skip` carries the DESCENT's move positions when the caller is comparing a ramp against the literal.
+    // It is empty for every other caller, so those measurements are the ones they always were.
     for (let i = 0; i < Math.min(r.par.length, r.lit.length); i++) {
-        vsLit = Math.max(vsLit, Math.abs(r.par[i][0] - r.lit[i][0]), Math.abs(r.par[i][1] - r.lit[i][1]));
-        worstZ = Math.max(worstZ, Math.abs(r.par[i][2] - r.lit[i][2]));
+        if (skip.has(i)) continue;
+        vsLit = Math.max(vsLit, Math.abs(r.par[i][3] - r.lit[i][3]), Math.abs(r.par[i][4] - r.lit[i][4]));
+        worstZ = Math.max(worstZ, Math.abs(r.par[i][5] - r.lit[i][5]));
     }
     for (let i = 0; i < Math.min(r.par.length, r.flat.length); i++) {
-        const [x, y] = r.flat[i];
+        const [, , , x, y] = r.flat[i];
         const ex = pivotX + (x - pivotX) * c - (y - pivotY) * s;
         const ey = pivotY + (x - pivotX) * s + (y - pivotY) * c;
-        vsExact = Math.max(vsExact, Math.abs(r.par[i][0] - ex), Math.abs(r.par[i][1] - ey));
-        if (i < r.lit.length) litVsExact = Math.max(litVsExact, Math.abs(r.lit[i][0] - ex), Math.abs(r.lit[i][1] - ey));
+        vsExact = Math.max(vsExact, Math.abs(r.par[i][3] - ex), Math.abs(r.par[i][4] - ey));
+        if (i < r.lit.length && !skip.has(i)) litVsExact = Math.max(litVsExact, Math.abs(r.lit[i][3] - ex), Math.abs(r.lit[i][4] - ey));
     }
     return { vsLit, vsExact, litVsExact, worstZ, feedVsLit, feedVsFlat };
 }
@@ -183,7 +190,23 @@ for (const entry of ['plunge', 'ramp', 'helix']) {
     test(`COMPOSED — rotation × placement shift × ${entry} descent`, async ({ page }) => {
         await boot(page);
         const r = await bridge(page, { ...FACE, entry, helixDia: 8, helixPitch: 1, angle: 12.5, originX: 40, originY: 25, attach: 'll' });
-        const m = measure(r, 12.5);
+        /**
+         * ⚠ t1487 — RESTATED, NOT RETIRED (ruled t1486). C4 points the ramp along the ROW rather than at the area
+         * centre (t1483/t1485), so on the ramp arm the two descents are no longer the same two moves — and this
+         * test's claim was never about that. It is about the ROTATION composing with the placement shift, which is
+         * asserted against an EXACT rotation of this same program (`vsExact`) and is untouched: that comparison is
+         * parametric-against-parametric and covers the descent moves too, ramp included.
+         *
+         * So only the vs-LITERAL measurement steps around the descent, and the descent gets its declared
+         * relationship instead — measured in the ROTATED frame on both sides, which is the stronger reading here.
+         */
+        const skip = entry === 'ramp' ? new Set(splitRampDescent(r.par).indices) : new Set();
+        const m = measure(r, 12.5, 0, 0, skip);
+        if (entry === 'ramp') {
+            const rel = rampDescentRelationship(r.lit, r.par, { bbox: cutBox(r.lit) });
+            expect(rel.ok, `the rotated descent holds its declared relationship to the rotated literal — ${rel.why}`).toBe(true);
+            expect(skip.size, 'and the descent really was found, so the skip above is not silently empty').toBeGreaterThan(0);
+        }
         expect(r.lit.length, 'the literal reference cuts').toBeGreaterThan(4);
         expect(r.par.length, `same count (literal ${r.lit.length}, parametric ${r.par.length})`).toBe(r.lit.length);
         expect(r.par.length, 'and the rotation changes no move count').toBe(r.flat.length);

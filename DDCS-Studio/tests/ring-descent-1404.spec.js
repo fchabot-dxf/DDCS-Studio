@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { rampDescentRelationship, splitRampDescent, cutBox } from './support/rampRelationship.js';
 
 /**
  * t1404 — THE RINGS DESCEND, THE ENVELOPE STOPS LYING, AND THE INSET SEAM LANDS.
@@ -64,7 +65,23 @@ for (const c of RING_CONFIGS) {
         // fix would show up here as `0`, naming what broke, rather than as an opaque array mismatch.
         expect(r.lRamp, `the literal ramps on this config (else the config proves nothing)`).toBeGreaterThan(0);
         expect(r.pRamp, `the parametric must ramp too — this is the t1402 defect`).toBe(r.lRamp);
-        expect(r.P, `and the whole toolpath agrees move for move`).toEqual(r.L);
+        /**
+         * ⚠ t1487 — THE CRITERION IS RESTATED, THE COVERAGE IS NOT DROPPED (ruled t1486; the t1391/t1406 precedent).
+         *
+         * This read `expect(r.P).toEqual(r.L)` — the whole toolpath, move for move. C4 (t1483/t1485) points the ramp
+         * along the ROW instead of at the area centre, because the centre-ward ramp had to bake a hypotenuse and SQRT
+         * is unverified here (t1339). So the literal's descent is no longer the reference for THIS descent — and the
+         * walk around it still is, exactly as before.
+         *
+         * What replaces it is not weaker, it is more specific: the walk is asserted move-for-move as it always was,
+         * and the descent is asserted on the properties an operator picks a ramp FOR — same start, same drop, same
+         * run length (which IS the angle: the run is drop/tan(angle) on both sides), same feed, returns to its start,
+         * stays in the material. See tests/support/rampRelationship.js for the measurement this rests on.
+         */
+        const L = splitRampDescent(r.L), P = splitRampDescent(r.P);
+        expect(P.walk, 'OUTSIDE the descent the toolpath is unchanged, move for move').toEqual(L.walk);
+        const rel = rampDescentRelationship(r.L, r.P, { bbox: cutBox(r.L) });
+        expect(rel.ok, `and the descent holds its declared relationship to the literal — ${rel.why}`).toBe(true);
     });
 }
 
@@ -94,7 +111,9 @@ test('RINGS HELIX — the descent the rings never had, move for move', async ({ 
  */
 const UNCHANGED = [
     { name: 'parallel × plunge', cfg: { strategy: 'parallel', entry: 'plunge' } },
-    { name: 'parallel × ramp', cfg: { strategy: 'parallel', entry: 'ramp' } },
+    // t1487 — the ONE row here whose descent C4 re-points, flagged as DATA rather than by a branch reading its name.
+    // Everything this row ever claimed still holds outside the descent, which is what the flag scopes.
+    { name: 'parallel × ramp', cfg: { strategy: 'parallel', entry: 'ramp' }, ramp: true },
     { name: 'concentric × plunge', cfg: { strategy: 'concentric', entry: 'plunge' } },
     { name: 'concentric × plunge, rotated', cfg: { strategy: 'concentric', entry: 'plunge', rotAngle: 17, rotPivotX: 5, rotPivotY: -3 } },
     { name: 'concentric × plunge, confirm every 2', cfg: { strategy: 'concentric', entry: 'plunge', confirmEvery: 2 } },
@@ -103,7 +122,16 @@ for (const u of UNCHANGED) {
     test(`STILL EXACT — ${u.name}`, async ({ page }) => {
         await boot(page);
         const r = await bridge(page, { ...BASE, ...u.cfg });
-        expect(r.P, 'the fix touched only the two broken combinations').toEqual(r.L);
+        if (!u.ramp) {
+            expect(r.P, 'the fix touched only the two broken combinations').toEqual(r.L);
+            return;
+        }
+        // t1487 — the ramp row keeps the SAME claim about everything C4 did not touch, and states the descent as the
+        // relationship (see RINGS RAMP above). A row that quietly dropped to "the descent is exempt" would let a
+        // regression in the WALK hide behind the one part that legitimately moved.
+        expect(splitRampDescent(r.P).walk, 'the walk around the descent is exact, as it always was').toEqual(splitRampDescent(r.L).walk);
+        const rel = rampDescentRelationship(r.L, r.P, { bbox: cutBox(r.L) });
+        expect(rel.ok, `and the descent holds its declared relationship — ${rel.why}`).toBe(true);
     });
 }
 

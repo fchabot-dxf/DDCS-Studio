@@ -33,24 +33,45 @@ test('PREMISE 2 — the atom still has the four shapes the design says it has', 
     await boot(page);
     const r = await page.evaluate(async () => {
         const m = await import('/wizards/ops/surfaceraster.js');
+        const arc = await import('/data/slotCapabilityArc.js');
         const src = { rowAxis: typeof m.rasterRowAxisOf === 'function' };
         return {
             ...src,
             // C1: the row count really is the "fit" rule (half a stepover in, keep what fits)
             axisX: m.rasterRowAxisOf({ direction: 'x' }), axisY: m.rasterRowAxisOf({ direction: 'y' }),
-            // C4: the ramp rows really do still bake their geometry
+            // C4: the ramp rows really do still bake their geometry -- t1487: LANDED, so they no longer do
             rampBakes: (m.SURFACE_RASTER_BAKES['parallel/ramp'].inputs || []).length > 0,
             rampWhy: m.SURFACE_RASTER_BAKES['parallel/ramp'].why,
+            helixBakes: (m.SURFACE_RASTER_BAKES['parallel/helix'].inputs || []).length > 0,
+            helixWhy: m.SURFACE_RASTER_BAKES['parallel/helix'].why,
             plungeClean: (m.SURFACE_RASTER_BAKES['parallel/plunge'].inputs || []).length === 0,
-            // C2: inset really is one number on both axes
-            insetIsOne: (m.SURFACE_RASTER_BAKES['parallel/ramp'].inputs || []).includes('inset'),
+            // C2: inset really is one number on both axes -- read off the HELIX row, the one that still bakes
+            // geometry now that C4 emptied the ramp's. Same declaration, a source that is still true.
+            insetIsOne: (m.SURFACE_RASTER_BAKES['parallel/helix'].inputs || []).includes('inset'),
+            landed: arc.SLOT_CAPABILITIES.find((c) => c.id === 'declared-run-vector').landed,
         };
     });
     expect(r.rowAxis, 'the row axis is still chosen by a declared helper (C3\'s starting point)').toBe(true);
-    expect(r.rampBakes, 'the ramp still bakes its geometry — C4 is what collapses this').toBe(true);
-    expect(r.rampWhy, 'and it still bakes it for the distance-to-centre reason C4 removes').toMatch(/hypotenuse|centre/i);
-    expect(r.plungeClean, 'plunge already bakes nothing, so C4 changes only the two descents').toBe(true);
+    /**
+     * ── ⚠ t1487 — C4 LANDED, SO THIS PREMISE INVERTS (ruled t1486: invert, cite the history) ─────────────────────
+     *
+     * These lines asserted the PRE-C4 state — "the ramp still bakes its geometry, C4 is what collapses this" — which
+     * was the right shape for a design not yet built: a premise test guards a DESIGN against the code moving under
+     * it. The code has now moved the way the design said it would (t1483 declared the run vector; t1485 completed it
+     * on the cross axis), so the honest assertion is that the collapse HAPPENED, not that it is still pending.
+     *
+     * ⚠ AND THE HELIX IS ASSERTED UNMOVED HERE TOO, as everywhere else in this act: C4's helix half did NOT ship
+     * (t1472/t1474 ruled helical arcs unattested on this controller family), so the helix rows still bake and still
+     * say why. A premise test that let BOTH rows empty would stop guarding the capability still outstanding.
+     */
+    expect(r.rampBakes, 'C4 LANDED: the ramp rows are empty — it bakes nothing a pendant can dial').toBe(false);
+    expect(r.rampWhy, 'and the reason is GONE rather than reworded — an empty row and an empty why, together').toBe('');
+    expect(r.helixBakes, 'the HELIX half did not land, so those rows still bake').toBe(true);
+    expect(r.helixWhy, 'and still name the inradius clamp that keeps them there').toMatch(/inradius/i);
+    expect(r.plungeClean, 'plunge already baked nothing, which is why C4 only ever changed the descents').toBe(true);
     expect(r.insetIsOne, 'inset is still a single declared input — C2 is what splits it').toBe(true);
+    expect(r.landed, 'and the arc RECORDS that C4 shipped, so the design does not read as still pending').toMatch(/RAMP HALF SHIPPED/);
+    expect(r.landed, 'while naming the half that did not').toMatch(/HELIX HALF DID NOT/);
 });
 
 test('PREMISE 3 — the slot kernel still expresses what the atom must learn (C4 is half-built already)', () => {

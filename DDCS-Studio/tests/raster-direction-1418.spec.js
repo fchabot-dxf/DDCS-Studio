@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { rampDescentRelationship, splitRampDescent, cutBox } from './support/rampRelationship.js';
 
 /**
  * t1418 — DIRECTION-TAUGHT: `surfaceraster` walks all three directions, and the one-way boundary clause empties.
@@ -172,8 +173,27 @@ for (const cfg of SWEEP) {
 
         // THE SAME CUTTING FLOORS, then the ruled per-phase criterion.
         expect(r.par.floors, `the same cutting floors: literal ${JSON.stringify(r.lit.floors)} vs parametric ${JSON.stringify(r.par.floors)}`).toEqual(r.lit.floors);
-        const c = compareLevel(r.lit.cuts, r.par.cuts);
-        expect(c.ok, `the same set of FILL cutting moves, at the same feeds — ${c.why}`).toBe(true);
+        /**
+         * ⚠ t1487 — RESTATED, NOT RETIRED (ruled t1486). On the RAMP arm the descent is taken out of the per-phase
+         * comparison and asserted on its declared relationship instead: C4 points the ramp along the ROW rather than
+         * at the area centre (t1483/t1485), so the literal's two descent moves per level stopped being this
+         * descent's reference while everything around them stayed exactly what it was.
+         *
+         * ⚠ GATED ON `entry: 'ramp'` DELIBERATELY. A HELIX descent also cuts while changing Z and moving in XY, so an
+         * ungated split would quietly lift the helix rows out of their move-for-move criterion too — and the ruling
+         * is explicit that plunge and helix keep theirs untouched. On a plunge config the split is a no-op anyway
+         * (there is no ramping move to find); the gate is what makes that true of the helix as well.
+         */
+        const isRamp = cfg.p.entry === 'ramp';
+        const litFill = isRamp ? splitRampDescent(r.lit.cuts, (e) => e.t) : null;
+        const parFill = isRamp ? splitRampDescent(r.par.cuts, (e) => e.t) : null;
+        const c = compareLevel(litFill ? litFill.walk : r.lit.cuts, parFill ? parFill.walk : r.par.cuts);
+
+        expect(c.ok, `the same set of FILL cutting moves${isRamp ? ' OUTSIDE the descent' : ''}, at the same feeds — ${c.why}`).toBe(true);
+        if (isRamp) {
+            const rel = rampDescentRelationship(r.lit.cuts, r.par.cuts, { at: (e) => e.t, bbox: cutBox(r.lit.cuts, (e) => e.t) });
+            expect(rel.ok, `and the descent holds its declared relationship to the literal — ${rel.why}`).toBe(true);
+        }
         expect(c.quantised, `moves agreeing only to within the 0.001mm emit quantum: ${c.quantised} of ${r.lit.cuts.length}`).toBeLessThanOrEqual(r.lit.cuts.length);
 
         // THE FOUR END-CHOOSING LABELS ARE NOT EMITTED — the flowLabels declaration and the body agree (see below).

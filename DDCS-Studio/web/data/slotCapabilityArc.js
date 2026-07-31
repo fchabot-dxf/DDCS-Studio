@@ -70,6 +70,18 @@ export const SLOT_CAPABILITIES = [
             + 'its distance-to-centre and becomes pendant-true',
         gate: '',
         /**
+         * t1487 — WHAT ACTUALLY LANDED, recorded on the row rather than left for a reader to infer from the code.
+         * A design entry whose premise has been overtaken and does not say so is the same defect class as a PROVEN
+         * row that keeps a criterion it no longer meets.
+         */
+        landed: 'THE RAMP HALF SHIPPED — t1483 declared the run vector (direction from the walk, limit a LIVE span '
+            + 'register) and t1485 completed it (the descent start rides the walk\'s own declared axis forms, so a '
+            + 'dialled stepover descends where it cuts). Both BAKES ramp rows are inputs: [], the opCamMap entry gate '
+            + 'narrowed to helix alone, and trigEvidence\'s raster-ramp row closed by the no-SQRT road. '
+            + 'THE HELIX HALF DID NOT, and went a different way: t1472/t1474 ruled helical arcs unattested on this '
+            + 'controller family, so the helix keeps its polyline AND its inradius bake — which is why the slot '
+            + 'boundary\'s descent clause survives on its helix half (SLOT_RASTER_GAP, amended t1487)',
+        /**
          * ⚠ t1480 — C4'S TRUE REACH, MAPPED BEFORE ANY EMIT WAS TOUCHED. The scout costed this capability as
          * "+1 register, touches only the descent", and the EMIT half of that is right: the declared vector is the
          * row's own cut direction (±1 on the row axis — the ring walk leaves its corner along +X, the row walk along

@@ -269,7 +269,7 @@ test('PROOF E — every POCKET_FIELDS knob drives the traced motion (rpm drives 
  * and this slot's area is a pendant knob, so the emitter degrades to the plunge it can always do correctly and prints
  * the reason on the line where it descends. The row says the same thing before a chip is cut (GENERATOR_BAKES_PICK).
  */
-test('PROOF F — strategy, direction and entry all reach the macro; a ramp degrades in the open', async ({ page }) => {
+test('PROOF F — strategy, direction and entry all reach the macro; a ramp packs a REAL ramp, a helix degrades in the open', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { pocketSlot } = await import('/data/millToSlot.js');
@@ -287,9 +287,24 @@ test('PROOF F — strategy, direction and entry all reach the macro; a ramp degr
     expect(r.direction, 'and so does a ONE-WAY one').not.toBe(r.base);
     expect(r.entry, 'and a RAMP one').not.toBe(r.base);
     expect(r.rowAxis, 'and rows ∥ Y').not.toBe(r.base);
-    expect(r.entry, 'a ramp pick degrades to a plunge and SAYS so, on the descent line').toMatch(/ramp entry degraded to a plunge/);
-    expect(r.helix, 'and a helix pick names itself in its own degrade').toMatch(/helix entry degraded to a plunge/);
-    expect(r.entry, 'and emits no ramp move at all — it degrades, it does not half-ramp').not.toMatch(/\( ramp \)/);
+    /**
+     * ── ⚠ t1487 — THE RAMP'S DEGRADE IS GONE, AND ITS ABSENCE IS THE CLAIM (ruled t1486: invert, cite the history) ──
+     *
+     * This asserted that a packed RAMP degrades to a plunge and says so. That degrade existed for a measured reason:
+     * a slot holds its geometry in REGISTERS, the ramp baked its run and its start from build-time numbers, and a
+     * descent built from stale defaults against a dialled rect cuts a real ramp in the wrong place (t1425). C4
+     * (t1483/t1485) removed the bake rather than the exposure — the run vector reads LIVE span registers and the
+     * start rides the live row register — so there is nothing left to degrade FROM, and a packed ramp now packs a
+     * real ramp. `SURFACE_RASTER_BAKES` carries two empty rows saying exactly that.
+     *
+     * ⚠ THE HELIX KEEPS ITS DEGRADE, asserted in the same test and for the same reason it is asserted beside the
+     * ramp everywhere else: it still bakes the inradius that clamps its radius (t1343), so it still degrades, still
+     * naming itself. Two descents that changed together would be indistinguishable from one that did not change.
+     */
+    expect(r.entry, 'a packed ramp is a REAL ramp now — nothing left to degrade from').not.toMatch(/ramp entry degraded to a plunge/);
+    expect(r.entry, 'and it emits the ramp move itself').toMatch(/\( ramp \)/);
+    expect(r.helix, 'while a helix pick still degrades, naming itself').toMatch(/helix entry degraded to a plunge/);
+    expect(r.helix, 'and emits no helix move at all — it degrades, it does not half-helix').not.toMatch(/\( helix \)/);
     // THE WALL FOLLOWS THE STRATEGY, because that is what carrying it means: the concentric walk's outermost ring IS
     // the wall (the op's own help says a spiral has no separate wall pass), so a second one would be a wasted pass.
     expect(r.base, 'the raster pocket finishes with a wall pass, in its OWN depth loop after the clear (t1405)').toMatch(/wall finish pass at the inset boundary — its OWN depth loop/);

@@ -147,9 +147,26 @@ test('CLAUSES 2-4 — the inset is anisotropic, the passes carry a BEARING, and 
 
     // 4 — THE DESCENT
     expect(r.slotRamp[1], 'the slot ramps ALONG its length: the pass Y never changes').toBeCloseTo(r.slotRamp[3], 3);
-    expect(r.atomRamp[1] === r.atomRamp[3], 'the atom ramps toward the AREA CENTRE, so its Y drifts across the channel').toBe(false);
+    /**
+     * ── ⚠ t1487 — HALF OF THIS CLAUSE IS RETIRED, AND THE BOUNDARY STANDS ON THE OTHER HALF ──────────────────────
+     *
+     * This read "the atom ramps toward the AREA CENTRE, so its Y drifts across the channel" — one of the four
+     * measured reasons a slot cannot ride the atom. C4 (t1483/t1485) taught the atom a DECLARED RUN VECTOR: its ramp
+     * now runs along its own ROW and its cross coordinate never moves, exactly as a slot's does. So that reason is
+     * gone, and `SLOT_RASTER_GAP` says so rather than keeping a sentence that stopped being true.
+     *
+     * ⚠ THE BOUNDARY DOES NOT MOVE, and this is the part worth being careful about: the descent clause survives on
+     * its HELIX half (the atom still helixes in the middle of the channel, clamped by the rect inradius — t1472/1474
+     * ruled the true-arc helix a different road), and the ramp half only ever agreed with a slot that happens to be
+     * AXIS-ALIGNED, which THE AXIS clause already covers. Three of the four still need a capability the atom does not
+     * declare. A capability that dissolved one reason and was allowed to read as dissolving the boundary is exactly
+     * what this spec exists to prevent.
+     */
+    expect(r.atomRamp[1], 'the atom ramps along its ROW now (C4) — its cross coordinate no longer drifts').toBeCloseTo(r.atomRamp[3], 3);
+    expect(r.gap, 'and the declared boundary records that half as retired, rather than keeping a stale reason').toMatch(/C4, t1485|retired/);
     expect(r.slotHelix[0], 'the slot helixes at the ENTRY END').toBeLessThan(10);
-    expect(r.atomHelix[0], '…the atom in the MIDDLE of the channel, which it then cuts back out of').toBeGreaterThan(25);
+    expect(r.atomHelix[0], '…the atom STILL in the MIDDLE of the channel — the half of this clause that stands').toBeGreaterThan(25);
+    expect(r.gap, 'and the boundary still holds on three of its four measured ways').toMatch(/Three of the four still need a capability/);
 });
 
 test('THE BOUNDARY IS ABOUT THE WALK, not about a slot\'s numbers — so nothing can dial past it', async ({ page }) => {

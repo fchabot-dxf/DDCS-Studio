@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { rampDescentRelationship, splitRampDescent, cutBox } from './support/rampRelationship.js';
 
 /**
  * t1329 — THE SURFACING PILOT: the emit becomes PARAMETRIC, and the migration proves itself safe before anything dies.
@@ -453,7 +454,22 @@ for (const cfg of RAMP_CONFIGS) {
         const r = await bridge(page, { ...cfg, entry: 'ramp' });
         expect(r.oldCut.length, 'the literal ramp path cuts something').toBeGreaterThan(0);
         expect(r.newCut.length, `same number of cutting moves (literal ${r.oldCut.length}, parametric ${r.newCut.length})`).toBe(r.oldCut.length);
-        expect(r.newCut, 'and every cutting move is identical, in order — the ramp included').toEqual(r.oldCut);
+        /**
+         * ⚠ t1487 — RESTATED, NOT RETIRED (ruled t1486). This asserted the whole path including the ramp, and C4
+         * points the ramp along the ROW rather than at the area centre (t1483/t1485; t1339 named the reason — the
+         * centre-ward ramp bakes a hypotenuse and SQRT is unverified here). The move count above is unchanged and
+         * still asserted; what moved is WHICH way two moves per level point.
+         */
+        const L = splitRampDescent(r.oldCut), P = splitRampDescent(r.newCut);
+        expect(P.walk, 'OUTSIDE the descent every cutting move is identical, in order').toEqual(L.walk);
+        if (L.pairs.length) {
+            const rel = rampDescentRelationship(r.oldCut, r.newCut, { bbox: cutBox(r.oldCut) });
+            expect(rel.ok, `and the descent holds its declared relationship to the literal — ${rel.why}`).toBe(true);
+        } else {
+            // the shallow-angle config: the run does not fit, so BOTH sides degrade to a plunge and there is no
+            // descent to restate. That case stays exact, move for move, and saying so keeps the restatement honest.
+            expect(r.newCut, 'a ramp that cannot fit degrades on both sides — still identical, move for move').toEqual(r.oldCut);
+        }
     });
 }
 
@@ -483,9 +499,22 @@ test('THE RAMP BAKES ONLY WHAT CANNOT MOVE — and says what that costs', async 
 /**
  * t1341 — THE PENDANT GATE. The descent bakes part of its geometry (see rampLines); that is safe on the wizard
  * path, where the text is fixed forever at build values, and unsafe under a pendant that can move the knobs the
- * raster re-derives from. So a ramp/helix slot refuses to expose them — greyed with the reason, never hidden.
+ * raster re-derives from. So a helix slot refuses to expose them — greyed with the reason, never hidden.
+ *
+ * ── ⚠ t1487 — THE RAMP CROSSED TO THE OTHER SIDE OF THIS GATE, and the inversion is the point ────────────────────
+ *
+ * This test read "a ramp/helix slot refuses", and for the ramp that premise is gone rather than reworded: C4
+ * (t1483/t1485) gives the ramp a declared run vector against LIVE span registers and a start on the live row
+ * register, so a ramp slot bakes NO geometry and there is nothing a pendant can kink. `SURFACE_RASTER_BAKES` says
+ * so with two empty rows, `opCamMap`'s gate narrowed to helix alone, and this is where that has to show.
+ *
+ * ⚠ THE HELIX IS ASSERTED UNMOVED IN THE SAME TEST — deliberately, and it is the same shape t1483 used for the
+ * raster-live PROOF 3 transition. A capability that lifted one descent and quietly carried the other with it would
+ * read identically from outside; asserting both here is what makes the lift a claim about the ramp specifically.
+ * The helix still bakes the inradius that clamps its radius and seeds the rotating vector (t1343), so it still
+ * refuses, still with the reason on the control.
  */
-test('THE ENTRY GATE — a ramp slot refuses the knobs that would kink its descent', async ({ page }) => {
+test('THE ENTRY GATE — a HELIX slot refuses the knobs that would kink its descent; the RAMP no longer needs to', async ({ page }) => {
     await boot(page);
     const r = await page.evaluate(async () => {
         const { seedFromOp, ENTRY_GEOMETRY_KNOBS, ENTRY_GATE_REASON } = await import('/data/opCamMap.js');
@@ -498,12 +527,15 @@ test('THE ENTRY GATE — a ramp slot refuses the knobs that would kink its desce
         };
         return { plunge: pick(base), ramp: pick({ ...base, entry: 'ramp', rampAngle: 3 }), helix: pick({ ...base, entry: 'helix', helixDia: 8, helixPitch: 1 }), knobs: ENTRY_GEOMETRY_KNOBS, reason: ENTRY_GATE_REASON };
     });
-    // A PLUNGE SLOT KEEPS FULL EXPOSURE — a straight drop has no geometry to kink, so nothing is taken away
-    for (const k of r.knobs) {
-        expect(r.plunge[k].exposable, `${k} stays exposable on a plunge slot`).not.toBe(false);
+    // A PLUNGE SLOT KEEPS FULL EXPOSURE — a straight drop has no geometry to kink, so nothing is taken away.
+    // t1487 — AND A RAMP SLOT NOW SITS BESIDE IT, for the same reason arrived at a different way: it bakes nothing.
+    for (const entry of ['plunge', 'ramp']) {
+        for (const k of r.knobs) {
+            expect(r[entry][k].exposable, `${k} stays exposable on a ${entry} slot — it bakes no geometry to kink`).not.toBe(false);
+        }
     }
-    // A RAMP OR HELIX SLOT REFUSES EXACTLY THOSE TWO, with the reason ON the control
-    for (const entry of ['ramp', 'helix']) {
+    // A HELIX SLOT REFUSES EXACTLY THOSE TWO, with the reason ON the control — unmoved by the ramp's lift
+    for (const entry of ['helix']) {
         for (const k of r.knobs) {
             expect(r[entry][k].exposable, `${entry}: ${k} is refused`).toBe(false);
             expect(r[entry][k].tip, `${entry}: ${k} carries the reason`).toBe(r.reason);
@@ -893,7 +925,8 @@ const SKIM_JOGS = [
 ];
 const SKIM_SHAPES = [
     { name: 'parallel · plunge · MULTI-LEVEL', cfg: { strategy: 'parallel', entry: 'plunge', depth: 1.2, stepdown: 0.4 } },
-    { name: 'parallel · ramp', cfg: { strategy: 'parallel', entry: 'ramp', rampAngle: 3, depth: 0.8, stepdown: 0.4 } },
+    // t1487 — the one skim shape whose descent C4 re-points, flagged as DATA (see the branch below)
+    { name: 'parallel · ramp', cfg: { strategy: 'parallel', entry: 'ramp', rampAngle: 3, depth: 0.8, stepdown: 0.4 }, ramp: true },
     { name: 'parallel · helix', cfg: { strategy: 'parallel', entry: 'helix', helixDia: 8, helixPitch: 1, depth: 0.8, stepdown: 0.4 } },
     { name: 'CONCENTRIC · plunge', cfg: { strategy: 'concentric', entry: 'plunge', depth: 0.8, stepdown: 0.4 } },
     { name: 'single level, single row', cfg: { strategy: 'parallel', entry: 'plunge', depth: 0.5, stepdown: 0.5, h: 5 } },
@@ -922,8 +955,12 @@ for (const J of SKIM_JOGS) {
                 const segs = (nc) => (traceToolpath(nc).segments || []);
                 // t1377 — the FEED rides along: it is frame-independent, so it needs no origin subtraction and a
                 // skim body that cut at the wrong speed would now show up here.
+                // t1487 — the tuple carries its START as well as its end now. It was end-only, which is all an
+                // in-order equality needs; the ramp relationship asks where a descent BEGINS and whether it returns
+                // there, and neither question can be asked of an endpoint. Strictly more data, same comparison.
                 const cutFrom = (nc, ox, oy, oz) => segs(nc).filter((s) => !s.rapid)
-                    .map((s) => [+(s.x2 - ox).toFixed(3), +(s.y2 - oy).toFixed(3), +(s.z2 - oz).toFixed(3), +Number(s.feed || 0).toFixed(3)]);
+                    .map((s) => [+(s.x1 - ox).toFixed(3), +(s.y1 - oy).toFixed(3), +(s.z1 - oz).toFixed(3),
+                        +(s.x2 - ox).toFixed(3), +(s.y2 - oy).toFixed(3), +(s.z2 - oz).toFixed(3), +Number(s.feed || 0).toFixed(3)]);
                 // the literal is already relative to the jog; the parametric is absolute in the jog frame
                 const lit = cutFrom(literal, 0, 0, 0);
                 const par = cutFrom(parametric, J.jx, J.jy, J.jz);
@@ -941,7 +978,17 @@ for (const J of SKIM_JOGS) {
             expect(r.par.length, `same number of cutting moves (literal ${r.lit.length}, parametric ${r.par.length})`).toBe(r.lit.length);
             // MOVE FOR MOVE, measured from the jog point in both. The frame is the only thing that differs, and it
             // cancels — which is the whole claim.
-            expect(r.par, 'every cutting move is the same distance from the jog start, in order').toEqual(r.lit);
+            if (!S.ramp) {
+                expect(r.par, 'every cutting move is the same distance from the jog start, in order').toEqual(r.lit);
+            } else {
+                // t1487 — RESTATED, NOT RETIRED (ruled t1486). The skim claim is about the FRAME — that it cancels —
+                // and that claim is untouched by which way a ramp points. So the walk is still asserted move for
+                // move from the jog start, and the descent is asserted on its declared relationship, in the jog
+                // frame on both sides. A skim body that lost the frame would still fail on the walk.
+                expect(splitRampDescent(r.par).walk, 'every cutting move OUTSIDE the descent is the same distance from the jog start, in order').toEqual(splitRampDescent(r.lit).walk);
+                const rel = rampDescentRelationship(r.lit, r.par, { bbox: cutBox(r.lit) });
+                expect(rel.ok, `and the descent holds its declared relationship, measured from the jog start — ${rel.why}`).toBe(true);
+            }
             // THE FRAME IS READ, not assumed, and guarded before any motion.
             expect(r.hasFrameRead, 'the body reads the live position').toBe(true);
             expect(r.sentinel, 'and refuses if it did not arrive').toBe(true);
