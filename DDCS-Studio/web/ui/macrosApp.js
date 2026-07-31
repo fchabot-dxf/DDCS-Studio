@@ -1381,7 +1381,7 @@ function homingPostIsExpert() {
             }
             const camLabel = a.camType === 'substack' ? 'sub-stack — parts stay live' : a.camType;
             return `<div class="cbm-op-group" data-oi="${oi}" style="margin-top:${oi ? 12 : 0}px;"><div style="font-size:12px; font-weight:600; color:var(--accent,#6ea8fe); border-bottom:1px solid var(--border); padding:3px 0; margin-bottom:3px;">${oi + 1}. ${camEsc(a.label)} <span style="color:var(--text-dim); font-weight:400; font-size:10px;">→ ${camEsc(camLabel)}</span></div>
-                <table style="width:100%; font-size:11.5px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th style="padding:2px 6px;">Param</th><th>Value</th><th>On the pendant?</th><th>Pendant slot</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+                <div class="cbm-tablewrap"><table style="width:100%; font-size:11.5px; border-collapse:collapse;"><thead><tr style="color:var(--text-dim); font-size:10px; text-align:left;"><th style="padding:2px 6px;">Param</th><th>Value</th><th>On the pendant?</th><th>Pendant slot</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
         }).join('');
         el.innerHTML = `${sections}<div class="settings-hint" style="margin-top:8px;">Expose = the operator fills it on the pendant (#11xx → #2600). Bake = frozen into the macro; the row vanishes. Enum params pick a friendly label; the pendant stores its number.</div>`;
     }
@@ -1408,7 +1408,22 @@ function homingPostIsExpert() {
     function mountAuthoringSurface(body) {
         const n = _authoring.ops.length;
         const editing = _editingSlot != null;   // t1127 S3 — Edit reads "Update CAM (camN)"; New reads "Build CAM slot"
-        body.innerHTML = `<div class="cam-build-mode" style="padding:14px 16px;">
+        body.innerHTML = `<style>
+            /* t1470 (user, mobile) — THE FIELD TABLE SCROLLS IN ITS OWN CONTAINER. Four columns (param · value ·
+               the expose/bake pair · the pendant slot) have a comfortable width that a phone does not have, and the
+               browser's answer was to CRUSH them: at 400px the labels wrapped into each other and the pendant slot
+               ran into the radios. Giving the table a readable minimum and letting it scroll SIDEWAYS INSIDE ITS OWN
+               BOX keeps the columns legible without the page itself scrolling — the whole point of "its own
+               container". Inert on desktop, where the table is already narrower than its host and never scrolls. */
+            .cam-auth-overlay .cbm-tablewrap{max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;}
+            /* the surface's own padding moved OFF the element's style attribute and in here: an inline style outranks
+               every selector, so the phone override below was dead where it stood. One source, and it now bites. */
+            .cam-auth-overlay .cam-build-mode{padding:14px 16px;}
+            @media (max-width: 600px) {
+                .cam-auth-overlay .cbm-tablewrap table{min-width:440px;}
+                .cam-auth-overlay .cam-build-mode{padding:12px 10px;}   /* claw back gutter the phone cannot spare */
+            }
+        </style><div class="cam-build-mode">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;"><b style="flex:1; font-size:14px;">${editing ? `✎ Update CAM (cam${_editingSlot})` : '✚ Build CAM slot'}${n > 1 ? ` — ${n} ops` : ''}</b><button class="toolbar-btn settings-io" data-act="cbm-icon-import" title="Import a BMP / image as an icon layer">🖼 Import BMP</button><button class="toolbar-btn settings-io" data-act="cbm-cancel">✕ Cancel</button></div>
             <div class="settings-row" style="align-items:center; margin-top:2px;"><label style="font-size:11px; color:var(--text-dim);">Slot name&nbsp;<input id="cbm_name" value="${camEsc(_authoring.name || '')}" placeholder="e.g. Pocket" style="min-width:200px;"></label></div>
             <div style="margin-top:10px;">
@@ -1520,7 +1535,9 @@ function homingPostIsExpert() {
         }
         const ov = document.createElement('div'); ov.className = 'cam-auth-overlay';
         ov.style.cssText = 'position:fixed; inset:0; z-index:9998; background:rgba(0,0,0,.55); display:flex; align-items:flex-start; justify-content:center; overflow:auto; padding:22px 12px;';
-        const body = document.createElement('div'); body.style.cssText = 'width:min(1000px,97vw); background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px;';
+        // t1470 — 100% not 97vw: the overlay ALREADY reserves the gutter with its own 12px padding, so 97vw double-counted
+        // it and the panel ran ~12px past the space it was given (a phone-only overflow the desktop width never reached).
+        const body = document.createElement('div'); body.style.cssText = 'width:min(1000px,100%); background:var(--panel,#161b22); border:1px solid var(--border); border-radius:10px;';
         ov.appendChild(body); document.body.appendChild(ov); _cbmOverlay = ov;
         attachCbmListeners(body);
         mountAuthoringSurface(body);          // builds the shell + renders the group-by-op table (or the empty-state)

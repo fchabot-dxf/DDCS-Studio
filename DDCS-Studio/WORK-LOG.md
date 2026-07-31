@@ -12065,3 +12065,62 @@ reach them, so there is nothing to flag on that front.
 
 **RELEASE:** unlike t1466 this one IS user-visible on the live deploy, so it is worth a `.ver` bump — left to the
 advisor, whose full suite is the stated gate.
+
+## t1470 (seat A) — THE MOBILE CAM-BUILDER: a three-across row turned one axis. Desktop pinned byte-for-byte.
+
+### WHAT WAS WRONG — measured at 400px before anything changed, and WRAPPING is what made it look broken
+
+The Build-CAM-slot surface is a desktop three-across working row (tool rail · canvas · tabbed panel) whose hard
+minimum is `40 + 220 + 250 + 2×12 = 534px`, against **~342px of usable width** at 400vw. So the flex line wrapped —
+and it wrapped in the worst possible order:
+
+    rail    40 × 240   ALONE on line one: a tall tower with 274px of dead space beside it   ← the user's "stranded"
+    stage  314 wide    line two
+    dock   250 wide    line three — NARROWER than the canvas above it, and left-misaligned  ← the "misaligned stack"
+    panel  388 wide    inside 376px: `min(1000px,97vw)` DOUBLE-COUNTED the overlay's own 12px padding
+
+That last one is a separate small defect the phone found and the desktop width never reached: the overlay reserves
+its gutter with `padding:22px 12px`, and then the panel asked for 97vw on top of it.
+
+### THE FIX — the same DOM, one axis, and nothing hidden or scaled
+
+Below **600px** (an EXISTING project breakpoint — four other rules already use it; inventing a fifth number would
+have been the cost) the row becomes a column: **tools across the top** (44px touch targets sharing the width),
+**canvas full width**, **panel below at the same width and the same left edge**. Stacking is not a fallback here, it
+is the right reading order on a phone.
+
+    rail 326×44  ·  stage 326  ·  dock 326  — all three edge-aligned; the working block lost 145px of height (627→482)
+
+**THE FIELD TABLE SCROLLS IN ITS OWN BOX.** Four columns (param · value · expose/bake · pendant slot) have a
+comfortable width a phone does not have, and the browser's answer was to CRUSH them. A `.cbm-tablewrap` with
+`overflow-x:auto` plus a 440px table minimum keeps the columns legible and — **the whole point of "its own
+container"** — leaves `documentElement.scrollWidth === clientWidth`: the table slides, the page does not.
+
+⚠ **AND ONE RULE I WROTE WAS DEAD ON ARRIVAL, WHICH IS WHY I MEASURED AGAIN AFTER APPLYING IT.** The phone padding
+override had no effect: `.cam-build-mode` carried its padding as an **inline style attribute**, which outranks every
+selector. The measurement said `work.x = 29` both before and after — identical, when it should have moved. Rather
+than delete the rule (leaving the phone its desktop gutter) or reach for `!important`, the padding moved OFF the
+attribute and INTO the style block, so there is one source and the override bites. A rule that looks like it works
+and does not is worse than no rule.
+
+### THE ONE MISTAKE, AND WHAT CAUGHT IT
+
+My first edit didn't parse: I wrote **backticks around `flex-wrap`** in a CSS comment that lives inside a JS template
+literal, which closed the literal. `node --check` named it in one line; the browser had only said "Unexpected
+identifier". Worth recording because this file's whole style block is a template literal — **no backticks in any
+comment inside it**, the same class of trap as the `.nc` bracketed comments two turns ago.
+
+### GATE (fast tier)
+
+new spec `cam-builder-mobile-1470` **3/3**, **MUTATION-TESTED**: disabling both phone media queries turns the **two
+phone tests RED and leaves the DESKTOP one GREEN** — the shape that proves the desktop assertions are pinning
+something real rather than passing by luck. The desktop test asserts the **exact** pre-change geometry (rail 40×260,
+stage 520, dock 250, panel 1000, all three on one row, the scroll container inert), because "desktop unmoved" is
+half this act and an unpinned claim decays.
+
+Whole CAM family + `region-editor` + `wizbar-icon-picker` **150/150**. The six now-deterministic ledger specs
+**28/28** — run because a red one is REAL from this turn on; none is in my radius. **IRON RULE 11/11, same list, no
+growth.** Smoke **71/71**. Screenshot `scratchpad/t1470-cam-phone.png`, **eyeballed**: tool row, full-width canvas,
+aligned panel, readable table with its fourth column cut at the scroll edge.
+
+**RELEASE:** user-visible on mobile — worth a `.ver` bump, left to the advisor's full-suite gate.

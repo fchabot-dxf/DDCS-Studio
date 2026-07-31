@@ -165,6 +165,22 @@ export function openIconEditor(initial, onSave, opts = {}) {
         #iconed-modal label{font-size:11px;color:var(--text-dim);display:flex;flex-direction:column;gap:2px;}
         #iconed-modal .ie-foot{padding:10px 14px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
         #iconed-modal input[type=range]{width:120px;}
+        /* t1470 (user, mobile) — THE THREE-ACROSS ROW CANNOT FIT A PHONE, so below 600px it becomes a COLUMN.
+           The row's hard minimum is rail 40 + stage 220 + dock 250 + two 12px gaps = 534px, against ~342px of usable
+           width at 400vw. flex-wrap then did what wrapping does and it looked like a bug: the RAIL was left ALONE on
+           the first line as a tall 40×240 tower with 274px of dead space beside it, the canvas took line two, and the
+           250px dock sat on line three NARROWER THAN — and left-misaligned with — the canvas above it. Stacking is not
+           a fallback here, it is the right reading order on a phone: tools ACROSS the top, canvas full width, panel
+           below. Same DOM, same tools, one axis changed — nothing is hidden and nothing is scaled.
+           The .ie-inline .ie-stage selector is re-stated because its own (1,2,0) max-width would outrank this block. */
+        @media (max-width: 600px) {
+            #iconed-modal .ie-canvasrow{flex-direction:column;flex-wrap:nowrap;align-items:stretch;}
+            #iconed-modal .ie-rail{flex-direction:row;flex-wrap:wrap;justify-content:flex-start;align-self:auto;gap:6px;}
+            #iconed-modal .ie-rail button{flex:1 1 44px;width:auto;height:44px;}   /* share the row, and ≥44px to touch */
+            #iconed-modal .ie-stage,#iconed-modal.ie-inline .ie-stage{flex:0 0 auto;width:100%;max-width:none;min-width:0;}
+            #iconed-modal .ie-dock{flex:0 0 auto;width:100%;align-self:auto;}
+            #iconed-modal .ie-dockbody{min-height:200px;}   /* the tile grid needs room once it is no longer canvas-tall */
+        }
     </style>
     <div class="ie-panel">
         <div class="ie-head"><span class="ie-title">🖼 Icon editor — 360×180</span><button class="toolbar-btn settings-io" data-ie="import" title="Import a BMP / image as a layer">🖼 Import BMP</button><button data-ie="x" title="Close">✕</button></div>
