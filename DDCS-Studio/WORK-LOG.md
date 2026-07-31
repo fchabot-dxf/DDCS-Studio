@@ -12802,3 +12802,78 @@ is measured OVERSIZE and destructive. **A fresh seat should take C1.** It is des
 the arc (equality arm + divergence arm), and its precondition just landed.
 
 **Full suite on the branch: 2287 passed, 6 skipped, 0 failed.** Branch `wip/c2-two-axis-inset`.
+
+## t1492 (seat A) — C1: WALL-ANCHORED ROWS, phase AND clamp in one act (slot arc 3/4).
+
+### THE ORDER OF WORK, AND WHY IT WAS THAT ORDER
+
+This is the act the arc itself flags as dangerous: the phase WITHOUT the clamp is measured OVERSIZE, which is the
+destructive direction. So nothing was written until the arc's own divergence region had been **reproduced on the
+real kernels** — the three whole-multiple widths and the three that overshoot. It reproduced exactly (+1.20 at 12,
++1.20 at 16.8, +0.60 at 15, against a `slotPath` whose rows are `[−3,−0.6,1.8,3]`, `[−5.4,−3,−0.6,1.8,4.2,5.4]`,
+`[−4.5,−2.1,0.3,2.7,4.5]`). Only then was the rule derived, and it was derived ARITHMETICALLY against all six before
+a line of emit changed:
+
+    n   = FIX[(span − 0.001)/step] + 2      passes from the near wall, PLUS the forced final one
+    row = origin + i·step
+    IF row > far wall THEN row = far wall
+
+**Both halves fall out of one count and one guard.** At a WHOLE multiple the last loop row lands exactly on the wall
+and the clamp is a no-op; where it is not, the clamp is the whole difference between a channel that is right and one
+that is 1.2mm oversize. The `− 0.001` is the ring count's own collapse boundary, and it is what stops the
+whole-multiple case emitting the wall twice.
+
+### THE BRIDGE CAUGHT THE DEFECT ON ITS FIRST RUN, WHICH IS THE POINT OF WRITING IT FIRST
+
+The first run matched **nothing** — the atom still cut the fit rows at every width. `rowAnchor` never reached the
+walk: I resolved it inside `rowWalk` off `o`, and the walk's opts object is built at the seed and did not carry it,
+so `rasterRowAnchorOf` read undefined and fell silently to `fit`.
+
+**That is the t1402 shape exactly** — `ringWalk` never destructured `entry`, so a ramp selection emitted a straight
+plunge, silently, in released code. It is now resolved at the seed beside `direction` and `rowAxis`, where the other
+two walk words already live, and the comment says why. Had I trusted the change instead of bridging it, C1 would
+have looked complete and cut nothing differently.
+
+### WHERE IT LANDED
+
+**TEN widths, all MATCH `slotPath` move for move** — the three equality cases, the three divergent ones, two bands
+narrower than a single stepover (7×Ø6, 6.5×Ø6 → both walls, nothing between), one narrow with a bigger tool, and a
+60mm-wide channel at 24 passes where an off-by-one could not hide. Every one ends exactly ON the far wall and none
+rides past it.
+
+**THE STAY: 432 configs, 0 differ** — absent, `fit`, and an unknown word all emit today's program, and the shipping
+surfacing path still counts *rows that FIT* and emits no wall-anchored count at all. Surfacing and pocket must not
+phase, and they do not.
+
+**`@work` follows the clamp's extra pass** (106/80/93/54 against the fit rule's 93/67/80/41), and the declared pass
+count equals the rows the macro actually cuts at every width checked. A declaration still reading the fit formula
+would have under-counted every slot-shaped job by exactly the pass the clamp adds.
+
+### ⚠ ONE DIVERGENCE NAMED RATHER THAN PAPERED OVER
+
+At **width == tool** the band is zero: `slotPath` emits a single centreline pass, and the atom REFUSES — its
+collapsed-inset guard fires first, in its own words ("leaves no area to clear"). That is the atom being LOUDER, not
+wronger, and the degenerate has its own arm in the slot kernel. It is recorded on the arc row rather than smoothed
+over, because a bridge that quietly skipped the one width where the two disagree would be the wrong kind of green.
+
+### THE BOUNDARY AFTER TWO CLAUSES
+
+`SLOT_RASTER_GAP` now records THE ROW RULE retired by C1 and THE INSET retired by C2, and what stands is **THE AXIS
+(C3)** plus the descent's helix half. The naming-not-counting change I made at t1490 paid off immediately: this act
+moved that sentence by one NAME, and the two specs asserting it moved by one name each. A count would have gone
+stale in three places with nothing failing to say so.
+
+### CAPACITY — the flag from t1490, and what happened to it
+
+I flagged plainly at t1490 that a fresh seat should take C1, and the advisor dispatched it here anyway. That is
+their call and I took it, with one self-imposed condition: **measure first, and park at the first sign of a slip in
+the emit path.** No slip occurred in the emit path this act. The one defect I introduced — `rowAnchor` not reaching
+the walk — was caught by the bridge on its first run, before any declaration was written against it, which is the
+discipline working rather than luck. Two escaping slips did happen in TEST-authoring tooling (a Python-written JS
+string, twice), both caught by `node --check` and by an assertion mismatch; neither reached the atom.
+
+**Still true for C3:** it is the trig-gated one, and its LIVE form needs COS/SIN of a runtime angle — unverified on
+this controller, V13's decision. Its BAKED form is two build-time constants and needs no evidence. That split should
+be ruled before the act starts, not during it.
+
+**Full suite on the branch: 2299 passed, 6 skipped, 0 failed.** Branch `wip/c1-phase-clamp`.
