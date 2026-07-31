@@ -1,0 +1,21 @@
+
+
+V1_M350_xxxxxxxx.zip  -------------------------V1硬件版本的升级包
+V2_M350_xxxxxxxx.zip  -------------------------V2硬件版本的升级包
+setting                            ------------------------- 出厂参数文件
+
+V1_M350_xxxxxxxx.zip  -------------------------Upgrade package for V1 hardware version
+V2_M350_xxxxxxxx.zip  -------------------------Upgrade package for V2 hardware version
+setting                            ------------------------- Factory parameter file
+
+
+
+
+如需恢复出厂参数，请将setting文件放在升级包文件夹中(V1:install  V2:psys)，进行升级即可。如不恢复参数，则忽略此步骤！！！
+
+To restore factory parameters, place the setting file in the upgrade package folder (V1: install, V2: psys) and proceed with the upgrade. If you do not wish to restore the parameters, you can skip this step!
+
+
+
+
+

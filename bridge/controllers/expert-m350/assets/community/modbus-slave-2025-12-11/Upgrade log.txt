@@ -1,0 +1,393 @@
+2021-02-02-00
+1: Add parameter No. 269 [Debug printing enable]; debugging information will not be prompted in the disabled mode;
+
+2021-04-08-00
+1: When modifying the continuous spiral arc command, the cumulative error problem occurs;
+
+
+2021-04-29-00
+1: Add a special interface for testing, long press the [Cancel] key to enter the main interface;
+
+
+2021-05-17-00
+1: Increase the virtual key character, the character content can be expanded;
+
+2021-08-11-00
+1:Increase the Russian font, the Russian translation package is not translated
+
+2021-08-12-00
+1: Solve the problem that the five-axis coordinate is not displayed in the teaching interface of [Program], and the 3 and 4 axes are displayed normally.
+2: Add Russian translation package (Special thanks: §³§Ö§â§Ô§Ö§Û §³§ä§â§Ñ§Ó§Ú§ß§ã§Ü§Ú§Û)
+
+2021-09-03-00
+1: Open M3K accessory panel function, 268 set accessory panel model
+
+2021-09-09-00
+1: File display remove path name
+
+2021-11-19-00
+1£ºIncrease system self-test interface
+
+2021-11-22-00
+1£ºModify the record box control bug
+
+2021-12-07-02
+1: Increase the parameters of 271, the maximum contour error; the default is 0; the value setting, the faster the speed, the more smooth. It is recommended to set up 0.002mm;
+
+2021-12-10-00
+1: Teach the increasing entry of the fourth axis of the fourth shaft;
+
+2021-12-14-00
+1: Add new hardware support
+
+
+2022-01-07-00
+1: Modify the boot file copy protection
+
+2022-01-10-00
+1: Registration number limit
+
+2022-01-17-01
+1: Compatible with new hardware
+
+2022-01-25-00
+1: Increase the test file
+
+
+2022-01-26-00
+1: Adjust the test interface
+
+
+2022-02-08-00
+1: Increase the free configuration of the physical axis (the main from the axis);
+    488-492: The program axis corresponding to the physical axis can be configured,
+    The programming axis of the default physical axis is: x y z 4th 5th
+E.g:
+   If you want to configure the fourth axis into the slave axis of the double Y axis Y, you can set the 491 parameter to y.
+
+2022-03-02-00
+1: Add system folder erroneous deletion; note: NAND1-1 folder is forbidden to delete, otherwise the system crashes!
+
+2022-03-17-00
+1: Compatible 2020-401-02 Hardware firmware version
+
+2022-03-23-01
+1:Teach (Guided Programming) function.The key function index number is: 1398
+
+2022-03-24-00
+1: Increase the label machine print macro address # 1619;
+
+2022-04-03-01
+1: Modify the test interface label print;
+
+2022-04-08-00
+1: Add 272-277 parameters, external input buttons can be customized;
+
+2022-04-11-01
+1: # 988- # 992 Physical axis and program axis configuration macro address.
+
+
+2022-04-15-00
+1: Increase user custom CAM, buttate the key index 1399.
+
+2022-04-18-01
+1: Increase the function shortcut key in the division, and the keys to the key section is: 1334.
+
+2022-05-13-01
+1: Parameter interface increases#50-#499 saving and loading function, file path: Local/uservar
+
+
+2022-05-23-01
+1: Modify the test interface [Hardware error] Mistake display problem;
+2: Add record to the file macro function: RECORD[];
+
+2022-05-23-02
+1:RECORD[x1,x2,x3,x4,x5,x6,x7]  Maximum save 5 data;
+
+2022-05-24-01
+1: Record [] can customize the preservation content format;
+
+2022-05-25-00
+Optimize record [] saving method
+
+2022-06-02-00
+1:Add 279 parameter MODBUS RTU£»
+2:Add Modbus RTU to write macro function MSETDATA [];
+
+2022-06-09-00
+1: Add Modbus RTU Reading Macros: Mgetdata [];
+2: Add Modbus RTU data conversion macro function: mdata2byte [];
+3: Add Modbus RTU data conversion macro function: MBYTE2DATA [];
+
+2022-06-15-00
+1: Support M3K and Modbus RTUs at the same time.
+
+2022-06-29-00
+1: Improve the definition of the USB standard keyboard and add 15 custom function keys.
+
+
+2022-07-01-00
+1: Improve the MODBUS macro function
+
+2022-07-05-00
+1: Modify the manual mobile axis affects the problem of stopping the main axis of the servo.
+
+2022-09-26-00
+1:#1505 modal dialog box increases the return value, 0: cancel key 1: OK key.
+
+2023-01-04-01
+1: Compatible with new hardware.
+2: Add G100-G199 parameter macro address;
+
+2023-05-05-00
+1£ºSQRT [] increase the validity of the value
+
+2023-05-08-00
+1: Increase the macro function   ROUND[ ];
+
+2023-05-15-00
+1: System boot only loads the slib-g.NC slib-m.NC slibuser.nc three library files;
+
+2023-05-24-00
+1: Key index 1389 can enter the local disk on any interface;
+2: Add shortcut code to the file interface: 1531: Copy 1532: Paste 1533: Copy to the U disk or local
+
+2023-05-29-00
+1: The files set up by the factory settings are: default_Setting
+
+2023-06-06-00
+1: The value protection of#578 and#1994 has been added;
+2: No. 76 parameters can take effect without restarting;
+
+2023-06-21-00
+1: Fix: When the parameter file is not on the U disk, the error prompts to upgrade the parameter success;
+2: M4 spindle start -stop light is turned on;
+3: Amend the file interface F4 button title in real -time display;
+4: Modify the file English,#842 title;
+5: MDI increases ESC prompts;
+
+2023-06-25-01
+1: Repair: Run the M30 crash (06-06 starts to appear);
+2: Repair: The files without a change of lines at the end will delete the character's problem when editing;
+
+
+2023-09-17-00
+1: Resolve the issue of garbled display caused by excessively long comment text!
+
+
+2023-10-31-00
+1: Solve the problem of invalid local disk clearing function in V2 version; 
+
+2023-11-09-00
+1: Added parameter number 253, does the feed rate adjustment apply to G0?
+
+2023-12-18-01
+1: Added parameter number 295, feed rate maximum value;
+2:Place the actual maximum error of the zero switch in the macro variable #2106.
+
+2023-12-19-00
+1: Increase the key value and status macro address, #2038, which is readable and writable. It needs to be cleared before use.
+
+
+2024-01-05-00
+1: Resolved the issue of rebooting in multi-level folders for V1 version.
+2: Added super administrator privileges to one-click backup.
+3:Fixing character encoding issues in the [eng] file.
+4:Update the latest Russian translation files: msg2 and rus. Thanks, §¯§Ú§Ü§à§Ý§Ñ§Û §©§Ó§ñ§Ô§Ú§ß§è§Ö§Ó.
+5: Open optimization parameters for speeds 280 and 281.
+
+
+2024-01-09-00
+1: Modified the pause mechanism to resume from the current position when paused and restarted;
+2: Enabled operations such as copy, paste, and delete for folders and filenames containing spaces.
+3: Add macro window with input box for #2070, for example: #2070=100(Dialog Box Title: ); The address after the equal sign is the macro variable address, ranging from 50 to 499.
+
+
+2024-02-02-00
+1: #1505 can print macro addresses (#1510-#1513).
+
+2024-03-10-01
+1: Fixed the FUP[] macro operator instruction.
+2: Solved the issue where CAM files couldn't load processing after removing the USB flash drive.
+3: Fixed the issue of the "Clear Local" function in the file management interface sub-menu being ineffective.
+
+2024-03-15-00
+1: Add parameter #93, which allows selecting whether to start processing from the current line's starting point or from a new position when pausing and restarting.
+
+2024-03-16-00
+1: Increase the quantity of images in the CAM library to a total of 30;
+2: Modify the issue where the first parameter does not refresh when switching CAMs.
+
+
+2024-03-20-02
+1: Fixed the issue of CAM interface freezing upon startup in the previous software version of V2.
+2: CAM parameters can now be saved when disconnected.
+
+2024-03-22-00
+1: Added USB barcode scanner file selection function;(pr210=1396,pr278=2)
+
+2024-03-23-00
+1: CAM parameters (#2500-#2999) support assignment and can be saved as parameters.
+
+
+2024-03-26-00
+1: [V2] Added system power supply voltage detection. When voltage fluctuations beyond the normal range are detected, a prompt will be given.
+
+2024-03-28-00
+1: Processing files with filenames starting with "macro" will default to enabling macro parsing functionality.
+2: All CAM files should be named macro_cam10.nc and need to be placed in the local disk (local) CAM folder. The folder can be copied entirely from a USB drive to the local disk.
+3: When modifying the super administrator password, the original password must be entered for modification to take place.
+
+2024-03-30-00
+1: Increase character length for displaying CAM names.
+2: The fixed vertical tool magazine input and output in slib-g.nc can be customized.
+
+2024-04-09-00
+1: Add low-voltage information prompt£»
+
+2024-05-16-02
+1: When executing the external input macro program extnc-xx, increase the delay to prevent the macro program code from taking up too much time and not being executed;
+
+2024-07-02-00
+1: Parameters 272-277: External input expansion button function definition adds a value setting of 1-32, which can control the corresponding output port to turn off or on.
+
+2024-08-14-00
+1: Increase the character limit for each line of code.
+
+2024-08-15-00
+1: Fix the issue with incorrect XYZ offset references when the tool number exceeds the tool library capacity.
+
+2024-08-19-01
+1: The P keyword for G73, G81-G84 commands is non-modal and will not be retained or automatically extended in subsequent commands.
+
+2024-08-28-00
+1:Increase the character length for file names;
+2:Use boot time for time counting;
+3:Update Russian language configuration files: msg2 and rus.
+
+2024-08-29-00
+1:Enter the system folder to add operation protection.
+
+
+2024-08-30-00
+1£ºResolve the issue of functions #1505, #2070, and #1503 malfunctioning due to excessively long file names.
+
+2024-09-10-01
+1£ºFix issues caused by subroutine calls due to excessively long file names.
+
+2024-09-15-00 
+1: Fixed the issue with incorrect character display for the F4 button on the file management interface.
+
+2024-09-23-01
+1: Update Russian translation package eng, msg2, rus;
+
+2024:11-07-01
+1£ºFix the issue where pausing and restarting from the current position is ineffective when macro command parsing is enabled.
+
+2024-11-08-00
+1: Resolve the issue of G31 and G53 commands not shielding the servo spindle.
+
+2024-11-11-00
+1: When macro parsing is enabled, support resuming from the current position after pausing.
+
+2024-11-11-01
+1: Added parameter 296: Serial Port 2 Parity and parameter 297: Serial Port 2 Stop Bit.
+
+2024-11-14-00
+1: Add macro address #2039 [Prompt message background color] =-1: Default color is green, >0: Actual color value.
+
+2024-11-15-01
+1: When K1-K16 are configured as output ports, the key indicator lights are synchronized in real-time with the output status.
+
+2024-11-22-00
+1: The test interface F6 has been updated to include testing for Serial Port 1 and Serial Port 2. Before testing, TXD1 and RXD1 should be shorted, and TXD2 and RXD2 should be shorted.
+
+2024-12-12-00
+1: Added a language configuration option for parameter #240; the corresponding language configuration files are: msg_utf8 and cfg_utf8.
+2: Adjusted some interface displays for language compatibility, such as: the zero-seeking completion flag is differentiated by the character color of XYZAB; IO status page: status display changed to character display, and enable changed to English.
+
+2025-02-14-00
+1: Fixed several display issues.
+2: Added a display for the successful return of mechanical zero.
+
+2025-02-21-00
+1: Resolve the issue of an abnormal pause when encountering T code when #76=1.
+2: Improve the G31 command
+
+
+2025-03-14-00
+
+1£ºAdded macro variable #2040:
+    =0: Default mode
+    =1: Do not clear the display content
+2:Added macro variable #2041:
+    =1: Exit the program
+3:Modified the label printing data format
+
+
+2025-03-28-00
+
+1: The factory test file is changed to Test.nc;
+2: For parameters 50-59, a macro variable assignment modification function is added;
+3: The minimum value for parameters 50-54 in the parameter configuration file is modified to 1;
+4: Fixed the issue with incorrect character display for parameter #240 in the "eng" file;
+5: Added variable #2042 to control the turning on and off of the buzzer;
+6: Added variable #2043 to control the buzzer's cycle.
+
+Example:
+Write #2043=0; #2042=1000, the controller will emit a continuous 1-second beep.
+Write #2043=100; #2042=1000, the controller will emit 5 short beeps of 100 milliseconds each, with a 100-millisecond interval between each beep.
+
+
+2025-04-21-00
+1: When assigning values to parameters #500¨C#1499, a value range check has been added. If the assigned value exceeds the allowed range, the assignment will be ignored. If no range is specified, values can be assigned freely.
+
+2025-05-07-00
+1:Added parameter No. 141: Safe height before tool setting (machine position). Before tool setting, the Z-axis will first move to the safe height specified by parameter 141.
+2:When parameters No. 449 and 450 are set to rotary axis characteristics, the workpiece coordinate system will remain aligned with the machine coordinate system. During workpiece zeroing, the zero offset values (parameters 238 and 239) will be automatically calculated¡ªmanual modification is not required.
+3:Modified the fixed linear tool magazine process in slib-g.nc when Pr802 == 3. The process is as follows (example for T1 to T2):
+T1 to T2 example:
+Stop the spindle
+Move Z to the position set by parameter 806, at the speed defined by parameter 812
+Move to T1 XY position (parameters 830, 850) at speed 811
+Move to T1 Z position (parameter 870) at speed 812
+Output M154 to release the tool
+Delay 100 ms
+Detect tool release input with M301
+
+Move Z to the position set by parameter 806 at speed 812
+Move to T2 XY position (parameters 831, 851) at speed 811
+Move to T2 Z position (parameter 871) at speed 812
+Output M155 to lock the tool
+Delay 200 ms
+Detect tool lock input with M302
+Move Z to the position set by parameter 806 at speed 812
+Tool change complete
+
+Note:
+The ports for M154, M155, M301, and M302 are configured in the IO status interface.
+
+
+2025-06-06-00
+1:Added a file sorting feature that allows cycling through three sorting modes using the F6 key: Name, Extension, and Date. The default sorting mode on startup is by Name.
+
+2025-06-12-00
+1: Modified the O501 homing subprogram to set the maximum G31 probing distance to 10,000 mm.
+2: Added display of the current sorting method in the file interface.
+3: Parameter #149 now stores the current sorting method and retains it after power-off.
+
+2025-06-16-00
+1: Minor fix
+
+2025-06-19-00
+1: Increased the number of characters allowed in the #2070 input box.
+
+2025-07-01-00
+1: Improve the G04 command.
+
+2025-08-28-00
+1:Added #2044 Current Override Macro Address, readable and writable.
+
+2025-12-11-00
+1:Parameter No. 279: Added slave mode to Modbus RTU mode.
+2:Added compatibility with the M3X IoT box.
